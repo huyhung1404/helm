@@ -33,7 +33,8 @@ internal sealed class ShellController(
     {
         tray.RefreshMenu();
         search.Invalidate();
-        _ = services.GetRequiredService<Core.Services.IUpdateService>().CheckAsync(CancellationToken.None);
+        // Update checks start 30 s later in the background so launch is never slowed down.
+        services.GetRequiredService<Updates.VelopackUpdateService>().StartBackgroundChecks();
 
         // An installed build owns the startup task: make sure it targets the stable launcher, not an old folder.
         var location = services.GetRequiredService<Core.Services.IAppLocation>();

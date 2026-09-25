@@ -43,7 +43,8 @@ internal static class HelmHost
         builder.Services.AddSingleton<TrayService>();
         builder.Services.AddSingleton<SearchService>();
         builder.Services.AddSingleton<ShellController>();
-        builder.Services.AddSingleton<Core.Services.IUpdateService, StubUpdateService>();
+        builder.Services.AddSingleton<Updates.VelopackUpdateService>();
+        builder.Services.AddSingleton<Core.Services.IUpdateService>(sp => sp.GetRequiredService<Updates.VelopackUpdateService>());
 
         // Shell views and view models
         builder.Services.AddSingleton<MainWindowViewModel>();

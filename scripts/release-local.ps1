@@ -50,7 +50,7 @@ try {
         '--packVersion', $Version,
         '--packDir', $publishDir,
         '--mainExe', 'Helm.exe',
-        '--icon', 'src/Helm.App/Assets/helm.ico',
+        '--icon', 'src/Helm.App/Assets/helm-tile.ico',
         '--runtime', 'win-x64',
         '--channel', $Channel,
         '--releaseNotes', $notes,
