@@ -310,6 +310,8 @@ internal sealed class VelopackUpdateService : IUpdateService, IDisposable
     {
         HttpRequestException http when http.StatusCode is System.Net.HttpStatusCode.Forbidden =>
             "GitHub refused the request (rate limit?). Add a GitHub token in Updates or try again later.",
+        HttpRequestException http when http.StatusCode is System.Net.HttpStatusCode.NotFound or System.Net.HttpStatusCode.Unauthorized =>
+            "GitHub could not find the releases. If the repository is private, add a GitHub token (read access to contents) in Updates.",
         HttpRequestException => $"Could not reach the update server: {ex.Message}",
         TaskCanceledException => "The update server did not respond in time.",
         _ => ex.Message,
