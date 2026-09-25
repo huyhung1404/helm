@@ -37,6 +37,9 @@ public interface IWindowService
     /// <summary>Moves/resizes so the <em>visible</em> frame matches <paramref name="frame"/>. Restores maximized/minimized windows first.</summary>
     bool MoveWindow(nint hwnd, PixelRect frame, bool activate = false);
 
+    /// <summary>Raw SetWindowPos in physical pixels (no border compensation) — for Helm's own borderless windows.</summary>
+    bool SetWindowBounds(nint hwnd, PixelRect bounds);
+
     bool SetTopmost(nint hwnd, bool topmost);
 
     bool IsTopmost(nint hwnd);
@@ -199,6 +202,10 @@ public sealed class WindowService(ILogger<WindowService> logger) : IWindowServic
         if (activate) PInvoke.SetForegroundWindow(h);
         return true;
     }
+
+    public bool SetWindowBounds(nint hwnd, PixelRect bounds) =>
+        PInvoke.SetWindowPos(hwnd.ToHwnd(), default, bounds.Left, bounds.Top, bounds.Width, bounds.Height,
+            SET_WINDOW_POS_FLAGS.SWP_NOZORDER | SET_WINDOW_POS_FLAGS.SWP_NOACTIVATE | SET_WINDOW_POS_FLAGS.SWP_NOOWNERZORDER);
 
     public bool SetTopmost(nint hwnd, bool topmost)
     {
