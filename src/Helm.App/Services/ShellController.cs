@@ -33,6 +33,7 @@ internal sealed class ShellController(
     {
         tray.RefreshMenu();
         search.Invalidate();
+        _ = services.GetRequiredService<Core.Services.IUpdateService>().CheckAsync(CancellationToken.None);
     }
 
     public void ShowMainWindow()
