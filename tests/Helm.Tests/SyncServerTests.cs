@@ -211,21 +211,172 @@ public sealed class SyncServerTests : IDisposable
         Assert.Equal(new Note("Keep me", "moves with the device"), b.Notes.Get(id));
     }
 
+    [ServerFact]
+    public async Task Removing_a_device_with_key_rotation_locks_it_out_of_new_data_and_others_unlock_once()
+    {
+        const string pass = "a long enough rotation passphrase";
+        var a = NewSetupDevice("a");
+        await a.Setup.RedeemInviteAsync(await CreateInviteAsync(), "Rotate", "PC", ServerUrl);
+        var oldRecovery = await a.Setup.CreatePassphraseAsync(pass);
+        var before = a.Notes.Add(new Note("Before", "epoch 1"));
+        await a.Engine.SyncNowAsync();
+
+        var (_, tokenB) = await a.Setup.AddDeviceAsync("Laptop");
+        var (lost, tokenLost) = await a.Setup.AddDeviceAsync("Lost phone");
+        var b = NewSetupDevice("b");
+        await b.Setup.ConnectWithTokenAsync(tokenB, ServerUrl);
+        await b.Setup.UnlockWithPassphraseAsync(pass);
+        var thief = NewSetupDevice("thief");
+        await thief.Setup.ConnectWithTokenAsync(tokenLost, ServerUrl);
+        await thief.Setup.UnlockWithPassphraseAsync(pass);
+
+        await Assert.ThrowsAsync<SyncKeyException>(() => a.Setup.RemoveDeviceAndRotateKeyAsync(lost.Id, "wrong passphrase!!"));
+        var newRecovery = await a.Setup.RemoveDeviceAndRotateKeyAsync(lost.Id, pass);
+        Assert.NotEqual(oldRecovery, newRecovery);
+        var after = a.Notes.Add(new Note("After", "epoch 2"));
+        Assert.Equal(SyncRunOutcome.Completed, (await a.Engine.SyncNowAsync()).Outcome);
+
+        // The removed device is refused by the server.
+        Assert.Equal(SyncRunOutcome.Unauthorized, (await thief.Engine.SyncNowAsync()).Outcome);
+
+        // B notices the new key, keeps its data, and continues after one unlock.
+        Assert.Equal(SyncRunOutcome.KeyChanged, (await b.Engine.SyncNowAsync()).Outcome);
+        Assert.Equal(SyncSetupStage.NeedsKey, b.Setup.Stage);
+        Assert.True(b.Setup.KeyChangedElsewhere);
+        Assert.Equal(new Note("Before", "epoch 1"), b.Notes.Get(before));
+        await b.Setup.UnlockWithPassphraseAsync(pass);
+        Assert.Equal(SyncSetupStage.Ready, b.Setup.Stage);
+        Assert.Equal(new Note("After", "epoch 2"), b.Notes.Get(after));
+
+        // The old recovery key no longer opens the account; the new one does, and sees both epochs.
+        var (_, tokenD) = await a.Setup.AddDeviceAsync("New PC");
+        var d = NewSetupDevice("d");
+        await d.Setup.ConnectWithTokenAsync(tokenD, ServerUrl);
+        await Assert.ThrowsAsync<SyncKeyException>(() => d.Setup.UnlockWithRecoveryKeyAsync(oldRecovery));
+        await d.Setup.UnlockWithRecoveryKeyAsync(newRecovery);
+        Assert.Equal(new Note("Before", "epoch 1"), d.Notes.Get(before));
+        Assert.Equal(new Note("After", "epoch 2"), d.Notes.Get(after));
+    }
+
+    [ServerFact]
+    public async Task A_helm_0_5_keyring_is_upgraded_to_argon2id_when_a_device_unlocks()
+    {
+        var a = NewSetupDevice("a");
+        await a.Setup.RedeemInviteAsync(await CreateInviteAsync(), "Legacy", "PC", ServerUrl);
+        var legacy = LegacyKeyring("the old 0.5 passphrase");
+        using (var api = new SyncApiClient())
+            Assert.True(await api.PutKeyringAsync(a.Credentials.Load()!, 0, legacy));
+        Assert.True(await a.Setup.NeedsProtectionUpgradeAsync());
+
+        await a.Setup.UnlockWithPassphraseAsync("the old 0.5 passphrase");
+
+        Assert.Equal(SyncSetupStage.Ready, a.Setup.Stage);
+        Assert.False(await a.Setup.NeedsProtectionUpgradeAsync());
+    }
+
+    [ServerFact]
+    public async Task A_backup_can_be_restored_and_devices_receive_it()
+    {
+        var a = NewSetupDevice("a");
+        var account = await a.Setup.RedeemInviteAsync(await CreateInviteAsync(), "Backup", "PC", ServerUrl);
+        await a.Setup.CreatePassphraseAsync("a long enough backup passphrase");
+        var id = a.Notes.Add(new Note("Plan", "good version"));
+        await a.Engine.SyncNowAsync();
+
+        var run = await AdminAsync(HttpMethod.Post, "admin/backups/run", new { });
+        Assert.True(run.GetProperty("accounts").GetInt32() >= 1);
+        var list = await AdminGetAsync($"admin/backups?prefix=accounts/{account.AccountId}/");
+        var key = list.GetProperty("backups")[0].GetProperty("key").GetString()!;
+
+        a.Notes.Upsert(id, new Note("Plan", "accidentally overwritten"));
+        await a.Engine.SyncNowAsync();
+
+        using (var wrongConfirm = new HttpRequestMessage(HttpMethod.Post, new Uri(ServerUrl!, $"admin/accounts/{account.AccountId}/restore"))
+               { Content = JsonContent.Create(new { key, confirm = "nope" }) })
+        {
+            wrongConfirm.Headers.Authorization = new AuthenticationHeaderValue("Bearer", AdminToken);
+            Assert.Equal(System.Net.HttpStatusCode.BadRequest, (await _admin.SendAsync(wrongConfirm)).StatusCode);
+        }
+        var restored = await AdminAsync(HttpMethod.Post, $"admin/accounts/{account.AccountId}/restore", new { key, confirm = account.AccountId });
+        Assert.Equal(1, restored.GetProperty("restored").GetInt32());
+
+        Assert.Equal(SyncRunOutcome.Completed, (await a.Engine.SyncNowAsync()).Outcome);
+        Assert.Equal(new Note("Plan", "good version"), a.Notes.Get(id));
+    }
+
+    [ServerFact]
+    public async Task Invite_redemption_is_rate_limited_per_client()
+    {
+        using var client = new HttpClient();
+        // Its own client address, so this test does not use up the limit of the other tests (all from 127.0.0.1).
+        // Cloudflare overwrites CF-Connecting-IP with the real address in production, so clients cannot pick it.
+        var ip = $"198.51.100.{Random.Shared.Next(1, 255)}";
+        var statuses = new List<int>();
+        for (var i = 0; i < 25; i++)
+        {
+            var body = SyncToken.InvitePrefix + new string('Q', 40);
+            using var request = new HttpRequestMessage(HttpMethod.Post, new Uri(ServerUrl!, "v1/redeem"))
+            {
+                Content = JsonContent.Create(new { invite = body + SyncToken.Checksum(body), accountName = "x", deviceName = "y" }),
+            };
+            request.Headers.Add("CF-Connecting-IP", ip);
+            statuses.Add((int)(await client.SendAsync(request)).StatusCode);
+        }
+        Assert.Contains(429, statuses);
+        Assert.All(statuses, s => Assert.True(s is 400 or 429, $"unexpected {s}"));
+    }
+
     private sealed record Note(string Title, string Body);
 
     private sealed record Device(SyncEngine Engine, SyncedCollection<Note> Notes);
 
-    private sealed record SetupDevice(SyncSetupService Setup, SyncEngine Engine, SyncedCollection<Note> Notes);
+    private async Task<JsonElement> AdminGetAsync(string path)
+    {
+        using var request = new HttpRequestMessage(HttpMethod.Get, new Uri(ServerUrl!, path));
+        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", AdminToken);
+        using var response = await _admin.SendAsync(request);
+        var text = await response.Content.ReadAsStringAsync();
+        Assert.True(response.IsSuccessStatusCode, $"GET {path}: {(int)response.StatusCode} {text}");
+        return JsonDocument.Parse(text).RootElement.Clone();
+    }
+
+    /// <summary>A keyring as Helm 0.5.0 wrote it (v1, PBKDF2; 100k iterations to keep the test fast).</summary>
+    private static string LegacyKeyring(string passphrase)
+    {
+        var master = System.Security.Cryptography.RandomNumberGenerator.GetBytes(32);
+        var salt = System.Security.Cryptography.RandomNumberGenerator.GetBytes(16);
+        var kek = System.Security.Cryptography.Rfc2898DeriveBytes.Pbkdf2(System.Text.Encoding.UTF8.GetBytes(passphrase), salt, 100_000,
+            System.Security.Cryptography.HashAlgorithmName.SHA256, 32);
+        var recoveryKek = System.Security.Cryptography.RandomNumberGenerator.GetBytes(32);
+        return JsonSerializer.Serialize(new
+        {
+            v = 1,
+            kdf = new { alg = "pbkdf2-sha256", iter = 100_000, salt },
+            pass = WrapKey(kek, master, "helm-sync/v1/keyring|passphrase"),
+            rec = WrapKey(recoveryKek, master, "helm-sync/v1/keyring|recovery"),
+        });
+    }
+
+    private static byte[] WrapKey(byte[] kek, byte[] master, string aad)
+    {
+        var output = new byte[60];
+        System.Security.Cryptography.RandomNumberGenerator.Fill(output.AsSpan(0, 12));
+        using var gcm = new System.Security.Cryptography.AesGcm(kek, 16);
+        gcm.Encrypt(output.AsSpan(0, 12), master, output.AsSpan(28), output.AsSpan(12, 16), System.Text.Encoding.UTF8.GetBytes(aad));
+        return output;
+    }
+
+    private sealed record SetupDevice(SyncSetupService Setup, SyncEngine Engine, SyncedCollection<Note> Notes, ISyncCredentialStore Credentials);
 
     private SetupDevice NewSetupDevice(string name)
     {
-        var db = Own(new SyncDatabase(Path.Combine(_dir, name + ".db")));
+        var db = Own(new SyncDatabase(Path.Combine(_dir, name + ".db"), TestKeys.Local));
         var credentials = new InMemorySyncCredentialStore();
         var keys = new InMemoryMasterKeyStore();
         var api = Own(new SyncApiClient());
         var engine = Own(new SyncEngine(db, new HttpSyncTransport(credentials, api), keys, [], debounce: TimeSpan.FromHours(1)));
         var notes = Own(new SyncedCollection<Note>(engine, new() { Name = "notes", ConflictPolicy = SyncConflictPolicy.KeepBoth }));
-        return new SetupDevice(new SyncSetupService(credentials, keys, api, engine), engine, notes);
+        return new SetupDevice(new SyncSetupService(credentials, keys, api, engine), engine, notes, credentials);
     }
 
     private async Task<string> CreateInviteAsync(int quotaMb = 10)
@@ -236,7 +387,7 @@ public sealed class SyncServerTests : IDisposable
 
     private Device NewDevice(string name, string token)
     {
-        var db = Own(new SyncDatabase(Path.Combine(_dir, name + ".db")));
+        var db = Own(new SyncDatabase(Path.Combine(_dir, name + ".db"), TestKeys.Local));
         var transport = new HttpSyncTransport(new InMemorySyncCredentialStore(new SyncCredentials(ServerUrl!, token)), Own(new SyncApiClient()));
         var engine = Own(new SyncEngine(db, transport, new InMemoryMasterKeyStore(_key), [], debounce: TimeSpan.FromHours(1)));
         var notes = Own(new SyncedCollection<Note>(engine, new()

@@ -10,6 +10,11 @@ export interface Env {
   ACCOUNT: DurableObjectNamespace<AccountObject>;
   REGISTRY: DurableObjectNamespace<RegistryObject>;
   ADMIN_TOKEN?: string;
+  /** Nightly backups (R2 bucket helm-sync-backups). Without it, backups are off. */
+  BACKUPS?: R2Bucket;
+  /** Per-IP limits for invite redemption and failed admin sign-ins (Workers rate limiting). */
+  REDEEM_LIMITER?: RateLimit;
+  ADMIN_LIMITER?: RateLimit;
 }
 
 export interface Result {
@@ -18,7 +23,8 @@ export interface Result {
 }
 
 export type ApiOp = "me" | "push" | "pull" | "getKeyring" | "putKeyring" | "listTokens" | "createToken" | "revokeToken";
-export type AccountAdminOp = "init" | "info" | "setQuota" | "createToken" | "listTokens" | "revokeToken" | "revokeAll";
+export type AccountAdminOp =
+  | "init" | "info" | "setQuota" | "createToken" | "listTokens" | "revokeToken" | "revokeAll" | "export" | "import";
 
 export interface ApiInput {
   body?: unknown;
@@ -103,6 +109,10 @@ export class AccountObject extends DurableObject<Env> {
             : { status: 404, body: { error: "token_not_found" } };
         case "revokeAll":
           return { status: 200, body: { revoked: this.store.revokeAllTokens() } };
+        case "export":
+          return { status: 200, body: this.store.exportSnapshot() };
+        case "import":
+          return { status: 200, body: this.store.importSnapshot(arg) };
       }
     });
   }
@@ -151,6 +161,10 @@ export class RegistryObject extends DurableObject<Env> {
       this.store.revokeInvite(id)
         ? { status: 200, body: { revoked: true } }
         : { status: 404, body: { error: "invite_not_found" } });
+  }
+
+  async exportSnapshot(): Promise<Result> {
+    return run(async () => ({ status: 200, body: this.store.exportSnapshot() }));
   }
 
   async redeem(codeHash: string, accountId: string, name: string): Promise<Result> {

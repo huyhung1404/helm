@@ -19,6 +19,7 @@ helm_pat_<accountId>_<secret><checksum>
 
 Cloudflare builds and deploys the Worker from this GitHub repository (Workers Builds), and the admin page at `/admin` replaces `admin.ps1`. The code must be on the branch that Cloudflare watches (`main` by default).
 
+0. **Create the backup bucket first.** R2 Object Storage → **Create bucket** → name `helm-sync-backups`. Without this bucket, `wrangler deploy` fails because `wrangler.toml` binds it for the nightly backups.
 1. **Connect the repository.** Workers & Pages → **Create application** → **Import a repository** → connect GitHub. When GitHub asks which repositories to allow, select only `helm`.
 2. **Configure the project**, then select **Save and Deploy**:
    - Project name: `helm-sync`. It must match `name` in `wrangler.toml`, or the build fails.
@@ -42,6 +43,7 @@ Cloudflare builds and deploys the Worker from this GitHub repository (Workers Bu
 7. **Hand out access** at `https://sync.huyhung1404.com/admin`. Sign in with `ADMIN_TOKEN`, then:
    - **Invites:** set a note, how long the code stays valid, and the storage quota, then select **Create invite**. Send the code privately. The person enters it in Helm → General → Sync (**I have an invite code**), which creates their own account. They add their other devices themselves under **Devices**.
    - **Accounts:** see storage use, change quotas, revoke tokens, or disable an account.
+   - **Backups:** run a backup now, and restore one per account. You confirm a restore by typing the account id.
 
    An invite code is shown only once, so copy it when it appears.
 
@@ -119,4 +121,6 @@ Without these variables the `SyncServerTests` are skipped. CI runs them against 
 - Malformed tokens, including ones with a bad checksum, are rejected before any Durable Object is touched. A well-formed token for an id nobody created reaches an empty object that writes nothing.
 - Account ids come from the admin API only, so no one can create an account.
 - The `/admin` page is static (strict CSP, no inline script, no third-party origins, framing denied). It renders data only as text, and every action goes through the admin API with the token you type.
+- Invite redemption (20 per minute) and failed admin sign-ins (10 per minute) are rate limited per client IP by Workers rate limiting.
+- Nightly backups hold ciphertext only, with no tokens; 30 days are kept in R2. Deleting the Worker or its Durable Objects in the dashboard deletes the live data, but not the backups in R2.
 - For extra protection, add a Cloudflare WAF rate-limiting rule for `sync.huyhung1404.com/admin/*` and `/v1/*`.

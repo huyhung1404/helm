@@ -45,6 +45,17 @@ export interface RecordJson {
   payload: string;
 }
 
+export interface AccountSnapshot {
+  format: "helm-sync-account";
+  version: 1;
+  exportedAt: number;
+  accountId: string;
+  name: string;
+  seq: number;
+  keyring: { version: number; data: string } | null;
+  records: RecordJson[];
+}
+
 export interface PushOutcomeJson {
   collection: string;
   id: string;
@@ -281,6 +292,70 @@ export class AccountStore {
         version, data,
       );
       return { accepted: true, version };
+    });
+  }
+
+  // ---------------------------------------------------------------- backup
+
+  /** Everything needed to rebuild the account's data: ciphertext only, as stored. Tokens are not included. */
+  exportSnapshot(): AccountSnapshot {
+    this.requireInitialized();
+    const info = this.info();
+    return {
+      format: "helm-sync-account",
+      version: 1,
+      exportedAt: this.now(),
+      accountId: info.accountId,
+      name: info.name,
+      seq: Number(this.meta("seq")),
+      keyring: this.getKeyring(),
+      records: this.sql.all<RecordRow>("SELECT collection, id, version, seq, deleted, payload FROM records ORDER BY seq").map(toRecordJson),
+    };
+  }
+
+  /**
+   * Restores a snapshot on top of the current data. Every restored record gets a new version above both the
+   * current and the backed-up one, and a new seq, so devices pull it and replace their copy; records created after
+   * the backup are kept. Tokens and a current keyring are kept (they may be newer than the backup).
+   */
+  importSnapshot(snapshot: unknown): { restored: number } {
+    this.requireInitialized();
+    if (!isObject(snapshot) || snapshot.format !== "helm-sync-account" || snapshot.version !== 1 || !Array.isArray(snapshot.records)) {
+      throw new HttpError(400, "invalid_snapshot");
+    }
+    if (snapshot.accountId !== this.meta("account_id")) throw new HttpError(400, "snapshot_of_another_account");
+    const records = snapshot.records.map((raw, index) => {
+      if (!isObject(raw) || typeof raw.collection !== "string" || !COLLECTION_PATTERN.test(raw.collection) || !isValidId(raw.id)
+        || !Number.isSafeInteger(raw.version) || typeof raw.deleted !== "boolean" || typeof raw.payload !== "string") {
+        throw new HttpError(400, "invalid_snapshot", `records[${index}]`);
+      }
+      const payload = fromBase64(raw.payload);
+      if (!payload || payload.length === 0) throw new HttpError(400, "invalid_snapshot", `records[${index}].payload`);
+      return { collection: raw.collection, id: raw.id as string, version: raw.version as number, deleted: raw.deleted, payload };
+    });
+
+    return this.sql.transaction(() => {
+      let seq = Number(this.meta("seq"));
+      for (const record of records) {
+        const current = this.sql.all<{ version: number }>(
+          "SELECT version FROM records WHERE collection = ? AND id = ?", record.collection, record.id)[0];
+        const version = Math.max(current?.version ?? 0, record.version) + 1;
+        seq += 1;
+        this.sql.run(
+          `INSERT INTO records (collection, id, version, seq, deleted, payload) VALUES (?, ?, ?, ?, ?, ?)
+           ON CONFLICT (collection, id) DO UPDATE SET
+             version = excluded.version, seq = excluded.seq, deleted = excluded.deleted, payload = excluded.payload`,
+          record.collection, record.id, version, seq, record.deleted ? 1 : 0, record.payload,
+        );
+      }
+      this.setMeta("seq", String(seq));
+      const keyring = isObject(snapshot.keyring) ? snapshot.keyring : null;
+      if (!this.getKeyring() && keyring && Number.isSafeInteger(keyring.version) && typeof keyring.data === "string") {
+        this.sql.run("INSERT INTO keyring (id, version, data) VALUES (1, ?, ?)", keyring.version as number, keyring.data);
+      }
+      const used = this.sql.all<{ n: number | null }>("SELECT SUM(LENGTH(payload)) AS n FROM records")[0].n ?? 0;
+      this.setMeta("used_bytes", String(used));
+      return { restored: records.length };
     });
   }
 

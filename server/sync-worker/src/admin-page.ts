@@ -84,6 +84,12 @@ const HTML = `<!doctype html>
       </div>
     </div>
 
+    <div class="card">
+      <h2>Backups</h2>
+      <p class="muted">Every night at 02:00 (Vietnam time) each account is saved to R2 (encrypted data only) and kept 30 days.</p>
+      <div class="row"><button id="run-backup">Back up now</button><span id="backup-result" class="muted"></span></div>
+    </div>
+
     <div id="account" class="card" hidden>
       <h2 id="account-title"></h2>
       <p class="muted" id="account-id"></p>
@@ -105,6 +111,9 @@ const HTML = `<!doctype html>
         <p><strong>Copy this token now. It is shown only once.</strong> Paste it into Helm → General → Sync on that device.</p>
         <div class="row"><code id="new-token-value"></code><button id="copy-token">Copy</button></div>
       </div>
+      <h3>Backups of this account</h3>
+      <table><thead><tr><th>Backup</th><th>Size</th><th>Taken</th><th></th></tr></thead>
+        <tbody id="account-backups"></tbody></table>
       <div class="danger">
         <button id="disable-account" class="danger-button">Disable account (revoke every token)</button>
       </div>
@@ -277,6 +286,39 @@ const JS = `"use strict";
     });
   }
 
+  async function runBackupNow() {
+    await run($("run-backup"), async () => {
+      const r = await api("POST", "/admin/backups/run");
+      $("backup-result").textContent = "Backed up " + r.accounts + " account(s), " + (r.bytes / 1024).toFixed(1) + " KB"
+        + (r.failed.length ? " — FAILED: " + r.failed.join(", ") : "");
+      if (selected) await loadAccountBackups();
+    });
+  }
+
+  async function loadAccountBackups() {
+    const body = $("account-backups");
+    let backups = [];
+    try { backups = (await api("GET", "/admin/backups?prefix=" + encodeURIComponent("accounts/" + selected + "/"))).backups; }
+    catch (e) { if (e.status === 503) { body.replaceChildren(el("tr", {}, el("td", { colspan: "4", className: "muted" }, "Backups are off (no R2 bucket bound)."))); return; } throw e; }
+    body.replaceChildren(...backups.map((b) => el("tr", {},
+      el("td", {}, el("code", {}, b.key.split("/").pop())),
+      el("td", {}, (b.size / 1024).toFixed(1) + " KB"),
+      el("td", {}, new Date(b.uploaded).toLocaleString()),
+      el("td", {}, el("button", { className: "link revoke", onclick: (e) => restore(b, e.currentTarget) }, "Restore")))));
+    if (backups.length === 0) body.append(el("tr", {}, el("td", { colspan: "4", className: "muted" }, "No backups yet.")));
+  }
+
+  async function restore(backup, button) {
+    const typed = prompt("Restore " + backup.key.split("/").pop() + "? " + "Every device of this account will receive the backed-up version of each record "
+      + "(records created later are kept). Type the account id to confirm:");
+    if (typed === null) return;
+    await run(button, async () => {
+      const r = await api("POST", "/admin/accounts/" + encodeURIComponent(selected) + "/restore", { key: backup.key, confirm: typed.trim() });
+      status("Restored " + r.restored + " record(s).");
+      await loadUsage();
+    });
+  }
+
   async function loadUsage() {
     const info = await api("GET", "/admin/accounts/" + encodeURIComponent(selected));
     $("account-usage").textContent = "Storage: " + mb(info.usedBytes) + " of " + mb(info.quotaBytes) + " MB";
@@ -298,7 +340,7 @@ const JS = `"use strict";
     $("account-id").textContent = "Account " + account.accountId;
     $("new-token").hidden = true; $("new-token-value").textContent = "";
     $("account").hidden = false;
-    await Promise.all([loadTokens(), loadAccounts(), loadUsage()]);
+    await Promise.all([loadTokens(), loadAccounts(), loadUsage(), loadAccountBackups()]);
   }
 
   async function loadTokens() {
@@ -380,6 +422,7 @@ const JS = `"use strict";
     $("copy-invite").addEventListener("click", () => copyText("new-invite-value"));
     $("create-invite").addEventListener("click", createInvite);
     $("save-quota").addEventListener("click", saveQuota);
+    $("run-backup").addEventListener("click", runBackupNow);
     $("disable-account").addEventListener("click", disableAccount);
     $("admin-token").focus();
   });

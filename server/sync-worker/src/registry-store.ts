@@ -105,6 +105,11 @@ export class RegistryStore {
     return this.list().find((a) => a.accountId === accountId) ?? null;
   }
 
+  /** Accounts and invites (code hashes only), for the nightly backup. */
+  exportSnapshot(): { format: "helm-sync-registry"; version: 1; exportedAt: number; accounts: AccountSummary[]; invites: InviteSummary[] } {
+    return { format: "helm-sync-registry", version: 1, exportedAt: this.now(), accounts: this.list(), invites: this.listInvites() };
+  }
+
   markDisabled(accountId: string): void {
     this.sql.run("UPDATE accounts SET disabled_at = ? WHERE account_id = ? AND disabled_at IS NULL", this.now(), accountId);
   }

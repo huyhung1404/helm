@@ -27,11 +27,17 @@
 //     GET    /admin/accounts/:id/tokens
 //     DELETE /admin/accounts/:id/tokens/:tokenId
 //     POST   /admin/accounts/:id/disable             revoke every token of the account
+//     POST   /admin/accounts/:id/restore             { key, confirm: <accountId> } restore from an R2 backup
+//     GET    /admin/backups?prefix=                  list backups
+//     POST   /admin/backups/run                      back up now (also runs nightly from the cron trigger)
+//
+//   Rate limits (per client IP): /v1/redeem, and failed admin sign-ins.
 //
 // See docs/sync-protocol.md. There is no open sign-up: an account needs an invite or the admin.
 
 import { LIMITS } from "./account-store.ts";
 import { adminAsset } from "./admin-page.ts";
+import { listBackups, readBackup, runBackup } from "./backup.ts";
 import type { ApiInput, ApiOp, Env, Result } from "./objects.ts";
 import { INVITE_LIMITS } from "./registry-store.ts";
 import { HttpError } from "./sql.ts";
@@ -61,6 +67,13 @@ export default {
       console.error(error);
       return respond({ status: 500, body: { error: "internal" } });
     }
+  },
+
+  async scheduled(controller: ScheduledController, env: Env, ctx: ExecutionContext): Promise<void> {
+    if (!env.BACKUPS) return;
+    ctx.waitUntil(runBackup(env, new Date(controller.scheduledTime)).then((run) => {
+      console.log(`backup ${run.date}: ${run.accounts} accounts, ${run.bytes} bytes, ${run.deleted} pruned, failed: ${run.failed.join(",") || "none"}`);
+    }));
   },
 } satisfies ExportedHandler<Env>;
 
@@ -93,6 +106,7 @@ async function handleApi(request: Request, env: Env, url: URL): Promise<Result> 
 
 async function handleRedeem(request: Request, env: Env): Promise<Result> {
   if (request.method !== "POST") throw new HttpError(405, "method_not_allowed");
+  await enforceLimit(env.REDEEM_LIMITER, request, "Too many invite attempts. Wait a minute.");
   const body = await readJson(request);
   if (!isRecord(body)) throw new HttpError(400, "invalid_body");
   const invite = typeof body.invite === "string" ? body.invite.trim() : "";
@@ -119,7 +133,11 @@ async function handleAdmin(request: Request, env: Env, url: URL): Promise<Result
   const expected = env.ADMIN_TOKEN;
   if (!expected || expected.length < 32) throw new HttpError(503, "admin_disabled", "Set the ADMIN_TOKEN secret (32+ chars).");
   const provided = bearer(request);
-  if (!provided || !(await secretsEqual(provided, expected))) throw new HttpError(401, "invalid_admin_token");
+  if (!provided || !(await secretsEqual(provided, expected))) {
+    // Only failures count, so a correct token is never throttled.
+    await enforceLimit(env.ADMIN_LIMITER, request, "Too many failed sign-ins. Wait a minute.");
+    throw new HttpError(401, "invalid_admin_token");
+  }
 
   const registry = registryObject(env);
   const parts = url.pathname.split("/").filter(Boolean); // ["admin", "accounts" | "invites", id?, ...]
@@ -145,6 +163,16 @@ async function handleAdmin(request: Request, env: Env, url: URL): Promise<Result
       return created.status === 201 ? { status: 201, body: { code, ...(created.body as object) } } : created;
     }
     if (parts.length === 3 && method === "DELETE") return rpc(registry.revokeInvite(parts[2]));
+    throw new HttpError(404, "not_found");
+  }
+
+  if (parts[1] === "backups") {
+    if (parts.length === 2 && method === "GET") {
+      const prefix = url.searchParams.get("prefix") ?? "";
+      if (!/^[A-Za-z0-9/_.-]{0,100}$/.test(prefix)) throw new HttpError(400, "invalid_prefix");
+      return { status: 200, body: { backups: await listBackups(env, prefix) } };
+    }
+    if (parts.length === 3 && parts[2] === "run" && method === "POST") return { status: 200, body: await runBackup(env, new Date()) };
     throw new HttpError(404, "not_found");
   }
 
@@ -181,12 +209,27 @@ async function handleAdmin(request: Request, env: Env, url: URL): Promise<Result
     throw new HttpError(405, "method_not_allowed");
   }
   if (parts.length === 5 && parts[3] === "tokens" && method === "DELETE") return rpc(target.admin("revokeToken", parts[4]));
+  if (parts.length === 4 && parts[3] === "restore" && method === "POST") {
+    const input = await readJson(request);
+    const key = isRecord(input) && typeof input.key === "string" ? input.key : "";
+    // Typing the account id is the confirmation: a restore rewrites what every device of the account sees.
+    if (!isRecord(input) || input.confirm !== accountId) throw new HttpError(400, "confirmation_required", "Pass confirm: <accountId>.");
+    if (!key.startsWith(`accounts/${accountId}/`)) throw new HttpError(400, "backup_of_another_account");
+    return rpc(target.admin("import", await readBackup(env, key)));
+  }
   if (parts.length === 4 && parts[3] === "disable" && method === "POST") {
     const revoked = await rpc(target.admin("revokeAll", null));
     await rpc(registry.markDisabled(accountId));
     return revoked;
   }
   throw new HttpError(404, "not_found");
+}
+
+async function enforceLimit(limiter: RateLimit | undefined, request: Request, message: string): Promise<void> {
+  if (!limiter) return;
+  const key = request.headers.get("CF-Connecting-IP") ?? "unknown";
+  const { success } = await limiter.limit({ key });
+  if (!success) throw new HttpError(429, "rate_limited", message);
 }
 
 /** RPC stubs type an `unknown` body as unserializable; every object method returns a plain Result. */

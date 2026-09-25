@@ -191,3 +191,30 @@ test("a device can create tokens for other devices, never with more scopes than 
   // Without explicit scopes a grantor passes on exactly its own.
   assert.deepEqual((await store.createToken({ name: "copy" }, reader)).info.scopes, ["sync:read", "tokens:manage"]);
 });
+
+test("a snapshot restores records as new versions, keeps newer records and the current keyring", async () => {
+  const { store, accountId } = setup();
+  store.push({ items: [item("a", 0, "a1"), item("b", 0, "b1")] });
+  store.putKeyring({ baseVersion: 0, data: "keyring-at-backup" });
+  const snapshot = store.exportSnapshot();
+  assert.equal(snapshot.records.length, 2);
+  assert.ok(!JSON.stringify(snapshot).includes("tokens"), "tokens are not part of a backup");
+
+  // After the backup: "a" is edited twice, "c" is created, the keyring changes.
+  store.push({ items: [item("a", 1, "a2")] });
+  store.push({ items: [item("a", 2, "a3"), item("c", 0, "c1")] });
+  store.putKeyring({ baseVersion: 1, data: "keyring-now" });
+  const before = store.pull("0", null).nextSeq;
+
+  assert.deepEqual(store.importSnapshot(snapshot), { restored: 2 });
+
+  const after = store.pull(String(before), null).records;
+  assert.deepEqual(after.map((r) => [r.id, r.version, r.payload]), [["a", 4, payload("a1")], ["b", 2, payload("b1")]]);
+  assert.equal(store.pull("0", null).records.find((r) => r.id === "c")?.payload, payload("c1"));
+  assert.deepEqual(store.getKeyring(), { version: 2, data: "keyring-now" });
+  assert.equal(store.info().usedBytes, ["a1", "b1", "c1"].reduce((n, t) => n + new TextEncoder().encode(t).length, 0));
+
+  rejects(() => store.importSnapshot({ ...snapshot, accountId: newAccountId() }), 400, "snapshot_of_another_account");
+  rejects(() => store.importSnapshot({ format: "nope" }), 400, "invalid_snapshot");
+  void accountId;
+});

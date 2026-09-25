@@ -19,5 +19,24 @@ class_name = "RegistryObject"
 tag = "v1"
 new_sqlite_classes = ["AccountObject", "RegistryObject"]
 
+# Nightly backups (02:00 in Vietnam). Create the bucket first: R2 -> Create bucket -> helm-sync-backups.
+[[r2_buckets]]
+binding = "BACKUPS"
+bucket_name = "helm-sync-backups"
+
+[triggers]
+crons = ["0 19 * * *"]
+
+# Per-IP limits: invite redemption, and failed admin sign-ins (period must be 10 or 60 seconds).
+[[ratelimits]]
+name = "REDEEM_LIMITER"
+namespace_id = "1101"
+simple = { limit = 20, period = 60 }
+
+[[ratelimits]]
+name = "ADMIN_LIMITER"
+namespace_id = "1102"
+simple = { limit = 10, period = 60 }
+
 [observability]
 enabled = true
