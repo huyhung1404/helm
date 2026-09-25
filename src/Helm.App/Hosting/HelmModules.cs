@@ -1,4 +1,5 @@
 using Helm.Modules.AlwaysOnTop;
+using Helm.Modules.Zones;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Helm.App.Hosting;
@@ -8,6 +9,7 @@ internal static class HelmModules
 {
     public static void Register(IServiceCollection services)
     {
+        services.AddZonesModule();
         services.AddAlwaysOnTopModule();
     }
 }
