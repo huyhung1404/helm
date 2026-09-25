@@ -15,4 +15,10 @@ public sealed class HelmPaths
     public string SettingsFile(string id) => Path.Combine(SettingsDirectory, $"{id}.json");
 
     public string ModuleDataDirectory(string moduleId) => Path.Combine(SettingsDirectory, moduleId);
+
+    /// <summary>Local replica of synced data (see docs/sync-protocol.md).</summary>
+    public string SyncDirectory => Path.Combine(Root, "sync");
+    public string SyncDatabaseFile => Path.Combine(SyncDirectory, "helm-sync.db");
+    public string SyncKeyFile => Path.Combine(SyncDirectory, "master.key");
+    public string SyncCredentialsFile => Path.Combine(SyncDirectory, "credentials.bin");
 }

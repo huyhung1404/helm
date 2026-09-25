@@ -4,6 +4,7 @@ using Helm.Core.Hotkeys;
 using Helm.Core.Modules;
 using Helm.Core.Services;
 using Helm.Core.Settings;
+using Helm.Core.Sync;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Logging;
@@ -26,6 +27,7 @@ public static class HelmCoreServices
         services.AddSingleton<IProcessLauncher, ProcessLauncher>();
         services.TryAddSingleton<IAppLocation, ProcessAppLocation>();
         services.AddSingleton<IModuleHost, ModuleRegistry>();
+        services.AddHelmSync(paths);
         return services;
     }
 
