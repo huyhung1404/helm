@@ -93,7 +93,7 @@ public class ModulePageBase : Page
         Title = module.DisplayName;
         _heroIcon.Symbol = module.Icon;
         _description.Text = module.Description;
-        _enableCard.Icon = new SymbolIcon(module.Icon);
+        _enableCard.Icon = new SymbolIcon { Symbol = module.Icon };
         _enableHeader.Title = $"Enable {module.DisplayName}";
 
         _enableToggle.SetBinding(ToggleSwitch.IsCheckedProperty, new Binding(nameof(IHelmModule.IsEnabled)) { Source = module, Mode = BindingMode.TwoWay });
