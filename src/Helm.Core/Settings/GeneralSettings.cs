@@ -1,3 +1,5 @@
+using System.Text.Json.Serialization;
+
 namespace Helm.Core.Settings;
 
 public enum AppTheme
@@ -35,6 +37,7 @@ public sealed class GeneralSettings : IVersionedSettings
     public WindowPlacementSettings Window { get; set; } = new();
 
     /// <summary>moduleId → enabled. Missing ids fall back to the module's default (enabled).</summary>
+    [JsonObjectCreationHandling(JsonObjectCreationHandling.Populate)]
     public Dictionary<string, bool> EnabledModules { get; set; } = new(StringComparer.OrdinalIgnoreCase);
 
     public DateTimeOffset? LastUpdateCheck { get; set; }
