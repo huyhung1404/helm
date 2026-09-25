@@ -24,12 +24,13 @@ internal sealed class TrayService(IModuleHost modules, ILogger<TrayService> logg
             _icon = new TaskbarIcon
             {
                 ToolTipText = "Helm",
-                IconSource = new BitmapImage(new Uri("pack://application:,,,/Assets/helm.ico")),
+                IconSource = TrayIconSource(),
                 NoLeftClickDelay = true,
                 LeftClickCommand = new RelayCommand(open),
                 ContextMenu = BuildMenu(),
             };
             _icon.ForceCreate(enablesEfficiencyMode: false);
+            Microsoft.Win32.SystemEvents.UserPreferenceChanged += OnUserPreferenceChanged;
         }
         catch (Exception ex)
         {
@@ -43,14 +44,47 @@ internal sealed class TrayService(IModuleHost modules, ILogger<TrayService> logg
         if (_icon is not null) _icon.ContextMenu = BuildMenu();
     }
 
+    private (string Version, Action Apply)? _updateReady;
+
+    /// <summary>Adds (or removes, with null) a "Restart to update" item to the tray menu.</summary>
+    public void SetUpdateReady(string? version, Action? apply)
+    {
+        _updateReady = version is not null && apply is not null ? (version, apply) : null;
+        System.Windows.Application.Current?.Dispatcher.BeginInvoke(RefreshMenu);
+    }
+
     public void ShowNotification(string title, string message)
     {
         try { _icon?.ShowNotification(title, message); }
         catch (Exception ex) { logger.LogWarning(ex, "Tray notification failed"); }
     }
 
+    /// <summary>Monochrome white mark on a dark taskbar, the gradient mark on a light one.</summary>
+    private static BitmapImage TrayIconSource()
+    {
+        var light = false;
+        try
+        {
+            using var key = Microsoft.Win32.Registry.CurrentUser.OpenSubKey(@"Software\Microsoft\Windows\CurrentVersion\Themes\Personalize");
+            light = key?.GetValue("SystemUsesLightTheme") is int v && v == 1;
+        }
+        catch (System.Security.SecurityException) { }
+        var file = light ? "helm.ico" : "helm-tray-white.ico";
+        return new BitmapImage(new Uri($"pack://application:,,,/Assets/{file}"));
+    }
+
+    private void OnUserPreferenceChanged(object? sender, Microsoft.Win32.UserPreferenceChangedEventArgs e)
+    {
+        if (e.Category != Microsoft.Win32.UserPreferenceCategory.General || _icon is null) return;
+        _icon.Dispatcher.BeginInvoke(() =>
+        {
+            if (_icon is not null) _icon.IconSource = TrayIconSource();
+        });
+    }
+
     public void Dispose()
     {
+        Microsoft.Win32.SystemEvents.UserPreferenceChanged -= OnUserPreferenceChanged;
         _icon?.Dispose();
         _icon = null;
     }
@@ -74,6 +108,12 @@ internal sealed class TrayService(IModuleHost modules, ILogger<TrayService> logg
         }
 
         menu.Items.Add(new Separator());
+        if (_updateReady is { } ready)
+        {
+            var update = new MenuItem { Header = $"Restart to update (v{ready.Version})" };
+            update.Click += (_, _) => ready.Apply();
+            menu.Items.Add(update);
+        }
         var exit = new MenuItem { Header = "Exit" };
         exit.Click += (_, _) => _exit?.Invoke();
         menu.Items.Add(exit);

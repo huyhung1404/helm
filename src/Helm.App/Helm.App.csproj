@@ -24,6 +24,7 @@
   <ItemGroup>
     <Resource Include="Assets\helm.ico" />
     <Resource Include="Assets\helm.png" />
+    <Resource Include="Assets\helm-tray-white.ico" />
   </ItemGroup>
 
   <ItemGroup>
