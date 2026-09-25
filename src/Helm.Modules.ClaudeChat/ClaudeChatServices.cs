@@ -9,5 +9,6 @@ public static class ClaudeChatServices
     public static IServiceCollection AddClaudeChatModule(this IServiceCollection services) =>
         services
             .AddHelmModule<ClaudeChatModule, ClaudeChatPage, ClaudeChatViewModel>()
-            .AddSingleton<ClaudeChatView>(); // one view for the whole app: it moves between the page and a floating window
+            .AddSingleton<ClaudeChatView>() // one view for the whole app: it moves between the page and a floating window
+            .AddSingleton<ChatPresenter>();
 }

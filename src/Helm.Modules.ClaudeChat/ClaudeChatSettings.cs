@@ -1,3 +1,4 @@
+using Helm.Core.Hotkeys;
 using Helm.Core.Settings;
 using Helm.Modules.ClaudeChat.Cli;
 
@@ -10,7 +11,18 @@ public sealed class ClaudeChatSettings : IVersionedSettings
 {
     public static int CurrentVersion => 1;
 
+    /// <summary>Win+Alt+C: Win+Shift+C is PowerToys' Color Picker.</summary>
+    public static readonly HotkeyGesture DefaultHotkey = new(HotkeyModifiers.Win | HotkeyModifiers.Alt, 'C');
+
     public int Version { get; set; }
+
+    /// <summary>Shows the chat: its floating window when torn out, otherwise the Claude Chat page.</summary>
+    public HotkeyGesture Hotkey { get; set; } = DefaultHotkey;
+
+    /// <summary>Size of the floating chat window, in device-independent pixels (kept across tear-outs).</summary>
+    public double FloatingWidth { get; set; } = 560;
+
+    public double FloatingHeight { get; set; } = 760;
 
     /// <summary>The folder Claude Code works in (its project). Empty means the user's profile folder.</summary>
     public string WorkingDirectory { get; set; } = string.Empty;

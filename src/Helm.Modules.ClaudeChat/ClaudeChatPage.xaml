@@ -6,6 +6,7 @@
     xmlns:core="clr-namespace:Helm.Core.Ui;assembly=Helm.Core"
     xmlns:chat="clr-namespace:Helm.Modules.ClaudeChat.Chat"
     BodyFillsHeight="True"
+    ExtraMessage="{Binding Module.HotkeyError}"
     Module="{Binding Module}">
 
     <Grid Margin="0,12,0,0">
@@ -57,6 +58,12 @@
                 </Border>
                 <Border Style="{DynamicResource HelmExpanderRow}">
                     <core:RowLayout>
+                        <core:CardHeader Title="Shortcut to show the chat" Description="Opens this page, or the chat window when you have dragged it out." />
+                        <core:HotkeyPicker HorizontalAlignment="Right" DefaultGesture="{Binding DefaultHotkey}" Gesture="{Binding Hotkey}" />
+                    </core:RowLayout>
+                </Border>
+                <Border Style="{DynamicResource HelmExpanderRow}">
+                    <core:RowLayout>
                         <core:CardHeader Title="Claude Code location" Description="{Binding CliDescription}" />
                         <ui:TextBox
                             MinWidth="260"
@@ -70,5 +77,33 @@
 
         <!-- The chat host. The view is created once and moved between hosts (page / floating window). -->
         <ContentControl x:Name="ChatHost" Grid.Row="1" />
+
+        <!-- Shown while the chat lives in its own window -->
+        <Border
+            Grid.Row="1"
+            Style="{DynamicResource HelmSurface}"
+            Visibility="{Binding Presenter.IsDetached, Converter={StaticResource BoolToVisibility}}">
+            <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
+                <ui:SymbolIcon
+                    HorizontalAlignment="Center"
+                    FontSize="40"
+                    Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                    Symbol="WindowNew24" />
+                <TextBlock
+                    Margin="0,8,0,16"
+                    HorizontalAlignment="Center"
+                    Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                    Text="The chat is open in its own window. The conversation keeps running there." />
+                <StackPanel HorizontalAlignment="Center" Orientation="Horizontal">
+                    <ui:Button
+                        Margin="0,0,8,0"
+                        Appearance="Primary"
+                        Command="{Binding Presenter.DockCommand}"
+                        Content="Bring it back here"
+                        Icon="{ui:SymbolIcon PanelLeft24}" />
+                    <ui:Button Command="{Binding Presenter.ShowWindowCommand}" Content="Show the window" Icon="{ui:SymbolIcon WindowNew24}" />
+                </StackPanel>
+            </StackPanel>
+        </Border>
     </Grid>
 </core:ModulePageBase>

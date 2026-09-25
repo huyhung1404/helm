@@ -15,18 +15,26 @@ namespace Helm.Modules.ClaudeChat;
 public sealed class ClaudeChatModule : HelmModuleBase
 {
     public const string ModuleId = "claude-chat";
+    private const string HotkeyId = "show";
 
     private readonly IChildProcessLauncher _launcher;
+    private readonly IHotkeyManager _hotkeys;
     private readonly ILogger<ClaudeChatModule> _logger;
     private readonly SemaphoreSlim _gate = new(1, 1);
     private ClaudeSession? _session;
+    private HotkeyRegistration? _registration;
 
-    public ClaudeChatModule(ISettingsStoreFactory settings, IChildProcessLauncher launcher, ILogger<ClaudeChatModule> logger)
+    public ClaudeChatModule(ISettingsStoreFactory settings, IChildProcessLauncher launcher, IHotkeyManager hotkeys, ILogger<ClaudeChatModule> logger)
     {
         Settings = settings.Get<ClaudeChatSettings>(ModuleId);
         _launcher = launcher;
+        _hotkeys = hotkeys;
         _logger = logger;
-        Settings.Changed += (_, _) => RefreshCli();
+        Settings.Changed += (_, _) =>
+        {
+            RefreshCli();
+            _ = ApplyHotkeyAsync();
+        };
     }
 
     public override string Id => ModuleId;
@@ -35,7 +43,8 @@ public sealed class ClaudeChatModule : HelmModuleBase
     public override ModuleGroup Group => ModuleGroup.Advanced;
     public override SymbolRegular Icon => SymbolRegular.ChatSparkle24;
     public override Type SettingsPageType => typeof(ClaudeChatPage);
-    public override IReadOnlyList<HotkeyDefinition> Hotkeys => [];
+    public override IReadOnlyList<HotkeyDefinition> Hotkeys =>
+        [new HotkeyDefinition(ModuleId, HotkeyId, "Show Claude Chat", Settings.Current.Hotkey)];
 
     public ISettingsStore<ClaudeChatSettings> Settings { get; }
 
@@ -45,13 +54,29 @@ public sealed class ClaudeChatModule : HelmModuleBase
     /// <summary>Raised (on any thread) when <see cref="Cli"/> changes.</summary>
     public event EventHandler? CliChanged;
 
-    public override Task EnableAsync(CancellationToken ct)
+    /// <summary>Raised on the hotkey thread when the user asks to see the chat.</summary>
+    public event EventHandler? RevealRequested;
+
+    public override async Task EnableAsync(CancellationToken ct)
     {
         RefreshCli();
-        return Task.CompletedTask;
+        await ApplyHotkeyAsync().ConfigureAwait(false);
     }
 
-    public override async Task DisableAsync() => await EndSessionAsync().ConfigureAwait(false);
+    public override async Task DisableAsync()
+    {
+        await _gate.WaitAsync().ConfigureAwait(false);
+        try
+        {
+            _registration?.Dispose();
+            _registration = null;
+        }
+        finally
+        {
+            _gate.Release();
+        }
+        await EndSessionAsync().ConfigureAwait(false);
+    }
 
     /// <summary>Ends any current session and starts a new one with the current settings.</summary>
     /// <exception cref="ClaudeSessionException">Claude Code is missing or did not start.</exception>
@@ -110,6 +135,43 @@ public sealed class ClaudeChatModule : HelmModuleBase
             _logger.LogWarning(ex, "Ending the Claude Code session failed");
         }
     }
+
+    /// <summary>(Re)registers the hotkey while enabled; the gesture may have changed in the settings.</summary>
+    private async Task ApplyHotkeyAsync()
+    {
+        await _gate.WaitAsync().ConfigureAwait(false);
+        try
+        {
+            var definition = Hotkeys[0];
+            if (!IsEnabled)
+            {
+                NotifyHotkeysChanged();
+                return;
+            }
+            if (_registration is { IsRegistered: true } current && current.Definition.Gesture == definition.Gesture) return;
+            _registration?.Dispose();
+            _registration = await _hotkeys.TryRegisterAsync(definition, () => RevealRequested?.Invoke(this, EventArgs.Empty)).ConfigureAwait(false);
+            HotkeyError = _registration.IsRegistered ? null : $"The shortcut {definition.Gesture} is not active: {_registration.Error}";
+            NotifyHotkeysChanged();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Registering the Claude Chat shortcut failed");
+        }
+        finally
+        {
+            _gate.Release();
+        }
+    }
+
+    /// <summary>Why the shortcut is not active, or null. Shown on the page next to the other status.</summary>
+    public string? HotkeyError
+    {
+        get => _hotkeyError;
+        private set => SetProperty(ref _hotkeyError, value);
+    }
+
+    private string? _hotkeyError;
 
     private void RefreshCli()
     {

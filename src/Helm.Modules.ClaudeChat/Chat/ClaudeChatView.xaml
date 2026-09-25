@@ -223,12 +223,34 @@
             <!-- Header: status + actions. Also the drag handle for tearing the chat out (later). -->
             <Border
                 x:Name="Header"
-                Padding="16,10"
+                Padding="10,10,16,10"
+                Background="Transparent"
                 BorderBrush="{DynamicResource CardStrokeColorDefaultBrush}"
-                BorderThickness="0,0,0,1">
+                BorderThickness="0,0,0,1"
+                Cursor="SizeAll"
+                MouseLeftButtonDown="OnHeaderMouseDown"
+                MouseLeftButtonUp="OnHeaderMouseUp"
+                MouseMove="OnHeaderMouseMove"
+                ToolTip="Drag to open the chat in its own window">
                 <DockPanel>
+                    <ui:SymbolIcon
+                        Margin="0,0,8,0"
+                        DockPanel.Dock="Left"
+                        FontSize="16"
+                        Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                        Symbol="ReOrderDotsVertical24" />
+                    <ui:Button
+                        x:Name="PopOutButton"
+                        AutomationProperties.Name="Open in a window"
+                        Appearance="Transparent"
+                        Click="OnPopOutClick"
+                        Cursor="Arrow"
+                        DockPanel.Dock="Right"
+                        Icon="{ui:SymbolIcon WindowNew24}"
+                        ToolTip="Open the chat in its own window (or drag this bar out)" />
                     <ui:Button
                         AutomationProperties.Name="New chat"
+                        Cursor="Arrow"
                         Appearance="Transparent"
                         Command="{Binding NewChatCommand}"
                         DockPanel.Dock="Right"

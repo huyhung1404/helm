@@ -10,6 +10,6 @@ public partial class ClaudeChatPage : ModulePageBase
         DataContext = viewModel;
         InitializeComponent();
         chatView.DataContext = viewModel.Chat;
-        ChatHost.Content = chatView;
+        viewModel.Presenter.AttachPageHost(ChatHost);
     }
 }

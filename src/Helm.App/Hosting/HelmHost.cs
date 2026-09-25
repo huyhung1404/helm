@@ -3,6 +3,7 @@ using Helm.App.ViewModels;
 using Helm.App.Views;
 using Helm.App.Views.Pages;
 using Helm.Core;
+using Helm.Core.Services;
 using Helm.Core.Settings;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
@@ -39,6 +40,7 @@ internal static class HelmHost
         builder.Services.AddSingleton<ThemeService>();
         builder.Services.AddSingleton<ShellNavigator>();
         builder.Services.AddSingleton<IShellNavigator>(sp => sp.GetRequiredService<ShellNavigator>());
+        builder.Services.AddSingleton<IShellNavigation>(sp => sp.GetRequiredService<ShellNavigator>());
         builder.Services.AddSingleton<IDialogService, DialogService>();
         builder.Services.AddSingleton<TrayService>();
         builder.Services.AddSingleton<SearchService>();

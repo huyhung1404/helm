@@ -1,6 +1,7 @@
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Threading;
+using Helm.Core.Services;
 using Wpf.Ui.Controls;
 
 namespace Helm.App.Services;
@@ -15,7 +16,7 @@ internal interface IShellNavigator
 }
 
 /// <summary>Bridges view models to the MainWindow's NavigationView without them touching the view.</summary>
-internal sealed class ShellNavigator(SearchService search) : IShellNavigator
+internal sealed class ShellNavigator(SearchService search) : IShellNavigator, IShellNavigation
 {
     private NavigationView? _navigation;
     private Action? _showWindow;
@@ -25,6 +26,8 @@ internal sealed class ShellNavigator(SearchService search) : IShellNavigator
         _navigation = navigation;
         _showWindow = showWindow;
     }
+
+    public void ShowPage(Type pageType) => Navigate(pageType);
 
     public void NavigateToCard(Type pageType, string cardTitle) => Navigate(pageType, search.FindCard(pageType, cardTitle));
 

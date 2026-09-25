@@ -1,5 +1,6 @@
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using Helm.Core.Hotkeys;
 using Helm.Core.Services;
 using Helm.Core.Settings;
 using Helm.Modules.ClaudeChat.Chat;
@@ -20,10 +21,12 @@ public sealed partial class ClaudeChatViewModel : ObservableObject
     [ObservableProperty] private string _model = string.Empty;
     [ObservableProperty] private PermissionModeOption _permissionMode;
     [ObservableProperty] private string _cliPath = string.Empty;
+    [ObservableProperty] private HotkeyGesture _hotkey;
 
-    public ClaudeChatViewModel(ClaudeChatModule module, IUiDispatcher ui, ILogger<ClaudeChatViewModel> logger)
+    public ClaudeChatViewModel(ClaudeChatModule module, ChatPresenter presenter, IUiDispatcher ui, ILogger<ClaudeChatViewModel> logger)
     {
         Module = module;
+        Presenter = presenter;
         _store = module.Settings;
         _ui = ui;
         Chat = new ChatViewModel(module, ui, logger);
@@ -36,6 +39,11 @@ public sealed partial class ClaudeChatViewModel : ObservableObject
 
     /// <summary>The conversation; lives as long as Helm, wherever its view is shown.</summary>
     public ChatViewModel Chat { get; }
+
+    /// <summary>Where the chat is shown (page or floating window).</summary>
+    public ChatPresenter Presenter { get; }
+
+    public HotkeyGesture DefaultHotkey => ClaudeChatSettings.DefaultHotkey;
 
     public IReadOnlyList<string> Models { get; } = ["", "opus", "sonnet", "haiku"];
 
@@ -65,6 +73,7 @@ public sealed partial class ClaudeChatViewModel : ObservableObject
     partial void OnModelChanged(string value) => Save(s => s.Model = value.Trim());
     partial void OnPermissionModeChanged(PermissionModeOption value) => Save(s => s.PermissionMode = value.Mode);
     partial void OnCliPathChanged(string value) => Save(s => s.CliPath = value.Trim());
+    partial void OnHotkeyChanged(HotkeyGesture value) => Save(s => s.Hotkey = value);
 
     private void Load(ClaudeChatSettings s)
     {
@@ -73,6 +82,7 @@ public sealed partial class ClaudeChatViewModel : ObservableObject
         Model = s.Model;
         PermissionMode = PermissionModes.FirstOrDefault(o => o.Mode == s.PermissionMode) ?? PermissionModes[0];
         CliPath = s.CliPath;
+        Hotkey = s.Hotkey;
         _loading = false;
     }
 
