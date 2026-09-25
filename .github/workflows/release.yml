@@ -1,0 +1,96 @@
+name: Release
+
+# Push a tag like v0.2.0 (stable) or v0.3.0-preview.1 (preview, GitHub pre-release) — see scripts/bump-version.ps1.
+on:
+  push:
+    tags: ['v*.*.*']
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Existing tag to (re)build and publish, e.g. v0.2.0'
+        required: true
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-${{ github.event.inputs.tag || github.ref_name }}
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: windows-latest
+    env:
+      TAG: ${{ github.event.inputs.tag || github.ref_name }}
+      REPO_URL: https://github.com/${{ github.repository }}
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.tag || github.ref }}
+          fetch-depth: 0
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: |
+            8.0.x
+            10.0.x
+
+      - name: Resolve version and channel from the tag
+        id: meta
+        shell: pwsh
+        run: |
+          $tag = $env:TAG
+          if ($tag -notmatch '^v(\d+\.\d+\.\d+)(-[0-9A-Za-z.-]+)?$') { throw "Tag '$tag' is not vX.Y.Z or vX.Y.Z-suffix" }
+          $version = $tag.Substring(1)
+          $pre = $version.Contains('-')
+          $channel = if ($pre) { 'preview' } else { 'stable' }
+          "version=$version" >> $env:GITHUB_OUTPUT
+          "channel=$channel" >> $env:GITHUB_OUTPUT
+          "prerelease=$($pre.ToString().ToLowerInvariant())" >> $env:GITHUB_OUTPUT
+          Write-Host "Helm $version on channel $channel (pre-release: $pre)"
+
+      - name: Restore
+        run: dotnet restore
+
+      - name: Test
+        run: dotnet test --configuration Release --no-restore
+
+      - name: Restore tools (vpk)
+        run: dotnet tool restore
+
+      - name: Download previous release (for delta packages)
+        shell: pwsh
+        continue-on-error: true
+        run: |
+          $vpkArgs = @('vpk', 'download', 'github', '--repoUrl', $env:REPO_URL, '--token', $env:GH_TOKEN,
+                    '--channel', '${{ steps.meta.outputs.channel }}', '--outputDir', 'releases')
+          if ('${{ steps.meta.outputs.prerelease }}' -eq 'true') { $vpkArgs += '--pre' }
+          dotnet @vpkArgs
+
+      - name: Publish and pack (framework-dependent; add -SelfContained to bundle the runtime)
+        shell: pwsh
+        run: ./scripts/release-local.ps1 -Version '${{ steps.meta.outputs.version }}' -Channel '${{ steps.meta.outputs.channel }}' -OutputDir releases
+
+      - name: Upload release to GitHub
+        shell: pwsh
+        run: |
+          $vpkArgs = @('vpk', 'upload', 'github',
+                    '--repoUrl', $env:REPO_URL, '--token', $env:GH_TOKEN,
+                    '--outputDir', 'releases', '--channel', '${{ steps.meta.outputs.channel }}',
+                    '--tag', $env:TAG, '--releaseName', 'Helm ${{ steps.meta.outputs.version }}',
+                    '--publish', '--merge')
+          if ('${{ steps.meta.outputs.prerelease }}' -eq 'true') { $vpkArgs += '--pre' }
+          dotnet @vpkArgs
+          if ($LASTEXITCODE -ne 0) { throw 'vpk upload failed' }
+
+      - name: Friendly installer name, release notes from CHANGELOG
+        shell: pwsh
+        run: |
+          $channel = '${{ steps.meta.outputs.channel }}'
+          Copy-Item "releases/HelmApp-$channel-Setup.exe" 'releases/Helm-win-Setup.exe'
+          gh release upload $env:TAG 'releases/Helm-win-Setup.exe' --clobber
+          $notes = 'artifacts/notes-${{ steps.meta.outputs.version }}.md'
+          $flags = @('--notes-file', $notes)
+          if ('${{ steps.meta.outputs.prerelease }}' -eq 'true') { $flags += '--prerelease' } else { $flags += '--latest' }
+          gh release edit $env:TAG @flags
