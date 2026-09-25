@@ -7,7 +7,6 @@ using System.Windows.Media.Effects;
 using System.Windows.Threading;
 using Helm.Core.Settings;
 using Wpf.Ui.Controls;
-using Button = Wpf.Ui.Controls.Button;
 
 namespace Helm.App.Views;
 
@@ -37,7 +36,7 @@ internal sealed class NavPaneController
     private readonly FrameworkElement? _hoverTrigger;
     private readonly DispatcherTimer _poll = new() { Interval = TimeSpan.FromMilliseconds(60) };
     private readonly Thumb _resizer;
-    private readonly Button _pinButton;
+    private readonly NavigationViewItem _pinItem;
     private readonly SymbolIcon _pinIcon = new();
     private Grid? _paneGrid;
     private FrameworkElement? _content;
@@ -60,16 +59,10 @@ internal sealed class NavPaneController
         _nav.OpenPaneLength = _width;
         _nav.IsPaneToggleVisible = false;
 
-        _pinButton = new Button
-        {
-            Appearance = ControlAppearance.Transparent,
-            Padding = new Thickness(6),
-            HorizontalAlignment = HorizontalAlignment.Right,
-            Margin = new Thickness(0, 0, 4, 4),
-            Content = _pinIcon,
-        };
-        _pinButton.Click += (_, _) => SetPinned(!_pinned);
-        _nav.PaneHeader = _pinButton;
+        // A footer item (last) instead of a pane header: no extra row above the menu, and it stays visible (as an
+        // icon) in the collapsed strip.
+        _pinItem = new NavigationViewItem { Icon = _pinIcon };
+        _pinItem.Click += (_, _) => SetPinned(!_pinned);
 
         _resizer = new Thumb
         {
@@ -90,6 +83,7 @@ internal sealed class NavPaneController
         _nav.Loaded += (_, _) =>
         {
             AttachTemplate();
+            if (!_nav.FooterMenuItems.Contains(_pinItem)) _nav.FooterMenuItems.Add(_pinItem);
             SetExpanded(_pinned);
             _poll.Start();
         };
@@ -185,8 +179,8 @@ internal sealed class NavPaneController
     private void UpdateLayout()
     {
         _pinIcon.Symbol = _pinned ? SymbolRegular.PinOff24 : SymbolRegular.Pin24;
-        _pinButton.ToolTip = _pinned ? "Unpin the menu (auto-hide)" : "Pin the menu open";
-        _pinButton.Visibility = _expanded ? Visibility.Visible : Visibility.Collapsed;
+        _pinItem.Content = _pinned ? "Unpin menu" : "Pin menu";
+        _pinItem.ToolTip = _pinned ? "Let the menu hide automatically" : "Keep the menu open";
         if (_paneGrid is null || _content is null) return;
 
         var expandedWidth = _width + PaneGridHorizontalMargin;

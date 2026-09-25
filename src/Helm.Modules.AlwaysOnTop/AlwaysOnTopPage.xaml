@@ -27,29 +27,29 @@
         <TextBlock Text="Appearance" Style="{DynamicResource HelmSectionHeader}" />
         <ui:CardExpander Margin="0,0,0,4" IsExpanded="True" Icon="{ui:SymbolIcon BorderOutside24}">
             <ui:CardExpander.Header>
-                <Grid>
+                <core:RowLayout>
                     <core:CardHeader Title="Show a border around the pinned window" Description="Draws a click-through frame so pinned windows stand out." />
                     <ui:ToggleSwitch HorizontalAlignment="Right" Margin="0,0,16,0" IsChecked="{Binding ShowBorder}" />
-                </Grid>
+                </core:RowLayout>
             </ui:CardExpander.Header>
             <StackPanel IsEnabled="{Binding ShowBorder}">
                 <Border Style="{DynamicResource HelmExpanderRow}" BorderThickness="0">
-                    <Grid>
+                    <core:RowLayout>
                         <core:CardHeader Title="Use the Windows accent color" />
                         <ui:ToggleSwitch HorizontalAlignment="Right" IsChecked="{Binding UseAccentColor}" />
-                    </Grid>
+                    </core:RowLayout>
                 </Border>
                 <Border Style="{DynamicResource HelmExpanderRow}" IsEnabled="{Binding UseAccentColor, Converter={StaticResource InverseBool}}">
-                    <Grid>
+                    <core:RowLayout>
                         <core:CardHeader Title="Border color" />
                         <core:ColorSwatchPicker HorizontalAlignment="Right" Color="{Binding BorderColor}" />
-                    </Grid>
+                    </core:RowLayout>
                 </Border>
                 <Border Style="{DynamicResource HelmExpanderRow}">
-                    <Grid>
+                    <core:RowLayout>
                         <core:CardHeader Title="Border thickness (px)" />
                         <ComboBox HorizontalAlignment="Right" MinWidth="120" ItemsSource="{Binding Thicknesses}" SelectedItem="{Binding BorderThickness}" />
-                    </Grid>
+                    </core:RowLayout>
                 </Border>
             </StackPanel>
         </ui:CardExpander>

@@ -21,14 +21,14 @@
                 <ui:ImageIcon Source="pack://application:,,,/Assets/helm.png" Width="32" Height="32" RenderOptions.BitmapScalingMode="HighQuality" />
             </ui:CardExpander.Icon>
             <ui:CardExpander.Header>
-                <Grid>
+                <core:RowLayout>
                     <core:CardHeader Title="Updates" Description="{Binding CurrentVersion}" />
                     <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,0,16,0">
                         <ui:ProgressRing IsIndeterminate="True" Width="20" Height="20" Margin="0,0,12,0"
                                          Visibility="{Binding IsChecking, Converter={StaticResource BoolToVisibility}}" />
                         <ui:Button Content="Check for updates" Command="{Binding CheckCommand}" IsEnabled="{Binding IsInstalled}" />
                     </StackPanel>
-                </Grid>
+                </core:RowLayout>
             </ui:CardExpander.Header>
             <StackPanel>
                 <!-- Status -->
@@ -40,7 +40,7 @@
                         <ui:InfoBar Title="Update problem" Message="{Binding ErrorMessage}" Severity="Warning" IsClosable="False"
                                     IsOpen="{Binding HasError}" Margin="0,0,0,8"
                                     Visibility="{Binding HasError, Converter={StaticResource BoolToVisibility}}" />
-                        <Grid>
+                        <core:RowLayout>
                             <StackPanel>
                                 <TextBlock Text="{Binding StatusText}" FontWeight="SemiBold" />
                                 <TextBlock Text="{Binding LastCheckedText}" Style="{DynamicResource HelmSecondaryText}" />
@@ -51,7 +51,7 @@
                                 <ui:Button Content="Restart to update" Appearance="Primary" Icon="{ui:SymbolIcon ArrowSync24}" Command="{Binding RestartToUpdateCommand}"
                                            Visibility="{Binding IsDownloaded, Converter={StaticResource BoolToVisibility}}" />
                             </StackPanel>
-                        </Grid>
+                        </core:RowLayout>
                         <ProgressBar Margin="0,8,0,0" Height="4" Minimum="0" Maximum="100" Value="{Binding Progress, Mode=OneWay}"
                                      Visibility="{Binding IsDownloading, Converter={StaticResource BoolToVisibility}}" />
                         <Border Margin="0,12,0,0" Padding="12" CornerRadius="6" Background="{DynamicResource ControlFillColorDefaultBrush}"
@@ -67,31 +67,31 @@
                 </Border>
 
                 <Border Style="{DynamicResource HelmExpanderRow}" IsEnabled="{Binding IsInstalled}">
-                    <Grid>
+                    <core:RowLayout>
                         <core:CardHeader Title="Update channel" Description="Preview gets GitHub pre-releases earlier; Stable is recommended." />
                         <ComboBox HorizontalAlignment="Right" MinWidth="140" ItemsSource="{Binding Channels}" SelectedItem="{Binding Channel}" />
-                    </Grid>
+                    </core:RowLayout>
                 </Border>
                 <Border Style="{DynamicResource HelmExpanderRow}" IsEnabled="{Binding IsInstalled}">
-                    <Grid>
+                    <core:RowLayout>
                         <core:CardHeader Title="Automatically download updates" Description="Downloads in the background; nothing is installed until you restart to update." />
                         <ui:ToggleSwitch HorizontalAlignment="Right" IsChecked="{Binding AutoDownload}" />
-                    </Grid>
+                    </core:RowLayout>
                 </Border>
                 <Border Style="{DynamicResource HelmExpanderRow}" IsEnabled="{Binding IsInstalled}">
-                    <Grid>
+                    <core:RowLayout>
                         <core:CardHeader Title="Install updates automatically when Helm restarts" Description="A downloaded update is applied the next time Helm starts." />
                         <ui:ToggleSwitch HorizontalAlignment="Right" IsChecked="{Binding AutoInstallOnRestart}" />
-                    </Grid>
+                    </core:RowLayout>
                 </Border>
                 <Border Style="{DynamicResource HelmExpanderRow}">
-                    <Grid>
+                    <core:RowLayout>
                         <core:CardHeader Title="Delete my settings when Helm is uninstalled" Description="Off: settings and logs in %LOCALAPPDATA%\Helm survive an uninstall/reinstall." />
                         <ui:ToggleSwitch HorizontalAlignment="Right" IsChecked="{Binding PurgeDataOnUninstall}" />
-                    </Grid>
+                    </core:RowLayout>
                 </Border>
                 <Border Style="{DynamicResource HelmExpanderRow}">
-                    <Grid>
+                    <core:RowLayout>
                         <StackPanel>
                             <TextBlock Text="Release history" />
                             <TextBlock Style="{DynamicResource HelmSecondaryText}" Visibility="{Binding HasSourceOverride, Converter={StaticResource BoolToVisibility}}">
@@ -99,7 +99,7 @@
                             </TextBlock>
                         </StackPanel>
                         <ui:HyperlinkButton HorizontalAlignment="Right" Content="Open GitHub releases" Command="{Binding OpenReleasesCommand}" />
-                    </Grid>
+                    </core:RowLayout>
                 </Border>
             </StackPanel>
         </ui:CardExpander>

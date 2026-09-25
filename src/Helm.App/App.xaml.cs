@@ -63,8 +63,9 @@ public partial class App : Application
                 AppInfo.Version, Services.GetRequiredService<Core.Services.IProcessLauncher>().IsElevated);
 
             var shell = Services.GetRequiredService<ShellController>();
-            var startHidden = _args.Contains("--startup", StringComparer.OrdinalIgnoreCase)
-                || Services.GetRequiredService<ISettingsStoreFactory>().Get<GeneralSettings>(GeneralSettings.StoreId).Current.StartMinimized;
+            // "--page X" (dev/testing) always shows the window on that page.
+            var startHidden = !_args.Contains("--page", StringComparer.OrdinalIgnoreCase) && (_args.Contains("--startup", StringComparer.OrdinalIgnoreCase)
+                || Services.GetRequiredService<ISettingsStoreFactory>().Get<GeneralSettings>(GeneralSettings.StoreId).Current.StartMinimized);
             shell.Initialize(showWindow: !startHidden);
 
             _instance.ListenForActivation(() => Dispatcher.BeginInvoke(shell.ShowMainWindow));

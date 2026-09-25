@@ -30,19 +30,19 @@
             </ui:CardExpander.Header>
             <StackPanel>
                 <Border Style="{DynamicResource HelmExpanderRow}" BorderThickness="0">
-                    <Grid>
+                    <core:RowLayout>
                         <core:CardHeader Title="Activation key" Description="Hold this key while dragging to show zones." />
                         <ComboBox HorizontalAlignment="Right" MinWidth="140" ItemsSource="{Binding ActivationKeys}" SelectedItem="{Binding ActivationKey}" />
-                    </Grid>
+                    </core:RowLayout>
                 </Border>
                 <Border Style="{DynamicResource HelmExpanderRow}">
-                    <Grid>
+                    <core:RowLayout>
                         <core:CardHeader Title="Always show zones while dragging" Description="Zones appear on every drag; holding the activation key hides them instead." />
                         <ui:ToggleSwitch HorizontalAlignment="Right" IsChecked="{Binding AlwaysShowZones}" />
-                    </Grid>
+                    </core:RowLayout>
                 </Border>
                 <Border Style="{DynamicResource HelmExpanderRow}">
-                    <Grid>
+                    <core:RowLayout>
                         <StackPanel>
                             <TextBlock Text="Select multiple zones by dragging across them" />
                             <TextBlock Style="{DynamicResource HelmSecondaryText}">
@@ -51,7 +51,7 @@
                             </TextBlock>
                         </StackPanel>
                         <ui:ToggleSwitch HorizontalAlignment="Right" IsChecked="{Binding MultiZoneSpanning}" />
-                    </Grid>
+                    </core:RowLayout>
                 </Border>
             </StackPanel>
         </ui:CardExpander>
@@ -85,43 +85,43 @@
             </ui:CardExpander.Header>
             <StackPanel>
                 <Border Style="{DynamicResource HelmExpanderRow}" BorderThickness="0">
-                    <Grid>
+                    <core:RowLayout>
                         <core:CardHeader Title="Show zone numbers" />
                         <ui:ToggleSwitch HorizontalAlignment="Right" IsChecked="{Binding ShowZoneNumbers}" />
-                    </Grid>
+                    </core:RowLayout>
                 </Border>
                 <Border Style="{DynamicResource HelmExpanderRow}">
-                    <Grid>
+                    <core:RowLayout>
                         <core:CardHeader Title="Zone opacity (%)" />
                         <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
                             <Slider Width="180" Minimum="10" Maximum="100" TickFrequency="5" IsSnapToTickEnabled="True" Value="{Binding ZoneOpacity}" VerticalAlignment="Center" />
                             <TextBlock Width="36" TextAlignment="Right" VerticalAlignment="Center" Text="{Binding ZoneOpacity, StringFormat={}{0:0}}" />
                         </StackPanel>
-                    </Grid>
+                    </core:RowLayout>
                 </Border>
                 <Border Style="{DynamicResource HelmExpanderRow}">
-                    <Grid>
+                    <core:RowLayout>
                         <core:CardHeader Title="Highlight color" />
                         <core:ColorSwatchPicker HorizontalAlignment="Right" Color="{Binding HighlightColor}" />
-                    </Grid>
+                    </core:RowLayout>
                 </Border>
                 <Border Style="{DynamicResource HelmExpanderRow}">
-                    <Grid>
+                    <core:RowLayout>
                         <core:CardHeader Title="Inactive zone color" />
                         <core:ColorSwatchPicker HorizontalAlignment="Right" Color="{Binding ZoneColor}" />
-                    </Grid>
+                    </core:RowLayout>
                 </Border>
                 <Border Style="{DynamicResource HelmExpanderRow}">
-                    <Grid>
+                    <core:RowLayout>
                         <core:CardHeader Title="Border and number color" />
                         <core:ColorSwatchPicker HorizontalAlignment="Right" Color="{Binding BorderColor}" />
-                    </Grid>
+                    </core:RowLayout>
                 </Border>
                 <Border Style="{DynamicResource HelmExpanderRow}">
-                    <Grid>
+                    <core:RowLayout>
                         <core:CardHeader Title="Columns in the layout picker" />
                         <ComboBox HorizontalAlignment="Right" MinWidth="100" ItemsSource="{Binding PickerColumnOptions}" SelectedItem="{Binding PickerColumns}" />
-                    </Grid>
+                    </core:RowLayout>
                 </Border>
             </StackPanel>
         </ui:CardExpander>

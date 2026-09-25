@@ -3,6 +3,13 @@
 All notable changes to Helm. The top section is used as the GitHub release body and as the Velopack release notes.
 Format: [Keep a Changelog](https://keepachangelog.com), versions follow [SemVer](https://semver.org).
 
+## [0.2.6] - 2026-09-25
+
+### Fixed
+- The pin button added an empty row at the top of the menu and shifted every item down; it is now the last
+  footer item ("Pin menu" / "Unpin menu") and also shows as an icon in the collapsed strip.
+- On narrow content areas, long setting descriptions ran underneath switches, combo boxes and buttons. Setting
+  rows now give the control its space first and wrap the text in what remains.
 ## [0.2.5] - 2026-09-25
 
 ### Added
