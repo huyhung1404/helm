@@ -3,6 +3,21 @@
 All notable changes to Helm. The top section is used as the GitHub release body and as the Velopack release notes.
 Format: [Keep a Changelog](https://keepachangelog.com), versions follow [SemVer](https://semver.org).
 
+## [0.6.0] - 2026-09-25
+
+### Security
+- Stronger passphrase protection: the account passphrase is now protected with Argon2id, which makes
+  guessing it far harder. Accounts set up with 0.5.0 are upgraded the next time a device unlocks, or from
+  General → Sync → "Strengthen passphrase protection".
+- New passphrases need at least 14 characters. Easily guessed ones (repeats, runs like "abcd" or "1234") are
+  refused, and the page shows how strong the passphrase is while you type it.
+- Removing a device can now change the account key: choose "Remove and change key" and enter your passphrase.
+  The removed device can never read anything written afterwards, and you get a new recovery key (the old one
+  stops working). Your other devices ask for the passphrase once.
+- Synced data stored on this PC is now encrypted as well, with a key that never leaves the device. Existing
+  data is encrypted automatically on the first start.
+- The sync server now keeps a nightly backup (30 days) and limits repeated invite and sign-in attempts.
+
 ## [0.5.0] - 2026-09-25
 
 ### Added
