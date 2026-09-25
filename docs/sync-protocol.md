@@ -121,19 +121,57 @@ The account's wrapped master key: an opaque string of at most 16 KiB, produced a
 
 ## Encryption (end-to-end)
 
-- A 32-byte random master key per account. On each device it is stored with DPAPI (CurrentUser) in `sync\master.key`.
-- The keyring (`/v1/keyring`, opaque to the server) wraps the master key twice with AES-256-GCM:
-  - with a passphrase key, `PBKDF2-HMAC-SHA256(passphrase, 16-byte salt, 600 000 iterations)`;
-  - with a recovery key, `HKDF-SHA256(32 random bytes, info "helm-sync/v1/recovery")`, shown once as `HELM-XXXX-…` in Crockford base32.
+### Keys and epochs
 
-  The first device creates the keyring. Other devices unlock it with either secret. Changing the passphrase re-wraps the same master key and keeps the recovery key.
-- The key for a collection is `HKDF-SHA256(master, salt = "", info = "helm-sync/v1/collection:<name>")`.
-- Envelope: `[0x01][nonce 12][tag 16][AES-256-GCM ciphertext]`, with AAD `"helm-sync/v1|<collection>|<id>"`. The server cannot move a payload onto another record.
+- Each account has a 32-byte random master key per **epoch**. The epoch starts at 1 and increases each time the key is rotated.
+- A device stores every epoch key it knows (a `SyncKeySet`) with DPAPI (CurrentUser) in `sync\master.key`. Helm 0.5.0 stored one bare 32-byte key there; it is read as epoch 1.
+- The key for a collection is `HKDF-SHA256(master of the epoch, salt = "", info = "helm-sync/v1/collection:<name>")`.
+
+### The keyring (`/v1/keyring`, opaque to the server)
+
+Keyring v2 is `{v: 2, epoch, kdf, pass, rec, prev}`. It holds the current master key wrapped twice with AES-256-GCM, plus every older master key:
+
+| Slot | Wraps | With |
+|---|---|---|
+| `pass` | the current master key | `Argon2id(passphrase, 16-byte salt, 128 MiB, 3 passes, 4 lanes)` |
+| `rec` | the current master key | `HKDF-SHA256(32 random bytes, info "helm-sync/v1/recovery")`, shown once as `HELM-XXXX-…` in Crockford base32 |
+| `prev` | each older epoch key | the current master key |
+
+- AAD names the slot and the epoch. Epoch 1 keeps the exact AAD strings of Helm 0.5.0.
+- **Helm 0.5.0 keyrings** (v1: PBKDF2-HMAC-SHA256, 600 000 iterations) still open. Unlocking with the passphrase re-wraps the passphrase slot with Argon2id in place (compare-and-set). The Sync page also offers "Strengthen passphrase protection".
+- **New passphrases** need at least 14 characters. The strength estimate (character pool × non-patterned length) must reach 60 bits, so repeats, runs such as `abcd` or `1234`, and short single-class passphrases are refused.
+- **Rotation** (removing a device and changing the key):
+  1. Check the passphrase, revoke the device's token, and sync.
+  2. Create a new master key for `epoch + 1`, wrapped by the same passphrase and a **new** recovery key. The old recovery key stops working. Every older key is re-wrapped under the new one.
+  3. Mark every local record for re-sealing (`reseal = 1`) and push. A re-seal loses every conflict, so it never creates a conflict copy.
+- **Other devices after a rotation:** they meet a payload from a newer epoch, stop the run without skipping it or advancing the cursor, forget their key, and ask for the passphrase once (state `KeyChanged`). The removed device keeps only old keys and has no token.
+
+### Payload envelope
+
+- **v2:** `[0x02][epoch, uint32 BE][nonce 12][tag 16][AES-256-GCM ciphertext]`, with AAD `"helm-sync/v2|<epoch>|<collection>|<id>"`.
+- **v1 (Helm 0.5.0):** `[0x01][nonce 12][tag 16][ciphertext]`, with AAD `"helm-sync/v1|<collection>|<id>"`, always epoch 1. It is still read.
+- The server cannot move a payload onto another record.
 - Plaintext: `{"s": schemaVersion, "t": updatedAtMs, "d": deviceId, "b": bodyJson | null}`. Edit times, device ids and schema versions are therefore hidden from the server as well.
-- Limits:
+- **Limits:**
   - The server still learns collection names, ids, sizes and timing.
   - It can replay an older payload of the same record.
   - It cannot read or forge payloads.
+
+### At rest on the device
+
+- `helm-sync.db` stores record bodies encrypted with a separate **device-local key**: 32 random bytes in `sync\local.key` under DPAPI, AES-256-GCM, AAD `"helm-local/v1|<collection>|<id>"`.
+- `secure_delete` is on, so overwritten and deleted content is zeroed.
+- A Helm 0.5.0 replica (plaintext, schema 1) is encrypted in place on first open, then checkpointed and vacuumed.
+- If the local key is lost, the unreadable file is moved aside (`helm-sync.db.unreadable-<time>`) and the replica is rebuilt from the server.
+- This protects a copied or backed-up database file. It does not protect against malware running as the same Windows user.
+
+## Server protections
+
+- **Rate limits** (Workers rate limiting, per client IP): `/v1/redeem` 20 per minute, and failed admin sign-ins 10 per minute. A correct admin token is never throttled.
+- **Backups:** a cron trigger runs every night at 19:00 UTC (02:00 in Vietnam).
+  - It writes `accounts/<id>/<YYYY-MM-DD>.json.gz` (ciphertext, keyring and seq; no tokens) and `registry/<date>.json.gz` to the R2 bucket `helm-sync-backups`, and keeps 30 days.
+  - `POST /admin/backups/run` runs a backup on demand.
+  - `POST /admin/accounts/:id/restore {key, confirm: <accountId>}` restores one. Every restored record gets a version above both the current one and the backed-up one, plus a new seq, so every device pulls it. Records created after the backup are kept, and so are tokens and a newer keyring.
 
 ## Not built yet
 
@@ -141,3 +179,4 @@ The account's wrapped master key: an opaque string of at most 16 KiB, produced a
 - WebSocket change notifications (Durable Object hibernation).
 - Selective sync per device, plus tombstone and blob garbage collection.
 - Changing the passphrase from the UI: `SyncSetupService.ChangePassphraseAsync` exists, but no button calls it yet.
+- An edit made on another device while a rotation re-encrypts everything may come back as a conflict copy. The KeepBoth policy guarantees that no data is lost.

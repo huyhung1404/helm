@@ -1,15 +1,18 @@
+using System.Security.Cryptography;
+using System.Text;
 using Microsoft.Data.Sqlite;
 
 namespace Helm.Core.Sync;
 
 /// <summary>One row of the local replica.</summary>
 /// <param name="Version">Server version the row reflects, or that the pending local edit was made on (0 = never synced).</param>
-/// <param name="Body">Record JSON in plaintext; null for a tombstone.</param>
+/// <param name="Body">Record JSON (decrypted); null for a tombstone.</param>
 /// <param name="Dirty">Has a local edit not yet accepted by the server.</param>
 /// <param name="LocalRev">Bumped on every write, so an edit made while a push is in flight is not marked clean.</param>
+/// <param name="Reseal">Dirty only to be re-encrypted under a new key epoch, not edited: loses every conflict.</param>
 internal sealed record SyncRow(
     string Collection, string Id, long Version, int SchemaVersion, bool Deleted, long UpdatedAtMs, string DeviceId,
-    string? Body, bool Dirty, long LocalRev);
+    string? Body, bool Dirty, long LocalRev, bool Reseal = false);
 
 internal enum LocalWriteResult
 {
@@ -18,21 +21,31 @@ internal enum LocalWriteResult
     RejectedNewerSchema,
 }
 
+/// <summary>The local key does not open this replica (e.g. the key file was lost); it must be rebuilt from the server.</summary>
+public sealed class SyncLocalKeyException(string message) : Exception(message);
+
 /// <summary>
-/// The local replica: every synced record of every collection in one SQLite file, plus the pull cursor. Plaintext
-/// lives here (it is what modules query); at-rest protection is the user's Windows profile. One connection guarded
-/// by a lock: the data is small and SQLite is fast, so this keeps the threading model trivial.
+/// The local replica: every synced record of every collection in one SQLite file, plus the pull cursor.
+/// Record bodies are encrypted at rest with a device-local key (AES-256-GCM, AAD "helm-local/v1|collection|id"),
+/// kept apart from the account key and protected by DPAPI, so a copied database file is unreadable elsewhere.
+/// One connection guarded by a lock: the data is small and SQLite is fast, so this keeps threading trivial.
 /// </summary>
 public sealed class SyncDatabase : IDisposable
 {
-    private const int SchemaVersion = 1;
+    private const int SchemaVersion = 2;
+    private const string KeyCheckMeta = "local_key_check";
     private readonly object _gate = new();
     private readonly SqliteConnection _connection;
+    private readonly byte[] _localKey;
     private SqliteTransaction? _transaction;
 
-    public SyncDatabase(string filePath)
+    /// <param name="localKey">32 random bytes from <see cref="DpapiLocalKeyStore"/>; the same key on every open.</param>
+    /// <exception cref="SyncLocalKeyException">The file was encrypted with another key.</exception>
+    public SyncDatabase(string filePath, byte[] localKey)
     {
+        if (localKey.Length != SyncKeyring.KeySize) throw new ArgumentException("The local key must be 32 bytes.", nameof(localKey));
         FilePath = filePath;
+        _localKey = localKey.ToArray();
         Directory.CreateDirectory(Path.GetDirectoryName(filePath)!);
         // No pooling: Dispose must release the file (tests delete it; "reset" must be able to as well).
         _connection = new SqliteConnection(new SqliteConnectionStringBuilder
@@ -42,9 +55,19 @@ public sealed class SyncDatabase : IDisposable
             Pooling = false,
         }.ToString());
         _connection.Open();
-        Execute("PRAGMA journal_mode = WAL; PRAGMA synchronous = NORMAL;");
-        EnsureSchema();
-        DeviceId = GetMeta("device_id") ?? CreateDeviceId();
+        try
+        {
+            // secure_delete: overwritten and deleted content is zeroed rather than left in free pages.
+            Execute("PRAGMA journal_mode = WAL; PRAGMA synchronous = NORMAL; PRAGMA secure_delete = ON;");
+            EnsureSchema();
+            VerifyLocalKey();
+            DeviceId = GetMeta("device_id") ?? CreateDeviceId();
+        }
+        catch
+        {
+            _connection.Dispose();
+            throw;
+        }
     }
 
     public string FilePath { get; }
@@ -55,6 +78,7 @@ public sealed class SyncDatabase : IDisposable
     public void Dispose()
     {
         lock (_gate) _connection.Dispose();
+        CryptographicOperations.ZeroMemory(_localKey);
     }
 
     internal void InTransaction(Action action)
@@ -142,11 +166,11 @@ public sealed class SyncDatabase : IDisposable
             }
 
             using var cmd = Command("""
-                INSERT INTO records (collection, id, version, schema_version, deleted, updated_at, device_id, body, dirty, local_rev)
-                VALUES ($c, $id, 0, $s, $del, $t, $dev, $b, 1, 1)
+                INSERT INTO records (collection, id, version, schema_version, deleted, updated_at, device_id, body, dirty, local_rev, reseal)
+                VALUES ($c, $id, 0, $s, $del, $t, $dev, $b, 1, 1, 0)
                 ON CONFLICT (collection, id) DO UPDATE SET
                     schema_version = $s, deleted = $del, updated_at = $t, device_id = $dev, body = $b,
-                    dirty = 1, local_rev = local_rev + 1
+                    dirty = 1, local_rev = local_rev + 1, reseal = 0
                 """);
             cmd.Parameters.AddWithValue("$c", collection);
             cmd.Parameters.AddWithValue("$id", id);
@@ -154,7 +178,7 @@ public sealed class SyncDatabase : IDisposable
             cmd.Parameters.AddWithValue("$del", deleted ? 1 : 0);
             cmd.Parameters.AddWithValue("$t", updatedAtMs);
             cmd.Parameters.AddWithValue("$dev", DeviceId);
-            cmd.Parameters.AddWithValue("$b", (object?)body ?? DBNull.Value);
+            cmd.Parameters.AddWithValue("$b", (object?)EncryptBody(collection, id, body) ?? DBNull.Value);
             cmd.ExecuteNonQuery();
             return LocalWriteResult.Written;
         }
@@ -166,7 +190,9 @@ public sealed class SyncDatabase : IDisposable
         lock (_gate)
         {
             using var cmd = Command("""
-                UPDATE records SET version = $v, dirty = CASE WHEN local_rev = $rev THEN 0 ELSE dirty END
+                UPDATE records SET version = $v,
+                    dirty = CASE WHEN local_rev = $rev THEN 0 ELSE dirty END,
+                    reseal = CASE WHEN local_rev = $rev THEN 0 ELSE reseal END
                 WHERE collection = $c AND id = $id
                 """);
             cmd.Parameters.AddWithValue("$v", newVersion);
@@ -196,11 +222,11 @@ public sealed class SyncDatabase : IDisposable
         lock (_gate)
         {
             using var cmd = Command("""
-                INSERT INTO records (collection, id, version, schema_version, deleted, updated_at, device_id, body, dirty, local_rev)
-                VALUES ($c, $id, $v, $s, $del, $t, $dev, $b, 0, 1)
+                INSERT INTO records (collection, id, version, schema_version, deleted, updated_at, device_id, body, dirty, local_rev, reseal)
+                VALUES ($c, $id, $v, $s, $del, $t, $dev, $b, 0, 1, 0)
                 ON CONFLICT (collection, id) DO UPDATE SET
                     version = $v, schema_version = $s, deleted = $del, updated_at = $t, device_id = $dev, body = $b,
-                    dirty = 0, local_rev = local_rev + 1
+                    dirty = 0, local_rev = local_rev + 1, reseal = 0
                 """);
             cmd.Parameters.AddWithValue("$c", collection);
             cmd.Parameters.AddWithValue("$id", id);
@@ -209,8 +235,21 @@ public sealed class SyncDatabase : IDisposable
             cmd.Parameters.AddWithValue("$del", deleted ? 1 : 0);
             cmd.Parameters.AddWithValue("$t", content.UpdatedAtMs);
             cmd.Parameters.AddWithValue("$dev", content.DeviceId);
-            cmd.Parameters.AddWithValue("$b", deleted ? DBNull.Value : (object?)content.Body ?? DBNull.Value);
+            cmd.Parameters.AddWithValue("$b", deleted ? DBNull.Value : (object?)EncryptBody(collection, id, content.Body) ?? DBNull.Value);
             cmd.ExecuteNonQuery();
+        }
+    }
+
+    /// <summary>
+    /// After a key rotation: queue every clean record (tombstones and newer-schema records too) to be uploaded again,
+    /// sealed with the new key. Pending real edits are left alone; they are sealed with the new key anyway.
+    /// </summary>
+    internal int MarkAllForReseal()
+    {
+        lock (_gate)
+        {
+            using var cmd = Command("UPDATE records SET dirty = 1, reseal = 1, local_rev = local_rev + 1 WHERE dirty = 0");
+            return cmd.ExecuteNonQuery();
         }
     }
 
@@ -265,24 +304,63 @@ public sealed class SyncDatabase : IDisposable
         InTransaction(() =>
         {
             Execute("DELETE FROM records WHERE deleted = 1");
-            Execute("UPDATE records SET version = 0, dirty = 1, local_rev = local_rev + 1");
+            Execute("UPDATE records SET version = 0, dirty = 1, reseal = 0, local_rev = local_rev + 1");
             Execute("DELETE FROM cursors");
         });
     }
 
-    private const string Columns = "collection, id, version, schema_version, deleted, updated_at, device_id, body, dirty, local_rev";
+    private const string Columns = "collection, id, version, schema_version, deleted, updated_at, device_id, body, dirty, local_rev, reseal";
 
-    private static SyncRow ReadRow(SqliteDataReader r) => new(
-        r.GetString(0), r.GetString(1), r.GetInt64(2), r.GetInt32(3), r.GetInt64(4) != 0, r.GetInt64(5), r.GetString(6),
-        r.IsDBNull(7) ? null : r.GetString(7), r.GetInt64(8) != 0, r.GetInt64(9));
+    private SyncRow ReadRow(SqliteDataReader r)
+    {
+        var collection = r.GetString(0);
+        var id = r.GetString(1);
+        var body = r.IsDBNull(7) ? null : DecryptBody(collection, id, r.GetFieldValue<byte[]>(7));
+        return new SyncRow(collection, id, r.GetInt64(2), r.GetInt32(3), r.GetInt64(4) != 0, r.GetInt64(5), r.GetString(6),
+            body, r.GetInt64(8) != 0, r.GetInt64(9), r.GetInt64(10) != 0);
+    }
 
-    private static List<SyncRow> ReadRows(SqliteCommand cmd)
+    private List<SyncRow> ReadRows(SqliteCommand cmd)
     {
         var rows = new List<SyncRow>();
         using var reader = cmd.ExecuteReader();
         while (reader.Read()) rows.Add(ReadRow(reader));
         return rows;
     }
+
+    private byte[]? EncryptBody(string collection, string id, string? body)
+    {
+        if (body is null) return null;
+        var plaintext = Encoding.UTF8.GetBytes(body);
+        var output = new byte[12 + 16 + plaintext.Length];
+        RandomNumberGenerator.Fill(output.AsSpan(0, 12));
+        using (var gcm = new AesGcm(_localKey, 16))
+            gcm.Encrypt(output.AsSpan(0, 12), plaintext, output.AsSpan(28), output.AsSpan(12, 16), LocalAad(collection, id));
+        CryptographicOperations.ZeroMemory(plaintext);
+        return output;
+    }
+
+    private string? DecryptBody(string collection, string id, byte[] stored)
+    {
+        if (stored.Length < 28) throw new SyncLocalKeyException($"Damaged local record {collection}/{id}.");
+        var plaintext = new byte[stored.Length - 28];
+        try
+        {
+            using var gcm = new AesGcm(_localKey, 16);
+            gcm.Decrypt(stored.AsSpan(0, 12), stored.AsSpan(28), stored.AsSpan(12, 16), plaintext, LocalAad(collection, id));
+            return Encoding.UTF8.GetString(plaintext);
+        }
+        catch (CryptographicException)
+        {
+            throw new SyncLocalKeyException($"Local record {collection}/{id} cannot be decrypted with this device's key.");
+        }
+        finally
+        {
+            CryptographicOperations.ZeroMemory(plaintext);
+        }
+    }
+
+    private static byte[] LocalAad(string collection, string id) => Encoding.UTF8.GetBytes($"helm-local/v1|{collection}|{id}");
 
     private SqliteCommand Command(string sql)
     {
@@ -306,25 +384,70 @@ public sealed class SyncDatabase : IDisposable
             throw new InvalidOperationException($"{FilePath} was written by a newer Helm (schema {current}).");
         if (current == SchemaVersion) return;
 
-        Execute($"""
-            CREATE TABLE IF NOT EXISTS meta (key TEXT PRIMARY KEY, value TEXT NOT NULL);
-            CREATE TABLE IF NOT EXISTS records (
-                collection     TEXT    NOT NULL,
-                id             TEXT    NOT NULL,
-                version        INTEGER NOT NULL DEFAULT 0,
-                schema_version INTEGER NOT NULL,
-                deleted        INTEGER NOT NULL DEFAULT 0,
-                updated_at     INTEGER NOT NULL,
-                device_id      TEXT    NOT NULL,
-                body           TEXT,
-                dirty          INTEGER NOT NULL DEFAULT 0,
-                local_rev      INTEGER NOT NULL DEFAULT 0,
-                PRIMARY KEY (collection, id)
-            ) WITHOUT ROWID;
-            CREATE INDEX IF NOT EXISTS records_dirty ON records (dirty) WHERE dirty = 1;
-            CREATE TABLE IF NOT EXISTS cursors (name TEXT PRIMARY KEY, last_seq INTEGER NOT NULL);
-            PRAGMA user_version = {SchemaVersion};
-            """);
+        if (current == 0)
+        {
+            Execute($"""
+                CREATE TABLE IF NOT EXISTS meta (key TEXT PRIMARY KEY, value TEXT NOT NULL);
+                CREATE TABLE IF NOT EXISTS records (
+                    collection     TEXT    NOT NULL,
+                    id             TEXT    NOT NULL,
+                    version        INTEGER NOT NULL DEFAULT 0,
+                    schema_version INTEGER NOT NULL,
+                    deleted        INTEGER NOT NULL DEFAULT 0,
+                    updated_at     INTEGER NOT NULL,
+                    device_id      TEXT    NOT NULL,
+                    body           BLOB,
+                    dirty          INTEGER NOT NULL DEFAULT 0,
+                    local_rev      INTEGER NOT NULL DEFAULT 0,
+                    reseal         INTEGER NOT NULL DEFAULT 0,
+                    PRIMARY KEY (collection, id)
+                ) WITHOUT ROWID;
+                CREATE INDEX IF NOT EXISTS records_dirty ON records (dirty) WHERE dirty = 1;
+                CREATE TABLE IF NOT EXISTS cursors (name TEXT PRIMARY KEY, last_seq INTEGER NOT NULL);
+                PRAGMA user_version = {SchemaVersion};
+                """);
+            return;
+        }
+
+        // v1 (Helm 0.5.0): plaintext bodies, no reseal column. Encrypt in place, then rewrite the file so no
+        // plaintext survives in free pages or the WAL.
+        InTransaction(() =>
+        {
+            Execute("ALTER TABLE records ADD COLUMN reseal INTEGER NOT NULL DEFAULT 0");
+            var plain = new List<(string Collection, string Id, string Body)>();
+            using (var select = Command("SELECT collection, id, body FROM records WHERE body IS NOT NULL"))
+            using (var reader = select.ExecuteReader())
+            {
+                while (reader.Read()) plain.Add((reader.GetString(0), reader.GetString(1), reader.GetString(2)));
+            }
+            foreach (var (collection, id, body) in plain)
+            {
+                using var update = Command("UPDATE records SET body = $b WHERE collection = $c AND id = $id");
+                update.Parameters.AddWithValue("$b", EncryptBody(collection, id, body)!);
+                update.Parameters.AddWithValue("$c", collection);
+                update.Parameters.AddWithValue("$id", id);
+                update.ExecuteNonQuery();
+            }
+            Execute($"PRAGMA user_version = {SchemaVersion}");
+        });
+        Execute("PRAGMA wal_checkpoint(TRUNCATE);");
+        Execute("VACUUM;");
+    }
+
+    /// <summary>A known value encrypted with the local key: opening with another key fails fast instead of per row.</summary>
+    private void VerifyLocalKey()
+    {
+        var stored = GetMeta(KeyCheckMeta);
+        if (stored is null)
+        {
+            using var insert = Command("INSERT INTO meta (key, value) VALUES ($k, $v)");
+            insert.Parameters.AddWithValue("$k", KeyCheckMeta);
+            insert.Parameters.AddWithValue("$v", Convert.ToBase64String(EncryptBody("meta", KeyCheckMeta, "ok")!));
+            insert.ExecuteNonQuery();
+            return;
+        }
+        if (DecryptBody("meta", KeyCheckMeta, Convert.FromBase64String(stored)) != "ok")
+            throw new SyncLocalKeyException("The local sync key does not match this replica.");
     }
 
     private string? GetMeta(string key)

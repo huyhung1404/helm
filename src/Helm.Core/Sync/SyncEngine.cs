@@ -17,6 +17,8 @@ public enum SyncState
     Unauthorized,
     /// <summary>The account's storage quota is full; local edits are kept but not uploaded.</summary>
     QuotaExceeded,
+    /// <summary>The account key was rotated on another device: unlock again with the passphrase.</summary>
+    KeyChanged,
     Error,
 }
 
@@ -29,6 +31,7 @@ public enum SyncRunOutcome
     Offline,
     Unauthorized,
     QuotaExceeded,
+    KeyChanged,
     Failed,
 }
 
@@ -107,6 +110,12 @@ public sealed class SyncEngine : ISyncService, IDisposable
 
     public event EventHandler<SyncStatus>? StatusChanged;
 
+    /// <summary>
+    /// Raised when the server holds data sealed with a newer key epoch (the account key was rotated elsewhere). The
+    /// run stops without skipping anything; <see cref="SyncSetupService"/> then asks for the passphrase again.
+    /// </summary>
+    public event EventHandler? KeyEpochChanged;
+
     /// <summary>Raised after a run for every collection whose records changed (remote edits, conflict copies).</summary>
     internal event EventHandler<SyncRecordsChangedEventArgs>? RecordsChanged;
 
@@ -164,6 +173,14 @@ public sealed class SyncEngine : ISyncService, IDisposable
             SetStatus(Status with { State = SyncState.Idle });
             throw;
         }
+        catch (SyncKeyEpochException ex)
+        {
+            _logger.LogInformation("Sync data uses key epoch {Epoch}; this device must unlock again", ex.Epoch);
+            SetStatus(Status with { State = SyncState.KeyChanged, LastError = ex.Message });
+            try { KeyEpochChanged?.Invoke(this, EventArgs.Empty); }
+            catch (Exception handlerEx) { _logger.LogError(handlerEx, "A key-change handler failed"); }
+            return run.Result(SyncRunOutcome.KeyChanged);
+        }
         catch (SyncQuotaException ex)
         {
             _logger.LogWarning("Sync storage quota exceeded: {Message}", ex.Message);
@@ -216,6 +233,7 @@ public sealed class SyncEngine : ISyncService, IDisposable
             var outcomes = await _transport.PushAsync(items, ct).ConfigureAwait(false);
 
             var progressed = false;
+            SyncKeyEpochException? newerEpoch = null;
             _db.InTransaction(() =>
             {
                 var byKey = dirty.ToDictionary(row => (row.Collection, row.Id));
@@ -231,10 +249,19 @@ public sealed class SyncEngine : ISyncService, IDisposable
                     else
                     {
                         run.Conflicts++;
-                        progressed |= ResolveRejectedPush(keyring, row, outcome.Current, run);
+                        try
+                        {
+                            progressed |= ResolveRejectedPush(keyring, row, outcome.Current, run);
+                        }
+                        catch (SyncKeyEpochException ex)
+                        {
+                            // Keep the accepted items of this batch; stop after the transaction.
+                            newerEpoch = ex;
+                        }
                     }
                 }
             });
+            if (newerEpoch is not null) throw newerEpoch;
             // Nothing could be resolved (e.g. unreadable server copies): stop instead of pushing the same batch again.
             if (!progressed) return;
         }
@@ -301,6 +328,9 @@ public sealed class SyncEngine : ISyncService, IDisposable
         var policy = descriptor?.Policy ?? SyncConflictPolicy.LastWriterWins;
         // Never overwrite a record written by a newer schema: this build would drop the fields it does not know.
         if (descriptor is not null && remote.SchemaVersion > descriptor.SchemaVersion) policy = SyncConflictPolicy.RemoteWins;
+
+        // Re-sealing after a key rotation is not an edit: whatever the server has now wins.
+        if (local.Reseal) policy = SyncConflictPolicy.RemoteWins;
 
         switch (policy)
         {
@@ -372,16 +402,16 @@ public sealed class SyncEngine : ISyncService, IDisposable
         lock (_keyGate)
         {
             if (_keyring is not null) return _keyring;
-            var key = _keys.Load();
-            if (key is null) return null;
-            try
+            var data = _keys.Load();
+            if (data is null) return null;
+            using var set = SyncKeySet.TryParse(data);
+            CryptographicOperations.ZeroMemory(data);
+            if (set is null)
             {
-                _keyring = new SyncKeyring(key);
+                _logger.LogWarning("The stored sync key is unreadable; unlock sync again");
+                return null;
             }
-            finally
-            {
-                CryptographicOperations.ZeroMemory(key);
-            }
+            _keyring = new SyncKeyring(set);
             return _keyring;
         }
     }

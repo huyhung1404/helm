@@ -21,4 +21,5 @@ public sealed class HelmPaths
     public string SyncDatabaseFile => Path.Combine(SyncDirectory, "helm-sync.db");
     public string SyncKeyFile => Path.Combine(SyncDirectory, "master.key");
     public string SyncCredentialsFile => Path.Combine(SyncDirectory, "credentials.bin");
+    public string SyncLocalKeyFile => Path.Combine(SyncDirectory, "local.key");
 }

@@ -101,7 +101,7 @@ public sealed class SyncTransportTests
         var dir = Path.Combine(Path.GetTempPath(), "helm-tests", Guid.NewGuid().ToString("N"));
         try
         {
-            using var db = new SyncDatabase(Path.Combine(dir, "a.db"));
+            using var db = new SyncDatabase(Path.Combine(dir, "a.db"), TestKeys.Local);
             var transport = Transport(_ => Json(status, $$"""{"error":"{{code}}"}"""));
             using var engine = new SyncEngine(db, transport, new InMemoryMasterKeyStore(SyncKeyring.CreateMasterKey()), [],
                 debounce: TimeSpan.FromHours(1));

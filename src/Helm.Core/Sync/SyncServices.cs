@@ -13,7 +13,7 @@ public static class SyncServices
     /// </summary>
     public static IServiceCollection AddHelmSync(this IServiceCollection services, HelmPaths paths)
     {
-        services.AddSingleton(_ => new SyncDatabase(paths.SyncDatabaseFile));
+        services.AddSingleton(sp => OpenDatabase(paths, sp.GetService<ILoggerFactory>()?.CreateLogger("Sync.Database")));
         services.TryAddSingleton<ISyncCredentialStore>(_ => new DpapiSyncCredentialStore(paths.SyncCredentialsFile));
         services.TryAddSingleton(_ => new SyncApiClient());
         services.TryAddSingleton<ISyncTransport>(sp => new HttpSyncTransport(
@@ -54,6 +54,33 @@ public static class SyncServices
         services.AddSingleton<ISyncedSettings<T>>(sp => new SyncedSettings<T>(
             sp.GetRequiredService<SyncEngine>(), storeId, Logger(sp, SyncedSettings<T>.CollectionName(storeId))));
         return services;
+    }
+
+    /// <summary>
+    /// Opens the replica. If this device's local key no longer opens it (key file lost), the unreadable file is kept
+    /// aside and a fresh replica is created; the next sync downloads everything again from the server.
+    /// </summary>
+    internal static SyncDatabase OpenDatabase(HelmPaths paths, ILogger? logger)
+    {
+        var key = new DpapiLocalKeyStore(paths.SyncLocalKeyFile).GetOrCreate();
+        try
+        {
+            return new SyncDatabase(paths.SyncDatabaseFile, key);
+        }
+        catch (SyncLocalKeyException ex)
+        {
+            var aside = paths.SyncDatabaseFile + $".unreadable-{DateTime.Now:yyyyMMdd-HHmmss}";
+            logger?.LogWarning(ex, "Local sync data cannot be decrypted; moving it to {File} and syncing again from the server", aside);
+            foreach (var suffix in new[] { "", "-wal", "-shm" })
+            {
+                if (File.Exists(paths.SyncDatabaseFile + suffix)) File.Move(paths.SyncDatabaseFile + suffix, aside + suffix);
+            }
+            return new SyncDatabase(paths.SyncDatabaseFile, key);
+        }
+        finally
+        {
+            System.Security.Cryptography.CryptographicOperations.ZeroMemory(key);
+        }
     }
 
     private static ILogger? Logger(IServiceProvider sp, string collection) =>

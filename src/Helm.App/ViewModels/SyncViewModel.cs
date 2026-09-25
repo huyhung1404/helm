@@ -66,6 +66,18 @@ internal sealed partial class SyncViewModel : ObservableObject
     [ObservableProperty, NotifyPropertyChangedFor(nameof(IsShowingRecoveryKey))]
     private string? _recoveryKeyToShow;
 
+    /// <summary>Shown above the recovery key: a new account, or a key rotation that replaced the old recovery key.</summary>
+    [ObservableProperty] private string _recoveryKeyTitle = "Save your recovery key now";
+
+    [ObservableProperty] private bool _needsProtectionUpgrade;
+    [ObservableProperty] private string _upgradePassphrase = "";
+
+    /// <summary>The device the user chose to remove; the page then asks whether to also change the account key.</summary>
+    [ObservableProperty, NotifyPropertyChangedFor(nameof(IsRemovingDevice), nameof(RemovingDeviceText))]
+    private SyncDeviceItem? _removingDevice;
+
+    [ObservableProperty] private string _removePassphrase = "";
+
     [ObservableProperty] private string _accountName = "";
     [ObservableProperty] private string _statusText = "";
     [ObservableProperty] private string _usageText = "";
@@ -108,6 +120,18 @@ internal sealed partial class SyncViewModel : ObservableObject
     public bool IsUnlocking => AccountHasPassphrase == true;
     public bool IsCheckingPassphrase => AccountHasPassphrase is null;
     public bool IsShowingRecoveryKey => RecoveryKeyToShow is not null;
+    public bool IsRemovingDevice => RemovingDevice is not null;
+    public string RemovingDeviceText => RemovingDevice is null ? "" : $"Remove “{RemovingDevice.Token.Name}”";
+    public bool KeyChangedElsewhere => _setup.KeyChangedElsewhere;
+
+    /// <summary>Live feedback while typing a new passphrase.</summary>
+    public string PassphraseStrengthText => SyncKeyVault.EstimateStrength(Passphrase) switch
+    {
+        PassphraseStrength.TooShort => $"Too short — at least {SyncKeyVault.MinPassphraseLength} characters",
+        PassphraseStrength.Weak => "Weak — easy to guess; use several unrelated words",
+        PassphraseStrength.Fair => "Fair — longer is better",
+        _ => "Strong",
+    };
     public bool HasNewDeviceToken => NewDeviceToken is not null;
     public bool HasError => ErrorMessage is not null;
     public int MinPassphraseLength => SyncKeyVault.MinPassphraseLength;
@@ -115,9 +139,12 @@ internal sealed partial class SyncViewModel : ObservableObject
 
     public ObservableCollection<SyncDeviceItem> Devices { get; } = [];
 
+    partial void OnPassphraseChanged(string value) => OnPropertyChanged(nameof(PassphraseStrengthText));
+
     partial void OnStageChanged(SyncSetupStage value)
     {
         OnPropertyChanged(nameof(ServerText));
+        OnPropertyChanged(nameof(KeyChangedElsewhere));
         // A stage change during an action (e.g. Connect) is refreshed once that action ends; see RunAsync.
         if (IsBusy) _refreshPending = true;
         else _ = RefreshAsync();
@@ -144,6 +171,7 @@ internal sealed partial class SyncViewModel : ObservableObject
     private Task CreatePassphraseAsync() => RunAsync(async () =>
     {
         if (Passphrase != PassphraseConfirm) throw new UserError("The two passphrases do not match.");
+        RecoveryKeyTitle = "Save your recovery key now";
         RecoveryKeyToShow = await _setup.CreatePassphraseAsync(Passphrase).ConfigureAwait(true);
         ClearSecrets();
     });
@@ -192,19 +220,58 @@ internal sealed partial class SyncViewModel : ObservableObject
     [RelayCommand]
     private void DismissNewDeviceToken() => NewDeviceToken = null;
 
+    /// <summary>Opens the removal panel: remove and change the key (recommended), or remove only.</summary>
     [RelayCommand]
-    private async Task RevokeDeviceAsync(SyncDeviceItem? device)
+    private void RevokeDevice(SyncDeviceItem? device)
     {
-        if (device is null) return;
-        var confirmed = await _dialogs.ConfirmAsync("Remove this device?",
-            $"“{device.Token.Name}” will stop syncing immediately. Its local data stays on that device.", "Remove device").ConfigureAwait(true);
+        RemovingDevice = device;
+        RemovePassphrase = "";
+        ErrorMessage = null;
+    }
+
+    [RelayCommand]
+    private void CancelRemoveDevice()
+    {
+        RemovingDevice = null;
+        RemovePassphrase = "";
+    }
+
+    [RelayCommand]
+    private Task RemoveDeviceAndChangeKeyAsync() => RunAsync(async () =>
+    {
+        if (RemovingDevice is not { } device) return;
+        if (string.IsNullOrEmpty(RemovePassphrase)) throw new UserError("Enter your passphrase to change the account key.");
+        var recovery = await _setup.RemoveDeviceAndRotateKeyAsync(device.Token.Id, RemovePassphrase).ConfigureAwait(true);
+        RemovePassphrase = "";
+        RemovingDevice = null;
+        RecoveryKeyTitle = "The account key changed — save your NEW recovery key";
+        RecoveryKeyToShow = recovery;
+        await LoadDevicesAsync().ConfigureAwait(true);
+    });
+
+    [RelayCommand]
+    private async Task RemoveDeviceOnlyAsync()
+    {
+        if (RemovingDevice is not { } device) return;
+        var confirmed = await _dialogs.ConfirmAsync("Remove without changing the key?",
+            $"“{device.Token.Name}” stops syncing now, but it keeps the account key: if someone has that device, " +
+            "they could read data they get hold of later. Changing the key prevents that.", "Remove only").ConfigureAwait(true);
         if (!confirmed) return;
         await RunAsync(async () =>
         {
             await _setup.RevokeDeviceAsync(device.Token.Id).ConfigureAwait(true);
+            RemovingDevice = null;
             await LoadDevicesAsync().ConfigureAwait(true);
         }).ConfigureAwait(true);
     }
+
+    [RelayCommand]
+    private Task UpgradeProtectionAsync() => RunAsync(async () =>
+    {
+        await _setup.UpgradeProtectionAsync(UpgradePassphrase).ConfigureAwait(true);
+        UpgradePassphrase = "";
+        NeedsProtectionUpgrade = false;
+    });
 
     [RelayCommand]
     private async Task SignOutAsync()
@@ -247,6 +314,7 @@ internal sealed partial class SyncViewModel : ObservableObject
         UsagePercent = account.QuotaBytes > 0 ? Math.Min(100, 100.0 * account.UsedBytes / account.QuotaBytes) : 0;
         UsageText = $"{Megabytes(account.UsedBytes)} of {Megabytes(account.QuotaBytes)} MB used";
         if (IsReady && CanManageDevices) await LoadDevicesAsync().ConfigureAwait(true);
+        if (IsReady) NeedsProtectionUpgrade = await _setup.NeedsProtectionUpgradeAsync().ConfigureAwait(true);
     }
 
     private async Task LoadDevicesAsync()
@@ -268,6 +336,7 @@ internal sealed partial class SyncViewModel : ObservableObject
             SyncState.Offline => "Offline — changes are kept and sent later" + last,
             SyncState.Unauthorized => "This device's token was revoked or has expired. Turn off sync and connect again.",
             SyncState.QuotaExceeded => "Storage is full — new changes stay on this device. " + status.LastError,
+            SyncState.KeyChanged => "The account key was changed on another device. Unlock with your passphrase to continue.",
             SyncState.Error => "Sync problem: " + status.LastError,
             _ => "Not set up",
         };
@@ -314,6 +383,8 @@ internal sealed partial class SyncViewModel : ObservableObject
         Passphrase = "";
         PassphraseConfirm = "";
         RecoveryKeyInput = "";
+        UpgradePassphrase = "";
+        RemovePassphrase = "";
     }
 
     private static void CopyToClipboard(string? text)

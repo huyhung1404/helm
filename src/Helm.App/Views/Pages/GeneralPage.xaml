@@ -179,6 +179,9 @@
 
                 <!-- 2. Connected, key needed: create the passphrase (first device) or unlock -->
                 <StackPanel Visibility="{Binding NeedsKey, Converter={StaticResource BoolToVisibility}}">
+                    <ui:InfoBar Title="The account key was changed" Severity="Informational" IsClosable="False" IsOpen="True" Margin="0,0,0,8"
+                                Message="A device was removed on another PC and the key was changed. Enter your passphrase once to keep syncing; nothing on this device was lost."
+                                Visibility="{Binding KeyChangedElsewhere, Converter={StaticResource BoolToVisibility}}" />
                     <Border Style="{DynamicResource HelmExpanderRow}" BorderThickness="0" Visibility="{Binding IsCheckingPassphrase, Converter={StaticResource BoolToVisibility}}">
                         <TextBlock Text="Checking the account…" Style="{DynamicResource HelmSecondaryText}" />
                     </Border>
@@ -189,6 +192,7 @@
                                        Text="It encrypts your data before it leaves this device and unlocks sync on your other devices. Nobody can reset it for you." />
                             <ui:PasswordBox AutomationProperties.Name="New passphrase" PlaceholderText="{Binding MinPassphraseLength, StringFormat='Passphrase (at least {0} characters)'}"
                                             Password="{Binding Passphrase, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Margin="0,0,0,8" />
+                            <TextBlock Text="{Binding PassphraseStrengthText}" Style="{DynamicResource HelmSecondaryText}" Margin="0,-4,0,8" />
                             <ui:PasswordBox AutomationProperties.Name="Repeat passphrase" PlaceholderText="Repeat the passphrase" Password="{Binding PassphraseConfirm, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Margin="0,0,0,8" />
                             <ui:Button Content="Create passphrase and start syncing" Appearance="Primary" Command="{Binding CreatePassphraseCommand}" />
                         </StackPanel>
@@ -213,7 +217,7 @@
                 <!-- Recovery key, shown once after the passphrase is created -->
                 <Border Style="{DynamicResource HelmExpanderRow}" Visibility="{Binding IsShowingRecoveryKey, Converter={StaticResource BoolToVisibility}}">
                     <StackPanel>
-                        <ui:InfoBar Title="Save your recovery key now" Severity="Warning" IsClosable="False" IsOpen="True" Margin="0,0,0,8"
+                        <ui:InfoBar Title="{Binding RecoveryKeyTitle}" Severity="Warning" IsClosable="False" IsOpen="True" Margin="0,0,0,8"
                                     Message="It is shown only this once. If you forget the passphrase, this key is the only way back into your data. Store it in a password manager or print it." />
                         <ui:TextBox AutomationProperties.Name="Your recovery key" Text="{Binding RecoveryKeyToShow, Mode=OneWay}" IsReadOnly="True" FontFamily="Consolas" TextWrapping="Wrap" Margin="0,0,0,8" />
                         <StackPanel Orientation="Horizontal">
@@ -234,6 +238,18 @@
                             </StackPanel>
                             <ui:Button HorizontalAlignment="Right" Content="Sync now" Icon="{ui:SymbolIcon ArrowSync24}" Command="{Binding SyncNowCommand}" />
                         </core:RowLayout>
+                    </Border>
+                    <Border Style="{DynamicResource HelmExpanderRow}" Visibility="{Binding NeedsProtectionUpgrade, Converter={StaticResource BoolToVisibility}}">
+                        <StackPanel>
+                            <TextBlock Text="Strengthen passphrase protection" FontWeight="SemiBold" />
+                            <TextBlock TextWrapping="Wrap" Style="{DynamicResource HelmSecondaryText}" Margin="0,4,0,8"
+                                       Text="Your passphrase is protected the older way (PBKDF2). Enter it once to switch to Argon2id, which makes guessing it far harder. Nothing else changes." />
+                            <StackPanel Orientation="Horizontal">
+                                <ui:PasswordBox AutomationProperties.Name="Passphrase to strengthen" PlaceholderText="Your passphrase" MinWidth="260"
+                                                Password="{Binding UpgradePassphrase, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Margin="0,0,8,0" />
+                                <ui:Button Content="Strengthen" Appearance="Primary" Command="{Binding UpgradeProtectionCommand}" />
+                            </StackPanel>
+                        </StackPanel>
                     </Border>
                     <Border Style="{DynamicResource HelmExpanderRow}">
                         <StackPanel>
@@ -262,6 +278,21 @@
                                     </DataTemplate>
                                 </ItemsControl.ItemTemplate>
                             </ItemsControl>
+                            <Border Padding="12" Margin="0,0,0,8" CornerRadius="6" Background="{DynamicResource ControlFillColorDefaultBrush}"
+                                    Visibility="{Binding IsRemovingDevice, Converter={StaticResource BoolToVisibility}}">
+                                <StackPanel>
+                                    <TextBlock Text="{Binding RemovingDeviceText}" FontWeight="SemiBold" />
+                                    <TextBlock TextWrapping="Wrap" Style="{DynamicResource HelmSecondaryText}" Margin="0,4,0,8"
+                                               Text="Recommended: also change the account key, so that device can never read anything written from now on. Your other devices will ask for the passphrase once, and you get a new recovery key." />
+                                    <ui:PasswordBox AutomationProperties.Name="Passphrase to change the key" PlaceholderText="Your passphrase"
+                                                    Password="{Binding RemovePassphrase, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Margin="0,0,0,8" />
+                                    <StackPanel Orientation="Horizontal">
+                                        <ui:Button Content="Remove and change key" Appearance="Danger" Command="{Binding RemoveDeviceAndChangeKeyCommand}" Margin="0,0,8,0" />
+                                        <ui:Button Content="Remove only" Command="{Binding RemoveDeviceOnlyCommand}" Margin="0,0,8,0" />
+                                        <ui:Button Content="Cancel" Command="{Binding CancelRemoveDeviceCommand}" />
+                                    </StackPanel>
+                                </StackPanel>
+                            </Border>
                             <TextBlock Text="Add a device" FontWeight="SemiBold" Margin="0,8,0,8" />
                             <StackPanel Orientation="Horizontal">
                                 <ui:TextBox AutomationProperties.Name="New device name" PlaceholderText="Device name, e.g. Laptop" Text="{Binding NewDeviceName, UpdateSourceTrigger=PropertyChanged}" MinWidth="220" Margin="0,0,8,0" />

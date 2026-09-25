@@ -23,7 +23,7 @@ public sealed class SyncTests : IDisposable
     {
         var path = Path.Combine(_dir, "solo.db");
         string id;
-        using (var db = new SyncDatabase(path))
+        using (var db = new SyncDatabase(path, TestKeys.Local))
         using (var engine = NewEngine(db, new NullSyncTransport()))
         using (var notes = new SyncedCollection<Note>(engine, NoteOptions()))
         {
@@ -33,7 +33,7 @@ public sealed class SyncTests : IDisposable
             Assert.False(notes.Delete("fixed"));
         }
 
-        using var reopened = new SyncDatabase(path);
+        using var reopened = new SyncDatabase(path, TestKeys.Local);
         using var engine2 = NewEngine(reopened, new NullSyncTransport());
         using var notes2 = new SyncedCollection<Note>(engine2, NoteOptions());
         Assert.Equal(new Note("Groceries", "milk"), notes2.Get(id));
@@ -392,7 +392,7 @@ public sealed class SyncTests : IDisposable
 
     private Device NewDevice(string name, ISyncTransport? transport = null, IMasterKeyStore? keys = null, int schemaVersion = 1)
     {
-        var db = Own(new SyncDatabase(Path.Combine(_dir, name + ".db")));
+        var db = Own(new SyncDatabase(Path.Combine(_dir, name + ".db"), TestKeys.Local));
         var engine = Own(NewEngine(db, transport ?? _server.Connect(), keys ?? new InMemoryMasterKeyStore(_key)));
         var notes = Own(new SyncedCollection<Note>(engine, NoteOptions(schemaVersion)));
         return new Device(engine, notes);
