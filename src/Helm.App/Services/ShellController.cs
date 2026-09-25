@@ -34,6 +34,11 @@ internal sealed class ShellController(
         tray.RefreshMenu();
         search.Invalidate();
         _ = services.GetRequiredService<Core.Services.IUpdateService>().CheckAsync(CancellationToken.None);
+
+        // An installed build owns the startup task: make sure it targets the stable launcher, not an old folder.
+        var location = services.GetRequiredService<Core.Services.IAppLocation>();
+        if (location.IsInstalled)
+            _ = services.GetRequiredService<Core.Services.IStartupTaskService>().EnsurePathAsync(location.LauncherPath);
     }
 
     public void ShowMainWindow()

@@ -25,6 +25,9 @@ internal static class HelmHost
         builder.Logging.ClearProviders();
         builder.Services.AddSerilog(dispose: false);
 
+        // Velopack-aware location first so Core's TryAdd fallback is skipped.
+        builder.Services.AddSingleton<Core.Services.IAppLocation, Updates.VelopackAppLocation>();
+
         // Core infrastructure (settings, hooks, hotkeys, window/monitor services, module registry)
         builder.Services.AddHelmCore(paths);
 

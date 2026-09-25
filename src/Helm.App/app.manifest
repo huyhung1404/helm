@@ -5,8 +5,10 @@
   <trustInfo xmlns="urn:schemas-microsoft-com:asm.v2">
     <security>
       <requestedPrivileges xmlns="urn:schemas-microsoft-com:asm.v3">
-        <!-- Hooks, hotkeys and window moves must also work on elevated windows. -->
-        <requestedExecutionLevel level="requireAdministrator" uiAccess="false" />
+        <!-- asInvoker on purpose: Velopack's Setup/Update start the app with CreateProcess, which fails with
+             ERROR_ELEVATION_REQUIRED (740) for requireAdministrator apps. Program.Main elevates itself right after
+             the Velopack bootstrap (see Updates/Elevation.cs), so Helm still always runs as administrator. -->
+        <requestedExecutionLevel level="asInvoker" uiAccess="false" />
       </requestedPrivileges>
     </security>
   </trustInfo>

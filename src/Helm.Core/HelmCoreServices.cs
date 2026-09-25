@@ -5,6 +5,7 @@ using Helm.Core.Modules;
 using Helm.Core.Services;
 using Helm.Core.Settings;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Logging;
 
 namespace Helm.Core;
@@ -23,6 +24,7 @@ public static class HelmCoreServices
         services.AddSingleton<IMonitorService, MonitorService>();
         services.AddSingleton<IStartupTaskService, StartupTaskService>();
         services.AddSingleton<IProcessLauncher, ProcessLauncher>();
+        services.TryAddSingleton<IAppLocation, ProcessAppLocation>();
         services.AddSingleton<IModuleHost, ModuleRegistry>();
         return services;
     }

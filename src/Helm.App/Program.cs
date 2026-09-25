@@ -1,3 +1,6 @@
+using Helm.App.Updates;
+using Velopack;
+
 namespace Helm.App;
 
 public static class Program
@@ -5,6 +8,20 @@ public static class Program
     [STAThread]
     public static int Main(string[] args)
     {
+        // 1. Velopack first (vpk checks it is literally in Main): install/update/uninstall hooks exit inside Run().
+        VelopackApp.Build()
+            .SetArgs(args)
+            .SetAutoApplyOnStartup(VelopackLifecycle.AutoApplyOnStartup())
+            .OnFirstRun(VelopackLifecycle.FirstRun)
+            .OnRestarted(VelopackLifecycle.Restarted)
+            .OnAfterUpdateFastCallback(VelopackLifecycle.AfterUpdate)
+            .OnBeforeUninstallFastCallback(VelopackLifecycle.BeforeUninstall)
+            .Run();
+
+        // 2. Helm needs administrator rights; relaunch elevated (UAC) when started unelevated.
+        if (!Elevation.EnsureElevated(args)) return 0;
+
+        // 3. Single instance: a second launch activates the first one.
         using var instance = SingleInstance.Acquire();
         if (!instance.IsFirstInstance)
         {

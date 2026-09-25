@@ -6,8 +6,6 @@
     <AssemblyName>Helm</AssemblyName>
     <RootNamespace>Helm.App</RootNamespace>
     <ApplicationManifest>app.manifest</ApplicationManifest>
-    <!-- Dev smoke tests without UAC: dotnet build -p:HelmAsInvoker=true -->
-    <ApplicationManifest Condition="'$(HelmAsInvoker)' == 'true'">app.asinvoker.manifest</ApplicationManifest>
     <ApplicationIcon>Assets\helm.ico</ApplicationIcon>
     <StartupObject>Helm.App.Program</StartupObject>
     <RuntimeIdentifier>win-x64</RuntimeIdentifier>
@@ -19,6 +17,7 @@
     <PackageReference Include="Microsoft.Extensions.Hosting" Version="8.0.1" />
     <PackageReference Include="Serilog.Extensions.Hosting" Version="8.0.0" />
     <PackageReference Include="Serilog.Sinks.File" Version="6.0.0" />
+    <PackageReference Include="Velopack" Version="1.2.158" />
     <PackageReference Include="WPF-UI" Version="4.3.0" />
   </ItemGroup>
 

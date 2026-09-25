@@ -13,6 +13,15 @@ public interface IStartupTaskService
     Task EnableAsync(string executablePath, string arguments = "--startup");
 
     Task DisableAsync();
+
+    /// <summary>The executable the task starts, or null when there is no task.</summary>
+    string? GetExecutablePath();
+
+    /// <summary>
+    /// If the task exists but points somewhere else (an old versioned folder, bin/…), re-points it to
+    /// <paramref name="launcherPath"/>. Returns true when it changed anything.
+    /// </summary>
+    Task<bool> EnsurePathAsync(string launcherPath);
 }
 
 /// <summary>Auto-start through Task Scheduler so the elevated app can launch at logon without a UAC prompt.</summary>
@@ -33,6 +42,30 @@ public sealed class StartupTaskService(ILogger<StartupTaskService> logger) : ISt
             logger.LogWarning(ex, "Could not query startup task");
             return false;
         }
+    }
+
+    public string? GetExecutablePath()
+    {
+        try
+        {
+            using var ts = new TaskService();
+            return ts.GetTask(TaskName)?.Definition.Actions.OfType<ExecAction>().FirstOrDefault()?.Path;
+        }
+        catch (Exception ex)
+        {
+            logger.LogWarning(ex, "Could not read startup task");
+            return null;
+        }
+    }
+
+    public async Task<bool> EnsurePathAsync(string launcherPath)
+    {
+        var current = GetExecutablePath();
+        if (current is null || string.Equals(Path.GetFullPath(current), Path.GetFullPath(launcherPath), StringComparison.OrdinalIgnoreCase))
+            return false;
+        logger.LogInformation("Startup task points to {Old}; re-pointing to {New}", current, launcherPath);
+        await EnableAsync(launcherPath).ConfigureAwait(false);
+        return true;
     }
 
     public Task EnableAsync(string executablePath, string arguments = "--startup") => Task.Run(() =>

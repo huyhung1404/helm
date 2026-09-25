@@ -13,6 +13,7 @@ internal sealed partial class GeneralViewModel : ObservableObject
     private readonly ISettingsStore<GeneralSettings> _general;
     private readonly IStartupTaskService _startup;
     private readonly IProcessLauncher _launcher;
+    private readonly IAppLocation _location;
     private readonly IUpdateService _updates;
     private readonly IDialogService _dialogs;
     private readonly ShellController _shell;
@@ -44,6 +45,7 @@ internal sealed partial class GeneralViewModel : ObservableObject
         ISettingsStoreFactory settings,
         IStartupTaskService startup,
         IProcessLauncher launcher,
+        IAppLocation location,
         IUpdateService updates,
         IDialogService dialogs,
         ShellController shell,
@@ -53,6 +55,7 @@ internal sealed partial class GeneralViewModel : ObservableObject
         _general = settings.Get<GeneralSettings>(GeneralSettings.StoreId);
         _startup = startup;
         _launcher = launcher;
+        _location = location;
         _updates = updates;
         _dialogs = dialogs;
         _shell = shell;
@@ -163,7 +166,7 @@ internal sealed partial class GeneralViewModel : ObservableObject
         IsStartupBusy = true;
         try
         {
-            if (enable) await _startup.EnableAsync(_launcher.ExecutablePath).ConfigureAwait(true);
+            if (enable) await _startup.EnableAsync(_location.LauncherPath).ConfigureAwait(true);
             else await _startup.DisableAsync().ConfigureAwait(true);
             StatusMessage = null;
         }
