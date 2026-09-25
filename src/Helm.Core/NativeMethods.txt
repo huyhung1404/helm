@@ -120,3 +120,6 @@ Rectangle
 // Shell / misc
 SHQueryUserNotificationState
 MessageBeep
+SHChangeNotify
+SHCNE_ID
+SHCNF_FLAGS

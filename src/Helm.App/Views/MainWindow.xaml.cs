@@ -34,6 +34,42 @@ internal partial class MainWindow : FluentWindow
         SearchBox.SuggestionChosen += (_, e) => NavigateTo(e.SelectedItem as SearchResult);
 
         Loaded += (_, _) => Navigation.Navigate(StartupPage());
+        Navigation.Navigated += (_, _) => Dispatcher.BeginInvoke(System.Windows.Threading.DispatcherPriority.Loaded, ConstrainPageWidth);
+    }
+
+    /// <summary>
+    /// WPF-UI hosts pages in a scroll viewer that also scrolls horizontally, so a page is measured with infinite
+    /// width and one long line (e.g. an update tile) makes the whole page wider than the window — cards then get
+    /// clipped on the right. Disabling horizontal scrolling on the host makes every page fit the viewport.
+    /// </summary>
+    private void ConstrainPageWidth()
+    {
+        if (Navigation.SelectedItem is null) return;
+        foreach (var viewer in FindDescendants<System.Windows.Controls.ScrollViewer>(Navigation))
+        {
+            // Only the hosts between the NavigationView and the page, not scroll viewers inside page content.
+            if (viewer.Content is System.Windows.Controls.Page or System.Windows.Controls.Frame
+                || viewer.TemplatedParent is not null && FindAncestor<System.Windows.Controls.Page>(viewer) is null)
+                viewer.HorizontalScrollBarVisibility = System.Windows.Controls.ScrollBarVisibility.Disabled;
+        }
+    }
+
+    private static IEnumerable<T> FindDescendants<T>(DependencyObject root) where T : DependencyObject
+    {
+        var count = System.Windows.Media.VisualTreeHelper.GetChildrenCount(root);
+        for (var i = 0; i < count; i++)
+        {
+            var child = System.Windows.Media.VisualTreeHelper.GetChild(root, i);
+            if (child is T match) yield return match;
+            foreach (var nested in FindDescendants<T>(child)) yield return nested;
+        }
+    }
+
+    private static T? FindAncestor<T>(DependencyObject node) where T : DependencyObject
+    {
+        for (var p = System.Windows.Media.VisualTreeHelper.GetParent(node); p is not null; p = System.Windows.Media.VisualTreeHelper.GetParent(p))
+            if (p is T match) return match;
+        return null;
     }
 
     /// <summary>"--page Diagnostics" (dev/testing) opens that page instead of Home.</summary>

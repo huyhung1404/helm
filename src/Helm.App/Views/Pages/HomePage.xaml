@@ -41,13 +41,13 @@
         <Grid Margin="0,0,0,16">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="Auto" />
-                <ColumnDefinition Width="Auto" />
-                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="*" />
             </Grid.ColumnDefinitions>
 
             <Button Grid.Column="0" Style="{StaticResource TileButton}" Padding="0,0,12,0" HorizontalContentAlignment="Left" Command="{Binding OpenWhatsNewCommand}">
                 <StackPanel Orientation="Horizontal">
-                    <Border Width="120" Height="68" CornerRadius="6" Margin="0,0,16,0">
+                    <Border Width="104" Height="60" CornerRadius="6" Margin="0,0,12,0">
                         <Border.Background>
                             <LinearGradientBrush StartPoint="0,0" EndPoint="1,1">
                                 <GradientStop Color="#0B3A66" Offset="0" />
@@ -63,19 +63,19 @@
                 </StackPanel>
             </Button>
 
-            <Button Grid.Column="1" Style="{StaticResource TileButton}" Padding="12,8" Margin="24,0,0,0" HorizontalContentAlignment="Left"
+            <Button Grid.Column="1" Style="{StaticResource TileButton}" Padding="12,8" Margin="12,0,0,0" HorizontalContentAlignment="Stretch"
                     Command="{Binding OpenConflictsCommand}" ToolTip="{Binding ConflictDetails}">
-                <StackPanel Orientation="Horizontal">
+                <DockPanel>
                     <ui:SymbolIcon Symbol="KeyboardShift24" FontSize="24" Margin="0,0,12,0" VerticalAlignment="Center" />
                     <StackPanel VerticalAlignment="Center">
-                        <TextBlock Text="Shortcut conflicts" FontWeight="SemiBold" />
-                        <TextBlock Text="{Binding ConflictSummary}" Style="{DynamicResource HelmSecondaryText}" />
+                        <TextBlock Text="Shortcut conflicts" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+                        <TextBlock Text="{Binding ConflictSummary}" Style="{DynamicResource HelmSecondaryText}" TextWrapping="NoWrap" TextTrimming="CharacterEllipsis" />
                     </StackPanel>
-                </StackPanel>
+                </DockPanel>
             </Button>
 
-            <Button Grid.Column="2" Style="{StaticResource TileButton}" Padding="12,8" Margin="24,0,0,0" HorizontalContentAlignment="Left" Command="{Binding UpdateTileCommand}">
-                <StackPanel Orientation="Horizontal">
+            <Button Grid.Column="2" Style="{StaticResource TileButton}" Padding="12,8" Margin="12,0,0,0" HorizontalContentAlignment="Stretch" Command="{Binding UpdateTileCommand}" ToolTip="{Binding UpdateTooltip}">
+                <DockPanel>
                     <Grid Margin="0,0,12,0" VerticalAlignment="Center">
                         <ui:SymbolIcon FontSize="24" Filled="True" Visibility="{Binding IsCheckingForUpdates, Converter={StaticResource InverseBoolToVisibility}}">
                             <ui:SymbolIcon.Style>
@@ -99,10 +99,10 @@
                                          Visibility="{Binding IsCheckingForUpdates, Converter={StaticResource BoolToVisibility}}" />
                     </Grid>
                     <StackPanel VerticalAlignment="Center">
-                        <TextBlock Text="{Binding UpdateTitle}" FontWeight="SemiBold" />
-                        <TextBlock Text="{Binding UpdateSubtitle}" Style="{DynamicResource HelmSecondaryText}" />
+                        <TextBlock Text="{Binding UpdateTitle}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+                        <TextBlock Text="{Binding UpdateSubtitle}" Style="{DynamicResource HelmSecondaryText}" TextWrapping="NoWrap" TextTrimming="CharacterEllipsis" />
                     </StackPanel>
-                </StackPanel>
+                </DockPanel>
             </Button>
         </Grid>
 

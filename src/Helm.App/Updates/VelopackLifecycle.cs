@@ -22,7 +22,13 @@ internal static class VelopackLifecycle
     /// <summary>Only apply a pre-downloaded update at startup when the user opted in.</summary>
     public static bool AutoApplyOnStartup() => ReadGeneralSettings()?.Updates.AutoInstallOnRestart ?? false;
 
-    public static void FirstRun(SemanticVersion version) => HookLog.Write($"First run of {version} after install.");
+    public static void FirstRun(SemanticVersion version)
+    {
+        HookLog.Write($"First run of {version} after install.");
+        // Reinstalling over an older build keeps the same shortcut paths; drop Explorer's cached icons.
+        try { Core.Desktop.ShellNotifications.RefreshIcons(); }
+        catch (Exception ex) { HookLog.Write($"Icon refresh failed: {ex.Message}"); }
+    }
 
     public static void Restarted(SemanticVersion version) => HookLog.Write($"Restarted after updating to {version}.");
 
@@ -48,6 +54,9 @@ internal static class VelopackLifecycle
     public static void AfterUpdate(SemanticVersion version)
     {
         HookLog.Write($"Updated to {version}.");
+        // Shortcut paths do not change across updates, so Explorer keeps showing the old cached icon otherwise.
+        try { Core.Desktop.ShellNotifications.RefreshIcons(); }
+        catch (Exception ex) { HookLog.Write($"Icon refresh failed: {ex.Message}"); }
         // Keep an existing startup task pointing at the stable launcher (it is not created if the user never enabled it).
         TryFixStartupTask();
     }

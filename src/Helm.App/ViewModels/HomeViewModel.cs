@@ -119,6 +119,11 @@ internal sealed partial class HomeViewModel : ObservableObject
         _navigator.NavigateToCard(typeof(GeneralPage), "Updates");
     }
 
+    /// <summary>Full tile text (the tile itself may be trimmed at narrow widths) plus the last error, if any.</summary>
+    public string UpdateTooltip => string.IsNullOrEmpty(_updates.ErrorMessage)
+        ? $"{UpdateTitle}{Environment.NewLine}{UpdateSubtitle}"
+        : $"{UpdateTitle}{Environment.NewLine}{_updates.ErrorMessage}";
+
     /// <summary>"ok" (green check), "attention" (accent download), "muted" (info) — styles the tile icon.</summary>
     public string UpdateTone => _updates.State switch
     {
@@ -205,6 +210,7 @@ internal sealed partial class HomeViewModel : ObservableObject
             _ => ("You're up to date", lastChecked),
         };
         OnPropertyChanged(nameof(UpdateTone));
+        OnPropertyChanged(nameof(UpdateTooltip));
     }
 
     private static string FormatWhen(DateTimeOffset when)

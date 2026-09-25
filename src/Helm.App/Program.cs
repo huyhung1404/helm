@@ -23,7 +23,8 @@ public static class Program
 
         // 3. Single instance: a second launch activates the first one.
         using var instance = SingleInstance.Acquire();
-        if (!instance.IsFirstInstance)
+        // --allow-multiple (dev/testing): run next to an installed Helm instead of activating it.
+        if (!instance.IsFirstInstance && !args.Contains("--allow-multiple", StringComparer.OrdinalIgnoreCase))
         {
             instance.SignalFirstInstance();
             return 0;
