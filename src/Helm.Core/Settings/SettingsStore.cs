@@ -13,6 +13,8 @@ public static class HelmJson
         PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
         ReadCommentHandling = JsonCommentHandling.Skip,
         AllowTrailingCommas = true,
+        // Doubles such as an unset window position (NaN) must never make a settings write throw.
+        NumberHandling = JsonNumberHandling.AllowNamedFloatingPointLiterals,
         Converters = { new JsonStringEnumConverter(JsonNamingPolicy.CamelCase) },
     };
 }
@@ -32,7 +34,7 @@ public sealed class SettingsStore<T> : ISettingsStore<T>, IDisposable where T : 
         _logger = logger ?? NullLogger.Instance;
         _debounce = debounce ?? TimeSpan.FromMilliseconds(400);
         _writesSuspended = writesSuspended ?? (() => false);
-        _timer = new Timer(_ => Flush(), null, Timeout.Infinite, Timeout.Infinite);
+        _timer = new Timer(_ => FlushFromTimer(), null, Timeout.Infinite, Timeout.Infinite);
         Current = Load();
     }
 
@@ -72,7 +74,16 @@ public sealed class SettingsStore<T> : ISettingsStore<T>, IDisposable where T : 
             _dirty = false;
             if (_writesSuspended()) return;
             Current.Version = T.CurrentVersion;
-            json = JsonSerializer.Serialize(Current, HelmJson.Options);
+            try
+            {
+                json = JsonSerializer.Serialize(Current, HelmJson.Options);
+            }
+            catch (Exception ex) when (ex is ArgumentException or NotSupportedException or InvalidOperationException or JsonException)
+            {
+                // A value that cannot be serialized must cost one lost write, never the process.
+                _logger.LogError(ex, "Could not serialize settings for {File}; keeping the previous file", FilePath);
+                return;
+            }
         }
 
         try
@@ -92,6 +103,19 @@ public sealed class SettingsStore<T> : ISettingsStore<T>, IDisposable where T : 
     {
         Flush();
         _timer.Dispose();
+    }
+
+    /// <summary>Timer callbacks run on the thread pool, where an unhandled exception terminates Helm.</summary>
+    private void FlushFromTimer()
+    {
+        try
+        {
+            Flush();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Debounced settings write failed for {File}", FilePath);
+        }
     }
 
     private T Load()

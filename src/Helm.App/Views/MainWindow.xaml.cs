@@ -51,8 +51,12 @@ internal partial class MainWindow : FluentWindow
     /// <summary>Remembers size/position in general.json.</summary>
     public void SavePlacement()
     {
+        // Before the window has ever been shown WPF reports Left/Top as NaN (CenterScreen) and RestoreBounds as
+        // Rect.Empty (infinite); only persist real, finite placements.
+        if (!IsLoaded) return;
         var bounds = WindowState == WindowState.Normal ? new Rect(Left, Top, Width, Height) : RestoreBounds;
-        if (bounds.IsEmpty || double.IsInfinity(bounds.Width)) return;
+        if (bounds.IsEmpty || !double.IsFinite(bounds.Left) || !double.IsFinite(bounds.Top)
+            || !double.IsFinite(bounds.Width) || !double.IsFinite(bounds.Height)) return;
         _general.Update(s =>
         {
             s.Window.Left = bounds.Left;
@@ -78,18 +82,18 @@ internal partial class MainWindow : FluentWindow
     private void RestorePlacement()
     {
         var p = _general.Current.Window;
-        Width = Math.Max(MinWidth, p.Width);
-        Height = Math.Max(MinHeight, p.Height);
-        if (!double.IsNaN(p.Left) && !double.IsNaN(p.Top))
+        Width = double.IsFinite(p.Width) ? Math.Max(MinWidth, p.Width) : MinWidth;
+        Height = double.IsFinite(p.Height) ? Math.Max(MinHeight, p.Height) : MinHeight;
+        if (p.Left is { } left && p.Top is { } top && double.IsFinite(left) && double.IsFinite(top))
         {
             var virtualScreen = new Rect(SystemParameters.VirtualScreenLeft, SystemParameters.VirtualScreenTop,
                 SystemParameters.VirtualScreenWidth, SystemParameters.VirtualScreenHeight);
             // Only restore when the title bar would still be reachable on the current monitor setup.
-            if (virtualScreen.Contains(new Point(p.Left + 100, p.Top + 20)))
+            if (virtualScreen.Contains(new Point(left + 100, top + 20)))
             {
                 WindowStartupLocation = WindowStartupLocation.Manual;
-                Left = p.Left;
-                Top = p.Top;
+                Left = left;
+                Top = top;
             }
         }
         if (p.IsMaximized) WindowState = WindowState.Maximized;

@@ -17,8 +17,9 @@ public enum UtilitiesSortMode
 
 public sealed class WindowPlacementSettings
 {
-    public double Left { get; set; } = double.NaN;
-    public double Top { get; set; } = double.NaN;
+    /// <summary>Null until the window has been placed once (then centered on screen).</summary>
+    public double? Left { get; set; }
+    public double? Top { get; set; }
     public double Width { get; set; } = 1100;
     public double Height { get; set; } = 780;
     public bool IsMaximized { get; set; }

@@ -79,8 +79,16 @@ public sealed class ModuleRegistry : IModuleHost
     private async void OnModulePropertyChanged(object? sender, PropertyChangedEventArgs e)
     {
         if (e.PropertyName != nameof(IHelmModule.IsEnabled) || sender is not IHelmModule module) return;
-        _general.Update(s => s.EnabledModules[module.Id] = module.IsEnabled);
-        await SyncAsync(module, CancellationToken.None).ConfigureAwait(true);
+        try
+        {
+            _general.Update(s => s.EnabledModules[module.Id] = module.IsEnabled);
+            await SyncAsync(module, CancellationToken.None).ConfigureAwait(true);
+        }
+        catch (Exception ex)
+        {
+            // async void: an escaping exception would terminate Helm.
+            _logger.LogError(ex, "Toggling module {Id} failed", module.Id);
+        }
     }
 
     /// <summary>Brings the running state in line with <see cref="IHelmModule.IsEnabled"/>, serialized per module.</summary>

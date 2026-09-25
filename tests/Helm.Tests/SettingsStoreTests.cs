@@ -104,6 +104,40 @@ public sealed class SettingsStoreTests : IDisposable
         Assert.False(File.Exists(path));
     }
 
+    [Fact]
+    public void Non_finite_doubles_are_written_and_read_back_instead_of_crashing()
+    {
+        // Regression: an unset window position (NaN) made the debounced write throw on the thread pool.
+        var path = Path.Combine(_dir, "general.json");
+        using (var store = new SettingsStore<GeneralSettings>(path))
+        {
+            store.Update(s =>
+            {
+                s.Window.Width = double.NaN;
+                s.Window.Height = double.PositiveInfinity;
+            });
+            store.Flush();
+        }
+
+        using var reloaded = new SettingsStore<GeneralSettings>(path);
+        Assert.True(double.IsNaN(reloaded.Current.Window.Width));
+        Assert.True(double.IsPositiveInfinity(reloaded.Current.Window.Height));
+        Assert.Null(reloaded.Current.Window.Left);
+    }
+
+    [Fact]
+    public void Legacy_nan_window_position_loads_as_unset_or_nan_without_throwing()
+    {
+        var path = Path.Combine(_dir, "general.json");
+        Directory.CreateDirectory(_dir);
+        File.WriteAllText(path, """{ "version": 1, "window": { "width": 1100, "height": 780 } }""");
+
+        using var store = new SettingsStore<GeneralSettings>(path);
+
+        Assert.Equal(1100, store.Current.Window.Width);
+        Assert.Null(store.Current.Window.Top);
+    }
+
     public enum SampleMode { First, Second }
 
     public sealed class SampleSettings : IVersionedSettings

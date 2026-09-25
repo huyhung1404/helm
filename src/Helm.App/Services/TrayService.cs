@@ -29,9 +29,7 @@ internal sealed class TrayService(IModuleHost modules, ILogger<TrayService> logg
                 LeftClickCommand = new RelayCommand(open),
                 ContextMenu = BuildMenu(),
             };
-            _icon.ForceCreate(enablesEfficiencyMode: false);
-            Microsoft.Win32.SystemEvents.UserPreferenceChanged += OnUserPreferenceChanged;
-        }
+            _icon.ForceCreate(enablesEfficiencyMode: false);        }
         catch (Exception ex)
         {
             logger.LogError(ex, "Failed to create tray icon");
@@ -59,32 +57,11 @@ internal sealed class TrayService(IModuleHost modules, ILogger<TrayService> logg
         catch (Exception ex) { logger.LogWarning(ex, "Tray notification failed"); }
     }
 
-    /// <summary>Monochrome white mark on a dark taskbar, the gradient mark on a light one.</summary>
-    private static BitmapImage TrayIconSource()
-    {
-        var light = false;
-        try
-        {
-            using var key = Microsoft.Win32.Registry.CurrentUser.OpenSubKey(@"Software\Microsoft\Windows\CurrentVersion\Themes\Personalize");
-            light = key?.GetValue("SystemUsesLightTheme") is int v && v == 1;
-        }
-        catch (System.Security.SecurityException) { }
-        var file = light ? "helm.ico" : "helm-tray-white.ico";
-        return new BitmapImage(new Uri($"pack://application:,,,/Assets/{file}"));
-    }
-
-    private void OnUserPreferenceChanged(object? sender, Microsoft.Win32.UserPreferenceChangedEventArgs e)
-    {
-        if (e.Category != Microsoft.Win32.UserPreferenceCategory.General || _icon is null) return;
-        _icon.Dispatcher.BeginInvoke(() =>
-        {
-            if (_icon is not null) _icon.IconSource = TrayIconSource();
-        });
-    }
+    /// <summary>The color mark reads well on both light and dark taskbars.</summary>
+    private static BitmapImage TrayIconSource() => new(new Uri("pack://application:,,,/Assets/helm.ico"));
 
     public void Dispose()
     {
-        Microsoft.Win32.SystemEvents.UserPreferenceChanged -= OnUserPreferenceChanged;
         _icon?.Dispose();
         _icon = null;
     }

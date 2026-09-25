@@ -1,30 +1,30 @@
 <#
 .SYNOPSIS
-  Regenerates Helm's icons in src/Helm.App/Assets.
+  Regenerates Helm's icons in src/Helm.App/Assets from the vector description of the brand mark.
 
-  Concept: a bold "H" made of two tall rounded rectangles (two windows snapped side by side) joined by a bar,
-  blue→teal gradient, white highlight on the bar. Every size is drawn natively on a pixel-snapped grid (not
-  downscaled) so 16 px stays crisp.
+  The mark (traced from the design reference): two tall rounded rectangles side by side — a blue window on the
+  left, a teal window on the right, separated by a thin gap — crossed by a rounded white bar. Every size is drawn
+  natively on a pixel-snapped grid (never downscaled), with a 1 px minimum gap and 2 px minimum bar so 16 px stays
+  readable.
 
   Outputs:
-    helm-mark-1024.png / helm.png (256) / helm.ico   gradient mark, transparent (app, window, taskbar)
-    helm-tile-1024.png / helm-tile.ico               rounded-square tile with a white mark (installer)
-    helm-tray-white-1024.png / helm-tray-white.ico   monochrome white mark (tray on dark taskbars)
+    helm-mark-1024.png / helm.png (256) / helm.ico   color mark, transparent (exe, window, taskbar, tray)
+    helm-tile-1024.png / helm-tile.ico               mark on a dark rounded tile (installer)
 #>
 param([string]$OutDir = (Join-Path $PSScriptRoot '..\src\Helm.App\Assets'))
 $ErrorActionPreference = 'Stop'
 Add-Type -AssemblyName System.Drawing
 New-Item -ItemType Directory -Force $OutDir | Out-Null
 
-$Blue = [System.Drawing.Color]::FromArgb(255, 0x1F, 0x6F, 0xF2)
-$Teal = [System.Drawing.Color]::FromArgb(255, 0x12, 0xC6, 0xB0)
-$TileBlue = [System.Drawing.Color]::FromArgb(255, 0x16, 0x5B, 0xD9)
-$TileTeal = [System.Drawing.Color]::FromArgb(255, 0x0E, 0xA8, 0x9A)
+function C([string]$hex) { [System.Drawing.ColorTranslator]::FromHtml($hex) }
+$LeftTop = C '#0078F4'; $LeftBottom = C '#08B4FF'
+$RightTop = C '#00C4DA'; $RightBottom = C '#03CEBA'
+$TileTop = C '#252A36'; $TileBottom = C '#1A1E27'
 
 function New-RoundedPath([double]$x, [double]$y, [double]$w, [double]$h, [double]$r) {
     $p = New-Object System.Drawing.Drawing2D.GraphicsPath
     $r = [Math]::Max(0, [Math]::Min($r, [Math]::Min($w, $h) / 2))
-    if ($r -lt 0.5) { $p.AddRectangle((New-Object System.Drawing.RectangleF $x, $y, $w, $h)); return $p }
+    if ($r -lt 0.75) { $p.AddRectangle((New-Object System.Drawing.RectangleF $x, $y, $w, $h)); return $p }
     $d = 2 * $r
     $p.AddArc([single]$x, [single]$y, [single]$d, [single]$d, 180, 90)
     $p.AddArc([single]($x + $w - $d), [single]$y, [single]$d, [single]$d, 270, 90)
@@ -34,21 +34,21 @@ function New-RoundedPath([double]$x, [double]$y, [double]$w, [double]$h, [double
     return $p
 }
 
-# Geometry of the H on a unit square, snapped to whole pixels for the target size.
-function Get-Geometry([int]$s, [double]$inset) {
-    $snap = { param($v) [Math]::Round($v * $s) }
-    $area = 1 - 2 * $inset
-    $u = { param($v) & $snap ($inset + $v * $area) }
+# Pixel-snapped geometry of the mark inside a square of $s pixels; $fill is the share of the height it occupies.
+function Get-Geometry([int]$s, [double]$fill) {
     $g = @{}
-    $g.Top = & $u 0.08; $g.Bottom = & $u 0.92
-    $g.LeftX = & $u 0.12; $g.PillarW = [Math]::Max(3, (& $u 0.37) - $g.LeftX)
-    $g.RightX = $s - $g.LeftX - $g.PillarW
-    $barH = [Math]::Max(2, (& $u 0.585) - (& $u 0.415))
-    $g.BarY = [Math]::Round(($s - $barH) / 2); $g.BarH = $barH
-    $g.BarX = $g.LeftX + $g.PillarW - [Math]::Max(1, [Math]::Round($g.PillarW * 0.25))
-    $g.BarW = $g.RightX + [Math]::Max(1, [Math]::Round($g.PillarW * 0.25)) - $g.BarX
-    $g.Radius = [Math]::Max(0, [Math]::Round($g.PillarW * 0.28))
-    $g.BarRadius = [Math]::Max(0, [Math]::Round($barH * 0.30))
+    $H = [Math]::Max(8, [Math]::Round($s * $fill))
+    $W = [Math]::Round($H * 0.835)
+    $g.Gap = [Math]::Max(1, [Math]::Round($W * 0.063))
+    $g.PillarW = [Math]::Floor(($W - $g.Gap) / 2)
+    $W = 2 * $g.PillarW + $g.Gap
+    $g.X = [Math]::Floor(($s - $W) / 2); $g.Y = [Math]::Floor(($s - $H) / 2)
+    $g.W = $W; $g.H = $H
+    $g.Radius = [Math]::Max(1, [Math]::Round($g.PillarW * 0.18))
+    $g.BarH = [Math]::Max(2, [Math]::Round($H * 0.062))
+    $g.BarY = $g.Y + [Math]::Round(($H - $g.BarH) / 2)
+    $g.BarX = $g.X + [Math]::Max(1, [Math]::Round($W * 0.068))
+    $g.BarW = ($g.X + $W - [Math]::Max(1, [Math]::Round($W * 0.068))) - $g.BarX
     return $g
 }
 
@@ -62,65 +62,42 @@ function New-Canvas([int]$s) {
     return @($bmp, $g)
 }
 
-function Draw-H($g, [int]$s, $geo, [string]$style) {
-    $left = New-RoundedPath $geo.LeftX $geo.Top $geo.PillarW ($geo.Bottom - $geo.Top) $geo.Radius
-    $right = New-RoundedPath $geo.RightX $geo.Top $geo.PillarW ($geo.Bottom - $geo.Top) $geo.Radius
-    $bar = New-RoundedPath $geo.BarX $geo.BarY $geo.BarW $geo.BarH $geo.BarRadius
-    $full = New-Object System.Drawing.RectangleF 0, 0, $s, $s
+function Draw-Mark($g, $geo, [bool]$mono) {
+    $left = New-RoundedPath $geo.X $geo.Y $geo.PillarW $geo.H $geo.Radius
+    $rightX = $geo.X + $geo.PillarW + $geo.Gap
+    $right = New-RoundedPath $rightX $geo.Y $geo.PillarW $geo.H $geo.Radius
+    $bar = New-RoundedPath $geo.BarX $geo.BarY $geo.BarW $geo.BarH ($geo.BarH / 2)
 
-    if ($style -eq 'mark') {
-        # One continuous diagonal blue→teal gradient across the whole letter.
-        $grad = New-Object System.Drawing.Drawing2D.LinearGradientBrush $full, $Blue, $Teal, 45.0
-        $g.FillPath($grad, $left); $g.FillPath($grad, $right)
-        # Subtle depth: the bar casts a soft shadow onto the pillars, so it reads as sitting in front of them.
-        if ($s -ge 32) {
-            $state = $g.Save()
-            $clip = New-Object System.Drawing.Region $left; $clip.Union($right); $g.Clip = $clip
-            foreach ($k in 1..3) {
-                $m = New-Object System.Drawing.Drawing2D.Matrix; $m.Translate(0, [single]($s * 0.008 * $k))
-                $shadow = $bar.Clone(); $shadow.Transform($m)
-                $g.FillPath((New-Object System.Drawing.SolidBrush ([System.Drawing.Color]::FromArgb(22, 6, 30, 70))), $shadow)
-            }
-            $g.Restore($state)
-        }
-        $g.FillPath($grad, $bar)
-        # White highlight: a slim rounded line along the top of the bar, spanning the gap between the windows.
-        $hlH = [Math]::Max(1, [Math]::Round($geo.BarH * 0.22))
-        $hlY = $geo.BarY + [Math]::Max(1, [Math]::Round($geo.BarH * 0.20))
-        $hlX = $geo.LeftX + $geo.PillarW + [Math]::Max(1, [Math]::Round($geo.PillarW * 0.10))
-        $hlW = $geo.RightX - [Math]::Max(1, [Math]::Round($geo.PillarW * 0.10)) - $hlX
-        $hl = New-RoundedPath $hlX $hlY $hlW $hlH ([Math]::Round($hlH / 2))
-        $g.FillPath((New-Object System.Drawing.SolidBrush ([System.Drawing.Color]::FromArgb(230, 255, 255, 255))), $hl)
-    }
-    else {
+    if ($mono) {
         $white = New-Object System.Drawing.SolidBrush ([System.Drawing.Color]::White)
-        $g.FillPath($white, $left); $g.FillPath($white, $right); $g.FillPath($white, $bar)
+        $g.FillPath($white, $left); $g.FillPath($white, $right)
+        # Cut the bar out so the monochrome mark still reads as "two windows + bar".
+        $g.CompositingMode = 'SourceCopy'
+        $g.FillPath((New-Object System.Drawing.SolidBrush ([System.Drawing.Color]::Transparent)), $bar)
+        $g.CompositingMode = 'SourceOver'
+        return
     }
+
+    $lr = New-Object System.Drawing.RectangleF $geo.X, ($geo.Y - 1), $geo.PillarW, ($geo.H + 2)
+    $rr = New-Object System.Drawing.RectangleF $rightX, ($geo.Y - 1), $geo.PillarW, ($geo.H + 2)
+    $g.FillPath((New-Object System.Drawing.Drawing2D.LinearGradientBrush $lr, $LeftTop, $LeftBottom, 90.0), $left)
+    $g.FillPath((New-Object System.Drawing.Drawing2D.LinearGradientBrush $rr, $RightTop, $RightBottom, 90.0), $right)
+    $g.FillPath((New-Object System.Drawing.SolidBrush ([System.Drawing.Color]::White)), $bar)
 }
 
-function New-Mark([int]$s) {
-    $bmp, $g = New-Canvas $s
-    Draw-H $g $s (Get-Geometry $s 0.02) 'mark'
-    $g.Dispose(); return $bmp
-}
-
-function New-Tray([int]$s) {
-    $bmp, $g = New-Canvas $s
-    Draw-H $g $s (Get-Geometry $s 0.02) 'white'
-    $g.Dispose(); return $bmp
-}
+function New-Mark([int]$s) { $bmp, $g = New-Canvas $s; Draw-Mark $g (Get-Geometry $s 0.90) $false; $g.Dispose(); return $bmp }
 
 function New-Tile([int]$s) {
     $bmp, $g = New-Canvas $s
     $pad = [Math]::Round($s * 0.03)
     $tile = New-RoundedPath $pad $pad ($s - 2 * $pad) ($s - 2 * $pad) ([Math]::Round($s * 0.22))
     $full = New-Object System.Drawing.RectangleF 0, 0, $s, $s
-    $g.FillPath((New-Object System.Drawing.Drawing2D.LinearGradientBrush $full, $TileBlue, $TileTeal, 45.0), $tile)
-    Draw-H $g $s (Get-Geometry $s 0.20) 'white'
+    $g.FillPath((New-Object System.Drawing.Drawing2D.LinearGradientBrush $full, $TileTop, $TileBottom, 90.0), $tile)
+    Draw-Mark $g (Get-Geometry $s 0.62) $false
     $g.Dispose(); return $bmp
 }
 
-function Save-Png($bmp, [string]$name) { $bmp.Save((Join-Path $OutDir $name), [System.Drawing.Imaging.ImageFormat]::Png) }
+function Save-Png($bmp, [string]$name) { $bmp.Save((Join-Path $OutDir $name), [System.Drawing.Imaging.ImageFormat]::Png); $bmp.Dispose() }
 
 function Save-Ico([scriptblock]$factory, [string]$name) {
     $sizes = 16, 20, 24, 32, 40, 48, 64, 128, 256
@@ -147,27 +124,24 @@ function Save-Ico([scriptblock]$factory, [string]$name) {
 
 Save-Png (New-Mark 1024) 'helm-mark-1024.png'
 Save-Png (New-Tile 1024) 'helm-tile-1024.png'
-Save-Png (New-Tray 1024) 'helm-tray-white-1024.png'
 Save-Png (New-Mark 256) 'helm.png'
 Save-Ico ${function:New-Mark} 'helm.ico'
 Save-Ico ${function:New-Tile} 'helm-tile.ico'
-Save-Ico ${function:New-Tray} 'helm-tray-white.ico'
 
-# Preview sheet: every size on dark and light backgrounds (not shipped).
-$preview = New-Object System.Drawing.Bitmap 760, 560
+# Preview sheet (not shipped): each size on a dark and a light strip.
+$preview = New-Object System.Drawing.Bitmap 820, 560
 $pg = [System.Drawing.Graphics]::FromImage($preview)
-$pg.Clear([System.Drawing.Color]::FromArgb(255, 32, 32, 32))
-$pg.FillRectangle((New-Object System.Drawing.SolidBrush ([System.Drawing.Color]::FromArgb(255, 243, 243, 243))), 0, 280, 760, 280)
+$pg.Clear((C '#202020'))
+$pg.FillRectangle((New-Object System.Drawing.SolidBrush (C '#F3F3F3')), 0, 280, 820, 280)
 $x = 10
-foreach ($sz in 16, 24, 32, 48, 64, 128) {
+foreach ($sz in 16, 20, 24, 32, 48, 64, 128) {
     foreach ($row in 0, 1) {
         $y = 10 + $row * 280
         $pg.DrawImage((New-Mark $sz), $x, $y)
-        $pg.DrawImage((New-Tile $sz), $x, $y + ($sz + 4))
-        if ($row -eq 0 -and $sz -le 32) { $pg.DrawImage((New-Tray $sz), $x + $sz + 4, $y) }
+        $pg.DrawImage((New-Tile $sz), $x, $y + $sz + 6)
     }
-    $x += $sz + 44
+    $x += $sz + 36
 }
 $pg.Dispose()
 $preview.Save((Join-Path ([IO.Path]::GetTempPath()) 'helm-icon-preview.png'), [System.Drawing.Imaging.ImageFormat]::Png)
-Write-Host "Icons written to $OutDir (preview: $(Join-Path ([IO.Path]::GetTempPath()) 'helm-icon-preview.png'))"
+Write-Host "Icons written to $OutDir"
