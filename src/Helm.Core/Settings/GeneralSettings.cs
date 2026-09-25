@@ -23,6 +23,12 @@ public sealed class WindowPlacementSettings
     public double Width { get; set; } = 1100;
     public double Height { get; set; } = 780;
     public bool IsMaximized { get; set; }
+
+    /// <summary>Navigation pane pinned open. Unpinned it collapses to an icon strip and slides out on hover.</summary>
+    public bool NavPinned { get; set; }
+
+    /// <summary>Expanded navigation pane width in DIPs (drag its right edge to change).</summary>
+    public double NavWidth { get; set; } = 300;
 }
 
 /// <summary>general.json: shell-wide preferences plus the enabled state of every module.</summary>

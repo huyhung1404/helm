@@ -15,7 +15,7 @@
     WindowCornerPreference="Round"
     WindowStartupLocation="CenterScreen">
 
-    <Grid>
+    <Grid x:Name="RootGrid">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
             <RowDefinition Height="*" />
@@ -24,7 +24,7 @@
         <ui:TitleBar x:Name="TitleBar" Grid.Row="0" Height="48">
             <ui:TitleBar.Header>
                 <StackPanel Orientation="Horizontal" Width="292" Margin="16,0,0,0" VerticalAlignment="Center">
-                    <Image services:AppIcon.Size="20" Margin="0,0,10,0" />
+                    <Image x:Name="TitleIcon" services:AppIcon.Size="20" Margin="0,0,10,0" ToolTip="Menu" />
                     <TextBlock Text="Helm" FontSize="12" VerticalAlignment="Center" />
                 </StackPanel>
             </ui:TitleBar.Header>

@@ -1,4 +1,4 @@
-﻿using System.ComponentModel;
+using System.ComponentModel;
 using System.Windows;
 using Helm.App.Services;
 using Helm.App.ViewModels;
@@ -15,6 +15,7 @@ internal partial class MainWindow : FluentWindow
     private readonly MainWindowViewModel _viewModel;
     private readonly IServiceProvider _services;
     private readonly ISettingsStore<GeneralSettings> _general;
+    private readonly NavPaneController _navPane;
 
     public MainWindow(MainWindowViewModel viewModel, IServiceProvider services, ShellNavigator navigator, ISettingsStoreFactory settings)
     {
@@ -25,6 +26,7 @@ internal partial class MainWindow : FluentWindow
         InitializeComponent();
 
         RestorePlacement();
+        _navPane = new NavPaneController(Navigation, RootGrid, _general, TitleIcon);
         Navigation.SetServiceProvider(services);
         BuildNavigation();
         navigator.Attach(Navigation, () => _services.GetRequiredService<ShellController>().ShowMainWindow());

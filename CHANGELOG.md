@@ -3,6 +3,13 @@
 All notable changes to Helm. The top section is used as the GitHub release body and as the Velopack release notes.
 Format: [Keep a Changelog](https://keepachangelog.com), versions follow [SemVer](https://semver.org).
 
+## [0.2.5] - 2026-09-25
+
+### Added
+- Auto-hiding navigation menu: it shrinks to a strip of icons and slides out over the page when you hover the
+  strip or the Helm icon in the title bar, then hides again when the mouse leaves.
+- Pin button at the top of the menu to keep it open next to the page.
+- Drag the right edge of the open menu to change its width (220–520 px). Pin state and width are remembered.
 ## [0.2.4] - 2026-09-25
 
 ### Changed
