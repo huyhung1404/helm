@@ -3,6 +3,20 @@
 All notable changes to Helm. The top section is used as the GitHub release body and as the Velopack release notes.
 Format: [Keep a Changelog](https://keepachangelog.com), versions follow [SemVer](https://semver.org).
 
+## [0.5.0] - 2026-09-25
+
+### Added
+- Sync across devices (General → Sync). Your Helm data is kept in step across your PCs and encrypted on the
+  device before it leaves: neither the sync server nor the person who invited you can read it.
+  - Start with an invite code, which creates your own account. On other devices, use a device token that you
+    create under Devices.
+  - The first device sets the account passphrase and shows a recovery key once. Keep that key safe: it is the
+    only way back in if you forget the passphrase.
+  - Shows sync status and storage used, lets you add or remove devices, and turns sync off on one device while
+    keeping its data.
+  - Syncs when Helm starts, every 5 minutes, and shortly after each change. Changes made offline are sent later.
+- No tool uses sync yet; Notes will be the first.
+
 ## [0.5.0-preview.1] - 2026-09-25
 
 ### Added
