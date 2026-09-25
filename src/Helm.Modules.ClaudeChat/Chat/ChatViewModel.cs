@@ -19,6 +19,9 @@ public enum ChatState
     /// <summary>A turn is running.</summary>
     Busy,
 
+    /// <summary>A turn is paused on a permission card the user has not answered yet.</summary>
+    WaitingForPermission,
+
     /// <summary>An interrupt was sent; waiting for the turn to end.</summary>
     Stopping,
 }
@@ -30,13 +33,11 @@ public enum ChatState
 /// </summary>
 public sealed partial class ChatViewModel : ObservableObject
 {
-    /// <summary>Until the permission card exists, requests are refused with this, so a turn never hangs.</summary>
-    internal const string NoPromptYetMessage = "Helm cannot show permission prompts yet, so this was refused. Ask the user to allow it in their Claude Code settings or to switch the permission mode.";
-
     private readonly ClaudeChatModule _module;
     private readonly IUiDispatcher _ui;
     private readonly ILogger _logger;
     private readonly Dictionary<string, ToolChatItem> _tools = new(StringComparer.Ordinal);
+    private readonly List<PermissionChatItem> _pendingPermissions = [];
     private ClaudeSession? _session;
     private AssistantChatItem? _streaming;
     private bool _endingOnPurpose;
@@ -75,7 +76,7 @@ public sealed partial class ChatViewModel : ObservableObject
     /// <summary>The CLI's id for this conversation (for resuming it later).</summary>
     public string? SessionId { get; private set; }
 
-    public bool IsBusy => State is ChatState.Starting or ChatState.Busy or ChatState.Stopping;
+    public bool IsBusy => State is ChatState.Starting or ChatState.Busy or ChatState.WaitingForPermission or ChatState.Stopping;
 
     public bool CanSend => State == ChatState.Idle && !string.IsNullOrWhiteSpace(Draft);
 
@@ -85,6 +86,7 @@ public sealed partial class ChatViewModel : ObservableObject
     {
         ChatState.Starting => "Starting Claude Code…",
         ChatState.Busy => "Claude is working…",
+        ChatState.WaitingForPermission => "Waiting for your answer…",
         ChatState.Stopping => "Stopping…",
         _ when _session is null => "Ready — a session starts with your first message",
         _ => string.Join(" · ", new[] { Model, WorkingDirectory }.Where(s => !string.IsNullOrEmpty(s))),
@@ -120,7 +122,7 @@ public sealed partial class ChatViewModel : ObservableObject
         }
     }
 
-    private bool CanStop => State == ChatState.Busy;
+    private bool CanStop => State is ChatState.Busy or ChatState.WaitingForPermission;
 
     [RelayCommand(CanExecute = nameof(CanStop))]
     private async Task StopAsync()
@@ -147,6 +149,7 @@ public sealed partial class ChatViewModel : ObservableObject
         Detach();
         await _module.EndSessionAsync();
         _endingOnPurpose = false;
+        ExpirePermissions();
         Items.Clear();
         _tools.Clear();
         SessionId = null;
@@ -177,10 +180,6 @@ public sealed partial class ChatViewModel : ObservableObject
         {
             await foreach (var ev in session.Events.ReadAllAsync().ConfigureAwait(false))
             {
-                if (ev is PermissionRequest request)
-                {
-                    await RefuseAsync(session, request).ConfigureAwait(false);
-                }
                 _ui.Post(() =>
                 {
                     if (ReferenceEquals(session, _session)) Apply(ev);
@@ -195,16 +194,33 @@ public sealed partial class ChatViewModel : ObservableObject
         _ui.Post(() => OnSessionEnded(session, stderr));
     }
 
-    private async Task RefuseAsync(ClaudeSession session, PermissionRequest request)
+    /// <summary>The user answered a permission card; send it to the CLI that asked.</summary>
+    private async Task AnswerPermissionAsync(PermissionChatItem item, PermissionOption? option, bool allow)
     {
+        _pendingPermissions.Remove(item);
+        var session = _session;
+        if (session is null)
+        {
+            item.Expire();
+            return;
+        }
+        if (_pendingPermissions.Count == 0 && State == ChatState.WaitingForPermission) State = ChatState.Busy;
         try
         {
-            await session.DenyAsync(request, NoPromptYetMessage).ConfigureAwait(false);
+            if (allow) await session.AllowAsync(item.Request, option?.UpdatedPermissions);
+            else await session.DenyAsync(item.Request, PermissionChatItem.DeniedMessage);
         }
         catch (ClaudeSessionException ex)
         {
             _logger.LogWarning(ex, "Could not answer a permission request");
+            Add(new NoticeChatItem($"Helm could not pass on your answer: {ex.Message}", NoticeKind.Error));
         }
+    }
+
+    private void ExpirePermissions()
+    {
+        foreach (var item in _pendingPermissions) item.Expire();
+        _pendingPermissions.Clear();
     }
 
     private void Apply(ClaudeEvent ev)
@@ -235,7 +251,11 @@ public sealed partial class ChatViewModel : ObservableObject
                 break;
 
             case PermissionRequest request:
-                Add(new NoticeChatItem($"Claude asked to use {request.DisplayName} ({ToolChatItem.Summarize(request.ToolName, request.Input)}). Helm refused because permission prompts are not available yet.", NoticeKind.Warning));
+                SealStreaming();
+                var card = new PermissionChatItem(request, AnswerPermissionAsync);
+                _pendingPermissions.Add(card);
+                Add(card);
+                if (State is ChatState.Busy) State = ChatState.WaitingForPermission;
                 break;
 
             case PermissionDenied denied:
@@ -248,9 +268,10 @@ public sealed partial class ChatViewModel : ObservableObject
 
             case TurnCompleted done:
                 SealStreaming();
+                ExpirePermissions();
                 foreach (var t in _tools.Values.Where(t => t.IsRunning)) t.IsRunning = false;
                 SessionCostUsd = done.CostUsd;
-                if (done.IsError && !done.WasInterrupted) Add(new NoticeChatItem($"The turn ended with an error ({done.Subtype}).", NoticeKind.Error));
+                if (done.IsError && !done.WasInterrupted && State != ChatState.Stopping) Add(new NoticeChatItem($"The turn ended with an error ({done.Subtype}).", NoticeKind.Error));
                 State = ChatState.Idle;
                 break;
         }
@@ -287,8 +308,9 @@ public sealed partial class ChatViewModel : ObservableObject
     private void OnSessionEnded(ClaudeSession session, string stderr)
     {
         if (!ReferenceEquals(session, _session)) return;
+        SealStreaming(); // before Detach, which forgets the streaming row
         Detach();
-        SealStreaming();
+        ExpirePermissions();
         if (!_endingOnPurpose)
         {
             var message = _module.IsEnabled ? "Claude Code stopped unexpectedly." : "Claude Chat was turned off, so the session ended.";

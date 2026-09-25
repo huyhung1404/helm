@@ -1,5 +1,6 @@
 using System.Text;
 using Helm.Core.Processes;
+using Helm.Modules.ClaudeChat.Chat;
 using Helm.Modules.ClaudeChat.Cli;
 using Microsoft.Extensions.Logging.Abstractions;
 
@@ -58,6 +59,21 @@ public class ClaudeSessionE2ETests
             Assert.True(denied.Permissions.Count > 0, "No permission request. Transcript: " + denied.Transcript);
             Assert.Contains(denied.ToolResults, t => t.IsError && t.Content.Contains("Denied by the Helm test."));
             Assert.False(File.Exists(secondOutside));
+
+            // 5. "Allow for this chat" (a command rule forced to the session) covers the next matching command and
+            //    writes nothing to the project's Claude Code settings.
+            await session.SendUserMessageAsync("Use the Bash tool to run exactly this command and nothing else: mkdir alpha beta");
+            var ruled = await ReadTurnAsync(session, onPermission: r =>
+            {
+                var rule = PermissionOptions.From(r.Suggestions).First(o => o.Label.StartsWith("Allow mkdir alpha", StringComparison.Ordinal));
+                return session.AllowAsync(r, rule.UpdatedPermissions);
+            });
+            Assert.NotEmpty(ruled.Permissions);
+            await session.SendUserMessageAsync("Use the Bash tool to run exactly this command and nothing else: mkdir alpha gamma");
+            var covered = await ReadTurnAsync(session);
+            Assert.True(covered.Permissions.Count == 0, "Asked again. Transcript: " + covered.Transcript);
+            Assert.True(Directory.Exists(Path.Combine(folder, "gamma")));
+            Assert.False(File.Exists(Path.Combine(folder, ".claude", "settings.local.json")));
         }
         finally
         {

@@ -58,7 +58,8 @@ public sealed record PermissionDenied(string ToolName, string? ToolUseId, string
 /// <summary><c>result</c>: the turn is over and the CLI is idle, waiting for the next user message.</summary>
 public sealed record TurnCompleted(string Subtype, bool IsError, string? TerminalReason, double CostUsd, long DurationMs, int NumTurns) : ClaudeEvent
 {
-    public bool WasInterrupted => TerminalReason == "aborted_streaming";
+    /// <summary>"aborted_streaming" mid-reply, "aborted_tools" while a tool or a permission prompt was pending, ...</summary>
+    public bool WasInterrupted => TerminalReason?.StartsWith("aborted", StringComparison.Ordinal) == true;
 }
 
 /// <summary>A reply to a <c>control_request</c> Helm sent (initialize, interrupt). Consumed by <see cref="ClaudeSession"/>.</summary>

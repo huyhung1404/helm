@@ -123,6 +123,14 @@ public class ClaudeProtocolTests
         Assert.True(result.WasInterrupted);
     }
 
+    [Theory]
+    [InlineData("aborted_tools", true)]
+    [InlineData("aborted_streaming", true)]
+    [InlineData("completed", false)]
+    [InlineData(null, false)]
+    public void Any_aborted_terminal_reason_counts_as_interrupted(string? reason, bool interrupted) =>
+        Assert.Equal(interrupted, new TurnCompleted("error_during_execution", true, reason, 0, 0, 1).WasInterrupted);
+
     [Fact]
     public void User_message_is_one_ascii_line()
     {

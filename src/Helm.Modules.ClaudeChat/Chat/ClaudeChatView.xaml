@@ -97,6 +97,100 @@
             </Expander>
         </DataTemplate>
 
+        <DataTemplate DataType="{x:Type chat:PermissionChatItem}">
+            <Border
+                x:Name="Card"
+                Margin="28,6,48,6"
+                Padding="14,12"
+                AutomationProperties.Name="Permission request"
+                BorderThickness="1"
+                CornerRadius="8">
+                <Border.Style>
+                    <Style TargetType="Border">
+                        <Setter Property="Background" Value="{DynamicResource CardBackgroundFillColorDefaultBrush}" />
+                        <Setter Property="BorderBrush" Value="{DynamicResource CardStrokeColorDefaultBrush}" />
+                        <Style.Triggers>
+                            <DataTrigger Binding="{Binding IsPending}" Value="True">
+                                <Setter Property="BorderBrush" Value="{DynamicResource AccentFillColorDefaultBrush}" />
+                            </DataTrigger>
+                        </Style.Triggers>
+                    </Style>
+                </Border.Style>
+                <StackPanel>
+                    <DockPanel>
+                        <ui:SymbolIcon
+                            Margin="0,0,10,0"
+                            DockPanel.Dock="Left"
+                            FontSize="18"
+                            Foreground="{DynamicResource AccentTextFillColorPrimaryBrush}"
+                            Symbol="ShieldKeyhole24" />
+                        <TextBlock FontWeight="SemiBold" Text="{Binding Title}" TextWrapping="Wrap" />
+                    </DockPanel>
+                    <TextBox
+                        Margin="28,6,0,0"
+                        FontFamily="Cascadia Mono, Consolas"
+                        FontSize="12"
+                        Style="{StaticResource ChatText}"
+                        Text="{Binding Summary, Mode=OneWay}" />
+                    <TextBlock
+                        Margin="28,4,0,0"
+                        Style="{DynamicResource HelmSecondaryText}"
+                        Text="{Binding Reason}"
+                        Visibility="{Binding Reason, Converter={StaticResource NotEmptyToVisibility}}" />
+                    <Expander Margin="24,6,0,0" Header="Details">
+                        <ScrollViewer MaxHeight="200" VerticalScrollBarVisibility="Auto">
+                            <TextBox
+                                FontFamily="Cascadia Mono, Consolas"
+                                FontSize="12"
+                                Style="{StaticResource ChatText}"
+                                Text="{Binding Details, Mode=OneWay}" />
+                        </ScrollViewer>
+                    </Expander>
+
+                    <!-- Answer buttons while pending; the outcome afterwards -->
+                    <StackPanel Margin="28,10,0,0" Visibility="{Binding IsPending, Converter={StaticResource BoolToVisibility}}">
+                        <StackPanel Orientation="Horizontal">
+                            <ui:Button
+                                MinWidth="110"
+                                Margin="0,0,8,0"
+                                Appearance="Primary"
+                                Command="{Binding AllowOnceCommand}"
+                                Content="Allow once" />
+                            <ui:Button MinWidth="90" Command="{Binding DenyCommand}" Content="Deny" />
+                        </StackPanel>
+                        <TextBlock
+                            Margin="0,12,0,4"
+                            Style="{DynamicResource HelmSecondaryText}"
+                            Text="Or allow for the rest of this chat (nothing is saved to your Claude Code settings):"
+                            Visibility="{Binding Options.Count, Converter={StaticResource NotEmptyToVisibility}}" />
+                        <ItemsControl ItemsSource="{Binding Options}">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <ui:Button
+                                        Margin="0,2,0,2"
+                                        Padding="10,5"
+                                        HorizontalAlignment="Left"
+                                        HorizontalContentAlignment="Left"
+                                        Appearance="Transparent"
+                                        AutomationProperties.Name="{Binding Label}"
+                                        Command="{Binding DataContext.AllowWithCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}"
+                                        CommandParameter="{Binding}"
+                                        ToolTip="{Binding Label}">
+                                        <TextBlock Text="{Binding Label}" TextTrimming="CharacterEllipsis" />
+                                    </ui:Button>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </StackPanel>
+                    <TextBlock
+                        Margin="28,8,0,0"
+                        FontWeight="SemiBold"
+                        Text="{Binding Outcome}"
+                        Visibility="{Binding Outcome, Converter={StaticResource NotEmptyToVisibility}}" />
+                </StackPanel>
+            </Border>
+        </DataTemplate>
+
         <DataTemplate DataType="{x:Type chat:NoticeChatItem}">
             <Border Margin="28,4,48,4" Padding="10,6" CornerRadius="6" BorderThickness="1">
                 <Border.Style>
