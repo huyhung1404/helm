@@ -1,0 +1,20 @@
+﻿<Project>
+  <PropertyGroup>
+    <TargetFramework>net8.0-windows10.0.19041.0</TargetFramework>
+    <SupportedOSPlatformVersion>10.0.19041.0</SupportedOSPlatformVersion>
+    <LangVersion>latest</LangVersion>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <PlatformTarget>x64</PlatformTarget>
+    <!-- Only the .NET 10 runtime may be installed; allow running on newer major runtimes. -->
+    <RollForward>Major</RollForward>
+    <TreatWarningsAsErrors>false</TreatWarningsAsErrors>
+    <WarningsAsErrors>$(WarningsAsErrors);CS8600;CS8601;CS8602;CS8603;CS8604;CS8605;CS8618;CS8619;CS8620;CS8622;CS8625;CS8629;CS8631;CS8633</WarningsAsErrors>
+    <!-- NETSDK1138: net8 is out of support on newer SDKs; this is an intentional target. -->
+    <NoWarn>$(NoWarn);NETSDK1138</NoWarn>
+    <Version>0.1.0</Version>
+    <Authors>huyhung1404</Authors>
+    <Product>Helm</Product>
+    <Copyright>Copyright (c) 2026 huyhung1404</Copyright>
+  </PropertyGroup>
+</Project>

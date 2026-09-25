@@ -1,0 +1,8 @@
+<Project>
+  <!-- The WindowsDesktop SDK removes these implicit usings (Path clashes with System.Windows.Shapes.Path);
+       non-XAML code in this repo relies on them, so re-add them after the SDK has run. -->
+  <ItemGroup>
+    <Using Include="System.IO" />
+    <Using Include="System.Net.Http" />
+  </ItemGroup>
+</Project>
