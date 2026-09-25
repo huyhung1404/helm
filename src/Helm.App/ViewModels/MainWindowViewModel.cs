@@ -27,10 +27,17 @@ internal sealed partial class MainWindowViewModel : ObservableObject
                 g,
                 modules.Modules.Where(m => m.Group == g).OrderBy(m => m.DisplayName).ToList(),
                 ExtraPagesFor(g)))
+            .Where(g => ShowEmptyGroups || g.Modules.Count > 0 || g.ExtraPages.Count > 0)
             .ToList();
     }
 
-    /// <summary>Every group is always present so the nav tree mirrors PowerToys, even when empty.</summary>
+    /// <summary>
+    /// Set to true to show every group (with a "coming soon" placeholder) like PowerToys. Off while Helm only
+    /// ships Zones, so the nav only lists groups that contain something.
+    /// </summary>
+    private const bool ShowEmptyGroups = false;
+
+    /// <summary>Nav groups built from the registered modules' <see cref="ModuleGroup"/>.</summary>
     public IReadOnlyList<NavGroup> Groups { get; }
 
     public IReadOnlyList<SearchResult> Search(string text) => _search.Search(text);
@@ -38,9 +45,12 @@ internal sealed partial class MainWindowViewModel : ObservableObject
     [RelayCommand]
     private void OpenFeedback() => _launcher.OpenUrl(AppInfo.IssuesUrl);
 
+    /// <summary>
+    /// Non-module pages inside groups. The Diagnostics page (Advanced) is hidden for now; it still opens with
+    /// "--page Diagnostics". Re-enable: ModuleGroup.Advanced => [new ExtraNavPage("Diagnostics", SymbolRegular.Bug24, typeof(DiagnosticsPage))]
+    /// </summary>
     private static IReadOnlyList<ExtraNavPage> ExtraPagesFor(ModuleGroup group) => group switch
     {
-        ModuleGroup.Advanced => [new ExtraNavPage("Diagnostics", SymbolRegular.Bug24, typeof(DiagnosticsPage))],
         _ => [],
     };
 }

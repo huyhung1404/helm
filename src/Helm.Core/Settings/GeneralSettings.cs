@@ -67,9 +67,6 @@ public sealed class UpdateSettings
     /// <summary>Apply a downloaded update the next time Helm starts.</summary>
     public bool AutoInstallOnRestart { get; set; }
 
-    /// <summary>Optional GitHub token (only to raise API rate limits; the repository is public).</summary>
-    public string? GitHubToken { get; set; }
-
     /// <summary>Dev only: a local releases folder or file:// URL used instead of GitHub (see docs/testing-updates.md).</summary>
     public string? SourceOverride { get; set; }
 }

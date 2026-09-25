@@ -1,4 +1,3 @@
-using Helm.Modules.AlwaysOnTop;
 using Helm.Modules.Zones;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -10,6 +9,8 @@ internal static class HelmModules
     public static void Register(IServiceCollection services)
     {
         services.AddZonesModule();
-        services.AddAlwaysOnTopModule();
+
+        // Temporarily hidden; the module is still built and can be re-enabled with this one line:
+        // services.AddAlwaysOnTopModule();   (using Helm.Modules.AlwaysOnTop;)
     }
 }

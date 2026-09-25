@@ -172,7 +172,8 @@ internal partial class MainWindow : FluentWindow
             Navigation.MenuItems.Add(groupItem);
         }
 
-        Navigation.FooterMenuItems.Add(NavItem("Welcome to Helm", SymbolRegular.HandWave24, typeof(WelcomePage)));
+        // "Welcome to Helm" (WelcomePage) is hidden for now; re-add:
+        // Navigation.FooterMenuItems.Add(NavItem("Welcome to Helm", SymbolRegular.HandWave24, typeof(WelcomePage)));
         Navigation.FooterMenuItems.Add(NavItem("What's new", SymbolRegular.Megaphone24, typeof(WhatsNewPage)));
         var feedback = new NavigationViewItem { Content = "Give feedback", Icon = new SymbolIcon(SymbolRegular.PersonFeedback24) };
         feedback.Click += (_, _) => _viewModel.OpenFeedbackCommand.Execute(null);

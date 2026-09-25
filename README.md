@@ -2,12 +2,12 @@
 
 A personal Windows admin and productivity toolkit in the spirit of Microsoft PowerToys. Helm is one Fluent desktop app made of independent tools ("modules"), each with its own tab.
 
-**v0.1** ships the full shell and two modules:
+Helm currently ships one module, **Zones**. Always On Top, the Diagnostics page and the Welcome page are built but hidden until they are needed; each comes back with one line (see `src/Helm.App/Hosting/HelmModules.cs`, `MainWindowViewModel.ExtraPagesFor` and `MainWindow.BuildNavigation`).
 
 | Module | What it does |
 |---|---|
 | **Zones** | Splits each monitor into zones (templates or custom grid/canvas layouts). Hold <kbd>Shift</kbd> while dragging a window to snap it; <kbd>Win</kbd>+<kbd>Shift</kbd>+<kbd>`</kbd> opens the layout editor; optional <kbd>Win</kbd>+<kbd>←</kbd>/<kbd>→</kbd> override. |
-| **Always On Top** | <kbd>Win</kbd>+<kbd>Ctrl</kbd>+<kbd>T</kbd> pins the active window above all others and draws a colored border around it. |
+| **Always On Top** *(hidden for now)* | <kbd>Win</kbd>+<kbd>Ctrl</kbd>+<kbd>T</kbd> pins the active window above all others and draws a colored border around it. |
 
 ## Install
 
@@ -22,7 +22,7 @@ Updates are automatic. Helm checks GitHub Releases 30 seconds after it starts an
 - **Manual check**: General → Updates → *Check for updates*.
 - **Channels**: *Stable* (default) or *Preview*, which receives GitHub pre-releases such as `v0.4.0-preview.1`.
 - Before applying an update, Helm disables every module (hooks, topmost windows, overlays). The restarted Helm stays elevated without another UAC prompt.
-- **Rate limits**: the repository is public, so no token is needed. If GitHub throttles you, add a token in General → Updates.
+- The repository is public, so update checks need no account or token.
 
 **Portable and dev builds do not auto-update.** Running from `bin/`, `dotnet run` or an unpacked portable zip shows "Updates unavailable" with an explanation, and every update action is disabled.
 

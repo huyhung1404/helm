@@ -3,6 +3,16 @@
 All notable changes to Helm. The top section is used as the GitHub release body and as the Velopack release notes.
 Format: [Keep a Changelog](https://keepachangelog.com), versions follow [SemVer](https://semver.org).
 
+## [0.2.4] - 2026-09-25
+
+### Changed
+- Helm now focuses on Zones: Always On Top, the Diagnostics page, the Welcome page and the empty tool groups are
+  hidden (the code stays and can be re-enabled later).
+- Removed the GitHub token setting; the repository is public, so update checks never need one.
+
+### Fixed
+- The title-bar and Home icons were a downscaled 256 px image and looked blurry; they now use the icon frame drawn
+  for their exact pixel size.
 ## [0.2.3] - 2026-09-25
 
 ### Fixed

@@ -18,7 +18,7 @@
         <TextBlock Text="Version" Style="{DynamicResource HelmSectionHeader}" Margin="0,0,0,8" />
         <ui:CardExpander x:Name="UpdatesCard" Margin="0,0,0,4" IsExpanded="True" DataContext="{Binding Updates}">
             <ui:CardExpander.Icon>
-                <ui:ImageIcon Source="pack://application:,,,/Assets/helm.png" Width="28" Height="28" />
+                <ui:ImageIcon Source="pack://application:,,,/Assets/helm.png" Width="32" Height="32" RenderOptions.BitmapScalingMode="HighQuality" />
             </ui:CardExpander.Icon>
             <ui:CardExpander.Header>
                 <Grid>
@@ -82,12 +82,6 @@
                     <Grid>
                         <core:CardHeader Title="Install updates automatically when Helm restarts" Description="A downloaded update is applied the next time Helm starts." />
                         <ui:ToggleSwitch HorizontalAlignment="Right" IsChecked="{Binding AutoInstallOnRestart}" />
-                    </Grid>
-                </Border>
-                <Border Style="{DynamicResource HelmExpanderRow}" IsEnabled="{Binding IsInstalled}">
-                    <Grid>
-                        <core:CardHeader Title="GitHub token (optional)" Description="Only needed if GitHub rate-limits update checks. Stored in general.json." />
-                        <ui:TextBox HorizontalAlignment="Right" Width="260" Text="{Binding GitHubToken, UpdateSourceTrigger=LostFocus}" PlaceholderText="ghp_…" />
                     </Grid>
                 </Border>
                 <Border Style="{DynamicResource HelmExpanderRow}">

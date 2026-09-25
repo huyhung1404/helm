@@ -236,7 +236,7 @@ internal sealed class VelopackUpdateService : IUpdateService, IDisposable
     private UpdateManager GetManager()
     {
         var u = _general.Current.Updates;
-        var key = $"{u.Channel}|{u.SourceOverride}|{u.GitHubToken?.Length}";
+        var key = $"{u.Channel}|{u.SourceOverride}";
         if (_manager is not null && _managerKey == key) return _manager;
 
         var options = new UpdateOptions
@@ -260,8 +260,8 @@ internal sealed class VelopackUpdateService : IUpdateService, IDisposable
             var path = Uri.TryCreate(source, UriKind.Absolute, out var fileUri) && fileUri.IsFile ? fileUri.LocalPath : source;
             return new SimpleFileSource(new DirectoryInfo(path));
         }
-        var token = string.IsNullOrWhiteSpace(u.GitHubToken) ? null : u.GitHubToken.Trim();
-        return new GithubSource(AppInfo.RepositoryUrl, token, UpdatePolicy.IncludePrereleases(u.Channel), null);
+        // The repository is public: anonymous GitHub API access, no token.
+        return new GithubSource(AppInfo.RepositoryUrl, null, UpdatePolicy.IncludePrereleases(u.Channel), null);
     }
 
     private void NotifyAvailable(string version)
@@ -309,9 +309,9 @@ internal sealed class VelopackUpdateService : IUpdateService, IDisposable
     private static string Describe(Exception ex) => ex switch
     {
         HttpRequestException http when http.StatusCode is System.Net.HttpStatusCode.Forbidden =>
-            "GitHub refused the request (rate limit?). Add a GitHub token in Updates or try again later.",
+            "GitHub refused the request (probably its hourly rate limit). Helm will try again later.",
         HttpRequestException http when http.StatusCode is System.Net.HttpStatusCode.NotFound or System.Net.HttpStatusCode.Unauthorized =>
-            "GitHub could not find Helm's releases. Check your connection, or add a GitHub token in Updates if access is restricted.",
+            "GitHub could not find Helm's releases. Check your connection and try again.",
         HttpRequestException => $"Could not reach the update server: {ex.Message}",
         TaskCanceledException => "The update server did not respond in time.",
         _ => ex.Message,

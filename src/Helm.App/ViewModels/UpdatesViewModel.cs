@@ -19,7 +19,6 @@ internal sealed partial class UpdatesViewModel : ObservableObject
     [ObservableProperty] private UpdateChannel _channel;
     [ObservableProperty] private bool _autoDownload;
     [ObservableProperty] private bool _autoInstallOnRestart;
-    [ObservableProperty] private string _gitHubToken = string.Empty;
     [ObservableProperty] private bool _purgeDataOnUninstall;
 
     public UpdatesViewModel(IUpdateService updates, ISettingsStoreFactory settings, IProcessLauncher launcher, IUiDispatcher ui)
@@ -34,7 +33,6 @@ internal sealed partial class UpdatesViewModel : ObservableObject
         Channel = u.Channel;
         AutoDownload = u.AutoDownload;
         AutoInstallOnRestart = u.AutoInstallOnRestart;
-        GitHubToken = u.GitHubToken ?? string.Empty;
         PurgeDataOnUninstall = _general.Current.PurgeDataOnUninstall;
         _loading = false;
 
@@ -106,7 +104,6 @@ internal sealed partial class UpdatesViewModel : ObservableObject
     partial void OnChannelChanged(UpdateChannel value) => Save(s => s.Updates.Channel = value);
     partial void OnAutoDownloadChanged(bool value) => Save(s => s.Updates.AutoDownload = value);
     partial void OnAutoInstallOnRestartChanged(bool value) => Save(s => s.Updates.AutoInstallOnRestart = value);
-    partial void OnGitHubTokenChanged(string value) => Save(s => s.Updates.GitHubToken = string.IsNullOrWhiteSpace(value) ? null : value.Trim());
     partial void OnPurgeDataOnUninstallChanged(bool value) => Save(s => s.PurgeDataOnUninstall = value);
 
     private void Save(Action<GeneralSettings> apply)

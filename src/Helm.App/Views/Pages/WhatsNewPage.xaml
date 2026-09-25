@@ -10,9 +10,9 @@
             <StackPanel>
                 <TextBlock x:Name="VersionText" FontSize="16" FontWeight="SemiBold" Margin="0,0,0,8" />
                 <TextBlock TextWrapping="Wrap" LineHeight="22">
-                    • New Fluent shell modelled after PowerToys Settings: Home, General, search, tray.<LineBreak />
                     • <Bold>Zones</Bold>: templates, custom grid/canvas layouts, drag-to-snap, Win+Arrow override.<LineBreak />
-                    • <Bold>Always On Top</Bold>: pin windows with Win+Ctrl+T, colored border, pinned list.
+                    • Automatic updates from GitHub Releases (General → Updates).<LineBreak />
+                    • Fluent shell modelled after PowerToys Settings: Home, General, search, tray.
                 </TextBlock>
             </StackPanel>
         </Border>
