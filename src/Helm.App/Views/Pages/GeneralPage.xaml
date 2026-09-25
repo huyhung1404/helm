@@ -7,7 +7,7 @@
     xmlns:core="clr-namespace:Helm.Core.Ui;assembly=Helm.Core"
     Title="General">
 
-    <StackPanel Margin="0,0,24,24">
+    <StackPanel Margin="24,0,24,24">
         <TextBlock Text="General" FontSize="28" FontWeight="SemiBold" Margin="0,0,0,16" />
 
         <ui:InfoBar Title="Something went wrong" Message="{Binding StatusMessage}" Severity="Warning" IsClosable="True"

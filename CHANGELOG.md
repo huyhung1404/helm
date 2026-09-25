@@ -3,6 +3,11 @@
 All notable changes to Helm. The top section is used as the GitHub release body and as the Velopack release notes.
 Format: [Keep a Changelog](https://keepachangelog.com), versions follow [SemVer](https://semver.org).
 
+## [0.2.3] - 2026-09-25
+
+### Fixed
+- The content background started 24 px to the right of the navigation pane, leaving a strip of pane color;
+  the content area now starts right at the pane and the 24 px inset is applied inside each page.
 ## [0.2.2] - 2026-09-25
 
 ### Fixed

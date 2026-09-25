@@ -52,7 +52,7 @@
             IsPaneToggleVisible="False"
             OpenPaneLength="300"
             PaneDisplayMode="Left"
-            FrameMargin="24,0,0,0"
+            FrameMargin="0"
             Transition="FadeInWithSlide"
             TransitionDuration="150">
             <ui:NavigationView.ContentOverlay>

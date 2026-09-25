@@ -57,7 +57,7 @@ public class ModulePageBase : Page
         _enableCard.Header = _enableHeader;
         _enableCard.Content = _enableToggle;
 
-        var stack = new StackPanel { Margin = new Thickness(0, 0, 24, 24) };
+        var stack = new StackPanel { Margin = new Thickness(24, 0, 24, 24) };
         stack.Children.Add(_title);
         stack.Children.Add(intro);
         stack.Children.Add(_infoBar);

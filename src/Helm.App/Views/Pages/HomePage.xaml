@@ -34,7 +34,7 @@
         </Style>
     </Page.Resources>
 
-    <StackPanel Margin="0,0,24,24">
+    <StackPanel Margin="24,0,24,24">
         <TextBlock Text="Home" FontSize="28" FontWeight="SemiBold" Margin="0,0,0,16" />
 
         <!-- Top strip: what's new / shortcut conflicts / updates -->
