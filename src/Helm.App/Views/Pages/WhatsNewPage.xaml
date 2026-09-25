@@ -10,7 +10,7 @@
             <StackPanel>
                 <TextBlock x:Name="VersionText" FontSize="16" FontWeight="SemiBold" Margin="0,0,0,8" />
                 <TextBlock TextWrapping="Wrap" LineHeight="22">
-                    • <Bold>Zones</Bold>: draw your own zones on one monitor or across monitors, several layouts per monitor (Ctrl+Win+Alt+1…9), Win+PgUp/PgDn between windows in a zone.<LineBreak />
+                    • A clean start: Helm ships without tools for now; new tools are planned and will arrive as updates.<LineBreak />
                     • Automatic updates from GitHub Releases (General → Updates).<LineBreak />
                     • Fluent shell modelled after PowerToys Settings: Home, General, search, tray.
                 </TextBlock>

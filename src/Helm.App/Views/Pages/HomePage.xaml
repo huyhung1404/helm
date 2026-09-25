@@ -119,7 +119,7 @@
                 <Border Style="{DynamicResource HelmSurface}" Margin="0,0,0,16">
                     <StackPanel>
                         <TextBlock Text="Quick access" FontSize="16" FontWeight="SemiBold" Margin="0,0,0,12" />
-                        <TextBlock Text="Enable a utility to pin it here." Style="{DynamicResource HelmSecondaryText}"
+                        <TextBlock Text="Tools you turn on will appear here." Style="{DynamicResource HelmSecondaryText}"
                                    Visibility="{Binding HasQuickAccess, Converter={StaticResource InverseBoolToVisibility}}" />
                         <ItemsControl ItemsSource="{Binding QuickAccess}">
                             <ItemsControl.ItemsPanel>
@@ -147,7 +147,7 @@
                 <Border Style="{DynamicResource HelmSurface}">
                     <StackPanel>
                         <TextBlock Text="Shortcuts" FontSize="16" FontWeight="SemiBold" Margin="0,0,0,12" />
-                        <TextBlock Text="Shortcuts of enabled utilities appear here." Style="{DynamicResource HelmSecondaryText}"
+                        <TextBlock Text="Keyboard shortcuts of your tools will appear here." Style="{DynamicResource HelmSecondaryText}"
                                    Visibility="{Binding HasShortcuts, Converter={StaticResource InverseBoolToVisibility}}" />
                         <ItemsControl ItemsSource="{Binding Shortcuts}">
                             <ItemsControl.ItemTemplate>
@@ -204,7 +204,7 @@
                             </DataTemplate>
                         </ItemsControl.ItemTemplate>
                     </ItemsControl>
-                    <TextBlock Text="No utilities registered." Margin="16,4,16,16" Style="{DynamicResource HelmSecondaryText}"
+                    <TextBlock Text="No tools yet — new tools are on the way." Margin="16,4,16,16" Style="{DynamicResource HelmSecondaryText}"
                                Visibility="{Binding Utilities.Count, Converter={StaticResource EmptyToVisibility}}" />
                 </StackPanel>
             </Border>

@@ -25,8 +25,8 @@ This checklist exercises the full Velopack flow on one machine without GitHub. Y
 ## 2. Create some state to verify later
 
 - [ ] General → **Run at startup** = On.
-- [ ] Zones: open the editor (<kbd>Win</kbd>+<kbd>Shift</kbd>+<kbd>`</kbd>), apply a non-default layout to one monitor.
-- [ ] Always On Top: change the border color.
+- [ ] General: change the app theme and turn on **Start minimized to tray**.
+- [ ] Pin the navigation menu and drag its edge wider.
 - [ ] In an elevated PowerShell, confirm the task points at the stable launcher:
 
   ```powershell
@@ -69,7 +69,7 @@ This checklist exercises the full Velopack flow on one machine without GitHub. Y
 
 ## 6. Verify nothing was lost
 
-- [ ] The Zones layout from step 2 is still applied, and the Always On Top border color is unchanged.
+- [ ] The theme, start-minimized, pinned menu and menu width from step 2 are unchanged.
 - [ ] General → Run at startup is still On. In elevated PowerShell, `(Get-ScheduledTask -TaskName Helm).Actions.Execute` still points at `...\HelmApp\Helm.exe`, not `current\` or an `app-0.3.x` folder.
 - [ ] Sign out and back in. Helm starts elevated with no UAC prompt, straight into the tray.
 - [ ] `velopack-hooks.log` contains `Updated to 0.3.1.`

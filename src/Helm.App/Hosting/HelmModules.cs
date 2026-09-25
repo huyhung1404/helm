@@ -1,16 +1,18 @@
-using Helm.Modules.Zones;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Helm.App.Hosting;
 
-/// <summary>The one place where modules are wired into the app. Add a line here for every new module.</summary>
+/// <summary>
+/// The one place where modules are wired into the app. Add a line here for every new module, e.g.
+/// <c>services.AddMyToolModule();</c> (see README → Adding a module).
+/// </summary>
 internal static class HelmModules
 {
     public static void Register(IServiceCollection services)
     {
-        services.AddZonesModule();
+        // No modules yet — new tools are planned (README → Roadmap).
 
-        // Temporarily hidden; the module is still built and can be re-enabled with this one line:
-        // services.AddAlwaysOnTopModule();   (using Helm.Modules.AlwaysOnTop;)
+        // Built but hidden; re-enable with (using Helm.Modules.AlwaysOnTop;):
+        // services.AddAlwaysOnTopModule();
     }
 }

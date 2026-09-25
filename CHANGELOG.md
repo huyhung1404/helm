@@ -3,6 +3,13 @@
 All notable changes to Helm. The top section is used as the GitHub release body and as the Velopack release notes.
 Format: [Keep a Changelog](https://keepachangelog.com), versions follow [SemVer](https://semver.org).
 
+## [0.4.0] - 2026-09-25
+
+### Removed
+- The Zones tool. Helm now ships as a clean shell (Home, General, search, tray, auto-update) with no tools yet;
+  new tools are planned and will arrive as updates. The Zones code remains in git history (tag v0.3.0) as the
+  starting point for a redesigned window-layout tool. Existing zone files in %LOCALAPPDATA%\Helm\settings\zones
+  are left untouched.
 ## [0.3.0] - 2026-09-25
 
 ### Changed

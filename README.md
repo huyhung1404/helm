@@ -2,13 +2,7 @@
 
 A personal Windows admin and productivity toolkit in the spirit of Microsoft PowerToys. Helm is one Fluent desktop app made of independent tools ("modules"), each with its own tab.
 
-Helm currently ships one module, **Zones**. Always On Top, the Diagnostics page and the Welcome page are built but hidden until they are needed; each comes back with one line (see `src/Helm.App/Hosting/HelmModules.cs`, `MainWindowViewModel.ExtraPagesFor` and `MainWindow.BuildNavigation`).
-
-| Module | What it does |
-|---|---|
-| **Zones** | Draw your own zones (no templates) for one monitor or **across several monitors** — a zone may straddle two screens. Several layouts per monitor: give each a number and press <kbd>Ctrl</kbd>+<kbd>Win</kbd>+<kbd>Alt</kbd>+<kbd>1…9</kbd> to switch. Hold <kbd>Shift</kbd> while dragging a window to snap it; <kbd>Win</kbd>+<kbd>PgUp</kbd>/<kbd>PgDn</kbd> switches between windows sharing a zone; <kbd>Win</kbd>+<kbd>Shift</kbd>+<kbd>`</kbd> opens the editor. |
-| **Always On Top** *(hidden for now)* | <kbd>Win</kbd>+<kbd>Ctrl</kbd>+<kbd>T</kbd> pins the active window above all others and draws a colored border around it. |
-
+Helm currently ships **no tools**: it is the shell (Home, General, search, tray, auto-update) plus the shared infrastructure for tools — hooks, hotkeys, window/monitor services and overlays. Tools are planned and will arrive as updates (see [Roadmap](#roadmap)). Always On Top is built but not registered; it comes back with one line in `src/Helm.App/Hosting/HelmModules.cs`. The previous Zones module is kept in git history (tag `v0.3.0`).
 ## Install
 
 Download **`Helm-win-Setup.exe`** from the [latest release](https://github.com/huyhung1404/helm/releases/latest) and run it. Setup installs per user into `%LOCALAPPDATA%\HelmApp` (no admin needed to install) and creates Start menu and desktop shortcuts. It also installs the .NET 8 Desktop Runtime if it is missing. When Helm starts, it asks once for administrator rights (UAC).
@@ -121,9 +115,12 @@ The nav tree, Home tiles, tray toggles, search and enable persistence all come f
 
 ## Roadmap
 
-- Code signing for the installer and binaries (removes SmartScreen warnings).
-- **System Tools**: Color Picker, Screen Ruler, Text Extractor (OCR), Awake, Light Switch.
-- **Windowing & Layouts**: Crop And Lock, Window Hopper, per-virtual-desktop layouts for Zones.
-- **Input & Output**: Keyboard Manager (remaps), Find My Mouse, mouse jump between monitors.
+Planned tools, each added as its own module (`src/Helm.Modules.<Name>`):
+
+- **Window layouts (Zones, redesigned)**: custom zones, layouts across monitors, number shortcuts to switch layouts, cycling between windows in a zone. The v0.3.0 implementation is the starting point.
+- **Always On Top**: already built; re-enable after a review.
+- **System Tools**: Color Picker, Screen Ruler, Text Extractor (OCR), Awake.
+- **Input & Output**: Keyboard Manager (remaps), Find My Mouse.
 - **File Management**: File Locksmith, bulk rename, Hosts file editor, Environment Variables.
-- **Advanced**: Registry preview, a command palette / launcher, Unity-specific helpers (kill stuck editors, clear Library caches).
+- **Advanced**: a command palette / launcher, Unity helpers (kill stuck editors, clear Library caches).
+- Code signing for the installer and binaries.

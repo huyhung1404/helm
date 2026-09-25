@@ -15,8 +15,6 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Helm.App", "src\Helm.App\He
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Helm.Modules.AlwaysOnTop", "src\Helm.Modules.AlwaysOnTop\Helm.Modules.AlwaysOnTop.csproj", "{CA0C5418-76E3-4C26-8E2E-8937F07BC0B8}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Helm.Modules.Zones", "src\Helm.Modules.Zones\Helm.Modules.Zones.csproj", "{C4ED9DC4-FCE3-4626-A904-F237081A3D4D}"
-EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -75,18 +73,6 @@ Global
 		{CA0C5418-76E3-4C26-8E2E-8937F07BC0B8}.Release|x64.Build.0 = Release|Any CPU
 		{CA0C5418-76E3-4C26-8E2E-8937F07BC0B8}.Release|x86.ActiveCfg = Release|Any CPU
 		{CA0C5418-76E3-4C26-8E2E-8937F07BC0B8}.Release|x86.Build.0 = Release|Any CPU
-		{C4ED9DC4-FCE3-4626-A904-F237081A3D4D}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{C4ED9DC4-FCE3-4626-A904-F237081A3D4D}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{C4ED9DC4-FCE3-4626-A904-F237081A3D4D}.Debug|x64.ActiveCfg = Debug|Any CPU
-		{C4ED9DC4-FCE3-4626-A904-F237081A3D4D}.Debug|x64.Build.0 = Debug|Any CPU
-		{C4ED9DC4-FCE3-4626-A904-F237081A3D4D}.Debug|x86.ActiveCfg = Debug|Any CPU
-		{C4ED9DC4-FCE3-4626-A904-F237081A3D4D}.Debug|x86.Build.0 = Debug|Any CPU
-		{C4ED9DC4-FCE3-4626-A904-F237081A3D4D}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{C4ED9DC4-FCE3-4626-A904-F237081A3D4D}.Release|Any CPU.Build.0 = Release|Any CPU
-		{C4ED9DC4-FCE3-4626-A904-F237081A3D4D}.Release|x64.ActiveCfg = Release|Any CPU
-		{C4ED9DC4-FCE3-4626-A904-F237081A3D4D}.Release|x64.Build.0 = Release|Any CPU
-		{C4ED9DC4-FCE3-4626-A904-F237081A3D4D}.Release|x86.ActiveCfg = Release|Any CPU
-		{C4ED9DC4-FCE3-4626-A904-F237081A3D4D}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -96,6 +82,5 @@ Global
 		{DFA0F8D6-A7F1-4EE3-8A37-CA2DEE2C4F02} = {0AB3BF05-4346-4AA6-1389-037BE0695223}
 		{9ACC1364-77E5-456E-A53A-1C60A35E4CA5} = {827E0CD3-B72D-47B6-A68D-7590B98EB39B}
 		{CA0C5418-76E3-4C26-8E2E-8937F07BC0B8} = {827E0CD3-B72D-47B6-A68D-7590B98EB39B}
-		{C4ED9DC4-FCE3-4626-A904-F237081A3D4D} = {827E0CD3-B72D-47B6-A68D-7590B98EB39B}
 	EndGlobalSection
 EndGlobal
