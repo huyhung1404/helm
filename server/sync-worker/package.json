@@ -1,0 +1,17 @@
+{
+  "name": "helm-sync-worker",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "test": "node --test \"test/*.test.ts\"",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "5.20260925.1",
+    "@types/node": "26.6.2",
+    "typescript": "7.0.2",
+    "wrangler": "4.140.0"
+  }
+}

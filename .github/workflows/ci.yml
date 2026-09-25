@@ -28,6 +28,38 @@ jobs:
       - name: Build (warnings are errors)
         run: dotnet build --configuration Release --no-restore -warnaserror
 
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: server/sync-worker/package-lock.json
+
+      - name: Sync worker (typecheck, unit tests)
+        working-directory: server/sync-worker
+        run: |
+          npm ci
+          npm run typecheck
+          npm test
+
+      # SyncServerTests run the real engine against the real Worker when these variables are set.
+      - name: Start sync worker locally
+        working-directory: server/sync-worker
+        env:
+          WRANGLER_SEND_METRICS: "false"
+        run: |
+          $admin = [Convert]::ToBase64String([Security.Cryptography.RandomNumberGenerator]::GetBytes(32))
+          Write-Output "::add-mask::$admin"
+          "ADMIN_TOKEN=$admin" | Set-Content .dev.vars -Encoding ascii
+          "HELM_SYNC_TEST_ADMIN=$admin" >> $env:GITHUB_ENV
+          "HELM_SYNC_TEST_URL=http://127.0.0.1:8787" >> $env:GITHUB_ENV
+          Start-Process -FilePath npx.cmd -ArgumentList 'wrangler', 'dev', '--port', '8787', '--ip', '127.0.0.1' `
+            -RedirectStandardOutput wrangler.log -RedirectStandardError wrangler.err -NoNewWindow
+          for ($i = 0; $i -lt 60; $i++) {
+            try { Invoke-RestMethod http://127.0.0.1:8787/health | Out-Null; exit 0 } catch { Start-Sleep -Seconds 2 }
+          }
+          Get-Content wrangler.log, wrangler.err
+          exit 1
+
       - name: Test
         run: dotnet test --configuration Release --no-build --logger "trx;LogFileName=results.trx"
 

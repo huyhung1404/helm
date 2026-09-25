@@ -1,0 +1,23 @@
+# Helm sync server. Setup and deploy: see README.md in this folder.
+name = "helm-sync"
+main = "src/index.ts"
+compatibility_date = "2026-09-01"
+
+# Served only on the custom domain; the *.workers.dev URL stays off.
+workers_dev = false
+routes = [{ pattern = "sync.huyhung1404.com", custom_domain = true }]
+
+[[durable_objects.bindings]]
+name = "ACCOUNT"
+class_name = "AccountObject"
+
+[[durable_objects.bindings]]
+name = "REGISTRY"
+class_name = "RegistryObject"
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["AccountObject", "RegistryObject"]
+
+[observability]
+enabled = true
