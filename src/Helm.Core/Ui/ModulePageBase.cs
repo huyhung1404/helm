@@ -25,6 +25,9 @@ public class ModulePageBase : Page
     public static readonly DependencyProperty ExtraMessageProperty = DependencyProperty.Register(
         nameof(ExtraMessage), typeof(string), typeof(ModulePageBase), new PropertyMetadata(null, (d, _) => ((ModulePageBase)d).UpdateInfoBar()));
 
+    public static readonly DependencyProperty BodyFillsHeightProperty = DependencyProperty.Register(
+        nameof(BodyFillsHeight), typeof(bool), typeof(ModulePageBase), new PropertyMetadata(false, (d, e) => ScrollViewer.SetCanContentScroll(d, !(bool)e.NewValue)));
+
     private readonly TextBlock _title = new() { FontSize = 28, FontWeight = FontWeights.SemiBold, Margin = new Thickness(0, 0, 0, 20) };
     private readonly SymbolIcon _heroIcon = new() { FontSize = 56 };
     private readonly TextBlock _description = new() { FontSize = 14, TextWrapping = TextWrapping.Wrap, VerticalAlignment = VerticalAlignment.Center };
@@ -57,13 +60,17 @@ public class ModulePageBase : Page
         _enableCard.Header = _enableHeader;
         _enableCard.Content = _enableToggle;
 
-        var stack = new StackPanel { Margin = new Thickness(24, 0, 24, 24) };
-        stack.Children.Add(_title);
-        stack.Children.Add(intro);
-        stack.Children.Add(_infoBar);
-        stack.Children.Add(_enableCard);
-        stack.Children.Add(_body);
-        base.Content = stack;
+        // A grid rather than a stack panel so the body can take the remaining height (BodyFillsHeight). Inside the
+        // shell's scroll viewer the height is unbounded and the star row simply sizes to its content.
+        var layout = new Grid { Margin = new Thickness(24, 0, 24, 24) };
+        UIElement[] rows = [_title, intro, _infoBar, _enableCard, _body];
+        for (var i = 0; i < rows.Length; i++)
+        {
+            layout.RowDefinitions.Add(new RowDefinition { Height = i == rows.Length - 1 ? new GridLength(1, GridUnitType.Star) : GridLength.Auto });
+            Grid.SetRow(rows[i], i);
+            layout.Children.Add(rows[i]);
+        }
+        base.Content = layout;
     }
 
     public IHelmModule? Module
@@ -76,6 +83,18 @@ public class ModulePageBase : Page
     {
         get => GetValue(BodyProperty);
         set => SetValue(BodyProperty, value);
+    }
+
+    /// <summary>
+    /// For pages that manage their own scrolling (a chat, a log): the page is not wrapped in the shell's scroll viewer
+    /// and <see cref="Body"/> fills the height left under the header. WPF-UI's NavigationViewContentPresenter sets
+    /// IsDynamicScrollViewerEnabled from <see cref="ScrollViewer.CanContentScrollProperty"/>, which it overrides to
+    /// true for every Page; this sets it to false for the page.
+    /// </summary>
+    public bool BodyFillsHeight
+    {
+        get => (bool)GetValue(BodyFillsHeightProperty);
+        set => SetValue(BodyFillsHeightProperty, value);
     }
 
     /// <summary>Optional extra warning (e.g. a hotkey conflict) shown in the InfoBar in addition to the module status.</summary>

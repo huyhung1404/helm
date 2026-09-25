@@ -1,0 +1,74 @@
+<core:ModulePageBase
+    x:Class="Helm.Modules.ClaudeChat.ClaudeChatPage"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
+    xmlns:core="clr-namespace:Helm.Core.Ui;assembly=Helm.Core"
+    xmlns:chat="clr-namespace:Helm.Modules.ClaudeChat.Chat"
+    BodyFillsHeight="True"
+    Module="{Binding Module}">
+
+    <Grid Margin="0,12,0,0">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" MinHeight="320" />
+        </Grid.RowDefinitions>
+
+        <ui:CardExpander Margin="0,0,0,12" Icon="{ui:SymbolIcon Settings24}">
+            <ui:CardExpander.Header>
+                <core:CardHeader Title="Session settings" Description="Folder, model and permissions. Changes apply when you start a new chat." />
+            </ui:CardExpander.Header>
+            <StackPanel>
+                <Border Style="{DynamicResource HelmExpanderRow}" BorderThickness="0">
+                    <core:RowLayout>
+                        <core:CardHeader Title="Working folder" Description="{Binding DefaultWorkingDirectory, StringFormat='Claude Code reads and edits files here. Empty uses {0}.'}" />
+                        <DockPanel HorizontalAlignment="Right">
+                            <ui:Button
+                                Margin="8,0,0,0"
+                                Command="{Binding BrowseWorkingDirectoryCommand}"
+                                Content="Browse…"
+                                DockPanel.Dock="Right"
+                                Icon="{ui:SymbolIcon FolderOpen24}" />
+                            <ui:TextBox MinWidth="260" PlaceholderText="{Binding DefaultWorkingDirectory}" Text="{Binding WorkingDirectory, UpdateSourceTrigger=LostFocus}" />
+                        </DockPanel>
+                    </core:RowLayout>
+                </Border>
+                <Border Style="{DynamicResource HelmExpanderRow}">
+                    <core:RowLayout>
+                        <core:CardHeader Title="Model" Description="An alias (opus, sonnet, haiku) or a full model id. Empty uses Claude Code's default." />
+                        <ComboBox
+                            MinWidth="200"
+                            HorizontalAlignment="Right"
+                            IsEditable="True"
+                            ItemsSource="{Binding Models}"
+                            Text="{Binding Model, UpdateSourceTrigger=LostFocus}" />
+                    </core:RowLayout>
+                </Border>
+                <Border Style="{DynamicResource HelmExpanderRow}">
+                    <core:RowLayout>
+                        <core:CardHeader Title="Permissions" Description="{Binding PermissionMode.Description}" />
+                        <ComboBox
+                            MinWidth="200"
+                            HorizontalAlignment="Right"
+                            DisplayMemberPath="Title"
+                            ItemsSource="{Binding PermissionModes}"
+                            SelectedItem="{Binding PermissionMode}" />
+                    </core:RowLayout>
+                </Border>
+                <Border Style="{DynamicResource HelmExpanderRow}">
+                    <core:RowLayout>
+                        <core:CardHeader Title="Claude Code location" Description="{Binding CliDescription}" />
+                        <ui:TextBox
+                            MinWidth="260"
+                            HorizontalAlignment="Right"
+                            PlaceholderText="Find automatically"
+                            Text="{Binding CliPath, UpdateSourceTrigger=LostFocus}" />
+                    </core:RowLayout>
+                </Border>
+            </StackPanel>
+        </ui:CardExpander>
+
+        <!-- The chat host. The view is created once and moved between hosts (page / floating window). -->
+        <ContentControl x:Name="ChatHost" Grid.Row="1" />
+    </Grid>
+</core:ModulePageBase>

@@ -1,3 +1,4 @@
+using Helm.Modules.ClaudeChat;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Helm.App.Hosting;
@@ -10,7 +11,7 @@ internal static class HelmModules
 {
     public static void Register(IServiceCollection services)
     {
-        // No modules yet — new tools are planned (README → Roadmap).
+        services.AddClaudeChatModule();
 
         // Built but hidden; re-enable with (using Helm.Modules.AlwaysOnTop;):
         // services.AddAlwaysOnTopModule();
