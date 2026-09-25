@@ -90,6 +90,8 @@ Key infrastructure in `Helm.Core`:
 
 ## Adding a module
 
+> **Fastest way:** open [docs/new-tool-prompt.md](docs/new-tool-prompt.md), fill in the tool name and what it does, and paste the file into Claude Code. It contains every rule needed so a new tool matches the others (structure, UI, testing, release).
+
 1. Create `src/Helm.Modules.<Name>` (WPF class library referencing `Helm.Core`).
 2. Implement the module, usually by deriving from `HelmModuleBase`:
 
