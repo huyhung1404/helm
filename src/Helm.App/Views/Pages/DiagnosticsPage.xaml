@@ -3,8 +3,61 @@
     x:ClassModifier="internal"
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
+    xmlns:core="clr-namespace:Helm.Core.Ui;assembly=Helm.Core"
     Title="Diagnostics">
-    <StackPanel>
-        <TextBlock Text="Diagnostics" FontSize="28" FontWeight="SemiBold" />
+
+    <StackPanel Margin="0,0,24,24">
+        <Grid Margin="0,0,0,8">
+            <TextBlock Text="Diagnostics" FontSize="28" FontWeight="SemiBold" />
+            <ui:Button HorizontalAlignment="Right" Content="Refresh" Icon="{ui:SymbolIcon ArrowClockwise24}" Command="{Binding RefreshCommand}" />
+        </Grid>
+        <TextBlock Text="{Binding Summary}" Style="{DynamicResource HelmSecondaryText}" Margin="0,0,0,8" />
+
+        <TextBlock Text="Input hooks" Style="{DynamicResource HelmSectionHeader}" />
+        <ui:CardControl Margin="0,0,0,4" Icon="{ui:SymbolIcon Keyboard24}">
+            <ui:CardControl.Header>
+                <core:CardHeader Title="Test keyboard and mouse hooks" Description="{Binding HookStatus}" />
+            </ui:CardControl.Header>
+            <ui:ToggleSwitch IsChecked="{Binding IsHookTestEnabled}" />
+        </ui:CardControl>
+        <Border Style="{DynamicResource HelmSurface}" Margin="0,0,0,4">
+            <StackPanel>
+                <TextBlock><Run Text="Last key: " /><Run Text="{Binding LastKey, Mode=OneWay}" FontFamily="Consolas" /></TextBlock>
+                <TextBlock Margin="0,4,0,0"><Run Text="Last mouse: " /><Run Text="{Binding LastMouse, Mode=OneWay}" FontFamily="Consolas" /></TextBlock>
+            </StackPanel>
+        </Border>
+
+        <TextBlock Text="Shortcut conflicts" Style="{DynamicResource HelmSectionHeader}" />
+        <Border Style="{DynamicResource HelmSurface}">
+            <StackPanel>
+                <TextBlock Text="No conflicts." Style="{DynamicResource HelmSecondaryText}"
+                           Visibility="{Binding Conflicts.Count, Converter={StaticResource EmptyToVisibility}}" />
+                <ItemsControl ItemsSource="{Binding Conflicts}" />
+            </StackPanel>
+        </Border>
+
+        <TextBlock Text="Monitors" Style="{DynamicResource HelmSectionHeader}" />
+        <ui:DataGrid ItemsSource="{Binding Monitors}" AutoGenerateColumns="False" IsReadOnly="True" HeadersVisibility="Column" MaxHeight="220">
+            <ui:DataGrid.Columns>
+                <DataGridTextColumn Header="Id" Binding="{Binding Id}" />
+                <DataGridTextColumn Header="Bounds" Binding="{Binding Bounds}" />
+                <DataGridTextColumn Header="Work area" Binding="{Binding WorkArea}" />
+                <DataGridTextColumn Header="DPI" Binding="{Binding Dpi}" />
+                <DataGridCheckBoxColumn Header="Primary" Binding="{Binding IsPrimary}" />
+            </ui:DataGrid.Columns>
+        </ui:DataGrid>
+
+        <TextBlock Text="Top-level app windows" Style="{DynamicResource HelmSectionHeader}" />
+        <ui:DataGrid ItemsSource="{Binding Windows}" AutoGenerateColumns="False" IsReadOnly="True" HeadersVisibility="Column" MaxHeight="420">
+            <ui:DataGrid.Columns>
+                <DataGridTextColumn Header="HWND" Binding="{Binding HandleHex}" />
+                <DataGridTextColumn Header="Process" Binding="{Binding ProcessName}" />
+                <DataGridTextColumn Header="Title" Binding="{Binding Title}" Width="*" />
+                <DataGridTextColumn Header="Frame bounds" Binding="{Binding Bounds}" />
+                <DataGridCheckBoxColumn Header="Max" Binding="{Binding IsMaximized}" />
+                <DataGridCheckBoxColumn Header="Top" Binding="{Binding IsTopmost}" />
+            </ui:DataGrid.Columns>
+        </ui:DataGrid>
     </StackPanel>
 </Page>

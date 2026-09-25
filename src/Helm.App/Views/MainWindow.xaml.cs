@@ -33,7 +33,19 @@ internal partial class MainWindow : FluentWindow
         SearchBox.QuerySubmitted += (_, e) => NavigateTo(_viewModel.Search(e.QueryText).FirstOrDefault());
         SearchBox.SuggestionChosen += (_, e) => NavigateTo(e.SelectedItem as SearchResult);
 
-        Loaded += (_, _) => Navigation.Navigate(typeof(HomePage));
+        Loaded += (_, _) => Navigation.Navigate(StartupPage());
+    }
+
+    /// <summary>"--page Diagnostics" (dev/testing) opens that page instead of Home.</summary>
+    private Type StartupPage()
+    {
+        var args = Environment.GetCommandLineArgs();
+        var index = Array.FindIndex(args, a => a.Equals("--page", StringComparison.OrdinalIgnoreCase));
+        if (index < 0 || index + 1 >= args.Length) return typeof(HomePage);
+        var name = args[index + 1];
+        var candidates = new[] { typeof(HomePage), typeof(GeneralPage), typeof(DiagnosticsPage), typeof(WelcomePage), typeof(WhatsNewPage) }
+            .Concat(_viewModel.Groups.SelectMany(g => g.Modules).Select(m => m.SettingsPageType));
+        return candidates.FirstOrDefault(t => t.Name.StartsWith(name, StringComparison.OrdinalIgnoreCase)) ?? typeof(HomePage);
     }
 
     /// <summary>Remembers size/position in general.json.</summary>

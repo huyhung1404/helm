@@ -1,3 +1,5 @@
+using Helm.Core.Desktop;
+using Helm.Core.Hooks;
 using Helm.Core.Hotkeys;
 using Helm.Core.Modules;
 using Helm.Core.Services;
@@ -15,6 +17,10 @@ public static class HelmCoreServices
         services.AddSingleton(paths);
         services.AddSingleton<ISettingsStoreFactory>(sp => new SettingsStoreFactory(paths, sp.GetService<ILoggerFactory>()));
         services.AddSingleton<IHotkeyManager, HotkeyManager>();
+        services.AddSingleton<LowLevelKeyboardHook>();
+        services.AddSingleton<LowLevelMouseHook>();
+        services.AddSingleton<IWindowService, WindowService>();
+        services.AddSingleton<IMonitorService, MonitorService>();
         services.AddSingleton<IStartupTaskService, StartupTaskService>();
         services.AddSingleton<IProcessLauncher, ProcessLauncher>();
         services.AddSingleton<IModuleHost, ModuleRegistry>();
