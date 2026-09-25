@@ -10,7 +10,7 @@ public class ZoneMathTests
     [Fact]
     public void Without_spacing_neighbours_share_exact_edges()
     {
-        var zones = ZoneMath.ToPixels(LayoutTemplates.Generate(LayoutKind.Columns, 3), WorkArea, spacing: 0);
+        var zones = ZoneMath.ToPixels(TestLayouts.Columns(3), WorkArea, spacing: 0);
 
         Assert.Equal(new PixelRect(0, 0, 640, 1040), zones[0]);
         Assert.Equal(zones[0].Right, zones[1].Left);
@@ -22,7 +22,7 @@ public class ZoneMathTests
     public void Spacing_is_exact_between_zones_and_at_borders()
     {
         const int s = 16;
-        var zones = ZoneMath.ToPixels(LayoutTemplates.Generate(LayoutKind.Columns, 2), WorkArea, s);
+        var zones = ZoneMath.ToPixels(TestLayouts.Columns(2), WorkArea, s);
 
         Assert.Equal(s, zones[0].Left - WorkArea.Left);
         Assert.Equal(s, zones[0].Top - WorkArea.Top);
@@ -34,7 +34,7 @@ public class ZoneMathTests
     [Fact]
     public void Odd_spacing_still_produces_exact_gaps()
     {
-        var zones = ZoneMath.ToPixels(LayoutTemplates.Generate(LayoutKind.Rows, 3), WorkArea, 7);
+        var zones = ZoneMath.ToPixels(TestLayouts.Rows(3), WorkArea, 7);
         Assert.Equal(7, zones[1].Top - zones[0].Bottom);
         Assert.Equal(7, zones[2].Top - zones[1].Bottom);
     }
@@ -66,7 +66,7 @@ public class ZoneMathTests
     [Fact]
     public void Hit_test_prefers_containing_zone_then_nearest_within_sensitivity()
     {
-        var zones = ZoneMath.ToPixels(LayoutTemplates.Generate(LayoutKind.Columns, 2), WorkArea, 20);
+        var zones = ZoneMath.ToPixels(TestLayouts.Columns(2), WorkArea, 20);
         // inside zone 1
         Assert.Equal(1, ZoneMath.HitTest(zones, new PixelPoint(1500, 500), 10));
         // in the 20px gap, 4px from zone 0's right edge
@@ -85,7 +85,7 @@ public class ZoneMathTests
     [Fact]
     public void Span_selection_grows_to_a_rectangle()
     {
-        var zones = ZoneMath.ToPixels(LayoutTemplates.Generate(LayoutKind.Grid, 9), WorkArea, 8); // 3x3
+        var zones = ZoneMath.ToPixels(TestLayouts.Square(3), WorkArea, 8); // 3x3
         var span = ZoneMath.SelectSpan(zones, 0, 4); // top-left to center
         Assert.Equal([0, 1, 3, 4], span);
         var union = ZoneMath.UnionOf(zones, span);
@@ -107,14 +107,14 @@ public class ZoneMathTests
     [Fact]
     public void Rows_template_is_a_vertical_stack()
     {
-        Assert.True(ZoneMath.IsVerticalStack(LayoutTemplates.Generate(LayoutKind.Rows, 3)));
-        Assert.False(ZoneMath.IsVerticalStack(LayoutTemplates.Generate(LayoutKind.Columns, 3)));
+        Assert.True(ZoneMath.IsVerticalStack(TestLayouts.Rows(3)));
+        Assert.False(ZoneMath.IsVerticalStack(TestLayouts.Columns(3)));
     }
 
     [Fact]
     public void Match_zone_tolerates_small_offsets()
     {
-        var zones = ZoneMath.ToPixels(LayoutTemplates.Generate(LayoutKind.Columns, 2), WorkArea, 0);
+        var zones = ZoneMath.ToPixels(TestLayouts.Columns(2), WorkArea, 0);
         Assert.Equal(1, ZoneMath.MatchZone(zones, zones[1].Inflate(2, 1)));
         Assert.Equal(-1, ZoneMath.MatchZone(zones, zones[1].Inflate(40, 0)));
     }

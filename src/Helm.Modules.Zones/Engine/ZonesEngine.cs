@@ -15,6 +15,8 @@ namespace Helm.Modules.Zones.Engine;
 /// </summary>
 internal sealed class ZonesEngine : IAsyncDisposable
 {
+    private static readonly TimeSpan FlashDuration = TimeSpan.FromMilliseconds(900);
+
     private readonly IWindowService _windows;
     private readonly IMonitorService _monitors;
     private readonly ZonesDataService _data;
@@ -24,14 +26,17 @@ internal sealed class ZonesEngine : IAsyncDisposable
     private readonly MessageLoopThread _thread;
     private readonly Dictionary<nint, SnapState> _snapped = new();
     private readonly HashSet<nint> _placedNewWindows = [];
-    private readonly Dictionary<string, MonitorZones> _zoneCache = new(StringComparer.OrdinalIgnoreCase);
+    private readonly Dictionary<string, MonitorZones?> _zoneCache = new(StringComparer.OrdinalIgnoreCase);
     private readonly HashSet<int> _swallowedKeyUps = [];
 
+    private IReadOnlyList<MonitorInfo> _monitorList = [];
     private WinEventHook? _winEvents;
     private IDisposable? _mouseLease;
     private IDisposable? _keyboardLease;
     private OverlayWindow? _overlay;
     private DragSession? _drag;
+    private Flash? _flash;
+    private IDisposable? _flashTimer;
     private volatile Options _options;
     private volatile bool _dragActive;
     private volatile bool _foregroundSnappable;
@@ -69,7 +74,11 @@ internal sealed class ZonesEngine : IAsyncDisposable
             engine._mouseLease = mouseHook.Acquire();
             engine._keyboardLease = keyboardHook.Acquire();
             engine._data.Changed += engine.OnDataChanged;
-            await engine._thread.InvokeAsync(engine.RefreshForeground).ConfigureAwait(false);
+            await engine._thread.InvokeAsync(() =>
+            {
+                engine.RefreshMonitors();
+                engine.RefreshForeground();
+            }).ConfigureAwait(false);
         }
         catch
         {
@@ -84,11 +93,28 @@ internal sealed class ZonesEngine : IAsyncDisposable
         _options = options;
         _thread.Post(() =>
         {
-            _overlay?.Invalidate();
             if (_overlay is not null) _overlay.Alpha = options.OverlayAlpha;
+            _overlay?.Invalidate();
             RefreshForeground();
         });
     }
+
+    /// <summary>Ctrl+Win+Alt+&lt;number&gt; (from the hotkey thread): switch the monitor under the cursor.</summary>
+    public void SwitchLayout(int number) => _thread.Post(() =>
+    {
+        RefreshMonitors();
+        if (_monitors.FromPoint(_windows.GetCursorPosition()) is not { } monitor) return;
+        var layout = _data.ApplyNumber(number, monitor, _monitorList);
+        if (layout is null)
+        {
+            _logger.LogInformation("No layout {Number} for {Monitor}", number, monitor.Id);
+            return;
+        }
+        _logger.LogInformation("Switched {Monitor} to layout {Number} \"{Name}\"", monitor.Id, number, layout.Name);
+        _zoneCache.Clear();
+        RefreshForeground();
+        if (_options.FlashLayoutOnSwitch && ZonesFor(monitor) is { } zones) ShowFlash(zones, $"{number} · {layout.Name}");
+    });
 
     public async ValueTask DisposeAsync()
     {
@@ -103,6 +129,7 @@ internal sealed class ZonesEngine : IAsyncDisposable
             await _thread.InvokeAsync(() =>
             {
                 _winEvents?.Dispose();
+                _flashTimer?.Dispose();
                 _overlay?.Dispose();
                 _overlay = null;
                 _drag = null;
@@ -137,25 +164,30 @@ internal sealed class ZonesEngine : IAsyncDisposable
         }
 
         var options = _options;
-        if (!options.OverrideWindowsSnap || HotkeyRecording.IsRecording || !_foregroundSnappable) return;
-        var delta = e.VirtualKey switch
-        {
-            VirtualKeyNames.Left => -1,
-            VirtualKeyNames.Right => 1,
-            VirtualKeyNames.Up when _foregroundVertical => -1,
-            VirtualKeyNames.Down when _foregroundVertical => 1,
-            _ => 0,
-        };
-        if (delta == 0) return;
+        if (HotkeyRecording.IsRecording || !_foregroundSnappable) return;
         if (!(_windows.IsKeyDown(VirtualKeyNames.LWin) || _windows.IsKeyDown(VirtualKeyNames.RWin))) return;
         if (_windows.IsKeyDown(VirtualKeyNames.Control) || _windows.IsKeyDown(VirtualKeyNames.Menu) || _windows.IsKeyDown(VirtualKeyNames.Shift)) return;
+
+        Action? action = e.VirtualKey switch
+        {
+            VirtualKeyNames.PageUp when options.CycleWindowsInZone => () => CycleInZone(-1),
+            VirtualKeyNames.PageDown when options.CycleWindowsInZone => () => CycleInZone(1),
+            VirtualKeyNames.Left when options.OverrideWindowsSnap => () => MoveForegroundByKeyboard(-1),
+            VirtualKeyNames.Right when options.OverrideWindowsSnap => () => MoveForegroundByKeyboard(1),
+            VirtualKeyNames.Up when options.OverrideWindowsSnap && _foregroundVertical => () => MoveForegroundByKeyboard(-1),
+            VirtualKeyNames.Down when options.OverrideWindowsSnap && _foregroundVertical => () => MoveForegroundByKeyboard(1),
+            _ => null,
+        };
+        if (action is null) return;
 
         e.Handled = true;
         _swallowedKeyUps.Add(e.VirtualKey);
         _thread.Post(() =>
         {
-            InputSimulator.SendDummyKey(); // keeps the Start menu closed when Win is released
-            MoveForegroundByKeyboard(delta);
+            // Keeps the Start menu closed when Win is released, and makes Helm the last input source so it may
+            // move the foreground to another window.
+            InputSimulator.SendDummyKey();
+            action();
         });
     }
 
@@ -201,6 +233,14 @@ internal sealed class ZonesEngine : IAsyncDisposable
         }
     }
 
+    private void RefreshMonitors()
+    {
+        var monitors = _monitors.GetMonitors();
+        if (!monitors.Select(m => (m.Id, m.WorkArea, m.Dpi)).SequenceEqual(_monitorList.Select(m => (m.Id, m.WorkArea, m.Dpi))))
+            _zoneCache.Clear();
+        _monitorList = monitors;
+    }
+
     private bool IsEligible(nint hwnd)
     {
         if (!_windows.IsManageable(hwnd)) return false;
@@ -212,27 +252,28 @@ internal sealed class ZonesEngine : IAsyncDisposable
         var hwnd = _windows.GetForegroundWindow();
         var eligible = hwnd != 0 && IsEligible(hwnd);
         _foregroundSnappable = eligible;
-        if (eligible && _monitors.FromWindow(hwnd) is { } monitor)
-            _foregroundVertical = ZoneMath.IsVerticalStack(ZonesFor(monitor).Layout.GetZones());
-        else
-            _foregroundVertical = false;
+        _foregroundVertical = eligible && _monitors.FromWindow(hwnd) is { } monitor && ZonesFor(monitor) is { } zones
+                              && ZoneMath.IsVerticalStack(zones.Layout.Zones);
     }
 
-    private MonitorZones ZonesFor(MonitorInfo monitor)
+    private MonitorZones? ZonesFor(MonitorInfo monitor)
     {
-        var key = $"{monitor.Id}|{monitor.WorkArea}|{monitor.Dpi}";
-        if (!_zoneCache.TryGetValue(key, out var zones))
+        if (_monitorList.Count == 0) RefreshMonitors();
+        if (!_zoneCache.TryGetValue(monitor.Id, out var zones))
         {
-            zones = _data.GetZones(monitor);
-            _zoneCache[key] = zones;
+            zones = _data.GetZones(monitor, _monitorList);
+            _zoneCache[monitor.Id] = zones;
         }
         return zones;
     }
+
+    private int Sensitivity(MonitorInfo monitor) => (int)Math.Round(_options.HighlightDistance * monitor.Scale);
 
     private void BeginDrag(nint hwnd)
     {
         _drag = null;
         if (!IsEligible(hwnd) || _windows.GetFrameBounds(hwnd) is not { } frame) return;
+        RefreshMonitors();
 
         var cursor = _windows.GetCursorPosition();
         var scale = _monitors.FromPoint(cursor)?.Scale ?? 1;
@@ -249,11 +290,9 @@ internal sealed class ZonesEngine : IAsyncDisposable
             originalSize = snap.OriginalSize;
             if (_options.RestoreSizeOnUnsnap && !_windows.IsMaximized(hwnd))
             {
-                // Shrink back to the pre-snap size, keeping the cursor at the same relative spot of the caption.
                 var ratio = frame.Width == 0 ? 0.5 : (cursor.X - frame.Left) / (double)frame.Width;
                 var left = cursor.X - (int)(ratio * snap.OriginalSize.Width);
                 _windows.MoveWindow(hwnd, PixelRect.FromSize(left, frame.Top, snap.OriginalSize.Width, snap.OriginalSize.Height));
-                frame = _windows.GetFrameBounds(hwnd) ?? frame;
             }
         }
 
@@ -268,32 +307,25 @@ internal sealed class ZonesEngine : IAsyncDisposable
         var options = _options;
         var cursor = _windows.GetCursorPosition();
         var active = options.AlwaysShowZones ^ _windows.IsKeyDown(options.ActivationKey);
-        if (!active)
+        if (!active || _monitors.FromPoint(cursor) is not { } monitor || ZonesFor(monitor) is not { } zones)
         {
             drag.Selection = [];
             drag.Anchor = -1;
-            _overlay?.Hide();
+            if (_flash is null) _overlay?.Hide();
             return;
         }
 
-        if (_monitors.FromPoint(cursor) is not { } monitor) return;
-        var zones = ZonesFor(monitor);
-        if (drag.Zones?.Monitor.Id != monitor.Id || !ReferenceEquals(drag.Zones, zones))
+        if (!ReferenceEquals(drag.Zones, zones))
         {
             drag.Zones = zones;
             drag.Anchor = -1;
         }
 
-        var hit = ZoneMath.HitTest(zones.Zones, cursor, zones.Sensitivity);
+        var hit = ZoneMath.HitTest(zones.Zones, cursor, Sensitivity(monitor));
         IReadOnlyList<int> selection;
-        if (hit < 0)
-        {
-            selection = [];
-        }
+        if (hit < 0) selection = [];
         else if (options.MultiZoneSpanning && _windows.IsKeyDown(options.SpanKey) && drag.Anchor >= 0)
-        {
             selection = ZoneMath.SelectSpan(zones.Zones, drag.Anchor, hit);
-        }
         else
         {
             drag.Anchor = hit;
@@ -302,7 +334,8 @@ internal sealed class ZonesEngine : IAsyncDisposable
 
         var changed = !selection.SequenceEqual(drag.Selection);
         drag.Selection = selection;
-        ShowOverlay(zones, changed);
+        CancelFlash();
+        ShowOverlay(zones.Reference, changed);
     }
 
     private void EndDrag(nint hwnd)
@@ -310,7 +343,7 @@ internal sealed class ZonesEngine : IAsyncDisposable
         var drag = _drag;
         _drag = null;
         _dragActive = false;
-        _overlay?.Hide();
+        if (_flash is null) _overlay?.Hide();
         if (drag is null || drag.Hwnd != hwnd || drag.Zones is not { } zones || drag.Selection.Count == 0) return;
 
         var target = ZoneMath.UnionOf(zones.Zones, drag.Selection);
@@ -324,14 +357,14 @@ internal sealed class ZonesEngine : IAsyncDisposable
             _logger.LogDebug("Could not move 0x{Hwnd:X} into zone(s) {Zones}", hwnd, string.Join(",", indices));
             return;
         }
-        _snapped[hwnd] = new SnapState(zones.Monitor.Id, zones.Layout.Id, indices.ToList(), originalSize);
+        _snapped[hwnd] = new SnapState(zones.Key, indices.ToList(), originalSize);
 
         var process = _windows.GetProcessName(hwnd);
         if (!string.IsNullOrEmpty(process))
         {
             _data.RecordHistory(HistoryKeys(process, _windows.GetTitle(hwnd)), new ZoneHistoryEntry
             {
-                MonitorId = zones.Monitor.Id,
+                MonitorId = zones.PrimaryMonitor.Id,
                 LayoutId = zones.Layout.Id,
                 Zones = indices.ToList(),
                 Updated = DateTimeOffset.Now,
@@ -339,22 +372,50 @@ internal sealed class ZonesEngine : IAsyncDisposable
         }
     }
 
+    /// <summary>The zone(s) the window occupies: remembered from a snap, or matched from its current frame.</summary>
+    private IReadOnlyList<int>? CurrentZones(nint hwnd, MonitorZones zones)
+    {
+        if (_snapped.TryGetValue(hwnd, out var snap) && snap.ZoneKey == zones.Key && snap.Zones.All(i => i < zones.Zones.Count))
+        {
+            // Still there? (the user may have moved it without dragging, e.g. with Windows Snap)
+            if (_windows.GetFrameBounds(hwnd) is { } f && ZoneMath.MatchZone([ZoneMath.UnionOf(zones.Zones, snap.Zones)], f) == 0)
+                return snap.Zones;
+        }
+        if (_windows.GetFrameBounds(hwnd) is { } frame && ZoneMath.MatchZone(zones.Zones, frame) is var matched and >= 0)
+            return [matched];
+        return null;
+    }
+
     private void MoveForegroundByKeyboard(int delta)
     {
         var hwnd = _windows.GetForegroundWindow();
-        if (!IsEligible(hwnd) || _monitors.FromWindow(hwnd) is not { } monitor) return;
-        var zones = ZonesFor(monitor);
-        if (zones.Zones.Count == 0) return;
+        if (!IsEligible(hwnd) || _monitors.FromWindow(hwnd) is not { } monitor || ZonesFor(monitor) is not { } zones) return;
 
-        int? current = null;
-        if (_snapped.TryGetValue(hwnd, out var snap) && snap.MonitorId == monitor.Id && snap.LayoutId == zones.Layout.Id)
-            current = delta > 0 ? snap.Zones.Max() : snap.Zones.Min();
-        else if (_windows.GetFrameBounds(hwnd) is { } frame && ZoneMath.MatchZone(zones.Zones, frame) is var matched and >= 0)
-            current = matched;
-
-        var next = ZoneMath.Step(zones.Zones.Count, current, delta);
-        var original = snap?.OriginalSize ?? (_windows.GetFrameBounds(hwnd) is { } f ? (f.Width, f.Height) : (800, 600));
+        var current = CurrentZones(hwnd, zones);
+        int? from = current is null ? null : delta > 0 ? current.Max() : current.Min();
+        var next = ZoneMath.Step(zones.Zones.Count, from, delta);
+        var original = _snapped.TryGetValue(hwnd, out var snap) ? snap.OriginalSize
+            : _windows.GetFrameBounds(hwnd) is { } f ? (f.Width, f.Height) : (800, 600);
         Snap(hwnd, zones, [next], zones.Zones[next], original);
+    }
+
+    /// <summary>Win+PgUp/PgDn: activate the previous/next window occupying the same zone as the foreground window.</summary>
+    private void CycleInZone(int delta)
+    {
+        var hwnd = _windows.GetForegroundWindow();
+        if (!IsEligible(hwnd) || _monitors.FromWindow(hwnd) is not { } monitor || ZonesFor(monitor) is not { } zones) return;
+        if (CurrentZones(hwnd, zones) is not { } current) return;
+        var target = ZoneMath.UnionOf(zones.Zones, current);
+
+        var group = _windows.GetAppWindows()
+            .Where(w => !w.IsMinimized && IsEligible(w.Handle))
+            .Where(w => ZoneMath.MatchZone([target], w.Bounds) == 0)
+            .Select(w => w.Handle)
+            .OrderBy(h => (long)h)
+            .ToList();
+        var next = ZoneMath.CycleTarget(group, hwnd, delta);
+        if (next == 0) return;
+        if (!_windows.Activate(next)) _logger.LogDebug("Could not activate 0x{Hwnd:X}", next);
     }
 
     private void PlaceNewWindow(nint hwnd)
@@ -365,14 +426,13 @@ internal sealed class ZonesEngine : IAsyncDisposable
         if (string.IsNullOrEmpty(process)) return;
         if (_data.FindHistory(HistoryKeys(process, _windows.GetTitle(hwnd))) is not { } entry) return;
 
-        var monitor = _monitors.GetMonitors().FirstOrDefault(m => string.Equals(m.Id, entry.MonitorId, StringComparison.OrdinalIgnoreCase));
-        if (monitor is null) return;
-        var zones = ZonesFor(monitor);
+        RefreshMonitors();
+        var monitor = _monitorList.FirstOrDefault(m => string.Equals(m.Id, entry.MonitorId, StringComparison.OrdinalIgnoreCase));
+        if (monitor is null || ZonesFor(monitor) is not { } zones) return;
         if (zones.Layout.Id != entry.LayoutId || entry.Zones.Any(z => z < 0 || z >= zones.Zones.Count)) return;
 
         var frame = _windows.GetFrameBounds(hwnd);
         var target = ZoneMath.UnionOf(zones.Zones, entry.Zones);
-        // Give the app a moment to finish its own initial placement, then snap.
         _ = Task.Delay(150).ContinueWith(_ => _thread.Post(() =>
         {
             if (!_windows.IsWindow(hwnd) || _windows.IsMaximized(hwnd) || _windows.IsMinimized(hwnd)) return;
@@ -381,7 +441,6 @@ internal sealed class ZonesEngine : IAsyncDisposable
         }), TaskScheduler.Default);
     }
 
-    /// <summary>Most specific first: process + title hash, then process only.</summary>
     private static IEnumerable<string> HistoryKeys(string process, string title)
     {
         yield return $"{process.ToLowerInvariant()}|{StableHash(title):x8}";
@@ -399,7 +458,29 @@ internal sealed class ZonesEngine : IAsyncDisposable
         return hash;
     }
 
-    private void ShowOverlay(MonitorZones zones, bool selectionChanged)
+    // ───────────────────────────── overlay ─────────────────────────────
+
+    private void ShowFlash(MonitorZones zones, string label)
+    {
+        CancelFlash();
+        _flash = new Flash(zones, label);
+        ShowOverlay(zones.Reference, true);
+        _flashTimer = _thread.StartTimer(FlashDuration, () =>
+        {
+            CancelFlash();
+            if (_drag is null) _overlay?.Hide();
+        });
+    }
+
+    private void CancelFlash()
+    {
+        if (_flash is null) return;
+        _flash = null;
+        _flashTimer?.Dispose();
+        _flashTimer = null;
+    }
+
+    private void ShowOverlay(PixelRect bounds, bool repaint)
     {
         if (_overlay is null)
         {
@@ -414,29 +495,56 @@ internal sealed class ZonesEngine : IAsyncDisposable
             }
         }
 
-        if (_overlay.Bounds != zones.Monitor.WorkArea)
+        if (_overlay.Bounds != bounds)
         {
-            _overlay.SetBounds(zones.Monitor.WorkArea);
-            selectionChanged = true;
+            _overlay.SetBounds(bounds);
+            repaint = true;
         }
         _overlay.Show();
-        if (selectionChanged) _overlay.Invalidate();
+        if (repaint) _overlay.Invalidate();
     }
 
     private void Paint(IOverlayCanvas canvas)
     {
-        if (_drag is not { Zones: { } zones } drag) return;
         var o = _options;
-        var origin = zones.Monitor.WorkArea;
-        var border = Math.Max(1, (int)Math.Round(2 * zones.Monitor.Scale));
-        var fontSize = (int)Math.Round(40 * zones.Monitor.Scale);
+        MonitorZones? zones;
+        IReadOnlyList<int> selection;
+        string? label = null;
+        if (_flash is { } flash)
+        {
+            zones = flash.Zones;
+            selection = [];
+            label = flash.Label;
+        }
+        else if (_drag is { Zones: { } dragZones } drag)
+        {
+            zones = dragZones;
+            selection = drag.Selection;
+        }
+        else return;
+
+        var origin = zones.Reference;
+        var scale = zones.PrimaryMonitor.Scale;
+        var border = Math.Max(1, (int)Math.Round(2 * scale));
+        var fontSize = (int)Math.Round(40 * scale);
         for (var i = 0; i < zones.Zones.Count; i++)
         {
             var r = zones.Zones[i].Offset(-origin.Left, -origin.Top);
-            var highlighted = drag.Selection.Contains(i);
+            var highlighted = selection.Contains(i);
             canvas.Fill(r, highlighted ? o.HighlightColor : o.ZoneColor);
             canvas.Frame(r, highlighted ? o.HighlightColor.Lerp(o.BorderColor, 0.5) : o.BorderColor, border);
             if (o.ShowZoneNumbers) canvas.Text(r, (i + 1).ToString(), o.BorderColor, fontSize);
+        }
+
+        if (label is not null)
+        {
+            // Name badge centered on the monitor the layout was switched on.
+            var m = zones.PrimaryMonitor.WorkArea.Offset(-origin.Left, -origin.Top);
+            var w = (int)(360 * scale);
+            var h = (int)(64 * scale);
+            var badge = PixelRect.FromSize(m.Left + (m.Width - w) / 2, m.Top + (m.Height - h) / 2, w, h);
+            canvas.Fill(badge, o.HighlightColor);
+            canvas.Text(badge, label, new RgbColor(255, 255, 255), (int)(24 * scale));
         }
     }
 
@@ -446,8 +554,11 @@ internal sealed class ZonesEngine : IAsyncDisposable
         bool MultiZoneSpanning,
         int SpanKey,
         bool OverrideWindowsSnap,
+        bool CycleWindowsInZone,
         bool RestoreSizeOnUnsnap,
         bool MoveNewWindowsToLastZone,
+        bool FlashLayoutOnSwitch,
+        int HighlightDistance,
         byte OverlayAlpha,
         RgbColor ZoneColor,
         RgbColor BorderColor,
@@ -461,8 +572,11 @@ internal sealed class ZonesEngine : IAsyncDisposable
             s.MultiZoneSpanning,
             s.SpanKey,
             s.OverrideWindowsSnap,
+            s.CycleWindowsInZone,
             s.RestoreSizeOnUnsnap,
             s.MoveNewWindowsToLastZone,
+            s.FlashLayoutOnSwitch,
+            Math.Clamp(s.HighlightDistance, 0, 200),
             (byte)Math.Clamp(s.ZoneOpacity * 255 / 100, 20, 255),
             AvoidKey(RgbColor.Parse(s.ZoneColor, new RgbColor(43, 43, 43))),
             AvoidKey(RgbColor.Parse(s.BorderColor, new RgbColor(255, 255, 255))),
@@ -474,6 +588,8 @@ internal sealed class ZonesEngine : IAsyncDisposable
         private static RgbColor AvoidKey(RgbColor c) => c == OverlayWindow.TransparentKey ? new RgbColor(2, 0, 2) : c;
     }
 
+    private sealed record Flash(MonitorZones Zones, string Label);
+
     private sealed class DragSession(nint hwnd, (int Width, int Height) originalSize)
     {
         public nint Hwnd { get; } = hwnd;
@@ -483,5 +599,5 @@ internal sealed class ZonesEngine : IAsyncDisposable
         public IReadOnlyList<int> Selection { get; set; } = [];
     }
 
-    private sealed record SnapState(string MonitorId, string LayoutId, List<int> Zones, (int Width, int Height) OriginalSize);
+    private sealed record SnapState(string ZoneKey, List<int> Zones, (int Width, int Height) OriginalSize);
 }

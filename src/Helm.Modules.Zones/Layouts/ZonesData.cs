@@ -3,78 +3,59 @@ using Helm.Core.Settings;
 
 namespace Helm.Modules.Zones.Layouts;
 
-/// <summary>zones/layouts.json: template parameters and custom layouts.</summary>
+/// <summary>zones/layouts.json: the user's custom layouts.</summary>
 public sealed class LayoutsFile : IVersionedSettings
 {
-    public static int CurrentVersion => 1;
+    public static int CurrentVersion => 2;
 
     public int Version { get; set; }
 
-    public List<LayoutDefinition> Layouts { get; set; } = [];
+    public List<ZoneLayout> Layouts { get; set; } = [];
 
-    /// <summary>Adds any missing template entries plus the shipped sample custom layouts on first run.</summary>
-    public bool EnsureDefaults()
+    /// <summary>
+    /// v1 → v2: templates are dropped; custom grid and canvas layouts become custom zone layouts for one monitor and
+    /// get numbers 1–9 in order.
+    /// </summary>
+    public void Migrate(int fromVersion)
     {
-        var changed = false;
-        var fresh = Layouts.Count == 0;
-        foreach (var template in LayoutTemplates.Defaults())
+        if (fromVersion >= 2) return;
+        var migrated = new List<ZoneLayout>();
+        foreach (var old in Layouts)
         {
-            if (Layouts.Any(l => l.Id == template.Id)) continue;
-            Layouts.Insert(Math.Min(Layouts.Count, (int)template.Kind), template);
-            changed = true;
+            var zones = old.LegacyKind switch
+            {
+                "customGrid" => old.LegacyGrid?.ToZones().ToList(),
+                "customCanvas" => old.LegacyCanvas,
+                _ => null, // templates (focus, columns, rows, grid, priorityGrid) no longer exist
+            };
+            if (zones is null || zones.Count == 0) continue;
+            migrated.Add(new ZoneLayout
+            {
+                Id = old.Id,
+                Name = old.Name,
+                Scope = LayoutScope.Monitor,
+                Zones = zones,
+                Number = migrated.Count < ZoneLayout.MaxNumber ? migrated.Count + 1 : null,
+            });
         }
-
-        if (fresh)
-        {
-            Layouts.AddRange(SampleLayouts());
-            changed = true;
-        }
-        return changed;
+        Layouts = migrated;
     }
 
-    public LayoutDefinition? Find(string? id) => id is null ? null : Layouts.FirstOrDefault(l => l.Id == id);
+    public ZoneLayout? Find(string? id) => id is null ? null : Layouts.FirstOrDefault(l => l.Id == id);
 
-    public static IEnumerable<LayoutDefinition> SampleLayouts()
-    {
-        // A wide main area with a narrow sidebar split in two — handy for Unity + browser + terminal.
-        yield return new LayoutDefinition
-        {
-            Id = "sample-main-sidebar",
-            Name = "Main + sidebar",
-            Kind = LayoutKind.CustomGrid,
-            Grid = new GridLayout([0.5, 0.5], [0.7, 0.3], [[0, 1], [0, 2]]),
-        };
-        // Portrait monitors: a large top area and two stacked bottom zones.
-        yield return new LayoutDefinition
-        {
-            Id = "sample-portrait",
-            Name = "Portrait stack",
-            Kind = LayoutKind.CustomGrid,
-            Grid = new GridLayout([0.5, 0.25, 0.25], [1.0], [[0], [1], [2]]),
-        };
-        yield return new LayoutDefinition
-        {
-            Id = "sample-canvas",
-            Name = "Floating center",
-            Kind = LayoutKind.CustomCanvas,
-            Spacing = 0,
-            Canvas = [new ZoneRect(0.15, 0.1, 0.7, 0.8), new ZoneRect(0.0, 0.0, 0.3, 0.5), new ZoneRect(0.7, 0.5, 0.3, 0.5)],
-        };
-    }
+    public ZoneLayout? FindByNumber(int number) => Layouts.FirstOrDefault(l => l.Number == number);
 }
 
 /// <summary>Per-monitor choice in zones/applied.json.</summary>
 public sealed class AppliedLayout
 {
-    public string LayoutId { get; set; } = LayoutTemplates.TemplateId(LayoutKind.Columns);
-    public int Spacing { get; set; } = 16;
-    public bool ShowSpacing { get; set; } = true;
+    public string LayoutId { get; set; } = string.Empty;
 }
 
-/// <summary>zones/applied.json: monitor id → applied layout.</summary>
+/// <summary>zones/applied.json: monitor id → the layout currently active on it (a spanning layout is listed on each of its monitors).</summary>
 public sealed class AppliedFile : IVersionedSettings
 {
-    public static int CurrentVersion => 1;
+    public static int CurrentVersion => 2;
 
     public int Version { get; set; }
 

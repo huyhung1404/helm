@@ -3,6 +3,22 @@
 All notable changes to Helm. The top section is used as the GitHub release body and as the Velopack release notes.
 Format: [Keep a Changelog](https://keepachangelog.com), versions follow [SemVer](https://semver.org).
 
+## [0.3.0] - 2026-09-25
+
+### Changed
+- Zones layouts are now fully custom: the built-in templates are gone and you draw zones directly on your
+  monitors. Edges snap to other zones and to monitor edges; zones can be split in half. Existing custom grid and
+  canvas layouts are converted automatically; a two-column "Layout 1" is created on a fresh install.
+
+### Added
+- Layouts across monitors: one layout can cover several monitors and a zone can straddle the boundary between them.
+- Several layouts per monitor: give a layout a number and press Ctrl+Win+Alt+1…9 to switch the monitor under the
+  mouse to it; the new zones and the layout name are shown briefly.
+- Win+PgUp / Win+PgDn activates the previous / next window that shares the focused window's zone.
+- Highlight distance setting.
+
+### Fixed
+- Editor buttons (Delete / Apply) overlapped on narrow picker panels.
 ## [0.2.6] - 2026-09-25
 
 ### Fixed

@@ -5,10 +5,16 @@ using Helm.Modules.Zones.Layouts;
 
 namespace Helm.Modules.Zones;
 
-/// <summary>Zones for one monitor, ready for hit testing (physical pixels).</summary>
-public sealed record MonitorZones(MonitorInfo Monitor, LayoutDefinition Layout, AppliedLayout Applied, IReadOnlyList<PixelRect> Zones)
+/// <summary>
+/// The zones active around one monitor, ready for hit testing (physical pixels). For a spanning layout the zones and
+/// <see cref="Reference"/> extend over every covered monitor.
+/// </summary>
+public sealed record MonitorZones(ZoneLayout Layout, IReadOnlyList<MonitorInfo> Monitors, PixelRect Reference, IReadOnlyList<PixelRect> Zones)
 {
-    public int Sensitivity => (int)Math.Round(Layout.SensitivityRadius * Monitor.Scale);
+    /// <summary>Stable key for "which zone set is this window in" (layout + where it is applied).</summary>
+    public string Key => $"{Layout.Id}@{string.Join("+", Monitors.Select(m => m.Id))}";
+
+    public MonitorInfo PrimaryMonitor => Monitors[0];
 }
 
 /// <summary>
@@ -28,60 +34,94 @@ public sealed class ZonesDataService
         _applied = settings.GetFile<AppliedFile>(Path.Combine("zones", "applied.json"));
         _history = settings.GetFile<ZoneHistoryFile>(Path.Combine("zones", "app-zone-history.json"));
 
-        if (_layouts.Current.EnsureDefaults()) _layouts.Update(_ => { });
+        // Nothing to snap to before the user draws a layout: start with an editable two-column layout.
+        if (_layouts.Current.Layouts.Count == 0) _layouts.Update(f => f.Layouts.Add(LayoutGeometry.Starter(null)));
+        // Drop applied entries that point at layouts which no longer exist (e.g. removed templates).
+        var valid = _layouts.Current.Layouts.Select(l => l.Id).ToHashSet();
+        if (_applied.Current.Monitors.Values.Any(a => !valid.Contains(a.LayoutId)))
+            _applied.Update(f =>
+            {
+                foreach (var key in f.Monitors.Where(kv => !valid.Contains(kv.Value.LayoutId)).Select(kv => kv.Key).ToList())
+                    f.Monitors.Remove(key);
+            });
     }
 
     /// <summary>Raised (on the writer's thread) after layouts or applied layouts change.</summary>
     public event EventHandler? Changed;
 
-    public IReadOnlyList<LayoutDefinition> GetLayouts()
+    public IReadOnlyList<ZoneLayout> GetLayouts()
     {
         lock (_gate) return _layouts.Current.Layouts.Select(l => l.Clone()).ToList();
     }
 
-    public LayoutDefinition? GetLayout(string id)
+    public ZoneLayout? GetLayout(string id)
     {
         lock (_gate) return _layouts.Current.Find(id)?.Clone();
     }
 
-    /// <summary>The layout applied to <paramref name="monitor"/> (a sensible default when none was chosen yet).</summary>
-    public (LayoutDefinition Layout, AppliedLayout Applied) GetApplied(MonitorInfo monitor)
+    /// <summary>Id of the layout active on <paramref name="monitor"/> (the first layout when none was chosen).</summary>
+    public ZoneLayout? GetAppliedLayout(MonitorInfo monitor)
     {
         lock (_gate)
         {
-            if (_applied.Current.Monitors.TryGetValue(monitor.Id, out var applied) && _layouts.Current.Find(applied.LayoutId) is { } layout)
-                return (layout.Clone(), Copy(applied));
-
-            // Portrait screens stack rows; landscape screens get the priority grid, like PowerToys.
-            var kind = monitor.WorkArea.Height > monitor.WorkArea.Width ? LayoutKind.Rows : LayoutKind.PriorityGrid;
-            var fallback = _layouts.Current.Find(LayoutTemplates.TemplateId(kind)) ?? LayoutTemplates.Defaults().First(l => l.Kind == kind);
-            return (fallback.Clone(), new AppliedLayout { LayoutId = fallback.Id, Spacing = fallback.Spacing, ShowSpacing = fallback.ShowSpacing });
+            var file = _layouts.Current;
+            if (_applied.Current.Monitors.TryGetValue(monitor.Id, out var applied) && file.Find(applied.LayoutId) is { } layout)
+                return layout.Clone();
+            return file.Layouts.FirstOrDefault(l => l.Scope == LayoutScope.Monitor)?.Clone();
         }
     }
 
-    /// <summary>Pixel zones for <paramref name="monitor"/> with spacing applied and scaled for its DPI.</summary>
-    public MonitorZones GetZones(MonitorInfo monitor)
+    /// <summary>Pixel zones active around <paramref name="monitor"/>, or null when it has no usable layout.</summary>
+    public MonitorZones? GetZones(MonitorInfo monitor, IReadOnlyList<MonitorInfo> monitors)
     {
-        var (layout, applied) = GetApplied(monitor);
-        var spacing = applied.ShowSpacing && layout.UsesSpacing ? ZoneMath.ScaleSpacing(applied.Spacing, monitor.Dpi) : 0;
-        var zones = ZoneMath.ToPixels(layout.GetZones(), monitor.WorkArea, spacing, spacing > 0);
-        return new MonitorZones(monitor, layout, applied, zones);
+        var layout = GetAppliedLayout(monitor);
+        if (layout is null || layout.Zones.Count == 0) return null;
+        if (LayoutGeometry.ReferenceRect(layout, monitor, monitors) is not { } reference) return null;
+        var covered = LayoutGeometry.CoveredMonitors(layout, monitor, monitors);
+        return new MonitorZones(layout, covered, reference, LayoutGeometry.ToPixels(layout.Zones, reference));
     }
 
-    public void Apply(string monitorId, LayoutDefinition layout, int spacing, bool showSpacing)
+    /// <summary>Makes <paramref name="layout"/> active on <paramref name="target"/> (and on every monitor it spans).</summary>
+    public void Apply(ZoneLayout layout, MonitorInfo target, IReadOnlyList<MonitorInfo> monitors)
     {
         lock (_gate)
         {
-            SaveLayoutLocked(layout);
-            _applied.Update(f => f.Monitors[monitorId] = new AppliedLayout { LayoutId = layout.Id, Spacing = spacing, ShowSpacing = showSpacing });
+            var covered = LayoutGeometry.CoveredMonitors(layout, target, monitors);
+            _applied.Update(f =>
+            {
+                foreach (var m in covered) f.Monitors[m.Id] = new AppliedLayout { LayoutId = layout.Id };
+            });
         }
         Changed?.Invoke(this, EventArgs.Empty);
     }
 
-    /// <summary>Adds or replaces a layout (templates keep their id and only store their parameters).</summary>
-    public void SaveLayout(LayoutDefinition layout)
+    /// <summary>Ctrl+Win+Alt+&lt;number&gt;: applies the layout with that number around <paramref name="target"/>.</summary>
+    public ZoneLayout? ApplyNumber(int number, MonitorInfo target, IReadOnlyList<MonitorInfo> monitors)
     {
-        lock (_gate) SaveLayoutLocked(layout);
+        ZoneLayout? layout;
+        lock (_gate) layout = _layouts.Current.FindByNumber(number)?.Clone();
+        if (layout is null) return null;
+        if (layout.Scope == LayoutScope.Span && !LayoutGeometry.CoveredMonitors(layout, target, monitors).Any(m => m.Id == target.Id))
+            return null; // a spanning layout only applies where its monitors are
+        Apply(layout, target, monitors);
+        return layout;
+    }
+
+    /// <summary>Adds or replaces a layout. A number already used by another layout is taken over by this one.</summary>
+    public void SaveLayout(ZoneLayout layout)
+    {
+        var copy = layout.Clone();
+        lock (_gate)
+        {
+            _layouts.Update(f =>
+            {
+                if (copy.Number is { } n)
+                    foreach (var other in f.Layouts.Where(l => l.Id != copy.Id && l.Number == n)) other.Number = null;
+                var index = f.Layouts.FindIndex(l => l.Id == copy.Id);
+                if (index >= 0) f.Layouts[index] = copy;
+                else f.Layouts.Add(copy);
+            });
+        }
         Changed?.Invoke(this, EventArgs.Empty);
     }
 
@@ -89,8 +129,6 @@ public sealed class ZonesDataService
     {
         lock (_gate)
         {
-            var layout = _layouts.Current.Find(id);
-            if (layout is null || layout.IsTemplate) return;
             _layouts.Update(f => f.Layouts.RemoveAll(l => l.Id == id));
             _applied.Update(f =>
             {
@@ -108,7 +146,6 @@ public sealed class ZonesDataService
             _history.Update(f =>
             {
                 foreach (var key in keys) f.Entries[key] = entry;
-                // Keep the file small: drop the oldest entries beyond 500.
                 if (f.Entries.Count > 500)
                     foreach (var old in f.Entries.OrderBy(kv => kv.Value.Updated).Take(f.Entries.Count - 500).Select(kv => kv.Key).ToList())
                         f.Entries.Remove(old);
@@ -125,17 +162,4 @@ public sealed class ZonesDataService
             return null;
         }
     }
-
-    private void SaveLayoutLocked(LayoutDefinition layout)
-    {
-        var copy = layout.Clone();
-        _layouts.Update(f =>
-        {
-            var index = f.Layouts.FindIndex(l => l.Id == copy.Id);
-            if (index >= 0) f.Layouts[index] = copy;
-            else f.Layouts.Add(copy);
-        });
-    }
-
-    private static AppliedLayout Copy(AppliedLayout a) => new() { LayoutId = a.LayoutId, Spacing = a.Spacing, ShowSpacing = a.ShowSpacing };
 }

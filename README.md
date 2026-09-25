@@ -6,7 +6,7 @@ Helm currently ships one module, **Zones**. Always On Top, the Diagnostics page 
 
 | Module | What it does |
 |---|---|
-| **Zones** | Splits each monitor into zones (templates or custom grid/canvas layouts). Hold <kbd>Shift</kbd> while dragging a window to snap it; <kbd>Win</kbd>+<kbd>Shift</kbd>+<kbd>`</kbd> opens the layout editor; optional <kbd>Win</kbd>+<kbd>←</kbd>/<kbd>→</kbd> override. |
+| **Zones** | Draw your own zones (no templates) for one monitor or **across several monitors** — a zone may straddle two screens. Several layouts per monitor: give each a number and press <kbd>Ctrl</kbd>+<kbd>Win</kbd>+<kbd>Alt</kbd>+<kbd>1…9</kbd> to switch. Hold <kbd>Shift</kbd> while dragging a window to snap it; <kbd>Win</kbd>+<kbd>PgUp</kbd>/<kbd>PgDn</kbd> switches between windows sharing a zone; <kbd>Win</kbd>+<kbd>Shift</kbd>+<kbd>`</kbd> opens the editor. |
 | **Always On Top** *(hidden for now)* | <kbd>Win</kbd>+<kbd>Ctrl</kbd>+<kbd>T</kbd> pins the active window above all others and draws a colored border around it. |
 
 ## Install

@@ -33,7 +33,9 @@ public partial class App : Application
     {
         base.OnStartup(e);
 
-        var paths = new HelmPaths();
+        // "--data-dir <path>" (dev/testing): use a separate settings/logs root instead of %LOCALAPPDATA%\Helm.
+        var dataDirIndex = Array.FindIndex(_args, a => a.Equals("--data-dir", StringComparison.OrdinalIgnoreCase));
+        var paths = new HelmPaths(dataDirIndex >= 0 && dataDirIndex + 1 < _args.Length ? _args[dataDirIndex + 1] : null);
         Directory.CreateDirectory(paths.LogsDirectory);
         Log.Logger = new LoggerConfiguration()
             .MinimumLevel.Debug()

@@ -30,7 +30,20 @@ public sealed class ZonesSettings : IVersionedSettings
     // Editor
     public HotkeyGesture EditorHotkey { get; set; } = DefaultEditorHotkey;
 
+    /// <summary>How close (px at 100% scale) the cursor must be to a zone for it to highlight when between zones.</summary>
+    public int HighlightDistance { get; set; } = 20;
+
+    // Layout switching
+    /// <summary>Ctrl+Win+Alt+1…9 switches the monitor under the cursor to the layout with that number.</summary>
+    public bool LayoutHotkeys { get; set; } = true;
+
+    /// <summary>Briefly show the new layout's zones and name after switching.</summary>
+    public bool FlashLayoutOnSwitch { get; set; } = true;
+
     // Window behavior
+    /// <summary>Win+PgUp / Win+PgDn activates the previous/next window that shares the focused window's zone.</summary>
+    public bool CycleWindowsInZone { get; set; } = true;
+
     public bool OverrideWindowsSnap { get; set; }
     public bool RestoreSizeOnUnsnap { get; set; } = true;
     public bool MoveNewWindowsToLastZone { get; set; }
@@ -41,7 +54,6 @@ public sealed class ZonesSettings : IVersionedSettings
     public string BorderColor { get; set; } = "#FFFFFF";
     public string HighlightColor { get; set; } = "#0078D4";
     public bool ShowZoneNumbers { get; set; } = true;
-    public int PickerColumns { get; set; } = 3;
 
     public List<string> ExcludedApps { get; set; } = [];
 

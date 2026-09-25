@@ -16,10 +16,9 @@
     Left="0" Top="0" Width="800" Height="600">
 
     <Window.Resources>
-        <!-- Layout card in the picker -->
-        <DataTemplate x:Key="LayoutCard" DataType="{x:Type editor:LayoutItemViewModel}">
-            <Button Margin="4" Padding="8" Cursor="Hand" HorizontalContentAlignment="Stretch"
-                    Command="{Binding DataContext.SelectCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+        <DataTemplate x:Key="LayoutCard" DataType="{x:Type editor:LayoutCardViewModel}">
+            <Button Width="196" Margin="4" Padding="8" Cursor="Hand" HorizontalContentAlignment="Stretch"
+                    Command="{Binding DataContext.Session.SelectCommand, RelativeSource={RelativeSource AncestorType=Window}}"
                     CommandParameter="{Binding}">
                 <Button.Template>
                     <ControlTemplate TargetType="Button">
@@ -38,42 +37,43 @@
                     </ControlTemplate>
                 </Button.Template>
                 <StackPanel>
-                    <editor:LayoutPreview Zones="{Binding Zones}" Height="72" Gap="3"
-                                          AspectRatio="{Binding DataContext.AspectRatio, RelativeSource={RelativeSource AncestorType=Window}}" />
+                    <Grid Height="84">
+                        <editor:LayoutPreview Zones="{Binding Zones}" AspectRatio="{Binding AspectRatio}" Gap="2" HorizontalAlignment="Center" />
+                        <Border HorizontalAlignment="Left" VerticalAlignment="Top" CornerRadius="4" Padding="6,1" Margin="2"
+                                Background="{Binding DataContext.AccentBrush, RelativeSource={RelativeSource AncestorType=Window}}"
+                                Visibility="{Binding HasNumber, Converter={StaticResource BoolToVisibility}}" ToolTip="Ctrl+Win+Alt+number">
+                            <TextBlock Text="{Binding NumberText}" FontWeight="SemiBold" Foreground="White" FontSize="12" />
+                        </Border>
+                    </Grid>
                     <Grid Margin="0,8,0,0">
-                        <StackPanel>
-                            <TextBlock Text="{Binding Name}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" Foreground="{DynamicResource TextFillColorPrimaryBrush}" />
-                            <TextBlock Text="{Binding Subtitle}" FontSize="11" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+                        <StackPanel Margin="0,0,20,0">
+                            <TextBlock Text="{Binding Name}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+                            <TextBlock Text="{Binding Subtitle}" FontSize="11" TextTrimming="CharacterEllipsis" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
                         </StackPanel>
                         <ui:SymbolIcon Symbol="CheckmarkCircle20" Filled="True" HorizontalAlignment="Right" VerticalAlignment="Top"
                                        Foreground="{Binding DataContext.AccentBrush, RelativeSource={RelativeSource AncestorType=Window}}"
-                                       Visibility="{Binding IsApplied, Converter={StaticResource BoolToVisibility}}" ToolTip="Applied to this monitor" />
+                                       Visibility="{Binding IsApplied, Converter={StaticResource BoolToVisibility}}" ToolTip="Active on this monitor" />
                     </Grid>
                 </StackPanel>
             </Button>
         </DataTemplate>
-
-        <ItemsPanelTemplate x:Key="CardGrid">
-            <UniformGrid Columns="{Binding DataContext.PickerColumns, RelativeSource={RelativeSource AncestorType=Window}}" />
-        </ItemsPanelTemplate>
     </Window.Resources>
 
     <Grid>
-        <!-- The work area of this monitor: live preview or the interactive editor -->
-        <Grid x:Name="WorkAreaHost">
-            <editor:LayoutPreview Stretch="True" Zones="{Binding PreviewZones}" ShowNumbers="True" Gap="10"
-                                  Visibility="{Binding IsEditing, Converter={StaticResource InverseBoolToVisibility}}" Opacity="0.9" />
-            <editor:GridEditorSurface Grid="{Binding EditGrid}" SelectedZones="{Binding GridSelection}" PixelSize="{Binding PixelSize}" Accent="{Binding Accent}"
-                                      Visibility="{Binding ShowGridEditor, Converter={StaticResource BoolToVisibility}}" />
-            <editor:CanvasEditorSurface Zones="{Binding EditCanvas}" SelectedIndex="{Binding CanvasSelection}" PixelSize="{Binding PixelSize}" Accent="{Binding Accent}"
-                                        Visibility="{Binding ShowCanvasEditor, Converter={StaticResource BoolToVisibility}}" />
-        </Grid>
+        <ContentPresenter x:Name="CanvasHost" />
 
-        <!-- Layout picker -->
-        <Border x:Name="Picker" HorizontalAlignment="Center" VerticalAlignment="Center" MaxWidth="860" Margin="24"
+        <!-- Other monitors: a small caption so it is clear the editor is open there too -->
+        <Border HorizontalAlignment="Center" VerticalAlignment="Top" Margin="24" CornerRadius="8" Padding="12,6"
+                Background="{DynamicResource ApplicationBackgroundBrush}"
+                Visibility="{Binding IsHome, Converter={StaticResource InverseBoolToVisibility}}">
+            <TextBlock Text="{Binding MonitorCaption}" FontSize="12" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+        </Border>
+
+        <!-- Layout picker (home monitor) -->
+        <Border HorizontalAlignment="Center" VerticalAlignment="Center" MaxWidth="700" Margin="24"
                 CornerRadius="10" Padding="20" BorderThickness="1"
                 Background="{DynamicResource ApplicationBackgroundBrush}" BorderBrush="{DynamicResource SurfaceStrokeColorDefaultBrush}"
-                Visibility="{Binding IsEditing, Converter={StaticResource InverseBoolToVisibility}}">
+                Visibility="{Binding ShowPicker, Converter={StaticResource BoolToVisibility}}">
             <Grid>
                 <Grid.RowDefinitions>
                     <RowDefinition Height="Auto" />
@@ -82,83 +82,62 @@
                 </Grid.RowDefinitions>
 
                 <Grid Margin="0,0,0,12">
-                    <StackPanel>
-                        <TextBlock Text="{Binding Title}" FontSize="20" FontWeight="SemiBold" />
-                        <TextBlock Text="Pick a layout for this monitor. Esc closes the editor." FontSize="12" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+                    <StackPanel Margin="0,0,44,0">
+                        <TextBlock Text="{Binding Session.Title}" FontSize="20" FontWeight="SemiBold" TextWrapping="Wrap" />
+                        <TextBlock Text="Choose the layout for this monitor, or draw a new one. Ctrl+Win+Alt+number switches layouts at any time. Esc closes."
+                                   FontSize="12" TextWrapping="Wrap" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
                     </StackPanel>
-                    <ui:Button HorizontalAlignment="Right" VerticalAlignment="Top" Appearance="Transparent" Padding="8" Command="{Binding CloseCommand}" ToolTip="Close (Esc)">
+                    <ui:Button HorizontalAlignment="Right" VerticalAlignment="Top" Appearance="Transparent" Padding="8"
+                               Command="{Binding Session.CloseCommand}" ToolTip="Close (Esc)">
                         <ui:SymbolIcon Symbol="Dismiss24" />
                     </ui:Button>
                 </Grid>
 
                 <ScrollViewer x:Name="PickerScroll" Grid.Row="1" VerticalScrollBarVisibility="Auto">
                     <StackPanel>
-                        <TextBlock Text="Templates" FontWeight="SemiBold" Margin="4,0,0,4" />
-                        <ItemsControl ItemsSource="{Binding Templates}" ItemTemplate="{StaticResource LayoutCard}" ItemsPanel="{StaticResource CardGrid}" />
-
-                        <Grid Margin="4,16,0,4">
-                            <TextBlock Text="Custom" FontWeight="SemiBold" VerticalAlignment="Center" />
-                            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
-                                <ui:Button Content="New grid" Icon="{ui:SymbolIcon Grid24}" Command="{Binding NewGridCommand}" Margin="0,0,8,0" />
-                                <ui:Button Content="New canvas" Icon="{ui:SymbolIcon SquareMultiple24}" Command="{Binding NewCanvasCommand}" />
-                            </StackPanel>
-                        </Grid>
-                        <ItemsControl ItemsSource="{Binding Customs}" ItemTemplate="{StaticResource LayoutCard}" ItemsPanel="{StaticResource CardGrid}" />
-
-                        <!-- Parameters of the selected layout -->
-                        <Border Margin="4,16,4,0" Padding="12" CornerRadius="6" Background="{DynamicResource CardBackgroundFillColorDefaultBrush}">
-                            <WrapPanel>
-                                <StackPanel Margin="0,0,24,0" Visibility="{Binding IsSelectedTemplate, Converter={StaticResource BoolToVisibility}}">
-                                    <TextBlock Text="Number of zones" FontSize="12" Margin="0,0,0,4" />
-                                    <ui:NumberBox Value="{Binding ZoneCount, UpdateSourceTrigger=PropertyChanged}" Minimum="1" Maximum="40" SmallChange="1" MaxDecimalPlaces="0" Width="140" />
-                                </StackPanel>
-                                <StackPanel Margin="0,0,24,0" Visibility="{Binding SelectedUsesSpacing, Converter={StaticResource BoolToVisibility}}">
-                                    <CheckBox Content="Space around zones (px)" IsChecked="{Binding ShowSpacing}" Margin="0,0,0,4" />
-                                    <ui:NumberBox Value="{Binding Spacing, UpdateSourceTrigger=PropertyChanged}" Minimum="0" Maximum="200" SmallChange="1" MaxDecimalPlaces="0" Width="140" IsEnabled="{Binding ShowSpacing}" />
-                                </StackPanel>
-                                <StackPanel>
-                                    <TextBlock Text="Highlight distance (px)" FontSize="12" Margin="0,0,0,4" />
-                                    <ui:NumberBox Value="{Binding Sensitivity, UpdateSourceTrigger=PropertyChanged}" Minimum="0" Maximum="200" SmallChange="5" MaxDecimalPlaces="0" Width="140" />
-                                </StackPanel>
-                            </WrapPanel>
-                        </Border>
+                        <WrapPanel Margin="0,0,0,8">
+                            <ui:Button Content="New layout for this monitor" Icon="{ui:SymbolIcon Add24}" Command="{Binding Session.NewForMonitorCommand}" Margin="4" />
+                            <ui:Button Content="New layout across monitors" Icon="{ui:SymbolIcon DesktopFlow24}" Command="{Binding Session.NewAcrossMonitorsCommand}" Margin="4"
+                                       Visibility="{Binding Session.IsMultiMonitor, Converter={StaticResource BoolToVisibility}}" />
+                        </WrapPanel>
+                        <ItemsControl ItemsSource="{Binding Session.Layouts}" ItemTemplate="{StaticResource LayoutCard}">
+                            <ItemsControl.ItemsPanel>
+                                <ItemsPanelTemplate>
+                                    <WrapPanel />
+                                </ItemsPanelTemplate>
+                            </ItemsControl.ItemsPanel>
+                        </ItemsControl>
                     </StackPanel>
                 </ScrollViewer>
 
-                <Grid Grid.Row="2" Margin="4,16,4,0">
-                    <StackPanel Orientation="Horizontal">
-                        <ui:Button Content="Edit" Icon="{ui:SymbolIcon Edit24}" Command="{Binding EditCommand}" Margin="0,0,8,0" ToolTip="Templates are edited as a new custom copy" />
-                        <ui:Button Content="Duplicate" Icon="{ui:SymbolIcon Copy24}" Command="{Binding DuplicateCommand}" Margin="0,0,8,0" />
-                        <ui:Button Content="Delete" Icon="{ui:SymbolIcon Delete24}" Command="{Binding DeleteCommand}"
-                                   Visibility="{Binding IsSelectedCustom, Converter={StaticResource BoolToVisibility}}" />
-                    </StackPanel>
-                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
-                        <ui:Button Content="Apply" Command="{Binding ApplyCommand}" Margin="0,0,8,0" />
-                        <ui:Button Content="Apply &amp; close" Appearance="Primary" Command="{Binding ApplyAndCloseCommand}" />
-                    </StackPanel>
-                </Grid>
+                <WrapPanel Grid.Row="2" Margin="0,16,0,0" HorizontalAlignment="Right">
+                    <ui:Button Content="Edit" Icon="{ui:SymbolIcon Edit24}" Command="{Binding Session.EditSelectedCommand}" Margin="4" IsEnabled="{Binding Session.HasSelection}" />
+                    <ui:Button Content="Duplicate" Icon="{ui:SymbolIcon Copy24}" Command="{Binding Session.DuplicateCommand}" Margin="4" IsEnabled="{Binding Session.HasSelection}" />
+                    <ui:Button Content="Delete" Icon="{ui:SymbolIcon Delete24}" Command="{Binding Session.DeleteCommand}" Margin="4" IsEnabled="{Binding Session.HasSelection}" />
+                    <ui:Button Content="Apply" Command="{Binding Session.ApplyCommand}" Margin="4" IsEnabled="{Binding Session.HasSelection}" />
+                    <ui:Button Content="Apply &amp; close" Appearance="Primary" Command="{Binding Session.ApplyAndCloseCommand}" Margin="4" IsEnabled="{Binding Session.HasSelection}" />
+                </WrapPanel>
             </Grid>
         </Border>
 
-        <!-- Edit toolbar -->
-        <Border HorizontalAlignment="Center" VerticalAlignment="Top" Margin="24" CornerRadius="10" Padding="14,10" BorderThickness="1"
+        <!-- Edit toolbar (home monitor) -->
+        <Border HorizontalAlignment="Center" VerticalAlignment="Top" Margin="24" MaxWidth="820" CornerRadius="10" Padding="14,10" BorderThickness="1"
                 Background="{DynamicResource ApplicationBackgroundBrush}" BorderBrush="{DynamicResource SurfaceStrokeColorDefaultBrush}"
-                Visibility="{Binding IsEditing, Converter={StaticResource BoolToVisibility}}">
-            <StackPanel MaxWidth="820">
-                <StackPanel Orientation="Horizontal">
-                    <ui:TextBox Text="{Binding EditName, UpdateSourceTrigger=PropertyChanged}" Width="220" Margin="0,0,12,0" PlaceholderText="Layout name" />
-                    <ui:Button Content="Merge" Icon="{ui:SymbolIcon TableCellsMerge24}" Command="{Binding MergeCommand}" IsEnabled="{Binding CanMerge}" Margin="0,0,8,0"
-                               Visibility="{Binding ShowGridEditor, Converter={StaticResource BoolToVisibility}}" />
-                    <ui:Button Content="Reset" Icon="{ui:SymbolIcon ArrowReset24}" Command="{Binding ResetGridCommand}" Margin="0,0,8,0"
-                               Visibility="{Binding ShowGridEditor, Converter={StaticResource BoolToVisibility}}" />
-                    <ui:Button Content="Add zone" Icon="{ui:SymbolIcon Add24}" Command="{Binding AddCanvasZoneCommand}" Margin="0,0,8,0"
-                               Visibility="{Binding ShowCanvasEditor, Converter={StaticResource BoolToVisibility}}" />
-                    <ui:Button Content="Delete zone" Icon="{ui:SymbolIcon Delete24}" Command="{Binding DeleteCanvasZoneCommand}" Margin="0,0,8,0"
-                               Visibility="{Binding ShowCanvasEditor, Converter={StaticResource BoolToVisibility}}" />
-                    <ui:Button Content="Save" Appearance="Primary" Icon="{ui:SymbolIcon Save24}" Command="{Binding SaveEditCommand}" Margin="8,0,8,0" />
-                    <ui:Button Content="Cancel" Command="{Binding CancelEditCommand}" />
-                </StackPanel>
-                <TextBlock Text="{Binding EditHint}" FontSize="12" Margin="0,8,0,0" TextWrapping="Wrap" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+                Visibility="{Binding ShowToolbar, Converter={StaticResource BoolToVisibility}}">
+            <StackPanel>
+                <WrapPanel>
+                    <ui:TextBox Text="{Binding Session.EditName, UpdateSourceTrigger=PropertyChanged}" Width="200" Margin="4" PlaceholderText="Layout name" />
+                    <ComboBox Width="190" Margin="4" ItemsSource="{Binding Session.NumberOptions}" SelectedIndex="{Binding Session.EditNumberIndex}" ToolTip="Shortcut to switch to this layout" />
+                    <ui:Button Content="Split ↔" Icon="{ui:SymbolIcon SplitVertical24}" Command="{Binding Session.SplitVerticalCommand}" Margin="4"
+                               IsEnabled="{Binding Session.CanEditZone}" ToolTip="Split the selected zone into left and right halves" />
+                    <ui:Button Content="Split ↕" Icon="{ui:SymbolIcon SplitHorizontal24}" Command="{Binding Session.SplitHorizontalCommand}" Margin="4"
+                               IsEnabled="{Binding Session.CanEditZone}" ToolTip="Split the selected zone into top and bottom halves" />
+                    <ui:Button Content="Delete zone" Icon="{ui:SymbolIcon Delete24}" Command="{Binding Session.DeleteZoneCommand}" Margin="4" IsEnabled="{Binding Session.CanEditZone}" />
+                    <ui:Button Content="Reset" Icon="{ui:SymbolIcon ArrowReset24}" Command="{Binding Session.ResetZonesCommand}" Margin="4" ToolTip="One zone per monitor" />
+                    <ui:Button Content="Save" Appearance="Primary" Icon="{ui:SymbolIcon Save24}" Command="{Binding Session.SaveEditCommand}" Margin="4" />
+                    <ui:Button Content="Cancel" Command="{Binding Session.CancelEditCommand}" Margin="4" />
+                </WrapPanel>
+                <TextBlock Text="{Binding Session.EditHint}" FontSize="12" Margin="4,6,4,0" TextWrapping="Wrap" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
             </StackPanel>
         </Border>
     </Grid>

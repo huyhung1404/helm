@@ -42,6 +42,9 @@ public interface IWindowService
 
     bool SetTopmost(nint hwnd, bool topmost);
 
+    /// <summary>Restores (if minimized) and brings a window to the foreground.</summary>
+    bool Activate(nint hwnd);
+
     bool IsTopmost(nint hwnd);
 
     bool IsWindow(nint hwnd);
@@ -206,6 +209,14 @@ public sealed class WindowService(ILogger<WindowService> logger) : IWindowServic
     public bool SetWindowBounds(nint hwnd, PixelRect bounds) =>
         PInvoke.SetWindowPos(hwnd.ToHwnd(), default, bounds.Left, bounds.Top, bounds.Width, bounds.Height,
             SET_WINDOW_POS_FLAGS.SWP_NOZORDER | SET_WINDOW_POS_FLAGS.SWP_NOACTIVATE | SET_WINDOW_POS_FLAGS.SWP_NOOWNERZORDER);
+
+    public bool Activate(nint hwnd)
+    {
+        var h = hwnd.ToHwnd();
+        if (!PInvoke.IsWindow(h)) return false;
+        if (PInvoke.IsIconic(h)) PInvoke.ShowWindow(h, SHOW_WINDOW_CMD.SW_RESTORE);
+        return PInvoke.SetForegroundWindow(h);
+    }
 
     public bool SetTopmost(nint hwnd, bool topmost)
     {

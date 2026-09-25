@@ -11,7 +11,7 @@
         <TextBlock Text="Editor" Style="{DynamicResource HelmSectionHeader}" />
         <ui:CardControl Margin="0,0,0,4" Icon="{ui:SymbolIcon SlideLayout24}" Command="{Binding OpenEditorCommand}">
             <ui:CardControl.Header>
-                <core:CardHeader Title="Open layout editor" Description="Pick, create and apply layouts on every monitor." />
+                <core:CardHeader Title="Open layout editor" Description="Draw your own zones — for one monitor, or across several monitors — and choose the layout for each monitor." />
             </ui:CardControl.Header>
             <ui:SymbolIcon Symbol="Open24" />
         </ui:CardControl>
@@ -21,6 +21,23 @@
             </ui:CardControl.Header>
             <core:HotkeyPicker Gesture="{Binding EditorHotkey}" DefaultGesture="{Binding DefaultEditorHotkey}" />
         </ui:CardControl>
+
+        <!-- Layout switching -->
+        <TextBlock Text="Layouts" Style="{DynamicResource HelmSectionHeader}" />
+        <ui:CardExpander Margin="0,0,0,4" IsExpanded="True" Icon="{ui:SymbolIcon NumberSymbolSquare24}">
+            <ui:CardExpander.Header>
+                <core:RowLayout Margin="0,0,16,0">
+                    <core:CardHeader Title="Switch layouts with Ctrl+Win+Alt+number" Description="Give a layout a number (1–9) in the editor; the shortcut applies it to the monitor under the mouse." />
+                    <ui:ToggleSwitch IsChecked="{Binding LayoutHotkeys}" />
+                </core:RowLayout>
+            </ui:CardExpander.Header>
+            <Border Style="{DynamicResource HelmExpanderRow}" BorderThickness="0" IsEnabled="{Binding LayoutHotkeys}">
+                <core:RowLayout>
+                    <core:CardHeader Title="Show the layout after switching" Description="Briefly shows the new zones and the layout name." />
+                    <ui:ToggleSwitch IsChecked="{Binding FlashLayoutOnSwitch}" />
+                </core:RowLayout>
+            </Border>
+        </ui:CardExpander>
 
         <!-- Activation -->
         <TextBlock Text="Activation" Style="{DynamicResource HelmSectionHeader}" />
@@ -53,11 +70,26 @@
                         <ui:ToggleSwitch HorizontalAlignment="Right" IsChecked="{Binding MultiZoneSpanning}" />
                     </core:RowLayout>
                 </Border>
+                <Border Style="{DynamicResource HelmExpanderRow}">
+                    <core:RowLayout>
+                        <core:CardHeader Title="Highlight distance (px)" Description="How close the cursor must be to a zone for it to light up when it is between zones." />
+                        <StackPanel Orientation="Horizontal">
+                            <Slider Width="160" Minimum="0" Maximum="100" TickFrequency="5" IsSnapToTickEnabled="True" Value="{Binding HighlightDistance}" VerticalAlignment="Center" />
+                            <TextBlock Width="36" TextAlignment="Right" VerticalAlignment="Center" Text="{Binding HighlightDistance, StringFormat={}{0:0}}" />
+                        </StackPanel>
+                    </core:RowLayout>
+                </Border>
             </StackPanel>
         </ui:CardExpander>
 
         <!-- Windows behavior -->
         <TextBlock Text="Window behavior" Style="{DynamicResource HelmSectionHeader}" />
+        <ui:CardControl Margin="0,0,0,4" Icon="{ui:SymbolIcon WindowMultiple20}">
+            <ui:CardControl.Header>
+                <core:CardHeader Title="Switch between windows in a zone with Win+PgUp / Win+PgDn" Description="When several windows share the focused window's zone, activates the previous / next one." />
+            </ui:CardControl.Header>
+            <ui:ToggleSwitch IsChecked="{Binding CycleWindowsInZone}" />
+        </ui:CardControl>
         <ui:CardControl Margin="0,0,0,4" Icon="{ui:SymbolIcon ArrowSwap24}">
             <ui:CardControl.Header>
                 <core:CardHeader Title="Override Windows Snap" Description="Win+Left/Right move the focused window to the previous/next zone (Win+Up/Down too when zones are stacked)." />
@@ -115,12 +147,6 @@
                     <core:RowLayout>
                         <core:CardHeader Title="Border and number color" />
                         <core:ColorSwatchPicker HorizontalAlignment="Right" Color="{Binding BorderColor}" />
-                    </core:RowLayout>
-                </Border>
-                <Border Style="{DynamicResource HelmExpanderRow}">
-                    <core:RowLayout>
-                        <core:CardHeader Title="Columns in the layout picker" />
-                        <ComboBox HorizontalAlignment="Right" MinWidth="100" ItemsSource="{Binding PickerColumnOptions}" SelectedItem="{Binding PickerColumns}" />
                     </core:RowLayout>
                 </Border>
             </StackPanel>

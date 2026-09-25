@@ -5,6 +5,7 @@ using Helm.Core.Modules;
 using Helm.Core.Settings;
 using Helm.Modules.Zones.Editor;
 using Helm.Modules.Zones.Engine;
+using Helm.Modules.Zones.Layouts;
 using Microsoft.Extensions.Logging;
 using Wpf.Ui.Controls;
 
@@ -14,6 +15,7 @@ public sealed class ZonesModule : HelmModuleBase
 {
     public const string ModuleId = "zones";
     private const string EditorHotkeyId = "editor";
+    private const HotkeyModifiers LayoutModifiers = HotkeyModifiers.Ctrl | HotkeyModifiers.Win | HotkeyModifiers.Alt;
 
     private readonly IHotkeyManager _hotkeys;
     private readonly IWindowService _windows;
@@ -23,8 +25,9 @@ public sealed class ZonesModule : HelmModuleBase
     private readonly ZonesEditorController _editor;
     private readonly ILogger<ZonesModule> _logger;
     private readonly SemaphoreSlim _gate = new(1, 1);
+    private readonly List<HotkeyRegistration> _registrations = [];
     private ZonesEngine? _engine;
-    private HotkeyRegistration? _editorRegistration;
+    private (HotkeyGesture Editor, bool Layouts) _registeredFor;
 
     public ZonesModule(
         ISettingsStoreFactory settings,
@@ -51,7 +54,7 @@ public sealed class ZonesModule : HelmModuleBase
 
     public override string Id => ModuleId;
     public override string DisplayName => "Zones";
-    public override string Description => "Divide each monitor into zones and snap windows into them. Hold Shift while dragging a window to see the zones.";
+    public override string Description => "Draw your own zones — on one monitor or across several — and snap windows into them. Hold Shift while dragging a window to see the zones.";
     public override ModuleGroup Group => ModuleGroup.WindowingAndLayouts;
     public override SymbolRegular Icon => SymbolRegular.SlideLayout24;
     public override Type SettingsPageType => typeof(ZonesPage);
@@ -77,6 +80,13 @@ public sealed class ZonesModule : HelmModuleBase
             };
             if (!s.AlwaysShowZones)
                 list.Add(new HotkeyDefinition(ModuleId, "activate", "Activate zones while dragging (hold)", new HotkeyGesture(activation, 0)));
+            if (s.LayoutHotkeys)
+                list.Add(new HotkeyDefinition(ModuleId, "layout-1", "Switch to layout 1 (…9)", new HotkeyGesture(LayoutModifiers, '1')));
+            if (s.CycleWindowsInZone)
+            {
+                list.Add(new HotkeyDefinition(ModuleId, "cycle-prev", "Previous window in the zone", new HotkeyGesture(HotkeyModifiers.Win, VirtualKeyNames.PageUp)));
+                list.Add(new HotkeyDefinition(ModuleId, "cycle-next", "Next window in the zone", new HotkeyGesture(HotkeyModifiers.Win, VirtualKeyNames.PageDown)));
+            }
             if (s.OverrideWindowsSnap)
             {
                 list.Add(new HotkeyDefinition(ModuleId, "prev", "Move window to the previous zone", new HotkeyGesture(HotkeyModifiers.Win, VirtualKeyNames.Left)));
@@ -86,7 +96,7 @@ public sealed class ZonesModule : HelmModuleBase
         }
     }
 
-    public void OpenEditor() => _editor.Show(Settings.Current.PickerColumns);
+    public void OpenEditor() => _editor.Show();
 
     public override async Task EnableAsync(CancellationToken ct)
     {
@@ -106,7 +116,7 @@ public sealed class ZonesModule : HelmModuleBase
                 StatusMessage = $"Window snapping is unavailable: {ex.Message}";
                 throw;
             }
-            await RegisterEditorHotkeyAsync().ConfigureAwait(false);
+            await RegisterHotkeysAsync().ConfigureAwait(false);
         }
         finally
         {
@@ -119,8 +129,7 @@ public sealed class ZonesModule : HelmModuleBase
         await _gate.WaitAsync().ConfigureAwait(false);
         try
         {
-            _editorRegistration?.Dispose();
-            _editorRegistration = null;
+            UnregisterHotkeys();
             _editor.Close();
             if (_engine is { } engine)
             {
@@ -134,12 +143,40 @@ public sealed class ZonesModule : HelmModuleBase
         }
     }
 
-    private async Task RegisterEditorHotkeyAsync()
+    private void UnregisterHotkeys()
     {
-        _editorRegistration?.Dispose();
-        var definition = Hotkeys[0];
-        _editorRegistration = await _hotkeys.TryRegisterAsync(definition, () => _editor.Toggle(Settings.Current.PickerColumns)).ConfigureAwait(false);
-        StatusMessage = _editorRegistration.IsRegistered ? null : $"The editor shortcut {definition.Gesture} is not active: {_editorRegistration.Error}";
+        foreach (var r in _registrations) r.Dispose();
+        _registrations.Clear();
+    }
+
+    /// <summary>Editor shortcut plus Ctrl+Win+Alt+1…9 (one registration each); failures become one InfoBar message.</summary>
+    private async Task RegisterHotkeysAsync()
+    {
+        UnregisterHotkeys();
+        var s = Settings.Current;
+        var problems = new List<string>();
+
+        var editor = await _hotkeys.TryRegisterAsync(Hotkeys[0], () => _editor.Toggle()).ConfigureAwait(false);
+        _registrations.Add(editor);
+        if (!editor.IsRegistered) problems.Add($"The editor shortcut {s.EditorHotkey} is not active: {editor.Error}");
+
+        if (s.LayoutHotkeys && _engine is { } engine)
+        {
+            var failed = new List<int>();
+            for (var n = 1; n <= ZoneLayout.MaxNumber; n++)
+            {
+                var number = n;
+                var definition = new HotkeyDefinition(ModuleId, $"layout-{n}", $"Switch to layout {n}", new HotkeyGesture(LayoutModifiers, '0' + n));
+                var registration = await _hotkeys.TryRegisterAsync(definition, () => engine.SwitchLayout(number)).ConfigureAwait(false);
+                _registrations.Add(registration);
+                if (!registration.IsRegistered) failed.Add(n);
+            }
+            if (failed.Count > 0)
+                problems.Add($"Ctrl+Win+Alt+{string.Join(", ", failed)} could not be registered (used by another application).");
+        }
+
+        _registeredFor = (s.EditorHotkey, s.LayoutHotkeys);
+        StatusMessage = problems.Count == 0 ? null : string.Join(Environment.NewLine, problems);
         NotifyHotkeysChanged();
     }
 
@@ -151,7 +188,8 @@ public sealed class ZonesModule : HelmModuleBase
             NotifyHotkeysChanged();
             if (_engine is null) return;
             _engine.UpdateOptions(ZonesEngine.Options.From(Settings.Current));
-            if (_editorRegistration?.Definition.Gesture != Settings.Current.EditorHotkey) await RegisterEditorHotkeyAsync().ConfigureAwait(false);
+            if (_registeredFor != (Settings.Current.EditorHotkey, Settings.Current.LayoutHotkeys))
+                await RegisterHotkeysAsync().ConfigureAwait(false);
         }
         catch (Exception ex)
         {

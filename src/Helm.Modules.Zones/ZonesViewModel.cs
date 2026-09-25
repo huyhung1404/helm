@@ -23,7 +23,10 @@ public sealed partial class ZonesViewModel : ObservableObject
     [ObservableProperty] private string _borderColor = "#FFFFFF";
     [ObservableProperty] private string _highlightColor = "#0078D4";
     [ObservableProperty] private bool _showZoneNumbers;
-    [ObservableProperty] private int _pickerColumns;
+    [ObservableProperty] private double _highlightDistance;
+    [ObservableProperty] private bool _layoutHotkeys;
+    [ObservableProperty] private bool _flashLayoutOnSwitch;
+    [ObservableProperty] private bool _cycleWindowsInZone;
     [ObservableProperty] private string _excludedApps = string.Empty;
 
     public ZonesViewModel(ZonesModule module)
@@ -38,8 +41,6 @@ public sealed partial class ZonesViewModel : ObservableObject
     public HotkeyGesture DefaultEditorHotkey => ZonesSettings.DefaultEditorHotkey;
 
     public IReadOnlyList<ZoneActivationKey> ActivationKeys { get; } = Enum.GetValues<ZoneActivationKey>();
-
-    public IReadOnlyList<int> PickerColumnOptions { get; } = [2, 3, 4, 5, 6];
 
     public string SpanKeyText => ActivationKey == ZoneActivationKey.Ctrl ? "Alt" : "Ctrl";
 
@@ -63,7 +64,10 @@ public sealed partial class ZonesViewModel : ObservableObject
     partial void OnBorderColorChanged(string value) => Save(s => s.BorderColor = value);
     partial void OnHighlightColorChanged(string value) => Save(s => s.HighlightColor = value);
     partial void OnShowZoneNumbersChanged(bool value) => Save(s => s.ShowZoneNumbers = value);
-    partial void OnPickerColumnsChanged(int value) => Save(s => s.PickerColumns = value);
+    partial void OnHighlightDistanceChanged(double value) => Save(s => s.HighlightDistance = (int)Math.Round(value));
+    partial void OnLayoutHotkeysChanged(bool value) => Save(s => s.LayoutHotkeys = value);
+    partial void OnFlashLayoutOnSwitchChanged(bool value) => Save(s => s.FlashLayoutOnSwitch = value);
+    partial void OnCycleWindowsInZoneChanged(bool value) => Save(s => s.CycleWindowsInZone = value);
     partial void OnExcludedAppsChanged(string value) => Save(s => s.ExcludedApps = ProcessExclusions.ParseLines(value));
 
     private void Load(ZonesSettings s)
@@ -81,7 +85,10 @@ public sealed partial class ZonesViewModel : ObservableObject
         BorderColor = s.BorderColor;
         HighlightColor = s.HighlightColor;
         ShowZoneNumbers = s.ShowZoneNumbers;
-        PickerColumns = s.PickerColumns;
+        HighlightDistance = s.HighlightDistance;
+        LayoutHotkeys = s.LayoutHotkeys;
+        FlashLayoutOnSwitch = s.FlashLayoutOnSwitch;
+        CycleWindowsInZone = s.CycleWindowsInZone;
         ExcludedApps = string.Join(Environment.NewLine, s.ExcludedApps);
         _loading = false;
     }

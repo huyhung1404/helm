@@ -63,7 +63,7 @@ public class GridLayoutTests
     [Fact]
     public void Merge_two_neighbours_and_collapse_redundant_columns()
     {
-        var grid = LayoutTemplates.GenerateGrid(LayoutKind.Columns, 3);
+        var grid = TestLayouts.ColumnsGrid(3);
 
         var merged = grid.Merge([1, 2]);
 
@@ -76,7 +76,7 @@ public class GridLayoutTests
     [Fact]
     public void Merge_diagonal_zones_expands_to_a_rectangle()
     {
-        var grid = LayoutTemplates.GenerateGrid(LayoutKind.Grid, 4); // 2x2
+        var grid = TestLayouts.SquareGrid(2); // 2x2
 
         var merged = grid.Merge([0, 3]);
 
@@ -87,7 +87,7 @@ public class GridLayoutTests
     [Fact]
     public void Move_splitter_resizes_neighbours_and_clamps()
     {
-        var grid = LayoutTemplates.GenerateGrid(LayoutKind.Columns, 2);
+        var grid = TestLayouts.ColumnsGrid(2);
 
         var moved = grid.MoveSplitter(SplitOrientation.Vertical, 0, 0.7);
         Assert.Equal(0.7, moved.Columns[0], 9);
@@ -119,7 +119,7 @@ public class GridLayoutTests
     [Fact]
     public void Transpose_twice_is_identity()
     {
-        var grid = LayoutTemplates.GenerateGrid(LayoutKind.PriorityGrid, 5);
+        var grid = new GridLayout([0.5, 0.5], [0.25, 0.5, 0.25], [[0, 2, 3], [1, 2, 4]]);
         var back = grid.Transpose().Transpose();
         Assert.Equal(grid.Rows, back.Rows);
         Assert.Equal(grid.Columns, back.Columns);

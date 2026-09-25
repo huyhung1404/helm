@@ -133,6 +133,20 @@ public static class ZoneMath
         return -1;
     }
 
+    /// <summary>
+    /// Win+PgUp/PgDn: the window to activate among the windows sharing a zone. <paramref name="group"/> must be in a
+    /// stable order (so repeated presses visit every window); wraps around. Returns 0 when there is nothing to switch to.
+    /// </summary>
+    public static nint CycleTarget(IReadOnlyList<nint> group, nint current, int delta)
+    {
+        if (group.Count < 2) return 0;
+        var index = -1;
+        for (var i = 0; i < group.Count; i++)
+            if (group[i] == current) { index = i; break; }
+        if (index < 0) return group[0];
+        return group[((index + delta) % group.Count + group.Count) % group.Count];
+    }
+
     private static PixelRect Intersect(PixelRect a, PixelRect b) =>
         new(Math.Max(a.Left, b.Left), Math.Max(a.Top, b.Top), Math.Min(a.Right, b.Right), Math.Min(a.Bottom, b.Bottom));
 }
