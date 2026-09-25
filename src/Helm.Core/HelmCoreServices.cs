@@ -2,6 +2,7 @@ using Helm.Core.Desktop;
 using Helm.Core.Hooks;
 using Helm.Core.Hotkeys;
 using Helm.Core.Modules;
+using Helm.Core.Processes;
 using Helm.Core.Services;
 using Helm.Core.Settings;
 using Helm.Core.Sync;
@@ -25,6 +26,7 @@ public static class HelmCoreServices
         services.AddSingleton<IMonitorService, MonitorService>();
         services.AddSingleton<IStartupTaskService, StartupTaskService>();
         services.AddSingleton<IProcessLauncher, ProcessLauncher>();
+        services.AddSingleton<IChildProcessLauncher, ChildProcessLauncher>();
         services.TryAddSingleton<IAppLocation, ProcessAppLocation>();
         services.AddSingleton<IModuleHost, ModuleRegistry>();
         services.AddHelmSync(paths);

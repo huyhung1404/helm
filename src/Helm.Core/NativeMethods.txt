@@ -68,6 +68,22 @@ OpenProcess
 QueryFullProcessImageName
 CloseHandle
 
+// Child processes (unelevated launch, pipes, kill-on-close job)
+OpenProcessToken
+DuplicateTokenEx
+CreateProcessWithTokenW
+CreateProcess
+CreatePipe
+SetHandleInformation
+ResumeThread
+TerminateProcess
+GetExitCodeProcess
+CreateJobObject
+SetInformationJobObject
+AssignProcessToJobObject
+TerminateJobObject
+JOBOBJECT_EXTENDED_LIMIT_INFORMATION
+
 // Monitors & DPI
 EnumDisplayMonitors
 GetMonitorInfo
