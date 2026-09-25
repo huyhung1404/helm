@@ -24,6 +24,13 @@ internal sealed class SearchService(IServiceProvider services, IModuleHost modul
 
     public void Invalidate() => _index = null;
 
+    /// <summary>The settings card on <paramref name="pageType"/> whose header title is <paramref name="title"/>.</summary>
+    public FrameworkElement? FindCard(Type pageType, string title)
+    {
+        _index ??= BuildIndex();
+        return _index.FirstOrDefault(r => r.PageType == pageType && r.Target is not null && string.Equals(r.Title, title, StringComparison.OrdinalIgnoreCase))?.Target;
+    }
+
     public IReadOnlyList<SearchResult> Search(string query, int max = 12)
     {
         if (string.IsNullOrWhiteSpace(query)) return [];
@@ -95,6 +102,7 @@ internal sealed class SearchService(IServiceProvider services, IModuleHost modul
         // Headers of cards are not always logical children; include them explicitly.
         if (node is CardControl { Header: DependencyObject h1 }) children.Add(h1);
         if (node is HeaderedContentControl { Header: DependencyObject h2 } && !children.Contains(h2)) children.Add(h2);
+        if (node is CardExpander { Header: DependencyObject h3 } && !children.Contains(h3)) children.Add(h3);
         if (node is ModulePageBase { Body: DependencyObject body } && !children.Contains(body)) children.Add(body);
 
         foreach (var child in children)

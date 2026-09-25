@@ -14,7 +14,6 @@ internal sealed partial class GeneralViewModel : ObservableObject
     private readonly IStartupTaskService _startup;
     private readonly IProcessLauncher _launcher;
     private readonly IAppLocation _location;
-    private readonly IUpdateService _updates;
     private readonly IDialogService _dialogs;
     private readonly ShellController _shell;
     private readonly ILogger<GeneralViewModel> _logger;
@@ -35,18 +34,12 @@ internal sealed partial class GeneralViewModel : ObservableObject
     [ObservableProperty]
     private string? _statusMessage;
 
-    [ObservableProperty]
-    private bool _isCheckingForUpdates;
-
-    [ObservableProperty]
-    private string _updateStatus = "Not checked yet";
-
     public GeneralViewModel(
         ISettingsStoreFactory settings,
         IStartupTaskService startup,
         IProcessLauncher launcher,
         IAppLocation location,
-        IUpdateService updates,
+        UpdatesViewModel updates,
         IDialogService dialogs,
         ShellController shell,
         ILogger<GeneralViewModel> logger)
@@ -56,7 +49,7 @@ internal sealed partial class GeneralViewModel : ObservableObject
         _startup = startup;
         _launcher = launcher;
         _location = location;
-        _updates = updates;
+        Updates = updates;
         _dialogs = dialogs;
         _shell = shell;
         _logger = logger;
@@ -67,8 +60,6 @@ internal sealed partial class GeneralViewModel : ObservableObject
         _loading = false;
 
         _ = LoadStartupStateAsync();
-        RefreshUpdateStatus();
-        updates.StateChanged += (_, _) => System.Windows.Application.Current.Dispatcher.BeginInvoke(RefreshUpdateStatus);
     }
 
     public bool HasStatusMessage => !string.IsNullOrEmpty(StatusMessage);
@@ -77,7 +68,8 @@ internal sealed partial class GeneralViewModel : ObservableObject
 
     public IReadOnlyList<AppTheme> Themes { get; } = Enum.GetValues<AppTheme>();
 
-    public string Version => $"Helm v{AppInfo.Version}";
+    /// <summary>General → Updates section.</summary>
+    public UpdatesViewModel Updates { get; }
 
     public string ElevationText => _launcher.IsElevated
         ? "Running as administrator — hooks and hotkeys also work on elevated windows."
@@ -105,29 +97,6 @@ internal sealed partial class GeneralViewModel : ObservableObject
 
     [RelayCommand]
     private void OpenLogsFolder() => _launcher.OpenFolder(_settings.Paths.LogsDirectory);
-
-    [RelayCommand]
-    private void OpenReleases() => _launcher.OpenUrl(AppInfo.ReleasesUrl);
-
-    [RelayCommand]
-    private async Task CheckForUpdatesAsync()
-    {
-        IsCheckingForUpdates = true;
-        try
-        {
-            await _updates.CheckAsync(CancellationToken.None).ConfigureAwait(true);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogWarning(ex, "Update check failed");
-            StatusMessage = $"Update check failed: {ex.Message}";
-        }
-        finally
-        {
-            IsCheckingForUpdates = false;
-            RefreshUpdateStatus();
-        }
-    }
 
     [RelayCommand]
     private async Task ResetAllSettingsAsync()
@@ -182,18 +151,5 @@ internal sealed partial class GeneralViewModel : ObservableObject
         {
             IsStartupBusy = false;
         }
-    }
-
-    private void RefreshUpdateStatus()
-    {
-        var checkedAt = _updates.LastChecked;
-        var result = _updates.LastResult?.Status switch
-        {
-            UpdateCheckStatus.UpdateAvailable => $"Version {_updates.LastResult.Version} is available.",
-            UpdateCheckStatus.Failed => $"Last check failed: {_updates.LastResult.Message}",
-            UpdateCheckStatus.NotInstalled => _updates.LastResult.Message ?? "Updates are unavailable for this build.",
-            _ => "You're up to date.",
-        };
-        UpdateStatus = checkedAt is null ? "Not checked yet" : $"{result} Last checked {checkedAt.Value.ToLocalTime():g}.";
     }
 }

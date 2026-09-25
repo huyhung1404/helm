@@ -107,22 +107,25 @@ internal sealed partial class HomeViewModel : ObservableObject
         if (module is not null) _navigator.Navigate(module.SettingsPageType);
     }
 
+    /// <summary>Tile click: up to date → check again; anything needing attention → General → Updates.</summary>
     [RelayCommand]
-    private async Task CheckForUpdatesAsync()
+    private async Task UpdateTileAsync()
     {
-        if (IsCheckingForUpdates) return;
-        IsCheckingForUpdates = true;
-        UpdateTitle = "Checking for updates…";
-        try
+        if (_updates.State is UpdateState.Idle or UpdateState.UpToDate)
         {
             await _updates.CheckAsync(CancellationToken.None).ConfigureAwait(true);
+            return;
         }
-        finally
-        {
-            IsCheckingForUpdates = false;
-            RefreshUpdateTile();
-        }
+        _navigator.NavigateToCard(typeof(GeneralPage), "Updates");
     }
+
+    /// <summary>"ok" (green check), "attention" (accent download), "muted" (info) — styles the tile icon.</summary>
+    public string UpdateTone => _updates.State switch
+    {
+        UpdateState.UpdateAvailable or UpdateState.Downloading or UpdateState.Downloaded or UpdateState.Applying => "attention",
+        UpdateState.NotInstalled or UpdateState.Failed => "muted",
+        _ => "ok",
+    };
 
     public void RefreshAll()
     {
@@ -186,17 +189,22 @@ internal sealed partial class HomeViewModel : ObservableObject
 
     private void RefreshUpdateTile()
     {
-        var result = _updates.LastResult;
-        UpdateTitle = result?.Status switch
+        var version = _updates.LastResult?.Version;
+        var lastChecked = _updates.LastChecked is { } checkedAt ? $"Last checked: {FormatWhen(checkedAt)}" : "Not checked yet";
+        IsCheckingForUpdates = _updates.State == UpdateState.Checking;
+        (UpdateTitle, UpdateSubtitle) = _updates.State switch
         {
-            UpdateCheckStatus.UpdateAvailable => $"Update available · v{result.Version}",
-            UpdateCheckStatus.Failed => "Couldn't check for updates",
-            UpdateCheckStatus.NotInstalled => "Updates unavailable",
-            _ => "You're up to date",
+            UpdateState.Checking => ("Checking…", lastChecked),
+            UpdateState.UpToDate => ("You're up to date", lastChecked),
+            UpdateState.UpdateAvailable => ($"Update available · v{version}", "Open General → Updates"),
+            UpdateState.Downloading => ($"Update available · v{version}", $"Downloading… {_updates.DownloadProgress}%"),
+            UpdateState.Downloaded => ($"Update available · v{version}", "Ready — restart to update"),
+            UpdateState.Applying => ($"Updating to v{version}", "Restarting…"),
+            UpdateState.NotInstalled => ("Updates unavailable (portable build)", "Install Helm to get updates"),
+            UpdateState.Failed => ("Couldn't check for updates", lastChecked),
+            _ => ("You're up to date", lastChecked),
         };
-        UpdateSubtitle = _updates.LastChecked is { } checkedAt
-            ? $"Last checked: {FormatWhen(checkedAt)}"
-            : "Not checked yet";
+        OnPropertyChanged(nameof(UpdateTone));
     }
 
     private static string FormatWhen(DateTimeOffset when)

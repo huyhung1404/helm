@@ -74,11 +74,27 @@
                 </StackPanel>
             </Button>
 
-            <Button Grid.Column="2" Style="{StaticResource TileButton}" Padding="12,8" Margin="24,0,0,0" HorizontalContentAlignment="Left" Command="{Binding CheckForUpdatesCommand}">
+            <Button Grid.Column="2" Style="{StaticResource TileButton}" Padding="12,8" Margin="24,0,0,0" HorizontalContentAlignment="Left" Command="{Binding UpdateTileCommand}">
                 <StackPanel Orientation="Horizontal">
                     <Grid Margin="0,0,12,0" VerticalAlignment="Center">
-                        <ui:SymbolIcon Symbol="CheckmarkCircle24" Filled="True" FontSize="24" Foreground="{DynamicResource SystemFillColorSuccessBrush}"
-                                       Visibility="{Binding IsCheckingForUpdates, Converter={StaticResource InverseBoolToVisibility}}" />
+                        <ui:SymbolIcon FontSize="24" Filled="True" Visibility="{Binding IsCheckingForUpdates, Converter={StaticResource InverseBoolToVisibility}}">
+                            <ui:SymbolIcon.Style>
+                                <Style TargetType="ui:SymbolIcon">
+                                    <Setter Property="Symbol" Value="CheckmarkCircle24" />
+                                    <Setter Property="Foreground" Value="{DynamicResource SystemFillColorSuccessBrush}" />
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding UpdateTone}" Value="attention">
+                                            <Setter Property="Symbol" Value="ArrowCircleDown24" />
+                                            <Setter Property="Foreground" Value="{DynamicResource AccentTextFillColorPrimaryBrush}" />
+                                        </DataTrigger>
+                                        <DataTrigger Binding="{Binding UpdateTone}" Value="muted">
+                                            <Setter Property="Symbol" Value="Info24" />
+                                            <Setter Property="Foreground" Value="{DynamicResource TextFillColorSecondaryBrush}" />
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </ui:SymbolIcon.Style>
+                        </ui:SymbolIcon>
                         <ui:ProgressRing IsIndeterminate="True" Width="22" Height="22"
                                          Visibility="{Binding IsCheckingForUpdates, Converter={StaticResource BoolToVisibility}}" />
                     </Grid>

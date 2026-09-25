@@ -1,4 +1,4 @@
-﻿using System.Windows;
+using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Threading;
 using Wpf.Ui.Controls;
@@ -9,10 +9,13 @@ internal interface IShellNavigator
 {
     /// <summary>Shows the main window and navigates to <paramref name="pageType"/>; optionally scrolls to a settings card.</summary>
     void Navigate(Type pageType, FrameworkElement? focus = null);
+
+    /// <summary>Navigates to <paramref name="pageType"/> and reveals the card whose header title is <paramref name="cardTitle"/>.</summary>
+    void NavigateToCard(Type pageType, string cardTitle);
 }
 
 /// <summary>Bridges view models to the MainWindow's NavigationView without them touching the view.</summary>
-internal sealed class ShellNavigator : IShellNavigator
+internal sealed class ShellNavigator(SearchService search) : IShellNavigator
 {
     private NavigationView? _navigation;
     private Action? _showWindow;
@@ -22,6 +25,8 @@ internal sealed class ShellNavigator : IShellNavigator
         _navigation = navigation;
         _showWindow = showWindow;
     }
+
+    public void NavigateToCard(Type pageType, string cardTitle) => Navigate(pageType, search.FindCard(pageType, cardTitle));
 
     public void Navigate(Type pageType, FrameworkElement? focus = null)
     {
@@ -39,17 +44,13 @@ internal sealed class ShellNavigator : IShellNavigator
         for (DependencyObject? p = target; p is not null; p = LogicalTreeHelperParent(p))
         {
             if (p is Expander expander) expander.IsExpanded = true;
+            if (p is CardExpander cardExpander) cardExpander.IsExpanded = true;
         }
         target.BringIntoView();
         if (target.Focusable) target.Focus();
 
-        var original = target.Opacity;
-        var animation = new System.Windows.Media.Animation.DoubleAnimation(0.35, 1.0, TimeSpan.FromMilliseconds(700))
-        {
-            AutoReverse = false,
-        };
+        var animation = new System.Windows.Media.Animation.DoubleAnimation(0.35, 1.0, TimeSpan.FromMilliseconds(700));
         target.BeginAnimation(UIElement.OpacityProperty, animation);
-        target.Opacity = original;
     }
 
     private static DependencyObject? LogicalTreeHelperParent(DependencyObject d) =>
