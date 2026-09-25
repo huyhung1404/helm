@@ -1,0 +1,113 @@
+<core:ModulePageBase
+    x:Class="Helm.Modules.AlwaysOnTop.AlwaysOnTopPage"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
+    xmlns:core="clr-namespace:Helm.Core.Ui;assembly=Helm.Core"
+    xmlns:local="clr-namespace:Helm.Modules.AlwaysOnTop"
+    Module="{Binding Module}">
+
+    <StackPanel>
+        <!-- Activation -->
+        <TextBlock Text="Activation" Style="{DynamicResource HelmSectionHeader}" />
+        <ui:CardControl Margin="0,0,0,4" Icon="{ui:SymbolIcon Keyboard24}">
+            <ui:CardControl.Header>
+                <core:CardHeader Title="Activation shortcut" Description="Pins or unpins the window that has focus." />
+            </ui:CardControl.Header>
+            <core:HotkeyPicker Gesture="{Binding Hotkey}" DefaultGesture="{Binding DefaultHotkey}" />
+        </ui:CardControl>
+        <ui:CardControl Margin="0,0,0,4" Icon="{ui:SymbolIcon Games24}">
+            <ui:CardControl.Header>
+                <core:CardHeader Title="Do not activate when Game Mode is on" Description="Ignore the shortcut while a full-screen game or presentation is running." />
+            </ui:CardControl.Header>
+            <ui:ToggleSwitch IsChecked="{Binding DoNotActivateInGameMode}" />
+        </ui:CardControl>
+
+        <!-- Appearance -->
+        <TextBlock Text="Appearance" Style="{DynamicResource HelmSectionHeader}" />
+        <ui:CardExpander Margin="0,0,0,4" IsExpanded="True" Icon="{ui:SymbolIcon BorderOutside24}">
+            <ui:CardExpander.Header>
+                <Grid>
+                    <core:CardHeader Title="Show a border around the pinned window" Description="Draws a click-through frame so pinned windows stand out." />
+                    <ui:ToggleSwitch HorizontalAlignment="Right" Margin="0,0,16,0" IsChecked="{Binding ShowBorder}" />
+                </Grid>
+            </ui:CardExpander.Header>
+            <StackPanel IsEnabled="{Binding ShowBorder}">
+                <Border Style="{DynamicResource HelmExpanderRow}" BorderThickness="0">
+                    <Grid>
+                        <core:CardHeader Title="Use the Windows accent color" />
+                        <ui:ToggleSwitch HorizontalAlignment="Right" IsChecked="{Binding UseAccentColor}" />
+                    </Grid>
+                </Border>
+                <Border Style="{DynamicResource HelmExpanderRow}" IsEnabled="{Binding UseAccentColor, Converter={StaticResource InverseBool}}">
+                    <Grid>
+                        <core:CardHeader Title="Border color" />
+                        <core:ColorSwatchPicker HorizontalAlignment="Right" Color="{Binding BorderColor}" />
+                    </Grid>
+                </Border>
+                <Border Style="{DynamicResource HelmExpanderRow}">
+                    <Grid>
+                        <core:CardHeader Title="Border thickness (px)" />
+                        <ComboBox HorizontalAlignment="Right" MinWidth="120" ItemsSource="{Binding Thicknesses}" SelectedItem="{Binding BorderThickness}" />
+                    </Grid>
+                </Border>
+            </StackPanel>
+        </ui:CardExpander>
+
+        <!-- Sound -->
+        <TextBlock Text="Sound" Style="{DynamicResource HelmSectionHeader}" />
+        <ui:CardControl Margin="0,0,0,4" Icon="{ui:SymbolIcon Speaker224}">
+            <ui:CardControl.Header>
+                <core:CardHeader Title="Play a sound when pinning and unpinning" />
+            </ui:CardControl.Header>
+            <ui:ToggleSwitch IsChecked="{Binding PlaySound}" />
+        </ui:CardControl>
+
+        <!-- Excluded apps -->
+        <TextBlock Text="Excluded apps" Style="{DynamicResource HelmSectionHeader}" />
+        <ui:CardExpander Margin="0,0,0,4" Icon="{ui:SymbolIcon AppsList24}">
+            <ui:CardExpander.Header>
+                <core:CardHeader Title="Excluded apps" Description="Process names that can never be pinned, one per line (e.g. Unity.exe)." />
+            </ui:CardExpander.Header>
+            <ui:TextBox Text="{Binding ExcludedApps, UpdateSourceTrigger=LostFocus}" AcceptsReturn="True" TextWrapping="Wrap"
+                        MinHeight="100" MaxHeight="240" VerticalScrollBarVisibility="Auto" PlaceholderText="Example: Unity.exe" />
+        </ui:CardExpander>
+
+        <!-- Currently pinned -->
+        <Grid Margin="0,24,0,8">
+            <TextBlock Text="Currently pinned" FontSize="14" FontWeight="SemiBold" VerticalAlignment="Center" />
+            <ui:Button HorizontalAlignment="Right" Content="Unpin all" Icon="{ui:SymbolIcon PinOff24}" Command="{Binding UnpinAllCommand}"
+                       IsEnabled="{Binding HasPinned}" />
+        </Grid>
+        <Border Style="{DynamicResource HelmSurface}" Padding="0">
+            <StackPanel>
+                <TextBlock Margin="16" Text="No windows are pinned. Focus a window and press the shortcut."
+                           Style="{DynamicResource HelmSecondaryText}"
+                           Visibility="{Binding HasPinned, Converter={StaticResource InverseBoolToVisibility}}" />
+                <ItemsControl ItemsSource="{Binding Pinned}">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate DataType="{x:Type local:PinnedWindowInfo}">
+                            <Border BorderThickness="0,0,0,1" BorderBrush="{DynamicResource CardStrokeColorDefaultBrush}">
+                                <Grid Margin="16,8">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="32" />
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <ui:SymbolIcon Symbol="Pin24" Foreground="{DynamicResource AccentTextFillColorPrimaryBrush}" VerticalAlignment="Center" />
+                                    <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                        <TextBlock Text="{Binding Title}" TextTrimming="CharacterEllipsis" />
+                                        <TextBlock Text="{Binding ProcessName}" Style="{DynamicResource HelmSecondaryText}" />
+                                    </StackPanel>
+                                    <ui:Button Grid.Column="2" Content="Unpin"
+                                               Command="{Binding DataContext.UnpinCommand, RelativeSource={RelativeSource AncestorType=core:ModulePageBase}}"
+                                               CommandParameter="{Binding}" />
+                                </Grid>
+                            </Border>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+            </StackPanel>
+        </Border>
+    </StackPanel>
+</core:ModulePageBase>

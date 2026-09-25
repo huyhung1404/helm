@@ -19,6 +19,9 @@ public interface IWindowService
 
     WindowInfo? GetInfo(nint hwnd);
 
+    /// <summary>Visible, titled, top-level, not a tool window, not cloaked, not a shell surface.</summary>
+    bool IsAppWindow(nint hwnd);
+
     /// <summary>True for windows Zones/Always On Top should act on (app windows, no owner, not shell surfaces).</summary>
     bool IsManageable(nint hwnd);
 
@@ -238,7 +241,7 @@ public sealed class WindowService(ILogger<WindowService> logger) : IWindowServic
         return state is QUERY_USER_NOTIFICATION_STATE.QUNS_RUNNING_D3D_FULL_SCREEN or QUERY_USER_NOTIFICATION_STATE.QUNS_PRESENTATION_MODE;
     }
 
-    private bool IsAppWindow(nint hwnd)
+    public bool IsAppWindow(nint hwnd)
     {
         var h = hwnd.ToHwnd();
         if (!PInvoke.IsWindowVisible(h)) return false;

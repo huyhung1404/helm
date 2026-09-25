@@ -29,6 +29,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\Helm.Core\Helm.Core.csproj" />
+    <ProjectReference Include="..\Helm.Modules.AlwaysOnTop\Helm.Modules.AlwaysOnTop.csproj" />
   </ItemGroup>
 
 </Project>
