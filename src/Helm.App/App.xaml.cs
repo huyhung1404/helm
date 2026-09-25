@@ -74,6 +74,8 @@ public partial class App : Application
 
             await Services.GetRequiredService<IModuleHost>().StartAsync(CancellationToken.None).ConfigureAwait(true);
             shell.OnModulesStarted();
+            // Background sync (a no-op until this device is connected in General → Sync).
+            Services.GetRequiredService<Core.Sync.SyncEngine>().Start();
         }
         catch (Exception ex)
         {

@@ -134,6 +134,161 @@
             <ui:ToggleSwitch IsChecked="{Binding StartMinimized}" />
         </ui:CardControl>
 
+        <!-- Sync -->
+        <TextBlock Text="Sync" Style="{DynamicResource HelmSectionHeader}" />
+        <ui:CardExpander Margin="0,0,0,4" IsExpanded="True" Icon="{ui:SymbolIcon ArrowSync24}" DataContext="{Binding Sync}">
+            <ui:CardExpander.Header>
+                <core:RowLayout>
+                    <core:CardHeader Title="Sync across devices"
+                                     Description="End-to-end encrypted: neither the server nor whoever issued your invite can read your data." />
+                    <ui:ProgressRing IsIndeterminate="True" Width="20" Height="20" Margin="0,0,16,0" HorizontalAlignment="Right"
+                                     Visibility="{Binding IsBusy, Converter={StaticResource BoolToVisibility}}" />
+                </core:RowLayout>
+            </ui:CardExpander.Header>
+            <StackPanel>
+                <ui:InfoBar Title="Sync" Message="{Binding ErrorMessage}" Severity="Warning" IsClosable="False" IsOpen="{Binding HasError}"
+                            Margin="0,0,0,8" Visibility="{Binding HasError, Converter={StaticResource BoolToVisibility}}" />
+
+                <!-- 1. Not connected: invite code or device token -->
+                <StackPanel Visibility="{Binding IsNotConnected, Converter={StaticResource BoolToVisibility}}">
+                    <Border Style="{DynamicResource HelmExpanderRow}" BorderThickness="0">
+                        <StackPanel>
+                            <TextBlock TextWrapping="Wrap" Style="{DynamicResource HelmSecondaryText}" Margin="0,0,0,8"
+                                       Text="Sync needs an invite code (to create your account) or a device token (to add this device to an account you already have)." />
+                            <StackPanel Orientation="Horizontal">
+                                <RadioButton Content="I have an invite code" IsChecked="{Binding UseInvite}" Margin="0,0,24,0" />
+                                <RadioButton Content="I have a device token" IsChecked="{Binding UseToken}" />
+                            </StackPanel>
+                        </StackPanel>
+                    </Border>
+                    <Border Style="{DynamicResource HelmExpanderRow}" Visibility="{Binding UseInvite, Converter={StaticResource BoolToVisibility}}">
+                        <StackPanel>
+                            <ui:TextBox AutomationProperties.Name="Invite code" PlaceholderText="Invite code (helm_inv_…)" Text="{Binding InviteCode, UpdateSourceTrigger=PropertyChanged}" FontFamily="Consolas" Margin="0,0,0,8" />
+                            <ui:TextBox AutomationProperties.Name="Account name" PlaceholderText="Account name, e.g. your name" Text="{Binding AccountNameInput, UpdateSourceTrigger=PropertyChanged}" Margin="0,0,0,8" />
+                            <ui:TextBox AutomationProperties.Name="Device name" PlaceholderText="This device's name" Text="{Binding DeviceName, UpdateSourceTrigger=PropertyChanged}" Margin="0,0,0,8" />
+                            <ui:Button Content="Create account" Appearance="Primary" Command="{Binding ConnectCommand}" />
+                        </StackPanel>
+                    </Border>
+                    <Border Style="{DynamicResource HelmExpanderRow}" Visibility="{Binding UseToken, Converter={StaticResource BoolToVisibility}}">
+                        <StackPanel>
+                            <ui:TextBox AutomationProperties.Name="Device token" PlaceholderText="Device token (helm_pat_…)" Text="{Binding TokenInput, UpdateSourceTrigger=PropertyChanged}" FontFamily="Consolas" Margin="0,0,0,8" />
+                            <ui:Button Content="Connect" Appearance="Primary" Command="{Binding ConnectCommand}" />
+                        </StackPanel>
+                    </Border>
+                </StackPanel>
+
+                <!-- 2. Connected, key needed: create the passphrase (first device) or unlock -->
+                <StackPanel Visibility="{Binding NeedsKey, Converter={StaticResource BoolToVisibility}}">
+                    <Border Style="{DynamicResource HelmExpanderRow}" BorderThickness="0" Visibility="{Binding IsCheckingPassphrase, Converter={StaticResource BoolToVisibility}}">
+                        <TextBlock Text="Checking the account…" Style="{DynamicResource HelmSecondaryText}" />
+                    </Border>
+                    <Border Style="{DynamicResource HelmExpanderRow}" BorderThickness="0" Visibility="{Binding IsCreatingPassphrase, Converter={StaticResource BoolToVisibility}}">
+                        <StackPanel>
+                            <TextBlock FontWeight="SemiBold" Text="{Binding AccountName, StringFormat='Create the passphrase for {0}'}" />
+                            <TextBlock TextWrapping="Wrap" Style="{DynamicResource HelmSecondaryText}" Margin="0,4,0,8"
+                                       Text="It encrypts your data before it leaves this device and unlocks sync on your other devices. Nobody can reset it for you." />
+                            <ui:PasswordBox AutomationProperties.Name="New passphrase" PlaceholderText="{Binding MinPassphraseLength, StringFormat='Passphrase (at least {0} characters)'}"
+                                            Password="{Binding Passphrase, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Margin="0,0,0,8" />
+                            <ui:PasswordBox AutomationProperties.Name="Repeat passphrase" PlaceholderText="Repeat the passphrase" Password="{Binding PassphraseConfirm, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Margin="0,0,0,8" />
+                            <ui:Button Content="Create passphrase and start syncing" Appearance="Primary" Command="{Binding CreatePassphraseCommand}" />
+                        </StackPanel>
+                    </Border>
+                    <Border Style="{DynamicResource HelmExpanderRow}" BorderThickness="0" Visibility="{Binding IsUnlocking, Converter={StaticResource BoolToVisibility}}">
+                        <StackPanel>
+                            <TextBlock FontWeight="SemiBold" Text="{Binding AccountName, StringFormat='Unlock {0} on this device'}" />
+                            <TextBlock TextWrapping="Wrap" Style="{DynamicResource HelmSecondaryText}" Margin="0,4,0,8"
+                                       Text="Enter the passphrase you created on your first device, or use your recovery key." />
+                            <ui:PasswordBox AutomationProperties.Name="Passphrase" PlaceholderText="Passphrase" Password="{Binding Passphrase, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Margin="0,0,0,8"
+                                            Visibility="{Binding UseRecoveryKey, Converter={StaticResource InverseBoolToVisibility}}" />
+                            <ui:TextBox AutomationProperties.Name="Recovery key" PlaceholderText="Recovery key (HELM-…)" Text="{Binding RecoveryKeyInput, UpdateSourceTrigger=PropertyChanged}" FontFamily="Consolas" Margin="0,0,0,8"
+                                        Visibility="{Binding UseRecoveryKey, Converter={StaticResource BoolToVisibility}}" />
+                            <StackPanel Orientation="Horizontal">
+                                <ui:Button Content="Unlock" Appearance="Primary" Command="{Binding UnlockCommand}" Margin="0,0,16,0" />
+                                <CheckBox Content="Use the recovery key instead" IsChecked="{Binding UseRecoveryKey}" VerticalAlignment="Center" />
+                            </StackPanel>
+                        </StackPanel>
+                    </Border>
+                </StackPanel>
+
+                <!-- Recovery key, shown once after the passphrase is created -->
+                <Border Style="{DynamicResource HelmExpanderRow}" Visibility="{Binding IsShowingRecoveryKey, Converter={StaticResource BoolToVisibility}}">
+                    <StackPanel>
+                        <ui:InfoBar Title="Save your recovery key now" Severity="Warning" IsClosable="False" IsOpen="True" Margin="0,0,0,8"
+                                    Message="It is shown only this once. If you forget the passphrase, this key is the only way back into your data. Store it in a password manager or print it." />
+                        <ui:TextBox AutomationProperties.Name="Your recovery key" Text="{Binding RecoveryKeyToShow, Mode=OneWay}" IsReadOnly="True" FontFamily="Consolas" TextWrapping="Wrap" Margin="0,0,0,8" />
+                        <StackPanel Orientation="Horizontal">
+                            <ui:Button Content="Copy" Icon="{ui:SymbolIcon Copy24}" Command="{Binding CopyRecoveryKeyCommand}" Margin="0,0,8,0" />
+                            <ui:Button Content="I saved it" Appearance="Primary" Command="{Binding DismissRecoveryKeyCommand}" />
+                        </StackPanel>
+                    </StackPanel>
+                </Border>
+
+                <!-- 3. Ready: status, storage, devices -->
+                <StackPanel Visibility="{Binding IsReady, Converter={StaticResource BoolToVisibility}}">
+                    <Border Style="{DynamicResource HelmExpanderRow}" BorderThickness="0">
+                        <core:RowLayout>
+                            <StackPanel>
+                                <TextBlock FontWeight="SemiBold" Text="{Binding AccountName}" />
+                                <TextBlock Text="{Binding StatusText}" Style="{DynamicResource HelmSecondaryText}" TextWrapping="Wrap" />
+                                <TextBlock Text="{Binding ServerText}" Style="{DynamicResource HelmSecondaryText}" />
+                            </StackPanel>
+                            <ui:Button HorizontalAlignment="Right" Content="Sync now" Icon="{ui:SymbolIcon ArrowSync24}" Command="{Binding SyncNowCommand}" />
+                        </core:RowLayout>
+                    </Border>
+                    <Border Style="{DynamicResource HelmExpanderRow}">
+                        <StackPanel>
+                            <TextBlock Text="{Binding UsageText}" />
+                            <ProgressBar Margin="0,6,0,0" Height="4" Minimum="0" Maximum="100" Value="{Binding UsagePercent, Mode=OneWay}" />
+                        </StackPanel>
+                    </Border>
+                    <Border Style="{DynamicResource HelmExpanderRow}" Visibility="{Binding CanManageDevices, Converter={StaticResource BoolToVisibility}}">
+                        <StackPanel>
+                            <TextBlock Text="Devices" FontWeight="SemiBold" Margin="0,0,0,8" />
+                            <ItemsControl ItemsSource="{Binding Devices}">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate>
+                                        <core:RowLayout Margin="0,0,0,8">
+                                            <StackPanel>
+                                                <TextBlock>
+                                                    <Run Text="{Binding Name, Mode=OneWay}" /> <Run Text="{Binding Status, Mode=OneWay}" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+                                                </TextBlock>
+                                                <TextBlock Text="{Binding Details}" Style="{DynamicResource HelmSecondaryText}" />
+                                            </StackPanel>
+                                            <ui:Button HorizontalAlignment="Right" Content="Remove" Appearance="Danger"
+                                                       Command="{Binding DataContext.RevokeDeviceCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}"
+                                                       CommandParameter="{Binding}"
+                                                       Visibility="{Binding CanRevoke, Converter={StaticResource BoolToVisibility}}" />
+                                        </core:RowLayout>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                            <TextBlock Text="Add a device" FontWeight="SemiBold" Margin="0,8,0,8" />
+                            <StackPanel Orientation="Horizontal">
+                                <ui:TextBox AutomationProperties.Name="New device name" PlaceholderText="Device name, e.g. Laptop" Text="{Binding NewDeviceName, UpdateSourceTrigger=PropertyChanged}" MinWidth="220" Margin="0,0,8,0" />
+                                <ui:TextBox AutomationProperties.Name="New device expiry in days" PlaceholderText="Expires in days (optional)" Text="{Binding NewDeviceDays, UpdateSourceTrigger=PropertyChanged}" MinWidth="200" Margin="0,0,8,0" />
+                                <ui:Button Content="Create token" Command="{Binding AddDeviceCommand}" />
+                            </StackPanel>
+                            <StackPanel Margin="0,8,0,0" Visibility="{Binding HasNewDeviceToken, Converter={StaticResource BoolToVisibility}}">
+                                <TextBlock TextWrapping="Wrap" Style="{DynamicResource HelmSecondaryText}" Margin="0,0,0,4"
+                                           Text="Copy this token now; it is shown only once. On the new device: General → Sync → I have a device token, then unlock with your passphrase." />
+                                <ui:TextBox AutomationProperties.Name="New device token" Text="{Binding NewDeviceToken, Mode=OneWay}" IsReadOnly="True" FontFamily="Consolas" Margin="0,0,0,8" />
+                                <StackPanel Orientation="Horizontal">
+                                    <ui:Button Content="Copy" Icon="{ui:SymbolIcon Copy24}" Command="{Binding CopyNewDeviceTokenCommand}" Margin="0,0,8,0" />
+                                    <ui:Button Content="Done" Command="{Binding DismissNewDeviceTokenCommand}" />
+                                </StackPanel>
+                            </StackPanel>
+                        </StackPanel>
+                    </Border>
+                    <Border Style="{DynamicResource HelmExpanderRow}">
+                        <core:RowLayout>
+                            <core:CardHeader Title="Turn off sync on this device" Description="Stops syncing and forgets this device's token and key. Your data stays." />
+                            <ui:Button HorizontalAlignment="Right" Content="Turn off…" Appearance="Danger" Command="{Binding SignOutCommand}" />
+                        </core:RowLayout>
+                    </Border>
+                </StackPanel>
+            </StackPanel>
+        </ui:CardExpander>
+
         <!-- Files -->
         <TextBlock Text="Backup &amp; troubleshooting" Style="{DynamicResource HelmSectionHeader}" />
         <ui:CardControl Margin="0,0,0,4" Icon="{ui:SymbolIcon FolderOpen24}">
