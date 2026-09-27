@@ -196,8 +196,9 @@ public class ClaudeCliTests
     /// <summary>
     /// Run the suite from an elevated terminal to cover the shell-token path: the child must come out at medium
     /// integrity (S-1-16-8192), never high (S-1-16-12288), even though the test process is administrator.
-    /// With UAC off (e.g. GitHub's Windows runners) every process of an administrator, the shell included, runs
-    /// at high integrity: there is no lower token to use, so there is nothing to check.
+    /// Where Windows gives an administrator no filtered token (UAC off, or the built-in Administrator without
+    /// admin approval mode) every process of theirs, the shell included, runs at high integrity: there is no lower
+    /// token to use, so there is nothing to check.
     /// </summary>
     [Fact]
     public async Task Child_process_is_never_elevated()
@@ -208,8 +209,10 @@ public class ClaudeCliTests
 
         var output = await new StreamReader(child.StandardOutput).ReadToEndAsync().WaitAsync(TimeSpan.FromSeconds(10));
 
-        Assert.Contains("S-1-16-8192", output);
-        Assert.DoesNotContain("S-1-16-12288", output);
+        // On failure, say which integrity the child got and who ran the test.
+        var levels = string.Join(", ", output.Split('\n').Where(l => l.Contains("S-1-16-")).Select(l => l.Trim()));
+        var context = $"child integrity: [{levels}]; test user: {System.Security.Principal.WindowsIdentity.GetCurrent().User}; elevated: {new Helm.Core.Services.ProcessLauncher(NullLogger<Helm.Core.Services.ProcessLauncher>.Instance).IsElevated}";
+        Assert.True(output.Contains("S-1-16-8192") && !output.Contains("S-1-16-12288"), context);
     }
 
     [Fact]
@@ -220,11 +223,17 @@ public class ClaudeCliTests
         Assert.Throws<ChildProcessException>(() => launcher.Start(new ChildProcessStartInfo("cmd.exe", @"C:\does\not\exist\helm")));
     }
 
-    /// <summary>UAC on (EnableLUA=1): administrators get a filtered, medium-integrity token for normal processes.</summary>
+    /// <summary>
+    /// Whether this administrator gets a filtered, medium-integrity token for normal processes: UAC on
+    /// (EnableLUA=1), and either not the built-in Administrator (RID 500) or admin approval mode on for it
+    /// (FilterAdministratorToken=1).
+    /// </summary>
     private static bool UacSplitsAdminTokens()
     {
         using var key = Microsoft.Win32.Registry.LocalMachine.OpenSubKey(@"SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\System");
-        return key?.GetValue("EnableLUA") is int enabled && enabled != 0;
+        if (key?.GetValue("EnableLUA") is not int lua || lua == 0) return false;
+        var builtInAdmin = System.Security.Principal.WindowsIdentity.GetCurrent().User?.Value.EndsWith("-500", StringComparison.Ordinal) == true;
+        return !builtInAdmin || key.GetValue("FilterAdministratorToken") is int filter && filter != 0;
     }
 
     private static HashSet<int> PingPids() => System.Diagnostics.Process.GetProcessesByName("PING").Select(p => p.Id).ToHashSet();
