@@ -3,6 +3,29 @@
 All notable changes to Helm. The top section is used as the GitHub release body and as the Velopack release notes.
 Format: [Keep a Changelog](https://keepachangelog.com), versions follow [SemVer](https://semver.org).
 
+## [0.7.0] - 2026-09-27
+
+### Added
+- Claude Chat (Advanced): chat with Claude Code in its own Helm window. It uses the Claude Code you already
+  have installed and signed in, so there is no API key to set up and nothing extra to pay per message.
+  - Work on several projects at once: add folders on the left, open as many chats in each as you like, and
+    let them run side by side. Each chat shows whether it is working, waiting for you, finished or stopped
+    with an error.
+  - Helm notifies you when a chat you are not looking at finishes, needs your permission or fails. Click the
+    notification to go straight to that chat.
+  - Claude asks before it changes anything: allow once, allow for the rest of the chat, or deny. "For the rest
+    of the chat" never writes to your Claude Code settings.
+  - Type / for commands and actions (attach or mention a file, clear, export as Markdown, switch model, and
+    Claude Code's own commands and skills), and @ to mention a file of the project.
+  - Past chats of a folder are one click away (the clock button), and the folders and chats you had open come
+    back the next time you open Helm, ready to continue.
+  - Replies show formatted text, lists, tables and code. Choose the model per chat and switch it mid-chat.
+  - Open it from Quick access on Home, with Win+Alt+C, or from the Claude Chat page, which holds its settings.
+- Quick access tiles can now start a tool's main action directly, and tools can show their own logo.
+
+### Fixed
+- The icon on a tool's "Enable" card was smaller than the other card icons.
+
 ## [0.6.0] - 2026-09-25
 
 ### Security
