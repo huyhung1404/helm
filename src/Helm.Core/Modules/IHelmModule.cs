@@ -1,4 +1,5 @@
 using System.ComponentModel;
+using System.Windows.Media;
 using Helm.Core.Hotkeys;
 using Wpf.Ui.Controls;
 
@@ -44,6 +45,12 @@ public interface IHelmModule : INotifyPropertyChanged
     string Description { get; }
     ModuleGroup Group { get; }
     SymbolRegular Icon { get; }
+
+    /// <summary>
+    /// Optional picture (e.g. a product logo) shown instead of <see cref="Icon"/> wherever the module appears.
+    /// Null for most modules. Must be frozen: it is shared by several windows.
+    /// </summary>
+    ImageSource? IconImage => null;
 
     /// <summary>Persisted by <see cref="IModuleHost"/>; bound to the toggles on Home and on the module page.</summary>
     bool IsEnabled { get; set; }

@@ -11,6 +11,7 @@
     <local:NotEmptyToVisibilityConverter x:Key="EmptyToVisibility" Invert="True" />
     <local:HexToBrushConverter x:Key="HexToBrush" />
     <local:EnumEqualsConverter x:Key="EnumEquals" />
+    <local:ModuleIconConverter x:Key="ModuleIcon" />
 
     <!-- Section title between groups of cards ("Editor", "Zones", ...) -->
     <Style x:Key="HelmSectionHeader" TargetType="TextBlock">

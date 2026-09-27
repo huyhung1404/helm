@@ -12,7 +12,8 @@ using Wpf.Ui.Controls;
 
 namespace Helm.App.ViewModels;
 
-internal sealed record ShortcutItem(SymbolRegular Icon, string Description, HotkeyGesture Gesture);
+/// <summary><see cref="Module"/> is there for its icon (a symbol or a picture).</summary>
+internal sealed record ShortcutItem(IHelmModule Module, string Description, HotkeyGesture Gesture);
 
 internal sealed partial class HomeViewModel : ObservableObject
 {
@@ -22,6 +23,7 @@ internal sealed partial class HomeViewModel : ObservableObject
     private readonly IShellNavigator _navigator;
     private readonly IUiDispatcher _ui;
     private readonly ISettingsStore<GeneralSettings> _general;
+    private readonly IReadOnlyDictionary<string, IModuleLauncher> _launchers;
 
     [ObservableProperty]
     private int _conflictCount;
@@ -50,8 +52,10 @@ internal sealed partial class HomeViewModel : ObservableObject
         IUpdateService updates,
         IShellNavigator navigator,
         IUiDispatcher ui,
-        ISettingsStoreFactory settings)
+        ISettingsStoreFactory settings,
+        IEnumerable<IModuleLauncher> launchers)
     {
+        _launchers = launchers.ToDictionary(l => l.ModuleId, StringComparer.Ordinal);
         _modules = modules;
         _hotkeys = hotkeys;
         _updates = updates;
@@ -85,6 +89,15 @@ internal sealed partial class HomeViewModel : ObservableObject
     private void OpenModule(IHelmModule? module)
     {
         if (module is not null) _navigator.Navigate(module.SettingsPageType);
+    }
+
+    /// <summary>Quick access tile: the module's own action when it has one (e.g. a new chat), else its page.</summary>
+    [RelayCommand]
+    private async Task LaunchModuleAsync(IHelmModule? module)
+    {
+        if (module is null) return;
+        if (_launchers.TryGetValue(module.Id, out var launcher)) await launcher.LaunchAsync();
+        else _navigator.Navigate(module.SettingsPageType);
     }
 
     [RelayCommand]
@@ -174,7 +187,7 @@ internal sealed partial class HomeViewModel : ObservableObject
             .OrderBy(m => m.DisplayName)
             .SelectMany(m => m.Hotkeys
                 .Where(h => h.Gesture.Key != 0 || h.Gesture.Modifiers != HotkeyModifiers.None)
-                .Select(h => new ShortcutItem(m.Icon, h.Description, h.Gesture)));
+                .Select(h => new ShortcutItem(m, h.Description, h.Gesture)));
         Replace(Shortcuts, items);
         OnPropertyChanged(nameof(HasShortcuts));
     }

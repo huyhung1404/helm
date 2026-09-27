@@ -1,3 +1,4 @@
+using System.Windows.Media;
 using CommunityToolkit.Mvvm.ComponentModel;
 using Helm.Core.Hotkeys;
 using Wpf.Ui.Controls;
@@ -21,6 +22,7 @@ public abstract partial class HelmModuleBase : ObservableObject, IHelmModule
     public abstract string Description { get; }
     public abstract ModuleGroup Group { get; }
     public abstract SymbolRegular Icon { get; }
+    public virtual ImageSource? IconImage => null;
     public abstract Type SettingsPageType { get; }
     public abstract IReadOnlyList<HotkeyDefinition> Hotkeys { get; }
 

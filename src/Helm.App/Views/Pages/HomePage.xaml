@@ -130,11 +130,11 @@
                             <ItemsControl.ItemTemplate>
                                 <DataTemplate>
                                     <Button Style="{StaticResource TileButton}" Padding="8,12" Margin="2" HorizontalContentAlignment="Center"
-                                            Command="{Binding DataContext.OpenModuleCommand, RelativeSource={RelativeSource AncestorType=Page}}"
+                                            Command="{Binding DataContext.LaunchModuleCommand, RelativeSource={RelativeSource AncestorType=Page}}"
                                             CommandParameter="{Binding}">
                                         <StackPanel>
-                                            <ui:SymbolIcon Symbol="{Binding Icon}" FontSize="32" HorizontalAlignment="Center" Margin="0,0,0,8"
-                                                           Foreground="{DynamicResource AccentTextFillColorPrimaryBrush}" />
+                                            <ContentPresenter Content="{Binding Converter={StaticResource ModuleIcon}, ConverterParameter=32}" HorizontalAlignment="Center" Margin="0,0,0,8"
+                                                              TextElement.Foreground="{DynamicResource AccentTextFillColorPrimaryBrush}" />
                                             <TextBlock Text="{Binding DisplayName}" TextAlignment="Center" TextWrapping="Wrap" FontSize="12" />
                                         </StackPanel>
                                     </Button>
@@ -158,8 +158,8 @@
                                             <ColumnDefinition Width="*" />
                                             <ColumnDefinition Width="Auto" />
                                         </Grid.ColumnDefinitions>
-                                        <ui:SymbolIcon Symbol="{Binding Icon}" FontSize="16" VerticalAlignment="Center"
-                                                       Foreground="{DynamicResource AccentTextFillColorPrimaryBrush}" />
+                                        <ContentPresenter Content="{Binding Module, Converter={StaticResource ModuleIcon}, ConverterParameter=16}" VerticalAlignment="Center" HorizontalAlignment="Left"
+                                                          TextElement.Foreground="{DynamicResource AccentTextFillColorPrimaryBrush}" />
                                         <TextBlock Grid.Column="1" Text="{Binding Description}" TextWrapping="Wrap" VerticalAlignment="Center" Margin="0,0,12,0" />
                                         <core:Keycaps Grid.Column="2" Gesture="{Binding Gesture}" />
                                     </Grid>
@@ -190,8 +190,8 @@
                                             <ColumnDefinition Width="Auto" />
                                             <ColumnDefinition Width="Auto" />
                                         </Grid.ColumnDefinitions>
-                                        <ui:SymbolIcon Symbol="{Binding Icon}" FontSize="20" VerticalAlignment="Center"
-                                                       Foreground="{DynamicResource AccentTextFillColorPrimaryBrush}" />
+                                        <ContentPresenter Content="{Binding Converter={StaticResource ModuleIcon}, ConverterParameter=20}" VerticalAlignment="Center" HorizontalAlignment="Left"
+                                                          TextElement.Foreground="{DynamicResource AccentTextFillColorPrimaryBrush}" />
                                         <TextBlock Grid.Column="1" Text="{Binding DisplayName}" VerticalAlignment="Center" />
                                         <ui:ToggleSwitch Grid.Column="2" IsChecked="{Binding IsEnabled, Mode=TwoWay}" VerticalAlignment="Center" Margin="0,0,4,0" />
                                         <ui:Button Grid.Column="3" Appearance="Transparent" Padding="8"

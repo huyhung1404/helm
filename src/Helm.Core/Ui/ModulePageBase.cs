@@ -1,6 +1,7 @@
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Data;
+using System.Windows.Documents;
 using System.Windows.Markup;
 using Helm.Core.Modules;
 using Wpf.Ui.Controls;
@@ -29,7 +30,7 @@ public class ModulePageBase : Page
         nameof(BodyFillsHeight), typeof(bool), typeof(ModulePageBase), new PropertyMetadata(false, (d, e) => ScrollViewer.SetCanContentScroll(d, !(bool)e.NewValue)));
 
     private readonly TextBlock _title = new() { FontSize = 28, FontWeight = FontWeights.SemiBold, Margin = new Thickness(0, 0, 0, 20) };
-    private readonly SymbolIcon _heroIcon = new() { FontSize = 56 };
+    private readonly Border _hero = new();
     private readonly TextBlock _description = new() { FontSize = 14, TextWrapping = TextWrapping.Wrap, VerticalAlignment = VerticalAlignment.Center };
     private readonly InfoBar _infoBar = new() { Severity = InfoBarSeverity.Warning, IsClosable = false, Margin = new Thickness(0, 0, 0, 12) };
     private readonly CardControl _enableCard = new() { Margin = new Thickness(0, 0, 0, 4) };
@@ -39,18 +40,14 @@ public class ModulePageBase : Page
 
     public ModulePageBase()
     {
-        var hero = new Border
-        {
-            Width = 96,
-            Height = 96,
-            CornerRadius = new CornerRadius(8),
-            Margin = new Thickness(0, 0, 20, 0),
-            Child = _heroIcon,
-        };
+        var hero = _hero;
+        hero.Width = 96;
+        hero.Height = 96;
+        hero.CornerRadius = new CornerRadius(8);
+        hero.Margin = new Thickness(0, 0, 20, 0);
         hero.SetResourceReference(Border.BackgroundProperty, "ControlFillColorSecondaryBrush");
-        _heroIcon.HorizontalAlignment = HorizontalAlignment.Center;
-        _heroIcon.VerticalAlignment = VerticalAlignment.Center;
-        _heroIcon.SetResourceReference(ForegroundProperty, "AccentTextFillColorPrimaryBrush");
+        // The icon (set with the module) inherits the accent colour when it is a symbol.
+        hero.SetResourceReference(TextElement.ForegroundProperty, "AccentTextFillColorPrimaryBrush");
 
         var intro = new DockPanel { Margin = new Thickness(0, 0, 0, 24), LastChildFill = true };
         DockPanel.SetDock(hero, Dock.Left);
@@ -110,9 +107,12 @@ public class ModulePageBase : Page
 
         _title.Text = module.DisplayName;
         Title = module.DisplayName;
-        _heroIcon.Symbol = module.Icon;
+        var heroIcon = ModuleIcon.Create(module, fontSize: 56, imageSize: 56);
+        heroIcon.HorizontalAlignment = HorizontalAlignment.Center;
+        heroIcon.VerticalAlignment = VerticalAlignment.Center;
+        _hero.Child = heroIcon;
         _description.Text = module.Description;
-        _enableCard.Icon = new SymbolIcon { Symbol = module.Icon };
+        _enableCard.Icon = ModuleIcon.Create(module, imageSize: 24);
         _enableHeader.Title = $"Enable {module.DisplayName}";
 
         _enableToggle.SetBinding(ToggleSwitch.IsCheckedProperty, new Binding(nameof(IHelmModule.IsEnabled)) { Source = module, Mode = BindingMode.TwoWay });

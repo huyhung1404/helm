@@ -5,6 +5,7 @@ using Helm.App.ViewModels;
 using Helm.App.Views.Pages;
 using Helm.Core.Modules;
 using Helm.Core.Settings;
+using Helm.Core.Ui;
 using Microsoft.Extensions.DependencyInjection;
 using Wpf.Ui.Controls;
 
@@ -156,10 +157,10 @@ internal partial class MainWindow : FluentWindow
             };
 
             foreach (var module in group.Modules)
-                groupItem.MenuItems.Add(NavItem(module.DisplayName, module.Icon, module.SettingsPageType));
+                groupItem.MenuItems.Add(NavItem(module.DisplayName, ModuleIcon.Create(module, imageSize: 18), module.SettingsPageType));
 
             foreach (var extra in group.ExtraPages)
-                groupItem.MenuItems.Add(NavItem(extra.Title, extra.Icon, extra.PageType));
+                groupItem.MenuItems.Add(NavItem(extra.Title, new SymbolIcon(extra.Icon), extra.PageType));
 
             if (groupItem.MenuItems.Count == 0)
             {
@@ -182,10 +183,12 @@ internal partial class MainWindow : FluentWindow
         Navigation.FooterMenuItems.Add(feedback);
     }
 
-    private static NavigationViewItem NavItem(string title, SymbolRegular icon, Type pageType) => new()
+    private static NavigationViewItem NavItem(string title, SymbolRegular icon, Type pageType) => NavItem(title, new SymbolIcon(icon), pageType);
+
+    private static NavigationViewItem NavItem(string title, IconElement icon, Type pageType) => new()
     {
         Content = title,
-        Icon = new SymbolIcon(icon),
+        Icon = icon,
         TargetPageType = pageType,
     };
 

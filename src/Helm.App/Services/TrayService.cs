@@ -4,16 +4,18 @@ using System.Windows.Media.Imaging;
 using CommunityToolkit.Mvvm.Input;
 using H.NotifyIcon;
 using Helm.Core.Modules;
+using Helm.Core.Services;
 using Microsoft.Extensions.Logging;
 
 namespace Helm.App.Services;
 
 /// <summary>Tray icon: left click opens Helm; menu has Open, per-module toggles and Exit.</summary>
-internal sealed class TrayService(IModuleHost modules, ILogger<TrayService> logger) : IDisposable
+internal sealed class TrayService(IModuleHost modules, ILogger<TrayService> logger) : IUserNotifications, IDisposable
 {
     private TaskbarIcon? _icon;
     private Action? _open;
     private Action? _exit;
+    private Action? _notificationClick;
 
     public void Create(Action open, Action exit)
     {
@@ -29,7 +31,14 @@ internal sealed class TrayService(IModuleHost modules, ILogger<TrayService> logg
                 LeftClickCommand = new RelayCommand(open),
                 ContextMenu = BuildMenu(),
             };
-            _icon.ForceCreate(enablesEfficiencyMode: false);        }
+            _icon.TrayBalloonTipClicked += (_, _) =>
+            {
+                var click = _notificationClick;
+                _notificationClick = null;
+                click?.Invoke();
+            };
+            _icon.ForceCreate(enablesEfficiencyMode: false);
+        }
         catch (Exception ex)
         {
             logger.LogError(ex, "Failed to create tray icon");
@@ -51,10 +60,19 @@ internal sealed class TrayService(IModuleHost modules, ILogger<TrayService> logg
         System.Windows.Application.Current?.Dispatcher.BeginInvoke(RefreshMenu);
     }
 
-    public void ShowNotification(string title, string message)
+    public void ShowNotification(string title, string message) => Show(title, message);
+
+    /// <summary>Only the latest notification's action is kept; Windows shows one balloon at a time.</summary>
+    public void Show(string title, string message, Action? onClick = null)
     {
-        try { _icon?.ShowNotification(title, message); }
-        catch (Exception ex) { logger.LogWarning(ex, "Tray notification failed"); }
+        void Run()
+        {
+            _notificationClick = onClick;
+            try { _icon?.ShowNotification(title, message); }
+            catch (Exception ex) { logger.LogWarning(ex, "Tray notification failed"); }
+        }
+        if (System.Windows.Application.Current?.Dispatcher is { } d && !d.CheckAccess()) d.BeginInvoke(Run);
+        else Run();
     }
 
     /// <summary>The color mark reads well on both light and dark taskbars.</summary>
