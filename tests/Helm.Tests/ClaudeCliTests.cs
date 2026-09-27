@@ -196,10 +196,13 @@ public class ClaudeCliTests
     /// <summary>
     /// Run the suite from an elevated terminal to cover the shell-token path: the child must come out at medium
     /// integrity (S-1-16-8192), never high (S-1-16-12288), even though the test process is administrator.
+    /// With UAC off (e.g. GitHub's Windows runners) every process of an administrator, the shell included, runs
+    /// at high integrity: there is no lower token to use, so there is nothing to check.
     /// </summary>
     [Fact]
     public async Task Child_process_is_never_elevated()
     {
+        if (!UacSplitsAdminTokens()) return;
         var launcher = new ChildProcessLauncher(NullLogger<ChildProcessLauncher>.Instance);
         using var child = launcher.Start(new ChildProcessStartInfo("whoami.exe /groups /fo csv", Path.GetTempPath()));
 
@@ -215,6 +218,13 @@ public class ClaudeCliTests
         var launcher = new ChildProcessLauncher(NullLogger<ChildProcessLauncher>.Instance);
 
         Assert.Throws<ChildProcessException>(() => launcher.Start(new ChildProcessStartInfo("cmd.exe", @"C:\does\not\exist\helm")));
+    }
+
+    /// <summary>UAC on (EnableLUA=1): administrators get a filtered, medium-integrity token for normal processes.</summary>
+    private static bool UacSplitsAdminTokens()
+    {
+        using var key = Microsoft.Win32.Registry.LocalMachine.OpenSubKey(@"SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\System");
+        return key?.GetValue("EnableLUA") is int enabled && enabled != 0;
     }
 
     private static HashSet<int> PingPids() => System.Diagnostics.Process.GetProcessesByName("PING").Select(p => p.Id).ToHashSet();
