@@ -1,52 +1,38 @@
-using System.ComponentModel;
 using System.Windows;
+using System.Windows.Controls;
+using Helm.Modules.ClaudeChat.Cli;
 using Wpf.Ui.Appearance;
 using Wpf.Ui.Controls;
 
 namespace Helm.Modules.ClaudeChat.Chat;
 
-/// <summary>
-/// The floating home of <see cref="ClaudeChatView"/> once the user drags it out of the page. Closing it (✕ or
-/// "Back to Helm") puts the chat back on the page instead — the conversation keeps running either way.
-/// </summary>
+/// <summary>The Claude Chat window: folders and their chats on the left, the selected chat on the right.</summary>
 public partial class ChatWindow : FluentWindow
 {
-    private bool _closeForGood;
-
-    public ChatWindow()
+    public ChatWindow(ChatWorkspaceViewModel workspace)
     {
+        DataContext = workspace;
         InitializeComponent();
         SourceInitialized += (_, _) => ApplicationThemeManager.Apply(this);
+        ChatView.Workspace = workspace;
     }
 
-    /// <summary>The user asked to put the chat back on the page (the window hides afterwards).</summary>
-    public event EventHandler? DockRequested;
+    public void FocusComposer() => ChatView.FocusComposer();
 
-    public ClaudeChatView? View
+    /// <summary>Picking a chat row shows it; picking a folder row keeps the current chat.</summary>
+    private void OnTreeSelectionChanged(object sender, RoutedPropertyChangedEventArgs<object> e)
     {
-        get => Host.Content as ClaudeChatView;
-        set => Host.Content = value;
-    }
-
-    /// <summary>Distance from the window's top edge to the chat view, in DIPs (title bar).</summary>
-    public double ViewTop => TitleBar.ActualHeight > 0 ? TitleBar.ActualHeight : 32;
-
-    /// <summary>Really closes the window (module turned off, Helm exiting).</summary>
-    public void CloseForGood()
-    {
-        _closeForGood = true;
-        Close();
-    }
-
-    private void OnDockClick(object sender, RoutedEventArgs e) => DockRequested?.Invoke(this, EventArgs.Empty);
-
-    protected override void OnClosing(CancelEventArgs e)
-    {
-        if (!_closeForGood && !Dispatcher.HasShutdownStarted)
+        if (e.NewValue is ChatViewModel chat && DataContext is ChatWorkspaceViewModel workspace)
         {
-            e.Cancel = true;
-            DockRequested?.Invoke(this, EventArgs.Empty);
+            workspace.SelectedChat = chat;
+            Dispatcher.BeginInvoke(ChatView.FocusComposer);
         }
-        base.OnClosing(e);
+    }
+
+    private async void OnHistoryPicked(object sender, SelectionChangedEventArgs e)
+    {
+        if (HistoryList.SelectedItem is not PastSession past || DataContext is not ChatWorkspaceViewModel workspace) return;
+        HistoryList.SelectedItem = null;
+        await workspace.OpenPastCommand.ExecuteAsync(past);
     }
 }

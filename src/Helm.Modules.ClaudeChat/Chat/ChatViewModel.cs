@@ -26,13 +26,33 @@ public enum ChatState
     Stopping,
 }
 
+/// <summary>What the chat's row in the tree shows, and what a notification is about.</summary>
+public enum ChatAttention
+{
+    None,
+
+    /// <summary>A reply is running.</summary>
+    Working,
+
+    /// <summary>A permission card is waiting for the user.</summary>
+    NeedsYou,
+
+    /// <summary>A reply finished while the user was looking elsewhere.</summary>
+    Done,
+
+    /// <summary>The reply or the process failed while the user was looking elsewhere.</summary>
+    Failed,
+}
+
 /// <summary>
-/// The conversation: its rows, the draft, and the session feeding it. It does not know where it is shown, so the
-/// same instance keeps running when the view moves between the module page and a floating window.
+/// One chat of the tree: its rows, draft, folder and its own Claude Code process (started with the first message).
 /// All members are UI-thread only; session events are marshalled through <see cref="IUiDispatcher"/>.
 /// </summary>
 public sealed partial class ChatViewModel : ObservableObject
 {
+    public const string NewChatTitle = "New chat";
+    private const int TitleLength = 48;
+
     private readonly ClaudeChatModule _module;
     private readonly IUiDispatcher _ui;
     private readonly ILogger _logger;
@@ -43,38 +63,86 @@ public sealed partial class ChatViewModel : ObservableObject
     private bool _endingOnPurpose;
 
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(IsBusy), nameof(CanSend), nameof(StatusText))]
-    [NotifyCanExecuteChangedFor(nameof(SendCommand), nameof(StopCommand), nameof(NewChatCommand))]
+    [NotifyPropertyChangedFor(nameof(IsBusy), nameof(CanSend), nameof(StatusText), nameof(CanChangeFolder), nameof(Attention))]
+    [NotifyCanExecuteChangedFor(nameof(SendCommand), nameof(StopCommand))]
     private ChatState _state;
+
+    /// <summary>Set by the workspace: the chat shown on the right. Seeing a chat clears its Done/Failed mark.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(Attention))]
+    private bool _isSelected;
+
+    /// <summary>A finished (or failed) reply the user has not looked at yet.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(Attention))]
+    private ChatAttention _unseen;
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(CanSend))]
     [NotifyCanExecuteChangedFor(nameof(SendCommand))]
     private string _draft = string.Empty;
 
+    /// <summary>The model the CLI reported for the running session (full id).</summary>
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(StatusText))]
     private string? _model;
 
+    /// <summary>The folder this chat works in. Changeable until the first message.</summary>
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(StatusText))]
-    private string? _workingDirectory;
+    [NotifyPropertyChangedFor(nameof(FolderName))]
+    private string _folder;
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(CostText))]
     private double _sessionCostUsd;
 
-    public ChatViewModel(ClaudeChatModule module, IUiDispatcher ui, ILogger logger)
+    /// <summary>The model picked in the composer; empty = the default from the settings.</summary>
+    [ObservableProperty]
+    private string _selectedModel = string.Empty;
+
+    /// <summary>The CLI's id for this conversation (for resuming it later).</summary>
+    [ObservableProperty]
+    private string? _sessionId;
+
+    /// <summary>Tab caption: the CLI's generated title once known, else the first message.</summary>
+    [ObservableProperty]
+    private string _title = NewChatTitle;
+
+    public ChatViewModel(ClaudeChatModule module, IUiDispatcher ui, ILogger logger, string folder)
     {
         _module = module;
         _ui = ui;
         _logger = logger;
+        _folder = folder;
+    }
+
+    /// <summary>Raised when a turn ends (so the tree can pick up the CLI's title for the chat).</summary>
+    public event EventHandler? TurnFinished;
+
+    /// <summary>Raised when the chat needs the user: a reply finished or failed, or a permission card appeared.</summary>
+    public event EventHandler<ChatAttention>? AttentionRaised;
+
+    public ChatAttention Attention => State == ChatState.WaitingForPermission ? ChatAttention.NeedsYou
+        : IsBusy ? ChatAttention.Working
+        : Unseen;
+
+    partial void OnIsSelectedChanged(bool value)
+    {
+        if (value) Unseen = ChatAttention.None;
+    }
+
+    private void RaiseAttention(ChatAttention kind)
+    {
+        if (!IsSelected && kind is ChatAttention.Done or ChatAttention.Failed) Unseen = kind;
+        AttentionRaised?.Invoke(this, kind);
     }
 
     public ObservableCollection<ChatItem> Items { get; } = [];
 
-    /// <summary>The CLI's id for this conversation (for resuming it later).</summary>
-    public string? SessionId { get; private set; }
+    /// <summary>Choices for the composer's model picker ("" = the default from the settings).</summary>
+    public IReadOnlyList<string> Models { get; } = ["", "opus", "sonnet", "haiku"];
+
+    public string FolderName => Path.GetFileName(Path.TrimEndingDirectorySeparator(Folder)) is { Length: > 0 } name ? name : Folder;
 
     public bool IsBusy => State is ChatState.Starting or ChatState.Busy or ChatState.WaitingForPermission or ChatState.Stopping;
 
@@ -82,18 +150,20 @@ public sealed partial class ChatViewModel : ObservableObject
 
     public bool IsEmpty => Items.Count == 0;
 
-    public string StatusText => State switch
+    /// <summary>The folder belongs to the conversation once it has started.</summary>
+    public bool CanChangeFolder => IsEmpty && SessionId is null && State == ChatState.Idle;
+
+    public string? StatusText => State switch
     {
         ChatState.Starting => "Starting Claude Code…",
         ChatState.Busy => "Claude is working…",
         ChatState.WaitingForPermission => "Waiting for your answer…",
         ChatState.Stopping => "Stopping…",
-        _ when _session is null => "Ready — a session starts with your first message",
-        _ => string.Join(" · ", new[] { Model, WorkingDirectory }.Where(s => !string.IsNullOrEmpty(s))),
+        _ => Model,
     };
 
     /// <summary>What the turns would cost at API prices; with a Claude subscription nothing is charged per token.</summary>
-    public string? CostText => SessionCostUsd > 0 ? string.Create(CultureInfo.InvariantCulture, $"≈ ${SessionCostUsd:0.000} API-equivalent") : null;
+    public string? CostText => SessionCostUsd > 0 ? string.Create(CultureInfo.InvariantCulture, $"≈ ${SessionCostUsd:0.000}") : null;
 
     [RelayCommand(CanExecute = nameof(CanSend))]
     private async Task SendAsync()
@@ -102,14 +172,14 @@ public sealed partial class ChatViewModel : ObservableObject
         if (text.Length == 0 || State != ChatState.Idle) return;
         Draft = string.Empty;
         Add(new UserChatItem(text));
+        if (Title == NewChatTitle) Title = Shorten(text);
 
         try
         {
             if (_session is null || _session.HasExited)
             {
                 State = ChatState.Starting;
-                var session = await _module.StartSessionAsync(SessionId, CancellationToken.None);
-                Attach(session);
+                Attach(await _module.StartSessionAsync(Folder, SessionId, NullIfEmpty(SelectedModel), CancellationToken.None));
             }
             State = ChatState.Busy;
             await _session!.SendUserMessageAsync(text);
@@ -139,31 +209,70 @@ public sealed partial class ChatViewModel : ObservableObject
         }
     }
 
-    private bool CanStartNewChat => State is ChatState.Idle;
+    /// <summary>Switches the running session right away; otherwise the pick applies when the session starts.</summary>
+    partial void OnSelectedModelChanged(string value) => _ = ApplyModelAsync(value);
 
-    /// <summary>Ends the Claude Code session and clears the conversation.</summary>
-    [RelayCommand(CanExecute = nameof(CanStartNewChat))]
-    private async Task NewChatAsync()
+    private async Task ApplyModelAsync(string value)
+    {
+        if (_session is not { HasExited: false } session || NullIfEmpty(value) is not { } model) return;
+        try
+        {
+            await session.SetModelAsync(model); // the CLI confirms with its own "Set model to …" notice
+        }
+        catch (ClaudeSessionException ex)
+        {
+            Add(new NoticeChatItem(ex.Message, NoticeKind.Error));
+        }
+    }
+
+    /// <summary>Fills this (empty) tab with a saved conversation; the next message continues it (<c>--resume</c>).</summary>
+    public async Task LoadPastAsync(PastSession past)
+    {
+        var transcript = await Task.Run(() => ClaudeSessionStore.ReadTranscript(past.FilePath));
+        // Claude Code resumes a conversation only from the folder it ran in.
+        if (past.WorkingDirectory is { Length: > 0 } folder && Directory.Exists(folder)) Folder = folder;
+        foreach (var entry in transcript)
+        {
+            switch (entry)
+            {
+                case TranscriptUserText user:
+                    Add(new UserChatItem(user.Text));
+                    break;
+                case TranscriptAssistantText text:
+                    Add(new AssistantChatItem { Text = text.Text, IsStreaming = false });
+                    break;
+                case TranscriptToolUse use:
+                    var tool = new ToolChatItem(use.Id, use.Name, ToolChatItem.Summarize(use.Name, use.Input)) { IsRunning = false };
+                    _tools[use.Id] = tool;
+                    Add(tool);
+                    break;
+                case TranscriptToolResult result when _tools.TryGetValue(result.ToolUseId, out var t):
+                    t.Complete(result.Content, result.IsError);
+                    break;
+            }
+        }
+        _tools.Clear();
+        SessionId = past.SessionId;
+        Title = past.Title;
+        Add(new NoticeChatItem($"Continued from {past.LastActive:g}. Your next message picks up this conversation."));
+        OnPropertyChanged(nameof(CanChangeFolder));
+    }
+
+    /// <summary>Ends this chat's Claude Code process (the tab is closing).</summary>
+    public async Task CloseAsync()
     {
         _endingOnPurpose = true;
-        Detach();
-        await _module.EndSessionAsync();
-        _endingOnPurpose = false;
         ExpirePermissions();
-        Items.Clear();
-        _tools.Clear();
-        SessionId = null;
-        Model = null;
-        WorkingDirectory = null;
-        SessionCostUsd = 0;
-        OnPropertyChanged(nameof(IsEmpty));
-        OnPropertyChanged(nameof(StatusText));
+        if (_session is { } session)
+        {
+            Detach();
+            await _module.EndSessionAsync(session);
+        }
     }
 
     private void Attach(ClaudeSession session)
     {
         _session = session;
-        OnPropertyChanged(nameof(StatusText));
         _ = Task.Run(() => PumpAsync(session));
     }
 
@@ -230,7 +339,6 @@ public sealed partial class ChatViewModel : ObservableObject
             case SessionStarted started:
                 SessionId = started.SessionId;
                 Model = started.Model;
-                WorkingDirectory = started.WorkingDirectory;
                 break;
 
             case TextDelta { ParentToolUseId: null } delta:
@@ -256,6 +364,7 @@ public sealed partial class ChatViewModel : ObservableObject
                 _pendingPermissions.Add(card);
                 Add(card);
                 if (State is ChatState.Busy) State = ChatState.WaitingForPermission;
+                RaiseAttention(ChatAttention.NeedsYou);
                 break;
 
             case PermissionDenied denied:
@@ -271,8 +380,12 @@ public sealed partial class ChatViewModel : ObservableObject
                 ExpirePermissions();
                 foreach (var t in _tools.Values.Where(t => t.IsRunning)) t.IsRunning = false;
                 SessionCostUsd = done.CostUsd;
-                if (done.IsError && !done.WasInterrupted && State != ChatState.Stopping) Add(new NoticeChatItem($"The turn ended with an error ({done.Subtype}).", NoticeKind.Error));
+                var failed = done.IsError && !done.WasInterrupted && State != ChatState.Stopping;
+                var stopped = State == ChatState.Stopping || done.WasInterrupted;
+                if (failed) Add(new NoticeChatItem($"The turn ended with an error ({done.Subtype}).", NoticeKind.Error));
                 State = ChatState.Idle;
+                TurnFinished?.Invoke(this, EventArgs.Empty);
+                if (!stopped) RaiseAttention(failed ? ChatAttention.Failed : ChatAttention.Done); // the user pressed Stop: nothing to announce
                 break;
         }
     }
@@ -317,13 +430,53 @@ public sealed partial class ChatViewModel : ObservableObject
             if (_module.IsEnabled && !string.IsNullOrWhiteSpace(stderr)) message += Environment.NewLine + stderr;
             Add(new NoticeChatItem(message, _module.IsEnabled ? NoticeKind.Error : NoticeKind.Info));
         }
+        var wasWorking = IsBusy;
         State = ChatState.Idle;
-        OnPropertyChanged(nameof(StatusText));
+        if (wasWorking && !_endingOnPurpose && _module.IsEnabled) RaiseAttention(ChatAttention.Failed);
     }
 
     private void Add(ChatItem item)
     {
         Items.Add(item);
-        if (Items.Count == 1) OnPropertyChanged(nameof(IsEmpty));
+        if (Items.Count == 1)
+        {
+            OnPropertyChanged(nameof(IsEmpty));
+            OnPropertyChanged(nameof(CanChangeFolder));
+        }
     }
+
+    /// <summary>"/ Export conversation": the chat as Markdown (messages, tool calls, notices).</summary>
+    public string ToMarkdown()
+    {
+        var sb = new System.Text.StringBuilder();
+        sb.Append("# ").AppendLine(Title).AppendLine();
+        sb.Append("Folder: `").Append(Folder).AppendLine("`").AppendLine();
+        foreach (var item in Items)
+        {
+            switch (item)
+            {
+                case UserChatItem u:
+                    sb.AppendLine("## You").AppendLine().AppendLine(u.Text).AppendLine();
+                    break;
+                case AssistantChatItem a:
+                    sb.AppendLine("## Claude").AppendLine().AppendLine(a.Text).AppendLine();
+                    break;
+                case ToolChatItem t:
+                    sb.Append("> **").Append(t.Name).Append("** `").Append(t.Summary).AppendLine("`").AppendLine();
+                    break;
+                case NoticeChatItem n:
+                    sb.Append("> ").AppendLine(n.Text.ReplaceLineEndings(" ")).AppendLine();
+                    break;
+            }
+        }
+        return sb.ToString();
+    }
+
+    internal static string Shorten(string text)
+    {
+        var line = text.ReplaceLineEndings(" ").Trim();
+        return line.Length <= TitleLength ? line : line[..TitleLength].TrimEnd() + "…";
+    }
+
+    private static string? NullIfEmpty(string? s) => string.IsNullOrWhiteSpace(s) ? null : s.Trim();
 }

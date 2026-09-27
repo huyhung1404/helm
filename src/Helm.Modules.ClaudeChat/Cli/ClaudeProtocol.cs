@@ -30,6 +30,31 @@ public static class ClaudeProtocol
         }
     }
 
+    /// <summary>Reads the initialize reply: <c>commands[] {name, description, argumentHint, builtin}</c>, <c>models[] {value, displayName, description}</c>.</summary>
+    public static ClaudeCapabilities ParseCapabilities(JsonElement? reply)
+    {
+        if (reply is not { ValueKind: JsonValueKind.Object } r) return ClaudeCapabilities.Empty;
+        var commands = new List<SlashCommand>();
+        if (r.TryGetProperty("commands", out var cs) && cs.ValueKind == JsonValueKind.Array)
+        {
+            foreach (var c in cs.EnumerateArray())
+            {
+                if (Str(c, "name") is not { Length: > 0 } name || name.StartsWith("__", StringComparison.Ordinal)) continue; // internal
+                commands.Add(new SlashCommand(name, Str(c, "description") ?? string.Empty, Str(c, "argumentHint") is { Length: > 0 } h ? h : null, Bool(c, "builtin")));
+            }
+        }
+        var models = new List<ModelChoice>();
+        if (r.TryGetProperty("models", out var ms) && ms.ValueKind == JsonValueKind.Array)
+        {
+            foreach (var m in ms.EnumerateArray())
+            {
+                if (Str(m, "value") is not { Length: > 0 } value) continue;
+                models.Add(new ModelChoice(value, Str(m, "displayName") ?? value, Str(m, "description")));
+            }
+        }
+        return new ClaudeCapabilities(commands, models);
+    }
+
     // ---- stdin messages -------------------------------------------------------------------------------------------
 
     /// <summary>First line of every session; the CLI answers with a <see cref="ControlResponse"/> listing commands.</summary>
@@ -37,6 +62,10 @@ public static class ClaudeProtocol
 
     /// <summary>Stops the running turn; the CLI then reports a <see cref="TurnCompleted"/> with <c>aborted_streaming</c>.</summary>
     public static string Interrupt(string requestId) => ControlRequest(requestId, new JsonObject { ["subtype"] = "interrupt" });
+
+    /// <summary>Switches the model for the following turns of the running session (reported by the next <see cref="SessionStarted"/>).</summary>
+    public static string SetModel(string requestId, string model) =>
+        ControlRequest(requestId, new JsonObject { ["subtype"] = "set_model", ["model"] = model });
 
     public static string UserMessage(string text) => Serialize(new JsonObject
     {
@@ -137,7 +166,7 @@ public static class ClaudeProtocol
     private static IReadOnlyList<ClaudeEvent> ParseUser(JsonElement root)
     {
         if (!root.TryGetProperty("message", out var message) || !message.TryGetProperty("content", out var content)) return [];
-        if (content.ValueKind == JsonValueKind.String) return [new ConversationNotice(content.GetString() ?? string.Empty)];
+        if (content.ValueKind == JsonValueKind.String) return [new ConversationNotice(Unwrap(content.GetString() ?? string.Empty))];
         if (content.ValueKind != JsonValueKind.Array) return [];
 
         var events = new List<ClaudeEvent>();
@@ -152,7 +181,7 @@ public static class ClaudeProtocol
                         Bool(block, "is_error")));
                     break;
                 case "text":
-                    events.Add(new ConversationNotice(Str(block, "text") ?? string.Empty));
+                    events.Add(new ConversationNotice(Unwrap(Str(block, "text") ?? string.Empty)));
                     break;
             }
         }
@@ -216,6 +245,20 @@ public static class ClaudeProtocol
         }
         return sb.ToString();
     }
+
+    /// <summary>
+    /// The CLI wraps output of its own commands, e.g. after set_model:
+    /// <c>&lt;local-command-stdout&gt;Set model to …&lt;/local-command-stdout&gt;</c>. Keep the text, drop the tags.
+    /// </summary>
+    internal static string Unwrap(string text)
+    {
+        var match = s_localCommand.Match(text.Trim());
+        return match.Success ? match.Groups["body"].Value.Trim() : text;
+    }
+
+    private static readonly System.Text.RegularExpressions.Regex s_localCommand = new(
+        @"^<(?<tag>local-command-(?:stdout|stderr))>(?<body>.*)</\k<tag>>$",
+        System.Text.RegularExpressions.RegexOptions.Singleline | System.Text.RegularExpressions.RegexOptions.CultureInvariant);
 
     // ---- helpers --------------------------------------------------------------------------------------------------
 

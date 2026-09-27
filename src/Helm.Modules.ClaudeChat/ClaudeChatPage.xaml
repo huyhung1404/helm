@@ -5,105 +5,72 @@
     xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
     xmlns:core="clr-namespace:Helm.Core.Ui;assembly=Helm.Core"
     xmlns:chat="clr-namespace:Helm.Modules.ClaudeChat.Chat"
-    BodyFillsHeight="True"
     ExtraMessage="{Binding Module.HotkeyError}"
     Module="{Binding Module}">
 
-    <Grid Margin="0,12,0,0">
-        <Grid.RowDefinitions>
-            <RowDefinition Height="Auto" />
-            <RowDefinition Height="*" MinHeight="320" />
-        </Grid.RowDefinitions>
+    <StackPanel>
+        <TextBlock Text="Chat" Style="{DynamicResource HelmSectionHeader}" />
+        <ui:CardControl Margin="0,0,0,4">
+            <ui:CardControl.Icon>
+                <ui:ImageIcon Width="24" Height="24" Source="{x:Static chat:ClaudeLogo.Image}" />
+            </ui:CardControl.Icon>
+            <ui:CardControl.Header>
+                <core:CardHeader Title="Open Claude Chat" Description="The chat has its own window, with your recent chats from every folder on the left." />
+            </ui:CardControl.Header>
+            <ui:Button Appearance="Primary" Command="{Binding OpenChatCommand}" Content="Open chat" Icon="{ui:SymbolIcon WindowNew24}" />
+        </ui:CardControl>
 
-        <ui:CardExpander Margin="0,0,0,12" Icon="{ui:SymbolIcon Settings24}">
-            <ui:CardExpander.Header>
-                <core:CardHeader Title="Session settings" Description="Folder, model and permissions. Changes apply when you start a new chat." />
-            </ui:CardExpander.Header>
-            <StackPanel>
-                <Border Style="{DynamicResource HelmExpanderRow}" BorderThickness="0">
-                    <core:RowLayout>
-                        <core:CardHeader Title="Working folder" Description="{Binding DefaultWorkingDirectory, StringFormat='Claude Code reads and edits files here. Empty uses {0}.'}" />
-                        <DockPanel HorizontalAlignment="Right">
-                            <ui:Button
-                                Margin="8,0,0,0"
-                                Command="{Binding BrowseWorkingDirectoryCommand}"
-                                Content="Browse…"
-                                DockPanel.Dock="Right"
-                                Icon="{ui:SymbolIcon FolderOpen24}" />
-                            <ui:TextBox MinWidth="260" PlaceholderText="{Binding DefaultWorkingDirectory}" Text="{Binding WorkingDirectory, UpdateSourceTrigger=LostFocus}" />
-                        </DockPanel>
-                    </core:RowLayout>
-                </Border>
-                <Border Style="{DynamicResource HelmExpanderRow}">
-                    <core:RowLayout>
-                        <core:CardHeader Title="Model" Description="An alias (opus, sonnet, haiku) or a full model id. Empty uses Claude Code's default." />
-                        <ComboBox
-                            MinWidth="200"
-                            HorizontalAlignment="Right"
-                            IsEditable="True"
-                            ItemsSource="{Binding Models}"
-                            Text="{Binding Model, UpdateSourceTrigger=LostFocus}" />
-                    </core:RowLayout>
-                </Border>
-                <Border Style="{DynamicResource HelmExpanderRow}">
-                    <core:RowLayout>
-                        <core:CardHeader Title="Permissions" Description="{Binding PermissionMode.Description}" />
-                        <ComboBox
-                            MinWidth="200"
-                            HorizontalAlignment="Right"
-                            DisplayMemberPath="Title"
-                            ItemsSource="{Binding PermissionModes}"
-                            SelectedItem="{Binding PermissionMode}" />
-                    </core:RowLayout>
-                </Border>
-                <Border Style="{DynamicResource HelmExpanderRow}">
-                    <core:RowLayout>
-                        <core:CardHeader Title="Shortcut to show the chat" Description="Opens this page, or the chat window when you have dragged it out." />
-                        <core:HotkeyPicker HorizontalAlignment="Right" DefaultGesture="{Binding DefaultHotkey}" Gesture="{Binding Hotkey}" />
-                    </core:RowLayout>
-                </Border>
-                <Border Style="{DynamicResource HelmExpanderRow}">
-                    <core:RowLayout>
-                        <core:CardHeader Title="Claude Code location" Description="{Binding CliDescription}" />
-                        <ui:TextBox
-                            MinWidth="260"
-                            HorizontalAlignment="Right"
-                            PlaceholderText="Find automatically"
-                            Text="{Binding CliPath, UpdateSourceTrigger=LostFocus}" />
-                    </core:RowLayout>
-                </Border>
-            </StackPanel>
-        </ui:CardExpander>
+        <TextBlock Text="New chats" Style="{DynamicResource HelmSectionHeader}" />
+        <ui:CardControl Margin="0,0,0,4" Icon="{ui:SymbolIcon Folder24}">
+            <ui:CardControl.Header>
+                <core:CardHeader Title="Working folder" Description="{Binding DefaultWorkingDirectory, StringFormat='Where a new chat starts; you can change it in the chat window too. Empty uses {0}.'}" />
+            </ui:CardControl.Header>
+            <DockPanel HorizontalAlignment="Right">
+                <ui:Button
+                    Margin="8,0,0,0"
+                    Command="{Binding BrowseWorkingDirectoryCommand}"
+                    Content="Browse…"
+                    DockPanel.Dock="Right"
+                    Icon="{ui:SymbolIcon FolderOpen24}" />
+                <ui:TextBox Width="280" PlaceholderText="{Binding DefaultWorkingDirectory}" Text="{Binding WorkingDirectory, UpdateSourceTrigger=LostFocus}" />
+            </DockPanel>
+        </ui:CardControl>
+        <ui:CardControl Margin="0,0,0,4" Icon="{ui:SymbolIcon BrainCircuit24}">
+            <ui:CardControl.Header>
+                <core:CardHeader Title="Model" Description="An alias (opus, sonnet, haiku) or a full model id. Empty uses Claude Code's default." />
+            </ui:CardControl.Header>
+            <ComboBox
+                Width="200"
+                HorizontalAlignment="Right"
+                IsEditable="True"
+                ItemsSource="{Binding Models}"
+                Text="{Binding Model, UpdateSourceTrigger=LostFocus}" />
+        </ui:CardControl>
+        <ui:CardControl Margin="0,0,0,4" Icon="{ui:SymbolIcon ShieldKeyhole24}">
+            <ui:CardControl.Header>
+                <core:CardHeader Title="Permissions" Description="{Binding PermissionMode.Description}" />
+            </ui:CardControl.Header>
+            <ComboBox
+                Width="200"
+                HorizontalAlignment="Right"
+                DisplayMemberPath="Title"
+                ItemsSource="{Binding PermissionModes}"
+                SelectedItem="{Binding PermissionMode}" />
+        </ui:CardControl>
 
-        <!-- The chat host. The view is created once and moved between hosts (page / floating window). -->
-        <ContentControl x:Name="ChatHost" Grid.Row="1" />
+        <TextBlock Text="Advanced" Style="{DynamicResource HelmSectionHeader}" />
+        <ui:CardControl Margin="0,0,0,4" Icon="{ui:SymbolIcon Keyboard24}">
+            <ui:CardControl.Header>
+                <core:CardHeader Title="Shortcut to open the chat" Description="Brings up the Claude Chat window from anywhere." />
+            </ui:CardControl.Header>
+            <core:HotkeyPicker HorizontalAlignment="Right" DefaultGesture="{Binding DefaultHotkey}" Gesture="{Binding Hotkey}" />
+        </ui:CardControl>
+        <ui:CardControl Margin="0,0,0,4" Icon="{ui:SymbolIcon Code24}">
+            <ui:CardControl.Header>
+                <core:CardHeader Title="Claude Code location" Description="{Binding CliDescription}" />
+            </ui:CardControl.Header>
+            <ui:TextBox Width="280" HorizontalAlignment="Right" PlaceholderText="Find automatically" Text="{Binding CliPath, UpdateSourceTrigger=LostFocus}" />
+        </ui:CardControl>
 
-        <!-- Shown while the chat lives in its own window -->
-        <Border
-            Grid.Row="1"
-            Style="{DynamicResource HelmSurface}"
-            Visibility="{Binding Presenter.IsDetached, Converter={StaticResource BoolToVisibility}}">
-            <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
-                <ui:SymbolIcon
-                    HorizontalAlignment="Center"
-                    FontSize="40"
-                    Foreground="{DynamicResource TextFillColorTertiaryBrush}"
-                    Symbol="WindowNew24" />
-                <TextBlock
-                    Margin="0,8,0,16"
-                    HorizontalAlignment="Center"
-                    Foreground="{DynamicResource TextFillColorSecondaryBrush}"
-                    Text="The chat is open in its own window. The conversation keeps running there." />
-                <StackPanel HorizontalAlignment="Center" Orientation="Horizontal">
-                    <ui:Button
-                        Margin="0,0,8,0"
-                        Appearance="Primary"
-                        Command="{Binding Presenter.DockCommand}"
-                        Content="Bring it back here"
-                        Icon="{ui:SymbolIcon PanelLeft24}" />
-                    <ui:Button Command="{Binding Presenter.ShowWindowCommand}" Content="Show the window" Icon="{ui:SymbolIcon WindowNew24}" />
-                </StackPanel>
-            </StackPanel>
-        </Border>
-    </Grid>
+    </StackPanel>
 </core:ModulePageBase>

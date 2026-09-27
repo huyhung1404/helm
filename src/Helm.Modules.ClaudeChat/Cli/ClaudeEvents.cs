@@ -65,5 +65,17 @@ public sealed record TurnCompleted(string Subtype, bool IsError, string? Termina
 /// <summary>A reply to a <c>control_request</c> Helm sent (initialize, interrupt). Consumed by <see cref="ClaudeSession"/>.</summary>
 public sealed record ControlResponse(string RequestId, bool Success, JsonElement? Response, string? Error) : ClaudeEvent;
 
+/// <summary>A slash command the CLI accepts as a message (built-in commands and the user's skills).</summary>
+public sealed record SlashCommand(string Name, string Description, string? ArgumentHint, bool IsBuiltIn);
+
+/// <summary>A model the CLI offers (<see cref="Value"/> is what <c>--model</c> / set_model take).</summary>
+public sealed record ModelChoice(string Value, string DisplayName, string? Description);
+
+/// <summary>What the CLI reported in the initialize handshake.</summary>
+public sealed record ClaudeCapabilities(IReadOnlyList<SlashCommand> Commands, IReadOnlyList<ModelChoice> Models)
+{
+    public static ClaudeCapabilities Empty { get; } = new([], []);
+}
+
 /// <summary>Any line Helm does not model (rate limits, status, thinking token estimates, future event types).</summary>
 public sealed record UnknownEvent(string Type, string? Subtype) : ClaudeEvent;

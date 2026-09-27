@@ -1,7 +1,9 @@
+using System.Windows.Media;
 using Helm.Core.Hotkeys;
 using Helm.Core.Modules;
 using Helm.Core.Processes;
 using Helm.Core.Settings;
+using Helm.Modules.ClaudeChat.Chat;
 using Helm.Modules.ClaudeChat.Cli;
 using Microsoft.Extensions.Logging;
 using Wpf.Ui.Controls;
@@ -21,7 +23,8 @@ public sealed class ClaudeChatModule : HelmModuleBase
     private readonly IHotkeyManager _hotkeys;
     private readonly ILogger<ClaudeChatModule> _logger;
     private readonly SemaphoreSlim _gate = new(1, 1);
-    private ClaudeSession? _session;
+    private readonly HashSet<ClaudeSession> _sessions = [];
+    private int _probing;
     private HotkeyRegistration? _registration;
 
     public ClaudeChatModule(ISettingsStoreFactory settings, IChildProcessLauncher launcher, IHotkeyManager hotkeys, ILogger<ClaudeChatModule> logger)
@@ -42,6 +45,7 @@ public sealed class ClaudeChatModule : HelmModuleBase
     public override string Description => "Chat with Claude Code right inside Helm. It uses the Claude Code you already have installed and signed in, works in the folder you pick, and asks before it changes anything.";
     public override ModuleGroup Group => ModuleGroup.Advanced;
     public override SymbolRegular Icon => SymbolRegular.ChatSparkle24;
+    public override ImageSource IconImage => ClaudeLogo.Image;
     public override Type SettingsPageType => typeof(ClaudeChatPage);
     public override IReadOnlyList<HotkeyDefinition> Hotkeys =>
         [new HotkeyDefinition(ModuleId, HotkeyId, "Show Claude Chat", Settings.Current.Hotkey)];
@@ -53,6 +57,34 @@ public sealed class ClaudeChatModule : HelmModuleBase
 
     /// <summary>Raised (on any thread) when <see cref="Cli"/> changes.</summary>
     public event EventHandler? CliChanged;
+
+    /// <summary>Commands and models from the latest initialize handshake (empty until one ran).</summary>
+    public ClaudeCapabilities Capabilities { get; private set; } = ClaudeCapabilities.Empty;
+
+    /// <summary>Raised (on any thread) when <see cref="Capabilities"/> changes.</summary>
+    public event EventHandler? CapabilitiesChanged;
+
+    /// <summary>
+    /// Fills <see cref="Capabilities"/> before any chat has started, with a short-lived Claude Code process in
+    /// <paramref name="folder"/> (the handshake uses no model, so it costs nothing). Does nothing when known.
+    /// </summary>
+    public async Task EnsureCapabilitiesAsync(string folder)
+    {
+        if (Capabilities.Commands.Count > 0 || !IsEnabled || Interlocked.Exchange(ref _probing, 1) == 1) return;
+        try
+        {
+            var session = await StartSessionAsync(folder, null, null, CancellationToken.None).ConfigureAwait(false);
+            await EndSessionAsync(session).ConfigureAwait(false);
+        }
+        catch (ClaudeSessionException ex)
+        {
+            _logger.LogDebug(ex, "Could not read Claude Code's commands");
+        }
+        finally
+        {
+            Interlocked.Exchange(ref _probing, 0);
+        }
+    }
 
     /// <summary>Raised on the hotkey thread when the user asks to see the chat.</summary>
     public event EventHandler? RevealRequested;
@@ -75,64 +107,64 @@ public sealed class ClaudeChatModule : HelmModuleBase
         {
             _gate.Release();
         }
-        await EndSessionAsync().ConfigureAwait(false);
+        ClaudeSession[] running;
+        lock (_sessions)
+        {
+            running = [.. _sessions];
+            _sessions.Clear();
+        }
+        await Task.WhenAll(running.Select(EndCoreAsync)).ConfigureAwait(false);
     }
 
-    /// <summary>Ends any current session and starts a new one with the current settings.</summary>
+    /// <summary>Starts one more Claude Code process (every open chat has its own).</summary>
+    /// <param name="folder">The chat's working folder.</param>
+    /// <param name="model">Overrides the model from the settings (null = the settings' choice).</param>
     /// <exception cref="ClaudeSessionException">Claude Code is missing or did not start.</exception>
-    public async Task<ClaudeSession> StartSessionAsync(string? resumeSessionId, CancellationToken ct)
+    public async Task<ClaudeSession> StartSessionAsync(string folder, string? resumeSessionId, string? model, CancellationToken ct)
     {
-        await _gate.WaitAsync(ct).ConfigureAwait(false);
-        try
-        {
-            await EndSessionCoreAsync().ConfigureAwait(false);
-            if (!IsEnabled) throw new ClaudeSessionException("Claude Chat is turned off.");
+        if (!IsEnabled) throw new ClaudeSessionException("Claude Chat is turned off.");
+        RefreshCli();
+        var settings = Settings.Current;
+        var cli = Cli ?? throw new ClaudeSessionException(MissingCliMessage(settings));
+        if (!Directory.Exists(folder)) throw new ClaudeSessionException($"The working folder '{folder}' does not exist.");
 
-            RefreshCli();
-            var cli = Cli ?? throw new ClaudeSessionException(MissingCliMessage(Settings.Current));
-            var settings = Settings.Current;
-            var folder = settings.ResolveWorkingDirectory();
-            if (!Directory.Exists(folder)) throw new ClaudeSessionException($"The working folder '{folder}' does not exist.");
-
-            var options = new ClaudeSessionOptions(folder)
-            {
-                Model = string.IsNullOrWhiteSpace(settings.Model) ? null : settings.Model.Trim(),
-                PermissionMode = settings.PermissionMode,
-                ResumeSessionId = resumeSessionId,
-            };
-            _session = await ClaudeSession.StartAsync(_launcher, cli, options, _logger, ct).ConfigureAwait(false);
-            return _session;
-        }
-        finally
+        var options = new ClaudeSessionOptions(folder)
         {
-            _gate.Release();
+            Model = model ?? (string.IsNullOrWhiteSpace(settings.Model) ? null : settings.Model.Trim()),
+            PermissionMode = settings.PermissionMode,
+            ResumeSessionId = resumeSessionId,
+        };
+        var session = await ClaudeSession.StartAsync(_launcher, cli, options, _logger, ct).ConfigureAwait(false);
+        lock (_sessions) _sessions.Add(session);
+        var capabilities = ClaudeProtocol.ParseCapabilities(session.Capabilities);
+        if (capabilities.Commands.Count > 0 || capabilities.Models.Count > 0)
+        {
+            Capabilities = capabilities;
+            CapabilitiesChanged?.Invoke(this, EventArgs.Empty);
         }
+        if (!IsEnabled) await EndSessionAsync(session).ConfigureAwait(false); // turned off while it was starting
+        return session;
     }
 
-    public async Task EndSessionAsync()
+    /// <summary>Ends one chat's Claude Code process (closing its tab, a new chat in that tab).</summary>
+    public Task EndSessionAsync(ClaudeSession session)
     {
-        await _gate.WaitAsync().ConfigureAwait(false);
-        try
+        lock (_sessions)
         {
-            await EndSessionCoreAsync().ConfigureAwait(false);
+            if (!_sessions.Remove(session)) return Task.CompletedTask;
         }
-        finally
-        {
-            _gate.Release();
-        }
+        return EndCoreAsync(session);
     }
 
-    private async Task EndSessionCoreAsync()
+    private async Task EndCoreAsync(ClaudeSession session)
     {
-        if (_session is not { } session) return;
-        _session = null;
         try
         {
             await session.DisposeAsync().ConfigureAwait(false);
         }
         catch (Exception ex)
         {
-            _logger.LogWarning(ex, "Ending the Claude Code session failed");
+            _logger.LogWarning(ex, "Ending a Claude Code session failed");
         }
     }
 

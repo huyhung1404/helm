@@ -22,6 +22,22 @@
             </Setter>
         </Style>
 
+        <!-- Editable text without the themed chrome: the composer box draws the frame -->
+        <Style x:Key="ComposerText" TargetType="TextBox">
+            <Setter Property="FontSize" Value="14" />
+            <Setter Property="Foreground" Value="{DynamicResource TextFillColorPrimaryBrush}" />
+            <Setter Property="CaretBrush" Value="{DynamicResource TextFillColorPrimaryBrush}" />
+            <Setter Property="SelectionBrush" Value="{DynamicResource AccentFillColorDefaultBrush}" />
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="TextBox">
+                        <ScrollViewer x:Name="PART_ContentHost" Focusable="False" HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="{TemplateBinding VerticalScrollBarVisibility}" />
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
         <DataTemplate DataType="{x:Type chat:UserChatItem}">
             <Border
                 Margin="64,6,0,6"
@@ -37,14 +53,14 @@
 
         <DataTemplate DataType="{x:Type chat:AssistantChatItem}">
             <DockPanel Margin="0,6,48,6">
-                <ui:SymbolIcon
+                <Image
+                    Width="18"
+                    Height="18"
                     Margin="0,2,10,0"
                     VerticalAlignment="Top"
                     DockPanel.Dock="Left"
-                    FontSize="18"
-                    Foreground="{DynamicResource AccentTextFillColorPrimaryBrush}"
-                    Symbol="ChatSparkle24" />
-                <TextBox Style="{StaticResource ChatText}" Text="{Binding Text, Mode=OneWay}" />
+                    Source="{x:Static chat:ClaudeLogo.Image}" />
+                <chat:MarkdownView Markdown="{Binding Text, Mode=OneWay}" />
             </DockPanel>
         </DataTemplate>
 
@@ -212,130 +228,231 @@
         </DataTemplate>
     </UserControl.Resources>
 
-    <Border Style="{DynamicResource HelmSurface}" Padding="0">
-        <Grid>
-            <Grid.RowDefinitions>
-                <RowDefinition Height="Auto" />
-                <RowDefinition Height="*" />
-                <RowDefinition Height="Auto" />
-            </Grid.RowDefinitions>
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
 
-            <!-- Header: status + actions. Also the drag handle for tearing the chat out (later). -->
-            <Border
-                x:Name="Header"
-                Padding="10,10,16,10"
-                Background="Transparent"
-                BorderBrush="{DynamicResource CardStrokeColorDefaultBrush}"
-                BorderThickness="0,0,0,1"
-                Cursor="SizeAll"
-                MouseLeftButtonDown="OnHeaderMouseDown"
-                MouseLeftButtonUp="OnHeaderMouseUp"
-                MouseMove="OnHeaderMouseMove"
-                ToolTip="Drag to open the chat in its own window">
-                <DockPanel>
-                    <ui:SymbolIcon
-                        Margin="0,0,8,0"
-                        DockPanel.Dock="Left"
-                        FontSize="16"
-                        Foreground="{DynamicResource TextFillColorTertiaryBrush}"
-                        Symbol="ReOrderDotsVertical24" />
-                    <ui:Button
-                        x:Name="PopOutButton"
-                        AutomationProperties.Name="Open in a window"
-                        Appearance="Transparent"
-                        Click="OnPopOutClick"
-                        Cursor="Arrow"
-                        DockPanel.Dock="Right"
-                        Icon="{ui:SymbolIcon WindowNew24}"
-                        ToolTip="Open the chat in its own window (or drag this bar out)" />
-                    <ui:Button
-                        AutomationProperties.Name="New chat"
-                        Cursor="Arrow"
-                        Appearance="Transparent"
-                        Command="{Binding NewChatCommand}"
-                        DockPanel.Dock="Right"
-                        Icon="{ui:SymbolIcon ChatAdd24}"
-                        ToolTip="New chat: ends this session and starts over" />
-                    <ui:ProgressRing
-                        Width="14"
-                        Height="14"
-                        Margin="0,0,10,0"
-                        DockPanel.Dock="Left"
-                        IsIndeterminate="True"
-                        Visibility="{Binding IsBusy, Converter={StaticResource BoolToVisibility}}" />
-                    <StackPanel VerticalAlignment="Center">
-                        <TextBlock FontWeight="SemiBold" Text="{Binding StatusText}" TextTrimming="CharacterEllipsis" />
-                        <TextBlock
-                            Style="{DynamicResource HelmSecondaryText}"
-                            Text="{Binding CostText}"
-                            Visibility="{Binding CostText, Converter={StaticResource NotEmptyToVisibility}}" />
-                    </StackPanel>
-                </DockPanel>
-            </Border>
-
-            <!-- Conversation -->
-            <ScrollViewer
-                x:Name="Scroller"
-                AutomationProperties.Name="Conversation"
-                Grid.Row="1"
-                Padding="16,8"
-                ScrollChanged="OnScrollChanged"
-                VerticalScrollBarVisibility="Auto">
-                <ItemsControl ItemsSource="{Binding Items}" />
-            </ScrollViewer>
-            <StackPanel
-                Grid.Row="1"
+        <!-- Conversation -->
+        <ScrollViewer
+            x:Name="Scroller"
+            Padding="16,8"
+            AutomationProperties.Name="Conversation"
+            ScrollChanged="OnScrollChanged"
+            VerticalScrollBarVisibility="Auto">
+            <ItemsControl ItemsSource="{Binding Items}" />
+        </ScrollViewer>
+        <StackPanel
+            Margin="24,0"
+            HorizontalAlignment="Center"
+            VerticalAlignment="Center"
+            IsHitTestVisible="False"
+            Visibility="{Binding IsEmpty, Converter={StaticResource BoolToVisibility}}">
+            <Image
+                Width="44"
+                Height="44"
                 HorizontalAlignment="Center"
-                VerticalAlignment="Center"
-                IsHitTestVisible="False"
-                Visibility="{Binding IsEmpty, Converter={StaticResource BoolToVisibility}}">
-                <ui:SymbolIcon
-                    HorizontalAlignment="Center"
-                    FontSize="40"
-                    Foreground="{DynamicResource TextFillColorTertiaryBrush}"
-                    Symbol="ChatSparkle24" />
-                <TextBlock
-                    Margin="0,8,0,0"
-                    HorizontalAlignment="Center"
-                    Foreground="{DynamicResource TextFillColorSecondaryBrush}"
-                    Text="Ask Claude about the working folder, or ask it to change something." />
-            </StackPanel>
+                Source="{x:Static chat:ClaudeLogo.Image}" />
+            <TextBlock
+                Margin="0,12,0,4"
+                HorizontalAlignment="Center"
+                Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                Text="Ask Claude about this folder, or ask it to change something." />
+            <TextBlock
+                HorizontalAlignment="Center"
+                Style="{DynamicResource HelmSecondaryText}"
+                Text="Type / for commands and @ to mention a file." />
+        </StackPanel>
 
-            <!-- Composer -->
-            <Border
-                Grid.Row="2"
-                Padding="12"
-                BorderBrush="{DynamicResource CardStrokeColorDefaultBrush}"
-                BorderThickness="0,1,0,0">
-                <DockPanel>
-                    <Grid Margin="8,0,0,0" VerticalAlignment="Bottom" DockPanel.Dock="Right">
+        <!-- Composer: positions as in Claude Code for VS Code, drawn in Helm's style -->
+        <Border
+            x:Name="ComposerBox"
+            Grid.Row="1"
+            Margin="12,4,12,12"
+            Padding="10,6,6,6"
+            Background="{DynamicResource ControlFillColorDefaultBrush}"
+            BorderThickness="1"
+            CornerRadius="8">
+            <Border.Style>
+                <Style TargetType="Border">
+                    <Setter Property="BorderBrush" Value="{DynamicResource CardStrokeColorDefaultBrush}" />
+                    <Style.Triggers>
+                        <Trigger Property="IsKeyboardFocusWithin" Value="True">
+                            <Setter Property="BorderBrush" Value="{DynamicResource AccentFillColorDefaultBrush}" />
+                        </Trigger>
+                    </Style.Triggers>
+                </Style>
+            </Border.Style>
+            <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                </Grid.RowDefinitions>
+
+                <Grid>
+                    <TextBox
+                        x:Name="Composer"
+                        MinHeight="40"
+                        MaxHeight="200"
+                        AcceptsReturn="True"
+                        AutomationProperties.Name="Message"
+                        PreviewKeyDown="OnComposerKeyDown"
+                        SelectionChanged="OnComposerCaretMoved"
+                        Style="{StaticResource ComposerText}"
+                        Text="{Binding Draft, UpdateSourceTrigger=PropertyChanged}"
+                        TextChanged="OnComposerTextChanged"
+                        TextWrapping="Wrap"
+                        VerticalScrollBarVisibility="Auto" />
+                    <TextBlock
+                        Margin="2,1,0,0"
+                        Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                        IsHitTestVisible="False"
+                        Text="Message Claude — Enter to send, Shift+Enter for a new line"
+                        Visibility="{Binding Draft, Converter={StaticResource EmptyToVisibility}}" />
+                </Grid>
+
+                <DockPanel Grid.Row="1" Margin="0,4,0,0">
+                    <Grid DockPanel.Dock="Right">
                         <ui:Button
+                            Width="32"
+                            Height="32"
+                            Padding="0"
                             AutomationProperties.Name="Send"
                             Appearance="Primary"
                             Command="{Binding SendCommand}"
-                            Icon="{ui:SymbolIcon Send24}"
+                            Icon="{ui:SymbolIcon ArrowUp24}"
                             ToolTip="Send (Enter)"
                             Visibility="{Binding IsBusy, Converter={StaticResource InverseBoolToVisibility}}" />
                         <ui:Button
+                            Width="32"
+                            Height="32"
+                            Padding="0"
                             AutomationProperties.Name="Stop"
                             Command="{Binding StopCommand}"
                             Icon="{ui:SymbolIcon Stop24}"
                             ToolTip="Stop"
                             Visibility="{Binding IsBusy, Converter={StaticResource BoolToVisibility}}" />
                     </Grid>
-                    <ui:TextBox
-                        x:Name="Composer"
-                        AutomationProperties.Name="Message"
-                        MaxHeight="180"
-                        AcceptsReturn="True"
-                        ClearButtonEnabled="False"
-                        PlaceholderText="Message Claude — Enter to send, Shift+Enter for a new line"
-                        PreviewKeyDown="OnComposerKeyDown"
-                        Text="{Binding Draft, UpdateSourceTrigger=PropertyChanged}"
-                        TextWrapping="Wrap"
-                        VerticalScrollBarVisibility="Auto" />
+                    <ui:Button
+                        Padding="6"
+                        AutomationProperties.Name="Commands"
+                        Appearance="Transparent"
+                        Click="OnSlashButton"
+                        DockPanel.Dock="Left"
+                        Icon="{ui:SymbolIcon Add16}"
+                        ToolTip="Commands and actions (/)" />
+                    <ui:Button
+                        Padding="6"
+                        AutomationProperties.Name="Mention a file"
+                        Appearance="Transparent"
+                        Click="OnMentionButton"
+                        DockPanel.Dock="Left"
+                        Icon="{ui:SymbolIcon Mention24}"
+                        ToolTip="Mention a file (@)" />
+                    <ComboBox
+                        x:Name="ModelPicker"
+                        MinWidth="130"
+                        Margin="4,0,8,0"
+                        VerticalAlignment="Center"
+                        AutomationProperties.Name="Model"
+                        DisplayMemberPath="DisplayName"
+                        DockPanel.Dock="Left"
+                        SelectionChanged="OnModelPicked"
+                        ToolTip="Model for this chat; changing it switches the running chat" />
+                    <StackPanel VerticalAlignment="Center" Orientation="Horizontal">
+                        <ui:ProgressRing
+                            Width="12"
+                            Height="12"
+                            Margin="0,0,6,0"
+                            IsIndeterminate="True"
+                            Visibility="{Binding IsBusy, Converter={StaticResource BoolToVisibility}}" />
+                        <TextBlock
+                            VerticalAlignment="Center"
+                            Style="{DynamicResource HelmSecondaryText}"
+                            Text="{Binding StatusText}"
+                            TextTrimming="CharacterEllipsis"
+                            TextWrapping="NoWrap" />
+                        <TextBlock
+                            Margin="8,0,0,0"
+                            VerticalAlignment="Center"
+                            Style="{DynamicResource HelmSecondaryText}"
+                            Text="{Binding CostText}"
+                            TextWrapping="NoWrap"
+                            ToolTip="What these turns would cost at API prices; nothing is charged per token on a Claude subscription." />
+                    </StackPanel>
                 </DockPanel>
+            </Grid>
+        </Border>
+
+        <!-- The "/" and "@" menu, above the composer -->
+        <Popup
+            x:Name="MenuPopup"
+            AllowsTransparency="True"
+            Placement="Top"
+            PlacementTarget="{Binding ElementName=ComposerBox}"
+            StaysOpen="False">
+            <Border
+                Width="{Binding ActualWidth, ElementName=ComposerBox}"
+                MaxHeight="340"
+                Margin="0,0,0,4"
+                Padding="4"
+                Background="{DynamicResource ApplicationBackgroundBrush}"
+                BorderBrush="{DynamicResource CardStrokeColorDefaultBrush}"
+                BorderThickness="1"
+                CornerRadius="8">
+                <ListBox
+                    x:Name="MenuList"
+                    AutomationProperties.Name="Suggestions"
+                    Background="Transparent"
+                    BorderThickness="0"
+                    ScrollViewer.HorizontalScrollBarVisibility="Disabled">
+                    <ListBox.GroupStyle>
+                        <GroupStyle>
+                            <GroupStyle.HeaderTemplate>
+                                <DataTemplate>
+                                    <TextBlock Margin="8,6,0,2" Style="{DynamicResource HelmSecondaryText}" Text="{Binding Name}" />
+                                </DataTemplate>
+                            </GroupStyle.HeaderTemplate>
+                        </GroupStyle>
+                    </ListBox.GroupStyle>
+                    <ListBox.ItemContainerStyle>
+                        <Style BasedOn="{StaticResource {x:Type ListBoxItem}}" TargetType="ListBoxItem">
+                            <Setter Property="AutomationProperties.Name" Value="{Binding Title}" />
+                            <Setter Property="Padding" Value="8,4" />
+                        </Style>
+                    </ListBox.ItemContainerStyle>
+                    <ListBox.ItemTemplate>
+                        <DataTemplate DataType="{x:Type chat:Suggestion}">
+                            <Button
+                                Padding="0"
+                                HorizontalContentAlignment="Stretch"
+                                AutomationProperties.Name="{Binding Title}"
+                                Background="Transparent"
+                                BorderThickness="0"
+                                Click="OnSuggestionClicked"
+                                Focusable="False">
+                                <Button.Template>
+                                    <ControlTemplate TargetType="Button">
+                                        <ContentPresenter />
+                                    </ControlTemplate>
+                                </Button.Template>
+                            <DockPanel>
+                                <TextBlock
+                                    MaxWidth="320"
+                                    Margin="12,0,0,0"
+                                    DockPanel.Dock="Right"
+                                    Style="{DynamicResource HelmSecondaryText}"
+                                    Text="{Binding Detail}"
+                                    TextTrimming="CharacterEllipsis"
+                                    TextWrapping="NoWrap" />
+                                <TextBlock Text="{Binding Title}" TextTrimming="CharacterEllipsis" />
+                            </DockPanel>
+                            </Button>
+                        </DataTemplate>
+                    </ListBox.ItemTemplate>
+                </ListBox>
             </Border>
-        </Grid>
-    </Border>
+        </Popup>
+    </Grid>
 </UserControl>

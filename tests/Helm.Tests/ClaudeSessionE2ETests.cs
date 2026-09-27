@@ -74,9 +74,28 @@ public class ClaudeSessionE2ETests
             Assert.True(covered.Permissions.Count == 0, "Asked again. Transcript: " + covered.Transcript);
             Assert.True(Directory.Exists(Path.Combine(folder, "gamma")));
             Assert.False(File.Exists(Path.Combine(folder, ".claude", "settings.local.json")));
+
+            // 6. Switching the model mid-session applies to the next turn.
+            await session.SetModelAsync("sonnet");
+            await session.SendUserMessageAsync("Reply with exactly: switched");
+            var switched = await ReadTurnAsync(session);
+            Assert.Contains("sonnet", switched.Started?.Model ?? string.Empty);
+
+            // 7. The CLI's saved copy of this conversation is found and read back (its file format is undocumented).
+            var sessionId = first.Started!.SessionId;
+            var saved = Assert.Single(ClaudeSessionStore.List(folder), s => s.SessionId == sessionId);
+            Assert.False(string.IsNullOrWhiteSpace(saved.Title));
+            var transcript = ClaudeSessionStore.ReadTranscript(saved.FilePath);
+            Assert.Contains(transcript, e => e is TranscriptUserText { Text: "Reply with exactly the word: pong" });
+            Assert.Contains(transcript, e => e is TranscriptToolUse { Name: "Write" });
         }
         finally
         {
+            // The CLI keeps a history folder per working folder; do not leave one behind for every test run.
+            if (ClaudeSessionStore.FindProjectDirectory(folder) is { } history)
+            {
+                try { Directory.Delete(history, recursive: true); } catch (IOException) { }
+            }
             File.Delete(outside);
             File.Delete(secondOutside);
             try { Directory.Delete(folder, recursive: true); } catch (IOException) { }

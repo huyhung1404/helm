@@ -5,7 +5,6 @@ using Helm.Core.Services;
 using Helm.Core.Settings;
 using Helm.Modules.ClaudeChat.Chat;
 using Helm.Modules.ClaudeChat.Cli;
-using Microsoft.Extensions.Logging;
 
 namespace Helm.Modules.ClaudeChat;
 
@@ -23,25 +22,25 @@ public sealed partial class ClaudeChatViewModel : ObservableObject
     [ObservableProperty] private string _cliPath = string.Empty;
     [ObservableProperty] private HotkeyGesture _hotkey;
 
-    public ClaudeChatViewModel(ClaudeChatModule module, ChatPresenter presenter, IUiDispatcher ui, ILogger<ClaudeChatViewModel> logger)
+    private readonly ChatWindowHost _chatWindow;
+
+    public ClaudeChatViewModel(ClaudeChatModule module, ChatWindowHost chatWindow, IUiDispatcher ui)
     {
         Module = module;
-        Presenter = presenter;
+        _chatWindow = chatWindow;
         _store = module.Settings;
         _ui = ui;
-        Chat = new ChatViewModel(module, ui, logger);
         _permissionMode = PermissionModes[0];
         Load(_store.Current);
+        // The chat can change the working folder too (new chat in another folder); keep the page in sync.
+        _store.Changed += (_, current) => _ui.Post(() => Load(current));
         module.CliChanged += (_, _) => _ui.Post(() => OnPropertyChanged(nameof(CliDescription)));
     }
 
     public ClaudeChatModule Module { get; }
 
-    /// <summary>The conversation; lives as long as Helm, wherever its view is shown.</summary>
-    public ChatViewModel Chat { get; }
-
-    /// <summary>Where the chat is shown (page or floating window).</summary>
-    public ChatPresenter Presenter { get; }
+    [RelayCommand]
+    private void OpenChat() => _chatWindow.Show();
 
     public HotkeyGesture DefaultHotkey => ClaudeChatSettings.DefaultHotkey;
 

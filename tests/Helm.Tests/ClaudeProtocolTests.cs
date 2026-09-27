@@ -131,6 +131,20 @@ public class ClaudeProtocolTests
     public void Any_aborted_terminal_reason_counts_as_interrupted(string? reason, bool interrupted) =>
         Assert.Equal(interrupted, new TurnCompleted("error_during_execution", true, reason, 0, 0, 1).WasInterrupted);
 
+    [Theory]
+    [InlineData("<local-command-stdout>Set model to `sonnet (claude-sonnet-5)`</local-command-stdout>", "Set model to `sonnet (claude-sonnet-5)`")]
+    [InlineData("<local-command-stderr>\nbad model\n</local-command-stderr>", "bad model")]
+    [InlineData("[Request interrupted by user]", "[Request interrupted by user]")]
+    [InlineData("<local-command-stdout>unclosed", "<local-command-stdout>unclosed")]
+    public void Cli_command_output_is_unwrapped(string raw, string shown)
+    {
+        var line = System.Text.Json.JsonSerializer.Serialize(new { type = "user", message = new { role = "user", content = raw } });
+
+        var notice = Assert.IsType<ConversationNotice>(Assert.Single(ClaudeProtocol.Parse(line)));
+
+        Assert.Equal(shown, notice.Text);
+    }
+
     [Fact]
     public void User_message_is_one_ascii_line()
     {

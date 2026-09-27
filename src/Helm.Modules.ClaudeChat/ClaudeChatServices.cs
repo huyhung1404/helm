@@ -1,4 +1,5 @@
 using Helm.Core;
+using Helm.Core.Modules;
 using Helm.Modules.ClaudeChat.Chat;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -9,6 +10,7 @@ public static class ClaudeChatServices
     public static IServiceCollection AddClaudeChatModule(this IServiceCollection services) =>
         services
             .AddHelmModule<ClaudeChatModule, ClaudeChatPage, ClaudeChatViewModel>()
-            .AddSingleton<ClaudeChatView>() // one view for the whole app: it moves between the page and a floating window
-            .AddSingleton<ChatPresenter>();
+            .AddSingleton<ChatWorkspaceViewModel>() // folders and their chats, one Claude Code process per chat
+            .AddSingleton<ChatWindowHost>()
+            .AddSingleton<IModuleLauncher, ClaudeChatLauncher>(); // Quick access: new chat in a folder you pick
 }

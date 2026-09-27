@@ -176,6 +176,14 @@ public sealed class ClaudeSession : IAsyncDisposable
     public Task DenyAsync(PermissionRequest request, string message, CancellationToken ct = default) =>
         WriteLineAsync(ClaudeProtocol.Deny(request, message), ct);
 
+    /// <summary>Uses <paramref name="model"/> (an alias or id) from the next turn on.</summary>
+    /// <exception cref="ClaudeSessionException">The CLI refused the model.</exception>
+    public async Task SetModelAsync(string model, CancellationToken ct = default)
+    {
+        var reply = await SendControlAsync(id => ClaudeProtocol.SetModel(id, model), ct).ConfigureAwait(false);
+        if (!reply.Success) throw new ClaudeSessionException($"Claude Code did not switch to '{model}': {reply.Error}");
+    }
+
     /// <summary>Stops the running turn. The turn still ends with a <see cref="TurnCompleted"/> event.</summary>
     public async Task InterruptAsync(CancellationToken ct = default)
     {
