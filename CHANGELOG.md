@@ -3,6 +3,14 @@
 All notable changes to Helm. The top section is used as the GitHub release body and as the Velopack release notes.
 Format: [Keep a Changelog](https://keepachangelog.com), versions follow [SemVer](https://semver.org).
 
+## [0.9.2] - 2026-09-28
+
+### Fixed
+- Opening Helm from the Start menu or the desktop could bring up another copy of Helm running on the PC (for
+  example a test build) instead of the installed one, a different one each time. Only the installed Helm answers now.
+- Tracker and Vault icons no longer sit on a coloured tile and are the same size as the Claude Chat icon, on the
+  PC and on Android.
+
 ## [0.9.1] - 2026-09-28
 
 ### Fixed
