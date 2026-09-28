@@ -3,7 +3,7 @@
 All notable changes to Helm. The top section is used as the GitHub release body and as the Velopack release notes.
 Format: [Keep a Changelog](https://keepachangelog.com), versions follow [SemVer](https://semver.org).
 
-## [Unreleased]
+## [0.8.0] - 2026-09-28
 
 ### Added
 - Helm for Android (8.0 or newer): `Helm-android.apk` is attached to every release, with the same Home and
