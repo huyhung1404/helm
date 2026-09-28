@@ -59,7 +59,7 @@ public class ModulePageBase : Page
 
         // A grid rather than a stack panel so the body can take the remaining height (BodyFillsHeight). Inside the
         // shell's scroll viewer the height is unbounded and the star row simply sizes to its content.
-        var layout = new Grid { Margin = new Thickness(24, 0, 24, 24) };
+        var layout = new Grid { Margin = new Thickness(24, 16, 24, 24) };
         UIElement[] rows = [_title, intro, _infoBar, _enableCard, _body];
         for (var i = 0; i < rows.Length; i++)
         {

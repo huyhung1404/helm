@@ -129,6 +129,8 @@ A tool you work in keeps **what it is for** apart from **how it is configured**:
 
 - The shell does the routing from `IModuleContent`; do not change the shell for a new tool. A module with its own Quick
   access action (`IModuleLauncher`, e.g. Claude Chat opening its window) keeps that action.
+- PC page margin: the content page's root panel uses `Margin="24,16,24,24"`, the same as Home, General and
+  `ModulePageBase`, so the title sits 16 px below the window's title bar on every page.
 - Content page layout: the tool's title (PC; the Android app bar shows it already), then the tool's main picker (e.g.
   the workspace) as the first card under it, full width and easy to see, then the content. No settings button, no
   Enable card, no icon + description block: settings are reached from Home → Utilities only. When the tool is off, show
