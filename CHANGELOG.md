@@ -3,7 +3,7 @@
 All notable changes to Helm. The top section is used as the GitHub release body and as the Velopack release notes.
 Format: [Keep a Changelog](https://keepachangelog.com), versions follow [SemVer](https://semver.org).
 
-## [Unreleased]
+## [0.10.0] - 2026-09-28
 
 ### Added
 - Vault: **Token** items for API keys and access tokens: one hidden field, shown and copied like a password. Older Helm
