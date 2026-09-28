@@ -1,6 +1,7 @@
 using System.Collections.ObjectModel;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using Avalonia.Media;
 using FluentIcons.Common;
 using Helm.Core.Modules;
 using Helm.App.Android.Services;
@@ -8,7 +9,7 @@ using Helm.App.Android.Services;
 namespace Helm.App.Android.ViewModels;
 
 /// <summary>One row of the navigation drawer: a page, or a group header above that group's tools.</summary>
-public sealed record NavEntry(string Title, Symbol Icon, bool IsHeader, Action? Open)
+public sealed record NavEntry(string Title, Symbol Icon, bool IsHeader, Action? Open, IImage? Image = null)
 {
     public bool IsPage => !IsHeader;
 }
@@ -29,7 +30,7 @@ public sealed partial class MainViewModel : ObservableObject
         {
             Entries.Add(new NavEntry(group.Key.DisplayName(), Symbol.Apps, true, null));
             foreach (var module in group.OrderBy(m => m.DisplayName))
-                Entries.Add(new NavEntry(module.DisplayName, module.Icon, false, () => navigator.GoModuleContent(module)));
+                Entries.Add(new NavEntry(module.DisplayName, module.Icon, false, () => navigator.GoModuleContent(module), module.IconImage));
         }
         GeneralEntry = new NavEntry("General", Symbol.Settings, false, navigator.GoGeneral);
 

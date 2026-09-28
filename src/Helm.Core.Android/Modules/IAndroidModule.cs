@@ -1,3 +1,4 @@
+using Avalonia.Media;
 using FluentIcons.Common;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -9,6 +10,12 @@ public interface IAndroidModule : IModule
     /// <summary>Fluent System Icon, the same set the Windows app uses (WPF-UI SymbolRegular).</summary>
     Symbol Icon { get; }
 
+    /// <summary>
+    /// Optional picture (e.g. an app icon) shown instead of <see cref="Icon"/> wherever the tool appears: drawer, Home,
+    /// the page frame. Null for most tools. Loaded once and shared (a module is a singleton).
+    /// </summary>
+    IImage? IconImage => null;
+
     /// <summary>The module's page: an Avalonia control resolved from DI (its DataContext is set by the page itself).</summary>
     Type PageType { get; }
 }
@@ -17,6 +24,7 @@ public interface IAndroidModule : IModule
 public abstract class AndroidModuleBase : ModuleBase, IAndroidModule
 {
     public abstract Symbol Icon { get; }
+    public virtual IImage? IconImage => null;
     public abstract Type PageType { get; }
 }
 

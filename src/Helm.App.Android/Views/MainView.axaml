@@ -1,6 +1,7 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:ic="using:FluentIcons.Avalonia"
+             xmlns:ui="using:Helm.Core.Ui"
              xmlns:vm="using:Helm.App.Android.ViewModels"
              xmlns:views="using:Helm.App.Android.Views"
              x:Class="Helm.App.Android.Views.MainView"
@@ -46,7 +47,7 @@
                                             <Button Classes="flat" IsVisible="{Binding IsPage}" CommandParameter="{Binding}"
                                                     Command="{Binding $parent[ItemsControl].((vm:MainViewModel)DataContext).OpenCommand}">
                                                 <StackPanel Orientation="Horizontal" Spacing="16">
-                                                    <ic:SymbolIcon Symbol="{Binding Icon}" FontSize="20" />
+                                                    <ui:ModuleIcon Symbol="{Binding Icon}" Image="{Binding Image}" Size="20" />
                                                     <TextBlock Text="{Binding Title}" VerticalAlignment="Center" />
                                                 </StackPanel>
                                             </Button>

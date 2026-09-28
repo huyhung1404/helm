@@ -1,6 +1,7 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:ic="using:FluentIcons.Avalonia"
+             xmlns:ui="using:Helm.Core.Ui"
              xmlns:vm="using:Helm.App.Android.ViewModels"
              xmlns:m="using:Helm.Core.Modules"
              x:Class="Helm.App.Android.Views.HomeView"
@@ -63,7 +64,7 @@
                             <Button Classes="flat" Padding="8,12" Margin="2" HorizontalContentAlignment="Center" CommandParameter="{Binding}"
                                     Command="{Binding $parent[ItemsControl].((vm:HomeViewModel)DataContext).LaunchModuleCommand}">
                                 <StackPanel Spacing="8">
-                                    <ic:SymbolIcon Symbol="{Binding Icon}" FontSize="30" Foreground="{DynamicResource SystemAccentColor}" HorizontalAlignment="Center" />
+                                    <ui:ModuleIcon Symbol="{Binding Icon}" Image="{Binding IconImage}" Size="30" Foreground="{DynamicResource SystemAccentColor}" HorizontalAlignment="Center" />
                                     <TextBlock Text="{Binding DisplayName}" TextAlignment="Center" TextWrapping="Wrap" FontSize="12" />
                                 </StackPanel>
                             </Button>
@@ -87,7 +88,7 @@
                         <DataTemplate DataType="m:IAndroidModule">
                             <Border BorderThickness="0,1,0,0" BorderBrush="{DynamicResource HelmCardStroke}">
                                 <Grid ColumnDefinitions="36,*,Auto,Auto" Margin="16,4,4,4">
-                                    <ic:SymbolIcon Symbol="{Binding Icon}" FontSize="20" Foreground="{DynamicResource SystemAccentColor}" VerticalAlignment="Center" HorizontalAlignment="Left" />
+                                    <ui:ModuleIcon Symbol="{Binding Icon}" Image="{Binding IconImage}" Size="20" Foreground="{DynamicResource SystemAccentColor}" VerticalAlignment="Center" HorizontalAlignment="Left" />
                                     <TextBlock Grid.Column="1" Text="{Binding DisplayName}" VerticalAlignment="Center" />
                                     <ToggleSwitch Grid.Column="2" IsChecked="{Binding IsEnabled}" OnContent="" OffContent="" VerticalAlignment="Center" />
                                     <Button Grid.Column="3" Classes="flat" Width="44" Height="44" Padding="0" HorizontalContentAlignment="Center" CommandParameter="{Binding}"

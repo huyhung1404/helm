@@ -22,6 +22,10 @@ Print a short plan before you start, then continue without waiting:
 - **Class prefix**: PascalCase, e.g. `ColorPicker`.
 - **Group**: one of `SystemTools`, `WindowingAndLayouts`, `InputAndOutput`, `FileManagement`, `Advanced`. Pick the closest.
 - **Icon**: a `SymbolRegular` value that exists (see §6). On Android the same icon is `FluentIcons.Common.Symbol.<Name>` (no size suffix).
+  A tool may also have an app picture that replaces the symbol everywhere: a 256 px PNG with real transparency in
+  `src/Helm.Modules.<Prefix>.Core/Assets/`, linked as `<Resource>` (PC) / `<AvaloniaResource>` (Android), exposed as
+  `IconImage` (PC: a frozen `ImageSource`; Android: an `IImage`, loaded once). Keep the symbol as the fallback. See
+  `TrackerLogo` / Tracker's Android module.
 - **Default hotkey**: only if the tool needs one; choose one that is unlikely to clash.
 - **Content page**: yes if the tool is something you *work in* (lists, a chat, a vault, a viewer), no if it only
   runs in the background and is configured (a hotkey, a hook). See "Content page and settings page" in §4.

@@ -1,3 +1,6 @@
+using Avalonia.Media;
+using Avalonia.Media.Imaging;
+using Avalonia.Platform;
 using FluentIcons.Common;
 using Helm.Core.Modules;
 using Microsoft.Extensions.Logging;
@@ -27,6 +30,22 @@ public sealed class TrackerModule : AndroidModuleBase, IModuleContent, IDisposab
     public override string Description => TrackerIds.Description;
     public override ModuleGroup Group => ModuleGroup.SystemTools;
     public override Symbol Icon => Symbol.TaskListSquare;
+
+    /// <summary>The same app icon as on Windows (Assets/tracker.png), loaded on first use.</summary>
+    public override IImage? IconImage => s_logo.Value;
+
+    private static readonly Lazy<IImage?> s_logo = new(() =>
+    {
+        try
+        {
+            using var stream = AssetLoader.Open(new Uri("avares://Helm.Modules.Tracker.Android/Assets/tracker.png"));
+            return new Bitmap(stream);
+        }
+        catch (Exception)
+        {
+            return null; // falls back to the symbol
+        }
+    });
     public override Type PageType => typeof(TrackerPage);
     public Type ContentPageType => typeof(TrackerContentPage);
 

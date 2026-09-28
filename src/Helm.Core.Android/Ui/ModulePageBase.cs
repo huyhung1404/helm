@@ -73,8 +73,8 @@ public class ModulePageBase : ContentControl
 
     private Control BuildFrame(INameScope scope)
     {
-        var heroIcon = new SymbolIcon { FontSize = 40, HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center };
-        heroIcon.Bind(SymbolIcon.ForegroundProperty, heroIcon.GetResourceObservable("SystemAccentColor"));
+        var heroIcon = new ModuleIcon { Size = 40, HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center };
+        heroIcon.Bind(ForegroundProperty, heroIcon.GetResourceObservable("SystemAccentColor"));
         var hero = new Border { Width = 64, Height = 64, CornerRadius = new CornerRadius(8), Margin = new Thickness(0, 0, 16, 0), Child = heroIcon };
         hero.Bind(Border.BackgroundProperty, hero.GetResourceObservable("HelmSubtleFill"));
         var description = new TextBlock { TextWrapping = TextWrapping.Wrap, VerticalAlignment = VerticalAlignment.Center };
@@ -86,7 +86,7 @@ public class ModulePageBase : ContentControl
         var infoText = new TextBlock { TextWrapping = TextWrapping.Wrap };
         var infoBar = new Border { Child = infoText, IsVisible = false, Classes = { "infobar", "warning" } };
 
-        var enableIcon = new SymbolIcon { FontSize = 20, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 0, 16, 0) };
+        var enableIcon = new ModuleIcon { Size = 20, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 0, 16, 0) };
         var enableTitle = new TextBlock { VerticalAlignment = VerticalAlignment.Center, TextWrapping = TextWrapping.Wrap };
         var toggle = new ToggleSwitch { OnContent = "On", OffContent = "Off", VerticalAlignment = VerticalAlignment.Center };
         toggle.IsCheckedChanged += (_, _) =>
@@ -139,6 +139,7 @@ public class ModulePageBase : ContentControl
         if (_frame is not { } f) return;
         var module = Module;
         f.HeroIcon.Symbol = f.EnableIcon.Symbol = module?.Icon ?? Symbol.Apps;
+        f.HeroIcon.Image = f.EnableIcon.Image = module?.IconImage;
         f.Description.Text = module?.Description;
         f.EnableTitle.Text = module is null ? "" : $"Enable {module.DisplayName}";
         f.Toggle.IsChecked = module?.IsEnabled ?? false;
@@ -150,6 +151,6 @@ public class ModulePageBase : ContentControl
     }
 
     private sealed record Frame(
-        SymbolIcon HeroIcon, TextBlock Description, Border InfoBar, TextBlock InfoText,
-        SymbolIcon EnableIcon, TextBlock EnableTitle, ToggleSwitch Toggle, ContentPresenter Presenter);
+        ModuleIcon HeroIcon, TextBlock Description, Border InfoBar, TextBlock InfoText,
+        ModuleIcon EnableIcon, TextBlock EnableTitle, ToggleSwitch Toggle, ContentPresenter Presenter);
 }
