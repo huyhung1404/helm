@@ -59,14 +59,26 @@ jobs:
       - name: Build signed APK
         env:
           HELM_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          # SHA-256 of the Helm release certificate (public). A different key would break updates on every phone.
+          RELEASE_CERT_SHA256: e97a927caec382d0cd42c52806dda29202008227acbe5b32c85c791375bef223
         run: |
           version="${TAG#v}"
           dotnet build src/Helm.App.Android --configuration Release -p:Version="$version" \
             -p:AndroidSdkDirectory="$ANDROID_SDK_ROOT" -p:HelmKeystore="$RUNNER_TEMP/helm-release.keystore"
-          cp src/Helm.App.Android/bin/Release/net10.0-android/com.huyhung1404.helm-Signed.apk Helm-android.apk
-          apksigner=$(ls -d "$ANDROID_SDK_ROOT"/build-tools/*/ | sort -V | tail -1)apksigner
-          "$apksigner" verify --print-certs Helm-android.apk | grep -E "Signer #1 certificate (DN|SHA-256)"
           rm -f "$RUNNER_TEMP/helm-release.keystore"
+          cp src/Helm.App.Android/bin/Release/net10.0-android/com.huyhung1404.helm-Signed.apk Helm-android.apk
+          apksigner="$(ls -d "$ANDROID_SDK_ROOT"/build-tools/*/ | sort -V | tail -1)apksigner"
+          echo "Verifying with $apksigner"
+          if ! certs=$("$apksigner" verify --print-certs Helm-android.apk 2>&1); then
+            echo "$certs"
+            echo "::error::apksigner could not verify Helm-android.apk"
+            exit 1
+          fi
+          echo "$certs"
+          if ! echo "$certs" | grep -qi "certificate SHA-256 digest: $RELEASE_CERT_SHA256"; then
+            echo "::error::Helm-android.apk is not signed with the Helm release key ($RELEASE_CERT_SHA256)"
+            exit 1
+          fi
 
       - uses: actions/upload-artifact@v4
         with:
