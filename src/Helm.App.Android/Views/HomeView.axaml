@@ -2,7 +2,7 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:ic="using:FluentIcons.Avalonia"
              xmlns:vm="using:Helm.App.Android.ViewModels"
-             xmlns:m="using:Helm.App.Android.Modules"
+             xmlns:m="using:Helm.Core.Modules"
              x:Class="Helm.App.Android.Views.HomeView"
              x:DataType="vm:HomeViewModel">
 

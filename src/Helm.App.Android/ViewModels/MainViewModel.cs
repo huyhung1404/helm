@@ -2,9 +2,8 @@ using System.Collections.ObjectModel;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using FluentIcons.Common;
-using Helm.App.Android.Modules;
-using Helm.App.Android.Services;
 using Helm.Core.Modules;
+using Helm.App.Android.Services;
 
 namespace Helm.App.Android.ViewModels;
 
@@ -69,6 +68,8 @@ public sealed partial class MainViewModel : ObservableObject
             IsPaneOpen = false;
             return true;
         }
+        // A tool with its own back stack (an open item) goes back first.
+        if (Navigator.CurrentPage is ModulePage { Module: Helm.Core.Platform.IBackHandler page } && page.HandleBack()) return true;
         if (!Navigator.IsHome)
         {
             Navigator.GoHome();

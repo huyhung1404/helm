@@ -4,6 +4,7 @@ using Android.Views;
 using View = Android.Views.View;
 using Avalonia.Android;
 using Helm.App.Android.Views;
+using Helm.Core.Platform;
 
 namespace Helm.App.Android;
 
@@ -43,9 +44,28 @@ public sealed class MainActivity : AvaloniaMainActivity
     private View? _avaloniaView;
     private ContentInsetsListener? _layoutListener;
 
+    // Tools reach the activity, its results and the app's foreground/background changes through ActivityHost.
+    protected override void OnCreate(global::Android.OS.Bundle? savedInstanceState)
+    {
+        base.OnCreate(savedInstanceState);
+        ActivityHost.OnCreated(this);
+    }
+
+    protected override void OnPause()
+    {
+        ActivityHost.OnPaused(this);
+        base.OnPause();
+    }
+
+    protected override void OnActivityResult(int requestCode, Result resultCode, global::Android.Content.Intent? data)
+    {
+        if (!ActivityHost.OnActivityResult(requestCode, resultCode, data)) base.OnActivityResult(requestCode, resultCode, data);
+    }
+
     protected override void OnResume()
     {
         base.OnResume();
+        ActivityHost.OnResumed(this);
         if (_layoutListener is null && Window?.DecorView is { } decor)
         {
             _layoutListener = new ContentInsetsListener(this);

@@ -46,11 +46,24 @@ Wire it up:
 2. `dotnet add src/Helm.App reference …` and `dotnet add tests/Helm.Tests reference …`
 3. Add one line in `src/Helm.App/Hosting/HelmModules.cs`: `services.Add<Prefix>Module();`
 
-**Android**: `src/Helm.Modules.<Prefix>.Android/` (`net10.0-android`, `SupportedOSPlatformVersion` 26, Avalonia 12.1.3 +
-FluentIcons.Avalonia, ProjectReference `..\Helm.Core`): `<Prefix>Module.cs` (`sealed : AndroidModuleBase` — Id, DisplayName,
-Description, Group, Icon, PageType, EnableAsync, DisableAsync), `<Prefix>Page.axaml(.cs)` (a `UserControl` that sets its
-own DataContext from DI), the view model, and `Add<Prefix>Module()` calling
-`services.AddAndroidModule<Module, Page>()`. Add a ProjectReference from `src/Helm.App.Android` and one line in
+**Android** (the layout below):
+
+```
+src/Helm.Modules.<Prefix>.Android/
+  Helm.Modules.<Prefix>.Android.csproj  net10.0-android, SupportedOSPlatformVersion 26, PlatformTarget AnyCPU,
+                                        Avalonia 12.1.3 + FluentIcons.Avalonia, ProjectReference ..\Helm.Core.Android only
+                                        (brings Helm.Core and Helm.Shell); copy the <Using Remove> block and the
+                                        SQLitePCLRaw.bundle_e_sqlite3 pin from Helm.Core.Android.csproj
+  <Prefix>Module.cs                     sealed : AndroidModuleBase — Id, DisplayName, Description, Group, Icon, PageType,
+                                        EnableAsync, DisableAsync
+  <Prefix>Page.axaml(.cs)               ui:ModulePageBase, Module="{Binding Module}", sets its own DataContext from DI
+  <Prefix>ViewModel.cs                  (or the shared one from the .Core project, see below)
+  <Prefix>Services.cs                   AddXxxModule() => services.AddAndroidModule<Module, Page>() (+ extra singletons)
+```
+
+`AndroidModuleBase`, `AddAndroidModule` (namespace `Helm.Core.Modules`) and `ModulePageBase` (namespace
+`Helm.Core.Ui`) live in `src/Helm.Core.Android`, the counterpart of Helm.Core.Windows. A tool never references
+`Helm.App.Android`. Wire it up with a ProjectReference from `src/Helm.App.Android` and one line in
 `src/Helm.App.Android/Hosting/AndroidModules.cs`. It is **not** added to `Helm.sln` (CI builds it on Linux).
 
 **PC + Android**: everything that is not UI goes in a portable `src/Helm.Modules.<Prefix>.Core/` (`net8.0`,
@@ -141,7 +154,33 @@ The page is a `core:ModulePageBase`. It already renders the title, the icon + de
 #### Android pages
 
 - Phone first: design for 360 dp wide, one column; stack what the PC page puts side by side. The shell provides
-  the app bar (title), the 16 px inset and scrolling, so the page is just a `StackPanel`.
+  the app bar (title), the 16 px inset and scrolling. The page is a `ui:ModulePageBase`
+  (`xmlns:ui="using:Helm.Core.Ui"`), which already renders the icon + description, the InfoBar for
+  `StatusMessage` and the **Enable <Tool>** card, like on PC; its content is a `StackPanel` of sections:
+
+  ```xml
+  <ui:ModulePageBase xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+      xmlns:ui="using:Helm.Core.Ui" xmlns:vm="using:Helm.Modules.<Prefix>"
+      x:Class="Helm.Modules.<Prefix>.<Prefix>Page" x:DataType="vm:<Prefix>ViewModel" Module="{Binding Module}">
+      <StackPanel>
+          <TextBlock Text="Behavior" Classes="section" />
+          <Border Classes="card">
+              <StackPanel>
+                  <DockPanel>
+                      <ToggleSwitch DockPanel.Dock="Right" IsChecked="{Binding SomeFlag}" OnContent="" OffContent="" />
+                      <StackPanel VerticalAlignment="Center">
+                          <TextBlock Text="Setting" Classes="title" />
+                          <TextBlock Text="What it does, in one sentence." Classes="secondary" />
+                      </StackPanel>
+                  </DockPanel>
+                  <Border Classes="row"> <!-- next row of the same card --> </Border>
+              </StackPanel>
+          </Border>
+      </StackPanel>
+  </ui:ModulePageBase>
+  ```
+- The shell creates a new page each time the tool is opened (pages are transient); the view model and module are
+  singletons.
 - Same vocabulary as the PC page: section titles `TextBlock Classes="section"`, cards `Border Classes="card"`,
   rows inside a card `Border Classes="row"`, secondary text `TextBlock Classes="secondary"`, warnings
   `Border Classes="infobar warning"`, icons `ic:SymbolIcon` (`xmlns:ic="using:FluentIcons.Avalonia"`). Colors come
@@ -150,6 +189,12 @@ The page is a `core:ModulePageBase`. It already renders the title, the icon + de
   primary action and `Classes="danger"` for destructive ones; ask through `IDialogService` before anything destructive.
 - No hotkeys and no Win32. Long-running work must survive the activity being recreated: state lives in the view
   model / module, never in the view.
+- Platform services to reuse instead of calling Android APIs from a view model: `ISecretProtector` (Android
+  Keystore, for small secrets), `IDialogService` (confirmations), `IClipboardService`, `IUiDispatcher`,
+  `IProcessLauncher` (open URLs), `ISettingsStoreFactory`. Anything that needs the activity (permissions, pickers,
+  window flags) goes behind an interface in the tool's portable code, implemented in the Android project.
+- App-private files go under `HelmPaths` (`/data/data/<package>/files/Helm`); `android:allowBackup` is off, so
+  anything that must survive losing the phone has to be synced or exported.
 
 ### 5. Home, tray and search integration (free if you follow the contract)
 

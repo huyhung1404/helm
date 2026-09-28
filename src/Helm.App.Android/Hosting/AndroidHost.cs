@@ -1,8 +1,7 @@
-using Helm.App.Android.Modules;
+using Helm.Core.Modules;
 using Helm.App.Android.Services;
 using Helm.App.Android.ViewModels;
 using Helm.Core;
-using Helm.Core.Modules;
 using Helm.Core.Services;
 using Helm.Core.Settings;
 using Helm.Core.Sync;

@@ -2,7 +2,6 @@ using System.Collections.ObjectModel;
 using System.ComponentModel;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
-using Helm.App.Android.Modules;
 using Helm.Core.Modules;
 using Helm.Core.Services;
 using Helm.Core.Settings;

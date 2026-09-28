@@ -79,6 +79,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\Helm.Core\Helm.Core.csproj" />
+    <ProjectReference Include="..\Helm.Core.Android\Helm.Core.Android.csproj" />
     <ProjectReference Include="..\Helm.Shell\Helm.Shell.csproj" />
   </ItemGroup>
 

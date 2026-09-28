@@ -1,5 +1,5 @@
 using CommunityToolkit.Mvvm.ComponentModel;
-using Helm.App.Android.Modules;
+using Helm.Core.Modules;
 using Helm.Core.Services;
 using Microsoft.Extensions.DependencyInjection;
 
