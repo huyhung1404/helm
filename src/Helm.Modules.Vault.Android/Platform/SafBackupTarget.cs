@@ -60,6 +60,22 @@ internal sealed class SafBackupTarget(DocumentFile root, string displayName) : I
         return Task.CompletedTask;
     }
 
+    public Task<int> DeleteStaleTempFilesAsync(string directory, TimeSpan olderThan, CancellationToken ct)
+    {
+        var cutoff = DateTimeOffset.UtcNow.Add(-olderThan).ToUnixTimeMilliseconds();
+        var removed = 0;
+        void Sweep(DocumentFile folder)
+        {
+            foreach (var entry in folder.ListFiles() ?? [])
+            {
+                if (entry.IsDirectory) Sweep(entry);
+                else if (entry.Name?.EndsWith(".tmp", StringComparison.Ordinal) == true && entry.LastModified() < cutoff && entry.Delete()) removed++;
+            }
+        }
+        if (Find(directory) is { IsDirectory: true } start) Sweep(start);
+        return Task.FromResult(removed);
+    }
+
     private DocumentFile? Find(string path)
     {
         var current = root;

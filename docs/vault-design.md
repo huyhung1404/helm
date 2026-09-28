@@ -78,3 +78,32 @@ each document: FileKey (32 random bytes) stored inside its item, so only the Vau
 P0 Android module infrastructure (`Helm.Core.Android`), P1 Vault core, P2 blobs (client + Worker), P3 backup
 repository, restore tool and KDBX export, P4 PC UI, P5 Android UI, P6 later items. Every phase builds with
 `-warnaserror` and passes the tests before the next starts.
+
+## Security review (2026-09-28)
+
+An attacker's pass over the vault, with each attack written as a test first (tests/Helm.Tests/VaultAttackTests.cs,
+VaultLogLeakTests.cs, VaultBackupTests.cs, VaultCryptoTests.cs) and then fixed.
+
+| # | Attack | Before | Fix |
+|---|---|---|---|
+| S1 | Steal the backup folder (or the replica) and crack the vault password offline: the only lock left | "Password@2026!!", "HelmVault2026!!", "Nguyen@1990Hung!" passed as strong | A zxcvbn-style estimate (common and Vietnamese words, leetspeak, years, keyboard walks, repeats), also for the sync passphrase. Argon2id 128 MiB costs ~0.3 s per guess on a PC |
+| S2 | Hide deletions between thousands of filler records so each batch stays under the guard | Two batches of 3 slipped through (threshold 6) | Deletions of the last 24 h count together (stored in the replica), across batches and runs |
+| S3 | Trickle deletions, two per sync, until the vault is empty | All 10 applied | Same rolling 24 h count; a decision (apply or keep) resets it |
+| S4 | Tamper the keyring's Argon2 costs down, so the next password change is wrapped weakly | Costs were copied | A password change never goes below today's default |
+| S5 | Read an opened document's text from the Windows Search index after it was deleted | vault-open was indexable | The folder and files are "not content indexed" (and hidden); files are marked before any byte is written |
+| S6 | A chunk in the backup rots (disk, sync client), found only at restore time | Only existence was checked | Each backup decrypts a random 64 MiB of older chunks and rewrites damaged ones from the device or server |
+| S7 | Leftover temp files from a crash in the backup folder | Kept forever | Removed after a day |
+| S8 | Read secrets from the log files (they can be shared) | — | Verified: the whole lifecycle logs no password, recovery key, field, title, note or file name (a planted leak is caught) |
+
+Checked and holding: a hostile server cannot read, forge, reorder or move records or chunks (AAD binds collection,
+id, uid, epoch, trash state, blob list and chunk index); renaming an old snapshot to look newer fails; a planted
+backup keyring does not open with the user's password; the recovery id reveals nothing about the key.
+
+Residual risks (documented, not fixed):
+- Malware running as the user while the vault is unlocked can read it (memory, screen); .NET strings cannot be wiped.
+- A compromised device that holds the sync key and token can overwrite records with garbage, which the guard cannot
+  judge; the vault shows such records as unreadable, and the verified backups are the way back.
+- Windows Hello keys of unpackaged apps share one namespace: another program of the same user could ask Windows Hello
+  to sign for "Helm Vault", which still needs the user to approve the prompt.
+- Documents opened in another app may be cached by that app; printing the Emergency Kit passes through the spooler.
+- The sync server learns how many vault records exist and their approximate sizes (chunks are padded to 64 KiB).

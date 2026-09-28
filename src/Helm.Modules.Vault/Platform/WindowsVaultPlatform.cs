@@ -67,9 +67,17 @@ internal sealed class WindowsVaultPlatform : IVaultPlatform
 
     public async Task OpenFileAsync(string name, string mediaType, byte[] content, CancellationToken ct)
     {
-        var folder = Path.Combine(_openFolder, Guid.NewGuid().ToString("N")[..8]);
-        Directory.CreateDirectory(folder);
-        var path = Path.Combine(folder, SafeName(name));
+        // Out of Windows Search (which would keep the text of a PDF in its index long after the file is gone) and
+        // hidden. New files inherit "not content indexed" from the folder; set it on the file too, before writing.
+        Directory.CreateDirectory(_openFolder);
+        var root = new DirectoryInfo(_openFolder);
+        root.Attributes |= FileAttributes.NotContentIndexed | FileAttributes.Hidden;
+        var folder = Directory.CreateDirectory(Path.Combine(_openFolder, Guid.NewGuid().ToString("N")[..8]));
+        folder.Attributes |= FileAttributes.NotContentIndexed;
+        var path = Path.Combine(folder.FullName, SafeName(name));
+        // Empty first, marked, then filled: the indexer never sees the content of an unmarked file.
+        File.Create(path).Dispose();
+        File.SetAttributes(path, File.GetAttributes(path) | FileAttributes.NotContentIndexed);
         await File.WriteAllBytesAsync(path, content, ct).ConfigureAwait(true);
         try
         {

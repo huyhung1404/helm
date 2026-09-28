@@ -178,7 +178,8 @@ public static class SyncKeyVault
         }
         var distinct = passphrase.Distinct().Count();
         effective = Math.Min(effective, distinct * 3);
-        var bits = effective * Math.Log2(pool);
+        // And what a cracker's rules would need: common words, leetspeak, years, keyboard walks, repeats.
+        var bits = Math.Min(effective * Math.Log2(pool), GuessabilityEstimator.Bits(passphrase));
         return bits < 60 ? PassphraseStrength.Weak : bits < 80 ? PassphraseStrength.Fair : PassphraseStrength.Strong;
     }
 

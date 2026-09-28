@@ -27,6 +27,10 @@ public interface IBackupTarget
     Task DeleteAsync(string path, CancellationToken ct);
 
     Task DeleteDirectoryAsync(string directory, CancellationToken ct);
+
+    /// <summary>Removes temp files (from a write a crash interrupted) older than <paramref name="olderThan"/>, anywhere below the directory.</summary>
+    /// <returns>How many were removed.</returns>
+    Task<int> DeleteStaleTempFilesAsync(string directory, TimeSpan olderThan, CancellationToken ct);
 }
 
 /// <summary>A folder on this computer (including folders that a cloud client such as Google Drive or OneDrive syncs).</summary>
@@ -85,6 +89,21 @@ public sealed class FolderBackupTarget(string root) : IBackupTarget
         var full = Full(directory);
         if (Directory.Exists(full)) Directory.Delete(full, recursive: true);
         return Task.CompletedTask;
+    }
+
+    public Task<int> DeleteStaleTempFilesAsync(string directory, TimeSpan olderThan, CancellationToken ct)
+    {
+        var full = Full(directory);
+        if (!Directory.Exists(full)) return Task.FromResult(0);
+        var cutoff = DateTime.UtcNow - olderThan;
+        var removed = 0;
+        foreach (var file in Directory.EnumerateFiles(full, "*.tmp", SearchOption.AllDirectories))
+        {
+            if (File.GetLastWriteTimeUtc(file) >= cutoff) continue;
+            File.Delete(file);
+            removed++;
+        }
+        return Task.FromResult(removed);
     }
 
     private string Full(string path)

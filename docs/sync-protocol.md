@@ -173,7 +173,7 @@ Keyring v2 is `{v: 2, epoch, kdf, pass, rec, prev}`. It holds the current master
 
 - AAD names the slot and the epoch. Epoch 1 keeps the exact AAD strings of Helm 0.5.0.
 - **Helm 0.5.0 keyrings** (v1: PBKDF2-HMAC-SHA256, 600 000 iterations) still open. Unlocking with the passphrase re-wraps the passphrase slot with Argon2id in place (compare-and-set). The Sync page also offers "Strengthen passphrase protection".
-- **New passphrases** need at least 14 characters. The strength estimate (character pool × non-patterned length) must reach 60 bits, so repeats, runs such as `abcd` or `1234`, and short single-class passphrases are refused.
+- **New passphrases** need at least 14 characters. The strength estimate must reach 60 bits: the lower of character pool × non-patterned length and a cracker-style estimate that counts common words (English, names and Vietnamese), leetspeak, years, keyboard walks and repeated blocks as a few bits each. So repeats, runs such as `abcd` or `1234`, "Password@2026!!" and short single-class passphrases are refused.
 - **Rotation** (removing a device and changing the key):
   1. Check the passphrase, revoke the device's token, and sync.
   2. Create a new master key for `epoch + 1`, wrapped by the same passphrase and a **new** recovery key. The old recovery key stops working. Every older key is re-wrapped under the new one.

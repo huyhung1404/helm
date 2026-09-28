@@ -119,7 +119,14 @@ public static class VaultKeyring
     {
         EnsureSupported(keyring);
         ValidateNewPassword(newPassword);
-        var kdf = VaultKdf.Default() with { MemoryKib = keyring.Kdf.MemoryKib, Passes = keyring.Kdf.Passes, Lanes = keyring.Kdf.Lanes };
+        // Never weaker than today's default: a keyring tampered to low Argon2 costs must not carry them over.
+        var standard = VaultKdf.Default();
+        var kdf = standard with
+        {
+            MemoryKib = Math.Max(standard.MemoryKib, keyring.Kdf.MemoryKib),
+            Passes = Math.Max(standard.Passes, keyring.Kdf.Passes),
+            Lanes = keyring.Kdf.Lanes is >= 1 and <= 16 ? keyring.Kdf.Lanes : standard.Lanes,
+        };
         var changed = keyring with
         {
             Kdf = kdf,

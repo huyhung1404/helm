@@ -213,6 +213,7 @@ public sealed class VaultBackupTests : IDisposable
         public Task<byte[]?> ReadAsync(string path, CancellationToken ct) => inner.ReadAsync(path, ct);
         public Task DeleteAsync(string path, CancellationToken ct) => inner.DeleteAsync(path, ct);
         public Task DeleteDirectoryAsync(string directory, CancellationToken ct) => inner.DeleteDirectoryAsync(directory, ct);
+        public Task<int> DeleteStaleTempFilesAsync(string directory, TimeSpan olderThan, CancellationToken ct) => inner.DeleteStaleTempFilesAsync(directory, olderThan, ct);
 
         public Task WriteAsync(string path, byte[] data, CancellationToken ct)
         {
@@ -226,6 +227,45 @@ public sealed class VaultBackupTests : IDisposable
     private sealed class WrappedLocation(Func<IBackupTarget, IBackupTarget> wrap) : IVaultBackupLocation
     {
         public IBackupTarget? Open(string? location) => new FolderBackupLocation().Open(location) is { } target ? wrap(target) : null;
+    }
+
+    [Fact]
+    public async Task A_document_chunk_that_rotted_in_the_backup_is_detected_and_rewritten()
+    {
+        var a = await NewVault("pc");
+        var data = RandomNumberGenerator.GetBytes(3000);
+        await a.Files.AttachAsync(a.Store.Add(VaultItem.New(VaultItemKind.Document, "Scan")), "scan.pdf", "application/pdf", new MemoryStream(data));
+        await a.Backup.BackUpAsync();
+        var chunk = Directory.EnumerateFiles(Path.Combine(BackupFolder), "*.chunk", SearchOption.AllDirectories).Single();
+        var bytes = await File.ReadAllBytesAsync(chunk);
+        bytes[100] ^= 0x40;
+        await File.WriteAllBytesAsync(chunk, bytes);
+
+        _clock.Advance(TimeSpan.FromMinutes(1));
+        var result = await a.Backup.BackUpAsync();
+
+        Assert.Equal(1, result.ChunksRepaired);
+        var repository = Assert.Single(await VaultBackupRepository.FindAsync(new FolderBackupTarget(BackupFolder)));
+        using var key = VaultKeyring.UnlockWithPassword(repository.Keyring, Password);
+        var b = NewDevice("phone");
+        await b.Backup.RestoreVaultAsync(repository, repository.Snapshots[0], key);
+        Assert.Equal(data, await b.Files.ReadAllAsync(Assert.Single(b.Store.Items().Single().Item.Attachments)));
+    }
+
+    [Fact]
+    public async Task Temp_files_left_by_a_crash_are_cleaned_up()
+    {
+        var a = await NewVault("pc");
+        a.Store.Add(Login("Bank", "x"));
+        await a.Backup.BackUpAsync();
+        var repoDir = Path.Combine(BackupFolder, VaultBackupRepository.DirectoryFor(a.Session.VaultId!));
+        var leftover = Path.Combine(repoDir, "snapshots", "20260101T000000000Z.hvs.1234abcd.tmp");
+        await File.WriteAllTextAsync(leftover, "half a snapshot");
+        File.SetLastWriteTimeUtc(leftover, DateTime.UtcNow.AddDays(-2));
+
+        await a.Backup.BackUpAsync();
+
+        Assert.False(File.Exists(leftover));
     }
 
     [Fact]

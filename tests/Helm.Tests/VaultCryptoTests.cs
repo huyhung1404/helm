@@ -83,7 +83,9 @@ public sealed class VaultCryptoTests
         using var byNew = VaultKeyring.UnlockWithPassword(changed, "a brand new vault password 7");
         using var byRecovery = VaultKeyring.UnlockWithRecoveryKey(changed, created.RecoveryKey);
         Assert.Equal(created.Key.Bytes.ToArray(), byNew.Bytes.ToArray());
-        Assert.Equal(created.Keyring.Kdf.MemoryKib, changed.Kdf.MemoryKib);
+        // The cheap test parameters count as a tampered, weakened keyring: a password change restores today's cost.
+        Assert.Equal(VaultKdf.Default().MemoryKib, changed.Kdf.MemoryKib);
+        Assert.Equal(VaultKdf.Default().Passes, changed.Kdf.Passes);
         Assert.NotEqual(created.Keyring.Kdf.Salt, changed.Kdf.Salt);
     }
 

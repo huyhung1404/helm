@@ -22,7 +22,8 @@ public sealed class FolderBackupLocation : IVaultBackupLocation
         !string.IsNullOrWhiteSpace(location) && Directory.Exists(location) ? new FolderBackupTarget(location) : null;
 }
 
-public sealed record VaultBackupResult(string Snapshot, bool Written, int Records, int Blobs, int ChunksCopied, int SnapshotsPruned);
+/// <param name="ChunksRepaired">Chunks the backup held damaged (bit rot, a sync client's mistake) and that were written again.</param>
+public sealed record VaultBackupResult(string Snapshot, bool Written, int Records, int Blobs, int ChunksCopied, int SnapshotsPruned, int ChunksRepaired = 0);
 
 /// <summary>
 /// Backs the vault up into an append-only repository in a folder the user picked, verifies what it wrote, and
@@ -213,6 +214,10 @@ public sealed class VaultBackupService
             }
         }
 
+        // 3b. Chunks copied on earlier days are decrypted again, a random share per run (64 MiB): a chunk that rotted in
+        // the backup is found long before a restore would need it, and rewritten from this device or the server.
+        var repaired = await DeepVerifyAsync(target, directory, blobs, copiedThisRun: copied, ct).ConfigureAwait(false);
+
         // 4. The snapshot, unless the latest one already holds exactly this.
         var repository = await VaultBackupRepository.OpenAsync(target, directory, ct).ConfigureAwait(false)
             ?? throw new IOException("The backup folder did not keep the keyring.");
@@ -250,7 +255,34 @@ public sealed class VaultBackupService
 
         // 6. Only now: prune old snapshots, then the chunks no kept snapshot needs.
         var pruned = await PruneAsync(target, directory, key, ct).ConfigureAwait(false);
-        return new VaultBackupResult(name, written, records.Count, blobs.Count, copied, pruned);
+        await target.DeleteStaleTempFilesAsync(directory, TimeSpan.FromDays(1), ct).ConfigureAwait(false);
+        return new VaultBackupResult(name, written, records.Count, blobs.Count, copied, pruned, repaired);
+    }
+
+    private const long DeepVerifyBudget = 64L * 1024 * 1024;
+
+    private async Task<int> DeepVerifyAsync(IBackupTarget target, string directory, IReadOnlyList<BlobRef> blobs, int copiedThisRun, CancellationToken ct)
+    {
+        var chunks = blobs.SelectMany(b => Enumerable.Range(0, b.ChunkCount).Select(i => (Blob: b, Index: i))).OrderBy(_ => Random.Shared.Next()).ToList();
+        long read = 0;
+        var repaired = 0;
+        foreach (var (blob, index) in chunks)
+        {
+            if (read >= DeepVerifyBudget) break;
+            var path = VaultBackupRepository.ChunkPath(directory, blob.Id, index);
+            var stored = await target.ReadAsync(path, ct).ConfigureAwait(false);
+            read += stored?.Length ?? 0;
+            if (stored is not null && BlobStore.IsIntact(blob, index, stored)) continue;
+            var good = await _blobs.ReadSealedChunkAsync(blob.Id, index, ct).ConfigureAwait(false);
+            if (!BlobStore.IsIntact(blob, index, good))
+                throw new IOException($"A chunk of a document is damaged in the backup and on this device ({blob.Id}/{index}).");
+            await target.WriteAsync(path, good, ct).ConfigureAwait(false);
+            if (await target.ReadAsync(path, ct).ConfigureAwait(false) is not { } back || !back.AsSpan().SequenceEqual(good))
+                throw new IOException($"The backup folder did not keep a repaired chunk ({path}).");
+            _logger.LogWarning("Backup chunk {Blob}/{Index} was damaged; rewritten", blob.Id, index);
+            repaired++;
+        }
+        return repaired;
     }
 
     private static async Task VerifyChunksAsync(IBackupTarget target, string directory, IReadOnlyList<SnapshotBlob> blobs, CancellationToken ct)

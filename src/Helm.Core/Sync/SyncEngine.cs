@@ -259,6 +259,7 @@ public sealed class SyncEngine : ISyncService, IDisposable
     /// <summary>The user accepts the held deletions: the next run applies them.</summary>
     public Task<SyncRunResult> ApproveHeldAsync(CancellationToken ct = default)
     {
+        if (Hold is { } hold) ResetRecentDeletions(hold.Collection);
         _applyHold = true;
         return SyncNowAsync(ct);
     }
@@ -279,6 +280,7 @@ public sealed class SyncEngine : ISyncService, IDisposable
                     foreach (var (id, version) in hold.Records) _db.KeepLocal(hold.Collection, id, version);
                 });
                 _logger.LogWarning("Kept {Count} {Collection} records that the server had deleted", hold.Records.Count, hold.Collection);
+                ResetRecentDeletions(hold.Collection);
                 Hold = null;
             }
         }
@@ -383,6 +385,7 @@ public sealed class SyncEngine : ISyncService, IDisposable
                     // Throws before anything pending is applied; the cursor stays, so the same pages come back next run.
                     CheckChangeGuards(run);
                     foreach (var (held, heldNext) in pending) Apply(keyring, held, heldNext, run);
+                    foreach (var (collection, deletions) in run.GuardedDeletions) AddRecentDeletions(collection, deletions.Count);
                     pending.Clear();
                     run.GuardedDeletions.Clear();
                 }
@@ -492,14 +495,43 @@ public sealed class SyncEngine : ISyncService, IDisposable
         }
     }
 
+    /// <summary>
+    /// Deletions already applied in the last <see cref="GuardWindow"/> count too, so a hostile or buggy source cannot
+    /// empty a collection a few records per run, or by padding one run with thousands of other records.
+    /// </summary>
     private void CheckChangeGuards(RunState run)
     {
         foreach (var (collection, deletions) in run.GuardedDeletions)
         {
             var live = _db.List(collection).Count;
-            if (deletions.Count >= SyncChangeGuard.Threshold(live)) throw new SyncHeldException(new SyncHold(collection, live, deletions.ToList()));
+            var recent = RecentDeletions(collection);
+            if (recent + deletions.Count >= SyncChangeGuard.Threshold(live + recent))
+                throw new SyncHeldException(new SyncHold(collection, live, deletions.ToList()));
         }
     }
+
+    private static readonly TimeSpan GuardWindow = TimeSpan.FromHours(24);
+
+    private int RecentDeletions(string collection)
+    {
+        var stored = _db.GetMetaValue(GuardMeta(collection))?.Split('|');
+        if (stored is not [var start, var count] || !long.TryParse(start, out var startMs) || !int.TryParse(count, out var n)) return 0;
+        return _time.GetUtcNow() - DateTimeOffset.FromUnixTimeMilliseconds(startMs) > GuardWindow ? 0 : n;
+    }
+
+    private void AddRecentDeletions(string collection, int count)
+    {
+        if (count == 0) return;
+        var recent = RecentDeletions(collection);
+        var stored = _db.GetMetaValue(GuardMeta(collection))?.Split('|');
+        var start = recent > 0 && stored is [var s, _] ? s : _time.GetUtcNow().ToUnixTimeMilliseconds().ToString(System.Globalization.CultureInfo.InvariantCulture);
+        _db.SetMetaValue(GuardMeta(collection), $"{start}|{recent + count}");
+    }
+
+    /// <summary>The user decided about a hold: what was deleted so far no longer counts against the next one.</summary>
+    private void ResetRecentDeletions(string collection) => _db.SetMetaValue(GuardMeta(collection), null);
+
+    private static string GuardMeta(string collection) => "guard_deletions:" + collection;
 
     private bool IsExpendable(Func<string, bool> expendable, string body)
     {

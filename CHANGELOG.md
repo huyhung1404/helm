@@ -20,7 +20,10 @@ Format: [Keep a Changelog](https://keepachangelog.com), versions follow [SemVer]
     to every release, opens a backup without Helm, and the vault exports to KeePass (KDBX 4).
   - Copied secrets stay out of the clipboard history and are cleared after 30 seconds; the vault is hidden
     from screenshots and screen sharing.
-- Sync: files (blobs) for tools such as Vault, and a guard that holds bulk deletions for review.
+- Sync: files (blobs) for tools such as Vault, and a guard that holds bulk deletions for review (counted over
+  24 hours, so they cannot be spread thin).
+- Stronger password check for the vault password and new sync passphrases: common words, names, years and keyboard
+  patterns no longer count as strong (for example "Password@2026!!").
 - Android tools can now be added (Helm.Core.Android), with the same page layout as on the PC.
 - Tools you work in open their content from the menu and Quick access, and their settings from Home → Utilities.
 - Tracker (PC and Android, System Tools): lists you keep in workspaces, synced across your devices with Helm Sync.

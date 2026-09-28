@@ -326,6 +326,20 @@ public sealed class BlobStore : IBlobSync
         }
     }
 
+    /// <summary>True when <paramref name="sealedChunk"/> is chunk <paramref name="index"/> of <paramref name="blob"/>, undamaged.</summary>
+    public static bool IsIntact(BlobRef blob, int index, byte[] sealedChunk)
+    {
+        try
+        {
+            CryptographicOperations.ZeroMemory(Open(blob.Key, blob.Id, index, sealedChunk));
+            return true;
+        }
+        catch (CryptographicException)
+        {
+            return false;
+        }
+    }
+
     internal static byte[] Seal(byte[] key, string id, int index, ReadOnlySpan<byte> plaintext)
     {
         var output = new byte[Overhead + plaintext.Length];
