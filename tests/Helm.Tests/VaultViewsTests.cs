@@ -74,6 +74,13 @@ public sealed class VaultViewsTests : IDisposable
         var detail = new ItemDetailView { DataContext = app.Items.Detail };
         Layout(detail);
 
+        // The icon, large and at list size.
+        foreach (var size in new[] { 256.0, 32.0 })
+        {
+            var icon = new System.Windows.Controls.Image { Source = Helm.Modules.Vault.VaultIcon.Image, Width = size, Height = size };
+            Layout(icon);
+        }
+
         session.Lock("test");
         Pump(Task.CompletedTask);
         Assert.True(app.IsUnlock);

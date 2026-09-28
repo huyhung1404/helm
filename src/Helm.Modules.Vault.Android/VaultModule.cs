@@ -34,7 +34,8 @@ public sealed class VaultModule(
     public override string DisplayName => "Vault";
     public override string Description => "Keeps passwords, secure notes, cards and documents encrypted, synced and backed up.";
     public override ModuleGroup Group => ModuleGroup.Advanced;
-    public override Symbol Icon => Symbol.LockClosed;
+    public override Symbol Icon => Symbol.ShieldKeyhole;
+    public override Avalonia.Media.IImage IconImage => VaultIcon.Image;
     public override Type PageType => typeof(VaultPage);
 
     public override Task EnableAsync(CancellationToken ct)
