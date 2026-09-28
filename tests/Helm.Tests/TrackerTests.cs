@@ -307,6 +307,40 @@ public sealed class TrackerTests
         }
     }
 
+    [Fact]
+    public void Ticking_the_box_completes_without_a_click_and_the_row_says_took_and_worked()
+    {
+        var dir = Path.Combine(Path.GetTempPath(), "helm-tests", Guid.NewGuid().ToString("N"));
+        try
+        {
+            using var settings = new SettingsStoreFactory(new HelmPaths(dir));
+            var vm = new TrackerViewModel(_store, settings, new InlineDispatcher(),
+                new YesDialogs(), new NullClipboard(), NullLogger<TrackerViewModel>.Instance);
+            vm.CreateTasksWorkspaceCommand.Execute(null);
+            vm.NewTitle = "Report";
+            vm.AddCommand.Execute(null);
+            var row = Assert.Single(vm.OpenItems);
+
+            _time.Advance(TimeSpan.FromMinutes(30));
+            row.StartCommand.Execute(null);
+            _time.Advance(TimeSpan.FromMinutes(15));
+            row.Done = true; // what UI Automation (screen readers) does: set IsChecked, no click
+
+            Assert.Same(row, Assert.Single(vm.CompletedItems));
+            Assert.True(row.Done);
+            Assert.Contains("took 45m", row.Details); // from when it was added, like the history
+            Assert.Contains("worked 15m", row.Details);
+
+            row.Done = false;
+            Assert.Same(row, Assert.Single(vm.OpenItems));
+        }
+        finally
+        {
+            try { if (Directory.Exists(dir)) Directory.Delete(dir, recursive: true); }
+            catch (IOException) { } // a settings write may still be finishing; it is only a temp folder
+        }
+    }
+
     private sealed class MemoryCollection<T> : ISyncedCollection<T> where T : class
     {
         private readonly SortedDictionary<string, T> _records = new(StringComparer.Ordinal);

@@ -11,6 +11,10 @@
             <Setter Property="TextDecorations" Value="Strikethrough" />
             <Setter Property="Foreground" Value="{DynamicResource HelmSecondaryText}" />
         </Style>
+        <!-- Past its due date and still open -->
+        <Style Selector="TextBlock.secondary.overdue">
+            <Setter Property="Foreground" Value="{DynamicResource HelmDanger}" />
+        </Style>
         <Style Selector="TextBlock.owed">
             <Setter Property="Foreground" Value="{DynamicResource HelmSuccess}" />
         </Style>
@@ -47,7 +51,7 @@
                 <StackPanel>
                     <Grid ColumnDefinitions="Auto,*,Auto">
                         <CheckBox VerticalAlignment="Center" MinWidth="0" Margin="0,0,4,0"
-                                  IsChecked="{Binding IsCompleted, Mode=OneWay}" Command="{Binding ToggleCompleteCommand}"
+                                  IsChecked="{Binding Done}"
                                   AutomationProperties.Name="Done" />
                         <!-- Tap the text to show the row's actions -->
                         <Button Grid.Column="1" Classes="flat" Padding="4,4" Command="{Binding ToggleExpandedCommand}">
@@ -64,7 +68,7 @@
                                     </Border>
                                 </WrapPanel>
                                 <TextBlock Text="{Binding Title}" TextWrapping="Wrap" Classes.done="{Binding IsCompleted}" />
-                                <TextBlock Text="{Binding Details}" Classes="secondary" />
+                                <TextBlock Text="{Binding Details}" Classes="secondary" Classes.overdue="{Binding IsOverdue}" />
                                 <TextBlock Text="{Binding Item.Notes}" Classes="secondary" IsVisible="{Binding HasNotes}" Margin="0,2,0,0" />
                             </StackPanel>
                         </Button>
@@ -248,7 +252,7 @@
             </Grid>
             <Border Classes="card" Padding="12,0" IsVisible="{Binding ShowCompleted}">
                 <StackPanel>
-                    <TextBlock Margin="0,12" Text="Nothing finished yet. Tick an item and it moves here, with its times recorded."
+                    <TextBlock Margin="0,12" Text="{Binding EmptyCompletedText}"
                                Classes="secondary" IsVisible="{Binding !HasCompleted}" />
                     <ItemsControl ItemsSource="{Binding CompletedItems}" />
                 </StackPanel>
@@ -274,7 +278,7 @@
             <Border Classes="card" Margin="0,0,2,4">
                 <StackPanel>
                     <TextBlock Text="{Binding ReportCompleted}" Classes="stat" />
-                    <TextBlock Text="Completed" Classes="secondary" />
+                    <TextBlock Text="{Binding ReportCompletedLabel}" Classes="secondary" />
                 </StackPanel>
             </Border>
             <Border Classes="card" Margin="2,0,0,4">
@@ -286,16 +290,16 @@
             <Border Classes="card" Margin="0,0,2,4">
                 <StackPanel>
                     <TextBlock Text="{Binding ReportAverageLead}" Classes="stat" />
-                    <TextBlock Text="Average time from added to done" Classes="secondary" />
+                    <TextBlock Text="{Binding ReportLeadLabel}" Classes="secondary" />
                 </StackPanel>
             </Border>
             <Border Classes="card" Margin="2,0,0,4">
                 <StackPanel>
                     <TextBlock Text="{Binding ReportMedianLead}" Classes="stat" />
-                    <TextBlock Text="Median time from added to done" Classes="secondary" />
+                    <TextBlock Text="{Binding ReportMedianLabel}" Classes="secondary" />
                 </StackPanel>
             </Border>
-            <Border Classes="card" Margin="0,0,2,4">
+            <Border Classes="card" Margin="0,0,2,4" IsVisible="{Binding ShowTaskReport}">
                 <StackPanel>
                     <TextBlock Text="{Binding ReportAverageWork}" Classes="stat" />
                     <TextBlock Text="Average time from start to done" Classes="secondary" />
@@ -328,8 +332,8 @@
                         </DataTemplate>
                     </ItemsControl.ItemTemplate>
                 </ItemsControl>
-                <TextBlock Text="By priority" Classes="title" Margin="0,16,0,6" />
-                <ItemsControl ItemsSource="{Binding ReportPriorities}">
+                <TextBlock Text="By priority" Classes="title" Margin="0,16,0,6" IsVisible="{Binding ShowTaskReport}" />
+                <ItemsControl ItemsSource="{Binding ReportPriorities}" IsVisible="{Binding ShowTaskReport}">
                     <ItemsControl.ItemsPanel>
                         <ItemsPanelTemplate>
                             <WrapPanel />

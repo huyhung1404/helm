@@ -41,7 +41,7 @@
                         </Grid.ColumnDefinitions>
 
                         <CheckBox VerticalAlignment="Center" Margin="0,0,4,0" MinWidth="0"
-                                  IsChecked="{Binding IsCompleted, Mode=OneWay}" Command="{Binding ToggleCompleteCommand}"
+                                  IsChecked="{Binding Done}"
                                   ToolTip="Mark as done (records the finish time)" AutomationProperties.Name="Done" />
 
                         <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="4,2">
@@ -74,7 +74,18 @@
                                     </Style>
                                 </TextBlock.Style>
                             </TextBlock>
-                            <TextBlock Text="{Binding Details}" Style="{DynamicResource HelmSecondaryText}" />
+                            <TextBlock Text="{Binding Details}">
+                                <TextBlock.Style>
+                                    <Style TargetType="TextBlock" BasedOn="{StaticResource HelmSecondaryText}">
+                                        <Style.Triggers>
+                                            <!-- Past its due date and still open -->
+                                            <DataTrigger Binding="{Binding IsOverdue}" Value="True">
+                                                <Setter Property="Foreground" Value="{DynamicResource SystemFillColorCriticalBrush}" />
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </TextBlock.Style>
+                            </TextBlock>
                             <TextBlock Text="{Binding Item.Notes}" Style="{DynamicResource HelmSecondaryText}" Margin="0,2,0,0"
                                        Visibility="{Binding HasNotes, Converter={StaticResource BoolToVisibility}}" />
                         </StackPanel>
@@ -83,37 +94,37 @@
                                    Visibility="{Binding IsDebt, Converter={StaticResource BoolToVisibility}}" />
 
                         <StackPanel Grid.Column="3" Orientation="Horizontal" VerticalAlignment="Center">
-                            <ui:Button Style="{StaticResource RowAction}" Icon="{ui:SymbolIcon Play24}" ToolTip="Start now (records the start time)"
+                            <ui:Button Style="{StaticResource RowAction}" Icon="{ui:SymbolIcon Play24}" ToolTip="Start now (records the start time)" AutomationProperties.Name="Start"
                                        Command="{Binding StartCommand}" Visibility="{Binding CanStart, Converter={StaticResource BoolToVisibility}}" />
-                            <ui:Button Style="{StaticResource RowAction}" Icon="{ui:SymbolIcon ArrowUp24}" ToolTip="Move up"
+                            <ui:Button Style="{StaticResource RowAction}" Icon="{ui:SymbolIcon ArrowUp24}" ToolTip="Move up" AutomationProperties.Name="Move up"
                                        Command="{Binding MoveUpCommand}" IsEnabled="{Binding CanMoveUp}"
                                        Visibility="{Binding IsOpen, Converter={StaticResource BoolToVisibility}}" />
-                            <ui:Button Style="{StaticResource RowAction}" Icon="{ui:SymbolIcon ArrowDown24}" ToolTip="Move down"
+                            <ui:Button Style="{StaticResource RowAction}" Icon="{ui:SymbolIcon ArrowDown24}" ToolTip="Move down" AutomationProperties.Name="Move down"
                                        Command="{Binding MoveDownCommand}" IsEnabled="{Binding CanMoveDown}"
                                        Visibility="{Binding IsOpen, Converter={StaticResource BoolToVisibility}}" />
-                            <ui:Button Style="{StaticResource RowAction}" Icon="{ui:SymbolIcon Edit24}" ToolTip="Edit" Command="{Binding BeginEditCommand}" />
-                            <ui:Button Style="{StaticResource RowAction}" Icon="{ui:SymbolIcon Delete24}" ToolTip="Delete" Command="{Binding DeleteCommand}" />
+                            <ui:Button Style="{StaticResource RowAction}" Icon="{ui:SymbolIcon Edit24}" ToolTip="Edit" AutomationProperties.Name="Edit" Command="{Binding BeginEditCommand}" />
+                            <ui:Button Style="{StaticResource RowAction}" Icon="{ui:SymbolIcon Delete24}" ToolTip="Delete" AutomationProperties.Name="Delete" Command="{Binding DeleteCommand}" />
                         </StackPanel>
                     </Grid>
 
                     <!-- Inline editor -->
                     <StackPanel Margin="32,8,0,6" Visibility="{Binding IsEditing, Converter={StaticResource BoolToVisibility}}">
                         <WrapPanel Visibility="{Binding IsDebt, Converter={StaticResource BoolToVisibility}}">
-                            <ui:TextBox Width="200" Margin="0,0,8,8" PlaceholderText="Person" Text="{Binding EditPerson, UpdateSourceTrigger=PropertyChanged}" />
-                            <ui:TextBox Width="160" Margin="0,0,8,8" PlaceholderText="Amount" Text="{Binding EditAmount, UpdateSourceTrigger=PropertyChanged}" />
+                            <ui:TextBox Width="200" Margin="0,0,8,8" PlaceholderText="Person" AutomationProperties.Name="Edit person" Text="{Binding EditPerson, UpdateSourceTrigger=PropertyChanged}" />
+                            <ui:TextBox Width="160" Margin="0,0,8,8" PlaceholderText="Amount" AutomationProperties.Name="Edit amount" Text="{Binding EditAmount, UpdateSourceTrigger=PropertyChanged}" />
                             <ComboBox Width="140" Margin="0,0,8,8"
                                       ItemsSource="{Binding DataContext.DirectionNames, RelativeSource={RelativeSource AncestorType=core:ModulePageBase}}"
-                                      SelectedIndex="{Binding EditDirectionIndex}" />
+                                      SelectedIndex="{Binding EditDirectionIndex}" AutomationProperties.Name="Edit direction" />
                         </WrapPanel>
-                        <ui:TextBox Margin="0,0,0,8" PlaceholderText="Title" Text="{Binding EditTitle, UpdateSourceTrigger=PropertyChanged}" />
-                        <ui:TextBox Margin="0,0,0,8" PlaceholderText="Notes" AcceptsReturn="True" TextWrapping="Wrap" MinHeight="60"
+                        <ui:TextBox Margin="0,0,0,8" PlaceholderText="Title" AutomationProperties.Name="Edit title" Text="{Binding EditTitle, UpdateSourceTrigger=PropertyChanged}" />
+                        <ui:TextBox Margin="0,0,0,8" PlaceholderText="Notes" AutomationProperties.Name="Edit notes" AcceptsReturn="True" TextWrapping="Wrap" MinHeight="60"
                                     Text="{Binding EditNotes, UpdateSourceTrigger=PropertyChanged}" />
                         <WrapPanel>
                             <ComboBox Width="140" Margin="0,0,8,8"
                                       Visibility="{Binding IsDebt, Converter={StaticResource InverseBoolToVisibility}}"
                                       ItemsSource="{Binding DataContext.PriorityNames, RelativeSource={RelativeSource AncestorType=core:ModulePageBase}}"
-                                      SelectedIndex="{Binding EditPriorityIndex}" />
-                            <DatePicker Width="160" Margin="0,0,8,8" SelectedDate="{Binding EditDueDate}" ToolTip="Due date" />
+                                      SelectedIndex="{Binding EditPriorityIndex}" AutomationProperties.Name="Edit priority" />
+                            <DatePicker Width="160" Margin="0,0,8,8" SelectedDate="{Binding EditDueDate}" ToolTip="Due date" AutomationProperties.Name="Edit due date" />
                             <ui:Button Margin="0,0,8,8" Appearance="Primary" Content="Save" Icon="{ui:SymbolIcon Save24}" Command="{Binding SaveEditCommand}" />
                             <ui:Button Margin="0,0,8,8" Content="Cancel" Command="{Binding CancelEditCommand}" />
                         </WrapPanel>
@@ -152,7 +163,7 @@
                 <ui:CardControl.Header>
                     <core:CardHeader Title="Current workspace" Description="{Binding SelectedWorkspace.KindText}" />
                 </ui:CardControl.Header>
-                <ComboBox Width="240" HorizontalAlignment="Right" ItemsSource="{Binding Workspaces}" DisplayMemberPath="Name"
+                <ComboBox Width="240" HorizontalAlignment="Right" AutomationProperties.Name="Current workspace" ItemsSource="{Binding Workspaces}" DisplayMemberPath="Name"
                           SelectedItem="{Binding SelectedWorkspace}" />
             </ui:CardControl>
             <ui:CardExpander Margin="0,0,0,4" Icon="{ui:SymbolIcon Edit24}">
@@ -163,20 +174,20 @@
                     <Border Style="{DynamicResource HelmExpanderRow}" BorderThickness="0">
                         <core:RowLayout>
                             <core:CardHeader Title="Workspace name" />
-                            <ui:TextBox Width="240" Text="{Binding WorkspaceName, UpdateSourceTrigger=LostFocus}" />
+                            <ui:TextBox Width="240" AutomationProperties.Name="Workspace name" Text="{Binding WorkspaceName, UpdateSourceTrigger=LostFocus}" />
                         </core:RowLayout>
                     </Border>
                     <Border Style="{DynamicResource HelmExpanderRow}" Visibility="{Binding IsDebtWorkspace, Converter={StaticResource BoolToVisibility}}">
                         <core:RowLayout>
                             <core:CardHeader Title="Currency" Description="Shown after every amount in this debt book, e.g. ₫ or USD." />
-                            <ui:TextBox Width="120" Text="{Binding WorkspaceCurrency, UpdateSourceTrigger=LostFocus}" />
+                            <ui:TextBox Width="120" AutomationProperties.Name="Currency" Text="{Binding WorkspaceCurrency, UpdateSourceTrigger=LostFocus}" />
                         </core:RowLayout>
                     </Border>
                     <Border Style="{DynamicResource HelmExpanderRow}">
                         <core:RowLayout>
                             <core:CardHeader Title="New workspace" Description="Pick a name and what it holds." />
-                            <ui:TextBox Width="180" PlaceholderText="Name" Text="{Binding NewWorkspaceName, UpdateSourceTrigger=PropertyChanged}" />
-                            <ComboBox Width="140" ItemsSource="{Binding KindNames}" SelectedIndex="{Binding NewWorkspaceKindIndex}" />
+                            <ui:TextBox Width="180" PlaceholderText="Name" AutomationProperties.Name="New workspace name" Text="{Binding NewWorkspaceName, UpdateSourceTrigger=PropertyChanged}" />
+                            <ComboBox Width="140" AutomationProperties.Name="New workspace kind" ItemsSource="{Binding KindNames}" SelectedIndex="{Binding NewWorkspaceKindIndex}" />
                             <ui:Button Content="Create" Icon="{ui:SymbolIcon Add24}" Command="{Binding CreateWorkspaceCommand}" />
                         </core:RowLayout>
                     </Border>
@@ -194,29 +205,29 @@
             <Border Style="{DynamicResource HelmSurface}" Margin="0,0,0,4">
                 <StackPanel>
                     <WrapPanel Visibility="{Binding IsDebtWorkspace, Converter={StaticResource BoolToVisibility}}">
-                        <ui:TextBox Width="220" Margin="0,0,8,8" PlaceholderText="Person" Icon="{ui:SymbolIcon Person24}"
+                        <ui:TextBox Width="220" Margin="0,0,8,8" PlaceholderText="Person" AutomationProperties.Name="Person" Icon="{ui:SymbolIcon Person24}"
                                     Text="{Binding NewPerson, UpdateSourceTrigger=PropertyChanged}">
                             <ui:TextBox.InputBindings>
                                 <KeyBinding Key="Enter" Command="{Binding AddCommand}" />
                             </ui:TextBox.InputBindings>
                         </ui:TextBox>
-                        <ui:TextBox Width="180" Margin="0,0,8,8" PlaceholderText="Amount, e.g. 150k" Icon="{ui:SymbolIcon Money24}"
+                        <ui:TextBox Width="180" Margin="0,0,8,8" PlaceholderText="Amount, e.g. 150k" AutomationProperties.Name="Amount" Icon="{ui:SymbolIcon Money24}"
                                     Text="{Binding NewAmount, UpdateSourceTrigger=PropertyChanged}">
                             <ui:TextBox.InputBindings>
                                 <KeyBinding Key="Enter" Command="{Binding AddCommand}" />
                             </ui:TextBox.InputBindings>
                         </ui:TextBox>
-                        <ComboBox Width="140" Margin="0,0,8,8" ItemsSource="{Binding DirectionNames}" SelectedIndex="{Binding NewDirectionIndex}" />
+                        <ComboBox Width="140" Margin="0,0,8,8" ItemsSource="{Binding DirectionNames}" SelectedIndex="{Binding NewDirectionIndex}" AutomationProperties.Name="Direction" />
                     </WrapPanel>
-                    <ui:TextBox Margin="0,0,0,8" PlaceholderText="{Binding TitlePlaceholder}" Text="{Binding NewTitle, UpdateSourceTrigger=PropertyChanged}">
+                    <ui:TextBox Margin="0,0,0,8" AutomationProperties.Name="Title" PlaceholderText="{Binding TitlePlaceholder}" Text="{Binding NewTitle, UpdateSourceTrigger=PropertyChanged}">
                         <ui:TextBox.InputBindings>
                             <KeyBinding Key="Enter" Command="{Binding AddCommand}" />
                         </ui:TextBox.InputBindings>
                     </ui:TextBox>
                     <WrapPanel>
                         <ComboBox Width="140" Margin="0,0,8,0" ItemsSource="{Binding PriorityNames}" SelectedIndex="{Binding NewPriorityIndex}"
-                                  ToolTip="Priority" Visibility="{Binding IsTaskWorkspace, Converter={StaticResource BoolToVisibility}}" />
-                        <DatePicker Width="160" Margin="0,0,8,0" SelectedDate="{Binding NewDueDate}" ToolTip="Due date (optional)" />
+                                  ToolTip="Priority" AutomationProperties.Name="Priority" Visibility="{Binding IsTaskWorkspace, Converter={StaticResource BoolToVisibility}}" />
+                        <DatePicker Width="160" Margin="0,0,8,0" SelectedDate="{Binding NewDueDate}" ToolTip="Due date (optional)" AutomationProperties.Name="Due date" />
                         <ui:Button Appearance="Primary" Content="Add" Icon="{ui:SymbolIcon Add24}" Command="{Binding AddCommand}" />
                     </WrapPanel>
                 </StackPanel>
@@ -225,7 +236,7 @@
                     Visibility="{Binding HasMessage, Converter={StaticResource BoolToVisibility}}">
                 <core:RowLayout>
                     <TextBlock Text="{Binding Message}" TextWrapping="Wrap" VerticalAlignment="Center" />
-                    <ui:Button Style="{StaticResource RowAction}" Icon="{ui:SymbolIcon Dismiss24}" ToolTip="Dismiss" Command="{Binding DismissMessageCommand}" />
+                    <ui:Button Style="{StaticResource RowAction}" Icon="{ui:SymbolIcon Dismiss24}" ToolTip="Dismiss" AutomationProperties.Name="Dismiss" Command="{Binding DismissMessageCommand}" />
                 </core:RowLayout>
             </Border>
 
@@ -271,7 +282,7 @@
             </core:RowLayout>
             <Border Style="{DynamicResource HelmSurface}" Padding="0" Visibility="{Binding ShowCompleted, Converter={StaticResource BoolToVisibility}}">
                 <StackPanel>
-                    <TextBlock Margin="16" Text="Nothing finished yet. Tick an item and it moves here, with its times recorded."
+                    <TextBlock Margin="16" Text="{Binding EmptyCompletedText}"
                                Style="{DynamicResource HelmSecondaryText}"
                                Visibility="{Binding HasCompleted, Converter={StaticResource InverseBoolToVisibility}}" />
                     <ItemsControl ItemsSource="{Binding CompletedItems}" ItemTemplate="{StaticResource ItemRow}" />
@@ -285,16 +296,16 @@
             <ui:CardControl.Header>
                 <core:CardHeader Title="Report period" Description="{Binding ReportRangeText}" />
             </ui:CardControl.Header>
-            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+            <StackPanel Width="310" Orientation="Horizontal" HorizontalAlignment="Right">
                 <CheckBox Margin="0,0,12,0" Content="All workspaces" IsChecked="{Binding ReportAllWorkspaces}" VerticalAlignment="Center" />
-                <ComboBox Width="160" ItemsSource="{Binding ReportRangeNames}" SelectedIndex="{Binding ReportRangeIndex}" />
+                <ComboBox Width="160" ItemsSource="{Binding ReportRangeNames}" SelectedIndex="{Binding ReportRangeIndex}" AutomationProperties.Name="Report period" />
             </StackPanel>
         </ui:CardControl>
         <UniformGrid Columns="3" Margin="0,0,0,0">
             <Border Style="{DynamicResource HelmSurface}" Margin="0,0,4,4">
                 <StackPanel>
                     <TextBlock Text="{Binding ReportCompleted}" Style="{StaticResource StatValue}" />
-                    <TextBlock Text="Completed" Style="{DynamicResource HelmSecondaryText}" />
+                    <TextBlock Text="{Binding ReportCompletedLabel}" Style="{DynamicResource HelmSecondaryText}" />
                 </StackPanel>
             </Border>
             <Border Style="{DynamicResource HelmSurface}" Margin="0,0,4,4">
@@ -312,16 +323,16 @@
             <Border Style="{DynamicResource HelmSurface}" Margin="0,0,4,4">
                 <StackPanel>
                     <TextBlock Text="{Binding ReportAverageLead}" Style="{StaticResource StatValue}" />
-                    <TextBlock Text="Average time from added to done" Style="{DynamicResource HelmSecondaryText}" />
+                    <TextBlock Text="{Binding ReportLeadLabel}" Style="{DynamicResource HelmSecondaryText}" />
                 </StackPanel>
             </Border>
             <Border Style="{DynamicResource HelmSurface}" Margin="0,0,4,4">
                 <StackPanel>
                     <TextBlock Text="{Binding ReportMedianLead}" Style="{StaticResource StatValue}" />
-                    <TextBlock Text="Median time from added to done" Style="{DynamicResource HelmSecondaryText}" />
+                    <TextBlock Text="{Binding ReportMedianLabel}" Style="{DynamicResource HelmSecondaryText}" />
                 </StackPanel>
             </Border>
-            <Border Style="{DynamicResource HelmSurface}" Margin="0,0,0,4">
+            <Border Style="{DynamicResource HelmSurface}" Margin="0,0,0,4" Visibility="{Binding ShowTaskReport, Converter={StaticResource BoolToVisibility}}">
                 <StackPanel>
                     <TextBlock Text="{Binding ReportAverageWork}" Style="{StaticResource StatValue}" />
                     <TextBlock Text="Average time from start to done" Style="{DynamicResource HelmSecondaryText}" />
@@ -352,8 +363,9 @@
                         </DataTemplate>
                     </ItemsControl.ItemTemplate>
                 </ItemsControl>
-                <TextBlock Text="By priority" FontWeight="SemiBold" Margin="0,16,0,6" />
-                <ItemsControl ItemsSource="{Binding ReportPriorities}">
+                <TextBlock Text="By priority" FontWeight="SemiBold" Margin="0,16,0,6"
+                           Visibility="{Binding ShowTaskReport, Converter={StaticResource BoolToVisibility}}" />
+                <ItemsControl ItemsSource="{Binding ReportPriorities}" Visibility="{Binding ShowTaskReport, Converter={StaticResource BoolToVisibility}}">
                     <ItemsControl.ItemsPanel>
                         <ItemsPanelTemplate>
                             <WrapPanel />
@@ -370,11 +382,12 @@
                 </ItemsControl>
             </StackPanel>
         </Border>
-        <ui:CardControl Margin="0,0,0,4" Icon="{ui:SymbolIcon ArrowExport24}">
+        <ui:CardControl Margin="0,0,0,4" Icon="{ui:SymbolIcon ArrowDownload24}">
             <ui:CardControl.Header>
-                <core:CardHeader Title="Export to CSV" Description="Every item, or every change in the history, with times in minutes, for a spreadsheet." />
+                <core:CardHeader Title="Export to CSV" Description="Every item or every change, with times in minutes, for a spreadsheet." />
             </ui:CardControl.Header>
-            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+            <!-- Fixed width: without it WPF-UI's CardControl squeezes the icon column and clips the icon. -->
+            <StackPanel Width="220" Orientation="Horizontal" HorizontalAlignment="Right">
                 <ui:Button Margin="0,0,8,0" Content="Items…" Icon="{ui:SymbolIcon TableSimple24}" Click="ExportItems_Click" />
                 <ui:Button Content="History…" Icon="{ui:SymbolIcon History24}" Click="ExportHistory_Click" />
             </StackPanel>

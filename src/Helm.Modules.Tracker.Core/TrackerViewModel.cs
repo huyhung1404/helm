@@ -128,6 +128,15 @@ public sealed partial class TrackerViewModel : ObservableObject
     public string AddHeader => IsDebtWorkspace ? "Add a debt" : "Add a task";
     public string TitlePlaceholder => IsDebtWorkspace ? "What it was for (optional)" : "What needs doing?";
     public string EmptyOpenText => IsDebtWorkspace ? "Nothing outstanding. Everyone is square." : "Nothing to do. Add a task above.";
+    public string EmptyCompletedText => IsDebtWorkspace
+        ? "Nothing settled yet. Tick a debt when it is paid back and it moves here, with the date."
+        : "Nothing finished yet. Tick an item and it moves here, with its times recorded.";
+
+    /// <summary>Priorities and working time mean nothing for a debt book; its report shows only counts and times.</summary>
+    public bool ShowTaskReport => ReportAllWorkspaces || !IsDebtWorkspace;
+    public string ReportCompletedLabel => ShowTaskReport ? "Completed" : "Settled";
+    public string ReportLeadLabel => ShowTaskReport ? "Average time from added to done" : "Average time until paid back";
+    public string ReportMedianLabel => ShowTaskReport ? "Median time from added to done" : "Median time until paid back";
 
     // ---- Workspaces ----------------------------------------------------------------------------------------------
 
@@ -285,6 +294,7 @@ public sealed partial class TrackerViewModel : ObservableObject
     {
         if (_loading) return;
         _settings.Update(s => s.ReportAllWorkspaces = value);
+        OnReportScopeChanged();
         RefreshReport();
     }
 
@@ -526,7 +536,17 @@ public sealed partial class TrackerViewModel : ObservableObject
         OnPropertyChanged(nameof(AddHeader));
         OnPropertyChanged(nameof(TitlePlaceholder));
         OnPropertyChanged(nameof(EmptyOpenText));
+        OnPropertyChanged(nameof(EmptyCompletedText));
+        OnReportScopeChanged();
         AddCommand.NotifyCanExecuteChanged();
+    }
+
+    private void OnReportScopeChanged()
+    {
+        OnPropertyChanged(nameof(ShowTaskReport));
+        OnPropertyChanged(nameof(ReportCompletedLabel));
+        OnPropertyChanged(nameof(ReportLeadLabel));
+        OnPropertyChanged(nameof(ReportMedianLabel));
     }
 
     private void CreateAndSelect(string name, WorkspaceKind kind)
@@ -537,10 +557,13 @@ public sealed partial class TrackerViewModel : ObservableObject
         SelectedWorkspace = Workspaces.FirstOrDefault(w => w.Id == id) ?? SelectedWorkspace;
     }
 
-    /// <summary>The current region's currency symbol ("₫" in Vietnam), or nothing if unknown.</summary>
+    /// <summary>
+    /// The currency of the region set in the OS ("₫" in Vietnam, even with an English display language), or nothing
+    /// if unknown.
+    /// </summary>
     private static string DefaultCurrency()
     {
-        try { return new RegionInfo(CultureInfo.CurrentCulture.Name).CurrencySymbol; }
+        try { return RegionInfo.CurrentRegion.CurrencySymbol; }
         catch (ArgumentException) { return ""; }
     }
 

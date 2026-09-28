@@ -209,6 +209,12 @@ The page is a `core:ModulePageBase`. It already renders the title, the icon + de
   $a=[Reflection.Assembly]::LoadFrom("$env:USERPROFILE\.nuget\packages\wpf-ui\4.3.0\lib\net472\Wpf.Ui.dll"); [Enum]::GetNames($a.GetType('Wpf.Ui.Controls.SymbolRegular')) | Select-String '<Name>'
   ```
   A missing name compiles fine but crashes at runtime with a XamlParseException.
+  The name existing is not enough: WPF-UI 4.3 draws a symbol as a single 16-bit `char`, so any symbol whose value
+  is above U+FFFF (e.g. `ArrowExport24` = U+F0281, `DocumentArrowDown24` = U+F0527) shows a stray letter such as
+  "ʁ". Check the value too, and pick another icon if it is above `0xFFFF`:
+  ```powershell
+  '{0:X}' -f [int][Enum]::Parse($a.GetType('Wpf.Ui.Controls.SymbolRegular'), '<Name>')
+  ```
 - **Settings JSON**: doubles may be NaN, which is allowed. Dictionaries that need case-insensitive keys need `[JsonObjectCreationHandling(JsonObjectCreationHandling.Populate)]`.
 - **App types** are `internal` with `public` constructors, because DI needs public constructors. XAML views in App use `x:ClassModifier="internal"`.
 - **Windows PowerShell 5.1** mangles UTF-8 files when you edit them with `Get-Content`/`Set-Content`. Edit with the Edit/Write tools, or with `[IO.File]::ReadAllText/WriteAllText` and an explicit `UTF8Encoding($false)`.

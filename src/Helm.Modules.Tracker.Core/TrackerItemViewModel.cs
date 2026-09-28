@@ -63,6 +63,21 @@ public sealed partial class TrackerItemViewModel : ObservableObject
 
     public bool IsOpen => !Item.IsCompleted;
 
+    /// <summary>
+    /// The row's check box. Bound two-way (not through a command) so a click, the keyboard and screen readers
+    /// (UI Automation toggles IsChecked without a click) all complete or reopen the item.
+    /// </summary>
+    public bool Done
+    {
+        get => Item.IsCompleted;
+        set
+        {
+            if (value != Item.IsCompleted) _owner.ToggleComplete(this);
+            // If the store refused (or the refresh is pending), put the box back to the real state.
+            OnPropertyChanged();
+        }
+    }
+
     public bool IsStarted => Item.StartedExplicitly && !Item.IsCompleted;
 
     public bool CanStart => !Item.IsCompleted && Item.StartedAt is null && !IsDebt;
@@ -104,11 +119,17 @@ public sealed partial class TrackerItemViewModel : ObservableObject
         {
             var parts = new List<string>();
             if (IsDebt) parts.Add(TrackerFormat.Direction(Item.Direction));
-            else if (Item.Priority != TrackerPriority.Normal) parts.Add(PriorityText);
+            // Urgent and High already show as a badge next to the title.
+            else if (Item.Priority == TrackerPriority.Low) parts.Add(PriorityText);
             if (Item.CompletedAt is { } done)
             {
                 parts.Add((IsDebt ? "Settled " : "Done ") + TrackerFormat.When(done));
-                if (!IsDebt) parts.Add("took " + TrackerFormat.Duration(done - (Item.StartedExplicitly ? Item.StartedAt ?? Item.CreatedAt : Item.CreatedAt)));
+                if (!IsDebt)
+                {
+                    // Same meaning as the history and the report: "took" counts from when it was added.
+                    parts.Add("took " + TrackerFormat.Duration(done - Item.CreatedAt));
+                    if (Item.StartedExplicitly && Item.StartedAt is { } started) parts.Add("worked " + TrackerFormat.Duration(done - started));
+                }
             }
             else
             {
