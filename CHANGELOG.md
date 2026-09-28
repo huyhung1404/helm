@@ -15,6 +15,8 @@ Format: [Keep a Changelog](https://keepachangelog.com), versions follow [SemVer]
 - Vault: the list has two tabs. **Logins & tokens** shows each one with its icon, the hidden password or token and Copy;
   **Other** holds notes, cards, identities, documents and pictures, each with its picture or its type's icon. The Show
   choices and the trash belong to the open tab.
+- Vault (PC): click the open item in the list again to close it; the next click opens it again. An item you are
+  editing stays open.
 - A login without a password no longer shows "No password" in the list.
 - Pages start 16 px below the window's title bar instead of right under it.
 

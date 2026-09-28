@@ -201,7 +201,7 @@
                         </TextBlock>
                         <Grid>
                             <!-- Passwords: one row per account, copy right on the row -->
-                            <ListBox ItemsSource="{Binding PasswordRows}" SelectedItem="{Binding SelectedPassword}" BorderThickness="0" Background="Transparent"
+                            <ListBox ItemsSource="{Binding PasswordRows}" SelectedItem="{Binding SelectedPassword}" BorderThickness="0" Background="Transparent" PreviewMouseLeftButtonDown="OnRowMouseDown"
                                      ScrollViewer.HorizontalScrollBarVisibility="Disabled" HorizontalContentAlignment="Stretch"
                                      Visibility="{Binding IsPasswordsView, Converter={StaticResource BoolToVisibility}}" AutomationProperties.Name="Logins and tokens list">
                                 <ListBox.ItemTemplate>
@@ -257,7 +257,7 @@
                                 </ListBox.ItemTemplate>
                             </ListBox>
 
-                            <ListBox ItemsSource="{Binding Rows}" SelectedItem="{Binding Selected}" BorderThickness="0" Background="Transparent"
+                            <ListBox ItemsSource="{Binding Rows}" SelectedItem="{Binding Selected}" BorderThickness="0" Background="Transparent" PreviewMouseLeftButtonDown="OnRowMouseDown"
                                      ScrollViewer.HorizontalScrollBarVisibility="Disabled" Visibility="{Binding IsListView, Converter={StaticResource BoolToVisibility}}">
                                 <ListBox.ItemTemplate>
                                     <DataTemplate DataType="{x:Type vm:ItemRow}">

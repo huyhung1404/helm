@@ -102,6 +102,18 @@ public sealed class VaultViewsTests : IDisposable
         Assert.Equal("GitHub", app.Items.Detail!.Title);
         Layout(window);
 
+        // A click on the open row's Copy button keeps it open; a click on the row itself closes it.
+        var list = Descendants<System.Windows.Controls.ListBox>(window).Single(l => System.Windows.Automation.AutomationProperties.GetName(l) == "Logins and tokens list");
+        var openRow = (System.Windows.Controls.ListBoxItem)list.ItemContainerGenerator.ContainerFromItem(app.Items.SelectedPassword);
+        var copy = Descendants<Wpf.Ui.Controls.Button>(openRow).First(b => b.Command == app.Items.SelectedPassword!.CopyCommand);
+        Click(copy);
+        Assert.Equal("GitHub", app.Items.Detail?.Title);
+        Click(openRow);
+        Assert.Null(app.Items.Detail);
+        Assert.Null(app.Items.SelectedPassword);
+        app.Items.SelectedPassword = app.Items.PasswordRows.Single(r => r.Title == "GitHub");
+        Layout(window);
+
         // The icon, large and at list size.
         foreach (var size in new[] { 256.0, 32.0 })
         {
@@ -179,6 +191,27 @@ public sealed class VaultViewsTests : IDisposable
         using var file = File.Create(Path.Combine(folder, $"{++s_shot:00}-{element.GetType().Name}.png"));
         encoder.Save(file);
     }
+
+    private static IEnumerable<T> Descendants<T>(DependencyObject root) where T : DependencyObject
+    {
+        for (var i = 0; i < System.Windows.Media.VisualTreeHelper.GetChildrenCount(root); i++)
+        {
+            var child = System.Windows.Media.VisualTreeHelper.GetChild(root, i);
+            if (child is T match) yield return match;
+            foreach (var nested in Descendants<T>(child)) yield return nested;
+        }
+    }
+
+    /// <summary>
+    /// The tunnelling half of a left click as real input raises it: Mouse.PreviewMouseDown, which every element on the
+    /// route turns into its own PreviewMouseLeftButtonDown (a direct event, so raising that one would reach only the target).
+    /// </summary>
+    private static void Click(UIElement target) =>
+        target.RaiseEvent(new System.Windows.Input.MouseButtonEventArgs(System.Windows.Input.Mouse.PrimaryDevice, 0, System.Windows.Input.MouseButton.Left)
+        {
+            RoutedEvent = System.Windows.Input.Mouse.PreviewMouseDownEvent,
+            Source = target,
+        });
 
     /// <summary>The resources App.xaml merges: WPF-UI's theme and controls, then Helm's styles.</summary>
     private static void EnsureApplication()

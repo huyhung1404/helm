@@ -166,6 +166,28 @@ public sealed partial class ItemsViewModel : ObservableObject
     [RelayCommand]
     private void ShowTab(VaultTab tab) => Tab = tab;
 
+    /// <summary>
+    /// Clicking the open row again closes it (the next click opens it again). An item being edited stays open, so
+    /// nothing typed is lost.
+    /// </summary>
+    [RelayCommand]
+    private void CloseDetail()
+    {
+        if (Detail is { IsEditing: true }) return;
+        _refreshing = true;
+        try
+        {
+            SelectedPassword = null;
+            Selected = null;
+        }
+        finally
+        {
+            _refreshing = false;
+        }
+        Detail = null;
+        _session.Touch();
+    }
+
     public static VaultTab TabOf(VaultItemKind kind) => kind is VaultItemKind.Login or VaultItemKind.Token ? VaultTab.LoginsAndTokens : VaultTab.Other;
 
     partial void OnTabChanged(VaultTab value)

@@ -240,6 +240,30 @@ public sealed class VaultViewModelTests : IDisposable
     }
 
     [Fact]
+    public async Task Clicking_the_open_row_again_closes_it_but_never_an_edit()
+    {
+        var (app, session, store) = NewApp();
+        await session.CreateAsync(Password);
+        store.Add(VaultItem.New(VaultItemKind.Login, "Bank") with { Fields = [new VaultField("Password", "p", VaultFieldKind.Password)] });
+        var items = app.Items;
+        items.Refresh();
+
+        items.SelectedPassword = items.PasswordRows.Single();
+        Assert.NotNull(items.Detail);
+        items.CloseDetailCommand.Execute(null);
+        Assert.Null(items.Detail);
+        Assert.Null(items.Selected);
+        Assert.Null(items.SelectedPassword);
+        items.SelectedPassword = items.PasswordRows.Single(); // and open again
+        Assert.Equal("Bank", items.Detail!.Title);
+
+        items.Detail.EditCommand.Execute(null);
+        items.Detail.Title = "Bank (typing)";
+        items.CloseDetailCommand.Execute(null);
+        Assert.Equal("Bank (typing)", items.Detail!.Title); // an edit stays open
+    }
+
+    [Fact]
     public void An_item_kind_from_a_newer_Helm_is_refused_not_guessed()
     {
         // What an older Helm does with a Token (or any kind added later): the item fails to parse, so the store lists
