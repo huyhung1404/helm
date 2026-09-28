@@ -3,6 +3,12 @@
 All notable changes to Helm. The top section is used as the GitHub release body and as the Velopack release notes.
 Format: [Keep a Changelog](https://keepachangelog.com), versions follow [SemVer](https://semver.org).
 
+## [0.9.1] - 2026-09-28
+
+### Fixed
+- Tracker's icon was drawn larger than Vault's (and the other tool icons) in the menu, on Home and on its pages.
+  It now fills the same square, on the PC and on Android.
+
 ## [0.9.0] - 2026-09-28
 
 ### Added
