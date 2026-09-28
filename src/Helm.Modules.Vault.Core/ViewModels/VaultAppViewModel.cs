@@ -53,6 +53,11 @@ public sealed partial class VaultAppViewModel : ObservableObject
     [ObservableProperty] private string _kitConfirmation = "";
     [ObservableProperty] private string? _kitError;
 
+    // The user guide, shown in place of the vault screens (it works locked, unlocked and before setup)
+    [ObservableProperty] private bool _isGuideOpen;
+
+    public IReadOnlyList<Guide.GuideBlock> Guide => Vault.Guide.VaultGuide.Blocks;
+
     public VaultAppViewModel(VaultSession session, VaultStore store, VaultFiles files, VaultBackupService backup, SyncEngine engine,
         IVaultPlatform platform, IUiDispatcher ui, ILogger<VaultAppViewModel>? logger = null)
     {
@@ -184,6 +189,12 @@ public sealed partial class VaultAppViewModel : ObservableObject
 
     [RelayCommand]
     private void Lock() => _session.Lock("user");
+
+    [RelayCommand]
+    private void ShowGuide() => IsGuideOpen = true;
+
+    [RelayCommand]
+    private void CloseGuide() => IsGuideOpen = false;
 
     [RelayCommand]
     private Task SaveKitAsync() => Kit is null ? Task.CompletedTask : RunAsync(() => _platform.SaveEmergencyKitAsync(Kit, CancellationToken.None));

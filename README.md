@@ -8,7 +8,7 @@ Tools:
 |---|---|---|
 | Claude Chat | PC | Chat with Claude Code in its own window, several projects side by side |
 | Tracker | PC + Android | To-do lists and debt books in workspaces, synced across devices; completions are logged with their start and finish times for reports and CSV export, and Android has a home-screen widget |
-| Vault | PC + Android | Passwords, secure notes, cards, identities and documents, end-to-end encrypted, synced, and backed up to a folder you choose ([design](docs/vault-design.md), [format](docs/vault-format.md)) |
+| Vault | PC + Android | Passwords, secure notes, cards, identities and documents, end-to-end encrypted, synced, and backed up to a folder you choose ([guide](docs/vault-guide.md), [design](docs/vault-design.md), [format](docs/vault-format.md)) |
 
 More tools are planned (see [Roadmap](#roadmap)). Always On Top is built but not registered; it comes back with one line in `src/Helm.App/Hosting/HelmModules.cs`. The previous Zones module is kept in git history (tag `v0.3.0`).
 ## Install

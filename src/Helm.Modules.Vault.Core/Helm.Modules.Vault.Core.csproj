@@ -11,6 +11,12 @@
 
   <ItemGroup>
     <ProjectReference Include="..\Helm.Core\Helm.Core.csproj" />
+    <PackageReference Include="Markdig" Version="1.4.0" />
+  </ItemGroup>
+
+  <!-- The user guide shown in the app is docs/vault-guide.md itself: one text for GitHub and for the app. -->
+  <ItemGroup>
+    <EmbeddedResource Include="..\..\docs\vault-guide.md" LogicalName="Helm.Modules.Vault.vault-guide.md" Link="Guide\vault-guide.md" />
   </ItemGroup>
 
   <ItemGroup>

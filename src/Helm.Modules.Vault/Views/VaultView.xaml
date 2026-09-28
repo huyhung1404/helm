@@ -57,6 +57,7 @@
                     <TextBlock Text="Create your vault" FontSize="22" FontWeight="SemiBold" Margin="0,12,0,4" />
                     <TextBlock Style="{DynamicResource HelmSecondaryText}" FontSize="13"
                                Text="Choose a vault password you will remember. It is different from your sync passphrase, and nobody — not Helm, not the server — can reset it. You also get a recovery key to print and keep safe." />
+                    <ui:HyperlinkButton Content="New to Vault? Read the guide first" Padding="0" Margin="0,6,0,0" Command="{Binding ShowGuideCommand}" />
                     <TextBlock Text="Vault password" Margin="0,16,0,4" />
                     <ui:PasswordBox x:Name="NewPasswordBox" AutomationProperties.Name="Vault password" Password="{Binding NewPassword, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" PlaceholderText="At least 14 characters" />
                     <TextBlock Text="{Binding PasswordStrength}" Style="{DynamicResource HelmSecondaryText}" Margin="0,4,0,0" />

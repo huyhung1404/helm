@@ -47,6 +47,16 @@ public sealed class VaultViewsTests : IDisposable
         Layout(window);
         Assert.True(app.IsSetup);
 
+        // The guide: every block builds, and a link scrolls to its section.
+        var guide = new VaultGuideView();
+        Layout(guide);
+        Assert.True(guide.ScrollTo("sao-lưu"));
+        Assert.False(guide.ScrollTo("no-such-section"));
+        Layout(guide);
+        app.ShowGuideCommand.Execute(null);
+        Assert.True(app.IsGuideOpen);
+        app.CloseGuideCommand.Execute(null);
+
         app.NewPassword = app.ConfirmPassword = "correct horse battery staple";
         Pump(app.CreateCommand.ExecuteAsync(null));
         Assert.True(app.IsItems);

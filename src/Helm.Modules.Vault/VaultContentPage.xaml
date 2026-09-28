@@ -16,6 +16,11 @@
             <WrapPanel DockPanel.Dock="Right" VerticalAlignment="Center">
                 <ui:Button Content="Lock" Icon="{ui:SymbolIcon LockClosed24}" Margin="0,0,8,0" Command="{Binding App.LockCommand}"
                            Visibility="{Binding App.IsItems, Converter={StaticResource BoolToVisibility}}" />
+                <ui:Button Content="Guide" Icon="{ui:SymbolIcon BookInformation24}" Margin="0,0,8,0" Command="{Binding App.ShowGuideCommand}"
+                           ToolTip="How to use Vault: passwords, backups, recovery"
+                           Visibility="{Binding App.IsGuideOpen, Converter={StaticResource InverseBoolToVisibility}}" />
+                <ui:Button Content="Back to the vault" Icon="{ui:SymbolIcon ArrowLeft24}" Margin="0,0,8,0" Command="{Binding App.CloseGuideCommand}"
+                           Visibility="{Binding App.IsGuideOpen, Converter={StaticResource BoolToVisibility}}" />
                 <ui:Button Content="Settings" Icon="{ui:SymbolIcon Settings24}" Command="{Binding OpenSettingsCommand}" ToolTip="Vault settings: locking, backup, password" />
             </WrapPanel>
             <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
@@ -27,6 +32,9 @@
         <ui:InfoBar Grid.Row="1" Margin="0,0,0,12" Severity="Informational" IsClosable="False" Title="Vault is turned off"
                     Message="Turn it on in its settings to use it." IsOpen="{Binding Module.IsEnabled, Converter={StaticResource InverseBool}}" />
 
-        <views:VaultView x:Name="View" Grid.Row="2" DataContext="{Binding App}" IsEnabled="{Binding DataContext.Module.IsEnabled, RelativeSource={RelativeSource AncestorType=Page}}" />
+        <views:VaultView x:Name="View" Grid.Row="2" DataContext="{Binding App}" IsEnabled="{Binding DataContext.Module.IsEnabled, RelativeSource={RelativeSource AncestorType=Page}}"
+                         Visibility="{Binding App.IsGuideOpen, Converter={StaticResource InverseBoolToVisibility}}" />
+        <!-- The guide works whether the vault is set up, locked, open or turned off -->
+        <views:VaultGuideView Grid.Row="2" Visibility="{Binding App.IsGuideOpen, Converter={StaticResource BoolToVisibility}}" />
     </Grid>
 </Page>

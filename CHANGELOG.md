@@ -11,6 +11,8 @@ Format: [Keep a Changelog](https://keepachangelog.com), versions follow [SemVer]
     Kit. Nothing can be read without one of them, not even by the sync server.
   - Unlock with Windows Hello or a fingerprint; the password is asked again every two weeks (configurable).
     The vault locks after inactivity, when Windows locks, and shortly after the phone app goes to the background.
+  - A user guide in Vietnamese inside the PC app (Guide at the top of Vault, also on the first screen), the same
+    text as docs/vault-guide.md: the three secrets, setup, backups, restoring, and what to do when things go wrong.
   - Documents up to 256 MB each (the server's limit is adjustable), encrypted on the device and synced in chunks.
   - Nothing is lost by mistake: deleted items stay 30 days in the trash, every edit keeps the previous 10
     versions, edits made on two devices at once are both kept, and a sync that would delete many items is held
