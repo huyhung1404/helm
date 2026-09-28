@@ -84,6 +84,21 @@ public sealed record TrackerItem
     /// <summary>Debts: this entry is a repayment (its <see cref="Direction"/> pulls the balance toward 0).</summary>
     public bool IsRepayment { get; init; }
 
+    /// <summary>
+    /// Tasks that repeat every day: all days share this id; each day is its own item with id
+    /// <c>SeriesId@yyyy-MM-dd</c>, so two devices making the same day's task write the same record.
+    /// </summary>
+    public string? SeriesId { get; init; }
+
+    /// <summary>The day this occurrence of a repeating task is for.</summary>
+    public DateOnly? OccurrenceDate { get; init; }
+
+    /// <summary>The series goes on: a new occurrence appears each day (the latest occurrence decides).</summary>
+    public bool RepeatDaily { get; init; }
+
+    /// <summary>Last day of the series; null repeats for ever.</summary>
+    public DateOnly? RepeatUntil { get; init; }
+
     public DateTimeOffset CreatedAt { get; init; }
 
     /// <summary>When work began: set by Start, or on completion (= <see cref="CreatedAt"/>) if Start was never pressed.</summary>
@@ -106,6 +121,9 @@ public sealed record TrackerItem
 
     [JsonIgnore]
     public bool IsSubtask => ParentId is not null;
+
+    [JsonIgnore]
+    public bool IsRepeating => SeriesId is not null;
 
     /// <summary>+Amount when the person owes the user, −Amount when the user owes them.</summary>
     [JsonIgnore]
@@ -176,6 +194,8 @@ public sealed record TrackerEvent
 
     public bool IsRepayment { get; init; }
 
+    public string? SeriesId { get; init; }
+
     public DateTimeOffset CreatedAt { get; init; }
 
     public DateTimeOffset? StartedAt { get; init; }
@@ -203,6 +223,7 @@ public sealed record TrackerEvent
         DueAt = item.DueAt,
         ParentId = item.ParentId,
         IsRepayment = item.IsRepayment,
+        SeriesId = item.SeriesId,
         CreatedAt = item.CreatedAt,
         StartedAt = item.StartedAt,
         CompletedAt = item.CompletedAt,
@@ -223,4 +244,6 @@ public sealed record TrackerItemDraft(
     decimal Amount = 0,
     DebtDirection Direction = DebtDirection.TheyOweMe,
     DateTimeOffset? DueAt = null,
-    string? ParentId = null);
+    string? ParentId = null,
+    bool RepeatDaily = false,
+    DateOnly? RepeatUntil = null);

@@ -81,7 +81,11 @@ internal static class TrackerWidgets
         views.SetViewVisibility(R.Id(context, "tracker_widget_compact"), compact ? ViewStates.Visible : ViewStates.Gone);
         views.SetViewVisibility(R.Id(context, "tracker_widget_menu"), menu ? ViewStates.Visible : ViewStates.Gone);
         views.SetViewVisibility(R.Id(context, "tracker_widget_menu_grow"), menu && !model.IsEmpty ? ViewStates.Visible : ViewStates.Gone);
-        views.SetTextViewText(R.Id(context, "tracker_widget_count"), model.OpenCount > 99 ? "99+" : model.OpenCount.ToString(System.Globalization.CultureInfo.CurrentCulture));
+        // The count fills the round button; longer numbers get smaller so they are never cut.
+        var count = model.OpenCount > 99 ? "99+" : model.OpenCount.ToString(System.Globalization.CultureInfo.CurrentCulture);
+        var countView = R.Id(context, "tracker_widget_count");
+        views.SetTextViewText(countView, count);
+        views.SetTextViewTextSize(countView, (int)Android.Util.ComplexUnitType.Sp, count.Length switch { 1 => 18, 2 => 15, _ => 12 });
 
         var bg = R.Id(context, "tracker_widget_bg");
         if (compact)

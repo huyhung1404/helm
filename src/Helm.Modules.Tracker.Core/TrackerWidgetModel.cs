@@ -37,6 +37,8 @@ public sealed record TrackerWidgetModel(
     {
         if (!enabled) return new TrackerWidgetModel(null, TrackerIds.DisplayName, "", "Tracker is turned off. Open Helm to turn it on.", []);
 
+        // A new day: today's repeating tasks appear on the widget too.
+        try { store.EnsureRepeats(); } catch (Exception) { /* drawing the widget must not fail on it */ }
         var workspaces = store.Workspaces();
         var chosen = workspaces.FirstOrDefault(w => w.Id == workspaceId) ?? workspaces.FirstOrDefault();
         if (chosen is null) return new TrackerWidgetModel(null, TrackerIds.DisplayName, "", "No workspaces yet. Tap + to create one in Helm.", []);

@@ -3,6 +3,18 @@
 All notable changes to Helm. The top section is used as the GitHub release body and as the Velopack release notes.
 Format: [Keep a Changelog](https://keepachangelog.com), versions follow [SemVer](https://semver.org).
 
+## [Unreleased]
+
+### Added
+- Tracker: tasks can repeat every day, for ever or for a number of days. Each new day the task is there again (with
+  the same due time and subtasks), on every device; days Helm was not opened are skipped. The task shows how many days
+  it was done, and the report lists each repeating task with the days done in its period. Deleting a repeating task
+  (or setting it to "Does not repeat") stops it.
+
+### Changed
+- Tracker widget (Android): the small button shows the number of open items itself, large enough not to be cut,
+  instead of a gear with a badge.
+
 ## [0.11.0] - 2026-09-28
 
 ### Changed

@@ -53,6 +53,8 @@ public sealed partial class TrackerViewModel : ObservableObject
     [ObservableProperty] private string _newAmount = "";
     [ObservableProperty] private int _newPriorityIndex = (int)TrackerPriority.Normal;
     [ObservableProperty] private int _newDebtKindIndex;
+    [ObservableProperty] private int _newRepeatIndex;
+    [ObservableProperty] private string _newRepeatDays = "7";
     [ObservableProperty] private DateTime? _newDueDate;
     [ObservableProperty] private string _newDueTimeText = "";
     [ObservableProperty] private TimeSpan? _newDueTime;
@@ -161,11 +163,38 @@ public sealed partial class TrackerViewModel : ObservableObject
     }
     public ObservableCollection<ReportBar> ReportDays { get; } = [];
     public ObservableCollection<ReportCount> ReportPriorities { get; } = [];
+
+    /// <summary>Repeating tasks and how many of their days were done in the report's range.</summary>
+    public ObservableCollection<ReportCount> ReportRepeats { get; } = [];
+
+    public bool HasReportRepeats => ReportRepeats.Count > 0;
     public ObservableCollection<HistoryRow> History { get; } = [];
 
     public IReadOnlyList<string> PriorityNames { get; } = Enum.GetValues<TrackerPriority>().Select(TrackerFormat.Priority).ToList();
     public IReadOnlyList<string> DirectionNames { get; } = Enum.GetValues<DebtDirection>().Select(TrackerFormat.Direction).ToList();
     public IReadOnlyList<string> DebtKindNames { get; } = Enum.GetValues<DebtEntryKind>().Select(TrackerFormat.DebtKind).ToList();
+
+    /// <summary>Index 0: once, 1: every day for ever, 2: every day for a number of days.</summary>
+    public IReadOnlyList<string> RepeatNames { get; } = ["Does not repeat", "Every day", "Every day, for a number of days"];
+
+    public bool NewRepeatsForDays => NewRepeatIndex == 2;
+
+    partial void OnNewRepeatIndexChanged(int value) => OnPropertyChanged(nameof(NewRepeatsForDays));
+
+    /// <summary>Repeat choice as typed: (repeat?, last day or null for ever); false when the number of days is not a number.</summary>
+    private bool TryRepeat(int index, string days, DateOnly firstDay, out bool repeat, out DateOnly? until)
+    {
+        repeat = index > 0;
+        until = null;
+        if (index != 2) return true;
+        if (!int.TryParse(days.Trim(), NumberStyles.Integer, CultureInfo.CurrentCulture, out var n) || n < 1 || n > 3650)
+        {
+            Message = $"\u201c{days}\u201d is not a number of days. Try 7 or 30.";
+            return false;
+        }
+        until = firstDay.AddDays(n - 1);
+        return true;
+    }
     public IReadOnlyList<string> KindNames { get; } = Enum.GetValues<WorkspaceKind>().Select(TrackerFormat.Kind).ToList();
     public IReadOnlyList<string> ReportRangeNames { get; } = ["Last 7 days", "Last 30 days", "Last 90 days", "All time"];
     public IReadOnlyList<string> WidgetBackgroundNames { get; } = TrackerWidgetStyle.BackgroundNames;
@@ -344,11 +373,15 @@ public sealed partial class TrackerViewModel : ObservableObject
         }
         else
         {
+            var today = DateOnly.FromDateTime(TimeZoneInfo.ConvertTime(_store.Now, TimeZoneInfo.Local).DateTime);
+            if (!TryRepeat(NewRepeatIndex, NewRepeatDays, today, out var repeat, out var until)) return;
             var draft = new TrackerItemDraft(
                 NewTitle,
                 (TrackerPriority)Math.Clamp(NewPriorityIndex, 0, PriorityNames.Count - 1),
                 NewDueDate is { } day ? DateOnly.FromDateTime(day) : null,
-                DueAt: NewDueTime is null && string.IsNullOrWhiteSpace(NewDueTimeText) ? null : dueAt);
+                DueAt: NewDueTime is null && string.IsNullOrWhiteSpace(NewDueTimeText) ? null : dueAt,
+                RepeatDaily: repeat,
+                RepeatUntil: until);
             if (!Try(() => _store.AddItem(ws.Id, draft))) return;
         }
         NewTitle = "";
@@ -356,6 +389,7 @@ public sealed partial class TrackerViewModel : ObservableObject
         NewAmount = "";
         NewDueDate = null;
         NewDueTimeText = "";
+        NewRepeatIndex = 0;
         NewPriorityIndex = (int)TrackerPriority.Normal;
     }
 
@@ -391,7 +425,9 @@ public sealed partial class TrackerViewModel : ObservableObject
     {
         var ok = await _dialogs.ConfirmAsync(
             row.IsDebt ? "Delete this debt?" : "Delete this task?",
-            $"“{row.Title}” will be removed from all your devices. Its history stays in the reports.",
+            row.Item.RepeatDaily
+                ? $"\u201c{row.Title}\u201d repeats every day. Deleting it removes today's and stops the repeating on all your devices; the days already done stay in the reports."
+                : $"\u201c{row.Title}\u201d will be removed from all your devices. Its history stays in the reports.",
             "Delete").ConfigureAwait(true);
         if (ok) Try(() => _store.DeleteItem(row.Id));
     }
@@ -413,6 +449,11 @@ public sealed partial class TrackerViewModel : ObservableObject
             Message = "A task needs a title.";
             return false;
         }
+        var repeat = row.Item.RepeatDaily;
+        var until = row.Item.RepeatUntil;
+        if (row.IsRepeating && !TryRepeat(row.EditRepeatIndex, row.EditRepeatDays, row.Item.OccurrenceDate ?? DateOnly.FromDateTime(DateTime.Today), out repeat, out until))
+            return false;
+        if (row.IsRepeating && !repeat && row.Item.SeriesId is { } series) Try(() => _store.StopRepeating(series));
         return Try(() => _store.UpdateItem(row.Id, item => item with
         {
             Title = row.EditTitle,
@@ -423,6 +464,8 @@ public sealed partial class TrackerViewModel : ObservableObject
             Person = row.EditPerson,
             Amount = amount,
             Direction = (DebtDirection)Math.Clamp(row.EditDirectionIndex, 0, DirectionNames.Count - 1),
+            RepeatDaily = repeat,
+            RepeatUntil = until,
         }));
     }
 
@@ -530,6 +573,8 @@ public sealed partial class TrackerViewModel : ObservableObject
     {
         try
         {
+            // A new day: today's repeating tasks appear (a no-op when they are already there).
+            _store.EnsureRepeats();
             RefreshWorkspaces();
             RefreshItems();
             RefreshReport();
@@ -689,12 +734,16 @@ public sealed partial class TrackerViewModel : ObservableObject
 
     private TrackerItemViewModel Row(string id, TrackerItem item, TrackerWorkspace ws, DateOnly today)
     {
+        var completions = item.SeriesId is { } series ? _store.SeriesCompletions(series) : 0;
         if (_rows.TryGetValue(id, out var row))
         {
+            var changed = row.Completions != completions;
+            row.Completions = completions;
             row.Update(item, ws, today);
+            if (changed) row.NotifyDetails();
             return row;
         }
-        row = new TrackerItemViewModel(this, id, item, ws, today);
+        row = new TrackerItemViewModel(this, id, item, ws, today) { Completions = completions };
         _rows[id] = row;
         return row;
     }
@@ -727,6 +776,8 @@ public sealed partial class TrackerViewModel : ObservableObject
         Replace(ReportDays, bars);
         Replace(ReportPriorities, Enum.GetValues<TrackerPriority>().OrderByDescending(p => p)
             .Select(p => new ReportCount(TrackerFormat.Priority(p), report.ByPriority.GetValueOrDefault(p))));
+        Replace(ReportRepeats, report.Repeats.Select(r => new ReportCount(r.Title, r.Count)));
+        OnPropertyChanged(nameof(HasReportRepeats));
         OnPropertyChanged(nameof(HasReportData));
     }
 

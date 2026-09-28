@@ -515,6 +515,109 @@ public sealed class TrackerTests
     }
 
     [Fact]
+    public void A_repeating_task_comes_back_each_new_day_once_with_its_time_and_subtasks()
+    {
+        var ws = _store.AddWorkspace("To-do", WorkspaceKind.Tasks);
+        var today = DateOnly.FromDateTime(TimeZoneInfo.ConvertTime(T0, TimeZoneInfo.Local).DateTime);
+        var at = TrackerDue.FromLocal(today.ToDateTime(TimeOnly.MinValue), new TimeSpan(7, 30, 0), TimeZoneInfo.Local);
+        var first = _store.AddItem(ws, new TrackerItemDraft("Exercise", DueAt: at, RepeatDaily: true));
+        var series = _store.GetItem(first)!.SeriesId!;
+        Assert.Equal(TrackerStore.OccurrenceId(series, today), first);
+        _store.AddItem(ws, new TrackerItemDraft("Stretch", ParentId: first));
+        _store.Complete(first);
+
+        Assert.Equal(0, _store.EnsureRepeats(today)); // today's is there already
+        var tomorrow = today.AddDays(1);
+        Assert.Equal(1, _store.EnsureRepeats(tomorrow));
+        Assert.Equal(0, _store.EnsureRepeats(tomorrow)); // once: the same id on every device
+        var next = _store.GetItem(TrackerStore.OccurrenceId(series, tomorrow))!;
+        Assert.Equal("Exercise", next.Title);
+        Assert.False(next.IsCompleted);
+        Assert.Equal(new TimeSpan(7, 30, 0), TimeZoneInfo.ConvertTime(next.DueAt!.Value, TimeZoneInfo.Local).TimeOfDay);
+        Assert.Equal(tomorrow, next.DueDate);
+        var sub = Assert.Single(_store.Subtasks(TrackerStore.OccurrenceId(series, tomorrow)));
+        Assert.Equal("Stretch", sub.Value.Title);
+        Assert.False(sub.Value.IsCompleted);
+        Assert.Equal(1, _store.SeriesCompletions(series));
+
+        // Days the app was not opened are skipped: only the day it is.
+        Assert.Equal(1, _store.EnsureRepeats(today.AddDays(5)));
+        Assert.Null(_store.GetItem(TrackerStore.OccurrenceId(series, today.AddDays(3))));
+
+        // Deleting a day stops the series.
+        _store.DeleteItem(TrackerStore.OccurrenceId(series, today.AddDays(5)));
+        Assert.Equal(0, _store.EnsureRepeats(today.AddDays(6)));
+    }
+
+    [Fact]
+    public void A_task_repeating_for_some_days_stops_after_its_last_day()
+    {
+        var ws = _store.AddWorkspace("To-do", WorkspaceKind.Tasks);
+        var today = DateOnly.FromDateTime(TimeZoneInfo.ConvertTime(T0, TimeZoneInfo.Local).DateTime);
+        var first = _store.AddItem(ws, new TrackerItemDraft("Pills", RepeatDaily: true, RepeatUntil: today.AddDays(1)));
+        Assert.Equal(1, _store.EnsureRepeats(today.AddDays(1)));
+        Assert.Equal(0, _store.EnsureRepeats(today.AddDays(2)));
+        Assert.Equal(2, _store.Items(ws).Count);
+        Assert.NotNull(first);
+    }
+
+    [Fact]
+    public void The_report_counts_the_days_a_repeating_task_was_done()
+    {
+        var ws = _store.AddWorkspace("To-do", WorkspaceKind.Tasks);
+        var today = DateOnly.FromDateTime(TimeZoneInfo.ConvertTime(T0, TimeZoneInfo.Local).DateTime);
+        var first = _store.AddItem(ws, new TrackerItemDraft("Read", RepeatDaily: true));
+        var series = _store.GetItem(first)!.SeriesId!;
+        _store.Complete(first);
+        _time.Advance(TimeSpan.FromDays(1));
+        _store.EnsureRepeats(today.AddDays(1));
+        _store.Complete(TrackerStore.OccurrenceId(series, today.AddDays(1)));
+        _store.AddItem(ws, new TrackerItemDraft("One-off"));
+
+        var report = TrackerReport.Build(_store.History(), ReportRange.Last7Days, _time.GetUtcNow(), TimeZoneInfo.Local);
+        var repeat = Assert.Single(report.Repeats);
+        Assert.Equal("Read", repeat.Title);
+        Assert.Equal(2, repeat.Count);
+    }
+
+    [Fact]
+    public void The_view_model_adds_a_task_repeating_for_a_number_of_days()
+    {
+        var dir = Path.Combine(Path.GetTempPath(), "helm-tests", Guid.NewGuid().ToString("N"));
+        try
+        {
+            using var settings = new SettingsStoreFactory(new HelmPaths(dir));
+            var vm = new TrackerViewModel(_store, settings, new InlineDispatcher(),
+                new YesDialogs(), new NullClipboard(), new TrackerReminderService(_store, settings, _time), NullLogger<TrackerViewModel>.Instance);
+            vm.CreateTasksWorkspaceCommand.Execute(null);
+            vm.NewTitle = "Water plants";
+            vm.NewRepeatIndex = 2;
+            Assert.True(vm.NewRepeatsForDays);
+            vm.NewRepeatDays = "soon";
+            vm.AddCommand.Execute(null);
+            Assert.True(vm.HasMessage);
+            Assert.Empty(vm.OpenItems);
+
+            vm.NewRepeatDays = "3";
+            vm.AddCommand.Execute(null);
+            var row = Assert.Single(vm.OpenItems);
+            Assert.True(row.IsRepeating);
+            var today = DateOnly.FromDateTime(TimeZoneInfo.ConvertTime(T0, TimeZoneInfo.Local).DateTime);
+            Assert.Equal(today.AddDays(2), row.Item.RepeatUntil);
+            Assert.Contains("Every day until", row.Details);
+            Assert.Contains("done 0 times", row.Details);
+
+            row.Done = true;
+            Assert.Contains("done 1 time", Assert.Single(vm.CompletedItems).Details);
+        }
+        finally
+        {
+            try { if (Directory.Exists(dir)) Directory.Delete(dir, recursive: true); }
+            catch (IOException) { }
+        }
+    }
+
+    [Fact]
     public void Ticking_the_box_completes_without_a_click_and_the_row_says_took_and_worked()
     {
         var dir = Path.Combine(Path.GetTempPath(), "helm-tests", Guid.NewGuid().ToString("N"));

@@ -186,6 +186,11 @@
                                         Visibility="{Binding IsStarted, Converter={StaticResource BoolToVisibility}}">
                                     <TextBlock Text="In progress" FontSize="11" FontWeight="SemiBold" Foreground="{DynamicResource AccentTextFillColorPrimaryBrush}" />
                                 </Border>
+                                <Border CornerRadius="4" Padding="4,0" Margin="0,0,6,0" VerticalAlignment="Center"
+                                        Background="{DynamicResource ControlFillColorSecondaryBrush}" ToolTip="{Binding RepeatText}"
+                                        Visibility="{Binding RepeatText, Converter={StaticResource NotEmptyToVisibility}}">
+                                    <ui:SymbolIcon Symbol="ArrowRepeatAll24" FontSize="12" Foreground="{DynamicResource AccentTextFillColorPrimaryBrush}" />
+                                </Border>
                                 <Border CornerRadius="4" Padding="6,0" Margin="0,0,6,0" VerticalAlignment="Center"
                                         Background="{DynamicResource ControlFillColorSecondaryBrush}" ToolTip="Subtasks done"
                                         Visibility="{Binding HasSubtasks, Converter={StaticResource BoolToVisibility}}">
@@ -293,6 +298,11 @@
                             <DatePicker Width="160" Margin="0,0,8,8" SelectedDate="{Binding EditDueDate}" ToolTip="Due date" AutomationProperties.Name="Edit due date" />
                             <ui:TextBox Width="92" Margin="0,0,8,8" PlaceholderText="HH:mm" ToolTip="Due time (optional)" AutomationProperties.Name="Edit due time"
                                         Text="{Binding EditDueTimeText, UpdateSourceTrigger=PropertyChanged}" />
+                            <ComboBox Width="150" Margin="0,0,8,8" SelectedIndex="{Binding EditRepeatIndex}" AutomationProperties.Name="Edit repeat"
+                                      ItemsSource="{Binding DataContext.RepeatNames, RelativeSource={RelativeSource AncestorType=Page}}"
+                                      Visibility="{Binding IsRepeating, Converter={StaticResource BoolToVisibility}}" ToolTip="Does not repeat stops it from coming back" />
+                            <ui:TextBox Width="110" Margin="0,0,8,8" PlaceholderText="Days" AutomationProperties.Name="Edit repeat days"
+                                        Text="{Binding EditRepeatDays, UpdateSourceTrigger=PropertyChanged}" Visibility="{Binding IsRepeating, Converter={StaticResource BoolToVisibility}}" />
                             <ui:Button Margin="0,0,8,8" Appearance="Primary" Content="Save" Icon="{ui:SymbolIcon Save24}" Command="{Binding SaveEditCommand}" />
                             <ui:Button Margin="0,0,8,8" Content="Cancel" Command="{Binding CancelEditCommand}" />
                         </WrapPanel>
@@ -384,6 +394,11 @@
                     <WrapPanel>
                         <ComboBox Width="140" Margin="0,0,8,0" ItemsSource="{Binding PriorityNames}" SelectedIndex="{Binding NewPriorityIndex}"
                                   ToolTip="Priority" AutomationProperties.Name="Priority" Visibility="{Binding IsTaskWorkspace, Converter={StaticResource BoolToVisibility}}" />
+                        <ComboBox Width="150" Margin="0,0,8,0" ItemsSource="{Binding RepeatNames}" SelectedIndex="{Binding NewRepeatIndex}"
+                                  ToolTip="A repeating task comes back every day; the report counts the days you did it" AutomationProperties.Name="Repeat"
+                                  Visibility="{Binding IsTaskWorkspace, Converter={StaticResource BoolToVisibility}}" />
+                        <ui:TextBox Width="110" Margin="0,0,8,0" PlaceholderText="Days" ToolTip="For how many days (today counts)" AutomationProperties.Name="Repeat days"
+                                    Text="{Binding NewRepeatDays, UpdateSourceTrigger=PropertyChanged}" Visibility="{Binding NewRepeatsForDays, Converter={StaticResource BoolToVisibility}}" />
                         <DatePicker Width="160" Margin="0,0,8,0" SelectedDate="{Binding NewDueDate}" ToolTip="Due date (optional)" AutomationProperties.Name="Due date" />
                         <ui:TextBox Width="92" Margin="0,0,8,0" PlaceholderText="HH:mm" ToolTip="Due time (optional)" AutomationProperties.Name="Due time"
                                     Text="{Binding NewDueTimeText, UpdateSourceTrigger=PropertyChanged}" />
@@ -520,6 +535,18 @@
                                     <TextBlock Grid.Row="1" Text="{Binding Label}" FontSize="10" HorizontalAlignment="Center" TextWrapping="NoWrap"
                                                Foreground="{DynamicResource TextFillColorSecondaryBrush}" Margin="-20,2,-20,0" TextAlignment="Center" />
                                 </Grid>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                    <TextBlock Text="Repeating tasks: days done" FontWeight="SemiBold" Margin="0,16,0,6"
+                               Visibility="{Binding HasReportRepeats, Converter={StaticResource BoolToVisibility}}" />
+                    <ItemsControl ItemsSource="{Binding ReportRepeats}" Visibility="{Binding HasReportRepeats, Converter={StaticResource BoolToVisibility}}">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate DataType="{x:Type local:ReportCount}">
+                                <DockPanel Margin="0,2">
+                                    <TextBlock DockPanel.Dock="Right" Text="{Binding Count}" FontWeight="SemiBold" Margin="12,0,0,0" />
+                                    <TextBlock Text="{Binding Label}" TextTrimming="CharacterEllipsis" />
+                                </DockPanel>
                             </DataTemplate>
                         </ItemsControl.ItemTemplate>
                     </ItemsControl>

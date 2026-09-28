@@ -34,6 +34,8 @@ public sealed partial class TrackerItemViewModel : ObservableObject
     [ObservableProperty] private string _editDueTimeText = "";
     [ObservableProperty] private TimeSpan? _editDueTime;
     [ObservableProperty] [NotifyCanExecuteChangedFor(nameof(AddSubtaskCommand))] private string _newSubtaskTitle = "";
+    [ObservableProperty] private int _editRepeatIndex;
+    [ObservableProperty] private string _editRepeatDays = "";
     private bool _syncingTime;
     [ObservableProperty] private string _editPerson = "";
     [ObservableProperty] private string _editAmount = "";
@@ -61,6 +63,16 @@ public sealed partial class TrackerItemViewModel : ObservableObject
     public System.Collections.ObjectModel.ObservableCollection<TrackerItemViewModel> Subtasks { get; } = [];
 
     public bool IsSubtask => Item.IsSubtask;
+
+    public bool IsRepeating => Item.IsRepeating;
+
+    /// <summary>"Every day", "Every day until 5/10" or "" (not repeating, or stopped).</summary>
+    public string RepeatText => !Item.RepeatDaily ? "" : Item.RepeatUntil is { } until
+        ? $"Every day until {until.ToString("d", System.Globalization.CultureInfo.CurrentCulture)}"
+        : "Every day";
+
+    /// <summary>How many days of this repeating task were done (all its days).</summary>
+    public int Completions { get; internal set; }
 
     public bool CanHaveSubtasks => !IsDebt && !Item.IsSubtask;
 
@@ -143,6 +155,11 @@ public sealed partial class TrackerItemViewModel : ObservableObject
         get
         {
             var parts = new List<string>();
+            if (Item.IsRepeating)
+            {
+                if (RepeatText.Length > 0) parts.Add(RepeatText);
+                parts.Add(Completions == 1 ? "done 1 time" : $"done {Completions} times");
+            }
             if (IsDebt) parts.Add(TrackerFormat.Direction(Item.Direction));
             // Urgent and High already show as a badge next to the title.
             else if (Item.Priority == TrackerPriority.Low) parts.Add(PriorityText);
@@ -165,6 +182,8 @@ public sealed partial class TrackerItemViewModel : ObservableObject
             return string.Join(" · ", parts);
         }
     }
+
+    internal void NotifyDetails() => OnPropertyChanged(nameof(Details));
 
     internal void Update(TrackerItem item, TrackerWorkspace workspace, DateOnly today)
     {
@@ -208,6 +227,9 @@ public sealed partial class TrackerItemViewModel : ObservableObject
         EditPerson = Item.Person;
         EditAmount = Item.Amount == 0 ? "" : Item.Amount.ToString("0.##", System.Globalization.CultureInfo.CurrentCulture);
         EditDirectionIndex = (int)Item.Direction;
+        EditRepeatIndex = !Item.RepeatDaily ? 0 : Item.RepeatUntil is null ? 1 : 2;
+        EditRepeatDays = Item.RepeatUntil is { } until && Item.OccurrenceDate is { } day
+            ? (until.DayNumber - day.DayNumber + 1).ToString(System.Globalization.CultureInfo.CurrentCulture) : "";
         IsEditing = true;
         IsExpanded = true;
     }

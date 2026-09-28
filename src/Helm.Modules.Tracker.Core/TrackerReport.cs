@@ -10,6 +10,9 @@ public enum ReportRange
 
 public sealed record ReportDay(DateOnly Date, int Count);
 
+/// <summary>A repeating task and how many of its days were done in the report's range.</summary>
+public sealed record ReportRepeat(string SeriesId, string Title, int Count);
+
 /// <summary>A finished item as counted by a report (its last completion that was not reopened afterwards).</summary>
 public sealed record ReportCompletion(TrackerEvent Event)
 {
@@ -56,6 +59,9 @@ public sealed class TrackerReport
     public IReadOnlyList<ReportDay> Days { get; private init; } = [];
 
     public IReadOnlyDictionary<TrackerPriority, int> ByPriority { get; private init; } = new Dictionary<TrackerPriority, int>();
+
+    /// <summary>Repeating tasks done in the range, the most done first.</summary>
+    public IReadOnlyList<ReportRepeat> Repeats { get; private init; } = [];
 
     public static (DateOnly? From, DateOnly To) Bounds(ReportRange range, DateTimeOffset now, TimeZoneInfo zone)
     {
@@ -129,6 +135,11 @@ public sealed class TrackerReport
             OnTimeRate = dueResults.Count == 0 ? null : dueResults.Count(ok => ok) / (double)dueResults.Count,
             Days = days,
             ByPriority = Enum.GetValues<TrackerPriority>().ToDictionary(p => p, p => completions.Count(c => c.Event.Priority == p)),
+            Repeats = completions.Where(c => c.Event.SeriesId is not null)
+                .GroupBy(c => c.Event.SeriesId!)
+                .Select(g => new ReportRepeat(g.Key, g.OrderBy(c => c.Event.At).Last().Event.Title, g.Count()))
+                .OrderByDescending(r => r.Count).ThenBy(r => r.Title, StringComparer.CurrentCultureIgnoreCase)
+                .ToList(),
         };
     }
 

@@ -40,6 +40,7 @@ public sealed class TrackerReminderService
     /// </summary>
     public TrackerReminder? TakeDue(TimeZoneInfo? zone = null)
     {
+        MakeTodaysRepeats();
         lock (_gate)
         {
             var s = _settings.Current;
@@ -57,6 +58,13 @@ public sealed class TrackerReminderService
     }
 
     /// <summary>"Remind me now": shows the reminder whatever the hour. False when nothing is due.</summary>
+    /// <summary>Called on the reminder timer (PC every 10 minutes, Android every hour): also makes today's repeating tasks.</summary>
+    private void MakeTodaysRepeats()
+    {
+        try { _store.EnsureRepeats(); }
+        catch (Exception) { /* a sync store problem must not stop the reminder */ }
+    }
+
     public bool RemindNow(TimeZoneInfo? zone = null)
     {
         var today = DateOnly.FromDateTime(TimeZoneInfo.ConvertTime(_time.GetUtcNow(), zone ?? TimeZoneInfo.Local).DateTime);

@@ -136,27 +136,17 @@
                 android:src="@drawable/tracker_widget_round"
                 android:importantForAccessibility="no" />
 
-            <ImageView
-                android:id="@+id/tracker_widget_toggle_icon"
+            <!-- The number of open items, big enough to read, instead of an icon -->
+            <TextView
+                android:id="@+id/tracker_widget_count"
                 android:layout_width="40dp"
                 android:layout_height="40dp"
                 android:layout_gravity="center"
-                android:padding="10dp"
-                android:src="@drawable/tracker_widget_settings"
-                android:importantForAccessibility="no" />
-
-            <TextView
-                android:id="@+id/tracker_widget_count"
-                android:layout_width="wrap_content"
-                android:layout_height="18dp"
-                android:minWidth="18dp"
-                android:layout_gravity="top|end"
                 android:gravity="center"
-                android:paddingStart="4dp"
-                android:paddingEnd="4dp"
-                android:background="@drawable/tracker_widget_badge"
-                android:textColor="#FFFFFFFF"
-                android:textSize="11sp"
+                android:maxLines="1"
+                android:includeFontPadding="false"
+                android:textColor="@color/tracker_widget_accent"
+                android:textSize="16sp"
                 android:textStyle="bold"
                 android:text="0" />
         </FrameLayout>

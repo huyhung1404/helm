@@ -163,9 +163,111 @@ public sealed class TrackerStore
                 Amount = Math.Abs(draft.Amount),
                 Direction = draft.Direction,
             };
-            var id = _items.Add(item);
+            string id;
+            if (draft.RepeatDaily && draft.ParentId is null && workspace.Kind == WorkspaceKind.Tasks)
+            {
+                // A repeating task: today's occurrence of a new series.
+                var today = Today();
+                var series = Guid.NewGuid().ToString("N");
+                item = item with { SeriesId = series, OccurrenceDate = today, RepeatDaily = true, RepeatUntil = draft.RepeatUntil };
+                id = OccurrenceId(series, today);
+                _items.Upsert(id, item);
+            }
+            else
+            {
+                id = _items.Add(item);
+            }
             Log(TrackerEventKind.Created, id, item, workspace.Kind);
             return id;
+        }
+    }
+
+    // ---- Repeating tasks -----------------------------------------------------------------------------------------
+
+    public static string OccurrenceId(string seriesId, DateOnly day) => $"{seriesId}@{day:yyyy-MM-dd}";
+
+    private DateOnly Today() => DateOnly.FromDateTime(TimeZoneInfo.ConvertTime(Now, TimeZoneInfo.Local).DateTime);
+
+    /// <summary>
+    /// Makes today's task of every repeating series that goes on (its latest day still repeats and today is not past
+    /// its last day). Days the app was not used are skipped: only today's task appears. The id is the same on every
+    /// device, so two devices doing this at once write one record.
+    /// </summary>
+    /// <returns>How many tasks were made.</returns>
+    public int EnsureRepeats(DateOnly? day = null)
+    {
+        var today = day ?? Today();
+        var made = 0;
+        lock (_gate)
+        {
+            var workspaces = _workspaces.All().Where(w => w.Value.Kind == WorkspaceKind.Tasks).Select(w => w.Id).ToHashSet(StringComparer.Ordinal);
+            var all = _items.All();
+            foreach (var series in all.Where(i => i.Value.SeriesId is not null && i.Value.OccurrenceDate is not null && !i.Value.IsSubtask)
+                         .GroupBy(i => i.Value.SeriesId!))
+            {
+                var latest = series.OrderByDescending(i => i.Value.OccurrenceDate).First();
+                var last = latest.Value;
+                if (!last.RepeatDaily || last.OccurrenceDate >= today || !workspaces.Contains(last.WorkspaceId)) continue;
+                if (last.RepeatUntil is { } until && today > until) continue;
+                var id = OccurrenceId(series.Key, today);
+                if (_items.Get(id) is not null) continue;
+
+                DateTimeOffset? dueAt = null;
+                if (last.DueAt is { } at)
+                {
+                    var local = today.ToDateTime(TimeOnly.FromTimeSpan(TimeZoneInfo.ConvertTime(at, TimeZoneInfo.Local).TimeOfDay));
+                    dueAt = new DateTimeOffset(local, TimeZoneInfo.Local.GetUtcOffset(local));
+                }
+                var next = new TrackerItem
+                {
+                    WorkspaceId = last.WorkspaceId,
+                    Title = last.Title,
+                    Notes = last.Notes,
+                    Priority = last.Priority,
+                    Order = last.Order,
+                    SeriesId = last.SeriesId,
+                    OccurrenceDate = today,
+                    RepeatDaily = true,
+                    RepeatUntil = last.RepeatUntil,
+                    DueAt = dueAt,
+                    DueDate = last.DueAt is not null || last.DueDate is not null ? today : null,
+                    CreatedAt = Now,
+                };
+                _items.Upsert(id, next);
+                Log(TrackerEventKind.Created, id, next, WorkspaceKind.Tasks);
+                // The same subtasks, not done yet.
+                var index = 0;
+                foreach (var (_, sub, _) in Subtasks(latest.Id))
+                {
+                    var subId = $"{id}/{index++}";
+                    if (_items.Get(subId) is not null) continue;
+                    _items.Upsert(subId, new TrackerItem
+                    {
+                        WorkspaceId = sub.WorkspaceId,
+                        ParentId = id,
+                        Title = sub.Title,
+                        Priority = sub.Priority,
+                        Order = sub.Order,
+                        CreatedAt = Now,
+                    });
+                }
+                made++;
+            }
+        }
+        return made;
+    }
+
+    /// <summary>How many days of a repeating task were done (over all its occurrences that still exist).</summary>
+    public int SeriesCompletions(string seriesId) =>
+        _items.All().Count(i => i.Value.SeriesId == seriesId && i.Value.IsCompleted && !i.Value.IsSubtask);
+
+    /// <summary>Stops a series: no new day appears (the tasks already there stay).</summary>
+    public void StopRepeating(string seriesId)
+    {
+        lock (_gate)
+        {
+            foreach (var (id, item, _) in _items.All().Where(i => i.Value.SeriesId == seriesId && i.Value.RepeatDaily).ToList())
+                _items.Upsert(id, item with { RepeatDaily = false });
         }
     }
 
@@ -251,6 +353,8 @@ public sealed class TrackerStore
         lock (_gate)
         {
             if (_items.Get(id) is not { } item) return false;
+            // Deleting a day of a repeating task ends the series (otherwise it would come back tomorrow).
+            if (item.SeriesId is { } series) StopRepeating(series);
             foreach (var (subId, sub, _) in Subtasks(id))
             {
                 Log(TrackerEventKind.Deleted, subId, sub);

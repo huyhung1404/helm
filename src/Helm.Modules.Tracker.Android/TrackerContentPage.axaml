@@ -131,6 +131,9 @@
                                     <Border Classes="badge" IsVisible="{Binding IsStarted}">
                                         <TextBlock Text="In progress" Foreground="{DynamicResource SystemAccentColor}" />
                                     </Border>
+                                    <Border Classes="badge" IsVisible="{Binding RepeatText, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
+                                        <ic:SymbolIcon Symbol="ArrowRepeatAll" FontSize="12" Foreground="{DynamicResource SystemAccentColor}" />
+                                    </Border>
                                     <Border Classes="badge" IsVisible="{Binding HasSubtasks}">
                                         <TextBlock Text="{Binding SubtaskProgress}" />
                                     </Border>
@@ -210,6 +213,11 @@
                                   SelectedIndex="{Binding EditPriorityIndex}" />
                         <CalendarDatePicker HorizontalAlignment="Stretch" SelectedDate="{Binding EditDueDate}" PlaceholderText="Due date (optional)" />
                         <TimePicker HorizontalAlignment="Stretch" SelectedTime="{Binding EditDueTime}" ClockIdentifier="24HourClock" />
+                        <Grid ColumnDefinitions="*,Auto" IsVisible="{Binding IsRepeating}">
+                            <ComboBox HorizontalAlignment="Stretch" SelectedIndex="{Binding EditRepeatIndex}"
+                                      ItemsSource="{Binding $parent[UserControl].((vm:TrackerViewModel)DataContext).RepeatNames}" />
+                            <TextBox Grid.Column="1" Width="96" Margin="8,0,0,0" PlaceholderText="Days" Text="{Binding EditRepeatDays}" />
+                        </Grid>
                         <WrapPanel>
                             <Button Classes="accent" Content="Save" Command="{Binding SaveEditCommand}" Margin="0,0,8,0" />
                             <Button Content="Cancel" Command="{Binding CancelEditCommand}" />
@@ -281,6 +289,11 @@
                     </TextBox>
                     <ComboBox HorizontalAlignment="Stretch" ItemsSource="{Binding PriorityNames}" SelectedIndex="{Binding NewPriorityIndex}"
                               IsVisible="{Binding IsTaskWorkspace}" AutomationProperties.Name="Priority" />
+                    <Grid ColumnDefinitions="*,Auto" IsVisible="{Binding IsTaskWorkspace}">
+                        <ComboBox HorizontalAlignment="Stretch" ItemsSource="{Binding RepeatNames}" SelectedIndex="{Binding NewRepeatIndex}" AutomationProperties.Name="Repeat" />
+                        <TextBox Grid.Column="1" Width="96" Margin="8,0,0,0" PlaceholderText="Days" Text="{Binding NewRepeatDays}" IsVisible="{Binding NewRepeatsForDays}"
+                                 AutomationProperties.Name="Repeat days" />
+                    </Grid>
                     <CalendarDatePicker x:Name="NewDuePicker" HorizontalAlignment="Stretch" SelectedDate="{Binding NewDueDate}" PlaceholderText="Due date (optional)" />
                     <TimePicker HorizontalAlignment="Stretch" SelectedTime="{Binding NewDueTime}" ClockIdentifier="24HourClock" IsVisible="{Binding NewDueDate, Converter={x:Static ObjectConverters.IsNotNull}}" />
                     <Button Classes="accent" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Content="Add" Command="{Binding AddCommand}" />
@@ -412,6 +425,17 @@
                                             Background="{DynamicResource SystemAccentColor}" />
                                     <TextBlock Grid.Row="1" Text="{Binding Label}" FontSize="10" HorizontalAlignment="Center" TextWrapping="NoWrap"
                                                Classes="secondary" Margin="-20,2,-20,0" TextAlignment="Center" />
+                                </Grid>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                    <TextBlock Text="Repeating tasks: days done" Classes="title" Margin="0,16,0,6" IsVisible="{Binding HasReportRepeats}" />
+                    <ItemsControl ItemsSource="{Binding ReportRepeats}" IsVisible="{Binding HasReportRepeats}">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate DataType="vm:ReportCount">
+                                <Grid ColumnDefinitions="*,Auto" Margin="0,2">
+                                    <TextBlock Text="{Binding Label}" TextTrimming="CharacterEllipsis" />
+                                    <TextBlock Grid.Column="1" Text="{Binding Count}" FontWeight="SemiBold" Margin="12,0,0,0" />
                                 </Grid>
                             </DataTemplate>
                         </ItemsControl.ItemTemplate>
