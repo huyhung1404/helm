@@ -31,6 +31,10 @@ public sealed partial class TrackerItemViewModel : ObservableObject
     [ObservableProperty] private string _editNotes = "";
     [ObservableProperty] private int _editPriorityIndex;
     [ObservableProperty] private DateTime? _editDueDate;
+    [ObservableProperty] private string _editDueTimeText = "";
+    [ObservableProperty] private TimeSpan? _editDueTime;
+    [ObservableProperty] [NotifyCanExecuteChangedFor(nameof(AddSubtaskCommand))] private string _newSubtaskTitle = "";
+    private bool _syncingTime;
     [ObservableProperty] private string _editPerson = "";
     [ObservableProperty] private string _editAmount = "";
     [ObservableProperty] private int _editDirectionIndex;
@@ -52,6 +56,27 @@ public sealed partial class TrackerItemViewModel : ObservableObject
     public string Id { get; }
 
     public TrackerItem Item { get; private set; }
+
+    /// <summary>The task's subtasks (open first). Empty for a subtask itself.</summary>
+    public System.Collections.ObjectModel.ObservableCollection<TrackerItemViewModel> Subtasks { get; } = [];
+
+    public bool IsSubtask => Item.IsSubtask;
+
+    public bool CanHaveSubtasks => !IsDebt && !Item.IsSubtask;
+
+    public bool HasSubtasks => Subtasks.Count > 0;
+
+    /// <summary>"2/3" subtasks done.</summary>
+    public string SubtaskProgress => HasSubtasks ? $"{Subtasks.Count(s => s.IsCompleted)}/{Subtasks.Count}" : "";
+
+    internal void SetSubtasks(IReadOnlyList<TrackerItemViewModel> rows)
+    {
+        if (Subtasks.SequenceEqual(rows)) { OnPropertyChanged(nameof(SubtaskProgress)); return; }
+        Subtasks.Clear();
+        foreach (var row in rows) Subtasks.Add(row);
+        OnPropertyChanged(nameof(HasSubtasks));
+        OnPropertyChanged(nameof(SubtaskProgress));
+    }
 
     public TrackerWorkspace Workspace { get; private set; }
 
@@ -88,7 +113,7 @@ public sealed partial class TrackerItemViewModel : ObservableObject
 
     public bool IsHigh => Item.Priority == TrackerPriority.High && IsOpen;
 
-    public bool IsOverdue => IsOpen && Item.DueDate is { } due && due < Today;
+    public bool IsOverdue => IsOpen && Item.DueMoment(TimeZoneInfo.Local) is { } due && due < DateTimeOffset.Now;
 
     /// <summary>Main line: the title, or for a debt "Person — reason".</summary>
     public string Title
@@ -133,7 +158,7 @@ public sealed partial class TrackerItemViewModel : ObservableObject
             }
             else
             {
-                if (Item.DueDate is { } due) parts.Add(TrackerFormat.Due(due, Today));
+                if (Item.DueAt is not null || Item.DueDate is not null) parts.Add(TrackerFormat.Due(Item, DateTimeOffset.Now));
                 if (Item.StartedExplicitly && Item.StartedAt is { } started) parts.Add("Started " + TrackerFormat.When(started));
                 else parts.Add("Added " + TrackerFormat.When(Item.CreatedAt));
             }
@@ -174,7 +199,12 @@ public sealed partial class TrackerItemViewModel : ObservableObject
         EditTitle = Item.Title;
         EditNotes = Item.Notes;
         EditPriorityIndex = (int)Item.Priority;
-        EditDueDate = Item.DueDate?.ToDateTime(TimeOnly.MinValue);
+        var dueLocal = Item.DueAt is { } at ? TimeZoneInfo.ConvertTime(at, TimeZoneInfo.Local) : (DateTimeOffset?)null;
+        EditDueDate = dueLocal?.Date ?? Item.DueDate?.ToDateTime(TimeOnly.MinValue);
+        _syncingTime = true;
+        EditDueTime = dueLocal?.TimeOfDay;
+        EditDueTimeText = TrackerFormat.Time(EditDueTime);
+        _syncingTime = false;
         EditPerson = Item.Person;
         EditAmount = Item.Amount == 0 ? "" : Item.Amount.ToString("0.##", System.Globalization.CultureInfo.CurrentCulture);
         EditDirectionIndex = (int)Item.Direction;
@@ -184,6 +214,30 @@ public sealed partial class TrackerItemViewModel : ObservableObject
 
     [RelayCommand]
     private void CancelEdit() => IsEditing = false;
+
+    partial void OnEditDueTimeTextChanged(string value)
+    {
+        if (_syncingTime || !TrackerFormat.TryParseTime(value, out var time)) return;
+        _syncingTime = true;
+        EditDueTime = time;
+        _syncingTime = false;
+    }
+
+    partial void OnEditDueTimeChanged(TimeSpan? value)
+    {
+        if (_syncingTime) return;
+        _syncingTime = true;
+        EditDueTimeText = TrackerFormat.Time(value);
+        _syncingTime = false;
+    }
+
+    private bool CanAddSubtask() => NewSubtaskTitle.Trim().Length > 0;
+
+    [RelayCommand(CanExecute = nameof(CanAddSubtask))]
+    private void AddSubtask()
+    {
+        if (_owner.AddSubtask(this, NewSubtaskTitle)) NewSubtaskTitle = "";
+    }
 
     [RelayCommand]
     private void SaveEdit()

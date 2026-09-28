@@ -29,6 +29,18 @@ public enum DebtDirection
     IOwe,
 }
 
+/// <summary>
+/// What the user adds to a person's debts. A repayment is stored as the direction that pulls the balance toward 0 (plus
+/// <see cref="TrackerItem.IsRepayment"/>), so older Helm versions, which know only the two directions, still add up the
+/// same balance.
+/// </summary>
+public enum DebtEntryKind
+{
+    OwesMe,
+    IOwe,
+    Repayment,
+}
+
 /// <summary>A named list (synced record in <c>tracker.workspaces</c>).</summary>
 public sealed record TrackerWorkspace
 {
@@ -60,7 +72,17 @@ public sealed record TrackerItem
     /// <summary>Manual position among open items of the same priority (ascending).</summary>
     public double Order { get; init; }
 
+    /// <summary>The due day (local). Kept next to <see cref="DueAt"/> for older Helm versions, which know only days.</summary>
     public DateOnly? DueDate { get; init; }
+
+    /// <summary>The due date and time; null for an item due on a day (<see cref="DueDate"/>) or not at all.</summary>
+    public DateTimeOffset? DueAt { get; init; }
+
+    /// <summary>Tasks: the item this is a subtask of (subtasks are items of their own, so older versions keep them).</summary>
+    public string? ParentId { get; init; }
+
+    /// <summary>Debts: this entry is a repayment (its <see cref="Direction"/> pulls the balance toward 0).</summary>
+    public bool IsRepayment { get; init; }
 
     public DateTimeOffset CreatedAt { get; init; }
 
@@ -81,6 +103,40 @@ public sealed record TrackerItem
 
     [JsonIgnore]
     public bool IsCompleted => CompletedAt is not null;
+
+    [JsonIgnore]
+    public bool IsSubtask => ParentId is not null;
+
+    /// <summary>+Amount when the person owes the user, −Amount when the user owes them.</summary>
+    [JsonIgnore]
+    public decimal SignedAmount => Direction == DebtDirection.TheyOweMe ? Amount : -Amount;
+
+    /// <summary>When the item is due: its time, or the end of its due day (local) when only a day was set.</summary>
+    public DateTimeOffset? DueMoment(TimeZoneInfo zone) => TrackerDue.Moment(DueAt, DueDate, zone);
+}
+
+/// <summary>Due dates with an optional time (DueAt), next to the day-only DueDate older versions read.</summary>
+public static class TrackerDue
+{
+    public static DateTimeOffset? Moment(DateTimeOffset? dueAt, DateOnly? dueDate, TimeZoneInfo zone)
+    {
+        if (dueAt is { } at) return at;
+        if (dueDate is not { } day) return null;
+        var local = day.ToDateTime(new TimeOnly(23, 59));
+        return new DateTimeOffset(local, zone.GetUtcOffset(local));
+    }
+
+    /// <summary>The local day of a due time, written as DueDate so older versions see the right day.</summary>
+    public static DateOnly? Day(DateTimeOffset? dueAt, TimeZoneInfo zone) =>
+        dueAt is { } at ? DateOnly.FromDateTime(TimeZoneInfo.ConvertTime(at, zone).DateTime) : null;
+
+    /// <summary>A date picked in the UI plus an optional time of day (local); null when no date.</summary>
+    public static DateTimeOffset? FromLocal(DateTime? date, TimeSpan? time, TimeZoneInfo zone)
+    {
+        if (date is not { } d) return null;
+        var local = d.Date + (time ?? new TimeSpan(23, 59, 0));
+        return new DateTimeOffset(local, zone.GetUtcOffset(local));
+    }
 }
 
 public enum TrackerEventKind
@@ -114,6 +170,12 @@ public sealed record TrackerEvent
 
     public DateOnly? DueDate { get; init; }
 
+    public DateTimeOffset? DueAt { get; init; }
+
+    public string? ParentId { get; init; }
+
+    public bool IsRepayment { get; init; }
+
     public DateTimeOffset CreatedAt { get; init; }
 
     public DateTimeOffset? StartedAt { get; init; }
@@ -138,6 +200,9 @@ public sealed record TrackerEvent
         Title = item.Title,
         Priority = item.Priority,
         DueDate = item.DueDate,
+        DueAt = item.DueAt,
+        ParentId = item.ParentId,
+        IsRepayment = item.IsRepayment,
         CreatedAt = item.CreatedAt,
         StartedAt = item.StartedAt,
         CompletedAt = item.CompletedAt,
@@ -156,4 +221,6 @@ public sealed record TrackerItemDraft(
     string Notes = "",
     string Person = "",
     decimal Amount = 0,
-    DebtDirection Direction = DebtDirection.TheyOweMe);
+    DebtDirection Direction = DebtDirection.TheyOweMe,
+    DateTimeOffset? DueAt = null,
+    string? ParentId = null);

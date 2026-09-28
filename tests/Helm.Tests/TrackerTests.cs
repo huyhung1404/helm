@@ -308,24 +308,163 @@ public sealed class TrackerTests
             vm.NewAmount = "lots";
             vm.AddCommand.Execute(null);
             Assert.True(vm.HasMessage);
-            Assert.Empty(vm.OpenItems);
+            Assert.Empty(vm.DebtPeople);
 
             vm.NewAmount = "150k";
             vm.AddCommand.Execute(null);
-            var row = Assert.Single(vm.OpenItems);
-            Assert.Equal(150_000m, row.Item.Amount);
+            var an = Assert.Single(vm.DebtPeople);
+            Assert.Equal("An", an.Name);
+            Assert.StartsWith("+", an.BalanceText);
             Assert.Equal("", vm.NewPerson);
 
-            row.ToggleCompleteCommand.Execute(null);
-            Assert.Empty(vm.OpenItems);
-            Assert.Same(row, Assert.Single(vm.CompletedItems)); // the row instance is reused
-            Assert.Equal("1", vm.ReportCompleted);
+            // A repayment of all of it settles An: no tick box.
+            vm.NewPerson = "an";
+            vm.NewDebtKindIndex = (int)DebtEntryKind.Repayment;
+            vm.NewAmount = "150,000";
+            vm.AddCommand.Execute(null);
+            Assert.Empty(vm.DebtPeople);
+            var settled = Assert.Single(vm.SettledPeople);
+            Assert.Equal("Settled", settled.BalanceText);
+            Assert.Equal(2, settled.Entries.Count);
         }
         finally
         {
             try { if (Directory.Exists(dir)) Directory.Delete(dir, recursive: true); }
             catch (IOException) { } // a settings write may still be finishing; it is only a temp folder
         }
+    }
+
+    [Fact]
+    public void Debts_of_the_same_person_add_up_whatever_the_case_and_spacing_and_settle_at_zero()
+    {
+        var ws = _store.AddWorkspace("Debts", WorkspaceKind.Debts);
+        _store.AddDebt(ws, "Minh  Anh", 500_000, DebtEntryKind.OwesMe, "lunch");
+        _time.Advance(TimeSpan.FromMinutes(1));
+        _store.AddDebt(ws, "minh anh", 200_000, DebtEntryKind.OwesMe);
+        _time.Advance(TimeSpan.FromMinutes(1));
+        _store.AddDebt(ws, "Minh Anh", 100_000, DebtEntryKind.IOwe);
+        Assert.Equal(600_000m, _store.DebtBalance(ws, "MINH ANH"));
+
+        var person = Assert.Single(DebtLedger.Open(_store.Items(ws)));
+        Assert.Equal("Minh  Anh".Replace("  ", " "), person.Name);
+        Assert.Equal([500_000m, 700_000m, 600_000m], person.Entries.Select(e => e.BalanceAfter));
+        Assert.All(_store.Items(ws), i => Assert.Equal("Minh Anh", i.Value.Person)); // one spelling, the first one (tidied)
+
+        // A repayment pulls toward 0 and is stored as the opposite direction, so older versions add up the same.
+        _time.Advance(TimeSpan.FromMinutes(1));
+        var repaid = _store.AddDebt(ws, "Minh Anh", 250_000, DebtEntryKind.Repayment);
+        Assert.Equal(DebtDirection.IOwe, _store.GetItem(repaid)!.Direction);
+        Assert.True(_store.GetItem(repaid)!.IsRepayment);
+        Assert.Equal(350_000m, _store.DebtBalance(ws, "Minh Anh"));
+        Assert.All(_store.Items(ws), i => Assert.False(i.Value.IsCompleted));
+
+        _time.Advance(TimeSpan.FromMinutes(1));
+        _store.AddDebt(ws, "Minh Anh", 350_000, DebtEntryKind.Repayment);
+        Assert.Empty(DebtLedger.Open(_store.Items(ws)));
+        var settled = Assert.Single(DebtLedger.Settled(_store.Items(ws)));
+        Assert.Equal(5, settled.Entries.Count);
+        Assert.All(_store.Items(ws), i => Assert.Equal(T0.AddMinutes(4), i.Value.CompletedAt)); // settled together
+        Assert.Equal(5, _store.History().Count(e => e.Kind == TrackerEventKind.Created)); // every amount change
+        Assert.Equal(5, _store.History().Count(e => e.Kind == TrackerEventKind.Completed));
+
+        // Nothing left to repay; a new debt starts a new account for the same person.
+        Assert.Throws<InvalidOperationException>(() => _store.AddDebt(ws, "Minh Anh", 1, DebtEntryKind.Repayment));
+        _time.Advance(TimeSpan.FromMinutes(1));
+        _store.AddDebt(ws, "Minh Anh", 10_000, DebtEntryKind.IOwe);
+        Assert.Equal(-10_000m, _store.DebtBalance(ws, "Minh Anh"));
+        var repay = _store.AddDebt(ws, "Minh Anh", 10_000, DebtEntryKind.Repayment);
+        Assert.Equal(DebtDirection.TheyOweMe, _store.GetItem(repay)!.Direction); // when I owe, my repayment adds back
+        Assert.Equal(2, DebtLedger.Settled(_store.Items(ws)).Count);
+        Assert.Throws<ArgumentException>(() => _store.AddDebt(ws, "  ", 5, DebtEntryKind.OwesMe));
+        Assert.Throws<ArgumentException>(() => _store.AddDebt(ws, "Lan", 0, DebtEntryKind.OwesMe));
+    }
+
+    [Fact]
+    public void A_persons_due_time_is_set_and_extended_on_all_their_open_entries()
+    {
+        var ws = _store.AddWorkspace("Debts", WorkspaceKind.Debts);
+        _store.AddDebt(ws, "Lan", 100, DebtEntryKind.OwesMe);
+        _store.AddDebt(ws, "Lan", 50, DebtEntryKind.OwesMe);
+        var due = new DateTimeOffset(2026, 10, 1, 18, 30, 0, TimeSpan.FromHours(7));
+        Assert.Equal(2, _store.SetDebtDue(ws, "lan", due));
+        Assert.All(_store.Items(ws), i =>
+        {
+            Assert.Equal(due, i.Value.DueAt);
+            Assert.NotNull(i.Value.DueDate); // older versions still see the day
+        });
+        // A new entry for Lan keeps her due time.
+        var later = _store.AddDebt(ws, "Lan", 25, DebtEntryKind.OwesMe);
+        Assert.Equal(due, _store.GetItem(later)!.DueAt);
+        _store.SetDebtDue(ws, "Lan", null);
+        Assert.All(_store.Items(ws), i => Assert.Null(i.Value.DueAt));
+    }
+
+    [Fact]
+    public void Subtasks_belong_to_their_task_are_finished_with_it_and_deleted_with_it()
+    {
+        var ws = _store.AddWorkspace("To-do", WorkspaceKind.Tasks);
+        var task = _store.AddItem(ws, new TrackerItemDraft("Release"));
+        var a = _store.AddItem(ws, new TrackerItemDraft("Build", ParentId: task));
+        var b = _store.AddItem(ws, new TrackerItemDraft("Test", ParentId: task));
+        Assert.Equal(task, Assert.Single(_store.OpenItems(ws)).Id); // subtasks are not top-level items
+        Assert.Equal([a, b], _store.Subtasks(task).Select(x => x.Id));
+        Assert.Throws<InvalidOperationException>(() => _store.AddItem(ws, new TrackerItemDraft("Nested", ParentId: a)));
+
+        _store.Complete(a);
+        Assert.Equal([b, a], _store.Subtasks(task).Select(x => x.Id)); // open first
+        _store.Complete(task);
+        Assert.All(_store.Subtasks(task), x => Assert.True(x.Value.IsCompleted));
+        _store.DeleteItem(task);
+        Assert.Empty(_store.Items(ws));
+    }
+
+    [Fact]
+    public void A_due_time_is_kept_with_its_day_for_older_versions_and_shown_with_the_time()
+    {
+        var ws = _store.AddWorkspace("To-do", WorkspaceKind.Tasks);
+        var at = TrackerDue.FromLocal(new DateTime(2026, 9, 28), new TimeSpan(14, 30, 0), TimeZoneInfo.Local)!.Value;
+        var id = _store.AddItem(ws, new TrackerItemDraft("Call", DueAt: at));
+        var item = _store.GetItem(id)!;
+        Assert.Equal(at, item.DueAt);
+        Assert.Equal(new DateOnly(2026, 9, 28), item.DueDate);
+        var morning = new DateTimeOffset(new DateTime(2026, 9, 28, 9, 0, 0), TimeZoneInfo.Local.GetUtcOffset(new DateTime(2026, 9, 28, 9, 0, 0)));
+        Assert.StartsWith("Due today", TrackerFormat.Due(item, morning));
+        Assert.Contains(TrackerFormat.Time(new TimeSpan(14, 30, 0)), TrackerFormat.Due(item, morning));
+        Assert.StartsWith("Overdue since", TrackerFormat.Due(item, morning.AddHours(6)));
+        // A day without a time is due at the end of that day.
+        var dayOnly = new TrackerItem { DueDate = new DateOnly(2026, 9, 28) };
+        Assert.Equal(23, TimeZoneInfo.ConvertTime(dayOnly.DueMoment(TimeZoneInfo.Local)!.Value, TimeZoneInfo.Local).Hour);
+    }
+
+    [Theory]
+    [InlineData("1500000", 7, "1,500,000", 9)]
+    [InlineData("1,500,0007", 10, "15,000,007", 10)]
+    [InlineData("1,50", 4, "150", 3)]
+    [InlineData("007", 3, "7", 1)]
+    [InlineData("150k", 4, "150k", 4)]
+    [InlineData("1234", 2, "1,234", 3)]
+    public void Amounts_get_thousands_separators_while_typed_keeping_the_caret(string text, int caret, string expected, int expectedCaret)
+    {
+        var (grouped, newCaret) = TrackerFormat.GroupDigits(text, caret, CultureInfo.GetCultureInfo("en-US"));
+        Assert.Equal(expected, grouped);
+        Assert.Equal(expectedCaret, newCaret);
+        Assert.Equal("1.500.000", TrackerFormat.GroupDigits("1500000", 7, CultureInfo.GetCultureInfo("vi-VN")).Text);
+        Assert.True(TrackerFormat.TryParseAmount("1.500.000", out var amount) && amount == 1_500_000);
+    }
+
+    [Theory]
+    [InlineData("14:30", 14, 30)]
+    [InlineData("1430", 14, 30)]
+    [InlineData("9", 9, 0)]
+    [InlineData("9h30", 9, 30)]
+    [InlineData("9h", 9, 0)]
+    public void Times_are_read_as_people_type_them(string text, int hours, int minutes)
+    {
+        Assert.True(TrackerFormat.TryParseTime(text, out var time));
+        Assert.Equal(new TimeSpan(hours, minutes, 0), time);
+        Assert.True(TrackerFormat.TryParseTime("", out var none) && none is null);
+        Assert.False(TrackerFormat.TryParseTime("25:00", out _));
+        Assert.False(TrackerFormat.TryParseTime("soon", out _));
     }
 
     [Fact]

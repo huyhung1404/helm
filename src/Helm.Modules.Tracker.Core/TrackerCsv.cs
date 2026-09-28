@@ -39,7 +39,7 @@ public static class TrackerCsv
                 Time(item.CreatedAt),
                 Time(item.StartedAt),
                 Time(item.CompletedAt),
-                item.DueDate?.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) ?? "",
+                item.DueAt is { } dueAt ? Time(dueAt) : item.DueDate?.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) ?? "",
                 Minutes(item.CompletedAt - item.CreatedAt),
                 Minutes(item.StartedExplicitly ? item.CompletedAt - item.StartedAt : null),
                 item.Person,

@@ -115,7 +115,12 @@ public sealed class TrackerStore
         return _items.All().Where(i => workspaces.Contains(i.Value.WorkspaceId)).ToList();
     }
 
-    /// <summary>Open items in list order: priority (urgent first), then manual order, then age.</summary>
+    /// <summary>A task's subtasks (open first, then done), in the order they were added.</summary>
+    public IReadOnlyList<SyncedItem<TrackerItem>> Subtasks(string parentId) =>
+        _items.All().Where(i => i.Value.ParentId == parentId)
+            .OrderBy(i => i.Value.IsCompleted).ThenBy(i => i.Value.Order).ThenBy(i => i.Value.CreatedAt).ThenBy(i => i.Id, StringComparer.Ordinal).ToList();
+
+    /// <summary>Open items in list order: priority (urgent first), then manual order, then age. Subtasks are listed under their task.</summary>
     public IReadOnlyList<SyncedItem<TrackerItem>> OpenItems(string workspaceId) =>
         TrackerOrdering.Open(Items(workspaceId));
 
@@ -128,21 +133,31 @@ public sealed class TrackerStore
         lock (_gate)
         {
             var workspace = _workspaces.Get(workspaceId) ?? throw new InvalidOperationException("That workspace no longer exists.");
+            if (draft.ParentId is { } parentId)
+            {
+                if (_items.Get(parentId) is not { } parent || parent.WorkspaceId != workspaceId || parent.IsSubtask)
+                    throw new InvalidOperationException("That task no longer exists.");
+                if (workspace.Kind != WorkspaceKind.Tasks) throw new InvalidOperationException("Only tasks have subtasks.");
+            }
             var title = draft.Title.Trim();
             var person = draft.Person.Trim();
             if (workspace.Kind == WorkspaceKind.Tasks && title.Length == 0) throw new ArgumentException("A task needs a title.", nameof(draft));
             if (workspace.Kind == WorkspaceKind.Debts && person.Length == 0 && title.Length == 0)
                 throw new ArgumentException("A debt needs a person or a description.", nameof(draft));
 
-            var siblings = Items(workspaceId).Where(i => !i.Value.IsCompleted && i.Value.Priority == draft.Priority).ToList();
+            var siblings = draft.ParentId is { } p
+                ? Subtasks(p)
+                : Items(workspaceId).Where(i => !i.Value.IsCompleted && !i.Value.IsSubtask && i.Value.Priority == draft.Priority).ToList();
             var item = new TrackerItem
             {
                 WorkspaceId = workspaceId,
+                ParentId = draft.ParentId,
                 Title = title,
                 Notes = draft.Notes.Trim(),
                 Priority = draft.Priority,
                 Order = siblings.Count == 0 ? 0 : siblings.Max(i => i.Value.Order) + 1,
-                DueDate = draft.DueDate,
+                DueAt = draft.DueAt,
+                DueDate = draft.DueAt is { } at ? TrackerDue.Day(at, TimeZoneInfo.Local) : draft.DueDate,
                 CreatedAt = Now,
                 Person = person,
                 Amount = Math.Abs(draft.Amount),
@@ -170,6 +185,8 @@ public sealed class TrackerStore
                 StartedExplicitly = current.StartedExplicitly,
             };
             updated = updated with { Title = updated.Title.Trim(), Person = updated.Person.Trim(), Notes = updated.Notes.Trim(), Amount = Math.Abs(updated.Amount) };
+            // The day older versions read follows the due time.
+            if (updated.DueAt is { } at) updated = updated with { DueDate = TrackerDue.Day(at, TimeZoneInfo.Local) };
             if (updated.Priority != current.Priority && !current.IsCompleted)
             {
                 // Moving to another priority puts the item at the end of that group.
@@ -202,9 +219,9 @@ public sealed class TrackerStore
         {
             if (_items.Get(id) is not { } item || item.IsCompleted) return false;
             var now = Now;
-            var done = item with { CompletedAt = now, StartedAt = item.StartedAt ?? item.CreatedAt };
-            _items.Upsert(id, done);
-            Log(TrackerEventKind.Completed, id, done);
+            CompleteOne(id, item, now);
+            // Finishing a task finishes what is left of it.
+            foreach (var (subId, sub, _) in Subtasks(id).Where(x => !x.Value.IsCompleted)) CompleteOne(subId, sub, now);
             return true;
         }
     }
@@ -234,8 +251,110 @@ public sealed class TrackerStore
         lock (_gate)
         {
             if (_items.Get(id) is not { } item) return false;
+            foreach (var (subId, sub, _) in Subtasks(id))
+            {
+                Log(TrackerEventKind.Deleted, subId, sub);
+                _items.Delete(subId);
+            }
             Log(TrackerEventKind.Deleted, id, item);
             return _items.Delete(id);
+        }
+    }
+
+    private void CompleteOne(string id, TrackerItem item, DateTimeOffset now)
+    {
+        var done = item with { CompletedAt = now, StartedAt = item.StartedAt ?? item.CreatedAt };
+        _items.Upsert(id, done);
+        Log(TrackerEventKind.Completed, id, done);
+    }
+
+    // ---- Debt book -----------------------------------------------------------------------------------------------
+
+    /// <summary>What a person owes the user (+) or the user owes them (-), over their open entries.</summary>
+    public decimal DebtBalance(string workspaceId, string person) =>
+        OpenDebts(workspaceId, person).Sum(i => i.Value.SignedAmount);
+
+    private List<SyncedItem<TrackerItem>> OpenDebts(string workspaceId, string person)
+    {
+        var key = DebtLedger.Key(person);
+        return Items(workspaceId).Where(i => !i.Value.IsCompleted && DebtLedger.Key(i.Value.Person) == key).ToList();
+    }
+
+    /// <summary>
+    /// Adds money to a person in the debt book: owes me (+), I owe (-) or a repayment (toward 0). The same person
+    /// (whatever the case and spacing of the name) shares one balance; when it reaches 0 every open entry of that person
+    /// is settled together. Each entry is its own record and history event, so every change of the amount is in the
+    /// history.
+    /// </summary>
+    /// <returns>The new entry's id.</returns>
+    public string AddDebt(string workspaceId, string person, decimal amount, DebtEntryKind kind, string note = "", DateTimeOffset? dueAt = null)
+    {
+        lock (_gate)
+        {
+            var workspace = _workspaces.Get(workspaceId) ?? throw new InvalidOperationException("That workspace no longer exists.");
+            if (workspace.Kind != WorkspaceKind.Debts) throw new InvalidOperationException("Debts go in the debt book.");
+            person = DebtLedger.Clean(person);
+            if (person.Length == 0) throw new ArgumentException("Who is it with? A debt needs a person.", nameof(person));
+            amount = Math.Abs(amount);
+            if (amount == 0) throw new ArgumentException("Enter an amount.", nameof(amount));
+
+            var open = OpenDebts(workspaceId, person);
+            var balance = open.Sum(i => i.Value.SignedAmount);
+            // The name as it was first written, so one person does not show up twice.
+            if (open.Count > 0) person = open.OrderBy(i => i.Value.CreatedAt).First().Value.Person;
+            DebtDirection direction;
+            switch (kind)
+            {
+                case DebtEntryKind.Repayment when balance == 0:
+                    throw new InvalidOperationException($"{person} has nothing to repay: the balance is 0.");
+                case DebtEntryKind.Repayment:
+                    direction = balance > 0 ? DebtDirection.IOwe : DebtDirection.TheyOweMe;
+                    break;
+                case DebtEntryKind.IOwe:
+                    direction = DebtDirection.IOwe;
+                    break;
+                default:
+                    direction = DebtDirection.TheyOweMe;
+                    break;
+            }
+            var due = dueAt ?? open.Select(i => i.Value.DueAt).Where(d => d is not null).Max();
+            var item = new TrackerItem
+            {
+                WorkspaceId = workspaceId,
+                Title = note.Trim(),
+                Person = person,
+                Amount = amount,
+                Direction = direction,
+                IsRepayment = kind == DebtEntryKind.Repayment,
+                DueAt = due,
+                DueDate = due is { } at ? TrackerDue.Day(at, TimeZoneInfo.Local) : open.Select(i => i.Value.DueDate).Where(d => d is not null).Max(),
+                CreatedAt = Now,
+            };
+            var id = _items.Add(item);
+            Log(TrackerEventKind.Created, id, item, WorkspaceKind.Debts);
+
+            if (balance + item.SignedAmount == 0)
+            {
+                var now = Now;
+                foreach (var (entryId, entry, _) in OpenDebts(workspaceId, person)) CompleteOne(entryId, entry, now);
+            }
+            return id;
+        }
+    }
+
+    /// <summary>Sets (or clears) when a person's open debts are due: every open entry of that person gets the new time.</summary>
+    public int SetDebtDue(string workspaceId, string person, DateTimeOffset? dueAt)
+    {
+        lock (_gate)
+        {
+            var open = OpenDebts(workspaceId, person);
+            var day = TrackerDue.Day(dueAt, TimeZoneInfo.Local);
+            foreach (var (id, entry, _) in open)
+            {
+                var updated = entry with { DueAt = dueAt, DueDate = day };
+                if (updated != entry) _items.Upsert(id, updated);
+            }
+            return open.Count;
         }
     }
 
@@ -285,7 +404,7 @@ public sealed class TrackerStore
 public static class TrackerOrdering
 {
     public static IReadOnlyList<SyncedItem<TrackerItem>> Open(IEnumerable<SyncedItem<TrackerItem>> items) =>
-        items.Where(i => !i.Value.IsCompleted)
+        items.Where(i => !i.Value.IsCompleted && !i.Value.IsSubtask)
             .OrderByDescending(i => i.Value.Priority)
             .ThenBy(i => i.Value.Order)
             .ThenBy(i => i.Value.CreatedAt)
@@ -293,7 +412,7 @@ public static class TrackerOrdering
             .ToList();
 
     public static IReadOnlyList<SyncedItem<TrackerItem>> Completed(IEnumerable<SyncedItem<TrackerItem>> items) =>
-        items.Where(i => i.Value.IsCompleted)
+        items.Where(i => i.Value.IsCompleted && !i.Value.IsSubtask)
             .OrderByDescending(i => i.Value.CompletedAt)
             .ThenBy(i => i.Id, StringComparer.Ordinal)
             .ToList();

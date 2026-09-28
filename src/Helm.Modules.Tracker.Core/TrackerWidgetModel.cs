@@ -72,7 +72,7 @@ public sealed record TrackerWidgetModel(
 
         var details = new List<string>();
         if (!debt && item.Priority is TrackerPriority.Urgent or TrackerPriority.High) details.Add(TrackerFormat.Priority(item.Priority));
-        if (item.DueDate is { } due) details.Add(TrackerFormat.Due(due, today));
+        if (item.DueAt is not null || item.DueDate is not null) details.Add(TrackerFormat.Due(item, DateTimeOffset.Now));
         if (!debt && item.StartedExplicitly) details.Add("In progress");
 
         var amount = debt

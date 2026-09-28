@@ -20,8 +20,8 @@ public sealed record ReportCompletion(TrackerEvent Event)
     public TimeSpan? WorkTime => Event.StartedExplicitly && Event.StartedAt is { } s ? (Event.CompletedAt ?? Event.At) - s : null;
 
     /// <summary>Null when the item had no due date.</summary>
-    public bool? OnTime(TimeZoneInfo zone) => Event.DueDate is { } due
-        ? DateOnly.FromDateTime(TimeZoneInfo.ConvertTime(Event.CompletedAt ?? Event.At, zone).DateTime) <= due
+    public bool? OnTime(TimeZoneInfo zone) => TrackerDue.Moment(Event.DueAt, Event.DueDate, zone) is { } due
+        ? (Event.CompletedAt ?? Event.At) <= due
         : null;
 }
 
