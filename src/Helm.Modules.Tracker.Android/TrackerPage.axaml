@@ -112,14 +112,24 @@
             </StackPanel>
         </Border>
 
-        <!-- Widget (shown only when the launcher can pin widgets on request) -->
-        <StackPanel x:Name="WidgetSection" IsVisible="False">
+        <!-- Widget -->
+        <StackPanel>
             <TextBlock Text="Widget" Classes="section" />
             <Border Classes="card">
                 <StackPanel Spacing="8">
                     <TextBlock Text="Home-screen widget" Classes="title" />
-                    <TextBlock Text="Your open tasks or debts on the home screen. Tap a circle to finish one, the title to switch workspace." Classes="secondary" />
-                    <Button Content="Add to home screen" Click="AddWidget_Click" />
+                    <TextBlock TextWrapping="Wrap" Classes="secondary"
+                               Text="Your open tasks or debts on the home screen: tap a circle to finish a task, the title to switch workspace. With nothing open, or after the shrink button, it becomes a small button showing how many are open; tap it for sync and +." />
+                    <!-- Only when the launcher can place a widget on request -->
+                    <Button x:Name="AddWidgetButton" Content="Add to home screen" Click="AddWidget_Click" IsVisible="False" />
+                    <TextBlock Text="Background" Margin="0,4,0,0" />
+                    <ComboBox HorizontalAlignment="Stretch" ItemsSource="{Binding WidgetBackgroundNames}" SelectedIndex="{Binding WidgetBackgroundIndex}" AutomationProperties.Name="Widget background" />
+                    <StackPanel IsVisible="{Binding IsWidgetOpacityAdjustable}">
+                        <TextBlock Text="{Binding WidgetOpacity, StringFormat='Opacity {0}%'}" />
+                        <Slider Minimum="0" Maximum="100" TickFrequency="10" IsSnapToTickEnabled="True" Value="{Binding WidgetOpacity}" AutomationProperties.Name="Widget opacity" />
+                    </StackPanel>
+                    <TextBlock Text="Text" />
+                    <ComboBox HorizontalAlignment="Stretch" ItemsSource="{Binding WidgetTextNames}" SelectedIndex="{Binding WidgetTextIndex}" AutomationProperties.Name="Widget text colour" />
                 </StackPanel>
             </Border>
         </StackPanel>

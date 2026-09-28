@@ -468,6 +468,53 @@ public sealed class TrackerTests
     }
 
     [Fact]
+    public void The_widget_counts_open_items_shows_one_row_per_person_and_shrinks_when_empty()
+    {
+        var tasks = _store.AddWorkspace("To-do", WorkspaceKind.Tasks);
+        var model = TrackerWidgetModel.Build(_store, tasks, enabled: true, T0, TimeZoneInfo.Utc);
+        Assert.True(model.IsEmpty);
+        Assert.Equal(0, model.OpenCount);
+
+        var a = _store.AddItem(tasks, new TrackerItemDraft("A"));
+        _store.AddItem(tasks, new TrackerItemDraft("A1", ParentId: a)); // subtasks are not counted
+        _store.AddItem(tasks, new TrackerItemDraft("B"));
+        model = TrackerWidgetModel.Build(_store, tasks, enabled: true, T0, TimeZoneInfo.Utc);
+        Assert.Equal(2, model.OpenCount);
+        Assert.False(model.IsEmpty);
+        Assert.All(model.Rows, r => Assert.True(r.CanComplete));
+
+        var debts = _store.AddWorkspace("Debts", WorkspaceKind.Debts);
+        _store.AddDebt(debts, "An", 100, DebtEntryKind.OwesMe);
+        _store.AddDebt(debts, "an", 50, DebtEntryKind.OwesMe);
+        _store.AddDebt(debts, "Binh", 30, DebtEntryKind.IOwe);
+        model = TrackerWidgetModel.Build(_store, debts, enabled: true, T0, TimeZoneInfo.Utc);
+        Assert.Equal(2, model.OpenCount);
+        Assert.Equal(["An", "Binh"], model.Rows.Select(r => r.Title));
+        Assert.All(model.Rows, r => Assert.False(r.CanComplete)); // a debt is settled by repaying it
+        Assert.True(model.Rows[0].OwedToMe);
+        Assert.StartsWith("+", model.Rows[0].Amount);
+    }
+
+    [Fact]
+    public void Widget_colours_follow_the_settings()
+    {
+        var s = new TrackerSettings();
+        Assert.Null(TrackerWidgetStyle.Background(s)); // the theme's card colour
+        Assert.Null(TrackerWidgetStyle.Text(s));
+        Assert.Equal(255, TrackerWidgetStyle.Alpha(s));
+
+        s.WidgetBackground = TrackerWidgetBackground.Dark;
+        s.WidgetOpacity = 50;
+        Assert.Equal(128, TrackerWidgetStyle.Alpha(s));
+        Assert.Equal(0xFFFFFFFFu, TrackerWidgetStyle.Text(s)!.Value.Main); // light text on dark, automatically
+        s.WidgetText = TrackerWidgetText.Dark;
+        Assert.Equal(0xFF1A1A1Au, TrackerWidgetStyle.Text(s)!.Value.Main);
+
+        s.WidgetBackground = TrackerWidgetBackground.Transparent;
+        Assert.Equal(0, TrackerWidgetStyle.Alpha(s));
+    }
+
+    [Fact]
     public void Ticking_the_box_completes_without_a_click_and_the_row_says_took_and_worked()
     {
         var dir = Path.Combine(Path.GetTempPath(), "helm-tests", Guid.NewGuid().ToString("N"));

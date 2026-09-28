@@ -75,6 +75,11 @@ public sealed partial class TrackerViewModel : ObservableObject
     [ObservableProperty] private string _reportOnTime = "—";
     [ObservableProperty] private string _reportRangeText = "";
 
+    // Android widget look (device-local)
+    [ObservableProperty] private int _widgetBackgroundIndex;
+    [ObservableProperty] private int _widgetOpacity = 100;
+    [ObservableProperty] private int _widgetTextIndex;
+
     // Reminders
     [ObservableProperty] private bool _remindersEnabled;
     [ObservableProperty] private int _reminderHourIndex;
@@ -108,6 +113,9 @@ public sealed partial class TrackerViewModel : ObservableObject
         RemindersEnabled = s.RemindersEnabled;
         ReminderHourIndex = Math.Clamp(s.ReminderHour, 0, 23);
         RemindDaysIndex = Math.Clamp(s.RemindDaysBefore, 0, RemindDaysNames.Count - 1);
+        WidgetBackgroundIndex = (int)s.WidgetBackground;
+        WidgetOpacity = Math.Clamp(s.WidgetOpacity, 0, 100);
+        WidgetTextIndex = (int)s.WidgetText;
         _loading = false;
 
         _store.Changed += (_, _) => ScheduleRefresh();
@@ -135,6 +143,35 @@ public sealed partial class TrackerViewModel : ObservableObject
     public IReadOnlyList<string> DebtKindNames { get; } = Enum.GetValues<DebtEntryKind>().Select(TrackerFormat.DebtKind).ToList();
     public IReadOnlyList<string> KindNames { get; } = Enum.GetValues<WorkspaceKind>().Select(TrackerFormat.Kind).ToList();
     public IReadOnlyList<string> ReportRangeNames { get; } = ["Last 7 days", "Last 30 days", "Last 90 days", "All time"];
+    public IReadOnlyList<string> WidgetBackgroundNames { get; } = TrackerWidgetStyle.BackgroundNames;
+    public IReadOnlyList<string> WidgetTextNames { get; } = TrackerWidgetStyle.TextNames;
+
+    /// <summary>Raised after the widget's look changed, so the platform redraws its widgets.</summary>
+    public event EventHandler? WidgetStyleChanged;
+
+    public bool IsWidgetOpacityAdjustable => WidgetBackgroundIndex != (int)TrackerWidgetBackground.Transparent;
+
+    partial void OnWidgetBackgroundIndexChanged(int value)
+    {
+        OnPropertyChanged(nameof(IsWidgetOpacityAdjustable));
+        if (_loading || value < 0) return;
+        _settings.Update(s => s.WidgetBackground = (TrackerWidgetBackground)Math.Clamp(value, 0, WidgetBackgroundNames.Count - 1));
+        WidgetStyleChanged?.Invoke(this, EventArgs.Empty);
+    }
+
+    partial void OnWidgetOpacityChanged(int value)
+    {
+        if (_loading) return;
+        _settings.Update(s => s.WidgetOpacity = Math.Clamp(value, 0, 100));
+        WidgetStyleChanged?.Invoke(this, EventArgs.Empty);
+    }
+
+    partial void OnWidgetTextIndexChanged(int value)
+    {
+        if (_loading || value < 0) return;
+        _settings.Update(s => s.WidgetText = (TrackerWidgetText)Math.Clamp(value, 0, WidgetTextNames.Count - 1));
+        WidgetStyleChanged?.Invoke(this, EventArgs.Empty);
+    }
 
     /// <summary>"00:00" … "23:00" in the current culture's short time format; the index is the hour.</summary>
     public IReadOnlyList<string> ReminderHourNames { get; } =

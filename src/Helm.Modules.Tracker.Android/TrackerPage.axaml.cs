@@ -25,13 +25,25 @@ public partial class TrackerPage : ModulePageBase
         InitializeComponent();
         // The view model is shared with Windows and knows nothing about the Android module type.
         Module = module;
-        WidgetSection.IsVisible = TrackerWidgets.CanRequestPin(Android.App.Application.Context);
+        AddWidgetButton.IsVisible = TrackerWidgets.CanRequestPin(Android.App.Application.Context);
+        _viewModel = viewModel;
+    }
+
+    private readonly TrackerViewModel _viewModel;
+
+    private void OnWidgetStyleChanged(object? sender, EventArgs e) => TrackerWidgets.RefreshAll(Android.App.Application.Context);
+
+    protected override void OnDetachedFromVisualTree(Avalonia.VisualTreeAttachmentEventArgs e)
+    {
+        _viewModel.WidgetStyleChanged -= OnWidgetStyleChanged;
+        base.OnDetachedFromVisualTree(e);
     }
 
     // Checked each time the page shows: the user may have changed it in Android settings meanwhile.
     protected override void OnAttachedToVisualTree(Avalonia.VisualTreeAttachmentEventArgs e)
     {
         base.OnAttachedToVisualTree(e);
+        _viewModel.WidgetStyleChanged += OnWidgetStyleChanged;
         NotificationsBlocked.IsVisible = !TrackerReminders.CanNotify(Android.App.Application.Context);
     }
 

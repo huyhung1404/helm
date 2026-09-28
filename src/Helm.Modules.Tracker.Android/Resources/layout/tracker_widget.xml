@@ -1,79 +1,202 @@
 <?xml version="1.0" encoding="utf-8"?>
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<!-- The Tracker widget. Full: the list with sync, + and shrink in its header. Compact (nothing open, or shrunk by the
+     user): only a small round button with the number of open items, on a see-through background; a tap shows sync,
+     + and (when there is something to show) grow. The launcher decides the widget's size, so the compact view simply
+     leaves the rest of it empty. -->
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:id="@+id/tracker_widget_root"
     android:layout_width="match_parent"
-    android:layout_height="match_parent"
-    android:orientation="vertical"
-    android:padding="12dp"
-    android:background="@drawable/tracker_widget_background">
+    android:layout_height="match_parent">
+
+    <!-- Background layer: tinted and faded from the settings -->
+    <ImageView
+        android:id="@+id/tracker_widget_bg"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:scaleType="fitXY"
+        android:src="@drawable/tracker_widget_background"
+        android:importantForAccessibility="no" />
 
     <LinearLayout
+        android:id="@+id/tracker_widget_full"
         android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:orientation="horizontal"
-        android:gravity="center_vertical">
+        android:layout_height="match_parent"
+        android:orientation="vertical"
+        android:padding="12dp">
 
-        <!-- Tap: next workspace -->
         <LinearLayout
-            android:id="@+id/tracker_widget_header"
-            android:layout_width="0dp"
+            android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:orientation="vertical"
-            android:paddingTop="2dp"
-            android:paddingBottom="2dp">
+            android:orientation="horizontal"
+            android:gravity="center_vertical">
 
-            <TextView
-                android:id="@+id/tracker_widget_title"
-                android:layout_width="wrap_content"
+            <!-- Tap: next workspace -->
+            <LinearLayout
+                android:id="@+id/tracker_widget_header"
+                android:layout_width="0dp"
                 android:layout_height="wrap_content"
-                android:text="Tracker"
-                android:textSize="16sp"
-                android:textStyle="bold"
-                android:textColor="@color/tracker_widget_text"
-                android:singleLine="true"
-                android:ellipsize="end" />
+                android:layout_weight="1"
+                android:orientation="vertical"
+                android:paddingTop="2dp"
+                android:paddingBottom="2dp">
 
-            <TextView
-                android:id="@+id/tracker_widget_summary"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:textSize="12sp"
-                android:textColor="@color/tracker_widget_secondary"
-                android:singleLine="true"
-                android:ellipsize="end" />
+                <TextView
+                    android:id="@+id/tracker_widget_title"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Tracker"
+                    android:textSize="16sp"
+                    android:textStyle="bold"
+                    android:textColor="@color/tracker_widget_text"
+                    android:singleLine="true"
+                    android:ellipsize="end" />
+
+                <TextView
+                    android:id="@+id/tracker_widget_summary"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:textSize="12sp"
+                    android:textColor="@color/tracker_widget_secondary"
+                    android:singleLine="true"
+                    android:ellipsize="end" />
+            </LinearLayout>
+
+            <ImageView
+                android:id="@+id/tracker_widget_sync"
+                android:layout_width="36dp"
+                android:layout_height="36dp"
+                android:padding="8dp"
+                android:src="@drawable/tracker_widget_sync"
+                android:contentDescription="Sync now" />
+
+            <!-- Tap: open Helm on the Tracker page -->
+            <ImageView
+                android:id="@+id/tracker_widget_add"
+                android:layout_width="36dp"
+                android:layout_height="36dp"
+                android:padding="7dp"
+                android:src="@drawable/tracker_widget_add"
+                android:contentDescription="Open Tracker in Helm" />
+
+            <ImageView
+                android:id="@+id/tracker_widget_shrink"
+                android:layout_width="36dp"
+                android:layout_height="36dp"
+                android:padding="9dp"
+                android:src="@drawable/tracker_widget_shrink"
+                android:contentDescription="Make the widget small" />
         </LinearLayout>
 
-        <!-- Tap: open Helm on the Tracker page -->
-        <ImageView
-            android:id="@+id/tracker_widget_add"
-            android:layout_width="40dp"
-            android:layout_height="40dp"
-            android:padding="8dp"
-            android:src="@drawable/tracker_widget_add"
-            android:contentDescription="Open Tracker in Helm" />
+        <FrameLayout
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="1"
+            android:layout_marginTop="6dp">
+
+            <ListView
+                android:id="@+id/tracker_widget_list"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:divider="@null"
+                android:dividerHeight="0dp" />
+
+            <TextView
+                android:id="@+id/tracker_widget_empty"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:gravity="center"
+                android:textSize="13sp"
+                android:textColor="@color/tracker_widget_secondary"
+                android:text="Nothing to do." />
+        </FrameLayout>
     </LinearLayout>
 
-    <FrameLayout
-        android:layout_width="match_parent"
-        android:layout_height="0dp"
-        android:layout_weight="1"
-        android:layout_marginTop="6dp">
+    <!-- Compact: the small button (with the count) and, after a tap, its actions -->
+    <LinearLayout
+        android:id="@+id/tracker_widget_compact"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="top|start"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:padding="6dp"
+        android:visibility="gone">
 
-        <ListView
-            android:id="@+id/tracker_widget_list"
-            android:layout_width="match_parent"
-            android:layout_height="match_parent"
-            android:divider="@null"
-            android:dividerHeight="0dp" />
+        <FrameLayout
+            android:id="@+id/tracker_widget_toggle"
+            android:layout_width="48dp"
+            android:layout_height="48dp"
+            android:contentDescription="Tracker: show the widget's buttons">
 
-        <TextView
-            android:id="@+id/tracker_widget_empty"
-            android:layout_width="match_parent"
-            android:layout_height="match_parent"
-            android:gravity="center"
-            android:textSize="13sp"
-            android:textColor="@color/tracker_widget_secondary"
-            android:text="Nothing to do." />
-    </FrameLayout>
-</LinearLayout>
+            <ImageView
+                android:id="@+id/tracker_widget_toggle_bg"
+                android:layout_width="40dp"
+                android:layout_height="40dp"
+                android:layout_gravity="center"
+                android:src="@drawable/tracker_widget_round"
+                android:importantForAccessibility="no" />
+
+            <ImageView
+                android:id="@+id/tracker_widget_toggle_icon"
+                android:layout_width="40dp"
+                android:layout_height="40dp"
+                android:layout_gravity="center"
+                android:padding="10dp"
+                android:src="@drawable/tracker_widget_settings"
+                android:importantForAccessibility="no" />
+
+            <TextView
+                android:id="@+id/tracker_widget_count"
+                android:layout_width="wrap_content"
+                android:layout_height="18dp"
+                android:minWidth="18dp"
+                android:layout_gravity="top|end"
+                android:gravity="center"
+                android:paddingStart="4dp"
+                android:paddingEnd="4dp"
+                android:background="@drawable/tracker_widget_badge"
+                android:textColor="#FFFFFFFF"
+                android:textSize="11sp"
+                android:textStyle="bold"
+                android:text="0" />
+        </FrameLayout>
+
+        <LinearLayout
+            android:id="@+id/tracker_widget_menu"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:visibility="gone">
+
+            <ImageView
+                android:id="@+id/tracker_widget_menu_sync"
+                android:layout_width="40dp"
+                android:layout_height="40dp"
+                android:layout_marginStart="4dp"
+                android:padding="10dp"
+                android:background="@drawable/tracker_widget_round"
+                android:src="@drawable/tracker_widget_sync"
+                android:contentDescription="Sync now" />
+
+            <ImageView
+                android:id="@+id/tracker_widget_menu_add"
+                android:layout_width="40dp"
+                android:layout_height="40dp"
+                android:layout_marginStart="4dp"
+                android:padding="9dp"
+                android:background="@drawable/tracker_widget_round"
+                android:src="@drawable/tracker_widget_add"
+                android:contentDescription="Open Tracker in Helm" />
+
+            <ImageView
+                android:id="@+id/tracker_widget_menu_grow"
+                android:layout_width="40dp"
+                android:layout_height="40dp"
+                android:layout_marginStart="4dp"
+                android:padding="11dp"
+                android:background="@drawable/tracker_widget_round"
+                android:src="@drawable/tracker_widget_grow"
+                android:contentDescription="Show the list" />
+        </LinearLayout>
+    </LinearLayout>
+</FrameLayout>

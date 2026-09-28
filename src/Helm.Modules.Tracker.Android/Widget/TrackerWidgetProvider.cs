@@ -11,6 +11,12 @@ namespace Helm.Modules.Tracker;
 [MetaData("android.appwidget.provider", Resource = "@xml/tracker_widget_info")]
 public sealed class TrackerWidgetProvider : AppWidgetProvider
 {
+    private static int? WidgetId(Intent intent)
+    {
+        var id = intent.GetIntExtra(AppWidgetManager.ExtraAppwidgetId, AppWidgetManager.InvalidAppwidgetId);
+        return id == AppWidgetManager.InvalidAppwidgetId ? null : id;
+    }
+
     public override void OnUpdate(Context? context, AppWidgetManager? appWidgetManager, int[]? appWidgetIds)
     {
         if (context is null || appWidgetManager is null || appWidgetIds is null) return;
@@ -34,8 +40,16 @@ public sealed class TrackerWidgetProvider : AppWidgetProvider
                 TrackerWidgets.HandleItem(context, intent);
                 break;
             case TrackerWidgets.ActionNextWorkspace:
-                var id = intent.GetIntExtra(AppWidgetManager.ExtraAppwidgetId, AppWidgetManager.InvalidAppwidgetId);
-                if (id != AppWidgetManager.InvalidAppwidgetId) TrackerWidgets.NextWorkspace(context, id);
+                if (WidgetId(intent) is { } next) TrackerWidgets.NextWorkspace(context, next);
+                break;
+            case TrackerWidgets.ActionSync:
+                TrackerWidgets.Sync(context, GoAsync());
+                break;
+            case TrackerWidgets.ActionToggleCompact:
+                if (WidgetId(intent) is { } compact) TrackerWidgets.ToggleCompact(context, compact);
+                break;
+            case TrackerWidgets.ActionToggleMenu:
+                if (WidgetId(intent) is { } menu) TrackerWidgets.ToggleMenu(context, menu);
                 break;
         }
     }

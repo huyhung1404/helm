@@ -7,7 +7,11 @@ public sealed record TrackerWidgetRow(
     string Amount,
     TrackerPriority Priority,
     bool IsDebt,
-    bool OwedToMe);
+    bool OwedToMe)
+{
+    /// <summary>Tasks are ticked off from the widget; a debt is settled by repaying it, in the app.</summary>
+    public bool CanComplete => !IsDebt;
+}
 
 /// <summary>
 /// What a home-screen widget shows: one workspace's open items in list order. Platform-free, so the Android widget
@@ -18,8 +22,12 @@ public sealed record TrackerWidgetModel(
     string Title,
     string Summary,
     string EmptyText,
-    IReadOnlyList<TrackerWidgetRow> Rows)
+    IReadOnlyList<TrackerWidgetRow> Rows,
+    int OpenCount = 0)
 {
+    /// <summary>Nothing open: the widget shrinks to its small icon on a see-through background.</summary>
+    public bool IsEmpty => OpenCount == 0;
+
     /// <summary>Widgets list at most this many items (a widget is a glance, not the whole list).</summary>
     public const int MaxRows = 50;
 
@@ -36,22 +44,26 @@ public sealed record TrackerWidgetModel(
         var ws = chosen.Value;
         var debts = ws.Kind == WorkspaceKind.Debts;
         var today = DateOnly.FromDateTime(TimeZoneInfo.ConvertTime(now, zone).DateTime);
-        var open = store.OpenItems(chosen.Id);
-        var rows = open.Take(MaxRows).Select(i => Row(i.Id, i.Value, ws, today)).ToList();
-
-        string summary;
         if (debts)
         {
-            var totals = DebtTotals.From(open.Select(i => i.Value));
-            summary = totals.Net == 0 ? $"{open.Count} open"
-                : (totals.Net > 0 ? "+" : "−") + TrackerFormat.Money(Math.Abs(totals.Net), ws.Currency);
+            // One row per person with a balance, as in the app.
+            var people = DebtLedger.Open(store.Items(chosen.Id)).Where(p => !p.IsSettled).ToList();
+            var personRows = people.Take(MaxRows).Select(p => new TrackerWidgetRow(
+                "person:" + p.Key,
+                p.Name,
+                p.Due(zone) is { } due ? TrackerFormat.Due(new TrackerItem { DueAt = due }, now, zone) : (p.Entries.Count == 1 ? "1 entry" : $"{p.Entries.Count} entries"),
+                TrackerFormat.Balance(p.Balance, ws.Currency),
+                TrackerPriority.Normal,
+                IsDebt: true,
+                OwedToMe: p.Balance > 0)).ToList();
+            var net = people.Sum(p => p.Balance);
+            var debtSummary = people.Count == 0 ? "Everyone is square" : TrackerFormat.Balance(net, ws.Currency);
+            return new TrackerWidgetModel(chosen.Id, ws.Name, debtSummary, "Nothing outstanding.", personRows, people.Count);
         }
-        else
-        {
-            summary = $"{open.Count} open";
-        }
-        var empty = debts ? "Nothing outstanding." : "Nothing to do.";
-        return new TrackerWidgetModel(chosen.Id, ws.Name, summary, empty, rows);
+
+        var open = store.OpenItems(chosen.Id);
+        var rows = open.Take(MaxRows).Select(i => Row(i.Id, i.Value, ws, today)).ToList();
+        return new TrackerWidgetModel(chosen.Id, ws.Name, $"{open.Count} open", "Nothing to do.", rows, open.Count);
     }
 
     /// <summary>The workspace after <paramref name="current"/> (wrapping), for the widget's "next workspace" tap.</summary>
