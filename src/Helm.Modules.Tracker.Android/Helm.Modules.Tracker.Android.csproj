@@ -25,11 +25,6 @@
     <PackageReference Include="SQLitePCLRaw.bundle_e_sqlite3" Version="2.1.13" />
   </ItemGroup>
 
-  <!-- The app icon is shared with the Windows app (it lives with the shared code). -->
-  <ItemGroup>
-    <AvaloniaResource Include="..\Helm.Modules.Tracker.Core\Assets\tracker.png" Link="Assets\tracker.png" />
-  </ItemGroup>
-
   <ItemGroup>
     <ProjectReference Include="..\Helm.Core.Android\Helm.Core.Android.csproj" />
     <ProjectReference Include="..\Helm.Modules.Tracker.Core\Helm.Modules.Tracker.Core.csproj" />

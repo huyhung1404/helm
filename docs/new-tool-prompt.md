@@ -22,10 +22,19 @@ Print a short plan before you start, then continue without waiting:
 - **Class prefix**: PascalCase, e.g. `ColorPicker`.
 - **Group**: one of `SystemTools`, `WindowingAndLayouts`, `InputAndOutput`, `FileManagement`, `Advanced`. Pick the closest.
 - **Icon**: a `SymbolRegular` value that exists (see §6). On Android the same icon is `FluentIcons.Common.Symbol.<Name>` (no size suffix).
-  A tool may also have an app picture that replaces the symbol everywhere: a 256 px PNG with real transparency in
-  `src/Helm.Modules.<Prefix>.Core/Assets/`, linked as `<Resource>` (PC) / `<AvaloniaResource>` (Android), exposed as
-  `IconImage` (PC: a frozen `ImageSource`; Android: an `IImage`, loaded once). Keep the symbol as the fallback. See
-  `TrackerLogo` / Tracker's Android module.
+  A tool may also have its own picture icon that replaces the symbol everywhere, exposed as `IconImage` (PC: a frozen
+  `ImageSource`; Android: an `IImage`, built once). Keep the symbol as the fallback. Picture icons must all look the
+  same size, so follow the **icon rule**:
+  - **No frame**: no background tile, rounded square or circle behind the glyph. The glyph itself carries the colour
+    (a solid colour or one gradient across the whole box), like the Claude symbol.
+  - **Same size as the Claude symbol**: draw in a 100 × 100 box with a transparent 100 × 100 rectangle as the first
+    drawing, and make the glyph fill the box: its longer side (including stroke width) spans about 98-100 of it,
+    centred. Do not leave extra margin; the hosts (navigation, Home, page hero) already space icons.
+  - **Vector, shared shapes**: path data and colours live in `<Prefix>IconShape` in the `.Core` project; the PC and
+    Android projects each build a `DrawingImage` from it. No PNG (bitmaps scale badly and get cut out with frames).
+  - **Readable at 16-20 px**: strokes at least 8 of 100. Render it next to `ClaudeLogo` at 128 and 20 px on dark and
+    light backgrounds before shipping.
+  See `ClaudeLogo`, `VaultIconShape` / `VaultIcon`, `TrackerIconShape` / `TrackerLogo` / `TrackerIcon`.
 - **Default hotkey**: only if the tool needs one; choose one that is unlikely to clash.
 - **Content page**: yes if the tool is something you *work in* (lists, a chat, a vault, a viewer), no if it only
   runs in the background and is configured (a hotkey, a hook). See "Content page and settings page" in §4.
