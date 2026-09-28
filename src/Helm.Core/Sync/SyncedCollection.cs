@@ -68,6 +68,18 @@ public sealed class SyncedCollectionOptions<T> where T : class
     /// </summary>
     public Func<JsonNode, int, JsonNode>? Migrate { get; init; }
 
+    /// <summary>
+    /// Holds a pull that deletes many records (see <see cref="SyncChangeGuard"/>). The function tells which deletions
+    /// are expected and need no confirmation (e.g. records already in a trash); null guards every deletion.
+    /// </summary>
+    public bool GuardDeletions { get; init; }
+
+    /// <inheritdoc cref="GuardDeletions"/>
+    public Func<T, bool>? IsExpendable { get; init; }
+
+    /// <summary>The blob ids a record uses (see <see cref="SyncCollectionDescriptor.BlobReferences"/>).</summary>
+    public Func<T, IEnumerable<string>>? BlobReferences { get; init; }
+
     internal SyncCollectionDescriptor ToDescriptor()
     {
         Func<string, string>? copy = null;
@@ -77,7 +89,17 @@ public sealed class SyncedCollectionOptions<T> where T : class
                 ? JsonSerializer.Serialize(create(value), SyncJson.Options)
                 : body;
         }
-        return new SyncCollectionDescriptor(Name, SchemaVersion, ConflictPolicy, copy);
+        SyncChangeGuard? guard = null;
+        if (GuardDeletions)
+        {
+            var expendable = IsExpendable;
+            guard = new SyncChangeGuard(expendable is null ? null
+                : body => JsonSerializer.Deserialize<T>(body, SyncJson.Options) is { } value && expendable(value));
+        }
+        Func<string, IEnumerable<string>>? blobs = null;
+        if (BlobReferences is { } references)
+            blobs = body => JsonSerializer.Deserialize<T>(body, SyncJson.Options) is { } value ? references(value) : [];
+        return new SyncCollectionDescriptor(Name, SchemaVersion, ConflictPolicy, copy, guard, blobs);
     }
 }
 

@@ -22,4 +22,7 @@ public sealed class HelmPaths
     public string SyncKeyFile => Path.Combine(SyncDirectory, "master.key");
     public string SyncCredentialsFile => Path.Combine(SyncDirectory, "credentials.bin");
     public string SyncLocalKeyFile => Path.Combine(SyncDirectory, "local.key");
+
+    /// <summary>Encrypted chunks of synced files (blobs): uploads waiting to be sent, and a cache of downloaded ones.</summary>
+    public string SyncBlobsDirectory => Path.Combine(SyncDirectory, "blobs");
 }

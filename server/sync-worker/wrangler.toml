@@ -24,6 +24,17 @@ new_sqlite_classes = ["AccountObject", "RegistryObject"]
 binding = "BACKUPS"
 bucket_name = "helm-sync-backups"
 
+# Encrypted blob chunks (Vault documents). Create the bucket first: R2 -> Create bucket -> helm-sync-blobs.
+[[r2_buckets]]
+binding = "BLOBS"
+bucket_name = "helm-sync-blobs"
+
+# Limits that can be raised without a code change (also editable under Settings -> Variables and Secrets).
+# MAX_BLOB_MB: largest document; MAX_QUOTA_MB: highest storage quota the admin may give an account.
+[vars]
+MAX_BLOB_MB = "256"
+MAX_QUOTA_MB = "102400"
+
 [triggers]
 crons = ["0 19 * * *"]
 

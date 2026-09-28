@@ -1,7 +1,7 @@
 // Helm sync Worker. Routes:
 //
 //   Sync API (Authorization: Bearer helm_pat_…)
-//     GET    /v1/me                       account (with storage usage) and this token
+//     GET    /v1/me                       account (with storage usage), this token and the effective limits
 //     POST   /v1/sync/push                { items: [...] } -> { outcomes: [...] }
 //     GET    /v1/sync/pull?since=&limit=  -> { records, nextSeq, hasMore }
 //     GET    /v1/keyring                  wrapped master key (opaque), 404 until the first device uploads it
@@ -9,6 +9,16 @@
 //     GET    /v1/tokens                   the account's devices           (scope tokens:manage)
 //     POST   /v1/tokens                   { name, scopes?, expiresInDays? } -> token (shown once)
 //     DELETE /v1/tokens/:tokenId          revoke a device
+//
+//   Blobs (encrypted chunks in R2; GET needs sync:read, the rest sync:write; 503 without the BLOBS bucket)
+//     POST   /v1/blobs                    { id, size, chunkCount } reserve (201 new, 200 same again)
+//     GET    /v1/blobs?after=&limit=      -> { blobs, hasMore, next }
+//     GET    /v1/blobs/:id                blob with the chunk indexes uploaded so far
+//     PUT    /v1/blobs/:id/chunks/:index  raw chunk (Content-Length required), streamed to R2
+//     GET    /v1/blobs/:id/chunks/:index  raw chunk of a committed blob
+//     POST   /v1/blobs/:id/commit         seal once every chunk is there (409 blob_incomplete with missing)
+//     DELETE /v1/blobs/:id                committed: to the trash (purged after 30 days); pending: purged now
+//     POST   /v1/blobs/:id/restore        out of the trash
 //
 //   Invites (no Authorization)
 //     POST   /v1/redeem                   { invite, accountName, deviceName } -> new account + its first token
@@ -30,15 +40,17 @@
 //     POST   /admin/accounts/:id/restore             { key, confirm: <accountId> } restore from an R2 backup
 //     GET    /admin/backups?prefix=                  list backups
 //     POST   /admin/backups/run                      back up now (also runs nightly from the cron trigger)
+//     POST   /admin/blobs/gc                         { now? } purge due blobs now (also nightly)
 //
 //   Rate limits (per client IP): /v1/redeem, and failed admin sign-ins.
 //
 // See docs/sync-protocol.md. There is no open sign-up: an account needs an invite or the admin.
 
-import { LIMITS } from "./account-store.ts";
+import { LIMITS, limitsFromEnv } from "./account-store.ts";
 import { adminAsset } from "./admin-page.ts";
 import { listBackups, readBackup, runBackup } from "./backup.ts";
-import type { ApiInput, ApiOp, Env, Result } from "./objects.ts";
+import { deleteBlob, getChunk, putChunk, requireBlobs, runBlobGc } from "./blobs.ts";
+import type { AccountAdminOp, ApiInput, ApiOp, Env, Result } from "./objects.ts";
 import { INVITE_LIMITS } from "./registry-store.ts";
 import { HttpError } from "./sql.ts";
 import {
@@ -49,13 +61,18 @@ export { AccountObject, RegistryObject } from "./objects.ts";
 
 const MAX_BODY_BYTES = 8 * 1024 * 1024;
 const MAX_NAME_LENGTH = 100;
+// /v1/blobs, /v1/blobs/:id, /v1/blobs/:id/commit|restore, /v1/blobs/:id/chunks/:index
+const BLOB_ROUTE = /^\/v1\/blobs(?:\/([^/]+)(?:\/(commit|restore|chunks\/([^/]+)))?)?$/;
 
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
     try {
       const url = new URL(request.url);
       if (url.pathname === "/v1/redeem") return respond(await handleRedeem(request, env));
-      if (url.pathname.startsWith("/v1/")) return respond(await handleApi(request, env, url));
+      if (url.pathname.startsWith("/v1/")) {
+        const result = await handleApi(request, env, url);
+        return result instanceof Response ? result : respond(result);
+      }
       // The admin page itself is static and holds no secret; everything it shows comes from the API below.
       const page = request.method === "GET" ? adminAsset(url.pathname) : null;
       if (page) return page;
@@ -63,25 +80,37 @@ export default {
       if (url.pathname === "/" || url.pathname === "/health") return respond({ status: 200, body: { service: "helm-sync" } });
       return respond({ status: 404, body: { error: "not_found" } });
     } catch (error) {
-      if (error instanceof HttpError) return respond({ status: error.status, body: { error: error.code, message: error.message } });
+      if (error instanceof HttpError) {
+        return respond({ status: error.status, body: { error: error.code, message: error.message, ...error.details } });
+      }
       console.error(error);
       return respond({ status: 500, body: { error: "internal" } });
     }
   },
 
   async scheduled(controller: ScheduledController, env: Env, ctx: ExecutionContext): Promise<void> {
-    if (!env.BACKUPS) return;
-    ctx.waitUntil(runBackup(env, new Date(controller.scheduledTime)).then((run) => {
-      console.log(`backup ${run.date}: ${run.accounts} accounts, ${run.bytes} bytes, ${run.deleted} pruned, failed: ${run.failed.join(",") || "none"}`);
-    }));
+    // Two independent jobs: either one may be off (no bucket) or fail without affecting the other.
+    if (env.BACKUPS) {
+      ctx.waitUntil(runBackup(env, new Date(controller.scheduledTime)).then((run) => {
+        console.log(`backup ${run.date}: ${run.accounts} accounts, ${run.bytes} bytes, ${run.deleted} pruned, failed: ${run.failed.join(",") || "none"}`);
+      }));
+    }
+    if (env.BLOBS) {
+      ctx.waitUntil(runBlobGc(env, controller.scheduledTime).then((run) => {
+        console.log(`blob gc: ${run.accounts} accounts, ${run.blobs} blobs, ${run.objects} objects, ${run.bytes} bytes, failed: ${run.failed.join(",") || "none"}`);
+      }, (error) => console.error("blob gc failed", error)));
+    }
   },
 } satisfies ExportedHandler<Env>;
 
-async function handleApi(request: Request, env: Env, url: URL): Promise<Result> {
+async function handleApi(request: Request, env: Env, url: URL): Promise<Result | Response> {
   const token = bearer(request);
   const parsed = token ? parseToken(token) : null;
   // Malformed tokens never reach a Durable Object, so random ids cannot create objects.
   if (!token || !parsed) throw new HttpError(401, "invalid_token");
+  if (url.pathname === "/v1/blobs" || url.pathname.startsWith("/v1/blobs/")) {
+    return handleBlobs(request, env, url, await hashToken(token), parsed.accountId);
+  }
 
   const input: ApiInput = { since: url.searchParams.get("since"), limit: url.searchParams.get("limit") };
   let op: ApiOp | undefined = ({
@@ -102,6 +131,34 @@ async function handleApi(request: Request, env: Env, url: URL): Promise<Result> 
 
   if (request.method !== "GET" && request.method !== "DELETE") input.body = await readJson(request);
   return rpc(account(env, parsed.accountId).api(await hashToken(token), op, input));
+}
+
+async function handleBlobs(request: Request, env: Env, url: URL, tokenHash: string, accountId: string): Promise<Result | Response> {
+  const route = BLOB_ROUTE.exec(url.pathname);
+  if (!route) throw new HttpError(404, "not_found");
+  const bucket = requireBlobs(env);
+  const target = account(env, accountId);
+  const api = (op: ApiOp, input: ApiInput) => rpc(target.api(tokenHash, op, input));
+  const admin = (op: AccountAdminOp, arg: unknown) => rpc(target.admin(op, arg));
+  const [, blobId, action, indexText] = route;
+  const method = request.method;
+
+  if (blobId === undefined) {
+    if (method === "GET") return api("listBlobs", { after: url.searchParams.get("after"), limit: url.searchParams.get("limit") });
+    if (method === "POST") return api("reserveBlob", { body: await readJson(request) });
+  } else if (action === undefined) {
+    if (method === "GET") return api("getBlob", { blobId });
+    if (method === "DELETE") return deleteBlob(bucket, api, admin, accountId, blobId);
+  } else if (action === "commit" || action === "restore") {
+    if (method === "POST") return api(action === "commit" ? "commitBlob" : "restoreBlob", { blobId });
+  } else {
+    if (!/^\d{1,6}$/.test(indexText)) throw new HttpError(400, "invalid_index");
+    const index = Number(indexText);
+    // The chunk body goes straight to R2: never through readJson.
+    if (method === "PUT") return putChunk(request, bucket, api, accountId, blobId, index);
+    if (method === "GET") return getChunk(bucket, api, accountId, blobId, index);
+  }
+  throw new HttpError(405, "method_not_allowed");
 }
 
 async function handleRedeem(request: Request, env: Env): Promise<Result> {
@@ -154,8 +211,9 @@ async function handleAdmin(request: Request, env: Env, url: URL): Promise<Result
       if (!Number.isSafeInteger(days) || (days as number) < 1 || (days as number) > INVITE_LIMITS.maxDays) {
         throw new HttpError(400, "invalid_days", `Days must be 1–${INVITE_LIMITS.maxDays}.`);
       }
-      if (!Number.isSafeInteger(quotaMb) || (quotaMb as number) < 1 || (quotaMb as number) > LIMITS.maxQuotaMb) {
-        throw new HttpError(400, "invalid_quota", `Quota must be 1–${LIMITS.maxQuotaMb} MB.`);
+      const { maxQuotaMb } = limitsFromEnv(env);
+      if (!Number.isSafeInteger(quotaMb) || (quotaMb as number) < 1 || (quotaMb as number) > maxQuotaMb) {
+        throw new HttpError(400, "invalid_quota", `Quota must be 1–${maxQuotaMb} MB.`);
       }
       const code = createInviteCode();
       const created = await rpc(registry.createInvite("inv_" + randomBase62(12), await hashToken(code),
@@ -173,6 +231,16 @@ async function handleAdmin(request: Request, env: Env, url: URL): Promise<Result
       return { status: 200, body: { backups: await listBackups(env, prefix) } };
     }
     if (parts.length === 3 && parts[2] === "run" && method === "POST") return { status: 200, body: await runBackup(env, new Date()) };
+    throw new HttpError(404, "not_found");
+  }
+
+  if (parts[1] === "blobs") {
+    if (parts.length === 3 && parts[2] === "gc" && method === "POST") {
+      const input = await readJson(request);
+      // Tests pass a later `now` to see what the nightly run will purge weeks from now.
+      const now = isRecord(input) && Number.isSafeInteger(input.now) ? (input.now as number) : Date.now();
+      return { status: 200, body: await runBlobGc(env, now) };
+    }
     throw new HttpError(404, "not_found");
   }
 

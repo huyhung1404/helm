@@ -206,7 +206,7 @@ test("a snapshot restores records as new versions, keeps newer records and the c
   store.putKeyring({ baseVersion: 1, data: "keyring-now" });
   const before = store.pull("0", null).nextSeq;
 
-  assert.deepEqual(store.importSnapshot(snapshot), { restored: 2 });
+  assert.deepEqual(store.importSnapshot(snapshot), { restored: 2, restoredBlobs: 0 });
 
   const after = store.pull(String(before), null).records;
   assert.deepEqual(after.map((r) => [r.id, r.version, r.payload]), [["a", 4, payload("a1")], ["b", 2, payload("b1")]]);

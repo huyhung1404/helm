@@ -14,6 +14,17 @@ internal sealed record SyncRow(
     string Collection, string Id, long Version, int SchemaVersion, bool Deleted, long UpdatedAtMs, string DeviceId,
     string? Body, bool Dirty, long LocalRev, bool Reseal = false);
 
+internal enum LocalBlobState
+{
+    /// <summary>Imported on this device; not yet (completely) on the server. Records that use it wait (I6).</summary>
+    Pending,
+    /// <summary>On the server; the local chunks are a cache and may be evicted.</summary>
+    Committed,
+}
+
+/// <param name="CipherSize">Bytes the server stores: the sum of the encrypted chunk sizes.</param>
+internal sealed record LocalBlob(string Id, long CipherSize, int ChunkCount, LocalBlobState State, long CreatedAtMs, long LastAccessMs);
+
 internal enum LocalWriteResult
 {
     Written,
@@ -32,7 +43,7 @@ public sealed class SyncLocalKeyException(string message) : Exception(message);
 /// </summary>
 public sealed class SyncDatabase : IDisposable
 {
-    private const int SchemaVersion = 2;
+    private const int SchemaVersion = 3;
     private const string KeyCheckMeta = "local_key_check";
     private readonly object _gate = new();
     private readonly SqliteConnection _connection;
@@ -131,6 +142,19 @@ public sealed class SyncDatabase : IDisposable
         }
     }
 
+    /// <summary>Every collection that has live records in the replica.</summary>
+    internal List<string> ListCollections()
+    {
+        lock (_gate)
+        {
+            using var cmd = Command("SELECT DISTINCT collection FROM records WHERE deleted = 0");
+            var names = new List<string>();
+            using var reader = cmd.ExecuteReader();
+            while (reader.Read()) names.Add(reader.GetString(0));
+            return names;
+        }
+    }
+
     internal List<SyncRow> GetDirty(int limit)
     {
         lock (_gate)
@@ -209,6 +233,25 @@ public sealed class SyncDatabase : IDisposable
         lock (_gate)
         {
             using var cmd = Command("UPDATE records SET version = $v WHERE collection = $c AND id = $id");
+            cmd.Parameters.AddWithValue("$v", serverVersion);
+            cmd.Parameters.AddWithValue("$c", collection);
+            cmd.Parameters.AddWithValue("$id", id);
+            cmd.ExecuteNonQuery();
+        }
+    }
+
+    /// <summary>
+    /// Keeps a live local row over a server change the user rejected (a held deletion): the row becomes a local edit
+    /// on <paramref name="serverVersion"/>, so the next push restores it on the server.
+    /// </summary>
+    internal void KeepLocal(string collection, string id, long serverVersion)
+    {
+        lock (_gate)
+        {
+            using var cmd = Command("""
+                UPDATE records SET version = $v, dirty = 1, local_rev = local_rev + 1, reseal = 0
+                WHERE collection = $c AND id = $id AND deleted = 0
+                """);
             cmd.Parameters.AddWithValue("$v", serverVersion);
             cmd.Parameters.AddWithValue("$c", collection);
             cmd.Parameters.AddWithValue("$id", id);
@@ -295,6 +338,67 @@ public sealed class SyncDatabase : IDisposable
         }
     }
 
+    internal void UpsertBlob(LocalBlob blob)
+    {
+        lock (_gate)
+        {
+            using var cmd = Command("""
+                INSERT INTO blobs (id, cipher_size, chunk_count, state, created_at, last_access) VALUES ($id, $size, $count, $state, $created, $access)
+                ON CONFLICT (id) DO UPDATE SET cipher_size = $size, chunk_count = $count, state = $state, last_access = $access
+                """);
+            cmd.Parameters.AddWithValue("$id", blob.Id);
+            cmd.Parameters.AddWithValue("$size", blob.CipherSize);
+            cmd.Parameters.AddWithValue("$count", blob.ChunkCount);
+            cmd.Parameters.AddWithValue("$state", blob.State.ToString());
+            cmd.Parameters.AddWithValue("$created", blob.CreatedAtMs);
+            cmd.Parameters.AddWithValue("$access", blob.LastAccessMs);
+            cmd.ExecuteNonQuery();
+        }
+    }
+
+    internal LocalBlob? GetBlob(string id)
+    {
+        lock (_gate)
+        {
+            using var cmd = Command("SELECT id, cipher_size, chunk_count, state, created_at, last_access FROM blobs WHERE id = $id");
+            cmd.Parameters.AddWithValue("$id", id);
+            return ReadBlobs(cmd).FirstOrDefault();
+        }
+    }
+
+    internal List<LocalBlob> ListBlobs(LocalBlobState? state = null)
+    {
+        lock (_gate)
+        {
+            using var cmd = Command("SELECT id, cipher_size, chunk_count, state, created_at, last_access FROM blobs"
+                + (state is null ? "" : " WHERE state = $state") + " ORDER BY created_at");
+            if (state is { } s) cmd.Parameters.AddWithValue("$state", s.ToString());
+            return ReadBlobs(cmd);
+        }
+    }
+
+    internal void DeleteBlob(string id)
+    {
+        lock (_gate)
+        {
+            using var cmd = Command("DELETE FROM blobs WHERE id = $id");
+            cmd.Parameters.AddWithValue("$id", id);
+            cmd.ExecuteNonQuery();
+        }
+    }
+
+    private List<LocalBlob> ReadBlobs(SqliteCommand cmd)
+    {
+        var blobs = new List<LocalBlob>();
+        using var r = cmd.ExecuteReader();
+        while (r.Read())
+        {
+            if (!Enum.TryParse<LocalBlobState>(r.GetString(3), out var state)) continue;
+            blobs.Add(new LocalBlob(r.GetString(0), r.GetInt64(1), r.GetInt32(2), state, r.GetInt64(4), r.GetInt64(5)));
+        }
+        return blobs;
+    }
+
     /// <summary>
     /// Forgets everything learned from a server (versions, cursors, tombstones) and marks every live record as a
     /// local edit, so the replica uploads cleanly into a different account instead of conflicting with it.
@@ -306,6 +410,8 @@ public sealed class SyncDatabase : IDisposable
             Execute("DELETE FROM records WHERE deleted = 1");
             Execute("UPDATE records SET version = 0, dirty = 1, reseal = 0, local_rev = local_rev + 1");
             Execute("DELETE FROM cursors");
+            // Files of the old account must be uploaded to the new one; the chunks are still on disk.
+            Execute("UPDATE blobs SET state = 'Pending' WHERE state = 'Committed'");
         });
     }
 
@@ -404,11 +510,35 @@ public sealed class SyncDatabase : IDisposable
                 ) WITHOUT ROWID;
                 CREATE INDEX IF NOT EXISTS records_dirty ON records (dirty) WHERE dirty = 1;
                 CREATE TABLE IF NOT EXISTS cursors (name TEXT PRIMARY KEY, last_seq INTEGER NOT NULL);
-                PRAGMA user_version = {SchemaVersion};
+                PRAGMA user_version = 2;
                 """);
-            return;
+            current = 2;
+        }
+        else if (current == 1)
+        {
+            MigrateFromV1();
+            current = 2;
         }
 
+        // v3: local state of blobs (files); their chunks are files next to the database.
+        if (current == 2)
+        {
+            Execute("""
+                CREATE TABLE IF NOT EXISTS blobs (
+                    id          TEXT    PRIMARY KEY,
+                    cipher_size INTEGER NOT NULL,
+                    chunk_count INTEGER NOT NULL,
+                    state       TEXT    NOT NULL,
+                    created_at  INTEGER NOT NULL,
+                    last_access INTEGER NOT NULL
+                ) WITHOUT ROWID;
+                PRAGMA user_version = 3;
+                """);
+        }
+    }
+
+    private void MigrateFromV1()
+    {
         // v1 (Helm 0.5.0): plaintext bodies, no reseal column. Encrypt in place, then rewrite the file so no
         // plaintext survives in free pages or the WAL.
         InTransaction(() =>
@@ -428,7 +558,7 @@ public sealed class SyncDatabase : IDisposable
                 update.Parameters.AddWithValue("$id", id);
                 update.ExecuteNonQuery();
             }
-            Execute($"PRAGMA user_version = {SchemaVersion}");
+            Execute("PRAGMA user_version = 2");
         });
         Execute("PRAGMA wal_checkpoint(TRUNCATE);");
         Execute("VACUUM;");

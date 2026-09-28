@@ -19,7 +19,11 @@ helm_pat_<accountId>_<secret><checksum>
 
 Cloudflare builds and deploys the Worker from this GitHub repository (Workers Builds), and the admin page at `/admin` replaces `admin.ps1`. The code must be on the branch that Cloudflare watches (`main` by default).
 
-0. **Create the backup bucket first.** R2 Object Storage → **Create bucket** → name `helm-sync-backups`. Without this bucket, `wrangler deploy` fails because `wrangler.toml` binds it for the nightly backups.
+0. **Create both R2 buckets first.** R2 Object Storage → **Create bucket**:
+   - `helm-sync-backups` for the nightly backups.
+   - `helm-sync-blobs` for Vault documents (encrypted chunks).
+
+   Without them, `wrangler deploy` fails, because `wrangler.toml` binds both.
 1. **Connect the repository.** Workers & Pages → **Create application** → **Import a repository** → connect GitHub. When GitHub asks which repositories to allow, select only `helm`.
 2. **Configure the project**, then select **Save and Deploy**:
    - Project name: `helm-sync`. It must match `name` in `wrangler.toml`, or the build fails.
@@ -46,6 +50,8 @@ Cloudflare builds and deploys the Worker from this GitHub repository (Workers Bu
    - **Backups:** run a backup now, and restore one per account. You confirm a restore by typing the account id.
 
    An invite code is shown only once, so copy it when it appears.
+
+**Raising limits** (no code change): Worker `helm-sync` → **Settings** → **Variables and Secrets** → edit `MAX_BLOB_MB` (largest document, 256 by default) or `MAX_QUOTA_MB` (the highest quota the admin may set, 102400 by default), then **Deploy**. Helm reads the effective limits from `/v1/me`. Each account's quota is still set on the admin page. A deploy from `wrangler.toml` resets dashboard edits to the `[vars]` there, so change both, or only `wrangler.toml`.
 
 The admin page keeps `ADMIN_TOKEN` in the tab's memory only. It is forgotten on reload and when you select **Lock**.
 
@@ -80,7 +86,7 @@ For a second lock on `/admin`, add Cloudflare Access: Zero Trust → Access → 
    ```
    Paste each token into Helm under General → Sync on that device.
 
-The Free Workers plan is enough to start (SQLite Durable Objects are included). R2 is not needed yet; it arrives with file attachments.
+The Free Workers plan is enough to start (SQLite Durable Objects are included). Create the R2 buckets `helm-sync-backups` and `helm-sync-blobs` before the first deploy (`npx wrangler r2 bucket create helm-sync-blobs`).
 
 ## Everyday admin
 
@@ -122,5 +128,6 @@ Without these variables the `SyncServerTests` are skipped. CI runs them against 
 - Account ids come from the admin API only, so no one can create an account.
 - The `/admin` page is static (strict CSP, no inline script, no third-party origins, framing denied). It renders data only as text, and every action goes through the admin API with the token you type.
 - Invite redemption (20 per minute) and failed admin sign-ins (10 per minute) are rate limited per client IP by Workers rate limiting.
+- Blob chunks stream between the device and R2 through the Worker, encrypted on the device. Deleted blobs stay in the trash for 30 days and abandoned uploads for 7, then the nightly job purges them.
 - Nightly backups hold ciphertext only, with no tokens; 30 days are kept in R2. Deleting the Worker or its Durable Objects in the dashboard deletes the live data, but not the backups in R2.
 - For extra protection, add a Cloudflare WAF rate-limiting rule for `sync.huyhung1404.com/admin/*` and `/v1/*`.

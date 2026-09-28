@@ -19,6 +19,11 @@ public enum SyncState
     QuotaExceeded,
     /// <summary>The account key was rotated on another device: unlock again with the passphrase.</summary>
     KeyChanged,
+    /// <summary>
+    /// A pull would delete many records of a guarded collection (see <see cref="SyncChangeGuard"/>). Nothing more is
+    /// pulled until the user decides (<see cref="SyncEngine.Hold"/>); local edits are still pushed.
+    /// </summary>
+    Held,
     Error,
 }
 
@@ -32,7 +37,17 @@ public enum SyncRunOutcome
     Unauthorized,
     QuotaExceeded,
     KeyChanged,
+    Held,
     Failed,
+}
+
+/// <summary>A pull that was not applied because it deletes <see cref="Records"/> of a guarded collection.</summary>
+/// <param name="Records">The records the server has deleted, with the server version of each deletion.</param>
+public sealed record SyncHold(string Collection, int LiveRecords, IReadOnlyList<(string Id, long Version)> Records);
+
+internal sealed class SyncHeldException(SyncHold hold) : Exception($"Sync would delete {hold.Records.Count} {hold.Collection} records.")
+{
+    public SyncHold Hold { get; } = hold;
 }
 
 public sealed record SyncRunResult(SyncRunOutcome Outcome, int Pushed, int Pulled, int Conflicts);
@@ -71,6 +86,10 @@ public sealed class SyncEngine : ISyncService, IDisposable
     // Push keeps going while batches make progress (a first upload can be thousands of records); this only stops
     // a pathological loop, e.g. a record that is edited during every single push.
     private const int MaxPushRounds = 1000;
+    // Pages (of PullPageSize) held in memory at most while judging guarded deletions together.
+    private const int MaxHeldPages = 20;
+    private const string BlobGcMeta = "blob_gc_at";
+    private static readonly TimeSpan BlobGcInterval = TimeSpan.FromDays(1);
 
     private readonly SyncDatabase _db;
     private readonly ISyncTransport _transport;
@@ -85,6 +104,8 @@ public sealed class SyncEngine : ISyncService, IDisposable
     private readonly object _keyGate = new();
     private SyncKeyring? _keyring;
     private volatile bool _disposed;
+    private volatile bool _applyHold;
+    private readonly IBlobSync? _blobs;
 
     public SyncEngine(
         SyncDatabase db,
@@ -93,8 +114,10 @@ public sealed class SyncEngine : ISyncService, IDisposable
         IEnumerable<SyncCollectionDescriptor> descriptors,
         ILogger<SyncEngine>? logger = null,
         TimeProvider? time = null,
-        TimeSpan? debounce = null)
+        TimeSpan? debounce = null,
+        IBlobSync? blobs = null)
     {
+        _blobs = blobs;
         _db = db;
         _transport = transport;
         _keys = keys;
@@ -118,6 +141,9 @@ public sealed class SyncEngine : ISyncService, IDisposable
 
     /// <summary>Raised after a run for every collection whose records changed (remote edits, conflict copies).</summary>
     internal event EventHandler<SyncRecordsChangedEventArgs>? RecordsChanged;
+
+    /// <summary>The deletions waiting for the user while <see cref="Status"/> is <see cref="SyncState.Held"/>; else null.</summary>
+    public SyncHold? Hold { get; private set; }
 
     internal SyncDatabase Database => _db;
 
@@ -161,10 +187,20 @@ public sealed class SyncEngine : ISyncService, IDisposable
         try
         {
             SetStatus(Status with { State = SyncState.Syncing });
+            // Files first: a record that uses a file is pushed only once the file is on the server (I6).
+            var blobsFit = _blobs is null || await _blobs.UploadPendingAsync(ct).ConfigureAwait(false);
             await PushAsync(keyring, run, ct).ConfigureAwait(false);
             await PullAsync(keyring, run, ct).ConfigureAwait(false);
             // Conflicts found while pulling may have kept local edits (rebased or copied): send them now.
             if (run.PendingPush) await PushAsync(keyring, run, ct).ConfigureAwait(false);
+            _applyHold = false;
+            Hold = null;
+            await CollectBlobGarbageAsync(ct).ConfigureAwait(false);
+            if (!blobsFit)
+            {
+                SetStatus(new SyncStatus(SyncState.QuotaExceeded, _time.GetUtcNow(), "Some files could not be uploaded: storage is full."));
+                return run.Result(SyncRunOutcome.QuotaExceeded);
+            }
             SetStatus(new SyncStatus(SyncState.Idle, _time.GetUtcNow(), null));
             return run.Result(SyncRunOutcome.Completed);
         }
@@ -180,6 +216,14 @@ public sealed class SyncEngine : ISyncService, IDisposable
             try { KeyEpochChanged?.Invoke(this, EventArgs.Empty); }
             catch (Exception handlerEx) { _logger.LogError(handlerEx, "A key-change handler failed"); }
             return run.Result(SyncRunOutcome.KeyChanged);
+        }
+        catch (SyncHeldException ex)
+        {
+            _logger.LogWarning("Sync held: the server deletes {Count} of {Live} {Collection} records", ex.Hold.Records.Count,
+                ex.Hold.LiveRecords, ex.Hold.Collection);
+            Hold = ex.Hold;
+            SetStatus(Status with { State = SyncState.Held, LastError = ex.Message });
+            return run.Result(SyncRunOutcome.Held);
         }
         catch (SyncQuotaException ex)
         {
@@ -212,6 +256,39 @@ public sealed class SyncEngine : ISyncService, IDisposable
         }
     }
 
+    /// <summary>The user accepts the held deletions: the next run applies them.</summary>
+    public Task<SyncRunResult> ApproveHeldAsync(CancellationToken ct = default)
+    {
+        _applyHold = true;
+        return SyncNowAsync(ct);
+    }
+
+    /// <summary>
+    /// The user keeps this device's records: each held deletion is overridden by uploading the local record again on
+    /// top of the server's deletion, which restores it on every device.
+    /// </summary>
+    public async Task<SyncRunResult> RejectHeldAsync(CancellationToken ct = default)
+    {
+        await _run.WaitAsync(ct).ConfigureAwait(false);
+        try
+        {
+            if (Hold is { } hold)
+            {
+                _db.InTransaction(() =>
+                {
+                    foreach (var (id, version) in hold.Records) _db.KeepLocal(hold.Collection, id, version);
+                });
+                _logger.LogWarning("Kept {Count} {Collection} records that the server had deleted", hold.Records.Count, hold.Collection);
+                Hold = null;
+            }
+        }
+        finally
+        {
+            _run.Release();
+        }
+        return await SyncNowAsync(ct).ConfigureAwait(false);
+    }
+
     public void Dispose()
     {
         _disposed = true;
@@ -224,7 +301,8 @@ public sealed class SyncEngine : ISyncService, IDisposable
     {
         for (var round = 0; round < MaxPushRounds; round++)
         {
-            var dirty = _db.GetDirty(PushBatchSize);
+            // Records whose files are still only on this device wait for the next run.
+            var dirty = _db.GetDirty(PushBatchSize * 10).Where(CanPush).Take(PushBatchSize).ToList();
             if (dirty.Count == 0) return;
 
             var items = dirty.Select(row => new PushItem(row.Collection, row.Id, row.Version, row.Deleted,
@@ -283,19 +361,42 @@ public sealed class SyncEngine : ISyncService, IDisposable
     private async Task PullAsync(SyncKeyring keyring, RunState run, CancellationToken ct)
     {
         var since = _db.GetCursor(MainCursor);
+        // Pages that delete guarded records are collected and judged together before any of them is applied, so
+        // deletions spread over several pages cannot slip under the threshold one page at a time.
+        var pending = new List<(PullPage Page, long Next)>();
         while (true)
         {
             var page = await _transport.PullAsync(since, PullPageSize, ct).ConfigureAwait(false);
             var next = Math.Max(since, page.NextSeq);
-            _db.InTransaction(() =>
+            var last = !page.HasMore || next == since;
+            if (_applyHold)
             {
-                foreach (var record in page.Records) ApplyPulled(keyring, record, run);
-                _db.SetCursor(MainCursor, next);
-            });
-            if (!page.HasMore || next == since) return;
+                Apply(keyring, page, next, run);
+            }
+            else
+            {
+                pending.Add((page, next));
+                CollectGuardedDeletions(page.Records, run);
+                // Once a guarded deletion was seen, keep collecting to the end of the pull (or the memory cap).
+                if (run.GuardedDeletions.Count == 0 || last || pending.Count >= MaxHeldPages)
+                {
+                    // Throws before anything pending is applied; the cursor stays, so the same pages come back next run.
+                    CheckChangeGuards(run);
+                    foreach (var (held, heldNext) in pending) Apply(keyring, held, heldNext, run);
+                    pending.Clear();
+                    run.GuardedDeletions.Clear();
+                }
+            }
+            if (last) return;
             since = next;
         }
     }
+
+    private void Apply(SyncKeyring keyring, PullPage page, long next, RunState run) => _db.InTransaction(() =>
+    {
+        foreach (var record in page.Records) ApplyPulled(keyring, record, run);
+        _db.SetCursor(MainCursor, next);
+    });
 
     private void ApplyPulled(SyncKeyring keyring, RemoteRecord record, RunState run)
     {
@@ -319,6 +420,99 @@ public sealed class SyncEngine : ISyncService, IDisposable
         }
         _db.ApplyRemote(record.Collection, record.Id, record.Version, remote, record.Deleted);
         run.Changed(record.Collection, record.Id);
+    }
+
+    private bool CanPush(SyncRow row)
+    {
+        if (_blobs is null || row.Deleted || row.Body is null) return true;
+        if (!_descriptors.TryGetValue(row.Collection, out var descriptor) || descriptor.BlobReferences is not { } references) return true;
+        try
+        {
+            return !references(row.Body).Any(_blobs.IsPending);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Could not read the files of {Collection}/{Id}; pushing it anyway", row.Collection, row.Id);
+            return true;
+        }
+    }
+
+    /// <summary>
+    /// At most daily, after a complete run: blobs no record uses are deleted (after a grace period, softly on the
+    /// server) and used ones that were deleted are restored. Skipped whenever the replica holds a collection this build
+    /// does not know, because its records might use blobs nobody here can see.
+    /// </summary>
+    private async Task CollectBlobGarbageAsync(CancellationToken ct)
+    {
+        if (_blobs is null) return;
+        var last = long.TryParse(_db.GetMetaValue(BlobGcMeta), out var ms) ? ms : 0;
+        if (_time.GetUtcNow() - DateTimeOffset.FromUnixTimeMilliseconds(last) < BlobGcInterval) return;
+        try
+        {
+            var unknown = _db.ListCollections().Where(c => !_descriptors.ContainsKey(c)).ToList();
+            if (unknown.Count > 0)
+            {
+                _logger.LogInformation("Blob clean-up skipped: unknown collections {Collections}", string.Join(", ", unknown));
+                return;
+            }
+            var referenced = new HashSet<string>(StringComparer.Ordinal);
+            foreach (var descriptor in _descriptors.Values)
+            {
+                if (descriptor.BlobReferences is not { } references) continue;
+                foreach (var row in _db.List(descriptor.Name))
+                {
+                    if (row.Body is not null) referenced.UnionWith(references(row.Body));
+                }
+            }
+            await _blobs.CollectGarbageAsync(referenced, ct).ConfigureAwait(false);
+            _db.SetMetaValue(BlobGcMeta, _time.GetUtcNow().ToUnixTimeMilliseconds().ToString(System.Globalization.CultureInfo.InvariantCulture));
+        }
+        catch (OperationCanceledException) when (ct.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            // A hook that cannot read a record, or the server failing: clean up another day, never guess.
+            _logger.LogWarning(ex, "Blob clean-up failed; it runs again later");
+        }
+    }
+
+    private void CollectGuardedDeletions(IReadOnlyList<RemoteRecord> records, RunState run)
+    {
+        foreach (var record in records)
+        {
+            if (!record.Deleted || !_descriptors.TryGetValue(record.Collection, out var descriptor) || descriptor.ChangeGuard is not { } guard) continue;
+            var local = _db.Get(record.Collection, record.Id);
+            if (local is null || local.Deleted || local.Version >= record.Version) continue;
+            if (local.Body is not null && guard.IsExpendable is { } expendable && IsExpendable(expendable, local.Body)) continue;
+            if (!run.GuardedDeletions.TryGetValue(record.Collection, out var deletions))
+                run.GuardedDeletions[record.Collection] = deletions = [];
+            deletions.Add((record.Id, record.Version));
+        }
+    }
+
+    private void CheckChangeGuards(RunState run)
+    {
+        foreach (var (collection, deletions) in run.GuardedDeletions)
+        {
+            var live = _db.List(collection).Count;
+            if (deletions.Count >= SyncChangeGuard.Threshold(live)) throw new SyncHeldException(new SyncHold(collection, live, deletions.ToList()));
+        }
+    }
+
+    private bool IsExpendable(Func<string, bool> expendable, string body)
+    {
+        try
+        {
+            return expendable(body);
+        }
+        catch (Exception ex)
+        {
+            // Unknown means guarded: a hook that cannot read the body must not let deletions through.
+            _logger.LogWarning(ex, "A change-guard hook failed");
+            return false;
+        }
     }
 
     /// <summary>A local edit and a server edit were both made on the same base version.</summary>
@@ -458,6 +652,8 @@ public sealed class SyncEngine : ISyncService, IDisposable
         public int Pulled;
         public int Conflicts;
         public bool PendingPush;
+        /// <summary>Guarded deletions in the pages pulled but not applied yet.</summary>
+        public Dictionary<string, List<(string Id, long Version)>> GuardedDeletions { get; } = new(StringComparer.Ordinal);
         public Dictionary<string, HashSet<string>> ChangedIds { get; } = new(StringComparer.Ordinal);
 
         public void Changed(string collection, string id)

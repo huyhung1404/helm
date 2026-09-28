@@ -2,7 +2,7 @@
 // so every call returns { status, body } and the Worker turns it into a Response.
 
 import { DurableObject } from "cloudflare:workers";
-import { AccountStore, type Scope } from "./account-store.ts";
+import { AccountStore, limitsFromEnv, type Scope } from "./account-store.ts";
 import { RegistryStore } from "./registry-store.ts";
 import { HttpError, type Sql, type SqlValue } from "./sql.ts";
 
@@ -12,6 +12,11 @@ export interface Env {
   ADMIN_TOKEN?: string;
   /** Nightly backups (R2 bucket helm-sync-backups). Without it, backups are off. */
   BACKUPS?: R2Bucket;
+  /** Encrypted blob chunks (R2 bucket helm-sync-blobs). Without it, the blob routes answer 503 blobs_disabled. */
+  BLOBS?: R2Bucket;
+  /** Limits an operator can raise without a code change ([vars] in wrangler.toml, or the dashboard). */
+  MAX_BLOB_MB?: string;
+  MAX_QUOTA_MB?: string;
   /** Per-IP limits for invite redemption and failed admin sign-ins (Workers rate limiting). */
   REDEEM_LIMITER?: RateLimit;
   ADMIN_LIMITER?: RateLimit;
@@ -22,15 +27,23 @@ export interface Result {
   body: unknown;
 }
 
-export type ApiOp = "me" | "push" | "pull" | "getKeyring" | "putKeyring" | "listTokens" | "createToken" | "revokeToken";
+export type ApiOp =
+  | "me" | "push" | "pull" | "getKeyring" | "putKeyring" | "listTokens" | "createToken" | "revokeToken"
+  | "reserveBlob" | "authorizeChunk" | "recordChunk" | "commitBlob" | "getBlob" | "listBlobs" | "readChunk"
+  | "deleteBlob" | "restoreBlob";
 export type AccountAdminOp =
-  | "init" | "info" | "setQuota" | "createToken" | "listTokens" | "revokeToken" | "revokeAll" | "export" | "import";
+  | "init" | "info" | "setQuota" | "createToken" | "listTokens" | "revokeToken" | "revokeAll" | "export" | "import"
+  | "blobsDue" | "blobsPurged";
 
 export interface ApiInput {
   body?: unknown;
   since?: string | null;
   limit?: string | null;
   tokenId?: string;
+  blobId?: string;
+  index?: number;
+  length?: number;
+  after?: string | null;
 }
 
 const REQUIRED_SCOPE: Record<ApiOp, Scope> = {
@@ -42,6 +55,15 @@ const REQUIRED_SCOPE: Record<ApiOp, Scope> = {
   listTokens: "tokens:manage",
   createToken: "tokens:manage",
   revokeToken: "tokens:manage",
+  getBlob: "sync:read",
+  listBlobs: "sync:read",
+  readChunk: "sync:read",
+  reserveBlob: "sync:write",
+  authorizeChunk: "sync:write",
+  recordChunk: "sync:write",
+  commitBlob: "sync:write",
+  deleteBlob: "sync:write",
+  restoreBlob: "sync:write",
 };
 
 export class AccountObject extends DurableObject<Env> {
@@ -49,15 +71,18 @@ export class AccountObject extends DurableObject<Env> {
 
   constructor(ctx: DurableObjectState, env: Env) {
     super(ctx, env);
-    this.store = new AccountStore(durableSql(ctx.storage));
+    this.store = new AccountStore(durableSql(ctx.storage), Date.now, limitsFromEnv(env));
   }
 
   async api(tokenHash: string, op: ApiOp, input: ApiInput): Promise<Result> {
     return run(async () => {
       const token = this.store.authenticate(tokenHash, REQUIRED_SCOPE[op]);
       switch (op) {
-        case "me":
-          return { status: 200, body: { account: this.store.info(), token } };
+        case "me": {
+          const { maxChunkBytes, maxChunksPerBlob, maxBlobBytes, maxPayloadBytes } = this.store.limits;
+          const limits = { maxChunkBytes, maxChunksPerBlob, maxBlobBytes, maxPayloadBytes };
+          return { status: 200, body: { account: this.store.info(), token, limits } };
+        }
         case "push":
           return { status: 200, body: { outcomes: this.store.push(input.body) } };
         case "pull":
@@ -80,6 +105,27 @@ export class AccountObject extends DurableObject<Env> {
           return this.store.revokeToken(input.tokenId ?? "")
             ? { status: 200, body: { revoked: true } }
             : { status: 404, body: { error: "token_not_found" } };
+        case "reserveBlob": {
+          const { created, blob } = this.store.blobs.reserve(input.body);
+          return { status: created ? 201 : 200, body: blob };
+        }
+        case "authorizeChunk":
+          this.store.blobs.authorizeChunk(input.blobId, input.index, input.length);
+          return { status: 200, body: { authorized: true } };
+        case "recordChunk":
+          return { status: 200, body: this.store.blobs.recordChunk(input.blobId, input.index, input.length) };
+        case "commitBlob":
+          return { status: 200, body: this.store.blobs.commit(input.blobId) };
+        case "getBlob":
+          return { status: 200, body: this.store.blobs.get(input.blobId) };
+        case "listBlobs":
+          return { status: 200, body: this.store.blobs.list(input.after ?? null, input.limit ?? null) };
+        case "readChunk":
+          return { status: 200, body: this.store.blobs.readChunk(input.blobId, input.index) };
+        case "deleteBlob":
+          return { status: 200, body: this.store.blobs.remove(input.blobId) };
+        case "restoreBlob":
+          return { status: 200, body: this.store.blobs.restore(input.blobId) };
       }
     });
   }
@@ -113,6 +159,10 @@ export class AccountObject extends DurableObject<Env> {
           return { status: 200, body: this.store.exportSnapshot() };
         case "import":
           return { status: 200, body: this.store.importSnapshot(arg) };
+        case "blobsDue":
+          return { status: 200, body: { ids: this.store.blobs.due(Number(arg)) } };
+        case "blobsPurged":
+          return { status: 200, body: this.store.blobs.purged(arg) };
       }
     });
   }
@@ -176,7 +226,7 @@ async function run(fn: () => Promise<Result>): Promise<Result> {
   try {
     return await fn();
   } catch (error) {
-    if (error instanceof HttpError) return { status: error.status, body: { error: error.code, message: error.message } };
+    if (error instanceof HttpError) return { status: error.status, body: { error: error.code, message: error.message, ...error.details } };
     console.error(error);
     return { status: 500, body: { error: "internal" } };
   }

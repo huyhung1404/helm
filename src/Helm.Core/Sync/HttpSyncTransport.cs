@@ -141,11 +141,79 @@ public sealed class SyncApiClient : IDisposable
     public Task RevokeTokenAsync(SyncCredentials credentials, string tokenId, CancellationToken ct = default) =>
         SendAsync<JsonElement>(credentials, HttpMethod.Delete, $"v1/tokens/{Uri.EscapeDataString(tokenId)}", null, ct);
 
-    private async Task<T> SendAsync<T>(SyncCredentials credentials, HttpMethod method, string path, object? body, CancellationToken ct, bool authenticate = true)
+    /// <summary>The server's effective limits; a server from before blobs reports none, and the defaults apply.</summary>
+    public async Task<SyncLimits> GetLimitsAsync(SyncCredentials credentials, CancellationToken ct = default)
+    {
+        var me = await SendAsync<MeResponse>(credentials, HttpMethod.Get, "v1/me", null, ct).ConfigureAwait(false);
+        const long chunk = 4 * 1024 * 1024 + 4096;
+        return me.Limits is { } l
+            ? new SyncLimits(l.MaxChunkBytes, l.MaxChunksPerBlob, l.MaxBlobBytes, l.MaxPayloadBytes)
+            : new SyncLimits(chunk, 65, 65 * chunk, 1024 * 1024);
+    }
+
+    public async Task<RemoteBlob> ReserveBlobAsync(SyncCredentials credentials, string id, long size, int chunkCount, CancellationToken ct) =>
+        ToBlob(await SendAsync<BlobJson>(credentials, HttpMethod.Post, "v1/blobs", new ReserveBlobRequest(id, size, chunkCount), ct).ConfigureAwait(false));
+
+    public async Task PutBlobChunkAsync(SyncCredentials credentials, string id, int index, ReadOnlyMemory<byte> data, CancellationToken ct)
+    {
+        var content = new ReadOnlyMemoryContent(data);
+        content.Headers.ContentType = new MediaTypeHeaderValue("application/octet-stream");
+        content.Headers.ContentLength = data.Length;
+        await SendAsync<JsonElement>(credentials, HttpMethod.Put, BlobPath(id) + $"/chunks/{index}", null, ct, content: content).ConfigureAwait(false);
+    }
+
+    public async Task<RemoteBlob> CommitBlobAsync(SyncCredentials credentials, string id, CancellationToken ct) =>
+        ToBlob(await SendAsync<BlobJson>(credentials, HttpMethod.Post, BlobPath(id) + "/commit", null, ct).ConfigureAwait(false));
+
+    public async Task<RemoteBlob?> GetBlobAsync(SyncCredentials credentials, string id, CancellationToken ct)
+    {
+        try
+        {
+            return ToBlob(await SendAsync<BlobJson>(credentials, HttpMethod.Get, BlobPath(id), null, ct).ConfigureAwait(false));
+        }
+        catch (SyncRequestException e) when (e.Status == HttpStatusCode.NotFound)
+        {
+            return null;
+        }
+    }
+
+    public async Task<RemoteBlobPage> ListBlobsAsync(SyncCredentials credentials, string? after, int limit, CancellationToken ct)
+    {
+        var query = $"v1/blobs?limit={limit}" + (after is null ? "" : "&after=" + Uri.EscapeDataString(after));
+        var page = await SendAsync<BlobPageJson>(credentials, HttpMethod.Get, query, null, ct).ConfigureAwait(false);
+        return new RemoteBlobPage(page.Blobs.Select(ToBlob).ToList(), page.HasMore, page.Next);
+    }
+
+    /// <returns>Null when the server has no such chunk.</returns>
+    public async Task<byte[]?> GetBlobChunkAsync(SyncCredentials credentials, string id, int index, CancellationToken ct)
+    {
+        using var request = new HttpRequestMessage(HttpMethod.Get, new Uri(credentials.Server, BlobPath(id) + $"/chunks/{index}"));
+        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", credentials.Token);
+        using var response = await _http.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, ct).ConfigureAwait(false);
+        if (response.StatusCode == HttpStatusCode.NotFound) return null;
+        if (!response.IsSuccessStatusCode) await ThrowAsync(response, authenticate: true, ct).ConfigureAwait(false);
+        return await response.Content.ReadAsByteArrayAsync(ct).ConfigureAwait(false);
+    }
+
+    public Task DeleteBlobAsync(SyncCredentials credentials, string id, CancellationToken ct) =>
+        SendAsync<JsonElement>(credentials, HttpMethod.Delete, BlobPath(id), null, ct);
+
+    public Task RestoreBlobAsync(SyncCredentials credentials, string id, CancellationToken ct) =>
+        SendAsync<JsonElement>(credentials, HttpMethod.Post, BlobPath(id) + "/restore", null, ct);
+
+    private static string BlobPath(string id) => "v1/blobs/" + Uri.EscapeDataString(id);
+
+    private static RemoteBlob ToBlob(BlobJson b) => new(b.Id, b.Size, b.ChunkCount,
+        b.State switch { "committed" => RemoteBlobState.Committed, "purging" => RemoteBlobState.Purging, _ => RemoteBlobState.Pending },
+        DateTimeOffset.FromUnixTimeMilliseconds(b.CreatedAt), FromMs(b.DeletedAt), b.Chunks ?? []);
+
+    private async Task<T> SendAsync<T>(SyncCredentials credentials, HttpMethod method, string path, object? body, CancellationToken ct,
+        bool authenticate = true, HttpContent? content = null)
     {
         using var request = new HttpRequestMessage(method, new Uri(credentials.Server, path));
         if (authenticate) request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", credentials.Token);
         if (body is not null) request.Content = JsonContent.Create(body, options: SyncJson.Wire);
+        else if (content is not null) request.Content = content;
 
         using var response = await _http.SendAsync(request, ct).ConfigureAwait(false);
         if (response.IsSuccessStatusCode)
@@ -153,7 +221,12 @@ public sealed class SyncApiClient : IDisposable
             return await response.Content.ReadFromJsonAsync<T>(SyncJson.Options, ct).ConfigureAwait(false)
                 ?? throw new HttpRequestException("The sync server sent an empty response.");
         }
+        await ThrowAsync(response, authenticate, ct).ConfigureAwait(false);
+        throw new HttpRequestException("Unreachable.");
+    }
 
+    private static async Task ThrowAsync(HttpResponseMessage response, bool authenticate, CancellationToken ct)
+    {
         var error = await ReadErrorAsync(response, ct).ConfigureAwait(false);
         var message = error.Message ?? error.Error;
         if (authenticate && response.StatusCode is HttpStatusCode.Unauthorized or HttpStatusCode.Forbidden)
@@ -188,7 +261,11 @@ public sealed class SyncApiClient : IDisposable
     private sealed record PushResponse(IReadOnlyList<PushOutcome> Outcomes);
     private sealed record MeAccount(string AccountId, string Name, long UsedBytes, long QuotaBytes);
     private sealed record TokenJson(string Id, string Name, IReadOnlyList<string> Scopes, long CreatedAt, long? ExpiresAt, long? LastUsedAt, long? RevokedAt);
-    private sealed record MeResponse(MeAccount Account, TokenJson Token);
+    private sealed record LimitsJson(long MaxChunkBytes, int MaxChunksPerBlob, long MaxBlobBytes, long MaxPayloadBytes);
+    private sealed record MeResponse(MeAccount Account, TokenJson Token, LimitsJson? Limits = null);
+    private sealed record ReserveBlobRequest(string Id, long Size, int ChunkCount);
+    private sealed record BlobJson(string Id, long Size, int ChunkCount, string State, long CreatedAt, long? CommittedAt, long? DeletedAt, IReadOnlyList<int>? Chunks);
+    private sealed record BlobPageJson(IReadOnlyList<BlobJson> Blobs, bool HasMore, string? Next);
     private sealed record RedeemRequest(string Invite, string AccountName, string DeviceName);
     private sealed record CreatedTokenJson(string Token, string Id, string Name, IReadOnlyList<string> Scopes, long CreatedAt, long? ExpiresAt, long? LastUsedAt, long? RevokedAt);
     private sealed record RedeemResponse(MeAccount Account, CreatedTokenJson Token);
@@ -199,14 +276,35 @@ public sealed class SyncApiClient : IDisposable
     private sealed record ErrorResponse(string Error, string? Message);
 }
 
-/// <summary><see cref="ISyncTransport"/> for the engine: the current device credentials plus <see cref="SyncApiClient"/>.</summary>
-public sealed class HttpSyncTransport(ISyncCredentialStore credentials, SyncApiClient api) : ISyncTransport
+/// <summary>
+/// <see cref="ISyncTransport"/> and <see cref="IBlobTransport"/> for the engine: the current device credentials plus
+/// <see cref="SyncApiClient"/>.
+/// </summary>
+public sealed class HttpSyncTransport(ISyncCredentialStore credentials, SyncApiClient api) : ISyncTransport, IBlobTransport
 {
     public bool IsConfigured => credentials.Load() is not null;
 
     public Task<IReadOnlyList<PushOutcome>> PushAsync(IReadOnlyList<PushItem> items, CancellationToken ct) => api.PushAsync(Current(), items, ct);
 
     public Task<PullPage> PullAsync(long sinceSeq, int limit, CancellationToken ct) => api.PullAsync(Current(), sinceSeq, limit, ct);
+
+    public Task<SyncLimits> GetLimitsAsync(CancellationToken ct) => api.GetLimitsAsync(Current(), ct);
+
+    public Task<RemoteBlob> ReserveAsync(string id, long size, int chunkCount, CancellationToken ct) => api.ReserveBlobAsync(Current(), id, size, chunkCount, ct);
+
+    public Task PutChunkAsync(string id, int index, ReadOnlyMemory<byte> data, CancellationToken ct) => api.PutBlobChunkAsync(Current(), id, index, data, ct);
+
+    public Task<RemoteBlob> CommitAsync(string id, CancellationToken ct) => api.CommitBlobAsync(Current(), id, ct);
+
+    public Task<RemoteBlob?> GetAsync(string id, CancellationToken ct) => api.GetBlobAsync(Current(), id, ct);
+
+    public Task<RemoteBlobPage> ListAsync(string? after, int limit, CancellationToken ct) => api.ListBlobsAsync(Current(), after, limit, ct);
+
+    public Task<byte[]?> GetChunkAsync(string id, int index, CancellationToken ct) => api.GetBlobChunkAsync(Current(), id, index, ct);
+
+    public Task DeleteAsync(string id, CancellationToken ct) => api.DeleteBlobAsync(Current(), id, ct);
+
+    public Task RestoreAsync(string id, CancellationToken ct) => api.RestoreBlobAsync(Current(), id, ct);
 
     private SyncCredentials Current() =>
         credentials.Load() ?? throw new InvalidOperationException("Sync is not configured on this device.");

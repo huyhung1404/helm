@@ -14,11 +14,14 @@ export interface Sql {
 export class HttpError extends Error {
   readonly status: number;
   readonly code: string;
+  /** Extra fields for the error body, e.g. the chunks a commit is missing. */
+  readonly details?: Record<string, unknown>;
 
-  constructor(status: number, code: string, message?: string) {
+  constructor(status: number, code: string, message?: string, details?: Record<string, unknown>) {
     super(message ?? code);
     this.status = status;
     this.code = code;
+    this.details = details;
   }
 }
 

@@ -2,6 +2,7 @@
 // so compare-and-set and the global seq need no further locking. Behaviour must match
 // tests/Helm.Tests/FakeSyncServer.cs and docs/sync-protocol.md.
 
+import { BLOB_LIMITS, BlobStore, blobLimits, type BlobLimits, type BlobSnapshotJson } from "./blob-store.ts";
 import { HttpError, asBytes, fromBase64, toBase64, type Sql } from "./sql.ts";
 import { createToken, hashToken, randomBase62 } from "./token.ts";
 
@@ -15,8 +16,32 @@ export const LIMITS = {
   maxTokensPerAccount: 100,
   maxTokenLifetimeDays: 3650,
   defaultQuotaMb: 256,
+  /** Default of MAX_QUOTA_MB: the highest quota the admin may set. */
   maxQuotaMb: 100 * 1024,
+  quotaMbCeiling: 1024 * 1024,
+  ...blobLimits(BLOB_LIMITS.defaultMaxBlobMb),
+  ...BLOB_LIMITS,
 };
+
+/** The limits in effect. Some are Worker vars, so an operator raises them without a code change. */
+export interface Limits extends BlobLimits {
+  maxPayloadBytes: number;
+  maxQuotaMb: number;
+}
+
+/** Reads MAX_BLOB_MB and MAX_QUOTA_MB (wrangler.toml [vars] or the dashboard). A missing or invalid value means the default. */
+export function limitsFromEnv(vars: { MAX_BLOB_MB?: unknown; MAX_QUOTA_MB?: unknown }): Limits {
+  return {
+    maxPayloadBytes: LIMITS.maxPayloadBytes,
+    maxQuotaMb: positiveInteger(vars.MAX_QUOTA_MB, LIMITS.maxQuotaMb, LIMITS.quotaMbCeiling),
+    ...blobLimits(positiveInteger(vars.MAX_BLOB_MB, BLOB_LIMITS.defaultMaxBlobMb, BLOB_LIMITS.maxBlobMbCeiling)),
+  };
+}
+
+function positiveInteger(value: unknown, fallback: number, max: number): number {
+  const n = typeof value === "number" ? value : typeof value === "string" && /^\s*\d{1,10}\s*$/.test(value) ? Number(value) : NaN;
+  return Number.isSafeInteger(n) && n >= 1 && n <= max ? n : fallback;
+}
 
 // tokens:manage lets a device list, create and revoke the account's tokens (Helm → General → Sync → Devices).
 export const SCOPES = ["sync:read", "sync:write", "tokens:manage"] as const;
@@ -54,6 +79,8 @@ export interface AccountSnapshot {
   seq: number;
   keyring: { version: number; data: string } | null;
   records: RecordJson[];
+  /** Committed blobs (metadata only; the chunks stay in R2). Absent in snapshots from before blobs. */
+  blobs?: BlobSnapshotJson[];
 }
 
 export interface PushOutcomeJson {
@@ -85,12 +112,25 @@ interface TokenRow {
 }
 
 export class AccountStore {
+  readonly limits: Limits;
   private readonly sql: Sql;
   private readonly now: () => number;
+  private readonly blobStore: BlobStore;
 
-  constructor(sql: Sql, now: () => number = Date.now) {
+  constructor(sql: Sql, now: () => number = Date.now, limits: Limits = limitsFromEnv({})) {
     this.sql = sql;
     this.now = now;
+    this.limits = limits;
+    this.blobStore = new BlobStore(sql, now, limits, {
+      grow: (bytes) => this.growUsage(bytes),
+      shrink: (bytes) => this.setMeta("used_bytes", String(Math.max(0, Number(this.meta("used_bytes")) - bytes))),
+    });
+  }
+
+  /** Blob metadata (Vault documents), sharing this account's storage quota. */
+  get blobs(): BlobStore {
+    this.requireInitialized();
+    return this.blobStore;
   }
 
   /** False for an id nobody created: such an object must stay empty (reads only), whatever the request. */
@@ -100,7 +140,7 @@ export class AccountStore {
   }
 
   init(accountId: string, name: string, quotaMb: number = LIMITS.defaultQuotaMb): void {
-    const quota = parseQuotaMb(quotaMb);
+    const quota = parseQuotaMb(quotaMb, this.limits.maxQuotaMb);
     if (this.initialized) throw new HttpError(409, "account_exists");
     this.sql.transaction(() => {
       this.sql.run("CREATE TABLE IF NOT EXISTS meta (key TEXT PRIMARY KEY, value TEXT NOT NULL)");
@@ -119,10 +159,11 @@ export class AccountStore {
       this.setMeta("seq", "0");
       this.setMeta("quota_bytes", String(quota));
       this.setMeta("used_bytes", "0");
+      this.blobStore.ensureSchema();
     });
   }
 
-  info(): { accountId: string; name: string; createdAt: number; usedBytes: number; quotaBytes: number } {
+  info(): { accountId: string; name: string; createdAt: number; usedBytes: number; quotaBytes: number; blobBytes: number } {
     this.requireInitialized();
     return {
       accountId: this.meta("account_id")!,
@@ -130,12 +171,13 @@ export class AccountStore {
       createdAt: Number(this.meta("created_at")),
       usedBytes: Number(this.meta("used_bytes")),
       quotaBytes: Number(this.meta("quota_bytes")),
+      blobBytes: this.blobStore.totalBytes(),
     };
   }
 
   setQuota(quotaMb: unknown): void {
     this.requireInitialized();
-    this.setMeta("quota_bytes", String(parseQuotaMb(quotaMb)));
+    this.setMeta("quota_bytes", String(parseQuotaMb(quotaMb, this.limits.maxQuotaMb)));
   }
 
   // ---------------------------------------------------------------- tokens
@@ -310,15 +352,17 @@ export class AccountStore {
       seq: Number(this.meta("seq")),
       keyring: this.getKeyring(),
       records: this.sql.all<RecordRow>("SELECT collection, id, version, seq, deleted, payload FROM records ORDER BY seq").map(toRecordJson),
+      blobs: this.blobStore.exportSnapshot(),
     };
   }
 
   /**
    * Restores a snapshot on top of the current data. Every restored record gets a new version above both the
    * current and the backed-up one, and a new seq, so devices pull it and replace their copy; records created after
-   * the backup are kept. Tokens and a current keyring are kept (they may be newer than the backup).
+   * the backup are kept. Tokens and a current keyring are kept (they may be newer than the backup). Blobs this
+   * account no longer has get their rows back; existing blobs are left alone.
    */
-  importSnapshot(snapshot: unknown): { restored: number } {
+  importSnapshot(snapshot: unknown): { restored: number; restoredBlobs: number } {
     this.requireInitialized();
     if (!isObject(snapshot) || snapshot.format !== "helm-sync-account" || snapshot.version !== 1 || !Array.isArray(snapshot.records)) {
       throw new HttpError(400, "invalid_snapshot");
@@ -333,6 +377,7 @@ export class AccountStore {
       if (!payload || payload.length === 0) throw new HttpError(400, "invalid_snapshot", `records[${index}].payload`);
       return { collection: raw.collection, id: raw.id as string, version: raw.version as number, deleted: raw.deleted, payload };
     });
+    const blobs = this.blobStore.parseSnapshot(snapshot.blobs);
 
     return this.sql.transaction(() => {
       let seq = Number(this.meta("seq"));
@@ -353,9 +398,10 @@ export class AccountStore {
       if (!this.getKeyring() && keyring && Number.isSafeInteger(keyring.version) && typeof keyring.data === "string") {
         this.sql.run("INSERT INTO keyring (id, version, data) VALUES (1, ?, ?)", keyring.version as number, keyring.data);
       }
+      const restoredBlobs = this.blobStore.importSnapshot(blobs);
       const used = this.sql.all<{ n: number | null }>("SELECT SUM(LENGTH(payload)) AS n FROM records")[0].n ?? 0;
-      this.setMeta("used_bytes", String(used));
-      return { restored: records.length };
+      this.setMeta("used_bytes", String(used + this.blobStore.totalBytes()));
+      return { restored: records.length, restoredBlobs };
     });
   }
 
@@ -363,6 +409,14 @@ export class AccountStore {
 
   private requireInitialized(): void {
     if (!this.initialized) throw new HttpError(404, "account_not_found");
+  }
+
+  /** Adds to used_bytes, refusing growth beyond the quota (blob reservations; a push checks its whole batch). */
+  private growUsage(bytes: number): void {
+    const used = Number(this.meta("used_bytes")) + bytes;
+    const quota = Number(this.meta("quota_bytes"));
+    if (used > quota) throw new HttpError(413, "quota_exceeded", `Storage quota exceeded (${mb(used)} of ${mb(quota)} MB).`);
+    this.setMeta("used_bytes", String(used));
   }
 
   private meta(key: string): string | null {
@@ -379,9 +433,9 @@ function mb(bytes: number): string {
   return (bytes / (1024 * 1024)).toFixed(1);
 }
 
-function parseQuotaMb(value: unknown): number {
-  if (!Number.isSafeInteger(value) || (value as number) < 1 || (value as number) > LIMITS.maxQuotaMb) {
-    throw new HttpError(400, "invalid_quota", `Quota must be 1–${LIMITS.maxQuotaMb} MB.`);
+function parseQuotaMb(value: unknown, maxQuotaMb: number): number {
+  if (!Number.isSafeInteger(value) || (value as number) < 1 || (value as number) > maxQuotaMb) {
+    throw new HttpError(400, "invalid_quota", `Quota must be 1–${maxQuotaMb} MB.`);
   }
   return (value as number) * 1024 * 1024;
 }

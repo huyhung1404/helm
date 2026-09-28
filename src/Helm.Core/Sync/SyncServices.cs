@@ -19,6 +19,11 @@ public static class SyncServices
         services.TryAddSingleton(_ => new SyncApiClient());
         services.TryAddSingleton<ISyncTransport>(sp => new HttpSyncTransport(
             sp.GetRequiredService<ISyncCredentialStore>(), sp.GetRequiredService<SyncApiClient>()));
+        // Blobs travel over the same server and token as records.
+        services.TryAddSingleton<IBlobTransport>(sp => sp.GetRequiredService<ISyncTransport>() as IBlobTransport ?? new NullBlobTransport());
+        services.AddSingleton(sp => new BlobStore(sp.GetRequiredService<SyncDatabase>(), sp.GetRequiredService<IBlobTransport>(),
+            paths.SyncBlobsDirectory, logger: sp.GetService<ILoggerFactory>()?.CreateLogger<BlobStore>()));
+        services.AddSingleton<IBlobSync>(sp => sp.GetRequiredService<BlobStore>());
         services.TryAddSingleton<IMasterKeyStore>(sp => new ProtectedMasterKeyStore(paths.SyncKeyFile, sp.GetRequiredService<ISecretProtector>()));
         services.AddSingleton<SyncEngine>();
         services.AddSingleton<ISyncService>(sp => sp.GetRequiredService<SyncEngine>());

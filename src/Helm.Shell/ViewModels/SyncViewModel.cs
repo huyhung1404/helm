@@ -340,6 +340,7 @@ public sealed partial class SyncViewModel : ObservableObject
             SyncState.Unauthorized => "This device's token was revoked or has expired. Turn off sync and connect again.",
             SyncState.QuotaExceeded => "Storage is full — new changes stay on this device. " + status.LastError,
             SyncState.KeyChanged => "The account key was changed on another device. Unlock with your passphrase to continue.",
+            SyncState.Held => "Sync is paused: another device deleted many records. Review the change in the tool that owns them.",
             SyncState.Error => "Sync problem: " + status.LastError,
             _ => "Not set up",
         };
