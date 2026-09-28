@@ -41,7 +41,7 @@ internal sealed class WindowsVaultPlatform : IVaultPlatform
         });
     }
 
-    private Window? Owner => _services.GetService<VaultWindowHost>()?.Window is { IsVisible: true } w ? w : Application.Current?.MainWindow;
+    private static Window? Owner => Application.Current?.MainWindow;
 
     public Task<VaultPickedFile?> PickFileAsync(CancellationToken ct)
     {
@@ -150,7 +150,7 @@ internal sealed class WindowsVaultPlatform : IVaultPlatform
         return Task.CompletedTask;
     }
 
-    public void ShowVault() => _services.GetRequiredService<VaultWindowHost>().Show();
+    public void ShowVault() => _services.GetRequiredService<Helm.Core.Services.IShellNavigation>().ShowPage(typeof(VaultContentPage));
 
     private void WipeOpenedFiles()
     {

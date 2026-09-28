@@ -8,6 +8,7 @@
     <UserControl.Resources>
         <local:NotEmptyToBoolConverter x:Key="NotEmptyToBool" />
         <local:KindIconConverter x:Key="KindIcon" />
+        <local:BytesToImageConverter x:Key="BytesToImage" />
     </UserControl.Resources>
 
     <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
@@ -15,8 +16,21 @@
 
             <!-- Header: kind, title, favorite, actions -->
             <DockPanel>
-                <ui:SymbolIcon DockPanel.Dock="Left" Symbol="{Binding Kind, Converter={StaticResource KindIcon}}" FontSize="28" Margin="0,0,12,0" VerticalAlignment="Center"
-                               Foreground="{DynamicResource AccentTextFillColorPrimaryBrush}" />
+                <!-- The item's picture, or its initial on its color (the same avatar as in the Passwords list) -->
+                <Grid DockPanel.Dock="Left" Width="48" Height="48" Margin="0,0,14,0" VerticalAlignment="Center">
+                    <Border CornerRadius="12" Background="{Binding AvatarColor, Converter={StaticResource HexToBrush}}"
+                            Visibility="{Binding HasIcon, Converter={StaticResource InverseBoolToVisibility}}">
+                        <TextBlock Text="{Binding Initial}" Foreground="White" FontSize="22" FontWeight="SemiBold" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                    </Border>
+                    <Border CornerRadius="12" Visibility="{Binding HasIcon, Converter={StaticResource BoolToVisibility}}"
+                            Background="{DynamicResource CardBackgroundFillColorSecondaryBrush}">
+                        <Border CornerRadius="12">
+                            <Border.Background>
+                                <ImageBrush ImageSource="{Binding Icon, Converter={StaticResource BytesToImage}}" Stretch="UniformToFill" />
+                            </Border.Background>
+                        </Border>
+                    </Border>
+                </Grid>
                 <WrapPanel DockPanel.Dock="Right" VerticalAlignment="Center">
                     <!-- Viewing a live item -->
                     <ui:Button Content="Edit" Icon="{ui:SymbolIcon Edit24}" Margin="4,0,0,0" Command="{Binding EditCommand}">
@@ -56,7 +70,13 @@
                                 Visibility="{Binding IsEditing, Converter={StaticResource BoolToVisibility}}" />
                 </Grid>
             </DockPanel>
-            <CheckBox Content="Favorite" Margin="40,8,0,0" IsChecked="{Binding Favorite}" Visibility="{Binding IsEditing, Converter={StaticResource BoolToVisibility}}" />
+            <WrapPanel Margin="62,8,0,0" Visibility="{Binding IsEditing, Converter={StaticResource BoolToVisibility}}">
+                <CheckBox Content="Favorite" IsChecked="{Binding Favorite}" Margin="0,0,16,0" VerticalAlignment="Center" />
+                <ui:Button Content="Choose icon…" Icon="{ui:SymbolIcon ImageAdd24}" Command="{Binding ChooseIconCommand}" Margin="0,0,8,0"
+                           ToolTip="A picture for this item (PNG, JPEG or WebP up to 256 KB). It is encrypted with the item." />
+                <ui:Button Content="Remove icon" Icon="{ui:SymbolIcon ImageOff24}" Appearance="Transparent" Command="{Binding RemoveIconCommand}"
+                           Visibility="{Binding HasIcon, Converter={StaticResource BoolToVisibility}}" />
+            </WrapPanel>
 
             <ui:InfoBar Margin="0,12,0,0" Severity="Error" IsClosable="False" Message="{Binding Error}" IsOpen="{Binding Error, Converter={StaticResource NotEmptyToBool}}" />
             <ui:InfoBar Margin="0,12,0,0" Severity="Informational" IsClosable="False" Title="In the trash"

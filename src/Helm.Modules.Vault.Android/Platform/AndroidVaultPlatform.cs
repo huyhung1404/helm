@@ -126,7 +126,7 @@ internal sealed class AndroidVaultPlatform : IVaultPlatform
             await writer.WriteAsync(kit.Text).ConfigureAwait(true);
     }
 
-    public void ShowVault() => _navigation.ShowPage(typeof(VaultPage));
+    public void ShowVault() => _navigation.ShowPage(typeof(VaultContentPage));
 
     private void Copy(string text, bool sensitive)
     {

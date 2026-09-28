@@ -11,10 +11,27 @@
         <Border Classes="card">
             <StackPanel Spacing="8">
                 <DockPanel>
-                    <ic:SymbolIcon DockPanel.Dock="Left" FontSize="24" Margin="0,0,12,0" Symbol="{Binding Kind, Converter={x:Static local:KindIcon.Converter}}" />
-                    <TextBlock Classes="title" FontSize="18" VerticalAlignment="Center" Text="{Binding Title}" IsVisible="{Binding !IsEditing}" />
-                    <TextBox PlaceholderText="Title" Text="{Binding Title}" IsVisible="{Binding IsEditing}" AutomationProperties.Name="Title" />
+                    <!-- Avatar: the item's own picture, else its first letter on a color from its title -->
+                    <Panel DockPanel.Dock="Left" Width="48" Height="48" Margin="0,0,12,0" VerticalAlignment="Center">
+                        <Border CornerRadius="12" Background="{Binding AvatarColor, Converter={x:Static local:HexBrush.Converter}}" IsVisible="{Binding !HasIcon}">
+                            <TextBlock Text="{Binding Initial}" Foreground="White" FontSize="21" FontWeight="SemiBold" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        </Border>
+                        <Border CornerRadius="12" ClipToBounds="True" IsVisible="{Binding HasIcon}">
+                            <Image Source="{Binding Icon, Converter={x:Static local:IconBitmap.Converter}}" Stretch="UniformToFill" />
+                        </Border>
+                    </Panel>
+                    <TextBlock Classes="title" FontSize="18" VerticalAlignment="Center" Text="{Binding Title}" IsVisible="{Binding !IsEditing}" TextWrapping="Wrap" />
+                    <TextBox PlaceholderText="Title" Text="{Binding Title}" IsVisible="{Binding IsEditing}" AutomationProperties.Name="Title" VerticalAlignment="Center" />
                 </DockPanel>
+                <WrapPanel IsVisible="{Binding IsEditing}">
+                    <Button Margin="0,0,8,4" Command="{Binding ChooseIconCommand}">
+                        <StackPanel Orientation="Horizontal" Spacing="6">
+                            <ic:SymbolIcon Symbol="ImageAdd" FontSize="16" />
+                            <TextBlock Text="Choose icon…" VerticalAlignment="Center" />
+                        </StackPanel>
+                    </Button>
+                    <Button Margin="0,0,8,4" Content="Remove icon" Command="{Binding RemoveIconCommand}" IsVisible="{Binding HasIcon}" />
+                </WrapPanel>
                 <CheckBox Content="Favorite" IsChecked="{Binding Favorite}" IsVisible="{Binding IsEditing}" />
                 <WrapPanel>
                     <Button Margin="0,0,8,4" Content="Edit" Command="{Binding EditCommand}">

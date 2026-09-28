@@ -65,6 +65,14 @@ public sealed record VaultItem
 
     public bool Favorite { get; init; }
 
+    /// <summary>
+    /// Optional picture the user chose for the item (PNG/JPEG/WebP bytes, at most <see cref="MaxIconBytes"/>). Sealed
+    /// with the item like everything else; Helm never fetches icons from the web, which would reveal the user's sites.
+    /// </summary>
+    public byte[]? Icon { get; init; }
+
+    public const int MaxIconBytes = 256 * 1024;
+
     public IReadOnlyList<VaultAttachment> Attachments { get; init; } = [];
 
     public long CreatedAtMs { get; init; }
@@ -82,7 +90,16 @@ public sealed record VaultItem
     /// <summary>Same content, ignoring times and history (an edit that changes nothing is not a new version).</summary>
     public bool SameContentAs(VaultItem other) =>
         Kind == other.Kind && Title == other.Title && Notes == other.Notes && Favorite == other.Favorite
-        && Fields.SequenceEqual(other.Fields) && Tags.SequenceEqual(other.Tags) && Attachments.Select(a => a.Id).SequenceEqual(other.Attachments.Select(a => a.Id));
+        && Fields.SequenceEqual(other.Fields) && Tags.SequenceEqual(other.Tags) && Attachments.Select(a => a.Id).SequenceEqual(other.Attachments.Select(a => a.Id))
+        && (Icon ?? []).AsSpan().SequenceEqual(other.Icon ?? []);
+
+    /// <summary>The password of a login (or the first password field of any item); null when there is none.</summary>
+    [JsonIgnore]
+    public string? Password => Fields.FirstOrDefault(f => f.Kind == VaultFieldKind.Password)?.Value;
+
+    /// <summary>The username (or email) shown under the title in lists.</summary>
+    [JsonIgnore]
+    public string? Username => Fields.FirstOrDefault(f => f.Kind is VaultFieldKind.Username or VaultFieldKind.Email && f.Value.Length > 0)?.Value;
 
     public override string ToString() => $"VaultItem({Kind}, {Fields.Count} fields, ***)";
 

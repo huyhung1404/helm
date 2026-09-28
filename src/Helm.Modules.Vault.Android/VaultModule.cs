@@ -23,7 +23,7 @@ public sealed class VaultModule(
     VaultAppViewModel app,
     ISettingsStoreFactory settings,
     IUiDispatcher ui,
-    ILogger<VaultModule> logger) : AndroidModuleBase, IBackHandler
+    ILogger<VaultModule> logger) : AndroidModuleBase, IModuleContent, IBackHandler
 {
     public const string ModuleId = "vault";
     private readonly ISettingsStore<VaultSettings> _settings = settings.Get<VaultSettings>(VaultSettings.StoreId);
@@ -37,6 +37,8 @@ public sealed class VaultModule(
     public override Symbol Icon => Symbol.ShieldKeyhole;
     public override Avalonia.Media.IImage IconImage => VaultIcon.Image;
     public override Type PageType => typeof(VaultPage);
+
+    public Type ContentPageType => typeof(VaultContentPage);
 
     public override Task EnableAsync(CancellationToken ct)
     {

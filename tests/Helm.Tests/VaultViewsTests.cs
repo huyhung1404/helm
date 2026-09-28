@@ -14,7 +14,7 @@ namespace Helm.Tests;
 
 /// <summary>
 /// Builds the vault's WPF views with the app's resources. A wrong resource key, icon or binding type in XAML compiles
-/// fine and only fails when the view is created, so this catches it before anyone opens the window.
+/// fine and only fails when the view is created, so this catches it before anyone opens the vault.
 /// </summary>
 public sealed class VaultViewsTests : IDisposable
 {
@@ -43,7 +43,7 @@ public sealed class VaultViewsTests : IDisposable
         var backup = new VaultBackupService(session, store, blobs, new FolderBackupLocation(), settings);
         var app = new VaultAppViewModel(session, store, files, backup, engine, new NullPlatform(), new Dispatcher());
 
-        var window = new VaultWindow(app);
+        var window = new VaultView { DataContext = app };
         Layout(window);
         Assert.True(app.IsSetup);
 
@@ -74,6 +74,22 @@ public sealed class VaultViewsTests : IDisposable
         var detail = new ItemDetailView { DataContext = app.Items.Detail };
         Layout(detail);
 
+        // The Passwords view: rows with a picture icon and with letter avatars.
+        app.Items.Detail!.CancelCommand.Execute(null);
+        store.Add(VaultItem.New(VaultItemKind.Login, "GitHub") with
+        {
+            Fields = [new VaultField("Username", "huyhung1404", VaultFieldKind.Username), new VaultField("Password", "gh-secret", VaultFieldKind.Password)],
+            Icon = PngOf(Helm.Modules.Vault.VaultIcon.Image),
+        });
+        store.Add(VaultItem.New(VaultItemKind.Login, "Zalo") with { Fields = [new VaultField("Phone", "0901 234 567", VaultFieldKind.Username), new VaultField("Password", "z", VaultFieldKind.Password)] });
+        app.Items.Filter = VaultFilter.Passwords;
+        Assert.Equal(3, app.Items.PasswordRows.Count);
+        app.Items.PasswordRows.Single(r => r.Title == "Bank").ToggleRevealCommand.Execute(null);
+        Layout(window);
+        app.Items.SelectedPassword = app.Items.PasswordRows.Single(r => r.Title == "GitHub");
+        Assert.Equal("GitHub", app.Items.Detail!.Title);
+        Layout(window);
+
         // The icon, large and at list size.
         foreach (var size in new[] { 256.0, 32.0 })
         {
@@ -85,8 +101,20 @@ public sealed class VaultViewsTests : IDisposable
         Pump(Task.CompletedTask);
         Assert.True(app.IsUnlock);
         Layout(window);
-        window.Close();
     });
+
+    private static byte[] PngOf(System.Windows.Media.ImageSource image)
+    {
+        var visual = new System.Windows.Media.DrawingVisual();
+        using (var context = visual.RenderOpen()) context.DrawImage(image, new Rect(0, 0, 128, 128));
+        var bitmap = new System.Windows.Media.Imaging.RenderTargetBitmap(128, 128, 96, 96, System.Windows.Media.PixelFormats.Pbgra32);
+        bitmap.Render(visual);
+        var encoder = new System.Windows.Media.Imaging.PngBitmapEncoder();
+        encoder.Frames.Add(System.Windows.Media.Imaging.BitmapFrame.Create(bitmap));
+        using var memory = new MemoryStream();
+        encoder.Save(memory);
+        return memory.ToArray();
+    }
 
     /// <summary>Runs the dispatcher until the task completes, like the app's message loop would.</summary>
     private static void Pump(Task task)

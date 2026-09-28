@@ -9,8 +9,9 @@ namespace Helm.Modules.Vault.ViewModels;
 public enum VaultFilter
 {
     All,
+    /// <summary>Every item with a password, one row each, with copy on the row itself.</summary>
+    Passwords,
     Favorites,
-    Logins,
     Notes,
     Cards,
     Identities,
@@ -38,6 +39,7 @@ public sealed partial class ItemsViewModel : ObservableObject
     [ObservableProperty] private ItemRow? _selected;
     [ObservableProperty] private ItemDetailViewModel? _detail;
     [ObservableProperty] private int _unreadableCount;
+    [ObservableProperty] private PasswordRowViewModel? _selectedPassword;
 
     internal ItemsViewModel(VaultStore store, VaultFiles files, VaultSession session, IVaultPlatform platform)
     {
@@ -48,6 +50,13 @@ public sealed partial class ItemsViewModel : ObservableObject
     }
 
     public ObservableCollection<ItemRow> Rows { get; } = [];
+
+    /// <summary>The Passwords view: one row per item with a password, with copy on the row.</summary>
+    public ObservableCollection<PasswordRowViewModel> PasswordRows { get; } = [];
+
+    public bool IsPasswordsView => Filter == VaultFilter.Passwords;
+
+    public bool IsListView => Filter != VaultFilter.Passwords;
 
     public IReadOnlyList<VaultFilter> Filters { get; } = Enum.GetValues<VaultFilter>();
 
@@ -76,9 +85,13 @@ public sealed partial class ItemsViewModel : ObservableObject
             var entries = Filter == VaultFilter.Trash ? _store.Trash() : _store.Items();
             var query = Search.Trim();
             Rows.Clear();
+            PasswordRows.Clear();
             foreach (var entry in entries.Where(e => Matches(e, Filter, query)))
+            {
                 Rows.Add(new ItemRow(entry.Uid, entry.Item.Title, Subtitle(entry.Item), entry.Item.Kind, entry.Item.Favorite, entry.Conflicts.Count > 0,
                     entry.Item.Attachments.Count));
+                if (Filter == VaultFilter.Passwords) PasswordRows.Add(new PasswordRowViewModel(entry.Uid, entry.Item, _platform, _session));
+            }
             UnreadableCount = _store.Unreadable().Count;
             var selected = Rows.FirstOrDefault(r => r.Uid == keep);
             Selected = selected;
@@ -97,6 +110,7 @@ public sealed partial class ItemsViewModel : ObservableObject
     public void Clear()
     {
         Rows.Clear();
+        PasswordRows.Clear();
         Selected = null;
         Detail = null;
         OnPropertyChanged(nameof(IsEmpty));
@@ -116,7 +130,16 @@ public sealed partial class ItemsViewModel : ObservableObject
     partial void OnFilterChanged(VaultFilter value)
     {
         OnPropertyChanged(nameof(IsTrash));
+        OnPropertyChanged(nameof(IsPasswordsView));
+        OnPropertyChanged(nameof(IsListView));
         Refresh();
+    }
+
+    /// <summary>Clicking a password row opens the item, like a row of the normal list.</summary>
+    partial void OnSelectedPasswordChanged(PasswordRowViewModel? value)
+    {
+        if (value is null || _refreshing) return;
+        Selected = Rows.FirstOrDefault(r => r.Uid == value.Uid);
     }
 
     partial void OnSelectedChanged(ItemRow? value)
@@ -155,7 +178,7 @@ public sealed partial class ItemsViewModel : ObservableObject
         var kindOk = filter switch
         {
             VaultFilter.Favorites => item.Favorite,
-            VaultFilter.Logins => item.Kind == VaultItemKind.Login,
+            VaultFilter.Passwords => item.Kind == VaultItemKind.Login || item.Password is { Length: > 0 },
             VaultFilter.Notes => item.Kind == VaultItemKind.Note,
             VaultFilter.Cards => item.Kind == VaultItemKind.Card,
             VaultFilter.Identities => item.Kind == VaultItemKind.Identity,

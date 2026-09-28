@@ -6,6 +6,34 @@ using Wpf.Ui.Controls;
 
 namespace Helm.Modules.Vault.Views;
 
+/// <summary>An item's own picture (bytes from the sealed item) as a small frozen bitmap; null when absent or unreadable.</summary>
+public sealed class BytesToImageConverter : IValueConverter
+{
+    public object? Convert(object? value, Type targetType, object? parameter, CultureInfo culture)
+    {
+        if (value is not byte[] { Length: > 0 } bytes) return null;
+        try
+        {
+            var image = new System.Windows.Media.Imaging.BitmapImage();
+            image.BeginInit();
+            image.CacheOption = System.Windows.Media.Imaging.BitmapCacheOption.OnLoad;
+            image.DecodePixelWidth = 96;
+            image.StreamSource = new System.IO.MemoryStream(bytes);
+            image.EndInit();
+            image.Freeze();
+            return image;
+        }
+        catch (Exception ex) when (ex is NotSupportedException or System.IO.IOException or InvalidOperationException or ArgumentException
+                                       or System.Runtime.InteropServices.COMException)
+        {
+            // A damaged picture shows the letter avatar instead.
+            return null;
+        }
+    }
+
+    public object ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture) => Binding.DoNothing;
+}
+
 /// <summary>True for a non-empty string (InfoBar.IsOpen from an error message).</summary>
 public sealed class NotEmptyToBoolConverter : IValueConverter
 {
@@ -30,7 +58,7 @@ public sealed class KindIconConverter : IValueConverter
         VaultItemKind.Login => SymbolRegular.Key24,
         VaultItemKind.Note => SymbolRegular.Note24,
         VaultItemKind.Card => SymbolRegular.Payment24,
-        VaultItemKind.Identity => SymbolRegular.PersonKey24,
+        VaultItemKind.Identity => SymbolRegular.ContactCard24,
         VaultItemKind.Document => SymbolRegular.Document24,
         _ => SymbolRegular.LockClosed24,
     };

@@ -23,3 +23,29 @@ public static class SecretChar
 {
     public static IValueConverter Converter { get; } = new FuncValueConverter<bool, char>(secret => secret ? '•' : '\0');
 }
+
+/// <summary>"#RRGGBB" (an avatar color) to a brush.</summary>
+public static class HexBrush
+{
+    public static IValueConverter Converter { get; } = new FuncValueConverter<string?, Avalonia.Media.IBrush?>(hex =>
+        hex is not null && Avalonia.Media.Color.TryParse(hex, out var color) ? new Avalonia.Media.SolidColorBrush(color) : null);
+}
+
+/// <summary>An item's own picture (bytes from the sealed item), decoded small; null when absent or unreadable.</summary>
+public static class IconBitmap
+{
+    public static IValueConverter Converter { get; } = new FuncValueConverter<byte[]?, Avalonia.Media.Imaging.Bitmap?>(bytes =>
+    {
+        if (bytes is not { Length: > 0 }) return null;
+        try
+        {
+            using var stream = new MemoryStream(bytes);
+            return Avalonia.Media.Imaging.Bitmap.DecodeToWidth(stream, 120);
+        }
+        catch (Exception)
+        {
+            // A damaged picture shows the letter avatar instead.
+            return null;
+        }
+    });
+}

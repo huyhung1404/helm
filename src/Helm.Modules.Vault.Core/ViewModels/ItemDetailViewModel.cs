@@ -135,6 +135,7 @@ public sealed partial class ItemDetailViewModel : ObservableObject
     [ObservableProperty] private bool _isBusy;
     [ObservableProperty] private string? _error;
     [ObservableProperty] private double _progress;
+    [ObservableProperty] private byte[]? _icon;
 
     internal ItemDetailViewModel(VaultStore store, VaultFiles files, VaultSession session, IVaultPlatform platform,
         VaultEntry? entry, VaultItemKind kind, Action<string?> saved)
@@ -183,6 +184,59 @@ public sealed partial class ItemDetailViewModel : ObservableObject
 
     public IReadOnlyList<VaultFieldKind> FieldKinds { get; } = Enum.GetValues<VaultFieldKind>();
 
+    public bool HasIcon => Icon is { Length: > 0 };
+
+    public string Initial => VaultAvatar.Initial(Title);
+
+    public string AvatarColor => VaultAvatar.Color(Title);
+
+    partial void OnIconChanged(byte[]? value) => OnPropertyChanged(nameof(HasIcon));
+
+    partial void OnTitleChanged(string value)
+    {
+        OnPropertyChanged(nameof(Initial));
+        OnPropertyChanged(nameof(AvatarColor));
+    }
+
+    /// <summary>A picture for the item (a logo you saved, a photo): PNG, JPEG or WebP up to 256 KB.</summary>
+    [RelayCommand]
+    private async Task ChooseIconAsync()
+    {
+        var picked = await _platform.PickFileAsync(CancellationToken.None).ConfigureAwait(true);
+        if (picked is null) return;
+        await using (picked.Content)
+        {
+            using var memory = new MemoryStream();
+            await picked.Content.CopyToAsync(memory).ConfigureAwait(true);
+            var bytes = memory.ToArray();
+            if (bytes.Length > VaultItem.MaxIconBytes)
+            {
+                Error = "Choose a smaller picture (at most 256 KB). A square logo of 128 × 128 pixels is plenty.";
+                return;
+            }
+            if (!LooksLikeImage(bytes))
+            {
+                Error = "That is not a PNG, JPEG or WebP picture.";
+                return;
+            }
+            Error = null;
+            Icon = bytes;
+        }
+        Touch();
+    }
+
+    [RelayCommand]
+    private void RemoveIcon()
+    {
+        Icon = null;
+        Touch();
+    }
+
+    private static bool LooksLikeImage(byte[] b) =>
+        b.Length > 12 && ((b[0] == 0x89 && b[1] == 0x50 && b[2] == 0x4E && b[3] == 0x47)          // PNG
+            || (b[0] == 0xFF && b[1] == 0xD8 && b[2] == 0xFF)                                     // JPEG
+            || (b[0] == 0x52 && b[1] == 0x49 && b[2] == 0x46 && b[3] == 0x46 && b[8] == 0x57 && b[9] == 0x45 && b[10] == 0x42 && b[11] == 0x50)); // WebP
+
     internal void Touch() => _session.Touch();
 
     internal void CopyField(FieldViewModel field)
@@ -229,6 +283,7 @@ public sealed partial class ItemDetailViewModel : ObservableObject
                 Title = Title.Trim(),
                 Notes = Notes,
                 Favorite = Favorite,
+                Icon = Icon,
                 Tags = Tags.Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries).Distinct().ToList(),
                 Fields = Fields.Select(f => f.ToField()).Where(f => f.Name.Length > 0 || f.Value.Length > 0).ToList(),
             };
@@ -403,6 +458,7 @@ public sealed partial class ItemDetailViewModel : ObservableObject
         Notes = item.Notes;
         Tags = string.Join(", ", item.Tags);
         Favorite = item.Favorite;
+        Icon = item.Icon;
         Fields.Clear();
         foreach (var field in item.Fields) Fields.Add(new FieldViewModel(this, field));
         Attachments.Clear();

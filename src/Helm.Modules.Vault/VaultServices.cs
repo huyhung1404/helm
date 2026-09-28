@@ -18,8 +18,9 @@ public static class VaultServices
         services.AddSingleton<SecureClipboard>();
         services.AddSingleton<IVaultPlatform, WindowsVaultPlatform>();
         services.AddVaultCore();
+        // Settings page through AddHelmModule; the vault itself is the content page (navigation pane, Home tile).
         return services.AddHelmModule<VaultModule, VaultPage, VaultPageViewModel>()
-            .AddSingleton<VaultWindowHost>()
-            .AddSingleton<IModuleLauncher, VaultLauncher>();
+            .AddSingleton<VaultContentViewModel>()
+            .AddSingleton<VaultContentPage>();
     }
 }

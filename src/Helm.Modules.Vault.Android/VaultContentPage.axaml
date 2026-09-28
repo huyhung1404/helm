@@ -1,0 +1,238 @@
+<!-- The vault itself: the drawer and the Home tile open this page. Its settings are VaultPage (the Utilities chevron, or Settings here). -->
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:ic="using:FluentIcons.Avalonia"
+             xmlns:local="using:Helm.Modules.Vault"
+             xmlns:vm="using:Helm.Modules.Vault.ViewModels"
+             xmlns:items="using:Helm.Modules.Vault.Items"
+             x:Class="Helm.Modules.Vault.VaultContentPage"
+             x:DataType="local:VaultPageViewModel">
+    <StackPanel Spacing="4">
+        <!-- Title row: the icon, Lock and the way to the settings -->
+        <DockPanel Margin="0,0,0,4">
+            <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
+                <Button Content="Lock" Command="{Binding App.LockCommand}" IsVisible="{Binding App.IsItems}" />
+                <Button Command="{Binding OpenSettingsCommand}" AutomationProperties.Name="Vault settings" ToolTip.Tip="Vault settings">
+                    <StackPanel Orientation="Horizontal" Spacing="6">
+                        <ic:SymbolIcon Symbol="Settings" FontSize="16" />
+                        <TextBlock Text="Settings" VerticalAlignment="Center" />
+                    </StackPanel>
+                </Button>
+            </StackPanel>
+            <!-- The top bar already names the page -->
+            <Image Source="{Binding VaultIcon}" Width="32" Height="32" HorizontalAlignment="Left" VerticalAlignment="Center" />
+
+        </DockPanel>
+
+        <Border Classes="infobar warning" IsVisible="{Binding !Module.IsEnabled}">
+            <DockPanel>
+                <Button DockPanel.Dock="Right" Margin="8,0,0,0" Content="Settings" Command="{Binding OpenSettingsCommand}" VerticalAlignment="Center" />
+                <TextBlock TextWrapping="Wrap" VerticalAlignment="Center" Text="Vault is turned off. Turn it on in its settings to use it." />
+            </DockPanel>
+        </Border>
+
+        <StackPanel Spacing="4" IsVisible="{Binding Module.IsEnabled}">
+            <!-- ===================== Setup ===================== -->
+            <Border Classes="card" IsVisible="{Binding App.IsSetup}">
+                <StackPanel Spacing="8">
+                    <TextBlock Text="Create your vault" Classes="title" FontSize="18" />
+                    <TextBlock Classes="secondary" Text="Choose a vault password you will remember. It is different from your sync passphrase, and nobody can reset it. You also get a recovery key to keep safe." />
+                    <TextBox PasswordChar="•" PlaceholderText="Vault password (at least 14 characters)" Text="{Binding App.NewPassword}" AutomationProperties.Name="Vault password" />
+                    <TextBlock Classes="secondary" Text="{Binding App.PasswordStrength}" />
+                    <TextBox PasswordChar="•" PlaceholderText="Type it again" Text="{Binding App.ConfirmPassword}" AutomationProperties.Name="Type it again" />
+                    <Button Classes="accent" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Content="Create vault" Command="{Binding App.CreateCommand}" />
+                    <TextBlock Text="Have a backup?" Classes="title" Margin="0,12,0,0" />
+                    <TextBlock Classes="secondary" Text="Restore the whole vault from a backup folder, with that vault's password or its recovery key." />
+                    <CheckBox Content="Use the recovery key" IsChecked="{Binding App.UseRecoveryKey}" />
+                    <TextBox PasswordChar="•" PlaceholderText="Vault password of the backup" Text="{Binding App.Password}" IsVisible="{Binding !App.UseRecoveryKey}" />
+                    <TextBox Classes="mono" PlaceholderText="HELMV-XXXX-…" Text="{Binding App.RecoveryKey}" IsVisible="{Binding App.UseRecoveryKey}" />
+                    <Button Content="Restore from a backup folder…" Command="{Binding App.RestoreFromBackupCommand}" />
+                </StackPanel>
+            </Border>
+
+            <!-- ===================== Unlock ===================== -->
+            <Border Classes="card" IsVisible="{Binding App.IsUnlock}">
+                <StackPanel Spacing="8">
+                    <StackPanel Orientation="Horizontal" Spacing="10">
+                        <ic:SymbolIcon Symbol="LockClosed" FontSize="24" />
+                        <TextBlock Text="Vault is locked" Classes="title" FontSize="18" VerticalAlignment="Center" />
+                    </StackPanel>
+                    <Button Classes="accent" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" IsVisible="{Binding App.CanUseDeviceUnlock}"
+                            Command="{Binding App.QuickUnlockCommand}">
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                            <ic:SymbolIcon Symbol="Fingerprint" FontSize="18" />
+                            <TextBlock Text="{Binding App.DeviceUnlockName}" />
+                        </StackPanel>
+                    </Button>
+                    <TextBox PasswordChar="•" PlaceholderText="Vault password" Text="{Binding App.Password}" IsVisible="{Binding !App.UseRecoveryKey}" AutomationProperties.Name="Vault password" />
+                    <TextBox Classes="mono" PlaceholderText="HELMV-XXXX-…" Text="{Binding App.RecoveryKey}" IsVisible="{Binding App.UseRecoveryKey}" AutomationProperties.Name="Recovery key" />
+                    <Button HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Content="Unlock" Command="{Binding App.UnlockCommand}" />
+                    <CheckBox Content="I forgot the password: use the recovery key" IsChecked="{Binding App.UseRecoveryKey}" />
+                </StackPanel>
+            </Border>
+
+            <!-- ===================== After a recovery-key unlock ===================== -->
+            <Border Classes="card" IsVisible="{Binding App.MustChangePassword}">
+                <StackPanel Spacing="8">
+                    <TextBlock Text="Set a new vault password" Classes="title" FontSize="18" />
+                    <TextBlock Classes="secondary" Text="You unlocked with the recovery key. Choose a new password; the recovery key keeps working." />
+                    <TextBox PasswordChar="•" PlaceholderText="New password" Text="{Binding App.NewPassword}" />
+                    <TextBlock Classes="secondary" Text="{Binding App.PasswordStrength}" />
+                    <TextBox PasswordChar="•" PlaceholderText="Type it again" Text="{Binding App.ConfirmPassword}" />
+                    <Button Classes="accent" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Content="Set password" Command="{Binding App.SetNewPasswordCommand}" />
+                </StackPanel>
+            </Border>
+
+            <!-- ===================== Emergency Kit ===================== -->
+            <Border Classes="card" IsVisible="{Binding App.HasKit}">
+                <StackPanel Spacing="8">
+                    <TextBlock Text="Save your Emergency Kit" Classes="title" FontSize="18" />
+                    <TextBlock Classes="secondary" Text="This recovery key is the only way back in if you forget the vault password. It is shown only now. Save it, keep it offline, then type it below." />
+                    <SelectableTextBlock Classes="mono" FontFamily="monospace" TextWrapping="Wrap" FontSize="15" Text="{Binding App.Kit.RecoveryKey}" />
+                    <TextBlock Classes="secondary" Text="{Binding App.Kit.RecoveryId, StringFormat='Recovery key id: {0}'}" />
+                    <Button Content="Save the Emergency Kit…" Command="{Binding App.SaveKitCommand}" />
+                    <TextBox Classes="mono" PlaceholderText="Type the recovery key to confirm" Text="{Binding App.KitConfirmation}" />
+                    <TextBlock Foreground="{DynamicResource HelmDanger}" TextWrapping="Wrap" Text="{Binding App.KitError}" IsVisible="{Binding App.KitError, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+                    <Button Classes="accent" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Content="I saved it" Command="{Binding App.ConfirmKitCommand}" />
+                </StackPanel>
+            </Border>
+
+            <!-- Errors of the screens above and of the vault itself -->
+            <Border Classes="infobar warning" IsVisible="{Binding App.Error, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
+                <TextBlock TextWrapping="Wrap" Text="{Binding App.Error}" />
+            </Border>
+
+            <!-- ===================== The vault ===================== -->
+            <StackPanel Spacing="4">
+                <StackPanel.IsVisible>
+                    <MultiBinding Converter="{x:Static BoolConverters.And}">
+                        <Binding Path="App.IsItems" />
+                        <Binding Path="!App.HasKit" />
+                    </MultiBinding>
+                </StackPanel.IsVisible>
+
+                <Border Classes="infobar warning" IsVisible="{Binding App.HeldWarning, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
+                    <StackPanel Spacing="8">
+                        <TextBlock TextWrapping="Wrap" Text="{Binding App.HeldWarning}" />
+                        <Button Classes="accent" Content="Keep my items" Command="{Binding App.KeepHeldCommand}" />
+                        <Button Content="Delete them here too" Command="{Binding App.ApplyHeldCommand}" />
+                    </StackPanel>
+                </Border>
+                <Border Classes="infobar warning" IsVisible="{Binding App.BackupWarning, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
+                    <TextBlock TextWrapping="Wrap" Text="{Binding App.BackupWarning}" />
+                </Border>
+                <Border Classes="infobar" IsVisible="{Binding App.KitWarning, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
+                    <TextBlock TextWrapping="Wrap" Text="{Binding App.KitWarning}" />
+                </Border>
+
+                <!-- List -->
+                <StackPanel Spacing="4" IsVisible="{Binding App.Items.Detail, Converter={x:Static ObjectConverters.IsNull}}">
+                    <DockPanel>
+                        <Button DockPanel.Dock="Right" Margin="6,0,0,0" ToolTip.Tip="New item" AutomationProperties.Name="New item">
+                            <ic:SymbolIcon Symbol="Add" FontSize="18" />
+                            <Button.Flyout>
+                                <MenuFlyout>
+                                    <MenuItem Header="Login" Command="{Binding App.Items.NewCommand}" CommandParameter="{x:Static items:VaultItemKind.Login}" />
+                                    <MenuItem Header="Secure note" Command="{Binding App.Items.NewCommand}" CommandParameter="{x:Static items:VaultItemKind.Note}" />
+                                    <MenuItem Header="Card" Command="{Binding App.Items.NewCommand}" CommandParameter="{x:Static items:VaultItemKind.Card}" />
+                                    <MenuItem Header="Identity" Command="{Binding App.Items.NewCommand}" CommandParameter="{x:Static items:VaultItemKind.Identity}" />
+                                    <MenuItem Header="Document" Command="{Binding App.Items.NewCommand}" CommandParameter="{x:Static items:VaultItemKind.Document}" />
+                                </MenuFlyout>
+                            </Button.Flyout>
+                        </Button>
+                        <TextBox PlaceholderText="Search" Text="{Binding App.Items.Search}" AutomationProperties.Name="Search" />
+                    </DockPanel>
+                    <ComboBox HorizontalAlignment="Stretch" ItemsSource="{Binding App.Items.Filters}" SelectedItem="{Binding App.Items.Filter}" />
+                    <TextBlock Classes="secondary" Margin="4,8" Text="Nothing here yet. Use + to add a login, a note, a card or a document." IsVisible="{Binding App.Items.IsEmpty}" />
+                    <!-- Passwords: one row per account, with its icon, the password and a copy button right on the row -->
+                    <Border Classes="card" Padding="4">
+                        <Border.IsVisible>
+                            <MultiBinding Converter="{x:Static BoolConverters.And}">
+                                <Binding Path="!App.Items.IsEmpty" />
+                                <Binding Path="App.Items.IsPasswordsView" />
+                            </MultiBinding>
+                        </Border.IsVisible>
+                        <ListBox ItemsSource="{Binding App.Items.PasswordRows}" SelectedItem="{Binding App.Items.SelectedPassword}" Background="Transparent"
+                                 AutomationProperties.Name="Passwords">
+                            <ListBox.ItemTemplate>
+                                <DataTemplate x:DataType="vm:PasswordRowViewModel">
+                                    <DockPanel Margin="2,8">
+                                        <Panel DockPanel.Dock="Left" Width="44" Height="44" Margin="0,0,12,0" VerticalAlignment="Center">
+                                            <Border CornerRadius="11" Background="{Binding AvatarColor, Converter={x:Static local:HexBrush.Converter}}" IsVisible="{Binding !HasIcon}">
+                                                <TextBlock Text="{Binding Initial}" Foreground="White" FontSize="19" FontWeight="SemiBold" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                            </Border>
+                                            <Border CornerRadius="11" ClipToBounds="True" IsVisible="{Binding HasIcon}">
+                                                <Image Source="{Binding Icon, Converter={x:Static local:IconBitmap.Converter}}" Stretch="UniformToFill" />
+                                            </Border>
+                                        </Panel>
+                                        <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center" Spacing="4" IsVisible="{Binding HasPassword}">
+                                            <Button Width="40" Height="40" Padding="0" HorizontalContentAlignment="Center" VerticalContentAlignment="Center" Background="Transparent"
+                                                    Command="{Binding ToggleRevealCommand}" AutomationProperties.Name="Show or hide the password">
+                                                <Panel>
+                                                    <ic:SymbolIcon Symbol="Eye" FontSize="18" IsVisible="{Binding !IsRevealed}" />
+                                                    <ic:SymbolIcon Symbol="EyeOff" FontSize="18" IsVisible="{Binding IsRevealed}" />
+                                                </Panel>
+                                            </Button>
+                                            <Button Classes="accent" Padding="12,8" CornerRadius="18" Command="{Binding CopyCommand}" AutomationProperties.Name="Copy the password">
+                                                <Panel>
+                                                    <StackPanel Orientation="Horizontal" Spacing="6" IsVisible="{Binding !IsCopied}">
+                                                        <ic:SymbolIcon Symbol="Copy" FontSize="16" />
+                                                        <TextBlock Text="Copy" VerticalAlignment="Center" />
+                                                    </StackPanel>
+                                                    <StackPanel Orientation="Horizontal" Spacing="6" IsVisible="{Binding IsCopied}">
+                                                        <ic:SymbolIcon Symbol="Checkmark" FontSize="16" />
+                                                        <TextBlock Text="Copied" VerticalAlignment="Center" />
+                                                    </StackPanel>
+                                                </Panel>
+                                            </Button>
+                                        </StackPanel>
+                                        <StackPanel VerticalAlignment="Center">
+                                            <TextBlock Text="{Binding Title}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+                                            <TextBlock Classes="secondary" Text="{Binding Subtitle}" TextTrimming="CharacterEllipsis" TextWrapping="NoWrap" />
+                                            <TextBlock Classes="secondary" FontFamily="monospace" Text="{Binding PasswordDisplay}" TextTrimming="CharacterEllipsis" TextWrapping="NoWrap" />
+                                        </StackPanel>
+                                    </DockPanel>
+                                </DataTemplate>
+                            </ListBox.ItemTemplate>
+                        </ListBox>
+                    </Border>
+
+                    <Border Classes="card" Padding="4">
+                        <Border.IsVisible>
+                            <MultiBinding Converter="{x:Static BoolConverters.And}">
+                                <Binding Path="!App.Items.IsEmpty" />
+                                <Binding Path="App.Items.IsListView" />
+                            </MultiBinding>
+                        </Border.IsVisible>
+                        <ListBox ItemsSource="{Binding App.Items.Rows}" SelectedItem="{Binding App.Items.Selected}" Background="Transparent">
+                            <ListBox.ItemTemplate>
+                                <DataTemplate x:DataType="vm:ItemRow">
+                                    <DockPanel Margin="4,6">
+                                        <ic:SymbolIcon DockPanel.Dock="Left" Margin="0,0,12,0" FontSize="20" Symbol="{Binding Kind, Converter={x:Static local:KindIcon.Converter}}" />
+                                        <ic:SymbolIcon DockPanel.Dock="Right" Symbol="Warning" FontSize="16" IsVisible="{Binding HasConflict}" />
+                                        <ic:SymbolIcon DockPanel.Dock="Right" Symbol="Star" IconVariant="Filled" FontSize="16" Margin="4,0" IsVisible="{Binding Favorite}" />
+                                        <StackPanel>
+                                            <TextBlock Text="{Binding Title}" TextTrimming="CharacterEllipsis" />
+                                            <TextBlock Classes="secondary" Text="{Binding Subtitle}" TextTrimming="CharacterEllipsis" TextWrapping="NoWrap" />
+                                        </StackPanel>
+                                    </DockPanel>
+                                </DataTemplate>
+                            </ListBox.ItemTemplate>
+                        </ListBox>
+                    </Border>
+                    <TextBlock Classes="secondary" Margin="4,4" IsVisible="{Binding App.Items.HasUnreadable}"
+                               Text="{Binding App.Items.UnreadableCount, StringFormat='{}{0} records cannot be opened with this vault key; they are kept, not deleted.'}" />
+                </StackPanel>
+
+                <!-- Detail -->
+                <ContentControl Content="{Binding App.Items.Detail}" IsVisible="{Binding App.Items.Detail, Converter={x:Static ObjectConverters.IsNotNull}}">
+                    <ContentControl.ContentTemplate>
+                        <DataTemplate x:DataType="vm:ItemDetailViewModel">
+                            <local:ItemDetailView />
+                        </DataTemplate>
+                    </ContentControl.ContentTemplate>
+                </ContentControl>
+            </StackPanel>
+        </StackPanel>
+    </StackPanel>
+</UserControl>

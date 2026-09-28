@@ -21,7 +21,7 @@ public sealed class VaultModule(
     VaultBackupService backup,
     ISettingsStoreFactory settings,
     IUiDispatcher ui,
-    ILogger<VaultModule> logger) : HelmModuleBase
+    ILogger<VaultModule> logger) : HelmModuleBase, IModuleContent
 {
     public const string ModuleId = "vault";
     private readonly ISettingsStore<VaultSettings> _settings = settings.Get<VaultSettings>(VaultSettings.StoreId);
@@ -34,6 +34,7 @@ public sealed class VaultModule(
     public override SymbolRegular Icon => SymbolRegular.ShieldKeyhole24;
     public override System.Windows.Media.ImageSource IconImage => VaultIcon.Image;
     public override Type SettingsPageType => typeof(VaultPage);
+    public Type ContentPageType => typeof(VaultContentPage);
     public override IReadOnlyList<HotkeyDefinition> Hotkeys => [];
 
     public override Task EnableAsync(CancellationToken ct)

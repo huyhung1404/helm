@@ -1,17 +1,35 @@
-<ui:FluentWindow x:Class="Helm.Modules.Vault.Views.VaultWindow"
-                 xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
-                 xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-                 xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
-                 xmlns:vm="clr-namespace:Helm.Modules.Vault.ViewModels;assembly=Helm.Modules.Vault.Core"
-                 xmlns:items="clr-namespace:Helm.Modules.Vault.Items;assembly=Helm.Modules.Vault.Core"
-                 xmlns:local="clr-namespace:Helm.Modules.Vault.Views"
-                 Title="Vault" Width="1040" Height="700" MinWidth="760" MinHeight="520"
-                 ExtendsContentIntoTitleBar="True" WindowBackdropType="Mica" ShowInTaskbar="True"
-                 WindowStartupLocation="CenterScreen">
-    <ui:FluentWindow.Resources>
+<!-- The vault itself: setup, unlock, the item list and the Emergency Kit. Hosted by VaultContentPage in Helm's
+     main window (the navigation pane and Home Quick access open it; its settings are a separate page). -->
+<UserControl x:Class="Helm.Modules.Vault.Views.VaultView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
+             xmlns:vm="clr-namespace:Helm.Modules.Vault.ViewModels;assembly=Helm.Modules.Vault.Core"
+             xmlns:items="clr-namespace:Helm.Modules.Vault.Items;assembly=Helm.Modules.Vault.Core"
+             xmlns:local="clr-namespace:Helm.Modules.Vault.Views">
+    <UserControl.Resources>
         <local:NotEmptyToBoolConverter x:Key="NotEmptyToBool" />
         <local:NotZeroToVisibilityConverter x:Key="NotZeroToVisibility" />
         <local:KindIconConverter x:Key="KindIcon" />
+        <local:BytesToImageConverter x:Key="BytesToImage" />
+
+        <!-- The avatar of a password row: the item's picture, or its initial on a stable color. -->
+        <DataTemplate x:Key="PasswordAvatar" DataType="{x:Type vm:PasswordRowViewModel}">
+            <Grid Width="36" Height="36">
+                <Border CornerRadius="9" Background="{Binding AvatarColor, Converter={StaticResource HexToBrush}}"
+                        Visibility="{Binding HasIcon, Converter={StaticResource InverseBoolToVisibility}}">
+                    <TextBlock Text="{Binding Initial}" Foreground="White" FontSize="16" FontWeight="SemiBold" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                </Border>
+                <Border CornerRadius="9" Visibility="{Binding HasIcon, Converter={StaticResource BoolToVisibility}}"
+                        Background="{DynamicResource CardBackgroundFillColorSecondaryBrush}">
+                    <Border CornerRadius="9">
+                        <Border.Background>
+                            <ImageBrush ImageSource="{Binding Icon, Converter={StaticResource BytesToImage}}" Stretch="UniformToFill" />
+                        </Border.Background>
+                    </Border>
+                </Border>
+            </Grid>
+        </DataTemplate>
         <Style x:Key="CenteredCard" TargetType="Border">
             <Setter Property="Background" Value="{DynamicResource CardBackgroundFillColorDefaultBrush}" />
             <Setter Property="BorderBrush" Value="{DynamicResource CardStrokeColorDefaultBrush}" />
@@ -22,7 +40,7 @@
             <Setter Property="HorizontalAlignment" Value="Center" />
             <Setter Property="VerticalAlignment" Value="Center" />
         </Style>
-    </ui:FluentWindow.Resources>
+    </UserControl.Resources>
 
     <Grid>
         <Grid.RowDefinitions>
@@ -30,11 +48,6 @@
             <RowDefinition Height="*" />
         </Grid.RowDefinitions>
 
-        <ui:TitleBar x:Name="TitleBar" Title="Vault" ShowMaximize="True">
-            <ui:TitleBar.Icon>
-                <ui:SymbolIcon Symbol="LockClosed24" />
-            </ui:TitleBar.Icon>
-        </ui:TitleBar>
 
         <!-- ============ Setup: create a vault, or restore one from a backup ============ -->
         <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" Visibility="{Binding IsSetup, Converter={StaticResource BoolToVisibility}}">
@@ -129,7 +142,7 @@
 
             <Grid Grid.Row="1" DataContext="{Binding Items}">
                 <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="300" MinWidth="240" />
+                    <ColumnDefinition Width="340" MinWidth="260" />
                     <ColumnDefinition Width="8" />
                     <ColumnDefinition Width="*" />
                 </Grid.ColumnDefinitions>
@@ -161,8 +174,64 @@
                             <Run Text="{Binding UnreadableCount, Mode=OneWay}" /><Run Text=" records cannot be opened with this vault's key; they are kept, not deleted." />
                         </TextBlock>
                         <Grid>
+                            <!-- Passwords: one row per account, copy right on the row -->
+                            <ListBox ItemsSource="{Binding PasswordRows}" SelectedItem="{Binding SelectedPassword}" BorderThickness="0" Background="Transparent"
+                                     ScrollViewer.HorizontalScrollBarVisibility="Disabled" HorizontalContentAlignment="Stretch"
+                                     Visibility="{Binding IsPasswordsView, Converter={StaticResource BoolToVisibility}}" AutomationProperties.Name="Passwords">
+                                <ListBox.ItemTemplate>
+                                    <DataTemplate DataType="{x:Type vm:PasswordRowViewModel}">
+                                        <Grid Margin="0,6">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="Auto" />
+                                                <ColumnDefinition Width="*" />
+                                                <ColumnDefinition Width="Auto" />
+                                            </Grid.ColumnDefinitions>
+                                            <ContentPresenter Content="{Binding}" ContentTemplate="{StaticResource PasswordAvatar}" Margin="0,0,12,0" VerticalAlignment="Center" />
+                                            <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                                <TextBlock Text="{Binding Title}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+                                                <TextBlock Text="{Binding Subtitle}" Style="{DynamicResource HelmSecondaryText}" TextTrimming="CharacterEllipsis" TextWrapping="NoWrap" />
+                                                <TextBlock Text="{Binding PasswordDisplay}" FontFamily="Consolas" FontSize="12" Margin="0,2,0,0"
+                                                           Foreground="{DynamicResource TextFillColorSecondaryBrush}" TextTrimming="CharacterEllipsis" />
+                                            </StackPanel>
+                                            <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center" Margin="8,0,0,0">
+                                                <ui:Button Appearance="Transparent" Padding="6" Command="{Binding ToggleRevealCommand}" ToolTip="Show or hide"
+                                                           AutomationProperties.Name="Show or hide" Visibility="{Binding HasPassword, Converter={StaticResource BoolToVisibility}}">
+                                                    <ui:SymbolIcon>
+                                                        <ui:SymbolIcon.Style>
+                                                            <Style TargetType="ui:SymbolIcon">
+                                                                <Setter Property="Symbol" Value="Eye24" />
+                                                                <Style.Triggers>
+                                                                    <DataTrigger Binding="{Binding IsRevealed}" Value="True"><Setter Property="Symbol" Value="EyeOff24" /></DataTrigger>
+                                                                </Style.Triggers>
+                                                            </Style>
+                                                        </ui:SymbolIcon.Style>
+                                                    </ui:SymbolIcon>
+                                                </ui:Button>
+                                                <ui:Button Margin="4,0,0,0" Padding="10,5" Command="{Binding CopyCommand}" ToolTip="Copy the password"
+                                                           AutomationProperties.Name="Copy the password" Visibility="{Binding HasPassword, Converter={StaticResource BoolToVisibility}}">
+                                                    <ui:Button.Style>
+                                                        <Style TargetType="ui:Button" BasedOn="{StaticResource {x:Type ui:Button}}">
+                                                            <Setter Property="Appearance" Value="Secondary" />
+                                                            <Setter Property="Icon" Value="{ui:SymbolIcon Copy24}" />
+                                                            <Setter Property="Content" Value="Copy" />
+                                                            <Style.Triggers>
+                                                                <DataTrigger Binding="{Binding IsCopied}" Value="True">
+                                                                    <Setter Property="Appearance" Value="Success" />
+                                                                    <Setter Property="Icon" Value="{ui:SymbolIcon Checkmark24}" />
+                                                                    <Setter Property="Content" Value="Copied" />
+                                                                </DataTrigger>
+                                                            </Style.Triggers>
+                                                        </Style>
+                                                    </ui:Button.Style>
+                                                </ui:Button>
+                                            </StackPanel>
+                                        </Grid>
+                                    </DataTemplate>
+                                </ListBox.ItemTemplate>
+                            </ListBox>
+
                             <ListBox ItemsSource="{Binding Rows}" SelectedItem="{Binding Selected}" BorderThickness="0" Background="Transparent"
-                                     ScrollViewer.HorizontalScrollBarVisibility="Disabled">
+                                     ScrollViewer.HorizontalScrollBarVisibility="Disabled" Visibility="{Binding IsListView, Converter={StaticResource BoolToVisibility}}">
                                 <ListBox.ItemTemplate>
                                     <DataTemplate DataType="{x:Type vm:ItemRow}">
                                         <DockPanel Margin="2,4">
@@ -224,4 +293,4 @@
             </Border>
         </Grid>
     </Grid>
-</ui:FluentWindow>
+</UserControl>

@@ -69,8 +69,18 @@ public sealed partial class MainViewModel : ObservableObject
             IsPaneOpen = false;
             return true;
         }
-        // A tool with its own back stack (an open item) goes back first.
-        if (Navigator.CurrentPage is ModulePage { Module: Helm.Core.Platform.IBackHandler page } && page.HandleBack()) return true;
+        if (Navigator.CurrentPage is ModulePage page)
+        {
+            var content = (page.Module as IModuleContent)?.ContentPageType;
+            // A tool's settings page goes back to its content page, where the menu and Quick access lead.
+            if (content is not null && page.PageType != content)
+            {
+                Navigator.GoModuleContent(page.Module);
+                return true;
+            }
+            // A tool with its own back stack (an open item) goes back first; only on the page that shows that stack.
+            if (page.Module is Helm.Core.Platform.IBackHandler handler && handler.HandleBack()) return true;
+        }
         if (!Navigator.IsHome)
         {
             Navigator.GoHome();
