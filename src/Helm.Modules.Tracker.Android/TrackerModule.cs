@@ -9,17 +9,19 @@ using AndroidApp = Android.App.Application;
 namespace Helm.Modules.Tracker;
 
 /// <summary>
-/// Tracker on Android. Nothing runs in the background; the module keeps the home-screen widgets in step with the
-/// data (local edits and synced changes) and with the on/off state.
+/// Tracker on Android. The module keeps the home-screen widgets in step with the data (local edits and synced
+/// changes) and with the on/off state, and sets the hourly alarm behind the due-date reminders.
 /// </summary>
 public sealed class TrackerModule : AndroidModuleBase, IModuleContent, IDisposable
 {
     private readonly ILogger<TrackerModule> _logger;
     private readonly Timer _widgetTimer;
 
-    public TrackerModule(TrackerStore store, ILogger<TrackerModule> logger)
+    public TrackerModule(TrackerStore store, TrackerReminderService reminders, ILogger<TrackerModule> logger)
     {
         _logger = logger;
+        // "Remind me now" on the settings page.
+        reminders.Requested += (_, reminder) => TrackerReminders.Post(AndroidApp.Context, reminder);
         _widgetTimer = new Timer(_ => RefreshWidgets(), null, Timeout.Infinite, Timeout.Infinite);
         // A sync can change hundreds of records in a row: redraw the widgets once it has settled.
         store.Changed += (_, _) => _widgetTimer.Change(TimeSpan.FromMilliseconds(400), Timeout.InfiniteTimeSpan);
@@ -53,12 +55,15 @@ public sealed class TrackerModule : AndroidModuleBase, IModuleContent, IDisposab
     {
         StatusMessage = null;
         RefreshWidgets();
+        TrackerReminders.Schedule(AndroidApp.Context);
+        TrackerReminders.CheckNow(AndroidApp.Context);
         return Task.CompletedTask;
     }
 
     public override Task DisableAsync()
     {
         RefreshWidgets(); // they show "Tracker is turned off"
+        TrackerReminders.Cancel(AndroidApp.Context);
         return Task.CompletedTask;
     }
 

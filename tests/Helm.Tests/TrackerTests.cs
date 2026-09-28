@@ -299,7 +299,7 @@ public sealed class TrackerTests
         {
             using var settings = new SettingsStoreFactory(new HelmPaths(dir));
             var vm = new TrackerViewModel(_store, settings, new InlineDispatcher(),
-                new YesDialogs(), new NullClipboard(), NullLogger<TrackerViewModel>.Instance);
+                new YesDialogs(), new NullClipboard(), new TrackerReminderService(_store, settings, _time), NullLogger<TrackerViewModel>.Instance);
             Assert.True(vm.HasNoWorkspaces);
 
             vm.CreateDebtWorkspaceCommand.Execute(null);
@@ -336,7 +336,7 @@ public sealed class TrackerTests
         {
             using var settings = new SettingsStoreFactory(new HelmPaths(dir));
             var vm = new TrackerViewModel(_store, settings, new InlineDispatcher(),
-                new YesDialogs(), new NullClipboard(), NullLogger<TrackerViewModel>.Instance);
+                new YesDialogs(), new NullClipboard(), new TrackerReminderService(_store, settings, _time), NullLogger<TrackerViewModel>.Instance);
             vm.CreateTasksWorkspaceCommand.Execute(null);
             vm.NewTitle = "Report";
             vm.AddCommand.Execute(null);
@@ -354,6 +354,77 @@ public sealed class TrackerTests
 
             row.Done = false;
             Assert.Same(row, Assert.Single(vm.OpenItems));
+        }
+        finally
+        {
+            try { if (Directory.Exists(dir)) Directory.Delete(dir, recursive: true); }
+            catch (IOException) { } // a settings write may still be finishing; it is only a temp folder
+        }
+    }
+
+    [Fact]
+    public void Reminder_lists_overdue_today_and_soon_items_but_not_done_or_undated_ones()
+    {
+        var tasks = _store.AddWorkspace("To-do", WorkspaceKind.Tasks);
+        var book = _store.AddWorkspace("Debts", WorkspaceKind.Debts);
+        var today = new DateOnly(2026, 9, 28);
+        _store.AddItem(tasks, new TrackerItemDraft("late", DueDate: today.AddDays(-2)));
+        _store.AddItem(tasks, new TrackerItemDraft("now", TrackerPriority.Urgent, today));
+        _store.AddItem(tasks, new TrackerItemDraft("tomorrow", DueDate: today.AddDays(1)));
+        _store.AddItem(tasks, new TrackerItemDraft("next week", DueDate: today.AddDays(7)));
+        _store.AddItem(tasks, new TrackerItemDraft("no date"));
+        _store.Complete(_store.AddItem(tasks, new TrackerItemDraft("done", DueDate: today)));
+        _store.AddItem(book, new TrackerItemDraft("", Person: "An", Amount: 50_000, DueDate: today));
+
+        var reminder = TrackerReminderService.Build(_store, today, daysBefore: 1)!;
+        Assert.Equal((1, 2, 1), (reminder.Overdue, reminder.DueToday, reminder.DueSoon));
+        Assert.Equal("Tracker: 1 overdue · 2 due today · 1 due soon", reminder.Title);
+        var lines = reminder.Message.Split('\n');
+        Assert.Equal("late (overdue by 2 days)", lines[0]);
+        Assert.Equal("now (due today)", lines[1]); // urgent before the debt due the same day
+        Assert.Equal("An (due today)", lines[2]);
+        Assert.StartsWith("tomorrow (", lines[3]);
+
+        Assert.Equal(3, TrackerReminderService.Build(_store, today, daysBefore: 0)!.Total);
+        Assert.Null(TrackerReminderService.Build(new TrackerStore(new MemoryCollection<TrackerWorkspace>(), new MemoryCollection<TrackerItem>(),
+            new MemoryLog<TrackerEvent>(), _time), today, 3));
+    }
+
+    [Fact]
+    public void Reminder_comes_once_a_day_from_the_reminder_hour_and_waits_while_nothing_is_due()
+    {
+        var dir = Path.Combine(Path.GetTempPath(), "helm-tests", Guid.NewGuid().ToString("N"));
+        try
+        {
+            using var settings = new SettingsStoreFactory(new HelmPaths(dir));
+            var service = new TrackerReminderService(_store, settings, _time);
+            var utc = TimeZoneInfo.Utc;
+            _time.Now = new DateTimeOffset(2026, 9, 28, 7, 0, 0, TimeSpan.Zero); // before 9:00
+            var tasks = _store.AddWorkspace("To-do", WorkspaceKind.Tasks);
+
+            Assert.Null(service.TakeDue(utc)); // nothing due yet
+            _time.Now = _time.Now.AddHours(3); // 10:00
+            Assert.Null(service.TakeDue(utc)); // still nothing due: not marked as shown
+            _store.AddItem(tasks, new TrackerItemDraft("pay rent", DueDate: new DateOnly(2026, 9, 28)));
+
+            var first = service.TakeDue(utc);
+            Assert.NotNull(first);
+            Assert.Null(service.TakeDue(utc)); // once a day
+            Assert.Equal(new DateOnly(2026, 9, 28), settings.Get<TrackerSettings>(TrackerIds.ModuleId).Current.LastReminderDate);
+
+            _time.Now = new DateTimeOffset(2026, 9, 29, 8, 59, 0, TimeSpan.Zero);
+            Assert.Null(service.TakeDue(utc)); // next day, before the hour
+            Assert.Equal(new DateTimeOffset(2026, 9, 29, 9, 0, 0, TimeSpan.Zero), service.NextCheck(utc));
+            _time.Now = _time.Now.AddMinutes(2);
+            Assert.Equal(1, service.TakeDue(utc)!.Overdue);
+
+            settings.Get<TrackerSettings>(TrackerIds.ModuleId).Update(s => { s.RemindersEnabled = false; s.LastReminderDate = null; });
+            Assert.Null(service.TakeDue(utc)); // off
+
+            TrackerReminder? requested = null;
+            service.Requested += (_, r) => requested = r;
+            Assert.True(service.RemindNow(utc)); // "Remind me now" ignores the hour and the switch
+            Assert.NotNull(requested);
         }
         finally
         {

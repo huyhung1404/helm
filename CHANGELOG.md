@@ -39,7 +39,10 @@ Format: [Keep a Changelog](https://keepachangelog.com), versions follow [SemVer]
     finish, working time, share done by the due date, completions per day and by priority. Export every item or
     the whole history as CSV (Save on the PC, Copy on the phone).
   - Android home-screen widget: a workspace's open items; tap a circle to finish one, the title to switch
-    workspace, + to open Tracker.
+    workspace, + to open Tracker. Settings → "Add to home screen" places it on launchers that allow it.
+  - Due date reminders: once a day (9:00 by default) a notification lists open tasks and debts that are overdue
+    or due soon (on the day, or 1–3 days before); click it to open Tracker. On the PC it comes from the tray; on
+    Android from a daily alarm, also when Helm is closed and after a restart (Android 13+ asks for permission).
 
 ## [0.8.1] - 2026-09-28
 

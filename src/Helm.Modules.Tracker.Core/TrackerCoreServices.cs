@@ -30,6 +30,8 @@ public static class TrackerCoreServices
             sp.GetRequiredService<ISyncedCollection<TrackerWorkspace>>(),
             sp.GetRequiredService<ISyncedCollection<TrackerItem>>(),
             sp.GetRequiredService<ISyncedLog<TrackerEvent>>()));
+        services.AddSingleton(sp => new TrackerReminderService(
+            sp.GetRequiredService<TrackerStore>(), sp.GetRequiredService<Helm.Core.Settings.ISettingsStoreFactory>()));
         // Windows registers it again through AddHelmModule; one instance either way.
         services.TryAddSingleton<TrackerViewModel>();
         return services;

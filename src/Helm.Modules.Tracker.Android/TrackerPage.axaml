@@ -76,6 +76,42 @@
             </DockPanel>
         </Border>
 
+        <!-- Reminders -->
+        <TextBlock Text="Reminders" Classes="section" />
+        <Border Classes="card">
+            <StackPanel>
+                <DockPanel>
+                    <ToggleSwitch DockPanel.Dock="Right" IsChecked="{Binding RemindersEnabled}" OnContent="" OffContent="" AutomationProperties.Name="Due date reminders" />
+                    <StackPanel VerticalAlignment="Center">
+                        <TextBlock Text="Due date reminders" Classes="title" />
+                        <TextBlock Text="Once a day, a notification about open tasks and debts that are due soon or overdue." Classes="secondary" />
+                    </StackPanel>
+                </DockPanel>
+                <Border x:Name="NotificationsBlocked" Classes="infobar warning" IsVisible="False" Margin="0,12,0,0">
+                    <TextBlock Text="Notifications are off for Helm in Android settings, so reminders cannot be shown." TextWrapping="Wrap" />
+                </Border>
+                <Border Classes="row" IsEnabled="{Binding RemindersEnabled}">
+                    <StackPanel Spacing="8">
+                        <TextBlock Text="Reminder time" />
+                        <TextBlock Text="The day's reminder comes at this hour, or when you next open Helm." Classes="secondary" />
+                        <ComboBox HorizontalAlignment="Stretch" ItemsSource="{Binding ReminderHourNames}" SelectedIndex="{Binding ReminderHourIndex}"
+                                  AutomationProperties.Name="Reminder time" />
+                    </StackPanel>
+                </Border>
+                <Border Classes="row" IsEnabled="{Binding RemindersEnabled}">
+                    <StackPanel Spacing="8">
+                        <TextBlock Text="Due soon means" />
+                        <TextBlock Text="How early an item with a due date is included. Overdue items always are." Classes="secondary" />
+                        <ComboBox HorizontalAlignment="Stretch" ItemsSource="{Binding RemindDaysNames}" SelectedIndex="{Binding RemindDaysIndex}"
+                                  AutomationProperties.Name="Due soon means" />
+                    </StackPanel>
+                </Border>
+                <Border Classes="row">
+                    <Button Content="Remind me now" Command="{Binding RemindNowCommand}" />
+                </Border>
+            </StackPanel>
+        </Border>
+
         <!-- Widget (shown only when the launcher can pin widgets on request) -->
         <StackPanel x:Name="WidgetSection" IsVisible="False">
             <TextBlock Text="Widget" Classes="section" />

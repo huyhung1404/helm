@@ -63,6 +63,37 @@
             </StackPanel>
         </ui:CardExpander>
 
+        <!-- Reminders -->
+        <TextBlock Text="Reminders" Style="{DynamicResource HelmSectionHeader}" />
+        <ui:CardExpander Margin="0,0,0,4" Icon="{ui:SymbolIcon AlertOn24}" IsExpanded="True">
+            <ui:CardExpander.Header>
+                <core:RowLayout>
+                    <core:CardHeader Title="Due date reminders" Description="Once a day, a notification about open tasks and debts that are due soon or overdue." />
+                    <ui:ToggleSwitch HorizontalAlignment="Right" Margin="0,0,16,0" IsChecked="{Binding RemindersEnabled}" />
+                </core:RowLayout>
+            </ui:CardExpander.Header>
+            <StackPanel IsEnabled="{Binding RemindersEnabled}">
+                <Border Style="{DynamicResource HelmExpanderRow}" BorderThickness="0">
+                    <core:RowLayout>
+                        <core:CardHeader Title="Reminder time" Description="The day's reminder comes at this hour, or when Helm starts later." />
+                        <ComboBox Width="140" AutomationProperties.Name="Reminder time" ItemsSource="{Binding ReminderHourNames}" SelectedIndex="{Binding ReminderHourIndex}" />
+                    </core:RowLayout>
+                </Border>
+                <Border Style="{DynamicResource HelmExpanderRow}">
+                    <core:RowLayout>
+                        <core:CardHeader Title="Due soon means" Description="How early an item with a due date is included. Overdue items always are." />
+                        <ComboBox Width="160" AutomationProperties.Name="Due soon means" ItemsSource="{Binding RemindDaysNames}" SelectedIndex="{Binding RemindDaysIndex}" />
+                    </core:RowLayout>
+                </Border>
+                <Border Style="{DynamicResource HelmExpanderRow}">
+                    <core:RowLayout>
+                        <core:CardHeader Title="Try it" Description="Shows today's reminder now." />
+                        <ui:Button Content="Remind me now" Icon="{ui:SymbolIcon Alert24}" Command="{Binding RemindNowCommand}" />
+                    </core:RowLayout>
+                </Border>
+            </StackPanel>
+        </ui:CardExpander>
+
         <!-- Display -->
         <TextBlock Text="Display" Style="{DynamicResource HelmSectionHeader}" />
         <ui:CardControl Margin="0,0,0,4" Icon="{ui:SymbolIcon CheckmarkCircle24}">

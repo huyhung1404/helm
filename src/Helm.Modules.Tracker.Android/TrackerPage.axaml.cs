@@ -28,6 +28,13 @@ public partial class TrackerPage : ModulePageBase
         WidgetSection.IsVisible = TrackerWidgets.CanRequestPin(Android.App.Application.Context);
     }
 
+    // Checked each time the page shows: the user may have changed it in Android settings meanwhile.
+    protected override void OnAttachedToVisualTree(Avalonia.VisualTreeAttachmentEventArgs e)
+    {
+        base.OnAttachedToVisualTree(e);
+        NotificationsBlocked.IsVisible = !TrackerReminders.CanNotify(Android.App.Application.Context);
+    }
+
     private void OpenTracker_Click(object? sender, RoutedEventArgs e) => _navigation?.ShowPage(typeof(TrackerContentPage));
 
     /// <summary>Many launchers hide their widget list; this asks the launcher to place the widget (it confirms).</summary>

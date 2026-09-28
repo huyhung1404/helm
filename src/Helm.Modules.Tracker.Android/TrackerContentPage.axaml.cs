@@ -16,6 +16,7 @@ namespace Helm.Modules.Tracker;
 public partial class TrackerContentPage : UserControl
 {
     private readonly TrackerModule _module;
+    private readonly TrackerViewModel _viewModel;
 
     /// <summary>For the XAML runtime loader and the designer; the shell resolves the page from DI.</summary>
     public TrackerContentPage()
@@ -26,6 +27,7 @@ public partial class TrackerContentPage : UserControl
     public TrackerContentPage(TrackerModule module, TrackerViewModel viewModel)
     {
         _module = module;
+        _viewModel = viewModel;
         DataContext = viewModel;
         InitializeComponent();
     }
@@ -35,18 +37,38 @@ public partial class TrackerContentPage : UserControl
     {
         base.OnAttachedToVisualTree(e);
         _module.PropertyChanged += OnModuleChanged;
+        _viewModel.PropertyChanged += OnViewModelChanged;
         ApplyEnabled();
+        // Opening Tracker is the moment to ask for notifications (Android 13+, once) and to catch today's reminder.
+        var context = Android.App.Application.Context;
+        TrackerReminders.AskPermissionOnce(context);
+        TrackerReminders.CheckNow(context);
     }
 
     protected override void OnDetachedFromVisualTree(VisualTreeAttachmentEventArgs e)
     {
         _module.PropertyChanged -= OnModuleChanged;
+        _viewModel.PropertyChanged -= OnViewModelChanged;
         base.OnDetachedFromVisualTree(e);
     }
 
     private void OnModuleChanged(object? sender, PropertyChangedEventArgs e)
     {
         if (e.PropertyName == nameof(IModule.IsEnabled)) Dispatcher.UIThread.Post(ApplyEnabled);
+    }
+
+    /// <summary>
+    /// After Add the view model clears the due date, but CalendarDatePicker keeps a date that was typed into its box
+    /// (it looks as if the next item had that date). Clear the box once the tap on Add has been handled.
+    /// </summary>
+    private void OnViewModelChanged(object? sender, PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName != nameof(TrackerViewModel.NewDueDate) || _viewModel.NewDueDate is not null) return;
+        Dispatcher.UIThread.Post(() =>
+        {
+            NewDuePicker.Text = string.Empty;
+            NewDuePicker.SelectedDate = null;
+        }, DispatcherPriority.Background);
     }
 
     private void ApplyEnabled()

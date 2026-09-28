@@ -34,6 +34,7 @@ public sealed partial class TrackerViewModel : ObservableObject
     private readonly IUiDispatcher _ui;
     private readonly IDialogService _dialogs;
     private readonly IClipboardService _clipboard;
+    private readonly TrackerReminderService _reminders;
     private readonly ILogger<TrackerViewModel> _logger;
     private readonly Dictionary<string, TrackerItemViewModel> _rows = new(StringComparer.Ordinal);
     private int _refreshQueued;
@@ -70,6 +71,11 @@ public sealed partial class TrackerViewModel : ObservableObject
     [ObservableProperty] private string _reportOnTime = "—";
     [ObservableProperty] private string _reportRangeText = "";
 
+    // Reminders
+    [ObservableProperty] private bool _remindersEnabled;
+    [ObservableProperty] private int _reminderHourIndex;
+    [ObservableProperty] private int _remindDaysIndex;
+
     /// <summary>A problem with the last action (shown under the add form); null when all is well.</summary>
     [ObservableProperty] private string? _message;
 
@@ -79,6 +85,7 @@ public sealed partial class TrackerViewModel : ObservableObject
         IUiDispatcher ui,
         IDialogService dialogs,
         IClipboardService clipboard,
+        TrackerReminderService reminders,
         ILogger<TrackerViewModel> logger)
     {
         _store = store;
@@ -86,6 +93,7 @@ public sealed partial class TrackerViewModel : ObservableObject
         _ui = ui;
         _dialogs = dialogs;
         _clipboard = clipboard;
+        _reminders = reminders;
         _logger = logger;
 
         _loading = true;
@@ -93,6 +101,9 @@ public sealed partial class TrackerViewModel : ObservableObject
         ShowCompleted = s.ShowCompleted;
         ReportRangeIndex = (int)s.ReportRange;
         ReportAllWorkspaces = s.ReportAllWorkspaces;
+        RemindersEnabled = s.RemindersEnabled;
+        ReminderHourIndex = Math.Clamp(s.ReminderHour, 0, 23);
+        RemindDaysIndex = Math.Clamp(s.RemindDaysBefore, 0, RemindDaysNames.Count - 1);
         _loading = false;
 
         _store.Changed += (_, _) => ScheduleRefresh();
@@ -110,6 +121,13 @@ public sealed partial class TrackerViewModel : ObservableObject
     public IReadOnlyList<string> DirectionNames { get; } = Enum.GetValues<DebtDirection>().Select(TrackerFormat.Direction).ToList();
     public IReadOnlyList<string> KindNames { get; } = Enum.GetValues<WorkspaceKind>().Select(TrackerFormat.Kind).ToList();
     public IReadOnlyList<string> ReportRangeNames { get; } = ["Last 7 days", "Last 30 days", "Last 90 days", "All time"];
+
+    /// <summary>"00:00" … "23:00" in the current culture's short time format; the index is the hour.</summary>
+    public IReadOnlyList<string> ReminderHourNames { get; } =
+        Enumerable.Range(0, 24).Select(h => new DateTime(2000, 1, 1, h, 0, 0).ToString("t", CultureInfo.CurrentCulture)).ToList();
+
+    /// <summary>Index = days before the due date.</summary>
+    public IReadOnlyList<string> RemindDaysNames { get; } = ["On the due date", "1 day before", "2 days before", "3 days before"];
 
     public bool HasWorkspaces => Workspaces.Count > 0;
     public bool HasNoWorkspaces => Workspaces.Count == 0;
@@ -294,6 +312,36 @@ public sealed partial class TrackerViewModel : ObservableObject
         if (_loading) return;
         _settings.Update(s => s.ReportRange = (ReportRange)Math.Clamp(value, 0, ReportRangeNames.Count - 1));
         RefreshReport();
+    }
+
+    partial void OnRemindersEnabledChanged(bool value)
+    {
+        if (!_loading) _settings.Update(s => s.RemindersEnabled = value);
+    }
+
+    partial void OnReminderHourIndexChanged(int value)
+    {
+        if (!_loading && value >= 0) _settings.Update(s => s.ReminderHour = Math.Clamp(value, 0, 23));
+    }
+
+    partial void OnRemindDaysIndexChanged(int value)
+    {
+        if (!_loading && value >= 0) _settings.Update(s => s.RemindDaysBefore = Math.Clamp(value, 0, RemindDaysNames.Count - 1));
+    }
+
+    /// <summary>Shows today's reminder right away (to try the notification), whatever the hour.</summary>
+    [RelayCommand]
+    private void RemindNow()
+    {
+        try
+        {
+            Message = _reminders.RemindNow() ? null : "Nothing is due soon or overdue, so there is nothing to remind you about.";
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Tracker reminder failed");
+            Message = $"Could not show the reminder: {ex.Message}";
+        }
     }
 
     partial void OnReportAllWorkspacesChanged(bool value)

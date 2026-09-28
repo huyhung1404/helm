@@ -210,7 +210,7 @@ internal static class TrackerWidgets
     private static string Key(int widgetId) => $"workspace_{widgetId}";
 
     /// <summary>Opens Helm on the Tracker page (or brings the running app forward).</summary>
-    private static PendingIntent? OpenAppIntent(Context context, int requestCode)
+    internal static PendingIntent? OpenAppIntent(Context context, int requestCode)
     {
         var launch = context.PackageManager?.GetLaunchIntentForPackage(context.PackageName!);
         if (launch is null) return null;

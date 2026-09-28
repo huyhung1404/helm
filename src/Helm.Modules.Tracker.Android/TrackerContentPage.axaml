@@ -187,7 +187,7 @@
                     </TextBox>
                     <ComboBox HorizontalAlignment="Stretch" ItemsSource="{Binding PriorityNames}" SelectedIndex="{Binding NewPriorityIndex}"
                               IsVisible="{Binding IsTaskWorkspace}" AutomationProperties.Name="Priority" />
-                    <CalendarDatePicker HorizontalAlignment="Stretch" SelectedDate="{Binding NewDueDate}" PlaceholderText="Due date (optional)" />
+                    <CalendarDatePicker x:Name="NewDuePicker" HorizontalAlignment="Stretch" SelectedDate="{Binding NewDueDate}" PlaceholderText="Due date (optional)" />
                     <Button Classes="accent" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Content="Add" Command="{Binding AddCommand}" />
                 </StackPanel>
             </Border>
