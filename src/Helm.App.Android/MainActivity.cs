@@ -78,12 +78,26 @@ public sealed class MainActivity : AvaloniaMainActivity
         base.OnResume();
         ActivityHost.OnResumed(this);
         OpenRequestedModule();
-        if (_layoutListener is null && Window?.DecorView is { } decor)
+        if (Window?.DecorView is { } decor)
         {
-            _layoutListener = new ContentInsetsListener(this);
-            decor.ViewTreeObserver?.AddOnGlobalLayoutListener(_layoutListener);
+            if (_layoutListener is null)
+            {
+                _layoutListener = new ContentInsetsListener(this);
+                decor.ViewTreeObserver?.AddOnGlobalLayoutListener(_layoutListener);
+            }
+            // Right after start Android can report the system bars later than the first layout, without another
+            // layout pass; measuring again a little later corrects that (it used to wait for the next resume).
+            decor.Post(MeasureContentInsets);
+            decor.PostDelayed(MeasureContentInsets, 300);
+            decor.PostDelayed(MeasureContentInsets, 1000);
         }
         MeasureContentInsets();
+    }
+
+    public override void OnWindowFocusChanged(bool hasFocus)
+    {
+        base.OnWindowFocusChanged(hasFocus);
+        if (hasFocus) MeasureContentInsets();
     }
 
     protected override void OnDestroy()
@@ -94,8 +108,10 @@ public sealed class MainActivity : AvaloniaMainActivity
     }
 
     /// <summary>
-    /// How far the Avalonia view sits inside the window. Depending on start-up timing Android sometimes lays the
-    /// content out below the status bar itself and sometimes behind it; MainView pads only by what is left.
+    /// The padding the shell still needs to stay clear of the status/navigation bars and the display cutout: what they
+    /// cover of the window, minus how far Android already placed the Avalonia view inside it. Both come from Android at
+    /// the same moment (the window's own insets and the view's position), so start-up timing cannot mix an old value of
+    /// one with a new value of the other.
     /// </summary>
     private void MeasureContentInsets()
     {
@@ -103,14 +119,36 @@ public sealed class MainActivity : AvaloniaMainActivity
         if (decor is null || decor.Width == 0) return;
         _avaloniaView ??= FindAvaloniaView(FindViewById(global::Android.Resource.Id.Content));
         if (_avaloniaView is not { Width: > 0 } view) return;
+        if (SystemBarInsets(decor) is not { } bars) return; // not attached yet: keep the last padding
         var location = new int[2];
         view.GetLocationInWindow(location);
+        var right = decor.Width - location[0] - view.Width;
+        var bottom = decor.Height - location[1] - view.Height;
         var density = Resources?.DisplayMetrics?.Density ?? 1f;
-        ContentInsets.Update(new Avalonia.Thickness(
-            location[0] / density,
-            location[1] / density,
-            Math.Max(0, decor.Width - location[0] - view.Width) / density,
-            Math.Max(0, decor.Height - location[1] - view.Height) / density));
+        var padding = new Avalonia.Thickness(
+            Math.Max(0, bars.Left - location[0]) / density,
+            Math.Max(0, bars.Top - location[1]) / density,
+            Math.Max(0, bars.Right - right) / density,
+            Math.Max(0, bars.Bottom - bottom) / density);
+        if (ContentInsets.Update(padding))
+            Serilog.Log.Information("Shell padding {Padding} dp (system bars {Bars} px, view at {X},{Y} px, window {W}x{H} px)",
+                padding, bars, location[0], location[1], decor.Width, decor.Height);
+    }
+
+    /// <summary>Status bar, navigation bar and display cutout, in pixels of the window; null until the window has insets.</summary>
+    private static (int Left, int Top, int Right, int Bottom)? SystemBarInsets(View decor)
+    {
+        if (decor.RootWindowInsets is not { } insets) return null;
+        if (OperatingSystem.IsAndroidVersionAtLeast(30))
+        {
+            var i = insets.GetInsets(WindowInsets.Type.SystemBars() | WindowInsets.Type.DisplayCutout());
+            return (i.Left, i.Top, i.Right, i.Bottom);
+        }
+        (int Left, int Top, int Right, int Bottom) system = (insets.SystemWindowInsetLeft, insets.SystemWindowInsetTop, insets.SystemWindowInsetRight, insets.SystemWindowInsetBottom);
+        if (OperatingSystem.IsAndroidVersionAtLeast(28) && insets.DisplayCutout is { } cutout)
+            return (Math.Max(system.Left, cutout.SafeInsetLeft), Math.Max(system.Top, cutout.SafeInsetTop),
+                Math.Max(system.Right, cutout.SafeInsetRight), Math.Max(system.Bottom, cutout.SafeInsetBottom));
+        return system;
     }
 
     /// <summary>A widget or shortcut can ask for a tool's page with <see cref="ShellIntents.ExtraModule"/>.</summary>

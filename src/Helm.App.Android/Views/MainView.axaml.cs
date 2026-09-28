@@ -36,18 +36,16 @@ public partial class MainView : UserControl
         if (_insets is not null)
         {
             _insets.DisplayEdgeToEdgePreference = true;
-            _insets.SafeAreaChanged += OnSafeAreaChanged;
-            ContentInsets.Changed += OnContentInsetsChanged;
-            UpdatePadding();
             UpdateSystemBarColor();
         }
+        ContentInsets.Changed += OnContentInsetsChanged;
+        UpdatePadding();
         ActualThemeVariantChanged += OnThemeChanged;
         _topLevel.BackRequested += OnBackRequested;
     }
 
     protected override void OnDetachedFromVisualTree(VisualTreeAttachmentEventArgs e)
     {
-        if (_insets is not null) _insets.SafeAreaChanged -= OnSafeAreaChanged;
         ContentInsets.Changed -= OnContentInsetsChanged;
         if (_topLevel is not null) _topLevel.BackRequested -= OnBackRequested;
         ActualThemeVariantChanged -= OnThemeChanged;
@@ -65,15 +63,13 @@ public partial class MainView : UserControl
             _insets.SystemBarColor = solid.Color;
     }
 
-    private void OnSafeAreaChanged(object? sender, SafeAreaChangedArgs e) => UpdatePadding();
-
     private void OnContentInsetsChanged(object? sender, EventArgs e) => UpdatePadding();
 
-    /// <summary>Pads the shell clear of the status/navigation bars and cutout, once (see <see cref="ContentInsets"/>).</summary>
-    private void UpdatePadding()
-    {
-        if (_insets is not null) Padding = ContentInsets.Remaining(_insets.SafeAreaPadding);
-    }
+    /// <summary>
+    /// Pads the shell clear of the status/navigation bars and cutout, once. The amount comes from Android itself (see
+    /// <see cref="ContentInsets"/>), not from Avalonia's safe area, which could be read before edge to edge took effect.
+    /// </summary>
+    private void UpdatePadding() => Padding = ContentInsets.Current;
 
     private void OnBackRequested(object? sender, RoutedEventArgs e)
     {
