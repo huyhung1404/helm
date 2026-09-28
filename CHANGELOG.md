@@ -16,6 +16,23 @@ Format: [Keep a Changelog](https://keepachangelog.com), versions follow [SemVer]
 - Vault: Other has one type, **Info**, with the fields you add; cards, identities and documents made before are Info
   items now and keep their fields.
 
+- Tracker debt book: one line per person. Entries for the same name (whatever its case or spacing) add up to one
+  balance: **Owes me** adds, **I owe** subtracts, and the new **Repayment** brings the balance back toward 0. A person
+  moves to Settled when the balance reaches 0; there is no tick box any more. Click a person to see every change of
+  the amount with the balance after it, and to set when it is due (+1 day, +1 week, +1 month, or a date and time);
+  click again to close. Amounts are not edited: add a repayment or delete a wrong entry.
+- Tracker debt book: amounts get thousands separators while you type, and names already in the book are suggested.
+- Tracker: due dates can have a time (hour and minute), for tasks and debts.
+- Tracker: tasks can have subtasks, each with its own tick; the task shows how many are done, and finishing the task
+  finishes them too.
+- Sync: a sync button on every page (next to the search box on Windows, in the app bar on Android) shows whether
+  everything is synced, syncing, offline or needs attention; click it to sync now, or to set sync up. While Helm is in
+  front it now checks for other devices' changes every 30 seconds (every 5 minutes in the background or tray), and
+  right away when you come back to it.
+- Tracker widget (Android): sync, + and a shrink button. With nothing to do, or when shrunk, it becomes a small button
+  showing how many items are open, on a see-through background; tap it for sync and +. Choose the widget's
+  background, its opacity and the text colour in Tracker's settings. The debt book shows one line per person.
+
 ### Fixed
 - Vault: "Emergency Kit not confirmed" no longer shows on your other devices once you confirmed it on one.
 

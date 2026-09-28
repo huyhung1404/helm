@@ -118,11 +118,14 @@ public sealed partial class DebtPersonViewModel : ObservableObject
     internal void Update(DebtPerson person, string currency, DateTimeOffset now)
     {
         if (person == _person && currency == _currency && now == _now) return;
+        var dueBefore = Due;
         _person = person;
         _currency = currency;
         _now = now;
         Rebuild();
         OnPropertyChanged(string.Empty);
+        // The date and time boxes show the new due time after +1 day, Set or a sync.
+        if (IsExpanded && Due != dueBefore) LoadEditDue();
     }
 
     private void Rebuild()
@@ -136,7 +139,11 @@ public sealed partial class DebtPersonViewModel : ObservableObject
     private void ToggleExpanded()
     {
         IsExpanded = !IsExpanded;
-        if (!IsExpanded) return;
+        if (IsExpanded) LoadEditDue();
+    }
+
+    private void LoadEditDue()
+    {
         var due = Due is { } d ? TimeZoneInfo.ConvertTime(d, TimeZoneInfo.Local) : (DateTimeOffset?)null;
         EditDueDate = due?.Date;
         var hasTime = _person.Entries.Any(e => e.Item.DueAt is not null);

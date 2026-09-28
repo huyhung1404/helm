@@ -347,12 +347,12 @@
                 <StackPanel>
                     <WrapPanel Visibility="{Binding IsDebtWorkspace, Converter={StaticResource BoolToVisibility}}">
                         <!-- Typing a name already in the book adds to that person -->
-                        <ComboBox Width="220" Margin="0,0,8,8" IsEditable="True" IsTextSearchEnabled="True" AutomationProperties.Name="Person"
-                                  ItemsSource="{Binding PersonNames}" Text="{Binding NewPerson, UpdateSourceTrigger=PropertyChanged}" ToolTip="Who it is with">
-                            <ComboBox.InputBindings>
+                        <ui:TextBox Width="220" Margin="0,0,8,8" PlaceholderText="Person" AutomationProperties.Name="Person" Icon="{ui:SymbolIcon Person24}"
+                                    ToolTip="Who it is with. A name already in the book adds to that person." Text="{Binding NewPerson, UpdateSourceTrigger=PropertyChanged}">
+                            <ui:TextBox.InputBindings>
                                 <KeyBinding Key="Enter" Command="{Binding AddCommand}" />
-                            </ComboBox.InputBindings>
-                        </ComboBox>
+                            </ui:TextBox.InputBindings>
+                        </ui:TextBox>
                         <ui:TextBox x:Name="AmountBox" Width="180" Margin="0,0,8,8" PlaceholderText="Amount, e.g. 150k" AutomationProperties.Name="Amount" Icon="{ui:SymbolIcon Money24}"
                                     Text="{Binding NewAmount, UpdateSourceTrigger=PropertyChanged}" TextChanged="OnAmountTextChanged">
                             <ui:TextBox.InputBindings>
@@ -362,6 +362,20 @@
                         <ComboBox Width="140" Margin="0,0,8,8" ItemsSource="{Binding DebtKindNames}" SelectedIndex="{Binding NewDebtKindIndex}" AutomationProperties.Name="Kind"
                                   ToolTip="Owes me adds, I owe subtracts, a repayment brings the balance back toward 0" />
                     </WrapPanel>
+                    <!-- Names already in the book that match what is typed: one click picks it -->
+                    <ItemsControl Margin="0,0,0,8" ItemsSource="{Binding PersonSuggestions}" Visibility="{Binding HasPersonSuggestions, Converter={StaticResource BoolToVisibility}}">
+                        <ItemsControl.ItemsPanel>
+                            <ItemsPanelTemplate>
+                                <WrapPanel />
+                            </ItemsPanelTemplate>
+                        </ItemsControl.ItemsPanel>
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <ui:Button Margin="0,0,6,6" Padding="10,3" Content="{Binding}" Icon="{ui:SymbolIcon Person24}" AutomationProperties.Name="{Binding}"
+                                           Command="{Binding DataContext.PickPersonCommand, RelativeSource={RelativeSource AncestorType=Page}}" CommandParameter="{Binding}" />
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
                     <ui:TextBox Margin="0,0,0,8" AutomationProperties.Name="Title" PlaceholderText="{Binding TitlePlaceholder}" Text="{Binding NewTitle, UpdateSourceTrigger=PropertyChanged}">
                         <ui:TextBox.InputBindings>
                             <KeyBinding Key="Enter" Command="{Binding AddCommand}" />

@@ -134,6 +134,31 @@ public sealed partial class TrackerViewModel : ObservableObject
 
     /// <summary>Names already in the debt book, for the person box (the same name adds to that person).</summary>
     public ObservableCollection<string> PersonNames { get; } = [];
+
+    /// <summary>Up to 6 names that contain what is typed in the person box (not shown once it is an exact name).</summary>
+    public ObservableCollection<string> PersonSuggestions { get; } = [];
+
+    public bool HasPersonSuggestions => PersonSuggestions.Count > 0;
+
+    partial void OnNewPersonChanged(string value) => UpdatePersonSuggestions();
+
+    private void UpdatePersonSuggestions()
+    {
+        var typed = DebtLedger.Clean(NewPerson);
+        var matches = typed.Length == 0 || PersonNames.Any(n => DebtLedger.Key(n) == DebtLedger.Key(typed))
+            ? []
+            : PersonNames.Where(n => n.Contains(typed, StringComparison.CurrentCultureIgnoreCase)).Take(6).ToList();
+        if (PersonSuggestions.SequenceEqual(matches)) return;
+        PersonSuggestions.Clear();
+        foreach (var name in matches) PersonSuggestions.Add(name);
+        OnPropertyChanged(nameof(HasPersonSuggestions));
+    }
+
+    [RelayCommand]
+    private void PickPerson(string? name)
+    {
+        if (name is { Length: > 0 }) NewPerson = name;
+    }
     public ObservableCollection<ReportBar> ReportDays { get; } = [];
     public ObservableCollection<ReportCount> ReportPriorities { get; } = [];
     public ObservableCollection<HistoryRow> History { get; } = [];
@@ -652,6 +677,7 @@ public sealed partial class TrackerViewModel : ObservableObject
         var names = items.Select(i => DebtLedger.Clean(i.Value.Person)).Where(n => n.Length > 0)
             .DistinctBy(DebtLedger.Key).Order(StringComparer.CurrentCultureIgnoreCase).ToList();
         Reconcile(PersonNames, names.Select(n => PersonNames.FirstOrDefault(x => x == n) ?? n).ToList());
+        UpdatePersonSuggestions();
 
         OpenSummary = owing.Count == 1 ? "1 person" : $"{owing.Count} people";
         var owedToMe = open.Where(p => p.Balance > 0).Sum(p => p.Balance);
