@@ -264,6 +264,8 @@ Generated_Code/
 # because we have git ;-)
 _UpgradeReport_Files/
 Backup*/
+# ...but Vault's backup code is source, not a Visual Studio conversion backup.
+!src/Helm.Modules.Vault.Core/Backup/
 UpgradeLog*.XML
 UpgradeLog*.htm
 ServiceFabricBackup/
