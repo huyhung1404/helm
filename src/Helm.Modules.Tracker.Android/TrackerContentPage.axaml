@@ -131,20 +131,23 @@
             </StackPanel>
         </Border>
 
-        <!-- Workspace picker and the way to the settings -->
-        <Grid ColumnDefinitions="*,Auto">
-            <ComboBox HorizontalAlignment="Stretch" VerticalAlignment="Center" ItemsSource="{Binding Workspaces}" SelectedItem="{Binding SelectedWorkspace}"
-                      IsVisible="{Binding HasWorkspaces}" AutomationProperties.Name="Current workspace">
-                <ComboBox.ItemTemplate>
-                    <DataTemplate DataType="vm:WorkspaceOption">
-                        <TextBlock Text="{Binding Name}" />
-                    </DataTemplate>
-                </ComboBox.ItemTemplate>
-            </ComboBox>
-            <Button Grid.Column="1" Classes="icon flat" Margin="4,0,0,0" Click="OpenSettings_Click" AutomationProperties.Name="Tracker settings">
-                <ic:SymbolIcon Symbol="Settings" FontSize="20" />
-            </Button>
-        </Grid>
+        <!-- Which list you are looking at, first and easy to see -->
+        <Border Classes="card" IsVisible="{Binding HasWorkspaces}">
+            <StackPanel Spacing="8">
+                <TextBlock Text="Workspace" Classes="title" />
+                <ComboBox HorizontalAlignment="Stretch" ItemsSource="{Binding Workspaces}" SelectedItem="{Binding SelectedWorkspace}"
+                          AutomationProperties.Name="Current workspace">
+                    <ComboBox.ItemTemplate>
+                        <DataTemplate DataType="vm:WorkspaceOption">
+                            <StackPanel>
+                                <TextBlock Text="{Binding Name}" />
+                                <TextBlock Text="{Binding KindText}" Classes="secondary" />
+                            </StackPanel>
+                        </DataTemplate>
+                    </ComboBox.ItemTemplate>
+                </ComboBox>
+            </StackPanel>
+        </Border>
 
         <StackPanel x:Name="Body">
             <!-- First run: no workspace yet -->

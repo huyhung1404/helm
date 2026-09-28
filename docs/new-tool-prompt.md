@@ -110,16 +110,16 @@ A tool you work in keeps **what it is for** apart from **how it is configured**:
 | | Content page | Settings page |
 |---|---|---|
 | What | The tool itself: its lists, editor, chat, report, history | The **Enable** card and the options |
-| Opened from | The navigation menu (PC) / drawer (Android) and the **Quick access** tile on Home | Home → **Utilities** (the `>` next to the toggle), search results, and a ⚙ button on the content page |
+| Opened from | The navigation menu (PC) / drawer (Android) and the **Quick access** tile on Home | Home → **Utilities** (the `>` next to the toggle) and search results |
 | Type | PC: a plain `Page`; Android: a `UserControl` | `core:ModulePageBase` / `ui:ModulePageBase` (as below) |
 | Declared by | the module implements `IModuleContent` (`Helm.Core.Modules`): `Type ContentPageType` | `SettingsPageType` (PC) / `PageType` (Android) |
 
 - The shell does the routing from `IModuleContent`; do not change the shell for a new tool. A module with its own Quick
   access action (`IModuleLauncher`, e.g. Claude Chat opening its window) keeps that action.
-- Content page layout: the tool's title (PC; the Android app bar shows it already) with the tool's main picker (e.g. the
-  workspace) and a ⚙ **settings** button on the right (`IShellNavigation.ShowPage(typeof(<Prefix>Page))`), then the
-  content. No Enable card, no icon + description block. When the tool is off, show a short note ("<Tool> is turned
-  off…") and make the content read-only; the data stays.
+- Content page layout: the tool's title (PC; the Android app bar shows it already), then the tool's main picker (e.g.
+  the workspace) as the first card under it, full width and easy to see, then the content. No settings button, no
+  Enable card, no icon + description block: settings are reached from Home → Utilities only. When the tool is off, show
+  a short note ("<Tool> is turned off…") and make the content read-only; the data stays.
 - Settings page: only things you set once and rarely change (create, rename, delete, defaults, display options,
   export). Put an **Open <Tool>** card first that goes to the content page. Everything a user does every day belongs on
   the content page.

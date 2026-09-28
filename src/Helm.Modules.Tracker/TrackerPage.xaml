@@ -4,11 +4,15 @@
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
     xmlns:core="clr-namespace:Helm.Core.Ui;assembly=Helm.Core.Windows"
+    xmlns:local="clr-namespace:Helm.Modules.Tracker"
     ExtraMessage="{Binding Message}">
 
     <!-- Tracker's settings (Home → Utilities). The lists themselves are on TrackerContentPage. -->
     <StackPanel>
-        <ui:CardControl Margin="0,0,0,4" Icon="{ui:SymbolIcon TaskListSquareLtr24}">
+        <ui:CardControl Margin="0,0,0,4">
+            <ui:CardControl.Icon>
+                <ui:ImageIcon Width="24" Height="24" Source="{x:Static local:TrackerLogo.Image}" />
+            </ui:CardControl.Icon>
             <ui:CardControl.Header>
                 <core:CardHeader Title="Open Tracker" Description="Your lists, the report and the history. Also in the menu and on Home." />
             </ui:CardControl.Header>

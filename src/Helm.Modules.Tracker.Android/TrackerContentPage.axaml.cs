@@ -5,7 +5,6 @@ using Avalonia.Interactivity;
 using Avalonia.Threading;
 using Helm.Core;
 using Helm.Core.Modules;
-using Helm.Core.Services;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Helm.Modules.Tracker;
@@ -17,19 +16,16 @@ namespace Helm.Modules.Tracker;
 public partial class TrackerContentPage : UserControl
 {
     private readonly TrackerModule _module;
-    private readonly IShellNavigation _navigation;
 
     /// <summary>For the XAML runtime loader and the designer; the shell resolves the page from DI.</summary>
     public TrackerContentPage()
-        : this(HelmAndroidServices.Current.GetRequiredService<TrackerModule>(), HelmAndroidServices.Current.GetRequiredService<TrackerViewModel>(),
-            HelmAndroidServices.Current.GetRequiredService<IShellNavigation>())
+        : this(HelmAndroidServices.Current.GetRequiredService<TrackerModule>(), HelmAndroidServices.Current.GetRequiredService<TrackerViewModel>())
     {
     }
 
-    public TrackerContentPage(TrackerModule module, TrackerViewModel viewModel, IShellNavigation navigation)
+    public TrackerContentPage(TrackerModule module, TrackerViewModel viewModel)
     {
         _module = module;
-        _navigation = navigation;
         DataContext = viewModel;
         InitializeComponent();
     }
@@ -58,6 +54,4 @@ public partial class TrackerContentPage : UserControl
         Body.IsEnabled = _module.IsEnabled;
         OffBar.IsVisible = !_module.IsEnabled;
     }
-
-    private void OpenSettings_Click(object? sender, RoutedEventArgs e) => _navigation.ShowPage(typeof(TrackerPage));
 }

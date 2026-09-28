@@ -143,21 +143,22 @@
     </Page.Resources>
 
     <StackPanel Margin="24,0,24,24">
-        <!-- Title, workspace picker and the way to the settings -->
-        <DockPanel Margin="0,0,0,8">
-            <ui:Button x:Name="SettingsButton" DockPanel.Dock="Right" Appearance="Transparent" Icon="{ui:SymbolIcon Settings24}"
-                       ToolTip="Tracker settings" AutomationProperties.Name="Tracker settings" Click="OpenSettings_Click" VerticalAlignment="Center" />
-            <ComboBox DockPanel.Dock="Right" Width="240" Margin="0,0,8,0" VerticalAlignment="Center" AutomationProperties.Name="Current workspace"
-                      ItemsSource="{Binding Workspaces}" DisplayMemberPath="Name" SelectedItem="{Binding SelectedWorkspace}"
-                      Visibility="{Binding HasWorkspaces, Converter={StaticResource BoolToVisibility}}" />
-            <TextBlock Text="Tracker" FontSize="28" FontWeight="SemiBold" VerticalAlignment="Center" />
-        </DockPanel>
+        <TextBlock Text="Tracker" FontSize="28" FontWeight="SemiBold" Margin="0,0,0,20" />
 
         <!-- Shown while the tool is turned off -->
         <ui:InfoBar x:Name="OffBar" Severity="Informational" IsClosable="False" IsOpen="False" Visibility="Collapsed" Margin="0,8,0,0"
                     Title="Tracker is turned off" Message="Your lists are kept. Turn Tracker on in its settings to use them." />
 
         <StackPanel x:Name="Body">
+            <!-- Which list you are looking at, first and easy to see -->
+            <ui:CardControl Margin="0,0,0,4" Icon="{ui:SymbolIcon Board24}"
+                            Visibility="{Binding HasWorkspaces, Converter={StaticResource BoolToVisibility}}">
+                <ui:CardControl.Header>
+                    <core:CardHeader Title="Workspace" Description="{Binding SelectedWorkspace.KindText}" />
+                </ui:CardControl.Header>
+                <ComboBox Width="280" HorizontalAlignment="Right" AutomationProperties.Name="Current workspace"
+                          ItemsSource="{Binding Workspaces}" DisplayMemberPath="Name" SelectedItem="{Binding SelectedWorkspace}" />
+            </ui:CardControl>
             <!-- First run: no workspace yet -->
             <Border Style="{DynamicResource HelmSurface}" Margin="0,24,0,4"
                     Visibility="{Binding HasNoWorkspaces, Converter={StaticResource BoolToVisibility}}">

@@ -1,4 +1,5 @@
 using Helm.Core.Hotkeys;
+using System.Windows.Media;
 using Helm.Core.Modules;
 using Wpf.Ui.Controls;
 
@@ -16,6 +17,7 @@ public sealed class TrackerModule : HelmModuleBase, IModuleContent
     public override string Description => TrackerIds.Description;
     public override ModuleGroup Group => ModuleGroup.SystemTools;
     public override SymbolRegular Icon => SymbolRegular.TaskListSquareLtr24;
+    public override ImageSource IconImage => TrackerLogo.Image;
     public override Type SettingsPageType => typeof(TrackerPage);
     public Type ContentPageType => typeof(TrackerContentPage);
     public override IReadOnlyList<HotkeyDefinition> Hotkeys => [];

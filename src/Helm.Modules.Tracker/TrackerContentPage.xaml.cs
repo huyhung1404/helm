@@ -2,23 +2,20 @@ using System.ComponentModel;
 using System.Windows;
 using System.Windows.Controls;
 using Helm.Core.Modules;
-using Helm.Core.Services;
 
 namespace Helm.Modules.Tracker;
 
 /// <summary>
 /// The Tracker itself, opened from the menu and the Quick access tile (see <see cref="IModuleContent"/>). While the
-/// tool is off the lists stay visible but read-only, with a note pointing to the settings.
+/// tool is off the lists stay visible but read-only, with a note pointing to the settings (Home → Utilities).
 /// </summary>
 public partial class TrackerContentPage : Page
 {
     private readonly TrackerModule _module;
-    private readonly IShellNavigation _navigation;
 
-    public TrackerContentPage(TrackerModule module, TrackerViewModel viewModel, IShellNavigation navigation)
+    public TrackerContentPage(TrackerModule module, TrackerViewModel viewModel)
     {
         _module = module;
-        _navigation = navigation;
         DataContext = viewModel;
         InitializeComponent();
         // Module and page are both singletons, so the subscription lives as long as the page.
@@ -38,6 +35,4 @@ public partial class TrackerContentPage : Page
         OffBar.IsOpen = !on;
         OffBar.Visibility = on ? Visibility.Collapsed : Visibility.Visible;
     }
-
-    private void OpenSettings_Click(object sender, RoutedEventArgs e) => _navigation.ShowPage(typeof(TrackerPage));
 }

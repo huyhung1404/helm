@@ -14,4 +14,9 @@
     <InternalsVisibleTo Include="Helm.Tests" />
   </ItemGroup>
 
+  <!-- The app icon lives with the shared code so the Android app can use the same file. -->
+  <ItemGroup>
+    <Resource Include="..\Helm.Modules.Tracker.Core\Assets\tracker.png" Link="Assets\tracker.png" />
+  </ItemGroup>
+
 </Project>

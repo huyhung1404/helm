@@ -15,7 +15,11 @@ public static class ModuleIcon
     {
         if (module.IconImage is { } image)
         {
-            return new ImageIcon { Source = image, Width = imageSize, Height = imageSize };
+            var icon = new ImageIcon { Source = image, Width = imageSize, Height = imageSize };
+            // Bitmap icons are drawn much smaller than their source (256 px into 18-56 px); the default linear scaling
+            // drops thin strokes. Vector icons (DrawingImage) are unaffected.
+            System.Windows.Media.RenderOptions.SetBitmapScalingMode(icon, System.Windows.Media.BitmapScalingMode.HighQuality);
+            return icon;
         }
         var symbol = new SymbolIcon { Symbol = module.Icon };
         if (fontSize is { } size) symbol.FontSize = size;
