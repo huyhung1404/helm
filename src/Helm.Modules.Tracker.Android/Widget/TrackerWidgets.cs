@@ -37,6 +37,27 @@ internal static class TrackerWidgets
         NotifyListChanged(context, manager, ids);
     }
 
+    /// <summary>Whether the launcher can place a widget when the app asks (Android 8+, most launchers).</summary>
+    public static bool CanRequestPin(Context context)
+    {
+        try { return AppWidgetManager.GetInstance(context)?.IsRequestPinAppWidgetSupported == true; }
+        catch (Exception) { return false; }
+    }
+
+    /// <summary>Asks the launcher to add the Tracker widget; the launcher shows its own confirmation.</summary>
+    public static void RequestPin(Context context)
+    {
+        try
+        {
+            var provider = new ComponentName(context, Java.Lang.Class.FromType(typeof(TrackerWidgetProvider)));
+            AppWidgetManager.GetInstance(context)?.RequestPinAppWidget(provider, null, null);
+        }
+        catch (Exception ex)
+        {
+            Log(ex, "Could not ask the launcher to add the Tracker widget");
+        }
+    }
+
     /// <summary>Before Android 12 the rows come from <see cref="TrackerWidgetService"/>, which must be told to reload.</summary>
     public static void NotifyListChanged(Context context, AppWidgetManager manager, int[] ids)
     {

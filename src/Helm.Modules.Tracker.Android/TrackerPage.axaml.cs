@@ -25,7 +25,11 @@ public partial class TrackerPage : ModulePageBase
         InitializeComponent();
         // The view model is shared with Windows and knows nothing about the Android module type.
         Module = module;
+        WidgetSection.IsVisible = TrackerWidgets.CanRequestPin(Android.App.Application.Context);
     }
 
     private void OpenTracker_Click(object? sender, RoutedEventArgs e) => _navigation?.ShowPage(typeof(TrackerContentPage));
+
+    /// <summary>Many launchers hide their widget list; this asks the launcher to place the widget (it confirms).</summary>
+    private void AddWidget_Click(object? sender, RoutedEventArgs e) => TrackerWidgets.RequestPin(Android.App.Application.Context);
 }

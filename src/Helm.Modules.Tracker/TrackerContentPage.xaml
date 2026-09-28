@@ -263,7 +263,8 @@
             </Border>
             </StackPanel>
 
-            <!-- Report -->
+            <!-- Report and history, once there is a workspace -->
+            <StackPanel Visibility="{Binding HasWorkspaces, Converter={StaticResource BoolToVisibility}}">
             <TextBlock Text="Report" Style="{DynamicResource HelmSectionHeader}" />
             <ui:CardControl Margin="0,0,0,4" Icon="{ui:SymbolIcon DataBarVertical24}">
                 <ui:CardControl.Header>
@@ -385,6 +386,7 @@
                     </ScrollViewer>
                 </StackPanel>
             </ui:CardExpander>
+            </StackPanel>
         </StackPanel>
     </StackPanel>
 </Page>

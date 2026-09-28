@@ -76,6 +76,18 @@
             </DockPanel>
         </Border>
 
+        <!-- Widget (shown only when the launcher can pin widgets on request) -->
+        <StackPanel x:Name="WidgetSection" IsVisible="False">
+            <TextBlock Text="Widget" Classes="section" />
+            <Border Classes="card">
+                <StackPanel Spacing="8">
+                    <TextBlock Text="Home-screen widget" Classes="title" />
+                    <TextBlock Text="Your open tasks or debts on the home screen. Tap a circle to finish one, the title to switch workspace." Classes="secondary" />
+                    <Button Content="Add to home screen" Click="AddWidget_Click" />
+                </StackPanel>
+            </Border>
+        </StackPanel>
+
         <!-- Data -->
         <TextBlock Text="Data" Classes="section" />
         <Border Classes="card">
