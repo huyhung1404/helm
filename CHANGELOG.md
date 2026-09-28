@@ -3,6 +3,11 @@
 All notable changes to Helm. The top section is used as the GitHub release body and as the Velopack release notes.
 Format: [Keep a Changelog](https://keepachangelog.com), versions follow [SemVer](https://semver.org).
 
+## [0.9.3] - 2026-09-28
+
+### Fixed
+- Vault: the page title, headings and labels were black in the dark theme (hard to read on the dark background).
+
 ## [0.9.2] - 2026-09-28
 
 ### Fixed
