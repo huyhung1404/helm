@@ -3,6 +3,12 @@
 All notable changes to Helm. The top section is used as the GitHub release body and as the Velopack release notes.
 Format: [Keep a Changelog](https://keepachangelog.com), versions follow [SemVer](https://semver.org).
 
+## [0.8.1] - 2026-09-28
+
+### Fixed
+- Android: an empty band could appear above the title bar on some starts (Android 15 and newer). The page is now
+  moved clear of the status bar exactly once, however Android lays the window out.
+
 ## [0.8.0] - 2026-09-28
 
 ### Added
