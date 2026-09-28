@@ -3,6 +3,7 @@ using System.Windows.Threading;
 using Helm.App.Hosting;
 using Helm.App.Services;
 using Helm.Core.Modules;
+using Helm.Core.Services;
 using Helm.Core.Settings;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;

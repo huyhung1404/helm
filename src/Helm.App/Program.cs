@@ -1,4 +1,5 @@
 using Helm.App.Updates;
+using Helm.Core.Services;
 using Velopack;
 
 namespace Helm.App;
@@ -22,9 +23,10 @@ public static class Program
         if (!Elevation.EnsureElevated(args)) return 0;
 
         // 3. Single instance: a second launch activates the first one.
-        using var instance = SingleInstance.Acquire();
-        // --allow-multiple (dev/testing): run next to an installed Helm instead of activating it.
-        if (!instance.IsFirstInstance && !args.Contains("--allow-multiple", StringComparer.OrdinalIgnoreCase))
+        // --allow-multiple (dev/testing): run next to an installed Helm, outside its single-instance group.
+        var allowMultiple = args.Contains("--allow-multiple", StringComparer.OrdinalIgnoreCase);
+        using var instance = allowMultiple ? SingleInstance.Detached() : SingleInstance.Acquire();
+        if (!allowMultiple && !instance.IsFirstInstance)
         {
             instance.SignalFirstInstance();
             return 0;
