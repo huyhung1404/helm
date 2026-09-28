@@ -30,6 +30,27 @@ public partial class TrackerContentPage : UserControl
         _viewModel = viewModel;
         DataContext = viewModel;
         InitializeComponent();
+        AmountBox.TextChanged += OnAmountTextChanged;
+    }
+
+    private bool _grouping;
+
+    /// <summary>Thousands separators while an amount is typed, so 1500000 reads 1,500,000; the caret stays put.</summary>
+    private void OnAmountTextChanged(object? sender, TextChangedEventArgs e)
+    {
+        if (_grouping || AmountBox.Text is not { } current) return;
+        var (text, caret) = TrackerFormat.GroupDigits(current, AmountBox.CaretIndex);
+        if (text == current) return;
+        _grouping = true;
+        try
+        {
+            AmountBox.Text = text;
+            AmountBox.CaretIndex = caret;
+        }
+        finally
+        {
+            _grouping = false;
+        }
     }
 
     // Pages are transient and the module is a singleton: listen only while shown.

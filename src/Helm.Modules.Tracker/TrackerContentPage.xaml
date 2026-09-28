@@ -31,6 +31,129 @@
             </Style.Triggers>
         </Style>
 
+        <!-- A whole row as one flat button (hover shading, keyboard focus) -->
+        <Style x:Key="RowButton" TargetType="Button">
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+            <Setter Property="FocusVisualStyle" Value="{x:Null}" />
+            <Setter Property="Foreground" Value="{DynamicResource TextFillColorPrimaryBrush}" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="Bd" Background="{TemplateBinding Background}" Padding="12,8" BorderThickness="1" BorderBrush="Transparent">
+                            <ContentPresenter HorizontalAlignment="Stretch" />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Bd" Property="Background" Value="{DynamicResource SubtleFillColorSecondaryBrush}" />
+                            </Trigger>
+                            <Trigger Property="IsKeyboardFocused" Value="True">
+                                <Setter TargetName="Bd" Property="BorderBrush" Value="{DynamicResource AccentTextFillColorPrimaryBrush}" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- Signed amount of a person or an entry: + in green, - in red -->
+        <Style x:Key="SignedText" TargetType="TextBlock">
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="VerticalAlignment" Value="Center" />
+            <Setter Property="Foreground" Value="{DynamicResource TextFillColorSecondaryBrush}" />
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding OwedToMe}" Value="True">
+                    <Setter Property="Foreground" Value="{DynamicResource SystemFillColorSuccessBrush}" />
+                </DataTrigger>
+                <DataTrigger Binding="{Binding IOwe}" Value="True">
+                    <Setter Property="Foreground" Value="{DynamicResource SystemFillColorCriticalBrush}" />
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+
+        <!-- A person in the debt book: click to see their history and set when it is due; click again to close. -->
+        <DataTemplate x:Key="PersonRow" DataType="{x:Type local:DebtPersonViewModel}">
+            <Border BorderThickness="0,0,0,1" BorderBrush="{DynamicResource CardStrokeColorDefaultBrush}">
+                <StackPanel>
+                    <Button Style="{StaticResource RowButton}" Command="{Binding ToggleExpandedCommand}" AutomationProperties.Name="{Binding Name}">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <ui:SymbolIcon Symbol="Person24" FontSize="20" Margin="0,0,12,0" VerticalAlignment="Center" />
+                            <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                <TextBlock Text="{Binding Name}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+                                <TextBlock Text="{Binding Details}" TextTrimming="CharacterEllipsis">
+                                    <TextBlock.Style>
+                                        <Style TargetType="TextBlock" BasedOn="{StaticResource HelmSecondaryText}">
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding IsOverdue}" Value="True">
+                                                    <Setter Property="Foreground" Value="{DynamicResource SystemFillColorCriticalBrush}" />
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </TextBlock.Style>
+                                </TextBlock>
+                            </StackPanel>
+                            <TextBlock Grid.Column="2" Text="{Binding BalanceText}" FontSize="15" Margin="12,0,4,0" Style="{StaticResource SignedText}" />
+                        </Grid>
+                    </Button>
+
+                    <StackPanel Margin="44,0,12,12" Visibility="{Binding IsExpanded, Converter={StaticResource BoolToVisibility}}">
+                        <!-- When it is due: extend, or set a date and time -->
+                        <WrapPanel Margin="0,4,0,8" Visibility="{Binding IsSettled, Converter={StaticResource InverseBoolToVisibility}}">
+                            <TextBlock Text="Due" VerticalAlignment="Center" Margin="0,0,8,8" />
+                            <ui:Button Margin="0,0,6,8" Content="+1 day" Command="{Binding ExtendCommand}" CommandParameter="1" ToolTip="Due one day later" />
+                            <ui:Button Margin="0,0,6,8" Content="+1 week" Command="{Binding ExtendCommand}" CommandParameter="7" ToolTip="Due a week later" />
+                            <ui:Button Margin="0,0,12,8" Content="+1 month" Command="{Binding ExtendCommand}" CommandParameter="30" ToolTip="Due 30 days later" />
+                            <DatePicker Width="150" Margin="0,0,6,8" SelectedDate="{Binding EditDueDate}" AutomationProperties.Name="Due date" />
+                            <ui:TextBox Width="92" Margin="0,0,6,8" PlaceholderText="HH:mm" AutomationProperties.Name="Due time" Text="{Binding EditDueTimeText, UpdateSourceTrigger=PropertyChanged}" />
+                            <ui:Button Margin="0,0,6,8" Appearance="Primary" Content="Set" Command="{Binding SetDueCommand}" />
+                            <ui:Button Margin="0,0,6,8" Content="No due date" Command="{Binding ClearDueCommand}" />
+                        </WrapPanel>
+                        <!-- Every change of the amount, newest first, with the balance after it -->
+                        <ItemsControl ItemsSource="{Binding Entries}">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate DataType="{x:Type local:DebtEntryRow}">
+                                    <Grid Margin="0,3">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="150" />
+                                            <ColumnDefinition Width="100" />
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                            <ColumnDefinition Width="Auto" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Text="{Binding When}" Style="{DynamicResource HelmSecondaryText}" VerticalAlignment="Center" />
+                                        <TextBlock Grid.Column="1" Text="{Binding KindText}" VerticalAlignment="Center" />
+                                        <TextBlock Grid.Column="2" Text="{Binding Note}" Style="{DynamicResource HelmSecondaryText}" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
+                                        <TextBlock Grid.Column="3" Text="{Binding AmountText}" FontWeight="SemiBold" Margin="12,0,0,0" VerticalAlignment="Center">
+                                            <TextBlock.Style>
+                                                <Style TargetType="TextBlock">
+                                                    <Setter Property="Foreground" Value="{DynamicResource SystemFillColorCriticalBrush}" />
+                                                    <Style.Triggers>
+                                                        <DataTrigger Binding="{Binding IsIncrease}" Value="True">
+                                                            <Setter Property="Foreground" Value="{DynamicResource SystemFillColorSuccessBrush}" />
+                                                        </DataTrigger>
+                                                    </Style.Triggers>
+                                                </Style>
+                                            </TextBlock.Style>
+                                        </TextBlock>
+                                        <TextBlock Grid.Column="4" Text="{Binding BalanceText}" Style="{DynamicResource HelmSecondaryText}" Margin="12,0,0,0" VerticalAlignment="Center" />
+                                        <ui:Button Grid.Column="5" Style="{StaticResource RowAction}" Icon="{ui:SymbolIcon Delete24}" ToolTip="Delete this entry" AutomationProperties.Name="Delete entry"
+                                                   Command="{Binding DeleteCommand}" />
+                                    </Grid>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </StackPanel>
+                </StackPanel>
+            </Border>
+        </DataTemplate>
+
         <DataTemplate x:Key="ItemRow" DataType="{x:Type local:TrackerItemViewModel}">
             <Border BorderThickness="0,0,0,1" BorderBrush="{DynamicResource CardStrokeColorDefaultBrush}">
                 <StackPanel Margin="12,6">
@@ -62,6 +185,11 @@
                                         Background="{DynamicResource ControlFillColorSecondaryBrush}"
                                         Visibility="{Binding IsStarted, Converter={StaticResource BoolToVisibility}}">
                                     <TextBlock Text="In progress" FontSize="11" FontWeight="SemiBold" Foreground="{DynamicResource AccentTextFillColorPrimaryBrush}" />
+                                </Border>
+                                <Border CornerRadius="4" Padding="6,0" Margin="0,0,6,0" VerticalAlignment="Center"
+                                        Background="{DynamicResource ControlFillColorSecondaryBrush}" ToolTip="Subtasks done"
+                                        Visibility="{Binding HasSubtasks, Converter={StaticResource BoolToVisibility}}">
+                                    <TextBlock Text="{Binding SubtaskProgress}" FontSize="11" FontWeight="SemiBold" />
                                 </Border>
                             </StackPanel>
                             <TextBlock Text="{Binding Title}" TextWrapping="Wrap" Margin="0,1,0,0">
@@ -104,10 +232,46 @@
                             <ui:Button Style="{StaticResource RowAction}" Icon="{ui:SymbolIcon ArrowDown24}" ToolTip="Move down" AutomationProperties.Name="Move down"
                                        Command="{Binding MoveDownCommand}" IsEnabled="{Binding CanMoveDown}"
                                        Visibility="{Binding IsOpen, Converter={StaticResource BoolToVisibility}}" />
+                            <ui:Button Style="{StaticResource RowAction}" Icon="{ui:SymbolIcon TaskListAdd24}" ToolTip="Add a subtask" AutomationProperties.Name="Add a subtask"
+                                       Command="{Binding ToggleExpandedCommand}" Visibility="{Binding CanHaveSubtasks, Converter={StaticResource BoolToVisibility}}" />
                             <ui:Button Style="{StaticResource RowAction}" Icon="{ui:SymbolIcon Edit24}" ToolTip="Edit" AutomationProperties.Name="Edit" Command="{Binding BeginEditCommand}" />
                             <ui:Button Style="{StaticResource RowAction}" Icon="{ui:SymbolIcon Delete24}" ToolTip="Delete" AutomationProperties.Name="Delete" Command="{Binding DeleteCommand}" />
                         </StackPanel>
                     </Grid>
+
+                    <!-- Subtasks -->
+                    <ItemsControl Margin="32,2,0,0" ItemsSource="{Binding Subtasks}" Visibility="{Binding HasSubtasks, Converter={StaticResource BoolToVisibility}}">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate DataType="{x:Type local:TrackerItemViewModel}">
+                                <DockPanel Margin="0,1">
+                                    <ui:Button DockPanel.Dock="Right" Style="{StaticResource RowAction}" Icon="{ui:SymbolIcon Delete24}" ToolTip="Delete the subtask"
+                                               AutomationProperties.Name="Delete subtask" Command="{Binding DeleteCommand}" />
+                                    <CheckBox MinWidth="0" IsChecked="{Binding Done}" AutomationProperties.Name="{Binding Title}" VerticalAlignment="Center">
+                                        <TextBlock Text="{Binding Title}" TextWrapping="Wrap">
+                                            <TextBlock.Style>
+                                                <Style TargetType="TextBlock">
+                                                    <Style.Triggers>
+                                                        <DataTrigger Binding="{Binding IsCompleted}" Value="True">
+                                                            <Setter Property="TextDecorations" Value="Strikethrough" />
+                                                            <Setter Property="Foreground" Value="{DynamicResource TextFillColorSecondaryBrush}" />
+                                                        </DataTrigger>
+                                                    </Style.Triggers>
+                                                </Style>
+                                            </TextBlock.Style>
+                                        </TextBlock>
+                                    </CheckBox>
+                                </DockPanel>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                    <DockPanel Margin="32,4,0,4" Visibility="{Binding IsExpanded, Converter={StaticResource BoolToVisibility}}">
+                        <ui:Button DockPanel.Dock="Right" Margin="8,0,0,0" Content="Add" Icon="{ui:SymbolIcon Add24}" Command="{Binding AddSubtaskCommand}" />
+                        <ui:TextBox PlaceholderText="A subtask" AutomationProperties.Name="New subtask" Text="{Binding NewSubtaskTitle, UpdateSourceTrigger=PropertyChanged}">
+                            <ui:TextBox.InputBindings>
+                                <KeyBinding Key="Enter" Command="{Binding AddSubtaskCommand}" />
+                            </ui:TextBox.InputBindings>
+                        </ui:TextBox>
+                    </DockPanel>
 
                     <!-- Inline editor -->
                     <StackPanel Margin="32,8,0,6" Visibility="{Binding IsEditing, Converter={StaticResource BoolToVisibility}}">
@@ -127,6 +291,8 @@
                                       ItemsSource="{Binding DataContext.PriorityNames, RelativeSource={RelativeSource AncestorType=Page}}"
                                       SelectedIndex="{Binding EditPriorityIndex}" AutomationProperties.Name="Edit priority" />
                             <DatePicker Width="160" Margin="0,0,8,8" SelectedDate="{Binding EditDueDate}" ToolTip="Due date" AutomationProperties.Name="Edit due date" />
+                            <ui:TextBox Width="92" Margin="0,0,8,8" PlaceholderText="HH:mm" ToolTip="Due time (optional)" AutomationProperties.Name="Edit due time"
+                                        Text="{Binding EditDueTimeText, UpdateSourceTrigger=PropertyChanged}" />
                             <ui:Button Margin="0,0,8,8" Appearance="Primary" Content="Save" Icon="{ui:SymbolIcon Save24}" Command="{Binding SaveEditCommand}" />
                             <ui:Button Margin="0,0,8,8" Content="Cancel" Command="{Binding CancelEditCommand}" />
                         </WrapPanel>
@@ -180,19 +346,21 @@
             <Border Style="{DynamicResource HelmSurface}" Margin="0,0,0,4">
                 <StackPanel>
                     <WrapPanel Visibility="{Binding IsDebtWorkspace, Converter={StaticResource BoolToVisibility}}">
-                        <ui:TextBox Width="220" Margin="0,0,8,8" PlaceholderText="Person" AutomationProperties.Name="Person" Icon="{ui:SymbolIcon Person24}"
-                                    Text="{Binding NewPerson, UpdateSourceTrigger=PropertyChanged}">
+                        <!-- Typing a name already in the book adds to that person -->
+                        <ComboBox Width="220" Margin="0,0,8,8" IsEditable="True" IsTextSearchEnabled="True" AutomationProperties.Name="Person"
+                                  ItemsSource="{Binding PersonNames}" Text="{Binding NewPerson, UpdateSourceTrigger=PropertyChanged}" ToolTip="Who it is with">
+                            <ComboBox.InputBindings>
+                                <KeyBinding Key="Enter" Command="{Binding AddCommand}" />
+                            </ComboBox.InputBindings>
+                        </ComboBox>
+                        <ui:TextBox x:Name="AmountBox" Width="180" Margin="0,0,8,8" PlaceholderText="Amount, e.g. 150k" AutomationProperties.Name="Amount" Icon="{ui:SymbolIcon Money24}"
+                                    Text="{Binding NewAmount, UpdateSourceTrigger=PropertyChanged}" TextChanged="OnAmountTextChanged">
                             <ui:TextBox.InputBindings>
                                 <KeyBinding Key="Enter" Command="{Binding AddCommand}" />
                             </ui:TextBox.InputBindings>
                         </ui:TextBox>
-                        <ui:TextBox Width="180" Margin="0,0,8,8" PlaceholderText="Amount, e.g. 150k" AutomationProperties.Name="Amount" Icon="{ui:SymbolIcon Money24}"
-                                    Text="{Binding NewAmount, UpdateSourceTrigger=PropertyChanged}">
-                            <ui:TextBox.InputBindings>
-                                <KeyBinding Key="Enter" Command="{Binding AddCommand}" />
-                            </ui:TextBox.InputBindings>
-                        </ui:TextBox>
-                        <ComboBox Width="140" Margin="0,0,8,8" ItemsSource="{Binding DirectionNames}" SelectedIndex="{Binding NewDirectionIndex}" AutomationProperties.Name="Direction" />
+                        <ComboBox Width="140" Margin="0,0,8,8" ItemsSource="{Binding DebtKindNames}" SelectedIndex="{Binding NewDebtKindIndex}" AutomationProperties.Name="Kind"
+                                  ToolTip="Owes me adds, I owe subtracts, a repayment brings the balance back toward 0" />
                     </WrapPanel>
                     <ui:TextBox Margin="0,0,0,8" AutomationProperties.Name="Title" PlaceholderText="{Binding TitlePlaceholder}" Text="{Binding NewTitle, UpdateSourceTrigger=PropertyChanged}">
                         <ui:TextBox.InputBindings>
@@ -203,6 +371,8 @@
                         <ComboBox Width="140" Margin="0,0,8,0" ItemsSource="{Binding PriorityNames}" SelectedIndex="{Binding NewPriorityIndex}"
                                   ToolTip="Priority" AutomationProperties.Name="Priority" Visibility="{Binding IsTaskWorkspace, Converter={StaticResource BoolToVisibility}}" />
                         <DatePicker Width="160" Margin="0,0,8,0" SelectedDate="{Binding NewDueDate}" ToolTip="Due date (optional)" AutomationProperties.Name="Due date" />
+                        <ui:TextBox Width="92" Margin="0,0,8,0" PlaceholderText="HH:mm" ToolTip="Due time (optional)" AutomationProperties.Name="Due time"
+                                    Text="{Binding NewDueTimeText, UpdateSourceTrigger=PropertyChanged}" />
                         <ui:Button Appearance="Primary" Content="Add" Icon="{ui:SymbolIcon Add24}" Command="{Binding AddCommand}" />
                     </WrapPanel>
                 </StackPanel>
@@ -247,6 +417,7 @@
                     <TextBlock Margin="16" Text="{Binding EmptyOpenText}" Style="{DynamicResource HelmSecondaryText}"
                                Visibility="{Binding HasNoOpen, Converter={StaticResource BoolToVisibility}}" />
                     <ItemsControl ItemsSource="{Binding OpenItems}" ItemTemplate="{StaticResource ItemRow}" />
+                    <ItemsControl ItemsSource="{Binding DebtPeople}" ItemTemplate="{StaticResource PersonRow}" />
                 </StackPanel>
             </Border>
 
@@ -259,6 +430,7 @@
                                Style="{DynamicResource HelmSecondaryText}"
                                Visibility="{Binding HasCompleted, Converter={StaticResource InverseBoolToVisibility}}" />
                     <ItemsControl ItemsSource="{Binding CompletedItems}" ItemTemplate="{StaticResource ItemRow}" />
+                    <ItemsControl ItemsSource="{Binding SettledPeople}" ItemTemplate="{StaticResource PersonRow}" />
                 </StackPanel>
             </Border>
             </StackPanel>

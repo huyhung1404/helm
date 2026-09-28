@@ -5,15 +5,17 @@ namespace Helm.Tests;
 
 /// <summary>
 /// WPF-UI 4.3 draws a SymbolRegular as one 16-bit char, so a symbol above U+FFFF shows a stray letter instead of the
-/// icon. Every symbol the PC vault names must fit in 16 bits.
+/// icon. Every symbol the PC app and its tools name must fit in 16 bits.
 /// </summary>
 public sealed partial class VaultSymbolTests
 {
     [Fact]
-    public void Every_symbol_the_PC_vault_uses_is_drawn_as_an_icon()
+    public void Every_symbol_the_PC_app_and_tools_use_is_drawn_as_an_icon()
     {
-        var root = Path.Combine(RepoRoot(), "src", "Helm.Modules.Vault");
-        var names = Directory.EnumerateFiles(root, "*.*", SearchOption.AllDirectories)
+        // Every WPF project (the Android ones use FluentIcons, which has no such limit).
+        var roots = Directory.EnumerateDirectories(Path.Combine(RepoRoot(), "src"))
+            .Where(d => !d.EndsWith(".Android", StringComparison.Ordinal) && Directory.EnumerateFiles(d, "*.xaml", SearchOption.AllDirectories).Any());
+        var names = roots.SelectMany(root => Directory.EnumerateFiles(root, "*.*", SearchOption.AllDirectories))
             .Where(f => f.EndsWith(".cs", StringComparison.Ordinal) || f.EndsWith(".xaml", StringComparison.Ordinal))
             .Where(f => !f.Contains($"{Path.DirectorySeparatorChar}obj{Path.DirectorySeparatorChar}", StringComparison.Ordinal))
             .SelectMany(f => SymbolName().Matches(File.ReadAllText(f)).Select(m => m.Groups[1].Value + m.Groups[2].Value))
