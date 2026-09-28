@@ -84,13 +84,14 @@ public sealed class VaultKdbxTests : IDisposable
         var edited = store.Get(bank)!.Item;
         store.Save(bank, edited with { Fields = [.. edited.Fields.Select(f => f.Kind == VaultFieldKind.Password ? f with { Value = "hunter2 & <new>" } : f)] });
         store.Add(VaultItem.New(VaultItemKind.Card, "Visa") with { Fields = [new VaultField("Number", "4111 1111 1111 1111", VaultFieldKind.Secret), new VaultField("Number", "second")] });
+        store.Add(VaultItem.New(VaultItemKind.Token, "OpenAI API") with { Fields = [new VaultField("Token", "sk-test-123", VaultFieldKind.Secret)] });
         var doc = store.Add(VaultItem.New(VaultItemKind.Document, "Passport"));
         var data = RandomNumberGenerator.GetBytes(200_000);
         await _files!.AttachAsync(doc, "passport.pdf", "application/pdf", new MemoryStream(data));
 
         var file = Path.Combine(_dir, "vault.kdbx");
         await using (var output = File.Create(file))
-            Assert.Equal(3, await exporter.ExportAsync(output, new KdbxExportOptions(ExportPassword), new KdbxKdf(8 * 1024 * 1024, 2, 1), default));
+            Assert.Equal(4, await exporter.ExportAsync(output, new KdbxExportOptions(ExportPassword), new KdbxKdf(8 * 1024 * 1024, 2, 1), default));
 
         var list = Run("ls", "-R", "-f", file);
         Assert.Contains("Logins/", list);
@@ -105,6 +106,8 @@ public sealed class VaultKdbxTests : IDisposable
         Assert.Equal("Ghi chú tiếng Việt ✨", Run("show", "-a", "Notes", file, "Logins/Bank").Trim());
         Assert.Equal("4111 1111 1111 1111", Run("show", "-s", "-a", "Number", file, "Cards/Visa").Trim());
         Assert.Equal("second", Run("show", "-a", "Number (2)", file, "Cards/Visa").Trim());
+        // A token is KeePass's (protected) password, not a custom field.
+        Assert.Equal("sk-test-123", Run("show", "-s", "-a", "Password", file, "Tokens/OpenAI API").Trim());
 
         var exported = Path.Combine(_dir, "out.pdf");
         Run("attachment-export", file, "Documents/Passport", "passport.pdf", exported);

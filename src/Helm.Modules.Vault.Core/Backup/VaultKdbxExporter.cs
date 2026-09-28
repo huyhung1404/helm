@@ -106,6 +106,14 @@ public sealed class VaultKdbxExporter(VaultStore store, VaultFiles files)
             strings.Add(new("URL", Take(VaultFieldKind.Url), false));
             used.UnionWith(["UserName", "Password", "URL"]);
         }
+        else if (item.Kind == VaultItemKind.Token)
+        {
+            // The token is KeePass's password, so it is protected and copied like one there too.
+            var index = item.Fields.ToList().FindIndex(f => f.IsSecret);
+            if (index >= 0) mapped.Add(index);
+            strings.Add(new("Password", index >= 0 ? item.Fields[index].Value : "", true));
+            used.Add("Password");
+        }
         strings.Add(new("Notes", item.Notes, false));
         used.Add("Notes");
 
@@ -151,6 +159,7 @@ public sealed class VaultKdbxExporter(VaultStore store, VaultFiles files)
         VaultItemKind.Card => "Cards",
         VaultItemKind.Identity => "Identities",
         VaultItemKind.Document => "Documents",
+        VaultItemKind.Token => "Tokens",
         _ => kind.ToString(),
     };
 

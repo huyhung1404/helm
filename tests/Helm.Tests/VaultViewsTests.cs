@@ -75,7 +75,7 @@ public sealed class VaultViewsTests : IDisposable
         store.Add(VaultItem.New(VaultItemKind.Note, "Wi-Fi at home") with { Notes = "Router in the hall" });
         var uid = store.Add(VaultItem.New(VaultItemKind.Card, "Visa") with { Notes = "Main card", Tags = ["bank", "travel"] });
         Pump(Task.CompletedTask);
-        app.Items.Refresh();
+        app.Items.Tab = VaultTab.Other;
         app.Items.Selected = app.Items.Rows.Single(r => r.Uid == uid);
         Layout(window);
         app.Items.Detail!.EditCommand.Execute(null);
@@ -84,7 +84,7 @@ public sealed class VaultViewsTests : IDisposable
         var detail = new ItemDetailView { DataContext = app.Items.Detail };
         Layout(detail);
 
-        // The Passwords view: rows with a picture icon and with letter avatars.
+        // The Logins & tokens tab: rows with a picture icon, letter avatars and a token.
         app.Items.Detail!.CancelCommand.Execute(null);
         store.Add(VaultItem.New(VaultItemKind.Login, "GitHub") with
         {
@@ -92,8 +92,10 @@ public sealed class VaultViewsTests : IDisposable
             Icon = PngOf(Helm.Modules.Vault.VaultIcon.Image),
         });
         store.Add(VaultItem.New(VaultItemKind.Login, "Zalo") with { Fields = [new VaultField("Phone", "0901 234 567", VaultFieldKind.Username), new VaultField("Password", "z", VaultFieldKind.Password)] });
-        app.Items.Filter = VaultFilter.Passwords;
-        Assert.Equal(3, app.Items.PasswordRows.Count);
+        store.Add(VaultItem.New(VaultItemKind.Token, "OpenAI API") with { Fields = [new VaultField("Token", "sk-test-123", VaultFieldKind.Secret)] });
+        app.Items.Tab = VaultTab.LoginsAndTokens;
+        Assert.Equal(4, app.Items.PasswordRows.Count);
+        Assert.Equal("Token", app.Items.PasswordRows.Single(r => r.Title == "OpenAI API").Subtitle);
         app.Items.PasswordRows.Single(r => r.Title == "Bank").ToggleRevealCommand.Execute(null);
         Layout(window);
         app.Items.SelectedPassword = app.Items.PasswordRows.Single(r => r.Title == "GitHub");

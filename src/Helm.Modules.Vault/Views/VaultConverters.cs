@@ -60,6 +60,7 @@ public sealed class KindIconConverter : IValueConverter
         VaultItemKind.Card => SymbolRegular.Payment24,
         VaultItemKind.Identity => SymbolRegular.ContactCard24,
         VaultItemKind.Document => SymbolRegular.Document24,
+        VaultItemKind.Token => SymbolRegular.Code24,
         _ => SymbolRegular.LockClosed24,
     };
 

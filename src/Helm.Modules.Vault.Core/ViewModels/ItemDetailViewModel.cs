@@ -137,6 +137,12 @@ public sealed partial class ItemDetailViewModel : ObservableObject
     [ObservableProperty] private double _progress;
     [ObservableProperty] private byte[]? _icon;
 
+    /// <summary>
+    /// The item's kind, changeable while editing (e.g. a token that was saved as a login). The fields stay as they are;
+    /// only the list it appears in and the defaults of a new item depend on it.
+    /// </summary>
+    [ObservableProperty] private VaultItemKind _kind;
+
     internal ItemDetailViewModel(VaultStore store, VaultFiles files, VaultSession session, IVaultPlatform platform,
         VaultEntry? entry, VaultItemKind kind, Action<string?> saved)
     {
@@ -158,7 +164,7 @@ public sealed partial class ItemDetailViewModel : ObservableObject
     /// <summary>Null for an item that is not saved yet.</summary>
     public string? Uid { get; private set; }
 
-    public VaultItemKind Kind => _item.Kind;
+    public IReadOnlyList<VaultItemKind> Kinds { get; } = Enum.GetValues<VaultItemKind>();
 
     public bool Trashed { get; }
 
@@ -280,6 +286,7 @@ public sealed partial class ItemDetailViewModel : ObservableObject
         {
             var edited = _item with
             {
+                Kind = Kind,
                 Title = Title.Trim(),
                 Notes = Notes,
                 Favorite = Favorite,
@@ -454,6 +461,7 @@ public sealed partial class ItemDetailViewModel : ObservableObject
 
     private void Load(VaultItem item)
     {
+        Kind = item.Kind;
         Title = item.Title;
         Notes = item.Notes;
         Tags = string.Join(", ", item.Tags);
@@ -470,7 +478,6 @@ public sealed partial class ItemDetailViewModel : ObservableObject
         History.Clear();
         foreach (var version in item.History) History.Add(new VersionViewModel(this, version));
         OnPropertyChanged(nameof(Modified));
-        OnPropertyChanged(nameof(Kind));
         OnPropertyChanged(nameof(IsNew));
         OnPropertyChanged(nameof(HasConflicts));
     }

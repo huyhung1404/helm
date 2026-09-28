@@ -14,6 +14,7 @@ public static class KindIcon
         VaultItemKind.Card => Symbol.Payment,
         VaultItemKind.Identity => Symbol.PersonKey,
         VaultItemKind.Document => Symbol.Document,
+        VaultItemKind.Token => Symbol.Code,
         _ => Symbol.LockClosed,
     });
 }

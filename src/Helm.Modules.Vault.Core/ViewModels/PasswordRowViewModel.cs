@@ -6,8 +6,8 @@ using Helm.Modules.Vault.Session;
 namespace Helm.Modules.Vault.ViewModels;
 
 /// <summary>
-/// One row of the Passwords list: icon (or a letter), app name, username, the password hidden until revealed, and a
-/// copy button that says "Copied" for a moment. Copying goes through the protected clipboard.
+/// One row of the Logins &amp; tokens list: icon (or a letter), app name, username, the password or token hidden until
+/// revealed, and a copy button that says "Copied" for a moment. Copying goes through the protected clipboard.
 /// </summary>
 public sealed partial class PasswordRowViewModel(string uid, VaultItem item, IVaultPlatform platform, VaultSession session) : ObservableObject
 {
@@ -18,13 +18,19 @@ public sealed partial class PasswordRowViewModel(string uid, VaultItem item, IVa
 
     public string Title => item.Title.Length > 0 ? item.Title : "Untitled";
 
-    public string Subtitle => item.Username ?? Website ?? "";
+    public string Subtitle => item.Username ?? Website ?? (IsToken ? "Token" : "");
 
     public string? Website => item.Fields.FirstOrDefault(f => f.Kind == VaultFieldKind.Url && f.Value.Length > 0)?.Value;
 
-    public bool HasPassword => item.Password is { Length: > 0 };
+    public bool IsToken => item.Kind == VaultItemKind.Token;
 
-    public string PasswordDisplay => !HasPassword ? "No password" : IsRevealed ? item.Password! : "••••••••••••";
+    /// <summary>The password, or the token of a token item.</summary>
+    public bool HasSecret => item.PrimarySecret is { Length: > 0 };
+
+    /// <summary>Hidden dots, the revealed value, or nothing (the row then shows no secret line at all).</summary>
+    public string SecretDisplay => !HasSecret ? "" : IsRevealed ? item.PrimarySecret! : "••••••••••••";
+
+    public string CopyLabel => IsToken ? "Copy the token" : "Copy the password";
 
     public byte[]? Icon => item.Icon;
 
@@ -37,7 +43,7 @@ public sealed partial class PasswordRowViewModel(string uid, VaultItem item, IVa
 
     public bool Favorite => item.Favorite;
 
-    partial void OnIsRevealedChanged(bool value) => OnPropertyChanged(nameof(PasswordDisplay));
+    partial void OnIsRevealedChanged(bool value) => OnPropertyChanged(nameof(SecretDisplay));
 
     [RelayCommand]
     private void ToggleReveal()
@@ -48,12 +54,12 @@ public sealed partial class PasswordRowViewModel(string uid, VaultItem item, IVa
 
     private int _copies;
 
-    /// <summary>Copies the password and shows "Copied" for 2 s. Not an async command: the button stays enabled meanwhile.</summary>
+    /// <summary>Copies the password (or token) and shows "Copied" for 2 s. Not an async command: the button stays enabled meanwhile.</summary>
     [RelayCommand]
     private void Copy()
     {
-        if (item.Password is not { Length: > 0 } password) return;
-        platform.CopySecret(password);
+        if (item.PrimarySecret is not { Length: > 0 } secret) return;
+        platform.CopySecret(secret);
         session.Touch();
         IsCopied = true;
         _ = ClearCopiedAsync(++_copies);

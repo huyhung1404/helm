@@ -71,6 +71,9 @@
                 </Grid>
             </DockPanel>
             <WrapPanel Margin="62,8,0,0" Visibility="{Binding IsEditing, Converter={StaticResource BoolToVisibility}}">
+                <TextBlock Text="Type" VerticalAlignment="Center" Margin="0,0,8,0" />
+                <ComboBox ItemsSource="{Binding Kinds}" SelectedItem="{Binding Kind}" MinWidth="120" Margin="0,0,16,0" VerticalAlignment="Center"
+                          AutomationProperties.Name="Type" ToolTip="Which list the item is in. Its fields stay as they are." />
                 <CheckBox Content="Favorite" IsChecked="{Binding Favorite}" Margin="0,0,16,0" VerticalAlignment="Center" />
                 <ui:Button Content="Choose icon…" Icon="{ui:SymbolIcon ImageAdd24}" Command="{Binding ChooseIconCommand}" Margin="0,0,8,0"
                            ToolTip="A picture for this item (PNG, JPEG or WebP up to 256 KB). It is encrypted with the item." />

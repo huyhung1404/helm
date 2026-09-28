@@ -32,6 +32,10 @@
                     </Button>
                     <Button Margin="0,0,8,4" Content="Remove icon" Command="{Binding RemoveIconCommand}" IsVisible="{Binding HasIcon}" />
                 </WrapPanel>
+                <DockPanel IsVisible="{Binding IsEditing}">
+                    <TextBlock DockPanel.Dock="Left" Text="Type" VerticalAlignment="Center" Margin="0,0,12,0" />
+                    <ComboBox ItemsSource="{Binding Kinds}" SelectedItem="{Binding Kind}" HorizontalAlignment="Stretch" AutomationProperties.Name="Type" />
+                </DockPanel>
                 <CheckBox Content="Favorite" IsChecked="{Binding Favorite}" IsVisible="{Binding IsEditing}" />
                 <WrapPanel>
                     <Button Margin="0,0,8,4" Content="Edit" Command="{Binding EditCommand}">

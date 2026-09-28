@@ -80,17 +80,34 @@ mã số, Several lines), ghi chú, tag, tài liệu đính kèm và đánh dấ
 - **Icon**: **Choose icon…** gán ảnh riêng cho mục (PNG, JPEG hoặc WebP, tối đa 256 KB), được mã hóa cùng mục.
   Không có ảnh thì mục hiện chữ cái đầu của tên trên một màu lấy theo tên.
 
-### Danh sách Passwords
+### Hai tab: Logins & tokens và Other
 
-Chọn **Passwords** trong ô lọc dưới Search để xem mọi mục có mật khẩu, mỗi mục một dòng: icon, tên, username và mật
-khẩu đang ẩn. Trên mỗi dòng:
+Danh sách chia làm hai tab ngay dưới Search:
 
-- **con mắt** hiện hoặc ẩn mật khẩu;
-- **Copy** sao chép mật khẩu và đổi thành **✓ Copied** trong 2 giây.
+- **Logins & tokens**: các mục dùng để đăng nhập (**Login**) và các **Token** (API key, access token), mỗi mục một
+  dòng: icon, tên, username (token thì hiện chữ "Token") và mật khẩu hoặc token đang ẩn. Trên mỗi dòng:
+  - **con mắt** hiện hoặc ẩn mật khẩu / token;
+  - **Copy** sao chép mật khẩu / token và đổi thành **✓ Copied** trong 2 giây.
 
-Chọn một dòng để mở mục đó. Các bộ lọc khác là **All**, **Favorites**, **Notes**, **Cards**, **Identities**,
-**Documents** và **Trash**. **Search** tìm trong tên, tag, tên tài liệu, username, email và website, không bao giờ
-tìm trong mật khẩu hay các giá trị ẩn khác.
+  Login chưa có mật khẩu thì dòng đó không hiện ô mật khẩu.
+- **Other**: mọi thứ còn lại (ghi chú, thẻ, giấy tờ, tài liệu, ảnh), mỗi dòng có ảnh của mục, hoặc icon của loại mục
+  nếu chưa gán ảnh.
+
+Chọn một dòng để mở mục đó. Ô **Show** dưới hai tab lọc trong tab đang mở: **All**, **Logins**, **Tokens**,
+**Favorites** và **Trash** ở tab đầu; **All**, **Notes**, **Cards**, **Identities**, **Documents**, **Favorites** và
+**Trash** ở tab Other. Mục mới tạo tự mở đúng tab của nó. **Search** tìm trong tab đang mở, theo tên, tag, tên tài
+liệu, username, email và website, không bao giờ tìm trong mật khẩu, token hay các giá trị ẩn khác.
+
+### Token (API key)
+
+Chọn **+** → **Token (API key)**: mục chỉ có một trường ẩn tên **Token**, dán token vào rồi **Save**. Cần thêm thông tin
+(website, ngày hết hạn…) thì dùng **Add field**.
+
+Token đã lỡ lưu dạng Login: mở mục, chọn **Edit**, đổi **Type** thành **Token** rồi **Save**. Các trường giữ nguyên
+và bản trước vẫn nằm trong lịch sử. **Type** đổi được cho mọi loại mục, nó chỉ quyết định mục nằm ở tab nào.
+
+> Máy nào còn chạy Helm bản cũ hơn sẽ chưa đọc được Token: bản cũ báo mục đó là "cannot be opened" nhưng vẫn giữ nguyên,
+> không xoá. Cập nhật Helm trên máy đó là thấy lại.
 
 ### Sao chép
 

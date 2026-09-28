@@ -6,22 +6,36 @@ using Helm.Modules.Vault.Session;
 
 namespace Helm.Modules.Vault.ViewModels;
 
+/// <summary>The two tabs of the list: what you sign in with, and everything else.</summary>
+public enum VaultTab
+{
+    /// <summary>Logins and tokens: one row each with the icon, the secret hidden until revealed and Copy on the row.</summary>
+    LoginsAndTokens,
+    /// <summary>Notes, cards, identities, documents and pictures.</summary>
+    Other,
+}
+
+/// <summary>The "Show" choice inside a tab. <see cref="ItemsViewModel.Filters"/> lists the ones that fit the tab.</summary>
 public enum VaultFilter
 {
     All,
-    /// <summary>Every item with a password, one row each, with copy on the row itself.</summary>
-    Passwords,
-    Favorites,
+    Logins,
+    Tokens,
     Notes,
     Cards,
     Identities,
     Documents,
+    Favorites,
+    /// <summary>The tab's deleted items (kept 30 days).</summary>
     Trash,
 }
 
 /// <summary>A row of the item list: only what the list shows (never a secret).</summary>
-public sealed record ItemRow(string Uid, string Title, string Subtitle, VaultItemKind Kind, bool Favorite, bool HasConflict, int Documents)
+public sealed record ItemRow(string Uid, string Title, string Subtitle, VaultItemKind Kind, bool Favorite, bool HasConflict, int Documents, byte[]? Icon = null)
 {
+    /// <summary>The picture the user chose for the item; without one the list shows the kind's symbol.</summary>
+    public bool HasIcon => Icon is { Length: > 0 };
+
     public override string ToString() => Title;
 }
 
@@ -35,6 +49,7 @@ public sealed partial class ItemsViewModel : ObservableObject
     private bool _refreshing;
 
     [ObservableProperty] private string _search = "";
+    [ObservableProperty] private VaultTab _tab = VaultTab.LoginsAndTokens;
     [ObservableProperty] private VaultFilter _filter = VaultFilter.All;
     [ObservableProperty] private ItemRow? _selected;
     [ObservableProperty] private ItemDetailViewModel? _detail;
@@ -51,14 +66,32 @@ public sealed partial class ItemsViewModel : ObservableObject
 
     public ObservableCollection<ItemRow> Rows { get; } = [];
 
-    /// <summary>The Passwords view: one row per item with a password, with copy on the row.</summary>
+    /// <summary>The Logins &amp; tokens tab: one row per item, with the secret and Copy on the row.</summary>
     public ObservableCollection<PasswordRowViewModel> PasswordRows { get; } = [];
 
-    public bool IsPasswordsView => Filter == VaultFilter.Passwords;
+    public bool IsPasswordsView => Tab == VaultTab.LoginsAndTokens && Filter != VaultFilter.Trash;
 
-    public bool IsListView => Filter != VaultFilter.Passwords;
+    public bool IsListView => !IsPasswordsView;
 
-    public IReadOnlyList<VaultFilter> Filters { get; } = Enum.GetValues<VaultFilter>();
+    public bool IsLoginsTab
+    {
+        get => Tab == VaultTab.LoginsAndTokens;
+        set { if (value) Tab = VaultTab.LoginsAndTokens; }
+    }
+
+    public bool IsOtherTab
+    {
+        get => Tab == VaultTab.Other;
+        set { if (value) Tab = VaultTab.Other; }
+    }
+
+    private static readonly IReadOnlyList<VaultFilter> LoginFilters = [VaultFilter.All, VaultFilter.Logins, VaultFilter.Tokens, VaultFilter.Favorites, VaultFilter.Trash];
+
+    private static readonly IReadOnlyList<VaultFilter> OtherFilters =
+        [VaultFilter.All, VaultFilter.Notes, VaultFilter.Cards, VaultFilter.Identities, VaultFilter.Documents, VaultFilter.Favorites, VaultFilter.Trash];
+
+    /// <summary>The "Show" choices of the current tab.</summary>
+    public IReadOnlyList<VaultFilter> Filters => Tab == VaultTab.LoginsAndTokens ? LoginFilters : OtherFilters;
 
     public IReadOnlyList<VaultItemKind> Kinds { get; } = Enum.GetValues<VaultItemKind>();
 
@@ -86,11 +119,11 @@ public sealed partial class ItemsViewModel : ObservableObject
             var query = Search.Trim();
             Rows.Clear();
             PasswordRows.Clear();
-            foreach (var entry in entries.Where(e => Matches(e, Filter, query)))
+            foreach (var entry in entries.Where(e => Matches(e, Tab, Filter, query)))
             {
                 Rows.Add(new ItemRow(entry.Uid, entry.Item.Title, Subtitle(entry.Item), entry.Item.Kind, entry.Item.Favorite, entry.Conflicts.Count > 0,
-                    entry.Item.Attachments.Count));
-                if (Filter == VaultFilter.Passwords) PasswordRows.Add(new PasswordRowViewModel(entry.Uid, entry.Item, _platform, _session));
+                    entry.Item.Attachments.Count, entry.Item.Icon));
+                if (IsPasswordsView) PasswordRows.Add(new PasswordRowViewModel(entry.Uid, entry.Item, _platform, _session));
             }
             UnreadableCount = _store.Unreadable().Count;
             var selected = Rows.FirstOrDefault(r => r.Uid == keep);
@@ -119,6 +152,9 @@ public sealed partial class ItemsViewModel : ObservableObject
     [RelayCommand]
     private void New(VaultItemKind kind)
     {
+        // The new item opens in the tab it will be listed in.
+        var tab = TabOf(kind);
+        if (Tab != tab) Tab = tab;
         if (Filter == VaultFilter.Trash) Filter = VaultFilter.All;
         Selected = null;
         Detail = new ItemDetailViewModel(_store, _files, _session, _platform, null, kind, OnDetailSaved);
@@ -126,6 +162,22 @@ public sealed partial class ItemsViewModel : ObservableObject
     }
 
     partial void OnSearchChanged(string value) => Refresh();
+
+    [RelayCommand]
+    private void ShowTab(VaultTab tab) => Tab = tab;
+
+    public static VaultTab TabOf(VaultItemKind kind) => kind is VaultItemKind.Login or VaultItemKind.Token ? VaultTab.LoginsAndTokens : VaultTab.Other;
+
+    partial void OnTabChanged(VaultTab value)
+    {
+        OnPropertyChanged(nameof(IsLoginsTab));
+        OnPropertyChanged(nameof(IsOtherTab));
+        OnPropertyChanged(nameof(Filters));
+        if (Filter == VaultFilter.All) Refresh();
+        else Filter = VaultFilter.All; // refreshes
+        OnPropertyChanged(nameof(IsPasswordsView));
+        OnPropertyChanged(nameof(IsListView));
+    }
 
     partial void OnFilterChanged(VaultFilter value)
     {
@@ -168,17 +220,19 @@ public sealed partial class ItemsViewModel : ObservableObject
         Refresh();
         if (uid is null) return;
         Selected = Rows.FirstOrDefault(r => r.Uid == uid);
-        // Saved but filtered out of the list (another kind, or restored from the trash): still show it.
+        // Saved but filtered out of the list (its kind changed, or restored from the trash): still show it.
         if (Selected is null) Detail = DetailFor(uid);
     }
 
-    private static bool Matches(VaultEntry entry, VaultFilter filter, string query)
+    private static bool Matches(VaultEntry entry, VaultTab tab, VaultFilter filter, string query)
     {
         var item = entry.Item;
+        if (TabOf(item.Kind) != tab) return false;
         var kindOk = filter switch
         {
             VaultFilter.Favorites => item.Favorite,
-            VaultFilter.Passwords => item.Kind == VaultItemKind.Login || item.Password is { Length: > 0 },
+            VaultFilter.Logins => item.Kind == VaultItemKind.Login,
+            VaultFilter.Tokens => item.Kind == VaultItemKind.Token,
             VaultFilter.Notes => item.Kind == VaultItemKind.Note,
             VaultFilter.Cards => item.Kind == VaultItemKind.Card,
             VaultFilter.Identities => item.Kind == VaultItemKind.Identity,

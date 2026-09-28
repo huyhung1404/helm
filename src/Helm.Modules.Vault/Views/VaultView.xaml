@@ -13,6 +13,22 @@
         <local:KindIconConverter x:Key="KindIcon" />
         <local:BytesToImageConverter x:Key="BytesToImage" />
 
+        <!-- The avatar of a row in the Other tab (and the trash): the item's picture, or its kind's symbol on a tile. -->
+        <DataTemplate x:Key="ItemAvatar" DataType="{x:Type vm:ItemRow}">
+            <Grid Width="36" Height="36">
+                <Border CornerRadius="9" Background="{DynamicResource CardBackgroundFillColorSecondaryBrush}"
+                        Visibility="{Binding HasIcon, Converter={StaticResource InverseBoolToVisibility}}">
+                    <!-- The row's own text colour, so the symbol stays visible on a selected (accent) row too -->
+                    <ui:SymbolIcon Symbol="{Binding Kind, Converter={StaticResource KindIcon}}" FontSize="20" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                </Border>
+                <Border CornerRadius="9" Visibility="{Binding HasIcon, Converter={StaticResource BoolToVisibility}}">
+                    <Border.Background>
+                        <ImageBrush ImageSource="{Binding Icon, Converter={StaticResource BytesToImage}}" Stretch="UniformToFill" />
+                    </Border.Background>
+                </Border>
+            </Grid>
+        </DataTemplate>
+
         <!-- The avatar of a password row: the item's picture, or its initial on a stable color. -->
         <DataTemplate x:Key="PasswordAvatar" DataType="{x:Type vm:PasswordRowViewModel}">
             <Grid Width="36" Height="36">
@@ -161,6 +177,7 @@
                                 <ui:DropDownButton.Flyout>
                                     <ContextMenu>
                                         <MenuItem Header="Login" Command="{Binding NewCommand}" CommandParameter="{x:Static items:VaultItemKind.Login}" />
+                                        <MenuItem Header="Token (API key)" Command="{Binding NewCommand}" CommandParameter="{x:Static items:VaultItemKind.Token}" />
                                         <MenuItem Header="Secure note" Command="{Binding NewCommand}" CommandParameter="{x:Static items:VaultItemKind.Note}" />
                                         <MenuItem Header="Card" Command="{Binding NewCommand}" CommandParameter="{x:Static items:VaultItemKind.Card}" />
                                         <MenuItem Header="Identity" Command="{Binding NewCommand}" CommandParameter="{x:Static items:VaultItemKind.Identity}" />
@@ -169,6 +186,14 @@
                                 </ui:DropDownButton.Flyout>
                             </ui:DropDownButton>
                         </Grid>
+                        <!-- Two tabs: what you sign in with, and everything else -->
+                        <UniformGrid DockPanel.Dock="Top" Rows="1" Margin="0,0,0,8">
+                            <RadioButton Style="{StaticResource {x:Type ToggleButton}}" GroupName="VaultTabs" Margin="0,0,3,0" HorizontalAlignment="Stretch"
+                                         Content="Logins &amp; tokens" IsChecked="{Binding IsLoginsTab}" AutomationProperties.Name="Logins and tokens" />
+                            <RadioButton Style="{StaticResource {x:Type ToggleButton}}" GroupName="VaultTabs" Margin="3,0,0,0" HorizontalAlignment="Stretch"
+                                         Content="Other" IsChecked="{Binding IsOtherTab}" AutomationProperties.Name="Other items"
+                                         ToolTip="Notes, cards, identities, documents and pictures" />
+                        </UniformGrid>
                         <ComboBox DockPanel.Dock="Top" Margin="0,0,0,8" AutomationProperties.Name="Show" ItemsSource="{Binding Filters}" SelectedItem="{Binding Filter}" />
                         <TextBlock DockPanel.Dock="Bottom" Margin="4,6,4,0" Style="{DynamicResource HelmSecondaryText}" Foreground="{DynamicResource SystemFillColorCautionBrush}"
                                    Visibility="{Binding UnreadableCount, Converter={StaticResource NotZeroToVisibility}}">
@@ -178,7 +203,7 @@
                             <!-- Passwords: one row per account, copy right on the row -->
                             <ListBox ItemsSource="{Binding PasswordRows}" SelectedItem="{Binding SelectedPassword}" BorderThickness="0" Background="Transparent"
                                      ScrollViewer.HorizontalScrollBarVisibility="Disabled" HorizontalContentAlignment="Stretch"
-                                     Visibility="{Binding IsPasswordsView, Converter={StaticResource BoolToVisibility}}" AutomationProperties.Name="Passwords">
+                                     Visibility="{Binding IsPasswordsView, Converter={StaticResource BoolToVisibility}}" AutomationProperties.Name="Logins and tokens list">
                                 <ListBox.ItemTemplate>
                                     <DataTemplate DataType="{x:Type vm:PasswordRowViewModel}">
                                         <Grid Margin="0,6">
@@ -191,12 +216,13 @@
                                             <StackPanel Grid.Column="1" VerticalAlignment="Center">
                                                 <TextBlock Text="{Binding Title}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
                                                 <TextBlock Text="{Binding Subtitle}" Style="{DynamicResource HelmSecondaryText}" TextTrimming="CharacterEllipsis" TextWrapping="NoWrap" />
-                                                <TextBlock Text="{Binding PasswordDisplay}" FontFamily="Consolas" FontSize="12" Margin="0,2,0,0"
-                                                           Foreground="{DynamicResource TextFillColorSecondaryBrush}" TextTrimming="CharacterEllipsis" />
+                                                <TextBlock Text="{Binding SecretDisplay}" FontFamily="Consolas" FontSize="12" Margin="0,2,0,0"
+                                                           Foreground="{DynamicResource TextFillColorSecondaryBrush}" TextTrimming="CharacterEllipsis"
+                                                           Visibility="{Binding HasSecret, Converter={StaticResource BoolToVisibility}}" />
                                             </StackPanel>
                                             <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center" Margin="8,0,0,0">
                                                 <ui:Button Appearance="Transparent" Padding="6" Command="{Binding ToggleRevealCommand}" ToolTip="Show or hide"
-                                                           AutomationProperties.Name="Show or hide" Visibility="{Binding HasPassword, Converter={StaticResource BoolToVisibility}}">
+                                                           AutomationProperties.Name="Show or hide" Visibility="{Binding HasSecret, Converter={StaticResource BoolToVisibility}}">
                                                     <ui:SymbolIcon>
                                                         <ui:SymbolIcon.Style>
                                                             <Style TargetType="ui:SymbolIcon">
@@ -208,8 +234,8 @@
                                                         </ui:SymbolIcon.Style>
                                                     </ui:SymbolIcon>
                                                 </ui:Button>
-                                                <ui:Button Margin="4,0,0,0" Padding="10,5" Command="{Binding CopyCommand}" ToolTip="Copy the password"
-                                                           AutomationProperties.Name="Copy the password" Visibility="{Binding HasPassword, Converter={StaticResource BoolToVisibility}}">
+                                                <ui:Button Margin="4,0,0,0" Padding="10,5" Command="{Binding CopyCommand}" ToolTip="{Binding CopyLabel}"
+                                                           AutomationProperties.Name="{Binding CopyLabel}" Visibility="{Binding HasSecret, Converter={StaticResource BoolToVisibility}}">
                                                     <ui:Button.Style>
                                                         <Style TargetType="ui:Button" BasedOn="{StaticResource {x:Type ui:Button}}">
                                                             <Setter Property="Appearance" Value="Secondary" />
@@ -235,21 +261,21 @@
                                      ScrollViewer.HorizontalScrollBarVisibility="Disabled" Visibility="{Binding IsListView, Converter={StaticResource BoolToVisibility}}">
                                 <ListBox.ItemTemplate>
                                     <DataTemplate DataType="{x:Type vm:ItemRow}">
-                                        <DockPanel Margin="2,4">
-                                            <ui:SymbolIcon DockPanel.Dock="Left" Margin="0,0,10,0" FontSize="20" Symbol="{Binding Kind, Converter={StaticResource KindIcon}}" VerticalAlignment="Center" />
+                                        <DockPanel Margin="0,6">
+                                            <ContentPresenter DockPanel.Dock="Left" Content="{Binding}" ContentTemplate="{StaticResource ItemAvatar}" Margin="0,0,12,0" VerticalAlignment="Center" />
                                             <ui:SymbolIcon DockPanel.Dock="Right" Symbol="Warning24" Foreground="{DynamicResource SystemFillColorCautionBrush}" ToolTip="Edited on two devices: choose a version"
                                                            Visibility="{Binding HasConflict, Converter={StaticResource BoolToVisibility}}" />
                                             <ui:SymbolIcon DockPanel.Dock="Right" Symbol="Star24" Filled="True" Margin="4,0" Foreground="{DynamicResource AccentTextFillColorPrimaryBrush}"
                                                            Visibility="{Binding Favorite, Converter={StaticResource BoolToVisibility}}" />
-                                            <StackPanel>
-                                                <TextBlock Text="{Binding Title}" TextTrimming="CharacterEllipsis" />
+                                            <StackPanel VerticalAlignment="Center">
+                                                <TextBlock Text="{Binding Title}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
                                                 <TextBlock Text="{Binding Subtitle}" Style="{DynamicResource HelmSecondaryText}" TextTrimming="CharacterEllipsis" TextWrapping="NoWrap" />
                                             </StackPanel>
                                         </DockPanel>
                                     </DataTemplate>
                                 </ListBox.ItemTemplate>
                             </ListBox>
-                            <TextBlock Text="Nothing here yet. Use + to add a login, a note, a card or a document." Style="{DynamicResource HelmSecondaryText}"
+                            <TextBlock Text="Nothing here yet. Use + to add a login, a token, a note, a card or a document." TextWrapping="Wrap" Style="{DynamicResource HelmSecondaryText}"
                                        Margin="8,16" TextAlignment="Center" Visibility="{Binding IsEmpty, Converter={StaticResource BoolToVisibility}}" />
                         </Grid>
                     </DockPanel>

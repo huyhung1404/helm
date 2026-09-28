@@ -10,6 +10,9 @@ public enum VaultItemKind
     Card,
     Identity,
     Document,
+    /// <summary>An API key or access token: one secret, nothing else required. Added after 0.9.3; older Helm versions list
+    /// such items as "cannot be opened" (kept, never deleted) until they are updated.</summary>
+    Token,
 }
 
 public enum VaultFieldKind
@@ -97,6 +100,19 @@ public sealed record VaultItem
     [JsonIgnore]
     public string? Password => Fields.FirstOrDefault(f => f.Kind == VaultFieldKind.Password)?.Value;
 
+    /// <summary>
+    /// What the Logins &amp; tokens list shows and copies: the password, or for a token its first hidden field. Null when
+    /// there is none.
+    /// </summary>
+    [JsonIgnore]
+    public string? PrimarySecret =>
+        Fields.FirstOrDefault(f => f.Kind == VaultFieldKind.Password && f.Value.Length > 0)?.Value
+        ?? (Kind == VaultItemKind.Token ? Fields.FirstOrDefault(f => f.IsSecret && f.Value.Length > 0)?.Value : null);
+
+    /// <summary>Logins and tokens: the items of the first tab.</summary>
+    [JsonIgnore]
+    public bool IsLoginOrToken => Kind is VaultItemKind.Login or VaultItemKind.Token;
+
     /// <summary>The username (or email) shown under the title in lists.</summary>
     [JsonIgnore]
     public string? Username => Fields.FirstOrDefault(f => f.Kind is VaultFieldKind.Username or VaultFieldKind.Email && f.Value.Length > 0)?.Value;
@@ -123,6 +139,10 @@ public sealed record VaultItem
                 new("Expiry", "", VaultFieldKind.Date),
                 new("CVV", "", VaultFieldKind.Secret),
                 new("PIN", "", VaultFieldKind.Secret),
+            ],
+            VaultItemKind.Token =>
+            [
+                new("Token", "", VaultFieldKind.Secret),
             ],
             VaultItemKind.Identity =>
             [

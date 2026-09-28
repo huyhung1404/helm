@@ -3,6 +3,21 @@
 All notable changes to Helm. The top section is used as the GitHub release body and as the Velopack release notes.
 Format: [Keep a Changelog](https://keepachangelog.com), versions follow [SemVer](https://semver.org).
 
+## [Unreleased]
+
+### Added
+- Vault: **Token** items for API keys and access tokens: one hidden field, shown and copied like a password. Older Helm
+  versions list tokens as "cannot be opened" (they keep them) until they are updated.
+- Vault: an item's **Type** can be changed while editing, e.g. to turn a token saved as a login into a token. Its fields
+  and history are kept.
+
+### Changed
+- Vault: the list has two tabs. **Logins & tokens** shows each one with its icon, the hidden password or token and Copy;
+  **Other** holds notes, cards, identities, documents and pictures, each with its picture or its type's icon. The Show
+  choices and the trash belong to the open tab.
+- A login without a password no longer shows "No password" in the list.
+- Pages start 16 px below the window's title bar instead of right under it.
+
 ## [0.9.3] - 2026-09-28
 
 ### Fixed
