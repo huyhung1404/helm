@@ -11,82 +11,27 @@
         <local:BytesToImageConverter x:Key="BytesToImage" />
     </UserControl.Resources>
 
-    <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
-        <StackPanel Margin="20,16,20,20">
+    <!-- The detail of an open card, shown below it in the list (read only; Edit opens the editor above the list).
+         The card itself shows the title, so this view does not repeat it. -->
+    <StackPanel Margin="0,4,0,0">
+        <!-- Actions -->
+        <WrapPanel HorizontalAlignment="Right">
+            <ui:Button Content="Edit" Icon="{ui:SymbolIcon Edit24}" Margin="4,0,0,0" Command="{Binding EditCommand}"
+                       Visibility="{Binding Trashed, Converter={StaticResource InverseBoolToVisibility}}" />
+            <ui:Button Icon="{ui:SymbolIcon Delete24}" ToolTip="Move to the trash" AutomationProperties.Name="Move to the trash" Margin="4,0,0,0"
+                       Command="{Binding MoveToTrashCommand}" Visibility="{Binding Trashed, Converter={StaticResource InverseBoolToVisibility}}" />
+            <ui:Button Content="Restore" Icon="{ui:SymbolIcon ArrowCounterclockwise24}" Appearance="Primary" Margin="4,0,0,0" Command="{Binding RestoreFromTrashCommand}"
+                       Visibility="{Binding Trashed, Converter={StaticResource BoolToVisibility}}" />
+            <ui:Button Content="Delete for good" Appearance="Danger" Margin="4,0,0,0" Command="{Binding DeleteForeverCommand}"
+                       Visibility="{Binding Trashed, Converter={StaticResource BoolToVisibility}}" />
+        </WrapPanel>
 
-            <!-- Header: kind, title, favorite, actions -->
-            <DockPanel>
-                <!-- The item's picture, or its initial on its color (the same avatar as in the Passwords list) -->
-                <Grid DockPanel.Dock="Left" Width="48" Height="48" Margin="0,0,14,0" VerticalAlignment="Center">
-                    <Border CornerRadius="12" Background="{Binding AvatarColor, Converter={StaticResource HexToBrush}}"
-                            Visibility="{Binding HasIcon, Converter={StaticResource InverseBoolToVisibility}}">
-                        <TextBlock Text="{Binding Initial}" Foreground="White" FontSize="22" FontWeight="SemiBold" HorizontalAlignment="Center" VerticalAlignment="Center" />
-                    </Border>
-                    <Border CornerRadius="12" Visibility="{Binding HasIcon, Converter={StaticResource BoolToVisibility}}"
-                            Background="{DynamicResource CardBackgroundFillColorSecondaryBrush}">
-                        <Border CornerRadius="12">
-                            <Border.Background>
-                                <ImageBrush ImageSource="{Binding Icon, Converter={StaticResource BytesToImage}}" Stretch="UniformToFill" />
-                            </Border.Background>
-                        </Border>
-                    </Border>
-                </Grid>
-                <WrapPanel DockPanel.Dock="Right" VerticalAlignment="Center">
-                    <!-- Viewing a live item -->
-                    <ui:Button Content="Edit" Icon="{ui:SymbolIcon Edit24}" Margin="4,0,0,0" Command="{Binding EditCommand}">
-                        <ui:Button.Style>
-                            <Style TargetType="ui:Button" BasedOn="{StaticResource {x:Type ui:Button}}">
-                                <Style.Triggers>
-                                    <DataTrigger Binding="{Binding IsEditing}" Value="True"><Setter Property="Visibility" Value="Collapsed" /></DataTrigger>
-                                    <DataTrigger Binding="{Binding Trashed}" Value="True"><Setter Property="Visibility" Value="Collapsed" /></DataTrigger>
-                                </Style.Triggers>
-                            </Style>
-                        </ui:Button.Style>
-                    </ui:Button>
-                    <ui:Button Icon="{ui:SymbolIcon Delete24}" ToolTip="Move to the trash" AutomationProperties.Name="Move to the trash" Margin="4,0,0,0" Command="{Binding MoveToTrashCommand}">
-                        <ui:Button.Style>
-                            <Style TargetType="ui:Button" BasedOn="{StaticResource {x:Type ui:Button}}">
-                                <Style.Triggers>
-                                    <DataTrigger Binding="{Binding IsEditing}" Value="True"><Setter Property="Visibility" Value="Collapsed" /></DataTrigger>
-                                    <DataTrigger Binding="{Binding Trashed}" Value="True"><Setter Property="Visibility" Value="Collapsed" /></DataTrigger>
-                                </Style.Triggers>
-                            </Style>
-                        </ui:Button.Style>
-                    </ui:Button>
-                    <!-- Editing -->
-                    <ui:Button Content="Save" Icon="{ui:SymbolIcon Save24}" Appearance="Primary" Margin="4,0,0,0" Command="{Binding SaveCommand}"
-                               Visibility="{Binding IsEditing, Converter={StaticResource BoolToVisibility}}" />
-                    <ui:Button Content="Cancel" Margin="4,0,0,0" Command="{Binding CancelCommand}" Visibility="{Binding IsEditing, Converter={StaticResource BoolToVisibility}}" />
-                    <!-- In the trash -->
-                    <ui:Button Content="Restore" Icon="{ui:SymbolIcon ArrowCounterclockwise24}" Appearance="Primary" Margin="4,0,0,0" Command="{Binding RestoreFromTrashCommand}"
-                               Visibility="{Binding Trashed, Converter={StaticResource BoolToVisibility}}" />
-                    <ui:Button Content="Delete for good" Appearance="Danger" Margin="4,0,0,0" Command="{Binding DeleteForeverCommand}"
-                               Visibility="{Binding Trashed, Converter={StaticResource BoolToVisibility}}" />
-                </WrapPanel>
-                <Grid VerticalAlignment="Center">
-                    <TextBlock Text="{Binding Title}" FontSize="22" FontWeight="SemiBold" TextTrimming="CharacterEllipsis"
-                               Visibility="{Binding IsEditing, Converter={StaticResource InverseBoolToVisibility}}" />
-                    <ui:TextBox AutomationProperties.Name="Title" Text="{Binding Title, UpdateSourceTrigger=PropertyChanged}" PlaceholderText="Title" FontSize="16"
-                                Visibility="{Binding IsEditing, Converter={StaticResource BoolToVisibility}}" />
-                </Grid>
-            </DockPanel>
-            <WrapPanel Margin="62,8,0,0" Visibility="{Binding IsEditing, Converter={StaticResource BoolToVisibility}}">
-                <TextBlock Text="Type" VerticalAlignment="Center" Margin="0,0,8,0" />
-                <ComboBox ItemsSource="{Binding Kinds}" SelectedItem="{Binding Kind}" MinWidth="120" Margin="0,0,16,0" VerticalAlignment="Center"
-                          AutomationProperties.Name="Type" ToolTip="Which list the item is in. Its fields stay as they are." />
-                <CheckBox Content="Favorite" IsChecked="{Binding Favorite}" Margin="0,0,16,0" VerticalAlignment="Center" />
-                <ui:Button Content="Choose icon…" Icon="{ui:SymbolIcon ImageAdd24}" Command="{Binding ChooseIconCommand}" Margin="0,0,8,0"
-                           ToolTip="A picture for this item (PNG, JPEG or WebP up to 256 KB). It is encrypted with the item." />
-                <ui:Button Content="Remove icon" Icon="{ui:SymbolIcon ImageOff24}" Appearance="Transparent" Command="{Binding RemoveIconCommand}"
-                           Visibility="{Binding HasIcon, Converter={StaticResource BoolToVisibility}}" />
-            </WrapPanel>
+        <ui:InfoBar Margin="0,12,0,0" Severity="Error" IsClosable="False" Message="{Binding Error}" IsOpen="{Binding Error, Converter={StaticResource NotEmptyToBool}}" />
+        <ui:InfoBar Margin="0,12,0,0" Severity="Informational" IsClosable="False" Title="In the trash"
+                    Message="This item is deleted for good after 30 days in the trash. Restore it to edit it."
+                    IsOpen="{Binding Trashed}" />
 
-            <ui:InfoBar Margin="0,12,0,0" Severity="Error" IsClosable="False" Message="{Binding Error}" IsOpen="{Binding Error, Converter={StaticResource NotEmptyToBool}}" />
-            <ui:InfoBar Margin="0,12,0,0" Severity="Informational" IsClosable="False" Title="In the trash"
-                        Message="This item is deleted for good after 30 days in the trash. Restore it to edit it."
-                        IsOpen="{Binding Trashed}" />
-
-            <!-- Conflicts: the same item was edited on two devices -->
+        <!-- Conflicts: the same item was edited on two devices -->
             <Border Style="{DynamicResource HelmSurface}" Margin="0,12,0,0" Visibility="{Binding HasConflicts, Converter={StaticResource BoolToVisibility}}">
                 <StackPanel>
                     <TextBlock Text="Edited on two devices" FontWeight="SemiBold" />
@@ -109,123 +54,80 @@
                 </StackPanel>
             </Border>
 
-            <!-- Fields -->
-            <ItemsControl ItemsSource="{Binding Fields}" Margin="0,16,0,0">
-                <ItemsControl.ItemTemplate>
-                    <DataTemplate DataType="{x:Type vm:FieldViewModel}">
-                        <Grid Margin="0,0,0,10">
-                            <!-- View -->
-                            <DockPanel Visibility="{Binding Owner.IsEditing, Converter={StaticResource InverseBoolToVisibility}}">
-                                <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center"
-                                            Visibility="{Binding HasValue, Converter={StaticResource BoolToVisibility}}">
-                                    <ui:Button Icon="{ui:SymbolIcon Eye24}" ToolTip="Show or hide" AutomationProperties.Name="Show or hide" Command="{Binding ToggleRevealCommand}" Appearance="Transparent"
-                                               Visibility="{Binding IsSecret, Converter={StaticResource BoolToVisibility}}" />
-                                    <ui:Button Icon="{ui:SymbolIcon Copy24}" ToolTip="Copy" AutomationProperties.Name="Copy" Command="{Binding CopyCommand}" Appearance="Transparent" />
-                                </StackPanel>
-                                <StackPanel>
-                                    <TextBlock Text="{Binding Name}" Style="{DynamicResource HelmSecondaryText}" />
-                                    <TextBlock AutomationProperties.Name="{Binding Name}" Text="{Binding Display}" TextWrapping="Wrap" FontSize="14" Margin="0,2,0,0" />
-                                </StackPanel>
-                            </DockPanel>
-                            <!-- Edit -->
-                            <Grid Visibility="{Binding Owner.IsEditing, Converter={StaticResource BoolToVisibility}}">
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="150" />
-                                    <ColumnDefinition Width="*" />
-                                    <ColumnDefinition Width="Auto" />
-                                </Grid.ColumnDefinitions>
-                                <StackPanel Margin="0,0,8,0">
-                                    <ui:TextBox AutomationProperties.Name="Field name" Text="{Binding Name, UpdateSourceTrigger=PropertyChanged}" PlaceholderText="Name" />
-                                    <ComboBox Margin="0,4,0,0" AutomationProperties.Name="Field type" ItemsSource="{Binding Owner.FieldKinds}" SelectedItem="{Binding Kind}" />
-                                </StackPanel>
-                                <Grid Grid.Column="1">
-                                    <ui:PasswordBox AutomationProperties.Name="{Binding Name}" Password="{Binding Value, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" RevealButtonEnabled="True"
-                                                    Visibility="{Binding IsSecret, Converter={StaticResource BoolToVisibility}}" VerticalAlignment="Top" />
-                                    <ui:TextBox AutomationProperties.Name="{Binding Name}" Text="{Binding Value, UpdateSourceTrigger=PropertyChanged}" AcceptsReturn="{Binding IsMultiline}" TextWrapping="Wrap"
-                                                Visibility="{Binding IsSecret, Converter={StaticResource InverseBoolToVisibility}}" VerticalAlignment="Top" />
-                                </Grid>
-                                <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Top" Margin="4,0,0,0">
-                                    <ui:Button Icon="{ui:SymbolIcon Wand24}" ToolTip="Generate a strong password" AutomationProperties.Name="Generate a strong password" Command="{Binding GenerateCommand}" Appearance="Transparent"
-                                               Visibility="{Binding IsPassword, Converter={StaticResource BoolToVisibility}}" />
-                                    <ui:Button Icon="{ui:SymbolIcon Dismiss24}" ToolTip="Remove this field" AutomationProperties.Name="Remove this field" Command="{Binding RemoveCommand}" Appearance="Transparent" />
-                                </StackPanel>
-                            </Grid>
-                        </Grid>
-                    </DataTemplate>
-                </ItemsControl.ItemTemplate>
-            </ItemsControl>
-            <ui:DropDownButton Content="Add field" Icon="{ui:SymbolIcon Add24}" HorizontalAlignment="Left" Visibility="{Binding IsEditing, Converter={StaticResource BoolToVisibility}}">
-                <ui:DropDownButton.Flyout>
-                    <ContextMenu>
-                        <MenuItem Header="Text" Command="{Binding AddFieldCommand}" CommandParameter="{x:Static items:VaultFieldKind.Text}" />
-                        <MenuItem Header="Username" Command="{Binding AddFieldCommand}" CommandParameter="{x:Static items:VaultFieldKind.Username}" />
-                        <MenuItem Header="Password" Command="{Binding AddFieldCommand}" CommandParameter="{x:Static items:VaultFieldKind.Password}" />
-                        <MenuItem Header="Hidden (PIN, code…)" Command="{Binding AddFieldCommand}" CommandParameter="{x:Static items:VaultFieldKind.Secret}" />
-                        <MenuItem Header="Website" Command="{Binding AddFieldCommand}" CommandParameter="{x:Static items:VaultFieldKind.Url}" />
-                        <MenuItem Header="Email" Command="{Binding AddFieldCommand}" CommandParameter="{x:Static items:VaultFieldKind.Email}" />
-                        <MenuItem Header="Phone" Command="{Binding AddFieldCommand}" CommandParameter="{x:Static items:VaultFieldKind.Phone}" />
-                        <MenuItem Header="Several lines" Command="{Binding AddFieldCommand}" CommandParameter="{x:Static items:VaultFieldKind.Multiline}" />
-                    </ContextMenu>
-                </ui:DropDownButton.Flyout>
-            </ui:DropDownButton>
+        <!-- Fields: name above the value, show/hide and copy on the right -->
+        <ItemsControl ItemsSource="{Binding Fields}" Margin="0,12,0,0">
+            <ItemsControl.ItemTemplate>
+                <DataTemplate DataType="{x:Type vm:FieldViewModel}">
+                    <DockPanel Margin="0,0,0,10">
+                        <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center"
+                                    Visibility="{Binding HasValue, Converter={StaticResource BoolToVisibility}}">
+                            <ui:Button Icon="{ui:SymbolIcon Eye24}" ToolTip="Show or hide" AutomationProperties.Name="Show or hide" Command="{Binding ToggleRevealCommand}" Appearance="Transparent"
+                                       Visibility="{Binding IsSecret, Converter={StaticResource BoolToVisibility}}" />
+                            <ui:Button Icon="{ui:SymbolIcon Copy24}" ToolTip="Copy" AutomationProperties.Name="Copy" Command="{Binding CopyCommand}" Appearance="Transparent" />
+                        </StackPanel>
+                        <StackPanel>
+                            <TextBlock Text="{Binding Name}" Style="{DynamicResource HelmSecondaryText}" />
+                            <TextBlock AutomationProperties.Name="{Binding Name}" Text="{Binding Display}" TextWrapping="Wrap" FontSize="14" Margin="0,2,0,0" />
+                        </StackPanel>
+                    </DockPanel>
+                </DataTemplate>
+            </ItemsControl.ItemTemplate>
+        </ItemsControl>
 
-            <!-- Notes and tags -->
-            <TextBlock Text="Notes" Style="{DynamicResource HelmSectionHeader}" />
-            <TextBlock Text="{Binding Notes}" TextWrapping="Wrap" Visibility="{Binding IsEditing, Converter={StaticResource InverseBoolToVisibility}}" />
-            <ui:TextBox AutomationProperties.Name="Notes" Text="{Binding Notes, UpdateSourceTrigger=PropertyChanged}" AcceptsReturn="True" TextWrapping="Wrap" MinHeight="80" VerticalContentAlignment="Top"
-                        Visibility="{Binding IsEditing, Converter={StaticResource BoolToVisibility}}" />
-            <ui:TextBox Margin="0,8,0,0" AutomationProperties.Name="Tags" Text="{Binding Tags, UpdateSourceTrigger=PropertyChanged}" PlaceholderText="Tags, separated by commas"
-                        Visibility="{Binding IsEditing, Converter={StaticResource BoolToVisibility}}" />
-            <TextBlock Margin="0,6,0,0" Style="{DynamicResource HelmSecondaryText}" Text="{Binding Tags}" Visibility="{Binding IsEditing, Converter={StaticResource InverseBoolToVisibility}}" />
+        <!-- Description (Info) or notes, and tags -->
+        <StackPanel Visibility="{Binding Notes, Converter={StaticResource NotEmptyToVisibility}}">
+            <TextBlock Text="{Binding NotesLabel}" Style="{DynamicResource HelmSectionHeader}" />
+            <TextBlock Text="{Binding Notes}" TextWrapping="Wrap" />
+        </StackPanel>
+        <TextBlock Margin="0,6,0,0" Style="{DynamicResource HelmSecondaryText}" Text="{Binding Tags}" Visibility="{Binding Tags, Converter={StaticResource NotEmptyToVisibility}}" />
 
             <!-- Documents -->
-            <DockPanel Margin="0,4,0,0">
-                <ui:Button DockPanel.Dock="Right" Content="Attach a document…" Icon="{ui:SymbolIcon Attach24}" Command="{Binding AttachCommand}" VerticalAlignment="Bottom"
-                           Visibility="{Binding Trashed, Converter={StaticResource InverseBoolToVisibility}}" />
-                <TextBlock Text="Documents" Style="{DynamicResource HelmSectionHeader}" />
-            </DockPanel>
-            <ProgressBar Margin="0,8,0,0" Minimum="0" Maximum="1" Value="{Binding Progress}" Visibility="{Binding IsBusy, Converter={StaticResource BoolToVisibility}}" />
-            <ItemsControl ItemsSource="{Binding Attachments}" Margin="0,8,0,0">
+        <DockPanel Margin="0,4,0,0">
+            <ui:Button DockPanel.Dock="Right" Content="Attach a document…" Icon="{ui:SymbolIcon Attach24}" Command="{Binding AttachCommand}" VerticalAlignment="Bottom"
+                       Visibility="{Binding Trashed, Converter={StaticResource InverseBoolToVisibility}}" />
+            <TextBlock Text="Documents" Style="{DynamicResource HelmSectionHeader}" />
+        </DockPanel>
+        <ProgressBar Margin="0,8,0,0" Minimum="0" Maximum="1" Value="{Binding Progress}" Visibility="{Binding IsBusy, Converter={StaticResource BoolToVisibility}}" />
+        <ItemsControl ItemsSource="{Binding Attachments}" Margin="0,8,0,0">
+            <ItemsControl.ItemTemplate>
+                <DataTemplate DataType="{x:Type vm:AttachmentViewModel}">
+                    <Border Style="{DynamicResource HelmSurface}" Padding="12,8" Margin="0,0,0,4">
+                        <DockPanel>
+                            <ui:SymbolIcon DockPanel.Dock="Left" Symbol="Document24" FontSize="20" Margin="0,0,10,0" VerticalAlignment="Center" />
+                            <WrapPanel DockPanel.Dock="Right" VerticalAlignment="Center">
+                                <ui:Button Icon="{ui:SymbolIcon Open24}" ToolTip="Open" AutomationProperties.Name="Open" Command="{Binding OpenCommand}" Appearance="Transparent" />
+                                <ui:Button Icon="{ui:SymbolIcon ArrowDownload24}" ToolTip="Save a copy…" AutomationProperties.Name="Save a copy…" Command="{Binding SaveAsCommand}" Appearance="Transparent" />
+                                <ui:Button Icon="{ui:SymbolIcon Delete24}" ToolTip="Remove" AutomationProperties.Name="Remove" Command="{Binding RemoveCommand}" Appearance="Transparent" />
+                            </WrapPanel>
+                            <StackPanel VerticalAlignment="Center">
+                                <TextBlock Text="{Binding Name}" TextTrimming="CharacterEllipsis" />
+                                <TextBlock Text="{Binding Details}" Style="{DynamicResource HelmSecondaryText}" />
+                            </StackPanel>
+                        </DockPanel>
+                    </Border>
+                </DataTemplate>
+            </ItemsControl.ItemTemplate>
+        </ItemsControl>
+
+        <!-- History -->
+        <Expander Margin="0,16,0,0" Visibility="{Binding IsNew, Converter={StaticResource InverseBoolToVisibility}}">
+            <Expander.Header>
+                <TextBlock><Run Text="History (" /><Run Text="{Binding History.Count, Mode=OneWay}" /><Run Text=" earlier versions)" /></TextBlock>
+            </Expander.Header>
+            <ItemsControl ItemsSource="{Binding History}" Margin="0,8,0,0">
                 <ItemsControl.ItemTemplate>
-                    <DataTemplate DataType="{x:Type vm:AttachmentViewModel}">
-                        <Border Style="{DynamicResource HelmSurface}" Padding="12,8" Margin="0,0,0,4">
-                            <DockPanel>
-                                <ui:SymbolIcon DockPanel.Dock="Left" Symbol="Document24" FontSize="20" Margin="0,0,10,0" VerticalAlignment="Center" />
-                                <WrapPanel DockPanel.Dock="Right" VerticalAlignment="Center">
-                                    <ui:Button Icon="{ui:SymbolIcon Open24}" ToolTip="Open" AutomationProperties.Name="Open" Command="{Binding OpenCommand}" Appearance="Transparent" />
-                                    <ui:Button Icon="{ui:SymbolIcon ArrowDownload24}" ToolTip="Save a copy…" AutomationProperties.Name="Save a copy…" Command="{Binding SaveAsCommand}" Appearance="Transparent" />
-                                    <ui:Button Icon="{ui:SymbolIcon Delete24}" ToolTip="Remove" AutomationProperties.Name="Remove" Command="{Binding RemoveCommand}" Appearance="Transparent" />
-                                </WrapPanel>
-                                <StackPanel VerticalAlignment="Center">
-                                    <TextBlock Text="{Binding Name}" TextTrimming="CharacterEllipsis" />
-                                    <TextBlock Text="{Binding Details}" Style="{DynamicResource HelmSecondaryText}" />
-                                </StackPanel>
-                            </DockPanel>
-                        </Border>
+                    <DataTemplate DataType="{x:Type vm:VersionViewModel}">
+                        <DockPanel Margin="0,4">
+                            <ui:Button DockPanel.Dock="Right" Content="Restore" Command="{Binding RestoreCommand}" />
+                            <StackPanel VerticalAlignment="Center">
+                                <TextBlock Text="{Binding When}" />
+                                <TextBlock Text="{Binding Summary}" Style="{DynamicResource HelmSecondaryText}" />
+                            </StackPanel>
+                        </DockPanel>
                     </DataTemplate>
                 </ItemsControl.ItemTemplate>
             </ItemsControl>
-
-            <!-- History -->
-            <Expander Margin="0,16,0,0" Visibility="{Binding IsNew, Converter={StaticResource InverseBoolToVisibility}}">
-                <Expander.Header>
-                    <TextBlock><Run Text="History (" /><Run Text="{Binding History.Count, Mode=OneWay}" /><Run Text=" earlier versions)" /></TextBlock>
-                </Expander.Header>
-                <ItemsControl ItemsSource="{Binding History}" Margin="0,8,0,0">
-                    <ItemsControl.ItemTemplate>
-                        <DataTemplate DataType="{x:Type vm:VersionViewModel}">
-                            <DockPanel Margin="0,4">
-                                <ui:Button DockPanel.Dock="Right" Content="Restore" Command="{Binding RestoreCommand}" />
-                                <StackPanel VerticalAlignment="Center">
-                                    <TextBlock Text="{Binding When}" />
-                                    <TextBlock Text="{Binding Summary}" Style="{DynamicResource HelmSecondaryText}" />
-                                </StackPanel>
-                            </DockPanel>
-                        </DataTemplate>
-                    </ItemsControl.ItemTemplate>
-                </ItemsControl>
-            </Expander>
-            <TextBlock Margin="0,12,0,0" Text="{Binding Modified}" Style="{DynamicResource HelmSecondaryText}" />
-        </StackPanel>
-    </ScrollViewer>
+        </Expander>
+        <TextBlock Margin="0,12,0,0" Text="{Binding Modified}" Style="{DynamicResource HelmSecondaryText}" />
+    </StackPanel>
 </UserControl>

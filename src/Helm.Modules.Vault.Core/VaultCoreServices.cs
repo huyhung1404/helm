@@ -24,6 +24,8 @@ public static class VaultCoreServices
             Name = VaultSession.KeyringCollection,
             ConflictPolicy = SyncConflictPolicy.LastWriterWins,
         });
+        // One record per vault and recovery key; records never change, so there is nothing to conflict on.
+        services.AddSyncedCollection(new SyncedCollectionOptions<VaultKitConfirmation> { Name = VaultSession.KitCollection });
         services.TryAddSingleton<IVaultDeviceUnlock, NoDeviceUnlock>();
         services.AddSingleton<VaultSession>();
         services.AddSingleton<VaultStore>();

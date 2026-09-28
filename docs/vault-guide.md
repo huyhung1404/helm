@@ -61,53 +61,55 @@ Vault vẫn dùng được trên một thiết bị mà không cần sync. Khi �
 
 ## Dùng hằng ngày
 
-### Thêm mục
+### Hai tab: Credentials và Other
 
-Chọn **+** rồi chọn loại:
+Trên cùng là ô **Search**, tìm trong **cả hai tab** cùng lúc: khi đang tìm, tên tab hiện số kết quả, ví dụ
+**Credentials (2)** và **Other (1)**, để không sót kết quả ở tab kia. Search tìm theo tên, tag, tên tài liệu, username,
+email, website và mô tả của mục Info, không bao giờ tìm trong mật khẩu, token hay các giá trị ẩn khác.
+
+- **Credentials**: những gì dùng để đăng nhập, gồm hai loại cố định là **Login** và **Token** (API key, access token).
+- **Other**: các mục **Info**, tức mọi thứ còn lại (ghi chú, thẻ, giấy tờ, tài liệu, ảnh), với các trường tự chọn.
+
+Dưới hai tab là các **sub tab** để lọc trong tab đang mở: **All**, **Logins**, **Tokens**, **Favorites**, **Trash** ở
+Credentials; **All**, **Favorites**, **Trash** ở Other. Mỗi tab có thùng rác riêng.
+
+### Card
+
+Mỗi mục là một card trải hết chiều ngang. Khi chưa mở, card hiện:
+
+- **Login**: icon (ảnh riêng, hoặc chữ cái đầu trên một màu lấy theo tên), tên, username kèm nút copy, và mật khẩu đang
+  ẩn kèm **con mắt** (hiện/ẩn) và **Copy** (đổi thành **✓ Copied** trong 2 giây). Login chưa có mật khẩu thì không hiện
+  dòng mật khẩu.
+- **Token**: tên và token đang ẩn, kèm con mắt và **Copy**.
+- **Info**: tên và mô tả (nếu có), tối đa hai dòng.
+
+Bấm vào card để mở chi tiết ngay bên dưới nó (mọi trường, mô tả, tag, tài liệu, lịch sử); bấm lần nữa để đóng. Mỗi lúc
+chỉ mở một card. Trên Android, chi tiết mở thành một trang, **Back** để quay lại danh sách.
+
+### Thêm và sửa mục
+
+Mỗi tab có nút tạo riêng ở bên phải: **New** ở Credentials (chọn **Login** hoặc **Token (API key)**), **New info** ở
+Other. Thêm và sửa mở trong một **popup** phía trên danh sách (trên Android là một trang), **Save** để lưu, **Cancel**
+hoặc **Esc** để bỏ.
 
 | Loại | Dùng cho | Có sẵn các trường |
 |---|---|---|
 | **Login** | Website và ứng dụng | Username, Password, Website |
-| **Secure note** | Mật khẩu Wi-Fi, câu trả lời bảo mật, mọi thứ riêng tư | Notes |
-| **Card** | Thẻ ngân hàng | Cardholder, Number, Expiry, CVV, PIN |
-| **Identity** | CCCD, hộ chiếu, bằng lái | Full name, ID number, Date of birth, Phone, Email, Address |
-| **Document** | Bản scan và file (PDF, ảnh, bất kỳ loại nào) | Attach a document… |
+| **Token** | API key, access token | Token (ẩn) |
+| **Info** | Mọi thứ khác | Không có sẵn, tự thêm trường cần dùng |
 
-Mỗi mục có thể thêm trường (**Add field**: Text, Username, Password, Email, Phone, Website, Hidden cho mã PIN hay
-mã số, Several lines), ghi chú, tag, tài liệu đính kèm và đánh dấu **Favorite**. Xong thì chọn **Save**.
+Trong popup, mỗi trường là một hàng: **loại trường**, **tên**, **giá trị** và nút **✕** để xóa. **Add field** thêm
+trường mới (Text, Username, Password, Hidden cho mã PIN hay mã số, Website, Email, Phone, Date, Several lines). Mục
+Info có ô **Description**: chính là dòng mô tả hiện trên card.
 
 - **Tạo mật khẩu mạnh**: nút đũa phép cạnh ô mật khẩu điền sẵn một mật khẩu ngẫu nhiên.
 - **Icon**: **Choose icon…** gán ảnh riêng cho mục (PNG, JPEG hoặc WebP, tối đa 256 KB), được mã hóa cùng mục.
-  Không có ảnh thì mục hiện chữ cái đầu của tên trên một màu lấy theo tên.
+- **Type**: đổi **Login**, **Token** hoặc **Info**. Các trường giữ nguyên, bản trước vẫn nằm trong lịch sử, mục chuyển
+  sang đúng tab. Token đã lỡ lưu dạng Login: mở card, **Edit**, đổi **Type** thành **Token** rồi **Save**.
+- Thẻ ngân hàng, giấy tờ, tài liệu tạo từ các bản Helm trước giờ đều là **Info** và vẫn giữ các trường của chúng.
 
-### Hai tab: Logins & tokens và Other
-
-Danh sách chia làm hai tab ngay dưới Search:
-
-- **Logins & tokens**: các mục dùng để đăng nhập (**Login**) và các **Token** (API key, access token), mỗi mục một
-  dòng: icon, tên, username (token thì hiện chữ "Token") và mật khẩu hoặc token đang ẩn. Trên mỗi dòng:
-  - **con mắt** hiện hoặc ẩn mật khẩu / token;
-  - **Copy** sao chép mật khẩu / token và đổi thành **✓ Copied** trong 2 giây.
-
-  Login chưa có mật khẩu thì dòng đó không hiện ô mật khẩu.
-- **Other**: mọi thứ còn lại (ghi chú, thẻ, giấy tờ, tài liệu, ảnh), mỗi dòng có ảnh của mục, hoặc icon của loại mục
-  nếu chưa gán ảnh.
-
-Chọn một dòng để mở mục đó. Ô **Show** dưới hai tab lọc trong tab đang mở: **All**, **Logins**, **Tokens**,
-**Favorites** và **Trash** ở tab đầu; **All**, **Notes**, **Cards**, **Identities**, **Documents**, **Favorites** và
-**Trash** ở tab Other. Mục mới tạo tự mở đúng tab của nó. **Search** tìm trong tab đang mở, theo tên, tag, tên tài
-liệu, username, email và website, không bao giờ tìm trong mật khẩu, token hay các giá trị ẩn khác.
-
-### Token (API key)
-
-Chọn **+** → **Token (API key)**: mục chỉ có một trường ẩn tên **Token**, dán token vào rồi **Save**. Cần thêm thông tin
-(website, ngày hết hạn…) thì dùng **Add field**.
-
-Token đã lỡ lưu dạng Login: mở mục, chọn **Edit**, đổi **Type** thành **Token** rồi **Save**. Các trường giữ nguyên
-và bản trước vẫn nằm trong lịch sử. **Type** đổi được cho mọi loại mục, nó chỉ quyết định mục nằm ở tab nào.
-
-> Máy nào còn chạy Helm bản cũ hơn sẽ chưa đọc được Token: bản cũ báo mục đó là "cannot be opened" nhưng vẫn giữ nguyên,
-> không xoá. Cập nhật Helm trên máy đó là thấy lại.
+> Máy nào còn chạy Helm bản cũ hơn 0.10 sẽ chưa đọc được Token: bản cũ báo mục đó là "cannot be opened" nhưng vẫn giữ
+> nguyên, không xoá. Cập nhật Helm trên máy đó là thấy lại.
 
 ### Sao chép
 

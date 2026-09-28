@@ -76,16 +76,19 @@ public sealed class VaultViewsTests : IDisposable
         var uid = store.Add(VaultItem.New(VaultItemKind.Card, "Visa") with { Notes = "Main card", Tags = ["bank", "travel"] });
         Pump(Task.CompletedTask);
         app.Items.Tab = VaultTab.Other;
-        app.Items.Selected = app.Items.Rows.Single(r => r.Uid == uid);
+        app.Items.ToggleCardCommand.Execute(app.Items.Cards.Single(c => c.Uid == uid));
         Layout(window);
         app.Items.Detail!.EditCommand.Execute(null);
+        Assert.True(app.Items.IsEditorOpen);
         Layout(window);
 
+        var editor = new ItemEditorView { DataContext = app.Items.Detail };
+        Layout(editor);
+        app.Items.Detail!.CancelCommand.Execute(null);
         var detail = new ItemDetailView { DataContext = app.Items.Detail };
         Layout(detail);
 
-        // The Logins & tokens tab: rows with a picture icon, letter avatars and a token.
-        app.Items.Detail!.CancelCommand.Execute(null);
+        // Credentials: a login with a picture, letter avatars and a token.
         store.Add(VaultItem.New(VaultItemKind.Login, "GitHub") with
         {
             Fields = [new VaultField("Username", "huyhung1404", VaultFieldKind.Username), new VaultField("Password", "gh-secret", VaultFieldKind.Password)],
@@ -93,25 +96,28 @@ public sealed class VaultViewsTests : IDisposable
         });
         store.Add(VaultItem.New(VaultItemKind.Login, "Zalo") with { Fields = [new VaultField("Phone", "0901 234 567", VaultFieldKind.Username), new VaultField("Password", "z", VaultFieldKind.Password)] });
         store.Add(VaultItem.New(VaultItemKind.Token, "OpenAI API") with { Fields = [new VaultField("Token", "sk-test-123", VaultFieldKind.Secret)] });
-        app.Items.Tab = VaultTab.LoginsAndTokens;
-        Assert.Equal(4, app.Items.PasswordRows.Count);
-        Assert.Equal("Token", app.Items.PasswordRows.Single(r => r.Title == "OpenAI API").Subtitle);
-        app.Items.PasswordRows.Single(r => r.Title == "Bank").ToggleRevealCommand.Execute(null);
-        Layout(window);
-        app.Items.SelectedPassword = app.Items.PasswordRows.Single(r => r.Title == "GitHub");
-        Assert.Equal("GitHub", app.Items.Detail!.Title);
+        app.Items.Tab = VaultTab.Credentials;
+        Assert.Equal(4, app.Items.Cards.Count);
+        Assert.True(app.Items.Cards.Single(c => c.Title == "OpenAI API").IsToken);
+        app.Items.Cards.Single(c => c.Title == "Bank").ToggleRevealCommand.Execute(null);
         Layout(window);
 
-        // A click on the open row's Copy button keeps it open; a click on the row itself closes it.
-        var list = Descendants<System.Windows.Controls.ListBox>(window).Single(l => System.Windows.Automation.AutomationProperties.GetName(l) == "Logins and tokens list");
-        var openRow = (System.Windows.Controls.ListBoxItem)list.ItemContainerGenerator.ContainerFromItem(app.Items.SelectedPassword);
-        var copy = Descendants<Wpf.Ui.Controls.Button>(openRow).First(b => b.Command == app.Items.SelectedPassword!.CopyCommand);
-        Click(copy);
-        Assert.Equal("GitHub", app.Items.Detail?.Title);
-        Click(openRow);
+        // The card button opens the card; the copy button on it takes its own clicks (text lets clicks through).
+        var gitHub = app.Items.Cards.Single(c => c.Title == "GitHub");
+        var cardButton = Descendants<System.Windows.Controls.Button>(window)
+            .Single(b => b.DataContext == gitHub && b.CommandParameter == gitHub && System.Windows.Automation.AutomationProperties.GetName(b) == "GitHub");
+        var cardBorder = Ancestor<System.Windows.Controls.Border>(cardButton, b => b.Style == window.TryFindResource("HelmSurface"));
+        var title = Descendants<System.Windows.Controls.TextBlock>(cardBorder).First(t => t.Text == "GitHub");
+        Assert.Same(cardButton, ButtonAt(title));
+        var copy = Descendants<Wpf.Ui.Controls.Button>(cardBorder).Single(b => b.Command == gitHub.CopyCommand);
+        Assert.Same(copy, ButtonAt(copy));
+        cardButton.Command.Execute(cardButton.CommandParameter);
+        Assert.True(gitHub.IsExpanded);
+        Assert.Equal("GitHub", app.Items.Detail!.Title);
+        Layout(window);
+        cardButton.Command.Execute(cardButton.CommandParameter);
         Assert.Null(app.Items.Detail);
-        Assert.Null(app.Items.SelectedPassword);
-        app.Items.SelectedPassword = app.Items.PasswordRows.Single(r => r.Title == "GitHub");
+        cardButton.Command.Execute(cardButton.CommandParameter);
         Layout(window);
 
         // The icon, large and at list size.
@@ -202,16 +208,37 @@ public sealed class VaultViewsTests : IDisposable
         }
     }
 
-    /// <summary>
-    /// The tunnelling half of a left click as real input raises it: Mouse.PreviewMouseDown, which every element on the
-    /// route turns into its own PreviewMouseLeftButtonDown (a direct event, so raising that one would reach only the target).
-    /// </summary>
-    private static void Click(UIElement target) =>
-        target.RaiseEvent(new System.Windows.Input.MouseButtonEventArgs(System.Windows.Input.Mouse.PrimaryDevice, 0, System.Windows.Input.MouseButton.Left)
-        {
-            RoutedEvent = System.Windows.Input.Mouse.PreviewMouseDownEvent,
-            Source = target,
-        });
+    private static T Ancestor<T>(DependencyObject node, Func<T, bool> match) where T : DependencyObject
+    {
+        for (var p = System.Windows.Media.VisualTreeHelper.GetParent(node); p is not null; p = System.Windows.Media.VisualTreeHelper.GetParent(p))
+            if (p is T t && match(t)) return t;
+        throw new InvalidOperationException($"No {typeof(T).Name} above {node}");
+    }
+
+    /// <summary>The button a click at the centre of <paramref name="element"/> would reach (WPF hit testing).</summary>
+    private static System.Windows.Controls.Primitives.ButtonBase? ButtonAt(FrameworkElement element)
+    {
+        DependencyObject top = element;
+        while (System.Windows.Media.VisualTreeHelper.GetParent(top) is { } parent) top = parent;
+        var root = (UIElement)top;
+        var point = element.TranslatePoint(new Point(element.ActualWidth / 2, element.ActualHeight / 2), root);
+        // A window that is never shown keeps the drawings of panels collapsed since (the Emergency Kit), which a shown
+        // window would not hit; skip what is collapsed or not hit-test visible, as input does.
+        DependencyObject? hit = null;
+        System.Windows.Media.VisualTreeHelper.HitTest(root,
+            d => d is UIElement { Visibility: not Visibility.Visible } or UIElement { IsHitTestVisible: false }
+                ? System.Windows.Media.HitTestFilterBehavior.ContinueSkipSelfAndChildren
+                : System.Windows.Media.HitTestFilterBehavior.Continue,
+            r =>
+            {
+                hit = r.VisualHit;
+                return System.Windows.Media.HitTestResultBehavior.Stop;
+            },
+            new System.Windows.Media.PointHitTestParameters(point));
+        for (var node = hit; node is not null; node = System.Windows.Media.VisualTreeHelper.GetParent(node))
+            if (node is System.Windows.Controls.Primitives.ButtonBase button) return button;
+        return null;
+    }
 
     /// <summary>The resources App.xaml merges: WPF-UI's theme and controls, then Helm's styles.</summary>
     private static void EnsureApplication()

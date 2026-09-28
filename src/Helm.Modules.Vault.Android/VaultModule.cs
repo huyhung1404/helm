@@ -71,9 +71,9 @@ public sealed class VaultModule(
     public bool HandleBack()
     {
         if (app.Items.Detail is not { } detail) return false;
-        if (detail.IsEditing && !detail.IsNew) detail.CancelCommand.Execute(null);
-        else app.Items.Selected = null;
-        app.Items.Detail = null;
+        // Editing: back cancels the edit (a new item closes); viewing: back closes the item.
+        if (detail.IsEditing) detail.CancelCommand.Execute(null);
+        else app.Items.CloseDetailCommand.Execute(null);
         return true;
     }
 

@@ -1,0 +1,107 @@
+<!-- Adding or editing an item: shown above the list (VaultView), never in the list itself. One row per field:
+     [type] [name] [value] [x]. -->
+<UserControl x:Class="Helm.Modules.Vault.Views.ItemEditorView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
+             xmlns:vm="clr-namespace:Helm.Modules.Vault.ViewModels;assembly=Helm.Modules.Vault.Core"
+             xmlns:items="clr-namespace:Helm.Modules.Vault.Items;assembly=Helm.Modules.Vault.Core"
+             xmlns:local="clr-namespace:Helm.Modules.Vault.Views">
+    <UserControl.Resources>
+        <local:NotEmptyToBoolConverter x:Key="NotEmptyToBool" />
+        <local:BytesToImageConverter x:Key="BytesToImage" />
+    </UserControl.Resources>
+
+    <DockPanel>
+        <!-- Save / Cancel stay visible however long the item is -->
+        <Border DockPanel.Dock="Bottom" BorderThickness="0,1,0,0" BorderBrush="{DynamicResource CardStrokeColorDefaultBrush}" Padding="20,12">
+            <DockPanel>
+                <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center">
+                    <ui:Button Content="Cancel" Margin="0,0,8,0" Command="{Binding CancelCommand}" MinWidth="90" />
+                    <ui:Button Content="Save" Icon="{ui:SymbolIcon Save24}" Appearance="Primary" Command="{Binding SaveCommand}" MinWidth="90" />
+                </StackPanel>
+                <ui:InfoBar Severity="Error" IsClosable="False" Message="{Binding Error}" IsOpen="{Binding Error, Converter={StaticResource NotEmptyToBool}}" Margin="0,0,12,0" />
+            </DockPanel>
+        </Border>
+
+        <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+            <StackPanel Margin="20,18,20,16">
+                <!-- Picture and title -->
+                <DockPanel>
+                    <Grid DockPanel.Dock="Left" Width="48" Height="48" Margin="0,0,14,0" VerticalAlignment="Center">
+                        <Border CornerRadius="12" Background="{Binding AvatarColor, Converter={StaticResource HexToBrush}}"
+                                Visibility="{Binding HasIcon, Converter={StaticResource InverseBoolToVisibility}}">
+                            <TextBlock Text="{Binding Initial}" Foreground="White" FontSize="22" FontWeight="SemiBold" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        </Border>
+                        <Border CornerRadius="12" Visibility="{Binding HasIcon, Converter={StaticResource BoolToVisibility}}">
+                            <Border.Background>
+                                <ImageBrush ImageSource="{Binding Icon, Converter={StaticResource BytesToImage}}" Stretch="UniformToFill" />
+                            </Border.Background>
+                        </Border>
+                    </Grid>
+                    <ui:TextBox x:Name="TitleBox" AutomationProperties.Name="Title" Text="{Binding Title, UpdateSourceTrigger=PropertyChanged}" PlaceholderText="Title" FontSize="16" VerticalAlignment="Center" />
+                </DockPanel>
+                <WrapPanel Margin="62,10,0,0">
+                    <TextBlock Text="Type" VerticalAlignment="Center" Margin="0,0,8,0" />
+                    <ComboBox ItemsSource="{Binding Types}" SelectedItem="{Binding Type}" MinWidth="110" Margin="0,0,16,0" VerticalAlignment="Center"
+                              AutomationProperties.Name="Type" ToolTip="Login and Token are in Credentials, Info in Other. The fields stay as they are." />
+                    <CheckBox Content="Favorite" IsChecked="{Binding Favorite}" Margin="0,0,16,0" VerticalAlignment="Center" />
+                    <ui:Button Content="Choose icon…" Icon="{ui:SymbolIcon ImageAdd24}" Command="{Binding ChooseIconCommand}" Margin="0,0,8,0"
+                               ToolTip="A picture for this item (PNG, JPEG or WebP up to 256 KB). It is encrypted with the item." />
+                    <ui:Button Content="Remove icon" Icon="{ui:SymbolIcon ImageOff24}" Appearance="Transparent" Command="{Binding RemoveIconCommand}"
+                               Visibility="{Binding HasIcon, Converter={StaticResource BoolToVisibility}}" />
+                </WrapPanel>
+
+                <!-- Fields: one row each -->
+                <TextBlock Text="Fields" Style="{DynamicResource HelmSectionHeader}" />
+                <ItemsControl ItemsSource="{Binding Fields}">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate DataType="{x:Type vm:FieldViewModel}">
+                            <Grid Margin="0,0,0,6">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="120" />
+                                    <ColumnDefinition Width="160" />
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <ComboBox AutomationProperties.Name="Field type" ItemsSource="{Binding Owner.FieldKinds}" SelectedItem="{Binding Kind}" VerticalAlignment="Top" />
+                                <ui:TextBox Grid.Column="1" Margin="6,0,0,0" AutomationProperties.Name="Field name" Text="{Binding Name, UpdateSourceTrigger=PropertyChanged}" PlaceholderText="Name" VerticalAlignment="Top" />
+                                <Grid Grid.Column="2" Margin="6,0,0,0">
+                                    <ui:PasswordBox AutomationProperties.Name="{Binding Name}" Password="{Binding Value, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" RevealButtonEnabled="True"
+                                                    Visibility="{Binding IsSecret, Converter={StaticResource BoolToVisibility}}" VerticalAlignment="Top" />
+                                    <ui:TextBox AutomationProperties.Name="{Binding Name}" Text="{Binding Value, UpdateSourceTrigger=PropertyChanged}" AcceptsReturn="{Binding IsMultiline}" TextWrapping="Wrap"
+                                                PlaceholderText="Value" Visibility="{Binding IsSecret, Converter={StaticResource InverseBoolToVisibility}}" VerticalAlignment="Top" />
+                                </Grid>
+                                <ui:Button Grid.Column="3" Icon="{ui:SymbolIcon Wand24}" ToolTip="Generate a strong password" AutomationProperties.Name="Generate a strong password" Command="{Binding GenerateCommand}" Appearance="Transparent"
+                                           Margin="2,0,0,0" VerticalAlignment="Top" Visibility="{Binding IsPassword, Converter={StaticResource BoolToVisibility}}" />
+                                <ui:Button Grid.Column="4" Icon="{ui:SymbolIcon Dismiss24}" ToolTip="Remove this field" AutomationProperties.Name="Remove this field" Command="{Binding RemoveCommand}" Appearance="Transparent"
+                                           Margin="2,0,0,0" VerticalAlignment="Top" />
+                            </Grid>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+                <ui:DropDownButton Content="Add field" Icon="{ui:SymbolIcon Add24}" HorizontalAlignment="Left" Margin="0,2,0,0">
+                    <ui:DropDownButton.Flyout>
+                        <ContextMenu>
+                            <MenuItem Header="Text" Command="{Binding AddFieldCommand}" CommandParameter="{x:Static items:VaultFieldKind.Text}" />
+                            <MenuItem Header="Username" Command="{Binding AddFieldCommand}" CommandParameter="{x:Static items:VaultFieldKind.Username}" />
+                            <MenuItem Header="Password" Command="{Binding AddFieldCommand}" CommandParameter="{x:Static items:VaultFieldKind.Password}" />
+                            <MenuItem Header="Hidden (PIN, code…)" Command="{Binding AddFieldCommand}" CommandParameter="{x:Static items:VaultFieldKind.Secret}" />
+                            <MenuItem Header="Website" Command="{Binding AddFieldCommand}" CommandParameter="{x:Static items:VaultFieldKind.Url}" />
+                            <MenuItem Header="Email" Command="{Binding AddFieldCommand}" CommandParameter="{x:Static items:VaultFieldKind.Email}" />
+                            <MenuItem Header="Phone" Command="{Binding AddFieldCommand}" CommandParameter="{x:Static items:VaultFieldKind.Phone}" />
+                            <MenuItem Header="Date" Command="{Binding AddFieldCommand}" CommandParameter="{x:Static items:VaultFieldKind.Date}" />
+                            <MenuItem Header="Several lines" Command="{Binding AddFieldCommand}" CommandParameter="{x:Static items:VaultFieldKind.Multiline}" />
+                        </ContextMenu>
+                    </ui:DropDownButton.Flyout>
+                </ui:DropDownButton>
+
+                <!-- Description (Info) or notes, and tags -->
+                <TextBlock Text="{Binding NotesLabel}" Style="{DynamicResource HelmSectionHeader}" />
+                <ui:TextBox AutomationProperties.Name="{Binding NotesLabel}" Text="{Binding Notes, UpdateSourceTrigger=PropertyChanged}" AcceptsReturn="True" TextWrapping="Wrap" MinHeight="80" VerticalContentAlignment="Top" />
+                <ui:TextBox Margin="0,8,0,0" AutomationProperties.Name="Tags" Text="{Binding Tags, UpdateSourceTrigger=PropertyChanged}" PlaceholderText="Tags, separated by commas" />
+            </StackPanel>
+        </ScrollViewer>
+    </DockPanel>
+</UserControl>

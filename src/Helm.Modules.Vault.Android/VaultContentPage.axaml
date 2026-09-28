@@ -125,121 +125,127 @@
                     <TextBlock TextWrapping="Wrap" Text="{Binding App.KitWarning}" />
                 </Border>
 
-                <!-- List -->
-                <StackPanel Spacing="4" IsVisible="{Binding App.Items.Detail, Converter={x:Static ObjectConverters.IsNull}}">
+                <!-- List: search over every tab, the two tabs with their own Create, sub-tabs, then the cards.
+                     Tapping a card opens it (the detail takes the page); Back closes it. -->
+                <StackPanel Spacing="6" IsVisible="{Binding App.Items.Detail, Converter={x:Static ObjectConverters.IsNull}}">
+                    <TextBox PlaceholderText="Search every tab" Text="{Binding App.Items.Search}" AutomationProperties.Name="Search" />
+                    <Grid ColumnDefinitions="*,6,*">
+                        <Button HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Content="{Binding App.Items.CredentialsHeader}"
+                                Classes.accent="{Binding App.Items.IsCredentialsTab}" AutomationProperties.Name="Credentials"
+                                Command="{Binding App.Items.ShowTabCommand}" CommandParameter="{x:Static vm:VaultTab.Credentials}" />
+                        <Button Grid.Column="2" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Content="{Binding App.Items.OtherHeader}"
+                                Classes.accent="{Binding App.Items.IsOtherTab}" AutomationProperties.Name="Other"
+                                Command="{Binding App.Items.ShowTabCommand}" CommandParameter="{x:Static vm:VaultTab.Other}" />
+                    </Grid>
                     <DockPanel>
-                        <Button DockPanel.Dock="Right" Margin="6,0,0,0" ToolTip.Tip="New item" AutomationProperties.Name="New item">
-                            <ic:SymbolIcon Symbol="Add" FontSize="18" />
+                        <!-- Create: each tab makes its own kinds -->
+                        <Button DockPanel.Dock="Right" Margin="6,0,0,0" VerticalAlignment="Center" IsVisible="{Binding App.Items.IsCredentialsTab}" AutomationProperties.Name="New credential">
+                            <StackPanel Orientation="Horizontal" Spacing="6">
+                                <ic:SymbolIcon Symbol="Add" FontSize="16" />
+                                <TextBlock Text="New" VerticalAlignment="Center" />
+                            </StackPanel>
                             <Button.Flyout>
                                 <MenuFlyout>
                                     <MenuItem Header="Login" Command="{Binding App.Items.NewCommand}" CommandParameter="{x:Static items:VaultItemKind.Login}" />
                                     <MenuItem Header="Token (API key)" Command="{Binding App.Items.NewCommand}" CommandParameter="{x:Static items:VaultItemKind.Token}" />
-                                    <MenuItem Header="Secure note" Command="{Binding App.Items.NewCommand}" CommandParameter="{x:Static items:VaultItemKind.Note}" />
-                                    <MenuItem Header="Card" Command="{Binding App.Items.NewCommand}" CommandParameter="{x:Static items:VaultItemKind.Card}" />
-                                    <MenuItem Header="Identity" Command="{Binding App.Items.NewCommand}" CommandParameter="{x:Static items:VaultItemKind.Identity}" />
-                                    <MenuItem Header="Document" Command="{Binding App.Items.NewCommand}" CommandParameter="{x:Static items:VaultItemKind.Document}" />
                                 </MenuFlyout>
                             </Button.Flyout>
                         </Button>
-                        <TextBox PlaceholderText="Search" Text="{Binding App.Items.Search}" AutomationProperties.Name="Search" />
+                        <Button DockPanel.Dock="Right" Margin="6,0,0,0" VerticalAlignment="Center" IsVisible="{Binding App.Items.IsOtherTab}" AutomationProperties.Name="New info"
+                                Command="{Binding App.Items.NewCommand}" CommandParameter="{x:Static items:VaultItemKind.Note}">
+                            <StackPanel Orientation="Horizontal" Spacing="6">
+                                <ic:SymbolIcon Symbol="Add" FontSize="16" />
+                                <TextBlock Text="New info" VerticalAlignment="Center" />
+                            </StackPanel>
+                        </Button>
+                        <!-- Sub-tabs -->
+                        <ListBox ItemsSource="{Binding App.Items.Filters}" SelectedItem="{Binding App.Items.Filter}" Background="Transparent"
+                                 ScrollViewer.HorizontalScrollBarVisibility="Auto" AutomationProperties.Name="Show">
+                            <ListBox.ItemsPanel>
+                                <ItemsPanelTemplate>
+                                    <StackPanel Orientation="Horizontal" />
+                                </ItemsPanelTemplate>
+                            </ListBox.ItemsPanel>
+                            <ListBox.Styles>
+                                <Style Selector="ListBoxItem">
+                                    <Setter Property="Padding" Value="12,6" />
+                                    <Setter Property="Margin" Value="0,0,4,0" />
+                                    <Setter Property="CornerRadius" Value="16" />
+                                </Style>
+                            </ListBox.Styles>
+                        </ListBox>
                     </DockPanel>
-                    <!-- Two tabs: what you sign in with, and everything else -->
-                    <Grid ColumnDefinitions="*,6,*">
-                        <Button HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Content="Logins &amp; tokens"
-                                Classes.accent="{Binding App.Items.IsLoginsTab}" AutomationProperties.Name="Logins and tokens"
-                                Command="{Binding App.Items.ShowTabCommand}" CommandParameter="{x:Static vm:VaultTab.LoginsAndTokens}" />
-                        <Button Grid.Column="2" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Content="Other"
-                                Classes.accent="{Binding App.Items.IsOtherTab}" AutomationProperties.Name="Other items"
-                                Command="{Binding App.Items.ShowTabCommand}" CommandParameter="{x:Static vm:VaultTab.Other}" />
-                    </Grid>
-                    <ComboBox HorizontalAlignment="Stretch" ItemsSource="{Binding App.Items.Filters}" SelectedItem="{Binding App.Items.Filter}" />
-                    <TextBlock Classes="secondary" Margin="4,8" TextWrapping="Wrap" Text="Nothing here yet. Use + to add a login, a token, a note, a card or a document." IsVisible="{Binding App.Items.IsEmpty}" />
-                    <!-- Passwords: one row per account, with its icon, the password and a copy button right on the row -->
-                    <Border Classes="card" Padding="4">
-                        <Border.IsVisible>
-                            <MultiBinding Converter="{x:Static BoolConverters.And}">
-                                <Binding Path="!App.Items.IsEmpty" />
-                                <Binding Path="App.Items.IsPasswordsView" />
-                            </MultiBinding>
-                        </Border.IsVisible>
-                        <ListBox ItemsSource="{Binding App.Items.PasswordRows}" SelectedItem="{Binding App.Items.SelectedPassword}" Background="Transparent"
-                                 AutomationProperties.Name="Logins and tokens list">
-                            <ListBox.ItemTemplate>
-                                <DataTemplate x:DataType="vm:PasswordRowViewModel">
-                                    <DockPanel Margin="2,8">
-                                        <Panel DockPanel.Dock="Left" Width="44" Height="44" Margin="0,0,12,0" VerticalAlignment="Center">
-                                            <Border CornerRadius="11" Background="{Binding AvatarColor, Converter={x:Static local:HexBrush.Converter}}" IsVisible="{Binding !HasIcon}">
-                                                <TextBlock Text="{Binding Initial}" Foreground="White" FontSize="19" FontWeight="SemiBold" HorizontalAlignment="Center" VerticalAlignment="Center" />
-                                            </Border>
-                                            <Border CornerRadius="11" ClipToBounds="True" IsVisible="{Binding HasIcon}">
-                                                <Image Source="{Binding Icon, Converter={x:Static local:IconBitmap.Converter}}" Stretch="UniformToFill" />
-                                            </Border>
-                                        </Panel>
-                                        <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center" Spacing="4" IsVisible="{Binding HasSecret}">
-                                            <Button Width="40" Height="40" Padding="0" HorizontalContentAlignment="Center" VerticalContentAlignment="Center" Background="Transparent"
-                                                    Command="{Binding ToggleRevealCommand}" AutomationProperties.Name="Show or hide">
-                                                <Panel>
-                                                    <ic:SymbolIcon Symbol="Eye" FontSize="18" IsVisible="{Binding !IsRevealed}" />
-                                                    <ic:SymbolIcon Symbol="EyeOff" FontSize="18" IsVisible="{Binding IsRevealed}" />
-                                                </Panel>
-                                            </Button>
-                                            <Button Classes="accent" Padding="12,8" CornerRadius="18" Command="{Binding CopyCommand}" AutomationProperties.Name="{Binding CopyLabel}">
-                                                <Panel>
-                                                    <StackPanel Orientation="Horizontal" Spacing="6" IsVisible="{Binding !IsCopied}">
-                                                        <ic:SymbolIcon Symbol="Copy" FontSize="16" />
-                                                        <TextBlock Text="Copy" VerticalAlignment="Center" />
-                                                    </StackPanel>
-                                                    <StackPanel Orientation="Horizontal" Spacing="6" IsVisible="{Binding IsCopied}">
-                                                        <ic:SymbolIcon Symbol="Checkmark" FontSize="16" />
-                                                        <TextBlock Text="Copied" VerticalAlignment="Center" />
-                                                    </StackPanel>
-                                                </Panel>
-                                            </Button>
-                                        </StackPanel>
-                                        <StackPanel VerticalAlignment="Center">
-                                            <TextBlock Text="{Binding Title}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
-                                            <TextBlock Classes="secondary" Text="{Binding Subtitle}" TextTrimming="CharacterEllipsis" TextWrapping="NoWrap" />
-                                            <TextBlock Classes="secondary" FontFamily="monospace" Text="{Binding SecretDisplay}" TextTrimming="CharacterEllipsis" TextWrapping="NoWrap" IsVisible="{Binding HasSecret}" />
-                                        </StackPanel>
-                                    </DockPanel>
-                                </DataTemplate>
-                            </ListBox.ItemTemplate>
-                        </ListBox>
-                    </Border>
+                    <TextBlock Classes="secondary" Margin="4,8" TextWrapping="Wrap" Text="Nothing here yet. Use New to add one." IsVisible="{Binding App.Items.IsEmpty}" />
 
-                    <Border Classes="card" Padding="4">
-                        <Border.IsVisible>
-                            <MultiBinding Converter="{x:Static BoolConverters.And}">
-                                <Binding Path="!App.Items.IsEmpty" />
-                                <Binding Path="App.Items.IsListView" />
-                            </MultiBinding>
-                        </Border.IsVisible>
-                        <ListBox ItemsSource="{Binding App.Items.Rows}" SelectedItem="{Binding App.Items.Selected}" Background="Transparent">
-                            <ListBox.ItemTemplate>
-                                <DataTemplate x:DataType="vm:ItemRow">
-                                    <DockPanel Margin="2,8">
-                                        <!-- The item's picture, or its kind's symbol on a tile -->
-                                        <Panel DockPanel.Dock="Left" Width="44" Height="44" Margin="0,0,12,0" VerticalAlignment="Center">
-                                            <Border CornerRadius="11" Background="{DynamicResource HelmSubtleFill}" IsVisible="{Binding !HasIcon}">
-                                                <ic:SymbolIcon FontSize="22" HorizontalAlignment="Center" VerticalAlignment="Center"
-                                                               Symbol="{Binding Kind, Converter={x:Static local:KindIcon.Converter}}" />
-                                            </Border>
-                                            <Border CornerRadius="11" ClipToBounds="True" IsVisible="{Binding HasIcon}">
-                                                <Image Source="{Binding Icon, Converter={x:Static local:IconBitmap.Converter}}" Stretch="UniformToFill" />
-                                            </Border>
-                                        </Panel>
-                                        <ic:SymbolIcon DockPanel.Dock="Right" Symbol="Warning" FontSize="16" IsVisible="{Binding HasConflict}" />
-                                        <ic:SymbolIcon DockPanel.Dock="Right" Symbol="Star" IconVariant="Filled" FontSize="16" Margin="4,0" IsVisible="{Binding Favorite}" />
-                                        <StackPanel VerticalAlignment="Center">
-                                            <TextBlock Text="{Binding Title}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
-                                            <TextBlock Classes="secondary" Text="{Binding Subtitle}" TextTrimming="CharacterEllipsis" TextWrapping="NoWrap" />
-                                        </StackPanel>
-                                    </DockPanel>
-                                </DataTemplate>
-                            </ListBox.ItemTemplate>
-                        </ListBox>
-                    </Border>
-                    <TextBlock Classes="secondary" Margin="4,4" IsVisible="{Binding App.Items.HasUnreadable}"
+                    <ItemsControl ItemsSource="{Binding App.Items.Cards}" AutomationProperties.Name="Items">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate x:DataType="vm:VaultCardViewModel">
+                                <Border Classes="card" Margin="0,0,0,6" Padding="0">
+                                    <Panel>
+                                        <!-- The whole card opens the item -->
+                                        <Button Classes="flat" HorizontalAlignment="Stretch" VerticalAlignment="Stretch" Background="Transparent" AutomationProperties.Name="{Binding Title}"
+                                                Command="{Binding $parent[UserControl].((local:VaultPageViewModel)DataContext).App.Items.ToggleCardCommand}" CommandParameter="{Binding}" />
+                                        <Grid ColumnDefinitions="Auto,*,Auto" RowDefinitions="Auto,Auto,Auto" Margin="12,10">
+                                            <!-- Login: its picture or initial -->
+                                            <Panel Grid.RowSpan="3" Width="44" Height="44" Margin="0,0,12,0" VerticalAlignment="Center" IsHitTestVisible="False" IsVisible="{Binding IsLogin}">
+                                                <Border CornerRadius="11" Background="{Binding AvatarColor, Converter={x:Static local:HexBrush.Converter}}" IsVisible="{Binding !HasIcon}">
+                                                    <TextBlock Text="{Binding Initial}" Foreground="White" FontSize="19" FontWeight="SemiBold" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                                </Border>
+                                                <Border CornerRadius="11" ClipToBounds="True" IsVisible="{Binding HasIcon}">
+                                                    <Image Source="{Binding Icon, Converter={x:Static local:IconBitmap.Converter}}" Stretch="UniformToFill" />
+                                                </Border>
+                                            </Panel>
+                                            <DockPanel Grid.Column="1" Grid.ColumnSpan="2" IsHitTestVisible="False">
+                                                <ic:SymbolIcon DockPanel.Dock="Right" Symbol="Warning" FontSize="16" IsVisible="{Binding HasConflict}" />
+                                                <ic:SymbolIcon DockPanel.Dock="Right" Symbol="Star" IconVariant="Filled" FontSize="16" Margin="4,0" IsVisible="{Binding Favorite}" />
+                                                <TextBlock Text="{Binding Title}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+                                            </DockPanel>
+
+                                            <!-- Login: username (copy) -->
+                                            <TextBlock Grid.Row="1" Grid.Column="1" Classes="secondary" Text="{Binding Username}" TextTrimming="CharacterEllipsis" VerticalAlignment="Center"
+                                                       IsHitTestVisible="False" IsVisible="{Binding HasUsername}" />
+                                            <Button Grid.Row="1" Grid.Column="2" Classes="flat" Width="40" Height="36" Padding="0" HorizontalContentAlignment="Center"
+                                                    Command="{Binding CopyUsernameCommand}" IsVisible="{Binding HasUsername}" AutomationProperties.Name="Copy the username">
+                                                <Panel>
+                                                    <ic:SymbolIcon Symbol="Copy" FontSize="16" IsVisible="{Binding !IsUsernameCopied}" />
+                                                    <ic:SymbolIcon Symbol="Checkmark" FontSize="16" IsVisible="{Binding IsUsernameCopied}" />
+                                                </Panel>
+                                            </Button>
+
+                                            <!-- Password or token: hidden until shown, copy -->
+                                            <TextBlock Grid.Row="2" Grid.Column="1" Classes="secondary" FontFamily="monospace" Text="{Binding SecretDisplay}" TextTrimming="CharacterEllipsis"
+                                                       VerticalAlignment="Center" IsHitTestVisible="False" IsVisible="{Binding HasSecret}" />
+                                            <StackPanel Grid.Row="2" Grid.Column="2" Orientation="Horizontal" Spacing="4" IsVisible="{Binding CanCopySecret}">
+                                                <Button Classes="flat" Width="40" Height="36" Padding="0" HorizontalContentAlignment="Center" Command="{Binding ToggleRevealCommand}" AutomationProperties.Name="Show or hide">
+                                                    <Panel>
+                                                        <ic:SymbolIcon Symbol="Eye" FontSize="16" IsVisible="{Binding !IsRevealed}" />
+                                                        <ic:SymbolIcon Symbol="EyeOff" FontSize="16" IsVisible="{Binding IsRevealed}" />
+                                                    </Panel>
+                                                </Button>
+                                                <Button Classes="accent" Padding="12,6" CornerRadius="16" Command="{Binding CopyCommand}" AutomationProperties.Name="{Binding CopyLabel}">
+                                                    <Panel>
+                                                        <StackPanel Orientation="Horizontal" Spacing="6" IsVisible="{Binding !IsCopied}">
+                                                            <ic:SymbolIcon Symbol="Copy" FontSize="14" />
+                                                            <TextBlock Text="Copy" VerticalAlignment="Center" />
+                                                        </StackPanel>
+                                                        <StackPanel Orientation="Horizontal" Spacing="6" IsVisible="{Binding IsCopied}">
+                                                            <ic:SymbolIcon Symbol="Checkmark" FontSize="14" />
+                                                            <TextBlock Text="Copied" VerticalAlignment="Center" />
+                                                        </StackPanel>
+                                                    </Panel>
+                                                </Button>
+                                            </StackPanel>
+
+                                            <!-- Info: its description, two lines at most -->
+                                            <TextBlock Grid.Row="1" Grid.Column="1" Grid.ColumnSpan="2" Classes="secondary" Text="{Binding Description}" TextWrapping="Wrap"
+                                                       TextTrimming="CharacterEllipsis" MaxLines="2" Margin="0,2,0,0" IsHitTestVisible="False" IsVisible="{Binding HasDescription}" />
+                                        </Grid>
+                                    </Panel>
+                                </Border>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                    <TextBlock Classes="secondary" Margin="4,4" TextWrapping="Wrap" IsVisible="{Binding App.Items.HasUnreadable}"
                                Text="{Binding App.Items.UnreadableCount, StringFormat='{}{0} records cannot be opened with this vault key; they are kept, not deleted.'}" />
                 </StackPanel>
 

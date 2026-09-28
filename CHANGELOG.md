@@ -3,6 +3,22 @@
 All notable changes to Helm. The top section is used as the GitHub release body and as the Velopack release notes.
 Format: [Keep a Changelog](https://keepachangelog.com), versions follow [SemVer](https://semver.org).
 
+## [Unreleased]
+
+### Changed
+- Vault: a new look. One search box above everything searches every tab (each tab shows how many items match). Two
+  tabs, **Credentials** (logins and tokens) and **Other** (Info items), each with its own **New** button, and sub-tabs
+  instead of the Show list (All, Logins, Tokens, Favorites, Trash; All, Favorites, Trash in Other).
+- Vault: items are cards across the whole width. A login card shows its icon, title, username and password, each with
+  Copy; a token card its title and token; an Info card its title and description. Click a card to open its details
+  below it, click again to close them.
+- Vault: adding and editing happen in a window above the list, with one row per field: type, name, value, remove.
+- Vault: Other has one type, **Info**, with the fields you add; cards, identities and documents made before are Info
+  items now and keep their fields.
+
+### Fixed
+- Vault: "Emergency Kit not confirmed" no longer shows on your other devices once you confirmed it on one.
+
 ## [0.10.1] - 2026-09-28
 
 ### Fixed

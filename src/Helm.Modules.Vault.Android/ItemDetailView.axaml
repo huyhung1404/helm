@@ -34,7 +34,7 @@
                 </WrapPanel>
                 <DockPanel IsVisible="{Binding IsEditing}">
                     <TextBlock DockPanel.Dock="Left" Text="Type" VerticalAlignment="Center" Margin="0,0,12,0" />
-                    <ComboBox ItemsSource="{Binding Kinds}" SelectedItem="{Binding Kind}" HorizontalAlignment="Stretch" AutomationProperties.Name="Type" />
+                    <ComboBox ItemsSource="{Binding Types}" SelectedItem="{Binding Type}" HorizontalAlignment="Stretch" AutomationProperties.Name="Type" />
                 </DockPanel>
                 <CheckBox Content="Favorite" IsChecked="{Binding Favorite}" IsVisible="{Binding IsEditing}" />
                 <WrapPanel>
@@ -110,29 +110,31 @@
                                         <TextBlock TextWrapping="Wrap" Text="{Binding Display}" />
                                     </StackPanel>
                                 </DockPanel>
-                                <!-- Edit -->
-                                <StackPanel Spacing="4" IsVisible="{Binding Owner.IsEditing}">
-                                    <DockPanel>
-                                        <Button DockPanel.Dock="Right" Classes="flat" Width="44" Command="{Binding RemoveCommand}" AutomationProperties.Name="Remove field">
-                                            <ic:SymbolIcon Symbol="Dismiss" FontSize="18" />
-                                        </Button>
-                                        <ComboBox DockPanel.Dock="Right" Margin="4,0" ItemsSource="{Binding Owner.FieldKinds}" SelectedItem="{Binding Kind}" />
-                                        <TextBox PlaceholderText="Name" Text="{Binding Name}" />
-                                    </DockPanel>
-                                    <DockPanel>
-                                        <Button DockPanel.Dock="Right" Classes="flat" Width="44" Command="{Binding GenerateCommand}" IsVisible="{Binding IsPassword}"
-                                                AutomationProperties.Name="Generate a strong password">
+                                <!-- Edit: one row, [type] [name] [value] [x] -->
+                                <Grid ColumnDefinitions="96,*,1.4*,Auto,Auto" IsVisible="{Binding Owner.IsEditing}">
+                                    <ComboBox ItemsSource="{Binding Owner.FieldKinds}" SelectedItem="{Binding Kind}" HorizontalAlignment="Stretch" AutomationProperties.Name="Field type" />
+                                    <TextBox Grid.Column="1" Margin="4,0,0,0" PlaceholderText="Name" Text="{Binding Name}" AutomationProperties.Name="Field name" />
+                                    <TextBox Grid.Column="2" Margin="4,0,0,0" PlaceholderText="Value" Text="{Binding Value}" AcceptsReturn="{Binding IsMultiline}" TextWrapping="Wrap"
+                                             PasswordChar="{Binding IsSecret, Converter={x:Static local:SecretChar.Converter}}" RevealPassword="{Binding IsRevealed}"
+                                             AutomationProperties.Name="{Binding Name}" />
+                                    <Panel Grid.Column="3">
+                                        <Button Classes="flat" Width="40" Command="{Binding GenerateCommand}" IsVisible="{Binding IsPassword}" AutomationProperties.Name="Generate a strong password">
                                             <ic:SymbolIcon Symbol="Wand" FontSize="18" />
                                         </Button>
-                                        <Button DockPanel.Dock="Right" Classes="flat" Width="44" Command="{Binding ToggleRevealCommand}" IsVisible="{Binding IsSecret}"
-                                                AutomationProperties.Name="Show or hide">
+                                        <Button Classes="flat" Width="40" Command="{Binding ToggleRevealCommand}" AutomationProperties.Name="Show or hide">
+                                            <Button.IsVisible>
+                                                <MultiBinding Converter="{x:Static BoolConverters.And}">
+                                                    <Binding Path="IsSecret" />
+                                                    <Binding Path="!IsPassword" />
+                                                </MultiBinding>
+                                            </Button.IsVisible>
                                             <ic:SymbolIcon Symbol="Eye" FontSize="18" />
                                         </Button>
-                                        <TextBox Text="{Binding Value}" AcceptsReturn="{Binding IsMultiline}" TextWrapping="Wrap"
-                                                 PasswordChar="{Binding IsSecret, Converter={x:Static local:SecretChar.Converter}}" RevealPassword="{Binding IsRevealed}"
-                                                 AutomationProperties.Name="{Binding Name}" />
-                                    </DockPanel>
-                                </StackPanel>
+                                    </Panel>
+                                    <Button Grid.Column="4" Classes="flat" Width="40" Command="{Binding RemoveCommand}" AutomationProperties.Name="Remove field">
+                                        <ic:SymbolIcon Symbol="Dismiss" FontSize="18" />
+                                    </Button>
+                                </Grid>
                             </StackPanel>
                         </DataTemplate>
                     </ItemsControl.ItemTemplate>
@@ -155,7 +157,7 @@
         </Border>
 
         <!-- Notes and tags -->
-        <TextBlock Classes="section" Text="Notes" />
+        <TextBlock Classes="section" Text="{Binding NotesLabel}" />
         <Border Classes="card">
             <StackPanel Spacing="6">
                 <TextBlock TextWrapping="Wrap" Text="{Binding Notes}" IsVisible="{Binding !IsEditing}" />

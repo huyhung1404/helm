@@ -138,10 +138,10 @@ public sealed partial class ItemDetailViewModel : ObservableObject
     [ObservableProperty] private byte[]? _icon;
 
     /// <summary>
-    /// The item's kind, changeable while editing (e.g. a token that was saved as a login). The fields stay as they are;
-    /// only the list it appears in and the defaults of a new item depend on it.
+    /// Login, Token or Info, changeable while editing (e.g. a token that was saved as a login). The fields stay as they
+    /// are; only the tab and the card's look depend on it.
     /// </summary>
-    [ObservableProperty] private VaultItemKind _kind;
+    [ObservableProperty] private VaultItemType _type;
 
     internal ItemDetailViewModel(VaultStore store, VaultFiles files, VaultSession session, IVaultPlatform platform,
         VaultEntry? entry, VaultItemKind kind, Action<string?> saved)
@@ -164,7 +164,29 @@ public sealed partial class ItemDetailViewModel : ObservableObject
     /// <summary>Null for an item that is not saved yet.</summary>
     public string? Uid { get; private set; }
 
-    public IReadOnlyList<VaultItemKind> Kinds { get; } = Enum.GetValues<VaultItemKind>();
+    public IReadOnlyList<VaultItemType> Types { get; } = Enum.GetValues<VaultItemType>();
+
+    public bool IsInfo => Type == VaultItemType.Info;
+
+    /// <summary>"Description" for Info items (the card shows it), "Notes" otherwise.</summary>
+    public string NotesLabel => IsInfo ? "Description" : "Notes";
+
+    partial void OnTypeChanged(VaultItemType value)
+    {
+        OnPropertyChanged(nameof(IsInfo));
+        OnPropertyChanged(nameof(NotesLabel));
+    }
+
+    /// <summary>
+    /// The stored kind for a type. Info keeps an older item's own kind (card, identity, document), so nothing is
+    /// rewritten needlessly and older Helm versions still read it; a new Info item is stored as a note.
+    /// </summary>
+    private static VaultItemKind KindFor(VaultItemType type, VaultItemKind current) => type switch
+    {
+        VaultItemType.Login => VaultItemKind.Login,
+        VaultItemType.Token => VaultItemKind.Token,
+        _ => VaultCardViewModel.TypeOf(current) == VaultItemType.Info ? current : VaultItemKind.Note,
+    };
 
     public bool Trashed { get; }
 
@@ -286,7 +308,7 @@ public sealed partial class ItemDetailViewModel : ObservableObject
         {
             var edited = _item with
             {
-                Kind = Kind,
+                Kind = KindFor(Type, _item.Kind),
                 Title = Title.Trim(),
                 Notes = Notes,
                 Favorite = Favorite,
@@ -461,7 +483,7 @@ public sealed partial class ItemDetailViewModel : ObservableObject
 
     private void Load(VaultItem item)
     {
-        Kind = item.Kind;
+        Type = VaultCardViewModel.TypeOf(item.Kind);
         Title = item.Title;
         Notes = item.Notes;
         Tags = string.Join(", ", item.Tags);

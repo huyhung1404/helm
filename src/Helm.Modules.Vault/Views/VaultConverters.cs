@@ -66,3 +66,12 @@ public sealed class KindIconConverter : IValueConverter
 
     public object ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture) => Binding.DoNothing;
 }
+
+/// <summary>The editor's height limit: the room above the list minus its margins, so Save stays on screen.</summary>
+public sealed class EditorHeightConverter : IValueConverter
+{
+    public object Convert(object? value, Type targetType, object? parameter, CultureInfo culture) =>
+        value is double height && height > 120 ? height - 48 : double.PositiveInfinity;
+
+    public object ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture) => DependencyProperty.UnsetValue;
+}

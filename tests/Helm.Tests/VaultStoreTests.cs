@@ -336,6 +336,27 @@ public sealed class VaultStoreTests : IDisposable
     }
 
     [Fact]
+    public async Task A_kit_confirmed_on_one_device_is_not_asked_again_on_another()
+    {
+        var a = NewDevice("a");
+        var b = NewDevice("b");
+        var recovery = await a.Session.CreateAsync(Password);
+        Assert.True(a.Session.ConfirmRecoveryKit(recovery));
+        await Sync(a, b);
+
+        await b.Session.UnlockAsync(Password);
+        Assert.True(b.Session.RecoveryKitConfirmed);
+
+        // A new recovery key needs its own kit, on every device.
+        var replaced = await a.Session.NewRecoveryKeyAsync(Password);
+        await Sync(a, b);
+        Assert.False(b.Session.RecoveryKitConfirmed);
+        Assert.True(a.Session.ConfirmRecoveryKit(replaced));
+        await Sync(a, b);
+        Assert.True(b.Session.RecoveryKitConfirmed);
+    }
+
+    [Fact]
     public async Task Quick_unlock_works_until_the_password_is_due_again()
     {
         var unlock = new FakeDeviceUnlock();
@@ -401,8 +422,9 @@ public sealed class VaultStoreTests : IDisposable
         {
             Name = VaultSession.KeyringCollection,
         }));
+        var kits = Own(new SyncedCollection<VaultKitConfirmation>(engine, new SyncedCollectionOptions<VaultKitConfirmation> { Name = VaultSession.KitCollection }));
         var settings = Own(new SettingsStoreFactory(paths));
-        var session = Own(new VaultSession(keyrings, settings, deviceUnlock ?? new NoDeviceUnlock(), engine, _clock)
+        var session = Own(new VaultSession(keyrings, settings, deviceUnlock ?? new NoDeviceUnlock(), engine, _clock, kits: kits)
         {
             NewKdf = VaultCryptoTests.CheapKdf,
         });

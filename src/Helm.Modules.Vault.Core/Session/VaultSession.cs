@@ -16,6 +16,15 @@ public enum VaultState
     Unlocked,
 }
 
+/// <summary>
+/// Someone proved on some device that they saved the Emergency Kit of this recovery key (synced, so the other devices of
+/// the account do not ask again). Holds no secret: the recovery id is printed on the kit.
+/// </summary>
+public sealed record VaultKitConfirmation(string VaultId, string RecoveryId, long ConfirmedAtMs)
+{
+    public static string RecordId(string vaultId, string recoveryId) => $"{vaultId}|{recoveryId}";
+}
+
 /// <summary>Too many wrong passwords in a row: try again after <see cref="RetryAfter"/>.</summary>
 public sealed class VaultThrottledException(TimeSpan retryAfter)
     : Exception($"Too many wrong passwords. Try again in {Math.Ceiling(retryAfter.TotalSeconds)} seconds.")
@@ -30,10 +39,14 @@ public sealed class VaultThrottledException(TimeSpan retryAfter)
 public sealed partial class VaultSession : ObservableObject, IDisposable
 {
     public const string KeyringCollection = "vault.keyring";
+
+    /// <summary>Emergency Kit confirmations (<see cref="VaultKitConfirmation"/>), one record per vault and recovery key.</summary>
+    public const string KitCollection = "vault.kits";
     public const int MaxDeviceUnlockFailures = 5;
     private const int FreePasswordAttempts = 3;
 
     private readonly ISyncedCollection<VaultKeyringData> _keyrings;
+    private readonly ISyncedCollection<VaultKitConfirmation>? _kits;
     private readonly ISettingsStore<VaultSettings> _settings;
     private readonly ISettingsStore<VaultDeviceState> _device;
     private readonly IVaultDeviceUnlock _deviceUnlock;
@@ -60,9 +73,12 @@ public sealed partial class VaultSession : ObservableObject, IDisposable
         IVaultDeviceUnlock deviceUnlock,
         ISyncService sync,
         TimeProvider? time = null,
-        ILogger<VaultSession>? logger = null)
+        ILogger<VaultSession>? logger = null,
+        ISyncedCollection<VaultKitConfirmation>? kits = null)
     {
         _keyrings = keyrings;
+        _kits = kits;
+        if (kits is not null) kits.Changed += (_, _) => OnPropertyChanged(nameof(RecoveryKitConfirmed));
         _settings = settings.Get<VaultSettings>(VaultSettings.StoreId);
         _device = settings.Get<VaultDeviceState>(VaultDeviceState.StoreId);
         _deviceUnlock = deviceUnlock;
@@ -90,7 +106,12 @@ public sealed partial class VaultSession : ObservableObject, IDisposable
     /// </summary>
     public IReadOnlyList<VaultKeyringData> OtherVaults { get; private set; } = [];
 
-    public bool RecoveryKitConfirmed => Keyring is { } k && _device.Current.ConfirmedRecoveryId == k.RecoveryId;
+    /// <summary>
+    /// The current recovery key's Emergency Kit was confirmed, on this device or (synced) on another one of the account.
+    /// A new recovery key has a new id, so it asks again.
+    /// </summary>
+    public bool RecoveryKitConfirmed => Keyring is { } k
+        && (_device.Current.ConfirmedRecoveryId == k.RecoveryId || _kits?.Get(VaultKitConfirmation.RecordId(k.VaultId, k.RecoveryId)) is not null);
 
     public bool IsDeviceUnlockEnrolled => VaultId is { } id && _deviceUnlock.IsEnrolled(id);
 
@@ -179,7 +200,7 @@ public sealed partial class VaultSession : ObservableObject, IDisposable
             throw;
         }
         _logger.LogWarning("Vault unlocked with the recovery key");
-        _device.Update(d => d.ConfirmedRecoveryId = keyring.RecoveryId);
+        MarkKitConfirmed(keyring);
         SetUnlocked(key, mustChangePassword: true);
     }
 
@@ -314,8 +335,7 @@ public sealed partial class VaultSession : ObservableObject, IDisposable
         {
             CryptographicOperations.ZeroMemory(secret);
         }
-        _device.Update(d => d.ConfirmedRecoveryId = keyring.RecoveryId);
-        OnPropertyChanged(nameof(RecoveryKitConfirmed));
+        MarkKitConfirmed(keyring);
         return true;
     }
 
@@ -391,10 +411,35 @@ public sealed partial class VaultSession : ObservableObject, IDisposable
         }
         previous?.Dispose();
         MustChangePassword = mustChangePassword;
+        if (Keyring is { } keyring && _device.Current.ConfirmedRecoveryId == keyring.RecoveryId) ShareKitConfirmation(keyring);
         State = VaultState.Unlocked;
         OnPropertyChanged(nameof(RecoveryKitConfirmed));
         _logger.LogInformation("Vault unlocked");
         Touch();
+    }
+
+    /// <summary>Remembers the confirmation on this device and shares it with the account's other devices.</summary>
+    private void MarkKitConfirmed(VaultKeyringData keyring)
+    {
+        _device.Update(d => d.ConfirmedRecoveryId = keyring.RecoveryId);
+        ShareKitConfirmation(keyring);
+        OnPropertyChanged(nameof(RecoveryKitConfirmed));
+    }
+
+    /// <summary>Also for confirmations made before they were synced (0.10.1 and older kept them on the device only).</summary>
+    private void ShareKitConfirmation(VaultKeyringData keyring)
+    {
+        if (_kits is null) return;
+        var id = VaultKitConfirmation.RecordId(keyring.VaultId, keyring.RecoveryId);
+        if (_kits.Get(id) is not null) return;
+        try
+        {
+            _kits.Upsert(id, new VaultKitConfirmation(keyring.VaultId, keyring.RecoveryId, Now()));
+        }
+        catch (InvalidOperationException ex)
+        {
+            _logger.LogWarning(ex, "Could not share the Emergency Kit confirmation");
+        }
     }
 
     private void OnPasswordUnlocked() => _device.Update(d =>
