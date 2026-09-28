@@ -37,7 +37,23 @@ internal partial class MainWindow : FluentWindow
         SearchBox.SuggestionChosen += (_, e) => NavigateTo(e.SelectedItem as SearchResult);
 
         Loaded += (_, _) => Navigation.Navigate(StartupPage());
-        Navigation.Navigated += (_, _) => Dispatcher.BeginInvoke(System.Windows.Threading.DispatcherPriority.Loaded, ConstrainPageWidth);
+        Navigation.Navigated += (_, e) =>
+        {
+            UseThemeForeground(e.Page);
+            Dispatcher.BeginInvoke(System.Windows.Threading.DispatcherPriority.Loaded, ConstrainPageWidth);
+        };
+    }
+
+    /// <summary>
+    /// A page's text inherits its colour from WPF-UI's scroll viewer around the page. A page that opts out of it
+    /// (ScrollViewer.CanContentScroll="False", e.g. Vault, which scrolls its own list) inherits nothing and falls back
+    /// to WPF's default black, unreadable in the dark theme. Every page therefore gets the theme's text colour unless it
+    /// sets its own.
+    /// </summary>
+    private static void UseThemeForeground(object? page)
+    {
+        if (page is System.Windows.Controls.Page p && p.ReadLocalValue(ForegroundProperty) == DependencyProperty.UnsetValue)
+            p.SetResourceReference(ForegroundProperty, "TextFillColorPrimaryBrush");
     }
 
     /// <summary>
