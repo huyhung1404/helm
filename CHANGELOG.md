@@ -3,7 +3,7 @@
 All notable changes to Helm. The top section is used as the GitHub release body and as the Velopack release notes.
 Format: [Keep a Changelog](https://keepachangelog.com), versions follow [SemVer](https://semver.org).
 
-## [Unreleased]
+## [0.9.0] - 2026-09-28
 
 ### Added
 - Vault (PC and Android): passwords, secure notes, cards, identities and documents in one encrypted vault.
