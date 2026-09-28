@@ -1,0 +1,295 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:ic="using:FluentIcons.Avalonia"
+             xmlns:vm="using:Helm.App.Android.ViewModels"
+             xmlns:shell="using:Helm.Shell.ViewModels"
+             x:Class="Helm.App.Android.Views.GeneralView"
+             x:DataType="vm:GeneralViewModel">
+
+    <!-- Mirrors the Windows General page. Updates and Sync bind to the same view models as on Windows. -->
+    <StackPanel>
+        <Border Classes="infobar warning" IsVisible="{Binding HasStatusMessage}">
+            <TextBlock Text="{Binding StatusMessage}" TextWrapping="Wrap" />
+        </Border>
+
+        <!-- Version / updates -->
+        <TextBlock Text="Version" Classes="section" Margin="4,0,0,8" />
+        <Border Classes="card" DataContext="{Binding Updates}" x:DataType="shell:UpdatesViewModel">
+            <StackPanel>
+                <DockPanel>
+                    <Image DockPanel.Dock="Left" Source="avares://Helm.Android/Assets/helm.png" Width="32" Height="32" Margin="0,0,12,0" VerticalAlignment="Center" />
+                    <StackPanel VerticalAlignment="Center">
+                        <TextBlock Text="Updates" Classes="title" />
+                        <TextBlock Text="{Binding CurrentVersion}" Classes="secondary" />
+                    </StackPanel>
+                </DockPanel>
+
+                <Border Classes="row">
+                    <StackPanel Spacing="8">
+                        <Border Classes="infobar" IsVisible="{Binding !IsInstalled}">
+                            <StackPanel>
+                                <TextBlock Text="Automatic updates are off" Classes="title" />
+                                <TextBlock Text="{Binding NotInstalledReason}" TextWrapping="Wrap" />
+                            </StackPanel>
+                        </Border>
+                        <Border Classes="infobar warning" IsVisible="{Binding HasError}">
+                            <StackPanel>
+                                <TextBlock Text="Update problem" Classes="title" />
+                                <TextBlock Text="{Binding ErrorMessage}" TextWrapping="Wrap" />
+                            </StackPanel>
+                        </Border>
+                        <TextBlock Text="{Binding StatusText}" Classes="title" />
+                        <TextBlock Text="{Binding LastCheckedText}" Classes="secondary" />
+                        <ProgressBar Minimum="0" Maximum="100" Value="{Binding Progress}" IsVisible="{Binding IsDownloading}" />
+                        <ProgressBar IsIndeterminate="True" IsVisible="{Binding IsChecking}" />
+                        <WrapPanel>
+                            <Button Content="Check for updates" Command="{Binding CheckCommand}" IsEnabled="{Binding IsInstalled}" Margin="0,0,8,8" />
+                            <Button Content="Download" Command="{Binding DownloadCommand}" IsVisible="{Binding CanDownload}" Margin="0,0,8,8" />
+                            <Button Content="{Binding ApplyActionText}" Classes="accent" Command="{Binding RestartToUpdateCommand}" IsVisible="{Binding IsDownloaded}" Margin="0,0,8,8" />
+                        </WrapPanel>
+                        <Border Classes="infobar" IsVisible="{Binding HasReleaseNotes}">
+                            <StackPanel>
+                                <TextBlock Text="Release notes" Classes="title" Margin="0,0,0,4" />
+                                <TextBlock Text="{Binding ReleaseNotes}" TextWrapping="Wrap" />
+                            </StackPanel>
+                        </Border>
+                    </StackPanel>
+                </Border>
+
+                <Border Classes="row" IsEnabled="{Binding IsInstalled}">
+                    <StackPanel Spacing="8">
+                        <TextBlock Text="Update channel" />
+                        <TextBlock Text="Preview gets GitHub pre-releases earlier; Stable is recommended." Classes="secondary" />
+                        <ComboBox ItemsSource="{Binding Channels}" SelectedItem="{Binding Channel}" MinWidth="160" />
+                    </StackPanel>
+                </Border>
+                <Border Classes="row" IsEnabled="{Binding IsInstalled}">
+                    <Grid ColumnDefinitions="*,Auto">
+                        <StackPanel VerticalAlignment="Center">
+                            <TextBlock Text="Automatically download updates" TextWrapping="Wrap" />
+                            <TextBlock Text="Downloads in the background; Android asks you before anything is installed." Classes="secondary" />
+                        </StackPanel>
+                        <ToggleSwitch Grid.Column="1" IsChecked="{Binding AutoDownload}" OnContent="" OffContent="" VerticalAlignment="Center" />
+                    </Grid>
+                </Border>
+                <Border Classes="row">
+                    <Grid ColumnDefinitions="*,Auto">
+                        <TextBlock Text="Release history" VerticalAlignment="Center" />
+                        <HyperlinkButton Grid.Column="1" Content="Open GitHub releases" Command="{Binding OpenReleasesCommand}" />
+                    </Grid>
+                </Border>
+            </StackPanel>
+        </Border>
+
+        <!-- Appearance -->
+        <TextBlock Text="Appearance" Classes="section" />
+        <Border Classes="card">
+            <DockPanel>
+                <ic:SymbolIcon DockPanel.Dock="Left" Symbol="DarkTheme" FontSize="22" Margin="0,0,16,0" VerticalAlignment="Center" />
+                <StackPanel Spacing="8">
+                    <TextBlock Text="App theme" />
+                    <TextBlock Text="Light, dark, or follow the Android setting." Classes="secondary" />
+                    <ComboBox ItemsSource="{Binding Themes}" SelectedItem="{Binding Theme}" MinWidth="160" />
+                </StackPanel>
+            </DockPanel>
+        </Border>
+
+        <!-- Sync -->
+        <TextBlock Text="Sync" Classes="section" />
+        <Border Classes="card" DataContext="{Binding Sync}" x:DataType="shell:SyncViewModel">
+            <StackPanel>
+                <DockPanel>
+                    <ic:SymbolIcon DockPanel.Dock="Left" Symbol="ArrowSync" FontSize="22" Margin="0,0,16,0" VerticalAlignment="Center" />
+                    <StackPanel VerticalAlignment="Center">
+                        <TextBlock Text="Sync across devices" Classes="title" />
+                        <TextBlock Text="End-to-end encrypted: neither the server nor whoever issued your invite can read your data." Classes="secondary" />
+                    </StackPanel>
+                </DockPanel>
+                <ProgressBar IsIndeterminate="True" IsVisible="{Binding IsBusy}" Margin="0,8,0,0" />
+                <Border Classes="infobar warning" IsVisible="{Binding HasError}" Margin="0,12,0,0">
+                    <TextBlock Text="{Binding ErrorMessage}" TextWrapping="Wrap" />
+                </Border>
+
+                <!-- 1. Not connected: invite code or device token -->
+                <StackPanel IsVisible="{Binding IsNotConnected}">
+                    <Border Classes="row">
+                        <StackPanel Spacing="8">
+                            <TextBlock Classes="secondary" Text="Sync needs an invite code (to create your account) or a device token (to add this device to an account you already have)." />
+                            <RadioButton GroupName="SyncConnect" Content="I have an invite code" IsChecked="{Binding UseInvite}" />
+                            <RadioButton GroupName="SyncConnect" Content="I have a device token" IsChecked="{Binding UseToken}" />
+                        </StackPanel>
+                    </Border>
+                    <Border Classes="row" IsVisible="{Binding UseInvite}">
+                        <StackPanel Spacing="8">
+                            <TextBox Classes="mono" PlaceholderText="Invite code (helm_inv_…)" Text="{Binding InviteCode}" AutomationProperties.Name="Invite code" />
+                            <TextBox PlaceholderText="Account name, e.g. your name" Text="{Binding AccountNameInput}" AutomationProperties.Name="Account name" />
+                            <TextBox PlaceholderText="This device's name" Text="{Binding DeviceName}" AutomationProperties.Name="Device name" />
+                            <Button Content="Create account" Classes="accent" Command="{Binding ConnectCommand}" />
+                        </StackPanel>
+                    </Border>
+                    <Border Classes="row" IsVisible="{Binding UseToken}">
+                        <StackPanel Spacing="8">
+                            <TextBox Classes="mono" PlaceholderText="Device token (helm_pat_…)" Text="{Binding TokenInput}" AutomationProperties.Name="Device token" />
+                            <Button Content="Connect" Classes="accent" Command="{Binding ConnectCommand}" />
+                        </StackPanel>
+                    </Border>
+                </StackPanel>
+
+                <!-- 2. Connected, key needed: create the passphrase (first device) or unlock -->
+                <StackPanel IsVisible="{Binding NeedsKey}">
+                    <Border Classes="infobar" IsVisible="{Binding KeyChangedElsewhere}" Margin="0,12,0,0">
+                        <StackPanel>
+                            <TextBlock Text="The account key was changed" Classes="title" />
+                            <TextBlock TextWrapping="Wrap" Text="A device was removed on another device and the key was changed. Enter your passphrase once to keep syncing; nothing on this device was lost." />
+                        </StackPanel>
+                    </Border>
+                    <Border Classes="row" IsVisible="{Binding IsCheckingPassphrase}">
+                        <TextBlock Text="Checking the account…" Classes="secondary" />
+                    </Border>
+                    <Border Classes="row" IsVisible="{Binding IsCreatingPassphrase}">
+                        <StackPanel Spacing="8">
+                            <TextBlock Classes="title" Text="{Binding AccountName, StringFormat='Create the passphrase for {0}'}" />
+                            <TextBlock Classes="secondary" Text="It encrypts your data before it leaves this device and unlocks sync on your other devices. Nobody can reset it for you." />
+                            <TextBox PasswordChar="●" Classes="revealPasswordButton" Text="{Binding Passphrase}" AutomationProperties.Name="New passphrase"
+                                     PlaceholderText="{Binding MinPassphraseLength, StringFormat='Passphrase (at least {0} characters)'}" />
+                            <TextBlock Text="{Binding PassphraseStrengthText}" Classes="secondary" />
+                            <TextBox PasswordChar="●" Classes="revealPasswordButton" Text="{Binding PassphraseConfirm}" PlaceholderText="Repeat the passphrase" AutomationProperties.Name="Repeat passphrase" />
+                            <Button Content="Create passphrase and start syncing" Classes="accent" Command="{Binding CreatePassphraseCommand}" />
+                        </StackPanel>
+                    </Border>
+                    <Border Classes="row" IsVisible="{Binding IsUnlocking}">
+                        <StackPanel Spacing="8">
+                            <TextBlock Classes="title" Text="{Binding AccountName, StringFormat='Unlock {0} on this device'}" />
+                            <TextBlock Classes="secondary" Text="Enter the passphrase you created on your first device, or use your recovery key." />
+                            <TextBox PasswordChar="●" Classes="revealPasswordButton" Text="{Binding Passphrase}" PlaceholderText="Passphrase" AutomationProperties.Name="Passphrase"
+                                     IsVisible="{Binding !UseRecoveryKey}" />
+                            <TextBox Classes="mono" Text="{Binding RecoveryKeyInput}" PlaceholderText="Recovery key (HELM-…)" AutomationProperties.Name="Recovery key"
+                                     IsVisible="{Binding UseRecoveryKey}" />
+                            <CheckBox Content="Use the recovery key instead" IsChecked="{Binding UseRecoveryKey}" />
+                            <Button Content="Unlock" Classes="accent" Command="{Binding UnlockCommand}" />
+                        </StackPanel>
+                    </Border>
+                </StackPanel>
+
+                <!-- Recovery key, shown once after the passphrase is created -->
+                <Border Classes="row" IsVisible="{Binding IsShowingRecoveryKey}">
+                    <StackPanel Spacing="8">
+                        <Border Classes="infobar warning" Margin="0">
+                            <StackPanel>
+                                <TextBlock Text="{Binding RecoveryKeyTitle}" Classes="title" />
+                                <TextBlock TextWrapping="Wrap" Text="It is shown only this once. If you forget the passphrase, this key is the only way back into your data. Store it in a password manager or print it." />
+                            </StackPanel>
+                        </Border>
+                        <TextBox Classes="mono" Text="{Binding RecoveryKeyToShow, Mode=OneWay}" IsReadOnly="True" TextWrapping="Wrap" AutomationProperties.Name="Your recovery key" />
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                            <Button Content="Copy" Command="{Binding CopyRecoveryKeyCommand}" />
+                            <Button Content="I saved it" Classes="accent" Command="{Binding DismissRecoveryKeyCommand}" />
+                        </StackPanel>
+                    </StackPanel>
+                </Border>
+
+                <!-- 3. Ready: status, storage, devices -->
+                <StackPanel IsVisible="{Binding IsReady}">
+                    <Border Classes="row">
+                        <StackPanel Spacing="4">
+                            <TextBlock Text="{Binding AccountName}" Classes="title" />
+                            <TextBlock Text="{Binding StatusText}" Classes="secondary" />
+                            <TextBlock Text="{Binding ServerText}" Classes="secondary" />
+                            <Button Content="Sync now" Command="{Binding SyncNowCommand}" Margin="0,4,0,0" />
+                        </StackPanel>
+                    </Border>
+                    <Border Classes="row" IsVisible="{Binding NeedsProtectionUpgrade}">
+                        <StackPanel Spacing="8">
+                            <TextBlock Text="Strengthen passphrase protection" Classes="title" />
+                            <TextBlock Classes="secondary" Text="Your passphrase is protected the older way (PBKDF2). Enter it once to switch to Argon2id, which makes guessing it far harder. Nothing else changes." />
+                            <TextBox PasswordChar="●" Classes="revealPasswordButton" Text="{Binding UpgradePassphrase}" PlaceholderText="Your passphrase" AutomationProperties.Name="Passphrase to strengthen" />
+                            <Button Content="Strengthen" Classes="accent" Command="{Binding UpgradeProtectionCommand}" />
+                        </StackPanel>
+                    </Border>
+                    <Border Classes="row">
+                        <StackPanel Spacing="6">
+                            <TextBlock Text="{Binding UsageText}" />
+                            <ProgressBar Minimum="0" Maximum="100" Value="{Binding UsagePercent}" />
+                        </StackPanel>
+                    </Border>
+                    <Border Classes="row" IsVisible="{Binding CanManageDevices}">
+                        <StackPanel Spacing="8">
+                            <TextBlock Text="Devices" Classes="title" />
+                            <ItemsControl ItemsSource="{Binding Devices}">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate DataType="shell:SyncDeviceItem">
+                                        <Grid ColumnDefinitions="*,Auto" Margin="0,0,0,8">
+                                            <StackPanel VerticalAlignment="Center">
+                                                <TextBlock TextWrapping="Wrap">
+                                                    <Run Text="{Binding Name, Mode=OneWay}" />
+                                                    <Run Text="{Binding Status, Mode=OneWay}" Foreground="{DynamicResource HelmSecondaryText}" />
+                                                </TextBlock>
+                                                <TextBlock Text="{Binding Details}" Classes="secondary" />
+                                            </StackPanel>
+                                            <Button Grid.Column="1" Content="Remove" Classes="danger" IsVisible="{Binding CanRevoke}" CommandParameter="{Binding}"
+                                                    Command="{Binding $parent[ItemsControl].((shell:SyncViewModel)DataContext).RevokeDeviceCommand}" />
+                                        </Grid>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                            <Border Classes="infobar" IsVisible="{Binding IsRemovingDevice}">
+                                <StackPanel Spacing="8">
+                                    <TextBlock Text="{Binding RemovingDeviceText}" Classes="title" />
+                                    <TextBlock TextWrapping="Wrap" Text="Recommended: also change the account key, so that device can never read anything written from now on. Your other devices will ask for the passphrase once, and you get a new recovery key." />
+                                    <TextBox PasswordChar="●" Classes="revealPasswordButton" Text="{Binding RemovePassphrase}" PlaceholderText="Your passphrase" AutomationProperties.Name="Passphrase to change the key" />
+                                    <WrapPanel>
+                                        <Button Content="Remove and change key" Classes="danger" Command="{Binding RemoveDeviceAndChangeKeyCommand}" Margin="0,0,8,8" />
+                                        <Button Content="Remove only" Command="{Binding RemoveDeviceOnlyCommand}" Margin="0,0,8,8" />
+                                        <Button Content="Cancel" Command="{Binding CancelRemoveDeviceCommand}" Margin="0,0,8,8" />
+                                    </WrapPanel>
+                                </StackPanel>
+                            </Border>
+                            <TextBlock Text="Add a device" Classes="title" Margin="0,8,0,0" />
+                            <TextBox Text="{Binding NewDeviceName}" PlaceholderText="Device name, e.g. Laptop" AutomationProperties.Name="New device name" />
+                            <TextBox Text="{Binding NewDeviceDays}" PlaceholderText="Expires in days (optional)" AutomationProperties.Name="New device expiry in days" />
+                            <Button Content="Create token" Command="{Binding AddDeviceCommand}" />
+                            <StackPanel Spacing="8" IsVisible="{Binding HasNewDeviceToken}">
+                                <TextBlock Classes="secondary" Text="Copy this token now; it is shown only once. On the new device: General → Sync → I have a device token, then unlock with your passphrase." />
+                                <TextBox Classes="mono" Text="{Binding NewDeviceToken, Mode=OneWay}" IsReadOnly="True" TextWrapping="Wrap" AutomationProperties.Name="New device token" />
+                                <StackPanel Orientation="Horizontal" Spacing="8">
+                                    <Button Content="Copy" Command="{Binding CopyNewDeviceTokenCommand}" />
+                                    <Button Content="Done" Command="{Binding DismissNewDeviceTokenCommand}" />
+                                </StackPanel>
+                            </StackPanel>
+                        </StackPanel>
+                    </Border>
+                    <Border Classes="row">
+                        <StackPanel Spacing="8">
+                            <TextBlock Text="Turn off sync on this device" />
+                            <TextBlock Text="Stops syncing and forgets this device's token and key. Your data stays." Classes="secondary" />
+                            <Button Content="Turn off…" Classes="danger" Command="{Binding SignOutCommand}" />
+                        </StackPanel>
+                    </Border>
+                </StackPanel>
+            </StackPanel>
+        </Border>
+
+        <!-- Backup & troubleshooting -->
+        <TextBlock Text="Backup &amp; troubleshooting" Classes="section" />
+        <Border Classes="card">
+            <DockPanel>
+                <ic:SymbolIcon DockPanel.Dock="Left" Symbol="DocumentText" FontSize="22" Margin="0,0,16,0" VerticalAlignment="Center" />
+                <StackPanel Spacing="8">
+                    <TextBlock Text="Logs" />
+                    <TextBlock Text="Rolling daily log files, kept for 14 days. Share the latest one to send it to yourself." Classes="secondary" />
+                    <Button Content="Share latest log" Command="{Binding ShareLogsCommand}" />
+                </StackPanel>
+            </DockPanel>
+        </Border>
+        <Border Classes="card">
+            <DockPanel>
+                <ic:SymbolIcon DockPanel.Dock="Left" Symbol="ArrowReset" FontSize="22" Margin="0,0,16,0" VerticalAlignment="Center" />
+                <StackPanel Spacing="8">
+                    <TextBlock Text="Reset all settings" />
+                    <TextBlock Text="Delete every setting on this phone, then restart Helm." Classes="secondary" />
+                    <Button Content="Reset…" Classes="danger" Command="{Binding ResetAllSettingsCommand}" />
+                </StackPanel>
+            </DockPanel>
+        </Border>
+    </StackPanel>
+</UserControl>

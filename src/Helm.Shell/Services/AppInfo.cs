@@ -1,8 +1,8 @@
 using System.Reflection;
 
-namespace Helm.App.Services;
+namespace Helm.Shell.Services;
 
-internal static class AppInfo
+public static class AppInfo
 {
     public const string RepositoryUrl = "https://github.com/huyhung1404/helm";
     public const string IssuesUrl = RepositoryUrl + "/issues/new";

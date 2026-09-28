@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<paths>
+  <!-- Downloaded update APKs (see AndroidUpdateService). -->
+  <cache-path name="updates" path="updates/" />
+  <!-- Log files shared from General → Logs. -->
+  <files-path name="logs" path="Helm/logs/" />
+</paths>

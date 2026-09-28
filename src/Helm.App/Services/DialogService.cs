@@ -1,12 +1,8 @@
-﻿using WpfUiMessageBox = Wpf.Ui.Controls.MessageBox;
+using Helm.Shell.Services;
+using WpfUiMessageBox = Wpf.Ui.Controls.MessageBox;
 using WpfUiMessageBoxResult = Wpf.Ui.Controls.MessageBoxResult;
 
 namespace Helm.App.Services;
-
-internal interface IDialogService
-{
-    Task<bool> ConfirmAsync(string title, string message, string confirmText);
-}
 
 internal sealed class DialogService : IDialogService
 {
@@ -22,4 +18,18 @@ internal sealed class DialogService : IDialogService
         };
         return await box.ShowDialogAsync().ConfigureAwait(true) == WpfUiMessageBoxResult.Primary;
     }
+}
+
+internal sealed class ClipboardService : IClipboardService
+{
+    public void SetText(string text)
+    {
+        try { System.Windows.Clipboard.SetText(text); }
+        catch (System.Runtime.InteropServices.COMException) { } // clipboard busy; the text is still selectable
+    }
+}
+
+internal sealed class DeviceInfo : IDeviceInfo
+{
+    public string DeviceName => Environment.MachineName;
 }

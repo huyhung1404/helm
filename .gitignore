@@ -484,3 +484,9 @@ $RECYCLE.BIN/
 # Velopack / local packaging
 releases/
 artifacts/
+
+# Android signing keys: never commit (see docs/android.md#release-signing)
+*.keystore
+*.jks
+*.p12
+keystore-base64.txt

@@ -1,5 +1,4 @@
 using System.Security.Cryptography;
-using System.Text;
 
 namespace Helm.Core.Sync;
 
@@ -17,12 +16,12 @@ public interface IMasterKeyStore
 }
 
 /// <summary>
-/// Keeps the master key in a file protected with DPAPI for the current Windows user, so another account on the
-/// machine (or a copy of the file on another machine) cannot use it.
+/// Keeps the master key in a file protected by <see cref="ISecretProtector"/> (DPAPI for the current Windows user,
+/// the Android Keystore on a phone), so another account (or a copy of the file on another device) cannot use it.
 /// </summary>
-public sealed class DpapiMasterKeyStore(string filePath) : IMasterKeyStore
+public sealed class ProtectedMasterKeyStore(string filePath, ISecretProtector protector) : IMasterKeyStore
 {
-    private static readonly byte[] Entropy = Encoding.UTF8.GetBytes("Helm.Sync.MasterKey.v1");
+    private const string Purpose = "Helm.Sync.MasterKey.v1";
 
     public string FilePath { get; } = filePath;
 
@@ -31,7 +30,7 @@ public sealed class DpapiMasterKeyStore(string filePath) : IMasterKeyStore
         if (!File.Exists(FilePath)) return null;
         try
         {
-            var key = ProtectedData.Unprotect(File.ReadAllBytes(FilePath), Entropy, DataProtectionScope.CurrentUser);
+            var key = protector.Unprotect(File.ReadAllBytes(FilePath), Purpose);
             return key.Length > 0 ? key : null;
         }
         catch (Exception ex) when (ex is CryptographicException or IOException or UnauthorizedAccessException)
@@ -43,7 +42,7 @@ public sealed class DpapiMasterKeyStore(string filePath) : IMasterKeyStore
     public void Save(ReadOnlySpan<byte> masterKey)
     {
         if (masterKey.IsEmpty) throw new ArgumentException("Empty key data.", nameof(masterKey));
-        var protectedKey = ProtectedData.Protect(masterKey.ToArray(), Entropy, DataProtectionScope.CurrentUser);
+        var protectedKey = protector.Protect(masterKey.ToArray(), Purpose);
         Directory.CreateDirectory(Path.GetDirectoryName(FilePath)!);
         var temp = FilePath + ".tmp";
         File.WriteAllBytes(temp, protectedKey);
@@ -72,9 +71,9 @@ public sealed class InMemoryMasterKeyStore(byte[]? key = null) : IMasterKeyStore
 /// The device-local key that encrypts the replica at rest (<see cref="SyncDatabase"/>). It never leaves this
 /// device and is unrelated to the account key; losing it only means the replica is rebuilt from the server.
 /// </summary>
-public sealed class DpapiLocalKeyStore(string filePath)
+public sealed class ProtectedLocalKeyStore(string filePath, ISecretProtector protector)
 {
-    private static readonly byte[] Entropy = Encoding.UTF8.GetBytes("Helm.Sync.LocalKey.v1");
+    private const string Purpose = "Helm.Sync.LocalKey.v1";
 
     public string FilePath { get; } = filePath;
 
@@ -84,7 +83,7 @@ public sealed class DpapiLocalKeyStore(string filePath)
         {
             try
             {
-                var key = ProtectedData.Unprotect(File.ReadAllBytes(FilePath), Entropy, DataProtectionScope.CurrentUser);
+                var key = protector.Unprotect(File.ReadAllBytes(FilePath), Purpose);
                 if (key.Length == SyncKeyring.KeySize) return key;
             }
             catch (CryptographicException)
@@ -95,7 +94,7 @@ public sealed class DpapiLocalKeyStore(string filePath)
         var created = RandomNumberGenerator.GetBytes(SyncKeyring.KeySize);
         Directory.CreateDirectory(Path.GetDirectoryName(FilePath)!);
         var temp = FilePath + ".tmp";
-        File.WriteAllBytes(temp, ProtectedData.Protect(created, Entropy, DataProtectionScope.CurrentUser));
+        File.WriteAllBytes(temp, protector.Protect(created, Purpose));
         File.Move(temp, FilePath, overwrite: true);
         return created;
     }

@@ -5,7 +5,7 @@
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
     xmlns:services="clr-namespace:Helm.App.Services"
-    xmlns:core="clr-namespace:Helm.Core.Ui;assembly=Helm.Core"
+    xmlns:core="clr-namespace:Helm.Core.Ui;assembly=Helm.Core.Windows"
     xmlns:vm="clr-namespace:Helm.App.ViewModels"
     Title="Home">
 

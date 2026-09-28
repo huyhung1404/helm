@@ -137,11 +137,11 @@ public sealed class SyncTransportTests
         var path = Path.Combine(Path.GetTempPath(), "helm-tests", Guid.NewGuid().ToString("N"), "credentials.bin");
         try
         {
-            var store = new DpapiSyncCredentialStore(path);
+            var store = new ProtectedSyncCredentialStore(path, new DpapiSecretProtector());
             var credentials = new SyncCredentials(new Uri("https://sync.example/"), ValidToken);
             store.Save(credentials);
 
-            Assert.Equal(credentials, new DpapiSyncCredentialStore(path).Load());
+            Assert.Equal(credentials, new ProtectedSyncCredentialStore(path, new DpapiSecretProtector()).Load());
             Assert.DoesNotContain(ValidToken, Encoding.UTF8.GetString(File.ReadAllBytes(path)));
             Assert.Throws<ArgumentException>(() => store.Save(credentials with { Token = "helm_pat_nope" }));
         }

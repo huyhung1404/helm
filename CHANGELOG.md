@@ -3,6 +3,18 @@
 All notable changes to Helm. The top section is used as the GitHub release body and as the Velopack release notes.
 Format: [Keep a Changelog](https://keepachangelog.com), versions follow [SemVer](https://semver.org).
 
+## [Unreleased]
+
+### Added
+- Helm for Android (8.0 or newer): `Helm-android.apk` is attached to every release, with the same Home and
+  General pages as on the PC. Tools come per platform; the Android app starts without any, and Claude Chat
+  stays PC only.
+  - Sync works on the phone too: add it to your account from General → Sync with a device token, then unlock
+    with your passphrase. Its keys are kept in the Android Keystore.
+  - Updates like on the PC (Stable or Preview): Helm downloads new versions from GitHub in the background,
+    checks them, and asks Android to install them when you tap Install update.
+  - Light, dark or system theme, shareable log files, and Reset all settings.
+
 ## [0.7.0] - 2026-09-27
 
 ### Added

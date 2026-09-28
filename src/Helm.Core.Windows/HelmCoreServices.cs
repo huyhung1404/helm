@@ -14,11 +14,11 @@ namespace Helm.Core;
 
 public static class HelmCoreServices
 {
-    /// <summary>Registers the shared infrastructure every module relies on.</summary>
+    /// <summary>Registers the shared infrastructure every Windows module relies on.</summary>
     public static IServiceCollection AddHelmCore(this IServiceCollection services, HelmPaths paths)
     {
-        services.AddSingleton(paths);
-        services.AddSingleton<ISettingsStoreFactory>(sp => new SettingsStoreFactory(paths, sp.GetService<ILoggerFactory>()));
+        services.AddSingleton<ISecretProtector, DpapiSecretProtector>();
+        services.AddHelmCommon(paths);
         services.AddSingleton<IHotkeyManager, HotkeyManager>();
         services.AddSingleton<LowLevelKeyboardHook>();
         services.AddSingleton<LowLevelMouseHook>();
@@ -29,7 +29,6 @@ public static class HelmCoreServices
         services.AddSingleton<IChildProcessLauncher, ChildProcessLauncher>();
         services.TryAddSingleton<IAppLocation, ProcessAppLocation>();
         services.AddSingleton<IModuleHost, ModuleRegistry>();
-        services.AddHelmSync(paths);
         return services;
     }
 

@@ -24,7 +24,8 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\src\Helm.Core\Helm.Core.csproj" />
+    <ProjectReference Include="..\..\src\Helm.Core.Windows\Helm.Core.Windows.csproj" />
+    <ProjectReference Include="..\..\src\Helm.Shell\Helm.Shell.csproj" />
     <ProjectReference Include="..\..\src\Helm.Modules.AlwaysOnTop\Helm.Modules.AlwaysOnTop.csproj" />
     <ProjectReference Include="..\..\src\Helm.Modules.ClaudeChat\Helm.Modules.ClaudeChat.csproj" />
   </ItemGroup>

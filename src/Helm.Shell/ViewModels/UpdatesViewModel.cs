@@ -1,14 +1,14 @@
 using System.Text.RegularExpressions;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
-using Helm.App.Services;
 using Helm.Core.Services;
 using Helm.Core.Settings;
+using Helm.Shell.Services;
 
-namespace Helm.App.ViewModels;
+namespace Helm.Shell.ViewModels;
 
 /// <summary>General → Updates. All state comes from <see cref="IUpdateService"/>; failures are shown quietly.</summary>
-internal sealed partial class UpdatesViewModel : ObservableObject
+public sealed partial class UpdatesViewModel : ObservableObject
 {
     private readonly IUpdateService _updates;
     private readonly ISettingsStore<GeneralSettings> _general;
@@ -75,12 +75,15 @@ internal sealed partial class UpdatesViewModel : ObservableObject
         UpdateState.Checking => "Checking for updates…",
         UpdateState.UpdateAvailable => $"Version {_updates.LastResult?.Version} is available{SizeText()}",
         UpdateState.Downloading => $"Downloading version {_updates.LastResult?.Version}… {Progress}%",
-        UpdateState.Downloaded => $"Version {_updates.LastResult?.Version} is ready — restart to update",
+        UpdateState.Downloaded => $"Version {_updates.LastResult?.Version} is ready — {ApplyActionText.ToLowerInvariant()}",
         UpdateState.Applying => "Applying the update…",
         UpdateState.Failed => "The last update attempt failed",
         UpdateState.UpToDate => "You're up to date",
         _ => "Not checked yet",
     };
+
+    /// <summary>"Restart to update" on Windows, "Install update" on Android.</summary>
+    public string ApplyActionText => _updates.ApplyActionText;
 
     public string LastCheckedText => _updates.LastChecked is { } t ? $"Last checked {t.ToLocalTime():g}" : "Never checked";
 

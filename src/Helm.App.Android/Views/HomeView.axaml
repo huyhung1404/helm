@@ -1,0 +1,106 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:ic="using:FluentIcons.Avalonia"
+             xmlns:vm="using:Helm.App.Android.ViewModels"
+             xmlns:m="using:Helm.App.Android.Modules"
+             x:Class="Helm.App.Android.Views.HomeView"
+             x:DataType="vm:HomeViewModel">
+
+    <!-- Same content as the Windows Home page, stacked for a phone: What's new, Updates, Quick access, Utilities. -->
+    <StackPanel Spacing="4">
+        <Border Classes="card" Padding="0">
+            <Button Classes="flat" Padding="12" Command="{Binding OpenWhatsNewCommand}">
+                <DockPanel>
+                    <Border Width="72" Height="44" CornerRadius="6" Margin="0,0,12,0" DockPanel.Dock="Left">
+                        <Border.Background>
+                            <LinearGradientBrush StartPoint="0%,0%" EndPoint="100%,100%">
+                                <GradientStop Color="#0B3A66" Offset="0" />
+                                <GradientStop Color="#2B2B6B" Offset="1" />
+                            </LinearGradientBrush>
+                        </Border.Background>
+                        <Image Source="avares://Helm.Android/Assets/helm.png" Width="30" Height="30" />
+                    </Border>
+                    <StackPanel VerticalAlignment="Center">
+                        <TextBlock Text="Learn what's new" Classes="title" />
+                        <TextBlock Text="{Binding Version}" Classes="secondary" />
+                    </StackPanel>
+                </DockPanel>
+            </Button>
+        </Border>
+
+        <Border Classes="card" Padding="0">
+            <Button Classes="flat" Padding="12" Command="{Binding UpdateTileTapCommand}">
+                <DockPanel>
+                    <Panel Width="28" Margin="4,0,16,0" DockPanel.Dock="Left" VerticalAlignment="Center">
+                        <ic:SymbolIcon Symbol="CheckmarkCircle" IconVariant="Filled" FontSize="26" Foreground="{DynamicResource HelmSuccess}"
+                                       IsVisible="{Binding IsToneOk}" />
+                        <ic:SymbolIcon Symbol="ArrowCircleDown" IconVariant="Filled" FontSize="26" Foreground="{DynamicResource SystemAccentColor}"
+                                       IsVisible="{Binding IsToneAttention}" />
+                        <ic:SymbolIcon Symbol="Info" IconVariant="Filled" FontSize="26" Foreground="{DynamicResource HelmSecondaryText}"
+                                       IsVisible="{Binding IsToneMuted}" />
+                        <ProgressBar IsIndeterminate="True" IsVisible="{Binding UpdateTile.IsChecking}" MinWidth="0" Width="28" VerticalAlignment="Center" />
+                    </Panel>
+                    <StackPanel VerticalAlignment="Center">
+                        <TextBlock Text="{Binding UpdateTile.Title}" Classes="title" />
+                        <TextBlock Text="{Binding UpdateTile.Subtitle}" Classes="secondary" />
+                    </StackPanel>
+                </DockPanel>
+            </Button>
+        </Border>
+
+        <Border Classes="card" Margin="0,12,0,4">
+            <StackPanel>
+                <TextBlock Text="Quick access" FontSize="16" FontWeight="SemiBold" Margin="0,0,0,12" />
+                <TextBlock Text="Tools you turn on will appear here." Classes="secondary" IsVisible="{Binding !HasQuickAccess}" />
+                <ItemsControl ItemsSource="{Binding QuickAccess}">
+                    <ItemsControl.ItemsPanel>
+                        <ItemsPanelTemplate>
+                            <UniformGrid Columns="3" />
+                        </ItemsPanelTemplate>
+                    </ItemsControl.ItemsPanel>
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate DataType="m:IAndroidModule">
+                            <Button Classes="flat" Padding="8,12" Margin="2" HorizontalContentAlignment="Center" CommandParameter="{Binding}"
+                                    Command="{Binding $parent[ItemsControl].((vm:HomeViewModel)DataContext).LaunchModuleCommand}">
+                                <StackPanel Spacing="8">
+                                    <ic:SymbolIcon Symbol="{Binding Icon}" FontSize="30" Foreground="{DynamicResource SystemAccentColor}" HorizontalAlignment="Center" />
+                                    <TextBlock Text="{Binding DisplayName}" TextAlignment="Center" TextWrapping="Wrap" FontSize="12" />
+                                </StackPanel>
+                            </Button>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+            </StackPanel>
+        </Border>
+
+        <Border Classes="card" Padding="0">
+            <StackPanel>
+                <Grid ColumnDefinitions="*,Auto" Margin="16,8,4,4">
+                    <TextBlock Text="Utilities" FontSize="16" FontWeight="SemiBold" VerticalAlignment="Center" />
+                    <Button Grid.Column="1" Classes="flat" Width="44" Height="44" Padding="0" HorizontalContentAlignment="Center"
+                            Command="{Binding ToggleSortCommand}" AutomationProperties.Name="Sort">
+                        <ic:SymbolIcon Symbol="ArrowSort" FontSize="20" />
+                    </Button>
+                </Grid>
+                <ItemsControl ItemsSource="{Binding Utilities}">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate DataType="m:IAndroidModule">
+                            <Border BorderThickness="0,1,0,0" BorderBrush="{DynamicResource HelmCardStroke}">
+                                <Grid ColumnDefinitions="36,*,Auto,Auto" Margin="16,4,4,4">
+                                    <ic:SymbolIcon Symbol="{Binding Icon}" FontSize="20" Foreground="{DynamicResource SystemAccentColor}" VerticalAlignment="Center" HorizontalAlignment="Left" />
+                                    <TextBlock Grid.Column="1" Text="{Binding DisplayName}" VerticalAlignment="Center" />
+                                    <ToggleSwitch Grid.Column="2" IsChecked="{Binding IsEnabled}" OnContent="" OffContent="" VerticalAlignment="Center" />
+                                    <Button Grid.Column="3" Classes="flat" Width="44" Height="44" Padding="0" HorizontalContentAlignment="Center" CommandParameter="{Binding}"
+                                            Command="{Binding $parent[ItemsControl].((vm:HomeViewModel)DataContext).OpenModuleCommand}">
+                                        <ic:SymbolIcon Symbol="ChevronRight" FontSize="18" />
+                                    </Button>
+                                </Grid>
+                            </Border>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+                <TextBlock Text="No tools yet — new tools are on the way." Classes="secondary" Margin="16,4,16,16" IsVisible="{Binding !HasUtilities}" />
+            </StackPanel>
+        </Border>
+    </StackPanel>
+</UserControl>

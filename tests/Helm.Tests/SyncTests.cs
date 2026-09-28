@@ -360,7 +360,7 @@ public sealed class SyncTests : IDisposable
     [Fact]
     public void Dpapi_key_store_round_trips_and_clears()
     {
-        var store = new DpapiMasterKeyStore(Path.Combine(_dir, "master.key"));
+        var store = new ProtectedMasterKeyStore(Path.Combine(_dir, "master.key"), new DpapiSecretProtector());
         Assert.Null(store.Load());
 
         store.Save(_key);

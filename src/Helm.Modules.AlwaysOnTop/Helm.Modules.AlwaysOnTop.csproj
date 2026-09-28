@@ -6,7 +6,7 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\Helm.Core\Helm.Core.csproj" />
+    <ProjectReference Include="..\Helm.Core.Windows\Helm.Core.Windows.csproj" />
   </ItemGroup>
 
   <ItemGroup>

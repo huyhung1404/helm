@@ -42,6 +42,8 @@ internal static class HelmHost
         builder.Services.AddSingleton<IShellNavigator>(sp => sp.GetRequiredService<ShellNavigator>());
         builder.Services.AddSingleton<IShellNavigation>(sp => sp.GetRequiredService<ShellNavigator>());
         builder.Services.AddSingleton<IDialogService, DialogService>();
+        builder.Services.AddSingleton<IClipboardService, ClipboardService>();
+        builder.Services.AddSingleton<IDeviceInfo, DeviceInfo>();
         builder.Services.AddSingleton<TrayService>();
         builder.Services.AddSingleton<IUserNotifications>(sp => sp.GetRequiredService<TrayService>());
         builder.Services.AddSingleton<SearchService>();

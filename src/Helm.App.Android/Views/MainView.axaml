@@ -1,0 +1,82 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:ic="using:FluentIcons.Avalonia"
+             xmlns:vm="using:Helm.App.Android.ViewModels"
+             xmlns:views="using:Helm.App.Android.Views"
+             x:Class="Helm.App.Android.Views.MainView"
+             x:DataType="vm:MainViewModel"
+             Background="{DynamicResource HelmBarBackground}">
+
+    <UserControl.DataTemplates>
+        <DataTemplate DataType="vm:HomeViewModel">
+            <views:HomeView />
+        </DataTemplate>
+        <DataTemplate DataType="vm:GeneralViewModel">
+            <views:GeneralView />
+        </DataTemplate>
+    </UserControl.DataTemplates>
+
+    <Grid>
+        <DockPanel>
+            <!-- App bar: drawer button + page title (the Windows title bar + nav pane toggle) -->
+            <Grid DockPanel.Dock="Top" ColumnDefinitions="Auto,*" Height="56" Background="{DynamicResource HelmBarBackground}">
+                <Button Classes="flat" Width="48" Height="48" Margin="4,0,0,0" Padding="0" HorizontalContentAlignment="Center"
+                        Command="{Binding TogglePaneCommand}" ToolTip.Tip="Navigation" AutomationProperties.Name="Open navigation">
+                    <ic:SymbolIcon Symbol="Navigation" FontSize="22" />
+                </Button>
+                <TextBlock Grid.Column="1" Text="{Binding Navigator.Title}" FontSize="20" FontWeight="SemiBold" VerticalAlignment="Center" Margin="8,0,16,0" />
+            </Grid>
+
+            <SplitView IsPaneOpen="{Binding IsPaneOpen}" DisplayMode="Overlay" OpenPaneLength="296" PaneBackground="{DynamicResource HelmBarBackground}">
+                <SplitView.Pane>
+                    <DockPanel Margin="8">
+                        <Button DockPanel.Dock="Bottom" Classes="flat" Command="{Binding OpenCommand}" CommandParameter="{Binding GeneralEntry}">
+                            <StackPanel Orientation="Horizontal" Spacing="16">
+                                <ic:SymbolIcon Symbol="Settings" FontSize="20" />
+                                <TextBlock Text="General" VerticalAlignment="Center" />
+                            </StackPanel>
+                        </Button>
+                        <ScrollViewer>
+                            <ItemsControl ItemsSource="{Binding Entries}">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate DataType="vm:NavEntry">
+                                        <Panel>
+                                            <TextBlock Text="{Binding Title}" IsVisible="{Binding IsHeader}" Classes="secondary" FontWeight="SemiBold" Margin="12,16,12,4" />
+                                            <Button Classes="flat" IsVisible="{Binding IsPage}" CommandParameter="{Binding}"
+                                                    Command="{Binding $parent[ItemsControl].((vm:MainViewModel)DataContext).OpenCommand}">
+                                                <StackPanel Orientation="Horizontal" Spacing="16">
+                                                    <ic:SymbolIcon Symbol="{Binding Icon}" FontSize="20" />
+                                                    <TextBlock Text="{Binding Title}" VerticalAlignment="Center" />
+                                                </StackPanel>
+                                            </Button>
+                                        </Panel>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </ScrollViewer>
+                    </DockPanel>
+                </SplitView.Pane>
+
+                <Border Background="{DynamicResource HelmPageBackground}" CornerRadius="8,8,0,0">
+                    <ScrollViewer x:Name="PageScroller" HorizontalScrollBarVisibility="Disabled">
+                        <ContentControl x:Name="PageHost" Content="{Binding Navigator.CurrentPage}" Margin="16,16,16,24" />
+                    </ScrollViewer>
+                </Border>
+            </SplitView>
+        </DockPanel>
+
+        <!-- Confirmation dialog (IDialogService) -->
+        <Border Background="{DynamicResource HelmScrim}" IsVisible="{Binding Dialogs.IsOpen}">
+            <Border Classes="card" MaxWidth="400" Margin="24" Padding="24,20" VerticalAlignment="Center" BoxShadow="0 8 32 0 #40000000">
+                <StackPanel Spacing="12">
+                    <TextBlock Text="{Binding Dialogs.Title}" FontSize="18" Classes="title" />
+                    <TextBlock Text="{Binding Dialogs.Message}" TextWrapping="Wrap" />
+                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Spacing="8" Margin="0,8,0,0">
+                        <Button Content="Cancel" Command="{Binding Dialogs.CancelCommand}" />
+                        <Button Content="{Binding Dialogs.ConfirmText}" Classes="accent" Command="{Binding Dialogs.ConfirmCommand}" />
+                    </StackPanel>
+                </StackPanel>
+            </Border>
+        </Border>
+    </Grid>
+</UserControl>

@@ -50,6 +50,12 @@ public interface IUpdateService
 
     Task DownloadAsync(IProgress<int>? progress, CancellationToken ct);
 
-    /// <summary>Disables every module, applies the downloaded update and restarts Helm.</summary>
+    /// <summary>Home tile title when <see cref="IsInstalled"/> is false.</summary>
+    string NotInstalledTitle => "Updates unavailable (portable build)";
+
+    /// <summary>Label of the action that installs a downloaded update.</summary>
+    string ApplyActionText => "Restart to update";
+
+    /// <summary>Disables every module, applies the downloaded update and restarts Helm (Android: opens the installer).</summary>
     Task ApplyAndRestartAsync();
 }

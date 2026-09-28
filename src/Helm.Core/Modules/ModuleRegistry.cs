@@ -4,11 +4,12 @@ using Microsoft.Extensions.Logging;
 
 namespace Helm.Core.Modules;
 
-public interface IModuleHost
+/// <summary>The modules of one app (Windows or Android) and their enabled state.</summary>
+public interface IModuleHost<TModule> where TModule : class, IModule
 {
-    IReadOnlyList<IHelmModule> Modules { get; }
+    IReadOnlyList<TModule> Modules { get; }
 
-    IHelmModule? Find(string id);
+    TModule? Find(string id);
 
     /// <summary>Enables every module whose saved state is enabled, then starts tracking toggles.</summary>
     Task StartAsync(CancellationToken ct);
@@ -17,14 +18,14 @@ public interface IModuleHost
     Task StopAllAsync();
 }
 
-public sealed class ModuleRegistry : IModuleHost
+public class ModuleRegistry<TModule> : IModuleHost<TModule> where TModule : class, IModule
 {
     private readonly ISettingsStore<GeneralSettings> _general;
-    private readonly ILogger<ModuleRegistry> _logger;
-    private readonly Dictionary<IHelmModule, ModuleState> _states = new();
+    private readonly ILogger _logger;
+    private readonly Dictionary<TModule, ModuleState> _states = new();
     private bool _started;
 
-    public ModuleRegistry(IEnumerable<IHelmModule> modules, ISettingsStoreFactory settings, ILogger<ModuleRegistry> logger)
+    public ModuleRegistry(IEnumerable<TModule> modules, ISettingsStoreFactory settings, ILogger logger)
     {
         _logger = logger;
         _general = settings.Get<GeneralSettings>(GeneralSettings.StoreId);
@@ -32,9 +33,9 @@ public sealed class ModuleRegistry : IModuleHost
         foreach (var module in Modules) _states[module] = new ModuleState();
     }
 
-    public IReadOnlyList<IHelmModule> Modules { get; }
+    public IReadOnlyList<TModule> Modules { get; }
 
-    public IHelmModule? Find(string id) => Modules.FirstOrDefault(m => string.Equals(m.Id, id, StringComparison.OrdinalIgnoreCase));
+    public TModule? Find(string id) => Modules.FirstOrDefault(m => string.Equals(m.Id, id, StringComparison.OrdinalIgnoreCase));
 
     public async Task StartAsync(CancellationToken ct)
     {
@@ -78,7 +79,7 @@ public sealed class ModuleRegistry : IModuleHost
 
     private async void OnModulePropertyChanged(object? sender, PropertyChangedEventArgs e)
     {
-        if (e.PropertyName != nameof(IHelmModule.IsEnabled) || sender is not IHelmModule module) return;
+        if (e.PropertyName != nameof(IModule.IsEnabled) || sender is not TModule module) return;
         try
         {
             _general.Update(s => s.EnabledModules[module.Id] = module.IsEnabled);
@@ -91,8 +92,8 @@ public sealed class ModuleRegistry : IModuleHost
         }
     }
 
-    /// <summary>Brings the running state in line with <see cref="IHelmModule.IsEnabled"/>, serialized per module.</summary>
-    private async Task SyncAsync(IHelmModule module, CancellationToken ct)
+    /// <summary>Brings the running state in line with <see cref="IModule.IsEnabled"/>, serialized per module.</summary>
+    private async Task SyncAsync(TModule module, CancellationToken ct)
     {
         var state = _states[module];
         await state.Gate.WaitAsync(ct).ConfigureAwait(true);
@@ -109,7 +110,7 @@ public sealed class ModuleRegistry : IModuleHost
                 catch (Exception ex)
                 {
                     _logger.LogError(ex, "Module {Id} failed to enable", module.Id);
-                    if (module is HelmModuleBase b) b.StatusMessage = $"Could not start {module.DisplayName}: {ex.Message}";
+                    if (module is ModuleBase b) b.StatusMessage = $"Could not start {module.DisplayName}: {ex.Message}";
                     try { await module.DisableAsync().ConfigureAwait(true); }
                     catch (Exception cleanupEx) { _logger.LogError(cleanupEx, "Module {Id} cleanup failed", module.Id); }
                 }
@@ -126,7 +127,7 @@ public sealed class ModuleRegistry : IModuleHost
                     _logger.LogError(ex, "Module {Id} failed to disable", module.Id);
                 }
                 state.Running = false;
-                if (module is HelmModuleBase b) b.StatusMessage = null;
+                if (module is ModuleBase b) b.StatusMessage = null;
             }
         }
         finally

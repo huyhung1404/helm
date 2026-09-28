@@ -138,12 +138,7 @@ internal sealed partial class HomeViewModel : ObservableObject
         : $"{UpdateTitle}{Environment.NewLine}{_updates.ErrorMessage}";
 
     /// <summary>"ok" (green check), "attention" (accent download), "muted" (info) — styles the tile icon.</summary>
-    public string UpdateTone => _updates.State switch
-    {
-        UpdateState.UpdateAvailable or UpdateState.Downloading or UpdateState.Downloaded or UpdateState.Applying => "attention",
-        UpdateState.NotInstalled or UpdateState.Failed => "muted",
-        _ => "ok",
-    };
+    public string UpdateTone => UpdateTile.From(_updates).Tone;
 
     public void RefreshAll()
     {
@@ -207,30 +202,11 @@ internal sealed partial class HomeViewModel : ObservableObject
 
     private void RefreshUpdateTile()
     {
-        var version = _updates.LastResult?.Version;
-        var lastChecked = _updates.LastChecked is { } checkedAt ? $"Last checked: {FormatWhen(checkedAt)}" : "Not checked yet";
-        IsCheckingForUpdates = _updates.State == UpdateState.Checking;
-        (UpdateTitle, UpdateSubtitle) = _updates.State switch
-        {
-            UpdateState.Checking => ("Checking…", lastChecked),
-            UpdateState.UpToDate => ("You're up to date", lastChecked),
-            UpdateState.UpdateAvailable => ($"Update available · v{version}", "Open General → Updates"),
-            UpdateState.Downloading => ($"Update available · v{version}", $"Downloading… {_updates.DownloadProgress}%"),
-            UpdateState.Downloaded => ($"Update available · v{version}", "Ready — restart to update"),
-            UpdateState.Applying => ($"Updating to v{version}", "Restarting…"),
-            UpdateState.NotInstalled => ("Updates unavailable (portable build)", "Install Helm to get updates"),
-            UpdateState.Failed => ("Couldn't check for updates", lastChecked),
-            _ => ("You're up to date", lastChecked),
-        };
+        var tile = UpdateTile.From(_updates);
+        IsCheckingForUpdates = tile.IsChecking;
+        (UpdateTitle, UpdateSubtitle) = (tile.Title, tile.Subtitle);
         OnPropertyChanged(nameof(UpdateTone));
         OnPropertyChanged(nameof(UpdateTooltip));
-    }
-
-    private static string FormatWhen(DateTimeOffset when)
-    {
-        var local = when.ToLocalTime();
-        var day = local.Date == DateTime.Today ? "Today" : local.Date == DateTime.Today.AddDays(-1) ? "Yesterday" : local.ToString("d");
-        return $"{day} at {local:t}";
     }
 
     private static void Replace<T>(ObservableCollection<T> target, IEnumerable<T> items)

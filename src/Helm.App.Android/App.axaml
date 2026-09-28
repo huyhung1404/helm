@@ -1,0 +1,103 @@
+<Application xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             x:Class="Helm.App.Android.App"
+             RequestedThemeVariant="Default">
+
+    <Application.Resources>
+        <ResourceDictionary>
+            <ResourceDictionary.ThemeDictionaries>
+                <!-- Same surfaces as the Windows app (WPF-UI Fluent): page, card, stroke, secondary text. -->
+                <ResourceDictionary x:Key="Light">
+                    <SolidColorBrush x:Key="HelmPageBackground" Color="#F3F3F3" />
+                    <SolidColorBrush x:Key="HelmBarBackground" Color="#EBEBEB" />
+                    <SolidColorBrush x:Key="HelmCardBackground" Color="#FBFBFB" />
+                    <SolidColorBrush x:Key="HelmCardStroke" Color="#E5E5E5" />
+                    <SolidColorBrush x:Key="HelmSubtleFill" Color="#0A000000" />
+                    <SolidColorBrush x:Key="HelmSecondaryText" Color="#5F5F5F" />
+                    <SolidColorBrush x:Key="HelmSuccess" Color="#0F7B0F" />
+                    <SolidColorBrush x:Key="HelmWarningBackground" Color="#FFF4CE" />
+                    <SolidColorBrush x:Key="HelmInfoBackground" Color="#F2F2F2" />
+                    <SolidColorBrush x:Key="HelmDanger" Color="#C42B1C" />
+                    <SolidColorBrush x:Key="HelmScrim" Color="#66000000" />
+                </ResourceDictionary>
+                <ResourceDictionary x:Key="Dark">
+                    <SolidColorBrush x:Key="HelmPageBackground" Color="#202020" />
+                    <SolidColorBrush x:Key="HelmBarBackground" Color="#1C1C1C" />
+                    <SolidColorBrush x:Key="HelmCardBackground" Color="#2B2B2B" />
+                    <SolidColorBrush x:Key="HelmCardStroke" Color="#1D1D1D" />
+                    <SolidColorBrush x:Key="HelmSubtleFill" Color="#0FFFFFFF" />
+                    <SolidColorBrush x:Key="HelmSecondaryText" Color="#C5C5C5" />
+                    <SolidColorBrush x:Key="HelmSuccess" Color="#6CCB5F" />
+                    <SolidColorBrush x:Key="HelmWarningBackground" Color="#433519" />
+                    <SolidColorBrush x:Key="HelmInfoBackground" Color="#2E2E2E" />
+                    <SolidColorBrush x:Key="HelmDanger" Color="#FF99A4" />
+                    <SolidColorBrush x:Key="HelmScrim" Color="#99000000" />
+                </ResourceDictionary>
+            </ResourceDictionary.ThemeDictionaries>
+        </ResourceDictionary>
+    </Application.Resources>
+
+    <Application.Styles>
+        <!-- Fluent blue accent (the Windows app follows the Windows accent, blue by default); Android's own is teal. -->
+        <FluentTheme>
+            <FluentTheme.Palettes>
+                <ColorPaletteResources x:Key="Light" Accent="#0067C0" />
+                <ColorPaletteResources x:Key="Dark" Accent="#4CC2FF" />
+            </FluentTheme.Palettes>
+        </FluentTheme>
+
+        <!-- A card (WPF-UI CardControl / CardExpander surface) -->
+        <Style Selector="Border.card">
+            <Setter Property="Background" Value="{DynamicResource HelmCardBackground}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource HelmCardStroke}" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="CornerRadius" Value="8" />
+            <Setter Property="Padding" Value="16,12" />
+            <Setter Property="Margin" Value="0,0,0,4" />
+        </Style>
+        <!-- A row inside a card, separated by a hairline like HelmExpanderRow -->
+        <Style Selector="Border.row">
+            <Setter Property="BorderBrush" Value="{DynamicResource HelmCardStroke}" />
+            <Setter Property="BorderThickness" Value="0,1,0,0" />
+            <Setter Property="Padding" Value="0,12,0,0" />
+            <Setter Property="Margin" Value="0,12,0,0" />
+        </Style>
+        <Style Selector="Border.infobar">
+            <Setter Property="Background" Value="{DynamicResource HelmInfoBackground}" />
+            <Setter Property="CornerRadius" Value="6" />
+            <Setter Property="Padding" Value="12,8" />
+            <Setter Property="Margin" Value="0,0,0,8" />
+        </Style>
+        <Style Selector="Border.infobar.warning">
+            <Setter Property="Background" Value="{DynamicResource HelmWarningBackground}" />
+        </Style>
+        <Style Selector="TextBlock.secondary">
+            <Setter Property="Foreground" Value="{DynamicResource HelmSecondaryText}" />
+            <Setter Property="FontSize" Value="12" />
+            <Setter Property="TextWrapping" Value="Wrap" />
+        </Style>
+        <Style Selector="TextBlock.title">
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="TextWrapping" Value="Wrap" />
+        </Style>
+        <Style Selector="TextBlock.section">
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="Margin" Value="4,20,0,8" />
+        </Style>
+        <Style Selector="TextBox.mono">
+            <Setter Property="FontFamily" Value="monospace" />
+        </Style>
+        <!-- Flat full-surface button for tiles, drawer rows and icon buttons -->
+        <Style Selector="Button.flat">
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="Padding" Value="12,10" />
+            <Setter Property="HorizontalAlignment" Value="Stretch" />
+            <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+            <Setter Property="CornerRadius" Value="6" />
+        </Style>
+        <Style Selector="Button.danger">
+            <Setter Property="Foreground" Value="{DynamicResource HelmDanger}" />
+        </Style>
+    </Application.Styles>
+</Application>

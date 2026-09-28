@@ -18,7 +18,64 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  # Helm for Android: the same version as the Windows app, signed with the release keystore from the repository
+  # secrets (ANDROID_KEYSTORE_BASE64, ANDROID_KEYSTORE_PASSWORD; see docs/android.md). The key must never change,
+  # otherwise phones cannot install the update over the version they have.
+  android:
+    runs-on: ubuntu-latest
+    env:
+      TAG: ${{ github.event.inputs.tag || github.ref_name }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.tag || github.ref }}
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: microsoft
+          java-version: '17'
+
+      - name: Android workload and SDK packages
+        run: |
+          dotnet workload install android
+          dotnet build src/Helm.App.Android -t:InstallAndroidDependencies -f net10.0-android \
+            -p:AndroidSdkDirectory="$ANDROID_SDK_ROOT" -p:AcceptAndroidSDKLicenses=True
+
+      - name: Release keystore
+        env:
+          KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+        run: |
+          if [ -z "$KEYSTORE_BASE64" ] || [ -z "$KEYSTORE_PASSWORD" ]; then
+            echo "::error::ANDROID_KEYSTORE_BASE64 / ANDROID_KEYSTORE_PASSWORD secrets are missing (docs/android.md)"
+            exit 1
+          fi
+          echo "$KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/helm-release.keystore"
+
+      - name: Build signed APK
+        env:
+          HELM_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+        run: |
+          version="${TAG#v}"
+          dotnet build src/Helm.App.Android --configuration Release -p:Version="$version" \
+            -p:AndroidSdkDirectory="$ANDROID_SDK_ROOT" -p:HelmKeystore="$RUNNER_TEMP/helm-release.keystore"
+          cp src/Helm.App.Android/bin/Release/net10.0-android/com.huyhung1404.helm-Signed.apk Helm-android.apk
+          apksigner=$(ls -d "$ANDROID_SDK_ROOT"/build-tools/*/ | sort -V | tail -1)apksigner
+          "$apksigner" verify --print-certs Helm-android.apk | grep -E "Signer #1 certificate (DN|SHA-256)"
+          rm -f "$RUNNER_TEMP/helm-release.keystore"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: helm-android
+          path: Helm-android.apk
+          if-no-files-found: error
+
   release:
+    needs: android
     runs-on: windows-latest
     env:
       TAG: ${{ github.event.inputs.tag || github.ref_name }}
@@ -84,12 +141,17 @@ jobs:
           dotnet @vpkArgs
           if ($LASTEXITCODE -ne 0) { throw 'vpk upload failed' }
 
-      - name: Friendly installer name, release notes from CHANGELOG
+      - uses: actions/download-artifact@v4
+        with:
+          name: helm-android
+          path: releases
+
+      - name: Friendly installer name, Android APK, release notes from CHANGELOG
         shell: pwsh
         run: |
           $channel = '${{ steps.meta.outputs.channel }}'
           Copy-Item "releases/HelmApp-$channel-Setup.exe" 'releases/Helm-win-Setup.exe'
-          gh release upload $env:TAG 'releases/Helm-win-Setup.exe' --clobber
+          gh release upload $env:TAG 'releases/Helm-win-Setup.exe' 'releases/Helm-android.apk' --clobber
           $notes = 'artifacts/notes-${{ steps.meta.outputs.version }}.md'
           $flags = @('--notes-file', $notes)
           if ('${{ steps.meta.outputs.prerelease }}' -eq 'true') { $flags += '--prerelease' } else { $flags += '--latest' }

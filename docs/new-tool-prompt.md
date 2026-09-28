@@ -1,34 +1,38 @@
 # Prompt: add a new tool to Helm
 
-How to use: fill in the two lines below, then paste this whole file into Claude Code at the root of the `helm` repo. Everything under "Rules" tells the AI how to build the tool, so it matches the existing Helm interface and code structure. You don't need to write anything else.
+How to use: fill in the three lines below, then paste this whole file into Claude Code at the root of the `helm` repo. Everything under "Rules" tells the AI how to build the tool, so it matches the existing Helm interface and code structure. You don't need to write anything else.
 
 ```
 Tool name:     <e.g. Color Picker>
 What it does:  <one or two sentences, e.g. "Win+Shift+C picks the color under the cursor and copies it as HEX">
+Platforms:     <PC | Android | PC + Android>
 ```
 
 ---
 
 ## Rules for the AI
 
-You are adding one new tool ("module") to **Helm**, a WPF (.NET 8) Windows toolkit in the style of PowerToys. Work from the two lines above. Decide every detail they leave open, following the rules below, and ask only if something is truly ambiguous. The finished tool must look and behave like any other Helm page.
+You are adding one new tool ("module") to **Helm**, a toolkit in the style of PowerToys with two apps: Windows (WPF, .NET 8, `src/Helm.App`) and Android (Avalonia 12, `src/Helm.App.Android`, see [android.md](android.md)). Home and General are shared; each tool exists only on the platforms named in "Platforms". Work from the three lines above. Decide every detail they leave open, following the rules below, and ask only if something is truly ambiguous. The finished tool must look and behave like any other Helm page.
 
 ### 1. Plan first (short)
 
 Print a short plan before you start, then continue without waiting:
-- **Module id**: kebab-case, e.g. `color-picker`.
+- **Platforms**: PC, Android or both (from the line above; if it is missing, ask). This decides the projects in §2.
+- **Module id**: kebab-case, e.g. `color-picker`. The same id on both platforms.
 - **Class prefix**: PascalCase, e.g. `ColorPicker`.
 - **Group**: one of `SystemTools`, `WindowingAndLayouts`, `InputAndOutput`, `FileManagement`, `Advanced`. Pick the closest.
-- **Icon**: a `SymbolRegular` value that exists (see §6).
+- **Icon**: a `SymbolRegular` value that exists (see §6). On Android the same icon is `FluentIcons.Common.Symbol.<Name>` (no size suffix).
 - **Default hotkey**: only if the tool needs one; choose one that is unlikely to clash.
 - **Settings and sections**: list them.
 - **Win32 needs**: which hooks, hotkeys, overlays or new P/Invoke the tool requires.
 
 ### 2. Files to create (same shape as `src/Helm.Modules.AlwaysOnTop`, the reference module)
 
+**PC** (the layout below):
+
 ```
 src/Helm.Modules.<Prefix>/
-  Helm.Modules.<Prefix>.csproj      UseWPF=true, ProjectReference ..\Helm.Core only, InternalsVisibleTo Helm.Tests
+  Helm.Modules.<Prefix>.csproj      UseWPF=true, ProjectReference ..\Helm.Core.Windows only, InternalsVisibleTo Helm.Tests
   <Prefix>Settings.cs               IVersionedSettings: static CurrentVersion => 1, Version, sensible defaults
   <Prefix>Module.cs                 sealed : HelmModuleBase — Id, DisplayName, Description, Group, Icon, SettingsPageType, Hotkeys, EnableAsync, DisableAsync
   <Prefix>Engine.cs                 (if it runs in the background) owns threads/hooks/overlays; IAsyncDisposable
@@ -42,12 +46,26 @@ Wire it up:
 2. `dotnet add src/Helm.App reference …` and `dotnet add tests/Helm.Tests reference …`
 3. Add one line in `src/Helm.App/Hosting/HelmModules.cs`: `services.Add<Prefix>Module();`
 
+**Android**: `src/Helm.Modules.<Prefix>.Android/` (`net10.0-android`, `SupportedOSPlatformVersion` 26, Avalonia 12.1.3 +
+FluentIcons.Avalonia, ProjectReference `..\Helm.Core`): `<Prefix>Module.cs` (`sealed : AndroidModuleBase` — Id, DisplayName,
+Description, Group, Icon, PageType, EnableAsync, DisableAsync), `<Prefix>Page.axaml(.cs)` (a `UserControl` that sets its
+own DataContext from DI), the view model, and `Add<Prefix>Module()` calling
+`services.AddAndroidModule<Module, Page>()`. Add a ProjectReference from `src/Helm.App.Android` and one line in
+`src/Helm.App.Android/Hosting/AndroidModules.cs`. It is **not** added to `Helm.sln` (CI builds it on Linux).
+
+**PC + Android**: everything that is not UI goes in a portable `src/Helm.Modules.<Prefix>.Core/` (`net8.0`,
+`SupportedOSPlatformVersion` empty, `PlatformTarget` AnyCPU, ProjectReference `..\Helm.Core`): settings, engine logic,
+the view model (CommunityToolkit.Mvvm, no WPF/Avalonia types). The PC project and the Android project above are then
+thin UI + module wrappers that reference it. The settings file and module id are identical, so synced settings (if any)
+mean the same on both.
+
 Do **not** change the shell (navigation, Home, tray, search). They pick the module up automatically from `ModuleGroup`, `Hotkeys` and the `CardHeader` titles on its page.
 
 ### 3. Architecture rules
 
-- Modules reference **Helm.Core only**, never Helm.App.
-- **No P/Invoke in modules.** If a Win32 API is missing, add it to `src/Helm.Core/NativeMethods.txt` (CsWin32) and expose a managed wrapper from a Core service (`IWindowService`, `IMonitorService`, or a new Core service).
+- PC modules reference **Helm.Core.Windows** (which brings Helm.Core), never Helm.App. Android modules and shared
+  `.Core` projects reference **Helm.Core** only. Nothing Windows- or Android-specific goes into Helm.Core.
+- **No P/Invoke in modules.** If a Win32 API is missing, add it to `src/Helm.Core.Windows/NativeMethods.txt` (CsWin32) and expose a managed wrapper from a Core service (`IWindowService`, `IMonitorService`, or a new Core service).
 - **Reuse Core infrastructure**:
   - `IHotkeyManager.TryRegisterAsync` for global hotkeys. It never throws; show a failure through `StatusMessage`.
   - `LowLevelKeyboardHook` / `LowLevelMouseHook`: call `.Acquire()` and dispose the lease. `Intercept` handlers must return within microseconds; post any real work to your thread.
@@ -73,7 +91,7 @@ The page is a `core:ModulePageBase`. It already renders the title, the icon + de
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
-    xmlns:core="clr-namespace:Helm.Core.Ui;assembly=Helm.Core"
+    xmlns:core="clr-namespace:Helm.Core.Ui;assembly=Helm.Core.Windows"
     Module="{Binding Module}">
     <StackPanel>
         <!-- Section title -->
@@ -120,6 +138,19 @@ The page is a `core:ModulePageBase`. It already renders the title, the icon + de
 - Typical section order: *Activation / Shortcut* → *Behavior* → *Appearance* → *Excluded apps* → tool-specific lists.
 - Full-screen overlays or editors (like the old Zones editor) use one window per monitor, are placed in physical pixels, close on Esc, and put buttons in a `WrapPanel` so they never overlap.
 
+#### Android pages
+
+- Phone first: design for 360 dp wide, one column; stack what the PC page puts side by side. The shell provides
+  the app bar (title), the 16 px inset and scrolling, so the page is just a `StackPanel`.
+- Same vocabulary as the PC page: section titles `TextBlock Classes="section"`, cards `Border Classes="card"`,
+  rows inside a card `Border Classes="row"`, secondary text `TextBlock Classes="secondary"`, warnings
+  `Border Classes="infobar warning"`, icons `ic:SymbolIcon` (`xmlns:ic="using:FluentIcons.Avalonia"`). Colors come
+  from `{DynamicResource Helm…}` / Fluent resources only (both themes are defined in `App.axaml`).
+- Compiled bindings are on (`x:DataType` on every view and `DataTemplate`). Buttons use `Classes="accent"` for the
+  primary action and `Classes="danger"` for destructive ones; ask through `IDialogService` before anything destructive.
+- No hotkeys and no Win32. Long-running work must survive the activity being recreated: state lives in the view
+  model / module, never in the view.
+
 ### 5. Home, tray and search integration (free if you follow the contract)
 
 - `Hotkeys` returns a `HotkeyDefinition` for every shortcut, including hold-keys (`Key = 0`, e.g. "Hold Shift"). Home lists them and the conflict tile checks the registered ones. Call `NotifyHotkeysChanged()` when they change.
@@ -150,10 +181,13 @@ The page is a `core:ModulePageBase`. It already renders the title, the icon + de
    ```
    Take a screenshot of **only that window** (PrintWindow). Don't simulate clicks or keys on the user's desktop. If an interaction really must be tested, target only the test window and check the real cursor position first. Never let a full-screen overlay stay open on the user's monitors.
 4. Check the page at 1000 px width, both with the navigation pinned and unpinned: no clipped or overlapping text.
+5. **Android** (if it is on Android): build and install on LDPlayer/an emulator as in [android.md](android.md), drive it
+   with `adb shell input`, and check screenshots from `adb exec-out screencap -p` (the emulator only). Check light and
+   dark theme, and that the Release build (trimmed) still works if the tool uses reflection or JSON.
 
 ### 8. Ship
 
-- Add a section at the top of `CHANGELOG.md` ("### Added – <Tool>: …").
+- Add the tool under `## [Unreleased]` at the top of `CHANGELOG.md` ("### Added – <Tool> (PC / Android / PC and Android): …").
 - Add a row for the tool to the README tool table and remove it from the roadmap if it was listed there.
 - Bump `<Version>` in `Directory.Build.props` (minor for a new tool). Commit, tag `vX.Y.Z`, and push `main` plus the tag. `.github/workflows/release.yml` publishes the release, and installed copies update from General → Updates.
 - Finish with a short summary: what the tool does, its shortcuts, which settings exist, what was verified, and what the user should test by hand.

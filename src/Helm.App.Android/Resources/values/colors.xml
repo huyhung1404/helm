@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+  <color name="splash_background">#F3F3F3</color>
+  <color name="helm_accent">#0067C0</color>
+</resources>

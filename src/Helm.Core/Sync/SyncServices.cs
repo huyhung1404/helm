@@ -8,17 +8,18 @@ namespace Helm.Core.Sync;
 public static class SyncServices
 {
     /// <summary>
-    /// Registers the local replica, the engine and the HTTPS transport. Until this device has a token and a master
+    /// Registers the local replica, the engine and the HTTPS transport. The platform registers
+    /// <see cref="ISecretProtector"/> first. Until this device has a token and a master
     /// key, everything works locally and sync is a no-op.
     /// </summary>
     public static IServiceCollection AddHelmSync(this IServiceCollection services, HelmPaths paths)
     {
-        services.AddSingleton(sp => OpenDatabase(paths, sp.GetService<ILoggerFactory>()?.CreateLogger("Sync.Database")));
-        services.TryAddSingleton<ISyncCredentialStore>(_ => new DpapiSyncCredentialStore(paths.SyncCredentialsFile));
+        services.AddSingleton(sp => OpenDatabase(paths, sp.GetRequiredService<ISecretProtector>(), sp.GetService<ILoggerFactory>()?.CreateLogger("Sync.Database")));
+        services.TryAddSingleton<ISyncCredentialStore>(sp => new ProtectedSyncCredentialStore(paths.SyncCredentialsFile, sp.GetRequiredService<ISecretProtector>()));
         services.TryAddSingleton(_ => new SyncApiClient());
         services.TryAddSingleton<ISyncTransport>(sp => new HttpSyncTransport(
             sp.GetRequiredService<ISyncCredentialStore>(), sp.GetRequiredService<SyncApiClient>()));
-        services.TryAddSingleton<IMasterKeyStore>(_ => new DpapiMasterKeyStore(paths.SyncKeyFile));
+        services.TryAddSingleton<IMasterKeyStore>(sp => new ProtectedMasterKeyStore(paths.SyncKeyFile, sp.GetRequiredService<ISecretProtector>()));
         services.AddSingleton<SyncEngine>();
         services.AddSingleton<ISyncService>(sp => sp.GetRequiredService<SyncEngine>());
         services.AddSingleton<SyncSetupService>();
@@ -60,9 +61,9 @@ public static class SyncServices
     /// Opens the replica. If this device's local key no longer opens it (key file lost), the unreadable file is kept
     /// aside and a fresh replica is created; the next sync downloads everything again from the server.
     /// </summary>
-    internal static SyncDatabase OpenDatabase(HelmPaths paths, ILogger? logger)
+    internal static SyncDatabase OpenDatabase(HelmPaths paths, ISecretProtector protector, ILogger? logger)
     {
-        var key = new DpapiLocalKeyStore(paths.SyncLocalKeyFile).GetOrCreate();
+        var key = new ProtectedLocalKeyStore(paths.SyncLocalKeyFile, protector).GetOrCreate();
         try
         {
             return new SyncDatabase(paths.SyncDatabaseFile, key);

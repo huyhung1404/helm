@@ -1,0 +1,85 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- Helm for Android (Avalonia). Shares Helm.Core (settings, sync, update rules) and Helm.Shell (Home/General view
+       models) with the Windows app; tools are registered per platform in Hosting/AndroidModules.cs. -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0-android</TargetFramework>
+    <SupportedOSPlatformVersion>26</SupportedOSPlatformVersion>
+    <PlatformTarget>AnyCPU</PlatformTarget>
+    <RootNamespace>Helm.App.Android</RootNamespace>
+    <AssemblyName>Helm.Android</AssemblyName>
+    <ApplicationId>com.huyhung1404.helm</ApplicationId>
+    <ApplicationTitle>Helm</ApplicationTitle>
+    <AndroidPackageFormat>apk</AndroidPackageFormat>
+    <AndroidEnableProfiledAot>false</AndroidEnableProfiledAot>
+    <!-- Real phones are arm64; LDPlayer and the emulator are x86_64. One APK carries both. -->
+    <RuntimeIdentifiers>android-arm64;android-x64</RuntimeIdentifiers>
+    <!-- Settings and sync records use reflection-based System.Text.Json. -->
+    <JsonSerializerIsReflectionEnabledByDefault>true</JsonSerializerIsReflectionEnabledByDefault>
+    <AvaloniaUseCompiledBindingsByDefault>true</AvaloniaUseCompiledBindingsByDefault>
+  </PropertyGroup>
+
+  <!-- versionName = <Version>; versionCode = M*1000000 + m*10000 + p*100 + (stable ? 99 : preview number), so every
+       release installs over the previous one and 1.2.0-preview.3 (1020003) < 1.2.0 (1020099). -->
+  <PropertyGroup>
+    <_HelmCore>$([System.Text.RegularExpressions.Regex]::Replace('$(Version)', '^(\d+\.\d+\.\d+).*$', '$1'))</_HelmCore>
+    <_HelmMajor>$([System.Text.RegularExpressions.Regex]::Replace('$(_HelmCore)', '^(\d+)\..*$', '$1'))</_HelmMajor>
+    <_HelmMinor>$([System.Text.RegularExpressions.Regex]::Replace('$(_HelmCore)', '^\d+\.(\d+)\..*$', '$1'))</_HelmMinor>
+    <_HelmPatch>$([System.Text.RegularExpressions.Regex]::Replace('$(_HelmCore)', '^.*\.(\d+)$', '$1'))</_HelmPatch>
+    <_HelmPre>$([System.Text.RegularExpressions.Regex]::Replace('$(Version)', '^[^-+]*(-[^+]*)?.*$', '$1'))</_HelmPre>
+    <_HelmPreNumber>99</_HelmPreNumber>
+    <_HelmPreNumber Condition="'$(_HelmPre)' != ''">$([System.Text.RegularExpressions.Regex]::Replace('$(_HelmPre)', '^\D*(\d{1,2})\D*$|^.*$', '0$1'))</_HelmPreNumber>
+    <ApplicationDisplayVersion>$(Version)</ApplicationDisplayVersion>
+    <ApplicationVersion>$([MSBuild]::Add($([MSBuild]::Add($([MSBuild]::Multiply($(_HelmMajor), 1000000)), $([MSBuild]::Multiply($(_HelmMinor), 10000)))), $([MSBuild]::Add($([MSBuild]::Multiply($(_HelmPatch), 100)), $(_HelmPreNumber)))))</ApplicationVersion>
+  </PropertyGroup>
+
+  <!-- Release signing: CI passes the keystore (see .github/workflows/release.yml); it must never change, or phones
+       cannot install updates over the old version. -->
+  <PropertyGroup Condition="'$(HelmKeystore)' != ''">
+    <AndroidKeyStore>true</AndroidKeyStore>
+    <AndroidSigningKeyStore>$(HelmKeystore)</AndroidSigningKeyStore>
+    <AndroidSigningKeyAlias>helm</AndroidSigningKeyAlias>
+    <AndroidSigningStorePass>env:HELM_KEYSTORE_PASSWORD</AndroidSigningStorePass>
+    <AndroidSigningKeyPass>env:HELM_KEYSTORE_PASSWORD</AndroidSigningKeyPass>
+    <!-- Only release-signed builds can install GitHub updates over themselves; others show "development build". -->
+    <DefineConstants>$(DefineConstants);HELM_SIGNED</DefineConstants>
+  </PropertyGroup>
+
+  <!-- The Android SDK's implicit usings clash with Avalonia/BCL names (Application, OperationCanceledException). -->
+  <ItemGroup>
+    <Using Remove="Android.App" />
+    <Using Remove="Android.Widget" />
+    <Using Remove="Android.OS.Bundle" />
+  </ItemGroup>
+
+  <!-- Development: -p:HelmAndroidEnvFile=<file with NAME=value lines>, e.g. HELM_SYNC_SERVER=http://127.0.0.1:8787 -->
+  <ItemGroup Condition="'$(HelmAndroidEnvFile)' != ''">
+    <AndroidEnvironment Include="$(HelmAndroidEnvFile)" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <AndroidResource Include="..\Helm.App\Assets\helm.png" Link="Resources\drawable\icon.png" />
+    <AvaloniaResource Include="..\Helm.App\Assets\helm.png" Link="Assets\helm.png" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Avalonia.Android" Version="12.1.3" />
+    <PackageReference Include="Avalonia.Themes.Fluent" Version="12.1.3" />
+    <PackageReference Include="Avalonia.Fonts.Inter" Version="12.1.3" />
+    <PackageReference Include="FluentIcons.Avalonia" Version="2.1.343" />
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="8.0.1" />
+    <PackageReference Include="Serilog.Extensions.Logging" Version="8.0.0" />
+    <PackageReference Include="Serilog.Sinks.File" Version="6.0.0" />
+    <PackageReference Include="Xamarin.AndroidX.Core.SplashScreen" Version="1.0.1.15" />
+    <!-- Microsoft.Data.Sqlite 8 pulls SQLitePCLRaw 2.1.6: a known high-severity advisory for the Android native
+         library, and no 16 KB page support (required from Android 16). 2.1.13 fixes both. -->
+    <PackageReference Include="SQLitePCLRaw.bundle_e_sqlite3" Version="2.1.13" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Helm.Core\Helm.Core.csproj" />
+    <ProjectReference Include="..\Helm.Shell\Helm.Shell.csproj" />
+  </ItemGroup>
+
+</Project>

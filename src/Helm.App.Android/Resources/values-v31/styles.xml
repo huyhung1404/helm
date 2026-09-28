@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<resources>
+  <style name="HelmTheme.NoActionBar" parent="@style/Theme.AppCompat.DayNight.NoActionBar">
+    <!-- Avalonia takes its accent from the theme: the Fluent blue the Windows app uses by default. -->
+    <item name="colorAccent">@color/helm_accent</item>
+    <item name="android:colorAccent">@color/helm_accent</item>
+    <item name="android:windowActionBar">false</item>
+    <item name="android:windowBackground">@null</item>
+    <item name="android:windowNoTitle">true</item>
+    <item name="android:windowSplashScreenBackground">@color/splash_background</item>
+    <item name="android:windowSplashScreenAnimatedIcon">@drawable/icon</item>
+    <item name="postSplashScreenTheme">@style/HelmTheme.Main</item>
+  </style>
+  <style name="HelmTheme.Main" parent="HelmTheme.NoActionBar">
+    <item name="android:windowIsTranslucent">true</item>
+  </style>
+</resources>

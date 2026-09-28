@@ -69,13 +69,13 @@ public sealed class SyncHardeningTests : IDisposable
     public void A_lost_local_key_moves_the_unreadable_replica_aside_and_starts_fresh()
     {
         var paths = new HelmPaths(_dir);
-        using (var db = SyncServices.OpenDatabase(paths, null))
+        using (var db = SyncServices.OpenDatabase(paths, new DpapiSecretProtector(), null))
         using (var engine = new SyncEngine(db, new NullSyncTransport(), new InMemoryMasterKeyStore(), []))
         using (var notes = new SyncedCollection<Note>(engine, new() { Name = "notes" }))
             notes.Upsert("n1", new Note("t", "b"));
 
         File.Delete(paths.SyncLocalKeyFile);
-        using (var db = SyncServices.OpenDatabase(paths, null))
+        using (var db = SyncServices.OpenDatabase(paths, new DpapiSecretProtector(), null))
         using (var engine = new SyncEngine(db, new NullSyncTransport(), new InMemoryMasterKeyStore(), []))
         using (var notes = new SyncedCollection<Note>(engine, new() { Name = "notes" }))
             Assert.Empty(notes.All());

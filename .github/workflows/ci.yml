@@ -74,3 +74,28 @@ jobs:
         with:
           name: test-results
           path: tests/**/TestResults/*.trx
+
+  # The Android app (src/Helm.App.Android) is not in Helm.sln, so Windows machines without the Android workload can
+  # still build the solution. It is built here, the same way release.yml builds it (but debug-signed).
+  android:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: microsoft
+          java-version: '17'
+
+      - name: Android workload and SDK packages
+        run: |
+          dotnet workload install android
+          dotnet build src/Helm.App.Android -t:InstallAndroidDependencies -f net10.0-android \
+            -p:AndroidSdkDirectory="$ANDROID_SDK_ROOT" -p:AcceptAndroidSDKLicenses=True
+
+      - name: Build APK (Release, debug-signed)
+        run: dotnet build src/Helm.App.Android --configuration Release -p:AndroidSdkDirectory="$ANDROID_SDK_ROOT"

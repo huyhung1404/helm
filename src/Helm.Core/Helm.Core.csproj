@@ -1,8 +1,11 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
+  <!-- Platform-neutral core shared by the Windows app and the Android app: module contracts, settings, sync and the
+       update rules. No WPF, Win32 or Android APIs here; those live in Helm.Core.Windows / Helm.App.Android. -->
   <PropertyGroup>
-    <UseWPF>true</UseWPF>
-    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <TargetFramework>net8.0</TargetFramework>
+    <SupportedOSPlatformVersion></SupportedOSPlatformVersion>
+    <PlatformTarget>AnyCPU</PlatformTarget>
     <RootNamespace>Helm.Core</RootNamespace>
   </PropertyGroup>
 
@@ -12,13 +15,6 @@
     <PackageReference Include="Microsoft.Data.Sqlite" Version="8.0.11" />
     <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="8.0.2" />
     <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="8.0.3" />
-    <PackageReference Include="Microsoft.Windows.CsWin32" Version="0.3.335">
-      <PrivateAssets>all</PrivateAssets>
-      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
-    </PackageReference>
-    <PackageReference Include="System.Security.Cryptography.ProtectedData" Version="8.0.0" />
-    <PackageReference Include="TaskScheduler" Version="2.12.2" />
-    <PackageReference Include="WPF-UI" Version="4.3.0" />
   </ItemGroup>
 
   <ItemGroup>

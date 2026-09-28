@@ -9,7 +9,7 @@
             <ResourceDictionary.MergedDictionaries>
                 <ui:ThemesDictionary Theme="Dark" />
                 <ui:ControlsDictionary />
-                <ResourceDictionary Source="pack://application:,,,/Helm.Core;component/Ui/HelmStyles.xaml" />
+                <ResourceDictionary Source="pack://application:,,,/Helm.Core.Windows;component/Ui/HelmStyles.xaml" />
             </ResourceDictionary.MergedDictionaries>
         </ResourceDictionary>
     </Application.Resources>

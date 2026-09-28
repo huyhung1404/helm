@@ -39,7 +39,7 @@ public sealed class SyncDatabase : IDisposable
     private readonly byte[] _localKey;
     private SqliteTransaction? _transaction;
 
-    /// <param name="localKey">32 random bytes from <see cref="DpapiLocalKeyStore"/>; the same key on every open.</param>
+    /// <param name="localKey">32 random bytes from <see cref="ProtectedLocalKeyStore"/>; the same key on every open.</param>
     /// <exception cref="SyncLocalKeyException">The file was encrypted with another key.</exception>
     public SyncDatabase(string filePath, byte[] localKey)
     {

@@ -1,5 +1,4 @@
 using System.Security.Cryptography;
-using System.Text;
 using System.Text.Json;
 using Helm.Core.Settings;
 
@@ -20,10 +19,10 @@ public interface ISyncCredentialStore
     event EventHandler? Changed;
 }
 
-/// <summary>Keeps the token in a DPAPI-protected file for the current Windows user, like the master key.</summary>
-public sealed class DpapiSyncCredentialStore(string filePath) : ISyncCredentialStore
+/// <summary>Keeps the token in a file protected by <see cref="ISecretProtector"/>, like the master key.</summary>
+public sealed class ProtectedSyncCredentialStore(string filePath, ISecretProtector protector) : ISyncCredentialStore
 {
-    private static readonly byte[] Entropy = Encoding.UTF8.GetBytes("Helm.Sync.Credentials.v1");
+    private const string Purpose = "Helm.Sync.Credentials.v1";
     private readonly object _gate = new();
     private SyncCredentials? _cached;
     private bool _loaded;
@@ -47,7 +46,7 @@ public sealed class DpapiSyncCredentialStore(string filePath) : ISyncCredentialS
     {
         if (!SyncToken.TryParse(credentials.Token, out _)) throw new ArgumentException("Not a valid Helm sync token.", nameof(credentials));
         var json = JsonSerializer.SerializeToUtf8Bytes(new Stored(credentials.Server.ToString(), credentials.Token), HelmJson.Options);
-        var protectedBytes = ProtectedData.Protect(json, Entropy, DataProtectionScope.CurrentUser);
+        var protectedBytes = protector.Protect(json, Purpose);
         CryptographicOperations.ZeroMemory(json);
         Directory.CreateDirectory(Path.GetDirectoryName(FilePath)!);
         var temp = FilePath + ".tmp";
@@ -77,7 +76,7 @@ public sealed class DpapiSyncCredentialStore(string filePath) : ISyncCredentialS
         if (!File.Exists(FilePath)) return null;
         try
         {
-            var json = ProtectedData.Unprotect(File.ReadAllBytes(FilePath), Entropy, DataProtectionScope.CurrentUser);
+            var json = protector.Unprotect(File.ReadAllBytes(FilePath), Purpose);
             var stored = JsonSerializer.Deserialize<Stored>(json, HelmJson.Options);
             CryptographicOperations.ZeroMemory(json);
             if (stored is null || !Uri.TryCreate(stored.Server, UriKind.Absolute, out var server)) return null;

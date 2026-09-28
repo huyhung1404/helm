@@ -1,11 +1,13 @@
 # Helm
 
-A personal Windows admin and productivity toolkit in the spirit of Microsoft PowerToys. Helm is one Fluent desktop app made of independent tools ("modules"), each with its own tab.
+A personal Windows admin and productivity toolkit in the spirit of Microsoft PowerToys. Helm is one Fluent desktop app made of independent tools ("modules"), each with its own tab, plus an Android app with the same Home and General pages ([docs/android.md](docs/android.md)). Each tool runs on the platforms it is built for: Claude Chat, for example, is PC only.
 
 Helm currently ships **no tools**: it is the shell (Home, General, search, tray, auto-update) plus the shared infrastructure for tools — hooks, hotkeys, window/monitor services and overlays. Tools are planned and will arrive as updates (see [Roadmap](#roadmap)). Always On Top is built but not registered; it comes back with one line in `src/Helm.App/Hosting/HelmModules.cs`. The previous Zones module is kept in git history (tag `v0.3.0`).
 ## Install
 
 Download **`Helm-win-Setup.exe`** from the [latest release](https://github.com/huyhung1404/helm/releases/latest) and run it. Setup installs per user into `%LOCALAPPDATA%\HelmApp` (no admin needed to install) and creates Start menu and desktop shortcuts. It also installs the .NET 8 Desktop Runtime if it is missing. When Helm starts, it asks once for administrator rights (UAC).
+
+**Android** (8.0 or newer): download **`Helm-android.apk`** from the same release and open it; Android asks you to allow installs from your browser or file manager once. Helm then updates itself from GitHub (General → Updates), asking before each install.
 
 Settings live separately in `%LOCALAPPDATA%\Helm`, so they survive an uninstall and reinstall. To remove them with the app, turn on General → Updates → *Delete my settings when Helm is uninstalled*.
 
@@ -30,7 +32,7 @@ Updates are automatic. Helm checks GitHub Releases 30 seconds after it starts an
    git push origin HEAD --follow-tags
    ```
 
-3. The tag push runs [.github/workflows/release.yml](.github/workflows/release.yml). It tests, publishes `win-x64`, packs with `vpk` (packId `HelmApp`, title "Helm", channel from the tag), uploads to GitHub Releases (pre-release for suffixed tags) and attaches `Helm-win-Setup.exe`.
+3. The tag push runs [.github/workflows/release.yml](.github/workflows/release.yml). Its `android` job builds `Helm-android.apk` with the same version, signed with the release keystore from the `ANDROID_KEYSTORE_BASE64` / `ANDROID_KEYSTORE_PASSWORD` secrets ([docs/android.md](docs/android.md#release-signing)). The `release` job then tests, publishes `win-x64`, packs with `vpk` (packId `HelmApp`, title "Helm", channel from the tag), uploads to GitHub Releases (pre-release for suffixed tags) and attaches `Helm-win-Setup.exe` and `Helm-android.apk`.
 
 The version has one source: `<Version>` in `Directory.Build.props`. CI overrides it from the tag (`v1.2.3` → `1.2.3`). Home and General display it.
 
@@ -70,15 +72,18 @@ A few command-line flags are handy while developing:
 
 ```
 src/
-  Helm.Core/                 no pages: module contracts, settings, Win32 (CsWin32), hooks, hotkeys,
-                             window/monitor services, GDI overlay window, shared UI controls (Ui/)
+  Helm.Core/                 net8.0, no UI: module contract (IModule, ModuleRegistry<T>), settings, sync, update rules
+  Helm.Shell/                net8.0: view models shared by both apps' Home and General (Updates, Sync)
+  Helm.Core.Windows/         Windows: IHelmModule, Win32 (CsWin32), hooks, hotkeys, window/monitor services,
+                             GDI overlay window, DPAPI, shared WPF controls (Ui/); namespaces stay Helm.Core.*
   Helm.App/                  WPF-UI shell: DI host, MainWindow, tray, Home/General/Diagnostics pages
-  Helm.Modules.Zones/        Layouts/ (pure model), Engine/ (snapping), Editor/ (overlay editor), settings page
-  Helm.Modules.AlwaysOnTop/  engine, settings page
-tests/Helm.Tests/            xUnit: layout templates, grid editing, zone math, settings, hotkey conflicts
+  Helm.App.Android/          Avalonia Android app: shell, Home/General, Keystore, APK updater (not in Helm.sln)
+  Helm.Modules.ClaudeChat/   Windows only: Claude Code chat window
+  Helm.Modules.AlwaysOnTop/  Windows only: engine, settings page
+tests/Helm.Tests/            xUnit: settings, sync (+ end-to-end against a local worker), updates, hotkeys, Claude Chat
 ```
 
-Modules reference `Helm.Core` only; `Helm.App` references everything.
+Windows modules reference `Helm.Core.Windows`, Android modules and shared tool logic reference `Helm.Core`; `Helm.App` / `Helm.App.Android` reference everything they ship.
 
 Key infrastructure in `Helm.Core`:
 
@@ -90,9 +95,9 @@ Key infrastructure in `Helm.Core`:
 
 ## Adding a module
 
-> **Fastest way:** open [docs/new-tool-prompt.md](docs/new-tool-prompt.md), fill in the tool name and what it does, and paste the file into Claude Code. It contains every rule needed so a new tool matches the others (structure, UI, testing, release).
+> **Fastest way:** open [docs/new-tool-prompt.md](docs/new-tool-prompt.md), fill in the tool name, what it does and its platforms (PC, Android or both), and paste the file into Claude Code. It contains every rule needed so a new tool matches the others (structure, UI, testing, release).
 
-1. Create `src/Helm.Modules.<Name>` (WPF class library referencing `Helm.Core`).
+1. Create `src/Helm.Modules.<Name>` (WPF class library referencing `Helm.Core.Windows`). Android tools follow [docs/android.md](docs/android.md#tools-and-platforms).
 2. Implement the module, usually by deriving from `HelmModuleBase`:
 
    ```csharp

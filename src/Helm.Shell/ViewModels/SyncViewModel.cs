@@ -1,15 +1,14 @@
 using System.Collections.ObjectModel;
-using System.Windows;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
-using Helm.App.Services;
 using Helm.Core.Services;
 using Helm.Core.Sync;
+using Helm.Shell.Services;
 using Microsoft.Extensions.Logging;
 
-namespace Helm.App.ViewModels;
+namespace Helm.Shell.ViewModels;
 
-internal sealed partial class SyncDeviceItem(SyncDeviceToken token, bool isThisDevice) : ObservableObject
+public sealed partial class SyncDeviceItem(SyncDeviceToken token, bool isThisDevice) : ObservableObject
 {
     public SyncDeviceToken Token { get; } = token;
     public string Name => IsThisDevice ? $"{Token.Name} (this device)" : Token.Name;
@@ -34,12 +33,13 @@ internal sealed partial class SyncDeviceItem(SyncDeviceToken token, bool isThisD
 }
 
 /// <summary>General → Sync: connect this device, protect the account key, see status and manage devices.</summary>
-internal sealed partial class SyncViewModel : ObservableObject
+public sealed partial class SyncViewModel : ObservableObject
 {
     private readonly SyncSetupService _setup;
     private readonly SyncEngine _engine;
     private readonly IUiDispatcher _ui;
     private readonly IDialogService _dialogs;
+    private readonly IClipboardService _clipboard;
     private readonly ILogger<SyncViewModel> _logger;
     private string? _thisTokenId;
     private bool _refreshPending;
@@ -52,7 +52,7 @@ internal sealed partial class SyncViewModel : ObservableObject
 
     [ObservableProperty] private string _inviteCode = "";
     [ObservableProperty] private string _accountNameInput = "";
-    [ObservableProperty] private string _deviceName = Environment.MachineName;
+    [ObservableProperty] private string _deviceName;
     [ObservableProperty] private string _tokenInput = "";
 
     [ObservableProperty, NotifyPropertyChangedFor(nameof(IsCreatingPassphrase), nameof(IsUnlocking), nameof(IsCheckingPassphrase))]
@@ -94,8 +94,11 @@ internal sealed partial class SyncViewModel : ObservableObject
     [ObservableProperty, NotifyPropertyChangedFor(nameof(HasError))]
     private string? _errorMessage;
 
-    public SyncViewModel(SyncSetupService setup, SyncEngine engine, IUiDispatcher ui, IDialogService dialogs, ILogger<SyncViewModel> logger)
+    public SyncViewModel(SyncSetupService setup, SyncEngine engine, IUiDispatcher ui, IDialogService dialogs, IClipboardService clipboard,
+        IDeviceInfo device, ILogger<SyncViewModel> logger)
     {
+        _clipboard = clipboard;
+        _deviceName = device.DeviceName;
         _setup = setup;
         _engine = engine;
         _ui = ui;
@@ -387,11 +390,9 @@ internal sealed partial class SyncViewModel : ObservableObject
         RemovePassphrase = "";
     }
 
-    private static void CopyToClipboard(string? text)
+    private void CopyToClipboard(string? text)
     {
-        if (string.IsNullOrEmpty(text)) return;
-        try { Clipboard.SetText(text); }
-        catch (System.Runtime.InteropServices.COMException) { } // clipboard busy; the text is still selectable
+        if (!string.IsNullOrEmpty(text)) _clipboard.SetText(text);
     }
 
     private static string Megabytes(long bytes) => (bytes / (1024.0 * 1024.0)).ToString("0.#");

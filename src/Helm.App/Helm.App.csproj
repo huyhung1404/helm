@@ -22,12 +22,18 @@
   </ItemGroup>
 
   <ItemGroup>
+    <Using Include="Helm.Shell.Services" />
+    <Using Include="Helm.Shell.ViewModels" />
+  </ItemGroup>
+
+  <ItemGroup>
     <Resource Include="Assets\helm.ico" />
     <Resource Include="Assets\helm.png" />
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\Helm.Core\Helm.Core.csproj" />
+    <ProjectReference Include="..\Helm.Core.Windows\Helm.Core.Windows.csproj" />
+    <ProjectReference Include="..\Helm.Shell\Helm.Shell.csproj" />
     <ProjectReference Include="..\Helm.Modules.AlwaysOnTop\Helm.Modules.AlwaysOnTop.csproj" />
     <ProjectReference Include="..\Helm.Modules.ClaudeChat\Helm.Modules.ClaudeChat.csproj" />
   </ItemGroup>
