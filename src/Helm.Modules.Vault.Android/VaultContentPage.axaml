@@ -159,17 +159,18 @@
                             </StackPanel>
                         </Button>
                         <!-- Sub-tabs -->
+                        <!-- Wraps to a second line on narrow phones instead of hiding sub-tabs off the edge -->
                         <ListBox ItemsSource="{Binding App.Items.Filters}" SelectedItem="{Binding App.Items.Filter}" Background="Transparent"
-                                 ScrollViewer.HorizontalScrollBarVisibility="Auto" AutomationProperties.Name="Show">
+                                 ScrollViewer.HorizontalScrollBarVisibility="Disabled" AutomationProperties.Name="Show">
                             <ListBox.ItemsPanel>
                                 <ItemsPanelTemplate>
-                                    <StackPanel Orientation="Horizontal" />
+                                    <WrapPanel />
                                 </ItemsPanelTemplate>
                             </ListBox.ItemsPanel>
                             <ListBox.Styles>
                                 <Style Selector="ListBoxItem">
                                     <Setter Property="Padding" Value="12,6" />
-                                    <Setter Property="Margin" Value="0,0,4,0" />
+                                    <Setter Property="Margin" Value="0,0,4,4" />
                                     <Setter Property="CornerRadius" Value="16" />
                                 </Style>
                             </ListBox.Styles>
