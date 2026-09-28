@@ -31,6 +31,7 @@
     <ProjectReference Include="..\..\src\Helm.Modules.Vault.Core\Helm.Modules.Vault.Core.csproj" />
     <ProjectReference Include="..\..\src\Helm.VaultRestore\Helm.VaultRestore.csproj" />
     <ProjectReference Include="..\..\src\Helm.Modules.Vault\Helm.Modules.Vault.csproj" />
+    <ProjectReference Include="..\..\src\Helm.Modules.Tracker\Helm.Modules.Tracker.csproj" />
   </ItemGroup>
 
 </Project>

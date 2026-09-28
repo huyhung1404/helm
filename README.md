@@ -7,6 +7,7 @@ Tools:
 | Tool | Platforms | What it does |
 |---|---|---|
 | Claude Chat | PC | Chat with Claude Code in its own window, several projects side by side |
+| Tracker | PC + Android | To-do lists and debt books in workspaces, synced across devices; completions are logged with their start and finish times for reports and CSV export, and Android has a home-screen widget |
 | Vault | PC + Android | Passwords, secure notes, cards, identities and documents, end-to-end encrypted, synced, and backed up to a folder you choose ([design](docs/vault-design.md), [format](docs/vault-format.md)) |
 
 More tools are planned (see [Roadmap](#roadmap)). Always On Top is built but not registered; it comes back with one line in `src/Helm.App/Hosting/HelmModules.cs`. The previous Zones module is kept in git history (tag `v0.3.0`).
@@ -68,7 +69,8 @@ A few command-line flags are handy while developing:
 | Path | Content |
 |---|---|
 | `%LOCALAPPDATA%\Helm\settings\general.json` | Theme, window placement, enabled modules, last update check |
-| `%LOCALAPPDATA%\Helm\settings\<moduleId>.json` | One file per module (`zones.json`, `always-on-top.json`) |
+| `%LOCALAPPDATA%\Helm\settings\<moduleId>.json` | One file per module (`zones.json`, `always-on-top.json`, `tracker.json`) |
+| `%LOCALAPPDATA%\Helm\sync\helm-sync.db` | Synced data (encrypted local replica), e.g. Tracker workspaces, items and history |
 | `%LOCALAPPDATA%\Helm\settings\zones\` | `layouts.json`, `applied.json` (monitor id → layout), `app-zone-history.json` |
 | `%LOCALAPPDATA%\Helm\logs\helm-YYYYMMDD.log` | Serilog rolling log, 14 days (`velopack-hooks.log` for install/update/uninstall hooks) |
 | `%LOCALAPPDATA%\HelmApp\` | Velopack install root: `Helm.exe` stable launcher, `Update.exe`, `current\` |
@@ -84,18 +86,21 @@ src/
   Helm.Core.Windows/         Windows: IHelmModule, Win32 (CsWin32), hooks, hotkeys, window/monitor services,
                              GDI overlay window, DPAPI, shared WPF controls (Ui/); namespaces stay Helm.Core.*
   Helm.App/                  WPF-UI shell: DI host, MainWindow, tray, Home/General/Diagnostics pages
-  Helm.Core.Android/         Android: IAndroidModule, ModulePageBase, ActivityHost (not in Helm.sln)
+  Helm.Core.Android/         Android: IAndroidModule, ModulePageBase, ActivityHost, HelmAndroidServices (not in Helm.sln)
   Helm.App.Android/          Avalonia Android app: shell, Home/General, Keystore, APK updater (not in Helm.sln)
   Helm.Modules.ClaudeChat/   Windows only: Claude Code chat window
   Helm.Modules.AlwaysOnTop/  Windows only: engine, settings page
+  Helm.Modules.Tracker.Core/ net8.0: Tracker data (on Helm Sync), reports, CSV, shared view model
+  Helm.Modules.Tracker/      Windows: Tracker page
+  Helm.Modules.Tracker.Android/ Android: Tracker page and home-screen widget (not in Helm.sln)
   Helm.Modules.Vault.Core/   net8.0: vault keys, items, locking, backups, KDBX export, shared view models
   Helm.Modules.Vault/        Windows: vault window and page, Windows Hello, protected clipboard
   Helm.Modules.Vault.Android/ Android: vault page, fingerprint unlock, FLAG_SECURE, SAF backups (not in Helm.sln)
   Helm.VaultRestore/         helm-vault-restore: opens a vault backup without Helm
-tests/Helm.Tests/            xUnit: settings, sync (+ end-to-end against a local worker), updates, hotkeys, Claude Chat, Vault
+tests/Helm.Tests/            xUnit: settings, sync (+ end-to-end against a local worker), updates, hotkeys, Claude Chat, Tracker, Vault
 ```
 
-Windows modules reference `Helm.Core.Windows`, Android modules and shared tool logic reference `Helm.Core`; `Helm.App` / `Helm.App.Android` reference everything they ship.
+Windows modules reference `Helm.Core.Windows`, Android modules reference `Helm.Core.Android`, and shared tool logic references `Helm.Core`; `Helm.App` / `Helm.App.Android` reference everything they ship.
 
 Key infrastructure in `Helm.Core`:
 

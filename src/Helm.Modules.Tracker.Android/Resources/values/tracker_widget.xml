@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Tracker widget colours, light theme: the same surfaces as the app (HelmCardBackground, HelmSecondaryText, ...). -->
+<resources>
+    <color name="tracker_widget_background">#FBFBFB</color>
+    <color name="tracker_widget_stroke">#E5E5E5</color>
+    <color name="tracker_widget_text">#1A1A1A</color>
+    <color name="tracker_widget_secondary">#5F5F5F</color>
+    <color name="tracker_widget_accent">#0067C0</color>
+    <color name="tracker_widget_urgent">#C42B1C</color>
+    <color name="tracker_widget_positive">#0F7B0F</color>
+    <string name="tracker_widget_description">Your open tasks or debts. Tap a circle to finish one, the title to switch workspace.</string>
+</resources>

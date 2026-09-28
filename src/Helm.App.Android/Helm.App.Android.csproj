@@ -82,6 +82,7 @@
     <ProjectReference Include="..\Helm.Core.Android\Helm.Core.Android.csproj" />
     <ProjectReference Include="..\Helm.Modules.Vault.Android\Helm.Modules.Vault.Android.csproj" />
     <ProjectReference Include="..\Helm.Shell\Helm.Shell.csproj" />
+    <ProjectReference Include="..\Helm.Modules.Tracker.Android\Helm.Modules.Tracker.Android.csproj" />
   </ItemGroup>
 
 </Project>

@@ -3,8 +3,12 @@ using Android.Content.PM;
 using Android.Views;
 using View = Android.Views.View;
 using Avalonia.Android;
+using Helm.App.Android.ViewModels;
 using Helm.App.Android.Views;
+using Helm.Core;
+using Helm.Core.Modules;
 using Helm.Core.Platform;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace Helm.App.Android;
 
@@ -62,10 +66,18 @@ public sealed class MainActivity : AvaloniaMainActivity
         if (!ActivityHost.OnActivityResult(requestCode, resultCode, data)) base.OnActivityResult(requestCode, resultCode, data);
     }
 
+    /// <summary>The activity is already running (e.g. opened again from a widget): take the new intent's extras.</summary>
+    protected override void OnNewIntent(global::Android.Content.Intent? intent)
+    {
+        base.OnNewIntent(intent);
+        if (intent is not null) Intent = intent;
+    }
+
     protected override void OnResume()
     {
         base.OnResume();
         ActivityHost.OnResumed(this);
+        OpenRequestedModule();
         if (_layoutListener is null && Window?.DecorView is { } decor)
         {
             _layoutListener = new ContentInsetsListener(this);
@@ -99,6 +111,23 @@ public sealed class MainActivity : AvaloniaMainActivity
             location[1] / density,
             Math.Max(0, decor.Width - location[0] - view.Width) / density,
             Math.Max(0, decor.Height - location[1] - view.Height) / density));
+    }
+
+    /// <summary>A widget or shortcut can ask for a tool's page with <see cref="ShellIntents.ExtraModule"/>.</summary>
+    private void OpenRequestedModule()
+    {
+        if (Intent?.GetStringExtra(ShellIntents.ExtraModule) is not { Length: > 0 } id) return;
+        Intent!.RemoveExtra(ShellIntents.ExtraModule);
+        try
+        {
+            var services = App.Services;
+            if (services.GetRequiredService<IModuleHost<IAndroidModule>>().Find(id) is { } module)
+                services.GetRequiredService<ShellNavigator>().GoModule(module);
+        }
+        catch (Exception ex)
+        {
+            Serilog.Log.Warning(ex, "Could not open tool {Id} from an intent", id);
+        }
     }
 
     private static View? FindAvaloniaView(View? view)

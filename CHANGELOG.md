@@ -22,6 +22,18 @@ Format: [Keep a Changelog](https://keepachangelog.com), versions follow [SemVer]
     from screenshots and screen sharing.
 - Sync: files (blobs) for tools such as Vault, and a guard that holds bulk deletions for review.
 - Android tools can now be added (Helm.Core.Android), with the same page layout as on the PC.
+- Tracker (PC and Android, System Tools): lists you keep in workspaces, synced across your devices with Helm Sync.
+  - Two kinds of workspace: a to-do list (title, priority Low / Normal / High / Urgent, due date, notes) and a debt
+    book (who, how much, owes me or I owe, with running totals). Create as many of each as you like.
+  - Open items are sorted by priority, then by your own order (move up and down within a priority).
+  - Tick an item and it is marked done and written to the history with the time it was added, started (the Start
+    button, or when it was added) and finished. Reopening and deleting are recorded too, and deleted items stay
+    in the reports.
+  - Report for the last 7, 30 or 90 days or all time: completed and added counts, average and median time to
+    finish, working time, share done by the due date, completions per day and by priority. Export every item or
+    the whole history as CSV (Save on the PC, Copy on the phone).
+  - Android home-screen widget: a workspace's open items; tap a circle to finish one, the title to switch
+    workspace, + to open Tracker.
 
 ## [0.8.1] - 2026-09-28
 

@@ -1,4 +1,5 @@
 using Helm.Core.Modules;
+using Helm.Modules.Tracker;
 using Helm.Modules.Vault;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -15,5 +16,6 @@ internal static class AndroidModules
     public static void Register(IServiceCollection services)
     {
         services.AddVaultModule();
+        services.AddTrackerModule();
     }
 }

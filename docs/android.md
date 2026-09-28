@@ -23,7 +23,11 @@ src/
                       UpdateTile) and their seams (IDialogService, IClipboardService, IDeviceInfo)
   Helm.Core.Windows/  WPF + Win32 on top of Helm.Core: IHelmModule, hooks, hotkeys, overlays, DPAPI, WPF controls.
                       Namespaces stay Helm.Core.*, so Windows modules did not change when Core was split.
-  Helm.App.Android/   the Android app: IAndroidModule, Avalonia views, Android Keystore, GitHub APK updater
+  Helm.Core.Android/  Android infrastructure for tools, like Helm.Core.Windows: IAndroidModule / AndroidModuleBase,
+                      AddAndroidModule, the page frame ModulePageBase, ActivityHost (the activity, results,
+                      lifecycle), IBackHandler, and HelmAndroidServices (the process-wide service provider, for
+                      widgets and receivers that run without the activity)
+  Helm.App.Android/   the Android app: shell, Avalonia views, Android Keystore, GitHub APK updater
 ```
 
 Platform pieces behind the shared seams:
@@ -43,13 +47,19 @@ Settings and sync data use the same formats on both, so a phone joins the same s
 Each tool says which platforms it runs on, and is registered in that platform's list:
 
 - **Windows only** (e.g. Claude Chat): `src/Helm.Modules.<Name>` as today, one line in `HelmModules.cs`.
-- **Android only**: `src/Helm.Modules.<Name>.Android` (`net10.0-android`, Avalonia, references `Helm.Core`),
-  a module deriving from `AndroidModuleBase` and an Avalonia `UserControl` page, registered with
-  `services.AddAndroidModule<TModule, TPage>()` in `AndroidModules.cs`.
+- **Android only**: `src/Helm.Modules.<Name>.Android` (`net10.0-android`, Avalonia, references
+  `Helm.Core.Android`), a module deriving from `AndroidModuleBase` and a `ui:ModulePageBase` page, registered with
+  `services.AddAndroidModule<TModule, TPage>()` in `AndroidModules.cs`. Keep the project's root namespace free of
+  a trailing `.Android` (e.g. `Helm.Modules.<Name>`), or it hides the `Android.*` SDK namespaces.
 - **Both**: the logic (settings, engine, view model) in a portable `src/Helm.Modules.<Name>.Core` (`net8.0`,
   references `Helm.Core`), plus a thin UI project per platform that references it.
 
 Android tools use the same Fluent System Icons as the Windows ones (`FluentIcons.Avalonia`, `Symbol.<Name>`).
+
+A tool can open its own page from outside the app (a widget, a shortcut) by launching Helm with the string extra
+`ShellIntents.ExtraModule` set to its module id; `MainActivity` navigates there. Tracker's widget is the example:
+`src/Helm.Modules.Tracker.Android/Widget` (layouts in its `Resources/`, looked up by name at run time).
+
 [docs/new-tool-prompt.md](new-tool-prompt.md) has the full rules.
 
 ## Build and run locally

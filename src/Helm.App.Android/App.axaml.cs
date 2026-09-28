@@ -6,6 +6,7 @@ using Helm.Core.Modules;
 using Helm.App.Android.Services;
 using Helm.App.Android.ViewModels;
 using Helm.App.Android.Views;
+using Helm.Core;
 using Helm.Core.Settings;
 using Helm.Core.Sync;
 using Helm.Shell.Services;
@@ -17,25 +18,28 @@ namespace Helm.App.Android;
 
 public partial class App : Avalonia.Application
 {
-    private static ServiceProvider? s_services;
+    private static bool s_started;
 
-    public static IServiceProvider Services => s_services ?? throw new InvalidOperationException("Helm has not started.");
+    /// <summary>The process-wide provider (also used by widgets, which can run without the activity).</summary>
+    public static IServiceProvider Services => HelmAndroidServices.Current;
 
     public override void Initialize() => AvaloniaXamlLoader.Load(this);
 
     public override void OnFrameworkInitializationCompleted()
     {
-        // The Android process outlives activities; build the services once per process.
-        if (s_services is null)
+        // The Android process outlives activities; start once per process. The services themselves may already exist
+        // if a widget ran first (AndroidApp.OnCreate configures them).
+        HelmAndroidServices.Configure(AndroidHost.Build);
+        if (!s_started)
         {
-            s_services = AndroidHost.Build();
+            s_started = true;
             AppDomain.CurrentDomain.UnhandledException += (_, e) => Log.Fatal(e.ExceptionObject as Exception, "Unhandled exception");
             TaskScheduler.UnobservedTaskException += (_, e) =>
             {
                 Log.Error(e.Exception, "Unobserved task exception");
                 e.SetObserved();
             };
-            _ = StartAsync(s_services);
+            _ = StartAsync(Services);
         }
 
         var general = Services.GetRequiredService<ISettingsStoreFactory>().Get<GeneralSettings>(GeneralSettings.StoreId);

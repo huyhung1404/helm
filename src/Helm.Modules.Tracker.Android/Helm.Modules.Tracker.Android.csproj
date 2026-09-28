@@ -1,0 +1,33 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- Tracker on Android: the module, its Avalonia page and the home-screen widget. The logic and the view model
+       come from Helm.Modules.Tracker.Core (shared with Windows). Not in Helm.sln; CI builds it with the app. -->
+  <PropertyGroup>
+    <TargetFramework>net10.0-android</TargetFramework>
+    <SupportedOSPlatformVersion>26</SupportedOSPlatformVersion>
+    <PlatformTarget>AnyCPU</PlatformTarget>
+    <!-- Same namespace as the Windows project. Never a namespace ending in ".Android": it would hide the
+         Android.* SDK namespaces inside this project. -->
+    <RootNamespace>Helm.Modules.Tracker</RootNamespace>
+    <AvaloniaUseCompiledBindingsByDefault>true</AvaloniaUseCompiledBindingsByDefault>
+  </PropertyGroup>
+
+  <!-- The Android SDK's implicit usings clash with Avalonia/BCL names (Application, OperationCanceledException). -->
+  <ItemGroup>
+    <Using Remove="Android.App" />
+    <Using Remove="Android.Widget" />
+    <Using Remove="Android.OS.Bundle" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Avalonia" Version="12.1.3" />
+    <PackageReference Include="FluentIcons.Avalonia" Version="2.1.343" />
+    <PackageReference Include="SQLitePCLRaw.bundle_e_sqlite3" Version="2.1.13" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Helm.Core.Android\Helm.Core.Android.csproj" />
+    <ProjectReference Include="..\Helm.Modules.Tracker.Core\Helm.Modules.Tracker.Core.csproj" />
+  </ItemGroup>
+
+</Project>
