@@ -328,23 +328,7 @@ public sealed partial class SyncViewModel : ObservableObject
             Devices.Add(new SyncDeviceItem(d, d.Id == _thisTokenId));
     }
 
-    private void UpdateStatusText()
-    {
-        var status = _engine.Status;
-        var last = status.LastSyncedAt is { } at ? $" · last synced {at.LocalDateTime:t}" : "";
-        StatusText = status.State switch
-        {
-            SyncState.Syncing => "Syncing…",
-            SyncState.Idle => status.LastSyncedAt is null ? "Ready" : "Up to date" + last,
-            SyncState.Offline => "Offline — changes are kept and sent later" + last,
-            SyncState.Unauthorized => "This device's token was revoked or has expired. Turn off sync and connect again.",
-            SyncState.QuotaExceeded => "Storage is full — new changes stay on this device. " + status.LastError,
-            SyncState.KeyChanged => "The account key was changed on another device. Unlock with your passphrase to continue.",
-            SyncState.Held => "Sync is paused: another device deleted many records. Review the change in the tool that owns them.",
-            SyncState.Error => "Sync problem: " + status.LastError,
-            _ => "Not set up",
-        };
-    }
+    private void UpdateStatusText() => StatusText = SyncStatusText.Describe(_engine.Status);
 
     private async Task RunAsync(Func<Task> work)
     {

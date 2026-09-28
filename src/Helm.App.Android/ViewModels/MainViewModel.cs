@@ -20,10 +20,15 @@ public sealed partial class MainViewModel : ObservableObject
     [ObservableProperty]
     private bool _isPaneOpen;
 
-    public MainViewModel(ShellNavigator navigator, DialogService dialogs, IModuleHost<IAndroidModule> modules)
+    /// <summary>The sync button in the app bar.</summary>
+    public Helm.Shell.ViewModels.SyncIndicatorViewModel Sync { get; }
+
+    public MainViewModel(ShellNavigator navigator, DialogService dialogs, IModuleHost<IAndroidModule> modules, Helm.Shell.ViewModels.SyncIndicatorViewModel sync)
     {
         Navigator = navigator;
         Dialogs = dialogs;
+        Sync = sync;
+        sync.OpenSettings = navigator.GoGeneral;
 
         Entries.Add(new NavEntry("Home", Symbol.Home, false, navigator.GoHome));
         foreach (var group in modules.Modules.GroupBy(m => m.Group).OrderBy(g => g.Key))

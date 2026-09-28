@@ -97,6 +97,7 @@ public sealed class SyncEngine : ISyncService, IDisposable
     private readonly ILogger _logger;
     private readonly TimeProvider _time;
     private readonly TimeSpan _debounce;
+    private TimeSpan _pollInterval = BackgroundPollInterval;
     private readonly ConcurrentDictionary<string, SyncCollectionDescriptor> _descriptors = new(StringComparer.Ordinal);
     private readonly SemaphoreSlim _run = new(1, 1);
     private readonly Timer _timer;
@@ -155,8 +156,26 @@ public sealed class SyncEngine : ISyncService, IDisposable
     public void Start(TimeSpan? interval = null)
     {
         if (_disposed || _periodic is not null) return;
-        var every = interval ?? TimeSpan.FromMinutes(5);
+        var every = interval ?? BackgroundPollInterval;
+        _pollInterval = every;
         _periodic = new Timer(_ => { if (_transport.IsConfigured) _ = RunScheduledAsync(); }, null, TimeSpan.FromSeconds(3), every);
+    }
+
+    /// <summary>How often to pull while the app is in front (30 s) or in the background / tray (5 min).</summary>
+    public static readonly TimeSpan ForegroundPollInterval = TimeSpan.FromSeconds(30);
+
+    public static readonly TimeSpan BackgroundPollInterval = TimeSpan.FromMinutes(5);
+
+    /// <summary>
+    /// Changes how often the periodic sync pulls (see <see cref="Start"/>), e.g. <see cref="ForegroundPollInterval"/>
+    /// while a window is shown so other devices' changes arrive within seconds. Shortening it syncs soon.
+    /// </summary>
+    public void SetPollInterval(TimeSpan every)
+    {
+        if (_disposed || _periodic is null || every <= TimeSpan.Zero) return;
+        try { _periodic.Change(every < _pollInterval ? TimeSpan.FromSeconds(1) : every, every); }
+        catch (ObjectDisposedException) { return; }
+        _pollInterval = every;
     }
 
     public void RequestSync()

@@ -58,7 +58,22 @@ public sealed class MainActivity : AvaloniaMainActivity
     protected override void OnPause()
     {
         ActivityHost.OnPaused(this);
+        SetSyncPolling(foreground: false);
         base.OnPause();
+    }
+
+    /// <summary>In front: pull every 30 s (and right away), so other devices' changes arrive within seconds; else every 5 min.</summary>
+    private static void SetSyncPolling(bool foreground)
+    {
+        try
+        {
+            App.Services.GetRequiredService<Helm.Core.Sync.SyncEngine>().SetPollInterval(
+                foreground ? Helm.Core.Sync.SyncEngine.ForegroundPollInterval : Helm.Core.Sync.SyncEngine.BackgroundPollInterval);
+        }
+        catch (Exception ex)
+        {
+            Serilog.Log.Warning(ex, "Could not change the sync interval");
+        }
     }
 
     protected override void OnActivityResult(int requestCode, Result resultCode, global::Android.Content.Intent? data)
@@ -77,6 +92,7 @@ public sealed class MainActivity : AvaloniaMainActivity
     {
         base.OnResume();
         ActivityHost.OnResumed(this);
+        SetSyncPolling(foreground: true);
         OpenRequestedModule();
         if (Window?.DecorView is { } decor)
         {

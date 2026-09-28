@@ -21,12 +21,23 @@
     <Grid>
         <DockPanel>
             <!-- App bar: drawer button + page title (the Windows title bar + nav pane toggle) -->
-            <Grid DockPanel.Dock="Top" ColumnDefinitions="Auto,*" Height="56" Background="{DynamicResource HelmBarBackground}">
+            <Grid DockPanel.Dock="Top" ColumnDefinitions="Auto,*,Auto" Height="56" Background="{DynamicResource HelmBarBackground}">
                 <Button Classes="flat" Width="48" Height="48" Margin="4,0,0,0" Padding="0" HorizontalContentAlignment="Center"
                         Command="{Binding TogglePaneCommand}" ToolTip.Tip="Navigation" AutomationProperties.Name="Open navigation">
                     <ic:SymbolIcon Symbol="Navigation" FontSize="22" />
                 </Button>
                 <TextBlock Grid.Column="1" Text="{Binding Navigator.Title}" FontSize="20" FontWeight="SemiBold" VerticalAlignment="Center" Margin="8,0,16,0" />
+                <!-- Sync: its state on every page; tap to sync now (or to set it up) -->
+                <Button Grid.Column="2" Classes="flat" Width="48" Height="48" Margin="0,0,4,0" Padding="0" HorizontalContentAlignment="Center"
+                        DataContext="{Binding Sync}" Command="{Binding SyncNowCommand}" ToolTip.Tip="{Binding ToolTip}" AutomationProperties.Name="Sync now">
+                    <Panel>
+                        <ic:SymbolIcon Symbol="ArrowSyncCheckmark" FontSize="22" Foreground="{DynamicResource HelmSuccess}" IsVisible="{Binding IsSynced}" />
+                        <ic:SymbolIcon Symbol="ArrowSync" FontSize="22" IsVisible="{Binding IsSyncing}" />
+                        <ic:SymbolIcon Symbol="CloudOff" FontSize="22" IsVisible="{Binding IsOffline}" />
+                        <ic:SymbolIcon Symbol="Warning" FontSize="22" Foreground="{DynamicResource HelmDanger}" IsVisible="{Binding HasProblem}" />
+                        <ic:SymbolIcon Symbol="ArrowSyncOff" FontSize="22" Foreground="{DynamicResource HelmSecondaryText}" IsVisible="{Binding IsNotSetUp}" />
+                    </Panel>
+                </Button>
             </Grid>
 
             <SplitView IsPaneOpen="{Binding IsPaneOpen}" DisplayMode="Overlay" OpenPaneLength="296" PaneBackground="{DynamicResource HelmBarBackground}">

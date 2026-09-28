@@ -32,6 +32,13 @@ internal partial class MainWindow : FluentWindow
         BuildNavigation();
         navigator.Attach(Navigation, () => _services.GetRequiredService<ShellController>().ShowMainWindow());
 
+        // The sync button, and quicker pulls while the window is shown so other devices' changes show up within seconds.
+        var sync = services.GetRequiredService<Helm.Shell.ViewModels.SyncIndicatorViewModel>();
+        sync.OpenSettings = () => navigator.NavigateToCard(typeof(Pages.GeneralPage), "Sync");
+        SyncButton.DataContext = sync;
+        var engine = services.GetRequiredService<Core.Sync.SyncEngine>();
+        IsVisibleChanged += (_, e) => engine.SetPollInterval(e.NewValue is true ? Core.Sync.SyncEngine.ForegroundPollInterval : Core.Sync.SyncEngine.BackgroundPollInterval);
+
         SearchBox.TextChanged += OnSearchTextChanged;
         SearchBox.QuerySubmitted += (_, e) => NavigateTo(_viewModel.Search(e.QueryText).FirstOrDefault());
         SearchBox.SuggestionChosen += (_, e) => NavigateTo(e.SelectedItem as SearchResult);
