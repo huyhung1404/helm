@@ -22,9 +22,12 @@ Format: [Keep a Changelog](https://keepachangelog.com), versions follow [SemVer]
     from screenshots and screen sharing.
 - Sync: files (blobs) for tools such as Vault, and a guard that holds bulk deletions for review.
 - Android tools can now be added (Helm.Core.Android), with the same page layout as on the PC.
+- Tools you work in open their content from the menu and Quick access, and their settings from Home → Utilities.
 - Tracker (PC and Android, System Tools): lists you keep in workspaces, synced across your devices with Helm Sync.
-  - Two kinds of workspace: a to-do list (title, priority Low / Normal / High / Urgent, due date, notes) and a debt
-    book (who, how much, owes me or I owe, with running totals). Create as many of each as you like.
+  - To-do lists (title, priority Low / Normal / High / Urgent, due date, notes), as many as you like, and one debt
+    book for everyone (who, how much, owes me or I owe, with running totals; amounts in ₫ by default).
+  - The menu and the Quick access tile open your lists; Home → Utilities opens Tracker's settings (workspaces,
+    display, CSV export).
   - Open items are sorted by priority, then by your own order (move up and down within a priority).
   - Tick an item and it is marked done and written to the history with the time it was added, started (the Start
     button, or when it was added) and finished. Reopening and deleting are recorded too, and deleted items stay

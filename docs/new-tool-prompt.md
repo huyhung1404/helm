@@ -23,6 +23,8 @@ Print a short plan before you start, then continue without waiting:
 - **Group**: one of `SystemTools`, `WindowingAndLayouts`, `InputAndOutput`, `FileManagement`, `Advanced`. Pick the closest.
 - **Icon**: a `SymbolRegular` value that exists (see §6). On Android the same icon is `FluentIcons.Common.Symbol.<Name>` (no size suffix).
 - **Default hotkey**: only if the tool needs one; choose one that is unlikely to clash.
+- **Content page**: yes if the tool is something you *work in* (lists, a chat, a vault, a viewer), no if it only
+  runs in the background and is configured (a hotkey, a hook). See "Content page and settings page" in §4.
 - **Settings and sections**: list them.
 - **Win32 needs**: which hooks, hotkeys, overlays or new P/Invoke the tool requires.
 
@@ -37,8 +39,10 @@ src/Helm.Modules.<Prefix>/
   <Prefix>Module.cs                 sealed : HelmModuleBase — Id, DisplayName, Description, Group, Icon, SettingsPageType, Hotkeys, EnableAsync, DisableAsync
   <Prefix>Engine.cs                 (if it runs in the background) owns threads/hooks/overlays; IAsyncDisposable
   <Prefix>ViewModel.cs              ObservableObject; loads settings, writes back on change (Save pattern with _loading guard)
-  <Prefix>Page.xaml(.cs)            core:ModulePageBase, Module="{Binding Module}", DataContext = view model
-  <Prefix>Services.cs               AddXxxModule() => services.AddHelmModule<Module, Page, ViewModel>() (+ extra singletons)
+  <Prefix>Page.xaml(.cs)            the SETTINGS page: core:ModulePageBase, Module="{Binding Module}", DataContext = view model
+  <Prefix>ContentPage.xaml(.cs)     (tools with content, §4) a plain Page with the tool itself; registered as a singleton
+  <Prefix>Services.cs               AddXxxModule() => services.AddHelmModule<Module, Page, ViewModel>() (+ extra singletons,
+                                    + AddSingleton<<Prefix>ContentPage>())
 ```
 
 Wire it up:
@@ -56,7 +60,9 @@ src/Helm.Modules.<Prefix>.Android/
                                         SQLitePCLRaw.bundle_e_sqlite3 pin from Helm.Core.Android.csproj
   <Prefix>Module.cs                     sealed : AndroidModuleBase — Id, DisplayName, Description, Group, Icon, PageType,
                                         EnableAsync, DisableAsync
-  <Prefix>Page.axaml(.cs)               ui:ModulePageBase, Module="{Binding Module}", sets its own DataContext from DI
+  <Prefix>Page.axaml(.cs)               the SETTINGS page: ui:ModulePageBase, Module="{Binding Module}", sets its own
+                                        DataContext from DI
+  <Prefix>ContentPage.axaml(.cs)        (tools with content, §4) a UserControl with the tool itself; AddTransient
   <Prefix>ViewModel.cs                  (or the shared one from the .Core project, see below)
   <Prefix>Services.cs                   AddXxxModule() => services.AddAndroidModule<Module, Page>() (+ extra singletons)
 ```
@@ -96,6 +102,33 @@ Do **not** change the shell (navigation, Home, tray, search). They pick the modu
 - Settings save through `store.Update(...)`, which is debounced and atomic. Read the current values from `store.Current`.
 
 ### 4. UI rules (keeps every tool looking the same)
+
+#### Content page and settings page (the structure every tool follows)
+
+A tool you work in keeps **what it is for** apart from **how it is configured**:
+
+| | Content page | Settings page |
+|---|---|---|
+| What | The tool itself: its lists, editor, chat, report, history | The **Enable** card and the options |
+| Opened from | The navigation menu (PC) / drawer (Android) and the **Quick access** tile on Home | Home → **Utilities** (the `>` next to the toggle), search results, and a ⚙ button on the content page |
+| Type | PC: a plain `Page`; Android: a `UserControl` | `core:ModulePageBase` / `ui:ModulePageBase` (as below) |
+| Declared by | the module implements `IModuleContent` (`Helm.Core.Modules`): `Type ContentPageType` | `SettingsPageType` (PC) / `PageType` (Android) |
+
+- The shell does the routing from `IModuleContent`; do not change the shell for a new tool. A module with its own Quick
+  access action (`IModuleLauncher`, e.g. Claude Chat opening its window) keeps that action.
+- Content page layout: the tool's title (PC; the Android app bar shows it already) with the tool's main picker (e.g. the
+  workspace) and a ⚙ **settings** button on the right (`IShellNavigation.ShowPage(typeof(<Prefix>Page))`), then the
+  content. No Enable card, no icon + description block. When the tool is off, show a short note ("<Tool> is turned
+  off…") and make the content read-only; the data stays.
+- Settings page: only things you set once and rarely change (create, rename, delete, defaults, display options,
+  export). Put an **Open <Tool>** card first that goes to the content page. Everything a user does every day belongs on
+  the content page.
+- Search indexes only the settings page (its `CardHeader` titles), so every option must live there.
+- Both pages bind the same singleton view model; state lives in the view model or the module, never in a page.
+- Tools without content (they only run in the background) have just the settings page, and every entry point opens it.
+- Reference: Tracker (`src/Helm.Modules.Tracker*`: `TrackerContentPage` + `TrackerPage`).
+
+#### Settings page
 
 The page is a `core:ModulePageBase`. It already renders the title, the icon + description block, the InfoBar and the big **Enable <Tool>** toggle, so do not add those yourself. The page body is a `StackPanel` of sections:
 
@@ -201,6 +234,8 @@ The page is a `core:ModulePageBase`. It already renders the title, the icon + de
 - `Hotkeys` returns a `HotkeyDefinition` for every shortcut, including hold-keys (`Key = 0`, e.g. "Hold Shift"). Home lists them and the conflict tile checks the registered ones. Call `NotifyHotkeysChanged()` when they change.
 - `Description` is one sentence and appears under the page title.
 - The module shows up on its own in the nav group, Home Quick access / Utilities, the tray toggles and search.
+  With `IModuleContent`, the nav item and the Quick access tile open the content page and the Utilities chevron and
+  search open the settings page (§4).
 
 ### 6. Pitfalls this repo has already hit (check them)
 

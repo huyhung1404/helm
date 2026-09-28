@@ -6,7 +6,7 @@ using Microsoft.Extensions.Logging;
 
 namespace Helm.App.Android.Views;
 
-/// <summary>Shows a tool: resolves a new instance of its <see cref="Helm.Core.Modules.IAndroidModule.PageType"/> from DI.</summary>
+/// <summary>Shows a tool: resolves a new instance of the page it asks for (<see cref="ModulePage.PageType"/>) from DI.</summary>
 public sealed class ModulePageTemplate : IDataTemplate
 {
     public bool Match(object? data) => data is ModulePage;
@@ -16,7 +16,7 @@ public sealed class ModulePageTemplate : IDataTemplate
         if (param is not ModulePage page) return null;
         try
         {
-            return (Control)App.Services.GetRequiredService(page.Module.PageType);
+            return (Control)App.Services.GetRequiredService(page.PageType);
         }
         catch (Exception ex)
         {

@@ -91,13 +91,16 @@ internal sealed partial class HomeViewModel : ObservableObject
         if (module is not null) _navigator.Navigate(module.SettingsPageType);
     }
 
-    /// <summary>Quick access tile: the module's own action when it has one (e.g. a new chat), else its page.</summary>
+    /// <summary>
+    /// Quick access tile: the module's own action when it has one (e.g. a new chat), else its content page
+    /// (<see cref="IModuleContent"/>), else its settings page. The Utilities chevron always opens the settings.
+    /// </summary>
     [RelayCommand]
     private async Task LaunchModuleAsync(IHelmModule? module)
     {
         if (module is null) return;
         if (_launchers.TryGetValue(module.Id, out var launcher)) await launcher.LaunchAsync();
-        else _navigator.Navigate(module.SettingsPageType);
+        else _navigator.Navigate((module as IModuleContent)?.ContentPageType ?? module.SettingsPageType);
     }
 
     [RelayCommand]

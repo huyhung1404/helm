@@ -29,7 +29,7 @@ public sealed partial class MainViewModel : ObservableObject
         {
             Entries.Add(new NavEntry(group.Key.DisplayName(), Symbol.Apps, true, null));
             foreach (var module in group.OrderBy(m => m.DisplayName))
-                Entries.Add(new NavEntry(module.DisplayName, module.Icon, false, () => navigator.GoModule(module)));
+                Entries.Add(new NavEntry(module.DisplayName, module.Icon, false, () => navigator.GoModuleContent(module)));
         }
         GeneralEntry = new NavEntry("General", Symbol.Settings, false, navigator.GoGeneral);
 

@@ -83,7 +83,8 @@ internal partial class MainWindow : FluentWindow
         if (index < 0 || index + 1 >= args.Length) return typeof(HomePage);
         var name = args[index + 1];
         var candidates = new[] { typeof(HomePage), typeof(GeneralPage), typeof(DiagnosticsPage), typeof(WelcomePage), typeof(WhatsNewPage) }
-            .Concat(_viewModel.Groups.SelectMany(g => g.Modules).Select(m => m.SettingsPageType));
+            .Concat(_viewModel.Groups.SelectMany(g => g.Modules).Select(m => m.SettingsPageType))
+            .Concat(_viewModel.Groups.SelectMany(g => g.Modules).OfType<IModuleContent>().Select(m => m.ContentPageType));
         return candidates.FirstOrDefault(t => t.Name.StartsWith(name, StringComparison.OrdinalIgnoreCase)) ?? typeof(HomePage);
     }
 
@@ -157,7 +158,8 @@ internal partial class MainWindow : FluentWindow
             };
 
             foreach (var module in group.Modules)
-                groupItem.MenuItems.Add(NavItem(module.DisplayName, ModuleIcon.Create(module, imageSize: 18), module.SettingsPageType));
+                // Tools with content open it from the menu; their settings are reached from Home → Utilities.
+                groupItem.MenuItems.Add(NavItem(module.DisplayName, ModuleIcon.Create(module, imageSize: 18), (module as IModuleContent)?.ContentPageType ?? module.SettingsPageType));
 
             foreach (var extra in group.ExtraPages)
                 groupItem.MenuItems.Add(NavItem(extra.Title, new SymbolIcon(extra.Icon), extra.PageType));

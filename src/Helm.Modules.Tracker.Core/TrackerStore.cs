@@ -47,19 +47,30 @@ public sealed class TrackerStore
 
     public TrackerWorkspace? GetWorkspace(string id) => _workspaces.Get(id);
 
-    public string AddWorkspace(string name, WorkspaceKind kind, string currency = "")
+    /// <summary>True when the (single) debt book exists.</summary>
+    public bool HasDebtBook => _workspaces.All().Any(w => w.Value.Kind == WorkspaceKind.Debts);
+
+    /// <summary>Currency of a new debt book unless the caller gives one.</summary>
+    public const string DefaultCurrency = "₫";
+
+    /// <exception cref="InvalidOperationException">
+    /// A debt book already exists: there is one debt book, with everyone in it (people are a field of each debt).
+    /// </exception>
+    public string AddWorkspace(string name, WorkspaceKind kind, string? currency = null)
     {
         name = name.Trim();
         if (name.Length == 0) throw new ArgumentException("A workspace needs a name.", nameof(name));
         lock (_gate)
         {
             var existing = _workspaces.All();
+            if (kind == WorkspaceKind.Debts && existing.FirstOrDefault(w => w.Value.Kind == WorkspaceKind.Debts) is { } book)
+                throw new InvalidOperationException($"You already have a debt book, \u201c{book.Value.Name}\u201d. Add everyone to it: each debt has its own person.");
             var order = existing.Count == 0 ? 0 : existing.Max(w => w.Value.Order) + 1;
             return _workspaces.Add(new TrackerWorkspace
             {
                 Name = name,
                 Kind = kind,
-                Currency = currency.Trim(),
+                Currency = (currency ?? (kind == WorkspaceKind.Debts ? DefaultCurrency : "")).Trim(),
                 Order = order,
                 CreatedAt = Now,
             });

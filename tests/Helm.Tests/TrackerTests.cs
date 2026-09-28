@@ -143,6 +143,27 @@ public sealed class TrackerTests
     }
 
     [Fact]
+    public void There_is_one_debt_book_in_vnd_but_any_number_of_to_do_lists()
+    {
+        var book = _store.AddWorkspace("Sổ nợ", WorkspaceKind.Debts);
+        Assert.Equal("₫", _store.GetWorkspace(book)!.Currency);
+        Assert.True(_store.HasDebtBook);
+
+        var refused = Assert.Throws<InvalidOperationException>(() => _store.AddWorkspace("Nợ bạn bè", WorkspaceKind.Debts));
+        Assert.Contains("Sổ nợ", refused.Message);
+
+        _store.AddWorkspace("Work", WorkspaceKind.Tasks);
+        _store.AddWorkspace("Home", WorkspaceKind.Tasks);
+        Assert.Equal(3, _store.Workspaces().Count);
+        Assert.Equal("", _store.Workspaces().First(w => w.Value.Name == "Work").Value.Currency);
+
+        // Once it is deleted, a new one can be made.
+        _store.DeleteWorkspace(book);
+        _store.AddWorkspace("Debts", WorkspaceKind.Debts, "USD");
+        Assert.Equal("USD", _store.Workspaces().Single(w => w.Value.Kind == WorkspaceKind.Debts).Value.Currency);
+    }
+
+    [Fact]
     public void Debts_need_a_person_or_a_reason_and_sum_per_direction()
     {
         var book = _store.AddWorkspace("Debts", WorkspaceKind.Debts, "₫");

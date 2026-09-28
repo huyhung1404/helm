@@ -18,7 +18,7 @@ public partial class MainView : UserControl
     {
         InitializeComponent();
         // A tool's page is whatever control its module names (created fresh from DI each time it is shown).
-        DataTemplates.Add(new FuncDataTemplate<ModulePage>((page, _) => (Control)App.Services.GetRequiredService(page.Module.PageType)));
+        DataTemplates.Add(new FuncDataTemplate<ModulePage>((page, _) => (Control)App.Services.GetRequiredService(page.PageType)));
         PageHost.PropertyChanged += (_, e) =>
         {
             if (e.Property == ContentControl.ContentProperty) PageScroller.Offset = default;

@@ -9,7 +9,7 @@ namespace Helm.Modules.Tracker;
 /// Tracker on Android. Nothing runs in the background; the module keeps the home-screen widgets in step with the
 /// data (local edits and synced changes) and with the on/off state.
 /// </summary>
-public sealed class TrackerModule : AndroidModuleBase, IDisposable
+public sealed class TrackerModule : AndroidModuleBase, IModuleContent, IDisposable
 {
     private readonly ILogger<TrackerModule> _logger;
     private readonly Timer _widgetTimer;
@@ -28,6 +28,7 @@ public sealed class TrackerModule : AndroidModuleBase, IDisposable
     public override ModuleGroup Group => ModuleGroup.SystemTools;
     public override Symbol Icon => Symbol.TaskListSquare;
     public override Type PageType => typeof(TrackerPage);
+    public Type ContentPageType => typeof(TrackerContentPage);
 
     public override Task EnableAsync(CancellationToken ct)
     {

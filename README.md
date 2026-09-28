@@ -137,6 +137,8 @@ Key infrastructure in `Helm.Core`:
 
 The nav tree, Home tiles, tray toggles, search and enable persistence all come from the registration. No other shell changes are needed.
 
+A tool you work in (lists, a chat, a vault) also has a **content page**: implement `IModuleContent` and the menu and the Quick access tile open it, while Home → Utilities and search open the settings page. See "Content page and settings page" in [docs/new-tool-prompt.md](docs/new-tool-prompt.md).
+
 ## Roadmap
 
 Planned tools, each added as its own module (`src/Helm.Modules.<Name>`):

@@ -113,6 +113,12 @@ public sealed partial class TrackerViewModel : ObservableObject
 
     public bool HasWorkspaces => Workspaces.Count > 0;
     public bool HasNoWorkspaces => Workspaces.Count == 0;
+
+    /// <summary>There is one debt book; once it exists only to-do lists can be added.</summary>
+    public bool CanAddDebtBook => !Workspaces.Any(w => w.Kind == WorkspaceKind.Debts);
+    public string NewWorkspaceHint => CanAddDebtBook
+        ? "A to-do list for tasks, or the debt book for who owes whom."
+        : "Another to-do list. Debts all go in your one debt book.";
     public bool IsDebtWorkspace => SelectedWorkspace?.Kind == WorkspaceKind.Debts;
     public bool IsTaskWorkspace => SelectedWorkspace is { Kind: WorkspaceKind.Tasks };
     public bool HasOpen => OpenItems.Count > 0;
@@ -392,6 +398,9 @@ public sealed partial class TrackerViewModel : ObservableObject
         LoadWorkspaceFields();
         OnPropertyChanged(nameof(HasWorkspaces));
         OnPropertyChanged(nameof(HasNoWorkspaces));
+        OnPropertyChanged(nameof(CanAddDebtBook));
+        OnPropertyChanged(nameof(NewWorkspaceHint));
+        if (!CanAddDebtBook) NewWorkspaceKindIndex = (int)WorkspaceKind.Tasks;
         OnWorkspaceKindChanged();
     }
 
@@ -552,19 +561,9 @@ public sealed partial class TrackerViewModel : ObservableObject
     private void CreateAndSelect(string name, WorkspaceKind kind)
     {
         string? id = null;
-        if (!Try(() => id = _store.AddWorkspace(name, kind, kind == WorkspaceKind.Debts ? DefaultCurrency() : ""))) return;
+        if (!Try(() => id = _store.AddWorkspace(name, kind))) return;
         Refresh();
         SelectedWorkspace = Workspaces.FirstOrDefault(w => w.Id == id) ?? SelectedWorkspace;
-    }
-
-    /// <summary>
-    /// The currency of the region set in the OS ("₫" in Vietnam, even with an English display language), or nothing
-    /// if unknown.
-    /// </summary>
-    private static string DefaultCurrency()
-    {
-        try { return RegionInfo.CurrentRegion.CurrencySymbol; }
-        catch (ArgumentException) { return ""; }
     }
 
     private Dictionary<string, TrackerWorkspace> WorkspaceMap() =>

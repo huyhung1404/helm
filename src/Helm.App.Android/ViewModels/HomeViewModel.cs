@@ -81,13 +81,16 @@ public sealed partial class HomeViewModel : ObservableObject
         if (module is not null) _navigator.GoModule(module);
     }
 
-    /// <summary>Quick access tile: the module's own action when it has one, else its page.</summary>
+    /// <summary>
+    /// Quick access tile: the module's own action when it has one, else its content page, else its settings. The
+    /// Utilities chevron always opens the settings.
+    /// </summary>
     [RelayCommand]
     private async Task LaunchModuleAsync(IAndroidModule? module)
     {
         if (module is null) return;
         if (_launchers.TryGetValue(module.Id, out var launcher)) await launcher.LaunchAsync();
-        else _navigator.GoModule(module);
+        else _navigator.GoModuleContent(module);
     }
 
     [RelayCommand]

@@ -4,384 +4,72 @@
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
     xmlns:core="clr-namespace:Helm.Core.Ui;assembly=Helm.Core.Windows"
-    xmlns:local="clr-namespace:Helm.Modules.Tracker;assembly=Helm.Modules.Tracker.Core">
+    ExtraMessage="{Binding Message}">
 
-    <core:ModulePageBase.Resources>
-        <!-- Small icon-only action button in a list row -->
-        <Style x:Key="RowAction" TargetType="ui:Button" BasedOn="{StaticResource {x:Type ui:Button}}">
-            <Setter Property="Appearance" Value="Transparent" />
-            <Setter Property="Padding" Value="6" />
-            <Setter Property="Margin" Value="2,0,0,0" />
-            <Setter Property="MinWidth" Value="0" />
-            <Setter Property="VerticalAlignment" Value="Center" />
-        </Style>
-
-        <!-- Signed amount: owed to me in green, I owe in red (theme colours) -->
-        <Style x:Key="AmountText" TargetType="TextBlock">
-            <Setter Property="FontWeight" Value="SemiBold" />
-            <Setter Property="VerticalAlignment" Value="Center" />
-            <Setter Property="Margin" Value="12,0,4,0" />
-            <Setter Property="Foreground" Value="{DynamicResource SystemFillColorCriticalBrush}" />
-            <Style.Triggers>
-                <DataTrigger Binding="{Binding OwedToMe}" Value="True">
-                    <Setter Property="Foreground" Value="{DynamicResource SystemFillColorSuccessBrush}" />
-                </DataTrigger>
-            </Style.Triggers>
-        </Style>
-
-        <DataTemplate x:Key="ItemRow" DataType="{x:Type local:TrackerItemViewModel}">
-            <Border BorderThickness="0,0,0,1" BorderBrush="{DynamicResource CardStrokeColorDefaultBrush}">
-                <StackPanel Margin="12,6">
-                    <Grid>
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="Auto" />
-                            <ColumnDefinition Width="*" />
-                            <ColumnDefinition Width="Auto" />
-                            <ColumnDefinition Width="Auto" />
-                        </Grid.ColumnDefinitions>
-
-                        <CheckBox VerticalAlignment="Center" Margin="0,0,4,0" MinWidth="0"
-                                  IsChecked="{Binding Done}"
-                                  ToolTip="Mark as done (records the finish time)" AutomationProperties.Name="Done" />
-
-                        <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="4,2">
-                            <StackPanel Orientation="Horizontal">
-                                <Border CornerRadius="4" Padding="6,0" Margin="0,0,6,0" VerticalAlignment="Center"
-                                        Background="{DynamicResource ControlFillColorSecondaryBrush}"
-                                        Visibility="{Binding IsUrgent, Converter={StaticResource BoolToVisibility}}">
-                                    <TextBlock Text="Urgent" FontSize="11" FontWeight="SemiBold" Foreground="{DynamicResource SystemFillColorCriticalBrush}" />
-                                </Border>
-                                <Border CornerRadius="4" Padding="6,0" Margin="0,0,6,0" VerticalAlignment="Center"
-                                        Background="{DynamicResource ControlFillColorSecondaryBrush}"
-                                        Visibility="{Binding IsHigh, Converter={StaticResource BoolToVisibility}}">
-                                    <TextBlock Text="High" FontSize="11" FontWeight="SemiBold" Foreground="{DynamicResource AccentTextFillColorPrimaryBrush}" />
-                                </Border>
-                                <Border CornerRadius="4" Padding="6,0" Margin="0,0,6,0" VerticalAlignment="Center"
-                                        Background="{DynamicResource ControlFillColorSecondaryBrush}"
-                                        Visibility="{Binding IsStarted, Converter={StaticResource BoolToVisibility}}">
-                                    <TextBlock Text="In progress" FontSize="11" FontWeight="SemiBold" Foreground="{DynamicResource AccentTextFillColorPrimaryBrush}" />
-                                </Border>
-                            </StackPanel>
-                            <TextBlock Text="{Binding Title}" TextWrapping="Wrap" Margin="0,1,0,0">
-                                <TextBlock.Style>
-                                    <Style TargetType="TextBlock">
-                                        <Style.Triggers>
-                                            <DataTrigger Binding="{Binding IsCompleted}" Value="True">
-                                                <Setter Property="TextDecorations" Value="Strikethrough" />
-                                                <Setter Property="Foreground" Value="{DynamicResource TextFillColorSecondaryBrush}" />
-                                            </DataTrigger>
-                                        </Style.Triggers>
-                                    </Style>
-                                </TextBlock.Style>
-                            </TextBlock>
-                            <TextBlock Text="{Binding Details}">
-                                <TextBlock.Style>
-                                    <Style TargetType="TextBlock" BasedOn="{StaticResource HelmSecondaryText}">
-                                        <Style.Triggers>
-                                            <!-- Past its due date and still open -->
-                                            <DataTrigger Binding="{Binding IsOverdue}" Value="True">
-                                                <Setter Property="Foreground" Value="{DynamicResource SystemFillColorCriticalBrush}" />
-                                            </DataTrigger>
-                                        </Style.Triggers>
-                                    </Style>
-                                </TextBlock.Style>
-                            </TextBlock>
-                            <TextBlock Text="{Binding Item.Notes}" Style="{DynamicResource HelmSecondaryText}" Margin="0,2,0,0"
-                                       Visibility="{Binding HasNotes, Converter={StaticResource BoolToVisibility}}" />
-                        </StackPanel>
-
-                        <TextBlock Grid.Column="2" Text="{Binding AmountText}" Style="{StaticResource AmountText}"
-                                   Visibility="{Binding IsDebt, Converter={StaticResource BoolToVisibility}}" />
-
-                        <StackPanel Grid.Column="3" Orientation="Horizontal" VerticalAlignment="Center">
-                            <ui:Button Style="{StaticResource RowAction}" Icon="{ui:SymbolIcon Play24}" ToolTip="Start now (records the start time)" AutomationProperties.Name="Start"
-                                       Command="{Binding StartCommand}" Visibility="{Binding CanStart, Converter={StaticResource BoolToVisibility}}" />
-                            <ui:Button Style="{StaticResource RowAction}" Icon="{ui:SymbolIcon ArrowUp24}" ToolTip="Move up" AutomationProperties.Name="Move up"
-                                       Command="{Binding MoveUpCommand}" IsEnabled="{Binding CanMoveUp}"
-                                       Visibility="{Binding IsOpen, Converter={StaticResource BoolToVisibility}}" />
-                            <ui:Button Style="{StaticResource RowAction}" Icon="{ui:SymbolIcon ArrowDown24}" ToolTip="Move down" AutomationProperties.Name="Move down"
-                                       Command="{Binding MoveDownCommand}" IsEnabled="{Binding CanMoveDown}"
-                                       Visibility="{Binding IsOpen, Converter={StaticResource BoolToVisibility}}" />
-                            <ui:Button Style="{StaticResource RowAction}" Icon="{ui:SymbolIcon Edit24}" ToolTip="Edit" AutomationProperties.Name="Edit" Command="{Binding BeginEditCommand}" />
-                            <ui:Button Style="{StaticResource RowAction}" Icon="{ui:SymbolIcon Delete24}" ToolTip="Delete" AutomationProperties.Name="Delete" Command="{Binding DeleteCommand}" />
-                        </StackPanel>
-                    </Grid>
-
-                    <!-- Inline editor -->
-                    <StackPanel Margin="32,8,0,6" Visibility="{Binding IsEditing, Converter={StaticResource BoolToVisibility}}">
-                        <WrapPanel Visibility="{Binding IsDebt, Converter={StaticResource BoolToVisibility}}">
-                            <ui:TextBox Width="200" Margin="0,0,8,8" PlaceholderText="Person" AutomationProperties.Name="Edit person" Text="{Binding EditPerson, UpdateSourceTrigger=PropertyChanged}" />
-                            <ui:TextBox Width="160" Margin="0,0,8,8" PlaceholderText="Amount" AutomationProperties.Name="Edit amount" Text="{Binding EditAmount, UpdateSourceTrigger=PropertyChanged}" />
-                            <ComboBox Width="140" Margin="0,0,8,8"
-                                      ItemsSource="{Binding DataContext.DirectionNames, RelativeSource={RelativeSource AncestorType=core:ModulePageBase}}"
-                                      SelectedIndex="{Binding EditDirectionIndex}" AutomationProperties.Name="Edit direction" />
-                        </WrapPanel>
-                        <ui:TextBox Margin="0,0,0,8" PlaceholderText="Title" AutomationProperties.Name="Edit title" Text="{Binding EditTitle, UpdateSourceTrigger=PropertyChanged}" />
-                        <ui:TextBox Margin="0,0,0,8" PlaceholderText="Notes" AutomationProperties.Name="Edit notes" AcceptsReturn="True" TextWrapping="Wrap" MinHeight="60"
-                                    Text="{Binding EditNotes, UpdateSourceTrigger=PropertyChanged}" />
-                        <WrapPanel>
-                            <ComboBox Width="140" Margin="0,0,8,8"
-                                      Visibility="{Binding IsDebt, Converter={StaticResource InverseBoolToVisibility}}"
-                                      ItemsSource="{Binding DataContext.PriorityNames, RelativeSource={RelativeSource AncestorType=core:ModulePageBase}}"
-                                      SelectedIndex="{Binding EditPriorityIndex}" AutomationProperties.Name="Edit priority" />
-                            <DatePicker Width="160" Margin="0,0,8,8" SelectedDate="{Binding EditDueDate}" ToolTip="Due date" AutomationProperties.Name="Edit due date" />
-                            <ui:Button Margin="0,0,8,8" Appearance="Primary" Content="Save" Icon="{ui:SymbolIcon Save24}" Command="{Binding SaveEditCommand}" />
-                            <ui:Button Margin="0,0,8,8" Content="Cancel" Command="{Binding CancelEditCommand}" />
-                        </WrapPanel>
-                    </StackPanel>
-                </StackPanel>
-            </Border>
-        </DataTemplate>
-
-        <!-- A number tile in the report -->
-        <Style x:Key="StatValue" TargetType="TextBlock">
-            <Setter Property="FontSize" Value="22" />
-            <Setter Property="FontWeight" Value="SemiBold" />
-        </Style>
-    </core:ModulePageBase.Resources>
-
+    <!-- Tracker's settings (Home → Utilities). The lists themselves are on TrackerContentPage. -->
     <StackPanel>
-        <!-- First run: no workspace yet -->
-        <Border Style="{DynamicResource HelmSurface}" Margin="0,24,0,4"
-                Visibility="{Binding HasNoWorkspaces, Converter={StaticResource BoolToVisibility}}">
-            <StackPanel>
-                <TextBlock Text="Create your first workspace" FontSize="16" FontWeight="SemiBold" />
-                <TextBlock Style="{DynamicResource HelmSecondaryText}" Margin="0,4,0,12"
-                           Text="A workspace is one list: a to-do list for tasks, or a debt book for who owes whom. You can add more later." />
-                <WrapPanel>
-                    <ui:Button Margin="0,0,8,0" Appearance="Primary" Content="New to-do list" Icon="{ui:SymbolIcon TaskListSquareLtr24}"
-                               Command="{Binding CreateTasksWorkspaceCommand}" />
-                    <ui:Button Content="New debt book" Icon="{ui:SymbolIcon PersonMoney24}" Command="{Binding CreateDebtWorkspaceCommand}" />
-                </WrapPanel>
-            </StackPanel>
-        </Border>
-
-        <StackPanel Visibility="{Binding HasWorkspaces, Converter={StaticResource BoolToVisibility}}">
-            <!-- Workspace -->
-            <TextBlock Text="Workspace" Style="{DynamicResource HelmSectionHeader}" />
-            <ui:CardControl Margin="0,0,0,4" Icon="{ui:SymbolIcon Board24}">
-                <ui:CardControl.Header>
-                    <core:CardHeader Title="Current workspace" Description="{Binding SelectedWorkspace.KindText}" />
-                </ui:CardControl.Header>
-                <ComboBox Width="240" HorizontalAlignment="Right" AutomationProperties.Name="Current workspace" ItemsSource="{Binding Workspaces}" DisplayMemberPath="Name"
-                          SelectedItem="{Binding SelectedWorkspace}" />
-            </ui:CardControl>
-            <ui:CardExpander Margin="0,0,0,4" Icon="{ui:SymbolIcon Edit24}">
-                <ui:CardExpander.Header>
-                    <core:CardHeader Title="Manage workspaces" Description="Rename or delete this workspace, or create another to-do list or debt book." />
-                </ui:CardExpander.Header>
-                <StackPanel>
-                    <Border Style="{DynamicResource HelmExpanderRow}" BorderThickness="0">
-                        <core:RowLayout>
-                            <core:CardHeader Title="Workspace name" />
-                            <ui:TextBox Width="240" AutomationProperties.Name="Workspace name" Text="{Binding WorkspaceName, UpdateSourceTrigger=LostFocus}" />
-                        </core:RowLayout>
-                    </Border>
-                    <Border Style="{DynamicResource HelmExpanderRow}" Visibility="{Binding IsDebtWorkspace, Converter={StaticResource BoolToVisibility}}">
-                        <core:RowLayout>
-                            <core:CardHeader Title="Currency" Description="Shown after every amount in this debt book, e.g. ₫ or USD." />
-                            <ui:TextBox Width="120" AutomationProperties.Name="Currency" Text="{Binding WorkspaceCurrency, UpdateSourceTrigger=LostFocus}" />
-                        </core:RowLayout>
-                    </Border>
-                    <Border Style="{DynamicResource HelmExpanderRow}">
-                        <core:RowLayout>
-                            <core:CardHeader Title="New workspace" Description="Pick a name and what it holds." />
-                            <ui:TextBox Width="180" PlaceholderText="Name" AutomationProperties.Name="New workspace name" Text="{Binding NewWorkspaceName, UpdateSourceTrigger=PropertyChanged}" />
-                            <ComboBox Width="140" AutomationProperties.Name="New workspace kind" ItemsSource="{Binding KindNames}" SelectedIndex="{Binding NewWorkspaceKindIndex}" />
-                            <ui:Button Content="Create" Icon="{ui:SymbolIcon Add24}" Command="{Binding CreateWorkspaceCommand}" />
-                        </core:RowLayout>
-                    </Border>
-                    <Border Style="{DynamicResource HelmExpanderRow}">
-                        <core:RowLayout>
-                            <core:CardHeader Title="Delete this workspace" Description="Removes it and its items from all your devices. The history stays in the reports." />
-                            <ui:Button Content="Delete" Icon="{ui:SymbolIcon Delete24}" Command="{Binding DeleteWorkspaceCommand}" />
-                        </core:RowLayout>
-                    </Border>
-                </StackPanel>
-            </ui:CardExpander>
-
-            <!-- Add -->
-            <TextBlock Text="{Binding AddHeader}" Style="{DynamicResource HelmSectionHeader}" />
-            <Border Style="{DynamicResource HelmSurface}" Margin="0,0,0,4">
-                <StackPanel>
-                    <WrapPanel Visibility="{Binding IsDebtWorkspace, Converter={StaticResource BoolToVisibility}}">
-                        <ui:TextBox Width="220" Margin="0,0,8,8" PlaceholderText="Person" AutomationProperties.Name="Person" Icon="{ui:SymbolIcon Person24}"
-                                    Text="{Binding NewPerson, UpdateSourceTrigger=PropertyChanged}">
-                            <ui:TextBox.InputBindings>
-                                <KeyBinding Key="Enter" Command="{Binding AddCommand}" />
-                            </ui:TextBox.InputBindings>
-                        </ui:TextBox>
-                        <ui:TextBox Width="180" Margin="0,0,8,8" PlaceholderText="Amount, e.g. 150k" AutomationProperties.Name="Amount" Icon="{ui:SymbolIcon Money24}"
-                                    Text="{Binding NewAmount, UpdateSourceTrigger=PropertyChanged}">
-                            <ui:TextBox.InputBindings>
-                                <KeyBinding Key="Enter" Command="{Binding AddCommand}" />
-                            </ui:TextBox.InputBindings>
-                        </ui:TextBox>
-                        <ComboBox Width="140" Margin="0,0,8,8" ItemsSource="{Binding DirectionNames}" SelectedIndex="{Binding NewDirectionIndex}" AutomationProperties.Name="Direction" />
-                    </WrapPanel>
-                    <ui:TextBox Margin="0,0,0,8" AutomationProperties.Name="Title" PlaceholderText="{Binding TitlePlaceholder}" Text="{Binding NewTitle, UpdateSourceTrigger=PropertyChanged}">
-                        <ui:TextBox.InputBindings>
-                            <KeyBinding Key="Enter" Command="{Binding AddCommand}" />
-                        </ui:TextBox.InputBindings>
-                    </ui:TextBox>
-                    <WrapPanel>
-                        <ComboBox Width="140" Margin="0,0,8,0" ItemsSource="{Binding PriorityNames}" SelectedIndex="{Binding NewPriorityIndex}"
-                                  ToolTip="Priority" AutomationProperties.Name="Priority" Visibility="{Binding IsTaskWorkspace, Converter={StaticResource BoolToVisibility}}" />
-                        <DatePicker Width="160" Margin="0,0,8,0" SelectedDate="{Binding NewDueDate}" ToolTip="Due date (optional)" AutomationProperties.Name="Due date" />
-                        <ui:Button Appearance="Primary" Content="Add" Icon="{ui:SymbolIcon Add24}" Command="{Binding AddCommand}" />
-                    </WrapPanel>
-                </StackPanel>
-            </Border>
-            <Border Style="{DynamicResource HelmSurface}" Margin="0,4,0,4" Padding="12,8"
-                    Visibility="{Binding HasMessage, Converter={StaticResource BoolToVisibility}}">
-                <core:RowLayout>
-                    <TextBlock Text="{Binding Message}" TextWrapping="Wrap" VerticalAlignment="Center" />
-                    <ui:Button Style="{StaticResource RowAction}" Icon="{ui:SymbolIcon Dismiss24}" ToolTip="Dismiss" AutomationProperties.Name="Dismiss" Command="{Binding DismissMessageCommand}" />
-                </core:RowLayout>
-            </Border>
-
-            <!-- Debt totals -->
-            <UniformGrid Columns="3" Margin="0,20,0,0" Visibility="{Binding IsDebtWorkspace, Converter={StaticResource BoolToVisibility}}">
-                <Border Style="{DynamicResource HelmSurface}" Margin="0,0,4,0">
-                    <StackPanel>
-                        <TextBlock Text="{Binding OwedToMeText}" Style="{StaticResource StatValue}" Foreground="{DynamicResource SystemFillColorSuccessBrush}" />
-                        <TextBlock Text="Owed to me" Style="{DynamicResource HelmSecondaryText}" />
-                    </StackPanel>
-                </Border>
-                <Border Style="{DynamicResource HelmSurface}" Margin="2,0,2,0">
-                    <StackPanel>
-                        <TextBlock Text="{Binding IOweText}" Style="{StaticResource StatValue}" Foreground="{DynamicResource SystemFillColorCriticalBrush}" />
-                        <TextBlock Text="I owe" Style="{DynamicResource HelmSecondaryText}" />
-                    </StackPanel>
-                </Border>
-                <Border Style="{DynamicResource HelmSurface}" Margin="4,0,0,0">
-                    <StackPanel>
-                        <TextBlock Text="{Binding NetText}" Style="{StaticResource StatValue}" />
-                        <TextBlock Text="Net" Style="{DynamicResource HelmSecondaryText}" />
-                    </StackPanel>
-                </Border>
-            </UniformGrid>
-
-            <!-- Open -->
-            <core:RowLayout Margin="0,24,0,8">
-                <TextBlock Text="{Binding OpenHeader}" FontSize="14" FontWeight="SemiBold" VerticalAlignment="Center" />
-                <TextBlock Text="{Binding OpenSummary}" Style="{DynamicResource HelmSecondaryText}" VerticalAlignment="Center" />
-            </core:RowLayout>
-            <Border Style="{DynamicResource HelmSurface}" Padding="0">
-                <StackPanel>
-                    <TextBlock Margin="16" Text="{Binding EmptyOpenText}" Style="{DynamicResource HelmSecondaryText}"
-                               Visibility="{Binding HasNoOpen, Converter={StaticResource BoolToVisibility}}" />
-                    <ItemsControl ItemsSource="{Binding OpenItems}" ItemTemplate="{StaticResource ItemRow}" />
-                </StackPanel>
-            </Border>
-
-            <!-- Completed -->
-            <core:RowLayout Margin="0,24,0,8">
-                <TextBlock Text="{Binding CompletedHeader}" FontSize="14" FontWeight="SemiBold" VerticalAlignment="Center" />
-                <ui:ToggleSwitch IsChecked="{Binding ShowCompleted}" OnContent="Shown" OffContent="Hidden" />
-            </core:RowLayout>
-            <Border Style="{DynamicResource HelmSurface}" Padding="0" Visibility="{Binding ShowCompleted, Converter={StaticResource BoolToVisibility}}">
-                <StackPanel>
-                    <TextBlock Margin="16" Text="{Binding EmptyCompletedText}"
-                               Style="{DynamicResource HelmSecondaryText}"
-                               Visibility="{Binding HasCompleted, Converter={StaticResource InverseBoolToVisibility}}" />
-                    <ItemsControl ItemsSource="{Binding CompletedItems}" ItemTemplate="{StaticResource ItemRow}" />
-                </StackPanel>
-            </Border>
-        </StackPanel>
-
-        <!-- Report -->
-        <TextBlock Text="Report" Style="{DynamicResource HelmSectionHeader}" />
-        <ui:CardControl Margin="0,0,0,4" Icon="{ui:SymbolIcon DataBarVertical24}">
+        <ui:CardControl Margin="0,0,0,4" Icon="{ui:SymbolIcon TaskListSquareLtr24}">
             <ui:CardControl.Header>
-                <core:CardHeader Title="Report period" Description="{Binding ReportRangeText}" />
+                <core:CardHeader Title="Open Tracker" Description="Your lists, the report and the history. Also in the menu and on Home." />
             </ui:CardControl.Header>
-            <StackPanel Width="310" Orientation="Horizontal" HorizontalAlignment="Right">
-                <CheckBox Margin="0,0,12,0" Content="All workspaces" IsChecked="{Binding ReportAllWorkspaces}" VerticalAlignment="Center" />
-                <ComboBox Width="160" ItemsSource="{Binding ReportRangeNames}" SelectedIndex="{Binding ReportRangeIndex}" AutomationProperties.Name="Report period" />
+            <ui:Button Appearance="Primary" Content="Open Tracker" Click="OpenTracker_Click" />
+        </ui:CardControl>
+
+        <!-- Workspaces -->
+        <TextBlock Text="Workspaces" Style="{DynamicResource HelmSectionHeader}" />
+        <ui:CardControl Margin="0,0,0,4" Icon="{ui:SymbolIcon Add24}">
+            <ui:CardControl.Header>
+                <core:CardHeader Title="New workspace" Description="{Binding NewWorkspaceHint}" />
+            </ui:CardControl.Header>
+            <StackPanel Width="440" Orientation="Horizontal" HorizontalAlignment="Right">
+                <ui:TextBox Width="180" Margin="0,0,8,0" PlaceholderText="Name" AutomationProperties.Name="New workspace name"
+                            Text="{Binding NewWorkspaceName, UpdateSourceTrigger=PropertyChanged}" />
+                <ComboBox Width="140" Margin="0,0,8,0" AutomationProperties.Name="New workspace kind" ItemsSource="{Binding KindNames}"
+                          SelectedIndex="{Binding NewWorkspaceKindIndex}" IsEnabled="{Binding CanAddDebtBook}" />
+                <ui:Button Content="Create" Icon="{ui:SymbolIcon Add24}" Command="{Binding CreateWorkspaceCommand}" />
             </StackPanel>
         </ui:CardControl>
-        <UniformGrid Columns="3" Margin="0,0,0,0">
-            <Border Style="{DynamicResource HelmSurface}" Margin="0,0,4,4">
-                <StackPanel>
-                    <TextBlock Text="{Binding ReportCompleted}" Style="{StaticResource StatValue}" />
-                    <TextBlock Text="{Binding ReportCompletedLabel}" Style="{DynamicResource HelmSecondaryText}" />
-                </StackPanel>
-            </Border>
-            <Border Style="{DynamicResource HelmSurface}" Margin="0,0,4,4">
-                <StackPanel>
-                    <TextBlock Text="{Binding ReportCreated}" Style="{StaticResource StatValue}" />
-                    <TextBlock Text="Added" Style="{DynamicResource HelmSecondaryText}" />
-                </StackPanel>
-            </Border>
-            <Border Style="{DynamicResource HelmSurface}" Margin="0,0,0,4">
-                <StackPanel>
-                    <TextBlock Text="{Binding ReportOnTime}" Style="{StaticResource StatValue}" />
-                    <TextBlock Text="Done by the due date" Style="{DynamicResource HelmSecondaryText}" />
-                </StackPanel>
-            </Border>
-            <Border Style="{DynamicResource HelmSurface}" Margin="0,0,4,4">
-                <StackPanel>
-                    <TextBlock Text="{Binding ReportAverageLead}" Style="{StaticResource StatValue}" />
-                    <TextBlock Text="{Binding ReportLeadLabel}" Style="{DynamicResource HelmSecondaryText}" />
-                </StackPanel>
-            </Border>
-            <Border Style="{DynamicResource HelmSurface}" Margin="0,0,4,4">
-                <StackPanel>
-                    <TextBlock Text="{Binding ReportMedianLead}" Style="{StaticResource StatValue}" />
-                    <TextBlock Text="{Binding ReportMedianLabel}" Style="{DynamicResource HelmSecondaryText}" />
-                </StackPanel>
-            </Border>
-            <Border Style="{DynamicResource HelmSurface}" Margin="0,0,0,4" Visibility="{Binding ShowTaskReport, Converter={StaticResource BoolToVisibility}}">
-                <StackPanel>
-                    <TextBlock Text="{Binding ReportAverageWork}" Style="{StaticResource StatValue}" />
-                    <TextBlock Text="Average time from start to done" Style="{DynamicResource HelmSecondaryText}" />
-                </StackPanel>
-            </Border>
-        </UniformGrid>
-        <Border Style="{DynamicResource HelmSurface}" Margin="0,0,0,4">
+        <ui:CardExpander Margin="0,0,0,4" Icon="{ui:SymbolIcon Edit24}" IsEnabled="{Binding HasWorkspaces}">
+            <ui:CardExpander.Header>
+                <core:RowLayout>
+                    <core:CardHeader Title="Edit a workspace" Description="Rename it, set its currency, or delete it." />
+                    <ComboBox Width="220" Margin="0,0,16,0" AutomationProperties.Name="Workspace to edit" ItemsSource="{Binding Workspaces}"
+                              DisplayMemberPath="Name" SelectedItem="{Binding SelectedWorkspace}" />
+                </core:RowLayout>
+            </ui:CardExpander.Header>
             <StackPanel>
-                <TextBlock Text="Completed per day" FontWeight="SemiBold" Margin="0,0,0,12" />
-                <ItemsControl ItemsSource="{Binding ReportDays}">
-                    <ItemsControl.ItemsPanel>
-                        <ItemsPanelTemplate>
-                            <UniformGrid Rows="1" />
-                        </ItemsPanelTemplate>
-                    </ItemsControl.ItemsPanel>
-                    <ItemsControl.ItemTemplate>
-                        <DataTemplate DataType="{x:Type local:ReportBar}">
-                            <Grid ToolTip="{Binding ToolTip}" Background="Transparent">
-                                <Grid.RowDefinitions>
-                                    <RowDefinition Height="64" />
-                                    <RowDefinition Height="18" />
-                                </Grid.RowDefinitions>
-                                <Border VerticalAlignment="Bottom" Height="{Binding BarHeight}" CornerRadius="2" Margin="1,0"
-                                        Background="{DynamicResource AccentFillColorDefaultBrush}" />
-                                <TextBlock Grid.Row="1" Text="{Binding Label}" FontSize="10" HorizontalAlignment="Center" TextWrapping="NoWrap"
-                                           Foreground="{DynamicResource TextFillColorSecondaryBrush}" Margin="-20,2,-20,0" TextAlignment="Center" />
-                            </Grid>
-                        </DataTemplate>
-                    </ItemsControl.ItemTemplate>
-                </ItemsControl>
-                <TextBlock Text="By priority" FontWeight="SemiBold" Margin="0,16,0,6"
-                           Visibility="{Binding ShowTaskReport, Converter={StaticResource BoolToVisibility}}" />
-                <ItemsControl ItemsSource="{Binding ReportPriorities}" Visibility="{Binding ShowTaskReport, Converter={StaticResource BoolToVisibility}}">
-                    <ItemsControl.ItemsPanel>
-                        <ItemsPanelTemplate>
-                            <WrapPanel />
-                        </ItemsPanelTemplate>
-                    </ItemsControl.ItemsPanel>
-                    <ItemsControl.ItemTemplate>
-                        <DataTemplate DataType="{x:Type local:ReportCount}">
-                            <StackPanel Orientation="Horizontal" Margin="0,0,20,0">
-                                <TextBlock Text="{Binding Label}" Style="{DynamicResource HelmSecondaryText}" VerticalAlignment="Center" />
-                                <TextBlock Text="{Binding Count}" FontWeight="SemiBold" Margin="6,0,0,0" VerticalAlignment="Center" />
-                            </StackPanel>
-                        </DataTemplate>
-                    </ItemsControl.ItemTemplate>
-                </ItemsControl>
+                <Border Style="{DynamicResource HelmExpanderRow}" BorderThickness="0">
+                    <core:RowLayout>
+                        <core:CardHeader Title="Workspace name" />
+                        <ui:TextBox Width="240" AutomationProperties.Name="Workspace name" Text="{Binding WorkspaceName, UpdateSourceTrigger=LostFocus}" />
+                    </core:RowLayout>
+                </Border>
+                <Border Style="{DynamicResource HelmExpanderRow}" Visibility="{Binding IsDebtWorkspace, Converter={StaticResource BoolToVisibility}}">
+                    <core:RowLayout>
+                        <core:CardHeader Title="Currency" Description="Shown after every amount in this debt book, e.g. ₫ or USD." />
+                        <ui:TextBox Width="120" AutomationProperties.Name="Currency" Text="{Binding WorkspaceCurrency, UpdateSourceTrigger=LostFocus}" />
+                    </core:RowLayout>
+                </Border>
+                <Border Style="{DynamicResource HelmExpanderRow}">
+                    <core:RowLayout>
+                        <core:CardHeader Title="Delete this workspace" Description="Removes it and its items from all your devices. The history stays in the reports." />
+                        <ui:Button Content="Delete" Icon="{ui:SymbolIcon Delete24}" Command="{Binding DeleteWorkspaceCommand}" />
+                    </core:RowLayout>
+                </Border>
             </StackPanel>
-        </Border>
+        </ui:CardExpander>
+
+        <!-- Display -->
+        <TextBlock Text="Display" Style="{DynamicResource HelmSectionHeader}" />
+        <ui:CardControl Margin="0,0,0,4" Icon="{ui:SymbolIcon CheckmarkCircle24}">
+            <ui:CardControl.Header>
+                <core:CardHeader Title="Show finished items" Description="List completed tasks and settled debts under the open ones." />
+            </ui:CardControl.Header>
+            <ui:ToggleSwitch IsChecked="{Binding ShowCompleted}" />
+        </ui:CardControl>
+
+        <!-- Data -->
+        <TextBlock Text="Data" Style="{DynamicResource HelmSectionHeader}" />
         <ui:CardControl Margin="0,0,0,4" Icon="{ui:SymbolIcon ArrowDownload24}">
             <ui:CardControl.Header>
                 <core:CardHeader Title="Export to CSV" Description="Every item or every change, with times in minutes, for a spreadsheet." />
@@ -392,35 +80,5 @@
                 <ui:Button Content="History…" Icon="{ui:SymbolIcon History24}" Click="ExportHistory_Click" />
             </StackPanel>
         </ui:CardControl>
-
-        <!-- History -->
-        <TextBlock Text="History" Style="{DynamicResource HelmSectionHeader}" />
-        <ui:CardExpander Margin="0,0,0,4" Icon="{ui:SymbolIcon History24}">
-            <ui:CardExpander.Header>
-                <core:CardHeader Title="Recent changes" Description="The last 100 things added, started, completed, reopened or deleted, newest first." />
-            </ui:CardExpander.Header>
-            <StackPanel>
-                <TextBlock Text="No history yet." Style="{DynamicResource HelmSecondaryText}"
-                           Visibility="{Binding HasHistory, Converter={StaticResource InverseBoolToVisibility}}" />
-                <ScrollViewer MaxHeight="360" VerticalScrollBarVisibility="Auto">
-                    <ItemsControl ItemsSource="{Binding History}">
-                        <ItemsControl.ItemTemplate>
-                            <DataTemplate DataType="{x:Type local:HistoryRow}">
-                                <Grid Margin="0,4">
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="150" />
-                                        <ColumnDefinition Width="*" />
-                                        <ColumnDefinition Width="Auto" />
-                                    </Grid.ColumnDefinitions>
-                                    <TextBlock Text="{Binding When}" Style="{DynamicResource HelmSecondaryText}" VerticalAlignment="Center" />
-                                    <TextBlock Grid.Column="1" Text="{Binding Text}" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" ToolTip="{Binding Text}" />
-                                    <TextBlock Grid.Column="2" Text="{Binding Workspace}" Style="{DynamicResource HelmSecondaryText}" Margin="12,0,0,0" VerticalAlignment="Center" />
-                                </Grid>
-                            </DataTemplate>
-                        </ItemsControl.ItemTemplate>
-                    </ItemsControl>
-                </ScrollViewer>
-            </StackPanel>
-        </ui:CardExpander>
     </StackPanel>
 </core:ModulePageBase>

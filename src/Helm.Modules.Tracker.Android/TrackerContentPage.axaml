@@ -1,0 +1,356 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:ic="using:FluentIcons.Avalonia"
+             xmlns:vm="using:Helm.Modules.Tracker"
+             x:Class="Helm.Modules.Tracker.TrackerContentPage"
+             x:DataType="vm:TrackerViewModel">
+
+    <!-- The Tracker itself (drawer and Quick access). Its options live on TrackerPage (Home → Utilities). -->
+    <UserControl.Styles>
+        <Style Selector="TextBlock.done">
+            <Setter Property="TextDecorations" Value="Strikethrough" />
+            <Setter Property="Foreground" Value="{DynamicResource HelmSecondaryText}" />
+        </Style>
+        <!-- Past its due date and still open -->
+        <Style Selector="TextBlock.secondary.overdue">
+            <Setter Property="Foreground" Value="{DynamicResource HelmDanger}" />
+        </Style>
+        <Style Selector="TextBlock.owed">
+            <Setter Property="Foreground" Value="{DynamicResource HelmSuccess}" />
+        </Style>
+        <Style Selector="TextBlock.iowe">
+            <Setter Property="Foreground" Value="{DynamicResource HelmDanger}" />
+        </Style>
+        <Style Selector="TextBlock.stat">
+            <Setter Property="FontSize" Value="20" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+        </Style>
+        <Style Selector="Border.badge">
+            <Setter Property="Background" Value="{DynamicResource HelmSubtleFill}" />
+            <Setter Property="CornerRadius" Value="4" />
+            <Setter Property="Padding" Value="6,0" />
+            <Setter Property="Margin" Value="0,0,6,2" />
+        </Style>
+        <Style Selector="Border.badge > TextBlock">
+            <Setter Property="FontSize" Value="11" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+        </Style>
+        <!-- Square icon button in a row (44 dp touch target) -->
+        <Style Selector="Button.icon">
+            <Setter Property="Width" Value="44" />
+            <Setter Property="Height" Value="44" />
+            <Setter Property="Padding" Value="0" />
+            <Setter Property="HorizontalContentAlignment" Value="Center" />
+            <Setter Property="VerticalContentAlignment" Value="Center" />
+        </Style>
+    </UserControl.Styles>
+
+    <UserControl.DataTemplates>
+        <DataTemplate DataType="vm:TrackerItemViewModel">
+            <Border BorderThickness="0,1,0,0" BorderBrush="{DynamicResource HelmCardStroke}" Padding="0,6">
+                <StackPanel>
+                    <Grid ColumnDefinitions="Auto,*,Auto">
+                        <CheckBox VerticalAlignment="Center" MinWidth="0" Margin="0,0,4,0"
+                                  IsChecked="{Binding Done}"
+                                  AutomationProperties.Name="Done" />
+                        <!-- Tap the text to show the row's actions -->
+                        <Button Grid.Column="1" Classes="flat" Padding="4,4" Command="{Binding ToggleExpandedCommand}">
+                            <StackPanel>
+                                <WrapPanel>
+                                    <Border Classes="badge" IsVisible="{Binding IsUrgent}">
+                                        <TextBlock Text="Urgent" Foreground="{DynamicResource HelmDanger}" />
+                                    </Border>
+                                    <Border Classes="badge" IsVisible="{Binding IsHigh}">
+                                        <TextBlock Text="High" Foreground="{DynamicResource SystemAccentColor}" />
+                                    </Border>
+                                    <Border Classes="badge" IsVisible="{Binding IsStarted}">
+                                        <TextBlock Text="In progress" Foreground="{DynamicResource SystemAccentColor}" />
+                                    </Border>
+                                </WrapPanel>
+                                <TextBlock Text="{Binding Title}" TextWrapping="Wrap" Classes.done="{Binding IsCompleted}" />
+                                <TextBlock Text="{Binding Details}" Classes="secondary" Classes.overdue="{Binding IsOverdue}" />
+                                <TextBlock Text="{Binding Item.Notes}" Classes="secondary" IsVisible="{Binding HasNotes}" Margin="0,2,0,0" />
+                            </StackPanel>
+                        </Button>
+                        <TextBlock Grid.Column="2" Text="{Binding AmountText}" FontWeight="SemiBold" VerticalAlignment="Center" Margin="8,0,4,0"
+                                   IsVisible="{Binding IsDebt}" Classes.owed="{Binding OwedToMe}" Classes.iowe="{Binding IOwe}" />
+                    </Grid>
+
+                    <!-- Actions -->
+                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Spacing="2" IsVisible="{Binding IsExpanded}">
+                        <Button Classes="icon flat" Command="{Binding StartCommand}" IsVisible="{Binding CanStart}" AutomationProperties.Name="Start">
+                            <ic:SymbolIcon Symbol="Play" FontSize="18" />
+                        </Button>
+                        <Button Classes="icon flat" Command="{Binding MoveUpCommand}" IsVisible="{Binding IsOpen}" IsEnabled="{Binding CanMoveUp}" AutomationProperties.Name="Move up">
+                            <ic:SymbolIcon Symbol="ArrowUp" FontSize="18" />
+                        </Button>
+                        <Button Classes="icon flat" Command="{Binding MoveDownCommand}" IsVisible="{Binding IsOpen}" IsEnabled="{Binding CanMoveDown}" AutomationProperties.Name="Move down">
+                            <ic:SymbolIcon Symbol="ArrowDown" FontSize="18" />
+                        </Button>
+                        <Button Classes="icon flat" Command="{Binding BeginEditCommand}" AutomationProperties.Name="Edit">
+                            <ic:SymbolIcon Symbol="Edit" FontSize="18" />
+                        </Button>
+                        <Button Classes="icon flat danger" Command="{Binding DeleteCommand}" AutomationProperties.Name="Delete">
+                            <ic:SymbolIcon Symbol="Delete" FontSize="18" />
+                        </Button>
+                    </StackPanel>
+
+                    <!-- Inline editor -->
+                    <StackPanel Spacing="8" Margin="0,8,0,4" IsVisible="{Binding IsEditing}">
+                        <StackPanel Spacing="8" IsVisible="{Binding IsDebt}">
+                            <TextBox PlaceholderText="Person" Text="{Binding EditPerson}" />
+                            <Grid ColumnDefinitions="*,8,Auto">
+                                <TextBox PlaceholderText="Amount" Text="{Binding EditAmount}" />
+                                <ComboBox Grid.Column="2" MinWidth="120"
+                                          ItemsSource="{Binding $parent[UserControl].((vm:TrackerViewModel)DataContext).DirectionNames}"
+                                          SelectedIndex="{Binding EditDirectionIndex}" />
+                            </Grid>
+                        </StackPanel>
+                        <TextBox PlaceholderText="Title" Text="{Binding EditTitle}" />
+                        <TextBox PlaceholderText="Notes" Text="{Binding EditNotes}" AcceptsReturn="True" TextWrapping="Wrap" MinHeight="64" />
+                        <ComboBox HorizontalAlignment="Stretch" IsVisible="{Binding !IsDebt}"
+                                  ItemsSource="{Binding $parent[UserControl].((vm:TrackerViewModel)DataContext).PriorityNames}"
+                                  SelectedIndex="{Binding EditPriorityIndex}" />
+                        <CalendarDatePicker HorizontalAlignment="Stretch" SelectedDate="{Binding EditDueDate}" PlaceholderText="Due date (optional)" />
+                        <WrapPanel>
+                            <Button Classes="accent" Content="Save" Command="{Binding SaveEditCommand}" Margin="0,0,8,0" />
+                            <Button Content="Cancel" Command="{Binding CancelEditCommand}" />
+                        </WrapPanel>
+                    </StackPanel>
+                </StackPanel>
+            </Border>
+        </DataTemplate>
+    </UserControl.DataTemplates>
+
+    <StackPanel>
+        <!-- Shown while the tool is turned off -->
+        <Border x:Name="OffBar" Classes="infobar" IsVisible="False">
+            <StackPanel>
+                <TextBlock Text="Tracker is turned off" Classes="title" />
+                <TextBlock Text="Your lists are kept. Turn Tracker on in its settings to use them." TextWrapping="Wrap" />
+            </StackPanel>
+        </Border>
+
+        <!-- Workspace picker and the way to the settings -->
+        <Grid ColumnDefinitions="*,Auto">
+            <ComboBox HorizontalAlignment="Stretch" VerticalAlignment="Center" ItemsSource="{Binding Workspaces}" SelectedItem="{Binding SelectedWorkspace}"
+                      IsVisible="{Binding HasWorkspaces}" AutomationProperties.Name="Current workspace">
+                <ComboBox.ItemTemplate>
+                    <DataTemplate DataType="vm:WorkspaceOption">
+                        <TextBlock Text="{Binding Name}" />
+                    </DataTemplate>
+                </ComboBox.ItemTemplate>
+            </ComboBox>
+            <Button Grid.Column="1" Classes="icon flat" Margin="4,0,0,0" Click="OpenSettings_Click" AutomationProperties.Name="Tracker settings">
+                <ic:SymbolIcon Symbol="Settings" FontSize="20" />
+            </Button>
+        </Grid>
+
+        <StackPanel x:Name="Body">
+            <!-- First run: no workspace yet -->
+            <Border Classes="card" IsVisible="{Binding HasNoWorkspaces}" Margin="0,16,0,4">
+                <StackPanel Spacing="8">
+                    <TextBlock Text="Create your first workspace" Classes="title" FontSize="16" />
+                    <TextBlock Classes="secondary" Text="A workspace is one list: a to-do list for tasks, or a debt book for who owes whom. You can add more later." />
+                    <Button Classes="accent" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Content="New to-do list"
+                            Command="{Binding CreateTasksWorkspaceCommand}" />
+                    <Button HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Content="New debt book"
+                            Command="{Binding CreateDebtWorkspaceCommand}" />
+                </StackPanel>
+            </Border>
+
+            <StackPanel IsVisible="{Binding HasWorkspaces}">
+            <!-- Add -->
+            <TextBlock Text="{Binding AddHeader}" Classes="section" />
+            <Border Classes="card">
+                <StackPanel Spacing="8">
+                    <StackPanel Spacing="8" IsVisible="{Binding IsDebtWorkspace}">
+                        <TextBox PlaceholderText="Person" Text="{Binding NewPerson}" AutomationProperties.Name="Person" />
+                        <Grid ColumnDefinitions="*,8,Auto">
+                            <TextBox PlaceholderText="Amount, e.g. 150k" Text="{Binding NewAmount}" AutomationProperties.Name="Amount" />
+                            <ComboBox Grid.Column="2" MinWidth="120" ItemsSource="{Binding DirectionNames}" SelectedIndex="{Binding NewDirectionIndex}" />
+                        </Grid>
+                    </StackPanel>
+                    <TextBox PlaceholderText="{Binding TitlePlaceholder}" Text="{Binding NewTitle}" AutomationProperties.Name="Title">
+                        <TextBox.KeyBindings>
+                            <KeyBinding Gesture="Enter" Command="{Binding AddCommand}" />
+                        </TextBox.KeyBindings>
+                    </TextBox>
+                    <ComboBox HorizontalAlignment="Stretch" ItemsSource="{Binding PriorityNames}" SelectedIndex="{Binding NewPriorityIndex}"
+                              IsVisible="{Binding IsTaskWorkspace}" AutomationProperties.Name="Priority" />
+                    <CalendarDatePicker HorizontalAlignment="Stretch" SelectedDate="{Binding NewDueDate}" PlaceholderText="Due date (optional)" />
+                    <Button Classes="accent" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Content="Add" Command="{Binding AddCommand}" />
+                </StackPanel>
+            </Border>
+            <Border Classes="infobar" IsVisible="{Binding HasMessage}" Margin="0,4,0,0">
+                <Grid ColumnDefinitions="*,Auto">
+                    <TextBlock Text="{Binding Message}" TextWrapping="Wrap" VerticalAlignment="Center" />
+                    <Button Grid.Column="1" Classes="icon flat" Command="{Binding DismissMessageCommand}" AutomationProperties.Name="Dismiss">
+                        <ic:SymbolIcon Symbol="Dismiss" FontSize="16" />
+                    </Button>
+                </Grid>
+            </Border>
+
+            <!-- Debt totals -->
+            <Grid ColumnDefinitions="*,4,*,4,*" Margin="0,16,0,0" IsVisible="{Binding IsDebtWorkspace}">
+                <Border Classes="card" Padding="12,10">
+                    <StackPanel>
+                        <TextBlock Text="{Binding OwedToMeText}" Classes="stat owed" FontSize="15" TextWrapping="Wrap" />
+                        <TextBlock Text="Owed to me" Classes="secondary" />
+                    </StackPanel>
+                </Border>
+                <Border Grid.Column="2" Classes="card" Padding="12,10">
+                    <StackPanel>
+                        <TextBlock Text="{Binding IOweText}" Classes="stat iowe" FontSize="15" TextWrapping="Wrap" />
+                        <TextBlock Text="I owe" Classes="secondary" />
+                    </StackPanel>
+                </Border>
+                <Border Grid.Column="4" Classes="card" Padding="12,10">
+                    <StackPanel>
+                        <TextBlock Text="{Binding NetText}" Classes="stat" FontSize="15" TextWrapping="Wrap" />
+                        <TextBlock Text="Net" Classes="secondary" />
+                    </StackPanel>
+                </Border>
+            </Grid>
+
+            <!-- Open -->
+            <Grid ColumnDefinitions="*,Auto" Margin="4,20,0,8">
+                <TextBlock Text="{Binding OpenHeader}" FontWeight="SemiBold" VerticalAlignment="Center" />
+                <TextBlock Grid.Column="1" Text="{Binding OpenSummary}" Classes="secondary" VerticalAlignment="Center" />
+            </Grid>
+            <Border Classes="card" Padding="12,0">
+                <StackPanel>
+                    <TextBlock Margin="0,12" Text="{Binding EmptyOpenText}" Classes="secondary" IsVisible="{Binding HasNoOpen}" />
+                    <ItemsControl ItemsSource="{Binding OpenItems}" />
+                </StackPanel>
+            </Border>
+
+            <!-- Completed -->
+            <TextBlock Text="{Binding CompletedHeader}" Classes="section" IsVisible="{Binding ShowCompleted}" />
+            <Border Classes="card" Padding="12,0" IsVisible="{Binding ShowCompleted}">
+                <StackPanel>
+                    <TextBlock Margin="0,12" Text="{Binding EmptyCompletedText}"
+                               Classes="secondary" IsVisible="{Binding !HasCompleted}" />
+                    <ItemsControl ItemsSource="{Binding CompletedItems}" />
+                </StackPanel>
+            </Border>
+            </StackPanel>
+
+            <!-- Report -->
+            <TextBlock Text="Report" Classes="section" />
+            <Border Classes="card">
+                <StackPanel Spacing="8">
+                    <ComboBox HorizontalAlignment="Stretch" ItemsSource="{Binding ReportRangeNames}" SelectedIndex="{Binding ReportRangeIndex}"
+                              AutomationProperties.Name="Report period" />
+                    <DockPanel>
+                        <ToggleSwitch DockPanel.Dock="Right" IsChecked="{Binding ReportAllWorkspaces}" OnContent="" OffContent="" VerticalAlignment="Center" />
+                        <StackPanel VerticalAlignment="Center">
+                            <TextBlock Text="All workspaces" />
+                            <TextBlock Text="{Binding ReportRangeText}" Classes="secondary" />
+                        </StackPanel>
+                    </DockPanel>
+                </StackPanel>
+            </Border>
+            <UniformGrid Columns="2">
+                <Border Classes="card" Margin="0,0,2,4">
+                    <StackPanel>
+                        <TextBlock Text="{Binding ReportCompleted}" Classes="stat" />
+                        <TextBlock Text="{Binding ReportCompletedLabel}" Classes="secondary" />
+                    </StackPanel>
+                </Border>
+                <Border Classes="card" Margin="2,0,0,4">
+                    <StackPanel>
+                        <TextBlock Text="{Binding ReportCreated}" Classes="stat" />
+                        <TextBlock Text="Added" Classes="secondary" />
+                    </StackPanel>
+                </Border>
+                <Border Classes="card" Margin="0,0,2,4">
+                    <StackPanel>
+                        <TextBlock Text="{Binding ReportAverageLead}" Classes="stat" />
+                        <TextBlock Text="{Binding ReportLeadLabel}" Classes="secondary" />
+                    </StackPanel>
+                </Border>
+                <Border Classes="card" Margin="2,0,0,4">
+                    <StackPanel>
+                        <TextBlock Text="{Binding ReportMedianLead}" Classes="stat" />
+                        <TextBlock Text="{Binding ReportMedianLabel}" Classes="secondary" />
+                    </StackPanel>
+                </Border>
+                <Border Classes="card" Margin="0,0,2,4" IsVisible="{Binding ShowTaskReport}">
+                    <StackPanel>
+                        <TextBlock Text="{Binding ReportAverageWork}" Classes="stat" />
+                        <TextBlock Text="Average time from start to done" Classes="secondary" />
+                    </StackPanel>
+                </Border>
+                <Border Classes="card" Margin="2,0,0,4">
+                    <StackPanel>
+                        <TextBlock Text="{Binding ReportOnTime}" Classes="stat" />
+                        <TextBlock Text="Done by the due date" Classes="secondary" />
+                    </StackPanel>
+                </Border>
+            </UniformGrid>
+            <Border Classes="card">
+                <StackPanel>
+                    <TextBlock Text="Completed per day" Classes="title" Margin="0,0,0,12" />
+                    <ItemsControl ItemsSource="{Binding ReportDays}">
+                        <ItemsControl.ItemsPanel>
+                            <ItemsPanelTemplate>
+                                <UniformGrid Rows="1" />
+                            </ItemsPanelTemplate>
+                        </ItemsControl.ItemsPanel>
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate DataType="vm:ReportBar">
+                                <Grid RowDefinitions="64,18" Background="Transparent" ToolTip.Tip="{Binding ToolTip}">
+                                    <Border VerticalAlignment="Bottom" Height="{Binding BarHeight}" CornerRadius="2" Margin="1,0"
+                                            Background="{DynamicResource SystemAccentColor}" />
+                                    <TextBlock Grid.Row="1" Text="{Binding Label}" FontSize="10" HorizontalAlignment="Center" TextWrapping="NoWrap"
+                                               Classes="secondary" Margin="-20,2,-20,0" TextAlignment="Center" />
+                                </Grid>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                    <TextBlock Text="By priority" Classes="title" Margin="0,16,0,6" IsVisible="{Binding ShowTaskReport}" />
+                    <ItemsControl ItemsSource="{Binding ReportPriorities}" IsVisible="{Binding ShowTaskReport}">
+                        <ItemsControl.ItemsPanel>
+                            <ItemsPanelTemplate>
+                                <WrapPanel />
+                            </ItemsPanelTemplate>
+                        </ItemsControl.ItemsPanel>
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate DataType="vm:ReportCount">
+                                <StackPanel Orientation="Horizontal" Margin="0,0,16,4">
+                                    <TextBlock Text="{Binding Label}" Classes="secondary" VerticalAlignment="Center" />
+                                    <TextBlock Text="{Binding Count}" FontWeight="SemiBold" Margin="6,0,0,0" VerticalAlignment="Center" />
+                                </StackPanel>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </StackPanel>
+            </Border>
+
+            <!-- History -->
+            <TextBlock Text="History" Classes="section" />
+            <Border Classes="card">
+                <Expander Header="Recent changes" HorizontalAlignment="Stretch">
+                    <StackPanel>
+                        <TextBlock Text="No history yet." Classes="secondary" IsVisible="{Binding !HasHistory}" />
+                        <ItemsControl ItemsSource="{Binding History}">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate DataType="vm:HistoryRow">
+                                    <StackPanel Margin="0,4">
+                                        <TextBlock Text="{Binding Text}" TextWrapping="Wrap" />
+                                        <TextBlock Classes="secondary">
+                                            <Run Text="{Binding When}" />
+                                            <Run Text=" · " />
+                                            <Run Text="{Binding Workspace}" />
+                                        </TextBlock>
+                                    </StackPanel>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </StackPanel>
+                </Expander>
+            </Border>
+        </StackPanel>
+    </StackPanel>
+</UserControl>

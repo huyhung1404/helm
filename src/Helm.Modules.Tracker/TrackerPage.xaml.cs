@@ -1,22 +1,28 @@
 using System.Text;
 using System.Windows;
+using Helm.Core.Services;
 using Helm.Core.Ui;
 using Microsoft.Win32;
 
 namespace Helm.Modules.Tracker;
 
+/// <summary>Tracker's settings (Home → Utilities). The lists are on <see cref="TrackerContentPage"/>.</summary>
 public partial class TrackerPage : ModulePageBase
 {
     private readonly TrackerViewModel _viewModel;
+    private readonly IShellNavigation _navigation;
 
-    public TrackerPage(TrackerModule module, TrackerViewModel viewModel)
+    public TrackerPage(TrackerModule module, TrackerViewModel viewModel, IShellNavigation navigation)
     {
         _viewModel = viewModel;
+        _navigation = navigation;
         DataContext = viewModel;
         InitializeComponent();
         // The view model is shared with Android and knows nothing about the Windows module type.
         Module = module;
     }
+
+    private void OpenTracker_Click(object sender, RoutedEventArgs e) => _navigation.ShowPage(typeof(TrackerContentPage));
 
     private void ExportItems_Click(object sender, RoutedEventArgs e) => Export("Items", "helm-tracker-items", _viewModel.ItemsCsv);
 

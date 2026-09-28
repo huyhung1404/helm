@@ -5,8 +5,11 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace Helm.App.Android.ViewModels;
 
-/// <summary>A tool's page: the view is created from <see cref="IAndroidModule.PageType"/> by the shell's data template.</summary>
-public sealed record ModulePage(IAndroidModule Module);
+/// <summary>
+/// A tool's page: <see cref="PageType"/> is its settings page (<see cref="IAndroidModule.PageType"/>) or its content
+/// page (<see cref="IModuleContent.ContentPageType"/>); the shell's data template creates it from DI.
+/// </summary>
+public sealed record ModulePage(IAndroidModule Module, Type PageType);
 
 /// <summary>
 /// Which page the shell shows. Pages are view models (Home, General, <see cref="ModulePage"/>); MainView's data
@@ -26,13 +29,24 @@ public sealed partial class ShellNavigator(IServiceProvider services) : Observab
 
     public void GoGeneral() => Show(services.GetRequiredService<GeneralViewModel>(), "General");
 
-    public void GoModule(IAndroidModule module) => Show(new ModulePage(module), module.DisplayName);
+    /// <summary>The tool's settings page (Home → Utilities).</summary>
+    public void GoModule(IAndroidModule module) => Show(new ModulePage(module, module.PageType), module.DisplayName);
 
-    /// <summary><see cref="IShellNavigation"/> for modules: <paramref name="pageType"/> is an Android module's page type.</summary>
+    /// <summary>What the drawer and Quick access open: the content page when the tool has one, else its settings.</summary>
+    public void GoModuleContent(IAndroidModule module) =>
+        Show(new ModulePage(module, (module as IModuleContent)?.ContentPageType ?? module.PageType), module.DisplayName);
+
+    /// <summary><see cref="IShellNavigation"/> for modules: a module's settings or content page type.</summary>
     public void ShowPage(Type pageType)
     {
-        var module = services.GetServices<IAndroidModule>().FirstOrDefault(m => m.PageType == pageType);
-        if (module is not null) GoModule(module);
+        foreach (var module in services.GetServices<IAndroidModule>())
+        {
+            if (module.PageType == pageType || (module as IModuleContent)?.ContentPageType == pageType)
+            {
+                Show(new ModulePage(module, pageType), module.DisplayName);
+                return;
+            }
+        }
     }
 
     partial void OnCurrentPageChanged(object? value) => OnPropertyChanged(nameof(IsHome));

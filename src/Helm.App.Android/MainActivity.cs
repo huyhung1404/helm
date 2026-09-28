@@ -122,7 +122,7 @@ public sealed class MainActivity : AvaloniaMainActivity
         {
             var services = App.Services;
             if (services.GetRequiredService<IModuleHost<IAndroidModule>>().Find(id) is { } module)
-                services.GetRequiredService<ShellNavigator>().GoModule(module);
+                services.GetRequiredService<ShellNavigator>().GoModuleContent(module);
         }
         catch (Exception ex)
         {
