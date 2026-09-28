@@ -1,7 +1,9 @@
 using Android.App;
 using Android.Content.PM;
 using Android.Views;
+using View = Android.Views.View;
 using Avalonia.Android;
+using Helm.App.Android.Views;
 
 namespace Helm.App.Android;
 
@@ -36,6 +38,59 @@ public sealed class MainActivity : AvaloniaMainActivity
         using var finger = MotionEvent.Obtain(e.DownTime, e.EventTime, e.Action, count, properties, coords, e.MetaState,
             e.ButtonState, e.XPrecision, e.YPrecision, e.DeviceId, e.EdgeFlags, e.Source, e.Flags)!;
         return base.DispatchTouchEvent(finger);
+    }
+
+    private View? _avaloniaView;
+    private ContentInsetsListener? _layoutListener;
+
+    protected override void OnResume()
+    {
+        base.OnResume();
+        if (_layoutListener is null && Window?.DecorView is { } decor)
+        {
+            _layoutListener = new ContentInsetsListener(this);
+            decor.ViewTreeObserver?.AddOnGlobalLayoutListener(_layoutListener);
+        }
+        MeasureContentInsets();
+    }
+
+    protected override void OnDestroy()
+    {
+        if (_layoutListener is not null) Window?.DecorView.ViewTreeObserver?.RemoveOnGlobalLayoutListener(_layoutListener);
+        _layoutListener = null;
+        base.OnDestroy();
+    }
+
+    /// <summary>
+    /// How far the Avalonia view sits inside the window. Depending on start-up timing Android sometimes lays the
+    /// content out below the status bar itself and sometimes behind it; MainView pads only by what is left.
+    /// </summary>
+    private void MeasureContentInsets()
+    {
+        var decor = Window?.DecorView;
+        if (decor is null || decor.Width == 0) return;
+        _avaloniaView ??= FindAvaloniaView(FindViewById(global::Android.Resource.Id.Content));
+        if (_avaloniaView is not { Width: > 0 } view) return;
+        var location = new int[2];
+        view.GetLocationInWindow(location);
+        var density = Resources?.DisplayMetrics?.Density ?? 1f;
+        ContentInsets.Update(new Avalonia.Thickness(
+            location[0] / density,
+            location[1] / density,
+            Math.Max(0, decor.Width - location[0] - view.Width) / density,
+            Math.Max(0, decor.Height - location[1] - view.Height) / density));
+    }
+
+    private static View? FindAvaloniaView(View? view)
+    {
+        while (view is not null and not Avalonia.Android.AvaloniaView)
+            view = view is ViewGroup { ChildCount: > 0 } group ? group.GetChildAt(0) : null;
+        return view;
+    }
+
+    private sealed class ContentInsetsListener(MainActivity activity) : Java.Lang.Object, ViewTreeObserver.IOnGlobalLayoutListener
+    {
+        public void OnGlobalLayout() => activity.MeasureContentInsets();
     }
 
     private static bool HasUnknownTool(MotionEvent e)

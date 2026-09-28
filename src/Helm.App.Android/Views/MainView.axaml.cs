@@ -36,8 +36,9 @@ public partial class MainView : UserControl
         if (_insets is not null)
         {
             _insets.DisplayEdgeToEdgePreference = true;
-            Padding = _insets.SafeAreaPadding;
             _insets.SafeAreaChanged += OnSafeAreaChanged;
+            ContentInsets.Changed += OnContentInsetsChanged;
+            UpdatePadding();
             UpdateSystemBarColor();
         }
         ActualThemeVariantChanged += OnThemeChanged;
@@ -47,6 +48,7 @@ public partial class MainView : UserControl
     protected override void OnDetachedFromVisualTree(VisualTreeAttachmentEventArgs e)
     {
         if (_insets is not null) _insets.SafeAreaChanged -= OnSafeAreaChanged;
+        ContentInsets.Changed -= OnContentInsetsChanged;
         if (_topLevel is not null) _topLevel.BackRequested -= OnBackRequested;
         ActualThemeVariantChanged -= OnThemeChanged;
         _insets = null;
@@ -63,7 +65,15 @@ public partial class MainView : UserControl
             _insets.SystemBarColor = solid.Color;
     }
 
-    private void OnSafeAreaChanged(object? sender, SafeAreaChangedArgs e) => Padding = e.SafeAreaPadding;
+    private void OnSafeAreaChanged(object? sender, SafeAreaChangedArgs e) => UpdatePadding();
+
+    private void OnContentInsetsChanged(object? sender, EventArgs e) => UpdatePadding();
+
+    /// <summary>Pads the shell clear of the status/navigation bars and cutout, once (see <see cref="ContentInsets"/>).</summary>
+    private void UpdatePadding()
+    {
+        if (_insets is not null) Padding = ContentInsets.Remaining(_insets.SafeAreaPadding);
+    }
 
     private void OnBackRequested(object? sender, RoutedEventArgs e)
     {
