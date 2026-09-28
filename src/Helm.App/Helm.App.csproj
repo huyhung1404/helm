@@ -36,6 +36,7 @@
     <ProjectReference Include="..\Helm.Shell\Helm.Shell.csproj" />
     <ProjectReference Include="..\Helm.Modules.AlwaysOnTop\Helm.Modules.AlwaysOnTop.csproj" />
     <ProjectReference Include="..\Helm.Modules.ClaudeChat\Helm.Modules.ClaudeChat.csproj" />
+    <ProjectReference Include="..\Helm.Modules.Vault\Helm.Modules.Vault.csproj" />
   </ItemGroup>
 
 </Project>

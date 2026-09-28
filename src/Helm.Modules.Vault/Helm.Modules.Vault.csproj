@@ -1,0 +1,19 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- Vault on Windows: the WPF window and settings page over the shared Helm.Modules.Vault.Core, plus Windows Hello,
+       the protected clipboard and locking with Windows. -->
+  <PropertyGroup>
+    <UseWPF>true</UseWPF>
+    <RootNamespace>Helm.Modules.Vault</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Helm.Core.Windows\Helm.Core.Windows.csproj" />
+    <ProjectReference Include="..\Helm.Modules.Vault.Core\Helm.Modules.Vault.Core.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="Helm.Tests" />
+  </ItemGroup>
+
+</Project>

@@ -42,6 +42,12 @@ public interface IWindowService
 
     bool SetTopmost(nint hwnd, bool topmost);
 
+    /// <summary>
+    /// Keeps one of Helm's own windows out of screenshots, screen recording and screen sharing (it shows as black or
+    /// not at all). Returns false where Windows does not support it (before Windows 10 2004).
+    /// </summary>
+    bool SetExcludedFromCapture(nint hwnd, bool excluded);
+
     /// <summary>Restores (if minimized) and brings a window to the foreground.</summary>
     bool Activate(nint hwnd);
 
@@ -223,6 +229,9 @@ public sealed class WindowService(ILogger<WindowService> logger) : IWindowServic
         var flags = SET_WINDOW_POS_FLAGS.SWP_NOMOVE | SET_WINDOW_POS_FLAGS.SWP_NOSIZE | SET_WINDOW_POS_FLAGS.SWP_NOACTIVATE;
         return PInvoke.SetWindowPos(hwnd.ToHwnd(), topmost ? HWND.HWND_TOPMOST : HWND.HWND_NOTOPMOST, 0, 0, 0, 0, flags);
     }
+
+    public bool SetExcludedFromCapture(nint hwnd, bool excluded) =>
+        PInvoke.SetWindowDisplayAffinity(hwnd.ToHwnd(), excluded ? WINDOW_DISPLAY_AFFINITY.WDA_EXCLUDEFROMCAPTURE : WINDOW_DISPLAY_AFFINITY.WDA_NONE);
 
     public bool IsTopmost(nint hwnd)
     {

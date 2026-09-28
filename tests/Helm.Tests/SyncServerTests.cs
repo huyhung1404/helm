@@ -76,6 +76,48 @@ public sealed class SyncServerTests : IDisposable
     }
 
     [ServerFact]
+    public async Task Vault_documents_travel_through_the_worker_as_blobs()
+    {
+        var accountId = await CreateAccountAsync();
+        var a = NewVaultDevice("va", await CreateTokenAsync(accountId, "PC"));
+        var b = NewVaultDevice("vb", await CreateTokenAsync(accountId, "Phone"));
+        const string password = "correct horse battery staple";
+        await a.Session.CreateAsync(password);
+        var uid = a.Store.Add(Helm.Modules.Vault.Items.VaultItem.New(Helm.Modules.Vault.Items.VaultItemKind.Document, "Passport"));
+        var data = System.Security.Cryptography.RandomNumberGenerator.GetBytes(BlobStore.ChunkSize + 4321);
+        var attachment = await a.Files.AttachAsync(uid, "passport.pdf", "application/pdf", new MemoryStream(data));
+
+        Assert.Equal(SyncRunOutcome.Completed, (await a.Engine.SyncNowAsync()).Outcome);
+        Assert.False(a.Files.IsUploading(attachment));
+        Assert.Equal(SyncRunOutcome.Completed, (await b.Engine.SyncNowAsync()).Outcome);
+        await b.Session.UnlockAsync(password);
+
+        var received = Assert.Single(b.Store.Get(uid)!.Item.Attachments);
+        Assert.Equal(data, await b.Files.ReadAllAsync(received));
+        var limits = await new SyncApiClient().GetLimitsAsync(new SyncCredentials(ServerUrl!, await CreateTokenAsync(accountId, "limits")));
+        Assert.True(limits.MaxChunksPerBlob > 1);
+    }
+
+    private sealed record VaultDevice(SyncEngine Engine, Helm.Modules.Vault.Session.VaultSession Session,
+        Helm.Modules.Vault.Items.VaultStore Store, Helm.Modules.Vault.Items.VaultFiles Files);
+
+    private VaultDevice NewVaultDevice(string name, string token)
+    {
+        var paths = new Helm.Core.Settings.HelmPaths(Path.Combine(_dir, name));
+        var db = Own(new SyncDatabase(paths.SyncDatabaseFile, TestKeys.Local));
+        var transport = new HttpSyncTransport(new InMemorySyncCredentialStore(new SyncCredentials(ServerUrl!, token)), Own(new SyncApiClient()));
+        var blobs = new BlobStore(db, transport, paths.SyncBlobsDirectory);
+        var engine = Own(new SyncEngine(db, transport, new InMemoryMasterKeyStore(_key), [], debounce: TimeSpan.FromHours(1), blobs: blobs));
+        var records = Own(new SyncedCollection<Helm.Modules.Vault.Items.VaultItemRecord>(engine, Helm.Modules.Vault.Items.VaultStore.Options));
+        var keyrings = Own(new SyncedCollection<Helm.Modules.Vault.Crypto.VaultKeyringData>(engine,
+            new() { Name = Helm.Modules.Vault.Session.VaultSession.KeyringCollection }));
+        var session = Own(new Helm.Modules.Vault.Session.VaultSession(keyrings, Own(new Helm.Core.Settings.SettingsStoreFactory(paths)),
+            new Helm.Modules.Vault.Session.NoDeviceUnlock(), engine) { NewKdf = VaultCryptoTests.CheapKdf });
+        var store = Own(new Helm.Modules.Vault.Items.VaultStore(records, session));
+        return new VaultDevice(engine, session, store, new Helm.Modules.Vault.Items.VaultFiles(store, blobs, session));
+    }
+
+    [ServerFact]
     public async Task Revoked_and_read_only_tokens_are_refused_and_local_data_is_kept()
     {
         var accountId = await CreateAccountAsync();

@@ -1,0 +1,227 @@
+<ui:FluentWindow x:Class="Helm.Modules.Vault.Views.VaultWindow"
+                 xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                 xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                 xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
+                 xmlns:vm="clr-namespace:Helm.Modules.Vault.ViewModels;assembly=Helm.Modules.Vault.Core"
+                 xmlns:items="clr-namespace:Helm.Modules.Vault.Items;assembly=Helm.Modules.Vault.Core"
+                 xmlns:local="clr-namespace:Helm.Modules.Vault.Views"
+                 Title="Vault" Width="1040" Height="700" MinWidth="760" MinHeight="520"
+                 ExtendsContentIntoTitleBar="True" WindowBackdropType="Mica" ShowInTaskbar="True"
+                 WindowStartupLocation="CenterScreen">
+    <ui:FluentWindow.Resources>
+        <local:NotEmptyToBoolConverter x:Key="NotEmptyToBool" />
+        <local:NotZeroToVisibilityConverter x:Key="NotZeroToVisibility" />
+        <local:KindIconConverter x:Key="KindIcon" />
+        <Style x:Key="CenteredCard" TargetType="Border">
+            <Setter Property="Background" Value="{DynamicResource CardBackgroundFillColorDefaultBrush}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource CardStrokeColorDefaultBrush}" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="CornerRadius" Value="8" />
+            <Setter Property="Padding" Value="28,24" />
+            <Setter Property="MaxWidth" Value="460" />
+            <Setter Property="HorizontalAlignment" Value="Center" />
+            <Setter Property="VerticalAlignment" Value="Center" />
+        </Style>
+    </ui:FluentWindow.Resources>
+
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+
+        <ui:TitleBar x:Name="TitleBar" Title="Vault" ShowMaximize="True">
+            <ui:TitleBar.Icon>
+                <ui:SymbolIcon Symbol="LockClosed24" />
+            </ui:TitleBar.Icon>
+        </ui:TitleBar>
+
+        <!-- ============ Setup: create a vault, or restore one from a backup ============ -->
+        <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" Visibility="{Binding IsSetup, Converter={StaticResource BoolToVisibility}}">
+            <Border Style="{StaticResource CenteredCard}" Margin="16">
+                <StackPanel>
+                    <ui:SymbolIcon Symbol="ShieldKeyhole24" FontSize="40" HorizontalAlignment="Left" Foreground="{DynamicResource AccentTextFillColorPrimaryBrush}" />
+                    <TextBlock Text="Create your vault" FontSize="22" FontWeight="SemiBold" Margin="0,12,0,4" />
+                    <TextBlock Style="{DynamicResource HelmSecondaryText}" FontSize="13"
+                               Text="Choose a vault password you will remember. It is different from your sync passphrase, and nobody — not Helm, not the server — can reset it. You also get a recovery key to print and keep safe." />
+                    <TextBlock Text="Vault password" Margin="0,16,0,4" />
+                    <ui:PasswordBox x:Name="NewPasswordBox" AutomationProperties.Name="Vault password" Password="{Binding NewPassword, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" PlaceholderText="At least 14 characters" />
+                    <TextBlock Text="{Binding PasswordStrength}" Style="{DynamicResource HelmSecondaryText}" Margin="0,4,0,0" />
+                    <TextBlock Text="Type it again" Margin="0,12,0,4" />
+                    <ui:PasswordBox AutomationProperties.Name="Type it again" Password="{Binding ConfirmPassword, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                    <ui:InfoBar Margin="0,12,0,0" IsOpen="{Binding Error, Converter={StaticResource NotEmptyToBool}}" Message="{Binding Error}" Severity="Error" IsClosable="False" />
+                    <ui:Button Content="Create vault" Appearance="Primary" Margin="0,16,0,0" HorizontalAlignment="Stretch" Command="{Binding CreateCommand}"
+                               IsEnabled="{Binding IsBusy, Converter={StaticResource InverseBool}}" IsDefault="True" />
+                    <ui:ProgressRing IsIndeterminate="True" Height="24" Width="24" Margin="0,12,0,0" Visibility="{Binding IsBusy, Converter={StaticResource BoolToVisibility}}" />
+
+                    <Separator Margin="0,20" />
+                    <TextBlock Text="Have a backup?" FontWeight="SemiBold" />
+                    <TextBlock Style="{DynamicResource HelmSecondaryText}" Margin="0,2,0,8"
+                               Text="Restore the whole vault from a backup folder, with that vault's password or its recovery key." />
+                    <CheckBox Content="Use the recovery key instead of the password" IsChecked="{Binding UseRecoveryKey}" />
+                    <ui:PasswordBox Margin="0,8,0,0" AutomationProperties.Name="Vault password of the backup" PlaceholderText="Vault password of the backup" Password="{Binding Password, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                    Visibility="{Binding UseRecoveryKey, Converter={StaticResource InverseBoolToVisibility}}" />
+                    <ui:TextBox Margin="0,8,0,0" AutomationProperties.Name="Recovery key of the backup" PlaceholderText="HELMV-XXXX-XXXX-…" FontFamily="Consolas" Text="{Binding RecoveryKey, UpdateSourceTrigger=PropertyChanged}"
+                                Visibility="{Binding UseRecoveryKey, Converter={StaticResource BoolToVisibility}}" />
+                    <ui:Button Content="Restore from a backup folder…" Margin="0,8,0,0" Icon="{ui:SymbolIcon ArrowCounterclockwise24}" Command="{Binding RestoreFromBackupCommand}"
+                               IsEnabled="{Binding IsBusy, Converter={StaticResource InverseBool}}" />
+                </StackPanel>
+            </Border>
+        </ScrollViewer>
+
+        <!-- ============ Unlock ============ -->
+        <Border Grid.Row="1" Style="{StaticResource CenteredCard}" Width="420" Visibility="{Binding IsUnlock, Converter={StaticResource BoolToVisibility}}">
+            <StackPanel>
+                <ui:SymbolIcon Symbol="LockClosed24" FontSize="40" HorizontalAlignment="Left" Foreground="{DynamicResource AccentTextFillColorPrimaryBrush}" />
+                <TextBlock Text="Vault is locked" FontSize="22" FontWeight="SemiBold" Margin="0,12,0,16" />
+                <ui:Button Content="{Binding DeviceUnlockName}" Icon="{ui:SymbolIcon Fingerprint24}" Appearance="Primary" HorizontalAlignment="Stretch" Margin="0,0,0,12"
+                           Command="{Binding QuickUnlockCommand}" Visibility="{Binding CanUseDeviceUnlock, Converter={StaticResource BoolToVisibility}}" />
+                <ui:PasswordBox x:Name="UnlockPasswordBox" AutomationProperties.Name="Vault password" PlaceholderText="Vault password" Password="{Binding Password, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                Visibility="{Binding UseRecoveryKey, Converter={StaticResource InverseBoolToVisibility}}" />
+                <ui:TextBox AutomationProperties.Name="Recovery key" PlaceholderText="HELMV-XXXX-XXXX-…" FontFamily="Consolas" Text="{Binding RecoveryKey, UpdateSourceTrigger=PropertyChanged}"
+                            Visibility="{Binding UseRecoveryKey, Converter={StaticResource BoolToVisibility}}" />
+                <ui:InfoBar Margin="0,12,0,0" IsOpen="{Binding Error, Converter={StaticResource NotEmptyToBool}}" Message="{Binding Error}" Severity="Error" IsClosable="False" />
+                <ui:Button Content="Unlock" Appearance="Primary" Margin="0,12,0,0" HorizontalAlignment="Stretch" Command="{Binding UnlockCommand}" IsDefault="True"
+                           IsEnabled="{Binding IsBusy, Converter={StaticResource InverseBool}}" />
+                <ui:ProgressRing IsIndeterminate="True" Height="24" Width="24" Margin="0,12,0,0" Visibility="{Binding IsBusy, Converter={StaticResource BoolToVisibility}}" />
+                <CheckBox Margin="0,16,0,0" Content="I forgot the password: use the recovery key" IsChecked="{Binding UseRecoveryKey}" />
+            </StackPanel>
+        </Border>
+
+        <!-- ============ After a recovery-key unlock: a new password first ============ -->
+        <Border Grid.Row="1" Style="{StaticResource CenteredCard}" Width="440" Visibility="{Binding MustChangePassword, Converter={StaticResource BoolToVisibility}}">
+            <StackPanel>
+                <TextBlock Text="Set a new vault password" FontSize="20" FontWeight="SemiBold" />
+                <TextBlock Style="{DynamicResource HelmSecondaryText}" FontSize="13" Margin="0,4,0,12"
+                           Text="You unlocked with the recovery key. Choose a new password; the recovery key keeps working." />
+                <ui:PasswordBox AutomationProperties.Name="New password" PlaceholderText="New password" Password="{Binding NewPassword, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                <TextBlock Text="{Binding PasswordStrength}" Style="{DynamicResource HelmSecondaryText}" Margin="0,4,0,8" />
+                <ui:PasswordBox AutomationProperties.Name="New password again" PlaceholderText="Type it again" Password="{Binding ConfirmPassword, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                <ui:InfoBar Margin="0,12,0,0" IsOpen="{Binding Error, Converter={StaticResource NotEmptyToBool}}" Message="{Binding Error}" Severity="Error" IsClosable="False" />
+                <ui:Button Content="Set password" Appearance="Primary" Margin="0,12,0,0" HorizontalAlignment="Stretch" Command="{Binding SetNewPasswordCommand}" />
+            </StackPanel>
+        </Border>
+
+        <!-- ============ The vault ============ -->
+        <Grid Grid.Row="1" Margin="8,0,8,8" Visibility="{Binding IsItems, Converter={StaticResource BoolToVisibility}}">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="*" />
+            </Grid.RowDefinitions>
+
+            <!-- Warnings that must not be missed -->
+            <StackPanel>
+                <ui:InfoBar Title="Sync is holding back deletions" Message="{Binding HeldWarning}" Severity="Warning" IsClosable="False" Margin="0,0,0,6"
+                            IsOpen="{Binding HeldWarning, Converter={StaticResource NotEmptyToBool}}">
+                    <ui:InfoBar.Content>
+                        <WrapPanel Margin="0,4,0,0">
+                            <ui:Button Content="Keep my items (restore them everywhere)" Appearance="Primary" Command="{Binding KeepHeldCommand}" Margin="0,0,8,0" />
+                            <ui:Button Content="Delete them here too" Command="{Binding ApplyHeldCommand}" />
+                        </WrapPanel>
+                    </ui:InfoBar.Content>
+                </ui:InfoBar>
+                <ui:InfoBar Title="Backup" Message="{Binding BackupWarning}" Severity="Warning" IsClosable="False" Margin="0,0,0,6"
+                            IsOpen="{Binding BackupWarning, Converter={StaticResource NotEmptyToBool}}" />
+                <ui:InfoBar Title="Emergency Kit" Message="{Binding KitWarning}" Severity="Informational" IsClosable="False" Margin="0,0,0,6"
+                            IsOpen="{Binding KitWarning, Converter={StaticResource NotEmptyToBool}}" />
+                <ui:InfoBar Message="{Binding Error}" Severity="Error" IsClosable="False" Margin="0,0,0,6" IsOpen="{Binding Error, Converter={StaticResource NotEmptyToBool}}" />
+            </StackPanel>
+
+            <Grid Grid.Row="1" DataContext="{Binding Items}">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="300" MinWidth="240" />
+                    <ColumnDefinition Width="8" />
+                    <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
+
+                <!-- List -->
+                <Border Style="{DynamicResource HelmSurface}" Padding="8">
+                    <DockPanel>
+                        <Grid DockPanel.Dock="Top" Margin="0,0,0,8">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <ui:TextBox x:Name="SearchBox" AutomationProperties.Name="Search" PlaceholderText="Search" Icon="{ui:SymbolIcon Search24}" Text="{Binding Search, UpdateSourceTrigger=PropertyChanged, Delay=150}" />
+                            <ui:DropDownButton Grid.Column="1" Margin="6,0,0,0" Icon="{ui:SymbolIcon Add24}" ToolTip="New item" AutomationProperties.Name="New item">
+                                <ui:DropDownButton.Flyout>
+                                    <ContextMenu>
+                                        <MenuItem Header="Login" Command="{Binding NewCommand}" CommandParameter="{x:Static items:VaultItemKind.Login}" />
+                                        <MenuItem Header="Secure note" Command="{Binding NewCommand}" CommandParameter="{x:Static items:VaultItemKind.Note}" />
+                                        <MenuItem Header="Card" Command="{Binding NewCommand}" CommandParameter="{x:Static items:VaultItemKind.Card}" />
+                                        <MenuItem Header="Identity" Command="{Binding NewCommand}" CommandParameter="{x:Static items:VaultItemKind.Identity}" />
+                                        <MenuItem Header="Document" Command="{Binding NewCommand}" CommandParameter="{x:Static items:VaultItemKind.Document}" />
+                                    </ContextMenu>
+                                </ui:DropDownButton.Flyout>
+                            </ui:DropDownButton>
+                        </Grid>
+                        <ComboBox DockPanel.Dock="Top" Margin="0,0,0,8" AutomationProperties.Name="Show" ItemsSource="{Binding Filters}" SelectedItem="{Binding Filter}" />
+                        <TextBlock DockPanel.Dock="Bottom" Margin="4,6,4,0" Style="{DynamicResource HelmSecondaryText}" Foreground="{DynamicResource SystemFillColorCautionBrush}"
+                                   Visibility="{Binding UnreadableCount, Converter={StaticResource NotZeroToVisibility}}">
+                            <Run Text="{Binding UnreadableCount, Mode=OneWay}" /><Run Text=" records cannot be opened with this vault's key; they are kept, not deleted." />
+                        </TextBlock>
+                        <Grid>
+                            <ListBox ItemsSource="{Binding Rows}" SelectedItem="{Binding Selected}" BorderThickness="0" Background="Transparent"
+                                     ScrollViewer.HorizontalScrollBarVisibility="Disabled">
+                                <ListBox.ItemTemplate>
+                                    <DataTemplate DataType="{x:Type vm:ItemRow}">
+                                        <DockPanel Margin="2,4">
+                                            <ui:SymbolIcon DockPanel.Dock="Left" Margin="0,0,10,0" FontSize="20" Symbol="{Binding Kind, Converter={StaticResource KindIcon}}" VerticalAlignment="Center" />
+                                            <ui:SymbolIcon DockPanel.Dock="Right" Symbol="Warning24" Foreground="{DynamicResource SystemFillColorCautionBrush}" ToolTip="Edited on two devices: choose a version"
+                                                           Visibility="{Binding HasConflict, Converter={StaticResource BoolToVisibility}}" />
+                                            <ui:SymbolIcon DockPanel.Dock="Right" Symbol="Star24" Filled="True" Margin="4,0" Foreground="{DynamicResource AccentTextFillColorPrimaryBrush}"
+                                                           Visibility="{Binding Favorite, Converter={StaticResource BoolToVisibility}}" />
+                                            <StackPanel>
+                                                <TextBlock Text="{Binding Title}" TextTrimming="CharacterEllipsis" />
+                                                <TextBlock Text="{Binding Subtitle}" Style="{DynamicResource HelmSecondaryText}" TextTrimming="CharacterEllipsis" TextWrapping="NoWrap" />
+                                            </StackPanel>
+                                        </DockPanel>
+                                    </DataTemplate>
+                                </ListBox.ItemTemplate>
+                            </ListBox>
+                            <TextBlock Text="Nothing here yet. Use + to add a login, a note, a card or a document." Style="{DynamicResource HelmSecondaryText}"
+                                       Margin="8,16" TextAlignment="Center" Visibility="{Binding IsEmpty, Converter={StaticResource BoolToVisibility}}" />
+                        </Grid>
+                    </DockPanel>
+                </Border>
+
+                <!-- Detail -->
+                <Border Grid.Column="2" Style="{DynamicResource HelmSurface}" Padding="0">
+                    <Grid>
+                        <TextBlock Text="Select an item" Style="{DynamicResource HelmSecondaryText}" FontSize="14" HorizontalAlignment="Center" VerticalAlignment="Center"
+                                   Visibility="{Binding Detail, Converter={StaticResource EmptyToVisibility}}" />
+                        <ContentControl Content="{Binding Detail}" Visibility="{Binding Detail, Converter={StaticResource NotEmptyToVisibility}}">
+                            <ContentControl.ContentTemplate>
+                                <DataTemplate DataType="{x:Type vm:ItemDetailViewModel}">
+                                    <local:ItemDetailView />
+                                </DataTemplate>
+                            </ContentControl.ContentTemplate>
+                        </ContentControl>
+                    </Grid>
+                </Border>
+            </Grid>
+        </Grid>
+
+        <!-- ============ Emergency Kit (after the vault or a new recovery key is created) ============ -->
+        <Grid Grid.Row="0" Grid.RowSpan="2" Background="{DynamicResource SmokeFillColorDefaultBrush}" Visibility="{Binding HasKit, Converter={StaticResource BoolToVisibility}}">
+            <!-- Solid, not the translucent card fill: nothing of the vault may show through the kit. -->
+            <Border Style="{StaticResource CenteredCard}" MaxWidth="620" Background="{DynamicResource SolidBackgroundFillColorQuarternaryBrush}">
+                <StackPanel>
+                    <ui:SymbolIcon Symbol="BookInformation24" FontSize="36" HorizontalAlignment="Left" Foreground="{DynamicResource AccentTextFillColorPrimaryBrush}" />
+                    <TextBlock Text="Save your Emergency Kit" FontSize="22" FontWeight="SemiBold" Margin="0,8,0,4" />
+                    <TextBlock Style="{DynamicResource HelmSecondaryText}" FontSize="13"
+                               Text="This recovery key is the only way back into the vault if you forget its password. It is shown only now. Print it (or print to PDF and keep the file offline), then type it below to confirm." />
+                    <TextBox Margin="0,16,0,0" AutomationProperties.Name="Your recovery key" IsReadOnly="True" FontFamily="Consolas" FontSize="15" TextWrapping="Wrap" Text="{Binding Kit.RecoveryKey, Mode=OneWay}" />
+                    <TextBlock Margin="0,6,0,0" Style="{DynamicResource HelmSecondaryText}">
+                        <Run Text="Recovery key id: " /><Run Text="{Binding Kit.RecoveryId, Mode=OneWay}" FontWeight="SemiBold" />
+                    </TextBlock>
+                    <ui:Button Content="Print the Emergency Kit…" Icon="{ui:SymbolIcon Print24}" Margin="0,12,0,0" Command="{Binding SaveKitCommand}" />
+                    <TextBlock Text="Type the recovery key to confirm you saved it" Margin="0,16,0,4" />
+                    <ui:TextBox AutomationProperties.Name="Confirm the recovery key" FontFamily="Consolas" Text="{Binding KitConfirmation, UpdateSourceTrigger=PropertyChanged}" PlaceholderText="HELMV-…" />
+                    <ui:InfoBar Margin="0,8,0,0" IsOpen="{Binding KitError, Converter={StaticResource NotEmptyToBool}}" Message="{Binding KitError}" Severity="Error" IsClosable="False" />
+                    <ui:Button Content="I saved it" Appearance="Primary" Margin="0,12,0,0" HorizontalAlignment="Stretch" Command="{Binding ConfirmKitCommand}" />
+                </StackPanel>
+            </Border>
+        </Grid>
+    </Grid>
+</ui:FluentWindow>

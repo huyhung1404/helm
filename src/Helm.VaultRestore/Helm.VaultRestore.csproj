@@ -1,0 +1,25 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- helm-vault-restore: opens a Vault backup repository without Helm, its server or the device that made it.
+       Published as a single file with every release (see docs/vault-format.md). -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <SupportedOSPlatformVersion></SupportedOSPlatformVersion>
+    <PlatformTarget>AnyCPU</PlatformTarget>
+    <RootNamespace>Helm.VaultRestore</RootNamespace>
+    <AssemblyName>helm-vault-restore</AssemblyName>
+    <InvariantGlobalization>true</InvariantGlobalization>
+    <!-- Published as one file: native libraries (SQLite, pulled by Helm.Core) go inside it too. -->
+    <IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Helm.Modules.Vault.Core\Helm.Modules.Vault.Core.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="Helm.Tests" />
+  </ItemGroup>
+
+</Project>

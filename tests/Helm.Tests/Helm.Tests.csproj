@@ -28,6 +28,9 @@
     <ProjectReference Include="..\..\src\Helm.Shell\Helm.Shell.csproj" />
     <ProjectReference Include="..\..\src\Helm.Modules.AlwaysOnTop\Helm.Modules.AlwaysOnTop.csproj" />
     <ProjectReference Include="..\..\src\Helm.Modules.ClaudeChat\Helm.Modules.ClaudeChat.csproj" />
+    <ProjectReference Include="..\..\src\Helm.Modules.Vault.Core\Helm.Modules.Vault.Core.csproj" />
+    <ProjectReference Include="..\..\src\Helm.VaultRestore\Helm.VaultRestore.csproj" />
+    <ProjectReference Include="..\..\src\Helm.Modules.Vault\Helm.Modules.Vault.csproj" />
   </ItemGroup>
 
 </Project>

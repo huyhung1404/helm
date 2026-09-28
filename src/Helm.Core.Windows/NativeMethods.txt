@@ -50,6 +50,7 @@ GetDesktopWindow
 GetWindowRect
 GetClientRect
 SetWindowPos
+SetWindowDisplayAffinity
 ShowWindow
 GetWindowPlacement
 InvalidateRect

@@ -2,7 +2,14 @@
 
 A personal Windows admin and productivity toolkit in the spirit of Microsoft PowerToys. Helm is one Fluent desktop app made of independent tools ("modules"), each with its own tab, plus an Android app with the same Home and General pages ([docs/android.md](docs/android.md)). Each tool runs on the platforms it is built for: Claude Chat, for example, is PC only.
 
-Helm currently ships **no tools**: it is the shell (Home, General, search, tray, auto-update) plus the shared infrastructure for tools — hooks, hotkeys, window/monitor services and overlays. Tools are planned and will arrive as updates (see [Roadmap](#roadmap)). Always On Top is built but not registered; it comes back with one line in `src/Helm.App/Hosting/HelmModules.cs`. The previous Zones module is kept in git history (tag `v0.3.0`).
+Tools:
+
+| Tool | Platforms | What it does |
+|---|---|---|
+| Claude Chat | PC | Chat with Claude Code in its own window, several projects side by side |
+| Vault | PC + Android | Passwords, secure notes, cards, identities and documents, end-to-end encrypted, synced, and backed up to a folder you choose ([design](docs/vault-design.md), [format](docs/vault-format.md)) |
+
+More tools are planned (see [Roadmap](#roadmap)). Always On Top is built but not registered; it comes back with one line in `src/Helm.App/Hosting/HelmModules.cs`. The previous Zones module is kept in git history (tag `v0.3.0`).
 ## Install
 
 Download **`Helm-win-Setup.exe`** from the [latest release](https://github.com/huyhung1404/helm/releases/latest) and run it. Setup installs per user into `%LOCALAPPDATA%\HelmApp` (no admin needed to install) and creates Start menu and desktop shortcuts. It also installs the .NET 8 Desktop Runtime if it is missing. When Helm starts, it asks once for administrator rights (UAC).
@@ -77,10 +84,15 @@ src/
   Helm.Core.Windows/         Windows: IHelmModule, Win32 (CsWin32), hooks, hotkeys, window/monitor services,
                              GDI overlay window, DPAPI, shared WPF controls (Ui/); namespaces stay Helm.Core.*
   Helm.App/                  WPF-UI shell: DI host, MainWindow, tray, Home/General/Diagnostics pages
+  Helm.Core.Android/         Android: IAndroidModule, ModulePageBase, ActivityHost (not in Helm.sln)
   Helm.App.Android/          Avalonia Android app: shell, Home/General, Keystore, APK updater (not in Helm.sln)
   Helm.Modules.ClaudeChat/   Windows only: Claude Code chat window
   Helm.Modules.AlwaysOnTop/  Windows only: engine, settings page
-tests/Helm.Tests/            xUnit: settings, sync (+ end-to-end against a local worker), updates, hotkeys, Claude Chat
+  Helm.Modules.Vault.Core/   net8.0: vault keys, items, locking, backups, KDBX export, shared view models
+  Helm.Modules.Vault/        Windows: vault window and page, Windows Hello, protected clipboard
+  Helm.Modules.Vault.Android/ Android: vault page, fingerprint unlock, FLAG_SECURE, SAF backups (not in Helm.sln)
+  Helm.VaultRestore/         helm-vault-restore: opens a vault backup without Helm
+tests/Helm.Tests/            xUnit: settings, sync (+ end-to-end against a local worker), updates, hotkeys, Claude Chat, Vault
 ```
 
 Windows modules reference `Helm.Core.Windows`, Android modules and shared tool logic reference `Helm.Core`; `Helm.App` / `Helm.App.Android` reference everything they ship.

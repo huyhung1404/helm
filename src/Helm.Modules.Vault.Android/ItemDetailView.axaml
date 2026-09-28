@@ -1,0 +1,189 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:ic="using:FluentIcons.Avalonia"
+             xmlns:local="using:Helm.Modules.Vault"
+             xmlns:vm="using:Helm.Modules.Vault.ViewModels"
+             xmlns:items="using:Helm.Modules.Vault.Items"
+             x:Class="Helm.Modules.Vault.ItemDetailView"
+             x:DataType="vm:ItemDetailViewModel">
+    <StackPanel Spacing="4">
+        <!-- Header -->
+        <Border Classes="card">
+            <StackPanel Spacing="8">
+                <DockPanel>
+                    <ic:SymbolIcon DockPanel.Dock="Left" FontSize="24" Margin="0,0,12,0" Symbol="{Binding Kind, Converter={x:Static local:KindIcon.Converter}}" />
+                    <TextBlock Classes="title" FontSize="18" VerticalAlignment="Center" Text="{Binding Title}" IsVisible="{Binding !IsEditing}" />
+                    <TextBox PlaceholderText="Title" Text="{Binding Title}" IsVisible="{Binding IsEditing}" AutomationProperties.Name="Title" />
+                </DockPanel>
+                <CheckBox Content="Favorite" IsChecked="{Binding Favorite}" IsVisible="{Binding IsEditing}" />
+                <WrapPanel>
+                    <Button Margin="0,0,8,4" Content="Edit" Command="{Binding EditCommand}">
+                        <Button.IsVisible>
+                            <MultiBinding Converter="{x:Static BoolConverters.And}">
+                                <Binding Path="!IsEditing" />
+                                <Binding Path="!Trashed" />
+                            </MultiBinding>
+                        </Button.IsVisible>
+                    </Button>
+                    <Button Margin="0,0,8,4" Content="Move to trash" Command="{Binding MoveToTrashCommand}">
+                        <Button.IsVisible>
+                            <MultiBinding Converter="{x:Static BoolConverters.And}">
+                                <Binding Path="!IsEditing" />
+                                <Binding Path="!Trashed" />
+                            </MultiBinding>
+                        </Button.IsVisible>
+                    </Button>
+                    <Button Classes="accent" Margin="0,0,8,4" Content="Save" Command="{Binding SaveCommand}" IsVisible="{Binding IsEditing}" />
+                    <Button Margin="0,0,8,4" Content="Cancel" Command="{Binding CancelCommand}" IsVisible="{Binding IsEditing}" />
+                    <Button Classes="accent" Margin="0,0,8,4" Content="Restore" Command="{Binding RestoreFromTrashCommand}" IsVisible="{Binding Trashed}" />
+                    <Button Classes="danger" Margin="0,0,8,4" Content="Delete for good" Command="{Binding DeleteForeverCommand}" IsVisible="{Binding Trashed}" />
+                </WrapPanel>
+            </StackPanel>
+        </Border>
+
+        <Border Classes="infobar warning" IsVisible="{Binding Error, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
+            <TextBlock TextWrapping="Wrap" Text="{Binding Error}" />
+        </Border>
+
+        <!-- Conflicts -->
+        <Border Classes="card" IsVisible="{Binding HasConflicts}">
+            <StackPanel Spacing="8">
+                <TextBlock Classes="title" Text="Edited on two devices" />
+                <TextBlock Classes="secondary" Text="Both versions are kept. Choose the one to keep; the other goes into the history." />
+                <Button Content="Keep the version shown here" Command="{Binding KeepCurrentCommand}" />
+                <ItemsControl ItemsSource="{Binding Conflicts}">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate x:DataType="vm:ConflictViewModel">
+                            <Border Classes="row">
+                                <StackPanel Spacing="4">
+                                    <TextBlock Text="{Binding When}" />
+                                    <TextBlock Classes="secondary" Text="{Binding Summary}" />
+                                    <Button Content="Keep this one" Command="{Binding KeepThisCommand}" />
+                                </StackPanel>
+                            </Border>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+            </StackPanel>
+        </Border>
+
+        <!-- Fields -->
+        <Border Classes="card">
+            <StackPanel>
+                <ItemsControl ItemsSource="{Binding Fields}">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate x:DataType="vm:FieldViewModel">
+                            <StackPanel Margin="0,4,0,8">
+                                <!-- View -->
+                                <DockPanel IsVisible="{Binding !Owner.IsEditing}">
+                                    <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" IsVisible="{Binding HasValue}">
+                                        <Button Classes="flat" Width="44" Command="{Binding ToggleRevealCommand}" IsVisible="{Binding IsSecret}" AutomationProperties.Name="Show or hide">
+                                            <ic:SymbolIcon Symbol="Eye" FontSize="18" />
+                                        </Button>
+                                        <Button Classes="flat" Width="44" Command="{Binding CopyCommand}" AutomationProperties.Name="Copy">
+                                            <ic:SymbolIcon Symbol="Copy" FontSize="18" />
+                                        </Button>
+                                    </StackPanel>
+                                    <StackPanel>
+                                        <TextBlock Classes="secondary" Text="{Binding Name}" />
+                                        <TextBlock TextWrapping="Wrap" Text="{Binding Display}" />
+                                    </StackPanel>
+                                </DockPanel>
+                                <!-- Edit -->
+                                <StackPanel Spacing="4" IsVisible="{Binding Owner.IsEditing}">
+                                    <DockPanel>
+                                        <Button DockPanel.Dock="Right" Classes="flat" Width="44" Command="{Binding RemoveCommand}" AutomationProperties.Name="Remove field">
+                                            <ic:SymbolIcon Symbol="Dismiss" FontSize="18" />
+                                        </Button>
+                                        <ComboBox DockPanel.Dock="Right" Margin="4,0" ItemsSource="{Binding Owner.FieldKinds}" SelectedItem="{Binding Kind}" />
+                                        <TextBox PlaceholderText="Name" Text="{Binding Name}" />
+                                    </DockPanel>
+                                    <DockPanel>
+                                        <Button DockPanel.Dock="Right" Classes="flat" Width="44" Command="{Binding GenerateCommand}" IsVisible="{Binding IsPassword}"
+                                                AutomationProperties.Name="Generate a strong password">
+                                            <ic:SymbolIcon Symbol="Wand" FontSize="18" />
+                                        </Button>
+                                        <Button DockPanel.Dock="Right" Classes="flat" Width="44" Command="{Binding ToggleRevealCommand}" IsVisible="{Binding IsSecret}"
+                                                AutomationProperties.Name="Show or hide">
+                                            <ic:SymbolIcon Symbol="Eye" FontSize="18" />
+                                        </Button>
+                                        <TextBox Text="{Binding Value}" AcceptsReturn="{Binding IsMultiline}" TextWrapping="Wrap"
+                                                 PasswordChar="{Binding IsSecret, Converter={x:Static local:SecretChar.Converter}}" RevealPassword="{Binding IsRevealed}"
+                                                 AutomationProperties.Name="{Binding Name}" />
+                                    </DockPanel>
+                                </StackPanel>
+                            </StackPanel>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+                <Button Content="Add field" IsVisible="{Binding IsEditing}">
+                    <Button.Flyout>
+                        <MenuFlyout>
+                            <MenuItem Header="Text" Command="{Binding AddFieldCommand}" CommandParameter="{x:Static items:VaultFieldKind.Text}" />
+                            <MenuItem Header="Username" Command="{Binding AddFieldCommand}" CommandParameter="{x:Static items:VaultFieldKind.Username}" />
+                            <MenuItem Header="Password" Command="{Binding AddFieldCommand}" CommandParameter="{x:Static items:VaultFieldKind.Password}" />
+                            <MenuItem Header="Hidden (PIN, code…)" Command="{Binding AddFieldCommand}" CommandParameter="{x:Static items:VaultFieldKind.Secret}" />
+                            <MenuItem Header="Website" Command="{Binding AddFieldCommand}" CommandParameter="{x:Static items:VaultFieldKind.Url}" />
+                            <MenuItem Header="Email" Command="{Binding AddFieldCommand}" CommandParameter="{x:Static items:VaultFieldKind.Email}" />
+                            <MenuItem Header="Phone" Command="{Binding AddFieldCommand}" CommandParameter="{x:Static items:VaultFieldKind.Phone}" />
+                            <MenuItem Header="Several lines" Command="{Binding AddFieldCommand}" CommandParameter="{x:Static items:VaultFieldKind.Multiline}" />
+                        </MenuFlyout>
+                    </Button.Flyout>
+                </Button>
+            </StackPanel>
+        </Border>
+
+        <!-- Notes and tags -->
+        <TextBlock Classes="section" Text="Notes" />
+        <Border Classes="card">
+            <StackPanel Spacing="6">
+                <TextBlock TextWrapping="Wrap" Text="{Binding Notes}" IsVisible="{Binding !IsEditing}" />
+                <TextBox AcceptsReturn="True" TextWrapping="Wrap" MinHeight="80" Text="{Binding Notes}" IsVisible="{Binding IsEditing}" AutomationProperties.Name="Notes" />
+                <TextBox PlaceholderText="Tags, separated by commas" Text="{Binding Tags}" IsVisible="{Binding IsEditing}" />
+                <TextBlock Classes="secondary" Text="{Binding Tags}" IsVisible="{Binding !IsEditing}" />
+            </StackPanel>
+        </Border>
+
+        <!-- Documents -->
+        <TextBlock Classes="section" Text="Documents" />
+        <Border Classes="card">
+            <StackPanel Spacing="6">
+                <ProgressBar Minimum="0" Maximum="1" Value="{Binding Progress}" IsVisible="{Binding IsBusy}" />
+                <ItemsControl ItemsSource="{Binding Attachments}">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate x:DataType="vm:AttachmentViewModel">
+                            <StackPanel Margin="0,4,0,8" Spacing="4">
+                                <TextBlock Text="{Binding Name}" TextTrimming="CharacterEllipsis" />
+                                <TextBlock Classes="secondary" Text="{Binding Details}" />
+                                <WrapPanel>
+                                    <Button Margin="0,0,8,0" Content="Open" Command="{Binding OpenCommand}" />
+                                    <Button Margin="0,0,8,0" Content="Save a copy" Command="{Binding SaveAsCommand}" />
+                                    <Button Classes="danger" Content="Remove" Command="{Binding RemoveCommand}" />
+                                </WrapPanel>
+                            </StackPanel>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+                <Button Content="Attach a document…" Command="{Binding AttachCommand}" IsVisible="{Binding !Trashed}" />
+            </StackPanel>
+        </Border>
+
+        <!-- History -->
+        <Expander Header="History" IsVisible="{Binding !IsNew}" HorizontalAlignment="Stretch" Margin="0,8,0,0">
+            <ItemsControl ItemsSource="{Binding History}">
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate x:DataType="vm:VersionViewModel">
+                        <DockPanel Margin="0,4">
+                            <Button DockPanel.Dock="Right" Content="Restore" Command="{Binding RestoreCommand}" />
+                            <StackPanel>
+                                <TextBlock Text="{Binding When}" />
+                                <TextBlock Classes="secondary" Text="{Binding Summary}" />
+                            </StackPanel>
+                        </DockPanel>
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+        </Expander>
+        <TextBlock Classes="secondary" Margin="4,8,0,0" Text="{Binding Modified}" />
+    </StackPanel>
+</UserControl>

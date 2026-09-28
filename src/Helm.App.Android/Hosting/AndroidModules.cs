@@ -1,4 +1,5 @@
 using Helm.Core.Modules;
+using Helm.Modules.Vault;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Helm.App.Android.Hosting;
@@ -13,6 +14,6 @@ internal static class AndroidModules
 {
     public static void Register(IServiceCollection services)
     {
-        // No Android tools yet.
+        services.AddVaultModule();
     }
 }

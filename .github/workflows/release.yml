@@ -158,12 +158,20 @@ jobs:
           name: helm-android
           path: releases
 
-      - name: Friendly installer name, Android APK, release notes from CHANGELOG
+      # helm-vault-restore opens a Vault backup without Helm: one self-contained file, so it works on a PC that has
+      # neither Helm nor .NET (docs/vault-format.md).
+      - name: Publish helm-vault-restore
+        run: >
+          dotnet publish src/Helm.VaultRestore -c Release -r win-x64 --self-contained -p:PublishSingleFile=true
+          -p:Version=${{ steps.meta.outputs.version }} -o artifacts/vault-restore
+
+      - name: Friendly installer name, Android APK, restore tool, release notes from CHANGELOG
         shell: pwsh
         run: |
           $channel = '${{ steps.meta.outputs.channel }}'
           Copy-Item "releases/HelmApp-$channel-Setup.exe" 'releases/Helm-win-Setup.exe'
-          gh release upload $env:TAG 'releases/Helm-win-Setup.exe' 'releases/Helm-android.apk' --clobber
+          Copy-Item 'artifacts/vault-restore/helm-vault-restore.exe' 'releases/helm-vault-restore-win-x64.exe'
+          gh release upload $env:TAG 'releases/Helm-win-Setup.exe' 'releases/Helm-android.apk' 'releases/helm-vault-restore-win-x64.exe' --clobber
           $notes = 'artifacts/notes-${{ steps.meta.outputs.version }}.md'
           $flags = @('--notes-file', $notes)
           if ('${{ steps.meta.outputs.prerelease }}' -eq 'true') { $flags += '--prerelease' } else { $flags += '--latest' }

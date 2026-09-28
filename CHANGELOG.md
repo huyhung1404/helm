@@ -3,6 +3,26 @@
 All notable changes to Helm. The top section is used as the GitHub release body and as the Velopack release notes.
 Format: [Keep a Changelog](https://keepachangelog.com), versions follow [SemVer](https://semver.org).
 
+## [Unreleased]
+
+### Added
+- Vault (PC and Android): passwords, secure notes, cards, identities and documents in one encrypted vault.
+  - Its own vault password, separate from the sync passphrase, plus a recovery key on a printable Emergency
+    Kit. Nothing can be read without one of them, not even by the sync server.
+  - Unlock with Windows Hello or a fingerprint; the password is asked again every two weeks (configurable).
+    The vault locks after inactivity, when Windows locks, and shortly after the phone app goes to the background.
+  - Documents up to 256 MB each (the server's limit is adjustable), encrypted on the device and synced in chunks.
+  - Nothing is lost by mistake: deleted items stay 30 days in the trash, every edit keeps the previous 10
+    versions, edits made on two devices at once are both kept, and a sync that would delete many items is held
+    until you decide.
+  - Daily encrypted backups into a folder you pick (Google Drive, OneDrive, a USB stick), verified after
+    writing. Restore a whole vault on a new device, or bring back deleted items. `helm-vault-restore`, attached
+    to every release, opens a backup without Helm, and the vault exports to KeePass (KDBX 4).
+  - Copied secrets stay out of the clipboard history and are cleared after 30 seconds; the vault is hidden
+    from screenshots and screen sharing.
+- Sync: files (blobs) for tools such as Vault, and a guard that holds bulk deletions for review.
+- Android tools can now be added (Helm.Core.Android), with the same page layout as on the PC.
+
 ## [0.8.1] - 2026-09-28
 
 ### Fixed

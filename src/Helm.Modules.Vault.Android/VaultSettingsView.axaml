@@ -1,0 +1,149 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:Helm.Modules.Vault.ViewModels"
+             x:Class="Helm.Modules.Vault.VaultSettingsView"
+             x:DataType="vm:VaultSettingsViewModel">
+    <StackPanel Spacing="4">
+        <Border Classes="infobar" IsVisible="{Binding Message, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
+            <TextBlock TextWrapping="Wrap" Text="{Binding Message}" />
+        </Border>
+        <Border Classes="infobar warning" IsVisible="{Binding Error, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
+            <TextBlock TextWrapping="Wrap" Text="{Binding Error}" />
+        </Border>
+
+        <TextBlock Classes="section" Text="Vault" />
+        <Border Classes="card">
+            <DockPanel>
+                <Button DockPanel.Dock="Right" Content="Lock now" Command="{Binding LockNowCommand}" IsVisible="{Binding IsUnlocked}" VerticalAlignment="Center" />
+                <StackPanel VerticalAlignment="Center">
+                    <TextBlock Classes="title" Text="Vault" />
+                    <TextBlock Classes="secondary" Text="{Binding StateText}" />
+                </StackPanel>
+            </DockPanel>
+        </Border>
+
+        <TextBlock Classes="section" Text="Locking" />
+        <Border Classes="card">
+            <StackPanel>
+                <StackPanel Spacing="4">
+                    <TextBlock Classes="title" Text="Lock after inactivity" />
+                    <ComboBox HorizontalAlignment="Stretch" ItemsSource="{Binding AutoLockChoices}" SelectedItem="{Binding AutoLock}" />
+                </StackPanel>
+                <Border Classes="row">
+                    <StackPanel Spacing="4">
+                        <TextBlock Classes="title" Text="Lock when Helm is in the background" />
+                        <TextBlock Classes="secondary" Text="After switching apps or turning the screen off, the vault locks after this long." />
+                        <ComboBox HorizontalAlignment="Stretch" ItemsSource="{Binding BackgroundLockChoices}" SelectedItem="{Binding BackgroundLock}" />
+                    </StackPanel>
+                </Border>
+                <Border Classes="row" IsEnabled="{Binding DeviceUnlockAvailable}">
+                    <DockPanel>
+                        <ToggleSwitch DockPanel.Dock="Right" IsChecked="{Binding DeviceUnlockEnabled}" OnContent="" OffContent="" />
+                        <StackPanel VerticalAlignment="Center">
+                            <TextBlock Classes="title" Text="Unlock with fingerprint or face" />
+                            <TextBlock Classes="secondary" Text="Instead of the vault password, on this phone. Adding a fingerprint turns it off." />
+                        </StackPanel>
+                    </DockPanel>
+                </Border>
+                <Border Classes="row">
+                    <StackPanel Spacing="4">
+                        <TextBlock Classes="title" Text="Ask for the password again" />
+                        <ComboBox HorizontalAlignment="Stretch" ItemsSource="{Binding RequirePasswordChoices}" SelectedItem="{Binding RequirePassword}" />
+                    </StackPanel>
+                </Border>
+            </StackPanel>
+        </Border>
+
+        <TextBlock Classes="section" Text="Privacy" />
+        <Border Classes="card">
+            <StackPanel>
+                <StackPanel Spacing="4">
+                    <TextBlock Classes="title" Text="Clear copied secrets" />
+                    <TextBlock Classes="secondary" Text="Copied passwords are marked sensitive and cleared after this long." />
+                    <ComboBox HorizontalAlignment="Stretch" ItemsSource="{Binding ClipboardChoices}" SelectedItem="{Binding ClipboardClear}" />
+                </StackPanel>
+                <Border Classes="row">
+                    <DockPanel>
+                        <ToggleSwitch DockPanel.Dock="Right" IsChecked="{Binding ProtectFromScreenCapture}" OnContent="" OffContent="" />
+                        <StackPanel VerticalAlignment="Center">
+                            <TextBlock Classes="title" Text="Hide from screenshots" />
+                            <TextBlock Classes="secondary" Text="While the vault is open, screenshots, recordings and the recent-apps preview stay blank." />
+                        </StackPanel>
+                    </DockPanel>
+                </Border>
+            </StackPanel>
+        </Border>
+
+        <TextBlock Classes="section" Text="Password and recovery key" />
+        <Border Classes="card">
+            <StackPanel Spacing="6">
+                <TextBlock Classes="title" Text="Change the vault password" />
+                <TextBlock Classes="secondary" Text="The recovery key stays the same. Other devices use the new password after they sync." />
+                <TextBox PasswordChar="•" PlaceholderText="Current password" Text="{Binding CurrentPassword}" />
+                <TextBox PasswordChar="•" PlaceholderText="New password" Text="{Binding NewPassword}" />
+                <TextBox PasswordChar="•" PlaceholderText="New password again" Text="{Binding ConfirmPassword}" />
+                <Button Content="Change password" Command="{Binding ChangePasswordCommand}" />
+                <Border Classes="row">
+                    <StackPanel Spacing="6">
+                        <TextBlock Classes="title" Text="Recovery key" />
+                        <TextBlock Classes="secondary" Text="{Binding RecoveryId, StringFormat='Your Emergency Kit must show the id {0}.'}" />
+                        <TextBlock Classes="secondary" Text="Lost the kit? Type the current password above, then create a new key; the old one stops working." />
+                        <Button Content="Create a new recovery key" Command="{Binding NewRecoveryKeyCommand}" />
+                    </StackPanel>
+                </Border>
+            </StackPanel>
+        </Border>
+
+        <TextBlock Classes="section" Text="Backup" />
+        <Border Classes="card">
+            <StackPanel>
+                <DockPanel>
+                    <Button DockPanel.Dock="Right" Content="Choose…" Command="{Binding ChooseBackupLocationCommand}" VerticalAlignment="Center" />
+                    <StackPanel VerticalAlignment="Center">
+                        <TextBlock Classes="title" Text="Backup folder" />
+                        <TextBlock Classes="secondary" Text="For example a Google Drive folder." />
+                        <TextBlock Classes="secondary" Text="{Binding BackupLocation}" TextTrimming="CharacterEllipsis" TextWrapping="NoWrap" />
+                    </StackPanel>
+                </DockPanel>
+                <Border Classes="row">
+                    <DockPanel>
+                        <Button DockPanel.Dock="Right" Content="Back up now" Command="{Binding BackUpNowCommand}" IsEnabled="{Binding HasBackupLocation}" VerticalAlignment="Center" />
+                        <StackPanel VerticalAlignment="Center">
+                            <TextBlock Classes="title" Text="Daily encrypted backup" />
+                            <TextBlock Classes="secondary" Text="{Binding BackupStatus}" />
+                        </StackPanel>
+                    </DockPanel>
+                </Border>
+                <Border Classes="row">
+                    <StackPanel Spacing="4">
+                        <TextBlock Classes="title" Text="Keep daily snapshots for" />
+                        <ComboBox HorizontalAlignment="Stretch" ItemsSource="{Binding KeepDailyChoices}" SelectedItem="{Binding KeepDaily}" />
+                        <TextBlock Classes="title" Text="Keep monthly snapshots for" Margin="0,8,0,0" />
+                        <ComboBox HorizontalAlignment="Stretch" ItemsSource="{Binding KeepMonthlyChoices}" SelectedItem="{Binding KeepMonthly}" />
+                    </StackPanel>
+                </Border>
+                <Border Classes="row">
+                    <DockPanel>
+                        <Button DockPanel.Dock="Right" Content="Restore" Command="{Binding RestoreMissingCommand}" IsEnabled="{Binding HasBackupLocation}" VerticalAlignment="Center" />
+                        <StackPanel VerticalAlignment="Center">
+                            <TextBlock Classes="title" Text="Restore deleted items" />
+                            <TextBlock Classes="secondary" Text="Brings back items that are in the latest backup but no longer in the vault." />
+                        </StackPanel>
+                    </DockPanel>
+                </Border>
+            </StackPanel>
+        </Border>
+
+        <TextBlock Classes="section" Text="Export" />
+        <Border Classes="card">
+            <StackPanel Spacing="6">
+                <TextBlock Classes="title" Text="Export to KeePass" />
+                <TextBlock Classes="secondary" Text="A KDBX file that KeePassDX, KeePassXC and KeePass open: your way out if you ever leave Helm." />
+                <TextBox PasswordChar="•" PlaceholderText="Password for the file (at least 14 characters)" Text="{Binding ExportPassword}" />
+                <TextBox PasswordChar="•" PlaceholderText="Password again" Text="{Binding ExportConfirm}" />
+                <CheckBox Content="Include documents" IsChecked="{Binding ExportDocuments}" />
+                <Button Content="Export…" Command="{Binding ExportKdbxCommand}" />
+            </StackPanel>
+        </Border>
+    </StackPanel>
+</UserControl>
