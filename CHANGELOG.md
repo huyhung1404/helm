@@ -3,6 +3,13 @@
 All notable changes to Helm. The top section is used as the GitHub release body and as the Velopack release notes.
 Format: [Keep a Changelog](https://keepachangelog.com), versions follow [SemVer](https://semver.org).
 
+## [Unreleased]
+
+### Added
+- Sync: **Change passphrase** (General → Sync, PC and Android). Enter the current passphrase, or the recovery key if
+  you forgot it, then the new one. Devices already syncing carry on without asking, and the recovery key stays the
+  same; a device you add from now on unlocks with the new passphrase.
+
 ## [0.16.0] - 2026-09-29
 
 ### Added

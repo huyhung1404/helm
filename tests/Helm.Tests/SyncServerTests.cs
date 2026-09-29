@@ -254,6 +254,43 @@ public sealed class SyncServerTests : IDisposable
     }
 
     [ServerFact]
+    public async Task Changing_the_passphrase_needs_the_current_one_and_keeps_devices_and_the_recovery_key()
+    {
+        const string oldPass = "the first account passphrase";
+        const string newPass = "a second passphrase entirely";
+        var a = NewSetupDevice("a");
+        await a.Setup.RedeemInviteAsync(await CreateInviteAsync(), "Change", "PC", ServerUrl);
+        var recovery = await a.Setup.CreatePassphraseAsync(oldPass);
+        var (_, tokenB) = await a.Setup.AddDeviceAsync("Laptop");
+        var b = NewSetupDevice("b");
+        await b.Setup.ConnectWithTokenAsync(tokenB, ServerUrl);
+        await b.Setup.UnlockWithPassphraseAsync(oldPass);
+
+        await Assert.ThrowsAsync<SyncKeyException>(() => a.Setup.ChangePassphraseAsync("not the passphrase at all", false, newPass));
+        await Assert.ThrowsAsync<SyncKeyException>(() => a.Setup.ChangePassphraseAsync(oldPass, false, "short"));
+        await a.Setup.ChangePassphraseAsync(oldPass, false, newPass);
+
+        // B stays unlocked and keeps syncing with its key.
+        var id = a.Notes.Add(new Note("After change", "still readable"));
+        await a.Engine.SyncNowAsync();
+        Assert.Equal(SyncRunOutcome.Completed, (await b.Engine.SyncNowAsync()).Outcome);
+        Assert.Equal(new Note("After change", "still readable"), b.Notes.Get(id));
+
+        // New devices unlock with the new passphrase only; the recovery key still works and can authorise a change.
+        var (_, tokenC) = await a.Setup.AddDeviceAsync("Phone");
+        var c = NewSetupDevice("c");
+        await c.Setup.ConnectWithTokenAsync(tokenC, ServerUrl);
+        await Assert.ThrowsAsync<SyncKeyException>(() => c.Setup.UnlockWithPassphraseAsync(oldPass));
+        await c.Setup.UnlockWithPassphraseAsync(newPass);
+        await c.Setup.ChangePassphraseAsync(recovery, true, oldPass + " again");
+        var (_, tokenD) = await a.Setup.AddDeviceAsync("Tablet");
+        var d = NewSetupDevice("d");
+        await d.Setup.ConnectWithTokenAsync(tokenD, ServerUrl);
+        await d.Setup.UnlockWithRecoveryKeyAsync(recovery);
+        Assert.Equal(new Note("After change", "still readable"), d.Notes.Get(id));
+    }
+
+    [ServerFact]
     public async Task Removing_a_device_with_key_rotation_locks_it_out_of_new_data_and_others_unlock_once()
     {
         const string pass = "a long enough rotation passphrase";

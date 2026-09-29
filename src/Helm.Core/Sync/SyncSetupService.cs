@@ -139,12 +139,21 @@ public sealed class SyncSetupService
             throw new SyncKeyException("Another device changed the keyring at the same time. Try again.");
     }
 
-    /// <summary>Re-protects the account key with a new passphrase for every device that joins later.</summary>
-    public async Task ChangePassphraseAsync(string newPassphrase, CancellationToken ct = default)
+    /// <summary>
+    /// Re-protects the account key with a new passphrase for every device that unlocks from now on. Devices already
+    /// unlocked keep syncing, and the recovery key stays the same. The current passphrase (or, when it is forgotten,
+    /// the recovery key) must be given first, so a device left unlocked cannot lock its owner out.
+    /// </summary>
+    /// <exception cref="SyncKeyException">Wrong current passphrase or recovery key, a weak new passphrase, or a concurrent change.</exception>
+    public async Task ChangePassphraseAsync(string currentSecret, bool currentIsRecoveryKey, string newPassphrase, CancellationToken ct = default)
     {
         var credentials = RequireCredentials();
         using var keys = LoadKeys() ?? throw new InvalidOperationException("Unlock sync on this device first.");
         var current = await RequireKeyringAsync(credentials, ct).ConfigureAwait(false);
+        // Checked before the new one, so a wrong current passphrase never reveals whether the new one is acceptable.
+        using (await Task.Run(() => currentIsRecoveryKey
+                   ? SyncKeyVault.UnlockWithRecoveryKey(current.Data, currentSecret)
+                   : SyncKeyVault.UnlockWithPassphrase(current.Data, currentSecret), ct).ConfigureAwait(false)) { }
         var updated = await Task.Run(() => SyncKeyVault.ChangePassphrase(current.Data, keys, newPassphrase), ct).ConfigureAwait(false);
         if (!await _api.PutKeyringAsync(credentials, current.Version, updated, ct).ConfigureAwait(false))
             throw new SyncKeyException("Another device changed the passphrase at the same time. Try again.");

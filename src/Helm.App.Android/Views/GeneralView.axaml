@@ -207,6 +207,32 @@
                         </StackPanel>
                     </Border>
                     <Border Classes="row">
+                        <StackPanel Spacing="8">
+                            <TextBlock Text="Passphrase" Classes="title" />
+                            <TextBlock Classes="secondary" Text="The passphrase that unlocks sync on a new device. Changing it keeps your devices syncing and your recovery key." />
+                            <Button Content="Change passphrase…" Command="{Binding StartChangePassphraseCommand}" IsVisible="{Binding !IsChangingPassphrase}" />
+                            <Border Classes="infobar" Margin="0" IsVisible="{Binding HasPassphraseChangedText}">
+                                <TextBlock TextWrapping="Wrap" Text="{Binding PassphraseChangedText}" />
+                            </Border>
+                            <StackPanel Spacing="8" IsVisible="{Binding IsChangingPassphrase}">
+                                <TextBox PasswordChar="●" Classes="revealPasswordButton" Text="{Binding ChangeCurrentSecret}" PlaceholderText="Current passphrase"
+                                         AutomationProperties.Name="Current passphrase" IsVisible="{Binding !ChangeWithRecoveryKey}" />
+                                <TextBox Classes="mono" Text="{Binding ChangeCurrentSecret}" PlaceholderText="Recovery key (HELM-…)"
+                                         AutomationProperties.Name="Recovery key to change the passphrase" IsVisible="{Binding ChangeWithRecoveryKey}" />
+                                <CheckBox Content="I forgot it: use the recovery key" IsChecked="{Binding ChangeWithRecoveryKey}" />
+                                <TextBox PasswordChar="●" Classes="revealPasswordButton" Text="{Binding ChangeNewPassphrase}" AutomationProperties.Name="New passphrase"
+                                         PlaceholderText="{Binding MinPassphraseLength, StringFormat='New passphrase (at least {0} characters)'}" />
+                                <TextBlock Classes="secondary" Text="{Binding ChangeStrengthText}" />
+                                <TextBox PasswordChar="●" Classes="revealPasswordButton" Text="{Binding ChangeConfirmPassphrase}" PlaceholderText="Repeat the new passphrase"
+                                         AutomationProperties.Name="Repeat new passphrase" />
+                                <WrapPanel>
+                                    <Button Content="Change passphrase" Classes="accent" Command="{Binding ChangePassphraseCommand}" Margin="0,0,8,8" />
+                                    <Button Content="Cancel" Command="{Binding CancelChangePassphraseCommand}" Margin="0,0,0,8" />
+                                </WrapPanel>
+                            </StackPanel>
+                        </StackPanel>
+                    </Border>
+                    <Border Classes="row">
                         <StackPanel Spacing="6">
                             <TextBlock Text="{Binding UsageText}" />
                             <ProgressBar Minimum="0" Maximum="100" Value="{Binding UsagePercent}" />

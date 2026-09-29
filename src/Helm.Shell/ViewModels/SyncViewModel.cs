@@ -72,6 +72,16 @@ public sealed partial class SyncViewModel : ObservableObject
     [ObservableProperty] private bool _needsProtectionUpgrade;
     [ObservableProperty] private string _upgradePassphrase = "";
 
+    /// <summary>The Change passphrase panel is open.</summary>
+    [ObservableProperty] private bool _isChangingPassphrase;
+    [ObservableProperty] private string _changeCurrentSecret = "";
+    [ObservableProperty] private bool _changeWithRecoveryKey;
+    [ObservableProperty] private string _changeNewPassphrase = "";
+    [ObservableProperty] private string _changeConfirmPassphrase = "";
+
+    [ObservableProperty, NotifyPropertyChangedFor(nameof(HasPassphraseChangedText))]
+    private string? _passphraseChangedText;
+
     /// <summary>The device the user chose to remove; the page then asks whether to also change the account key.</summary>
     [ObservableProperty, NotifyPropertyChangedFor(nameof(IsRemovingDevice), nameof(RemovingDeviceText))]
     private SyncDeviceItem? _removingDevice;
@@ -128,13 +138,18 @@ public sealed partial class SyncViewModel : ObservableObject
     public bool KeyChangedElsewhere => _setup.KeyChangedElsewhere;
 
     /// <summary>Live feedback while typing a new passphrase.</summary>
-    public string PassphraseStrengthText => SyncKeyVault.EstimateStrength(Passphrase) switch
+    public string PassphraseStrengthText => DescribeStrength(Passphrase);
+
+    private static string DescribeStrength(string passphrase) => SyncKeyVault.EstimateStrength(passphrase) switch
     {
         PassphraseStrength.TooShort => $"Too short — at least {SyncKeyVault.MinPassphraseLength} characters",
         PassphraseStrength.Weak => "Weak — easy to guess; use several unrelated words",
         PassphraseStrength.Fair => "Fair — longer is better",
         _ => "Strong",
     };
+    /// <summary>Live feedback while typing the new passphrase in the Change passphrase panel.</summary>
+    public string ChangeStrengthText => DescribeStrength(ChangeNewPassphrase);
+    public bool HasPassphraseChangedText => PassphraseChangedText is not null;
     public bool HasNewDeviceToken => NewDeviceToken is not null;
     public bool HasError => ErrorMessage is not null;
     public int MinPassphraseLength => SyncKeyVault.MinPassphraseLength;
@@ -143,6 +158,8 @@ public sealed partial class SyncViewModel : ObservableObject
     public ObservableCollection<SyncDeviceItem> Devices { get; } = [];
 
     partial void OnPassphraseChanged(string value) => OnPropertyChanged(nameof(PassphraseStrengthText));
+
+    partial void OnChangeNewPassphraseChanged(string value) => OnPropertyChanged(nameof(ChangeStrengthText));
 
     partial void OnStageChanged(SyncSetupStage value)
     {
@@ -277,6 +294,39 @@ public sealed partial class SyncViewModel : ObservableObject
     });
 
     [RelayCommand]
+    private void StartChangePassphrase()
+    {
+        ClearSecrets();
+        ChangeWithRecoveryKey = false;
+        PassphraseChangedText = null;
+        ErrorMessage = null;
+        IsChangingPassphrase = true;
+    }
+
+    [RelayCommand]
+    private void CancelChangePassphrase()
+    {
+        IsChangingPassphrase = false;
+        ClearSecrets();
+    }
+
+    [RelayCommand]
+    private Task ChangePassphraseAsync() => RunAsync(async () =>
+    {
+        if (string.IsNullOrEmpty(ChangeCurrentSecret))
+            throw new UserError(ChangeWithRecoveryKey ? "Enter your recovery key." : "Enter your current passphrase.");
+        if (ChangeNewPassphrase != ChangeConfirmPassphrase) throw new UserError("The two new passphrases do not match.");
+        if (!ChangeWithRecoveryKey && ChangeNewPassphrase == ChangeCurrentSecret) throw new UserError("The new passphrase is the same as the current one.");
+        await _setup.ChangePassphraseAsync(ChangeCurrentSecret, ChangeWithRecoveryKey, ChangeNewPassphrase).ConfigureAwait(true);
+        IsChangingPassphrase = false;
+        ClearSecrets();
+        PassphraseChangedText = "Passphrase changed. Use the new one when you add a device. Devices already syncing carry on, and your recovery key stays the same.";
+    });
+
+    [RelayCommand]
+    private void DismissPassphraseChanged() => PassphraseChangedText = null;
+
+    [RelayCommand]
     private async Task SignOutAsync()
     {
         var confirmed = await _dialogs.ConfirmAsync("Turn off sync on this device?",
@@ -373,6 +423,9 @@ public sealed partial class SyncViewModel : ObservableObject
         RecoveryKeyInput = "";
         UpgradePassphrase = "";
         RemovePassphrase = "";
+        ChangeCurrentSecret = "";
+        ChangeNewPassphrase = "";
+        ChangeConfirmPassphrase = "";
     }
 
     private void CopyToClipboard(string? text)

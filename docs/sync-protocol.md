@@ -212,5 +212,4 @@ Keyring v2 is `{v: 2, epoch, kdf, pass, rec, prev}`. It holds the current master
 - Blobs: chunks pass through the Worker rather than presigned R2 URLs, and payloads over 64 KiB still live in records. Orphaned R2 objects left by an upload racing a delete are not swept.
 - WebSocket change notifications (Durable Object hibernation).
 - Selective sync per device, plus tombstone garbage collection.
-- Changing the passphrase from the UI: `SyncSetupService.ChangePassphraseAsync` exists, but no button calls it yet.
 - An edit made on another device while a rotation re-encrypts everything may come back as a conflict copy. The KeepBoth policy guarantees that no data is lost.

@@ -253,6 +253,35 @@
                     </Border>
                     <Border Style="{DynamicResource HelmExpanderRow}">
                         <StackPanel>
+                            <core:RowLayout>
+                                <core:CardHeader Title="Passphrase" Description="The passphrase that unlocks sync on a new device. Changing it keeps your devices syncing and your recovery key." />
+                                <ui:Button HorizontalAlignment="Right" Content="Change passphrase…" Command="{Binding StartChangePassphraseCommand}"
+                                           Visibility="{Binding IsChangingPassphrase, Converter={StaticResource InverseBoolToVisibility}}" />
+                            </core:RowLayout>
+                            <ui:InfoBar Title="Passphrase changed" Severity="Success" IsOpen="True" IsClosable="False" Margin="0,8,0,0" Message="{Binding PassphraseChangedText}"
+                                        Visibility="{Binding HasPassphraseChangedText, Converter={StaticResource BoolToVisibility}}" />
+                            <StackPanel Margin="0,8,0,0" Visibility="{Binding IsChangingPassphrase, Converter={StaticResource BoolToVisibility}}">
+                                <ui:PasswordBox AutomationProperties.Name="Current passphrase" PlaceholderText="Current passphrase" Margin="0,0,0,8"
+                                                Password="{Binding ChangeCurrentSecret, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                                Visibility="{Binding ChangeWithRecoveryKey, Converter={StaticResource InverseBoolToVisibility}}" />
+                                <ui:TextBox AutomationProperties.Name="Recovery key to change the passphrase" PlaceholderText="Recovery key (HELM-…)" FontFamily="Consolas" Margin="0,0,0,8"
+                                            Text="{Binding ChangeCurrentSecret, UpdateSourceTrigger=PropertyChanged}"
+                                            Visibility="{Binding ChangeWithRecoveryKey, Converter={StaticResource BoolToVisibility}}" />
+                                <CheckBox Content="I forgot it: use the recovery key" IsChecked="{Binding ChangeWithRecoveryKey}" Margin="0,0,0,8" />
+                                <ui:PasswordBox AutomationProperties.Name="New passphrase" PlaceholderText="{Binding MinPassphraseLength, StringFormat='New passphrase (at least {0} characters)'}"
+                                                Password="{Binding ChangeNewPassphrase, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Margin="0,0,0,8" />
+                                <TextBlock Text="{Binding ChangeStrengthText}" Style="{DynamicResource HelmSecondaryText}" Margin="0,-4,0,8" />
+                                <ui:PasswordBox AutomationProperties.Name="Repeat new passphrase" PlaceholderText="Repeat the new passphrase"
+                                                Password="{Binding ChangeConfirmPassphrase, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Margin="0,0,0,8" />
+                                <StackPanel Orientation="Horizontal">
+                                    <ui:Button Content="Change passphrase" Appearance="Primary" Command="{Binding ChangePassphraseCommand}" Margin="0,0,8,0" />
+                                    <ui:Button Content="Cancel" Command="{Binding CancelChangePassphraseCommand}" />
+                                </StackPanel>
+                            </StackPanel>
+                        </StackPanel>
+                    </Border>
+                    <Border Style="{DynamicResource HelmExpanderRow}">
+                        <StackPanel>
                             <TextBlock Text="{Binding UsageText}" />
                             <ProgressBar Margin="0,6,0,0" Height="4" Minimum="0" Maximum="100" Value="{Binding UsagePercent, Mode=OneWay}" />
                         </StackPanel>
