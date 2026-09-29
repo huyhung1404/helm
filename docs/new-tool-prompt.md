@@ -306,6 +306,6 @@ The page is a `core:ModulePageBase`. It already renders the title, the icon + de
 ### 8. Ship
 
 - Add the tool under `## [Unreleased]` at the top of `CHANGELOG.md` ("### Added – <Tool> (PC / Android / PC and Android): …").
-- Add a row for the tool to the README tool table and remove it from the roadmap if it was listed there.
+- Add a row for the tool to the README tool table (and to the Tool list in `.github/ISSUE_TEMPLATE/bug_report.yml`) and remove it from the roadmap if it was listed there.
 - Bump `<Version>` in `Directory.Build.props` (minor for a new tool). Commit, tag `vX.Y.Z`, and push `main` plus the tag. `.github/workflows/release.yml` publishes the release, and installed copies update from General → Updates.
 - Finish with a short summary: what the tool does, its shortcuts, which settings exist, what was verified, and what the user should test by hand.

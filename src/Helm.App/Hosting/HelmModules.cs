@@ -10,7 +10,7 @@ namespace Helm.App.Hosting;
 
 /// <summary>
 /// The one place where modules are wired into the app. Add a line here for every new module, e.g.
-/// <c>services.AddMyToolModule();</c> (see README → Adding a module).
+/// <c>services.AddMyToolModule();</c> (see docs/development.md → Adding a module).
 /// </summary>
 internal static class HelmModules
 {

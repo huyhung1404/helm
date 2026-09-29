@@ -1,0 +1,68 @@
+name: Bug report
+description: Something in Helm does not work as expected.
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting. Security problems must not be reported here: see SECURITY.md.
+  - type: input
+    id: version
+    attributes:
+      label: Helm version
+      description: Shown on Home and in General → Updates.
+      placeholder: "0.16.0"
+    validations:
+      required: true
+  - type: dropdown
+    id: platform
+    attributes:
+      label: Platform
+      options:
+        - Windows
+        - Android
+        - Both
+    validations:
+      required: true
+  - type: dropdown
+    id: tool
+    attributes:
+      label: Tool
+      options:
+        - Claude Chat
+        - Command Palette
+        - Notes
+        - Quick Capture
+        - Tracker
+        - Vault
+        - Sync
+        - Updates / install
+        - Other
+    validations:
+      required: true
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened
+      description: What you did, what you expected, and what happened instead.
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Open …
+        2. Click …
+        3. See …
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment
+      description: Windows or Android version, device, anything unusual about your setup.
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs
+      description: On Windows, relevant lines from %LOCALAPPDATA%\Helm\logs\. Remove anything private first.
+      render: text

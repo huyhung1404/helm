@@ -1,8 +1,32 @@
+<div align="center">
+
+<img src="src/Helm.App/Assets/helm.png" width="96" alt="Helm logo">
+
 # Helm
 
-A personal Windows admin and productivity toolkit in the spirit of Microsoft PowerToys. Helm is one Fluent desktop app made of independent tools ("modules"), each with its own tab, plus an Android app with the same Home and General pages ([docs/android.md](docs/android.md)). Each tool runs on the platforms it is built for: Claude Chat, for example, is PC only.
+**A personal productivity toolkit for Windows and Android, in the spirit of Microsoft PowerToys.**
 
-Tools:
+Notes, tasks, a password vault, a command palette and a Claude Code chat in one Fluent app, synced end-to-end encrypted between your PC and your phone.
+
+[![Latest release](https://img.shields.io/github/v/release/huyhung1404/helm?label=release)](https://github.com/huyhung1404/helm/releases/latest)
+[![CI](https://img.shields.io/github/actions/workflow/status/huyhung1404/helm/ci.yml?branch=main&label=CI)](https://github.com/huyhung1404/helm/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/github/license/huyhung1404/helm)](LICENSE)
+![Platforms](https://img.shields.io/badge/platforms-Windows%2010%2B%20%7C%20Android%208%2B-0078D4)
+![.NET](https://img.shields.io/badge/.NET-8-512BD4)
+
+[Download](https://github.com/huyhung1404/helm/releases/latest) · [Changelog](CHANGELOG.md) · [Documentation](#documentation) · [Report a bug](https://github.com/huyhung1404/helm/issues/new/choose)
+
+</div>
+
+## Highlights
+
+- **One app, many tools.** Each tool is an independent module with its own page, Home tile and tray toggle. Turn on only what you use.
+- **PC and Android.** The same Home and General pages on both, and every tool runs on the platforms it is built for.
+- **Local-first, end-to-end encrypted sync.** Every device keeps a full copy of your data; the sync server only ever sees encrypted records.
+- **Updates itself.** New versions download in the background from GitHub Releases and install when you choose.
+- **Keyboard-first.** Alt+Space for the command palette, Win+Alt+N to capture a note or task from any app.
+
+## Tools
 
 | Tool | Platforms | What it does |
 |---|---|---|
@@ -14,44 +38,56 @@ Tools:
 | Vault | PC + Android | Passwords, secure notes, cards, identities and documents, end-to-end encrypted, synced, and backed up to a folder you choose ([guide](docs/vault-guide.md), [design](docs/vault-design.md), [format](docs/vault-format.md)) |
 
 More tools are planned (see [Roadmap](#roadmap)). Always On Top is built but not registered; it comes back with one line in `src/Helm.App/Hosting/HelmModules.cs`. The previous Zones module is kept in git history (tag `v0.3.0`).
+
 ## Install
 
-Download **`Helm-win-Setup.exe`** from the [latest release](https://github.com/huyhung1404/helm/releases/latest) and run it. Setup installs per user into `%LOCALAPPDATA%\HelmApp` (no admin needed to install) and creates Start menu and desktop shortcuts. It also installs the .NET 8 Desktop Runtime if it is missing. When Helm starts, it asks once for administrator rights (UAC).
+### Windows
 
-**Android** (8.0 or newer): download **`Helm-android.apk`** from the same release and open it; Android asks you to allow installs from your browser or file manager once. Helm then updates itself from GitHub (General → Updates), asking before each install.
+Requires Windows 10 (19041) or Windows 11, x64.
+
+1. Download **`Helm-win-Setup.exe`** from the [latest release](https://github.com/huyhung1404/helm/releases/latest) and run it.
+2. Setup installs per user into `%LOCALAPPDATA%\HelmApp` (no admin needed to install), creates Start menu and desktop shortcuts, and installs the .NET 8 Desktop Runtime if it is missing.
+3. When Helm starts, it asks once for administrator rights (UAC), so its hotkeys and hooks also work over elevated windows.
 
 Settings live separately in `%LOCALAPPDATA%\Helm`, so they survive an uninstall and reinstall. To remove them with the app, turn on General → Updates → *Delete my settings when Helm is uninstalled*.
 
-## Update
+### Android
 
-Updates are automatic. Helm checks GitHub Releases 30 seconds after it starts and then every 6 hours. It downloads new versions in the background (setting: *Automatically download updates*) and tells you with a tray notification and the Home tile. Nothing is installed until you choose **Restart to update**, either in General → Updates or from the tray menu. You can also turn on *Install updates automatically when Helm restarts*.
+Requires Android 8.0 or newer.
+
+Download **`Helm-android.apk`** from the same release and open it; Android asks you to allow installs from your browser or file manager once. Helm then updates itself from GitHub (General → Updates), asking before each install.
+
+## Updates
+
+Updates are automatic. Helm checks GitHub Releases shortly after it starts and then every 6 hours, downloads new versions in the background and tells you with a tray notification and the Home tile. Nothing is installed until you choose **Restart to update**, in General → Updates or from the tray menu.
 
 - **Manual check**: General → Updates → *Check for updates*.
 - **Channels**: *Stable* (default) or *Preview*, which receives GitHub pre-releases such as `v0.4.0-preview.1`.
-- Before applying an update, Helm disables every module (hooks, topmost windows, overlays). The restarted Helm stays elevated without another UAC prompt.
-- The repository is public, so update checks need no account or token.
+- **Auto-install**: turn on *Install updates automatically when Helm restarts*.
 
-**Portable and dev builds do not auto-update.** Running from `bin/`, `dotnet run` or an unpacked portable zip shows "Updates unavailable" with an explanation, and every update action is disabled.
+Portable and development builds do not auto-update.
 
-## Release process
+## Sync and privacy
 
-1. Add the changes under a new section at the top of [CHANGELOG.md](CHANGELOG.md). That section becomes the release notes.
-2. Bump, commit and tag:
+Helm is local-first: every tool reads and writes a replica on the device, and sync runs in the background. Data is encrypted on the device before it leaves it, so the sync server stores only opaque, encrypted records and cannot read your notes, tasks or vault. Vault backups written to your own folder are encrypted too, and `helm-vault-restore` opens them without Helm.
 
-   ```powershell
-   ./scripts/bump-version.ps1 0.3.0            # or 0.4.0-preview.1 for the preview channel
-   git push origin HEAD --follow-tags
-   ```
+Sync accounts are invite-only. Everything else in Helm works without an account. The protocol and the encryption are documented in [docs/sync-protocol.md](docs/sync-protocol.md) and [docs/vault-design.md](docs/vault-design.md).
 
-3. The tag push runs [.github/workflows/release.yml](.github/workflows/release.yml). Its `android` job builds `Helm-android.apk` with the same version, signed with the release keystore from the `ANDROID_KEYSTORE_BASE64` / `ANDROID_KEYSTORE_PASSWORD` secrets ([docs/android.md](docs/android.md#release-signing)). The `release` job then tests, publishes `win-x64`, packs with `vpk` (packId `HelmApp`, title "Helm", channel from the tag), uploads to GitHub Releases (pre-release for suffixed tags) and attaches `Helm-win-Setup.exe` and `Helm-android.apk`.
+## Documentation
 
-The version has one source: `<Version>` in `Directory.Build.props`. CI overrides it from the tag (`v1.2.3` → `1.2.3`). Home and General display it.
+| Document | For |
+|---|---|
+| [Vault guide](docs/vault-guide.md) (Vietnamese) | Using the vault: setup, daily use, unlocking, backups, recovery |
+| [Vault design](docs/vault-design.md) · [Vault format](docs/vault-format.md) | How the vault is encrypted, and its on-disk and backup format |
+| [Sync protocol](docs/sync-protocol.md) | How devices stay in step, the server, invites and tokens |
+| [Development](docs/development.md) | Building, running, solution layout, adding a module, releasing |
+| [Android](docs/android.md) | The Android app: shared code, tools per platform, testing, signing |
+| [Testing updates](docs/testing-updates.md) | End-to-end manual test for install → update → restart |
+| [New tool prompt](docs/new-tool-prompt.md) | Every rule a new tool follows, ready to paste into Claude Code |
 
-To pack locally without CI, run `./scripts/release-local.ps1` (output goes to `./releases`). Add `-SelfContained` to bundle the runtime. [docs/testing-updates.md](docs/testing-updates.md) is the end-to-end manual test for install → update → restart.
+## Building from source
 
-## Build and run
-
-Requirements: Windows 10 19041+ / Windows 11, the .NET 8 SDK or newer (the projects target `net8.0-windows10.0.19041.0` and roll forward to newer runtimes).
+Requirements: Windows 10 19041+ / Windows 11 and the .NET 8 SDK or newer.
 
 ```powershell
 dotnet build
@@ -59,88 +95,7 @@ dotnet test
 dotnet run --project src/Helm.App
 ```
 
-Helm **runs as administrator**, so low-level hooks, hotkeys and window moves also work on elevated windows. The manifest is deliberately `asInvoker`, and `Program.Main` relaunches itself elevated (UAC) right after the Velopack bootstrap. The reason: Velopack's Setup and Update start the app with `CreateProcess`, which fails with `ERROR_ELEVATION_REQUIRED` for `requireAdministrator` executables. `dotnet run` therefore shows a UAC prompt. If you start Visual Studio as administrator, there is no prompt and the debugger stays attached.
-
-A few command-line flags are handy while developing:
-
-- `--no-elevate`: skip self-elevation for quick UI checks. Hooks then cannot touch elevated windows.
-- `--startup`: start hidden in the tray (this is what the logon task uses).
-- `--page <Name>`: open a page directly, for example `--page Zones` or `--page Diagnostics`.
-
-### Where things live
-
-| Path | Content |
-|---|---|
-| `%LOCALAPPDATA%\Helm\settings\general.json` | Theme, window placement, enabled modules, last update check |
-| `%LOCALAPPDATA%\Helm\settings\<moduleId>.json` | One file per module (`zones.json`, `always-on-top.json`, `tracker.json`) |
-| `%LOCALAPPDATA%\Helm\sync\helm-sync.db` | Synced data (encrypted local replica), e.g. Tracker workspaces, items and history |
-| `%LOCALAPPDATA%\Helm\settings\zones\` | `layouts.json`, `applied.json` (monitor id → layout), `app-zone-history.json` |
-| `%LOCALAPPDATA%\Helm\logs\helm-YYYYMMDD.log` | Serilog rolling log, 14 days (`velopack-hooks.log` for install/update/uninstall hooks) |
-| `%LOCALAPPDATA%\HelmApp\` | Velopack install root: `Helm.exe` stable launcher, `Update.exe`, `current\` |
-
-"Run at startup" registers a Task Scheduler task named **Helm** with *Run with highest privileges* and an *At log on* trigger, so Helm starts elevated without a UAC prompt.
-
-## Solution layout
-
-```
-src/
-  Helm.Core/                 net8.0, no UI: module contract (IModule, ModuleRegistry<T>), settings, sync, update rules
-  Helm.Shell/                net8.0: view models shared by both apps' Home and General (Updates, Sync)
-  Helm.Core.Windows/         Windows: IHelmModule, Win32 (CsWin32), hooks, hotkeys, window/monitor services,
-                             GDI overlay window, DPAPI, shared WPF controls (Ui/); namespaces stay Helm.Core.*
-  Helm.App/                  WPF-UI shell: DI host, MainWindow, tray, Home/General/Diagnostics pages
-  Helm.Core.Android/         Android: IAndroidModule, ModulePageBase, ActivityHost, HelmAndroidServices (not in Helm.sln)
-  Helm.App.Android/          Avalonia Android app: shell, Home/General, Keystore, APK updater (not in Helm.sln)
-  Helm.Modules.ClaudeChat/   Windows only: Claude Code chat window
-  Helm.Modules.AlwaysOnTop/  Windows only: engine, settings page
-  Helm.Modules.Tracker.Core/ net8.0: Tracker data (on Helm Sync), reports, CSV, shared view model
-  Helm.Modules.Tracker/      Windows: Tracker page
-  Helm.Modules.Tracker.Android/ Android: Tracker page and home-screen widget (not in Helm.sln)
-  Helm.Modules.Vault.Core/   net8.0: vault keys, items, locking, backups, KDBX export, shared view models
-  Helm.Modules.Vault/        Windows: vault window and page, Windows Hello, protected clipboard
-  Helm.Modules.Vault.Android/ Android: vault page, fingerprint unlock, FLAG_SECURE, SAF backups (not in Helm.sln)
-  Helm.VaultRestore/         helm-vault-restore: opens a vault backup without Helm
-tests/Helm.Tests/            xUnit: settings, sync (+ end-to-end against a local worker), updates, hotkeys, Claude Chat, Tracker, Vault
-```
-
-Windows modules reference `Helm.Core.Windows`, Android modules reference `Helm.Core.Android`, and shared tool logic references `Helm.Core`; `Helm.App` / `Helm.App.Android` reference everything they ship.
-
-Key infrastructure in `Helm.Core`:
-
-- `MessageLoopThread` is an STA thread with its own `HWND_MESSAGE` window and message pump. Hotkeys, low-level hooks, WinEvent hooks and each module's overlays run on these threads, never on the WPF dispatcher.
-- `LowLevelKeyboardHook` / `LowLevelMouseHook` are ref-counted (`Acquire()`). `Intercept` runs inside the hook and can set `Handled` to swallow input. `Observed` is fed through a `Channel<T>` for heavier work.
-- `HotkeyManager` wraps `RegisterHotKey` and detects conflicts, both between modules and with other apps. It suspends itself while a hotkey picker is recording.
-- `WindowService` works with DWM *extended frame bounds*, so snapped windows sit flush without the invisible resize border.
-- `OverlayWindow` is a click-through, non-activating, layered GDI window that works in physical pixels. Zones overlays and pinned-window borders use it.
-
-## Adding a module
-
-> **Fastest way:** open [docs/new-tool-prompt.md](docs/new-tool-prompt.md), fill in the tool name, what it does and its platforms (PC, Android or both), and paste the file into Claude Code. It contains every rule needed so a new tool matches the others (structure, UI, testing, release).
-
-1. Create `src/Helm.Modules.<Name>` (WPF class library referencing `Helm.Core.Windows`). Android tools follow [docs/android.md](docs/android.md#tools-and-platforms).
-2. Implement the module, usually by deriving from `HelmModuleBase`:
-
-   ```csharp
-   public sealed class ColorPickerModule : HelmModuleBase
-   {
-       public override string Id => "color-picker";
-       public override string DisplayName => "Color Picker";
-       public override string Description => "Pick a color from anywhere on screen.";
-       public override ModuleGroup Group => ModuleGroup.SystemTools;
-       public override SymbolRegular Icon => SymbolRegular.Color24;
-       public override Type SettingsPageType => typeof(ColorPickerPage);
-       public override IReadOnlyList<HotkeyDefinition> Hotkeys => [...];
-       public override Task EnableAsync(CancellationToken ct) { /* hooks, hotkeys */ }
-       public override Task DisableAsync() { /* release everything; idempotent */ }
-   }
-   ```
-
-3. Build the settings page as a `core:ModulePageBase` with `Module="{Binding Module}"` and put `ui:CardControl`/`ui:CardExpander` sections inside, each with a `core:CardHeader`. The search box indexes those headers automatically.
-4. Register the module with `services.AddHelmModule<TModule, TPage, TViewModel>()` in a `Add<Name>Module()` extension, then add one line to `src/Helm.App/Hosting/HelmModules.cs`.
-
-The nav tree, Home tiles, tray toggles, search and enable persistence all come from the registration. No other shell changes are needed.
-
-A tool you work in (lists, a chat, a vault) also has a **content page**: implement `IModuleContent` and the menu and the Quick access tile open it, while Home → Utilities and search open the settings page. See "Content page and settings page" in [docs/new-tool-prompt.md](docs/new-tool-prompt.md).
+`dotnet run` shows a UAC prompt because Helm runs as administrator; pass `--no-elevate` for quick UI checks. The Android app is built separately (see [docs/android.md](docs/android.md)). The full guide, including the architecture and how to add a tool, is in [docs/development.md](docs/development.md).
 
 ## Roadmap
 
@@ -153,3 +108,15 @@ Planned tools, each added as its own module (`src/Helm.Modules.<Name>`):
 - **File Management**: File Locksmith, bulk rename, Hosts file editor, Environment Variables.
 - **Advanced**: Unity helpers (kill stuck editors, clear Library caches).
 - Code signing for the installer and binaries.
+
+## Contributing
+
+Bug reports and ideas are welcome in [Issues](https://github.com/huyhung1404/helm/issues/new/choose). Before opening a pull request, read [CONTRIBUTING.md](CONTRIBUTING.md).
+
+## Security
+
+Please do not report security problems in public issues. See [SECURITY.md](SECURITY.md) for how to report one privately.
+
+## License
+
+Helm is released under the [MIT License](LICENSE). Copyright (c) 2026 huyhung1404.
