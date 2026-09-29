@@ -3,7 +3,7 @@
 All notable changes to Helm. The top section is used as the GitHub release body and as the Velopack release notes.
 Format: [Keep a Changelog](https://keepachangelog.com), versions follow [SemVer](https://semver.org).
 
-## [Unreleased]
+## [0.12.0] - 2026-09-29
 
 ### Added
 - Tracker: tasks can repeat every day, for ever or for a number of days. Each new day the task is there again (with
