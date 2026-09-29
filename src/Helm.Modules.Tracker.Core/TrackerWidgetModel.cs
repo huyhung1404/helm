@@ -45,7 +45,6 @@ public sealed record TrackerWidgetModel(
 
         var ws = chosen.Value;
         var debts = ws.Kind == WorkspaceKind.Debts;
-        var today = DateOnly.FromDateTime(TimeZoneInfo.ConvertTime(now, zone).DateTime);
         if (debts)
         {
             // One row per person with a balance, as in the app.
@@ -64,7 +63,7 @@ public sealed record TrackerWidgetModel(
         }
 
         var open = store.OpenItems(chosen.Id);
-        var rows = open.Take(MaxRows).Select(i => Row(i.Id, i.Value, ws, today)).ToList();
+        var rows = open.Take(MaxRows).Select(i => Row(i.Id, i.Value, ws, now, zone)).ToList();
         return new TrackerWidgetModel(chosen.Id, ws.Name, $"{open.Count} open", "Nothing to do.", rows, open.Count);
     }
 
@@ -77,7 +76,7 @@ public sealed record TrackerWidgetModel(
         return ids[(index + 1) % ids.Count];
     }
 
-    private static TrackerWidgetRow Row(string id, TrackerItem item, TrackerWorkspace ws, DateOnly today)
+    private static TrackerWidgetRow Row(string id, TrackerItem item, TrackerWorkspace ws, DateTimeOffset now, TimeZoneInfo zone)
     {
         var debt = ws.Kind == WorkspaceKind.Debts;
         string title;
@@ -86,7 +85,8 @@ public sealed record TrackerWidgetModel(
 
         var details = new List<string>();
         if (!debt && item.Priority is TrackerPriority.Urgent or TrackerPriority.High) details.Add(TrackerFormat.Priority(item.Priority));
-        if (item.DueAt is not null || item.DueDate is not null) details.Add(TrackerFormat.Due(item, DateTimeOffset.Now));
+        // The time given to Build, not the clock: the model is the same whenever it is drawn (and testable).
+        if (item.DueAt is not null || item.DueDate is not null) details.Add(TrackerFormat.Due(item, now, zone));
         if (!debt && item.StartedExplicitly) details.Add("In progress");
 
         var amount = debt
