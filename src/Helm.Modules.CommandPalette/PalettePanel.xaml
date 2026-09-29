@@ -15,7 +15,7 @@
     <!-- The command palette: one search box over Helm's pages and settings, the tools' data and the apps. -->
     <StackPanel Margin="12">
         <ui:TextBox x:Name="Input" FontSize="18" Padding="12,10" ClearButtonEnabled="False" SpellCheck.IsEnabled="False"
-                    PlaceholderText="Search notes, tasks, apps, settings…" Icon="{ui:SymbolIcon Search24}"
+                    PlaceholderText="Search Helm, apps, files, windows, settings…" Icon="{ui:SymbolIcon Search24}"
                     AutomationProperties.Name="Search" Text="{Binding Query, UpdateSourceTrigger=PropertyChanged}" />
 
         <ListBox x:Name="List" Margin="0,8,0,0" MaxHeight="440" ItemsSource="{Binding Results}" SelectedItem="{Binding Selected}"
@@ -51,7 +51,10 @@
                    Foreground="{DynamicResource TextFillColorSecondaryBrush}"
                    Visibility="{Binding HasNoResults, Converter={StaticResource BoolToVisibility}}" />
 
-        <TextBlock Margin="8,10,8,0" FontSize="12" Foreground="{DynamicResource TextFillColorTertiaryBrush}"
-                   Text="↑↓ move · Enter open · Esc close" />
+        <DockPanel Margin="8,10,8,0">
+            <TextBlock DockPanel.Dock="Right" FontSize="12" Foreground="{DynamicResource TextFillColorTertiaryBrush}" Text="Searching files…"
+                       Visibility="{Binding IsSearching, Converter={StaticResource BoolToVisibility}}" />
+            <TextBlock FontSize="12" Foreground="{DynamicResource TextFillColorTertiaryBrush}" Text="↑↓ move · Enter open · Esc close" />
+        </DockPanel>
     </StackPanel>
 </UserControl>

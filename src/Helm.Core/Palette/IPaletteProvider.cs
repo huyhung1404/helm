@@ -13,6 +13,11 @@ public enum PaletteKind
     Debt,
     VaultItem,
     App,
+    File,
+    Folder,
+    Window,
+    WindowsSetting,
+    Web,
 }
 
 /// <summary>One result of the command palette.</summary>
@@ -24,6 +29,12 @@ public sealed record PaletteItem(string Title, string Subtitle, PaletteKind Kind
 {
     /// <summary>A file whose own icon is shown instead of the kind's (e.g. an app's shortcut); null for the kind's icon.</summary>
     public string? IconFile { get; init; }
+
+    /// <summary>
+    /// Something outside Helm (a file, an app, a window, a web search). Helm's own results rank above these unless
+    /// these match much better.
+    /// </summary>
+    public bool IsExternal { get; init; }
 }
 
 /// <summary>The text typed in the palette, and its folded words for <see cref="TextSearch.Score"/>.</summary>
@@ -55,4 +66,16 @@ public interface IPaletteProvider
     string? ModuleId { get; }
 
     IEnumerable<PaletteItem> Search(PaletteQuery query);
+}
+
+/// <summary>
+/// A source that is too slow for every key (e.g. the Windows Search index). The palette asks it on a background
+/// thread once typing pauses and adds its results when they arrive; a newer query cancels the older one.
+/// </summary>
+public interface ISlowPaletteProvider
+{
+    /// <inheritdoc cref="IPaletteProvider.ModuleId"/>
+    string? ModuleId { get; }
+
+    Task<IReadOnlyList<PaletteItem>> SearchAsync(PaletteQuery query, CancellationToken ct);
 }

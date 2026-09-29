@@ -13,6 +13,11 @@
   </ItemGroup>
 
   <ItemGroup>
+    <!-- Files and folders come from the Windows Search index (the one the Start menu uses), through its OLE DB provider. -->
+    <PackageReference Include="System.Data.OleDb" Version="8.0.1" />
+  </ItemGroup>
+
+  <ItemGroup>
     <InternalsVisibleTo Include="Helm.Tests" />
   </ItemGroup>
 

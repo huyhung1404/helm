@@ -89,6 +89,85 @@ public sealed class PaletteTests
         Assert.False(vm.HasNoResults); // nothing typed is not "nothing found"
     }
 
+    [Fact]
+    public void Helm_comes_first_unless_something_outside_matches_much_better()
+    {
+        PaletteItem Item(string title, double score, bool external) => new(title, "", external ? PaletteKind.App : PaletteKind.Note, score, () => { })
+            { IsExternal = external };
+
+        // Same match: Helm first.
+        Assert.Equal(["note", "app"], PaletteSearch.Order([Item("app", 1.0, true), Item("note", 1.0, false)]).Select(i => i.Title));
+        // A decent Helm match beats a perfect outside one.
+        Assert.Equal(["note", "app"], PaletteSearch.Order([Item("app", 1.0, true), Item("note", 0.62, false)]).Select(i => i.Title));
+        // A word deep in a note's text does not beat an app whose name starts with it.
+        Assert.Equal(["app", "note"], PaletteSearch.Order([Item("app", 1.0, true), Item("note", 0.25, false)]).Select(i => i.Title));
+    }
+
+    [Fact]
+    public async Task Slow_results_arrive_later_and_merge_unless_the_query_changed()
+    {
+        var delay = PaletteViewModel.SlowDelay;
+        PaletteViewModel.SlowDelay = TimeSpan.Zero;
+        try
+        {
+            var gate = new TaskCompletionSource();
+            var quick = new PaletteItem("Plan note", "", PaletteKind.Note, 0.5, () => { });
+            var vm = new PaletteViewModel(q => q.IsEmpty ? [] : [quick], async (q, ct) =>
+            {
+                await gate.Task.WaitAsync(ct);
+                return [new PaletteItem($"{q.Text}.docx", "", PaletteKind.File, 1.0, () => { }) { IsExternal = true }];
+            });
+
+            vm.Query = "plan";
+            Assert.True(vm.IsSearching);
+            Assert.Equal(["Plan note"], vm.Results.Select(r => r.Title)); // quick results at once
+            var first = vm.PendingSlowSearch!;
+            vm.Query = "planx"; // cancels the first slow search
+            var second = vm.PendingSlowSearch!;
+            gate.SetResult();
+            await first;
+            await second;
+
+            Assert.False(vm.IsSearching);
+            // Only the newest query's file, ranked with the rest: 1.0 × 0.6 beats the note's 0.5.
+            Assert.Equal(["planx.docx", "Plan note"], vm.Results.Select(r => r.Title));
+        }
+        finally
+        {
+            PaletteViewModel.SlowDelay = delay;
+        }
+    }
+
+    [Theory]
+    [InlineData("unity build", "CONTAINS(System.FileName, '\"unity*\" AND \"build*\"')")]
+    [InlineData("it's \"x\"", "CONTAINS(System.FileName, '\"its*\" AND \"x*\"')")]
+    public void File_search_sql_matches_word_starts_and_cannot_be_broken_by_quotes(string text, string expected) =>
+        Assert.Contains(expected, FilesPaletteProvider.Sql(text));
+
+    [Fact]
+    public void File_search_sql_needs_a_word() => Assert.Null(FilesPaletteProvider.Sql(" '\"* "));
+
+    [Theory]
+    [InlineData("wifi", "Wi-Fi")]
+    [InlineData("âm thanh", "Sound")]
+    [InlineData("cap nhat", "Windows Update")]
+    [InlineData("bluetooth", "Bluetooth & devices")]
+    [InlineData("go cai dat", "Installed apps")]
+    public void Windows_settings_are_found_in_english_and_vietnamese(string query, string page)
+    {
+        var q = new PaletteQuery(query);
+        var best = WindowsSettingsPaletteProvider.Pages.OrderByDescending(p => q.Score(p.Name, p.Keywords)).First();
+        Assert.Equal(page, best.Name);
+        Assert.StartsWith("ms-settings:", best.Uri);
+    }
+
+    [Fact]
+    public void Web_search_urls_escape_the_text()
+    {
+        Assert.Equal("https://www.google.com/search?q=unity%20dots%20%26%20ecs", CommandPaletteSettings.WebSearchUrl(WebSearchEngine.Google, "unity dots & ecs"));
+        Assert.StartsWith("https://duckduckgo.com/?q=", CommandPaletteSettings.WebSearchUrl(WebSearchEngine.DuckDuckGo, "x"));
+    }
+
     private sealed class FakeProvider(string? moduleId, params PaletteItem[] items) : IPaletteProvider
     {
         public bool Throws { get; init; }

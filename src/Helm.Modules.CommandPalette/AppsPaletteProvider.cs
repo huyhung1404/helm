@@ -1,4 +1,3 @@
-using System.Diagnostics;
 using Helm.Core.Palette;
 using Helm.Core.Settings;
 using Microsoft.Extensions.Logging;
@@ -34,6 +33,10 @@ internal sealed class AppsPaletteProvider(ISettingsStoreFactory settings, ILogge
             try
             {
                 var apps = StartMenuApps.Read();
+                // Microsoft Store apps (Calculator, Photos…) have no shortcut: add them from the "All apps" list.
+                var names = apps.Select(a => a.Name).ToHashSet(StringComparer.CurrentCultureIgnoreCase);
+                var store = StartMenuApps.ReadAppsFolder(logger).Where(a => !names.Contains(a.Name));
+                apps = apps.Concat(store).OrderBy(a => a.Name, StringComparer.CurrentCultureIgnoreCase).ToList();
                 lock (_gate) _apps = apps;
             }
             catch (Exception ex)
@@ -59,23 +62,16 @@ internal sealed class AppsPaletteProvider(ISettingsStoreFactory settings, ILogge
         return apps
             .Select(a => (a, score: query.Score(a.Name)))
             .Where(x => x.score > 0)
-            .Select(x => new PaletteItem(x.a.Name, "App", PaletteKind.App, x.score * 0.95, () => Open(x.a)) { IconFile = x.a.Path });
-    }
-
-    private void Open(StartMenuApp app)
-    {
-        try
-        {
-            Process.Start(new ProcessStartInfo("explorer.exe", $"\"{app.Path}\"") { UseShellExecute = false });
-        }
-        catch (Exception ex)
-        {
-            logger.LogWarning(ex, "Could not open {App}", app.Path);
-        }
+            .Select(x => new PaletteItem(x.a.Name, "App", PaletteKind.App, x.score, () => ShellOpen.AsUser(x.a.Path, logger))
+                { IconFile = x.a.IsShortcut ? x.a.Path : null, IsExternal = true });
     }
 }
 
-public sealed record StartMenuApp(string Name, string Path);
+/// <param name="Path">A shortcut file, or a "shell:AppsFolder\…" name for an app from the "All apps" list.</param>
+public sealed record StartMenuApp(string Name, string Path)
+{
+    public bool IsShortcut => !Path.StartsWith("shell:", StringComparison.OrdinalIgnoreCase);
+}
 
 /// <summary>Start menu shortcuts, without uninstallers and duplicates.</summary>
 public static class StartMenuApps
@@ -112,6 +108,43 @@ public static class StartMenuApps
             }
         }
         return apps.Values.OrderBy(a => a.Name, StringComparer.CurrentCultureIgnoreCase).ToList();
+    }
+
+    /// <summary>
+    /// The "All apps" list of the Start menu (shell:AppsFolder), which also has Microsoft Store apps. Read on its own
+    /// STA thread (Shell COM objects need one); empty when the shell cannot be reached.
+    /// </summary>
+    public static IReadOnlyList<StartMenuApp> ReadAppsFolder(Microsoft.Extensions.Logging.ILogger? logger = null)
+    {
+        var apps = new List<StartMenuApp>();
+        var thread = new Thread(() =>
+        {
+            try
+            {
+                if (Type.GetTypeFromProgID("Shell.Application") is not { } type) return;
+                dynamic shell = Activator.CreateInstance(type)!;
+                dynamic folder = shell.NameSpace("shell:AppsFolder");
+                if (folder is null) return;
+                foreach (dynamic item in folder.Items())
+                {
+                    string name = item.Name;
+                    string path = item.Path;
+                    if (string.IsNullOrWhiteSpace(name) || string.IsNullOrWhiteSpace(path) || IsNoise(name)) continue;
+                    // Web links and documents in the list are shortcuts already read above.
+                    if (path.Contains("://", StringComparison.Ordinal)) continue;
+                    apps.Add(new StartMenuApp(name.Trim(), @"shell:AppsFolder\" + path));
+                }
+            }
+            catch (Exception ex)
+            {
+                logger?.LogWarning(ex, "Could not read the Start menu's app list");
+            }
+        });
+        thread.SetApartmentState(ApartmentState.STA);
+        thread.IsBackground = true;
+        thread.Start();
+        if (!thread.Join(TimeSpan.FromSeconds(10))) return [];
+        return apps.DistinctBy(a => a.Name, StringComparer.CurrentCultureIgnoreCase).ToList();
     }
 
     private static bool IsNoise(string name) =>

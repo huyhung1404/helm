@@ -24,17 +24,53 @@
 
         <!-- What it finds -->
         <TextBlock Text="What it finds" Style="{DynamicResource HelmSectionHeader}" />
-        <ui:CardControl Margin="0,0,0,4" Icon="{ui:SymbolIcon AppGeneric24}">
-            <ui:CardControl.Header>
-                <core:CardHeader Title="Apps" Description="The apps in the Start menu. They open as you, not as administrator." />
-            </ui:CardControl.Header>
-            <ui:ToggleSwitch AutomationProperties.Name="Apps" IsChecked="{Binding IncludeApps}" />
-        </ui:CardControl>
         <ui:CardControl Margin="0,0,0,4" Icon="{ui:SymbolIcon Lightbulb24}">
             <ui:CardControl.Header>
-                <core:CardHeader Title="Helm and its tools"
-                                 Description="Pages and settings of Helm, your notes, open tasks and debts, and vault items while the vault is unlocked (titles only). Tools that are off are left out." />
+                <core:CardHeader Title="Helm and its tools, first"
+                                 Description="Pages and settings of Helm, your notes, open tasks and debts, and vault items while the vault is unlocked (titles only). They come before anything from Windows unless that matches much better." />
             </ui:CardControl.Header>
         </ui:CardControl>
+        <ui:CardExpander Margin="0,0,0,4" Icon="{ui:SymbolIcon Window24}" IsExpanded="True">
+            <ui:CardExpander.Header>
+                <core:CardHeader Title="Windows" Description="What else the palette finds on this PC. Everything opens as you, not as administrator." />
+            </ui:CardExpander.Header>
+            <StackPanel>
+                <Border Style="{DynamicResource HelmExpanderRow}" BorderThickness="0">
+                    <core:RowLayout>
+                        <core:CardHeader Title="Apps" Description="The Start menu's apps, Microsoft Store apps included." />
+                        <ui:ToggleSwitch AutomationProperties.Name="Apps" IsChecked="{Binding IncludeApps}" />
+                    </core:RowLayout>
+                </Border>
+                <Border Style="{DynamicResource HelmExpanderRow}">
+                    <core:RowLayout>
+                        <core:CardHeader Title="Files and folders"
+                                         Description="From the Windows Search index, by name. Add folders to it in Windows Settings → Privacy &amp; security → Searching Windows." />
+                        <ui:ToggleSwitch AutomationProperties.Name="Files and folders" IsChecked="{Binding IncludeFiles}" />
+                    </core:RowLayout>
+                </Border>
+                <Border Style="{DynamicResource HelmExpanderRow}">
+                    <core:RowLayout>
+                        <core:CardHeader Title="Open windows" Description="Type part of a window's title to switch to it." />
+                        <ui:ToggleSwitch AutomationProperties.Name="Open windows" IsChecked="{Binding IncludeWindows}" />
+                    </core:RowLayout>
+                </Border>
+                <Border Style="{DynamicResource HelmExpanderRow}">
+                    <core:RowLayout>
+                        <core:CardHeader Title="Windows Settings" Description="Pages such as Wi-Fi, Bluetooth, Display or Windows Update." />
+                        <ui:ToggleSwitch AutomationProperties.Name="Windows Settings" IsChecked="{Binding IncludeWindowsSettings}" />
+                    </core:RowLayout>
+                </Border>
+                <Border Style="{DynamicResource HelmExpanderRow}">
+                    <core:RowLayout>
+                        <core:CardHeader Title="Search the web" Description="The last result: the typed text in your browser." />
+                        <StackPanel Orientation="Horizontal">
+                            <ComboBox Width="140" Margin="0,0,12,0" AutomationProperties.Name="Search engine" ItemsSource="{Binding WebSearchNames}"
+                                      SelectedIndex="{Binding WebSearchIndex}" IsEnabled="{Binding IncludeWebSearch}" />
+                            <ui:ToggleSwitch AutomationProperties.Name="Search the web" IsChecked="{Binding IncludeWebSearch}" />
+                        </StackPanel>
+                    </core:RowLayout>
+                </Border>
+            </StackPanel>
+        </ui:CardExpander>
     </StackPanel>
 </core:ModulePageBase>

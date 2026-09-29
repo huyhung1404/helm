@@ -20,6 +20,11 @@ public sealed class PaletteKindSymbolConverter : IValueConverter
         PaletteKind.Debt => SymbolRegular.PersonMoney24,
         PaletteKind.VaultItem => SymbolRegular.Key24,
         PaletteKind.App => SymbolRegular.AppGeneric24,
+        PaletteKind.File => SymbolRegular.Document24,
+        PaletteKind.Folder => SymbolRegular.Folder24,
+        PaletteKind.Window => SymbolRegular.Window24,
+        PaletteKind.WindowsSetting => SymbolRegular.WrenchScrewdriver24,
+        PaletteKind.Web => SymbolRegular.Globe24,
         _ => SymbolRegular.Search24,
     };
 
@@ -39,6 +44,11 @@ public sealed class PaletteKindNameConverter : IValueConverter
         PaletteKind.Debt => "Debt",
         PaletteKind.VaultItem => "Vault",
         PaletteKind.App => "App",
+        PaletteKind.File => "File",
+        PaletteKind.Folder => "Folder",
+        PaletteKind.Window => "Window",
+        PaletteKind.WindowsSetting => "Windows",
+        PaletteKind.Web => "Web",
         _ => "",
     };
 

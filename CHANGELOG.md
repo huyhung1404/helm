@@ -5,6 +5,13 @@ Format: [Keep a Changelog](https://keepachangelog.com), versions follow [SemVer]
 
 ## [Unreleased]
 
+### Added
+- Command Palette searches Windows too, below Helm's own results: files and folders (from the Windows Search index,
+  the one the Start menu uses), Microsoft Store apps next to the Start menu's, open windows (switch to one), pages of
+  Windows Settings ("wifi", "bluetooth", "âm thanh", "cập nhật"…) and, last, "Search the web" (Google, Bing or
+  DuckDuckGo). A result from Windows only comes before a note or a task when it matches much better. Each source can
+  be turned off in the palette's settings. Everything opens as you, not as administrator.
+
 ### Fixed
 - Quick Capture (Android): the share dialog follows Helm's theme (light, dark or the phone's setting) with Helm's
   colours; its text and choices were in the wrong colours for the dialog's background.

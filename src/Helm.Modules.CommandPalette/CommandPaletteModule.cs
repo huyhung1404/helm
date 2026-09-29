@@ -32,6 +32,7 @@ public sealed class CommandPaletteModule : HelmModuleBase, IDisposable
     private FloatingPanelWindow? _window;
     private PalettePanel? _panel;
     private IReadOnlyList<IPaletteProvider>? _providers;
+    private IReadOnlyList<ISlowPaletteProvider>? _slowProviders;
 
     // Providers and the module host are resolved when the palette opens: the shell's providers depend on the module
     // list, which contains this module.
@@ -50,7 +51,7 @@ public sealed class CommandPaletteModule : HelmModuleBase, IDisposable
 
     public override string Id => ModuleId;
     public override string DisplayName => "Command Palette";
-    public override string Description => "One shortcut, one box: find and open your notes, tasks, apps and Helm's settings from any app.";
+    public override string Description => "One shortcut, one box: your notes and tasks first, then apps, files, open windows and Windows settings, from any app.";
     public override ModuleGroup Group => ModuleGroup.Advanced;
     public override SymbolRegular Icon => SymbolRegular.Search24;
     public override System.Windows.Media.ImageSource IconImage => CommandPaletteLogo.Image;
@@ -105,10 +106,11 @@ public sealed class CommandPaletteModule : HelmModuleBase, IDisposable
         {
             if (!IsEnabled) return;
             _providers ??= _services.GetServices<IPaletteProvider>().ToList();
+            _slowProviders ??= _services.GetServices<ISlowPaletteProvider>().ToList();
             foreach (var apps in _providers.OfType<AppsPaletteProvider>()) apps.RefreshIfStale();
             if (_window is null)
             {
-                var viewModel = new PaletteViewModel(Search);
+                var viewModel = new PaletteViewModel(Search, SearchSlowAsync);
                 viewModel.Chosen += (_, item) => Run(item);
                 _panel = new PalettePanel(viewModel);
                 _window = new FloatingPanelWindow(_windows, _monitors, 680) { Panel = _panel, Title = "Command Palette" };
@@ -128,6 +130,12 @@ public sealed class CommandPaletteModule : HelmModuleBase, IDisposable
     {
         var host = _services.GetRequiredService<IModuleHost>();
         return PaletteSearch.Search(_providers ?? [], id => host.Find(id)?.IsEnabled == true, query, _logger);
+    }
+
+    private Task<IReadOnlyList<PaletteItem>> SearchSlowAsync(PaletteQuery query, CancellationToken ct)
+    {
+        var host = _services.GetRequiredService<IModuleHost>();
+        return PaletteSearch.SearchSlowAsync(_slowProviders ?? [], id => host.Find(id)?.IsEnabled == true, query, ct, _logger);
     }
 
     /// <summary>The palette closes first, so the result can bring its own window to the front.</summary>
