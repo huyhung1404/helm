@@ -17,6 +17,7 @@ public static class VaultServices
         services.AddSingleton<IVaultBackupLocation, FolderBackupLocation>();
         services.AddSingleton<SecureClipboard>();
         services.AddSingleton<IVaultPlatform, WindowsVaultPlatform>();
+        services.AddSingleton<AutoTypeService>();
         services.AddVaultCore();
         // Settings page through AddHelmModule; the vault itself is the content page (navigation pane, Home tile).
         return services.AddHelmModule<VaultModule, VaultPage, VaultPageViewModel>()

@@ -35,6 +35,15 @@ Format: [Keep a Changelog](https://keepachangelog.com), versions follow [SemVer]
   add them (`claude mcp add … Helm.exe --mcp`). Claude asks before each use, **Allow changes** off makes the tools
   read-only, and nothing is deleted for good (notes go to the trash). The vault is never included. Helm has to be
   running; the tools of a tool you turned off are not offered.
+- Vault: **autofill on Android**. Choose Helm in Vault settings → Autofill (Android asks to confirm). Sign-in forms in
+  apps and browsers then offer the vault's logins for that site; a locked vault opens with the fingerprint or the
+  password first. For an app, the login you pick is offered there again next time. The current two-factor code fills a
+  code field too. Chrome and other browsers that do not ask autofill services themselves are read in Android's
+  compatibility mode. A login is never offered to a look-alike site.
+- Vault: **auto-type on Windows**. In a sign-in window press Ctrl+Alt+A (change it in Vault settings): Helm types the
+  username, Tab and the password of the login for that site (read from the browser's address bar) or app, or lets you
+  pick one. Nothing goes through the clipboard, except the two-factor code, copied for the next step. Optionally it
+  presses Enter too.
 
 ### Changed
 - Sync: deleted items no longer stay on the server for ever. A deletion is kept 90 days, long enough for every device

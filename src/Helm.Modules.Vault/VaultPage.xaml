@@ -64,6 +64,22 @@
             <ui:ToggleSwitch IsChecked="{Binding ProtectFromScreenCapture}" />
         </ui:CardControl>
 
+        <!-- Auto-type: Windows only, so bound to the page's own view model (outside Settings) -->
+        <TextBlock Text="Auto-type" Style="{DynamicResource HelmSectionHeader}" />
+        <ui:CardControl Margin="0,0,0,4" Icon="{ui:SymbolIcon Keyboard24}" DataContext="{Binding DataContext, RelativeSource={RelativeSource AncestorType=core:ModulePageBase}}">
+            <ui:CardControl.Header>
+                <core:CardHeader Title="Type a login into the window in front"
+                                 Description="In a sign-in window, press the shortcut: Helm types the username, Tab and the password of the login for that site (read from the browser's address bar) or app. With several, you pick one. The two-factor code, if any, goes to the clipboard." />
+            </ui:CardControl.Header>
+            <core:HotkeyPicker HorizontalAlignment="Right" DefaultGesture="{Binding DefaultAutoTypeHotkey}" Gesture="{Binding AutoTypeHotkey}" />
+        </ui:CardControl>
+        <ui:CardControl Margin="0,0,0,4" Icon="{ui:SymbolIcon ArrowEnter20}" DataContext="{Binding DataContext, RelativeSource={RelativeSource AncestorType=core:ModulePageBase}}">
+            <ui:CardControl.Header>
+                <core:CardHeader Title="Press Enter after the password" Description="Signs in at once on most sites. Off: you check, then press Enter yourself." />
+            </ui:CardControl.Header>
+            <ui:ToggleSwitch IsChecked="{Binding AutoTypePressEnter}" />
+        </ui:CardControl>
+
         <TextBlock Text="Password and recovery key" Style="{DynamicResource HelmSectionHeader}" />
         <ui:CardExpander Margin="0,0,0,4" Icon="{ui:SymbolIcon Key24}">
             <ui:CardExpander.Header>

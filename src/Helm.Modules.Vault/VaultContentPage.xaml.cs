@@ -6,17 +6,43 @@ using CommunityToolkit.Mvvm.Input;
 using Helm.Core.Desktop;
 using Helm.Core.Services;
 using Helm.Core.Settings;
+using Helm.Modules.Vault.Platform;
 using Helm.Modules.Vault.Session;
 using Helm.Modules.Vault.ViewModels;
 
 namespace Helm.Modules.Vault;
 
 /// <summary>The settings page: the module (for the Enable card) and the shared settings view model.</summary>
-public sealed class VaultPageViewModel(VaultModule module, VaultSettingsViewModel settings)
+public sealed partial class VaultPageViewModel(VaultModule module, VaultSettingsViewModel settings, AutoTypeService autoType) : CommunityToolkit.Mvvm.ComponentModel.ObservableObject
 {
     public VaultModule Module { get; } = module;
 
     public VaultSettingsViewModel Settings { get; } = settings;
+
+    public Helm.Core.Hotkeys.HotkeyGesture DefaultAutoTypeHotkey => VaultWindowsSettings.DefaultAutoTypeHotkey;
+
+    /// <summary>The auto-type shortcut (Windows-only setting); empty turns auto-type off.</summary>
+    public Helm.Core.Hotkeys.HotkeyGesture AutoTypeHotkey
+    {
+        get => autoType.Settings.Current.AutoTypeHotkey;
+        set
+        {
+            if (value == AutoTypeHotkey) return;
+            autoType.Settings.Update(s => s.AutoTypeHotkey = value);
+            OnPropertyChanged();
+        }
+    }
+
+    public bool AutoTypePressEnter
+    {
+        get => autoType.Settings.Current.AutoTypePressEnter;
+        set
+        {
+            if (value == AutoTypePressEnter) return;
+            autoType.Settings.Update(s => s.AutoTypePressEnter = value);
+            OnPropertyChanged();
+        }
+    }
 }
 
 /// <summary>The vault page: the module (is it on?), the shared vault screens, and the way to its settings.</summary>

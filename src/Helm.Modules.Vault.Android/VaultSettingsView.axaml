@@ -74,6 +74,17 @@
             </StackPanel>
         </Border>
 
+        <TextBlock Classes="section" Text="Autofill" />
+        <Border Classes="card">
+            <StackPanel Spacing="6">
+                <TextBlock Classes="title" Text="Fill passwords in other apps" />
+                <TextBlock Classes="secondary" TextWrapping="Wrap"
+                           Text="Sign-in forms in apps and browsers offer your vault's logins. When the vault is locked, a fingerprint or the password opens it first. A login you pick for an app is offered there again next time." />
+                <TextBlock x:Name="AutofillState" Classes="secondary" />
+                <Button x:Name="AutofillButton" Content="Use Helm for autofill…" Click="Autofill_Click" />
+            </StackPanel>
+        </Border>
+
         <TextBlock Classes="section" Text="Password and recovery key" />
         <Border Classes="card">
             <StackPanel Spacing="6">
