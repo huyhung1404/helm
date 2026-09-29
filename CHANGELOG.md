@@ -3,7 +3,7 @@
 All notable changes to Helm. The top section is used as the GitHub release body and as the Velopack release notes.
 Format: [Keep a Changelog](https://keepachangelog.com), versions follow [SemVer](https://semver.org).
 
-## [Unreleased]
+## [0.16.0] - 2026-09-29
 
 ### Added
 - Command Palette searches Windows too, below Helm's own results: files and folders (from the Windows Search index,
