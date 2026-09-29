@@ -279,11 +279,11 @@ public sealed class BlobStore : IBlobSync
         if (remote.State != RemoteBlobState.Committed)
         {
             var have = remote.Chunks.ToHashSet();
-            for (var index = 0; index < blob.ChunkCount; index++)
+            var missing = Enumerable.Range(0, blob.ChunkCount).Where(i => !have.Contains(i)).Select(i => (i, sizes[i].Length)).ToList();
+            if (missing.Count > 0)
             {
-                if (have.Contains(index)) continue;
-                var data = await File.ReadAllBytesAsync(ChunkPath(blob.Id, index), ct).ConfigureAwait(false);
-                await _transport.PutChunkAsync(blob.Id, index, data, ct).ConfigureAwait(false);
+                await _transport.PutChunksAsync(blob.Id, missing, (index, token) => File.ReadAllBytesAsync(ChunkPath(blob.Id, index), token), ct)
+                    .ConfigureAwait(false);
             }
             await _transport.CommitAsync(blob.Id, ct).ConfigureAwait(false);
         }

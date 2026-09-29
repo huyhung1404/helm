@@ -35,6 +35,16 @@ public interface IBlobTransport
     /// <summary>Stores one encrypted chunk; sending the same index again replaces it.</summary>
     Task PutChunkAsync(string id, int index, ReadOnlyMemory<byte> data, CancellationToken ct);
 
+    /// <summary>
+    /// Stores several chunks, reading each one only when it is sent. The HTTPS transport sends them straight to storage
+    /// through presigned URLs when the server offers them; this default sends them one by one with <see cref="PutChunkAsync"/>.
+    /// </summary>
+    async Task PutChunksAsync(string id, IReadOnlyList<(int Index, long Length)> chunks, Func<int, CancellationToken, Task<byte[]>> read,
+        CancellationToken ct)
+    {
+        foreach (var (index, _) in chunks) await PutChunkAsync(id, index, await read(index, ct).ConfigureAwait(false), ct).ConfigureAwait(false);
+    }
+
     /// <exception cref="SyncRequestException">Code blob_incomplete: chunks are missing.</exception>
     Task<RemoteBlob> CommitAsync(string id, CancellationToken ct);
 

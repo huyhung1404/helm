@@ -75,8 +75,11 @@ public partial class App : Application
 
             await Services.GetRequiredService<IModuleHost>().StartAsync(CancellationToken.None).ConfigureAwait(true);
             shell.OnModulesStarted();
-            // Background sync (a no-op until this device is connected in General → Sync).
-            Services.GetRequiredService<Core.Sync.SyncEngine>().Start();
+            // Background sync (a no-op until this device is connected in General → Sync). The live channel stays open
+            // while Helm runs, also in the tray: other devices' changes arrive within seconds.
+            var engine = Services.GetRequiredService<Core.Sync.SyncEngine>();
+            engine.Start();
+            engine.SetLive(true);
         }
         catch (Exception ex)
         {

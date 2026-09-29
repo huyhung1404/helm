@@ -280,6 +280,26 @@
                             </StackPanel>
                         </StackPanel>
                     </Border>
+                    <Border Style="{DynamicResource HelmExpanderRow}" Visibility="{Binding HasGroups, Converter={StaticResource BoolToVisibility}}">
+                        <StackPanel>
+                            <TextBlock Text="What syncs on this device" FontWeight="SemiBold" />
+                            <TextBlock TextWrapping="Wrap" Style="{DynamicResource HelmSecondaryText}" Margin="0,4,0,8"
+                                       Text="Untick a tool to stop syncing it here, e.g. the vault on a shared PC. What it has on this device stays, and changes made here meanwhile are sent when you tick it again." />
+                            <ItemsControl ItemsSource="{Binding Groups}">
+                                <ItemsControl.ItemsPanel>
+                                    <ItemsPanelTemplate>
+                                        <WrapPanel />
+                                    </ItemsPanelTemplate>
+                                </ItemsControl.ItemsPanel>
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate>
+                                        <CheckBox Content="{Binding Name}" IsChecked="{Binding IsSynced}" Margin="0,0,24,0"
+                                                  AutomationProperties.Name="{Binding Name, StringFormat='Sync {0} on this device'}" />
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </StackPanel>
+                    </Border>
                     <Border Style="{DynamicResource HelmExpanderRow}">
                         <StackPanel>
                             <TextBlock Text="{Binding UsageText}" />

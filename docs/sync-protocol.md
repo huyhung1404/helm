@@ -12,7 +12,7 @@ Helm is local-first. Every device keeps a full replica in `%LOCALAPPDATA%\Helm\s
 |---|---|---|
 | `collection` | client | `^[a-z0-9][a-z0-9._-]{0,63}$`, e.g. `notes`, `chat.messages`, `settings.shell` |
 | `id` | client | 1–128 chars, no control characters (Helm uses ULIDs) |
-| `version` | **server** | Per-record counter. The first accepted write is 1, and each later accepted write adds 1. |
+| `version` | **server** | Per-record counter. The first accepted write is 1 (or, once deletions were cleaned up, one above the highest version cleaned up), and each later accepted write adds 1. |
 | `seq` | **server** | Global counter, strictly increasing across all records of the account, assigned on every accepted write |
 | `deleted` | client | Tombstone flag. Tombstones are kept so other devices learn about the deletion. |
 | `payload` | client | Encrypted envelope (see Encryption) |
@@ -47,7 +47,7 @@ Errors are `{"error": code, "message"?}`:
 
 ### `GET /v1/me`
 
-Returns `{ account: { accountId, name, createdAt, usedBytes, quotaBytes, blobBytes }, token: { id, name, scopes, expiresAt, ... }, limits: { maxChunkBytes, maxChunksPerBlob, maxBlobBytes, maxPayloadBytes } }`. Helm calls it when a token is entered.
+Returns `{ account: { accountId, name, createdAt, usedBytes, quotaBytes, blobBytes }, token: { id, name, scopes, expiresAt, ... }, limits: { maxChunkBytes, maxChunksPerBlob, maxBlobBytes, maxPayloadBytes }, features, tombstoneDays }`. Helm calls it when a token is entered. `features` lists what this server offers beyond the base protocol: `live`, `pull-filter`, `tombstone-gc`, and `presigned-blobs` when the R2 keys are set. Helm does not depend on it: each feature falls back on its own against an older server.
 
 ### `POST /v1/sync/push` (scope `sync:write`)
 
@@ -78,7 +78,20 @@ Returns records with `seq > since`, ordered by `seq`. `limit` is 1–1000 (Helm 
 { "records": [ … ], "nextSeq": 1312, "hasMore": true }
 ```
 
-`nextSeq` is the highest `seq` returned, or `since` when the page is empty. Each record appears once, in its latest state.
+`nextSeq` is the highest `seq` returned while `hasMore` is true, and the account's current seq once nothing more matches (so a filtered pull does not scan the same unrelated records again). Each record appears once, in its latest state.
+
+**Filters** (selective sync): `&only=a,b` returns only those collections, `&exclude=a,b` all others. An entry ending in `.` is a prefix: `exclude=vault.` leaves out every `vault.*` collection. At most 32 entries; `only` and `exclude` together are `400 invalid_filter`. Servers from before filters ignore them, so Helm filters the records again itself.
+
+**Clean-up of deletions** (`410 resync_required`): the server keeps a deletion `TOMBSTONE_DAYS` (90 by default), then the nightly job removes it and remembers the highest seq removed (`purgedSeq`). A pull with `0 < since < purgedSeq` could miss a deletion that is gone, so it answers `410 { error: "resync_required", purgedSeq }`. `since=0` is always allowed. A record created again with the id of a removed one gets a version above every removed version, so a device that still holds the old deletion takes it as newer.
+
+### `GET /v1/sync/live` (scope `sync:read`, WebSocket)
+
+Upgrade with `Authorization: Bearer <token>`. The account's Durable Object keeps the socket with WebSocket hibernation and sends:
+
+- `{"type":"hello","seq":N}` when connected, N being the account's current seq;
+- `{"type":"changed","seq":N}` after every accepted push (and after an admin restore).
+
+Nothing else travels on it: the data still comes through `pull`. The client sends `ping` every 30 s, which the runtime answers `pong` without waking the object. Revoking a token closes its sockets with code `4001`; an expired token's socket is closed at the next notification. At most 32 sockets per account: a new one closes the oldest (`4008`).
 
 ### `POST /v1/redeem` (no token)
 
@@ -120,6 +133,11 @@ A blob as returned below is `{ id, size, chunkCount, state, createdAt, committed
 | `GET /v1/blobs/:id/chunks/:index` | The chunk bytes (`application/octet-stream`, `Content-Length`, `Cache-Control: no-store`). Only for committed blobs, including ones in the trash. Otherwise `404 blob_not_found` or `404 chunk_not_found`. |
 | `DELETE /v1/blobs/:id` | Committed: moves the blob to the trash and returns `200` blob with `deletedAt`. Pending: deletes its chunks and releases its quota now, and returns `200 { id, state: "purged" }`. Deleting again returns `200`; an unknown id returns `404`. |
 | `POST /v1/blobs/:id/restore` | Takes the blob out of the trash and returns `200` blob. `404` once it is purging or gone. |
+| `POST /v1/blobs/:id/upload-urls { chunks: [{ index, length }] }` | Presigned R2 `PUT` URLs (`{ urls: [{ index, url }], expiresAt }`, valid 10 minutes), after the same checks as a chunk upload. Each URL signs the `Content-Length`. `503 presign_disabled` without the R2 keys. |
+| `POST /v1/blobs/:id/uploaded { indexes }` | After presigned uploads: the Worker looks each chunk up in R2 and records the size R2 reports, all or nothing. `409 chunk_missing` with `missing` lists the chunks not in R2. |
+| `GET /v1/blobs/:id/download-urls` | Presigned R2 `GET` URLs of every chunk of a committed blob (also in the trash): `{ chunkCount, urls: [{ index, size, url }], expiresAt }`. |
+
+**Presigned URLs** are optional: they need an R2 API token (Object Read & Write on the blob bucket) in the Worker secrets `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID` and `R2_SECRET_ACCESS_KEY` (see server/sync-worker/README.md). The Worker signs them itself (SigV4, `src/presign.ts`); devices never see the keys. Helm tries them first. When the server answers `503`, `404` or `405`, or R2 refuses a signed URL, it uses the Worker routes above for that chunk and does not ask for presigned URLs again for an hour.
 
 **Garbage collection** runs with the nightly cron, independently of backups. It purges blobs that have been in the trash for more than 30 days and pending uploads created more than 7 days ago. It deletes their chunks from R2 first, then their rows, then releases their quota, so a run that fails halfway is completed by the next one. `POST /admin/blobs/gc { now? }` runs it on demand (`now` in ms lets tests look ahead) and returns `{ accounts, blobs, objects, bytes, failed }`.
 
@@ -133,6 +151,7 @@ A blob as returned below is `{ id, size, chunkCount, state, createdAt, committed
 - `DELETE /admin/accounts/:id/tokens/:tokenId`
 - `POST /admin/accounts/:id/disable`: revokes every token of the account.
 - `POST /admin/blobs/gc { now? }`: runs blob garbage collection now.
+- `POST /admin/tombstones/gc { now? }`: removes deletions older than `TOMBSTONE_DAYS` now (also nightly).
 
 ## Client behavior
 
@@ -145,6 +164,10 @@ A blob as returned below is `{ id, size, chunkCount, state, createdAt, committed
   - `RemoteWins`: used by append-only logs.
   - A record written by a **newer schema** always wins and is never overwritten. Older clients hide it and refuse to edit it.
 - **Pull:** apply records newer than the local version, then store the cursor in the same transaction. Conflicts found while pulling are pushed again within the same run.
+- **Live:** while the live channel is connected (always on Windows; on Android while Helm is in front), an announced seq above the cursor and above this device's own last push starts a run. The periodic poll then runs at most every 5 minutes, as a safety net. The channel reconnects after 1 s, doubling to 1 min; a refused token waits for new credentials; a server without the channel is tried again after 30 minutes.
+- **Selective sync** (device-local, General → Sync → "What syncs on this device"): each tool registers its prefix (`AddSyncGroup`). An excluded prefix is neither pushed (its edits stay dirty) nor pulled (`exclude=` plus the local filter), and blob clean-up is skipped while anything is excluded, because the device cannot see newer records that may use blobs. Syncing a prefix again runs a **catch-up**: a resync limited to `only=<prefix>`.
+- **Resync** (after `410 resync_required`, or a catch-up): pull everything in scope from 0 without saving progress, collecting every (collection, id) returned. Then each local row with a server version that the server did not return is dropped: its deletion was cleaned up there. A local edit of such a row is kept and pushed again as a new record (an edit beats a deletion). Guarded collections judge these drops like any other deletions, so a hostile server cannot empty the vault by pretending records were cleaned up. An interrupted resync starts over.
+- **Local tombstones:** once a day, deletions the server accepted more than 90 days ago are dropped from the replica.
 - **Failures:** network errors leave the data untouched and set the state to Offline. A payload that cannot be decrypted is logged and skipped.
 - **Deletion guard** (collections with `GuardDeletions`, e.g. `vault.items`): pages that delete live records which are not expendable (not in a trash) are collected until the end of the pull and judged together. At least `clamp(ceil(20 % of live records), 3, 10)` such deletions stop the run in state `Held` without applying any of those pages or moving the cursor. The user then applies them (`ApproveHeldAsync`) or keeps the local records (`RejectHeldAsync`), which re-uploads each one on top of the deletion.
 - **Blobs** (`src/Helm.Core/Sync/Blobs`):
@@ -209,7 +232,5 @@ Keyring v2 is `{v: 2, epoch, kdf, pass, rec, prev}`. It holds the current master
 
 ## Not built yet
 
-- Blobs: chunks pass through the Worker rather than presigned R2 URLs, and payloads over 64 KiB still live in records. Orphaned R2 objects left by an upload racing a delete are not swept.
-- WebSocket change notifications (Durable Object hibernation).
-- Selective sync per device, plus tombstone garbage collection.
+- Blobs: payloads over 64 KiB still live in records. Orphaned R2 objects left by an upload racing a delete are not swept. A presigned upload URL stays valid for its 10 minutes even if the blob is committed meanwhile (only the account's own devices get such URLs, and every chunk is authenticated by the client).
 - An edit made on another device while a rotation re-encrypts everything may come back as a conflict copy. The KeepBoth policy guarantees that no data is lost.

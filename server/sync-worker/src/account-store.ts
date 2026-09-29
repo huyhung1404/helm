@@ -19,6 +19,11 @@ export const LIMITS = {
   /** Default of MAX_QUOTA_MB: the highest quota the admin may set. */
   maxQuotaMb: 100 * 1024,
   quotaMbCeiling: 1024 * 1024,
+  /** Default of TOMBSTONE_DAYS: how long a deletion stays on the server before the nightly clean-up removes it. */
+  tombstoneDays: 90,
+  tombstoneDaysCeiling: 3650,
+  /** Collections or prefixes (ending in ".") in one pull filter. */
+  maxFilterEntries: 32,
   ...blobLimits(BLOB_LIMITS.defaultMaxBlobMb),
   ...BLOB_LIMITS,
 };
@@ -27,13 +32,15 @@ export const LIMITS = {
 export interface Limits extends BlobLimits {
   maxPayloadBytes: number;
   maxQuotaMb: number;
+  tombstoneDays: number;
 }
 
 /** Reads MAX_BLOB_MB and MAX_QUOTA_MB (wrangler.toml [vars] or the dashboard). A missing or invalid value means the default. */
-export function limitsFromEnv(vars: { MAX_BLOB_MB?: unknown; MAX_QUOTA_MB?: unknown }): Limits {
+export function limitsFromEnv(vars: { MAX_BLOB_MB?: unknown; MAX_QUOTA_MB?: unknown; TOMBSTONE_DAYS?: unknown }): Limits {
   return {
     maxPayloadBytes: LIMITS.maxPayloadBytes,
     maxQuotaMb: positiveInteger(vars.MAX_QUOTA_MB, LIMITS.maxQuotaMb, LIMITS.quotaMbCeiling),
+    tombstoneDays: positiveInteger(vars.TOMBSTONE_DAYS, LIMITS.tombstoneDays, LIMITS.tombstoneDaysCeiling),
     ...blobLimits(positiveInteger(vars.MAX_BLOB_MB, BLOB_LIMITS.defaultMaxBlobMb, BLOB_LIMITS.maxBlobMbCeiling)),
   };
 }
@@ -48,6 +55,8 @@ export const SCOPES = ["sync:read", "sync:write", "tokens:manage"] as const;
 export type Scope = (typeof SCOPES)[number];
 
 const COLLECTION_PATTERN = /^[a-z0-9][a-z0-9._-]{0,63}$/;
+// Accounts made before tombstone clean-up get records.written_at on their first request (see migrate()).
+const RECORDS_SCHEMA = "2";
 // Do not bother writing last_used_at more often than this.
 const LAST_USED_RESOLUTION_MS = 60 * 60 * 1000;
 
@@ -83,6 +92,16 @@ export interface AccountSnapshot {
   blobs?: BlobSnapshotJson[];
 }
 
+/**
+ * Which collections a pull returns. Each entry is a collection name, or a prefix when it ends in "." ("vault."
+ * is every vault.* collection). `only` keeps just those; `exclude` leaves those out (a device that does not sync
+ * a tool). Parsed from the query string: ?only=a,b. or ?exclude=vault.
+ */
+export interface PullFilter {
+  only?: string[];
+  exclude?: string[];
+}
+
 export interface PushOutcomeJson {
   collection: string;
   id: string;
@@ -116,6 +135,7 @@ export class AccountStore {
   private readonly sql: Sql;
   private readonly now: () => number;
   private readonly blobStore: BlobStore;
+  private migrated = false;
 
   constructor(sql: Sql, now: () => number = Date.now, limits: Limits = limitsFromEnv({})) {
     this.sql = sql;
@@ -146,7 +166,7 @@ export class AccountStore {
       this.sql.run("CREATE TABLE IF NOT EXISTS meta (key TEXT PRIMARY KEY, value TEXT NOT NULL)");
       this.sql.run(`CREATE TABLE IF NOT EXISTS records (
         collection TEXT NOT NULL, id TEXT NOT NULL, version INTEGER NOT NULL, seq INTEGER NOT NULL,
-        deleted INTEGER NOT NULL, payload BLOB NOT NULL, PRIMARY KEY (collection, id))`);
+        deleted INTEGER NOT NULL, payload BLOB NOT NULL, written_at INTEGER NOT NULL DEFAULT 0, PRIMARY KEY (collection, id))`);
       this.sql.run("CREATE UNIQUE INDEX IF NOT EXISTS records_seq ON records (seq)");
       this.sql.run(`CREATE TABLE IF NOT EXISTS tokens (
         id TEXT PRIMARY KEY, name TEXT NOT NULL, hash TEXT NOT NULL UNIQUE, scopes TEXT NOT NULL,
@@ -159,8 +179,16 @@ export class AccountStore {
       this.setMeta("seq", "0");
       this.setMeta("quota_bytes", String(quota));
       this.setMeta("used_bytes", "0");
+      this.setMeta("records_schema", RECORDS_SCHEMA);
+      this.setMeta("purged_seq", "0");
       this.blobStore.ensureSchema();
     });
+  }
+
+  /** The highest seq assigned so far (0 for a new account). */
+  currentSeq(): number {
+    this.requireInitialized();
+    return Number(this.meta("seq"));
   }
 
   info(): { accountId: string; name: string; createdAt: number; usedBytes: number; quotaBytes: number; blobBytes: number } {
@@ -267,13 +295,16 @@ export class AccountStore {
           return { collection: item.collection, id: item.id, accepted: false, version: 0, seq: 0, current: current ? toRecordJson(current) : null };
         }
         const seq = Number(this.meta("seq")) + 1;
-        const version = currentVersion + 1;
+        // A new record starts above every version cleaned up: a device still holding an old deletion of the same id
+        // must see the new record as newer (see purgeTombstones).
+        const version = current ? currentVersion + 1 : Number(this.meta("version_floor") ?? "0") + 1;
         this.setMeta("seq", String(seq));
         this.sql.run(
-          `INSERT INTO records (collection, id, version, seq, deleted, payload) VALUES (?, ?, ?, ?, ?, ?)
+          `INSERT INTO records (collection, id, version, seq, deleted, payload, written_at) VALUES (?, ?, ?, ?, ?, ?, ?)
            ON CONFLICT (collection, id) DO UPDATE SET
-             version = excluded.version, seq = excluded.seq, deleted = excluded.deleted, payload = excluded.payload`,
-          item.collection, item.id, version, seq, item.deleted ? 1 : 0, item.payload,
+             version = excluded.version, seq = excluded.seq, deleted = excluded.deleted, payload = excluded.payload,
+             written_at = excluded.written_at`,
+          item.collection, item.id, version, seq, item.deleted ? 1 : 0, item.payload, this.now(),
         );
         delta += item.payload.length - (current ? asBytes(current.payload).length : 0);
         return { collection: item.collection, id: item.id, accepted: true, version, seq, current: null };
@@ -290,20 +321,58 @@ export class AccountStore {
     });
   }
 
-  pull(sinceParam: string | null, limitParam: string | null): { records: RecordJson[]; nextSeq: number; hasMore: boolean } {
+  /**
+   * Records with seq > since, in seq order. When nothing more matches, nextSeq is the account's current seq, so a
+   * filtered pull does not scan the same unrelated records again next time.
+   *
+   * A cursor older than the last purged deletion (410 resync_required) may have missed deletions that are gone from
+   * the server: the device pulls again from 0 and drops what the server no longer has. since = 0 is always allowed.
+   */
+  pull(sinceParam: string | null, limitParam: string | null, filter: PullFilter = {}): { records: RecordJson[]; nextSeq: number; hasMore: boolean } {
     this.requireInitialized();
     const since = parseInteger(sinceParam ?? "0", "since", 0, Number.MAX_SAFE_INTEGER);
     const limit = parseInteger(limitParam ?? String(LIMITS.defaultPullLimit), "limit", 1, LIMITS.maxPullLimit);
+    const purgedSeq = Number(this.meta("purged_seq") ?? "0");
+    if (since > 0 && since < purgedSeq) {
+      throw new HttpError(410, "resync_required", "Deletions older than this cursor were cleaned up. Pull again from 0.", { purgedSeq });
+    }
+    const where = filterSql(filter);
     const rows = this.sql.all<RecordRow>(
-      "SELECT collection, id, version, seq, deleted, payload FROM records WHERE seq > ? ORDER BY seq LIMIT ?",
-      since, limit + 1,
+      `SELECT collection, id, version, seq, deleted, payload FROM records WHERE seq > ?${where.sql} ORDER BY seq LIMIT ?`,
+      since, ...where.params, limit + 1,
     );
     const page = rows.slice(0, limit);
+    const hasMore = rows.length > limit;
     return {
       records: page.map(toRecordJson),
-      nextSeq: page.length > 0 ? page[page.length - 1].seq : since,
-      hasMore: rows.length > limit,
+      nextSeq: hasMore ? page[page.length - 1].seq : Math.max(since, Number(this.meta("seq"))),
+      hasMore,
     };
+  }
+
+  // ---------------------------------------------------------------- tombstones
+
+  /**
+   * Removes deletions written before cutoffMs. Other devices learned about them long ago; a device whose cursor is
+   * older than the newest one removed gets 410 resync_required on its next pull (see pull()).
+   */
+  purgeTombstones(cutoffMs: number): { purged: number; bytes: number; purgedSeq: number } {
+    this.requireInitialized();
+    if (!Number.isSafeInteger(cutoffMs)) throw new HttpError(400, "invalid_cutoff");
+    return this.sql.transaction(() => {
+      const found = this.sql.all<{ n: number; m: number | null; v: number | null; b: number | null }>(
+        "SELECT COUNT(*) AS n, MAX(seq) AS m, MAX(version) AS v, SUM(LENGTH(payload)) AS b FROM records WHERE deleted = 1 AND written_at < ?",
+        cutoffMs)[0];
+      const previous = Number(this.meta("purged_seq") ?? "0");
+      if (found.n === 0) return { purged: 0, bytes: 0, purgedSeq: previous };
+      this.sql.run("DELETE FROM records WHERE deleted = 1 AND written_at < ?", cutoffMs);
+      const purgedSeq = Math.max(previous, found.m ?? 0);
+      this.setMeta("purged_seq", String(purgedSeq));
+      this.setMeta("version_floor", String(Math.max(Number(this.meta("version_floor") ?? "0"), found.v ?? 0)));
+      const bytes = found.b ?? 0;
+      this.setMeta("used_bytes", String(Math.max(0, Number(this.meta("used_bytes")) - bytes)));
+      return { purged: found.n, bytes, purgedSeq };
+    });
   }
 
   // ---------------------------------------------------------------- keyring
@@ -384,13 +453,14 @@ export class AccountStore {
       for (const record of records) {
         const current = this.sql.all<{ version: number }>(
           "SELECT version FROM records WHERE collection = ? AND id = ?", record.collection, record.id)[0];
-        const version = Math.max(current?.version ?? 0, record.version) + 1;
+        const version = Math.max(current?.version ?? Number(this.meta("version_floor") ?? "0"), record.version) + 1;
         seq += 1;
         this.sql.run(
-          `INSERT INTO records (collection, id, version, seq, deleted, payload) VALUES (?, ?, ?, ?, ?, ?)
+          `INSERT INTO records (collection, id, version, seq, deleted, payload, written_at) VALUES (?, ?, ?, ?, ?, ?, ?)
            ON CONFLICT (collection, id) DO UPDATE SET
-             version = excluded.version, seq = excluded.seq, deleted = excluded.deleted, payload = excluded.payload`,
-          record.collection, record.id, version, seq, record.deleted ? 1 : 0, record.payload,
+             version = excluded.version, seq = excluded.seq, deleted = excluded.deleted, payload = excluded.payload,
+             written_at = excluded.written_at`,
+          record.collection, record.id, version, seq, record.deleted ? 1 : 0, record.payload, this.now(),
         );
       }
       this.setMeta("seq", String(seq));
@@ -408,7 +478,25 @@ export class AccountStore {
   // ---------------------------------------------------------------- helpers
 
   private requireInitialized(): void {
+    if (this.migrated) return;
     if (!this.initialized) throw new HttpError(404, "account_not_found");
+    this.migrate();
+    this.migrated = true;
+  }
+
+  /**
+   * Accounts created before tombstone clean-up have no records.written_at: add it, and date every existing record
+   * today, so their deletions are kept the full retention from now on rather than purged at once.
+   */
+  private migrate(): void {
+    if (this.meta("records_schema") === RECORDS_SCHEMA) return;
+    this.sql.transaction(() => {
+      const columns = this.sql.all<{ name: string }>("PRAGMA table_info(records)").map((c) => c.name);
+      if (!columns.includes("written_at")) this.sql.run("ALTER TABLE records ADD COLUMN written_at INTEGER NOT NULL DEFAULT 0");
+      this.sql.run("UPDATE records SET written_at = ? WHERE written_at = 0", this.now());
+      if (this.meta("purged_seq") === null) this.setMeta("purged_seq", "0");
+      this.setMeta("records_schema", RECORDS_SCHEMA);
+    });
   }
 
   /** Adds to used_bytes, refusing growth beyond the quota (blob reservations; a push checks its whole batch). */
@@ -531,4 +619,27 @@ function parseTokenRequest(input: unknown): { name: string; scopes: Scope[]; exp
     expiresInDays = days as number;
   }
   return { name, scopes, expiresInDays };
+}
+
+/** Parses ?only= and ?exclude= (comma-separated collection names or "prefix." entries). */
+export function parsePullFilter(only: string | null, exclude: string | null): PullFilter {
+  const parse = (text: string | null, name: string): string[] | undefined => {
+    if (text === null) return undefined;
+    const entries = text.split(",").map((e) => e.trim()).filter((e) => e.length > 0);
+    if (entries.length === 0 || entries.length > LIMITS.maxFilterEntries || !entries.every((e) => COLLECTION_PATTERN.test(e))) {
+      throw new HttpError(400, `invalid_${name}`);
+    }
+    return [...new Set(entries)];
+  };
+  const filter: PullFilter = { only: parse(only, "only"), exclude: parse(exclude, "exclude") };
+  if (filter.only && filter.exclude) throw new HttpError(400, "invalid_filter", "Pass only or exclude, not both.");
+  return filter;
+}
+
+function filterSql(filter: PullFilter): { sql: string; params: string[] } {
+  const entries = filter.only ?? filter.exclude;
+  if (!entries || entries.length === 0) return { sql: "", params: [] };
+  // substr() rather than LIKE: "_" is a wildcard in LIKE and may appear in collection names.
+  const terms = entries.map((e) => (e.endsWith(".") ? `substr(collection, 1, ${e.length}) = ?` : "collection = ?"));
+  return { sql: ` AND ${filter.only ? "" : "NOT "}(${terms.join(" OR ")})`, params: entries };
 }

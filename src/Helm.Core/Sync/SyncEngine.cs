@@ -90,6 +90,16 @@ public sealed class SyncEngine : ISyncService, IDisposable
     private const int MaxHeldPages = 20;
     private const string BlobGcMeta = "blob_gc_at";
     private static readonly TimeSpan BlobGcInterval = TimeSpan.FromDays(1);
+    // Selective sync (device-local): prefixes this device does not sync, and re-enabled ones still to download again.
+    private const string ExcludeMeta = "sync_exclude";
+    private const string CatchUpMeta = "sync_catchup";
+    // Set when the server cleaned up deletions this device may have missed: the next run pulls everything from 0.
+    private const string ResyncMeta = "sync_resync";
+    private const string TombstoneGcMeta = "tombstone_gc_at";
+    /// <summary>Local deletions the server has are dropped after this long (the server keeps them 90 days by default).</summary>
+    internal static readonly TimeSpan LocalTombstoneRetention = TimeSpan.FromDays(90);
+    // A resync that keeps meeting fresh clean-ups on the server gives up after this many restarts (and retries next run).
+    private const int MaxResyncAttempts = 3;
 
     private readonly SyncDatabase _db;
     private readonly ISyncTransport _transport;
@@ -107,6 +117,13 @@ public sealed class SyncEngine : ISyncService, IDisposable
     private volatile bool _disposed;
     private volatile bool _applyHold;
     private readonly IBlobSync? _blobs;
+    private readonly object _selectionGate = new();
+    private string[] _excluded = [];
+    private readonly object _liveGate = new();
+    private SyncLiveChannel? _live;
+    private long _lastOwnSeq;
+    private long _liveSeq;
+    private long _lastRunTicks;
 
     public SyncEngine(
         SyncDatabase db,
@@ -126,6 +143,7 @@ public sealed class SyncEngine : ISyncService, IDisposable
         _time = time ?? TimeProvider.System;
         _debounce = debounce ?? TimeSpan.FromSeconds(2);
         foreach (var descriptor in descriptors) Register(descriptor);
+        _excluded = ParseList(db.GetMetaValue(ExcludeMeta));
         _timer = new Timer(_ => _ = RunScheduledAsync(), null, Timeout.Infinite, Timeout.Infinite);
         Status = new SyncStatus(transport.IsConfigured ? SyncState.Idle : SyncState.NotConfigured, null, null);
     }
@@ -152,13 +170,108 @@ public sealed class SyncEngine : ISyncService, IDisposable
 
     internal void Register(SyncCollectionDescriptor descriptor) => _descriptors[descriptor.Name] = descriptor;
 
+    /// <summary>
+    /// Collection prefixes (e.g. "vault.") this device does not sync: nothing of them is uploaded or downloaded. Local
+    /// data stays as it is, and edits made meanwhile are uploaded when the prefix is synced again.
+    /// </summary>
+    public IReadOnlyList<string> ExcludedPrefixes => Volatile.Read(ref _excluded);
+
+    public bool IsExcluded(string collection) => ExcludedPrefixes.Any(p => SyncPullFilter.Covers(p, collection));
+
+    /// <summary>
+    /// Stops or resumes syncing every collection under <paramref name="prefix"/> ("tool." with the dot) on this device.
+    /// Resuming downloads that part again in full, and drops what was deleted elsewhere meanwhile.
+    /// </summary>
+    public void SetExcluded(string prefix, bool excluded)
+    {
+        if (!prefix.EndsWith('.') || !SyncIds.IsValidCollection(prefix)) throw new ArgumentException("A prefix is a collection name ending in \".\".", nameof(prefix));
+        lock (_selectionGate)
+        {
+            var current = ExcludedPrefixes.ToList();
+            if (current.Contains(prefix) == excluded) return;
+            var catchUp = ParseList(_db.GetMetaValue(CatchUpMeta)).ToList();
+            if (excluded)
+            {
+                current.Add(prefix);
+                catchUp.Remove(prefix);
+            }
+            else
+            {
+                current.Remove(prefix);
+                if (!catchUp.Contains(prefix)) catchUp.Add(prefix);
+            }
+            var list = current.Order(StringComparer.Ordinal).ToArray();
+            _db.InTransaction(() =>
+            {
+                _db.SetMetaValue(ExcludeMeta, list.Length == 0 ? null : string.Join(',', list));
+                _db.SetMetaValue(CatchUpMeta, catchUp.Count == 0 ? null : string.Join(',', catchUp));
+            });
+            Volatile.Write(ref _excluded, list);
+        }
+        _logger.LogInformation("Sync of {Prefix}* on this device: {State}", prefix, excluded ? "off" : "on");
+        RequestSync();
+    }
+
+    /// <summary>True while the live channel is connected: other devices' changes arrive within seconds.</summary>
+    public bool IsLive => _live?.Connected == true;
+
+    /// <summary>
+    /// Keeps the server's live channel open (on) or closes it (off), e.g. only while the app is in front on a phone.
+    /// While it is connected, the periodic poll runs at most every <see cref="BackgroundPollInterval"/>. A no-op for a
+    /// transport without a live channel.
+    /// </summary>
+    public void SetLive(bool enabled)
+    {
+        if (_disposed || _transport is not ISyncLiveTransport transport) return;
+        lock (_liveGate)
+        {
+            if (!enabled)
+            {
+                _live?.Stop();
+                return;
+            }
+            // Connecting or dropping changes what the status says ("live"), not the status itself.
+            _live ??= new SyncLiveChannel(transport, () => _transport.IsConfigured && GetKeyring() is not null, OnLiveSeq,
+                _ => RaiseStatusChanged(), _logger);
+            _live.Start();
+        }
+    }
+
+    /// <summary>
+    /// A seq announced on the live channel. During a run it is only noted (the run's own push comes back this way,
+    /// and its pull fetches the rest); the end of the run checks it again.
+    /// </summary>
+    private void OnLiveSeq(long seq)
+    {
+        InterlockedMax(ref _liveSeq, seq);
+        if (_run.CurrentCount == 0) return;
+        if (seq > Math.Max(_db.GetCursor(MainCursor), Interlocked.Read(ref _lastOwnSeq))) RequestSync();
+    }
+
+    private static void InterlockedMax(ref long target, long value)
+    {
+        var current = Interlocked.Read(ref target);
+        while (value > current)
+        {
+            var seen = Interlocked.CompareExchange(ref target, value, current);
+            if (seen == current) return;
+            current = seen;
+        }
+    }
+
     /// <summary>Syncs now and then every <paramref name="interval"/> (default 5 minutes) while Helm runs.</summary>
     public void Start(TimeSpan? interval = null)
     {
         if (_disposed || _periodic is not null) return;
         var every = interval ?? BackgroundPollInterval;
         _pollInterval = every;
-        _periodic = new Timer(_ => { if (_transport.IsConfigured) _ = RunScheduledAsync(); }, null, TimeSpan.FromSeconds(3), every);
+        _periodic = new Timer(_ =>
+        {
+            if (!_transport.IsConfigured) return;
+            // Live: changes are announced, so polling is only a safety net.
+            if (IsLive && Environment.TickCount64 - Interlocked.Read(ref _lastRunTicks) < BackgroundPollInterval.TotalMilliseconds) return;
+            _ = RunScheduledAsync();
+        }, null, TimeSpan.FromSeconds(3), every);
     }
 
     /// <summary>How often to pull while the app is in front (30 s) or in the background / tray (5 min).</summary>
@@ -193,6 +306,8 @@ public sealed class SyncEngine : ISyncService, IDisposable
             _keyring?.Dispose();
             _keyring = null;
         }
+        // The credentials may have changed too: the live channel connects again with the current ones.
+        _live?.Reconnect();
     }
 
     public async Task<SyncRunResult> SyncNowAsync(CancellationToken ct = default)
@@ -209,12 +324,14 @@ public sealed class SyncEngine : ISyncService, IDisposable
             // Files first: a record that uses a file is pushed only once the file is on the server (I6).
             var blobsFit = _blobs is null || await _blobs.UploadPendingAsync(ct).ConfigureAwait(false);
             await PushAsync(keyring, run, ct).ConfigureAwait(false);
-            await PullAsync(keyring, run, ct).ConfigureAwait(false);
+            await PullMainAsync(keyring, run, ct).ConfigureAwait(false);
+            await CatchUpAsync(keyring, run, ct).ConfigureAwait(false);
             // Conflicts found while pulling may have kept local edits (rebased or copied): send them now.
             if (run.PendingPush) await PushAsync(keyring, run, ct).ConfigureAwait(false);
             _applyHold = false;
             Hold = null;
             await CollectBlobGarbageAsync(ct).ConfigureAwait(false);
+            CollectLocalTombstones();
             if (!blobsFit)
             {
                 SetStatus(new SyncStatus(SyncState.QuotaExceeded, _time.GetUtcNow(), "Some files could not be uploaded: storage is full."));
@@ -270,8 +387,11 @@ public sealed class SyncEngine : ISyncService, IDisposable
         }
         finally
         {
+            Interlocked.Exchange(ref _lastRunTicks, Environment.TickCount64);
             _run.Release();
             RaiseChanges(run);
+            // Something announced during the run that the run did not fetch (it came after the pull): go again.
+            if (Interlocked.Read(ref _liveSeq) > Math.Max(_db.GetCursor(MainCursor), Interlocked.Read(ref _lastOwnSeq))) RequestSync();
         }
     }
 
@@ -313,6 +433,7 @@ public sealed class SyncEngine : ISyncService, IDisposable
     public void Dispose()
     {
         _disposed = true;
+        lock (_liveGate) _live?.Dispose();
         _timer.Dispose();
         _periodic?.Dispose();
         ReloadKey();
@@ -322,8 +443,9 @@ public sealed class SyncEngine : ISyncService, IDisposable
     {
         for (var round = 0; round < MaxPushRounds; round++)
         {
-            // Records whose files are still only on this device wait for the next run.
-            var dirty = _db.GetDirty(PushBatchSize * 10).Where(CanPush).Take(PushBatchSize).ToList();
+            // Records whose files are still only on this device wait for the next run, and so do the collections this
+            // device does not sync.
+            var dirty = _db.GetDirty(PushBatchSize * 10).Where(row => !IsExcluded(row.Collection) && CanPush(row)).Take(PushBatchSize).ToList();
             if (dirty.Count == 0) return;
 
             var items = dirty.Select(row => new PushItem(row.Collection, row.Id, row.Version, row.Deleted,
@@ -341,6 +463,7 @@ public sealed class SyncEngine : ISyncService, IDisposable
                     if (!byKey.TryGetValue((outcome.Collection, outcome.Id), out var row)) continue;
                     if (outcome.Accepted)
                     {
+                        InterlockedMax(ref _lastOwnSeq, outcome.Seq);
                         _db.MarkPushed(row.Collection, row.Id, row.LocalRev, outcome.Version);
                         run.Pushed++;
                         progressed = true;
@@ -379,45 +502,166 @@ public sealed class SyncEngine : ISyncService, IDisposable
         return true;
     }
 
-    private async Task PullAsync(SyncKeyring keyring, RunState run, CancellationToken ct)
+    /// <summary>
+    /// The normal pull from the main cursor, leaving out what this device does not sync. When the server has cleaned
+    /// up deletions this device may not have seen, or a previous resync did not finish, everything is pulled again.
+    /// </summary>
+    private async Task PullMainAsync(SyncKeyring keyring, RunState run, CancellationToken ct)
     {
-        var since = _db.GetCursor(MainCursor);
+        var filter = new SyncPullFilter(Exclude: ExcludedPrefixes.Count == 0 ? null : ExcludedPrefixes);
+        if (_db.GetMetaValue(ResyncMeta) is null)
+        {
+            try
+            {
+                await PullScopeAsync(keyring, run, _db.GetCursor(MainCursor), filter, MainCursor, null, ct).ConfigureAwait(false);
+                return;
+            }
+            catch (SyncResyncRequiredException)
+            {
+                _logger.LogInformation("The sync server cleaned up deletions this device has not seen; downloading everything again");
+                _db.SetMetaValue(ResyncMeta, "1");
+            }
+        }
+        var next = await ResyncAsync(keyring, run, filter, ct).ConfigureAwait(false);
+        _db.InTransaction(() =>
+        {
+            _db.SetCursor(MainCursor, next);
+            _db.SetMetaValue(ResyncMeta, null);
+        });
+    }
+
+    /// <summary>
+    /// Prefixes synced again after a pause: the main cursor went past their records meanwhile, so each is downloaded
+    /// again in full (records already known are skipped by version) and what was deleted meanwhile is dropped.
+    /// </summary>
+    private async Task CatchUpAsync(SyncKeyring keyring, RunState run, CancellationToken ct)
+    {
+        foreach (var prefix in ParseList(_db.GetMetaValue(CatchUpMeta)))
+        {
+            if (!IsExcluded(prefix)) await ResyncAsync(keyring, run, new SyncPullFilter(Only: [prefix]), ct).ConfigureAwait(false);
+            lock (_selectionGate)
+            {
+                var left = ParseList(_db.GetMetaValue(CatchUpMeta)).Where(p => p != prefix).ToList();
+                _db.SetMetaValue(CatchUpMeta, left.Count == 0 ? null : string.Join(',', left));
+            }
+        }
+    }
+
+    /// <summary>
+    /// Pulls every record of <paramref name="filter"/> from seq 0 and then drops the local rows the server no longer
+    /// has (their deletions were cleaned up there). Progress is not saved: the comparison needs the complete list, so an
+    /// interrupted resync starts over. Returns the seq to continue from.
+    /// </summary>
+    private async Task<long> ResyncAsync(SyncKeyring keyring, RunState run, SyncPullFilter filter, CancellationToken ct)
+    {
+        for (var attempt = 1; ; attempt++)
+        {
+            var seen = new HashSet<(string, string)>();
+            try
+            {
+                var next = await PullScopeAsync(keyring, run, 0, filter, null, seen, ct).ConfigureAwait(false);
+                DropMissing(filter, seen, run);
+                return next;
+            }
+            catch (SyncResyncRequiredException) when (attempt < MaxResyncAttempts)
+            {
+                // Another clean-up ran on the server while pulling: the list is not complete, start over.
+            }
+        }
+    }
+
+    /// <summary>
+    /// After a complete resync: a local row with a server version that the server did not return was deleted and
+    /// cleaned up there. A clean row goes (guarded collections may hold the run, as for any mass deletion); a local
+    /// edit of it is kept and uploaded again as a new record, since an edit beats a deletion.
+    /// </summary>
+    private void DropMissing(SyncPullFilter filter, HashSet<(string, string)> seen, RunState run)
+    {
+        var missing = _db.ListKeys()
+            .Where(k => k.Version > 0 && filter.Matches(k.Collection) && !IsExcluded(k.Collection) && !seen.Contains((k.Collection, k.Id)))
+            .ToList();
+        if (missing.Count == 0) return;
+
+        var removed = new List<(string Collection, string Id)>();
+        foreach (var (collection, id, _, deleted, dirty) in missing)
+        {
+            if (dirty && !deleted)
+            {
+                _db.Rebase(collection, id, 0);
+                run.PendingPush = true;
+                continue;
+            }
+            if (!deleted && _descriptors.TryGetValue(collection, out var descriptor) && descriptor.ChangeGuard is { } guard)
+            {
+                var local = _db.Get(collection, id);
+                if (local?.Body is null || guard.IsExpendable is not { } expendable || !IsExpendable(expendable, local.Body))
+                {
+                    if (!run.GuardedDeletions.TryGetValue(collection, out var deletions)) run.GuardedDeletions[collection] = deletions = [];
+                    deletions.Add((id, 0));
+                }
+            }
+            removed.Add((collection, id));
+        }
+        if (!_applyHold) CheckChangeGuards(run);
+        _db.InTransaction(() =>
+        {
+            foreach (var (collection, id) in removed) _db.Remove(collection, id);
+        });
+        foreach (var (collection, deletions) in run.GuardedDeletions) AddRecentDeletions(collection, deletions.Count);
+        run.GuardedDeletions.Clear();
+        foreach (var (collection, id) in removed) run.Changed(collection, id);
+        _logger.LogInformation("Resync dropped {Count} records the server no longer has", removed.Count);
+    }
+
+    /// <param name="cursor">Saved after every applied page; null for a resync, which must not save partial progress.</param>
+    /// <param name="seen">Collects every record the server returned (for a resync's comparison).</param>
+    /// <returns>The seq to continue from.</returns>
+    private async Task<long> PullScopeAsync(SyncKeyring keyring, RunState run, long since, SyncPullFilter filter, string? cursor,
+        HashSet<(string, string)>? seen, CancellationToken ct)
+    {
         // Pages that delete guarded records are collected and judged together before any of them is applied, so
         // deletions spread over several pages cannot slip under the threshold one page at a time.
         var pending = new List<(PullPage Page, long Next)>();
         while (true)
         {
-            var page = await _transport.PullAsync(since, PullPageSize, ct).ConfigureAwait(false);
+            var page = await _transport.PullAsync(since, PullPageSize, filter, ct).ConfigureAwait(false);
             var next = Math.Max(since, page.NextSeq);
             var last = !page.HasMore || next == since;
             if (_applyHold)
             {
-                Apply(keyring, page, next, run);
+                Apply(keyring, page, next, run, filter, cursor, seen);
             }
             else
             {
                 pending.Add((page, next));
-                CollectGuardedDeletions(page.Records, run);
+                CollectGuardedDeletions(page.Records.Where(r => filter.Matches(r.Collection) && !IsExcluded(r.Collection)).ToList(), run);
                 // Once a guarded deletion was seen, keep collecting to the end of the pull (or the memory cap).
                 if (run.GuardedDeletions.Count == 0 || last || pending.Count >= MaxHeldPages)
                 {
                     // Throws before anything pending is applied; the cursor stays, so the same pages come back next run.
                     CheckChangeGuards(run);
-                    foreach (var (held, heldNext) in pending) Apply(keyring, held, heldNext, run);
+                    foreach (var (held, heldNext) in pending) Apply(keyring, held, heldNext, run, filter, cursor, seen);
                     foreach (var (collection, deletions) in run.GuardedDeletions) AddRecentDeletions(collection, deletions.Count);
                     pending.Clear();
                     run.GuardedDeletions.Clear();
                 }
             }
-            if (last) return;
+            if (last) return next;
             since = next;
         }
     }
 
-    private void Apply(SyncKeyring keyring, PullPage page, long next, RunState run) => _db.InTransaction(() =>
+    private void Apply(SyncKeyring keyring, PullPage page, long next, RunState run, SyncPullFilter filter, string? cursor,
+        HashSet<(string, string)>? seen) => _db.InTransaction(() =>
     {
-        foreach (var record in page.Records) ApplyPulled(keyring, record, run);
-        _db.SetCursor(MainCursor, next);
+        foreach (var record in page.Records)
+        {
+            // An older server ignores the filter: leave out what this device does not sync here.
+            if (!filter.Matches(record.Collection) || IsExcluded(record.Collection)) continue;
+            seen?.Add((record.Collection, record.Id));
+            ApplyPulled(keyring, record, run);
+        }
+        if (cursor is not null) _db.SetCursor(cursor, next);
     });
 
     private void ApplyPulled(SyncKeyring keyring, RemoteRecord record, RunState run)
@@ -477,6 +721,12 @@ public sealed class SyncEngine : ISyncService, IDisposable
                 _logger.LogInformation("Blob clean-up skipped: unknown collections {Collections}", string.Join(", ", unknown));
                 return;
             }
+            // Collections this device does not sync are out of date here: their newer records may use blobs it never saw.
+            if (ExcludedPrefixes.Count > 0)
+            {
+                _logger.LogInformation("Blob clean-up skipped: this device does not sync {Prefixes}", string.Join(", ", ExcludedPrefixes));
+                return;
+            }
             var referenced = new HashSet<string>(StringComparer.Ordinal);
             foreach (var descriptor in _descriptors.Values)
             {
@@ -499,6 +749,23 @@ public sealed class SyncEngine : ISyncService, IDisposable
             _logger.LogWarning(ex, "Blob clean-up failed; it runs again later");
         }
     }
+
+    /// <summary>
+    /// At most daily: local deletions the server accepted long ago are forgotten, so the replica does not keep one row
+    /// for every record ever deleted.
+    /// </summary>
+    private void CollectLocalTombstones()
+    {
+        var last = long.TryParse(_db.GetMetaValue(TombstoneGcMeta), out var ms) ? ms : 0;
+        var now = _time.GetUtcNow();
+        if (now - DateTimeOffset.FromUnixTimeMilliseconds(last) < BlobGcInterval) return;
+        var purged = _db.PurgeTombstones((now - LocalTombstoneRetention).ToUnixTimeMilliseconds());
+        _db.SetMetaValue(TombstoneGcMeta, now.ToUnixTimeMilliseconds().ToString(System.Globalization.CultureInfo.InvariantCulture));
+        if (purged > 0) _logger.LogInformation("Forgot {Count} old local deletions", purged);
+    }
+
+    private static string[] ParseList(string? value) =>
+        string.IsNullOrEmpty(value) ? [] : value.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
 
     private void CollectGuardedDeletions(IReadOnlyList<RemoteRecord> records, RunState run)
     {
@@ -670,7 +937,12 @@ public sealed class SyncEngine : ISyncService, IDisposable
     private void SetStatus(SyncStatus status)
     {
         Status = status;
-        try { StatusChanged?.Invoke(this, status); }
+        RaiseStatusChanged();
+    }
+
+    private void RaiseStatusChanged()
+    {
+        try { StatusChanged?.Invoke(this, Status); }
         catch (Exception ex) { _logger.LogError(ex, "A sync status handler failed"); }
     }
 

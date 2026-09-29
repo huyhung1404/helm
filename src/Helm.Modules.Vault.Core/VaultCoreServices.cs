@@ -28,6 +28,7 @@ public static class VaultCoreServices
         services.AddSyncedCollection(new SyncedCollectionOptions<VaultKitConfirmation> { Name = VaultSession.KitCollection });
         // One record per device: when it last made a good backup (one device with a backup folder is enough).
         services.AddSyncedCollection(new SyncedCollectionOptions<VaultBackupMark> { Name = VaultBackupService.MarksCollection });
+        services.AddSyncGroup("vault.", "Vault");
         services.TryAddSingleton<IVaultDeviceUnlock, NoDeviceUnlock>();
         services.AddSingleton<VaultSession>();
         services.AddSingleton<VaultStore>();

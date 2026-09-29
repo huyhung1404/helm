@@ -232,6 +232,20 @@
                             </StackPanel>
                         </StackPanel>
                     </Border>
+                    <Border Classes="row" IsVisible="{Binding HasGroups}">
+                        <StackPanel Spacing="6">
+                            <TextBlock Text="What syncs on this device" Classes="title" />
+                            <TextBlock Classes="secondary" Text="Untick a tool to stop syncing it on this phone. What it has here stays, and changes made here meanwhile are sent when you tick it again." />
+                            <ItemsControl ItemsSource="{Binding Groups}">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate DataType="shell:SyncGroupItem">
+                                        <CheckBox Content="{Binding Name}" IsChecked="{Binding IsSynced}"
+                                                  AutomationProperties.Name="{Binding Name, StringFormat='Sync {0} on this device'}" />
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </StackPanel>
+                    </Border>
                     <Border Classes="row">
                         <StackPanel Spacing="6">
                             <TextBlock Text="{Binding UsageText}" />

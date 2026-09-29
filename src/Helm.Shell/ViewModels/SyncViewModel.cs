@@ -32,6 +32,27 @@ public sealed partial class SyncDeviceItem(SyncDeviceToken token, bool isThisDev
     }
 }
 
+/// <summary>One tool on "What syncs on this device": unticking it stops this device syncing the tool's data.</summary>
+public sealed partial class SyncGroupItem : ObservableObject
+{
+    private readonly SyncEngine _engine;
+
+    public SyncGroupItem(SyncGroup group, SyncEngine engine)
+    {
+        Group = group;
+        _engine = engine;
+        _isSynced = !engine.ExcludedPrefixes.Contains(group.Prefix);
+    }
+
+    public SyncGroup Group { get; }
+
+    public string Name => Group.Name;
+
+    [ObservableProperty] private bool _isSynced;
+
+    partial void OnIsSyncedChanged(bool value) => _engine.SetExcluded(Group.Prefix, !value);
+}
+
 /// <summary>General → Sync: connect this device, protect the account key, see status and manage devices.</summary>
 public sealed partial class SyncViewModel : ObservableObject
 {
@@ -105,8 +126,10 @@ public sealed partial class SyncViewModel : ObservableObject
     private string? _errorMessage;
 
     public SyncViewModel(SyncSetupService setup, SyncEngine engine, IUiDispatcher ui, IDialogService dialogs, IClipboardService clipboard,
-        IDeviceInfo device, ILogger<SyncViewModel> logger)
+        IDeviceInfo device, ILogger<SyncViewModel> logger, IEnumerable<SyncGroup>? groups = null)
     {
+        foreach (var group in (groups ?? []).DistinctBy(g => g.Prefix).OrderBy(g => g.Name, StringComparer.CurrentCulture))
+            Groups.Add(new SyncGroupItem(group, engine));
         _clipboard = clipboard;
         _deviceName = device.DeviceName;
         _setup = setup;
@@ -156,6 +179,11 @@ public sealed partial class SyncViewModel : ObservableObject
     public string ServerText => $"Server: {_setup.Server.Host}";
 
     public ObservableCollection<SyncDeviceItem> Devices { get; } = [];
+
+    /// <summary>The tools this device may choose not to sync (device-local).</summary>
+    public ObservableCollection<SyncGroupItem> Groups { get; } = [];
+
+    public bool HasGroups => Groups.Count > 0;
 
     partial void OnPassphraseChanged(string value) => OnPropertyChanged(nameof(PassphraseStrengthText));
 
@@ -378,7 +406,8 @@ public sealed partial class SyncViewModel : ObservableObject
             Devices.Add(new SyncDeviceItem(d, d.Id == _thisTokenId));
     }
 
-    private void UpdateStatusText() => StatusText = SyncStatusText.Describe(_engine.Status);
+    private void UpdateStatusText() =>
+        StatusText = SyncStatusText.Describe(_engine.Status) + (_engine.IsLive ? " · live: other devices' changes arrive at once" : "");
 
     private async Task RunAsync(Func<Task> work)
     {

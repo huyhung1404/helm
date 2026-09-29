@@ -53,6 +53,17 @@ Cloudflare builds and deploys the Worker from this GitHub repository (Workers Bu
 
 **Raising limits** (no code change): Worker `helm-sync` → **Settings** → **Variables and Secrets** → edit `MAX_BLOB_MB` (largest document, 256 by default) or `MAX_QUOTA_MB` (the highest quota the admin may set, 102400 by default), then **Deploy**. Helm reads the effective limits from `/v1/me`. Each account's quota is still set on the admin page. A deploy from `wrangler.toml` resets dashboard edits to the `[vars]` there, so change both, or only `wrangler.toml`.
 
+**Presigned blob URLs** (optional, recommended): with them, Vault files go straight between devices and R2 instead of through the Worker, which saves Worker time on large files. Without them everything still works, the old way.
+
+1. R2 Object Storage → **Manage API tokens** → **Create API token**: permission **Object Read & Write**, applied to the bucket `helm-sync-blobs` only, no expiry (or put a reminder in your calendar). Copy the **Access Key ID** and **Secret Access Key**.
+2. Worker `helm-sync` → **Settings** → **Variables and Secrets** → **Add** three entries, each of type **Secret**:
+   - `R2_ACCOUNT_ID`: your Cloudflare account id (on the R2 overview page, or in the dashboard URL).
+   - `R2_ACCESS_KEY_ID` and `R2_SECRET_ACCESS_KEY`: the values from step 1.
+
+   Then select **Deploy**. `/v1/me` then lists `presigned-blobs` under `features`, and Helm uses it on its next sync. Use secrets, not plain variables: a deploy replaces plain variables with those in `wrangler.toml`.
+
+**Deletions** are kept on the server for `TOMBSTONE_DAYS` (90 by default), so every device learns about them, and then removed by the nightly job. A device that was offline for longer downloads everything again on its next sync and drops what was deleted meanwhile. `POST /admin/tombstones/gc` runs the clean-up now.
+
 The admin page keeps `ADMIN_TOKEN` in the tab's memory only. It is forgotten on reload and when you select **Lock**.
 
 For a second lock on `/admin`, add Cloudflare Access: Zero Trust → Access → Applications → **Add an application** → Self-hosted. Use the domain `sync.huyhung1404.com` with the path `admin`, and a policy that allows only your email. After that, `admin.ps1` needs an Access service token.

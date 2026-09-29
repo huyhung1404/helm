@@ -11,7 +11,13 @@ internal sealed class FakeSyncServer
     private readonly object _gate = new();
     private readonly Dictionary<(string Collection, string Id), RemoteRecord> _records = new();
     private readonly Dictionary<string, BlobEntry> _blobs = new(StringComparer.Ordinal);
+    private readonly Dictionary<(string Collection, string Id), DateTimeOffset> _writtenAt = new();
     private long _seq;
+    private long _purgedSeq;
+    private long _versionFloor;
+
+    /// <summary>Pull requests seen, with their filter (tests check what a device asks for).</summary>
+    public List<SyncPullFilter> PullFilters { get; } = [];
 
     /// <summary>Server clock for blob timestamps (tests move it to exercise garbage collection).</summary>
     public Func<DateTimeOffset> Now { get; set; } = () => DateTimeOffset.UtcNow;
@@ -71,21 +77,44 @@ internal sealed class FakeSyncServer
                     outcomes.Add(new PushOutcome(item.Collection, item.Id, false, 0, 0, current));
                     continue;
                 }
-                var stored = new RemoteRecord(item.Collection, item.Id, (current?.Version ?? 0) + 1, ++_seq, item.Deleted, item.Payload);
+                // A new record starts above every purged version, like the Worker (a device may still hold an old deletion).
+                var stored = new RemoteRecord(item.Collection, item.Id, (current?.Version ?? _versionFloor) + 1, ++_seq, item.Deleted, item.Payload);
                 _records[key] = stored;
+                _writtenAt[key] = Now();
                 outcomes.Add(new PushOutcome(item.Collection, item.Id, true, stored.Version, stored.Seq, null));
             }
             return outcomes;
         }
     }
 
-    private PullPage Pull(long since, int limit)
+    private PullPage Pull(long since, int limit, SyncPullFilter filter)
     {
         lock (_gate)
         {
-            var newer = _records.Values.Where(r => r.Seq > since).OrderBy(r => r.Seq).ToList();
+            PullFilters.Add(filter);
+            if (since > 0 && since < _purgedSeq)
+                throw new SyncResyncRequiredException("Deletions older than this cursor were cleaned up.");
+            var newer = _records.Values.Where(r => r.Seq > since && filter.Matches(r.Collection)).OrderBy(r => r.Seq).ToList();
             var page = newer.Take(limit).ToList();
-            return new PullPage(page, page.Count > 0 ? page[^1].Seq : since, newer.Count > page.Count);
+            var hasMore = newer.Count > page.Count;
+            return new PullPage(page, hasMore ? page[^1].Seq : Math.Max(since, _seq), hasMore);
+        }
+    }
+
+    /// <summary>The nightly clean-up: forgets deletions written before <paramref name="cutoff"/>, like the Worker.</summary>
+    public int PurgeTombstones(DateTimeOffset cutoff)
+    {
+        lock (_gate)
+        {
+            var old = _records.Values.Where(r => r.Deleted && _writtenAt[(r.Collection, r.Id)] < cutoff).ToList();
+            foreach (var r in old)
+            {
+                _records.Remove((r.Collection, r.Id));
+                _writtenAt.Remove((r.Collection, r.Id));
+                _purgedSeq = Math.Max(_purgedSeq, r.Seq);
+                _versionFloor = Math.Max(_versionFloor, r.Version);
+            }
+            return old.Count;
         }
     }
 
@@ -228,11 +257,14 @@ internal sealed class FakeSyncServer
             return Task.FromResult(outcomes);
         }
 
-        public Task<PullPage> PullAsync(long sinceSeq, int limit, CancellationToken ct)
+        /// <summary>Plays a server from before pull filters: it ignores them.</summary>
+        public bool IgnoresFilters { get; set; }
+
+        public Task<PullPage> PullAsync(long sinceSeq, int limit, SyncPullFilter filter, CancellationToken ct)
         {
             if (Offline) throw new HttpRequestException("offline");
             BeforePull?.Invoke();
-            return Task.FromResult(server.Pull(sinceSeq, limit));
+            return Task.FromResult(server.Pull(sinceSeq, limit, IgnoresFilters ? SyncPullFilter.None : filter));
         }
     }
 }

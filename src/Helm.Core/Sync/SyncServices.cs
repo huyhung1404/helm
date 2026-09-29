@@ -31,6 +31,16 @@ public static class SyncServices
         return services;
     }
 
+    /// <summary>
+    /// Lists a tool on General → Sync → "What syncs on this device", where each device can stop syncing it. Every
+    /// collection of the tool must start with <paramref name="prefix"/> (e.g. "vault.").
+    /// </summary>
+    public static IServiceCollection AddSyncGroup(this IServiceCollection services, string prefix, string name)
+    {
+        services.AddSingleton(new SyncGroup(prefix, name));
+        return services;
+    }
+
     /// <summary>Registers <see cref="ISyncedCollection{T}"/> for a module.</summary>
     public static IServiceCollection AddSyncedCollection<T>(this IServiceCollection services, SyncedCollectionOptions<T> options)
         where T : class
@@ -92,3 +102,8 @@ public static class SyncServices
     private static ILogger? Logger(IServiceProvider sp, string collection) =>
         sp.GetService<ILoggerFactory>()?.CreateLogger($"Sync.{collection}");
 }
+
+/// <summary>A tool's synced data, which a device can choose not to sync (see <see cref="SyncEngine.SetExcluded"/>).</summary>
+/// <param name="Prefix">What all of the tool's collection names start with, ending in "." (e.g. "vault.").</param>
+/// <param name="Name">The tool's name as the Sync page shows it.</param>
+public sealed record SyncGroup(string Prefix, string Name);

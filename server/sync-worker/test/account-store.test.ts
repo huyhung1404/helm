@@ -218,3 +218,99 @@ test("a snapshot restores records as new versions, keeps newer records and the c
   rejects(() => store.importSnapshot({ format: "nope" }), 400, "invalid_snapshot");
   void accountId;
 });
+
+test("a pull filter keeps only some collections, or leaves some out, and prefixes end with a dot", () => {
+  const { store } = setup();
+  const put = (collection: string, id: string) => ({ collection, id, baseVersion: 0, deleted: false, payload: payload(id) });
+  store.push({ items: [put("notes.items", "n"), put("vault.items", "v"), put("vault.keyring", "k"), put("tracker_x", "t"), put("trackerxitems", "u")] });
+
+  const ids = (filter: Parameters<typeof store.pull>[2]) => store.pull("0", null, filter).records.map((r) => r.id);
+  assert.deepEqual(ids({ exclude: ["vault."] }), ["n", "t", "u"]);
+  assert.deepEqual(ids({ only: ["vault."] }), ["v", "k"]);
+  assert.deepEqual(ids({ only: ["vault.items", "notes.items"] }), ["n", "v"]);
+  // "_" is not a wildcard, and a name without a dot is exact.
+  assert.deepEqual(ids({ only: ["tracker_x"] }), ["t"]);
+
+  // Nothing more matches: the cursor jumps to the account's seq, past the records left out.
+  assert.deepEqual(store.pull("0", "10", { only: ["notes.items"] }).nextSeq, 5);
+  const paged = store.pull("0", "1", { exclude: ["vault."] });
+  assert.deepEqual([paged.records.length, paged.nextSeq, paged.hasMore], [1, 1, true]);
+});
+
+test("pull filters are validated", async () => {
+  const { parsePullFilter } = await import("../src/account-store.ts");
+  assert.deepEqual(parsePullFilter("vault.,notes.items", null), { only: ["vault.", "notes.items"], exclude: undefined });
+  assert.deepEqual(parsePullFilter(null, null), { only: undefined, exclude: undefined });
+  rejects(() => parsePullFilter("Vault", null), 400, "invalid_only");
+  rejects(() => parsePullFilter(null, ""), 400, "invalid_exclude");
+  rejects(() => parsePullFilter("a", "b"), 400, "invalid_filter");
+  rejects(() => parsePullFilter(Array.from({ length: 33 }, (_, i) => `c${i}`).join(","), null), 400, "invalid_only");
+});
+
+test("old deletions are purged, their space comes back, and older cursors must resync", () => {
+  const { store, advance } = setup();
+  store.push({ items: [item("keep", 0), item("gone", 0)] });
+  store.push({ items: [item("gone", 1, "x", true)] }); // seq 3, a deletion
+  const used = store.info().usedBytes;
+  advance(10 * 86_400_000);
+  store.push({ items: [item("recent", 0)] });
+  store.push({ items: [item("recent", 1, "x", true)] }); // a deletion from today (seq 5)
+
+  const run = store.purgeTombstones(store.info().createdAt + 5 * 86_400_000);
+  assert.deepEqual([run.purged, run.purgedSeq], [1, 3]);
+  assert.ok(store.info().usedBytes < used + 100);
+  assert.deepEqual(store.pull("0", null).records.map((r) => r.id), ["keep", "recent"]);
+
+  // A device that stopped before the purged deletion would never learn about it: it must start over.
+  rejects(() => store.pull("2", null), 410, "resync_required");
+  assert.equal(store.pull("3", null).records.length, 1);
+  assert.equal(store.pull("0", null).records.length, 2);
+  // Nothing to purge: the horizon stays.
+  assert.deepEqual(store.purgeTombstones(0), { purged: 0, bytes: 0, purgedSeq: 3 });
+
+  // The same id created again starts above the purged version, so a device holding the old deletion takes it.
+  const [again] = store.push({ items: [item("gone", 0, "back")] });
+  assert.deepEqual([again.accepted, again.version], [true, 3]);
+  const [fresh] = store.push({ items: [item("brand-new", 0)] });
+  assert.equal(fresh.version, 3);
+});
+
+test("accounts from before tombstone clean-up get written_at dated at their first request", () => {
+  const sql = nodeSql();
+  let now = 1_800_000_000_000;
+  const old = new AccountStore(sql, () => now);
+  const accountId = newAccountId();
+  old.init(accountId, "Old");
+  old.push({ items: [item("a", 0)] });
+  old.push({ items: [item("a", 1, "x", true)] });
+  // Make it look like an account created by the previous server version.
+  sql.run("UPDATE records SET written_at = 0");
+  sql.run("DELETE FROM meta WHERE key IN ('records_schema', 'purged_seq')");
+
+  now += 1000;
+  const upgraded = new AccountStore(sql, () => now);
+  assert.equal(upgraded.pull("0", null).records.length, 1);
+  // Dated at the upgrade, so a clean-up for anything older than the upgrade leaves it alone.
+  assert.equal(upgraded.purgeTombstones(now).purged, 0);
+  assert.equal(upgraded.purgeTombstones(now + 1).purged, 1);
+});
+
+test("presigned uploads authorize a batch and record the sizes storage reports", () => {
+  const { store } = setup();
+  const id = "01ARZ3NDEKTSV4RRFFQ69G5FAV";
+  store.blobs.reserve({ id, size: 30, chunkCount: 3 });
+  assert.deepEqual(store.blobs.authorizeChunks(id, { chunks: [{ index: 0, length: 10 }, { index: 1, length: 10 }] }),
+    [{ index: 0, length: 10 }, { index: 1, length: 10 }]);
+  rejects(() => store.blobs.authorizeChunks(id, { chunks: [{ index: 0, length: 10 }, { index: 1, length: 21 }] }), 400, "chunk_exceeds_blob");
+  rejects(() => store.blobs.authorizeChunks(id, { chunks: [{ index: 3, length: 1 }] }), 400, "invalid_index");
+  rejects(() => store.blobs.authorizeChunks(id, { chunks: [{ index: 0, length: 1 }, { index: 0, length: 1 }] }), 400, "invalid_chunk");
+
+  store.blobs.recordChunks(id, { chunks: [{ index: 0, size: 10 }, { index: 1, size: 10 }] });
+  // All or nothing: a batch that overflows records none of it.
+  rejects(() => store.blobs.recordChunks(id, { chunks: [{ index: 2, size: 5 }, { index: 1, size: 20 }] }), 400, "chunk_exceeds_blob");
+  assert.deepEqual(store.blobs.get(id).chunks, [0, 1]);
+  rejects(() => store.blobs.readChunks(id), 404, "blob_not_found");
+  store.blobs.recordChunks(id, { chunks: [{ index: 2, size: 10 }] });
+  store.blobs.commit(id);
+  assert.deepEqual(store.blobs.readChunks(id), { chunkCount: 3, chunks: [{ index: 0, size: 10 }, { index: 1, size: 10 }, { index: 2, size: 10 }] });
+});

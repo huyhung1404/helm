@@ -76,6 +76,70 @@ public sealed class SyncServerTests : IDisposable
     }
 
     [ServerFact]
+    public async Task The_live_channel_brings_other_devices_changes_without_a_poll_and_closes_when_the_token_is_revoked()
+    {
+        var accountId = await CreateAccountAsync();
+        var (tokenA, idA) = await CreateTokenWithIdAsync(accountId, "PC");
+        var a = NewDevice("a", tokenA, debounce: TimeSpan.FromMilliseconds(50));
+        var b = NewDevice("b", await CreateTokenAsync(accountId, "Phone"));
+        await SyncAll(a, b);
+
+        a.Engine.SetLive(true);
+        await WaitUntil(() => a.Engine.IsLive, "the live channel connects");
+        var id = b.Notes.Add(new Note("Live", "arrives by itself"));
+        await SyncAll(b);
+        await WaitUntil(() => a.Notes.Get(id) is not null, "the change arrives without SyncNowAsync");
+        Assert.Equal(new Note("Live", "arrives by itself"), a.Notes.Get(id));
+
+        await AdminAsync(HttpMethod.Delete, $"admin/accounts/{accountId}/tokens/{idA}", new { });
+        await WaitUntil(() => !a.Engine.IsLive, "revoking the token closes the socket");
+        a.Engine.SetLive(false);
+    }
+
+    [ServerFact]
+    public async Task Pulls_filter_collections_on_the_server()
+    {
+        var accountId = await CreateAccountAsync();
+        var credentials = new SyncCredentials(ServerUrl!, await CreateTokenAsync(accountId, "PC"));
+        using var api = new SyncApiClient();
+        var keyring = new SyncKeyring(new SyncKeySet(1, new Dictionary<int, byte[]> { [1] = _key.ToArray() }));
+        var items = new[] { "notes.items", "vault.items", "vault.keyring", "tracker.items" }
+            .Select(c => new PushItem(c, "x", 0, false, keyring.Seal(c, "x", new SealedContent(1, 1, "d", "{}")))).ToList();
+        await api.PushAsync(credentials, items, CancellationToken.None);
+
+        var excluded = await api.PullAsync(credentials, 0, 100, new SyncPullFilter(Exclude: ["vault."]), CancellationToken.None);
+        Assert.Equal(["notes.items", "tracker.items"], excluded.Records.Select(r => r.Collection));
+        Assert.Equal(4, excluded.NextSeq);
+        var only = await api.PullAsync(credentials, 0, 100, new SyncPullFilter(Only: ["vault.", "notes.items"]), CancellationToken.None);
+        Assert.Equal(["notes.items", "vault.items", "vault.keyring"], only.Records.Select(r => r.Collection));
+    }
+
+    [ServerFact]
+    public async Task After_the_server_cleans_up_old_deletions_a_device_that_was_away_resyncs()
+    {
+        var accountId = await CreateAccountAsync();
+        var a = NewDevice("a", await CreateTokenAsync(accountId, "PC"));
+        var b = NewDevice("b", await CreateTokenAsync(accountId, "Laptop"));
+        a.Notes.Upsert("keep", new Note("Keep", "1"));
+        a.Notes.Upsert("gone", new Note("Gone", "2"));
+        await SyncAll(a, b);
+        Assert.True(a.Notes.Delete("gone"));
+        await SyncAll(a);
+
+        var run = await AdminAsync(HttpMethod.Post, "admin/tombstones/gc", new { now = DateTimeOffset.UtcNow.AddDays(100).ToUnixTimeMilliseconds() });
+        Assert.True(run.GetProperty("purged").GetInt32() >= 1);
+
+        await SyncAll(b);
+        Assert.Null(b.Notes.Get("gone"));
+        Assert.Equal(new Note("Keep", "1"), b.Notes.Get("keep"));
+
+        // The same id created again reaches a device that still has the old deletion.
+        a.Notes.Upsert("gone", new Note("Back", "3"));
+        await SyncAll(a, b);
+        Assert.Equal(new Note("Back", "3"), b.Notes.Get("gone"));
+    }
+
+    [ServerFact]
     public async Task Vault_documents_travel_through_the_worker_as_blobs()
     {
         var accountId = await CreateAccountAsync();
@@ -464,11 +528,11 @@ public sealed class SyncServerTests : IDisposable
         return body.GetProperty("code").GetString()!;
     }
 
-    private Device NewDevice(string name, string token)
+    private Device NewDevice(string name, string token, TimeSpan? debounce = null)
     {
         var db = Own(new SyncDatabase(Path.Combine(_dir, name + ".db"), TestKeys.Local));
         var transport = new HttpSyncTransport(new InMemorySyncCredentialStore(new SyncCredentials(ServerUrl!, token)), Own(new SyncApiClient()));
-        var engine = Own(new SyncEngine(db, transport, new InMemoryMasterKeyStore(_key), [], debounce: TimeSpan.FromHours(1)));
+        var engine = Own(new SyncEngine(db, transport, new InMemoryMasterKeyStore(_key), [], debounce: debounce ?? TimeSpan.FromHours(1)));
         var notes = Own(new SyncedCollection<Note>(engine, new()
         {
             Name = "notes",
@@ -481,6 +545,16 @@ public sealed class SyncServerTests : IDisposable
     private static async Task SyncAll(params Device[] devices)
     {
         foreach (var device in devices) Assert.Equal(SyncRunOutcome.Completed, (await device.Engine.SyncNowAsync()).Outcome);
+    }
+
+    private static async Task WaitUntil(Func<bool> condition, string what)
+    {
+        var deadline = DateTime.UtcNow.AddSeconds(15);
+        while (!condition())
+        {
+            Assert.True(DateTime.UtcNow < deadline, $"Timed out waiting until {what}.");
+            await Task.Delay(100);
+        }
     }
 
     private async Task<string> CreateAccountAsync(string name = "test")

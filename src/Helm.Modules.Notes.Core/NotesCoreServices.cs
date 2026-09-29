@@ -14,6 +14,7 @@ public static class NotesCoreServices
     public static IServiceCollection AddNotesCore(this IServiceCollection services)
     {
         services.AddSyncedCollection(NotesStore.Options);
+        services.AddSyncGroup("notes.", NotesIds.DisplayName);
         services.AddSingleton(sp => new NotesStore(sp.GetRequiredService<ISyncedCollection<NoteItem>>()));
         services.AddSingleton<ICaptureTarget, NoteCaptureTarget>();
         // Windows registers it again through AddHelmModule; one instance either way.

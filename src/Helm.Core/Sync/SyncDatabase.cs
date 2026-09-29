@@ -296,6 +296,45 @@ public sealed class SyncDatabase : IDisposable
         }
     }
 
+    /// <summary>Every row's key and sync state, without reading (decrypting) the bodies: for a resync's comparison.</summary>
+    internal List<(string Collection, string Id, long Version, bool Deleted, bool Dirty)> ListKeys()
+    {
+        lock (_gate)
+        {
+            using var cmd = Command("SELECT collection, id, version, deleted, dirty FROM records");
+            var keys = new List<(string, string, long, bool, bool)>();
+            using var reader = cmd.ExecuteReader();
+            while (reader.Read()) keys.Add((reader.GetString(0), reader.GetString(1), reader.GetInt64(2), reader.GetInt64(3) != 0, reader.GetInt64(4) != 0));
+            return keys;
+        }
+    }
+
+    /// <summary>Forgets a row entirely: the server no longer has the record (its deletion was cleaned up).</summary>
+    internal void Remove(string collection, string id)
+    {
+        lock (_gate)
+        {
+            using var cmd = Command("DELETE FROM records WHERE collection = $c AND id = $id");
+            cmd.Parameters.AddWithValue("$c", collection);
+            cmd.Parameters.AddWithValue("$id", id);
+            cmd.ExecuteNonQuery();
+        }
+    }
+
+    /// <summary>
+    /// Drops local deletions that reached the server and are older than <paramref name="beforeMs"/>: they only told
+    /// the server, and the server forgets them too after its retention. Pending deletions (dirty) are kept.
+    /// </summary>
+    internal int PurgeTombstones(long beforeMs)
+    {
+        lock (_gate)
+        {
+            using var cmd = Command("DELETE FROM records WHERE deleted = 1 AND dirty = 0 AND version > 0 AND updated_at < $t");
+            cmd.Parameters.AddWithValue("$t", beforeMs);
+            return cmd.ExecuteNonQuery();
+        }
+    }
+
     internal long GetCursor(string name)
     {
         lock (_gate)

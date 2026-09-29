@@ -31,9 +31,16 @@ bucket_name = "helm-sync-blobs"
 
 # Limits that can be raised without a code change (also editable under Settings -> Variables and Secrets).
 # MAX_BLOB_MB: largest document; MAX_QUOTA_MB: highest storage quota the admin may give an account.
+# TOMBSTONE_DAYS: how long a deletion stays on the server before the nightly clean-up removes it.
+#
+# Presigned blob URLs (chunks go straight between devices and R2, not through the Worker) need an R2 API token with
+# Object Read & Write on helm-sync-blobs: set R2_ACCOUNT_ID (your Cloudflare account id), R2_ACCESS_KEY_ID and
+# R2_SECRET_ACCESS_KEY as secrets (a deploy replaces plain variables with this file's, but keeps secrets). Without them
+# blobs keep streaming through the Worker.
 [vars]
 MAX_BLOB_MB = "256"
 MAX_QUOTA_MB = "102400"
+TOMBSTONE_DAYS = "90"
 
 [triggers]
 crons = ["0 19 * * *"]

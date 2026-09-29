@@ -3,7 +3,9 @@
 //   Sync API (Authorization: Bearer helm_pat_…)
 //     GET    /v1/me                       account (with storage usage), this token and the effective limits
 //     POST   /v1/sync/push                { items: [...] } -> { outcomes: [...] }
-//     GET    /v1/sync/pull?since=&limit=  -> { records, nextSeq, hasMore }
+//     GET    /v1/sync/pull?since=&limit=  -> { records, nextSeq, hasMore }; &only= or &exclude= filter collections
+//                                          (410 resync_required when deletions after `since` were cleaned up)
+//     GET    /v1/sync/live                WebSocket: {"type":"changed","seq":N} after each accepted push (sync:read)
 //     GET    /v1/keyring                  wrapped master key (opaque), 404 until the first device uploads it
 //     PUT    /v1/keyring                  { baseVersion, data } compare-and-set
 //     GET    /v1/tokens                   the account's devices           (scope tokens:manage)
@@ -19,6 +21,9 @@
 //     POST   /v1/blobs/:id/commit         seal once every chunk is there (409 blob_incomplete with missing)
 //     DELETE /v1/blobs/:id                committed: to the trash (purged after 30 days); pending: purged now
 //     POST   /v1/blobs/:id/restore        out of the trash
+//     POST   /v1/blobs/:id/upload-urls    { chunks: [{ index, length }] } -> presigned R2 PUT URLs (503 without R2 keys)
+//     POST   /v1/blobs/:id/uploaded       { indexes } after presigned PUTs: records the sizes R2 reports
+//     GET    /v1/blobs/:id/download-urls  presigned R2 GET URLs of a committed blob's chunks
 //
 //   Invites (no Authorization)
 //     POST   /v1/redeem                   { invite, accountName, deviceName } -> new account + its first token
@@ -41,6 +46,7 @@
 //     GET    /admin/backups?prefix=                  list backups
 //     POST   /admin/backups/run                      back up now (also runs nightly from the cron trigger)
 //     POST   /admin/blobs/gc                         { now? } purge due blobs now (also nightly)
+//     POST   /admin/tombstones/gc                    { now? } remove deletions older than TOMBSTONE_DAYS now (also nightly)
 //
 //   Rate limits (per client IP): /v1/redeem, and failed admin sign-ins.
 //
@@ -49,7 +55,9 @@
 import { LIMITS, limitsFromEnv } from "./account-store.ts";
 import { adminAsset } from "./admin-page.ts";
 import { listBackups, readBackup, runBackup } from "./backup.ts";
-import { deleteBlob, getChunk, putChunk, requireBlobs, runBlobGc } from "./blobs.ts";
+import {
+  deleteBlob, downloadUrls, getChunk, putChunk, recordUploaded, requireBlobs, runBlobGc, runTombstoneGc, uploadUrls,
+} from "./blobs.ts";
 import type { AccountAdminOp, ApiInput, ApiOp, Env, Result } from "./objects.ts";
 import { INVITE_LIMITS } from "./registry-store.ts";
 import { HttpError } from "./sql.ts";
@@ -62,7 +70,7 @@ export { AccountObject, RegistryObject } from "./objects.ts";
 const MAX_BODY_BYTES = 8 * 1024 * 1024;
 const MAX_NAME_LENGTH = 100;
 // /v1/blobs, /v1/blobs/:id, /v1/blobs/:id/commit|restore, /v1/blobs/:id/chunks/:index
-const BLOB_ROUTE = /^\/v1\/blobs(?:\/([^/]+)(?:\/(commit|restore|chunks\/([^/]+)))?)?$/;
+const BLOB_ROUTE = /^\/v1\/blobs(?:\/([^/]+)(?:\/(commit|restore|upload-urls|uploaded|download-urls|chunks\/([^/]+)))?)?$/;
 
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
@@ -100,6 +108,9 @@ export default {
         console.log(`blob gc: ${run.accounts} accounts, ${run.blobs} blobs, ${run.objects} objects, ${run.bytes} bytes, failed: ${run.failed.join(",") || "none"}`);
       }, (error) => console.error("blob gc failed", error)));
     }
+    ctx.waitUntil(runTombstoneGc(env, controller.scheduledTime).then((run) => {
+      console.log(`tombstone gc: ${run.accounts} accounts, ${run.purged} deletions, ${run.bytes} bytes, failed: ${run.failed.join(",") || "none"}`);
+    }, (error) => console.error("tombstone gc failed", error)));
   },
 } satisfies ExportedHandler<Env>;
 
@@ -111,8 +122,21 @@ async function handleApi(request: Request, env: Env, url: URL): Promise<Result |
   if (url.pathname === "/v1/blobs" || url.pathname.startsWith("/v1/blobs/")) {
     return handleBlobs(request, env, url, await hashToken(token), parsed.accountId);
   }
+  if (url.pathname === "/v1/sync/live") {
+    if (request.method !== "GET") throw new HttpError(405, "method_not_allowed");
+    // The account's Durable Object authenticates the token and keeps the socket (hibernation).
+    const headers = new Headers(request.headers);
+    headers.delete("Authorization");
+    headers.set("X-Helm-Token-Hash", await hashToken(token));
+    return account(env, parsed.accountId).fetch(new Request(request.url, { method: "GET", headers }));
+  }
 
-  const input: ApiInput = { since: url.searchParams.get("since"), limit: url.searchParams.get("limit") };
+  const input: ApiInput = {
+    since: url.searchParams.get("since"),
+    limit: url.searchParams.get("limit"),
+    only: url.searchParams.get("only"),
+    exclude: url.searchParams.get("exclude"),
+  };
   let op: ApiOp | undefined = ({
     "GET /v1/me": "me",
     "POST /v1/sync/push": "push",
@@ -151,6 +175,12 @@ async function handleBlobs(request: Request, env: Env, url: URL, tokenHash: stri
     if (method === "DELETE") return deleteBlob(bucket, api, admin, accountId, blobId);
   } else if (action === "commit" || action === "restore") {
     if (method === "POST") return api(action === "commit" ? "commitBlob" : "restoreBlob", { blobId });
+  } else if (action === "upload-urls") {
+    if (method === "POST") return uploadUrls(env, api, accountId, blobId, await readJson(request));
+  } else if (action === "uploaded") {
+    if (method === "POST") return recordUploaded(bucket, api, accountId, blobId, await readJson(request));
+  } else if (action === "download-urls") {
+    if (method === "GET") return downloadUrls(env, api, accountId, blobId);
   } else {
     if (!/^\d{1,6}$/.test(indexText)) throw new HttpError(400, "invalid_index");
     const index = Number(indexText);
@@ -240,6 +270,15 @@ async function handleAdmin(request: Request, env: Env, url: URL): Promise<Result
       // Tests pass a later `now` to see what the nightly run will purge weeks from now.
       const now = isRecord(input) && Number.isSafeInteger(input.now) ? (input.now as number) : Date.now();
       return { status: 200, body: await runBlobGc(env, now) };
+    }
+    throw new HttpError(404, "not_found");
+  }
+
+  if (parts[1] === "tombstones") {
+    if (parts.length === 3 && parts[2] === "gc" && method === "POST") {
+      const input = await readJson(request);
+      const now = isRecord(input) && Number.isSafeInteger(input.now) ? (input.now as number) : Date.now();
+      return { status: 200, body: await runTombstoneGc(env, now) };
     }
     throw new HttpError(404, "not_found");
   }

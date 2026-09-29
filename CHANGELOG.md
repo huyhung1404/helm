@@ -9,6 +9,22 @@ Format: [Keep a Changelog](https://keepachangelog.com), versions follow [SemVer]
 - Sync: **Change passphrase** (General → Sync, PC and Android). Enter the current passphrase, or the recovery key if
   you forgot it, then the new one. Devices already syncing carry on without asking, and the recovery key stays the
   same; a device you add from now on unlocks with the new passphrase.
+- Sync: **live updates**. A change made on one device reaches the others within seconds instead of at their next check:
+  Helm keeps a light connection to the sync server open (on Android while Helm is in front), and the server says when
+  something changed. The General → Sync status shows "live" while it is connected. Without it (an older server, no
+  network) Helm checks every 30 seconds or 5 minutes as before.
+- Sync: **choose what syncs on each device** (General → Sync → What syncs on this device): untick Notes, Tracker or
+  Vault to stop syncing that tool on this device, e.g. the vault on a shared PC. What it already has stays; ticking it
+  again downloads the tool's data afresh and sends the changes made here meanwhile.
+
+### Changed
+- Sync: deleted items no longer stay on the server for ever. A deletion is kept 90 days, long enough for every device
+  to learn about it, then removed, which gives the space back. A device that was away longer downloads everything
+  again on its next sync and drops what was deleted meanwhile; a vault that would lose many items that way asks first,
+  as for any mass deletion. Old deletions are also forgotten on each device.
+- Sync: Vault files go straight between your devices and the storage (Cloudflare R2) instead of through the sync
+  server, once the server has its storage keys (see server/sync-worker/README.md). Until then, and if anything goes
+  wrong with it, files take the old way.
 
 ## [0.16.0] - 2026-09-29
 

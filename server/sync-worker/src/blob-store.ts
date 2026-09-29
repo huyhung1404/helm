@@ -163,6 +163,37 @@ export class BlobStore {
     return { id: blob.id, index: index as number, size: length as number };
   }
 
+  /**
+   * Presigned uploads: checks a batch of chunks { index, length } at once, like authorizeChunk, and returns them.
+   * The device then PUTs each chunk straight to R2 and reports it with recordChunks.
+   */
+  authorizeChunks(id: unknown, body: unknown): { index: number; length: number }[] {
+    const chunks = parseChunkList(body, "length");
+    const blob = this.requireLive(id);
+    for (const c of chunks) this.uploadTarget(blob.id, c.index, c.length);
+    const indexes = new Set(chunks.map((c) => c.index));
+    const others = [...this.chunkSizes(blob.id)].filter(([i]) => !indexes.has(i)).reduce((n, [, size]) => n + size, 0);
+    if (others + chunks.reduce((n, c) => n + c.length, 0) > blob.size) throw chunkExceedsBlob(blob);
+    return chunks.map((c) => ({ index: c.index, length: c.length }));
+  }
+
+  /**
+   * Records chunks the Worker found in R2 after presigned uploads, with the sizes R2 reports (never the device's
+   * word). All or nothing: a batch that would not fit the reservation records none of them.
+   */
+  recordChunks(id: unknown, body: unknown): { index: number; size: number }[] {
+    const chunks = parseChunkList(body, "size");
+    return this.sql.transaction(() => chunks.map((c) => this.recordChunk(id, c.index, c.size)).map(({ index, size }) => ({ index, size })));
+  }
+
+  /** Presigned downloads: every chunk of a committed blob (also in the trash) with its size. */
+  readChunks(id: unknown): { chunkCount: number; chunks: { index: number; size: number }[] } {
+    const blob = this.requireAny(id);
+    if (blob.state !== "committed") throw new HttpError(404, "blob_not_found");
+    const chunks = [...this.chunkSizes(blob.id)].sort(([a], [b]) => a - b).map(([index, size]) => ({ index, size }));
+    return { chunkCount: blob.chunk_count, chunks };
+  }
+
   /** Seals a blob once every chunk is uploaded and their sizes add up to the reserved size. */
   commit(id: unknown): BlobDetailJson {
     const blob = this.requireLive(id);
@@ -390,6 +421,22 @@ function toBlobJson(row: BlobRow): BlobJson {
 function requireBlobId(id: unknown): string {
   if (!isBlobId(id)) throw new HttpError(400, "invalid_blob_id", "Blob ids are ULIDs (26 Crockford base32 characters).");
   return id;
+}
+
+/** { chunks: [{ index, <field> }] } with distinct indexes, at most one blob's worth. */
+function parseChunkList(body: unknown, field: "length" | "size"): { index: number; length: number; size: number }[] {
+  if (!isObject(body) || !Array.isArray(body.chunks) || body.chunks.length === 0 || body.chunks.length > 1024) {
+    throw new HttpError(400, "invalid_body", `Expected { chunks: [{ index, ${field} }] }.`);
+  }
+  const seen = new Set<number>();
+  return body.chunks.map((raw: unknown, i) => {
+    if (!isObject(raw) || !Number.isSafeInteger(raw.index) || !Number.isSafeInteger(raw[field]) || seen.has(raw.index as number)) {
+      throw new HttpError(400, "invalid_chunk", `chunks[${i}]`);
+    }
+    seen.add(raw.index as number);
+    const value = raw[field] as number;
+    return { index: raw.index as number, length: value, size: value };
+  });
 }
 
 function chunkExceedsBlob(blob: BlobRow): HttpError {

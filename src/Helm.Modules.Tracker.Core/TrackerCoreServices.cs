@@ -26,6 +26,7 @@ public static class TrackerCoreServices
         services.AddSyncedCollection(new SyncedCollectionOptions<TrackerWorkspace> { Name = TrackerStore.WorkspacesCollection });
         services.AddSyncedCollection(new SyncedCollectionOptions<TrackerItem> { Name = TrackerStore.ItemsCollection });
         services.AddSyncedLog<TrackerEvent>(TrackerStore.HistoryCollection);
+        services.AddSyncGroup("tracker.", TrackerIds.DisplayName);
         services.AddSingleton(sp => new TrackerStore(
             sp.GetRequiredService<ISyncedCollection<TrackerWorkspace>>(),
             sp.GetRequiredService<ISyncedCollection<TrackerItem>>(),

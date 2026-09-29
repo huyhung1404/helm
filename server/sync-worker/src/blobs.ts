@@ -4,9 +4,10 @@
 //
 //   blobs/<accountId>/<blobId>/<index>
 
-import { LIMITS } from "./account-store.ts";
+import { LIMITS, limitsFromEnv } from "./account-store.ts";
 import { blobKey, blobPrefix, type BlobJson } from "./blob-store.ts";
 import type { AccountAdminOp, ApiInput, ApiOp, Env, Result } from "./objects.ts";
+import { PRESIGN_SECONDS, presignConfigured, presignR2 } from "./presign.ts";
 import { HttpError } from "./sql.ts";
 
 export type AccountApi = (op: ApiOp, input: ApiInput) => Promise<Result>;
@@ -116,4 +117,90 @@ async function deletePrefix(bucket: R2Bucket, prefix: string): Promise<number> {
     }
     if (!page.truncated || keys.length === 0) return deleted;
   }
+}
+
+// ---------------------------------------------------------------- presigned URLs
+
+/** The chunks' R2 URLs for uploading: authorized by the Durable Object first, valid for PRESIGN_SECONDS. */
+export async function uploadUrls(env: Env, api: AccountApi, accountId: string, blobId: string, body: unknown): Promise<Result> {
+  requirePresign(env);
+  const allowed = await api("authorizeChunks", { blobId, body });
+  if (allowed.status !== 200) return allowed;
+  const now = new Date();
+  const chunks = (allowed.body as { chunks: { index: number; length: number }[] }).chunks;
+  const urls = await Promise.all(chunks.map(async (c) => ({
+    index: c.index,
+    url: await presignR2(env, "PUT", blobKey(accountId, blobId, c.index), now, c.length),
+  })));
+  return { status: 200, body: { urls, expiresAt: now.getTime() + PRESIGN_SECONDS * 1000 } };
+}
+
+/**
+ * After presigned uploads: looks each chunk up in R2 and records the size R2 reports. A chunk that is not there
+ * answers 409 chunk_missing with the indexes to upload again.
+ */
+export async function recordUploaded(bucket: R2Bucket, api: AccountApi, accountId: string, blobId: string, body: unknown): Promise<Result> {
+  const indexes = isRecord(body) && Array.isArray(body.indexes) ? body.indexes : null;
+  if (!indexes || indexes.length === 0 || indexes.length > 1024 || !indexes.every((i) => Number.isSafeInteger(i) && i >= 0)) {
+    throw new HttpError(400, "invalid_body", "Expected { indexes: [...] }.");
+  }
+  const found = await Promise.all((indexes as number[]).map(async (index) => ({ index, head: await bucket.head(blobKey(accountId, blobId, index)) })));
+  const missing = found.filter((f) => !f.head).map((f) => f.index);
+  if (missing.length > 0) return { status: 409, body: { error: "chunk_missing", message: `${missing.length} chunk(s) are not in storage.`, missing } };
+  return api("recordChunks", { blobId, body: { chunks: found.map((f) => ({ index: f.index, size: f.head!.size })) } });
+}
+
+/** Every chunk's R2 URL for downloading a committed blob, with its size. */
+export async function downloadUrls(env: Env, api: AccountApi, accountId: string, blobId: string): Promise<Result> {
+  requirePresign(env);
+  const allowed = await api("readChunks", { blobId });
+  if (allowed.status !== 200) return allowed;
+  const now = new Date();
+  const { chunkCount, chunks } = allowed.body as { chunkCount: number; chunks: { index: number; size: number }[] };
+  const urls = await Promise.all(chunks.map(async (c) => ({
+    index: c.index,
+    size: c.size,
+    url: await presignR2(env, "GET", blobKey(accountId, blobId, c.index), now),
+  })));
+  return { status: 200, body: { chunkCount, urls, expiresAt: now.getTime() + PRESIGN_SECONDS * 1000 } };
+}
+
+function requirePresign(env: Env): void {
+  if (!presignConfigured(env)) throw new HttpError(503, "presign_disabled", "Set R2_ACCOUNT_ID, R2_ACCESS_KEY_ID and R2_SECRET_ACCESS_KEY to enable presigned URLs.");
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+// ---------------------------------------------------------------- tombstones
+
+export interface TombstoneGcRun {
+  accounts: number;
+  purged: number;
+  bytes: number;
+  failed: string[];
+}
+
+/** Removes, in every account, deletions older than TOMBSTONE_DAYS (see AccountStore.purgeTombstones). */
+export async function runTombstoneGc(env: Env, now: number): Promise<TombstoneGcRun> {
+  const registry = env.REGISTRY.get(env.REGISTRY.idFromName("registry"));
+  const listed = (await registry.list()) as Result;
+  const cutoff = now - limitsFromEnv(env).tombstoneDays * 86_400_000;
+  const run: TombstoneGcRun = { accounts: 0, purged: 0, bytes: 0, failed: [] };
+  for (const { accountId } of (listed.body as { accounts: { accountId: string }[] }).accounts) {
+    try {
+      const stub = env.ACCOUNT.get(env.ACCOUNT.idFromName(accountId));
+      const result = (await stub.admin("purgeTombstones", cutoff)) as Result;
+      if (result.status !== 200) throw new Error(`purgeTombstones returned ${result.status}`);
+      const { purged, bytes } = result.body as { purged: number; bytes: number };
+      run.purged += purged;
+      run.bytes += bytes;
+      run.accounts += 1;
+    } catch (error) {
+      console.error(`tombstone gc of ${accountId} failed`, error);
+      run.failed.push(accountId);
+    }
+  }
+  return run;
 }
