@@ -24,8 +24,19 @@ public sealed partial class ClaudeChatViewModel : ObservableObject
 
     private readonly ChatWindowHost _chatWindow;
 
-    public ClaudeChatViewModel(ClaudeChatModule module, ChatWindowHost chatWindow, IUiDispatcher ui)
+    private readonly ISettingsStore<Helm.Core.Mcp.McpSettings>? _mcpStore;
+    private readonly Helm.Core.Mcp.McpClientConfig? _mcp;
+
+    [ObservableProperty] private bool _mcpEnabled;
+    [ObservableProperty] private bool _mcpAllowChanges;
+
+    public ClaudeChatViewModel(ClaudeChatModule module, ChatWindowHost chatWindow, IUiDispatcher ui, ISettingsStoreFactory? settings = null,
+        Helm.Core.Mcp.McpClientConfig? mcp = null)
     {
+        _mcpStore = settings?.Get<Helm.Core.Mcp.McpSettings>(Helm.Core.Mcp.McpSettings.StoreId);
+        _mcp = mcp;
+        _mcpEnabled = _mcpStore?.Current.Enabled ?? false;
+        _mcpAllowChanges = _mcpStore?.Current.AllowChanges ?? false;
         Module = module;
         _chatWindow = chatWindow;
         _store = module.Settings;
@@ -66,6 +77,26 @@ public sealed partial class ClaudeChatViewModel : ObservableObject
             InitialDirectory = Directory.Exists(WorkingDirectory) ? WorkingDirectory : DefaultWorkingDirectory,
         };
         if (dialog.ShowDialog() == true) WorkingDirectory = dialog.FolderName;
+    }
+
+    /// <summary>The line that adds Helm's tools to Claude Code in a terminal.</summary>
+    public string McpCommand => _mcp?.ClaudeCodeCommand ?? "";
+
+    partial void OnMcpEnabledChanged(bool value) => _mcpStore?.Update(s => s.Enabled = value);
+
+    partial void OnMcpAllowChangesChanged(bool value) => _mcpStore?.Update(s => s.AllowChanges = value);
+
+    [RelayCommand]
+    private void CopyMcpCommand()
+    {
+        try
+        {
+            System.Windows.Clipboard.SetText(McpCommand);
+        }
+        catch (System.Runtime.InteropServices.COMException)
+        {
+            // The clipboard is busy; the command stays selectable in its box.
+        }
     }
 
     partial void OnWorkingDirectoryChanged(string value) => Save(s => s.WorkingDirectory = value.Trim());

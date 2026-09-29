@@ -30,7 +30,8 @@ public sealed class TaskLinkProvider : ILinkProvider
     /// <summary>The id a link to this item uses: the series of a repeating task, else the item.</summary>
     public static string LinkId(string itemId, TrackerItem item) => item.SeriesId ?? itemId;
 
-    public LinkTarget? Resolve(string id) => Find(id) is { } found ? Target(id, found.Id, found.Value) : null;
+    /// <summary>A task by its link id, or by the id of one day of a repeating task (which resolves to the series).</summary>
+    public LinkTarget? Resolve(string id) => Find(id) is { } found ? Target(LinkId(found.Id, found.Value), found.Id, found.Value) : null;
 
     public IEnumerable<LinkTarget> Search(string text, int max)
     {

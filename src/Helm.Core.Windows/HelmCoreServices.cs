@@ -20,6 +20,7 @@ public static class HelmCoreServices
         services.AddSingleton<ISecretProtector, DpapiSecretProtector>();
         services.AddHelmCommon(paths);
         services.AddSingleton<IHotkeyManager, HotkeyManager>();
+        services.AddSingleton(sp => new Mcp.McpClientConfig(paths, sp.GetRequiredService<Settings.ISettingsStoreFactory>()));
         services.AddSingleton<LowLevelKeyboardHook>();
         services.AddSingleton<LowLevelMouseHook>();
         services.AddSingleton<IWindowService, WindowService>();

@@ -80,6 +80,8 @@ public partial class App : Application
             var engine = Services.GetRequiredService<Core.Sync.SyncEngine>();
             engine.Start();
             engine.SetLive(true);
+            // Claude's tools (a pipe only this user can open; each connection checks the MCP settings).
+            Services.GetRequiredService<Core.Mcp.McpPipeHost>().Start();
         }
         catch (Exception ex)
         {

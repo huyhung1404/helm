@@ -28,6 +28,9 @@ public sealed record ClaudeSessionOptions(string WorkingDirectory)
     public string? ResumeSessionId { get; init; }
 
     public ClaudePermissionMode PermissionMode { get; init; } = ClaudePermissionMode.Manual;
+
+    /// <summary>An MCP config file (--mcp-config) adding Helm's own tools (notes, Tracker) to the chat.</summary>
+    public string? McpConfigPath { get; init; }
 }
 
 public sealed class ClaudeSessionException(string message, Exception? inner = null) : Exception(message, inner);
@@ -149,6 +152,7 @@ public sealed class ClaudeSession : IAsyncDisposable
         if (options.PermissionMode == ClaudePermissionMode.Plan) args.AddRange(["--permission-mode", "plan"]);
         if (!string.IsNullOrWhiteSpace(options.Model)) args.AddRange(["--model", options.Model]);
         if (!string.IsNullOrWhiteSpace(options.ResumeSessionId)) args.AddRange(["--resume", options.ResumeSessionId]);
+        if (!string.IsNullOrWhiteSpace(options.McpConfigPath)) args.AddRange(["--mcp-config", options.McpConfigPath]);
         return args;
     }
 

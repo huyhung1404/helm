@@ -58,6 +58,33 @@
                 SelectedItem="{Binding PermissionMode}" />
         </ui:CardControl>
 
+        <!-- Helm's MCP server: notes and Tracker for Claude (never the vault) -->
+        <TextBlock Text="Helm tools for Claude" Style="{DynamicResource HelmSectionHeader}" />
+        <ui:CardControl Margin="0,0,0,4" Icon="{ui:SymbolIcon PlugConnected24}">
+            <ui:CardControl.Header>
+                <core:CardHeader Title="Let Claude use your notes and Tracker"
+                                 Description="Claude can find, read and write your notes, to-do lists and debt book, in Helm's chats and in Claude Code where you add it. It asks you before each use. The vault is never included." />
+            </ui:CardControl.Header>
+            <ui:ToggleSwitch HorizontalAlignment="Right" IsChecked="{Binding McpEnabled}" AutomationProperties.Name="Let Claude use your notes and Tracker" />
+        </ui:CardControl>
+        <ui:CardControl Margin="0,0,0,4" Icon="{ui:SymbolIcon Edit24}" IsEnabled="{Binding McpEnabled}">
+            <ui:CardControl.Header>
+                <core:CardHeader Title="Allow changes" Description="Off: Claude can only read. On: it can also add and edit notes and tasks, tick tasks and add debts (nothing is deleted for good)." />
+            </ui:CardControl.Header>
+            <ui:ToggleSwitch HorizontalAlignment="Right" IsChecked="{Binding McpAllowChanges}" AutomationProperties.Name="Allow changes" />
+        </ui:CardControl>
+        <Border Style="{DynamicResource HelmSurface}" Margin="0,0,0,4" IsEnabled="{Binding McpEnabled}">
+            <StackPanel>
+                <TextBlock Text="Claude Code in a terminal" FontWeight="SemiBold" />
+                <TextBlock Style="{DynamicResource HelmSecondaryText}" TextWrapping="Wrap" Margin="0,4,0,8"
+                           Text="Run this once to give Claude Code the same tools in every folder. Helm has to be running when Claude uses them." />
+                <DockPanel>
+                    <ui:Button DockPanel.Dock="Right" Margin="8,0,0,0" Content="Copy" Icon="{ui:SymbolIcon Copy24}" Command="{Binding CopyMcpCommandCommand}" />
+                    <ui:TextBox IsReadOnly="True" FontFamily="Consolas" Text="{Binding McpCommand, Mode=OneWay}" AutomationProperties.Name="Command to add Helm to Claude Code" />
+                </DockPanel>
+            </StackPanel>
+        </Border>
+
         <TextBlock Text="Advanced" Style="{DynamicResource HelmSectionHeader}" />
         <ui:CardControl Margin="0,0,0,4" Icon="{ui:SymbolIcon Keyboard24}">
             <ui:CardControl.Header>

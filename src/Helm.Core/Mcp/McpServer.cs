@@ -1,0 +1,220 @@
+using System.Text;
+using System.Text.Json;
+using System.Text.Json.Nodes;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
+
+namespace Helm.Core.Mcp;
+
+/// <summary>
+/// One tool Claude can call. <see cref="InputSchema"/> is a JSON Schema object; <see cref="Run"/> gets the arguments
+/// and returns what goes back to Claude (serialized as JSON text). A <see cref="McpToolException"/> becomes an error
+/// result Claude can read and correct.
+/// </summary>
+public sealed record McpTool(string Name, string Description, JsonObject InputSchema, Func<JsonElement, CancellationToken, Task<object?>> Run)
+{
+    /// <summary>Only reads (Claude may call it without asking); a tool that writes says so to the client.</summary>
+    public bool ReadOnly { get; init; }
+
+    /// <summary>A tool that takes no arguments.</summary>
+    public static JsonObject NoArguments() => new() { ["type"] = "object", ["properties"] = new JsonObject() };
+}
+
+/// <summary>A tool call that cannot be done as asked (unknown id, invalid date…): Claude sees the message.</summary>
+public sealed class McpToolException(string message) : Exception(message);
+
+/// <summary>Tools a Helm module offers over MCP (registered as <c>IMcpToolProvider</c> singletons).</summary>
+public interface IMcpToolProvider
+{
+    /// <summary>The module whose tools these are: they are offered only while it is turned on (null: always).</summary>
+    string? ModuleId { get; }
+
+    IEnumerable<McpTool> Tools { get; }
+}
+
+/// <summary>
+/// A Model Context Protocol server over one connection: newline-delimited JSON-RPC 2.0 (the stdio transport), with
+/// tools only. Requests are answered one at a time, in order. See https://modelcontextprotocol.io.
+/// </summary>
+public sealed class McpServer
+{
+    /// <summary>Newest first; a client asking for one of these gets it back, any other gets the newest.</summary>
+    public static readonly IReadOnlyList<string> ProtocolVersions = ["2025-06-18", "2025-03-26", "2024-11-05"];
+
+    private const int MaxLineBytes = 4 * 1024 * 1024;
+    // Compact, with Vietnamese letters and quotes as they are (no escapes): fewer tokens for Claude to read.
+    private static readonly JsonSerializerOptions Output = new(JsonSerializerDefaults.Web)
+    {
+        Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping,
+        DefaultIgnoreCondition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull,
+    };
+    private readonly IReadOnlyDictionary<string, McpTool> _tools;
+    private readonly string _version;
+    private readonly string _instructions;
+    private readonly ILogger _logger;
+
+    public McpServer(IEnumerable<McpTool> tools, string version, string instructions, ILogger? logger = null)
+    {
+        _tools = tools.GroupBy(t => t.Name, StringComparer.Ordinal).ToDictionary(g => g.Key, g => g.First(), StringComparer.Ordinal);
+        _version = version;
+        _instructions = instructions;
+        _logger = logger ?? NullLogger.Instance;
+    }
+
+    public IReadOnlyCollection<string> ToolNames => _tools.Keys.ToList();
+
+    /// <summary>Serves until the input ends (the client closed the connection) or <paramref name="ct"/> is cancelled.</summary>
+    public async Task RunAsync(Stream input, Stream output, CancellationToken ct)
+    {
+        using var reader = new StreamReader(input, new UTF8Encoding(false), detectEncodingFromByteOrderMarks: false, bufferSize: 16 * 1024, leaveOpen: true);
+        await using var writer = new StreamWriter(output, new UTF8Encoding(false), bufferSize: 16 * 1024, leaveOpen: true) { NewLine = "\n", AutoFlush = true };
+        while (!ct.IsCancellationRequested)
+        {
+            var line = await reader.ReadLineAsync(ct).ConfigureAwait(false);
+            if (line is null) return;
+            line = line.TrimStart('﻿'); // some clients start the stream with a byte order mark
+            if (line.Length == 0) continue;
+            var reply = line.Length > MaxLineBytes ? Error(null, -32600, "Message too large.") : await HandleAsync(line, ct).ConfigureAwait(false);
+            if (reply is not null) await writer.WriteLineAsync(reply.ToJsonString(Output)).ConfigureAwait(false);
+        }
+    }
+
+    /// <summary>One JSON-RPC message in, the reply out (null for a notification).</summary>
+    public async Task<JsonObject?> HandleAsync(string line, CancellationToken ct)
+    {
+        JsonNode? message;
+        try
+        {
+            message = JsonNode.Parse(line);
+        }
+        catch (JsonException)
+        {
+            return Error(null, -32700, "Parse error.");
+        }
+        if (message is JsonArray) return Error(null, -32600, "Batches are not supported.");
+        if (message is not JsonObject request || request["method"]?.GetValue<string>() is not { } method) return Error(null, -32600, "Invalid request.");
+        var id = request["id"]?.DeepClone();
+        var isNotification = !request.ContainsKey("id");
+        try
+        {
+            JsonNode? result = method switch
+            {
+                "initialize" => Initialize(request["params"] as JsonObject),
+                "ping" => new JsonObject(),
+                "tools/list" => ListTools(),
+                "tools/call" => await CallToolAsync(request["params"] as JsonObject, ct).ConfigureAwait(false),
+                _ when method.StartsWith("notifications/", StringComparison.Ordinal) => null,
+                _ => throw new JsonRpcException(-32601, $"Method not found: {method}"),
+            };
+            if (isNotification) return null;
+            return new JsonObject { ["jsonrpc"] = "2.0", ["id"] = id, ["result"] = result ?? new JsonObject() };
+        }
+        catch (JsonRpcException ex)
+        {
+            return isNotification ? null : Error(id, ex.Code, ex.Message);
+        }
+    }
+
+    private JsonObject Initialize(JsonObject? parameters)
+    {
+        var asked = parameters?["protocolVersion"]?.GetValue<string>();
+        return new JsonObject
+        {
+            ["protocolVersion"] = asked is not null && ProtocolVersions.Contains(asked) ? asked : ProtocolVersions[0],
+            ["capabilities"] = new JsonObject { ["tools"] = new JsonObject { ["listChanged"] = false } },
+            ["serverInfo"] = new JsonObject { ["name"] = "helm", ["title"] = "Helm", ["version"] = _version },
+            ["instructions"] = _instructions,
+        };
+    }
+
+    private JsonObject ListTools() => new()
+    {
+        ["tools"] = new JsonArray(_tools.Values.OrderBy(t => t.Name, StringComparer.Ordinal).Select(t => (JsonNode)new JsonObject
+        {
+            ["name"] = t.Name,
+            ["description"] = t.Description,
+            ["inputSchema"] = t.InputSchema.DeepClone(),
+            ["annotations"] = new JsonObject { ["readOnlyHint"] = t.ReadOnly, ["destructiveHint"] = false, ["openWorldHint"] = false },
+        }).ToArray()),
+    };
+
+    private async Task<JsonObject> CallToolAsync(JsonObject? parameters, CancellationToken ct)
+    {
+        var name = parameters?["name"]?.GetValue<string>() ?? throw new JsonRpcException(-32602, "Missing tool name.");
+        if (!_tools.TryGetValue(name, out var tool)) throw new JsonRpcException(-32602, $"Unknown tool: {name}");
+        using var arguments = JsonDocument.Parse(parameters?["arguments"]?.ToJsonString() ?? "{}");
+        try
+        {
+            var result = await tool.Run(arguments.RootElement, ct).ConfigureAwait(false);
+            var text = result as string ?? JsonSerializer.Serialize(result, Output);
+            return new JsonObject { ["content"] = new JsonArray(new JsonObject { ["type"] = "text", ["text"] = text }), ["isError"] = false };
+        }
+        catch (Exception ex) when (ex is McpToolException or ArgumentException or FormatException or InvalidOperationException or KeyNotFoundException)
+        {
+            // What was wrong with the call: Claude reads it and can try again.
+            _logger.LogInformation("MCP tool {Tool} refused: {Message}", name, ex.Message);
+            return new JsonObject { ["content"] = new JsonArray(new JsonObject { ["type"] = "text", ["text"] = ex.Message }), ["isError"] = true };
+        }
+    }
+
+    private static JsonObject Error(JsonNode? id, int code, string message) => new()
+    {
+        ["jsonrpc"] = "2.0",
+        ["id"] = id,
+        ["error"] = new JsonObject { ["code"] = code, ["message"] = message },
+    };
+
+    private sealed class JsonRpcException(int code, string message) : Exception(message)
+    {
+        public int Code { get; } = code;
+    }
+}
+
+/// <summary>Reading tool arguments: typed getters that explain what is wrong.</summary>
+public static class McpArgs
+{
+    public static string? String(JsonElement args, string name) =>
+        args.ValueKind == JsonValueKind.Object && args.TryGetProperty(name, out var value) && value.ValueKind != JsonValueKind.Null
+            ? value.ValueKind == JsonValueKind.String ? value.GetString() : throw new McpToolException($"{name} must be a string.")
+            : null;
+
+    public static string RequiredString(JsonElement args, string name) =>
+        String(args, name) is { Length: > 0 } value ? value : throw new McpToolException($"{name} is required.");
+
+    public static int? Int(JsonElement args, string name) =>
+        args.ValueKind == JsonValueKind.Object && args.TryGetProperty(name, out var value) && value.ValueKind != JsonValueKind.Null
+            ? value.TryGetInt32(out var n) ? n : throw new McpToolException($"{name} must be a whole number.")
+            : null;
+
+    public static bool? Bool(JsonElement args, string name) =>
+        args.ValueKind == JsonValueKind.Object && args.TryGetProperty(name, out var value) && value.ValueKind is JsonValueKind.True or JsonValueKind.False
+            ? value.GetBoolean()
+            : null;
+
+    public static IReadOnlyList<string> Strings(JsonElement args, string name) =>
+        args.ValueKind == JsonValueKind.Object && args.TryGetProperty(name, out var value) && value.ValueKind == JsonValueKind.Array
+            ? value.EnumerateArray().Select(v => v.ValueKind == JsonValueKind.String ? v.GetString()! : throw new McpToolException($"{name} must be a list of strings.")).ToList()
+            : [];
+
+    /// <summary>A JSON Schema object with these properties (name → schema) and required names.</summary>
+    public static JsonObject Schema(params (string Name, JsonObject Schema, bool Required)[] properties)
+    {
+        var props = new JsonObject();
+        foreach (var (name, schema, _) in properties) props[name] = schema;
+        var schemaObject = new JsonObject { ["type"] = "object", ["properties"] = props };
+        var required = properties.Where(p => p.Required).Select(p => (JsonNode)p.Name).ToArray();
+        if (required.Length > 0) schemaObject["required"] = new JsonArray(required);
+        return schemaObject;
+    }
+
+    public static JsonObject Text(string description) => new() { ["type"] = "string", ["description"] = description };
+
+    public static JsonObject Number(string description) => new() { ["type"] = "integer", ["description"] = description };
+
+    public static JsonObject Flag(string description) => new() { ["type"] = "boolean", ["description"] = description };
+
+    public static JsonObject OneOf(string description, params string[] values) =>
+        new() { ["type"] = "string", ["description"] = description, ["enum"] = new JsonArray(values.Select(v => (JsonNode)v).ToArray()) };
+
+    public static JsonObject List(string description) => new() { ["type"] = "array", ["items"] = new JsonObject { ["type"] = "string" }, ["description"] = description };
+}

@@ -52,6 +52,20 @@ internal static class HelmHost
         builder.Services.AddSingleton<Updates.VelopackUpdateService>();
         builder.Services.AddSingleton<Core.Services.IUpdateService>(sp => sp.GetRequiredService<Updates.VelopackUpdateService>());
 
+        // Helm's MCP server: the tools of the modules that are on, for Claude (Helm's chats and Claude Code).
+        builder.Services.AddSingleton(sp => new Core.Mcp.McpPipeHost(paths, () =>
+        {
+            var settings = sp.GetRequiredService<ISettingsStoreFactory>().Get<Core.Mcp.McpSettings>(Core.Mcp.McpSettings.StoreId).Current;
+            if (!settings.Enabled) return null;
+            var modules = sp.GetRequiredService<Core.Modules.IModuleHost>();
+            var tools = sp.GetServices<Core.Mcp.IMcpToolProvider>()
+                .Where(p => p.ModuleId is not { } id || modules.Find(id)?.IsEnabled == true)
+                .SelectMany(p => p.Tools)
+                .Where(t => settings.AllowChanges || t.ReadOnly);
+            return new Core.Mcp.McpServer(tools, Shell.Services.AppInfo.Version, Core.Mcp.McpEndpoint.Instructions,
+                sp.GetRequiredService<ILoggerFactory>().CreateLogger<Core.Mcp.McpServer>());
+        }, sp.GetRequiredService<ILogger<Core.Mcp.McpPipeHost>>()));
+
         // Shell views and view models
         builder.Services.AddSingleton<MainWindowViewModel>();
         builder.Services.AddSingleton<MainWindow>();

@@ -27,8 +27,12 @@ public sealed class ClaudeChatModule : HelmModuleBase
     private int _probing;
     private HotkeyRegistration? _registration;
 
-    public ClaudeChatModule(ISettingsStoreFactory settings, IChildProcessLauncher launcher, IHotkeyManager hotkeys, ILogger<ClaudeChatModule> logger)
+    private readonly Helm.Core.Mcp.McpClientConfig? _mcp;
+
+    public ClaudeChatModule(ISettingsStoreFactory settings, IChildProcessLauncher launcher, IHotkeyManager hotkeys, ILogger<ClaudeChatModule> logger,
+        Helm.Core.Mcp.McpClientConfig? mcp = null)
     {
+        _mcp = mcp;
         Settings = settings.Get<ClaudeChatSettings>(ModuleId);
         _launcher = launcher;
         _hotkeys = hotkeys;
@@ -133,6 +137,7 @@ public sealed class ClaudeChatModule : HelmModuleBase
             Model = model ?? (string.IsNullOrWhiteSpace(settings.Model) ? null : settings.Model.Trim()),
             PermissionMode = settings.PermissionMode,
             ResumeSessionId = resumeSessionId,
+            McpConfigPath = TryWriteMcpConfig(),
         };
         var session = await ClaudeSession.StartAsync(_launcher, cli, options, _logger, ct).ConfigureAwait(false);
         lock (_sessions) _sessions.Add(session);
@@ -213,6 +218,20 @@ public sealed class ClaudeChatModule : HelmModuleBase
         if (cli == Cli) return;
         Cli = cli;
         CliChanged?.Invoke(this, EventArgs.Empty);
+    }
+
+    /// <summary>Helm's own tools for the chat, when they are on; a chat without them is better than no chat.</summary>
+    private string? TryWriteMcpConfig()
+    {
+        try
+        {
+            return _mcp?.WriteConfigFile();
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            _logger.LogWarning(ex, "Could not write the MCP config for Claude Chat");
+            return null;
+        }
     }
 
     private static string MissingCliMessage(ClaudeChatSettings settings) => string.IsNullOrWhiteSpace(settings.CliPath)
