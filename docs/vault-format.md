@@ -55,7 +55,10 @@ Items are stored in collection `vault.items`, one record per version stream. The
 The item JSON has these fields:
 - `kind`: one of `login`, `note`, `card`, `identity`, `document`.
 - `title`.
-- `fields`: a list of `{ name, value, kind }`.
+- `fields`: a list of `{ name, value, kind }`. A `totp` field holds a two-factor secret: a base32 key or an
+  `otpauth://totp/…` link (RFC 6238; SHA1, SHA256 or SHA512, 6–8 digits, 1–300 s). A `url` field
+  `androidapp://<package>` or `app://<process>` remembers an Android app or a Windows program for autofill and
+  auto-type. Helm 0.16 and older cannot read an item with a `totp` field (they keep it).
 - `notes`, `tags`, `favorite`.
 - `attachments`: a list of `{ id, name, mediaType, size, blob }`.
 - `createdAtMs`, `modifiedAtMs`.
@@ -125,6 +128,7 @@ The content maps as follows:
 - One group per kind of item.
 - For logins: the first username, password and URL become `UserName`, `Password` and `URL`.
 - Every other field becomes a custom string. Secrets and passwords are protected strings.
+- The first two-factor field becomes the protected string `otp`, as an `otpauth://` link (what KeePassXC reads).
 - Documents become attachments, and the history becomes the entry history.
 
 The tests open every export with `keepassxc-cli`.

@@ -30,12 +30,12 @@ Notes, tasks, a password vault, a command palette and a Claude Code chat in one 
 
 | Tool | Platforms | What it does |
 |---|---|---|
-| Claude Chat | PC | Chat with Claude Code in its own window, several projects side by side |
+| Claude Chat | PC | Chat with Claude Code in its own window, several projects side by side; **Helm tools for Claude** (MCP): Claude can read and write your notes and Tracker, in Helm's chats and in Claude Code (`Helm.exe --mcp`) |
 | Command Palette | PC | Alt+Space: one search box, Helm first (notes, tasks, vault items while unlocked, settings), then Windows: apps, files, open windows, Windows Settings, the web |
-| Notes | PC + Android | Notes that save as you type and sync end-to-end encrypted; a note edited on two devices keeps both versions; 30-day trash; Markdown export |
+| Notes | PC + Android | Notes that save as you type and sync end-to-end encrypted; a note edited on two devices keeps both versions; 30-day trash; Markdown export; notes link to tasks and people in the debt book |
 | Quick Capture | PC + Android | Save a note, task or debt from anywhere: Win+Alt+N on PC, Share → "Save to Helm" or a Quick Settings tile on Android, with short forms like `/t buy milk tomorrow 9h` |
-| Tracker | PC + Android | To-do lists and debt books in workspaces, synced across devices; completions are logged with their start and finish times for reports and CSV export, and Android has a home-screen widget |
-| Vault | PC + Android | Passwords, secure notes, cards, identities and documents, end-to-end encrypted, synced, and backed up to a folder you choose ([guide](docs/vault-guide.md), [design](docs/vault-design.md), [format](docs/vault-format.md)) |
+| Tracker | PC + Android | To-do lists and debt books in workspaces, synced across devices; completions are logged with their start and finish times for reports and CSV export; a month/week calendar with .ics export; linked notes; Android has a home-screen widget |
+| Vault | PC + Android | Passwords, secure notes, cards, identities and documents, end-to-end encrypted, synced, and backed up to a folder you choose; two-factor codes (TOTP); autofill on Android and auto-type (Ctrl+Alt+A) on PC ([guide](docs/vault-guide.md), [design](docs/vault-design.md), [format](docs/vault-format.md)) |
 
 More tools are planned (see [Roadmap](#roadmap)). Always On Top is built but not registered; it comes back with one line in `src/Helm.App/Hosting/HelmModules.cs`. The previous Zones module is kept in git history (tag `v0.3.0`).
 
