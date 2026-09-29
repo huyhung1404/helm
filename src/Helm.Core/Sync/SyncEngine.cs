@@ -121,8 +121,12 @@ public sealed class SyncEngine : ISyncService, IDisposable
     private string[] _excluded = [];
     private readonly object _liveGate = new();
     private SyncLiveChannel? _live;
-    private long _lastOwnSeq;
+    // Seqs of this device's own accepted pushes (their live announcements are not news), and the highest seq
+    // another device announced.
+    private readonly System.Collections.Concurrent.ConcurrentDictionary<long, byte> _ownSeqs = new();
     private long _liveSeq;
+    // Bumped on every change of the selection: a resync that saw it change must not drop anything.
+    private int _selectionVersion;
     private long _lastRunTicks;
 
     public SyncEngine(
@@ -207,6 +211,7 @@ public sealed class SyncEngine : ISyncService, IDisposable
                 _db.SetMetaValue(CatchUpMeta, catchUp.Count == 0 ? null : string.Join(',', catchUp));
             });
             Volatile.Write(ref _excluded, list);
+            Interlocked.Increment(ref _selectionVersion);
         }
         _logger.LogInformation("Sync of {Prefix}* on this device: {State}", prefix, excluded ? "off" : "on");
         RequestSync();
@@ -243,9 +248,10 @@ public sealed class SyncEngine : ISyncService, IDisposable
     /// </summary>
     private void OnLiveSeq(long seq)
     {
+        if (_ownSeqs.ContainsKey(seq)) return;
         InterlockedMax(ref _liveSeq, seq);
         if (_run.CurrentCount == 0) return;
-        if (seq > Math.Max(_db.GetCursor(MainCursor), Interlocked.Read(ref _lastOwnSeq))) RequestSync();
+        if (seq > _db.GetCursor(MainCursor)) RequestSync();
     }
 
     private static void InterlockedMax(ref long target, long value)
@@ -306,7 +312,10 @@ public sealed class SyncEngine : ISyncService, IDisposable
             _keyring?.Dispose();
             _keyring = null;
         }
-        // The credentials may have changed too: the live channel connects again with the current ones.
+        // The credentials (even the account) may have changed too: forget what the old connection announced, and
+        // connect again with the current ones.
+        Interlocked.Exchange(ref _liveSeq, 0);
+        _ownSeqs.Clear();
         _live?.Reconnect();
     }
 
@@ -318,6 +327,7 @@ public sealed class SyncEngine : ISyncService, IDisposable
 
         await _run.WaitAsync(ct).ConfigureAwait(false);
         var run = new RunState();
+        var completed = false;
         try
         {
             SetStatus(Status with { State = SyncState.Syncing });
@@ -338,6 +348,7 @@ public sealed class SyncEngine : ISyncService, IDisposable
                 return run.Result(SyncRunOutcome.QuotaExceeded);
             }
             SetStatus(new SyncStatus(SyncState.Idle, _time.GetUtcNow(), null));
+            completed = true;
             return run.Result(SyncRunOutcome.Completed);
         }
         catch (OperationCanceledException) when (ct.IsCancellationRequested)
@@ -390,8 +401,9 @@ public sealed class SyncEngine : ISyncService, IDisposable
             Interlocked.Exchange(ref _lastRunTicks, Environment.TickCount64);
             _run.Release();
             RaiseChanges(run);
-            // Something announced during the run that the run did not fetch (it came after the pull): go again.
-            if (Interlocked.Read(ref _liveSeq) > Math.Max(_db.GetCursor(MainCursor), Interlocked.Read(ref _lastOwnSeq))) RequestSync();
+            // Something another device announced during the run that the run did not fetch (it came after the pull):
+            // go again. Only after a complete run: a held, offline or refused run would otherwise loop.
+            if (completed && Interlocked.Read(ref _liveSeq) > _db.GetCursor(MainCursor)) RequestSync();
         }
     }
 
@@ -445,7 +457,7 @@ public sealed class SyncEngine : ISyncService, IDisposable
         {
             // Records whose files are still only on this device wait for the next run, and so do the collections this
             // device does not sync.
-            var dirty = _db.GetDirty(PushBatchSize * 10).Where(row => !IsExcluded(row.Collection) && CanPush(row)).Take(PushBatchSize).ToList();
+            var dirty = _db.GetDirty(PushBatchSize * 10, ExcludedPrefixes).Where(CanPush).Take(PushBatchSize).ToList();
             if (dirty.Count == 0) return;
 
             var items = dirty.Select(row => new PushItem(row.Collection, row.Id, row.Version, row.Deleted,
@@ -463,7 +475,8 @@ public sealed class SyncEngine : ISyncService, IDisposable
                     if (!byKey.TryGetValue((outcome.Collection, outcome.Id), out var row)) continue;
                     if (outcome.Accepted)
                     {
-                        InterlockedMax(ref _lastOwnSeq, outcome.Seq);
+                        if (_ownSeqs.Count > 4096) _ownSeqs.Clear();
+                        _ownSeqs.TryAdd(outcome.Seq, 0);
                         _db.MarkPushed(row.Collection, row.Id, row.LocalRev, outcome.Version);
                         run.Pushed++;
                         progressed = true;
@@ -522,7 +535,12 @@ public sealed class SyncEngine : ISyncService, IDisposable
                 _db.SetMetaValue(ResyncMeta, "1");
             }
         }
-        var next = await ResyncAsync(keyring, run, filter, ct).ConfigureAwait(false);
+        // Null: the selection changed meanwhile; the resync runs again next time (the flag stays).
+        if (await ResyncAsync(keyring, run, filter, ct).ConfigureAwait(false) is not { } next)
+        {
+            RequestSync();
+            return;
+        }
         _db.InTransaction(() =>
         {
             _db.SetCursor(MainCursor, next);
@@ -538,9 +556,16 @@ public sealed class SyncEngine : ISyncService, IDisposable
     {
         foreach (var prefix in ParseList(_db.GetMetaValue(CatchUpMeta)))
         {
-            if (!IsExcluded(prefix)) await ResyncAsync(keyring, run, new SyncPullFilter(Only: [prefix]), ct).ConfigureAwait(false);
+            var version = Volatile.Read(ref _selectionVersion);
+            if (!IsExcluded(prefix) && await ResyncAsync(keyring, run, new SyncPullFilter(Only: [prefix]), ct).ConfigureAwait(false) is null)
+            {
+                RequestSync();
+                continue; // turned off (and maybe on) meanwhile: stays on the list, done again next run
+            }
             lock (_selectionGate)
             {
+                // Toggled while it ran: keep the entry (turning it on again asked for a fresh catch-up).
+                if (Volatile.Read(ref _selectionVersion) != version) continue;
                 var left = ParseList(_db.GetMetaValue(CatchUpMeta)).Where(p => p != prefix).ToList();
                 _db.SetMetaValue(CatchUpMeta, left.Count == 0 ? null : string.Join(',', left));
             }
@@ -552,14 +577,18 @@ public sealed class SyncEngine : ISyncService, IDisposable
     /// has (their deletions were cleaned up there). Progress is not saved: the comparison needs the complete list, so an
     /// interrupted resync starts over. Returns the seq to continue from.
     /// </summary>
-    private async Task<long> ResyncAsync(SyncKeyring keyring, RunState run, SyncPullFilter filter, CancellationToken ct)
+    /// <returns>Null when this device's selection changed during the pull: then nothing is dropped (records skipped
+    /// while a prefix was off would look missing), and the caller tries again.</returns>
+    private async Task<long?> ResyncAsync(SyncKeyring keyring, RunState run, SyncPullFilter filter, CancellationToken ct)
     {
         for (var attempt = 1; ; attempt++)
         {
             var seen = new HashSet<(string, string)>();
+            var version = Volatile.Read(ref _selectionVersion);
             try
             {
                 var next = await PullScopeAsync(keyring, run, 0, filter, null, seen, ct).ConfigureAwait(false);
+                if (Volatile.Read(ref _selectionVersion) != version) return null;
                 DropMissing(filter, seen, run);
                 return next;
             }
@@ -721,7 +750,13 @@ public sealed class SyncEngine : ISyncService, IDisposable
                 _logger.LogInformation("Blob clean-up skipped: unknown collections {Collections}", string.Join(", ", unknown));
                 return;
             }
-            // Collections this device does not sync are out of date here: their newer records may use blobs it never saw.
+            // Collections this device does not sync (or still has to download again) are out of date here: their newer
+            // records may use blobs it never saw.
+            if (_db.GetMetaValue(CatchUpMeta) is not null || _db.GetMetaValue(ResyncMeta) is not null)
+            {
+                _logger.LogInformation("Blob clean-up skipped: a download of everything is still pending");
+                return;
+            }
             if (ExcludedPrefixes.Count > 0)
             {
                 _logger.LogInformation("Blob clean-up skipped: this device does not sync {Prefixes}", string.Join(", ", ExcludedPrefixes));

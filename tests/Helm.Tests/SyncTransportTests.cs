@@ -259,7 +259,7 @@ public sealed class SyncTransportTests
 
         await Assert.ThrowsAsync<SyncResyncRequiredException>(() =>
             transport.PullAsync(3, 500, new SyncPullFilter(Exclude: ["vault.", "notes.items"]), CancellationToken.None));
-        Assert.Equal("?since=3&limit=500&exclude=vault.%2Cnotes.items", query);
+        Assert.Equal("?since=3&limit=500&resync=1&exclude=vault.%2Cnotes.items", query);
     }
 
     private sealed record Note(string Title);

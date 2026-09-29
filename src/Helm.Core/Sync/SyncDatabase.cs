@@ -155,12 +155,21 @@ public sealed class SyncDatabase : IDisposable
         }
     }
 
-    internal List<SyncRow> GetDirty(int limit)
+    /// <param name="excludedPrefixes">Collections this device does not sync (prefixes ending in "."): left out in the
+    /// query itself, so a pile of their edits never hides the others' behind the limit.</param>
+    internal List<SyncRow> GetDirty(int limit, IReadOnlyList<string>? excludedPrefixes = null)
     {
         lock (_gate)
         {
-            using var cmd = Command($"SELECT {Columns} FROM records WHERE dirty = 1 ORDER BY updated_at LIMIT $n");
+            var exclude = excludedPrefixes ?? [];
+            var where = string.Concat(exclude.Select((_, i) => $" AND substr(collection, 1, $l{i}) <> $p{i}"));
+            using var cmd = Command($"SELECT {Columns} FROM records WHERE dirty = 1{where} ORDER BY updated_at LIMIT $n");
             cmd.Parameters.AddWithValue("$n", limit);
+            for (var i = 0; i < exclude.Count; i++)
+            {
+                cmd.Parameters.AddWithValue($"$l{i}", exclude[i].Length);
+                cmd.Parameters.AddWithValue($"$p{i}", exclude[i]);
+            }
             return ReadRows(cmd);
         }
     }

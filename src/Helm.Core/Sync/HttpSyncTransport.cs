@@ -80,7 +80,8 @@ public sealed class SyncApiClient : IDisposable
 
     public async Task<PullPage> PullAsync(SyncCredentials credentials, long sinceSeq, int limit, SyncPullFilter filter, CancellationToken ct)
     {
-        var path = $"v1/sync/pull?since={sinceSeq}&limit={limit}";
+        // resync=1: this client handles 410 resync_required (older ones are never sent it).
+        var path = $"v1/sync/pull?since={sinceSeq}&limit={limit}&resync=1";
         if (filter.Only is { Count: > 0 } only) path += "&only=" + Uri.EscapeDataString(string.Join(',', only));
         else if (filter.Exclude is { Count: > 0 } exclude) path += "&exclude=" + Uri.EscapeDataString(string.Join(',', exclude));
         try

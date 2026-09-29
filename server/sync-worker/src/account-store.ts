@@ -328,12 +328,14 @@ export class AccountStore {
    * A cursor older than the last purged deletion (410 resync_required) may have missed deletions that are gone from
    * the server: the device pulls again from 0 and drops what the server no longer has. since = 0 is always allowed.
    */
-  pull(sinceParam: string | null, limitParam: string | null, filter: PullFilter = {}): { records: RecordJson[]; nextSeq: number; hasMore: boolean } {
+  pull(sinceParam: string | null, limitParam: string | null, filter: PullFilter = {}, canResync = true): { records: RecordJson[]; nextSeq: number; hasMore: boolean } {
     this.requireInitialized();
     const since = parseInteger(sinceParam ?? "0", "since", 0, Number.MAX_SAFE_INTEGER);
     const limit = parseInteger(limitParam ?? String(LIMITS.defaultPullLimit), "limit", 1, LIMITS.maxPullLimit);
     const purgedSeq = Number(this.meta("purged_seq") ?? "0");
-    if (since > 0 && since < purgedSeq) {
+    // Only for clients that say they can start over (&resync=1). An older Helm would treat 410 as a failure on every
+    // pull and never pull again; it gets the records instead (it may keep a record whose deletion it missed).
+    if (canResync && since > 0 && since < purgedSeq) {
       throw new HttpError(410, "resync_required", "Deletions older than this cursor were cleaned up. Pull again from 0.", { purgedSeq });
     }
     const where = filterSql(filter);

@@ -187,6 +187,54 @@ public sealed class SyncSelectiveTests : IDisposable
     }
 
     [Fact]
+    public async Task Turning_a_tool_off_and_on_during_its_catch_up_drops_nothing()
+    {
+        // Notes: not guarded against mass deletions, so nothing but the fix stands between a flip and data loss.
+        const int count = 600; // two pages of 500
+        var pc = NewDevice("pc");
+        var transport = _server.Connect();
+        var phone = NewDevice("phone", transport);
+        for (var i = 0; i < count; i++) pc.Notes.Upsert($"s{i}", new Note($"Secret {i}", "x"));
+        await SyncAll(pc, phone);
+        phone.Engine.SetExcluded("notes.", true);
+        pc.Notes.Upsert("new", new Note("New", "while off"));
+        await SyncAll(pc, phone);
+
+        phone.Engine.SetExcluded("notes.", false);
+        var pulls = 0;
+        transport.BeforePull = () =>
+        {
+            // 1: the main pull; 2 and 3: the two pages of the catch-up of Notes. The user turns Notes off while the
+            // first page downloads and on again before the second.
+            pulls++;
+            if (pulls == 2) phone.Engine.SetExcluded("notes.", true);
+            if (pulls == 3) phone.Engine.SetExcluded("notes.", false);
+        };
+        await phone.Engine.SyncNowAsync();
+        transport.BeforePull = null;
+        Assert.True(pulls >= 3);
+        Assert.Equal(count, phone.Notes.All().Count(s => s.Id != "new"));
+
+        // Later runs finish the catch-up.
+        await SyncAll(phone, phone);
+        Assert.Equal(new Note("New", "while off"), phone.Notes.Get("new"));
+        Assert.Equal(count + 1, phone.Notes.All().Count);
+    }
+
+    [Fact]
+    public async Task Many_unsent_edits_of_an_excluded_tool_never_hold_back_the_others()
+    {
+        var phone = NewDevice("phone");
+        phone.Engine.SetExcluded("vault.", true);
+        for (var i = 0; i < 1100; i++) phone.Secrets.Upsert($"s{i}", new Note($"Secret {i}", "x"));
+        _time.Advance(TimeSpan.FromMinutes(1));
+        phone.Notes.Upsert("n", new Note("Note", "must go out"));
+        await SyncAll(phone);
+        Assert.Contains(_server.Records, r => r.Collection == "notes.items" && r.Id == "n");
+        Assert.DoesNotContain(_server.Records, r => r.Collection == "vault.items");
+    }
+
+    [Fact]
     public void Only_prefixes_can_be_excluded()
     {
         var device = NewDevice("pc");

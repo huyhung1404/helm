@@ -57,6 +57,7 @@ export interface ApiInput {
   after?: string | null;
   only?: string | null;
   exclude?: string | null;
+  resync?: boolean;
 }
 
 const REQUIRED_SCOPE: Record<ApiOp, Scope> = {
@@ -180,7 +181,7 @@ export class AccountObject extends DurableObject<Env> {
           return { status: 200, body: { outcomes } };
         }
         case "pull":
-          return { status: 200, body: this.store.pull(input.since ?? null, input.limit ?? null, parsePullFilter(input.only ?? null, input.exclude ?? null)) };
+          return { status: 200, body: this.store.pull(input.since ?? null, input.limit ?? null, parsePullFilter(input.only ?? null, input.exclude ?? null), input.resync === true) };
         case "getKeyring": {
           const keyring = this.store.getKeyring();
           return keyring ? { status: 200, body: keyring } : { status: 404, body: { error: "no_keyring" } };

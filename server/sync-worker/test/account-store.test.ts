@@ -263,6 +263,8 @@ test("old deletions are purged, their space comes back, and older cursors must r
 
   // A device that stopped before the purged deletion would never learn about it: it must start over.
   rejects(() => store.pull("2", null), 410, "resync_required");
+  // An older client (no &resync=1) is never stuck: it gets the records.
+  assert.equal(store.pull("2", null, {}, false).records.length, 1);
   assert.equal(store.pull("3", null).records.length, 1);
   assert.equal(store.pull("0", null).records.length, 2);
   // Nothing to purge: the horizon stays.

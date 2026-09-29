@@ -136,6 +136,7 @@ async function handleApi(request: Request, env: Env, url: URL): Promise<Result |
     limit: url.searchParams.get("limit"),
     only: url.searchParams.get("only"),
     exclude: url.searchParams.get("exclude"),
+    resync: url.searchParams.get("resync") === "1",
   };
   let op: ApiOp | undefined = ({
     "GET /v1/me": "me",
