@@ -356,7 +356,212 @@
                 </StackPanel>
             </Border>
 
-            <StackPanel Visibility="{Binding HasWorkspaces, Converter={StaticResource BoolToVisibility}}">
+            <!-- Lists or calendar -->
+            <StackPanel Orientation="Horizontal" Margin="0,8,0,0" Visibility="{Binding HasWorkspaces, Converter={StaticResource BoolToVisibility}}">
+                <ui:Button Margin="0,0,6,0" Content="Lists" Icon="{ui:SymbolIcon TaskListLtr24}" Command="{Binding ShowListsCommand}" AutomationProperties.Name="Show the lists">
+                    <ui:Button.Style>
+                        <Style TargetType="ui:Button" BasedOn="{StaticResource {x:Type ui:Button}}">
+                            <Setter Property="Appearance" Value="Primary" />
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding IsCalendar}" Value="True"><Setter Property="Appearance" Value="Secondary" /></DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </ui:Button.Style>
+                </ui:Button>
+                <ui:Button Content="Calendar" Icon="{ui:SymbolIcon CalendarLtr24}" Command="{Binding ShowCalendarCommand}" AutomationProperties.Name="Show the calendar">
+                    <ui:Button.Style>
+                        <Style TargetType="ui:Button" BasedOn="{StaticResource {x:Type ui:Button}}">
+                            <Setter Property="Appearance" Value="Secondary" />
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding IsCalendar}" Value="True"><Setter Property="Appearance" Value="Primary" /></DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </ui:Button.Style>
+                </ui:Button>
+            </StackPanel>
+
+            <!-- Calendar: every due task and debt of the month (or week); a click on a day lists it below -->
+            <StackPanel Margin="0,16,0,0" Visibility="{Binding ShowCalendarView, Converter={StaticResource BoolToVisibility}}">
+                <Border Style="{DynamicResource HelmSurface}" Margin="0,0,0,8" Padding="12,8" Visibility="{Binding HasMessage, Converter={StaticResource BoolToVisibility}}">
+                    <core:RowLayout>
+                        <TextBlock Text="{Binding Message}" TextWrapping="Wrap" VerticalAlignment="Center" />
+                        <ui:Button Style="{StaticResource RowAction}" Icon="{ui:SymbolIcon Dismiss24}" ToolTip="Dismiss" AutomationProperties.Name="Dismiss" Command="{Binding DismissMessageCommand}" />
+                    </core:RowLayout>
+                </Border>
+                <DockPanel Margin="0,0,0,10">
+                    <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center">
+                        <CheckBox Content="All workspaces" IsChecked="{Binding CalendarAllWorkspaces}" Margin="0,0,12,0" VerticalAlignment="Center"
+                                  ToolTip="Untick to show only the workspace chosen above" />
+                        <ui:Button Margin="0,0,4,0" Content="Month" Command="{Binding SetCalendarMonthCommand}" AutomationProperties.Name="Month view">
+                            <ui:Button.Style>
+                                <Style TargetType="ui:Button" BasedOn="{StaticResource {x:Type ui:Button}}">
+                                    <Setter Property="Appearance" Value="Primary" />
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding IsWeekView}" Value="True"><Setter Property="Appearance" Value="Secondary" /></DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </ui:Button.Style>
+                        </ui:Button>
+                        <ui:Button Margin="0,0,12,0" Content="Week" Command="{Binding SetCalendarWeekCommand}" AutomationProperties.Name="Week view">
+                            <ui:Button.Style>
+                                <Style TargetType="ui:Button" BasedOn="{StaticResource {x:Type ui:Button}}">
+                                    <Setter Property="Appearance" Value="Secondary" />
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding IsWeekView}" Value="True"><Setter Property="Appearance" Value="Primary" /></DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </ui:Button.Style>
+                        </ui:Button>
+                        <ui:Button Content="Export .ics…" Icon="{ui:SymbolIcon ArrowDownload24}" Click="ExportIcs_Click"
+                                   ToolTip="Open tasks and debts with a due date, for Google Calendar, Outlook or your phone" />
+                    </StackPanel>
+                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                        <ui:Button Style="{StaticResource RowAction}" Icon="{ui:SymbolIcon ChevronLeft24}" Command="{Binding CalendarPreviousCommand}" ToolTip="Previous" AutomationProperties.Name="Previous" />
+                        <ui:Button Style="{StaticResource RowAction}" Icon="{ui:SymbolIcon ChevronRight24}" Command="{Binding CalendarNextCommand}" ToolTip="Next" AutomationProperties.Name="Next" />
+                        <ui:Button Margin="4,0,12,0" Content="Today" Command="{Binding CalendarTodayCommand}" />
+                        <TextBlock Text="{Binding CalendarTitle}" FontSize="20" FontWeight="SemiBold" VerticalAlignment="Center" />
+                    </StackPanel>
+                </DockPanel>
+
+                <ItemsControl ItemsSource="{Binding CalendarWeekdayNames}" Focusable="False" Visibility="{Binding IsWeekView, Converter={StaticResource InverseBoolToVisibility}}">
+                    <ItemsControl.ItemsPanel>
+                        <ItemsPanelTemplate>
+                            <UniformGrid Columns="7" />
+                        </ItemsPanelTemplate>
+                    </ItemsControl.ItemsPanel>
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate>
+                            <TextBlock Text="{Binding}" Margin="8,0,0,4" Style="{DynamicResource HelmSecondaryText}" />
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+                <ItemsControl ItemsSource="{Binding CalendarDays}" Focusable="False">
+                    <ItemsControl.ItemsPanel>
+                        <ItemsPanelTemplate>
+                            <UniformGrid Columns="7" />
+                        </ItemsPanelTemplate>
+                    </ItemsControl.ItemsPanel>
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate DataType="{x:Type local:CalendarDayViewModel}">
+                            <Button Style="{StaticResource RowButton}" Margin="2" Padding="0" Command="{Binding SelectCommand}" AutomationProperties.Name="{Binding AutomationName}">
+                                <Border CornerRadius="6" Padding="8,6" BorderThickness="1">
+                                    <Border.Style>
+                                        <Style TargetType="Border">
+                                            <Setter Property="MinHeight" Value="104" />
+                                            <Setter Property="Background" Value="{DynamicResource CardBackgroundFillColorDefaultBrush}" />
+                                            <Setter Property="BorderBrush" Value="{DynamicResource CardStrokeColorDefaultBrush}" />
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding DataContext.IsWeekView, RelativeSource={RelativeSource AncestorType=Page}}" Value="True">
+                                                    <Setter Property="MinHeight" Value="300" />
+                                                </DataTrigger>
+                                                <DataTrigger Binding="{Binding IsInRange}" Value="False">
+                                                    <Setter Property="Opacity" Value="0.45" />
+                                                </DataTrigger>
+                                                <DataTrigger Binding="{Binding IsSelected}" Value="True">
+                                                    <Setter Property="BorderBrush" Value="{DynamicResource AccentFillColorDefaultBrush}" />
+                                                    <Setter Property="BorderThickness" Value="2" />
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </Border.Style>
+                                    <StackPanel>
+                                        <TextBlock FontWeight="SemiBold" Margin="0,0,0,4">
+                                            <TextBlock.Style>
+                                                <Style TargetType="TextBlock">
+                                                    <Setter Property="Text" Value="{Binding DayNumber}" />
+                                                    <Style.Triggers>
+                                                        <DataTrigger Binding="{Binding DataContext.IsWeekView, RelativeSource={RelativeSource AncestorType=Page}}" Value="True">
+                                                            <Setter Property="Text" Value="{Binding WeekLabel}" />
+                                                        </DataTrigger>
+                                                        <DataTrigger Binding="{Binding IsToday}" Value="True">
+                                                            <Setter Property="Foreground" Value="{DynamicResource AccentTextFillColorPrimaryBrush}" />
+                                                        </DataTrigger>
+                                                    </Style.Triggers>
+                                                </Style>
+                                            </TextBlock.Style>
+                                        </TextBlock>
+                                        <ItemsControl ItemsSource="{Binding Entries}" Focusable="False" IsHitTestVisible="False">
+                                            <ItemsControl.ItemTemplate>
+                                                <DataTemplate DataType="{x:Type local:CalendarEntryViewModel}">
+                                                    <TextBlock Text="{Binding Line}" FontSize="12" TextTrimming="CharacterEllipsis" Margin="0,1" ToolTip="{Binding Detail}">
+                                                        <TextBlock.Style>
+                                                            <Style TargetType="TextBlock">
+                                                                <Style.Triggers>
+                                                                    <DataTrigger Binding="{Binding IsDebt}" Value="True">
+                                                                        <Setter Property="Foreground" Value="{DynamicResource AccentTextFillColorPrimaryBrush}" />
+                                                                    </DataTrigger>
+                                                                    <DataTrigger Binding="{Binding IsOverdue}" Value="True">
+                                                                        <Setter Property="Foreground" Value="{DynamicResource SystemFillColorCriticalBrush}" />
+                                                                    </DataTrigger>
+                                                                    <DataTrigger Binding="{Binding IsProjected}" Value="True">
+                                                                        <Setter Property="FontStyle" Value="Italic" />
+                                                                        <Setter Property="Foreground" Value="{DynamicResource TextFillColorSecondaryBrush}" />
+                                                                    </DataTrigger>
+                                                                    <DataTrigger Binding="{Binding IsDone}" Value="True">
+                                                                        <Setter Property="TextDecorations" Value="Strikethrough" />
+                                                                        <Setter Property="Foreground" Value="{DynamicResource TextFillColorSecondaryBrush}" />
+                                                                    </DataTrigger>
+                                                                </Style.Triggers>
+                                                            </Style>
+                                                        </TextBlock.Style>
+                                                    </TextBlock>
+                                                </DataTemplate>
+                                            </ItemsControl.ItemTemplate>
+                                        </ItemsControl>
+                                        <TextBlock Text="{Binding MoreText}" FontSize="12" Style="{DynamicResource HelmSecondaryText}"
+                                                   Visibility="{Binding HasMore, Converter={StaticResource BoolToVisibility}}" />
+                                    </StackPanel>
+                                </Border>
+                            </Button>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+
+                <!-- The day clicked: its tasks (tick or edit them here), debts and repeating tasks, and a task to add on it -->
+                <TextBlock Text="{Binding CalendarSelectedTitle}" Style="{DynamicResource HelmSectionHeader}"
+                           Visibility="{Binding HasCalendarDaySelection, Converter={StaticResource BoolToVisibility}}" />
+                <Border Style="{DynamicResource HelmSurface}" Padding="0" Visibility="{Binding HasCalendarDaySelection, Converter={StaticResource BoolToVisibility}}">
+                    <StackPanel>
+                        <DockPanel Margin="12,12,12,6" Visibility="{Binding CanAddOnCalendarDay, Converter={StaticResource BoolToVisibility}}">
+                            <ui:Button DockPanel.Dock="Right" Margin="8,0,0,0" Appearance="Primary" Content="Add" Icon="{ui:SymbolIcon Add24}" Command="{Binding AddOnCalendarDayCommand}" />
+                            <ui:TextBox PlaceholderText="A task due this day" AutomationProperties.Name="New task on this day" Text="{Binding CalendarNewTitle, UpdateSourceTrigger=PropertyChanged}">
+                                <ui:TextBox.InputBindings>
+                                    <KeyBinding Key="Enter" Command="{Binding AddOnCalendarDayCommand}" />
+                                </ui:TextBox.InputBindings>
+                            </ui:TextBox>
+                        </DockPanel>
+                        <TextBlock Margin="16,8,16,12" Text="Nothing is due this day." Style="{DynamicResource HelmSecondaryText}"
+                                   Visibility="{Binding IsCalendarDayEmpty, Converter={StaticResource BoolToVisibility}}" />
+                        <ItemsControl ItemsSource="{Binding CalendarDayItems}" ItemTemplate="{StaticResource ItemRow}" />
+                        <ItemsControl ItemsSource="{Binding CalendarDayOthers}">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate DataType="{x:Type local:CalendarEntryViewModel}">
+                                    <Border BorderThickness="0,0,0,1" BorderBrush="{DynamicResource CardStrokeColorDefaultBrush}">
+                                        <Button Style="{StaticResource RowButton}" Command="{Binding OpenCommand}" AutomationProperties.Name="{Binding Title}" IsEnabled="{Binding IsDebt}">
+                                            <DockPanel>
+                                                <ui:SymbolIcon DockPanel.Dock="Left" Margin="0,0,12,0" FontSize="18" VerticalAlignment="Center">
+                                                    <ui:SymbolIcon.Style>
+                                                        <Style TargetType="ui:SymbolIcon">
+                                                            <Setter Property="Symbol" Value="ArrowRepeatAll24" />
+                                                            <Style.Triggers>
+                                                                <DataTrigger Binding="{Binding IsDebt}" Value="True"><Setter Property="Symbol" Value="Person24" /></DataTrigger>
+                                                            </Style.Triggers>
+                                                        </Style>
+                                                    </ui:SymbolIcon.Style>
+                                                </ui:SymbolIcon>
+                                                <TextBlock DockPanel.Dock="Right" Text="{Binding Detail}" Style="{DynamicResource HelmSecondaryText}" VerticalAlignment="Center" Margin="12,0,0,0" />
+                                                <TextBlock Text="{Binding Line}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
+                                            </DockPanel>
+                                        </Button>
+                                    </Border>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </StackPanel>
+                </Border>
+            </StackPanel>
+
+            <StackPanel Visibility="{Binding ShowListsView, Converter={StaticResource BoolToVisibility}}">
             <!-- Add -->
             <TextBlock Text="{Binding AddHeader}" Style="{DynamicResource HelmSectionHeader}" />
             <Border Style="{DynamicResource HelmSurface}" Margin="0,0,0,4">
@@ -470,8 +675,8 @@
             </Border>
             </StackPanel>
 
-            <!-- Report and history, once there is a workspace -->
-            <StackPanel Visibility="{Binding HasWorkspaces, Converter={StaticResource BoolToVisibility}}">
+            <!-- Report and history, once there is a workspace (not with the calendar) -->
+            <StackPanel Visibility="{Binding ShowListsView, Converter={StaticResource BoolToVisibility}}">
             <TextBlock Text="Report" Style="{DynamicResource HelmSectionHeader}" />
             <ui:CardControl Margin="0,0,0,4" Icon="{ui:SymbolIcon DataBarVertical24}">
                 <ui:CardControl.Header>

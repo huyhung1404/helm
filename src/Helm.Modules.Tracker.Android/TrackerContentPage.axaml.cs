@@ -5,6 +5,7 @@ using Avalonia.Interactivity;
 using Avalonia.Threading;
 using Helm.Core;
 using Helm.Core.Modules;
+using Helm.Core.Services;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Helm.Modules.Tracker;
@@ -31,6 +32,23 @@ public partial class TrackerContentPage : UserControl
         DataContext = viewModel;
         InitializeComponent();
         AmountBox.TextChanged += OnAmountTextChanged;
+    }
+
+    /// <summary>The calendar as an .ics file through the share sheet (a calendar app, mail, Drive…).</summary>
+    private void ShareIcs_Click(object? sender, RoutedEventArgs e)
+    {
+        try
+        {
+            var sharer = HelmAndroidServices.Current.GetRequiredService<IFileSharer>();
+            Directory.CreateDirectory(sharer.ShareFolder);
+            var path = Path.Combine(sharer.ShareFolder, $"helm-tracker-{DateTime.Now:yyyyMMdd}.ics");
+            File.WriteAllText(path, _viewModel.CalendarIcs(), new System.Text.UTF8Encoding(encoderShouldEmitUTF8Identifier: false));
+            sharer.ShareFile(path, "text/calendar", "Share the calendar");
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException)
+        {
+            _viewModel.ReportExportFailure(ex);
+        }
     }
 
     private bool _grouping;

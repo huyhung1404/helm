@@ -51,6 +51,7 @@ internal static class AndroidHost
         services.AddSingleton<IDeviceInfo, AndroidDeviceInfo>();
         services.AddSingleton<AndroidLauncher>();
         services.AddSingleton<IProcessLauncher>(sp => sp.GetRequiredService<AndroidLauncher>());
+        services.AddSingleton<IFileSharer>(sp => sp.GetRequiredService<AndroidLauncher>());
         services.AddSingleton<DialogService>();
         services.AddSingleton<IDialogService>(sp => sp.GetRequiredService<DialogService>());
         services.AddSingleton<ThemeService>();

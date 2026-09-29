@@ -1,4 +1,5 @@
 using System.ComponentModel;
+using System.Text;
 using System.Windows;
 using System.Windows.Controls;
 using Helm.Core.Modules;
@@ -34,6 +35,28 @@ public partial class TrackerContentPage : Page
         Body.IsEnabled = on;
         OffBar.IsOpen = !on;
         OffBar.Visibility = on ? Visibility.Collapsed : Visibility.Visible;
+    }
+
+    /// <summary>View glue: the save dialog is Windows UI; the calendar file comes from the shared view model.</summary>
+    private void ExportIcs_Click(object sender, RoutedEventArgs e)
+    {
+        var viewModel = (TrackerViewModel)DataContext;
+        var dialog = new Microsoft.Win32.SaveFileDialog
+        {
+            FileName = $"helm-tracker-{DateTime.Now:yyyyMMdd}.ics",
+            DefaultExt = ".ics",
+            Filter = "Calendar files (*.ics)|*.ics|All files (*.*)|*.*",
+        };
+        if (dialog.ShowDialog(Window.GetWindow(this)) != true) return;
+        try
+        {
+            File.WriteAllText(dialog.FileName, viewModel.CalendarIcs(), new UTF8Encoding(encoderShouldEmitUTF8Identifier: false));
+            viewModel.ReportExport("The calendar", dialog.FileName);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or System.Security.SecurityException)
+        {
+            viewModel.ReportExportFailure(ex);
+        }
     }
 
     private bool _grouping;

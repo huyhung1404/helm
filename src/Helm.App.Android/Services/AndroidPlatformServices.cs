@@ -43,8 +43,11 @@ internal sealed class AndroidDeviceInfo : IDeviceInfo
 }
 
 /// <summary>Opens links and shares files through Android intents. There are no folders or processes to open.</summary>
-public sealed class AndroidLauncher(ILogger<AndroidLauncher> logger) : IProcessLauncher
+public sealed class AndroidLauncher(ILogger<AndroidLauncher> logger) : IProcessLauncher, IFileSharer
 {
+    /// <summary>Files written only to be shared (declared in Resources/xml/update_paths.xml); replaced on each share.</summary>
+    public string ShareFolder => Path.Combine(AndroidApp.Context.CacheDir!.AbsolutePath, "share");
+
     /// <summary>The FileProvider declared in AndroidManifest.xml (update APKs and logs).</summary>
     public const string FileProviderAuthority = "com.huyhung1404.helm.updates";
 

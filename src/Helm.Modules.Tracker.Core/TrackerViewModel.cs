@@ -282,6 +282,11 @@ public sealed partial class TrackerViewModel : ObservableObject
     public bool HasWorkspaces => Workspaces.Count > 0;
     public bool HasNoWorkspaces => Workspaces.Count == 0;
 
+    /// <summary>The lists, the report and the history (not while the calendar is shown).</summary>
+    public bool ShowListsView => HasWorkspaces && !IsCalendar;
+
+    public bool ShowCalendarView => HasWorkspaces && IsCalendar;
+
     /// <summary>There is one debt book; once it exists only to-do lists can be added.</summary>
     public bool CanAddDebtBook => !Workspaces.Any(w => w.Kind == WorkspaceKind.Debts);
     public string NewWorkspaceHint => CanAddDebtBook
@@ -630,6 +635,7 @@ public sealed partial class TrackerViewModel : ObservableObject
             RefreshItems();
             RefreshReport();
             RefreshHistory();
+            RefreshCalendar();
         }
         catch (Exception ex)
         {
@@ -674,6 +680,8 @@ public sealed partial class TrackerViewModel : ObservableObject
         LoadWorkspaceFields();
         OnPropertyChanged(nameof(HasWorkspaces));
         OnPropertyChanged(nameof(HasNoWorkspaces));
+        OnPropertyChanged(nameof(ShowListsView));
+        OnPropertyChanged(nameof(ShowCalendarView));
         OnPropertyChanged(nameof(CanAddDebtBook));
         OnPropertyChanged(nameof(NewWorkspaceHint));
         if (!CanAddDebtBook) NewWorkspaceKindIndex = (int)WorkspaceKind.Tasks;

@@ -43,6 +43,45 @@
         <Style Selector="Button.icon:disabled">
             <Setter Property="Opacity" Value="0.35" />
         </Style>
+        <!-- Calendar -->
+        <Style Selector="Button.day">
+            <Setter Property="Background" Value="{DynamicResource HelmCardBackground}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource HelmCardStroke}" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="CornerRadius" Value="6" />
+        </Style>
+        <Style Selector="Button.day.selected">
+            <Setter Property="BorderBrush" Value="{DynamicResource SystemAccentColor}" />
+            <Setter Property="BorderThickness" Value="2" />
+        </Style>
+        <Style Selector="Button.day.out">
+            <Setter Property="Opacity" Value="0.45" />
+        </Style>
+        <Style Selector="TextBlock.today">
+            <Setter Property="Foreground" Value="{DynamicResource SystemAccentColor}" />
+        </Style>
+        <Style Selector="Ellipse.dot">
+            <Setter Property="Fill" Value="{DynamicResource HelmSecondaryText}" />
+        </Style>
+        <Style Selector="Ellipse.dot.debt">
+            <Setter Property="Fill" Value="{DynamicResource SystemAccentColor}" />
+        </Style>
+        <Style Selector="Ellipse.dot.overdue">
+            <Setter Property="Fill" Value="{DynamicResource HelmDanger}" />
+        </Style>
+        <Style Selector="Ellipse.dot.done">
+            <Setter Property="Opacity" Value="0.4" />
+        </Style>
+        <Style Selector="TextBlock.overdue">
+            <Setter Property="Foreground" Value="{DynamicResource HelmDanger}" />
+        </Style>
+        <Style Selector="TextBlock.debtText">
+            <Setter Property="Foreground" Value="{DynamicResource SystemAccentColor}" />
+        </Style>
+        <Style Selector="TextBlock.projected">
+            <Setter Property="FontStyle" Value="Italic" />
+            <Setter Property="Foreground" Value="{DynamicResource HelmSecondaryText}" />
+        </Style>
         <Style Selector="Button.icon">
             <Setter Property="Width" Value="44" />
             <Setter Property="Height" Value="44" />
@@ -279,7 +318,159 @@
                 </StackPanel>
             </Border>
 
-            <StackPanel IsVisible="{Binding HasWorkspaces}">
+            <!-- Lists or calendar -->
+            <Grid ColumnDefinitions="*,8,*" Margin="0,8,0,0" IsVisible="{Binding HasWorkspaces}">
+                <Button HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Command="{Binding ShowListsCommand}" Classes.accent="{Binding !IsCalendar}"
+                        AutomationProperties.Name="Show the lists">
+                    <StackPanel Orientation="Horizontal" Spacing="6">
+                        <ic:SymbolIcon Symbol="TaskList" FontSize="16" />
+                        <TextBlock Text="Lists" />
+                    </StackPanel>
+                </Button>
+                <Button Grid.Column="2" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Command="{Binding ShowCalendarCommand}" Classes.accent="{Binding IsCalendar}"
+                        AutomationProperties.Name="Show the calendar">
+                    <StackPanel Orientation="Horizontal" Spacing="6">
+                        <ic:SymbolIcon Symbol="Calendar" FontSize="16" />
+                        <TextBlock Text="Calendar" />
+                    </StackPanel>
+                </Button>
+            </Grid>
+
+            <!-- Calendar: the month (dots per day) or the week (a list); a tap on a day lists it below -->
+            <StackPanel Spacing="8" Margin="0,12,0,0" IsVisible="{Binding ShowCalendarView}">
+                <Border Classes="infobar" IsVisible="{Binding HasMessage}">
+                    <TextBlock Text="{Binding Message}" TextWrapping="Wrap" />
+                </Border>
+                <Grid ColumnDefinitions="Auto,Auto,*,Auto">
+                    <Button Classes="icon flat" Command="{Binding CalendarPreviousCommand}" AutomationProperties.Name="Previous">
+                        <ic:SymbolIcon Symbol="ChevronLeft" FontSize="18" />
+                    </Button>
+                    <Button Grid.Column="1" Classes="icon flat" Command="{Binding CalendarNextCommand}" AutomationProperties.Name="Next">
+                        <ic:SymbolIcon Symbol="ChevronRight" FontSize="18" />
+                    </Button>
+                    <TextBlock Grid.Column="2" Text="{Binding CalendarTitle}" FontSize="18" FontWeight="SemiBold" VerticalAlignment="Center" Margin="4,0" TextTrimming="CharacterEllipsis" />
+                    <Button Grid.Column="3" Content="Today" Command="{Binding CalendarTodayCommand}" />
+                </Grid>
+                <WrapPanel>
+                    <Button Content="Month" Command="{Binding SetCalendarMonthCommand}" Classes.accent="{Binding !IsWeekView}" Margin="0,0,6,6" />
+                    <Button Content="Week" Command="{Binding SetCalendarWeekCommand}" Classes.accent="{Binding IsWeekView}" Margin="0,0,12,6" />
+                    <CheckBox Content="All workspaces" IsChecked="{Binding CalendarAllWorkspaces}" Margin="0,0,12,6" />
+                    <Button Click="ShareIcs_Click" Margin="0,0,0,6" AutomationProperties.Name="Share as a calendar file">
+                        <StackPanel Orientation="Horizontal" Spacing="6">
+                            <ic:SymbolIcon Symbol="Share" FontSize="16" />
+                            <TextBlock Text=".ics" />
+                        </StackPanel>
+                    </Button>
+                </WrapPanel>
+
+                <!-- Month: weekday names, then 6 weeks of small cells -->
+                <StackPanel IsVisible="{Binding !IsWeekView}">
+                    <ItemsControl ItemsSource="{Binding CalendarWeekdayNames}">
+                        <ItemsControl.ItemsPanel>
+                            <ItemsPanelTemplate>
+                                <UniformGrid Columns="7" />
+                            </ItemsPanelTemplate>
+                        </ItemsControl.ItemsPanel>
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate x:DataType="x:String">
+                                <TextBlock Text="{Binding}" Classes="secondary" HorizontalAlignment="Center" FontSize="12" />
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                    <ItemsControl ItemsSource="{Binding CalendarDays}">
+                        <ItemsControl.ItemsPanel>
+                            <ItemsPanelTemplate>
+                                <UniformGrid Columns="7" />
+                            </ItemsPanelTemplate>
+                        </ItemsControl.ItemsPanel>
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate DataType="vm:CalendarDayViewModel">
+                                <Button Classes="flat day" Classes.selected="{Binding IsSelected}" Classes.out="{Binding !IsInRange}" Padding="0" Margin="1"
+                                        HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch" Command="{Binding SelectCommand}" AutomationProperties.Name="{Binding AutomationName}">
+                                    <StackPanel Spacing="3" Margin="0,6">
+                                        <TextBlock Text="{Binding DayNumber}" HorizontalAlignment="Center" FontWeight="SemiBold" Classes.today="{Binding IsToday}" />
+                                        <ItemsControl ItemsSource="{Binding Entries}" HorizontalAlignment="Center">
+                                            <ItemsControl.ItemsPanel>
+                                                <ItemsPanelTemplate>
+                                                    <StackPanel Orientation="Horizontal" Spacing="2" />
+                                                </ItemsPanelTemplate>
+                                            </ItemsControl.ItemsPanel>
+                                            <ItemsControl.ItemTemplate>
+                                                <DataTemplate DataType="vm:CalendarEntryViewModel">
+                                                    <Ellipse Width="6" Height="6" Classes="dot" Classes.debt="{Binding IsDebt}" Classes.overdue="{Binding IsOverdue}" Classes.done="{Binding IsDone}" />
+                                                </DataTemplate>
+                                            </ItemsControl.ItemTemplate>
+                                        </ItemsControl>
+                                    </StackPanel>
+                                </Button>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </StackPanel>
+
+                <!-- Week: one row per day with what it lists -->
+                <ItemsControl ItemsSource="{Binding CalendarDays}" IsVisible="{Binding IsWeekView}">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate DataType="vm:CalendarDayViewModel">
+                            <Button Classes="flat day" Classes.selected="{Binding IsSelected}" Margin="0,2" Padding="10,8" HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch"
+                                    Command="{Binding SelectCommand}" AutomationProperties.Name="{Binding AutomationName}">
+                                <Grid ColumnDefinitions="72,*">
+                                    <TextBlock Text="{Binding WeekLabel}" FontWeight="SemiBold" Classes.today="{Binding IsToday}" />
+                                    <StackPanel Grid.Column="1" Spacing="2">
+                                        <ItemsControl ItemsSource="{Binding Entries}">
+                                            <ItemsControl.ItemTemplate>
+                                                <DataTemplate DataType="vm:CalendarEntryViewModel">
+                                                    <TextBlock Text="{Binding Line}" TextTrimming="CharacterEllipsis" Classes.debtText="{Binding IsDebt}" Classes.overdue="{Binding IsOverdue}"
+                                                               Classes.done="{Binding IsDone}" Classes.projected="{Binding IsProjected}" />
+                                                </DataTemplate>
+                                            </ItemsControl.ItemTemplate>
+                                        </ItemsControl>
+                                        <TextBlock Text="{Binding MoreText}" Classes="secondary" IsVisible="{Binding HasMore}" />
+                                    </StackPanel>
+                                </Grid>
+                            </Button>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+
+                <!-- The day tapped: its tasks (tick or edit them here), debts and repeating tasks, and a task to add on it -->
+                <StackPanel Spacing="6" IsVisible="{Binding HasCalendarDaySelection}">
+                    <TextBlock Text="{Binding CalendarSelectedTitle}" Classes="section" />
+                    <Border Classes="card">
+                        <StackPanel Spacing="6">
+                            <Grid ColumnDefinitions="*,Auto" IsVisible="{Binding CanAddOnCalendarDay}">
+                                <TextBox PlaceholderText="A task due this day" Text="{Binding CalendarNewTitle}" AutomationProperties.Name="New task on this day">
+                                    <TextBox.KeyBindings>
+                                        <KeyBinding Gesture="Enter" Command="{Binding AddOnCalendarDayCommand}" />
+                                    </TextBox.KeyBindings>
+                                </TextBox>
+                                <Button Grid.Column="1" Margin="6,0,0,0" Classes="accent" Content="Add" Command="{Binding AddOnCalendarDayCommand}" />
+                            </Grid>
+                            <TextBlock Text="Nothing is due this day." Classes="secondary" IsVisible="{Binding IsCalendarDayEmpty}" />
+                            <ItemsControl ItemsSource="{Binding CalendarDayItems}" />
+                            <ItemsControl ItemsSource="{Binding CalendarDayOthers}">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate DataType="vm:CalendarEntryViewModel">
+                                        <Button Classes="flat" HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch" Padding="4,8" Command="{Binding OpenCommand}"
+                                                IsEnabled="{Binding IsDebt}" AutomationProperties.Name="{Binding Title}">
+                                            <Grid ColumnDefinitions="Auto,*,Auto">
+                                                <Panel Margin="0,0,10,0" VerticalAlignment="Center">
+                                                    <ic:SymbolIcon Symbol="Person" FontSize="18" IsVisible="{Binding IsDebt}" />
+                                                    <ic:SymbolIcon Symbol="ArrowRepeatAll" FontSize="18" IsVisible="{Binding IsProjected}" />
+                                                </Panel>
+                                                <TextBlock Grid.Column="1" Text="{Binding Line}" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
+                                                <TextBlock Grid.Column="2" Text="{Binding Detail}" Classes="secondary" Margin="8,0,0,0" VerticalAlignment="Center" />
+                                            </Grid>
+                                        </Button>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </StackPanel>
+                    </Border>
+                </StackPanel>
+            </StackPanel>
+
+            <StackPanel IsVisible="{Binding ShowListsView}">
             <!-- Add -->
             <TextBlock Text="{Binding AddHeader}" Classes="section" />
             <Border Classes="card">
@@ -367,7 +558,7 @@
             </StackPanel>
 
             <!-- Report and history, once there is a workspace -->
-            <StackPanel IsVisible="{Binding HasWorkspaces}">
+            <StackPanel IsVisible="{Binding ShowListsView}">
             <TextBlock Text="Report" Classes="section" />
             <Border Classes="card">
                 <StackPanel Spacing="8">

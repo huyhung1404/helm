@@ -25,6 +25,11 @@ Format: [Keep a Changelog](https://keepachangelog.com), versions follow [SemVer]
   current 6-digit code with how many seconds it has left; **Code** copies it (through the protected clipboard). The key
   stays hidden. KeePass export writes it where KeePassXC reads it (`otp`).
   Note: an item with a one-time code field cannot be read by Helm 0.16 or older (it is kept, not lost); update every device.
+- Tracker: a **calendar** (PC and Android). **Calendar** next to Lists shows the month, or a week, with every task
+  and debt that has a due date, from every workspace (or only the chosen one): overdue in red, done crossed out, a
+  daily task on its coming days too. Click a day to see what is due, tick or edit it there, or add a task due that day.
+  **Export .ics** (PC) or **Share .ics** (Android) makes a calendar file of the open ones for Google Calendar, Outlook or
+  a phone; importing it again updates the same events. Timed items get a reminder 15 minutes before.
 
 ### Changed
 - Sync: deleted items no longer stay on the server for ever. A deletion is kept 90 days, long enough for every device
