@@ -153,8 +153,7 @@ public sealed class McpTests
         Assert.Contains("\"id\":7", reply);
 
         enabled = false;
-        await using var pipe = new NamedPipeClientStream(".", McpEndpoint.PipeName(paths), PipeDirection.InOut, PipeOptions.Asynchronous | PipeOptions.CurrentUserOnly);
-        await pipe.ConnectAsync(3000);
+        await using var pipe = await McpBridge.ConnectAsync(paths, 3000);
         var buffer = new byte[16];
         // Turned off: the server closes the connection without answering.
         var read = await pipe.ReadAsync(buffer).AsTask().WaitAsync(TimeSpan.FromSeconds(5));
@@ -203,8 +202,8 @@ public sealed class McpTests
 
     private static async Task<string> RoundTrip(HelmPaths paths, string line)
     {
-        await using var pipe = new NamedPipeClientStream(".", McpEndpoint.PipeName(paths), PipeDirection.InOut, PipeOptions.Asynchronous | PipeOptions.CurrentUserOnly);
-        await pipe.ConnectAsync(3000);
+        // The bridge's own connect (the one an elevated Claude uses too: CI runs these tests elevated).
+        await using var pipe = await McpBridge.ConnectAsync(paths, 3000);
         var bytes = Encoding.UTF8.GetBytes(line + "\n");
         await pipe.WriteAsync(bytes);
         await pipe.FlushAsync();

@@ -116,11 +116,10 @@ public static class McpBridge
     {
         var stdin = Console.OpenStandardInput();
         var stdout = Console.OpenStandardOutput();
-        // CurrentUserOnly: the pipe must belong to this user (another user cannot take the name first).
-        await using var pipe = new NamedPipeClientStream(".", McpEndpoint.PipeName(paths), PipeDirection.InOut, PipeOptions.Asynchronous | PipeOptions.CurrentUserOnly);
+        NamedPipeClientStream pipe;
         try
         {
-            await pipe.ConnectAsync(3000).ConfigureAwait(false);
+            pipe = await ConnectAsync(paths, 3000).ConfigureAwait(false);
         }
         catch (Exception ex) when (ex is TimeoutException or IOException or UnauthorizedAccessException)
         {
@@ -130,12 +129,41 @@ public static class McpBridge
             await offline.RunAsync(stdin, stdout, CancellationToken.None).ConfigureAwait(false);
             return 0;
         }
-        using var done = new CancellationTokenSource();
-        var up = RelayAsync(stdin, pipe, done.Token);
-        var down = RelayAsync(pipe, stdout, done.Token);
-        await Task.WhenAny(up, down).ConfigureAwait(false);
-        await done.CancelAsync().ConfigureAwait(false);
+        await using (pipe)
+        {
+            using var done = new CancellationTokenSource();
+            var up = RelayAsync(stdin, pipe, done.Token);
+            var down = RelayAsync(pipe, stdout, done.Token);
+            await Task.WhenAny(up, down).ConfigureAwait(false);
+            await done.CancelAsync().ConfigureAwait(false);
+        }
         return 0;
+    }
+
+    /// <summary>
+    /// Connects to Helm's pipe, and only if this user owns it (another user cannot take the name first).
+    /// Not <see cref="PipeOptions.CurrentUserOnly"/>: .NET compares the pipe's owner with the token's default owner,
+    /// which in an elevated token is Administrators, not the user, so an elevated Claude (started by the elevated
+    /// Helm) would be refused. Helm's pipe is owned by the user's SID; either SID of this token is accepted.
+    /// </summary>
+    /// <exception cref="UnauthorizedAccessException">The pipe belongs to someone else.</exception>
+    public static async Task<NamedPipeClientStream> ConnectAsync(HelmPaths paths, int timeoutMs)
+    {
+        var pipe = new NamedPipeClientStream(".", McpEndpoint.PipeName(paths), PipeDirection.InOut, PipeOptions.Asynchronous);
+        try
+        {
+            await pipe.ConnectAsync(timeoutMs).ConfigureAwait(false);
+            var owner = pipe.GetAccessControl().GetOwner(typeof(SecurityIdentifier));
+            using var me = WindowsIdentity.GetCurrent();
+            if (owner is null || (owner != me.User && owner != me.Owner))
+                throw new UnauthorizedAccessException($"The pipe {McpEndpoint.PipeName(paths)} is not owned by this user.");
+            return pipe;
+        }
+        catch
+        {
+            await pipe.DisposeAsync().ConfigureAwait(false);
+            throw;
+        }
     }
 
     private static async Task RelayAsync(Stream from, Stream to, CancellationToken ct)
