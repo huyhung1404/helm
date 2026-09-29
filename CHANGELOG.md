@@ -3,6 +3,12 @@
 All notable changes to Helm. The top section is used as the GitHub release body and as the Velopack release notes.
 Format: [Keep a Changelog](https://keepachangelog.com), versions follow [SemVer](https://semver.org).
 
+## [Unreleased]
+
+### Fixed
+- Quick Capture (Android): the share dialog follows Helm's theme (light, dark or the phone's setting) with Helm's
+  colours; its text and choices were in the wrong colours for the dialog's background.
+
 ## [0.15.0] - 2026-09-29
 
 ### Added
