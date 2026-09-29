@@ -2,6 +2,7 @@ using System.Collections.ObjectModel;
 using System.Globalization;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using Helm.Core.Links;
 using Helm.Core.Services;
 using Helm.Core.Settings;
 using Helm.Shell.Services;
@@ -36,6 +37,8 @@ public sealed partial class TrackerViewModel : ObservableObject
     private readonly IClipboardService _clipboard;
     private readonly TrackerReminderService _reminders;
     private readonly ILogger<TrackerViewModel> _logger;
+    private readonly LinkHub? _links;
+    private int _linksQueued;
     private readonly Dictionary<string, TrackerItemViewModel> _rows = new(StringComparer.Ordinal);
     private int _refreshQueued;
     private bool _loading;
@@ -97,9 +100,11 @@ public sealed partial class TrackerViewModel : ObservableObject
         IDialogService dialogs,
         IClipboardService clipboard,
         TrackerReminderService reminders,
-        ILogger<TrackerViewModel> logger)
+        ILogger<TrackerViewModel> logger,
+        LinkHub? links = null)
     {
         _store = store;
+        _links = links;
         _settings = settings.Get<TrackerSettings>(TrackerIds.ModuleId);
         _ui = ui;
         _dialogs = dialogs;
@@ -121,7 +126,47 @@ public sealed partial class TrackerViewModel : ObservableObject
         _loading = false;
 
         _store.Changed += (_, _) => ScheduleRefresh();
+        if (_links is not null) _links.Changed += (_, _) => ScheduleLinksRefresh();
         Refresh();
+    }
+
+    // ---- Links to notes ------------------------------------------------------------------------------------------
+
+    /// <summary>True when notes can be linked (the Notes tool is there).</summary>
+    public bool CanLink => _links?.Provider(LinkKinds.Note) is not null;
+
+    /// <summary>The notes of a task (not of a subtask or a debt entry: those belong to their task or person).</summary>
+    internal LinksViewModel? LinksFor(TrackerItemViewModel row) =>
+        !CanLink || row.IsDebt || row.IsSubtask ? null
+            : new LinksViewModel(_links!, new LinkRef(LinkKinds.Task, TaskLinkProvider.LinkId(row.Id, row.Item)), [LinkKinds.Note], () => row.Item.Title);
+
+    /// <summary>The notes of a person in the debt book (all their entries).</summary>
+    internal LinksViewModel? LinksFor(DebtPersonViewModel person) =>
+        !CanLink ? null : new LinksViewModel(_links!, new LinkRef(LinkKinds.Person, person.Key), [LinkKinds.Note], () => person.Name);
+
+    /// <summary>Shows a task, e.g. from a note linked to it: its list, with the row open.</summary>
+    public void ShowItem(string workspaceId, string itemId)
+    {
+        ShowWorkspace(workspaceId);
+        if (_rows.TryGetValue(itemId, out var row)) row.IsExpanded = true;
+    }
+
+    /// <summary>Shows a person of the debt book with their details open.</summary>
+    public void ShowPerson(string bookId, string key)
+    {
+        ShowWorkspace(bookId);
+        if (DebtPeople.Concat(SettledPeople).FirstOrDefault(p => p.Key == key) is { } person) person.Open();
+    }
+
+    private void ScheduleLinksRefresh()
+    {
+        if (Interlocked.Exchange(ref _linksQueued, 1) == 1) return;
+        _ui.Post(() =>
+        {
+            Interlocked.Exchange(ref _linksQueued, 0);
+            foreach (var row in _rows.Values) row.RefreshLinks();
+            foreach (var person in _people.Values) person.RefreshLinks();
+        });
     }
 
     public ObservableCollection<WorkspaceOption> Workspaces { get; } = [];

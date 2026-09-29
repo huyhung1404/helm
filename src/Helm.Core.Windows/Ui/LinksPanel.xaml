@@ -1,0 +1,96 @@
+<UserControl x:Class="Helm.Core.Ui.LinksPanel"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
+             xmlns:local="clr-namespace:Helm.Core.Ui"
+             xmlns:links="clr-namespace:Helm.Core.Links;assembly=Helm.Core"
+             x:Name="Root">
+    <!-- The links of one thing (a task, a person, a note), bound to a LinksViewModel: chips, then "Link…" and
+         "New note" when ShowActions, and the search that adds a link while picking. -->
+    <UserControl.Resources>
+        <local:BoolToVisibilityConverter x:Key="Visible" />
+        <local:BoolToVisibilityConverter x:Key="Hidden" Invert="True" />
+    </UserControl.Resources>
+    <StackPanel>
+        <ItemsControl ItemsSource="{Binding Items}" Visibility="{Binding HasItems, Converter={StaticResource Visible}}" Focusable="False">
+            <ItemsControl.ItemsPanel>
+                <ItemsPanelTemplate>
+                    <WrapPanel />
+                </ItemsPanelTemplate>
+            </ItemsControl.ItemsPanel>
+            <ItemsControl.ItemTemplate>
+                <DataTemplate DataType="{x:Type links:LinkedItemViewModel}">
+                    <Border CornerRadius="4" Margin="0,4,6,0" Padding="2,0,0,0" Background="{DynamicResource ControlFillColorSecondaryBrush}"
+                            BorderThickness="1" BorderBrush="{DynamicResource CardStrokeColorDefaultBrush}">
+                        <StackPanel Orientation="Horizontal">
+                            <Button Command="{Binding OpenCommand}" ToolTip="{Binding Subtitle}" Cursor="Hand" Padding="6,2" Background="Transparent" BorderThickness="0"
+                                    AutomationProperties.Name="{Binding Title, StringFormat='Open {0}'}">
+                                <StackPanel Orientation="Horizontal">
+                                    <ui:SymbolIcon FontSize="14" Margin="0,0,6,0" VerticalAlignment="Center" Foreground="{DynamicResource AccentTextFillColorPrimaryBrush}">
+                                        <ui:SymbolIcon.Style>
+                                            <Style TargetType="ui:SymbolIcon">
+                                                <Setter Property="Symbol" Value="Link24" />
+                                                <Style.Triggers>
+                                                    <DataTrigger Binding="{Binding IsNote}" Value="True">
+                                                        <Setter Property="Symbol" Value="Note24" />
+                                                    </DataTrigger>
+                                                    <DataTrigger Binding="{Binding IsTask}" Value="True">
+                                                        <Setter Property="Symbol" Value="TaskListLtr24" />
+                                                    </DataTrigger>
+                                                    <DataTrigger Binding="{Binding IsPerson}" Value="True">
+                                                        <Setter Property="Symbol" Value="Person24" />
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </ui:SymbolIcon.Style>
+                                    </ui:SymbolIcon>
+                                    <TextBlock Text="{Binding Title}" MaxWidth="260" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
+                                </StackPanel>
+                            </Button>
+                            <Button Command="{Binding UnlinkCommand}" ToolTip="Remove the link (nothing is deleted)" Padding="4,2" Background="Transparent" BorderThickness="0"
+                                    Cursor="Hand" AutomationProperties.Name="{Binding Title, StringFormat='Remove the link to {0}'}">
+                                <ui:SymbolIcon Symbol="Dismiss12" FontSize="10" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+                            </Button>
+                        </StackPanel>
+                    </Border>
+                </DataTemplate>
+            </ItemsControl.ItemTemplate>
+        </ItemsControl>
+
+        <WrapPanel Margin="0,6,0,0" Visibility="{Binding ShowActions, ElementName=Root, Converter={StaticResource Visible}}">
+            <ui:Button Margin="0,0,6,0" Content="{Binding PickText}" Icon="{ui:SymbolIcon Link24}" Command="{Binding StartPickingCommand}"
+                       Visibility="{Binding IsPicking, Converter={StaticResource Hidden}}" />
+            <ui:Button Content="{Binding CreateText}" Icon="{ui:SymbolIcon Add24}" Command="{Binding CreateCommand}"
+                       Visibility="{Binding CanCreate, Converter={StaticResource Visible}}" />
+        </WrapPanel>
+
+        <Border Margin="0,6,0,0" Padding="10" CornerRadius="6" Background="{DynamicResource ControlFillColorDefaultBrush}"
+                Visibility="{Binding IsPicking, Converter={StaticResource Visible}}">
+            <StackPanel>
+                <DockPanel>
+                    <ui:Button DockPanel.Dock="Right" Margin="6,0,0,0" Content="Cancel" Command="{Binding CancelPickingCommand}" />
+                    <ui:Button DockPanel.Dock="Right" Margin="6,0,0,0" Content="{Binding CreateText}" Icon="{ui:SymbolIcon Add24}" Command="{Binding CreateCommand}"
+                               Visibility="{Binding CanCreate, Converter={StaticResource Visible}}" />
+                    <ui:TextBox x:Name="QueryBox" PlaceholderText="Search" Icon="{ui:SymbolIcon Search24}" AutomationProperties.Name="Search for something to link"
+                                Text="{Binding Query, UpdateSourceTrigger=PropertyChanged}" />
+                </DockPanel>
+                <ItemsControl Margin="0,6,0,0" ItemsSource="{Binding Results}" Focusable="False">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate DataType="{x:Type links:LinkTarget}">
+                            <Button HorizontalAlignment="Stretch" HorizontalContentAlignment="Left" Padding="8,4" Margin="0,1" Background="Transparent" BorderThickness="0"
+                                    Cursor="Hand" AutomationProperties.Name="{Binding Title, StringFormat='Link {0}'}"
+                                    Command="{Binding DataContext.PickCommand, ElementName=Root}" CommandParameter="{Binding}">
+                                <StackPanel>
+                                    <TextBlock Text="{Binding Title}" TextTrimming="CharacterEllipsis" />
+                                    <TextBlock Text="{Binding Subtitle}" FontSize="12" Foreground="{DynamicResource TextFillColorSecondaryBrush}" TextTrimming="CharacterEllipsis" />
+                                </StackPanel>
+                            </Button>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+                <TextBlock Margin="8,6,0,0" Text="{Binding EmptyResultsText}" Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                           Visibility="{Binding HasResults, Converter={StaticResource Hidden}}" />
+            </StackPanel>
+        </Border>
+    </StackPanel>
+</UserControl>

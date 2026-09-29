@@ -1,4 +1,6 @@
 using Helm.Core.Capture;
+using Helm.Core.Links;
+using Helm.Core.Services;
 using Helm.Core.Sync;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
@@ -21,4 +23,15 @@ public static class NotesCoreServices
         services.TryAddSingleton<NotesViewModel>();
         return services;
     }
+
+    /// <summary>
+    /// Notes as link targets: tasks and people in the debt book can have notes linked to them. The platform passes its
+    /// Notes content page, which opens a linked note.
+    /// </summary>
+    public static IServiceCollection AddNoteLinks(this IServiceCollection services, Type contentPage) =>
+        services.AddHelmLinks().AddSingleton<ILinkProvider>(sp => new NoteLinkProvider(sp.GetRequiredService<NotesStore>(), id =>
+        {
+            sp.GetRequiredService<IShellNavigation>().ShowPage(contentPage);
+            sp.GetRequiredService<NotesViewModel>().OpenNote(id);
+        }));
 }

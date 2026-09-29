@@ -2,6 +2,7 @@ using System.Collections.ObjectModel;
 using System.Text;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using Helm.Core.Links;
 using Helm.Core.Services;
 using Helm.Core.Settings;
 using Helm.Core.Sync;
@@ -54,6 +55,7 @@ public sealed partial class NotesViewModel : ObservableObject, IDisposable
     private readonly IDialogService _dialogs;
     private readonly IClipboardService _clipboard;
     private readonly ILogger<NotesViewModel> _logger;
+    private readonly LinkHub? _links;
     private readonly Dictionary<string, NoteRowViewModel> _rows = new(StringComparer.Ordinal);
     private readonly Timer _autosave;
     private int _refreshQueued;
@@ -82,15 +84,20 @@ public sealed partial class NotesViewModel : ObservableObject, IDisposable
     /// <summary>A problem or a notice about the last action; null when there is nothing to say.</summary>
     [ObservableProperty] private string? _message;
 
+    /// <summary>What the note in the editor is linked to (tasks, people in the debt book); null for a new unsaved note.</summary>
+    [ObservableProperty] private LinksViewModel? _editorLinks;
+
     public NotesViewModel(
         NotesStore store,
         ISettingsStoreFactory settings,
         IUiDispatcher ui,
         IDialogService dialogs,
         IClipboardService clipboard,
-        ILogger<NotesViewModel> logger)
+        ILogger<NotesViewModel> logger,
+        LinkHub? links = null)
     {
         _store = store;
+        _links = links;
         _settings = settings.Get<NotesSettings>(NotesIds.ModuleId);
         _ui = ui;
         _dialogs = dialogs;
@@ -106,7 +113,18 @@ public sealed partial class NotesViewModel : ObservableObject, IDisposable
         _loading = false;
 
         _store.Changed += (_, _) => ScheduleRefresh();
+        if (_links is not null) _links.Changed += (_, _) => _ui.Post(() => EditorLinks?.Refresh());
         Refresh();
+    }
+
+    /// <summary>Every change of the note in the editor goes through here, so its links follow.</summary>
+    private void SetEditorId(string? id)
+    {
+        if (_editorId == id) return;
+        _editorId = id;
+        var canLink = _links is not null && (_links.Provider(LinkKinds.Task) is not null || _links.Provider(LinkKinds.Person) is not null);
+        EditorLinks = id is null || !canLink ? null
+            : new LinksViewModel(_links!, new LinkRef(LinkKinds.Note, id), [LinkKinds.Task, LinkKinds.Person], () => EditTitle);
     }
 
     /// <summary>The notes shown: search results, or the trash.</summary>
@@ -211,7 +229,7 @@ public sealed partial class NotesViewModel : ObservableObject, IDisposable
         {
             if (ShowingTrash) ShowingTrash = false;
             SelectedNote = null;
-            _editorId = null;
+            SetEditorId(null);
             _baseRev = "";
             _dirty = false;
             EditTitle = "";
@@ -237,7 +255,7 @@ public sealed partial class NotesViewModel : ObservableObject, IDisposable
         try
         {
             SelectedNote = null;
-            _editorId = null;
+            SetEditorId(null);
             IsEditorOpen = false;
             EditTitle = "";
             EditBody = "";
@@ -279,7 +297,7 @@ public sealed partial class NotesViewModel : ObservableObject, IDisposable
             {
                 if (EditTitle.Trim().Length == 0 && EditBody.Trim().Length == 0) return;
                 var id = _store.Add(EditTitle, EditBody);
-                _editorId = id;
+                SetEditorId(id);
                 _baseRev = _store.Get(id)?.Rev ?? "";
                 _dirty = false;
                 RememberSelection(id);
@@ -292,13 +310,13 @@ public sealed partial class NotesViewModel : ObservableObject, IDisposable
                 {
                     case NoteSaveOutcome.SavedAsCopy when result.CopyId is { } copy:
                         // The other device's version stays in the note; the editor carries on in the copy with its text.
-                        _editorId = copy;
+                        SetEditorId(copy);
                         _baseRev = _store.Get(copy)?.Rev ?? "";
                         RememberSelection(copy);
                         Message = $"This note changed on another device while you were typing. Your text was saved as a separate note, “{_store.Get(copy)?.DisplayTitle}”.";
                         break;
                     case NoteSaveOutcome.Recreated:
-                        _editorId = result.Id;
+                        SetEditorId(result.Id);
                         _baseRev = result.Rev;
                         RememberSelection(result.Id);
                         Message = "This note was deleted on another device. Your text was saved as a new note.";
@@ -575,7 +593,7 @@ public sealed partial class NotesViewModel : ObservableObject, IDisposable
         _loading = true;
         try
         {
-            _editorId = id;
+            SetEditorId(id);
             _baseRev = note.Rev;
             _dirty = false;
             EditTitle = note.Title;
@@ -598,7 +616,7 @@ public sealed partial class NotesViewModel : ObservableObject, IDisposable
         _loading = true;
         try
         {
-            _editorId = null;
+            SetEditorId(null);
             _dirty = false;
             SelectedNote = null;
             IsEditorOpen = false;

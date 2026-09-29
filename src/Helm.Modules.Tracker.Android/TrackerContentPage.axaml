@@ -2,6 +2,7 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:ic="using:FluentIcons.Avalonia"
              xmlns:vm="using:Helm.Modules.Tracker"
+             xmlns:core="using:Helm.Core.Ui"
              x:Class="Helm.Modules.Tracker.TrackerContentPage"
              x:DataType="vm:TrackerViewModel">
 
@@ -84,6 +85,9 @@
                                 <Button Content="No due date" Command="{Binding ClearDueCommand}" />
                             </WrapPanel>
                         </StackPanel>
+                        <!-- Notes about this person (bank details, what was agreed…) -->
+                        <TextBlock Text="Notes" FontWeight="SemiBold" Margin="0,6,0,0" IsVisible="{Binding Links, Converter={x:Static ObjectConverters.IsNotNull}}" />
+                        <core:LinksPanel DataContext="{Binding Links}" ShowActions="True" />
                         <!-- Every change of the amount, newest first -->
                         <TextBlock Text="History" FontWeight="SemiBold" Margin="0,6,0,0" />
                         <ItemsControl ItemsSource="{Binding Entries}">
@@ -147,6 +151,9 @@
                                    IsVisible="{Binding IsDebt}" Classes.owed="{Binding OwedToMe}" Classes.iowe="{Binding IOwe}" />
                     </Grid>
 
+                    <!-- Linked notes: tap one to open it in Notes -->
+                    <core:LinksPanel DataContext="{Binding Links}" Margin="28,0,0,4" />
+
                     <!-- Subtasks -->
                     <ItemsControl ItemsSource="{Binding Subtasks}" Margin="28,0,0,0" IsVisible="{Binding HasSubtasks}">
                         <ItemsControl.ItemTemplate>
@@ -186,6 +193,10 @@
                         </Button>
                         <Button Classes="icon flat" Command="{Binding MoveDownCommand}" IsVisible="{Binding IsOpen}" IsEnabled="{Binding CanMoveDown}" AutomationProperties.Name="Move down">
                             <ic:SymbolIcon Symbol="ArrowDown" FontSize="18" />
+                        </Button>
+                        <Button Classes="icon flat" Command="{Binding Links.StartPickingCommand}" IsVisible="{Binding Links, Converter={x:Static ObjectConverters.IsNotNull}}"
+                                AutomationProperties.Name="Link a note">
+                            <ic:SymbolIcon Symbol="Link" FontSize="18" />
                         </Button>
                         <Button Classes="icon flat" Command="{Binding BeginEditCommand}" AutomationProperties.Name="Edit">
                             <ic:SymbolIcon Symbol="Edit" FontSize="18" />

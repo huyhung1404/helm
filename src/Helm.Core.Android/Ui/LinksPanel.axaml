@@ -1,0 +1,100 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:ic="using:FluentIcons.Avalonia"
+             xmlns:links="using:Helm.Core.Links"
+             x:Class="Helm.Core.Ui.LinksPanel"
+             x:DataType="links:LinksViewModel"
+             x:Name="Root">
+    <!-- The links of one thing (a task, a person, a note), bound to a LinksViewModel: chips, then "Link…" and
+         "New note" when ShowActions, and the search that adds a link while picking. -->
+    <UserControl.Styles>
+        <Style Selector="Button.chip">
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="Padding" Value="8,6" />
+            <Setter Property="MinHeight" Value="36" />
+        </Style>
+        <Style Selector="Button.result">
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="HorizontalAlignment" Value="Stretch" />
+            <Setter Property="HorizontalContentAlignment" Value="Left" />
+            <Setter Property="Padding" Value="8,6" />
+        </Style>
+    </UserControl.Styles>
+    <StackPanel Spacing="6">
+        <ItemsControl ItemsSource="{Binding Items}" IsVisible="{Binding HasItems}">
+            <ItemsControl.ItemsPanel>
+                <ItemsPanelTemplate>
+                    <WrapPanel />
+                </ItemsPanelTemplate>
+            </ItemsControl.ItemsPanel>
+            <ItemsControl.ItemTemplate>
+                <DataTemplate DataType="links:LinkedItemViewModel">
+                    <Border CornerRadius="6" Margin="0,4,6,0" BorderThickness="1" BorderBrush="{DynamicResource HelmCardStroke}">
+                        <StackPanel Orientation="Horizontal">
+                            <Button Classes="chip" Command="{Binding OpenCommand}" AutomationProperties.Name="{Binding Title, StringFormat='Open {0}'}">
+                                <StackPanel Orientation="Horizontal" Spacing="6">
+                                    <Panel VerticalAlignment="Center">
+                                        <ic:SymbolIcon Symbol="Note" FontSize="16" IsVisible="{Binding IsNote}" Foreground="{DynamicResource SystemAccentColor}" />
+                                        <ic:SymbolIcon Symbol="TaskList" FontSize="16" IsVisible="{Binding IsTask}" Foreground="{DynamicResource SystemAccentColor}" />
+                                        <ic:SymbolIcon Symbol="Person" FontSize="16" IsVisible="{Binding IsPerson}" Foreground="{DynamicResource SystemAccentColor}" />
+                                    </Panel>
+                                    <TextBlock Text="{Binding Title}" MaxWidth="220" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
+                                </StackPanel>
+                            </Button>
+                            <Button Classes="chip" Padding="6" Command="{Binding UnlinkCommand}" AutomationProperties.Name="{Binding Title, StringFormat='Remove the link to {0}'}">
+                                <ic:SymbolIcon Symbol="Dismiss" FontSize="12" />
+                            </Button>
+                        </StackPanel>
+                    </Border>
+                </DataTemplate>
+            </ItemsControl.ItemTemplate>
+        </ItemsControl>
+
+        <WrapPanel IsVisible="{Binding #Root.ShowActions}">
+            <Button Margin="0,0,8,0" Command="{Binding StartPickingCommand}" IsVisible="{Binding !IsPicking}">
+                <StackPanel Orientation="Horizontal" Spacing="6">
+                    <ic:SymbolIcon Symbol="Link" FontSize="16" />
+                    <TextBlock Text="{Binding PickText}" />
+                </StackPanel>
+            </Button>
+            <Button Command="{Binding CreateCommand}" IsVisible="{Binding CanCreate}">
+                <StackPanel Orientation="Horizontal" Spacing="6">
+                    <ic:SymbolIcon Symbol="Add" FontSize="16" />
+                    <TextBlock Text="{Binding CreateText}" />
+                </StackPanel>
+            </Button>
+        </WrapPanel>
+
+        <Border Padding="8" CornerRadius="8" Background="{DynamicResource HelmCardBackground}" BorderThickness="1" BorderBrush="{DynamicResource HelmCardStroke}"
+                IsVisible="{Binding IsPicking}">
+            <StackPanel Spacing="6">
+                <TextBox x:Name="QueryBox" Text="{Binding Query}" PlaceholderText="Search" AutomationProperties.Name="Search for something to link" />
+                <ItemsControl ItemsSource="{Binding Results}">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate DataType="links:LinkTarget">
+                            <Button Classes="result" AutomationProperties.Name="{Binding Title, StringFormat='Link {0}'}"
+                                    Command="{Binding #Root.((links:LinksViewModel)DataContext).PickCommand}" CommandParameter="{Binding}">
+                                <StackPanel>
+                                    <TextBlock Text="{Binding Title}" TextTrimming="CharacterEllipsis" />
+                                    <TextBlock Text="{Binding Subtitle}" Classes="secondary" TextTrimming="CharacterEllipsis" />
+                                </StackPanel>
+                            </Button>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+                <TextBlock Text="{Binding EmptyResultsText}" Classes="secondary" IsVisible="{Binding !HasResults}" Margin="8,0" />
+                <WrapPanel>
+                    <Button Margin="0,0,8,0" Command="{Binding CreateCommand}" IsVisible="{Binding CanCreate}">
+                        <StackPanel Orientation="Horizontal" Spacing="6">
+                            <ic:SymbolIcon Symbol="Add" FontSize="16" />
+                            <TextBlock Text="{Binding CreateText}" />
+                        </StackPanel>
+                    </Button>
+                    <Button Content="Cancel" Command="{Binding CancelPickingCommand}" />
+                </WrapPanel>
+            </StackPanel>
+        </Border>
+    </StackPanel>
+</UserControl>

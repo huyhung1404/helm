@@ -2,6 +2,7 @@ using System.Collections.ObjectModel;
 using System.Globalization;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using Helm.Core.Links;
 
 namespace Helm.Modules.Tracker;
 
@@ -58,6 +59,31 @@ public sealed partial class DebtPersonViewModel : ObservableObject
     }
 
     public string Key => _person.Key;
+
+    private LinksViewModel? _links;
+    private bool _linksMade;
+
+    /// <summary>The notes linked to this person; null without the Notes tool.</summary>
+    public LinksViewModel? Links
+    {
+        get
+        {
+            if (!_linksMade)
+            {
+                _linksMade = true;
+                _links = _owner.LinksFor(this);
+            }
+            return _links;
+        }
+    }
+
+    internal void RefreshLinks() => _links?.Refresh();
+
+    /// <summary>Opens the details (e.g. from a linked note); a no-op when they are open.</summary>
+    internal void Open()
+    {
+        if (!IsExpanded) ToggleExpanded();
+    }
 
     public string Name => _person.Name;
 

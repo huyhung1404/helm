@@ -2,6 +2,7 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:ic="using:FluentIcons.Avalonia"
              xmlns:vm="using:Helm.Modules.Notes"
+             xmlns:core="using:Helm.Core.Ui"
              x:Class="Helm.Modules.Notes.NotesContentPage"
              x:DataType="vm:NotesViewModel">
 
@@ -111,6 +112,10 @@
                                 AutomationProperties.Name="Pin">
                             <ic:SymbolIcon Symbol="Pin" FontSize="18" />
                         </Button>
+                        <Button Classes="icon flat" Command="{Binding EditorLinks.StartPickingCommand}" IsVisible="{Binding EditorLinks, Converter={x:Static ObjectConverters.IsNotNull}}"
+                                AutomationProperties.Name="Link to a task or person">
+                            <ic:SymbolIcon Symbol="Link" FontSize="18" />
+                        </Button>
                         <Button Classes="icon flat" Command="{Binding CopyNoteCommand}" AutomationProperties.Name="Copy the note">
                             <ic:SymbolIcon Symbol="Copy" FontSize="18" />
                         </Button>
@@ -132,6 +137,8 @@
 
                 <TextBox x:Name="TitleBox" PlaceholderText="Title" FontSize="20" FontWeight="SemiBold" MaxLength="500"
                          Text="{Binding EditTitle}" IsReadOnly="{Binding EditTrashed}" AutomationProperties.Name="Title" />
+                <!-- What the note is linked to: tap a task or person to open it in Tracker -->
+                <core:LinksPanel DataContext="{Binding EditorLinks}" />
                 <TextBox x:Name="BodyBox" PlaceholderText="Write something…" AcceptsReturn="True" TextWrapping="Wrap" MinHeight="360"
                          VerticalContentAlignment="Top" FontSize="{Binding EditorFontSize}" Classes.mono="{Binding Monospace}"
                          Text="{Binding EditBody}" IsReadOnly="{Binding EditTrashed}" AutomationProperties.Name="Note text" />

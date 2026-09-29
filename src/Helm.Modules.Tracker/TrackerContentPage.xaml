@@ -114,6 +114,8 @@
                             <ui:Button Margin="0,0,6,8" Appearance="Primary" Content="Set" Command="{Binding SetDueCommand}" />
                             <ui:Button Margin="0,0,6,8" Content="No due date" Command="{Binding ClearDueCommand}" />
                         </WrapPanel>
+                        <!-- Notes about this person (bank details, what was agreed…) -->
+                        <core:LinksPanel DataContext="{Binding Links}" ShowActions="True" Margin="0,0,0,10" />
                         <!-- Every change of the amount, newest first, with the balance after it -->
                         <ItemsControl ItemsSource="{Binding Entries}">
                             <ItemsControl.ItemTemplate>
@@ -223,6 +225,8 @@
                             </TextBlock>
                             <TextBlock Text="{Binding Item.Notes}" Style="{DynamicResource HelmSecondaryText}" Margin="0,2,0,0"
                                        Visibility="{Binding HasNotes, Converter={StaticResource BoolToVisibility}}" />
+                            <!-- Linked notes: click one to open it in Notes -->
+                            <core:LinksPanel DataContext="{Binding Links}" />
                         </StackPanel>
 
                         <TextBlock Grid.Column="2" Text="{Binding AmountText}" Style="{StaticResource AmountText}"
@@ -239,6 +243,8 @@
                                        Visibility="{Binding IsOpen, Converter={StaticResource BoolToVisibility}}" />
                             <ui:Button Style="{StaticResource RowAction}" Icon="{ui:SymbolIcon TaskListAdd24}" ToolTip="Add a subtask" AutomationProperties.Name="Add a subtask"
                                        Command="{Binding ToggleExpandedCommand}" Visibility="{Binding CanHaveSubtasks, Converter={StaticResource BoolToVisibility}}" />
+                            <ui:Button Style="{StaticResource RowAction}" Icon="{ui:SymbolIcon Link24}" ToolTip="Link a note, or write a new one" AutomationProperties.Name="Link a note"
+                                       Command="{Binding Links.StartPickingCommand}" Visibility="{Binding Links, Converter={StaticResource NotEmptyToVisibility}}" />
                             <ui:Button Style="{StaticResource RowAction}" Icon="{ui:SymbolIcon Edit24}" ToolTip="Edit" AutomationProperties.Name="Edit" Command="{Binding BeginEditCommand}" />
                             <ui:Button Style="{StaticResource RowAction}" Icon="{ui:SymbolIcon Delete24}" ToolTip="Delete" AutomationProperties.Name="Delete" Command="{Binding DeleteCommand}" />
                         </StackPanel>

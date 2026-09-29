@@ -16,6 +16,10 @@ Format: [Keep a Changelog](https://keepachangelog.com), versions follow [SemVer]
 - Sync: **choose what syncs on each device** (General → Sync → What syncs on this device): untick Notes, Tracker or
   Vault to stop syncing that tool on this device, e.g. the vault on a shared PC. What it already has stays; ticking it
   again downloads the tool's data afresh and sends the changes made here meanwhile.
+- **Notes on tasks and debts** (PC and Android): link notes to a task, or to a person in the debt book (their bank
+  details, what was agreed…), and a note to tasks and people. The links show as chips on both sides; click one to open
+  it in the other tool, × removes the link (nothing is deleted). On a task, the link button offers **New note**, which
+  writes a note titled after the task. A repeating task keeps its notes every day. Links sync like everything else.
 
 ### Changed
 - Sync: deleted items no longer stay on the server for ever. A deletion is kept 90 days, long enough for every device

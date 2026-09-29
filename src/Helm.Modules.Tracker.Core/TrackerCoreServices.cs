@@ -1,3 +1,5 @@
+using Helm.Core.Links;
+using Helm.Core.Services;
 using Helm.Core.Sync;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
@@ -39,5 +41,21 @@ public static class TrackerCoreServices
         // Windows registers it again through AddHelmModule; one instance either way.
         services.TryAddSingleton<TrackerViewModel>();
         return services;
+    }
+
+    /// <summary>
+    /// Tasks and people in the debt book as link targets (notes link to them). The platform passes its Tracker content
+    /// page, which opens a linked task or person.
+    /// </summary>
+    public static IServiceCollection AddTrackerLinks(this IServiceCollection services, Type contentPage)
+    {
+        void Show(IServiceProvider sp, Action<TrackerViewModel> show)
+        {
+            sp.GetRequiredService<IShellNavigation>().ShowPage(contentPage);
+            show(sp.GetRequiredService<TrackerViewModel>());
+        }
+        return services.AddHelmLinks()
+            .AddSingleton<ILinkProvider>(sp => new TaskLinkProvider(sp.GetRequiredService<TrackerStore>(), (ws, item) => Show(sp, vm => vm.ShowItem(ws, item))))
+            .AddSingleton<ILinkProvider>(sp => new PersonLinkProvider(sp.GetRequiredService<TrackerStore>(), (book, key) => Show(sp, vm => vm.ShowPerson(book, key))));
     }
 }

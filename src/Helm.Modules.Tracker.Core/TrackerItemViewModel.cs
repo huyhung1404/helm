@@ -1,5 +1,6 @@
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using Helm.Core.Links;
 
 namespace Helm.Modules.Tracker;
 
@@ -58,6 +59,25 @@ public sealed partial class TrackerItemViewModel : ObservableObject
     public string Id { get; }
 
     public TrackerItem Item { get; private set; }
+
+    private LinksViewModel? _links;
+    private bool _linksMade;
+
+    /// <summary>The notes linked to this task; null for subtasks, debt entries, or without the Notes tool.</summary>
+    public LinksViewModel? Links
+    {
+        get
+        {
+            if (!_linksMade)
+            {
+                _linksMade = true;
+                _links = _owner.LinksFor(this);
+            }
+            return _links;
+        }
+    }
+
+    internal void RefreshLinks() => _links?.Refresh();
 
     /// <summary>The task's subtasks (open first). Empty for a subtask itself.</summary>
     public System.Collections.ObjectModel.ObservableCollection<TrackerItemViewModel> Subtasks { get; } = [];

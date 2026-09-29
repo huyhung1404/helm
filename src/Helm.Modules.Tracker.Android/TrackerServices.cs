@@ -8,6 +8,7 @@ public static class TrackerServices
     public static IServiceCollection AddTrackerModule(this IServiceCollection services) =>
         services
             .AddTrackerCore()
+            .AddTrackerLinks(typeof(TrackerContentPage))
             .AddAndroidModule<TrackerModule, TrackerPage>()
             .AddTransient<TrackerContentPage>();
 }

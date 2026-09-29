@@ -150,6 +150,7 @@
                         <Grid.RowDefinitions>
                             <RowDefinition Height="Auto" />
                             <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
                             <RowDefinition Height="*" />
                         </Grid.RowDefinitions>
 
@@ -171,6 +172,9 @@
                                         </Style>
                                     </ui:Button.Style>
                                 </ui:Button>
+                                <ui:Button Style="{StaticResource ToolbarAction}" Icon="{ui:SymbolIcon Link24}" ToolTip="Link to a task or a person in the debt book"
+                                           AutomationProperties.Name="Link to a task or person" Command="{Binding EditorLinks.StartPickingCommand}"
+                                           Visibility="{Binding EditorLinks, Converter={StaticResource NotEmptyToVisibility}}" />
                                 <ui:Button Style="{StaticResource ToolbarAction}" Icon="{ui:SymbolIcon Copy24}" ToolTip="Copy the note" AutomationProperties.Name="Copy the note"
                                            Command="{Binding CopyNoteCommand}" />
                                 <ui:Button Style="{StaticResource ToolbarAction}" Icon="{ui:SymbolIcon Delete24}" ToolTip="Move to the trash" AutomationProperties.Name="Move to the trash"
@@ -186,7 +190,9 @@
                         <ui:TextBox x:Name="TitleBox" Grid.Row="1" Margin="12,8,12,4" PlaceholderText="Title" FontSize="20" FontWeight="SemiBold"
                                     ClearButtonEnabled="False" AutomationProperties.Name="Title" MaxLength="500"
                                     IsReadOnly="{Binding EditTrashed}" Text="{Binding EditTitle, UpdateSourceTrigger=PropertyChanged}" />
-                        <ui:TextBox x:Name="BodyBox" Grid.Row="2" Margin="12,4,12,12" PlaceholderText="Write something…" Style="{StaticResource EditorText}"
+                        <!-- What the note is linked to: click a task or person to open it in Tracker -->
+                        <core:LinksPanel Grid.Row="2" Margin="16,0,12,4" DataContext="{Binding EditorLinks}" />
+                        <ui:TextBox x:Name="BodyBox" Grid.Row="3" Margin="12,4,12,12" PlaceholderText="Write something…" Style="{StaticResource EditorText}"
                                     ClearButtonEnabled="False" AutomationProperties.Name="Note text" AcceptsReturn="True" AcceptsTab="True"
                                     TextWrapping="Wrap" VerticalContentAlignment="Top" VerticalScrollBarVisibility="Auto" SpellCheck.IsEnabled="False"
                                     IsReadOnly="{Binding EditTrashed}" Text="{Binding EditBody, UpdateSourceTrigger=PropertyChanged}" />
