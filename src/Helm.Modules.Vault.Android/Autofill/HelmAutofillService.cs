@@ -40,6 +40,12 @@ public sealed class HelmAutofillService : AutofillService
                 return;
             }
             var session = HelmAndroidServices.Current.GetRequiredService<VaultSession>();
+            // No vault on this phone (yet): offer nothing rather than a dead end on every sign-in form.
+            if (session.State == VaultState.NotSetUp)
+            {
+                callback.OnSuccess(null);
+                return;
+            }
             if (session.State != VaultState.Unlocked)
             {
                 // The vault key is not in memory: offer to unlock; the activity answers with the logins.
