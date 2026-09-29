@@ -3,7 +3,13 @@
 All notable changes to Helm. The top section is used as the GitHub release body and as the Velopack release notes.
 Format: [Keep a Changelog](https://keepachangelog.com), versions follow [SemVer](https://semver.org).
 
-## [0.17.0] - 2026-09-29
+## [0.17.1] - 2026-09-29
+
+0.17.0 was tagged but never published (its release build stopped at a failing test); 0.17.1 is that release with the fix below.
+
+### Fixed
+- Helm tools for Claude (MCP) now connect when Helm runs as administrator, as the installed Helm does: Claude Chat's
+  chats (and Claude Code started from an administrator terminal) were refused by the pipe's owner check.
 
 ### Added
 - Sync: **Change passphrase** (General → Sync, PC and Android). Enter the current passphrase, or the recovery key if
