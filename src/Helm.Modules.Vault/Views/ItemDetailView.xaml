@@ -61,8 +61,19 @@
                     <DockPanel Margin="0,0,0,10">
                         <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center"
                                     Visibility="{Binding HasValue, Converter={StaticResource BoolToVisibility}}">
-                            <ui:Button Icon="{ui:SymbolIcon Eye24}" ToolTip="Show or hide" AutomationProperties.Name="Show or hide" Command="{Binding ToggleRevealCommand}" Appearance="Transparent"
-                                       Visibility="{Binding IsSecret, Converter={StaticResource BoolToVisibility}}" />
+                            <ui:Button ToolTip="Show or hide" AutomationProperties.Name="Show or hide" Command="{Binding ToggleRevealCommand}" Appearance="Transparent"
+                                       Visibility="{Binding IsSecret, Converter={StaticResource BoolToVisibility}}">
+                                <ui:SymbolIcon>
+                                    <ui:SymbolIcon.Style>
+                                        <Style TargetType="ui:SymbolIcon">
+                                            <Setter Property="Symbol" Value="Eye24" />
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding IsRevealed}" Value="True"><Setter Property="Symbol" Value="EyeOff24" /></DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </ui:SymbolIcon.Style>
+                                </ui:SymbolIcon>
+                            </ui:Button>
                             <ui:Button Icon="{ui:SymbolIcon Copy24}" ToolTip="Copy" AutomationProperties.Name="Copy" Command="{Binding CopyCommand}" Appearance="Transparent" />
                         </StackPanel>
                         <StackPanel>

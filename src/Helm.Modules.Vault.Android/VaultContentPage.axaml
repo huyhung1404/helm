@@ -203,10 +203,26 @@
                                         <Button Classes="flat" HorizontalAlignment="Stretch" VerticalAlignment="Stretch" Background="Transparent" AutomationProperties.Name="{Binding Title}"
                                                 Command="{Binding $parent[UserControl].((local:VaultPageViewModel)DataContext).App.Items.ToggleCardCommand}" CommandParameter="{Binding}" />
                                         <Grid ColumnDefinitions="Auto,*,Auto" RowDefinitions="Auto,Auto,Auto" Margin="12,10">
-                                            <!-- Login: its picture or initial -->
-                                            <Panel Grid.RowSpan="3" Width="44" Height="44" Margin="0,0,12,0" VerticalAlignment="Center" IsHitTestVisible="False" IsVisible="{Binding IsLogin}">
-                                                <Border CornerRadius="11" Background="{Binding AvatarColor, Converter={x:Static local:HexBrush.Converter}}" IsVisible="{Binding !HasIcon}">
+                                            <!-- The icon: its picture; else a login's initial, or the type's symbol (token, note, card...) -->
+                                            <Panel Grid.RowSpan="3" Width="44" Height="44" Margin="0,0,12,0" VerticalAlignment="Center" IsHitTestVisible="False">
+                                                <Border CornerRadius="11" Background="{Binding AvatarColor, Converter={x:Static local:HexBrush.Converter}}">
+                                                    <Border.IsVisible>
+                                                        <MultiBinding Converter="{x:Static BoolConverters.And}">
+                                                            <Binding Path="!HasIcon" />
+                                                            <Binding Path="IsLogin" />
+                                                        </MultiBinding>
+                                                    </Border.IsVisible>
                                                     <TextBlock Text="{Binding Initial}" Foreground="White" FontSize="19" FontWeight="SemiBold" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                                </Border>
+                                                <Border CornerRadius="11" Background="{DynamicResource HelmSubtleFill}">
+                                                    <Border.IsVisible>
+                                                        <MultiBinding Converter="{x:Static BoolConverters.And}">
+                                                            <Binding Path="!HasIcon" />
+                                                            <Binding Path="!IsLogin" />
+                                                        </MultiBinding>
+                                                    </Border.IsVisible>
+                                                    <ic:SymbolIcon Symbol="{Binding Kind, Converter={x:Static local:KindIcon.Converter}}" FontSize="22"
+                                                                   Foreground="{DynamicResource SystemAccentColor}" HorizontalAlignment="Center" VerticalAlignment="Center" />
                                                 </Border>
                                                 <Border CornerRadius="11" ClipToBounds="True" IsVisible="{Binding HasIcon}">
                                                     <Image Source="{Binding Icon, Converter={x:Static local:IconBitmap.Converter}}" Stretch="UniformToFill" />

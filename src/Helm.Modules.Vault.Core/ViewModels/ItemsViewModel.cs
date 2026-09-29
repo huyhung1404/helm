@@ -38,6 +38,7 @@ public sealed partial class ItemsViewModel : ObservableObject
     private readonly VaultFiles _files;
     private readonly VaultSession _session;
     private readonly IVaultPlatform _platform;
+    private bool _adding;
 
     [ObservableProperty] private string _search = "";
     [ObservableProperty] private VaultTab _tab = VaultTab.Credentials;
@@ -154,6 +155,7 @@ public sealed partial class ItemsViewModel : ObservableObject
         var tab = TabOf(kind);
         if (Tab != tab) Tab = tab;
         if (Filter == VaultFilter.Trash) Filter = VaultFilter.All;
+        _adding = true;
         Detail = new ItemDetailViewModel(_store, _files, _session, _platform, null, kind, OnDetailSaved);
         _session.Touch();
     }
@@ -250,6 +252,9 @@ public sealed partial class ItemsViewModel : ObservableObject
     /// <summary>After save, trash, restore or delete: the list is rebuilt and the item's card is open (null: none).</summary>
     private void OnDetailSaved(string? uid)
     {
+        // A new item appears closed in the list; an item that was edited stays open where it was.
+        var added = _adding;
+        _adding = false;
         Detail = null;
         ExpandedUid = null;
         if (uid is not null && _store.Get(uid) is { } entry)
@@ -258,7 +263,7 @@ public sealed partial class ItemsViewModel : ObservableObject
             var tab = TabOf(entry.Item.Kind);
             if (Tab != tab) Tab = tab;
             if (entry.Trashed != (Filter == VaultFilter.Trash)) Filter = entry.Trashed ? VaultFilter.Trash : VaultFilter.All;
-            ExpandedUid = uid;
+            if (!added) ExpandedUid = uid;
         }
         Refresh();
         if (ExpandedUid is { } open && Detail is null) Detail = DetailFor(open);

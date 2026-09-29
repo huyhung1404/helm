@@ -94,8 +94,14 @@ public sealed class VaultViewModelTests : IDisposable
         var card = Assert.Single(items.Cards);
         Assert.Equal("Bank", card.Title);
         Assert.Equal("anh@example.com", card.Username);
-        Assert.True(card.IsExpanded); // the saved item's card is open
+        Assert.False(card.IsExpanded); // a new item's card is closed once saved
+        Assert.Null(items.Detail);
+        items.ToggleCardCommand.Execute(card);
         Assert.Equal("••••••••••", items.Detail!.Fields.Single(f => f.IsPassword).Display);
+        var secret = items.Detail.Fields.Single(f => f.IsPassword);
+        secret.ToggleRevealCommand.Execute(null); // the eye next to Copy
+        Assert.Equal(generated, secret.Display);
+        items.ToggleCardCommand.Execute(card);
 
         card.CopyUsernameCommand.Execute(null);
         Assert.Equal("anh@example.com", _platform.CopiedText);

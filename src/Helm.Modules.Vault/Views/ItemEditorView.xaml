@@ -68,13 +68,57 @@
                                 <ComboBox AutomationProperties.Name="Field type" ItemsSource="{Binding Owner.FieldKinds}" SelectedItem="{Binding Kind}" VerticalAlignment="Top" />
                                 <ui:TextBox Grid.Column="1" Margin="6,0,0,0" AutomationProperties.Name="Field name" Text="{Binding Name, UpdateSourceTrigger=PropertyChanged}" PlaceholderText="Name" VerticalAlignment="Top" />
                                 <Grid Grid.Column="2" Margin="6,0,0,0">
-                                    <ui:PasswordBox AutomationProperties.Name="{Binding Name}" Password="{Binding Value, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" RevealButtonEnabled="True"
-                                                    Visibility="{Binding IsSecret, Converter={StaticResource BoolToVisibility}}" VerticalAlignment="Top" />
+                                    <!-- Hidden: a password box; shown (the eye) or not secret: a text box -->
+                                    <ui:PasswordBox AutomationProperties.Name="{Binding Name}" Password="{Binding Value, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" RevealButtonEnabled="False" VerticalAlignment="Top">
+                                        <ui:PasswordBox.Style>
+                                            <Style TargetType="ui:PasswordBox" BasedOn="{StaticResource {x:Type ui:PasswordBox}}">
+                                                <Setter Property="Visibility" Value="Collapsed" />
+                                                <Style.Triggers>
+                                                    <MultiDataTrigger>
+                                                        <MultiDataTrigger.Conditions>
+                                                            <Condition Binding="{Binding IsSecret}" Value="True" />
+                                                            <Condition Binding="{Binding IsRevealed}" Value="False" />
+                                                        </MultiDataTrigger.Conditions>
+                                                        <Setter Property="Visibility" Value="Visible" />
+                                                    </MultiDataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </ui:PasswordBox.Style>
+                                    </ui:PasswordBox>
                                     <ui:TextBox AutomationProperties.Name="{Binding Name}" Text="{Binding Value, UpdateSourceTrigger=PropertyChanged}" AcceptsReturn="{Binding IsMultiline}" TextWrapping="Wrap"
-                                                PlaceholderText="Value" Visibility="{Binding IsSecret, Converter={StaticResource InverseBoolToVisibility}}" VerticalAlignment="Top" />
+                                                PlaceholderText="Value" VerticalAlignment="Top">
+                                        <ui:TextBox.Style>
+                                            <Style TargetType="ui:TextBox" BasedOn="{StaticResource {x:Type ui:TextBox}}">
+                                                <Style.Triggers>
+                                                    <MultiDataTrigger>
+                                                        <MultiDataTrigger.Conditions>
+                                                            <Condition Binding="{Binding IsSecret}" Value="True" />
+                                                            <Condition Binding="{Binding IsRevealed}" Value="False" />
+                                                        </MultiDataTrigger.Conditions>
+                                                        <Setter Property="Visibility" Value="Collapsed" />
+                                                    </MultiDataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </ui:TextBox.Style>
+                                    </ui:TextBox>
                                 </Grid>
-                                <ui:Button Grid.Column="3" Icon="{ui:SymbolIcon Wand24}" ToolTip="Generate a strong password" AutomationProperties.Name="Generate a strong password" Command="{Binding GenerateCommand}" Appearance="Transparent"
-                                           Margin="2,0,0,0" VerticalAlignment="Top" Visibility="{Binding IsPassword, Converter={StaticResource BoolToVisibility}}" />
+                                <StackPanel Grid.Column="3" Orientation="Horizontal" VerticalAlignment="Top">
+                                    <ui:Button Appearance="Transparent" Margin="2,0,0,0" Command="{Binding ToggleRevealCommand}" ToolTip="Show or hide" AutomationProperties.Name="Show or hide"
+                                               Visibility="{Binding IsSecret, Converter={StaticResource BoolToVisibility}}">
+                                        <ui:SymbolIcon>
+                                            <ui:SymbolIcon.Style>
+                                                <Style TargetType="ui:SymbolIcon">
+                                                    <Setter Property="Symbol" Value="Eye24" />
+                                                    <Style.Triggers>
+                                                        <DataTrigger Binding="{Binding IsRevealed}" Value="True"><Setter Property="Symbol" Value="EyeOff24" /></DataTrigger>
+                                                    </Style.Triggers>
+                                                </Style>
+                                            </ui:SymbolIcon.Style>
+                                        </ui:SymbolIcon>
+                                    </ui:Button>
+                                    <ui:Button Icon="{ui:SymbolIcon Wand24}" ToolTip="Generate a strong password" AutomationProperties.Name="Generate a strong password" Command="{Binding GenerateCommand}" Appearance="Transparent"
+                                               Margin="2,0,0,0" Visibility="{Binding IsPassword, Converter={StaticResource BoolToVisibility}}" />
+                                </StackPanel>
                                 <ui:Button Grid.Column="4" Icon="{ui:SymbolIcon Dismiss24}" ToolTip="Remove this field" AutomationProperties.Name="Remove this field" Command="{Binding RemoveCommand}" Appearance="Transparent"
                                            Margin="2,0,0,0" VerticalAlignment="Top" />
                             </Grid>

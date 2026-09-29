@@ -11,6 +11,10 @@ Format: [Keep a Changelog](https://keepachangelog.com), versions follow [SemVer]
 - Vault: no more reminder to confirm the Emergency Kit in the list (its state is still in the Vault settings).
 - Vault: Favorites is the first sub-tab, shown as a star, and the trash the last, shown as a bin. Each card has a star
   to make it a favorite or not with one click (this is not a new version in the item's history).
+- Vault: every card has an icon: the item's picture, a login's initial, or its type's symbol (token, note, card…).
+- Vault: a new item is shown closed in the list once saved (an edited one stays open).
+- Vault: secret fields have an eye next to them while editing too (on Android also for passwords), and the eye shows
+  whether the value is visible.
 
 ## [0.12.0] - 2026-09-29
 

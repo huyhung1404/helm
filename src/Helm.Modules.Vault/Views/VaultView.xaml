@@ -16,11 +16,15 @@
         <local:EditorHeightConverter x:Key="EditorHeight" />
 
         <!-- The avatar of a login card: the item's picture, or its initial on a stable color. -->
+        <!-- Every card's icon: its picture; else a login's initial on its colour, or the type's symbol (token, note, card…). -->
         <DataTemplate x:Key="CardAvatar" DataType="{x:Type vm:VaultCardViewModel}">
             <Grid Width="40" Height="40">
-                <Border CornerRadius="10" Background="{Binding AvatarColor, Converter={StaticResource HexToBrush}}"
-                        Visibility="{Binding HasIcon, Converter={StaticResource InverseBoolToVisibility}}">
+                <Border x:Name="Letter" CornerRadius="10" Background="{Binding AvatarColor, Converter={StaticResource HexToBrush}}" Visibility="Collapsed">
                     <TextBlock Text="{Binding Initial}" Foreground="White" FontSize="17" FontWeight="SemiBold" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                </Border>
+                <Border x:Name="Symbol" CornerRadius="10" Background="{DynamicResource CardBackgroundFillColorSecondaryBrush}" Visibility="Collapsed">
+                    <ui:SymbolIcon Symbol="{Binding Kind, Converter={StaticResource KindIcon}}" FontSize="20"
+                                   Foreground="{DynamicResource AccentTextFillColorPrimaryBrush}" HorizontalAlignment="Center" VerticalAlignment="Center" />
                 </Border>
                 <Border CornerRadius="10" Visibility="{Binding HasIcon, Converter={StaticResource BoolToVisibility}}">
                     <Border.Background>
@@ -28,6 +32,22 @@
                     </Border.Background>
                 </Border>
             </Grid>
+            <DataTemplate.Triggers>
+                <MultiDataTrigger>
+                    <MultiDataTrigger.Conditions>
+                        <Condition Binding="{Binding HasIcon}" Value="False" />
+                        <Condition Binding="{Binding IsLogin}" Value="True" />
+                    </MultiDataTrigger.Conditions>
+                    <Setter TargetName="Letter" Property="Visibility" Value="Visible" />
+                </MultiDataTrigger>
+                <MultiDataTrigger>
+                    <MultiDataTrigger.Conditions>
+                        <Condition Binding="{Binding HasIcon}" Value="False" />
+                        <Condition Binding="{Binding IsLogin}" Value="False" />
+                    </MultiDataTrigger.Conditions>
+                    <Setter TargetName="Symbol" Property="Visibility" Value="Visible" />
+                </MultiDataTrigger>
+            </DataTemplate.Triggers>
         </DataTemplate>
 
         <!-- A whole card as one flat button (hover and press shading, keyboard focus) -->
@@ -291,9 +311,9 @@
                                                         <RowDefinition Height="Auto" />
                                                     </Grid.RowDefinitions>
 
-                                                    <!-- Login: its picture or initial -->
+                                                    <!-- The icon: picture, initial or type -->
                                                     <ContentPresenter Grid.RowSpan="3" Content="{Binding}" ContentTemplate="{StaticResource CardAvatar}" Margin="0,0,14,0" VerticalAlignment="Center"
-                                                                      IsHitTestVisible="False" Visibility="{Binding IsLogin, Converter={StaticResource BoolToVisibility}}" />
+                                                                      IsHitTestVisible="False" />
 
                                                     <DockPanel Grid.Column="1" Grid.ColumnSpan="2">
                                                         <ui:SymbolIcon DockPanel.Dock="Right" Symbol="Warning24" Foreground="{DynamicResource SystemFillColorCautionBrush}" IsHitTestVisible="False"
