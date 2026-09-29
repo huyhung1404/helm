@@ -6,6 +6,15 @@
              xmlns:items="using:Helm.Modules.Vault.Items"
              x:Class="Helm.Modules.Vault.ItemDetailView"
              x:DataType="vm:ItemDetailViewModel">
+    <UserControl.Styles>
+        <!-- A two-factor code shown in place of its secret: big, fixed-width digits -->
+        <Style Selector="TextBlock.code">
+            <Setter Property="FontFamily" Value="monospace" />
+            <Setter Property="FontSize" Value="22" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="Foreground" Value="{DynamicResource SystemAccentColor}" />
+        </Style>
+    </UserControl.Styles>
     <StackPanel Spacing="4">
         <!-- Header -->
         <Border Classes="card">
@@ -117,7 +126,13 @@
                                     </StackPanel>
                                     <StackPanel>
                                         <TextBlock Classes="secondary" Text="{Binding Name}" />
-                                        <TextBlock TextWrapping="Wrap" Text="{Binding Display}" IsVisible="{Binding IsValueField}" />
+                                        <TextBlock TextWrapping="Wrap" Text="{Binding Display}" IsVisible="{Binding IsValueField}"
+                                                   Classes.code="{Binding HasTotpCode}" />
+                                        <!-- A two-factor code: how long it stays valid -->
+                                        <StackPanel Orientation="Horizontal" Spacing="8" IsVisible="{Binding HasTotpCode}">
+                                            <ProgressBar Width="90" MinWidth="0" Height="3" MinHeight="3" Minimum="0" Maximum="100" Value="{Binding TotpProgress}" VerticalAlignment="Center" />
+                                            <TextBlock Classes="secondary" Text="{Binding TotpSecondsLeft, StringFormat='{}{0} s left'}" />
+                                        </StackPanel>
                                         <TextBlock TextWrapping="Wrap" Text="{Binding FileText}" IsVisible="{Binding IsFile}" />
                                         <Image Margin="0,6,0,0" MaxHeight="200" HorizontalAlignment="Left" Stretch="Uniform"
                                                Source="{Binding Preview, Converter={x:Static local:PreviewBitmap.Converter}}" IsVisible="{Binding HasPreview}" />
@@ -157,6 +172,23 @@
                                         <ic:SymbolIcon Symbol="Dismiss" FontSize="18" />
                                     </Button>
                                 </Grid>
+                                <!-- A two-factor key that gives no code, or its current code as a check -->
+                                <TextBlock Margin="100,4,0,0" TextWrapping="Wrap" Foreground="{DynamicResource HelmDanger}" Text="{Binding TotpError}">
+                                    <TextBlock.IsVisible>
+                                        <MultiBinding Converter="{x:Static BoolConverters.And}">
+                                            <Binding Path="Owner.IsEditing" />
+                                            <Binding Path="HasTotpError" />
+                                        </MultiBinding>
+                                    </TextBlock.IsVisible>
+                                </TextBlock>
+                                <TextBlock Margin="100,4,0,0" Classes="secondary" Text="{Binding TotpCode, StringFormat='Current code: {0}'}">
+                                    <TextBlock.IsVisible>
+                                        <MultiBinding Converter="{x:Static BoolConverters.And}">
+                                            <Binding Path="Owner.IsEditing" />
+                                            <Binding Path="HasTotpCode" />
+                                        </MultiBinding>
+                                    </TextBlock.IsVisible>
+                                </TextBlock>
                             </StackPanel>
                         </DataTemplate>
                     </ItemsControl.ItemTemplate>
@@ -168,6 +200,7 @@
                             <MenuItem Header="Username" Command="{Binding AddFieldCommand}" CommandParameter="{x:Static items:VaultFieldKind.Username}" />
                             <MenuItem Header="Password" Command="{Binding AddFieldCommand}" CommandParameter="{x:Static items:VaultFieldKind.Password}" />
                             <MenuItem Header="Hidden (PIN, code…)" Command="{Binding AddFieldCommand}" CommandParameter="{x:Static items:VaultFieldKind.Secret}" />
+                            <MenuItem Header="One-time code (2FA)" Command="{Binding AddFieldCommand}" CommandParameter="{x:Static items:VaultFieldKind.Totp}" />
                             <MenuItem Header="Website" Command="{Binding AddFieldCommand}" CommandParameter="{x:Static items:VaultFieldKind.Url}" />
                             <MenuItem Header="Email" Command="{Binding AddFieldCommand}" CommandParameter="{x:Static items:VaultFieldKind.Email}" />
                             <MenuItem Header="Phone" Command="{Binding AddFieldCommand}" CommandParameter="{x:Static items:VaultFieldKind.Phone}" />

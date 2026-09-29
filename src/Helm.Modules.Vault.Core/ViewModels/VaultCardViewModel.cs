@@ -27,6 +27,10 @@ public sealed partial class VaultCardViewModel(VaultEntry entry, IVaultPlatform 
     [ObservableProperty] private bool _isCopied;
     [ObservableProperty] private bool _isUsernameCopied;
     [ObservableProperty] private bool _isExpanded;
+    [ObservableProperty] private string _totpCode = "";
+    [ObservableProperty] private int _totpSecondsLeft;
+    [ObservableProperty] private bool _isTotpCopied;
+    private readonly Totp? _totp = entry.Trashed ? null : entry.Item.Totp;
 
     public string Uid { get; } = entry.Uid;
 
@@ -86,6 +90,29 @@ public sealed partial class VaultCardViewModel(VaultEntry entry, IVaultPlatform 
     public string AvatarColor => VaultAvatar.Color(_item.Title);
 
     partial void OnIsRevealedChanged(bool value) => OnPropertyChanged(nameof(SecretDisplay));
+
+    /// <summary>The item has a two-factor secret: the card shows its current code with Copy.</summary>
+    public bool HasTotp => _totp is not null;
+
+    /// <summary>Called every second while the list is shown.</summary>
+    internal void Tick(DateTimeOffset now)
+    {
+        if (_totp is null) return;
+        TotpCode = Totp.Group(_totp.Code(now));
+        TotpSecondsLeft = _totp.SecondsLeft(now);
+    }
+
+    private int _totpCopies;
+
+    [RelayCommand]
+    private void CopyTotp()
+    {
+        if (_totp is null) return;
+        platform.CopySecret(_totp.Code(DateTimeOffset.UtcNow));
+        session.Touch();
+        IsTotpCopied = true;
+        _ = ClearCopiedAsync(++_totpCopies, () => _totpCopies, () => IsTotpCopied = false);
+    }
 
     [RelayCommand]
     private void ToggleReveal()

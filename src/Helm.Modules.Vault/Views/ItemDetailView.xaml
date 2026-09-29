@@ -83,8 +83,33 @@
                         </StackPanel>
                         <StackPanel>
                             <TextBlock Text="{Binding Name}" Style="{DynamicResource HelmSecondaryText}" />
-                            <TextBlock AutomationProperties.Name="{Binding Name}" Text="{Binding Display}" TextWrapping="Wrap" FontSize="14" Margin="0,2,0,0"
-                                       Visibility="{Binding IsValueField, Converter={StaticResource BoolToVisibility}}" />
+                            <TextBlock AutomationProperties.Name="{Binding Name}" Text="{Binding Display}" TextWrapping="Wrap" Margin="0,2,0,0"
+                                       Visibility="{Binding IsValueField, Converter={StaticResource BoolToVisibility}}">
+                                <TextBlock.Style>
+                                    <Style TargetType="TextBlock">
+                                        <Setter Property="FontSize" Value="14" />
+                                        <Style.Triggers>
+                                            <!-- A two-factor code: big, fixed-width digits -->
+                                            <MultiDataTrigger>
+                                                <MultiDataTrigger.Conditions>
+                                                    <Condition Binding="{Binding IsTotp}" Value="True" />
+                                                    <Condition Binding="{Binding HasTotpCode}" Value="True" />
+                                                    <Condition Binding="{Binding IsRevealed}" Value="False" />
+                                                </MultiDataTrigger.Conditions>
+                                                <Setter Property="FontSize" Value="22" />
+                                                <Setter Property="FontFamily" Value="Consolas" />
+                                                <Setter Property="FontWeight" Value="SemiBold" />
+                                                <Setter Property="Foreground" Value="{DynamicResource AccentTextFillColorPrimaryBrush}" />
+                                            </MultiDataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </TextBlock.Style>
+                            </TextBlock>
+                            <!-- How long the code stays valid -->
+                            <StackPanel Orientation="Horizontal" Margin="0,2,0,0" Visibility="{Binding HasTotpCode, Converter={StaticResource BoolToVisibility}}">
+                                <ProgressBar Width="90" Height="3" Minimum="0" Maximum="100" Value="{Binding TotpProgress, Mode=OneWay}" VerticalAlignment="Center" />
+                                <TextBlock Margin="8,0,0,0" Style="{DynamicResource HelmSecondaryText}" Text="{Binding TotpSecondsLeft, StringFormat='{}{0} s left'}" />
+                            </StackPanel>
                             <TextBlock AutomationProperties.Name="{Binding Name}" Text="{Binding FileText}" TextWrapping="Wrap" FontSize="14" Margin="0,2,0,0"
                                        Visibility="{Binding IsFile, Converter={StaticResource BoolToVisibility}}" />
                             <Image Margin="0,6,0,0" MaxHeight="200" HorizontalAlignment="Left" Stretch="Uniform"

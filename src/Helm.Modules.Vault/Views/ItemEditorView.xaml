@@ -58,6 +58,10 @@
                     <ItemsControl.ItemTemplate>
                         <DataTemplate DataType="{x:Type vm:FieldViewModel}">
                             <Grid Margin="0,0,0,6">
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto" />
+                                    <RowDefinition Height="Auto" />
+                                </Grid.RowDefinitions>
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="120" />
                                     <ColumnDefinition Width="160" />
@@ -120,6 +124,11 @@
                                         </ui:TextBox.Style>
                                     </ui:TextBox>
                                 </Grid>
+                                <!-- A two-factor key that gives no code, or its current code as a check -->
+                                <TextBlock Grid.Row="1" Grid.Column="2" Margin="8,4,0,0" TextWrapping="Wrap" Foreground="{DynamicResource SystemFillColorCriticalBrush}"
+                                           Text="{Binding TotpError}" Visibility="{Binding HasTotpError, Converter={StaticResource BoolToVisibility}}" />
+                                <TextBlock Grid.Row="1" Grid.Column="2" Margin="8,4,0,0" Style="{DynamicResource HelmSecondaryText}"
+                                           Text="{Binding TotpCode, StringFormat='Current code: {0}'}" Visibility="{Binding HasTotpCode, Converter={StaticResource BoolToVisibility}}" />
                                 <StackPanel Grid.Column="3" Orientation="Horizontal" VerticalAlignment="Top">
                                     <ui:Button Appearance="Transparent" Margin="2,0,0,0" Command="{Binding ToggleRevealCommand}" ToolTip="Show or hide" AutomationProperties.Name="Show or hide"
                                                Visibility="{Binding IsSecret, Converter={StaticResource BoolToVisibility}}">
@@ -150,6 +159,7 @@
                             <MenuItem Header="Username" Command="{Binding AddFieldCommand}" CommandParameter="{x:Static items:VaultFieldKind.Username}" />
                             <MenuItem Header="Password" Command="{Binding AddFieldCommand}" CommandParameter="{x:Static items:VaultFieldKind.Password}" />
                             <MenuItem Header="Hidden (PIN, code…)" Command="{Binding AddFieldCommand}" CommandParameter="{x:Static items:VaultFieldKind.Secret}" />
+                            <MenuItem Header="One-time code (2FA)" Command="{Binding AddFieldCommand}" CommandParameter="{x:Static items:VaultFieldKind.Totp}" />
                             <MenuItem Header="Website" Command="{Binding AddFieldCommand}" CommandParameter="{x:Static items:VaultFieldKind.Url}" />
                             <MenuItem Header="Email" Command="{Binding AddFieldCommand}" CommandParameter="{x:Static items:VaultFieldKind.Email}" />
                             <MenuItem Header="Phone" Command="{Binding AddFieldCommand}" CommandParameter="{x:Static items:VaultFieldKind.Phone}" />

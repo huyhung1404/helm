@@ -20,6 +20,11 @@ Format: [Keep a Changelog](https://keepachangelog.com), versions follow [SemVer]
   details, what was agreed…), and a note to tasks and people. The links show as chips on both sides; click one to open
   it in the other tool, × removes the link (nothing is deleted). On a task, the link button offers **New note**, which
   writes a note titled after the task. A repeating task keeps its notes every day. Links sync like everything else.
+- Vault: **two-factor codes** (PC and Android). Add a field *One-time code (2FA)* to a login and paste the key the site
+  shows when you turn on two-factor sign-in (or the otpauth:// link of its QR code). The card and the item show the
+  current 6-digit code with how many seconds it has left; **Code** copies it (through the protected clipboard). The key
+  stays hidden. KeePass export writes it where KeePassXC reads it (`otp`).
+  Note: an item with a one-time code field cannot be read by Helm 0.16 or older (it is kept, not lost); update every device.
 
 ### Changed
 - Sync: deleted items no longer stay on the server for ever. A deletion is kept 90 days, long enough for every device

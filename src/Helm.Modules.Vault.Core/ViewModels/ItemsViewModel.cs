@@ -59,6 +59,14 @@ public sealed partial class ItemsViewModel : ObservableObject
     /// <summary>The cards of the current tab and sub-tab.</summary>
     public ObservableCollection<VaultCardViewModel> Cards { get; } = [];
 
+    /// <summary>Moves every shown one-time code on; the app calls it every second while the list is on screen.</summary>
+    public void TickTotp(DateTimeOffset now)
+    {
+        foreach (var card in Cards)
+            if (card.HasTotp) card.Tick(now);
+        Detail?.Tick(now);
+    }
+
     public bool IsCredentialsTab
     {
         get => Tab == VaultTab.Credentials;
@@ -128,6 +136,7 @@ public sealed partial class ItemsViewModel : ObservableObject
         Cards.Clear();
         foreach (var entry in entries.Where(e => Matches(e, Tab, Filter, query)))
             Cards.Add(new VaultCardViewModel(entry, _platform, _session) { IsExpanded = entry.Uid == ExpandedUid });
+        TickTotp(DateTimeOffset.UtcNow);
         CredentialsCount = items.Count(e => Matches(e, VaultTab.Credentials, VaultFilter.All, query));
         OtherCount = items.Count(e => Matches(e, VaultTab.Other, VaultFilter.All, query));
         UnreadableCount = _store.Unreadable().Count;

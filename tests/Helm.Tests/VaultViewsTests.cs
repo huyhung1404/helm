@@ -102,7 +102,8 @@ public sealed class VaultViewsTests : IDisposable
         // Credentials: a login with a picture, letter avatars and a token.
         store.Add(VaultItem.New(VaultItemKind.Login, "GitHub") with
         {
-            Fields = [new VaultField("Username", "huyhung1404", VaultFieldKind.Username), new VaultField("Password", "gh-secret", VaultFieldKind.Password)],
+            Fields = [new VaultField("Username", "huyhung1404", VaultFieldKind.Username), new VaultField("Password", "gh-secret", VaultFieldKind.Password),
+                new VaultField("2FA", "JBSWY3DPEHPK3PXP", VaultFieldKind.Totp)],
             Icon = PngOf(Helm.Modules.Vault.VaultIcon.Image),
         });
         store.Add(VaultItem.New(VaultItemKind.Login, "Zalo") with { Fields = [new VaultField("Phone", "0901 234 567", VaultFieldKind.Username), new VaultField("Password", "z", VaultFieldKind.Password)] });
@@ -125,7 +126,17 @@ public sealed class VaultViewsTests : IDisposable
         cardButton.Command.Execute(cardButton.CommandParameter);
         Assert.True(gitHub.IsExpanded);
         Assert.Equal("GitHub", app.Items.Detail!.Title);
+        // Two-factor: the card and the item show the current code, never the key.
+        Assert.True(gitHub.HasTotp);
+        Assert.Matches(@"^\d{3} \d{3}$", gitHub.TotpCode);
+        var code = app.Items.Detail!.Fields.Single(f => f.IsTotp);
+        Assert.Equal(code.TotpCode, code.Display);
+        Assert.DoesNotContain("JBSW", code.Display);
         Layout(window);
+        Layout(new ItemDetailView { DataContext = app.Items.Detail });
+        app.Items.Detail!.EditCommand.Execute(null);
+        Layout(new ItemEditorView { DataContext = app.Items.Detail });
+        app.Items.Detail!.CancelCommand.Execute(null);
         cardButton.Command.Execute(cardButton.CommandParameter);
         Assert.Null(app.Items.Detail);
         cardButton.Command.Execute(cardButton.CommandParameter);

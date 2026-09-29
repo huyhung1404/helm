@@ -33,6 +33,8 @@ public sealed partial class VaultAppViewModel : ObservableObject
     private readonly SyncEngine _engine;
     private readonly IVaultPlatform _platform;
     private readonly IUiDispatcher _ui;
+    // Kept so the timer is not collected; the view model lives as long as the app.
+    private readonly Timer _totpTimer;
     private readonly ILogger _logger;
 
     [ObservableProperty] private VaultScreen _screen;
@@ -69,6 +71,11 @@ public sealed partial class VaultAppViewModel : ObservableObject
         _ui = ui;
         _logger = (ILogger?)logger ?? NullLogger.Instance;
         Items = new ItemsViewModel(store, files, session, platform);
+        // One-time codes change every 30 s: the list and the open item show the current one with a countdown.
+        _totpTimer = new Timer(_ => _ui.Post(() =>
+        {
+            if (IsItems) Items.TickTotp(DateTimeOffset.UtcNow);
+        }), null, TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(1));
 
         session.PropertyChanged += OnSessionChanged;
         session.Locking += (_, _) => _ui.Post(Items.Clear);

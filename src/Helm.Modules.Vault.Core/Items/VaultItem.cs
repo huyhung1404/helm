@@ -33,13 +33,15 @@ public enum VaultFieldKind
     Document,
     TextFile,
     Keystore,
+    /// <summary>A two-factor secret (added after 0.16): Helm shows its current 6-digit code (see <see cref="Items.Totp"/>).</summary>
+    Totp,
 }
 
 /// <param name="AttachmentId">File fields: the item's attachment holding the file; <paramref name="Value"/> is its name.</param>
 public sealed record VaultField(string Name, string Value, VaultFieldKind Kind = VaultFieldKind.Text, string? AttachmentId = null)
 {
     [JsonIgnore]
-    public bool IsSecret => Kind is VaultFieldKind.Secret or VaultFieldKind.Password;
+    public bool IsSecret => Kind is VaultFieldKind.Secret or VaultFieldKind.Password or VaultFieldKind.Totp;
 
     [JsonIgnore]
     public bool IsFile => IsFileKind(Kind);
@@ -118,7 +120,11 @@ public sealed record VaultItem
     [JsonIgnore]
     public string? PrimarySecret =>
         Fields.FirstOrDefault(f => f.Kind == VaultFieldKind.Password && f.Value.Length > 0)?.Value
-        ?? (Kind == VaultItemKind.Token ? Fields.FirstOrDefault(f => f.IsSecret && f.Value.Length > 0)?.Value : null);
+        ?? (Kind == VaultItemKind.Token ? Fields.FirstOrDefault(f => f.IsSecret && f.Kind != VaultFieldKind.Totp && f.Value.Length > 0)?.Value : null);
+
+    /// <summary>The item's two-factor secret, when it has a valid one (the first one-time code field).</summary>
+    [JsonIgnore]
+    public Totp? Totp => Fields.Where(f => f.Kind == VaultFieldKind.Totp).Select(f => Items.Totp.Parse(f.Value)).FirstOrDefault(t => t is not null);
 
     /// <summary>Logins and tokens: the items of the first tab.</summary>
     [JsonIgnore]

@@ -20,7 +20,44 @@ public sealed partial class FieldViewModel(ItemDetailViewModel owner, VaultField
     /// <summary>An image field's picture, decrypted small for the view (null until loaded, or for other fields).</summary>
     [ObservableProperty] private byte[]? _preview;
 
-    public bool IsSecret => Kind is VaultFieldKind.Secret or VaultFieldKind.Password;
+    public bool IsSecret => Kind is VaultFieldKind.Secret or VaultFieldKind.Password or VaultFieldKind.Totp;
+
+    /// <summary>A two-factor secret: the view shows its current code (<see cref="TotpCode"/>), Copy copies the code.</summary>
+    public bool IsTotp => Kind == VaultFieldKind.Totp;
+
+    /// <summary>"492 039", or "" while the secret is not valid.</summary>
+    [ObservableProperty] private string _totpCode = "";
+
+    /// <summary>Seconds until the code changes; the view shows them as a countdown.</summary>
+    [ObservableProperty] private int _totpSecondsLeft;
+
+    [ObservableProperty] private double _totpProgress;
+
+    public bool HasTotpCode => TotpCode.Length > 0;
+
+    /// <summary>Why the secret gives no code (shown while editing), or "".</summary>
+    public string TotpError => IsTotp && Value.Trim().Length > 0 && !Items.Totp.TryParse(Value, out _, out var error) ? error : "";
+
+    public bool HasTotpError => TotpError.Length > 0;
+
+    /// <summary>Called every second while the item is shown.</summary>
+    internal void Tick(DateTimeOffset now)
+    {
+        if (!IsTotp || Items.Totp.Parse(Value) is not { } totp)
+        {
+            TotpCode = "";
+            return;
+        }
+        TotpCode = Items.Totp.Group(totp.Code(now));
+        TotpSecondsLeft = totp.SecondsLeft(now);
+        TotpProgress = 100.0 * TotpSecondsLeft / totp.Period;
+    }
+
+    partial void OnTotpCodeChanged(string value)
+    {
+        OnPropertyChanged(nameof(HasTotpCode));
+        OnPropertyChanged(nameof(Display));
+    }
 
     /// <summary>Image, document, text file or keystore: the value is a file of the item.</summary>
     public bool IsFile => VaultField.IsFileKind(Kind);
@@ -47,8 +84,10 @@ public sealed partial class FieldViewModel(ItemDetailViewModel owner, VaultField
 
     public bool IsLink => Kind == VaultFieldKind.Url && Uri.TryCreate(Value, UriKind.Absolute, out var uri) && uri.Scheme is "https" or "http";
 
-    /// <summary>What the view shows when not editing: dots for a hidden secret.</summary>
-    public string Display => Value.Length == 0 ? "—" : IsSecret && !IsRevealed ? "••••••••••" : Value;
+    /// <summary>What the view shows when not editing: dots for a hidden secret, the current code of a two-factor secret.</summary>
+    public string Display => Value.Length == 0 ? "—"
+        : IsTotp && !IsRevealed ? (TotpCode.Length > 0 ? TotpCode : "Not a valid key")
+        : IsSecret && !IsRevealed ? "••••••••••" : Value;
 
     public bool HasValue => Value.Length > 0;
 
@@ -68,6 +107,9 @@ public sealed partial class FieldViewModel(ItemDetailViewModel owner, VaultField
     {
         OnPropertyChanged(nameof(Display));
         OnPropertyChanged(nameof(HasValue));
+        OnPropertyChanged(nameof(TotpError));
+        OnPropertyChanged(nameof(HasTotpError));
+        Tick(DateTimeOffset.UtcNow);
     }
 
     partial void OnIsRevealedChanged(bool value) => OnPropertyChanged(nameof(Display));
@@ -81,6 +123,10 @@ public sealed partial class FieldViewModel(ItemDetailViewModel owner, VaultField
         OnPropertyChanged(nameof(IsSecret));
         OnPropertyChanged(nameof(IsPassword));
         OnPropertyChanged(nameof(IsMultiline));
+        OnPropertyChanged(nameof(IsTotp));
+        OnPropertyChanged(nameof(TotpError));
+        OnPropertyChanged(nameof(HasTotpError));
+        Tick(DateTimeOffset.UtcNow);
         OnPropertyChanged(nameof(Display));
     }
 
@@ -293,9 +339,23 @@ public sealed partial class ItemDetailViewModel : ObservableObject
 
     internal void Touch() => _session.Touch();
 
+    public bool HasTotp => Fields.Any(f => f.IsTotp);
+
+    /// <summary>Moves the codes of two-factor fields on (every second while the item is shown).</summary>
+    internal void Tick(DateTimeOffset now)
+    {
+        foreach (var field in Fields)
+            if (field.IsTotp) field.Tick(now);
+    }
+
     internal void CopyField(FieldViewModel field)
     {
-        if (field.IsSecret) _platform.CopySecret(field.Value);
+        // A two-factor field copies the code it shows now, never its secret.
+        if (field.IsTotp)
+        {
+            if (Totp.Parse(field.Value) is { } totp) _platform.CopySecret(totp.Code(DateTimeOffset.UtcNow));
+        }
+        else if (field.IsSecret) _platform.CopySecret(field.Value);
         else _platform.CopyText(field.Value);
         Touch();
     }
@@ -328,6 +388,11 @@ public sealed partial class ItemDetailViewModel : ObservableObject
         if (string.IsNullOrWhiteSpace(Title))
         {
             Error = "Give the item a title.";
+            return;
+        }
+        if (Fields.FirstOrDefault(f => f.HasTotpError) is { } badCode)
+        {
+            Error = $"{(badCode.Name.Trim().Length > 0 ? badCode.Name.Trim() : "One-time code")}: {badCode.TotpError}";
             return;
         }
         try
@@ -372,6 +437,7 @@ public sealed partial class ItemDetailViewModel : ObservableObject
             VaultFieldKind.Email => "Email",
             VaultFieldKind.Phone => "Phone",
             VaultFieldKind.Username => "Username",
+            VaultFieldKind.Totp => "One-time code",
             _ when VaultField.IsFileKind(kind) => FileFieldName(kind),
             _ => "Field",
         }, "", kind)));
@@ -585,6 +651,7 @@ public sealed partial class ItemDetailViewModel : ObservableObject
         OnPropertyChanged(nameof(Modified));
         OnPropertyChanged(nameof(IsNew));
         OnPropertyChanged(nameof(HasConflicts));
+        Tick(DateTimeOffset.UtcNow);
     }
 
     private async Task RunAsync(Func<Task> work)

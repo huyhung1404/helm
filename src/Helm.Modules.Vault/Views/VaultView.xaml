@@ -309,10 +309,11 @@
                                                         <RowDefinition Height="Auto" />
                                                         <RowDefinition Height="Auto" />
                                                         <RowDefinition Height="Auto" />
+                                                        <RowDefinition Height="Auto" />
                                                     </Grid.RowDefinitions>
 
                                                     <!-- The icon: picture, initial or type -->
-                                                    <ContentPresenter Grid.RowSpan="3" Content="{Binding}" ContentTemplate="{StaticResource CardAvatar}" Margin="0,0,14,0" VerticalAlignment="Center"
+                                                    <ContentPresenter Grid.RowSpan="4" Content="{Binding}" ContentTemplate="{StaticResource CardAvatar}" Margin="0,0,14,0" VerticalAlignment="Center"
                                                                       IsHitTestVisible="False" />
 
                                                     <DockPanel Grid.Column="1" Grid.ColumnSpan="2">
@@ -391,6 +392,32 @@
                                                             </ui:Button.Style>
                                                         </ui:Button>
                                                     </StackPanel>
+
+                                                    <!-- Two-factor code: the current one, how long it lasts, copy with feedback -->
+                                                    <StackPanel Grid.Row="3" Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center" Margin="0,2,0,0"
+                                                                Visibility="{Binding HasTotp, Converter={StaticResource BoolToVisibility}}">
+                                                        <TextBlock Text="{Binding TotpCode}" FontFamily="Consolas" FontSize="15" FontWeight="SemiBold" Foreground="{DynamicResource AccentTextFillColorPrimaryBrush}"
+                                                                   AutomationProperties.Name="One-time code" VerticalAlignment="Center" />
+                                                        <TextBlock Text="{Binding TotpSecondsLeft, StringFormat='{} · {0} s'}" Style="{DynamicResource HelmSecondaryText}" VerticalAlignment="Center" />
+                                                    </StackPanel>
+                                                    <ui:Button Grid.Row="3" Grid.Column="2" Margin="0,2,0,0" Padding="10,5" Command="{Binding CopyTotpCommand}" HorizontalAlignment="Right"
+                                                               ToolTip="Copy the one-time code" AutomationProperties.Name="Copy the one-time code"
+                                                               Visibility="{Binding HasTotp, Converter={StaticResource BoolToVisibility}}">
+                                                        <ui:Button.Style>
+                                                            <Style TargetType="ui:Button" BasedOn="{StaticResource {x:Type ui:Button}}">
+                                                                <Setter Property="Appearance" Value="Secondary" />
+                                                                <Setter Property="Icon" Value="{ui:SymbolIcon Copy24}" />
+                                                                <Setter Property="Content" Value="Code" />
+                                                                <Style.Triggers>
+                                                                    <DataTrigger Binding="{Binding IsTotpCopied}" Value="True">
+                                                                        <Setter Property="Appearance" Value="Success" />
+                                                                        <Setter Property="Icon" Value="{ui:SymbolIcon Checkmark24}" />
+                                                                        <Setter Property="Content" Value="Copied" />
+                                                                    </DataTrigger>
+                                                                </Style.Triggers>
+                                                            </Style>
+                                                        </ui:Button.Style>
+                                                    </ui:Button>
 
                                                     <!-- Info: its description, two lines at most -->
                                                     <TextBlock Grid.Row="1" Grid.Column="1" Grid.ColumnSpan="2" Text="{Binding Description}" Style="{DynamicResource HelmSecondaryText}"

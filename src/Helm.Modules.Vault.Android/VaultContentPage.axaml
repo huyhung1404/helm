@@ -202,9 +202,9 @@
                                         <!-- The whole card opens the item -->
                                         <Button Classes="flat" HorizontalAlignment="Stretch" VerticalAlignment="Stretch" Background="Transparent" AutomationProperties.Name="{Binding Title}"
                                                 Command="{Binding $parent[UserControl].((local:VaultPageViewModel)DataContext).App.Items.ToggleCardCommand}" CommandParameter="{Binding}" />
-                                        <Grid ColumnDefinitions="Auto,*,Auto" RowDefinitions="Auto,Auto,Auto" Margin="12,10">
+                                        <Grid ColumnDefinitions="Auto,*,Auto" RowDefinitions="Auto,Auto,Auto,Auto" Margin="12,10">
                                             <!-- The icon: its picture; else a login's initial, or the type's symbol (token, note, card...) -->
-                                            <Panel Grid.RowSpan="3" Width="44" Height="44" Margin="0,0,12,0" VerticalAlignment="Center" IsHitTestVisible="False">
+                                            <Panel Grid.RowSpan="4" Width="44" Height="44" Margin="0,0,12,0" VerticalAlignment="Center" IsHitTestVisible="False">
                                                 <Border CornerRadius="11" Background="{Binding AvatarColor, Converter={x:Static local:HexBrush.Converter}}">
                                                     <Border.IsVisible>
                                                         <MultiBinding Converter="{x:Static BoolConverters.And}">
@@ -276,6 +276,25 @@
                                                     </Panel>
                                                 </Button>
                                             </StackPanel>
+
+                                            <!-- Two-factor code: the current one and how long it lasts, copy -->
+                                            <StackPanel Grid.Row="3" Grid.Column="1" Orientation="Horizontal" Spacing="6" VerticalAlignment="Center" IsHitTestVisible="False" IsVisible="{Binding HasTotp}">
+                                                <TextBlock Text="{Binding TotpCode}" FontFamily="monospace" FontSize="16" FontWeight="SemiBold" Foreground="{DynamicResource SystemAccentColor}" />
+                                                <TextBlock Classes="secondary" Text="{Binding TotpSecondsLeft, StringFormat='{}{0} s'}" VerticalAlignment="Center" />
+                                            </StackPanel>
+                                            <Button Grid.Row="3" Grid.Column="2" Margin="0,4,0,0" Padding="12,6" CornerRadius="16" HorizontalAlignment="Right" Command="{Binding CopyTotpCommand}"
+                                                    IsVisible="{Binding HasTotp}" AutomationProperties.Name="Copy the one-time code">
+                                                <Panel>
+                                                    <StackPanel Orientation="Horizontal" Spacing="6" IsVisible="{Binding !IsTotpCopied}">
+                                                        <ic:SymbolIcon Symbol="Copy" FontSize="14" />
+                                                        <TextBlock Text="Code" VerticalAlignment="Center" />
+                                                    </StackPanel>
+                                                    <StackPanel Orientation="Horizontal" Spacing="6" IsVisible="{Binding IsTotpCopied}">
+                                                        <ic:SymbolIcon Symbol="Checkmark" FontSize="14" />
+                                                        <TextBlock Text="Copied" VerticalAlignment="Center" />
+                                                    </StackPanel>
+                                                </Panel>
+                                            </Button>
 
                                             <!-- Info: its description, two lines at most -->
                                             <TextBlock Grid.Row="1" Grid.Column="1" Grid.ColumnSpan="2" Classes="secondary" Text="{Binding Description}" TextWrapping="Wrap"

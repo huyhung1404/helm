@@ -109,7 +109,7 @@ public sealed class VaultKdbxExporter(VaultStore store, VaultFiles files)
         else if (item.Kind == VaultItemKind.Token)
         {
             // The token is KeePass's password, so it is protected and copied like one there too.
-            var index = item.Fields.ToList().FindIndex(f => f.IsSecret);
+            var index = item.Fields.ToList().FindIndex(f => f.IsSecret && f.Kind != VaultFieldKind.Totp);
             if (index >= 0) mapped.Add(index);
             strings.Add(new("Password", index >= 0 ? item.Fields[index].Value : "", true));
             used.Add("Password");
@@ -119,6 +119,13 @@ public sealed class VaultKdbxExporter(VaultStore store, VaultFiles files)
 
         foreach (var field in item.Fields.Where((_, i) => !mapped.Contains(i)))
         {
+            // KeePassXC (and KeePass 2.x plugins) read a two-factor secret from "otp" as an otpauth:// link.
+            if (field.Kind == VaultFieldKind.Totp && !used.Contains("otp") && Totp.Parse(field.Value) is { } totp)
+            {
+                strings.Add(new("otp", Totp.ToUri(totp, item.Title), true));
+                used.Add("otp");
+                continue;
+            }
             var key = UniqueKey(field.Name, used);
             strings.Add(new(key, field.Value, field.IsSecret));
         }
