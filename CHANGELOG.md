@@ -3,6 +3,18 @@
 All notable changes to Helm. The top section is used as the GitHub release body and as the Velopack release notes.
 Format: [Keep a Changelog](https://keepachangelog.com), versions follow [SemVer](https://semver.org).
 
+## [Unreleased]
+
+### Added
+- Vault: file fields: Image (with a preview), Document (any file), Text file (.txt) and Keystore. Add one with
+  Add field, then Choose… a file; it is encrypted at once and joins the item when you save (Cancel leaves nothing
+  behind). Viewing the item, each file has Open and Save a copy.
+
+### Changed
+- Vault: the separate Documents section is gone: files are fields now. Documents attached before show as file fields
+  (an Image, Text file, Keystore or Document by their type), so nothing is hidden.
+- Note: an item with a file field cannot be read by Helm 0.13 or older (it is kept, not lost); update every device.
+
 ## [0.13.0] - 2026-09-29
 
 ### Changed

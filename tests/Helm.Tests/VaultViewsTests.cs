@@ -74,6 +74,15 @@ public sealed class VaultViewsTests : IDisposable
         });
         store.Add(VaultItem.New(VaultItemKind.Note, "Wi-Fi at home") with { Notes = "Router in the hall" });
         var uid = store.Add(VaultItem.New(VaultItemKind.Card, "Visa") with { Notes = "Main card", Tags = ["bank", "travel"] });
+        // Files are fields: a picture (with its preview) and a keystore.
+        var scan = files.ImportAsync("scan.png", "image/png", new MemoryStream(PngOf(Helm.Modules.Vault.VaultIcon.Image)));
+        var keystore = files.ImportAsync("release.keystore", "application/octet-stream", new MemoryStream([1, 2, 3]));
+        Pump(Task.WhenAll(scan, keystore));
+        store.Save(uid, store.Get(uid)!.Item with
+        {
+            Fields = [new VaultField("Scan", "scan.png", VaultFieldKind.Image, scan.Result.Id), new VaultField("Keystore", "release.keystore", VaultFieldKind.Keystore, keystore.Result.Id)],
+            Attachments = [scan.Result, keystore.Result],
+        });
         Pump(Task.CompletedTask);
         app.Items.Tab = VaultTab.Other;
         app.Items.ToggleCardCommand.Execute(app.Items.Cards.Single(c => c.Uid == uid));
@@ -82,6 +91,8 @@ public sealed class VaultViewsTests : IDisposable
         Assert.True(app.Items.IsEditorOpen);
         Layout(window);
 
+        Pump(Task.Delay(300)); // the picture's preview is decrypted in the background
+        Assert.True(app.Items.Detail!.Fields.Single(f => f.IsImage).HasPreview);
         var editor = new ItemEditorView { DataContext = app.Items.Detail };
         Layout(editor);
         app.Items.Detail!.CancelCommand.Execute(null);

@@ -97,30 +97,52 @@
                             <StackPanel Margin="0,4,0,8">
                                 <!-- View -->
                                 <DockPanel IsVisible="{Binding !Owner.IsEditing}">
-                                    <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" IsVisible="{Binding HasValue}">
+                                    <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
                                         <Button Classes="flat" Width="44" Command="{Binding ToggleRevealCommand}" IsVisible="{Binding IsSecret}" AutomationProperties.Name="Show or hide">
                                             <Panel>
                                                 <ic:SymbolIcon Symbol="Eye" FontSize="18" IsVisible="{Binding !IsRevealed}" />
                                                 <ic:SymbolIcon Symbol="EyeOff" FontSize="18" IsVisible="{Binding IsRevealed}" />
                                             </Panel>
                                         </Button>
-                                        <Button Classes="flat" Width="44" Command="{Binding CopyCommand}" AutomationProperties.Name="Copy">
+                                        <Button Classes="flat" Width="44" Command="{Binding CopyCommand}" IsVisible="{Binding CanCopy}" AutomationProperties.Name="Copy">
                                             <ic:SymbolIcon Symbol="Copy" FontSize="18" />
+                                        </Button>
+                                        <!-- A file: open it, or save a copy -->
+                                        <Button Classes="flat" Width="44" Command="{Binding OpenFileCommand}" IsVisible="{Binding HasFile}" AutomationProperties.Name="Open">
+                                            <ic:SymbolIcon Symbol="Open" FontSize="18" />
+                                        </Button>
+                                        <Button Classes="flat" Width="44" Command="{Binding SaveFileCommand}" IsVisible="{Binding HasFile}" AutomationProperties.Name="Save a copy">
+                                            <ic:SymbolIcon Symbol="ArrowDownload" FontSize="18" />
                                         </Button>
                                     </StackPanel>
                                     <StackPanel>
                                         <TextBlock Classes="secondary" Text="{Binding Name}" />
-                                        <TextBlock TextWrapping="Wrap" Text="{Binding Display}" />
+                                        <TextBlock TextWrapping="Wrap" Text="{Binding Display}" IsVisible="{Binding IsValueField}" />
+                                        <TextBlock TextWrapping="Wrap" Text="{Binding FileText}" IsVisible="{Binding IsFile}" />
+                                        <Image Margin="0,6,0,0" MaxHeight="200" HorizontalAlignment="Left" Stretch="Uniform"
+                                               Source="{Binding Preview, Converter={x:Static local:PreviewBitmap.Converter}}" IsVisible="{Binding HasPreview}" />
                                     </StackPanel>
                                 </DockPanel>
                                 <!-- Edit: one row, [type] [name] [value] [x] -->
                                 <Grid ColumnDefinitions="96,*,1.4*,Auto,Auto" IsVisible="{Binding Owner.IsEditing}">
-                                    <ComboBox ItemsSource="{Binding Owner.FieldKinds}" SelectedItem="{Binding Kind}" HorizontalAlignment="Stretch" AutomationProperties.Name="Field type" />
-                                    <TextBox Grid.Column="1" Margin="4,0,0,0" PlaceholderText="Name" Text="{Binding Name}" AutomationProperties.Name="Field name" />
+                                    <ComboBox ItemsSource="{Binding Owner.FieldKinds}" SelectedItem="{Binding Kind}" HorizontalAlignment="Stretch" VerticalAlignment="Top" AutomationProperties.Name="Field type" />
+                                    <TextBox Grid.Column="1" Margin="4,0,0,0" VerticalAlignment="Top" PlaceholderText="Name" Text="{Binding Name}" AutomationProperties.Name="Field name" />
                                     <TextBox Grid.Column="2" Margin="4,0,0,0" PlaceholderText="Value" Text="{Binding Value}" AcceptsReturn="{Binding IsMultiline}" TextWrapping="Wrap"
                                              PasswordChar="{Binding IsSecret, Converter={x:Static local:SecretChar.Converter}}" RevealPassword="{Binding IsRevealed}"
-                                             AutomationProperties.Name="{Binding Name}" />
-                                    <StackPanel Grid.Column="3" Orientation="Horizontal">
+                                             AutomationProperties.Name="{Binding Name}" IsVisible="{Binding IsValueField}" />
+                                    <!-- A file: Choose / Replace, its name and a picture's preview -->
+                                    <StackPanel Grid.Column="2" Margin="4,0,0,0" Spacing="4" IsVisible="{Binding IsFile}">
+                                        <Button HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Command="{Binding ChooseFileCommand}" AutomationProperties.Name="Choose file">
+                                            <Panel>
+                                                <TextBlock Text="Choose…" IsVisible="{Binding !HasFile}" />
+                                                <TextBlock Text="Replace…" IsVisible="{Binding HasFile}" />
+                                            </Panel>
+                                        </Button>
+                                        <TextBlock Classes="secondary" Text="{Binding FileText}" TextTrimming="CharacterEllipsis" />
+                                        <Image MaxHeight="96" HorizontalAlignment="Left" Stretch="Uniform"
+                                               Source="{Binding Preview, Converter={x:Static local:PreviewBitmap.Converter}}" IsVisible="{Binding HasPreview}" />
+                                    </StackPanel>
+                                    <StackPanel Grid.Column="3" Orientation="Horizontal" VerticalAlignment="Top">
                                         <Button Classes="flat" Width="40" Command="{Binding ToggleRevealCommand}" IsVisible="{Binding IsSecret}" AutomationProperties.Name="Show or hide">
                                             <Panel>
                                                 <ic:SymbolIcon Symbol="Eye" FontSize="18" IsVisible="{Binding !IsRevealed}" />
@@ -131,7 +153,7 @@
                                             <ic:SymbolIcon Symbol="Wand" FontSize="18" />
                                         </Button>
                                     </StackPanel>
-                                    <Button Grid.Column="4" Classes="flat" Width="40" Command="{Binding RemoveCommand}" AutomationProperties.Name="Remove field">
+                                    <Button Grid.Column="4" Classes="flat" Width="40" VerticalAlignment="Top" Command="{Binding RemoveCommand}" AutomationProperties.Name="Remove field">
                                         <ic:SymbolIcon Symbol="Dismiss" FontSize="18" />
                                     </Button>
                                 </Grid>
@@ -150,6 +172,11 @@
                             <MenuItem Header="Email" Command="{Binding AddFieldCommand}" CommandParameter="{x:Static items:VaultFieldKind.Email}" />
                             <MenuItem Header="Phone" Command="{Binding AddFieldCommand}" CommandParameter="{x:Static items:VaultFieldKind.Phone}" />
                             <MenuItem Header="Several lines" Command="{Binding AddFieldCommand}" CommandParameter="{x:Static items:VaultFieldKind.Multiline}" />
+                            <Separator />
+                            <MenuItem Header="Image" Command="{Binding AddFieldCommand}" CommandParameter="{x:Static items:VaultFieldKind.Image}" />
+                            <MenuItem Header="Document (any file)" Command="{Binding AddFieldCommand}" CommandParameter="{x:Static items:VaultFieldKind.Document}" />
+                            <MenuItem Header="Text file (.txt)" Command="{Binding AddFieldCommand}" CommandParameter="{x:Static items:VaultFieldKind.TextFile}" />
+                            <MenuItem Header="Keystore" Command="{Binding AddFieldCommand}" CommandParameter="{x:Static items:VaultFieldKind.Keystore}" />
                         </MenuFlyout>
                     </Button.Flyout>
                 </Button>
@@ -167,29 +194,8 @@
             </StackPanel>
         </Border>
 
-        <!-- Documents -->
-        <TextBlock Classes="section" Text="Documents" />
-        <Border Classes="card">
-            <StackPanel Spacing="6">
-                <ProgressBar Minimum="0" Maximum="1" Value="{Binding Progress}" IsVisible="{Binding IsBusy}" />
-                <ItemsControl ItemsSource="{Binding Attachments}">
-                    <ItemsControl.ItemTemplate>
-                        <DataTemplate x:DataType="vm:AttachmentViewModel">
-                            <StackPanel Margin="0,4,0,8" Spacing="4">
-                                <TextBlock Text="{Binding Name}" TextTrimming="CharacterEllipsis" />
-                                <TextBlock Classes="secondary" Text="{Binding Details}" />
-                                <WrapPanel>
-                                    <Button Margin="0,0,8,0" Content="Open" Command="{Binding OpenCommand}" />
-                                    <Button Margin="0,0,8,0" Content="Save a copy" Command="{Binding SaveAsCommand}" />
-                                    <Button Classes="danger" Content="Remove" Command="{Binding RemoveCommand}" />
-                                </WrapPanel>
-                            </StackPanel>
-                        </DataTemplate>
-                    </ItemsControl.ItemTemplate>
-                </ItemsControl>
-                <Button Content="Attach a document…" Command="{Binding AttachCommand}" IsVisible="{Binding !Trashed}" />
-            </StackPanel>
-        </Border>
+        <!-- Files are fields now (Image, Document, Text file, Keystore): opening one shows progress here -->
+        <ProgressBar Minimum="0" Maximum="1" Value="{Binding Progress}" IsVisible="{Binding IsBusy}" Margin="0,4,0,0" />
 
         <!-- History -->
         <Expander Header="History" IsVisible="{Binding !IsNew}" HorizontalAlignment="Stretch" Margin="0,8,0,0">

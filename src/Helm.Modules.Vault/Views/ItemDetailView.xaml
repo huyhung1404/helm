@@ -59,8 +59,7 @@
             <ItemsControl.ItemTemplate>
                 <DataTemplate DataType="{x:Type vm:FieldViewModel}">
                     <DockPanel Margin="0,0,0,10">
-                        <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center"
-                                    Visibility="{Binding HasValue, Converter={StaticResource BoolToVisibility}}">
+                        <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center">
                             <ui:Button ToolTip="Show or hide" AutomationProperties.Name="Show or hide" Command="{Binding ToggleRevealCommand}" Appearance="Transparent"
                                        Visibility="{Binding IsSecret, Converter={StaticResource BoolToVisibility}}">
                                 <ui:SymbolIcon>
@@ -74,11 +73,22 @@
                                     </ui:SymbolIcon.Style>
                                 </ui:SymbolIcon>
                             </ui:Button>
-                            <ui:Button Icon="{ui:SymbolIcon Copy24}" ToolTip="Copy" AutomationProperties.Name="Copy" Command="{Binding CopyCommand}" Appearance="Transparent" />
+                            <ui:Button Icon="{ui:SymbolIcon Copy24}" ToolTip="Copy" AutomationProperties.Name="Copy" Command="{Binding CopyCommand}" Appearance="Transparent"
+                                       Visibility="{Binding CanCopy, Converter={StaticResource BoolToVisibility}}" />
+                            <!-- A file: open it, or save a copy -->
+                            <ui:Button Icon="{ui:SymbolIcon Open24}" ToolTip="Open" AutomationProperties.Name="Open" Command="{Binding OpenFileCommand}" Appearance="Transparent"
+                                       Visibility="{Binding HasFile, Converter={StaticResource BoolToVisibility}}" />
+                            <ui:Button Icon="{ui:SymbolIcon ArrowDownload24}" ToolTip="Save a copy…" AutomationProperties.Name="Save a copy" Command="{Binding SaveFileCommand}" Appearance="Transparent"
+                                       Visibility="{Binding HasFile, Converter={StaticResource BoolToVisibility}}" />
                         </StackPanel>
                         <StackPanel>
                             <TextBlock Text="{Binding Name}" Style="{DynamicResource HelmSecondaryText}" />
-                            <TextBlock AutomationProperties.Name="{Binding Name}" Text="{Binding Display}" TextWrapping="Wrap" FontSize="14" Margin="0,2,0,0" />
+                            <TextBlock AutomationProperties.Name="{Binding Name}" Text="{Binding Display}" TextWrapping="Wrap" FontSize="14" Margin="0,2,0,0"
+                                       Visibility="{Binding IsValueField, Converter={StaticResource BoolToVisibility}}" />
+                            <TextBlock AutomationProperties.Name="{Binding Name}" Text="{Binding FileText}" TextWrapping="Wrap" FontSize="14" Margin="0,2,0,0"
+                                       Visibility="{Binding IsFile, Converter={StaticResource BoolToVisibility}}" />
+                            <Image Margin="0,6,0,0" MaxHeight="200" HorizontalAlignment="Left" Stretch="Uniform"
+                                   Source="{Binding Preview, Converter={StaticResource BytesToImage}, ConverterParameter=480}" Visibility="{Binding HasPreview, Converter={StaticResource BoolToVisibility}}" />
                         </StackPanel>
                     </DockPanel>
                 </DataTemplate>
@@ -92,33 +102,8 @@
         </StackPanel>
         <TextBlock Margin="0,6,0,0" Style="{DynamicResource HelmSecondaryText}" Text="{Binding Tags}" Visibility="{Binding Tags, Converter={StaticResource NotEmptyToVisibility}}" />
 
-            <!-- Documents -->
-        <DockPanel Margin="0,4,0,0">
-            <ui:Button DockPanel.Dock="Right" Content="Attach a document…" Icon="{ui:SymbolIcon Attach24}" Command="{Binding AttachCommand}" VerticalAlignment="Bottom"
-                       Visibility="{Binding Trashed, Converter={StaticResource InverseBoolToVisibility}}" />
-            <TextBlock Text="Documents" Style="{DynamicResource HelmSectionHeader}" />
-        </DockPanel>
+        <!-- Files are fields now (Image, Document, Text file, Keystore): opening one shows progress here -->
         <ProgressBar Margin="0,8,0,0" Minimum="0" Maximum="1" Value="{Binding Progress}" Visibility="{Binding IsBusy, Converter={StaticResource BoolToVisibility}}" />
-        <ItemsControl ItemsSource="{Binding Attachments}" Margin="0,8,0,0">
-            <ItemsControl.ItemTemplate>
-                <DataTemplate DataType="{x:Type vm:AttachmentViewModel}">
-                    <Border Style="{DynamicResource HelmSurface}" Padding="12,8" Margin="0,0,0,4">
-                        <DockPanel>
-                            <ui:SymbolIcon DockPanel.Dock="Left" Symbol="Document24" FontSize="20" Margin="0,0,10,0" VerticalAlignment="Center" />
-                            <WrapPanel DockPanel.Dock="Right" VerticalAlignment="Center">
-                                <ui:Button Icon="{ui:SymbolIcon Open24}" ToolTip="Open" AutomationProperties.Name="Open" Command="{Binding OpenCommand}" Appearance="Transparent" />
-                                <ui:Button Icon="{ui:SymbolIcon ArrowDownload24}" ToolTip="Save a copy…" AutomationProperties.Name="Save a copy…" Command="{Binding SaveAsCommand}" Appearance="Transparent" />
-                                <ui:Button Icon="{ui:SymbolIcon Delete24}" ToolTip="Remove" AutomationProperties.Name="Remove" Command="{Binding RemoveCommand}" Appearance="Transparent" />
-                            </WrapPanel>
-                            <StackPanel VerticalAlignment="Center">
-                                <TextBlock Text="{Binding Name}" TextTrimming="CharacterEllipsis" />
-                                <TextBlock Text="{Binding Details}" Style="{DynamicResource HelmSecondaryText}" />
-                            </StackPanel>
-                        </DockPanel>
-                    </Border>
-                </DataTemplate>
-            </ItemsControl.ItemTemplate>
-        </ItemsControl>
 
         <!-- History -->
         <Expander Margin="0,16,0,0" Visibility="{Binding IsNew, Converter={StaticResource InverseBoolToVisibility}}">

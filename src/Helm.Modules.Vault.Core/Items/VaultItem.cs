@@ -28,12 +28,23 @@ public enum VaultFieldKind
     Number,
     Date,
     Multiline,
+    // Files (added after 0.13): the field names an encrypted attachment of the item (VaultField.AttachmentId).
+    Image,
+    Document,
+    TextFile,
+    Keystore,
 }
 
-public sealed record VaultField(string Name, string Value, VaultFieldKind Kind = VaultFieldKind.Text)
+/// <param name="AttachmentId">File fields: the item's attachment holding the file; <paramref name="Value"/> is its name.</param>
+public sealed record VaultField(string Name, string Value, VaultFieldKind Kind = VaultFieldKind.Text, string? AttachmentId = null)
 {
     [JsonIgnore]
     public bool IsSecret => Kind is VaultFieldKind.Secret or VaultFieldKind.Password;
+
+    [JsonIgnore]
+    public bool IsFile => IsFileKind(Kind);
+
+    public static bool IsFileKind(VaultFieldKind kind) => kind is VaultFieldKind.Image or VaultFieldKind.Document or VaultFieldKind.TextFile or VaultFieldKind.Keystore;
 
     /// <summary>Never prints the value: records land in logs and debugger views otherwise.</summary>
     public override string ToString() => $"VaultField({Name}, {Kind}, ***)";

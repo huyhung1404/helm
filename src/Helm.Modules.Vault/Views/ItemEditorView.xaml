@@ -67,7 +67,25 @@
                                 </Grid.ColumnDefinitions>
                                 <ComboBox AutomationProperties.Name="Field type" ItemsSource="{Binding Owner.FieldKinds}" SelectedItem="{Binding Kind}" VerticalAlignment="Top" />
                                 <ui:TextBox Grid.Column="1" Margin="6,0,0,0" AutomationProperties.Name="Field name" Text="{Binding Name, UpdateSourceTrigger=PropertyChanged}" PlaceholderText="Name" VerticalAlignment="Top" />
-                                <Grid Grid.Column="2" Margin="6,0,0,0">
+                                <!-- A file: its name and size, a picture's preview, and Choose / Replace -->
+                                <StackPanel Grid.Column="2" Margin="6,0,0,0" Visibility="{Binding IsFile, Converter={StaticResource BoolToVisibility}}">
+                                    <DockPanel>
+                                        <ui:Button DockPanel.Dock="Right" Margin="6,0,0,0" Icon="{ui:SymbolIcon FolderOpen24}" Command="{Binding ChooseFileCommand}" AutomationProperties.Name="Choose file">
+                                            <ui:Button.Style>
+                                                <Style TargetType="ui:Button" BasedOn="{StaticResource {x:Type ui:Button}}">
+                                                    <Setter Property="Content" Value="Choose file…" />
+                                                    <Style.Triggers>
+                                                        <DataTrigger Binding="{Binding HasFile}" Value="True"><Setter Property="Content" Value="Replace…" /></DataTrigger>
+                                                    </Style.Triggers>
+                                                </Style>
+                                            </ui:Button.Style>
+                                        </ui:Button>
+                                        <TextBlock Text="{Binding FileText}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" Style="{DynamicResource HelmSecondaryText}" />
+                                    </DockPanel>
+                                    <Image Margin="0,6,0,0" MaxHeight="120" HorizontalAlignment="Left" Stretch="Uniform"
+                                           Source="{Binding Preview, Converter={StaticResource BytesToImage}, ConverterParameter=480}" Visibility="{Binding HasPreview, Converter={StaticResource BoolToVisibility}}" />
+                                </StackPanel>
+                                <Grid Grid.Column="2" Margin="6,0,0,0" Visibility="{Binding IsValueField, Converter={StaticResource BoolToVisibility}}">
                                     <!-- Hidden: a password box; shown (the eye) or not secret: a text box -->
                                     <ui:PasswordBox AutomationProperties.Name="{Binding Name}" Password="{Binding Value, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" RevealButtonEnabled="False" VerticalAlignment="Top">
                                         <ui:PasswordBox.Style>
@@ -137,6 +155,11 @@
                             <MenuItem Header="Phone" Command="{Binding AddFieldCommand}" CommandParameter="{x:Static items:VaultFieldKind.Phone}" />
                             <MenuItem Header="Date" Command="{Binding AddFieldCommand}" CommandParameter="{x:Static items:VaultFieldKind.Date}" />
                             <MenuItem Header="Several lines" Command="{Binding AddFieldCommand}" CommandParameter="{x:Static items:VaultFieldKind.Multiline}" />
+                            <Separator />
+                            <MenuItem Header="Image" Command="{Binding AddFieldCommand}" CommandParameter="{x:Static items:VaultFieldKind.Image}" />
+                            <MenuItem Header="Document (any file)" Command="{Binding AddFieldCommand}" CommandParameter="{x:Static items:VaultFieldKind.Document}" />
+                            <MenuItem Header="Text file (.txt)" Command="{Binding AddFieldCommand}" CommandParameter="{x:Static items:VaultFieldKind.TextFile}" />
+                            <MenuItem Header="Keystore" Command="{Binding AddFieldCommand}" CommandParameter="{x:Static items:VaultFieldKind.Keystore}" />
                         </ContextMenu>
                     </ui:DropDownButton.Flyout>
                 </ui:DropDownButton>

@@ -17,6 +17,7 @@ public sealed class VaultViewModelTests : IDisposable
     private readonly string _dir = Path.Combine(Path.GetTempPath(), "helm-tests", Guid.NewGuid().ToString("N"));
     private readonly List<IDisposable> _owned = [];
     private readonly FakePlatform _platform = new();
+    private VaultFiles? _files;
 
     public void Dispose()
     {
@@ -122,6 +123,92 @@ public sealed class VaultViewModelTests : IDisposable
         var trashed = Assert.Single(items.Cards);
         Assert.False(trashed.CanCopySecret); // the trash is for restoring, not copying
         Assert.False(trashed.HasUsername);
+    }
+
+    [Fact]
+    public async Task A_file_field_holds_its_file_once_saved_and_cancel_leaves_nothing_behind()
+    {
+        var (app, session, store) = NewApp();
+        await session.CreateAsync(Password);
+        var items = app.Items;
+
+        items.NewCommand.Execute(VaultItemKind.Note);
+        var detail = items.Detail!;
+        detail.Title = "Release keys";
+        detail.AddFieldCommand.Execute(VaultFieldKind.Keystore);
+        var field = detail.Fields.Last();
+        Assert.Equal("Keystore", field.Name);
+        Assert.True(field.IsFile);
+        Assert.False(field.HasFile);
+        Assert.False(field.CanCopy);
+
+        var bytes = new byte[] { 0xFE, 0xED, 0xFE, 0xED, 1, 2, 3 };
+        _platform.NextPick = ("helm-release.keystore", "application/octet-stream", bytes);
+        await field.ChooseFileCommand.ExecuteAsync(null);
+        Assert.True(field.HasFile);
+        Assert.StartsWith("helm-release.keystore", field.FileText);
+        detail.SaveCommand.Execute(null);
+
+        var saved = Assert.Single(store.Items()).Item;
+        var attachment = Assert.Single(saved.Attachments);
+        var savedField = saved.Fields.Single(f => f.Kind == VaultFieldKind.Keystore);
+        Assert.Equal(attachment.Id, savedField.AttachmentId);
+
+        // Open hands the decrypted file to the platform.
+        items.ToggleCardCommand.Execute(items.Cards.Single());
+        var shown = items.Detail!.Fields.Single(f => f.IsFile);
+        await shown.OpenFileCommand.ExecuteAsync(null);
+        Assert.Equal(bytes, _platform.Opened);
+
+        // A file picked and then cancelled never joins the item.
+        items.Detail.EditCommand.Execute(null);
+        items.Detail.AddFieldCommand.Execute(VaultFieldKind.Document);
+        _platform.NextPick = ("passport.pdf", "application/pdf", [1, 2, 3]);
+        await items.Detail.Fields.Last().ChooseFileCommand.ExecuteAsync(null);
+        items.Detail.CancelCommand.Execute(null);
+        Assert.Single(store.Items().Single().Item.Attachments);
+
+        // Removing the field removes the file from the item (the history still has it).
+        items.Detail.EditCommand.Execute(null);
+        items.Detail.Fields.Single(f => f.IsFile).RemoveCommand.Execute(null);
+        items.Detail.SaveCommand.Execute(null);
+        Assert.Empty(store.Items().Single().Item.Attachments);
+    }
+
+    [Fact]
+    public async Task An_image_field_takes_only_pictures_and_shows_a_preview()
+    {
+        var (app, session, _) = NewApp();
+        await session.CreateAsync(Password);
+        app.Items.NewCommand.Execute(VaultItemKind.Note);
+        var detail = app.Items.Detail!;
+        detail.AddFieldCommand.Execute(VaultFieldKind.Image);
+        var field = detail.Fields.Last();
+
+        _platform.NextPick = ("notes.txt", "text/plain", [65]);
+        await field.ChooseFileCommand.ExecuteAsync(null);
+        Assert.False(field.HasFile);
+        Assert.Contains("not a picture", detail.Error);
+
+        _platform.NextPick = ("card.png", "image/png", [0x89, 0x50, 0x4E, 0x47]);
+        await field.ChooseFileCommand.ExecuteAsync(null);
+        Assert.True(field.HasFile);
+        Assert.True(field.HasPreview);
+    }
+
+    [Fact]
+    public async Task Documents_attached_before_file_fields_show_as_file_fields()
+    {
+        var (app, session, store) = NewApp();
+        await session.CreateAsync(Password);
+        var uid = store.Add(VaultItem.New(VaultItemKind.Login, "Passport"));
+        await _files!.AttachAsync(uid, "scan.jpg", "image/jpeg", new MemoryStream([1, 2, 3]));
+
+        app.Items.Refresh();
+        app.Items.ToggleCardCommand.Execute(app.Items.Cards.Single());
+        var field = Assert.Single(app.Items.Detail!.Fields, f => f.IsFile);
+        Assert.Equal(VaultFieldKind.Image, field.Kind);
+        Assert.True(field.HasFile);
     }
 
     [Fact]
@@ -414,7 +501,7 @@ public sealed class VaultViewModelTests : IDisposable
         var settings = Own(new SettingsStoreFactory(paths));
         var session = Own(new VaultSession(keyrings, settings, new NoDeviceUnlock(), engine) { NewKdf = VaultCryptoTests.CheapKdf });
         var store = Own(new VaultStore(records, session));
-        var files = new VaultFiles(store, blobs, session);
+        var files = _files = new VaultFiles(store, blobs, session);
         var backup = new VaultBackupService(session, store, blobs, new FolderBackupLocation(), settings);
         var app = new VaultAppViewModel(session, store, files, backup, engine, _platform, new ImmediateDispatcher());
         settingsViewModel = new VaultSettingsViewModel(session, store, files, backup, app, new NoDeviceUnlock(), _platform, new ImmediateDispatcher(), settings);
@@ -445,12 +532,21 @@ public sealed class VaultViewModelTests : IDisposable
         public EmergencyKit? SavedKit { get; private set; }
         public byte[] Created { get; private set; } = [];
 
-        public Task<VaultPickedFile?> PickFileAsync(CancellationToken ct) => Task.FromResult<VaultPickedFile?>(null);
+        public (string Name, string MediaType, byte[] Content)? NextPick { get; set; }
+        public byte[]? Opened { get; private set; }
+
+        public Task<VaultPickedFile?> PickFileAsync(CancellationToken ct) => Task.FromResult(NextPick is { } pick
+            ? new VaultPickedFile(pick.Name, pick.MediaType, new MemoryStream(pick.Content))
+            : null);
 
         public Task<Stream?> CreateFileAsync(string suggestedName, string mediaType, CancellationToken ct) =>
             Task.FromResult<Stream?>(new CapturingStream(bytes => Created = bytes));
 
-        public Task OpenFileAsync(string name, string mediaType, byte[] content, CancellationToken ct) => Task.CompletedTask;
+        public Task OpenFileAsync(string name, string mediaType, byte[] content, CancellationToken ct)
+        {
+            Opened = content.ToArray();
+            return Task.CompletedTask;
+        }
         public void CopySecret(string text) => CopiedSecret = text;
         public void CopyText(string text) => CopiedText = text;
         public Task<bool> ConfirmAsync(string title, string message, string confirmText) => Task.FromResult(true);

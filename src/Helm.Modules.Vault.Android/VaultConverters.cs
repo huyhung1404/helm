@@ -50,3 +50,21 @@ public static class IconBitmap
         }
     });
 }
+
+/// <summary>An image field's picture for the item view, decoded to a preview width; null when unreadable.</summary>
+public static class PreviewBitmap
+{
+    public static IValueConverter Converter { get; } = new FuncValueConverter<byte[]?, Avalonia.Media.Imaging.Bitmap?>(bytes =>
+    {
+        if (bytes is not { Length: > 0 }) return null;
+        try
+        {
+            using var stream = new MemoryStream(bytes);
+            return Avalonia.Media.Imaging.Bitmap.DecodeToWidth(stream, 480);
+        }
+        catch (Exception)
+        {
+            return null; // not a picture Avalonia reads: the name and Open still work
+        }
+    });
+}

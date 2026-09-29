@@ -15,8 +15,31 @@ public sealed partial class FieldViewModel(ItemDetailViewModel owner, VaultField
     [ObservableProperty] private string _value = field.Value;
     [ObservableProperty] private VaultFieldKind _kind = field.Kind;
     [ObservableProperty] private bool _isRevealed;
+    [ObservableProperty] private string? _attachmentId = field.AttachmentId;
+
+    /// <summary>An image field's picture, decrypted small for the view (null until loaded, or for other fields).</summary>
+    [ObservableProperty] private byte[]? _preview;
 
     public bool IsSecret => Kind is VaultFieldKind.Secret or VaultFieldKind.Password;
+
+    /// <summary>Image, document, text file or keystore: the value is a file of the item.</summary>
+    public bool IsFile => VaultField.IsFileKind(Kind);
+
+    public bool IsValueField => !IsFile;
+
+    public bool IsImage => Kind == VaultFieldKind.Image;
+
+    public bool HasFile => AttachmentId is not null && Owner.FindAttachment(AttachmentId) is not null;
+
+    public bool HasPreview => Preview is { Length: > 0 };
+
+    /// <summary>"passport.pdf · 1.2 MB" (or "No file yet").</summary>
+    public string FileText => AttachmentId is { } id && Owner.FindAttachment(id) is { } a
+        ? Sizes.Join(a.Name, Sizes.Format(a.Size))
+        : "No file yet";
+
+    /// <summary>Copy only for text values (a file is opened or saved instead).</summary>
+    public bool CanCopy => HasValue && !IsFile;
 
     public bool IsPassword => Kind == VaultFieldKind.Password;
 
@@ -31,7 +54,15 @@ public sealed partial class FieldViewModel(ItemDetailViewModel owner, VaultField
 
     public ItemDetailViewModel Owner { get; } = owner;
 
-    public VaultField ToField() => new(Name.Trim(), Value, Kind);
+    public VaultField ToField() => new(Name.Trim(), Value, Kind, IsFile ? AttachmentId : null);
+
+    partial void OnAttachmentIdChanged(string? value)
+    {
+        OnPropertyChanged(nameof(HasFile));
+        OnPropertyChanged(nameof(FileText));
+    }
+
+    partial void OnPreviewChanged(byte[]? value) => OnPropertyChanged(nameof(HasPreview));
 
     partial void OnValueChanged(string value)
     {
@@ -43,6 +74,10 @@ public sealed partial class FieldViewModel(ItemDetailViewModel owner, VaultField
 
     partial void OnKindChanged(VaultFieldKind value)
     {
+        OnPropertyChanged(nameof(IsFile));
+        OnPropertyChanged(nameof(IsValueField));
+        OnPropertyChanged(nameof(IsImage));
+        OnPropertyChanged(nameof(CanCopy));
         OnPropertyChanged(nameof(IsSecret));
         OnPropertyChanged(nameof(IsPassword));
         OnPropertyChanged(nameof(IsMultiline));
@@ -68,24 +103,16 @@ public sealed partial class FieldViewModel(ItemDetailViewModel owner, VaultField
 
     [RelayCommand]
     private void Remove() => Owner.Fields.Remove(this);
-}
 
-public sealed partial class AttachmentViewModel(ItemDetailViewModel owner, VaultAttachment attachment, string status) : ObservableObject
-{
-    public VaultAttachment Attachment { get; } = attachment;
-
-    public string Name => Attachment.Name;
-
-    public string Details => Sizes.Join(Sizes.Format(Attachment.Size), status);
+    /// <summary>Picks the file (encrypted at once; it joins the item on Save).</summary>
+    [RelayCommand]
+    private Task ChooseFileAsync() => Owner.ChooseFileAsync(this);
 
     [RelayCommand]
-    private Task OpenAsync() => owner.OpenAttachmentAsync(this);
+    private Task OpenFileAsync() => Owner.OpenFileAsync(this);
 
     [RelayCommand]
-    private Task SaveAsAsync() => owner.SaveAttachmentAsync(this);
-
-    [RelayCommand]
-    private Task RemoveAsync() => owner.RemoveAttachmentAsync(this);
+    private Task SaveFileAsync() => Owner.SaveFileAsync(this);
 }
 
 public sealed partial class VersionViewModel(ItemDetailViewModel owner, VaultItemVersion version) : ObservableObject
@@ -124,6 +151,7 @@ public sealed partial class ItemDetailViewModel : ObservableObject
     private readonly VaultSession _session;
     private readonly IVaultPlatform _platform;
     private readonly Action<string?> _saved;
+    private readonly Dictionary<string, VaultAttachment> _pending = new(StringComparer.Ordinal);
     private VaultItem _item;
     private string? _recordId;
 
@@ -197,8 +225,6 @@ public sealed partial class ItemDetailViewModel : ObservableObject
     public bool HasConflicts => Conflicts.Count > 0;
 
     public ObservableCollection<FieldViewModel> Fields { get; } = [];
-
-    public ObservableCollection<AttachmentViewModel> Attachments { get; } = [];
 
     public ObservableCollection<VersionViewModel> History { get; } = [];
 
@@ -314,7 +340,13 @@ public sealed partial class ItemDetailViewModel : ObservableObject
                 Favorite = Favorite,
                 Icon = Icon,
                 Tags = Tags.Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries).Distinct().ToList(),
-                Fields = Fields.Select(f => f.ToField()).Where(f => f.Name.Length > 0 || f.Value.Length > 0).ToList(),
+                Fields = Fields.Select(f => f.ToField())
+                    .Where(f => f.IsFile ? f.AttachmentId is not null && FindAttachment(f.AttachmentId) is not null : f.Name.Length > 0 || f.Value.Length > 0)
+                    .ToList(),
+                // Exactly the files the fields hold: new ones join, removed ones leave (they stay in the history).
+                Attachments = Fields.Where(f => f.IsFile && f.AttachmentId is not null)
+                    .Select(f => FindAttachment(f.AttachmentId!)).OfType<VaultAttachment>()
+                    .DistinctBy(a => a.Id).ToList(),
             };
             if (Uid is null) Uid = _store.Add(edited);
             else _store.Save(Uid, edited);
@@ -340,58 +372,105 @@ public sealed partial class ItemDetailViewModel : ObservableObject
             VaultFieldKind.Email => "Email",
             VaultFieldKind.Phone => "Phone",
             VaultFieldKind.Username => "Username",
+            _ when VaultField.IsFileKind(kind) => FileFieldName(kind),
             _ => "Field",
         }, "", kind)));
         Touch();
     }
 
-    [RelayCommand]
-    private async Task AttachAsync()
+    /// <summary>The attachment a file field names: one picked in this edit, or one the item already has.</summary>
+    internal VaultAttachment? FindAttachment(string id) =>
+        _pending.TryGetValue(id, out var pending) ? pending : _item.Attachments.FirstOrDefault(a => a.Id == id);
+
+    private static VaultFieldKind FileKindOf(string name, string mediaType)
     {
-        if (Uid is null)
-        {
-            Save();
-            if (Uid is null) return;
-        }
+        var ext = Path.GetExtension(name).ToLowerInvariant();
+        if (mediaType.StartsWith("image/", StringComparison.OrdinalIgnoreCase) || ext is ".png" or ".jpg" or ".jpeg" or ".gif" or ".webp" or ".bmp" or ".heic")
+            return VaultFieldKind.Image;
+        if (ext is ".txt" || mediaType.Equals("text/plain", StringComparison.OrdinalIgnoreCase)) return VaultFieldKind.TextFile;
+        if (ext is ".jks" or ".keystore" or ".p12" or ".pfx" or ".bks") return VaultFieldKind.Keystore;
+        return VaultFieldKind.Document;
+    }
+
+    private static string FileFieldName(VaultFieldKind kind) => kind switch
+    {
+        VaultFieldKind.Image => "Image",
+        VaultFieldKind.TextFile => "Text file",
+        VaultFieldKind.Keystore => "Keystore",
+        _ => "Document",
+    };
+
+    internal async Task ChooseFileAsync(FieldViewModel field)
+    {
         var picked = await _platform.PickFileAsync(CancellationToken.None).ConfigureAwait(true);
         if (picked is null) return;
-        await RunAsync(async () =>
+        await using (picked.Content)
         {
-            await using (picked.Content)
+            var kind = FileKindOf(picked.Name, picked.MediaType);
+            if (field.Kind == VaultFieldKind.Image && kind != VaultFieldKind.Image)
             {
-                var progress = new Progress<double>(p => Progress = p);
-                await _files.AttachAsync(Uid!, picked.Name, picked.MediaType, picked.Content, progress).ConfigureAwait(true);
+                Error = $"{picked.Name} is not a picture. Choose a PNG, JPEG, GIF, WebP or BMP file, or make the field a Document.";
+                return;
             }
-            Reload();
-        }).ConfigureAwait(true);
+            if (field.Kind == VaultFieldKind.TextFile && kind != VaultFieldKind.TextFile)
+            {
+                Error = $"{picked.Name} is not a .txt file. Choose a text file, or make the field a Document.";
+                return;
+            }
+            await RunAsync(async () =>
+            {
+                var attachment = await _files.ImportAsync(picked.Name, picked.MediaType, picked.Content, new Progress<double>(p => Progress = p)).ConfigureAwait(true);
+                _pending[attachment.Id] = attachment;
+                field.AttachmentId = attachment.Id;
+                field.Value = picked.Name;
+                field.Preview = null;
+                if (field.IsImage) field.Preview = await ReadPreviewAsync(attachment).ConfigureAwait(true);
+            }).ConfigureAwait(true);
+        }
+        Touch();
     }
 
-    internal Task OpenAttachmentAsync(AttachmentViewModel attachment) => RunAsync(async () =>
-    {
-        var data = await _files.ReadAllAsync(attachment.Attachment).ConfigureAwait(true);
-        await _platform.OpenFileAsync(attachment.Name, attachment.Attachment.MediaType, data, CancellationToken.None).ConfigureAwait(true);
-        System.Security.Cryptography.CryptographicOperations.ZeroMemory(data);
-    });
-
-    internal Task SaveAttachmentAsync(AttachmentViewModel attachment) => RunAsync(async () =>
-    {
-        var stream = await _platform.CreateFileAsync(attachment.Name, attachment.Attachment.MediaType, CancellationToken.None).ConfigureAwait(true);
-        if (stream is null) return;
-        await using (stream) await _files.OpenAsync(attachment.Attachment, stream, new Progress<double>(p => Progress = p)).ConfigureAwait(true);
-    });
-
-    internal async Task RemoveAttachmentAsync(AttachmentViewModel attachment)
-    {
-        if (Uid is null) return;
-        if (!await _platform.ConfirmAsync("Remove document", $"Remove {attachment.Name} from this item? It stays in the item's history, so you can restore it.", "Remove").ConfigureAwait(true))
-            return;
-        await RunAsync(() =>
+    internal Task OpenFileAsync(FieldViewModel field) => field.AttachmentId is { } id && FindAttachment(id) is { } attachment
+        ? RunAsync(async () =>
         {
-            _files.Remove(Uid, attachment.Attachment.Id);
-            Reload();
-            return Task.CompletedTask;
-        }).ConfigureAwait(true);
+            var data = await _files.ReadAllAsync(attachment).ConfigureAwait(true);
+            await _platform.OpenFileAsync(attachment.Name, attachment.MediaType, data, CancellationToken.None).ConfigureAwait(true);
+            System.Security.Cryptography.CryptographicOperations.ZeroMemory(data);
+        })
+        : Task.CompletedTask;
+
+    internal Task SaveFileAsync(FieldViewModel field) => field.AttachmentId is { } id && FindAttachment(id) is { } attachment
+        ? RunAsync(async () =>
+        {
+            var stream = await _platform.CreateFileAsync(attachment.Name, attachment.MediaType, CancellationToken.None).ConfigureAwait(true);
+            if (stream is null) return;
+            await using (stream) await _files.OpenAsync(attachment, stream, new Progress<double>(p => Progress = p)).ConfigureAwait(true);
+        })
+        : Task.CompletedTask;
+
+    /// <summary>Pictures of image fields, decrypted for the view (only small ones: a preview, not a download).</summary>
+    private async Task LoadPreviewsAsync()
+    {
+        foreach (var field in Fields.Where(f => f.IsImage && f.AttachmentId is not null).ToList())
+        {
+            if (FindAttachment(field.AttachmentId!) is not { } attachment) continue;
+            try
+            {
+                field.Preview = await ReadPreviewAsync(attachment).ConfigureAwait(true);
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                field.Preview = null; // offline, or locked meanwhile: the name and Open still work
+            }
+        }
     }
+
+    private const long MaxPreviewBytes = 8 * 1024 * 1024;
+
+    private async Task<byte[]?> ReadPreviewAsync(VaultAttachment attachment) =>
+        attachment.Size <= MaxPreviewBytes && _session.State == VaultState.Unlocked
+            ? await _files.ReadAllAsync(attachment).ConfigureAwait(true)
+            : null;
 
     internal async Task RestoreVersionAsync(VersionViewModel version)
     {
@@ -491,12 +570,16 @@ public sealed partial class ItemDetailViewModel : ObservableObject
         Icon = item.Icon;
         Fields.Clear();
         foreach (var field in item.Fields) Fields.Add(new FieldViewModel(this, field));
-        Attachments.Clear();
-        foreach (var attachment in item.Attachments)
+        // Documents attached before files were fields show as file fields, so nothing is hidden (they become
+        // real fields with the next Save).
+        var linked = item.Fields.Where(f => f.IsFile && f.AttachmentId is not null).Select(f => f.AttachmentId!).ToHashSet(StringComparer.Ordinal);
+        foreach (var attachment in item.Attachments.Where(a => !linked.Contains(a.Id)))
         {
-            var status = _files.IsUploading(attachment) ? "only on this device, uploading" : _files.IsOnThisDevice(attachment) ? "on this device" : "in the cloud";
-            Attachments.Add(new AttachmentViewModel(this, attachment, status));
+            var kind = FileKindOf(attachment.Name, attachment.MediaType);
+            Fields.Add(new FieldViewModel(this, new VaultField(FileFieldName(kind), attachment.Name, kind, attachment.Id)));
         }
+        _pending.Clear();
+        _ = LoadPreviewsAsync();
         History.Clear();
         foreach (var version in item.History) History.Add(new VersionViewModel(this, version));
         OnPropertyChanged(nameof(Modified));

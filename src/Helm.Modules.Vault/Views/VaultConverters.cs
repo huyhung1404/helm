@@ -17,7 +17,8 @@ public sealed class BytesToImageConverter : IValueConverter
             var image = new System.Windows.Media.Imaging.BitmapImage();
             image.BeginInit();
             image.CacheOption = System.Windows.Media.Imaging.BitmapCacheOption.OnLoad;
-            image.DecodePixelWidth = 96;
+            // The parameter is a wider decode (an image field's preview); an icon is 96 px.
+            image.DecodePixelWidth = parameter is string w && int.TryParse(w, NumberStyles.Integer, CultureInfo.InvariantCulture, out var width) ? width : 96;
             image.StreamSource = new System.IO.MemoryStream(bytes);
             image.EndInit();
             image.Freeze();

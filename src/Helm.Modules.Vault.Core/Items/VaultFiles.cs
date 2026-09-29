@@ -10,6 +10,19 @@ namespace Helm.Modules.Vault.Items;
 /// </summary>
 public sealed class VaultFiles(VaultStore store, BlobStore blobs, VaultSession session)
 {
+    /// <summary>
+    /// Encrypts <paramref name="content"/> into a blob of its own without touching any item: the editor keeps it until
+    /// Save puts it into the item (one new version), and drops it on Cancel.
+    /// </summary>
+    /// <exception cref="BlobTooLargeException">Larger than the sync server accepts.</exception>
+    public async Task<VaultAttachment> ImportAsync(string name, string mediaType, Stream content,
+        IProgress<double>? progress = null, CancellationToken ct = default)
+    {
+        _ = session.Key; // Fail before the (possibly long) encryption when the vault is locked.
+        var blob = await blobs.ImportAsync(content, progress, ct).ConfigureAwait(false);
+        return new VaultAttachment(SyncIds.NewId(), name, mediaType, blob.Size, blob);
+    }
+
     /// <summary>Encrypts <paramref name="content"/> and adds it to the item. The upload happens with the next sync.</summary>
     /// <exception cref="BlobTooLargeException">Larger than the sync server accepts.</exception>
     public async Task<VaultAttachment> AttachAsync(string uid, string name, string mediaType, Stream content,
