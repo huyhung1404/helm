@@ -32,6 +32,9 @@ public static class TrackerCoreServices
             sp.GetRequiredService<ISyncedLog<TrackerEvent>>()));
         services.AddSingleton(sp => new TrackerReminderService(
             sp.GetRequiredService<TrackerStore>(), sp.GetRequiredService<Helm.Core.Settings.ISettingsStoreFactory>()));
+        // Quick Capture: "/t buy milk tomorrow 9h" and "/d Nam 200k".
+        services.AddSingleton<Helm.Core.Capture.ICaptureTarget, TaskCaptureTarget>();
+        services.AddSingleton<Helm.Core.Capture.ICaptureTarget, DebtCaptureTarget>();
         // Windows registers it again through AddHelmModule; one instance either way.
         services.TryAddSingleton<TrackerViewModel>();
         return services;

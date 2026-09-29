@@ -129,7 +129,9 @@
                             </ItemsControl.ItemsPanel>
                             <ItemsControl.ItemTemplate>
                                 <DataTemplate>
+                                    <!-- Content at the top: a name on two lines must not push its icon above the others in the row. -->
                                     <Button Style="{StaticResource TileButton}" Padding="8,12" Margin="2" HorizontalContentAlignment="Center"
+                                            VerticalAlignment="Stretch" VerticalContentAlignment="Top"
                                             Command="{Binding DataContext.LaunchModuleCommand, RelativeSource={RelativeSource AncestorType=Page}}"
                                             CommandParameter="{Binding}">
                                         <StackPanel>

@@ -61,7 +61,9 @@
                     </ItemsControl.ItemsPanel>
                     <ItemsControl.ItemTemplate>
                         <DataTemplate DataType="m:IAndroidModule">
-                            <Button Classes="flat" Padding="8,12" Margin="2" HorizontalContentAlignment="Center" CommandParameter="{Binding}"
+                            <!-- Content at the top: a name on two lines must not push its icon above the others in the row. -->
+                            <Button Classes="flat" Padding="8,12" Margin="2" HorizontalContentAlignment="Center" VerticalAlignment="Stretch"
+                                    VerticalContentAlignment="Top" CommandParameter="{Binding}"
                                     Command="{Binding $parent[ItemsControl].((vm:HomeViewModel)DataContext).LaunchModuleCommand}">
                                 <StackPanel Spacing="8">
                                     <ui:ModuleIcon Symbol="{Binding Icon}" Image="{Binding IconImage}" Size="30" Foreground="{DynamicResource SystemAccentColor}" HorizontalAlignment="Center" />

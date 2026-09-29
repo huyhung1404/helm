@@ -187,6 +187,23 @@ public sealed partial class ItemsViewModel : ObservableObject
     [RelayCommand]
     private void ShowTab(VaultTab tab) => Tab = tab;
 
+    /// <summary>
+    /// Shows an item with its card open (e.g. picked in the command palette): its tab, no search, no filter. Nothing
+    /// happens while the vault is locked, for an item in the trash, or while the editor is open (typed text stays).
+    /// </summary>
+    public void Reveal(string uid)
+    {
+        if (_session.State != VaultState.Unlocked || Detail is { IsEditing: true }) return;
+        if (_store.Get(uid) is not { Trashed: false } entry) return;
+        _session.Touch();
+        if (Search.Length > 0) Search = "";
+        var tab = TabOf(entry.Item.Kind);
+        if (Tab != tab) Tab = tab;
+        if (Filter != VaultFilter.All) Filter = VaultFilter.All;
+        Refresh();
+        Expand(uid);
+    }
+
     /// <summary>The star on a card: favorite or not (not a new version of the item).</summary>
     [RelayCommand]
     private void ToggleFavorite(VaultCardViewModel? card)

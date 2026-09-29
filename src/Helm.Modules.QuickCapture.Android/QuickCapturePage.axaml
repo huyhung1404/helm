@@ -1,0 +1,65 @@
+<ui:ModulePageBase xmlns="https://github.com/avaloniaui"
+                   xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                   xmlns:ui="using:Helm.Core.Ui"
+                   xmlns:vm="using:Helm.Modules.QuickCapture"
+                   x:Class="Helm.Modules.QuickCapture.QuickCapturePage"
+                   x:DataType="vm:QuickCaptureViewModel"
+                   Module="{Binding Module}">
+
+    <StackPanel>
+        <Border Classes="infobar" IsVisible="{Binding HasMessage}">
+            <TextBlock Text="{Binding Message}" TextWrapping="Wrap" />
+        </Border>
+
+        <!-- Where to find it -->
+        <TextBlock Text="Where to find it" Classes="section" />
+        <Border Classes="card">
+            <StackPanel Spacing="8">
+                <TextBlock Text="Share to Helm" Classes="title" />
+                <TextBlock Classes="secondary"
+                           Text="In any app, tap Share and pick “Save to Helm”: the text or link is filled in, choose Note, Task or Debt and tap Save." />
+                <Border Classes="row">
+                    <StackPanel Spacing="8">
+                        <TextBlock Text="Quick Settings tile" Classes="title" />
+                        <TextBlock Classes="secondary"
+                                   Text="Swipe down twice, tap the pencil and drag “Quick Capture” into the panel. One tap then opens an empty capture box." />
+                        <Button x:Name="AddTileButton" Content="Add to Quick Settings" Click="AddTile_Click" IsVisible="False" />
+                    </StackPanel>
+                </Border>
+            </StackPanel>
+        </Border>
+
+        <!-- Behavior -->
+        <TextBlock Text="Behavior" Classes="section" />
+        <Border Classes="card">
+            <StackPanel Spacing="8">
+                <TextBlock Text="Save to" Classes="title" />
+                <TextBlock Text="The choice the box opens on. You can switch it in the box." Classes="secondary" />
+                <ComboBox HorizontalAlignment="Stretch" ItemsSource="{Binding TargetNames}" SelectedIndex="{Binding DefaultTargetIndex}"
+                          AutomationProperties.Name="Save to" />
+            </StackPanel>
+        </Border>
+
+        <Border Classes="card">
+            <StackPanel Spacing="8">
+                <TextBlock Text="What to type" Classes="title" />
+                <TextBlock Text="Start with a prefix to pick where it goes." Classes="secondary" />
+                <ItemsControl ItemsSource="{Binding Examples}">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate DataType="vm:CaptureExample">
+                            <Border Classes="row">
+                                <StackPanel Spacing="2">
+                                    <StackPanel Orientation="Horizontal" Spacing="8">
+                                        <TextBlock Text="{Binding Name}" FontWeight="SemiBold" />
+                                        <TextBlock Text="{Binding Prefix}" FontFamily="monospace" Foreground="{DynamicResource SystemAccentColor}" />
+                                    </StackPanel>
+                                    <TextBlock Text="{Binding Example}" Classes="secondary" />
+                                </StackPanel>
+                            </Border>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+            </StackPanel>
+        </Border>
+    </StackPanel>
+</ui:ModulePageBase>

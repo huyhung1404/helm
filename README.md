@@ -7,6 +7,9 @@ Tools:
 | Tool | Platforms | What it does |
 |---|---|---|
 | Claude Chat | PC | Chat with Claude Code in its own window, several projects side by side |
+| Command Palette | PC | Alt+Space: one search box for your notes, tasks, vault items (while unlocked), Helm's settings and the Start menu's apps |
+| Notes | PC + Android | Notes that save as you type and sync end-to-end encrypted; a note edited on two devices keeps both versions; 30-day trash; Markdown export |
+| Quick Capture | PC + Android | Save a note, task or debt from anywhere: Win+Alt+N on PC, Share → "Save to Helm" or a Quick Settings tile on Android, with short forms like `/t buy milk tomorrow 9h` |
 | Tracker | PC + Android | To-do lists and debt books in workspaces, synced across devices; completions are logged with their start and finish times for reports and CSV export, and Android has a home-screen widget |
 | Vault | PC + Android | Passwords, secure notes, cards, identities and documents, end-to-end encrypted, synced, and backed up to a folder you choose ([guide](docs/vault-guide.md), [design](docs/vault-design.md), [format](docs/vault-format.md)) |
 
@@ -148,5 +151,5 @@ Planned tools, each added as its own module (`src/Helm.Modules.<Name>`):
 - **System Tools**: Color Picker, Screen Ruler, Text Extractor (OCR), Awake.
 - **Input & Output**: Keyboard Manager (remaps), Find My Mouse.
 - **File Management**: File Locksmith, bulk rename, Hosts file editor, Environment Variables.
-- **Advanced**: a command palette / launcher, Unity helpers (kill stuck editors, clear Library caches).
+- **Advanced**: Unity helpers (kill stuck editors, clear Library caches).
 - Code signing for the installer and binaries.

@@ -1,0 +1,68 @@
+<core:ModulePageBase
+    x:Class="Helm.Modules.Notes.NotesPage"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
+    xmlns:core="clr-namespace:Helm.Core.Ui;assembly=Helm.Core.Windows"
+    xmlns:local="clr-namespace:Helm.Modules.Notes"
+    ExtraMessage="{Binding Message}">
+
+    <!-- Notes' settings (Home → Utilities). The notes themselves are on NotesContentPage. -->
+    <StackPanel>
+        <ui:CardControl Margin="0,0,0,4">
+            <ui:CardControl.Icon>
+                <ui:ImageIcon Width="24" Height="24" Source="{x:Static local:NotesLogo.Image}" />
+            </ui:CardControl.Icon>
+            <ui:CardControl.Header>
+                <core:CardHeader Title="Open Notes" Description="Your notes and the editor. Also in the menu and on Home." />
+            </ui:CardControl.Header>
+            <ui:Button Appearance="Primary" Content="Open Notes" Click="OpenNotes_Click" />
+        </ui:CardControl>
+
+        <!-- Display -->
+        <TextBlock Text="Display" Style="{DynamicResource HelmSectionHeader}" />
+        <ui:CardControl Margin="0,0,0,4" Icon="{ui:SymbolIcon ArrowSort24}">
+            <ui:CardControl.Header>
+                <core:CardHeader Title="Sort notes by" Description="Pinned notes always come first." />
+            </ui:CardControl.Header>
+            <ComboBox Width="180" AutomationProperties.Name="Sort notes by" ItemsSource="{Binding SortOrderNames}" SelectedIndex="{Binding SortOrderIndex}" />
+        </ui:CardControl>
+        <ui:CardExpander Margin="0,0,0,4" Icon="{ui:SymbolIcon TextFont24}" IsExpanded="True">
+            <ui:CardExpander.Header>
+                <core:CardHeader Title="Editor" Description="How the text of a note looks while you write it." />
+            </ui:CardExpander.Header>
+            <StackPanel>
+                <Border Style="{DynamicResource HelmExpanderRow}" BorderThickness="0">
+                    <core:RowLayout>
+                        <core:CardHeader Title="Text size" Description="In points, for the note's text (the title stays larger)." />
+                        <ComboBox Width="100" AutomationProperties.Name="Text size" ItemsSource="{Binding FontSizes}" SelectedItem="{Binding EditorFontSize}" />
+                    </core:RowLayout>
+                </Border>
+                <Border Style="{DynamicResource HelmExpanderRow}">
+                    <core:RowLayout>
+                        <core:CardHeader Title="Fixed-width font" Description="Every letter the same width, so code and columns line up." />
+                        <ui:ToggleSwitch AutomationProperties.Name="Fixed-width font" IsChecked="{Binding Monospace}" />
+                    </core:RowLayout>
+                </Border>
+            </StackPanel>
+        </ui:CardExpander>
+
+        <!-- Trash -->
+        <TextBlock Text="Trash" Style="{DynamicResource HelmSectionHeader}" />
+        <ui:CardControl Margin="0,0,0,4" Icon="{ui:SymbolIcon Delete24}">
+            <ui:CardControl.Header>
+                <core:CardHeader Title="Empty the trash" Description="{Binding TrashSummary}" />
+            </ui:CardControl.Header>
+            <ui:Button Content="Empty trash" Icon="{ui:SymbolIcon Delete24}" Command="{Binding EmptyTrashCommand}" IsEnabled="{Binding HasTrash}" />
+        </ui:CardControl>
+
+        <!-- Data -->
+        <TextBlock Text="Data" Style="{DynamicResource HelmSectionHeader}" />
+        <ui:CardControl Margin="0,0,0,4" Icon="{ui:SymbolIcon ArrowDownload24}">
+            <ui:CardControl.Header>
+                <core:CardHeader Title="Export as Markdown" Description="Saves every note as a .md file in a folder you choose. Files already there are kept." />
+            </ui:CardControl.Header>
+            <ui:Button Content="Choose folder…" Icon="{ui:SymbolIcon FolderOpen24}" Click="Export_Click" />
+        </ui:CardControl>
+    </StackPanel>
+</core:ModulePageBase>

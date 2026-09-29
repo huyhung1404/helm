@@ -1,0 +1,78 @@
+<UserControl
+    x:Class="Helm.Modules.QuickCapture.CapturePanel"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
+    xmlns:local="clr-namespace:Helm.Modules.QuickCapture">
+
+    <!-- The Quick Capture box: target buttons, the text, and what saving will do. -->
+    <Grid Margin="16,14,16,12">
+        <StackPanel x:Name="Editor">
+            <DockPanel Margin="0,0,0,10">
+                <TextBlock DockPanel.Dock="Right" Text="Esc to close" FontSize="12" VerticalAlignment="Center"
+                           Foreground="{DynamicResource TextFillColorTertiaryBrush}" />
+                <Image Source="{x:Static local:QuickCaptureLogo.Image}" Width="20" Height="20" Margin="0,0,10,0" VerticalAlignment="Center" />
+                <ItemsControl ItemsSource="{Binding Targets}" VerticalAlignment="Center" Focusable="False">
+                    <ItemsControl.ItemsPanel>
+                        <ItemsPanelTemplate>
+                            <StackPanel Orientation="Horizontal" />
+                        </ItemsPanelTemplate>
+                    </ItemsControl.ItemsPanel>
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate DataType="{x:Type local:CaptureTargetOption}">
+                            <ui:Button Content="{Binding Name}" Margin="0,0,6,0" Padding="12,4" MinWidth="0" Focusable="False" ToolTip="{Binding Hint}"
+                                       AutomationProperties.Name="{Binding Name}"
+                                       Command="{Binding DataContext.PickCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}" CommandParameter="{Binding}">
+                                <ui:Button.Style>
+                                    <Style TargetType="ui:Button" BasedOn="{StaticResource {x:Type ui:Button}}">
+                                        <Setter Property="Appearance" Value="Secondary" />
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding IsActive}" Value="True">
+                                                <Setter Property="Appearance" Value="Primary" />
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </ui:Button.Style>
+                            </ui:Button>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+            </DockPanel>
+
+            <ui:TextBox x:Name="Input" FontSize="16" MinHeight="44" MaxHeight="220" AcceptsReturn="True" TextWrapping="Wrap"
+                        VerticalScrollBarVisibility="Auto" ClearButtonEnabled="False" SpellCheck.IsEnabled="False"
+                        PlaceholderText="{Binding Example}" AutomationProperties.Name="Capture text"
+                        Text="{Binding Text, UpdateSourceTrigger=PropertyChanged}" IsEnabled="{Binding HasTargets}" />
+
+            <!-- What Enter will do, or why it cannot -->
+            <DockPanel Margin="2,10,2,0">
+                <TextBlock DockPanel.Dock="Right" FontSize="12" VerticalAlignment="Center" Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                           Text="Enter save · Shift+Enter new line · Tab switch" />
+                <TextBlock FontSize="13" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" Margin="0,0,12,0">
+                    <TextBlock.Style>
+                        <Style TargetType="TextBlock">
+                            <Setter Property="Text" Value="{Binding PreviewText}" />
+                            <Setter Property="Foreground" Value="{DynamicResource TextFillColorSecondaryBrush}" />
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding HasProblem}" Value="True">
+                                    <Setter Property="Text" Value="{Binding Problem}" />
+                                    <Setter Property="Foreground" Value="{DynamicResource SystemFillColorCriticalBrush}" />
+                                </DataTrigger>
+                                <DataTrigger Binding="{Binding HasNoTargets}" Value="True">
+                                    <Setter Property="Text" Value="Turn on Notes or Tracker in Helm to capture into them." />
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </TextBlock.Style>
+                </TextBlock>
+            </DockPanel>
+        </StackPanel>
+
+        <!-- After Enter: what was saved, for a moment before the box closes -->
+        <StackPanel x:Name="Done" Orientation="Horizontal" VerticalAlignment="Center" HorizontalAlignment="Center" Visibility="Collapsed">
+            <ui:SymbolIcon Symbol="CheckmarkCircle24" Filled="True" FontSize="22" Margin="0,0,10,0" VerticalAlignment="Center"
+                           Foreground="{DynamicResource SystemFillColorSuccessBrush}" />
+            <TextBlock x:Name="DoneText" FontSize="15" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" MaxWidth="540" />
+        </StackPanel>
+    </Grid>
+</UserControl>

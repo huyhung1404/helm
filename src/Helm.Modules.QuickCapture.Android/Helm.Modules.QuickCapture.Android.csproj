@@ -1,0 +1,38 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- Quick Capture on Android: "Save to Helm" in the share sheet and a Quick Settings tile, both opening a small
+       dialog that saves into Notes or Tracker through their ICaptureTarget (Helm.Core), so this project references no
+       other tool. Not in Helm.sln; CI builds it with the app. -->
+  <PropertyGroup>
+    <TargetFramework>net10.0-android</TargetFramework>
+    <SupportedOSPlatformVersion>26</SupportedOSPlatformVersion>
+    <PlatformTarget>AnyCPU</PlatformTarget>
+    <!-- Same namespace as the Windows project. Never a namespace ending in ".Android": it would hide the
+         Android.* SDK namespaces inside this project. -->
+    <RootNamespace>Helm.Modules.QuickCapture</RootNamespace>
+    <AvaloniaUseCompiledBindingsByDefault>true</AvaloniaUseCompiledBindingsByDefault>
+  </PropertyGroup>
+
+  <!-- The Android SDK's implicit usings clash with Avalonia/BCL names (Application, OperationCanceledException). -->
+  <ItemGroup>
+    <Using Remove="Android.App" />
+    <Using Remove="Android.Widget" />
+    <Using Remove="Android.OS.Bundle" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Avalonia" Version="12.1.3" />
+    <PackageReference Include="FluentIcons.Avalonia" Version="2.1.343" />
+    <PackageReference Include="SQLitePCLRaw.bundle_e_sqlite3" Version="2.1.13" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Helm.Core.Android\Helm.Core.Android.csproj" />
+  </ItemGroup>
+
+  <!-- The icon's shapes: the same file as on Windows (plain constants). -->
+  <ItemGroup>
+    <Compile Include="..\Helm.Modules.QuickCapture\QuickCaptureIconShape.cs" Link="QuickCaptureIconShape.cs" />
+  </ItemGroup>
+
+</Project>

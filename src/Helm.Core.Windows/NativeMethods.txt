@@ -140,3 +140,5 @@ MessageBeep
 SHChangeNotify
 SHCNE_ID
 SHCNF_FLAGS
+SHGetFileInfo
+DestroyIcon

@@ -3,6 +3,31 @@
 All notable changes to Helm. The top section is used as the GitHub release body and as the Velopack release notes.
 Format: [Keep a Changelog](https://keepachangelog.com), versions follow [SemVer](https://semver.org).
 
+## [Unreleased]
+
+### Added
+- Notes (PC and Android): notes that sync across your devices, end-to-end encrypted like the rest of Helm. They save
+  as you type; pin a note to keep it on top; search ignores accents ("ghi chu" finds "Ghi chú") and looks inside the
+  text. When two devices edit the same note, both versions are kept: the other one arrives as a "(conflict copy)".
+  Deleted notes stay in the trash for 30 days. The settings have the sort order, the text size, a fixed-width font,
+  and (PC) Export as Markdown.
+- Quick Capture (PC and Android): save a note, a task or a debt from anywhere. On PC, Win+Alt+N opens a small box over
+  any app; on Android, Share → "Save to Helm" in any app, or the Quick Settings tile. The line under the box says what
+  Enter will do. Short forms, in English or Vietnamese:
+  - `/t buy milk tomorrow 9h #Home !` a task in the list "Home", due tomorrow at 9:00, high priority (`!!` urgent);
+    days and times such as "mai", "thứ 6", "chủ nhật 3h chiều", "15/10", "mon 9:30pm" are read at the end.
+  - `/d Nam 200k lunch` Nam owes you, `Nam -200k` you owe Nam, `Nam trả 50k` a repayment.
+  - `/n` or nothing: a note (several lines: the first one is the title).
+- Command Palette (PC): Alt+Space opens one search box over any app. It finds your notes, open tasks, people in the
+  debt book, vault items while the vault is unlocked (titles only), Helm's pages and settings, and the apps in the
+  Start menu (they open as you, not as administrator). Text that finds nothing can be saved as a note, task or debt.
+
+### Changed
+- Vault: an item picked in the command palette opens with its card expanded.
+- Tracker has a new icon: a tick leaving a ring (also its reminder notifications on Android). Every tool icon now
+  has the same size and weight.
+- Home (PC and Android): the Quick access icons stay in one line when a tool's name takes two lines.
+
 ## [0.14.0] - 2026-09-29
 
 ### Added

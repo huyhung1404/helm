@@ -24,6 +24,9 @@ internal sealed class SearchService(IServiceProvider services, IModuleHost modul
 
     public void Invalidate() => _index = null;
 
+    /// <summary>Everything that can be found: pages and settings cards (for the command palette's own ranking).</summary>
+    public IReadOnlyList<SearchResult> All() => _index ??= BuildIndex();
+
     /// <summary>The settings card on <paramref name="pageType"/> whose header title is <paramref name="title"/>.</summary>
     public FrameworkElement? FindCard(Type pageType, string title)
     {

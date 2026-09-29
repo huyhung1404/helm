@@ -1,0 +1,59 @@
+<ui:ModulePageBase xmlns="https://github.com/avaloniaui"
+                   xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                   xmlns:ui="using:Helm.Core.Ui"
+                   xmlns:vm="using:Helm.Modules.Notes"
+                   x:Class="Helm.Modules.Notes.NotesPage"
+                   x:DataType="vm:NotesViewModel">
+
+    <!-- Notes' settings (Home → Utilities). The notes themselves are on NotesContentPage. -->
+    <StackPanel>
+        <Border Classes="infobar" IsVisible="{Binding HasMessage}">
+            <TextBlock Text="{Binding Message}" TextWrapping="Wrap" />
+        </Border>
+        <Border Classes="card">
+            <StackPanel Spacing="8">
+                <TextBlock Text="Open Notes" Classes="title" />
+                <TextBlock Text="Your notes and the editor. Also in the menu and on Home." Classes="secondary" />
+                <Button Classes="accent" Content="Open Notes" Click="OpenNotes_Click" />
+            </StackPanel>
+        </Border>
+
+        <!-- Display -->
+        <TextBlock Text="Display" Classes="section" />
+        <Border Classes="card">
+            <StackPanel Spacing="8">
+                <TextBlock Text="Sort notes by" Classes="title" />
+                <TextBlock Text="Pinned notes always come first." Classes="secondary" />
+                <ComboBox HorizontalAlignment="Stretch" ItemsSource="{Binding SortOrderNames}" SelectedIndex="{Binding SortOrderIndex}"
+                          AutomationProperties.Name="Sort notes by" />
+                <Border Classes="row">
+                    <StackPanel Spacing="8">
+                        <TextBlock Text="Text size" Classes="title" />
+                        <TextBlock Text="For the note's text; the title stays larger." Classes="secondary" />
+                        <ComboBox HorizontalAlignment="Stretch" ItemsSource="{Binding FontSizes}" SelectedItem="{Binding EditorFontSize}"
+                                  AutomationProperties.Name="Text size" />
+                    </StackPanel>
+                </Border>
+                <Border Classes="row">
+                    <DockPanel>
+                        <ToggleSwitch DockPanel.Dock="Right" IsChecked="{Binding Monospace}" OnContent="" OffContent="" AutomationProperties.Name="Fixed-width font" />
+                        <StackPanel VerticalAlignment="Center">
+                            <TextBlock Text="Fixed-width font" Classes="title" />
+                            <TextBlock Text="Every letter the same width, so code and columns line up." Classes="secondary" />
+                        </StackPanel>
+                    </DockPanel>
+                </Border>
+            </StackPanel>
+        </Border>
+
+        <!-- Trash -->
+        <TextBlock Text="Trash" Classes="section" />
+        <Border Classes="card">
+            <StackPanel Spacing="8">
+                <TextBlock Text="Empty the trash" Classes="title" />
+                <TextBlock Text="{Binding TrashSummary}" Classes="secondary" />
+                <Button Classes="danger" Content="Empty trash" Command="{Binding EmptyTrashCommand}" IsEnabled="{Binding HasTrash}" />
+            </StackPanel>
+        </Border>
+    </StackPanel>
+</ui:ModulePageBase>

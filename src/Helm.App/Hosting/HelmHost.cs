@@ -47,6 +47,7 @@ internal static class HelmHost
         builder.Services.AddSingleton<TrayService>();
         builder.Services.AddSingleton<IUserNotifications>(sp => sp.GetRequiredService<TrayService>());
         builder.Services.AddSingleton<SearchService>();
+        builder.Services.AddSingleton<Core.Palette.IPaletteProvider, ShellPaletteProvider>();
         builder.Services.AddSingleton<ShellController>();
         builder.Services.AddSingleton<Updates.VelopackUpdateService>();
         builder.Services.AddSingleton<Core.Services.IUpdateService>(sp => sp.GetRequiredService<Updates.VelopackUpdateService>());

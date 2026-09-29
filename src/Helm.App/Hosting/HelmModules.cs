@@ -1,4 +1,7 @@
 using Helm.Modules.ClaudeChat;
+using Helm.Modules.CommandPalette;
+using Helm.Modules.Notes;
+using Helm.Modules.QuickCapture;
 using Helm.Modules.Vault;
 using Helm.Modules.Tracker;
 using Microsoft.Extensions.DependencyInjection;
@@ -16,6 +19,9 @@ internal static class HelmModules
         services.AddClaudeChatModule();
         services.AddVaultModule();
         services.AddTrackerModule();
+        services.AddNotesModule();
+        services.AddQuickCaptureModule();
+        services.AddCommandPaletteModule();
 
         // Built but hidden; re-enable with (using Helm.Modules.AlwaysOnTop;):
         // services.AddAlwaysOnTopModule();

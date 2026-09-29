@@ -38,6 +38,9 @@
     <ProjectReference Include="..\Helm.Modules.ClaudeChat\Helm.Modules.ClaudeChat.csproj" />
     <ProjectReference Include="..\Helm.Modules.Vault\Helm.Modules.Vault.csproj" />
     <ProjectReference Include="..\Helm.Modules.Tracker\Helm.Modules.Tracker.csproj" />
+    <ProjectReference Include="..\Helm.Modules.Notes\Helm.Modules.Notes.csproj" />
+    <ProjectReference Include="..\Helm.Modules.QuickCapture\Helm.Modules.QuickCapture.csproj" />
+    <ProjectReference Include="..\Helm.Modules.CommandPalette\Helm.Modules.CommandPalette.csproj" />
   </ItemGroup>
 
 </Project>

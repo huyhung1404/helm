@@ -21,6 +21,7 @@ public static class VaultServices
         // Settings page through AddHelmModule; the vault itself is the content page (navigation pane, Home tile).
         return services.AddHelmModule<VaultModule, VaultPage, VaultPageViewModel>()
             .AddSingleton<VaultContentViewModel>()
-            .AddSingleton<VaultContentPage>();
+            .AddSingleton<VaultContentPage>()
+            .AddSingleton<Helm.Core.Palette.IPaletteProvider, VaultPaletteProvider>();
     }
 }

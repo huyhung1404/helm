@@ -60,6 +60,13 @@ A tool can open its own page from outside the app (a widget, a shortcut) by laun
 `ShellIntents.ExtraModule` set to its module id; `MainActivity` navigates there. Tracker's widget is the example:
 `src/Helm.Modules.Tracker.Android/Widget` (layouts in its `Resources/`, looked up by name at run time).
 
+Parts that run without Helm's activity (a widget, a broadcast, Quick Capture's share dialog and Quick Settings tile)
+get services from `HelmAndroidServices.Current`, and read whether a tool is on from `GeneralSettings.EnabledModules`
+(missing means on): the module registry only starts with the activity. Quick Capture
+(`src/Helm.Modules.QuickCapture.Android`) is the example of an exported activity and a `TileService` declared in a
+tool's own project, with fixed `Name`s so that disabling them while the tool is off (`SetComponentEnabledSetting`)
+is remembered.
+
 [docs/new-tool-prompt.md](new-tool-prompt.md) has the full rules.
 
 ## Build and run locally

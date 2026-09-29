@@ -1,0 +1,141 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:ic="using:FluentIcons.Avalonia"
+             xmlns:vm="using:Helm.Modules.Notes"
+             x:Class="Helm.Modules.Notes.NotesContentPage"
+             x:DataType="vm:NotesViewModel">
+
+    <!-- Notes itself (drawer and Quick access): the list, or one note open in the editor (Back returns to the list).
+         Its options live on NotesPage (Home → Utilities). -->
+    <UserControl.Styles>
+        <!-- Square icon button in a toolbar (44 dp touch target) -->
+        <Style Selector="Button.icon">
+            <Setter Property="Width" Value="44" />
+            <Setter Property="Height" Value="44" />
+            <Setter Property="Padding" Value="0" />
+            <Setter Property="HorizontalContentAlignment" Value="Center" />
+            <Setter Property="VerticalContentAlignment" Value="Center" />
+        </Style>
+        <Style Selector="Button.icon.on ic|SymbolIcon">
+            <Setter Property="Foreground" Value="{DynamicResource SystemAccentColor}" />
+        </Style>
+    </UserControl.Styles>
+
+    <StackPanel>
+        <!-- Shown while the tool is turned off -->
+        <Border x:Name="OffBar" Classes="infobar warning" IsVisible="False">
+            <TextBlock Text="Notes is turned off. Your notes are kept; turn Notes on in its settings to write." TextWrapping="Wrap" />
+        </Border>
+
+        <!-- What happened: a conflict copy, a note moved to the trash, a problem -->
+        <Border Classes="infobar" IsVisible="{Binding HasMessage}">
+            <DockPanel>
+                <Button DockPanel.Dock="Right" Classes="icon flat" Command="{Binding DismissMessageCommand}" AutomationProperties.Name="Dismiss">
+                    <ic:SymbolIcon Symbol="Dismiss" FontSize="16" />
+                </Button>
+                <TextBlock Text="{Binding Message}" TextWrapping="Wrap" VerticalAlignment="Center" />
+            </DockPanel>
+        </Border>
+
+        <Panel x:Name="Body">
+            <!-- The list -->
+            <StackPanel IsVisible="{Binding IsEditorClosed}" Spacing="8">
+                <Grid ColumnDefinitions="*,8,Auto">
+                    <TextBox PlaceholderText="Search notes" Text="{Binding Search}" AutomationProperties.Name="Search notes" />
+                    <Button Grid.Column="2" Classes="accent" Command="{Binding NewNoteCommand}" AutomationProperties.Name="New note">
+                        <StackPanel Orientation="Horizontal" Spacing="6">
+                            <ic:SymbolIcon Symbol="Add" FontSize="16" />
+                            <TextBlock Text="New" />
+                        </StackPanel>
+                    </Button>
+                </Grid>
+
+                <DockPanel>
+                    <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" Spacing="4">
+                        <Button Classes="flat" Padding="10,6" Command="{Binding ShowTrashCommand}" IsVisible="{Binding !ShowingTrash}"
+                                AutomationProperties.Name="Show the trash">
+                            <StackPanel Orientation="Horizontal" Spacing="6">
+                                <ic:SymbolIcon Symbol="Delete" FontSize="16" />
+                                <TextBlock Text="{Binding TrashButtonText}" />
+                            </StackPanel>
+                        </Button>
+                        <Button Classes="flat danger" Padding="10,6" Content="Empty" Command="{Binding EmptyTrashCommand}"
+                                IsVisible="{Binding ShowingTrash}" IsEnabled="{Binding HasTrash}" AutomationProperties.Name="Empty the trash" />
+                        <Button Classes="flat" Padding="10,6" Command="{Binding ShowNotesCommand}" IsVisible="{Binding ShowingTrash}"
+                                AutomationProperties.Name="Back to notes">
+                            <StackPanel Orientation="Horizontal" Spacing="6">
+                                <ic:SymbolIcon Symbol="ArrowLeft" FontSize="16" />
+                                <TextBlock Text="Notes" />
+                            </StackPanel>
+                        </Button>
+                    </StackPanel>
+                    <TextBlock Text="{Binding ListHeader}" Classes="title" VerticalAlignment="Center" Margin="4,0,0,0" />
+                </DockPanel>
+
+                <Border Classes="card" Padding="4" IsVisible="{Binding HasNotes}">
+                    <ItemsControl ItemsSource="{Binding Notes}">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate DataType="vm:NoteRowViewModel">
+                                <Button Classes="flat" Padding="12,10" AutomationProperties.Name="{Binding Title}"
+                                        Command="{Binding $parent[ItemsControl].((vm:NotesViewModel)DataContext).OpenRowCommand}" CommandParameter="{Binding}">
+                                    <StackPanel Spacing="2">
+                                        <Grid ColumnDefinitions="Auto,*,Auto">
+                                            <ic:SymbolIcon Symbol="Pin" IconVariant="Filled" FontSize="12" Margin="0,0,4,0" VerticalAlignment="Center"
+                                                           Foreground="{DynamicResource SystemAccentColor}" IsVisible="{Binding Pinned}" />
+                                            <TextBlock Grid.Column="1" Text="{Binding Title}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+                                            <TextBlock Grid.Column="2" Text="{Binding When}" Classes="secondary" TextWrapping="NoWrap" Margin="8,0,0,0" />
+                                        </Grid>
+                                        <TextBlock Text="{Binding Preview}" Classes="secondary" TextWrapping="NoWrap" TextTrimming="CharacterEllipsis"
+                                                   IsVisible="{Binding HasPreview}" />
+                                    </StackPanel>
+                                </Button>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </Border>
+
+                <TextBlock Text="{Binding EmptyListText}" Classes="secondary" Margin="4,8" IsVisible="{Binding IsListEmpty}" />
+            </StackPanel>
+
+            <!-- The note -->
+            <StackPanel IsVisible="{Binding IsEditorOpen}" Spacing="8">
+                <DockPanel>
+                    <Button DockPanel.Dock="Left" Classes="flat" Padding="8,6" Command="{Binding CloseEditorCommand}" AutomationProperties.Name="Back to the list">
+                        <StackPanel Orientation="Horizontal" Spacing="6">
+                            <ic:SymbolIcon Symbol="ArrowLeft" FontSize="16" />
+                            <TextBlock Text="Notes" />
+                        </StackPanel>
+                    </Button>
+                    <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
+                        <Button Classes="icon flat" Classes.on="{Binding EditPinned}" Command="{Binding TogglePinCommand}" IsVisible="{Binding CanEditPin}"
+                                AutomationProperties.Name="Pin">
+                            <ic:SymbolIcon Symbol="Pin" FontSize="18" />
+                        </Button>
+                        <Button Classes="icon flat" Command="{Binding CopyNoteCommand}" AutomationProperties.Name="Copy the note">
+                            <ic:SymbolIcon Symbol="Copy" FontSize="18" />
+                        </Button>
+                        <Button Classes="icon flat" Command="{Binding TrashCommand}" IsVisible="{Binding !EditTrashed}" AutomationProperties.Name="Move to the trash">
+                            <ic:SymbolIcon Symbol="Delete" FontSize="18" />
+                        </Button>
+                    </StackPanel>
+                    <Panel />
+                </DockPanel>
+
+                <TextBlock Text="{Binding EditorInfo}" Classes="secondary" Margin="4,0" />
+
+                <!-- A note in the trash: bring it back or delete it for good -->
+                <Grid ColumnDefinitions="*,8,*" IsVisible="{Binding EditTrashed}">
+                    <Button HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Classes="accent" Content="Restore" Command="{Binding RestoreCommand}" />
+                    <Button Grid.Column="2" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Classes="danger" Content="Delete for good"
+                            Command="{Binding DeleteForeverCommand}" />
+                </Grid>
+
+                <TextBox x:Name="TitleBox" PlaceholderText="Title" FontSize="20" FontWeight="SemiBold" MaxLength="500"
+                         Text="{Binding EditTitle}" IsReadOnly="{Binding EditTrashed}" AutomationProperties.Name="Title" />
+                <TextBox x:Name="BodyBox" PlaceholderText="Write something…" AcceptsReturn="True" TextWrapping="Wrap" MinHeight="360"
+                         VerticalContentAlignment="Top" FontSize="{Binding EditorFontSize}" Classes.mono="{Binding Monospace}"
+                         Text="{Binding EditBody}" IsReadOnly="{Binding EditTrashed}" AutomationProperties.Name="Note text" />
+            </StackPanel>
+        </Panel>
+    </StackPanel>
+</UserControl>

@@ -11,7 +11,7 @@ public static class TrackerIcon
     private static DrawingImage Create()
     {
         const double size = TrackerIconShape.Size;
-        // One gradient across the whole box, bottom-left to top-right, so every row shares it.
+        // One gradient across the whole box, bottom-left to top-right, so the ring and the tick share it.
         var gradient = new LinearGradientBrush
         {
             StartPoint = new RelativePoint(0, size, RelativeUnit.Absolute),
@@ -25,9 +25,8 @@ public static class TrackerIcon
             {
                 // A transparent box keeps the icon's own margins at any size.
                 new GeometryDrawing { Brush = Brushes.Transparent, Geometry = new RectangleGeometry(new Rect(0, 0, size, size)) },
-                new GeometryDrawing { Pen = Stroke(TrackerIconShape.Stroke), Geometry = Geometry.Parse(TrackerIconShape.Boxes) },
-                new GeometryDrawing { Pen = Stroke(TrackerIconShape.Stroke), Geometry = Geometry.Parse(TrackerIconShape.Ticks) },
-                new GeometryDrawing { Pen = Stroke(TrackerIconShape.LineStroke), Geometry = Geometry.Parse(TrackerIconShape.Lines) },
+                new GeometryDrawing { Pen = Stroke(TrackerIconShape.Stroke), Geometry = Geometry.Parse(TrackerIconShape.Ring) },
+                new GeometryDrawing { Pen = Stroke(TrackerIconShape.CheckStroke), Geometry = Geometry.Parse(TrackerIconShape.Check) },
             },
         };
         return new DrawingImage(group);

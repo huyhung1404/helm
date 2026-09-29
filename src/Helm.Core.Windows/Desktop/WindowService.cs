@@ -40,6 +40,9 @@ public interface IWindowService
     /// <summary>Raw SetWindowPos in physical pixels (no border compensation) — for Helm's own borderless windows.</summary>
     bool SetWindowBounds(nint hwnd, PixelRect bounds);
 
+    /// <summary>Moves one of Helm's own windows so its top-left corner is at a physical-pixel point; keeps its size.</summary>
+    bool SetWindowPosition(nint hwnd, PixelPoint topLeft);
+
     bool SetTopmost(nint hwnd, bool topmost);
 
     /// <summary>
@@ -215,6 +218,10 @@ public sealed class WindowService(ILogger<WindowService> logger) : IWindowServic
     public bool SetWindowBounds(nint hwnd, PixelRect bounds) =>
         PInvoke.SetWindowPos(hwnd.ToHwnd(), default, bounds.Left, bounds.Top, bounds.Width, bounds.Height,
             SET_WINDOW_POS_FLAGS.SWP_NOZORDER | SET_WINDOW_POS_FLAGS.SWP_NOACTIVATE | SET_WINDOW_POS_FLAGS.SWP_NOOWNERZORDER);
+
+    public bool SetWindowPosition(nint hwnd, PixelPoint topLeft) =>
+        PInvoke.SetWindowPos(hwnd.ToHwnd(), default, topLeft.X, topLeft.Y, 0, 0,
+            SET_WINDOW_POS_FLAGS.SWP_NOSIZE | SET_WINDOW_POS_FLAGS.SWP_NOZORDER | SET_WINDOW_POS_FLAGS.SWP_NOACTIVATE | SET_WINDOW_POS_FLAGS.SWP_NOOWNERZORDER);
 
     public bool Activate(nint hwnd)
     {

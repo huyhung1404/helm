@@ -34,7 +34,13 @@ Print a short plan before you start, then continue without waiting:
     Android projects each build a `DrawingImage` from it. No PNG (bitmaps scale badly and get cut out with frames).
   - **Readable at 16-20 px**: strokes at least 8 of 100. Render it next to `ClaudeLogo` at 128 and 20 px on dark and
     light backgrounds before shipping.
-  See `ClaudeLogo`, `VaultIconShape` / `VaultIcon`, `TrackerIconShape` / `TrackerLogo` / `TrackerIcon`.
+  - **Every tool gets a picture icon.** A bare `SymbolRegular` glyph fills only about 86 % of the box with half the
+    stroke weight and no colour, so it looks smaller next to the picture icons on Home and in the menu. Aim for about
+    the same ink as the others (28-30 % of the box at 128 px; measure it); fill a shape if thin strokes look light.
+  - A tool on both platforms without a `.Core` project can link the shape file into its Android project
+    (`<Compile Include="..\Helm.Modules.<Prefix>\<Prefix>IconShape.cs" Link="…" />`), as Quick Capture does.
+  See `ClaudeLogo`, `VaultIconShape` / `VaultIcon`, `TrackerIconShape` / `TrackerLogo` / `TrackerIcon`,
+  `QuickCaptureIconShape`, `CommandPaletteIconShape`.
 - **Default hotkey**: only if the tool needs one; choose one that is unlikely to clash.
 - **Content page**: yes if the tool is something you *work in* (lists, a chat, a vault, a viewer), no if it only
   runs in the background and is configured (a hotkey, a hook). See "Content page and settings page" in §4.
@@ -251,6 +257,17 @@ The page is a `core:ModulePageBase`. It already renders the title, the icon + de
 - The module shows up on its own in the nav group, Home Quick access / Utilities, the tray toggles and search.
   With `IModuleContent`, the nav item and the Quick access tile open the content page and the Utilities chevron and
   search open the settings page (§4).
+- **Quick Capture** (optional, both platforms): a tool whose data can be written from one line of text registers an
+  `ICaptureTarget` (`Helm.Core.Capture`) in its `.Core` services, e.g. `services.AddSingleton<ICaptureTarget, MyTarget>()`.
+  Give it a one-letter `Prefix` that is not taken (`n` Notes, `t` task, `d` debt), a `Preview` that says what Enter
+  will do, and never throw. See `NoteCaptureTarget`, `TaskCaptureTarget`.
+- **Command palette** (optional, PC): a tool with things to find registers an `IPaletteProvider`
+  (`Helm.Core.Palette`) in its PC project. Score with `PaletteQuery.Score` (accents and case do not matter), keep it
+  fast (it runs on every key), resolve `IShellNavigation` from `IServiceProvider` inside `Run` (resolving it in the
+  constructor makes a DI cycle through the module list), and never show secrets. See `NotesPaletteProvider`,
+  `VaultPaletteProvider` (only while unlocked, titles only).
+- Neither Quick Capture nor the palette references a tool: they find targets and providers in DI and offer only those
+  of tools that are on.
 
 ### 6. Pitfalls this repo has already hit (check them)
 

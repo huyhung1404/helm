@@ -279,6 +279,12 @@ public sealed partial class TrackerViewModel : ObservableObject
         NewWorkspaceName = "";
     }
 
+    /// <summary>Shows a workspace, e.g. the one of an item picked in the command palette.</summary>
+    public void ShowWorkspace(string workspaceId)
+    {
+        if (Workspaces.FirstOrDefault(w => w.Id == workspaceId) is { } ws && !ReferenceEquals(ws, SelectedWorkspace)) SelectedWorkspace = ws;
+    }
+
     [RelayCommand]
     private void CreateTasksWorkspace() => CreateAndSelect("To-do", WorkspaceKind.Tasks);
 

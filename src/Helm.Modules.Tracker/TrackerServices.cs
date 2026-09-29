@@ -1,4 +1,5 @@
 using Helm.Core;
+using Helm.Core.Palette;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Helm.Modules.Tracker;
@@ -9,5 +10,6 @@ public static class TrackerServices
         services
             .AddTrackerCore()
             .AddHelmModule<TrackerModule, TrackerPage, TrackerViewModel>()
-            .AddSingleton<TrackerContentPage>();
+            .AddSingleton<TrackerContentPage>()
+            .AddSingleton<IPaletteProvider, TrackerPaletteProvider>();
 }
