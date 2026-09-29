@@ -3,7 +3,7 @@
 All notable changes to Helm. The top section is used as the GitHub release body and as the Velopack release notes.
 Format: [Keep a Changelog](https://keepachangelog.com), versions follow [SemVer](https://semver.org).
 
-## [Unreleased]
+## [0.13.0] - 2026-09-29
 
 ### Changed
 - Vault: the backup warning only shows when none of your devices has backed the vault up for a week. One device with
