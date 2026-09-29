@@ -30,8 +30,14 @@ public sealed record VaultBackupResult(string Snapshot, bool Written, int Record
 /// prunes old snapshots (docs/vault-design.md, I7). Needs the vault unlocked: snapshots are sealed with a key derived
 /// from the vault key. Restores a whole vault onto a new device, or the items a vault is missing.
 /// </summary>
+/// <summary>A device's last good backup of the vault (synced, so one device backing up is enough for all of them).</summary>
+public sealed record VaultBackupMark(string Device, long LastGoodBackupMs);
+
 public sealed class VaultBackupService
 {
+    /// <summary>One <see cref="VaultBackupMark"/> per device.</summary>
+    public const string MarksCollection = "vault.backups";
+
     private readonly VaultSession _session;
     private readonly VaultStore _store;
     private readonly BlobStore _blobs;
@@ -42,10 +48,13 @@ public sealed class VaultBackupService
     private readonly TimeProvider _time;
     private readonly ILogger _logger;
     private readonly SemaphoreSlim _gate = new(1, 1);
+    private readonly ISyncedCollection<VaultBackupMark>? _marks;
 
     public VaultBackupService(VaultSession session, VaultStore store, BlobStore blobs, IVaultBackupLocation location,
-        ISettingsStoreFactory settings, IDeviceName? deviceName = null, TimeProvider? time = null, ILogger<VaultBackupService>? logger = null)
+        ISettingsStoreFactory settings, IDeviceName? deviceName = null, TimeProvider? time = null, ILogger<VaultBackupService>? logger = null,
+        ISyncedCollection<VaultBackupMark>? marks = null)
     {
+        _marks = marks;
         _session = session;
         _store = store;
         _blobs = blobs;
@@ -69,8 +78,29 @@ public sealed class VaultBackupService
     public bool IsDue => _settings.Current.BackupLocation is not null
         && (LastGoodBackup is not { } last || _time.GetUtcNow() - last > TimeSpan.FromHours(20));
 
-    /// <summary>No good backup for a week: the UI warns (and the vault should not be trusted without one).</summary>
-    public bool IsOverdue => LastGoodBackup is not { } last || _time.GetUtcNow() - last > TimeSpan.FromDays(7);
+    /// <summary>The latest good backup made by any device of the account (this one included).</summary>
+    public DateTimeOffset? LastGoodBackupAnywhere
+    {
+        get
+        {
+            var latest = _device.Current.LastGoodBackupMs;
+            if (_marks is not null)
+            {
+                try
+                {
+                    foreach (var mark in _marks.All()) latest = Math.Max(latest, mark.Value.LastGoodBackupMs);
+                }
+                catch (Exception ex) { _logger.LogWarning(ex, "Could not read the other devices' backups"); }
+            }
+            return latest > 0 ? DateTimeOffset.FromUnixTimeMilliseconds(latest) : null;
+        }
+    }
+
+    /// <summary>
+    /// No device made a good backup for a week: the UI warns. One device with a backup folder is enough; the others
+    /// do not need one.
+    /// </summary>
+    public bool IsOverdue => LastGoodBackupAnywhere is not { } last || _time.GetUtcNow() - last > TimeSpan.FromDays(7);
 
     /// <summary>Backs up now. A snapshot is written only when the vault changed since the latest one, which is re-verified either way.</summary>
     /// <exception cref="InvalidOperationException">No location set, or it is not reachable.</exception>
@@ -81,11 +111,13 @@ public sealed class VaultBackupService
         try
         {
             var result = await BackUpCoreAsync(ct).ConfigureAwait(false);
+            var now = _time.GetUtcNow().ToUnixTimeMilliseconds();
             _device.Update(d =>
             {
-                d.LastGoodBackupMs = _time.GetUtcNow().ToUnixTimeMilliseconds();
+                d.LastGoodBackupMs = now;
                 d.LastBackupError = null;
             });
+            ShareMark(now);
             _logger.LogInformation("Vault backup {Snapshot}: written {Written}, {Records} records, {Chunks} chunks copied, {Pruned} pruned",
                 result.Snapshot, result.Written, result.Records, result.ChunksCopied, result.SnapshotsPruned);
             return result;
@@ -102,6 +134,22 @@ public sealed class VaultBackupService
             try { Completed?.Invoke(this, EventArgs.Empty); }
             catch (Exception ex) { _logger.LogError(ex, "A backup handler failed"); }
         }
+    }
+
+    /// <summary>Tells the account's other devices that this one has a good backup (they stop warning).</summary>
+    private void ShareMark(long at)
+    {
+        if (_marks is null) return;
+        try
+        {
+            if (_device.Current.BackupDeviceId is not { Length: > 0 } id)
+            {
+                id = Guid.NewGuid().ToString("N");
+                _device.Update(d => d.BackupDeviceId = id);
+            }
+            _marks.Upsert(id, new VaultBackupMark(_deviceName.DeviceName, at));
+        }
+        catch (Exception ex) { _logger.LogWarning(ex, "Could not share the backup time with the other devices"); }
     }
 
     /// <summary>A backup location picked by the user (e.g. to restore from), through the platform's location type.</summary>

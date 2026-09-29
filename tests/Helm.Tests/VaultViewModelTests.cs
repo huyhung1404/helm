@@ -213,7 +213,7 @@ public sealed class VaultViewModelTests : IDisposable
 
         Assert.Equal(VaultTab.Credentials, items.Tab);
         Assert.Equal(["Bank", "GitHub token"], items.Cards.Select(c => c.Title).Order());
-        Assert.Equal([VaultFilter.All, VaultFilter.Logins, VaultFilter.Tokens, VaultFilter.Favorites, VaultFilter.Trash], items.Filters);
+        Assert.Equal([VaultFilter.Favorites, VaultFilter.All, VaultFilter.Logins, VaultFilter.Tokens, VaultFilter.Trash], items.Filters); // star first, bin last
         items.ShowFilterCommand.Execute(VaultFilter.Tokens);
         Assert.Equal("GitHub token", Assert.Single(items.Cards).Title);
 
@@ -221,7 +221,7 @@ public sealed class VaultViewModelTests : IDisposable
         Assert.True(items.IsOtherTab);
         Assert.False(items.IsCredentialsTab);
         Assert.Equal(VaultFilter.All, items.Filter); // a tab starts on All
-        Assert.Equal([VaultFilter.All, VaultFilter.Favorites, VaultFilter.Trash], items.Filters);
+        Assert.Equal([VaultFilter.Favorites, VaultFilter.All, VaultFilter.Trash], items.Filters);
         Assert.Equal(["Visa", "Wi-Fi"], items.Cards.Select(c => c.Title).Order());
 
         // One search for every tab: the headers count the matches of both.
@@ -317,6 +317,26 @@ public sealed class VaultViewModelTests : IDisposable
         Assert.Equal("Bank (typing)", items.Detail!.Title); // an edit stays open
         items.Detail.CancelCommand.Execute(null);
         Assert.False(items.IsEditorOpen);
+    }
+
+    [Fact]
+    public async Task The_star_on_a_card_toggles_favorite_without_a_new_version()
+    {
+        var (app, session, store) = NewApp();
+        await session.CreateAsync(Password);
+        var uid = store.Add(VaultItem.New(VaultItemKind.Login, "Bank"));
+        var items = app.Items;
+        items.Refresh();
+
+        items.ToggleFavoriteCommand.Execute(items.Cards.Single());
+        Assert.True(store.Get(uid)!.Item.Favorite);
+        Assert.True(items.Cards.Single().Favorite);
+        items.ShowFilterCommand.Execute(VaultFilter.Favorites);
+        Assert.Single(items.Cards);
+        items.ToggleFavoriteCommand.Execute(items.Cards.Single());
+        Assert.False(store.Get(uid)!.Item.Favorite);
+        Assert.Empty(items.Cards);
+        Assert.Empty(store.Get(uid)!.Item.History); // star clicks do not push real edits out of the history
     }
 
     [Fact]

@@ -3,6 +3,15 @@
 All notable changes to Helm. The top section is used as the GitHub release body and as the Velopack release notes.
 Format: [Keep a Changelog](https://keepachangelog.com), versions follow [SemVer](https://semver.org).
 
+## [Unreleased]
+
+### Changed
+- Vault: the backup warning only shows when none of your devices has backed the vault up for a week. One device with
+  a backup folder is enough; the others no longer ask for one.
+- Vault: no more reminder to confirm the Emergency Kit in the list (its state is still in the Vault settings).
+- Vault: Favorites is the first sub-tab, shown as a star, and the trash the last, shown as a bin. Each card has a star
+  to make it a favorite or not with one click (this is not a new version in the item's history).
+
 ## [0.12.0] - 2026-09-29
 
 ### Added

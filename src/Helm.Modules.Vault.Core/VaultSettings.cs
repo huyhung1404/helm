@@ -62,5 +62,8 @@ public sealed class VaultDeviceState : IVersionedSettings
 
     public long LastGoodBackupMs { get; set; }
 
+    /// <summary>This device's id in the synced backup marks (<see cref="Backup.VaultBackupService.MarksCollection"/>).</summary>
+    public string? BackupDeviceId { get; set; }
+
     public string? LastBackupError { get; set; }
 }

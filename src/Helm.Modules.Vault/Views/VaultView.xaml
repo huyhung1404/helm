@@ -188,8 +188,6 @@
                 </ui:InfoBar>
                 <ui:InfoBar Title="Backup" Message="{Binding BackupWarning}" Severity="Warning" IsClosable="False" Margin="0,0,0,6"
                             IsOpen="{Binding BackupWarning, Converter={StaticResource NotEmptyToBool}}" />
-                <ui:InfoBar Title="Emergency Kit" Message="{Binding KitWarning}" Severity="Informational" IsClosable="False" Margin="0,0,0,6"
-                            IsOpen="{Binding KitWarning, Converter={StaticResource NotEmptyToBool}}" />
                 <ui:InfoBar Message="{Binding Error}" Severity="Error" IsClosable="False" Margin="0,0,0,6" IsOpen="{Binding Error, Converter={StaticResource NotEmptyToBool}}" />
             </StackPanel>
 
@@ -230,6 +228,28 @@
                 <!-- Sub-tabs -->
                 <ListBox DockPanel.Dock="Top" Margin="0,8,0,4" ItemsSource="{Binding Filters}" SelectedItem="{Binding Filter}" BorderThickness="0" Background="Transparent"
                          AutomationProperties.Name="Show" ItemContainerStyle="{StaticResource SubTab}" ScrollViewer.HorizontalScrollBarVisibility="Disabled">
+                    <ListBox.ItemTemplate>
+                        <!-- Favorites is a star, the trash a bin; the others their name -->
+                        <DataTemplate DataType="{x:Type vm:VaultFilter}">
+                            <Grid AutomationProperties.Name="{Binding}" ToolTip="{Binding}">
+                                <TextBlock x:Name="Label" Text="{Binding}" />
+                                <ui:SymbolIcon x:Name="Glyph" Visibility="Collapsed" FontSize="16" Margin="-2,1" />
+                            </Grid>
+                            <DataTemplate.Triggers>
+                                <DataTrigger Binding="{Binding}" Value="{x:Static vm:VaultFilter.Favorites}">
+                                    <Setter TargetName="Label" Property="Visibility" Value="Collapsed" />
+                                    <Setter TargetName="Glyph" Property="Visibility" Value="Visible" />
+                                    <Setter TargetName="Glyph" Property="Symbol" Value="Star24" />
+                                    <Setter TargetName="Glyph" Property="Filled" Value="True" />
+                                </DataTrigger>
+                                <DataTrigger Binding="{Binding}" Value="{x:Static vm:VaultFilter.Trash}">
+                                    <Setter TargetName="Label" Property="Visibility" Value="Collapsed" />
+                                    <Setter TargetName="Glyph" Property="Visibility" Value="Visible" />
+                                    <Setter TargetName="Glyph" Property="Symbol" Value="Delete24" />
+                                </DataTrigger>
+                            </DataTemplate.Triggers>
+                        </DataTemplate>
+                    </ListBox.ItemTemplate>
                     <ListBox.ItemsPanel>
                         <ItemsPanelTemplate>
                             <WrapPanel />
@@ -278,8 +298,25 @@
                                                     <DockPanel Grid.Column="1" Grid.ColumnSpan="2">
                                                         <ui:SymbolIcon DockPanel.Dock="Right" Symbol="Warning24" Foreground="{DynamicResource SystemFillColorCautionBrush}" IsHitTestVisible="False"
                                                                        ToolTip="Edited on two devices: choose a version" Visibility="{Binding HasConflict, Converter={StaticResource BoolToVisibility}}" />
-                                                        <ui:SymbolIcon DockPanel.Dock="Right" Symbol="Star24" Filled="True" Margin="4,0" Foreground="{DynamicResource AccentTextFillColorPrimaryBrush}" IsHitTestVisible="False"
-                                                                       Visibility="{Binding Favorite, Converter={StaticResource BoolToVisibility}}" />
+                                                        <!-- Star: favorite or not, one click -->
+                                                        <ui:Button DockPanel.Dock="Right" Appearance="Transparent" Padding="4" Margin="4,-4,0,-4"
+                                                                   Command="{Binding DataContext.ToggleFavoriteCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}" CommandParameter="{Binding}"
+                                                                   ToolTip="Favorite" AutomationProperties.Name="Favorite"
+                                                                   Visibility="{Binding Trashed, Converter={StaticResource InverseBoolToVisibility}}">
+                                                            <ui:SymbolIcon Symbol="Star24" FontSize="16">
+                                                                <ui:SymbolIcon.Style>
+                                                                    <Style TargetType="ui:SymbolIcon">
+                                                                        <Setter Property="Foreground" Value="{DynamicResource TextFillColorSecondaryBrush}" />
+                                                                        <Style.Triggers>
+                                                                            <DataTrigger Binding="{Binding Favorite}" Value="True">
+                                                                                <Setter Property="Filled" Value="True" />
+                                                                                <Setter Property="Foreground" Value="{DynamicResource AccentTextFillColorPrimaryBrush}" />
+                                                                            </DataTrigger>
+                                                                        </Style.Triggers>
+                                                                    </Style>
+                                                                </ui:SymbolIcon.Style>
+                                                            </ui:SymbolIcon>
+                                                        </ui:Button>
                                                         <TextBlock Text="{Binding Title}" FontSize="15" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
                                                     </DockPanel>
 

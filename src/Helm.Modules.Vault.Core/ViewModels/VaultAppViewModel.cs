@@ -112,13 +112,10 @@ public sealed partial class VaultAppViewModel : ObservableObject
         ? $"Another device deleted {hold.Records.Count} of your {hold.LiveRecords} vault items without using the trash. Nothing was deleted here yet."
         : null;
 
+    /// <summary>Only when no device of the account backed the vault up for a week (one device with a folder is enough).</summary>
     public string? BackupWarning => !_backup.IsOverdue ? null
-        : _backup.LastGoodBackup is null ? "This vault has never been backed up. Choose a backup folder in the Vault settings."
-        : $"No good backup for {(DateTimeOffset.UtcNow - _backup.LastGoodBackup.Value).Days} days." + (_backup.LastError is { } e ? " " + e : "");
-
-    public string? KitWarning => _session.State == VaultState.Unlocked && !_session.RecoveryKitConfirmed && Kit is null
-        ? "You have not confirmed that you saved the Emergency Kit on this device. If you lose it, create a new recovery key in the Vault settings."
-        : null;
+        : _backup.LastGoodBackupAnywhere is not { } last ? "This vault has never been backed up. Choose a backup folder in the Vault settings (on one of your devices)."
+        : $"No device has backed up this vault for {(DateTimeOffset.UtcNow - last).Days} days." + (_backup.LastError is { } e ? " " + e : "");
 
     partial void OnNewPasswordChanged(string value) => OnPropertyChanged(nameof(PasswordStrength));
 
@@ -132,7 +129,6 @@ public sealed partial class VaultAppViewModel : ObservableObject
     partial void OnKitChanged(EmergencyKit? value)
     {
         OnPropertyChanged(nameof(HasKit));
-        OnPropertyChanged(nameof(KitWarning));
     }
 
     [RelayCommand]
@@ -269,7 +265,6 @@ public sealed partial class VaultAppViewModel : ObservableObject
     {
         OnPropertyChanged(nameof(HeldWarning));
         OnPropertyChanged(nameof(BackupWarning));
-        OnPropertyChanged(nameof(KitWarning));
     }
 
     private async Task RunAsync(Func<Task> work)

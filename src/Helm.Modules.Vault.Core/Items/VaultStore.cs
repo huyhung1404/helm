@@ -118,6 +118,19 @@ public sealed class VaultStore : IDisposable
         _session.Touch();
     }
 
+    /// <summary>
+    /// Stars or unstars an item. Not a new version: the history keeps the last real edits, not star clicks.
+    /// </summary>
+    public void SetFavorite(string uid, bool favorite)
+    {
+        var key = _session.Key;
+        var (recordId, current, record) = Primary(key, uid);
+        if (current.Favorite == favorite) return;
+        var saved = current with { Favorite = favorite, ModifiedAtMs = Now() };
+        _records.Upsert(recordId, VaultItemSealer.Seal(key, record.Vault, record.Epoch, uid, saved, record.Trashed, record.TrashedAtMs));
+        _session.Touch();
+    }
+
     /// <summary>Brings back an earlier version; the current one goes into the history, so this can be undone too.</summary>
     public void RestoreVersion(string uid, VaultItemVersion version) =>
         Save(uid, version.Item with { History = [] });

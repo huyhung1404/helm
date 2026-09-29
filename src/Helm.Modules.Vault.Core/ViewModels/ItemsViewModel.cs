@@ -70,9 +70,10 @@ public sealed partial class ItemsViewModel : ObservableObject
         set { if (value) Tab = VaultTab.Other; }
     }
 
-    private static readonly IReadOnlyList<VaultFilter> CredentialFilters = [VaultFilter.All, VaultFilter.Logins, VaultFilter.Tokens, VaultFilter.Favorites, VaultFilter.Trash];
+    // Favorites first (a star), the trash last (a bin).
+    private static readonly IReadOnlyList<VaultFilter> CredentialFilters = [VaultFilter.Favorites, VaultFilter.All, VaultFilter.Logins, VaultFilter.Tokens, VaultFilter.Trash];
 
-    private static readonly IReadOnlyList<VaultFilter> OtherFilters = [VaultFilter.All, VaultFilter.Favorites, VaultFilter.Trash];
+    private static readonly IReadOnlyList<VaultFilter> OtherFilters = [VaultFilter.Favorites, VaultFilter.All, VaultFilter.Trash];
 
     /// <summary>The sub-tabs of the current tab.</summary>
     public IReadOnlyList<VaultFilter> Filters => Tab == VaultTab.Credentials ? CredentialFilters : OtherFilters;
@@ -183,6 +184,22 @@ public sealed partial class ItemsViewModel : ObservableObject
 
     [RelayCommand]
     private void ShowTab(VaultTab tab) => Tab = tab;
+
+    /// <summary>The star on a card: favorite or not (not a new version of the item).</summary>
+    [RelayCommand]
+    private void ToggleFavorite(VaultCardViewModel? card)
+    {
+        if (card is null || card.Trashed) return;
+        try
+        {
+            _store.SetFavorite(card.Uid, !card.Favorite);
+        }
+        catch (Exception ex) when (ex is InvalidOperationException or Crypto.VaultKeyException)
+        {
+            return;
+        }
+        Refresh();
+    }
 
     [RelayCommand]
     private void ShowFilter(VaultFilter filter) => Filter = filter;

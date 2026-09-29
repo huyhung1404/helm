@@ -121,9 +121,6 @@
                 <Border Classes="infobar warning" IsVisible="{Binding App.BackupWarning, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
                     <TextBlock TextWrapping="Wrap" Text="{Binding App.BackupWarning}" />
                 </Border>
-                <Border Classes="infobar" IsVisible="{Binding App.KitWarning, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
-                    <TextBlock TextWrapping="Wrap" Text="{Binding App.KitWarning}" />
-                </Border>
 
                 <!-- List: search over every tab, the two tabs with their own Create, sub-tabs, then the cards.
                      Tapping a card opens it (the detail takes the page); Back closes it. -->
@@ -167,6 +164,25 @@
                                     <WrapPanel />
                                 </ItemsPanelTemplate>
                             </ListBox.ItemsPanel>
+                            <ListBox.ItemTemplate>
+                                <!-- Favorites is a star, the trash a bin; the others their name -->
+                                <DataTemplate x:DataType="vm:VaultFilter">
+                                    <Panel AutomationProperties.Name="{Binding}">
+                                        <TextBlock Text="{Binding}">
+                                            <TextBlock.IsVisible>
+                                                <MultiBinding Converter="{x:Static BoolConverters.And}">
+                                                    <Binding Converter="{x:Static ObjectConverters.NotEqual}" ConverterParameter="{x:Static vm:VaultFilter.Favorites}" />
+                                                    <Binding Converter="{x:Static ObjectConverters.NotEqual}" ConverterParameter="{x:Static vm:VaultFilter.Trash}" />
+                                                </MultiBinding>
+                                            </TextBlock.IsVisible>
+                                        </TextBlock>
+                                        <ic:SymbolIcon Symbol="Star" IconVariant="Filled" FontSize="16"
+                                                       IsVisible="{Binding Converter={x:Static ObjectConverters.Equal}, ConverterParameter={x:Static vm:VaultFilter.Favorites}}" />
+                                        <ic:SymbolIcon Symbol="Delete" FontSize="16"
+                                                       IsVisible="{Binding Converter={x:Static ObjectConverters.Equal}, ConverterParameter={x:Static vm:VaultFilter.Trash}}" />
+                                    </Panel>
+                                </DataTemplate>
+                            </ListBox.ItemTemplate>
                             <ListBox.Styles>
                                 <Style Selector="ListBoxItem">
                                     <Setter Property="Padding" Value="12,6" />
@@ -196,9 +212,17 @@
                                                     <Image Source="{Binding Icon, Converter={x:Static local:IconBitmap.Converter}}" Stretch="UniformToFill" />
                                                 </Border>
                                             </Panel>
-                                            <DockPanel Grid.Column="1" Grid.ColumnSpan="2" IsHitTestVisible="False">
+                                            <!-- Star: favorite or not, one tap -->
+                                            <Button Grid.Column="2" Classes="flat" Width="40" Height="36" Padding="0" HorizontalContentAlignment="Center" HorizontalAlignment="Right"
+                                                    Command="{Binding $parent[UserControl].((local:VaultPageViewModel)DataContext).App.Items.ToggleFavoriteCommand}" CommandParameter="{Binding}" IsVisible="{Binding !Trashed}" AutomationProperties.Name="Favorite">
+                                                <Panel>
+                                                    <ic:SymbolIcon Symbol="Star" IconVariant="Filled" FontSize="16" Foreground="{DynamicResource SystemAccentColor}" IsVisible="{Binding Favorite}" />
+                                                    <ic:SymbolIcon Symbol="Star" FontSize="16" IsVisible="{Binding !Favorite}" />
+                                                </Panel>
+                                            </Button>
+                                            <DockPanel Grid.Column="1" IsHitTestVisible="False">
                                                 <ic:SymbolIcon DockPanel.Dock="Right" Symbol="Warning" FontSize="16" IsVisible="{Binding HasConflict}" />
-                                                <ic:SymbolIcon DockPanel.Dock="Right" Symbol="Star" IconVariant="Filled" FontSize="16" Margin="4,0" IsVisible="{Binding Favorite}" />
+
                                                 <TextBlock Text="{Binding Title}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
                                             </DockPanel>
 

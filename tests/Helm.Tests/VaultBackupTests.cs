@@ -303,7 +303,31 @@ public sealed class VaultBackupTests : IDisposable
     }
 
     /// <summary>A device with sync switched off: everything, including documents, lives only on it and in the backup.</summary>
-    private Device NewDevice(string name, Func<IBackupTarget, IBackupTarget>? wrapTarget = null)
+    [Fact]
+    public async Task One_device_with_a_backup_is_enough_the_others_do_not_warn()
+    {
+        // The marks are synced; here both devices share the collection, as after a sync.
+        var paths = new HelmPaths(Path.Combine(_dir, "shared"));
+        var db = Own(new SyncDatabase(paths.SyncDatabaseFile, TestKeys.Local));
+        var engine = Own(new SyncEngine(db, new NullSyncTransport(), new InMemoryMasterKeyStore(), [], time: _clock, debounce: TimeSpan.FromHours(1)));
+        var marks = Own(new SyncedCollection<VaultBackupMark>(engine, new SyncedCollectionOptions<VaultBackupMark> { Name = VaultBackupService.MarksCollection }));
+
+        var a = NewDevice("a", marks: marks);
+        await a.Session.CreateAsync(Password);
+        var b = NewDevice("b", marks: marks);
+        b.Settings.Get<VaultSettings>(VaultSettings.StoreId).Update(s => s.BackupLocation = null); // no folder on this one
+        Assert.True(b.Backup.IsOverdue);
+
+        await a.Backup.BackUpAsync();
+        Assert.False(b.Backup.IsOverdue);
+        Assert.Equal(_clock.GetUtcNow(), b.Backup.LastGoodBackupAnywhere);
+        Assert.Null(b.Backup.LastGoodBackup); // this device itself never backed up
+
+        _clock.Advance(TimeSpan.FromDays(8));
+        Assert.True(b.Backup.IsOverdue); // but a week without any backup anywhere still warns
+    }
+
+    private Device NewDevice(string name, Func<IBackupTarget, IBackupTarget>? wrapTarget = null, ISyncedCollection<VaultBackupMark>? marks = null)
     {
         var paths = new HelmPaths(Path.Combine(_dir, name));
         var db = Own(new SyncDatabase(paths.SyncDatabaseFile, TestKeys.Local));
@@ -317,7 +341,7 @@ public sealed class VaultBackupTests : IDisposable
         var session = Own(new VaultSession(keyrings, settings, new NoDeviceUnlock(), engine, _clock) { NewKdf = VaultCryptoTests.CheapKdf });
         var store = Own(new VaultStore(records, session, _clock));
         var backup = new VaultBackupService(session, store, blobs,
-            wrapTarget is null ? new FolderBackupLocation() : new WrappedLocation(wrapTarget), settings, time: _clock);
+            wrapTarget is null ? new FolderBackupLocation() : new WrappedLocation(wrapTarget), settings, time: _clock, marks: marks);
         return new Device(session, store, new VaultFiles(store, blobs, session), backup, settings);
     }
 
