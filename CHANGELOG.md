@@ -3,6 +3,16 @@
 All notable changes to Helm. The top section is used as the GitHub release body and as the Velopack release notes.
 Format: [Keep a Changelog](https://keepachangelog.com), versions follow [SemVer](https://semver.org).
 
+## [0.18.1] - 2026-09-30
+
+### Changed
+- Home: the shortcut-conflicts tile shows a green check when there are none and an amber warning when there are.
+- Tracker: every field of the add and edit forms has a label (Person, Amount, Kind, Priority, Repeat, Due date, Time),
+  and times read like in Notes ("just now", "5 min ago", "Yesterday", "28 Sep"), updated every minute.
+- Notes and Tracker: delete buttons sit apart from the other actions, so they are harder to hit by mistake; small
+  badges are easier to read.
+- Screen readers name Home's tiles and toggles and each note in the list.
+
 ## [0.18.0] - 2026-09-30
 
 ### Added
