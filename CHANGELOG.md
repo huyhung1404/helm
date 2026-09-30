@@ -3,7 +3,7 @@
 All notable changes to Helm. The top section is used as the GitHub release body and as the Velopack release notes.
 Format: [Keep a Changelog](https://keepachangelog.com), versions follow [SemVer](https://semver.org).
 
-## [Unreleased]
+## [0.20.0] - 2026-09-30
 
 ### Changed
 - Watch Later: videos now **play right on the Watch Later page**, in Helm's window, instead of a window of their own.
