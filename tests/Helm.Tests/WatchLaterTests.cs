@@ -469,6 +469,114 @@ public sealed class WatchLaterTests : IDisposable
         Assert.Equal("something odd", YtDlpTools.ErrorText("something odd\n"));
     }
 
+    // ---- Playback ------------------------------------------------------------------------------------------------
+
+    [Fact]
+    public void Progress_is_remembered_and_near_the_end_the_video_counts_as_watched()
+    {
+        var id = _store.Add(VideoLink.Parse("https://youtu.be/dQw4w9WgXcQ")!).Id;
+
+        Assert.False(_store.SaveProgress(id, 5, 200));
+        Assert.Null(_store.Get(id)!.ResumeSeconds);
+        Assert.Equal(200, _store.Get(id)!.DurationSeconds);
+
+        Assert.False(_store.SaveProgress(id, 72.6, 200));
+        Assert.Equal(72, _store.Get(id)!.ResumeSeconds);
+        Assert.Equal("https://www.youtube.com/watch?v=dQw4w9WgXcQ&t=72s", WatchLaterFormat.ResumeUrl(_store.Get(id)!));
+
+        Assert.True(_store.SaveProgress(id, 181, 200));
+        var item = _store.Get(id)!;
+        Assert.True(item.Watched);
+        Assert.Null(item.ResumeSeconds);
+        Assert.False(_store.SaveProgress(id, 190, 200)); // already watched
+    }
+
+    [Fact]
+    public void Shorts_and_facebook_links_open_without_a_start_time()
+    {
+        var shortId = _store.Add(VideoLink.Parse("https://youtube.com/shorts/dQw4w9WgXcQ")!).Id;
+        var fb = _store.Add(VideoLink.Parse("https://www.facebook.com/watch/?v=1234567890123")!).Id;
+        _store.SaveProgress(shortId, 30, 60 * 10);
+        _store.SaveProgress(fb, 30, 600);
+
+        Assert.Equal("https://www.youtube.com/shorts/dQw4w9WgXcQ", WatchLaterFormat.ResumeUrl(_store.Get(shortId)!));
+        Assert.Equal("https://www.facebook.com/watch/?v=1234567890123", WatchLaterFormat.ResumeUrl(_store.Get(fb)!));
+    }
+
+    [Fact]
+    public void The_tracker_writes_sparingly_and_marks_watched_once()
+    {
+        var id = _store.Add(VideoLink.Parse("https://youtu.be/dQw4w9WgXcQ")!).Id;
+        var tracker = new PlaybackTracker(_store, id);
+        var marked = 0;
+        tracker.MarkedWatched += (_, _) => marked++;
+        var writes = 0;
+        _items.Changed += (_, _) => writes++;
+
+        for (var t = 12.0; t <= 40; t += 2) tracker.Report(t, 100); // every 2 s of playback
+        Assert.InRange(writes, 2, 3); // at 12 s and 28 s (+ 40 s)
+        tracker.Report(41, 100);
+        tracker.Flush(); // paused
+        Assert.Equal(41, _store.Get(id)!.ResumeSeconds);
+
+        tracker.Report(91, 100);
+        tracker.Report(93, 100);
+        tracker.Flush();
+        Assert.Equal(1, marked);
+        Assert.True(_store.Get(id)!.Watched);
+
+        tracker.Report(20, 100); // seeking back after it counted as watched
+        tracker.Flush();
+        Assert.Null(_store.Get(id)!.ResumeSeconds);
+    }
+
+    [Fact]
+    public void The_player_page_gets_its_video_in_the_query_and_errors_in_words()
+    {
+        Assert.Equal("https://helm-player.local/player.html?kind=facebook&href=https%3A%2F%2Fwww.facebook.com%2Freel%2F1&start=42",
+            Helm.Modules.WatchLater.Player.PlayerWindow.PageFor("facebook", "href", "https://www.facebook.com/reel/1", 42));
+        Assert.Contains("does not let it play outside YouTube", Helm.Modules.WatchLater.Player.PlayerWindow.ErrorText(150, null));
+        Assert.Equal("custom", Helm.Modules.WatchLater.Player.PlayerWindow.ErrorText(-3, "custom"));
+    }
+
+    [Fact]
+    public void Play_uses_helms_player_when_it_can_and_the_browser_otherwise()
+    {
+        var player = new FakePlayer();
+        var launcher = new RecordingLauncher();
+        var vm = new WatchLaterViewModel(_store, _settings, new InlineUi(), new AcceptDialogs(), new MemoryClipboard(), launcher, new FakeDownloads(),
+            new ThumbnailCache(new HelmPaths(_dir.Path)), NullLogger<WatchLaterViewModel>.Instance, player);
+        var yt = _store.Add(VideoLink.Parse("https://youtu.be/dQw4w9WgXcQ")!).Id;
+        _time.Advance(TimeSpan.FromMinutes(1));
+        _store.Add(VideoLink.Parse("https://example.com/clip")!);
+        vm.Refresh();
+
+        vm.OpenCommand.Execute(vm.Items.Single(r => r.Id == yt));
+        vm.OpenCommand.Execute(vm.Items.Single(r => r.Id != yt));
+        vm.OpenOutsideCommand.Execute(vm.Items.Single(r => r.Id == yt));
+
+        Assert.Equal([yt], player.Played);
+        Assert.Equal(["https://example.com/clip", "https://www.youtube.com/watch?v=dQw4w9WgXcQ"], launcher.Opened);
+        Assert.True(vm.HasPlayer);
+    }
+
+    private sealed class FakePlayer : IVideoPlayer
+    {
+        public List<string> Played { get; } = [];
+        public bool CanPlay(WatchItem item) => item.Source != WatchSource.Other;
+        public void Play(string id) => Played.Add(id);
+    }
+
+    private sealed class RecordingLauncher : IProcessLauncher
+    {
+        public List<string> Opened { get; } = [];
+        public string ExecutablePath => "";
+        public bool IsElevated => false;
+        public void OpenFolder(string path) { }
+        public void OpenUrl(string url) => Opened.Add(url);
+        public void StartNewInstance(string? arguments = null) { }
+    }
+
     // ---- Page ----------------------------------------------------------------------------------------------------
 
     [Fact]

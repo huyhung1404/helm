@@ -1,6 +1,8 @@
 using System.Windows.Media;
 using Helm.Core.Hotkeys;
 using Helm.Core.Modules;
+using Helm.Core.Services;
+using Helm.Modules.WatchLater.Player;
 using Wpf.Ui.Controls;
 
 namespace Helm.Modules.WatchLater;
@@ -10,7 +12,7 @@ namespace Helm.Modules.WatchLater;
 /// asked for are fetched. The menu and Quick access open <see cref="WatchLaterContentPage"/>; Home → Utilities opens the
 /// settings (<see cref="WatchLaterPage"/>).
 /// </summary>
-public sealed class WatchLaterModule(MetadataResolver resolver, PcDownloads downloads) : HelmModuleBase, IModuleContent
+public sealed class WatchLaterModule(MetadataResolver resolver, PcDownloads downloads, PlayerService player, IUiDispatcher ui) : HelmModuleBase, IModuleContent
 {
     public override string Id => WatchLaterIds.ModuleId;
     public override string DisplayName => WatchLaterIds.DisplayName;
@@ -34,6 +36,8 @@ public sealed class WatchLaterModule(MetadataResolver resolver, PcDownloads down
     public override async Task DisableAsync()
     {
         downloads.Stop();
+        // The player window saves where watching stopped as it closes.
+        await ui.InvokeAsync(player.Close).ConfigureAwait(false);
         await resolver.StopAsync().ConfigureAwait(false);
     }
 }

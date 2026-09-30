@@ -3,6 +3,19 @@
 All notable changes to Helm. The top section is used as the GitHub release body and as the Velopack release notes.
 Format: [Keep a Changelog](https://keepachangelog.com), versions follow [SemVer](https://semver.org).
 
+## [Unreleased]
+
+### Added
+- Watch Later: **play videos in Helm** (PC). Play opens Helm's player window: YouTube's and Facebook's own players, or
+  the downloaded file when there is one (it plays offline). Links inside the player open in the browser; a video
+  whose owner does not allow playing outside YouTube, or a private Facebook video, says so and offers the browser.
+- **Mini player**: a small player that stays on top of other windows, in the bottom-right corner at first; drag its
+  bar to move it, double-click it (or Esc) to go back to the normal window. Helm remembers both positions and which
+  one you used last.
+- **Carry on where you stopped**, on every device: the place is saved while you watch and synced; the card shows a
+  red bar and "stopped at 3:12", and opening a YouTube video in the browser or the phone's YouTube app starts there.
+- Videos you watch to about 90 % are marked as watched by themselves.
+
 ## [0.18.1] - 2026-09-30
 
 ### Changed

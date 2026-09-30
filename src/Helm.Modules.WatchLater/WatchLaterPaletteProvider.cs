@@ -5,11 +5,11 @@ using Microsoft.Extensions.DependencyInjection;
 namespace Helm.Modules.WatchLater;
 
 /// <summary>
-/// Watch Later in the command palette: saved videos whose title, channel or note match (Enter opens the video), and
+/// Watch Later in the command palette: saved videos whose title, channel or note match (Enter plays the video), and
 /// "Watch later" for a pasted link. The shell navigation is resolved when a result runs (it depends on the module
 /// list, which the palette module is part of).
 /// </summary>
-internal sealed class WatchLaterPaletteProvider(WatchLaterStore store, IProcessLauncher launcher, IServiceProvider services) : IPaletteProvider
+internal sealed class WatchLaterPaletteProvider(WatchLaterStore store, IProcessLauncher launcher, IVideoPlayer player, IServiceProvider services) : IPaletteProvider
 {
     private const int MaxResults = 6;
 
@@ -45,7 +45,11 @@ internal sealed class WatchLaterPaletteProvider(WatchLaterStore store, IProcessL
         {
             var detail = string.Join(" · ", new[] { item.Channel, WatchLaterFormat.KindName(item.Source, item.Kind),
                 item.DurationSeconds is int d && d > 0 ? WatchLaterFormat.Duration(d) : null }.Where(s => !string.IsNullOrWhiteSpace(s)));
-            yield return new PaletteItem(item.DisplayTitle, detail, PaletteKind.Video, score, () => launcher.OpenUrl(item.Url));
+            yield return new PaletteItem(item.DisplayTitle, detail, PaletteKind.Video, score, () =>
+            {
+                if (player.CanPlay(item)) player.Play(id);
+                else launcher.OpenUrl(WatchLaterFormat.ResumeUrl(item));
+            });
         }
     }
 }

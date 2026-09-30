@@ -56,6 +56,15 @@ public static class WatchLaterFormat
         _ => "Link",
     };
 
+    /// <summary>
+    /// The link to open outside Helm, carrying on where watching stopped (YouTube videos only: Shorts and Facebook
+    /// links have no start time).
+    /// </summary>
+    public static string ResumeUrl(WatchItem item) =>
+        item is { Source: WatchSource.YouTube, Kind: WatchKind.Video, ResumeSeconds: int s and > 0 }
+            ? item.Url + (item.Url.Contains('?') ? "&" : "?") + "t=" + s.ToString(CultureInfo.InvariantCulture) + "s"
+            : item.Url;
+
     public static string Shorten(string text, int max) =>
         text.Length <= max ? text : text[..(max - 1)].TrimEnd() + "…";
 

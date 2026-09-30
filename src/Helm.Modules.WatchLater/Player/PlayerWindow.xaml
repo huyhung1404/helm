@@ -1,0 +1,86 @@
+<ui:FluentWindow
+    x:Class="Helm.Modules.WatchLater.Player.PlayerWindow"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
+    xmlns:wv2="clr-namespace:Microsoft.Web.WebView2.Wpf;assembly=Microsoft.Web.WebView2.Wpf"
+    xmlns:self="clr-namespace:Helm.Modules.WatchLater"
+    Title="Watch Later"
+    Width="960"
+    Height="600"
+    MinWidth="240"
+    MinHeight="160"
+    ExtendsContentIntoTitleBar="True"
+    Icon="{x:Static self:WatchLaterLogo.Image}"
+    ShowInTaskbar="True"
+    WindowBackdropType="Mica"
+    WindowStartupLocation="Manual">
+
+    <!-- The player: the title bar and a toolbar, or (mini player, always on top) one thin bar to drag it by. The video
+         is a WebView2, which WPF cannot draw over, so every control sits above it rather than on it. -->
+    <ui:FluentWindow.Resources>
+        <Style x:Key="BarAction" TargetType="ui:Button" BasedOn="{StaticResource {x:Type ui:Button}}">
+            <Setter Property="Appearance" Value="Transparent" />
+            <Setter Property="Padding" Value="8,5" />
+            <Setter Property="Margin" Value="4,0,0,0" />
+            <Setter Property="MinWidth" Value="0" />
+            <Setter Property="VerticalAlignment" Value="Center" />
+        </Style>
+    </ui:FluentWindow.Resources>
+
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+
+        <ui:TitleBar x:Name="TitleBar" Title="Watch Later" ShowMaximize="True">
+            <ui:TitleBar.Icon>
+                <ui:ImageIcon Width="16" Height="16" Source="{x:Static self:WatchLaterLogo.Image}" />
+            </ui:TitleBar.Icon>
+        </ui:TitleBar>
+
+        <!-- Normal window: what is playing, and what can be done with it -->
+        <DockPanel x:Name="Toolbar" Grid.Row="1" Margin="16,0,8,8">
+            <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
+                <ui:Button Style="{StaticResource BarAction}" Icon="{ui:SymbolIcon CheckmarkCircle24}" Content="Watched" ToolTip="Mark as watched"
+                           AutomationProperties.Name="Mark as watched" Click="Watched_Click" />
+                <ui:Button Style="{StaticResource BarAction}" Icon="{ui:SymbolIcon Open24}" Content="Browser" ToolTip="Open in the browser, where it stopped"
+                           AutomationProperties.Name="Open in the browser" Click="Browser_Click" />
+                <ui:Button Style="{StaticResource BarAction}" Icon="{ui:SymbolIcon PictureInPicture24}" Content="Mini player"
+                           ToolTip="A small player that stays on top of other windows" AutomationProperties.Name="Mini player" Click="Mini_Click" />
+            </StackPanel>
+            <StackPanel VerticalAlignment="Center">
+                <TextBlock x:Name="VideoTitle" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+                <TextBlock x:Name="Status" Style="{DynamicResource HelmSecondaryText}" TextTrimming="CharacterEllipsis" TextWrapping="NoWrap" />
+            </StackPanel>
+        </DockPanel>
+
+        <!-- Mini player: drag the bar to move it, double-click to go back to the normal window -->
+        <Border x:Name="MiniBar" Grid.Row="2" Height="32" Visibility="Collapsed" Background="Transparent"
+                MouseLeftButtonDown="MiniBar_MouseLeftButtonDown" ToolTip="Drag to move; double-click to enlarge">
+            <DockPanel Margin="10,0,4,0">
+                <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
+                    <ui:Button Style="{StaticResource BarAction}" Padding="6,4" Icon="{ui:SymbolIcon ArrowMaximize24}" ToolTip="Back to the normal window"
+                               AutomationProperties.Name="Normal window" Click="Mini_Click" />
+                    <ui:Button Style="{StaticResource BarAction}" Padding="6,4" Icon="{ui:SymbolIcon Dismiss24}" ToolTip="Close"
+                               AutomationProperties.Name="Close" Click="Close_Click" />
+                </StackPanel>
+                <TextBlock x:Name="MiniTitle" VerticalAlignment="Center" FontSize="12" TextTrimming="CharacterEllipsis" />
+            </DockPanel>
+        </Border>
+
+        <Grid Grid.Row="3">
+            <wv2:WebView2 x:Name="Web" DefaultBackgroundColor="Black" />
+            <!-- The video cannot be played here -->
+            <StackPanel x:Name="Problem" Visibility="Collapsed" VerticalAlignment="Center" HorizontalAlignment="Center" Margin="24" MaxWidth="480">
+                <ui:SymbolIcon Symbol="VideoClip24" FontSize="40" HorizontalAlignment="Center" Foreground="{DynamicResource TextFillColorTertiaryBrush}" />
+                <TextBlock x:Name="ProblemText" Margin="0,12,0,0" TextAlignment="Center" TextWrapping="Wrap" />
+                <ui:Button Margin="0,16,0,0" HorizontalAlignment="Center" Appearance="Primary" Icon="{ui:SymbolIcon Open24}" Content="Open in the browser"
+                           Click="Browser_Click" />
+            </StackPanel>
+        </Grid>
+    </Grid>
+</ui:FluentWindow>

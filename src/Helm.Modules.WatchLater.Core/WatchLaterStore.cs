@@ -111,7 +111,35 @@ public sealed class WatchLaterStore
     public static string YouTubeThumbnail(string id) => $"https://i.ytimg.com/vi/{id}/mqdefault.jpg";
 
     public bool SetWatched(string id, bool watched) =>
-        Change(id, i => i.Watched == watched ? i : i with { Watched = watched, WatchedAt = watched ? Now : null });
+        Change(id, i => i.Watched == watched ? i : i with { Watched = watched, WatchedAt = watched ? Now : null, ResumeSeconds = watched ? null : i.ResumeSeconds });
+
+    /// <summary>Watching past this share of a video counts as watched.</summary>
+    public const double WatchedShare = 0.9;
+
+    /// <summary>Less than this into a video starts it from the beginning next time.</summary>
+    public const int MinResumeSeconds = 10;
+
+    /// <summary>
+    /// Where playback is: remembered to carry on from there (on any device), and past <see cref="WatchedShare"/> of the
+    /// video it counts as watched (the position is then forgotten).
+    /// </summary>
+    /// <returns>True when this marked the video as watched.</returns>
+    public bool SaveProgress(string id, double position, double duration)
+    {
+        var marked = false;
+        Change(id, i =>
+        {
+            var length = duration > 0 ? duration : i.DurationSeconds ?? 0;
+            var updated = i with { DurationSeconds = i.DurationSeconds is > 0 || duration <= 0 ? i.DurationSeconds : (int)Math.Round(duration) };
+            if (length > 0 && position >= length * WatchedShare)
+            {
+                if (!i.Watched) marked = true;
+                return updated with { Watched = true, WatchedAt = i.WatchedAt ?? Now, ResumeSeconds = null };
+            }
+            return updated with { ResumeSeconds = position < MinResumeSeconds ? null : (int)position };
+        });
+        return marked;
+    }
 
     /// <exception cref="ArgumentException">The note is too long.</exception>
     public bool SetNote(string id, string note)

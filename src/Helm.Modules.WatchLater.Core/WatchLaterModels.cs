@@ -83,6 +83,9 @@ public sealed record WatchItem
 
     public DateTimeOffset? DownloadedAt { get; init; }
 
+    /// <summary>Where watching stopped, in seconds (synced, so another device carries on there); null from the start.</summary>
+    public int? ResumeSeconds { get; init; }
+
     /// <summary>The title, or else the note, or else the link.</summary>
     [JsonIgnore]
     public string DisplayTitle =>

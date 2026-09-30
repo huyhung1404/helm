@@ -1,5 +1,6 @@
 using Helm.Core;
 using Helm.Core.Palette;
+using Helm.Modules.WatchLater.Player;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Helm.Modules.WatchLater;
@@ -13,6 +14,9 @@ public static class WatchLaterServices
             .AddSingleton<PcDownloads>()
             .AddSingleton<IWatchDownloads>(sp => sp.GetRequiredService<PcDownloads>())
             .AddSingleton<IVideoMetadataSource, YtDlpMetadataSource>()
+            // Play opens Helm's own player window.
+            .AddSingleton<PlayerService>()
+            .AddSingleton<IVideoPlayer>(sp => sp.GetRequiredService<PlayerService>())
             .AddWatchLaterCore()
             .AddHelmModule<WatchLaterModule, WatchLaterPage, WatchLaterViewModel>()
             .AddSingleton<WatchLaterToolsViewModel>()

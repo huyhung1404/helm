@@ -185,7 +185,7 @@
                             <Border Style="{DynamicResource HelmSurface}" Padding="0" Width="296" Margin="0,0,12,12" AutomationProperties.Name="{Binding Title}">
                                 <StackPanel>
                                     <!-- The thumbnail opens the video -->
-                                    <Button Cursor="Hand" ToolTip="Open the video" AutomationProperties.Name="Open the video" HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch"
+                                    <Button Cursor="Hand" ToolTip="Play" AutomationProperties.Name="Play the video" HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch"
                                             Command="{Binding DataContext.OpenCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}" CommandParameter="{Binding}">
                                         <Button.Template>
                                             <ControlTemplate TargetType="Button">
@@ -206,6 +206,13 @@
                                                     Background="{DynamicResource AccentFillColorDefaultBrush}" Opacity="1"
                                                     Visibility="{Binding IsShort, Converter={StaticResource BoolToVisibility}}">
                                                 <TextBlock Text="{Binding KindName}" FontSize="11" FontWeight="SemiBold" Foreground="{DynamicResource TextOnAccentFillColorPrimaryBrush}" />
+                                            </Border>
+                                            <!-- How far it was watched -->
+                                            <Border VerticalAlignment="Bottom" Height="4" Background="{DynamicResource SystemFillColorCriticalBrush}" RenderTransformOrigin="0,0"
+                                                    Visibility="{Binding HasProgress, Converter={StaticResource BoolToVisibility}}" ToolTip="How far you watched">
+                                                <Border.RenderTransform>
+                                                    <ScaleTransform ScaleX="{Binding WatchedFraction}" />
+                                                </Border.RenderTransform>
                                             </Border>
                                             <Border Style="{StaticResource Badge}" HorizontalAlignment="Right" VerticalAlignment="Bottom"
                                                     Visibility="{Binding HasDuration, Converter={StaticResource BoolToVisibility}}">
@@ -257,8 +264,10 @@
                                                      Visibility="{Binding IsDownloading, Converter={StaticResource BoolToVisibility}}" />
 
                                         <WrapPanel Margin="-6,6,0,0">
-                                            <ui:Button Style="{StaticResource CardAction}" Icon="{ui:SymbolIcon Play24}" ToolTip="Open the video" AutomationProperties.Name="Open"
+                                            <ui:Button Style="{StaticResource CardAction}" Icon="{ui:SymbolIcon Play24}" ToolTip="Play (carries on where it stopped)" AutomationProperties.Name="Play"
                                                        Command="{Binding DataContext.OpenCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}" CommandParameter="{Binding}" />
+                                            <ui:Button Style="{StaticResource CardAction}" Icon="{ui:SymbolIcon Globe24}" ToolTip="Open in the browser" AutomationProperties.Name="Open in the browser"
+                                                       Command="{Binding DataContext.OpenOutsideCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}" CommandParameter="{Binding}" />
                                             <ui:Button AutomationProperties.Name="Watched"
                                                        Command="{Binding DataContext.ToggleWatchedCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}" CommandParameter="{Binding}">
                                                 <ui:Button.Style>

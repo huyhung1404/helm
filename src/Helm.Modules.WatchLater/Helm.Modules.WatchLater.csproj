@@ -14,4 +14,13 @@
     <InternalsVisibleTo Include="Helm.Tests" />
   </ItemGroup>
 
+  <ItemGroup>
+    <!-- The player window (YouTube / Facebook embeds and downloaded files). -->
+    <PackageReference Include="Microsoft.Web.WebView2" Version="1.0.4258.31" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <EmbeddedResource Include="Player\player.html" LogicalName="Helm.WatchLater.player.html" />
+  </ItemGroup>
+
 </Project>

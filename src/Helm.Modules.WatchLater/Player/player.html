@@ -1,0 +1,111 @@
+<!doctype html>
+<!-- Helm's Watch Later player, served from https://helm-player.local/ inside WebView2 (a real https origin, which
+     YouTube's embed needs). The query says what to play:
+       ?kind=youtube&id=<video id>&start=<seconds>
+       ?kind=facebook&href=<video link>&start=<seconds>
+       ?kind=file&src=<https://helm-file.local/...>&start=<seconds>
+     It posts to Helm: {type:"progress", t, d, playing}, {type:"ended"}, {type:"error", code, message}. -->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="referrer" content="strict-origin-when-cross-origin">
+<title>Player</title>
+<style>
+  html, body { margin: 0; height: 100%; background: #000; overflow: hidden; }
+  #player, video, iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; background: #000; }
+  #fb { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; }
+  #fb .fb-video { width: 100%; }
+</style>
+</head>
+<body>
+<div id="player"></div>
+<script>
+(function () {
+  "use strict";
+  var q = new URLSearchParams(location.search);
+  var kind = q.get("kind");
+  var start = Math.max(0, parseInt(q.get("start") || "0", 10) || 0);
+
+  function post(message) {
+    try { window.chrome.webview.postMessage(message); } catch (e) { }
+  }
+  function progress(t, d, playing) {
+    if (typeof t === "number" && isFinite(t)) post({ type: "progress", t: t, d: (typeof d === "number" && isFinite(d)) ? d : 0, playing: !!playing });
+  }
+
+  if (kind === "youtube") {
+    var tag = document.createElement("script");
+    tag.src = "https://www.youtube.com/iframe_api";
+    tag.onerror = function () { post({ type: "error", code: -1, message: "YouTube's player could not be loaded (offline?)." }); };
+    document.head.appendChild(tag);
+    var player = null;
+    window.onYouTubeIframeAPIReady = function () {
+      player = new YT.Player("player", {
+        videoId: q.get("id"),
+        host: "https://www.youtube.com",
+        playerVars: { autoplay: 1, start: start, playsinline: 1, rel: 0, modestbranding: 1, origin: location.origin },
+        events: {
+          onReady: function (e) { e.target.playVideo(); },
+          onStateChange: function (e) {
+            if (e.data === YT.PlayerState.ENDED) post({ type: "ended" });
+            else if (e.data === YT.PlayerState.PAUSED) progress(player.getCurrentTime(), player.getDuration(), false);
+          },
+          onError: function (e) { post({ type: "error", code: e.data, message: "" }); }
+        }
+      });
+      setInterval(function () {
+        if (player && player.getCurrentTime) progress(player.getCurrentTime(), player.getDuration(), player.getPlayerState() === YT.PlayerState.PLAYING);
+      }, 2000);
+    };
+  } else if (kind === "facebook") {
+    var holder = document.getElementById("player");
+    holder.id = "fb";
+    var div = document.createElement("div");
+    div.className = "fb-video";
+    div.setAttribute("data-href", q.get("href"));
+    div.setAttribute("data-autoplay", "true");
+    div.setAttribute("data-allowfullscreen", "true");
+    div.setAttribute("data-show-text", "false");
+    div.setAttribute("data-width", "auto");
+    holder.appendChild(div);
+    var fbPlayer = null;
+    window.fbAsyncInit = function () {
+      FB.init({ xfbml: true, version: "v21.0" });
+      FB.Event.subscribe("xfbml.ready", function (msg) {
+        if (msg.type !== "video") return;
+        fbPlayer = msg.instance;
+        if (start > 0) fbPlayer.seek(start);
+        fbPlayer.play();
+        fbPlayer.subscribe("finishedPlaying", function () { post({ type: "ended" }); });
+        fbPlayer.subscribe("paused", function () { progress(fbPlayer.getCurrentPosition(), fbPlayer.getDuration(), false); });
+        fbPlayer.subscribe("error", function () { post({ type: "error", code: -2, message: "Facebook could not play this video." }); });
+      });
+      // A private video, or one Facebook will not embed, never becomes ready.
+      setTimeout(function () { if (!fbPlayer) post({ type: "error", code: -3, message: "Facebook does not let this video play outside Facebook (it may be private or in a group)." }); }, 20000);
+    };
+    setInterval(function () {
+      if (fbPlayer) progress(fbPlayer.getCurrentPosition(), fbPlayer.getDuration(), true);
+    }, 2000);
+    var sdk = document.createElement("script");
+    sdk.src = "https://connect.facebook.net/en_US/sdk.js";
+    sdk.async = true;
+    sdk.onerror = function () { post({ type: "error", code: -1, message: "Facebook's player could not be loaded (offline?)." }); };
+    document.body.appendChild(sdk);
+  } else if (kind === "file") {
+    var video = document.createElement("video");
+    video.src = q.get("src");
+    video.controls = true;
+    video.autoplay = true;
+    video.addEventListener("loadedmetadata", function () { if (start > 0 && start < video.duration) video.currentTime = start; });
+    video.addEventListener("pause", function () { progress(video.currentTime, video.duration, false); });
+    video.addEventListener("ended", function () { post({ type: "ended" }); });
+    video.addEventListener("error", function () { post({ type: "error", code: -4, message: "The downloaded file could not be played." }); });
+    setInterval(function () { if (!video.paused) progress(video.currentTime, video.duration, true); }, 2000);
+    document.getElementById("player").appendChild(video);
+  } else {
+    post({ type: "error", code: -5, message: "Nothing to play." });
+  }
+})();
+</script>
+</body>
+</html>

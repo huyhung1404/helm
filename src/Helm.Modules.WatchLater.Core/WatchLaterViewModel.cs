@@ -23,6 +23,7 @@ public sealed partial class WatchRowViewModel : ObservableObject
     [ObservableProperty] private string? _thumbnailPath;
     [ObservableProperty] private bool _isEditingNote;
     [ObservableProperty] private string _noteDraft = "";
+    [ObservableProperty] private double _watchedPercent;
 
     // Download
     [ObservableProperty] private string _downloadText = "";
@@ -48,12 +49,21 @@ public sealed partial class WatchRowViewModel : ObservableObject
     public bool HasDownloadText => DownloadText.Length > 0;
     public string WatchedLabel => Watched ? "Not watched" : "Watched";
     public bool IsNotEditingNote => !IsEditingNote;
+    public bool HasProgress => WatchedPercent > 0;
+
+    /// <summary>0 to 1: how much of the thumbnail's red bar is filled.</summary>
+    public double WatchedFraction => WatchedPercent / 100;
 
     partial void OnNoteChanged(string value) => OnPropertyChanged(nameof(HasNote));
     partial void OnDurationChanged(string value) => OnPropertyChanged(nameof(HasDuration));
     partial void OnDownloadTextChanged(string value) => OnPropertyChanged(nameof(HasDownloadText));
     partial void OnWatchedChanged(bool value) => OnPropertyChanged(nameof(WatchedLabel));
     partial void OnIsEditingNoteChanged(bool value) => OnPropertyChanged(nameof(IsNotEditingNote));
+    partial void OnWatchedPercentChanged(double value)
+    {
+        OnPropertyChanged(nameof(HasProgress));
+        OnPropertyChanged(nameof(WatchedFraction));
+    }
 
     partial void OnThumbnailPathChanged(string? value)
     {
@@ -69,7 +79,11 @@ public sealed partial class WatchRowViewModel : ObservableObject
         if (!string.IsNullOrWhiteSpace(item.Channel)) parts.Add(item.Channel.Trim());
         parts.Add(WatchLaterFormat.KindName(item.Source, item.Kind));
         parts.Add(item.Watched && item.WatchedAt is { } w ? "watched " + WatchLaterFormat.When(w, now) : "saved " + WatchLaterFormat.When(item.AddedAt, now));
+        if (!item.Watched && item.ResumeSeconds is int at && at > 0) parts.Add("stopped at " + WatchLaterFormat.Duration(at));
         Subtitle = string.Join(" · ", parts);
+        WatchedPercent = !item.Watched && item.ResumeSeconds is int r && item.DurationSeconds is int length && length > 0
+            ? Math.Clamp(r * 100.0 / length, 1, 100)
+            : 0;
         Note = item.Title is { Length: > 0 } || item.Note.Length == 0 ? item.Note : "";
         Duration = item.DurationSeconds is int seconds && seconds > 0 ? WatchLaterFormat.Duration(seconds) : "";
         KindName = WatchLaterFormat.KindName(item.Source, item.Kind);
@@ -119,6 +133,7 @@ public sealed partial class WatchLaterViewModel : ObservableObject
     private readonly IProcessLauncher _launcher;
     private readonly IWatchDownloads _downloads;
     private readonly ThumbnailCache _thumbnails;
+    private readonly IVideoPlayer? _player;
     private readonly ILogger<WatchLaterViewModel> _logger;
     private readonly Dictionary<string, WatchRowViewModel> _rows = new(StringComparer.Ordinal);
     private int _refreshQueued;
@@ -154,8 +169,10 @@ public sealed partial class WatchLaterViewModel : ObservableObject
         IProcessLauncher launcher,
         IWatchDownloads downloads,
         ThumbnailCache thumbnails,
-        ILogger<WatchLaterViewModel> logger)
+        ILogger<WatchLaterViewModel> logger,
+        IVideoPlayer? player = null)
     {
+        _player = player;
         _store = store;
         _settings = settings.Get<WatchLaterSettings>(WatchLaterIds.ModuleId);
         _ui = ui;
@@ -340,7 +357,9 @@ public sealed partial class WatchLaterViewModel : ObservableObject
         if (row is null || _store.Get(row.Id) is not { } item) return;
         try
         {
-            _launcher.OpenUrl(item.Url);
+            // In Helm's own player when it can play it (Windows); else in the browser or the app, where watching stopped.
+            if (_player?.CanPlay(item) == true) _player.Play(row.Id);
+            else _launcher.OpenUrl(WatchLaterFormat.ResumeUrl(item));
         }
         catch (Exception ex)
         {
@@ -348,6 +367,25 @@ public sealed partial class WatchLaterViewModel : ObservableObject
             Message = $"Could not open the link: {ex.Message}";
         }
     }
+
+    /// <summary>In the browser (Windows) or the YouTube / Facebook app (Android), where watching stopped.</summary>
+    [RelayCommand]
+    private void OpenOutside(WatchRowViewModel? row)
+    {
+        if (row is null || _store.Get(row.Id) is not { } item) return;
+        try
+        {
+            _launcher.OpenUrl(WatchLaterFormat.ResumeUrl(item));
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Opening a video failed");
+            Message = $"Could not open the link: {ex.Message}";
+        }
+    }
+
+    /// <summary>True when Play opens Helm's own player (Windows); the card then also offers the browser.</summary>
+    public bool HasPlayer => _player is not null;
 
     [RelayCommand]
     private void ToggleWatched(WatchRowViewModel? row)
