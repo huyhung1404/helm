@@ -3,7 +3,7 @@
 All notable changes to Helm. The top section is used as the GitHub release body and as the Velopack release notes.
 Format: [Keep a Changelog](https://keepachangelog.com), versions follow [SemVer](https://semver.org).
 
-## [Unreleased]
+## [0.18.0] - 2026-09-30
 
 ### Added
 - **Watch Later** (PC and Android): a place for the YouTube and Facebook videos, Shorts and Reels you want to watch
