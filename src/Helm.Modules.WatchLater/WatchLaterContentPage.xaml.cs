@@ -5,6 +5,7 @@ using System.Windows.Controls;
 using System.Windows.Data;
 using System.Windows.Input;
 using Helm.Core.Modules;
+using Helm.Modules.WatchLater.Player;
 
 namespace Helm.Modules.WatchLater;
 
@@ -13,17 +14,27 @@ namespace Helm.Modules.WatchLater;
 /// tool is off the saved videos stay visible but read-only, with a note pointing to the settings (Home → Utilities).
 /// A link dropped on the page is put in the box.
 /// </summary>
-public partial class WatchLaterContentPage : Page
+public partial class WatchLaterContentPage : Page, IPlayerPanel
 {
     private readonly WatchLaterModule _module;
     private readonly WatchLaterViewModel _viewModel;
+    private readonly PlayerService _player;
+    private bool _settingRate;
 
-    public WatchLaterContentPage(WatchLaterModule module, WatchLaterViewModel viewModel)
+    public WatchLaterContentPage(WatchLaterModule module, WatchLaterViewModel viewModel, PlayerService player)
     {
         _module = module;
         _viewModel = viewModel;
+        _player = player;
         DataContext = viewModel;
         InitializeComponent();
+        foreach (var speed in PlayerView.Speeds) SpeedBox.Items.Add(PlayerWindow.SpeedText(speed));
+        InlinePlayer.StatusChanged += (_, text) => PlayerStatus.Text = text;
+        player.AttachPanel(this);
+        // The video keeps a 16:9 shape, but leaves room for the list below it.
+        SizeChanged += (_, _) => FitPlayer();
+        // Leaving the page pauses the video (where it was is saved).
+        Unloaded += (_, _) => player.PausePanel();
         // Module, view model and page are singletons, so the subscriptions live as long as the page.
         module.PropertyChanged += OnModuleChanged;
         CommandBindings.Add(new CommandBinding(ApplicationCommands.Find, (_, _) => { SearchBox.Focus(); SearchBox.SelectAll(); }));
@@ -34,6 +45,46 @@ public partial class WatchLaterContentPage : Page
         Drop += OnDrop;
         ApplyEnabled();
     }
+
+    // ---- The player on the page (IPlayerPanel) ---------------------------------------------------------------------
+
+    PlayerView IPlayerPanel.View => InlinePlayer;
+
+    void IPlayerPanel.ShowPlayer(string title)
+    {
+        PlayerTitle.Text = title;
+        PlayerPanel.Visibility = Visibility.Visible;
+        FitPlayer();
+    }
+
+    void IPlayerPanel.HidePlayer() => PlayerPanel.Visibility = Visibility.Collapsed;
+
+    void IPlayerPanel.ShowRate(double rate)
+    {
+        _settingRate = true;
+        SpeedBox.SelectedIndex = Math.Max(0, PlayerView.Speeds.ToList().FindIndex(s => Math.Abs(s - rate) < 0.01));
+        _settingRate = false;
+    }
+
+    private void FitPlayer()
+    {
+        var width = Math.Max(0, PlayerPanel.ActualWidth > 0 ? PlayerPanel.ActualWidth : ActualWidth - 48);
+        InlinePlayer.Height = Math.Max(200, Math.Min(width * 9 / 16, ActualHeight * 0.55));
+    }
+
+    private void Speed_SelectionChanged(object sender, System.Windows.Controls.SelectionChangedEventArgs e)
+    {
+        if (_settingRate || SpeedBox.SelectedIndex < 0) return;
+        _player.SetRate(PlayerView.Speeds[SpeedBox.SelectedIndex]);
+    }
+
+    private void PlayerWatched_Click(object sender, RoutedEventArgs e) => InlinePlayer.MarkWatched();
+
+    private void PlayerBrowser_Click(object sender, RoutedEventArgs e) => InlinePlayer.OpenInBrowser();
+
+    private void PlayerMini_Click(object sender, RoutedEventArgs e) => _player.PopOut();
+
+    private void PlayerClose_Click(object sender, RoutedEventArgs e) => _player.StopPanel();
 
     private void OnDragOver(object sender, DragEventArgs e)
     {

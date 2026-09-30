@@ -37,14 +37,11 @@ public sealed class WatchLaterSettings : IVersionedSettings
     /// <summary>Videos downloaded on this PC: item id → file.</summary>
     public Dictionary<string, string> Downloads { get; set; } = new(StringComparer.Ordinal);
 
-    /// <summary>The player window: left, top, width, height (device-independent pixels); null centres it.</summary>
-    public double[]? PlayerBounds { get; set; }
-
     /// <summary>The mini player (always on top): left, top, width, height; null puts it in the bottom-right corner.</summary>
     public double[]? MiniBounds { get; set; }
 
-    /// <summary>The player opens as the mini player.</summary>
-    public bool PlayerMini { get; set; }
+    /// <summary>The playback speed last picked (1, 1.5, 2, 2.5 or 3).</summary>
+    public double PlaybackRate { get; set; } = 1;
 
     /// <summary>When yt-dlp last checked for an update (it breaks when YouTube changes, so it updates itself often).</summary>
     public DateTimeOffset? YtDlpCheckedAt { get; set; }

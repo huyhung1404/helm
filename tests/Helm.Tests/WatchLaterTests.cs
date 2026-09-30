@@ -534,9 +534,28 @@ public sealed class WatchLaterTests : IDisposable
     public void The_player_page_gets_its_video_in_the_query_and_errors_in_words()
     {
         Assert.Equal("https://helm-player.local/player.html?kind=facebook&href=https%3A%2F%2Fwww.facebook.com%2Freel%2F1&start=42",
-            Helm.Modules.WatchLater.Player.PlayerWindow.PageFor("facebook", "href", "https://www.facebook.com/reel/1", 42));
-        Assert.Contains("does not let it play outside YouTube", Helm.Modules.WatchLater.Player.PlayerWindow.ErrorText(150, null));
-        Assert.Equal("custom", Helm.Modules.WatchLater.Player.PlayerWindow.ErrorText(-3, "custom"));
+            Helm.Modules.WatchLater.Player.PlayerView.PageFor("facebook", "href", "https://www.facebook.com/reel/1", 42));
+        Assert.Contains("does not let it play outside YouTube", Helm.Modules.WatchLater.Player.PlayerView.ErrorText(150, null));
+        Assert.Equal("custom", Helm.Modules.WatchLater.Player.PlayerView.ErrorText(-3, "custom"));
+    }
+
+    [Fact]
+    public void Speeds_go_to_three_times_and_are_set_on_the_video_elements_in_invariant_culture()
+    {
+        Assert.Equal([1, 1.5, 2, 2.5, 3], Helm.Modules.WatchLater.Player.PlayerView.Speeds);
+        var previous = System.Globalization.CultureInfo.CurrentCulture;
+        try
+        {
+            System.Globalization.CultureInfo.CurrentCulture = new System.Globalization.CultureInfo("vi-VN"); // "2,5" would break the script
+            var script = Helm.Modules.WatchLater.Player.PlayerView.RateScript(2.5);
+            Assert.EndsWith("})(2.5);", script);
+            Assert.Contains("querySelectorAll('video')", script);
+            Assert.Equal("2.5×", Helm.Modules.WatchLater.Player.PlayerWindow.SpeedText(2.5));
+        }
+        finally
+        {
+            System.Globalization.CultureInfo.CurrentCulture = previous;
+        }
     }
 
     [Fact]

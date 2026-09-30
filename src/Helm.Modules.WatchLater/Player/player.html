@@ -4,7 +4,8 @@
        ?kind=youtube&id=<video id>&start=<seconds>
        ?kind=facebook&href=<video link>&start=<seconds>
        ?kind=file&src=<https://helm-file.local/...>&start=<seconds>
-     It posts to Helm: {type:"progress", t, d, playing}, {type:"ended"}, {type:"error", code, message}. -->
+     It posts to Helm: {type:"progress", t, d, playing}, {type:"ended"}, {type:"error", code, message}.
+     Helm calls window.helmPause() when the page it is on is left. -->
 <html lang="en">
 <head>
 <meta charset="utf-8">
@@ -56,6 +57,7 @@
       setInterval(function () {
         if (player && player.getCurrentTime) progress(player.getCurrentTime(), player.getDuration(), player.getPlayerState() === YT.PlayerState.PLAYING);
       }, 2000);
+      window.helmPause = function () { if (player && player.pauseVideo) player.pauseVideo(); };
     };
   } else if (kind === "facebook") {
     var holder = document.getElementById("player");
@@ -86,6 +88,7 @@
     setInterval(function () {
       if (fbPlayer) progress(fbPlayer.getCurrentPosition(), fbPlayer.getDuration(), true);
     }, 2000);
+    window.helmPause = function () { if (fbPlayer) fbPlayer.pause(); };
     var sdk = document.createElement("script");
     sdk.src = "https://connect.facebook.net/en_US/sdk.js";
     sdk.async = true;
@@ -102,6 +105,7 @@
     video.addEventListener("error", function () { post({ type: "error", code: -4, message: "The downloaded file could not be played." }); });
     setInterval(function () { if (!video.paused) progress(video.currentTime, video.duration, true); }, 2000);
     document.getElementById("player").appendChild(video);
+    window.helmPause = function () { video.pause(); };
   } else {
     post({ type: "error", code: -5, message: "Nothing to play." });
   }

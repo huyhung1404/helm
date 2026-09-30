@@ -3,6 +3,18 @@
 All notable changes to Helm. The top section is used as the GitHub release body and as the Velopack release notes.
 Format: [Keep a Changelog](https://keepachangelog.com), versions follow [SemVer](https://semver.org).
 
+## [Unreleased]
+
+### Changed
+- Watch Later: videos now **play right on the Watch Later page**, in Helm's window, instead of a window of their own.
+  Leaving the page pauses the video (where it was is saved). The mini player opens only from the player's Mini player
+  button, and its Back to Helm button (or a double-click on its bar, or Esc) returns the video to the page, carrying on
+  where it was.
+
+### Added
+- Watch Later: **playback speed** 1×, 1.5×, 2×, 2.5× and 3× (the list above the video, or the speed button of the mini
+  player), for YouTube and Facebook videos and downloaded files alike. Helm remembers the speed you picked last.
+
 ## [0.19.0] - 2026-09-30
 
 ### Added

@@ -6,6 +6,7 @@
     xmlns:core="clr-namespace:Helm.Core.Ui;assembly=Helm.Core.Windows"
     xmlns:local="clr-namespace:Helm.Modules.WatchLater;assembly=Helm.Modules.WatchLater.Core"
     xmlns:self="clr-namespace:Helm.Modules.WatchLater"
+    xmlns:player="clr-namespace:Helm.Modules.WatchLater.Player"
     Title="Watch Later" ScrollViewer.CanContentScroll="False">
 
     <!-- Watch Later itself (menu and Quick access): a box to save a link, the filters, and the saved videos as cards.
@@ -73,6 +74,31 @@
         </Border>
 
         <StackPanel x:Name="Top" Grid.Row="3">
+            <!-- The video playing, right here on the page (the mini player opens only from its button) -->
+            <Border x:Name="PlayerPanel" Style="{DynamicResource HelmSurface}" Padding="0" Margin="0,0,0,12" Visibility="Collapsed">
+                <StackPanel>
+                    <DockPanel Margin="12,8,8,8">
+                        <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
+                            <ComboBox x:Name="SpeedBox" Width="84" Margin="0,0,4,0" VerticalAlignment="Center" ToolTip="Speed" AutomationProperties.Name="Speed"
+                                      SelectionChanged="Speed_SelectionChanged" />
+                            <ui:Button Style="{StaticResource CardAction}" Icon="{ui:SymbolIcon CheckmarkCircle24}" ToolTip="Mark as watched"
+                                       AutomationProperties.Name="Mark as watched" Click="PlayerWatched_Click" />
+                            <ui:Button Style="{StaticResource CardAction}" Icon="{ui:SymbolIcon Globe24}" ToolTip="Open in the browser, where it stopped"
+                                       AutomationProperties.Name="Open in the browser" Click="PlayerBrowser_Click" />
+                            <ui:Button Style="{StaticResource CardAction}" Icon="{ui:SymbolIcon PictureInPicture24}" ToolTip="Mini player: a small player on top of other windows"
+                                       AutomationProperties.Name="Mini player" Click="PlayerMini_Click" />
+                            <ui:Button Style="{StaticResource CardAction}" Icon="{ui:SymbolIcon Dismiss24}" ToolTip="Stop and close the player"
+                                       AutomationProperties.Name="Close the player" Click="PlayerClose_Click" />
+                        </StackPanel>
+                        <StackPanel VerticalAlignment="Center">
+                            <TextBlock x:Name="PlayerTitle" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+                            <TextBlock x:Name="PlayerStatus" Style="{DynamicResource HelmSecondaryText}" TextTrimming="CharacterEllipsis" TextWrapping="NoWrap" />
+                        </StackPanel>
+                    </DockPanel>
+                    <player:PlayerView x:Name="InlinePlayer" Height="360" />
+                </StackPanel>
+            </Border>
+
             <!-- Save a link -->
             <Border Style="{DynamicResource HelmSurface}" Padding="12" Margin="0,0,0,12">
                 <StackPanel>

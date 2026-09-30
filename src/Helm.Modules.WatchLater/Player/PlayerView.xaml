@@ -1,0 +1,20 @@
+<UserControl
+    x:Class="Helm.Modules.WatchLater.Player.PlayerView"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
+    xmlns:wv2="clr-namespace:Microsoft.Web.WebView2.Wpf;assembly=Microsoft.Web.WebView2.Wpf">
+
+    <!-- The video itself, used on the Watch Later page and in the mini player. A WebView2 is a native window that WPF
+         cannot draw over, so the controls of whoever hosts this sit around it, never on it. -->
+    <Grid Background="Black">
+        <wv2:WebView2 x:Name="Web" DefaultBackgroundColor="Black" />
+        <!-- The video cannot be played here -->
+        <StackPanel x:Name="Problem" Visibility="Collapsed" VerticalAlignment="Center" HorizontalAlignment="Center" Margin="24" MaxWidth="480">
+            <ui:SymbolIcon Symbol="VideoClip24" FontSize="40" HorizontalAlignment="Center" Foreground="{DynamicResource TextFillColorTertiaryBrush}" />
+            <TextBlock x:Name="ProblemText" Margin="0,12,0,0" TextAlignment="Center" TextWrapping="Wrap" Foreground="{DynamicResource TextFillColorPrimaryBrush}" />
+            <ui:Button Margin="0,16,0,0" HorizontalAlignment="Center" Appearance="Primary" Icon="{ui:SymbolIcon Open24}" Content="Open in the browser"
+                       Click="Browser_Click" />
+        </StackPanel>
+    </Grid>
+</UserControl>
