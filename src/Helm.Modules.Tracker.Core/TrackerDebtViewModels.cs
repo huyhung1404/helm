@@ -100,13 +100,13 @@ public sealed partial class DebtPersonViewModel : ObservableObject
 
     public bool IsOverdue => Due is { } due && due < _now;
 
-    /// <summary>"Owes me · 3 entries · Due tomorrow 18:00" (open) or "Settled 28/09/2026 14:00 · 2 entries".</summary>
+    /// <summary>"Owes me · 3 entries · Due tomorrow 18:00" (open) or "Settled Yesterday · 2 entries".</summary>
     public string Details
     {
         get
         {
             var parts = new List<string>();
-            if (_person.SettledAt is { } at) parts.Add("Settled " + TrackerFormat.When(at));
+            if (_person.SettledAt is { } at) parts.Add("Settled " + TrackerFormat.WhenRelative(at, DateTimeOffset.Now));
             else if (OwedToMe) parts.Add("Owes me");
             else if (IOwe) parts.Add("I owe");
             parts.Add(_person.Entries.Count == 1 ? "1 entry" : $"{_person.Entries.Count} entries");

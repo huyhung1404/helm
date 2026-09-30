@@ -2,6 +2,7 @@ using System.ComponentModel;
 using System.Text;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Threading;
 using Helm.Core.Modules;
 
 namespace Helm.Modules.Tracker;
@@ -13,6 +14,7 @@ namespace Helm.Modules.Tracker;
 public partial class TrackerContentPage : Page
 {
     private readonly TrackerModule _module;
+    private readonly DispatcherTimer _clock = new() { Interval = TimeSpan.FromSeconds(60) };
 
     public TrackerContentPage(TrackerModule module, TrackerViewModel viewModel)
     {
@@ -22,6 +24,10 @@ public partial class TrackerContentPage : Page
         // Module and page are both singletons, so the subscription lives as long as the page.
         module.PropertyChanged += OnModuleChanged;
         ApplyEnabled();
+        // "Added just now" goes stale after a minute; refresh the relative times while the page is on screen.
+        _clock.Tick += (_, _) => viewModel.RefreshDetails();
+        Loaded += (_, _) => _clock.Start();
+        Unloaded += (_, _) => _clock.Stop();
     }
 
     private void OnModuleChanged(object? sender, PropertyChangedEventArgs e)

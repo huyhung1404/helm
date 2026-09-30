@@ -67,7 +67,20 @@
             <Button Grid.Column="1" Style="{StaticResource TileButton}" Padding="12,8" Margin="12,0,0,0" HorizontalContentAlignment="Stretch"
                     Command="{Binding OpenConflictsCommand}" ToolTip="{Binding ConflictDetails}">
                 <DockPanel>
-                    <ui:SymbolIcon Symbol="KeyboardShift24" FontSize="24" Margin="0,0,12,0" VerticalAlignment="Center" />
+                    <ui:SymbolIcon FontSize="24" Filled="True" Margin="0,0,12,0" VerticalAlignment="Center">
+                        <ui:SymbolIcon.Style>
+                            <Style TargetType="ui:SymbolIcon">
+                                <Setter Property="Symbol" Value="CheckmarkCircle24" />
+                                <Setter Property="Foreground" Value="{DynamicResource SystemFillColorSuccessBrush}" />
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding HasConflicts}" Value="True">
+                                        <Setter Property="Symbol" Value="Warning24" />
+                                        <Setter Property="Foreground" Value="{DynamicResource SystemFillColorCautionBrush}" />
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </ui:SymbolIcon.Style>
+                    </ui:SymbolIcon>
                     <StackPanel VerticalAlignment="Center">
                         <TextBlock Text="Shortcut conflicts" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
                         <TextBlock Text="{Binding ConflictSummary}" Style="{DynamicResource HelmSecondaryText}" TextWrapping="NoWrap" TextTrimming="CharacterEllipsis" />
@@ -122,6 +135,11 @@
                         <TextBlock Text="Tools you turn on will appear here." Style="{DynamicResource HelmSecondaryText}"
                                    Visibility="{Binding HasQuickAccess, Converter={StaticResource InverseBoolToVisibility}}" />
                         <ItemsControl ItemsSource="{Binding QuickAccess}">
+                            <ItemsControl.ItemContainerStyle>
+                                <Style TargetType="ContentPresenter">
+                                    <Setter Property="AutomationProperties.Name" Value="{Binding DisplayName}" />
+                                </Style>
+                            </ItemsControl.ItemContainerStyle>
                             <ItemsControl.ItemsPanel>
                                 <ItemsPanelTemplate>
                                     <UniformGrid Columns="2" />
@@ -130,7 +148,7 @@
                             <ItemsControl.ItemTemplate>
                                 <DataTemplate>
                                     <!-- Content at the top: a name on two lines must not push its icon above the others in the row. -->
-                                    <Button Style="{StaticResource TileButton}" Padding="8,12" Margin="2" HorizontalContentAlignment="Center"
+                                    <Button Style="{StaticResource TileButton}" Padding="8,12" Margin="2" HorizontalContentAlignment="Center" AutomationProperties.Name="{Binding DisplayName}"
                                             VerticalAlignment="Stretch" VerticalContentAlignment="Top"
                                             Command="{Binding DataContext.LaunchModuleCommand, RelativeSource={RelativeSource AncestorType=Page}}"
                                             CommandParameter="{Binding}">
@@ -152,6 +170,11 @@
                         <TextBlock Text="Keyboard shortcuts of your tools will appear here." Style="{DynamicResource HelmSecondaryText}"
                                    Visibility="{Binding HasShortcuts, Converter={StaticResource InverseBoolToVisibility}}" />
                         <ItemsControl ItemsSource="{Binding Shortcuts}">
+                            <ItemsControl.ItemContainerStyle>
+                                <Style TargetType="ContentPresenter">
+                                    <Setter Property="AutomationProperties.Name" Value="{Binding Description}" />
+                                </Style>
+                            </ItemsControl.ItemContainerStyle>
                             <ItemsControl.ItemTemplate>
                                 <DataTemplate DataType="{x:Type vm:ShortcutItem}">
                                     <Grid Margin="0,4">
@@ -182,6 +205,11 @@
                         </ui:Button>
                     </Grid>
                     <ItemsControl ItemsSource="{Binding Utilities}">
+                        <ItemsControl.ItemContainerStyle>
+                            <Style TargetType="ContentPresenter">
+                                <Setter Property="AutomationProperties.Name" Value="{Binding DisplayName}" />
+                            </Style>
+                        </ItemsControl.ItemContainerStyle>
                         <ItemsControl.ItemTemplate>
                             <DataTemplate>
                                 <Border BorderThickness="0,1,0,0" BorderBrush="{DynamicResource CardStrokeColorDefaultBrush}">
@@ -195,8 +223,8 @@
                                         <ContentPresenter Content="{Binding Converter={StaticResource ModuleIcon}, ConverterParameter=20}" VerticalAlignment="Center" HorizontalAlignment="Left"
                                                           TextElement.Foreground="{DynamicResource AccentTextFillColorPrimaryBrush}" />
                                         <TextBlock Grid.Column="1" Text="{Binding DisplayName}" VerticalAlignment="Center" />
-                                        <ui:ToggleSwitch Grid.Column="2" IsChecked="{Binding IsEnabled, Mode=TwoWay}" VerticalAlignment="Center" Margin="0,0,4,0" />
-                                        <ui:Button Grid.Column="3" Appearance="Transparent" Padding="8"
+                                        <ui:ToggleSwitch Grid.Column="2" IsChecked="{Binding IsEnabled, Mode=TwoWay}" AutomationProperties.Name="{Binding DisplayName}" VerticalAlignment="Center" Margin="0,0,4,0" />
+                                        <ui:Button Grid.Column="3" Appearance="Transparent" Padding="8" AutomationProperties.Name="{Binding DisplayName, StringFormat='{}{0} settings'}"
                                                    Command="{Binding DataContext.OpenModuleCommand, RelativeSource={RelativeSource AncestorType=Page}}"
                                                    CommandParameter="{Binding}">
                                             <ui:SymbolIcon Symbol="ChevronRight20" />

@@ -19,7 +19,7 @@
         <Style x:Key="ToolbarAction" TargetType="ui:Button" BasedOn="{StaticResource {x:Type ui:Button}}">
             <Setter Property="Appearance" Value="Transparent" />
             <Setter Property="Padding" Value="8,6" />
-            <Setter Property="Margin" Value="2,0,0,0" />
+            <Setter Property="Margin" Value="4,0,0,0" />
             <Setter Property="MinWidth" Value="0" />
             <Setter Property="VerticalAlignment" Value="Center" />
         </Style>
@@ -32,6 +32,11 @@
                     <Setter Property="FontFamily" Value="Cascadia Mono, Consolas, Courier New" />
                 </DataTrigger>
             </Style.Triggers>
+        </Style>
+
+        <!-- A note row reads as its title to screen readers, not as the view model's type name -->
+        <Style x:Key="NoteRow" TargetType="ListBoxItem" BasedOn="{StaticResource HelmListItem}">
+            <Setter Property="AutomationProperties.Name" Value="{Binding Title}" />
         </Style>
     </Page.Resources>
 
@@ -98,7 +103,7 @@
 
                     <ListBox x:Name="List" Grid.Row="2" Margin="4,0,4,4" ItemsSource="{Binding Notes}" SelectedItem="{Binding SelectedNote}"
                              AutomationProperties.Name="Notes" ScrollViewer.HorizontalScrollBarVisibility="Disabled"
-                             Background="Transparent" BorderThickness="0" ItemContainerStyle="{StaticResource HelmListItem}"
+                             Background="Transparent" BorderThickness="0" ItemContainerStyle="{StaticResource NoteRow}"
                              Visibility="{Binding HasNotes, Converter={StaticResource BoolToVisibility}}">
                         <ListBox.ItemTemplate>
                             <DataTemplate DataType="{x:Type local:NoteRowViewModel}">
@@ -142,7 +147,7 @@
                         <TextBlock Margin="0,16,0,4" HorizontalAlignment="Center" FontSize="16" FontWeight="SemiBold" Text="Pick a note, or start a new one" />
                         <TextBlock HorizontalAlignment="Center" TextAlignment="Center" Style="{DynamicResource HelmSecondaryText}" MaxWidth="360"
                                    Text="Notes save as you type and sync to your other devices. Win+Alt+N captures a note from anywhere." />
-                        <ui:Button Margin="0,16,0,0" HorizontalAlignment="Center" Appearance="Primary" Content="New note" Icon="{ui:SymbolIcon Add24}"
+                        <ui:Button Margin="0,16,0,0" HorizontalAlignment="Center" Appearance="Secondary" Content="New note" Icon="{ui:SymbolIcon Add24}"
                                    Command="{Binding NewNoteCommand}" />
                     </StackPanel>
 
@@ -177,11 +182,11 @@
                                            Visibility="{Binding EditorLinks, Converter={StaticResource NotEmptyToVisibility}}" />
                                 <ui:Button Style="{StaticResource ToolbarAction}" Icon="{ui:SymbolIcon Copy24}" ToolTip="Copy the note" AutomationProperties.Name="Copy the note"
                                            Command="{Binding CopyNoteCommand}" />
-                                <ui:Button Style="{StaticResource ToolbarAction}" Icon="{ui:SymbolIcon Delete24}" ToolTip="Move to the trash" AutomationProperties.Name="Move to the trash"
+                                <ui:Button Style="{StaticResource ToolbarAction}" Icon="{ui:SymbolIcon Delete24}" ToolTip="Move to the trash" AutomationProperties.Name="Move to the trash" Margin="16,0,0,0"
                                            Command="{Binding TrashCommand}" Visibility="{Binding EditTrashed, Converter={StaticResource InverseBoolToVisibility}}" />
                                 <ui:Button Style="{StaticResource ToolbarAction}" Icon="{ui:SymbolIcon ArrowUndo24}" Content="Restore" AutomationProperties.Name="Restore"
                                            Command="{Binding RestoreCommand}" Visibility="{Binding EditTrashed, Converter={StaticResource BoolToVisibility}}" />
-                                <ui:Button Style="{StaticResource ToolbarAction}" Icon="{ui:SymbolIcon Delete24}" Content="Delete for good" AutomationProperties.Name="Delete for good"
+                                <ui:Button Style="{StaticResource ToolbarAction}" Icon="{ui:SymbolIcon Delete24}" Content="Delete for good" AutomationProperties.Name="Delete for good" Margin="16,0,0,0"
                                            Command="{Binding DeleteForeverCommand}" Visibility="{Binding EditTrashed, Converter={StaticResource BoolToVisibility}}" />
                             </StackPanel>
                             <TextBlock Text="{Binding EditorInfo}" Style="{DynamicResource HelmSecondaryText}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" TextWrapping="NoWrap" />

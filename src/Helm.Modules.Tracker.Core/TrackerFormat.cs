@@ -143,6 +143,25 @@ public static class TrackerFormat
         TimeZoneInfo.ConvertTime(at, zone ?? TimeZoneInfo.Local).ToString("g", CultureInfo.CurrentCulture);
 
     /// <summary>
+    /// "just now", "5 min ago", "14:30" (today), "Yesterday", "28 Sep" (this year) or "28 Sep 2025": the same ladder
+    /// as the Notes list, so both tools speak about time the same way.
+    /// </summary>
+    public static string WhenRelative(DateTimeOffset at, DateTimeOffset now, TimeZoneInfo? zone = null)
+    {
+        zone ??= TimeZoneInfo.Local;
+        var ago = now - at;
+        if (ago < TimeSpan.FromMinutes(1)) return "just now";
+        if (ago < TimeSpan.FromHours(1)) return $"{(int)ago.TotalMinutes} min ago";
+        var local = TimeZoneInfo.ConvertTime(at, zone).DateTime;
+        var today = TimeZoneInfo.ConvertTime(now, zone).Date;
+        if (local.Date == today) return local.ToString("t", CultureInfo.CurrentCulture);
+        if (local.Date == today.AddDays(-1)) return "Yesterday";
+        return local.Year == today.Year
+            ? local.ToString("d MMM", CultureInfo.CurrentCulture)
+            : local.ToString("d MMM yyyy", CultureInfo.CurrentCulture);
+    }
+
+    /// <summary>
     /// "Due today 14:30", "Due tomorrow", "Overdue by 2 days", "Due 30/09 09:00": the time is shown when one was set
     /// (<see cref="TrackerItem.DueAt"/>).
     /// </summary>

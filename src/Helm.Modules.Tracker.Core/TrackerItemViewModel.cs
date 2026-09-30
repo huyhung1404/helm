@@ -175,6 +175,7 @@ public sealed partial class TrackerItemViewModel : ObservableObject
         get
         {
             var parts = new List<string>();
+            var now = DateTimeOffset.Now;
             if (Item.IsRepeating)
             {
                 if (RepeatText.Length > 0) parts.Add(RepeatText);
@@ -185,7 +186,7 @@ public sealed partial class TrackerItemViewModel : ObservableObject
             else if (Item.Priority == TrackerPriority.Low) parts.Add(PriorityText);
             if (Item.CompletedAt is { } done)
             {
-                parts.Add((IsDebt ? "Settled " : "Done ") + TrackerFormat.When(done));
+                parts.Add((IsDebt ? "Settled " : "Done ") + TrackerFormat.WhenRelative(done, now));
                 if (!IsDebt)
                 {
                     // Same meaning as the history and the report: "took" counts from when it was added.
@@ -195,9 +196,9 @@ public sealed partial class TrackerItemViewModel : ObservableObject
             }
             else
             {
-                if (Item.DueAt is not null || Item.DueDate is not null) parts.Add(TrackerFormat.Due(Item, DateTimeOffset.Now));
-                if (Item.StartedExplicitly && Item.StartedAt is { } started) parts.Add("Started " + TrackerFormat.When(started));
-                else parts.Add("Added " + TrackerFormat.When(Item.CreatedAt));
+                if (Item.DueAt is not null || Item.DueDate is not null) parts.Add(TrackerFormat.Due(Item, now));
+                if (Item.StartedExplicitly && Item.StartedAt is { } started) parts.Add("Started " + TrackerFormat.WhenRelative(started, now));
+                else parts.Add("Added " + TrackerFormat.WhenRelative(Item.CreatedAt, now));
             }
             return string.Join(" · ", parts);
         }

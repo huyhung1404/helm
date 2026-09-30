@@ -83,6 +83,8 @@ internal sealed partial class HomeViewModel : ObservableObject
 
     public bool HasShortcuts => Shortcuts.Count > 0;
 
+    public bool HasConflicts => ConflictCount > 0;
+
     public string SortTooltip => SortMode == UtilitiesSortMode.Alphabetical ? "Sorted alphabetically (click to group)" : "Grouped by category (click to sort A–Z)";
 
     [RelayCommand]
@@ -194,6 +196,7 @@ internal sealed partial class HomeViewModel : ObservableObject
     {
         var conflicts = _hotkeys.Conflicts;
         ConflictCount = conflicts.Count;
+        OnPropertyChanged(nameof(HasConflicts));
         ConflictSummary = conflicts.Count switch
         {
             0 => "No conflicts found",

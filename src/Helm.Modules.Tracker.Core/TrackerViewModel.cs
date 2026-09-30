@@ -791,6 +791,13 @@ public sealed partial class TrackerViewModel : ObservableObject
         NetText = TrackerFormat.Balance(owedToMe - iOwe, ws.Currency);
     }
 
+    /// <summary>Re-reads every row's secondary line so "just now" becomes "1 min ago" without a reload.</summary>
+    public void RefreshDetails()
+    {
+        foreach (var row in OpenItems) row.NotifyDetails();
+        foreach (var row in CompletedItems) row.NotifyDetails();
+    }
+
     private TrackerItemViewModel Row(string id, TrackerItem item, TrackerWorkspace ws, DateOnly today)
     {
         var completions = item.SeriesId is { } series ? _store.SeriesCompletions(series) : 0;

@@ -13,7 +13,7 @@
         <Style x:Key="RowAction" TargetType="ui:Button" BasedOn="{StaticResource {x:Type ui:Button}}">
             <Setter Property="Appearance" Value="Transparent" />
             <Setter Property="Padding" Value="6" />
-            <Setter Property="Margin" Value="2,0,0,0" />
+            <Setter Property="Margin" Value="4,0,0,0" />
             <Setter Property="MinWidth" Value="0" />
             <Setter Property="VerticalAlignment" Value="Center" />
         </Style>
@@ -145,7 +145,7 @@
                                             </TextBlock.Style>
                                         </TextBlock>
                                         <TextBlock Grid.Column="4" Text="{Binding BalanceText}" Style="{DynamicResource HelmSecondaryText}" Margin="12,0,0,0" VerticalAlignment="Center" />
-                                        <ui:Button Grid.Column="5" Style="{StaticResource RowAction}" Icon="{ui:SymbolIcon Delete24}" ToolTip="Delete this entry" AutomationProperties.Name="Delete entry"
+                                        <ui:Button Grid.Column="5" Style="{StaticResource RowAction}" Icon="{ui:SymbolIcon Delete24}" ToolTip="Delete this entry" AutomationProperties.Name="Delete entry" Margin="16,0,0,0"
                                                    Command="{Binding DeleteCommand}" />
                                     </Grid>
                                 </DataTemplate>
@@ -176,17 +176,17 @@
                                 <Border CornerRadius="4" Padding="6,0" Margin="0,0,6,0" VerticalAlignment="Center"
                                         Background="{DynamicResource ControlFillColorSecondaryBrush}"
                                         Visibility="{Binding IsUrgent, Converter={StaticResource BoolToVisibility}}">
-                                    <TextBlock Text="Urgent" FontSize="11" FontWeight="SemiBold" Foreground="{DynamicResource SystemFillColorCriticalBrush}" />
+                                    <TextBlock Text="Urgent" FontSize="12" FontWeight="SemiBold" Foreground="{DynamicResource SystemFillColorCriticalBrush}" />
                                 </Border>
                                 <Border CornerRadius="4" Padding="6,0" Margin="0,0,6,0" VerticalAlignment="Center"
                                         Background="{DynamicResource ControlFillColorSecondaryBrush}"
                                         Visibility="{Binding IsHigh, Converter={StaticResource BoolToVisibility}}">
-                                    <TextBlock Text="High" FontSize="11" FontWeight="SemiBold" Foreground="{DynamicResource AccentTextFillColorPrimaryBrush}" />
+                                    <TextBlock Text="High" FontSize="12" FontWeight="SemiBold" Foreground="{DynamicResource AccentTextFillColorPrimaryBrush}" />
                                 </Border>
                                 <Border CornerRadius="4" Padding="6,0" Margin="0,0,6,0" VerticalAlignment="Center"
                                         Background="{DynamicResource ControlFillColorSecondaryBrush}"
                                         Visibility="{Binding IsStarted, Converter={StaticResource BoolToVisibility}}">
-                                    <TextBlock Text="In progress" FontSize="11" FontWeight="SemiBold" Foreground="{DynamicResource AccentTextFillColorPrimaryBrush}" />
+                                    <TextBlock Text="In progress" FontSize="12" FontWeight="SemiBold" Foreground="{DynamicResource AccentTextFillColorPrimaryBrush}" />
                                 </Border>
                                 <Border CornerRadius="4" Padding="4,0" Margin="0,0,6,0" VerticalAlignment="Center"
                                         Background="{DynamicResource ControlFillColorSecondaryBrush}" ToolTip="{Binding RepeatText}"
@@ -196,7 +196,7 @@
                                 <Border CornerRadius="4" Padding="6,0" Margin="0,0,6,0" VerticalAlignment="Center"
                                         Background="{DynamicResource ControlFillColorSecondaryBrush}" ToolTip="Subtasks done"
                                         Visibility="{Binding HasSubtasks, Converter={StaticResource BoolToVisibility}}">
-                                    <TextBlock Text="{Binding SubtaskProgress}" FontSize="11" FontWeight="SemiBold" />
+                                    <TextBlock Text="{Binding SubtaskProgress}" FontSize="12" FontWeight="SemiBold" />
                                 </Border>
                             </StackPanel>
                             <TextBlock Text="{Binding Title}" TextWrapping="Wrap" Margin="0,1,0,0">
@@ -246,7 +246,7 @@
                             <ui:Button Style="{StaticResource RowAction}" Icon="{ui:SymbolIcon Link24}" ToolTip="Link a note, or write a new one" AutomationProperties.Name="Link a note"
                                        Command="{Binding Links.StartPickingCommand}" Visibility="{Binding Links, Converter={StaticResource NotEmptyToVisibility}}" />
                             <ui:Button Style="{StaticResource RowAction}" Icon="{ui:SymbolIcon Edit24}" ToolTip="Edit" AutomationProperties.Name="Edit" Command="{Binding BeginEditCommand}" />
-                            <ui:Button Style="{StaticResource RowAction}" Icon="{ui:SymbolIcon Delete24}" ToolTip="Delete" AutomationProperties.Name="Delete" Command="{Binding DeleteCommand}" />
+                            <ui:Button Style="{StaticResource RowAction}" Icon="{ui:SymbolIcon Delete24}" ToolTip="Delete" AutomationProperties.Name="Delete" Margin="16,0,0,0" Command="{Binding DeleteCommand}" />
                         </StackPanel>
                     </Grid>
 
@@ -256,7 +256,7 @@
                             <DataTemplate DataType="{x:Type local:TrackerItemViewModel}">
                                 <DockPanel Margin="0,1">
                                     <ui:Button DockPanel.Dock="Right" Style="{StaticResource RowAction}" Icon="{ui:SymbolIcon Delete24}" ToolTip="Delete the subtask"
-                                               AutomationProperties.Name="Delete subtask" Command="{Binding DeleteCommand}" />
+                                               AutomationProperties.Name="Delete subtask" Margin="16,0,0,0" Command="{Binding DeleteCommand}" />
                                     <CheckBox MinWidth="0" IsChecked="{Binding Done}" AutomationProperties.Name="{Binding Title}" VerticalAlignment="Center">
                                         <TextBlock Text="{Binding Title}" TextWrapping="Wrap">
                                             <TextBlock.Style>
@@ -287,30 +287,53 @@
                     <!-- Inline editor -->
                     <StackPanel Margin="32,8,0,6" Visibility="{Binding IsEditing, Converter={StaticResource BoolToVisibility}}">
                         <WrapPanel Visibility="{Binding IsDebt, Converter={StaticResource BoolToVisibility}}">
-                            <ui:TextBox Width="200" Margin="0,0,8,8" PlaceholderText="Person" AutomationProperties.Name="Edit person" Text="{Binding EditPerson, UpdateSourceTrigger=PropertyChanged}" />
-                            <ui:TextBox Width="160" Margin="0,0,8,8" PlaceholderText="Amount" AutomationProperties.Name="Edit amount" Text="{Binding EditAmount, UpdateSourceTrigger=PropertyChanged}" />
-                            <ComboBox Width="140" Margin="0,0,8,8"
-                                      ItemsSource="{Binding DataContext.DirectionNames, RelativeSource={RelativeSource AncestorType=Page}}"
-                                      SelectedIndex="{Binding EditDirectionIndex}" AutomationProperties.Name="Edit direction" />
+                            <StackPanel Margin="0,0,8,8">
+                                <TextBlock Text="Person" Style="{DynamicResource HelmSecondaryText}" Margin="0,0,0,4" />
+                                <ui:TextBox Width="200" PlaceholderText="Person" AutomationProperties.Name="Edit person" Text="{Binding EditPerson, UpdateSourceTrigger=PropertyChanged}" />
+                            </StackPanel>
+                            <StackPanel Margin="0,0,8,8">
+                                <TextBlock Text="Amount" Style="{DynamicResource HelmSecondaryText}" Margin="0,0,0,4" />
+                                <ui:TextBox Width="160" PlaceholderText="Amount" AutomationProperties.Name="Edit amount" Text="{Binding EditAmount, UpdateSourceTrigger=PropertyChanged}" />
+                            </StackPanel>
+                            <StackPanel Margin="0,0,8,8">
+                                <TextBlock Text="Direction" Style="{DynamicResource HelmSecondaryText}" Margin="0,0,0,4" />
+                                <ComboBox Width="140"
+                                          ItemsSource="{Binding DataContext.DirectionNames, RelativeSource={RelativeSource AncestorType=Page}}"
+                                          SelectedIndex="{Binding EditDirectionIndex}" AutomationProperties.Name="Edit direction" />
+                            </StackPanel>
                         </WrapPanel>
                         <ui:TextBox Margin="0,0,0,8" PlaceholderText="Title" AutomationProperties.Name="Edit title" Text="{Binding EditTitle, UpdateSourceTrigger=PropertyChanged}" />
                         <ui:TextBox Margin="0,0,0,8" PlaceholderText="Notes" AutomationProperties.Name="Edit notes" AcceptsReturn="True" TextWrapping="Wrap" MinHeight="60"
                                     Text="{Binding EditNotes, UpdateSourceTrigger=PropertyChanged}" />
                         <WrapPanel>
-                            <ComboBox Width="140" Margin="0,0,8,8"
-                                      Visibility="{Binding IsDebt, Converter={StaticResource InverseBoolToVisibility}}"
-                                      ItemsSource="{Binding DataContext.PriorityNames, RelativeSource={RelativeSource AncestorType=Page}}"
-                                      SelectedIndex="{Binding EditPriorityIndex}" AutomationProperties.Name="Edit priority" />
-                            <DatePicker Width="160" Margin="0,0,8,8" SelectedDate="{Binding EditDueDate}" ToolTip="Due date" AutomationProperties.Name="Edit due date" />
-                            <ui:TextBox Width="92" Margin="0,0,8,8" PlaceholderText="HH:mm" ToolTip="Due time (optional)" AutomationProperties.Name="Edit due time"
-                                        Text="{Binding EditDueTimeText, UpdateSourceTrigger=PropertyChanged}" />
-                            <ComboBox Width="150" Margin="0,0,8,8" SelectedIndex="{Binding EditRepeatIndex}" AutomationProperties.Name="Edit repeat"
-                                      ItemsSource="{Binding DataContext.RepeatNames, RelativeSource={RelativeSource AncestorType=Page}}"
-                                      Visibility="{Binding IsRepeating, Converter={StaticResource BoolToVisibility}}" ToolTip="Does not repeat stops it from coming back" />
-                            <ui:TextBox Width="110" Margin="0,0,8,8" PlaceholderText="Days" AutomationProperties.Name="Edit repeat days"
-                                        Text="{Binding EditRepeatDays, UpdateSourceTrigger=PropertyChanged}" Visibility="{Binding IsRepeating, Converter={StaticResource BoolToVisibility}}" />
-                            <ui:Button Margin="0,0,8,8" Appearance="Primary" Content="Save" Icon="{ui:SymbolIcon Save24}" Command="{Binding SaveEditCommand}" />
-                            <ui:Button Margin="0,0,8,8" Content="Cancel" Command="{Binding CancelEditCommand}" />
+                            <StackPanel Margin="0,0,8,8" Visibility="{Binding IsDebt, Converter={StaticResource InverseBoolToVisibility}}">
+                                <TextBlock Text="Priority" Style="{DynamicResource HelmSecondaryText}" Margin="0,0,0,4" />
+                                <ComboBox Width="140"
+                                          ItemsSource="{Binding DataContext.PriorityNames, RelativeSource={RelativeSource AncestorType=Page}}"
+                                          SelectedIndex="{Binding EditPriorityIndex}" AutomationProperties.Name="Edit priority" />
+                            </StackPanel>
+                            <StackPanel Margin="0,0,8,8">
+                                <TextBlock Text="Due date" Style="{DynamicResource HelmSecondaryText}" Margin="0,0,0,4" />
+                                <DatePicker Width="160" SelectedDate="{Binding EditDueDate}" ToolTip="Due date" AutomationProperties.Name="Edit due date" />
+                            </StackPanel>
+                            <StackPanel Margin="0,0,8,8">
+                                <TextBlock Text="Time" Style="{DynamicResource HelmSecondaryText}" Margin="0,0,0,4" />
+                                <ui:TextBox Width="92" PlaceholderText="HH:mm" ToolTip="Due time (optional)" AutomationProperties.Name="Edit due time"
+                                            Text="{Binding EditDueTimeText, UpdateSourceTrigger=PropertyChanged}" />
+                            </StackPanel>
+                            <StackPanel Margin="0,0,8,8" Visibility="{Binding IsRepeating, Converter={StaticResource BoolToVisibility}}">
+                                <TextBlock Text="Repeat" Style="{DynamicResource HelmSecondaryText}" Margin="0,0,0,4" />
+                                <ComboBox Width="150" SelectedIndex="{Binding EditRepeatIndex}" AutomationProperties.Name="Edit repeat"
+                                          ItemsSource="{Binding DataContext.RepeatNames, RelativeSource={RelativeSource AncestorType=Page}}"
+                                          ToolTip="Does not repeat stops it from coming back" />
+                            </StackPanel>
+                            <StackPanel Margin="0,0,8,8" Visibility="{Binding IsRepeating, Converter={StaticResource BoolToVisibility}}">
+                                <TextBlock Text="Days" Style="{DynamicResource HelmSecondaryText}" Margin="0,0,0,4" />
+                                <ui:TextBox Width="110" PlaceholderText="Days" AutomationProperties.Name="Edit repeat days"
+                                            Text="{Binding EditRepeatDays, UpdateSourceTrigger=PropertyChanged}" />
+                            </StackPanel>
+                            <ui:Button Margin="0,0,8,8" VerticalAlignment="Bottom" Appearance="Primary" Content="Save" Icon="{ui:SymbolIcon Save24}" Command="{Binding SaveEditCommand}" />
+                            <ui:Button Margin="0,0,8,8" VerticalAlignment="Bottom" Content="Cancel" Command="{Binding CancelEditCommand}" />
                         </WrapPanel>
                     </StackPanel>
                 </StackPanel>
@@ -568,20 +591,29 @@
                 <StackPanel>
                     <WrapPanel Visibility="{Binding IsDebtWorkspace, Converter={StaticResource BoolToVisibility}}">
                         <!-- Typing a name already in the book adds to that person -->
-                        <ui:TextBox Width="220" Margin="0,0,8,8" PlaceholderText="Person" AutomationProperties.Name="Person" Icon="{ui:SymbolIcon Person24}"
-                                    ToolTip="Who it is with. A name already in the book adds to that person." Text="{Binding NewPerson, UpdateSourceTrigger=PropertyChanged}">
-                            <ui:TextBox.InputBindings>
-                                <KeyBinding Key="Enter" Command="{Binding AddCommand}" />
-                            </ui:TextBox.InputBindings>
-                        </ui:TextBox>
-                        <ui:TextBox x:Name="AmountBox" Width="180" Margin="0,0,8,8" PlaceholderText="Amount, e.g. 150k" AutomationProperties.Name="Amount" Icon="{ui:SymbolIcon Money24}"
-                                    Text="{Binding NewAmount, UpdateSourceTrigger=PropertyChanged}" TextChanged="OnAmountTextChanged">
-                            <ui:TextBox.InputBindings>
-                                <KeyBinding Key="Enter" Command="{Binding AddCommand}" />
-                            </ui:TextBox.InputBindings>
-                        </ui:TextBox>
-                        <ComboBox Width="140" Margin="0,0,8,8" ItemsSource="{Binding DebtKindNames}" SelectedIndex="{Binding NewDebtKindIndex}" AutomationProperties.Name="Kind"
-                                  ToolTip="Owes me adds, I owe subtracts, a repayment brings the balance back toward 0" />
+                        <StackPanel Margin="0,0,8,8">
+                            <TextBlock Text="Person" Style="{DynamicResource HelmSecondaryText}" Margin="0,0,0,4" />
+                            <ui:TextBox Width="220" PlaceholderText="Person" AutomationProperties.Name="Person" Icon="{ui:SymbolIcon Person24}"
+                                        ToolTip="Who it is with. A name already in the book adds to that person." Text="{Binding NewPerson, UpdateSourceTrigger=PropertyChanged}">
+                                <ui:TextBox.InputBindings>
+                                    <KeyBinding Key="Enter" Command="{Binding AddCommand}" />
+                                </ui:TextBox.InputBindings>
+                            </ui:TextBox>
+                        </StackPanel>
+                        <StackPanel Margin="0,0,8,8">
+                            <TextBlock Text="Amount" Style="{DynamicResource HelmSecondaryText}" Margin="0,0,0,4" />
+                            <ui:TextBox x:Name="AmountBox" Width="180" PlaceholderText="Amount, e.g. 150k" AutomationProperties.Name="Amount" Icon="{ui:SymbolIcon Money24}"
+                                        Text="{Binding NewAmount, UpdateSourceTrigger=PropertyChanged}" TextChanged="OnAmountTextChanged">
+                                <ui:TextBox.InputBindings>
+                                    <KeyBinding Key="Enter" Command="{Binding AddCommand}" />
+                                </ui:TextBox.InputBindings>
+                            </ui:TextBox>
+                        </StackPanel>
+                        <StackPanel Margin="0,0,8,8">
+                            <TextBlock Text="Kind" Style="{DynamicResource HelmSecondaryText}" Margin="0,0,0,4" />
+                            <ComboBox Width="140" ItemsSource="{Binding DebtKindNames}" SelectedIndex="{Binding NewDebtKindIndex}" AutomationProperties.Name="Kind"
+                                      ToolTip="Owes me adds, I owe subtracts, a repayment brings the balance back toward 0" />
+                        </StackPanel>
                     </WrapPanel>
                     <!-- Names already in the book that match what is typed: one click picks it -->
                     <ItemsControl Margin="0,0,0,8" ItemsSource="{Binding PersonSuggestions}" Visibility="{Binding HasPersonSuggestions, Converter={StaticResource BoolToVisibility}}">
@@ -603,17 +635,31 @@
                         </ui:TextBox.InputBindings>
                     </ui:TextBox>
                     <WrapPanel>
-                        <ComboBox Width="140" Margin="0,0,8,0" ItemsSource="{Binding PriorityNames}" SelectedIndex="{Binding NewPriorityIndex}"
-                                  ToolTip="Priority" AutomationProperties.Name="Priority" Visibility="{Binding IsTaskWorkspace, Converter={StaticResource BoolToVisibility}}" />
-                        <ComboBox Width="150" Margin="0,0,8,0" ItemsSource="{Binding RepeatNames}" SelectedIndex="{Binding NewRepeatIndex}"
-                                  ToolTip="A repeating task comes back every day; the report counts the days you did it" AutomationProperties.Name="Repeat"
-                                  Visibility="{Binding IsTaskWorkspace, Converter={StaticResource BoolToVisibility}}" />
-                        <ui:TextBox Width="110" Margin="0,0,8,0" PlaceholderText="Days" ToolTip="For how many days (today counts)" AutomationProperties.Name="Repeat days"
-                                    Text="{Binding NewRepeatDays, UpdateSourceTrigger=PropertyChanged}" Visibility="{Binding NewRepeatsForDays, Converter={StaticResource BoolToVisibility}}" />
-                        <DatePicker Width="160" Margin="0,0,8,0" SelectedDate="{Binding NewDueDate}" ToolTip="Due date (optional)" AutomationProperties.Name="Due date" />
-                        <ui:TextBox Width="92" Margin="0,0,8,0" PlaceholderText="HH:mm" ToolTip="Due time (optional)" AutomationProperties.Name="Due time"
-                                    Text="{Binding NewDueTimeText, UpdateSourceTrigger=PropertyChanged}" />
-                        <ui:Button Appearance="Primary" Content="Add" Icon="{ui:SymbolIcon Add24}" Command="{Binding AddCommand}" />
+                        <StackPanel Margin="0,0,8,0" Visibility="{Binding IsTaskWorkspace, Converter={StaticResource BoolToVisibility}}">
+                            <TextBlock Text="Priority" Style="{DynamicResource HelmSecondaryText}" Margin="0,0,0,4" />
+                            <ComboBox Width="140" ItemsSource="{Binding PriorityNames}" SelectedIndex="{Binding NewPriorityIndex}"
+                                      ToolTip="Priority" AutomationProperties.Name="Priority" />
+                        </StackPanel>
+                        <StackPanel Margin="0,0,8,0" Visibility="{Binding IsTaskWorkspace, Converter={StaticResource BoolToVisibility}}">
+                            <TextBlock Text="Repeat" Style="{DynamicResource HelmSecondaryText}" Margin="0,0,0,4" />
+                            <ComboBox Width="150" ItemsSource="{Binding RepeatNames}" SelectedIndex="{Binding NewRepeatIndex}"
+                                      ToolTip="A repeating task comes back every day; the report counts the days you did it" AutomationProperties.Name="Repeat" />
+                        </StackPanel>
+                        <StackPanel Margin="0,0,8,0" Visibility="{Binding NewRepeatsForDays, Converter={StaticResource BoolToVisibility}}">
+                            <TextBlock Text="Days" Style="{DynamicResource HelmSecondaryText}" Margin="0,0,0,4" />
+                            <ui:TextBox Width="110" PlaceholderText="Days" ToolTip="For how many days (today counts)" AutomationProperties.Name="Repeat days"
+                                        Text="{Binding NewRepeatDays, UpdateSourceTrigger=PropertyChanged}" />
+                        </StackPanel>
+                        <StackPanel Margin="0,0,8,0">
+                            <TextBlock Text="Due date" Style="{DynamicResource HelmSecondaryText}" Margin="0,0,0,4" />
+                            <DatePicker Width="160" SelectedDate="{Binding NewDueDate}" ToolTip="Due date (optional)" AutomationProperties.Name="Due date" />
+                        </StackPanel>
+                        <StackPanel Margin="0,0,8,0">
+                            <TextBlock Text="Time" Style="{DynamicResource HelmSecondaryText}" Margin="0,0,0,4" />
+                            <ui:TextBox Width="92" PlaceholderText="HH:mm" ToolTip="Due time (optional)" AutomationProperties.Name="Due time"
+                                        Text="{Binding NewDueTimeText, UpdateSourceTrigger=PropertyChanged}" />
+                        </StackPanel>
+                        <ui:Button VerticalAlignment="Bottom" Appearance="Primary" Content="Add" Icon="{ui:SymbolIcon Add24}" Command="{Binding AddCommand}" />
                     </WrapPanel>
                 </StackPanel>
             </Border>
@@ -739,11 +785,11 @@
                                 <Grid ToolTip="{Binding ToolTip}" Background="Transparent">
                                     <Grid.RowDefinitions>
                                         <RowDefinition Height="64" />
-                                        <RowDefinition Height="18" />
+                                        <RowDefinition Height="20" />
                                     </Grid.RowDefinitions>
                                     <Border VerticalAlignment="Bottom" Height="{Binding BarHeight}" CornerRadius="2" Margin="1,0"
                                             Background="{DynamicResource AccentFillColorDefaultBrush}" />
-                                    <TextBlock Grid.Row="1" Text="{Binding Label}" FontSize="10" HorizontalAlignment="Center" TextWrapping="NoWrap"
+                                    <TextBlock Grid.Row="1" Text="{Binding Label}" FontSize="12" HorizontalAlignment="Center" TextWrapping="NoWrap"
                                                Foreground="{DynamicResource TextFillColorSecondaryBrush}" Margin="-20,2,-20,0" TextAlignment="Center" />
                                 </Grid>
                             </DataTemplate>
