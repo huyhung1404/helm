@@ -34,6 +34,12 @@ public interface ICaptureTarget
     /// <summary>Position among the targets (ascending).</summary>
     int Order { get; }
 
+    /// <summary>
+    /// True when shared text is clearly for this target (e.g. a video link for Watch Later), so the share sheet picks
+    /// it instead of the default target.
+    /// </summary>
+    bool Claims(string text) => false;
+
     CapturePreview Preview(string text);
 
     CaptureResult Capture(string text);

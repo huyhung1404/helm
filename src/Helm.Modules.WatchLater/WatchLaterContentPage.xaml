@@ -1,0 +1,305 @@
+<Page
+    x:Class="Helm.Modules.WatchLater.WatchLaterContentPage"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
+    xmlns:core="clr-namespace:Helm.Core.Ui;assembly=Helm.Core.Windows"
+    xmlns:local="clr-namespace:Helm.Modules.WatchLater;assembly=Helm.Modules.WatchLater.Core"
+    xmlns:self="clr-namespace:Helm.Modules.WatchLater"
+    Title="Watch Later" ScrollViewer.CanContentScroll="False">
+
+    <!-- Watch Later itself (menu and Quick access): a box to save a link, the filters, and the saved videos as cards.
+         The list scrolls by itself so the box and filters stay in view. Options live on WatchLaterPage. -->
+    <Page.Resources>
+        <self:ThumbnailConverter x:Key="Thumbnail" />
+
+        <!-- Small icon-only action on a card -->
+        <Style x:Key="CardAction" TargetType="ui:Button" BasedOn="{StaticResource {x:Type ui:Button}}">
+            <Setter Property="Appearance" Value="Transparent" />
+            <Setter Property="Padding" Value="7,5" />
+            <Setter Property="Margin" Value="0,0,2,0" />
+            <Setter Property="MinWidth" Value="0" />
+            <Setter Property="VerticalAlignment" Value="Center" />
+        </Style>
+
+        <!-- A filter above the list: the selected one is filled -->
+        <Style x:Key="FilterButton" TargetType="ui:Button" BasedOn="{StaticResource {x:Type ui:Button}}">
+            <Setter Property="Margin" Value="0,0,6,6" />
+            <Setter Property="Padding" Value="12,5" />
+            <Setter Property="Appearance" Value="Secondary" />
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding IsSelected}" Value="True">
+                    <Setter Property="Appearance" Value="Primary" />
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+
+        <!-- A small label over the thumbnail (length, Short) -->
+        <Style x:Key="Badge" TargetType="Border">
+            <Setter Property="CornerRadius" Value="4" />
+            <Setter Property="Padding" Value="6,2" />
+            <Setter Property="Margin" Value="8" />
+            <Setter Property="Background" Value="{DynamicResource SolidBackgroundFillColorBaseBrush}" />
+            <Setter Property="Opacity" Value="0.9" />
+        </Style>
+    </Page.Resources>
+
+    <Grid Margin="24,16,24,0">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+
+        <StackPanel Orientation="Horizontal" Margin="0,0,0,16">
+            <Image Source="{x:Static self:WatchLaterLogo.Image}" Width="32" Height="32" Margin="0,0,12,0" />
+            <TextBlock Text="Watch Later" FontSize="28" FontWeight="SemiBold" VerticalAlignment="Center" />
+        </StackPanel>
+
+        <!-- Shown while the tool is turned off -->
+        <ui:InfoBar x:Name="OffBar" Grid.Row="1" Severity="Informational" IsClosable="False" IsOpen="False" Visibility="Collapsed" Margin="0,0,0,12"
+                    Title="Watch Later is turned off" Message="Your saved videos are kept. Turn Watch Later on in its settings to add, watch and download." />
+
+        <!-- What happened: saved already, marked as watched, a problem -->
+        <Border Grid.Row="2" Style="{DynamicResource HelmSurface}" Margin="0,0,0,12" Padding="12,8"
+                Visibility="{Binding HasMessage, Converter={StaticResource BoolToVisibility}}">
+            <core:RowLayout>
+                <TextBlock Text="{Binding Message}" TextWrapping="Wrap" VerticalAlignment="Center" />
+                <ui:Button Style="{StaticResource CardAction}" Icon="{ui:SymbolIcon Dismiss24}" ToolTip="Dismiss" AutomationProperties.Name="Dismiss"
+                           Command="{Binding DismissMessageCommand}" />
+            </core:RowLayout>
+        </Border>
+
+        <StackPanel x:Name="Top" Grid.Row="3">
+            <!-- Save a link -->
+            <Border Style="{DynamicResource HelmSurface}" Padding="12" Margin="0,0,0,12">
+                <StackPanel>
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="3*" MinWidth="200" />
+                            <ColumnDefinition Width="8" />
+                            <ColumnDefinition Width="2*" MinWidth="140" />
+                            <ColumnDefinition Width="8" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <ui:TextBox x:Name="LinkBox" PlaceholderText="Paste a YouTube or Facebook link (Ctrl+L)" Icon="{ui:SymbolIcon Link24}"
+                                    AutomationProperties.Name="Video link" Text="{Binding NewLink, UpdateSourceTrigger=PropertyChanged}">
+                            <ui:TextBox.InputBindings>
+                                <KeyBinding Key="Return" Command="{Binding AddCommand}" />
+                            </ui:TextBox.InputBindings>
+                        </ui:TextBox>
+                        <ui:TextBox Grid.Column="2" PlaceholderText="Why you save it (optional)" AutomationProperties.Name="Note"
+                                    Text="{Binding NewNote, UpdateSourceTrigger=PropertyChanged}">
+                            <ui:TextBox.InputBindings>
+                                <KeyBinding Key="Return" Command="{Binding AddCommand}" />
+                            </ui:TextBox.InputBindings>
+                        </ui:TextBox>
+                        <ui:Button Grid.Column="4" Appearance="Primary" Content="Save" Icon="{ui:SymbolIcon Add24}" VerticalAlignment="Stretch"
+                                   Command="{Binding AddCommand}" IsEnabled="{Binding CanAdd}" />
+                    </Grid>
+                    <TextBlock Margin="4,6,0,0" Text="{Binding AddPreview}" Style="{DynamicResource HelmSecondaryText}"
+                               Visibility="{Binding AddPreview, Converter={StaticResource NotEmptyToVisibility}}" />
+                </StackPanel>
+            </Border>
+
+            <!-- Filters -->
+            <DockPanel Margin="0,0,0,6">
+                <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" Margin="12,0,0,6" VerticalAlignment="Top">
+                    <ComboBox Width="130" Margin="0,0,8,0" AutomationProperties.Name="Site" ItemsSource="{Binding SourceNames}" SelectedIndex="{Binding SourceIndex}" />
+                    <ui:TextBox x:Name="SearchBox" Width="220" PlaceholderText="Search (Ctrl+F)" Icon="{ui:SymbolIcon Search24}"
+                                AutomationProperties.Name="Search saved videos" Text="{Binding Search, UpdateSourceTrigger=PropertyChanged}" />
+                </StackPanel>
+                <ItemsControl ItemsSource="{Binding FilterTabs}" Focusable="False">
+                    <ItemsControl.ItemsPanel>
+                        <ItemsPanelTemplate>
+                            <WrapPanel />
+                        </ItemsPanelTemplate>
+                    </ItemsControl.ItemsPanel>
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate DataType="{x:Type local:WatchFilterTab}">
+                            <ui:Button Style="{StaticResource FilterButton}" Content="{Binding Label}" AutomationProperties.Name="{Binding Name}"
+                                       Command="{Binding DataContext.ShowFilterCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}" CommandParameter="{Binding}" />
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+            </DockPanel>
+
+            <!-- Pick the quality before downloading -->
+            <Border Style="{DynamicResource HelmSurface}" Margin="0,0,0,12" Visibility="{Binding IsPickerOpen, Converter={StaticResource BoolToVisibility}}">
+                <StackPanel>
+                    <TextBlock FontWeight="SemiBold" TextTrimming="CharacterEllipsis">
+                        <Run Text="Download " /><Run Text="{Binding PickerTitle, Mode=OneWay}" />
+                    </TextBlock>
+                    <TextBlock Margin="0,4,0,0" Text="{Binding PickerNote}" Style="{DynamicResource HelmSecondaryText}"
+                               Visibility="{Binding PickerNote, Converter={StaticResource NotEmptyToVisibility}}" />
+                    <ui:ProgressRing Margin="0,12,0,4" HorizontalAlignment="Left" Width="24" Height="24" IsIndeterminate="True"
+                                     Visibility="{Binding IsPickerLoading, Converter={StaticResource BoolToVisibility}}" />
+                    <ItemsControl Margin="0,8,0,0" ItemsSource="{Binding PickerOptions}" Focusable="False">
+                        <ItemsControl.ItemsPanel>
+                            <ItemsPanelTemplate>
+                                <WrapPanel />
+                            </ItemsPanelTemplate>
+                        </ItemsControl.ItemsPanel>
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate DataType="{x:Type local:QualityChoice}">
+                                <RadioButton Margin="0,0,20,6" GroupName="Quality" IsChecked="{Binding IsSelected, Mode=OneWay}" IsEnabled="{Binding Available}"
+                                             Command="{Binding DataContext.PickQualityCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}" CommandParameter="{Binding}"
+                                             AutomationProperties.Name="{Binding Label}">
+                                    <StackPanel>
+                                        <TextBlock Text="{Binding Label}" />
+                                        <TextBlock Text="{Binding Detail}" Style="{DynamicResource HelmSecondaryText}"
+                                                   Visibility="{Binding HasDetail, Converter={StaticResource BoolToVisibility}}" />
+                                    </StackPanel>
+                                </RadioButton>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                    <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
+                        <ui:Button Appearance="Primary" Content="{Binding PickerConfirmLabel}" Icon="{ui:SymbolIcon ArrowDownload24}"
+                                   Command="{Binding ConfirmDownloadCommand}" IsEnabled="{Binding CanConfirmPicker}" />
+                        <ui:Button Margin="8,0,0,0" Content="Install ffmpeg" Icon="{ui:SymbolIcon Video24}" Command="{Binding InstallFfmpegCommand}"
+                                   ToolTip="About 130 MB, once. Needed for most YouTube qualities."
+                                   Visibility="{Binding CanInstallFfmpeg, Converter={StaticResource BoolToVisibility}}" />
+                        <ui:Button Margin="8,0,0,0" Content="Cancel" Command="{Binding ClosePickerCommand}" />
+                    </StackPanel>
+                </StackPanel>
+            </Border>
+        </StackPanel>
+
+        <!-- The saved videos -->
+        <Grid x:Name="Body" Grid.Row="4">
+            <TextBlock Margin="4,8,4,16" Text="{Binding EmptyListText}" Style="{DynamicResource HelmSecondaryText}"
+                       Visibility="{Binding IsListEmpty, Converter={StaticResource BoolToVisibility}}" />
+            <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" PanningMode="VerticalOnly"
+                          Visibility="{Binding HasItems, Converter={StaticResource BoolToVisibility}}">
+                <ItemsControl ItemsSource="{Binding Items}" Focusable="False" Margin="0,0,0,24" AutomationProperties.Name="Saved videos">
+                    <ItemsControl.ItemsPanel>
+                        <ItemsPanelTemplate>
+                            <WrapPanel />
+                        </ItemsPanelTemplate>
+                    </ItemsControl.ItemsPanel>
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate DataType="{x:Type local:WatchRowViewModel}">
+                            <Border Style="{DynamicResource HelmSurface}" Padding="0" Width="296" Margin="0,0,12,12" AutomationProperties.Name="{Binding Title}">
+                                <StackPanel>
+                                    <!-- The thumbnail opens the video -->
+                                    <Button Cursor="Hand" ToolTip="Open the video" AutomationProperties.Name="Open the video" HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch"
+                                            Command="{Binding DataContext.OpenCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}" CommandParameter="{Binding}">
+                                        <Button.Template>
+                                            <ControlTemplate TargetType="Button">
+                                                <ContentPresenter />
+                                            </ControlTemplate>
+                                        </Button.Template>
+                                        <Grid Height="166">
+                                            <Border CornerRadius="7,7,0,0" Background="{DynamicResource ControlFillColorSecondaryBrush}">
+                                                <ui:SymbolIcon Symbol="VideoClip24" FontSize="36" Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                                               Visibility="{Binding HasNoThumbnail, Converter={StaticResource BoolToVisibility}}" />
+                                            </Border>
+                                            <Border CornerRadius="7,7,0,0" Visibility="{Binding HasThumbnail, Converter={StaticResource BoolToVisibility}}">
+                                                <Border.Background>
+                                                    <ImageBrush ImageSource="{Binding ThumbnailPath, Converter={StaticResource Thumbnail}}" Stretch="UniformToFill" />
+                                                </Border.Background>
+                                            </Border>
+                                            <Border Style="{StaticResource Badge}" HorizontalAlignment="Left" VerticalAlignment="Top"
+                                                    Background="{DynamicResource AccentFillColorDefaultBrush}" Opacity="1"
+                                                    Visibility="{Binding IsShort, Converter={StaticResource BoolToVisibility}}">
+                                                <TextBlock Text="{Binding KindName}" FontSize="11" FontWeight="SemiBold" Foreground="{DynamicResource TextOnAccentFillColorPrimaryBrush}" />
+                                            </Border>
+                                            <Border Style="{StaticResource Badge}" HorizontalAlignment="Right" VerticalAlignment="Bottom"
+                                                    Visibility="{Binding HasDuration, Converter={StaticResource BoolToVisibility}}">
+                                                <TextBlock Text="{Binding Duration}" FontSize="11" FontWeight="SemiBold" />
+                                            </Border>
+                                            <Border Style="{StaticResource Badge}" HorizontalAlignment="Left" VerticalAlignment="Bottom"
+                                                    Visibility="{Binding Watched, Converter={StaticResource BoolToVisibility}}">
+                                                <StackPanel Orientation="Horizontal">
+                                                    <ui:SymbolIcon Symbol="Checkmark24" FontSize="12" Margin="0,0,4,0" />
+                                                    <TextBlock Text="Watched" FontSize="11" FontWeight="SemiBold" />
+                                                </StackPanel>
+                                            </Border>
+                                        </Grid>
+                                    </Button>
+
+                                    <StackPanel Margin="12,10,12,8">
+                                        <TextBlock Text="{Binding Title}" FontWeight="SemiBold" TextWrapping="Wrap" TextTrimming="CharacterEllipsis"
+                                                   MaxHeight="40" ToolTip="{Binding Title}" />
+                                        <TextBlock Margin="0,2,0,0" Text="{Binding Subtitle}" Style="{DynamicResource HelmSecondaryText}"
+                                                   TextWrapping="NoWrap" TextTrimming="CharacterEllipsis" ToolTip="{Binding Subtitle}" />
+
+                                        <!-- The note, or its editor -->
+                                        <TextBlock Margin="0,6,0,0" Text="{Binding Note}" Style="{DynamicResource HelmSecondaryText}" FontStyle="Italic"
+                                                   TextTrimming="CharacterEllipsis" MaxHeight="48" ToolTip="{Binding Note}">
+                                            <TextBlock.Visibility>
+                                                <MultiBinding Converter="{x:Static self:AllTrueToVisibility.Instance}">
+                                                    <Binding Path="HasNote" />
+                                                    <Binding Path="IsNotEditingNote" />
+                                                </MultiBinding>
+                                            </TextBlock.Visibility>
+                                        </TextBlock>
+                                        <StackPanel Margin="0,6,0,0" Visibility="{Binding IsEditingNote, Converter={StaticResource BoolToVisibility}}">
+                                            <ui:TextBox PlaceholderText="Why you save it" AcceptsReturn="True" TextWrapping="Wrap" MaxHeight="120"
+                                                        VerticalScrollBarVisibility="Auto" AutomationProperties.Name="Note" Text="{Binding NoteDraft, UpdateSourceTrigger=PropertyChanged}" />
+                                            <StackPanel Orientation="Horizontal" Margin="0,6,0,0">
+                                                <ui:Button Appearance="Primary" Content="Save" Padding="12,4"
+                                                           Command="{Binding DataContext.SaveNoteCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}" CommandParameter="{Binding}" />
+                                                <ui:Button Margin="6,0,0,0" Content="Cancel" Padding="12,4"
+                                                           Command="{Binding DataContext.CancelNoteCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}" CommandParameter="{Binding}" />
+                                            </StackPanel>
+                                        </StackPanel>
+
+                                        <!-- The download -->
+                                        <TextBlock Margin="0,6,0,0" Text="{Binding DownloadText}" Style="{DynamicResource HelmSecondaryText}"
+                                                   TextTrimming="CharacterEllipsis" MaxHeight="34" ToolTip="{Binding DownloadText}"
+                                                   Visibility="{Binding HasDownloadText, Converter={StaticResource BoolToVisibility}}" />
+                                        <ProgressBar Margin="0,4,0,0" Height="4" Minimum="0" Maximum="100" Value="{Binding DownloadPercent, Mode=OneWay}"
+                                                     IsIndeterminate="{Binding IsProgressKnown, Converter={StaticResource InverseBool}}"
+                                                     Visibility="{Binding IsDownloading, Converter={StaticResource BoolToVisibility}}" />
+
+                                        <WrapPanel Margin="-6,6,0,0">
+                                            <ui:Button Style="{StaticResource CardAction}" Icon="{ui:SymbolIcon Play24}" ToolTip="Open the video" AutomationProperties.Name="Open"
+                                                       Command="{Binding DataContext.OpenCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}" CommandParameter="{Binding}" />
+                                            <ui:Button AutomationProperties.Name="Watched"
+                                                       Command="{Binding DataContext.ToggleWatchedCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}" CommandParameter="{Binding}">
+                                                <ui:Button.Style>
+                                                    <Style TargetType="ui:Button" BasedOn="{StaticResource CardAction}">
+                                                        <Setter Property="Icon" Value="{ui:SymbolIcon CheckmarkCircle24}" />
+                                                        <Setter Property="ToolTip" Value="Mark as watched" />
+                                                        <Style.Triggers>
+                                                            <DataTrigger Binding="{Binding Watched}" Value="True">
+                                                                <Setter Property="Icon" Value="{ui:SymbolIcon ArrowUndo24}" />
+                                                                <Setter Property="ToolTip" Value="Back to the list to watch" />
+                                                            </DataTrigger>
+                                                        </Style.Triggers>
+                                                    </Style>
+                                                </ui:Button.Style>
+                                            </ui:Button>
+                                            <ui:Button Style="{StaticResource CardAction}" Icon="{ui:SymbolIcon Edit24}" ToolTip="Edit the note" AutomationProperties.Name="Edit the note"
+                                                       Command="{Binding DataContext.EditNoteCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}" CommandParameter="{Binding}" />
+                                            <ui:Button Style="{StaticResource CardAction}" Icon="{ui:SymbolIcon ArrowDownload24}" ToolTip="Download (pick the quality first)" AutomationProperties.Name="Download"
+                                                       Command="{Binding DataContext.DownloadCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}" CommandParameter="{Binding}"
+                                                       Visibility="{Binding CanDownload, Converter={StaticResource BoolToVisibility}}" />
+                                            <ui:Button Style="{StaticResource CardAction}" Icon="{ui:SymbolIcon DismissCircle24}" ToolTip="Stop the download" AutomationProperties.Name="Stop the download"
+                                                       Command="{Binding DataContext.CancelDownloadCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}" CommandParameter="{Binding}"
+                                                       Visibility="{Binding CanCancelDownload, Converter={StaticResource BoolToVisibility}}" />
+                                            <ui:Button Style="{StaticResource CardAction}" Icon="{ui:SymbolIcon VideoClip24}" ToolTip="Play the downloaded file" AutomationProperties.Name="Play the downloaded file"
+                                                       Command="{Binding DataContext.OpenFileCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}" CommandParameter="{Binding}"
+                                                       Visibility="{Binding CanOpenFile, Converter={StaticResource BoolToVisibility}}" />
+                                            <ui:Button Style="{StaticResource CardAction}" Icon="{ui:SymbolIcon FolderOpen24}" ToolTip="Show the file in its folder" AutomationProperties.Name="Show the file"
+                                                       Command="{Binding DataContext.ShowFileCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}" CommandParameter="{Binding}"
+                                                       Visibility="{Binding CanOpenFile, Converter={StaticResource BoolToVisibility}}" />
+                                            <ui:Button Style="{StaticResource CardAction}" Icon="{ui:SymbolIcon Copy24}" ToolTip="Copy the link" AutomationProperties.Name="Copy the link"
+                                                       Command="{Binding DataContext.CopyLinkCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}" CommandParameter="{Binding}" />
+                                            <ui:Button Style="{StaticResource CardAction}" Icon="{ui:SymbolIcon Delete24}" ToolTip="Delete" AutomationProperties.Name="Delete"
+                                                       Command="{Binding DataContext.DeleteCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}" CommandParameter="{Binding}" />
+                                        </WrapPanel>
+                                    </StackPanel>
+                                </StackPanel>
+                            </Border>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+            </ScrollViewer>
+        </Grid>
+    </Grid>
+</Page>

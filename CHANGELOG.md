@@ -3,6 +3,26 @@
 All notable changes to Helm. The top section is used as the GitHub release body and as the Velopack release notes.
 Format: [Keep a Changelog](https://keepachangelog.com), versions follow [SemVer](https://semver.org).
 
+## [Unreleased]
+
+### Added
+- **Watch Later** (PC and Android): a place for the YouTube and Facebook videos, Shorts and Reels you want to watch
+  later, synced end-to-end encrypted like your notes.
+  - Save: on the phone, tap Share → **Save to Helm** in YouTube or Facebook (a video link picks Watch Later by itself);
+    on PC, paste or drop a link on the page, type `/w <link>` in Quick Capture, or paste it into the command palette.
+    What you type after the link becomes the video's note ("why I saved it"). Saving a video twice moves it to the top.
+  - The title, channel, length and thumbnail are filled in by themselves (YouTube's own data, Facebook's link preview,
+    and yt-dlp on PC). fb.watch and facebook.com/share links are followed to the real video; a Facebook video that
+    turns out to be a Reel is filed as one.
+  - Filters: To watch, Videos, Shorts & Reels, Watched, by site, and search (accents do not matter). Open plays it in
+    the YouTube or Facebook app on the phone, the browser on PC.
+  - **Download** (PC): pick the quality first (the ones the video really has, with their size). Helm fetches yt-dlp the
+    first time and keeps it up to date; ffmpeg, which YouTube needs for anything but audio, installs from the picker or
+    Settings in one click. Two downloads at a time, with progress, and a notification when done.
+  - **Download on PC** (Android): pick a quality and your PC downloads the video while Helm runs there; the phone then
+    shows "Downloaded on <PC>". Settings: the download folder, requests from the phone, and sign-in cookies from a
+    browser for private Facebook videos.
+
 ## [0.17.1] - 2026-09-29
 
 0.17.0 was tagged but never published (its release build stopped at a failing test); 0.17.1 is that release with the fix below.

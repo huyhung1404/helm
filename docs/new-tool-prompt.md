@@ -259,7 +259,7 @@ The page is a `core:ModulePageBase`. It already renders the title, the icon + de
   search open the settings page (§4).
 - **Quick Capture** (optional, both platforms): a tool whose data can be written from one line of text registers an
   `ICaptureTarget` (`Helm.Core.Capture`) in its `.Core` services, e.g. `services.AddSingleton<ICaptureTarget, MyTarget>()`.
-  Give it a one-letter `Prefix` that is not taken (`n` Notes, `t` task, `d` debt), a `Preview` that says what Enter
+  Give it a one-letter `Prefix` that is not taken (`n` Notes, `t` task, `d` debt, `w` Watch Later), a `Preview` that says what Enter
   will do, and never throw. See `NoteCaptureTarget`, `TaskCaptureTarget`.
 - **Command palette** (optional, PC): a tool with things to find registers an `IPaletteProvider`
   (`Helm.Core.Palette`) in its PC project. Score with `PaletteQuery.Score` (accents and case do not matter), keep it

@@ -4,6 +4,7 @@ using Helm.Modules.Notes;
 using Helm.Modules.QuickCapture;
 using Helm.Modules.Vault;
 using Helm.Modules.Tracker;
+using Helm.Modules.WatchLater;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Helm.App.Hosting;
@@ -20,6 +21,7 @@ internal static class HelmModules
         services.AddVaultModule();
         services.AddTrackerModule();
         services.AddNotesModule();
+        services.AddWatchLaterModule();
         services.AddQuickCaptureModule();
         services.AddCommandPaletteModule();
 

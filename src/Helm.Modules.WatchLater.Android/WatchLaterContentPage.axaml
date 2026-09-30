@@ -1,0 +1,217 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:ic="using:FluentIcons.Avalonia"
+             xmlns:vm="using:Helm.Modules.WatchLater"
+             x:Class="Helm.Modules.WatchLater.WatchLaterContentPage"
+             x:DataType="vm:WatchLaterViewModel">
+
+    <!-- Watch Later itself (drawer and Quick access): a box to save a link, the filters, the quality picker when
+         downloading, and the saved videos as cards. Its options live on WatchLaterPage (Home → Utilities). -->
+    <UserControl.Styles>
+        <!-- Square icon button on a card (44 dp touch target) -->
+        <Style Selector="Button.icon">
+            <Setter Property="Width" Value="44" />
+            <Setter Property="Height" Value="44" />
+            <Setter Property="Padding" Value="0" />
+            <Setter Property="HorizontalContentAlignment" Value="Center" />
+            <Setter Property="VerticalContentAlignment" Value="Center" />
+        </Style>
+        <!-- A filter: the selected one is filled -->
+        <Style Selector="Button.filter">
+            <Setter Property="Margin" Value="0,0,6,6" />
+            <Setter Property="Padding" Value="12,6" />
+        </Style>
+        <!-- A small label over the thumbnail -->
+        <Style Selector="Border.badge">
+            <Setter Property="CornerRadius" Value="4" />
+            <Setter Property="Padding" Value="6,2" />
+            <Setter Property="Margin" Value="8" />
+            <Setter Property="Background" Value="{DynamicResource SolidBackgroundFillColorBaseBrush}" />
+            <Setter Property="Opacity" Value="0.9" />
+        </Style>
+    </UserControl.Styles>
+
+    <StackPanel>
+        <!-- Shown while the tool is turned off -->
+        <Border x:Name="OffBar" Classes="infobar warning" IsVisible="False">
+            <TextBlock Text="Watch Later is turned off. Your saved videos are kept; turn it on in its settings to add and watch." TextWrapping="Wrap" />
+        </Border>
+
+        <!-- What happened: saved already, a download request, a problem -->
+        <Border Classes="infobar" IsVisible="{Binding HasMessage}">
+            <DockPanel>
+                <Button DockPanel.Dock="Right" Classes="icon flat" Command="{Binding DismissMessageCommand}" AutomationProperties.Name="Dismiss">
+                    <ic:SymbolIcon Symbol="Dismiss" FontSize="16" />
+                </Button>
+                <TextBlock Text="{Binding Message}" TextWrapping="Wrap" VerticalAlignment="Center" />
+            </DockPanel>
+        </Border>
+
+        <StackPanel x:Name="Body" Spacing="8">
+            <!-- Save a link -->
+            <Border Classes="card">
+                <StackPanel Spacing="8">
+                    <TextBox PlaceholderText="Paste a YouTube or Facebook link" Text="{Binding NewLink}" AutomationProperties.Name="Video link" />
+                    <TextBox PlaceholderText="Why you save it (optional)" Text="{Binding NewNote}" AutomationProperties.Name="Note" />
+                    <TextBlock Text="{Binding AddPreview}" Classes="secondary" TextWrapping="Wrap"
+                               IsVisible="{Binding AddPreview, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+                    <Button Classes="accent" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Command="{Binding AddCommand}"
+                            IsEnabled="{Binding CanAdd}" AutomationProperties.Name="Save">
+                        <StackPanel Orientation="Horizontal" Spacing="6">
+                            <ic:SymbolIcon Symbol="Add" FontSize="16" />
+                            <TextBlock Text="Save" />
+                        </StackPanel>
+                    </Button>
+                    <TextBlock Text="Tip: in YouTube or Facebook, tap Share → Save to Helm." Classes="secondary" TextWrapping="Wrap" />
+                </StackPanel>
+            </Border>
+
+            <!-- Filters -->
+            <ItemsControl ItemsSource="{Binding FilterTabs}">
+                <ItemsControl.ItemsPanel>
+                    <ItemsPanelTemplate>
+                        <WrapPanel />
+                    </ItemsPanelTemplate>
+                </ItemsControl.ItemsPanel>
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate DataType="vm:WatchFilterTab">
+                        <Button Classes="filter" Classes.accent="{Binding IsSelected}" Content="{Binding Label}" AutomationProperties.Name="{Binding Name}"
+                                Command="{Binding $parent[ItemsControl].((vm:WatchLaterViewModel)DataContext).ShowFilterCommand}" CommandParameter="{Binding}" />
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+            <Grid ColumnDefinitions="*,8,Auto">
+                <TextBox PlaceholderText="Search" Text="{Binding Search}" AutomationProperties.Name="Search saved videos" />
+                <ComboBox Grid.Column="2" MinWidth="120" ItemsSource="{Binding SourceNames}" SelectedIndex="{Binding SourceIndex}" AutomationProperties.Name="Site" />
+            </Grid>
+
+            <!-- Pick the quality before downloading -->
+            <Border Classes="card" IsVisible="{Binding IsPickerOpen}">
+                <StackPanel Spacing="8">
+                    <TextBlock Classes="title" TextWrapping="Wrap" MaxLines="2" TextTrimming="CharacterEllipsis">
+                        <Run Text="Download on PC: " /><Run Text="{Binding PickerTitle}" />
+                    </TextBlock>
+                    <TextBlock Text="{Binding PickerNote}" Classes="secondary" TextWrapping="Wrap"
+                               IsVisible="{Binding PickerNote, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+                    <ProgressBar IsIndeterminate="True" IsVisible="{Binding IsPickerLoading}" />
+                    <ItemsControl ItemsSource="{Binding PickerOptions}">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate DataType="vm:QualityChoice">
+                                <RadioButton GroupName="Quality" IsChecked="{Binding IsSelected, Mode=OneWay}" IsEnabled="{Binding Available}" MinHeight="44"
+                                             Command="{Binding $parent[ItemsControl].((vm:WatchLaterViewModel)DataContext).PickQualityCommand}" CommandParameter="{Binding}"
+                                             AutomationProperties.Name="{Binding Label}">
+                                    <StackPanel>
+                                        <TextBlock Text="{Binding Label}" />
+                                        <TextBlock Text="{Binding Detail}" Classes="secondary" IsVisible="{Binding HasDetail}" />
+                                    </StackPanel>
+                                </RadioButton>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                    <Grid ColumnDefinitions="*,8,*">
+                        <Button Classes="accent" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Content="{Binding PickerConfirmLabel}"
+                                Command="{Binding ConfirmDownloadCommand}" IsEnabled="{Binding CanConfirmPicker}" />
+                        <Button Grid.Column="2" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Content="Cancel" Command="{Binding ClosePickerCommand}" />
+                    </Grid>
+                </StackPanel>
+            </Border>
+
+            <TextBlock Text="{Binding EmptyListText}" Classes="secondary" TextWrapping="Wrap" Margin="4,8" IsVisible="{Binding IsListEmpty}" />
+
+            <!-- The saved videos -->
+            <ItemsControl ItemsSource="{Binding Items}" IsVisible="{Binding HasItems}">
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate DataType="vm:WatchRowViewModel">
+                        <Border Classes="card" Padding="0" Margin="0,0,0,8" AutomationProperties.Name="{Binding Title}">
+                            <StackPanel>
+                                <!-- The thumbnail opens the video (in the YouTube or Facebook app) -->
+                                <Button Classes="flat" Padding="0" HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch" AutomationProperties.Name="Open the video"
+                                        Command="{Binding $parent[ItemsControl].((vm:WatchLaterViewModel)DataContext).OpenCommand}" CommandParameter="{Binding}">
+                                    <Border CornerRadius="8,8,0,0" ClipToBounds="True" Height="180" Background="{DynamicResource ControlFillColorSecondaryBrush}">
+                                        <Panel>
+                                            <ic:SymbolIcon Symbol="VideoClip" FontSize="36" HorizontalAlignment="Center" VerticalAlignment="Center"
+                                                           Foreground="{DynamicResource TextFillColorTertiaryBrush}" IsVisible="{Binding HasNoThumbnail}" />
+                                            <Image Stretch="UniformToFill" Source="{Binding ThumbnailPath, Converter={x:Static vm:ThumbnailConverter.Instance}}"
+                                                   IsVisible="{Binding HasThumbnail}" />
+                                            <Border Classes="badge" HorizontalAlignment="Left" VerticalAlignment="Top" Background="{DynamicResource AccentFillColorDefaultBrush}"
+                                                    Opacity="1" IsVisible="{Binding IsShort}">
+                                                <TextBlock Text="{Binding KindName}" FontSize="11" FontWeight="SemiBold" Foreground="{DynamicResource TextOnAccentFillColorPrimaryBrush}" />
+                                            </Border>
+                                            <Border Classes="badge" HorizontalAlignment="Right" VerticalAlignment="Bottom" IsVisible="{Binding HasDuration}">
+                                                <TextBlock Text="{Binding Duration}" FontSize="11" FontWeight="SemiBold" />
+                                            </Border>
+                                            <Border Classes="badge" HorizontalAlignment="Left" VerticalAlignment="Bottom" IsVisible="{Binding Watched}">
+                                                <StackPanel Orientation="Horizontal" Spacing="4">
+                                                    <ic:SymbolIcon Symbol="Checkmark" FontSize="12" />
+                                                    <TextBlock Text="Watched" FontSize="11" FontWeight="SemiBold" />
+                                                </StackPanel>
+                                            </Border>
+                                        </Panel>
+                                    </Border>
+                                </Button>
+
+                                <StackPanel Margin="12,10,12,6" Spacing="4">
+                                    <TextBlock Text="{Binding Title}" FontWeight="SemiBold" TextWrapping="Wrap" MaxLines="2" TextTrimming="CharacterEllipsis" />
+                                    <TextBlock Text="{Binding Subtitle}" Classes="secondary" TextTrimming="CharacterEllipsis" />
+                                    <TextBlock Text="{Binding Note}" Classes="secondary" FontStyle="Italic" TextWrapping="Wrap" MaxLines="3" TextTrimming="CharacterEllipsis">
+                                        <TextBlock.IsVisible>
+                                            <MultiBinding Converter="{x:Static BoolConverters.And}">
+                                                <Binding Path="HasNote" />
+                                                <Binding Path="IsNotEditingNote" />
+                                            </MultiBinding>
+                                        </TextBlock.IsVisible>
+                                    </TextBlock>
+                                    <StackPanel Spacing="6" IsVisible="{Binding IsEditingNote}">
+                                        <TextBox PlaceholderText="Why you save it" AcceptsReturn="True" TextWrapping="Wrap" MaxHeight="140"
+                                                 Text="{Binding NoteDraft}" AutomationProperties.Name="Note" />
+                                        <Grid ColumnDefinitions="*,8,*">
+                                            <Button Classes="accent" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Content="Save"
+                                                    Command="{Binding $parent[ItemsControl].((vm:WatchLaterViewModel)DataContext).SaveNoteCommand}" CommandParameter="{Binding}" />
+                                            <Button Grid.Column="2" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Content="Cancel"
+                                                    Command="{Binding $parent[ItemsControl].((vm:WatchLaterViewModel)DataContext).CancelNoteCommand}" CommandParameter="{Binding}" />
+                                        </Grid>
+                                    </StackPanel>
+                                    <TextBlock Text="{Binding DownloadText}" Classes="secondary" TextWrapping="Wrap" IsVisible="{Binding HasDownloadText}" />
+
+                                    <WrapPanel Margin="-8,0,0,0">
+                                        <Button Classes="icon flat" AutomationProperties.Name="Open"
+                                                Command="{Binding $parent[ItemsControl].((vm:WatchLaterViewModel)DataContext).OpenCommand}" CommandParameter="{Binding}">
+                                            <ic:SymbolIcon Symbol="Play" FontSize="18" />
+                                        </Button>
+                                        <Button Classes="icon flat" AutomationProperties.Name="Watched"
+                                                Command="{Binding $parent[ItemsControl].((vm:WatchLaterViewModel)DataContext).ToggleWatchedCommand}" CommandParameter="{Binding}">
+                                            <Panel>
+                                                <ic:SymbolIcon Symbol="CheckmarkCircle" FontSize="18" IsVisible="{Binding !Watched}" />
+                                                <ic:SymbolIcon Symbol="ArrowUndo" FontSize="18" IsVisible="{Binding Watched}" />
+                                            </Panel>
+                                        </Button>
+                                        <Button Classes="icon flat" AutomationProperties.Name="Edit the note"
+                                                Command="{Binding $parent[ItemsControl].((vm:WatchLaterViewModel)DataContext).EditNoteCommand}" CommandParameter="{Binding}">
+                                            <ic:SymbolIcon Symbol="Edit" FontSize="18" />
+                                        </Button>
+                                        <Button Classes="icon flat" AutomationProperties.Name="Download on PC" IsVisible="{Binding CanDownload}"
+                                                Command="{Binding $parent[ItemsControl].((vm:WatchLaterViewModel)DataContext).DownloadCommand}" CommandParameter="{Binding}">
+                                            <ic:SymbolIcon Symbol="ArrowDownload" FontSize="18" />
+                                        </Button>
+                                        <Button Classes="icon flat" AutomationProperties.Name="Cancel the download" IsVisible="{Binding CanCancelDownload}"
+                                                Command="{Binding $parent[ItemsControl].((vm:WatchLaterViewModel)DataContext).CancelDownloadCommand}" CommandParameter="{Binding}">
+                                            <ic:SymbolIcon Symbol="DismissCircle" FontSize="18" />
+                                        </Button>
+                                        <Button Classes="icon flat" AutomationProperties.Name="Copy the link"
+                                                Command="{Binding $parent[ItemsControl].((vm:WatchLaterViewModel)DataContext).CopyLinkCommand}" CommandParameter="{Binding}">
+                                            <ic:SymbolIcon Symbol="Copy" FontSize="18" />
+                                        </Button>
+                                        <Button Classes="icon flat danger" AutomationProperties.Name="Delete"
+                                                Command="{Binding $parent[ItemsControl].((vm:WatchLaterViewModel)DataContext).DeleteCommand}" CommandParameter="{Binding}">
+                                            <ic:SymbolIcon Symbol="Delete" FontSize="18" />
+                                        </Button>
+                                    </WrapPanel>
+                                </StackPanel>
+                            </StackPanel>
+                        </Border>
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+        </StackPanel>
+    </StackPanel>
+</UserControl>

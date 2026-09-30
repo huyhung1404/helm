@@ -25,6 +25,27 @@ public static class CaptureRouter
         return target is null ? (null, text) : (target, trimmed[end..].TrimStart());
     }
 
+    /// <summary>
+    /// The target to select first for shared text: the first one that claims it (a video link → Watch Later), else
+    /// <paramref name="fallback"/>.
+    /// </summary>
+    public static ICaptureTarget? Suggest(IReadOnlyList<ICaptureTarget> targets, string text, ICaptureTarget? fallback)
+    {
+        if (string.IsNullOrWhiteSpace(text)) return fallback;
+        foreach (var target in targets)
+        {
+            try
+            {
+                if (target.Claims(text)) return target;
+            }
+            catch (Exception)
+            {
+                // A target must never break the capture box.
+            }
+        }
+        return fallback;
+    }
+
     /// <summary>The target for <paramref name="text"/>: its prefix, else <paramref name="selected"/>.</summary>
     public static (ICaptureTarget? Target, string Text) Resolve(IReadOnlyList<ICaptureTarget> targets, ICaptureTarget? selected, string text)
     {

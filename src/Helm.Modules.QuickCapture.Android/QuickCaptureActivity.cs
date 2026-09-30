@@ -46,13 +46,15 @@ public sealed class QuickCaptureActivity : Activity
             _targets =QuickCaptureModule.AvailableTargets(services.GetServices<ICaptureTarget>(), settings);
             if (_targets.Count == 0)
             {
-                Toast.MakeText(this, "Turn on Notes or Tracker in Helm to save into them.", ToastLength.Long)?.Show();
+                Toast.MakeText(this, "Turn on Notes, Tracker or Watch Later in Helm to save into them.", ToastLength.Long)?.Show();
                 Finish();
                 return;
             }
             var wanted = settings.Get<QuickCaptureSettings>(QuickCaptureModule.ModuleId).Current.DefaultTarget;
-            _selected = _targets.FirstOrDefault(t => t.Id == wanted) ?? _targets[0];
-            ShowDialog(SharedText(Intent));
+            var shared = SharedText(Intent);
+            // A shared video link goes to Watch Later rather than the default target.
+            _selected = CaptureRouter.Suggest(_targets, shared, _targets.FirstOrDefault(t => t.Id == wanted) ?? _targets[0]);
+            ShowDialog(shared);
         }
         catch (Exception ex)
         {

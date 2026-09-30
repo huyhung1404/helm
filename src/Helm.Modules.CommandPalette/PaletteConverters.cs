@@ -25,6 +25,7 @@ public sealed class PaletteKindSymbolConverter : IValueConverter
         PaletteKind.Window => SymbolRegular.Window24,
         PaletteKind.WindowsSetting => SymbolRegular.WrenchScrewdriver24,
         PaletteKind.Web => SymbolRegular.Globe24,
+        PaletteKind.Video => SymbolRegular.VideoClip24,
         _ => SymbolRegular.Search24,
     };
 
@@ -49,6 +50,7 @@ public sealed class PaletteKindNameConverter : IValueConverter
         PaletteKind.Window => "Window",
         PaletteKind.WindowsSetting => "Windows",
         PaletteKind.Web => "Web",
+        PaletteKind.Video => "Video",
         _ => "",
     };
 

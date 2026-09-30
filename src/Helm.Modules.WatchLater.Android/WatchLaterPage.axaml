@@ -1,0 +1,51 @@
+<ui:ModulePageBase xmlns="https://github.com/avaloniaui"
+                   xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                   xmlns:ui="using:Helm.Core.Ui"
+                   xmlns:vm="using:Helm.Modules.WatchLater"
+                   x:Class="Helm.Modules.WatchLater.WatchLaterPage"
+                   x:DataType="vm:WatchLaterViewModel">
+
+    <!-- Watch Later's settings (Home → Utilities). The saved videos are on WatchLaterContentPage. -->
+    <StackPanel>
+        <Border Classes="infobar" IsVisible="{Binding HasMessage}">
+            <TextBlock Text="{Binding Message}" TextWrapping="Wrap" />
+        </Border>
+        <Border Classes="card">
+            <StackPanel Spacing="8">
+                <TextBlock Text="Open Watch Later" Classes="title" />
+                <TextBlock Text="Your saved videos. Also in the menu and on Home. In YouTube or Facebook, tap Share → Save to Helm to save one." Classes="secondary"
+                           TextWrapping="Wrap" />
+                <Button Classes="accent" Content="Open Watch Later" Click="Open_Click" />
+            </StackPanel>
+        </Border>
+
+        <!-- Downloads -->
+        <TextBlock Text="Downloads" Classes="section" />
+        <Border Classes="card">
+            <StackPanel Spacing="8">
+                <TextBlock Text="Quality picked first" Classes="title" />
+                <TextBlock Text="Videos are downloaded on your PC: Download on PC asks it to, in the quality you pick. Helm must be running there with Watch Later on."
+                           Classes="secondary" TextWrapping="Wrap" />
+                <ComboBox HorizontalAlignment="Stretch" ItemsSource="{Binding QualityNames}" SelectedIndex="{Binding DefaultQualityIndex}"
+                          AutomationProperties.Name="Quality picked first" />
+            </StackPanel>
+        </Border>
+
+        <!-- Data -->
+        <TextBlock Text="Data" Classes="section" />
+        <Border Classes="card">
+            <StackPanel Spacing="8">
+                <TextBlock Text="Delete the watched videos" Classes="title" />
+                <TextBlock Text="{Binding WatchedSummary}" Classes="secondary" TextWrapping="Wrap" />
+                <Button Classes="danger" Content="Delete watched" Command="{Binding DeleteWatchedCommand}" IsEnabled="{Binding HasWatched}" />
+                <Border Classes="row">
+                    <StackPanel Spacing="8">
+                        <TextBlock Text="Clear the thumbnails" Classes="title" />
+                        <TextBlock Text="{Binding ThumbnailSummary}" Classes="secondary" TextWrapping="Wrap" />
+                        <Button Content="Clear" Command="{Binding ClearThumbnailsCommand}" />
+                    </StackPanel>
+                </Border>
+            </StackPanel>
+        </Border>
+    </StackPanel>
+</ui:ModulePageBase>

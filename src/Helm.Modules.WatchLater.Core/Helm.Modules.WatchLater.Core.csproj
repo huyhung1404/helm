@@ -1,0 +1,23 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- Watch Later logic shared by the Windows and Android apps: the data model, link parsing, the store (on Helm Sync),
+       metadata lookup, the thumbnail cache, the page view model and the Quick Capture target. No WPF, Avalonia or
+       platform APIs here; downloading (yt-dlp) is Windows-only and lives in Helm.Modules.WatchLater. -->
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <SupportedOSPlatformVersion></SupportedOSPlatformVersion>
+    <PlatformTarget>AnyCPU</PlatformTarget>
+    <RootNamespace>Helm.Modules.WatchLater</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Helm.Core\Helm.Core.csproj" />
+    <!-- IDialogService / IClipboardService / IDeviceInfo: the portable seams both apps already implement. -->
+    <ProjectReference Include="..\Helm.Shell\Helm.Shell.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="Helm.Tests" />
+  </ItemGroup>
+
+</Project>

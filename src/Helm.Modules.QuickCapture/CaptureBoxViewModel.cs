@@ -65,6 +65,8 @@ public sealed partial class CaptureBoxViewModel : ObservableObject
         if (text is not null) Text = text;
         if (Text.Trim().Length == 0 || keep is null) keep = _settings.Current.DefaultTarget;
         if (targetId is not null) keep = targetId;
+        // Text handed in (e.g. a video link from the palette) goes where it clearly belongs.
+        else if (text is not null && CaptureRouter.Suggest(targets, text, null) is { } claimed) keep = claimed.Id;
         Selected = Targets.FirstOrDefault(t => t.Target.Id == keep) ?? Targets.FirstOrDefault();
         Problem = null;
         OnPropertyChanged(nameof(HasTargets));

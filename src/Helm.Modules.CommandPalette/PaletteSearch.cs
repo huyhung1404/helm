@@ -23,6 +23,7 @@ public static class PaletteSearch
         PaletteKind.Task => 2,
         PaletteKind.Debt => 3,
         PaletteKind.VaultItem => 4,
+        PaletteKind.Video => 4,
         PaletteKind.Page => 5,
         PaletteKind.Setting => 6,
         PaletteKind.App => 7,

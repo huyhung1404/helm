@@ -18,6 +18,8 @@ public enum PaletteKind
     Window,
     WindowsSetting,
     Web,
+    /// <summary>A saved video (Watch Later).</summary>
+    Video,
 }
 
 /// <summary>One result of the command palette.</summary>
