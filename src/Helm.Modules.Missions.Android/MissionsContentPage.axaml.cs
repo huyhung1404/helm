@@ -45,6 +45,14 @@ public partial class MissionsContentPage : UserControl
         // Steps done on the PC or by Claude while the app was in the background.
         _viewModel.Refresh();
         _clock.Start();
+        try
+        {
+            _module.PageShown();
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"Missions reminder check failed: {ex}");
+        }
     }
 
     protected override void OnDetachedFromVisualTree(VisualTreeAttachmentEventArgs e)

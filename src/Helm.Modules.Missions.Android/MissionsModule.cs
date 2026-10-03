@@ -2,15 +2,28 @@ using Avalonia.Media;
 using FluentIcons.Common;
 using Helm.Core.Modules;
 using Helm.Core.Platform;
+using Microsoft.Extensions.Logging;
+using AndroidApp = Android.App.Application;
 
 namespace Helm.Modules.Missions;
 
 /// <summary>
-/// Missions on Android. The data lives in Helm Sync; nothing runs in the background. Back closes the celebration and
-/// the new-mission panel before leaving the page.
+/// Missions on Android. The data lives in Helm Sync; the module sets the hourly alarm behind the daily step reminder
+/// while the tool is on. Back closes the celebration and the new-mission or re-plan panel before leaving the page.
 /// </summary>
-public sealed class MissionsModule(MissionsViewModel viewModel) : AndroidModuleBase, IModuleContent, IBackHandler
+public sealed class MissionsModule : AndroidModuleBase, IModuleContent, IBackHandler
 {
+    private readonly MissionsViewModel _viewModel;
+    private readonly ILogger<MissionsModule> _logger;
+
+    public MissionsModule(MissionsViewModel viewModel, MissionReminderService reminders, ILogger<MissionsModule> logger)
+    {
+        _viewModel = viewModel;
+        _logger = logger;
+        // "Remind me now" on the settings page.
+        reminders.Requested += (_, reminder) => MissionReminders.Post(AndroidApp.Context, reminder);
+    }
+
     public override string Id => MissionsIds.ModuleId;
     public override string DisplayName => MissionsIds.DisplayName;
     public override string Description => MissionsIds.Description;
@@ -26,21 +39,52 @@ public sealed class MissionsModule(MissionsViewModel viewModel) : AndroidModuleB
     public override Task EnableAsync(CancellationToken ct)
     {
         StatusMessage = null;
+        try
+        {
+            MissionReminders.Schedule(AndroidApp.Context);
+            MissionReminders.CheckNow(AndroidApp.Context);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Could not set the Missions reminder");
+        }
         return Task.CompletedTask;
     }
 
-    public override Task DisableAsync() => Task.CompletedTask;
+    public override Task DisableAsync()
+    {
+        try
+        {
+            MissionReminders.Cancel(AndroidApp.Context);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Could not clear the Missions reminder");
+        }
+        return Task.CompletedTask;
+    }
 
-    /// <summary>Android back: the celebration, then the new-mission panel, close before the page does.</summary>
+    /// <summary>
+    /// The content page is on screen: the moment to ask for notifications (Android 13+, once) and to catch today's
+    /// reminder.
+    /// </summary>
+    public void PageShown()
+    {
+        var context = AndroidApp.Context;
+        MissionReminders.AskPermissionOnce(context);
+        MissionReminders.CheckNow(context);
+    }
+
+    /// <summary>Android back: the celebration, then an open panel, close before the page does.</summary>
     public bool HandleBack()
     {
-        if (viewModel.HasCelebration)
+        if (_viewModel.HasCelebration)
         {
-            viewModel.DismissCelebrationCommand.Execute(null);
+            _viewModel.DismissCelebrationCommand.Execute(null);
             return true;
         }
-        if (!viewModel.IsNewOpen) return false;
-        viewModel.CloseNewCommand.Execute(null);
+        if (!_viewModel.IsNewOpen) return false;
+        _viewModel.CloseNewCommand.Execute(null);
         return true;
     }
 }

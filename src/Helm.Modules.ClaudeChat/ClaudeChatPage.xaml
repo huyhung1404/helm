@@ -69,7 +69,7 @@
         </ui:CardControl>
         <ui:CardControl Margin="0,0,0,4" Icon="{ui:SymbolIcon Edit24}" IsEnabled="{Binding McpEnabled}">
             <ui:CardControl.Header>
-                <core:CardHeader Title="Allow changes" Description="Off: Claude can only read. On: it can also add and edit notes and tasks, tick tasks, add debts, create missions and complete their steps (nothing is deleted for good)." />
+                <core:CardHeader Title="Allow changes" Description="Off: Claude can only read. On: it can also add and edit notes and tasks, tick tasks, add debts, create, re-plan and advance missions (nothing is deleted for good)." />
             </ui:CardControl.Header>
             <ui:ToggleSwitch HorizontalAlignment="Right" IsChecked="{Binding McpAllowChanges}" AutomationProperties.Name="Allow changes" />
         </ui:CardControl>

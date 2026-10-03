@@ -29,7 +29,7 @@ public static class MissionImport
         MaxDepth = 32,
     };
 
-    public static MissionImportResult Parse(string? text)
+    public static MissionImportResult Parse(string? text, bool requireTitle = true)
     {
         if (string.IsNullOrWhiteSpace(text)) return Fail("Paste the JSON the AI gave you.");
         var json = Extract(text, out var cutOff);
@@ -54,11 +54,12 @@ public static class MissionImport
             }
         }
         if (doc is null) return Fail(error ?? "The JSON could not be read.");
-        using (doc) return Read(doc.RootElement);
+        using (doc) return Read(doc.RootElement, requireTitle);
     }
 
     /// <summary>Reads an already parsed object (Claude's tool arguments).</summary>
-    public static MissionImportResult Read(JsonElement root)
+    /// <param name="requireTitle">False for a new plan of an existing mission, which keeps its own title.</param>
+    public static MissionImportResult Read(JsonElement root, bool requireTitle = true)
     {
         var errors = new List<string>();
         var warnings = new List<string>();
@@ -68,7 +69,7 @@ public static class MissionImport
             return Fail($"This mission uses format {version}, newer than this Helm reads ({Version}). Update Helm and try again.");
 
         var title = Text(root, "title", "name", "mission");
-        if (title.Length == 0) errors.Add("The mission has no \"title\".");
+        if (title.Length == 0 && requireTitle) errors.Add("The mission has no \"title\".");
         else if (title.Length > MissionLimits.Title) warnings.Add($"The title is long; it was cut to {MissionLimits.Title} characters.");
 
         DateOnly? deadline = null;

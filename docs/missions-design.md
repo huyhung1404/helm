@@ -265,16 +265,30 @@ up again from the content page.
 
 ## 8. Plan
 
-**v1** (this build): everything above — module on PC and Android, import + preview, prompt form, sequential runner,
+**v1** (0.21.0): everything above — module on PC and Android, import + preview, prompt form, sequential runner,
 history and timeline, pace and streaks, the three celebrations and summary, settings page, MCP tools, tests,
 CHANGELOG/README rows, icon.
 
-**v2**:
-- *Re-plan*: a prompt that carries the progress and asks the AI to rewrite the remaining steps; importing it (or
-  `mission_replan` over MCP) replaces only the steps not yet done.
-- Daily reminder of today's step (PC tray, Android alarm as in Tracker).
-- Android share → "Save to Helm" with mission JSON opens the import preview.
-- *Save summary to Notes*.
+**v2** (built):
+- *Re-plan* (mission card, while the mission is not finished): what changed (optional) → a prompt with the mission,
+  the done steps (how long each took against its plan, their notes), the pace, and the steps left as JSON → the AI's
+  answer in the import panel (title optional) → preview "Replaces the N steps not done yet with M steps…" →
+  `MissionsStore.Replan`. Done and skipped steps stay with their phases; every step not done (the current one too) is
+  replaced; a plan phase whose title matches a phase that is not finished continues it (key and reward kept), other
+  phases are new and come after the phases with done steps; phases left empty go. The plan's deadline and note replace
+  the mission's when given. Claude does the same with `mission_replan` (asked to read `mission_get` first and to ask
+  the user). No history kind is added for it: older apps would not read a new `MissionEventKind`.
+- *Daily step reminder* (`MissionReminderService`, settings `RemindersEnabled` on, `ReminderHour` 8,
+  `LastReminderDate`): once a day after the hour, one line per active mission, "Title: current step (n days behind)";
+  missions with a done step or a tick today are left out, and a day with nothing waiting is not used up. PC: the
+  module's 10-minute timer and a tray notification that opens Missions. Android: an hourly inexact alarm, a boot
+  receiver, the "Daily step reminders" channel and a notification that opens Missions (as Tracker's reminders);
+  the notification permission is asked once when Missions opens. *Remind me now* on the settings pages.
+- *Share and Quick Capture*: `MissionCaptureTarget` ("mission", prefix `/m`). Shared text that imports as a mission
+  picks it by itself, and saving creates the mission as *Planned* (not the import preview: the Quick Capture dialog
+  is its own small window; the mission waits for *Start mission* anyway, and can be edited on the page).
+- *Save summary to Notes*: through Notes' Quick Capture target ("note"), so Missions does not reference Notes; shown
+  when Notes is on and a step is done. The note's title is "Mission: title".
 
 **v3**: Android home-screen widget with the current step, badges across missions, links from notes to missions.
 

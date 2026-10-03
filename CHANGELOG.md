@@ -3,6 +3,21 @@
 All notable changes to Helm. The top section is used as the GitHub release body and as the Velopack release notes.
 Format: [Keep a Changelog](https://keepachangelog.com), versions follow [SemVer](https://semver.org).
 
+## [Unreleased]
+
+### Added
+- Missions: **Re-plan**. Behind, ahead, or something changed? Say what (optional) and copy the prompt: it carries
+  what you have done, how long each step took and what is left. Paste the AI's new plan and check it; the steps not
+  done yet are replaced, the done ones stay. Claude can do the same (`mission_replan`).
+- Missions: a **daily step reminder** (PC and Android), once a day at the hour you pick, with the step each mission in
+  progress is on; missions you already moved on today are left out. Turn it off or try it in the Missions settings.
+- Missions: **share an AI's answer to Helm** on the phone (Share → Save to Helm), or paste it into Quick Capture on
+  the PC (`/m`): the mission in it is saved, ready to start.
+- Missions: **save the summary to Notes**.
+
+### Fixed
+- Missions on Android: the text and icons of the wide buttons were pushed to the top; they are centered now.
+
 ## [0.21.0] - 2026-10-03
 
 ### Added

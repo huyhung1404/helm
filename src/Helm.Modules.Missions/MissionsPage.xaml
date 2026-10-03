@@ -93,6 +93,31 @@
             <ui:ToggleSwitch AutomationProperties.Name="Show finished missions" IsChecked="{Binding ShowFinishedMissions}" />
         </ui:CardControl>
 
+        <!-- Reminders -->
+        <TextBlock Text="Reminders" Style="{DynamicResource HelmSectionHeader}" />
+        <ui:CardExpander Margin="0,0,0,4" Icon="{ui:SymbolIcon AlertOn24}" IsExpanded="True">
+            <ui:CardExpander.Header>
+                <core:RowLayout>
+                    <core:CardHeader Title="Daily step reminder" Description="Once a day, a notification with the step each mission in progress is on. Missions you already moved on today are left out." />
+                    <ui:ToggleSwitch HorizontalAlignment="Right" Margin="0,0,16,0" AutomationProperties.Name="Daily step reminder" IsChecked="{Binding RemindersEnabled}" />
+                </core:RowLayout>
+            </ui:CardExpander.Header>
+            <StackPanel IsEnabled="{Binding RemindersEnabled}">
+                <Border Style="{DynamicResource HelmExpanderRow}" BorderThickness="0">
+                    <core:RowLayout>
+                        <core:CardHeader Title="Reminder time" Description="The day's reminder comes at this hour, or when Helm starts later." />
+                        <ComboBox Width="140" AutomationProperties.Name="Reminder time" ItemsSource="{Binding ReminderHourNames}" SelectedIndex="{Binding ReminderHourIndex}" />
+                    </core:RowLayout>
+                </Border>
+                <Border Style="{DynamicResource HelmExpanderRow}">
+                    <core:RowLayout>
+                        <core:CardHeader Title="Try it" Description="Shows today's reminder now." />
+                        <ui:Button Content="Remind me now" Icon="{ui:SymbolIcon Alert24}" Command="{Binding RemindNowCommand}" />
+                    </core:RowLayout>
+                </Border>
+            </StackPanel>
+        </ui:CardExpander>
+
         <!-- New missions -->
         <TextBlock Text="New missions" Style="{DynamicResource HelmSectionHeader}" />
         <ui:CardControl Margin="0,0,0,4" Icon="{ui:SymbolIcon Copy24}">
@@ -100,6 +125,11 @@
                 <core:CardHeader Title="Copy the prompt template" Description="The prompt Helm fills in on the Missions page, with blanks to fill in yourself; any AI answers it with a mission to import." />
             </ui:CardControl.Header>
             <ui:Button Content="Copy template" Icon="{ui:SymbolIcon Copy24}" Command="{Binding CopyTemplateCommand}" />
+        </ui:CardControl>
+        <ui:CardControl Margin="0,0,0,4" Icon="{ui:SymbolIcon Share24}">
+            <ui:CardControl.Header>
+                <core:CardHeader Title="Save an AI's answer from anywhere" Description="Paste the answer into Quick Capture (Win+Alt+N), or start it with /m: the mission in it is saved, ready to start. On the phone, share the AI app's answer to Helm." />
+            </ui:CardControl.Header>
         </ui:CardControl>
         <ui:CardControl Margin="0,0,0,4" Icon="{ui:SymbolIcon Chat24}">
             <ui:CardControl.Header>

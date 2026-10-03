@@ -26,4 +26,13 @@ public sealed class MissionsSettings : IVersionedSettings
 
     /// <summary>Finished missions whose celebration was already shown on this device (finished elsewhere: shown once here).</summary>
     public List<string> CelebratedMissionIds { get; set; } = [];
+
+    /// <summary>A daily notification with the step each mission in progress is on.</summary>
+    public bool RemindersEnabled { get; set; } = true;
+
+    /// <summary>Local hour (0–23) from which the day's reminder may be shown.</summary>
+    public int ReminderHour { get; set; } = 8;
+
+    /// <summary>The local date of the last reminder shown on this device (one per day).</summary>
+    public DateOnly? LastReminderDate { get; set; }
 }

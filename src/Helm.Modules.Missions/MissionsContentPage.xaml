@@ -295,12 +295,34 @@
                 </StackPanel>
             </Border>
 
-            <!-- New mission, 2: the import and its preview -->
+            <!-- Planning the rest again, 1: what changed, and the prompt with the progress in it -->
+            <Border Style="{DynamicResource HelmSurface}" Margin="0,8,0,4" Visibility="{Binding IsReplanOpen, Converter={StaticResource BoolToVisibility}}">
+                <StackPanel>
+                    <TextBlock FontSize="16" FontWeight="SemiBold" TextWrapping="Wrap">
+                        <Run Text="1. Plan the rest of " /><Run Text="{Binding Title, Mode=OneWay}" /><Run Text=" again" />
+                    </TextBlock>
+                    <TextBlock Style="{DynamicResource HelmSecondaryText}" Margin="0,4,0,0" TextWrapping="Wrap"
+                               Text="Behind, ahead, or something changed? Helm writes a prompt with what you have done, how long it took and what is left; the AI answers with a new plan for the steps not done yet. Done steps stay as they are." />
+                    <TextBlock Text="What changed, or what you want (optional)" Style="{StaticResource FieldLabel}" />
+                    <ui:TextBox PlaceholderText="e.g. I was ill for a week; I can only do 30 minutes a day now" AutomationProperties.Name="What changed"
+                                AcceptsReturn="True" TextWrapping="Wrap" Text="{Binding ReplanReason, UpdateSourceTrigger=PropertyChanged}" />
+                    <WrapPanel Margin="0,16,0,0">
+                        <ui:Button Margin="0,0,8,0" Appearance="Primary" Content="Copy prompt" Icon="{ui:SymbolIcon Copy24}" Command="{Binding CopyReplanPromptCommand}" />
+                        <ui:Button Margin="0,0,8,0" Content="I have the new plan" Icon="{ui:SymbolIcon ArrowRight24}" Command="{Binding OpenReplanImportCommand}" />
+                        <ui:Button Content="Cancel" Command="{Binding CloseNewCommand}" />
+                    </WrapPanel>
+                    <TextBlock Margin="0,10,0,0" Style="{DynamicResource HelmSecondaryText}" TextWrapping="Wrap"
+                               Visibility="{Binding PromptCopied, Converter={StaticResource BoolToVisibility}}"
+                               Text="Copied. Paste it into any AI, then press I have the new plan and paste its answer." />
+                </StackPanel>
+            </Border>
+
+            <!-- New mission (or a new plan), 2: the import and its preview -->
             <Border Style="{DynamicResource HelmSurface}" Margin="0,8,0,4" Visibility="{Binding IsImportOpen, Converter={StaticResource BoolToVisibility}}">
                 <StackPanel>
-                    <TextBlock Text="2. Paste the AI's answer" FontSize="16" FontWeight="SemiBold" />
+                    <TextBlock Text="{Binding ImportHeading}" FontSize="16" FontWeight="SemiBold" />
                     <TextBlock Style="{DynamicResource HelmSecondaryText}" Margin="0,4,0,8" TextWrapping="Wrap"
-                               Text="The whole answer is fine: Helm finds the JSON in it. Check the steps below, then create the mission." />
+                               Text="The whole answer is fine: Helm finds the JSON in it. Check the steps below before you go on." />
                     <ui:TextBox x:Name="ImportBox" PlaceholderText="{}{ &quot;title&quot;: …, &quot;phases&quot;: [ … ] }" AutomationProperties.Name="Mission JSON"
                                 AcceptsReturn="True" AcceptsTab="True" TextWrapping="Wrap" Height="150" VerticalScrollBarVisibility="Auto" FontFamily="Cascadia Mono, Consolas"
                                 Text="{Binding ImportText, UpdateSourceTrigger=PropertyChanged, Delay=250}" />
@@ -313,17 +335,19 @@
                     <StackPanel Visibility="{Binding HasPreview, Converter={StaticResource BoolToVisibility}}">
                         <ui:InfoBar Margin="0,10,0,0" Severity="Warning" IsClosable="False" IsOpen="{Binding HasPreviewNote, Mode=OneWay}" Title="The AI notes"
                                     Message="{Binding PreviewNote}" Visibility="{Binding HasPreviewNote, Converter={StaticResource BoolToVisibility}}" />
-                        <TextBlock Text="Title" Style="{StaticResource FieldLabel}" />
-                        <ui:TextBox AutomationProperties.Name="Mission title" Text="{Binding PreviewTitle, UpdateSourceTrigger=PropertyChanged}" />
-                        <TextBlock Text="Goal" Style="{StaticResource FieldLabel}" />
-                        <ui:TextBox AutomationProperties.Name="Mission goal" AcceptsReturn="True" TextWrapping="Wrap" Text="{Binding PreviewGoal, UpdateSourceTrigger=PropertyChanged}" />
+                        <StackPanel Visibility="{Binding IsNewMission, Converter={StaticResource BoolToVisibility}}">
+                            <TextBlock Text="Title" Style="{StaticResource FieldLabel}" />
+                            <ui:TextBox AutomationProperties.Name="Mission title" Text="{Binding PreviewTitle, UpdateSourceTrigger=PropertyChanged}" />
+                            <TextBlock Text="Goal" Style="{StaticResource FieldLabel}" />
+                            <ui:TextBox AutomationProperties.Name="Mission goal" AcceptsReturn="True" TextWrapping="Wrap" Text="{Binding PreviewGoal, UpdateSourceTrigger=PropertyChanged}" />
+                        </StackPanel>
                         <Grid>
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="*" />
                                 <ColumnDefinition Width="12" />
                                 <ColumnDefinition Width="Auto" />
                             </Grid.ColumnDefinitions>
-                            <StackPanel>
+                            <StackPanel Visibility="{Binding IsNewMission, Converter={StaticResource BoolToVisibility}}">
                                 <TextBlock Text="Reward for finishing" Style="{StaticResource FieldLabel}" />
                                 <ui:TextBox AutomationProperties.Name="Mission reward" Text="{Binding PreviewReward, UpdateSourceTrigger=PropertyChanged}" />
                             </StackPanel>
@@ -360,9 +384,9 @@
                     </StackPanel>
 
                     <WrapPanel Margin="0,12,0,0">
-                        <ui:Button Margin="0,0,8,0" Appearance="Primary" Content="Create mission" Icon="{ui:SymbolIcon Flag24}" Command="{Binding CreateMissionCommand}"
+                        <ui:Button Margin="0,0,8,0" Appearance="Primary" Content="{Binding CreateLabel}" Icon="{ui:SymbolIcon Flag24}" Command="{Binding CreateMissionCommand}"
                                    IsEnabled="{Binding CanCreate}" />
-                        <ui:Button Margin="0,0,8,0" Content="Back to the prompt" Command="{Binding OpenPromptCommand}" />
+                        <ui:Button Margin="0,0,8,0" Content="Back to the prompt" Command="{Binding BackToPromptCommand}" />
                         <ui:Button Content="Cancel" Command="{Binding CloseNewCommand}" />
                     </WrapPanel>
                 </StackPanel>
@@ -392,6 +416,14 @@
                                            Visibility="{Binding Celebration.HasReward, Converter={StaticResource BoolToVisibility}}" />
                                 <ui:Button Margin="0,0,8,0" Content="Copy summary" Icon="{ui:SymbolIcon Copy24}" Command="{Binding CopySummaryCommand}"
                                            Visibility="{Binding IsMissionCelebration, Converter={StaticResource BoolToVisibility}}" />
+                                <ui:Button Margin="0,0,8,0" Content="Save to Notes" Icon="{ui:SymbolIcon Note24}" Command="{Binding SaveSummaryToNotesCommand}">
+                                    <ui:Button.Visibility>
+                                        <MultiBinding Converter="{x:Static self:AllTrueToVisibility.Instance}">
+                                            <Binding Path="IsMissionCelebration" />
+                                            <Binding Path="CanSaveToNotes" />
+                                        </MultiBinding>
+                                    </ui:Button.Visibility>
+                                </ui:Button>
                                 <ui:Button Content="Close" Command="{Binding DismissCelebrationCommand}" />
                             </WrapPanel>
                         </StackPanel>
@@ -456,7 +488,11 @@
                                        Visibility="{Binding IsActive, Converter={StaticResource BoolToVisibility}}" />
                             <ui:Button Margin="0,0,8,8" Content="Undo last step" Icon="{ui:SymbolIcon ArrowUndo24}" Command="{Binding UndoStepCommand}"
                                        Visibility="{Binding IsCompleted, Converter={StaticResource BoolToVisibility}}" />
+                            <ui:Button Margin="0,0,8,8" Content="Re-plan" Icon="{ui:SymbolIcon Sparkle24}" ToolTip="Behind or something changed: let an AI plan the steps not done yet again"
+                                       Command="{Binding OpenReplanCommand}" Visibility="{Binding IsOpenForChanges, Converter={StaticResource BoolToVisibility}}" />
                             <ui:Button Margin="0,0,8,8" Content="Copy summary" Icon="{ui:SymbolIcon DocumentText24}" Command="{Binding CopySummaryCommand}" />
+                            <ui:Button Margin="0,0,8,8" Content="Save to Notes" Icon="{ui:SymbolIcon Note24}" ToolTip="The summary as a new note"
+                                       Command="{Binding SaveSummaryToNotesCommand}" Visibility="{Binding CanSaveToNotes, Converter={StaticResource BoolToVisibility}}" />
                             <ui:Button Margin="0,0,8,8" Content="Copy as JSON" Icon="{ui:SymbolIcon Code24}" Command="{Binding CopyJsonCommand}" />
                             <ui:Button Margin="0,0,8,8" Content="Abandon" Icon="{ui:SymbolIcon Dismiss24}" Command="{Binding AbandonCommand}"
                                        Visibility="{Binding IsOpenForChanges, Converter={StaticResource BoolToVisibility}}" />

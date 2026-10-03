@@ -113,8 +113,37 @@
             </StackPanel>
         </Border>
 
+        <!-- Reminders -->
+        <TextBlock Text="Reminders" Classes="section" />
+        <Border Classes="card">
+            <StackPanel>
+                <DockPanel>
+                    <ToggleSwitch DockPanel.Dock="Right" IsChecked="{Binding RemindersEnabled}" OnContent="" OffContent="" AutomationProperties.Name="Daily step reminder" />
+                    <StackPanel VerticalAlignment="Center">
+                        <TextBlock Text="Daily step reminder" Classes="title" />
+                        <TextBlock Text="Once a day, a notification with the step each mission in progress is on. Missions you already moved on today are left out." Classes="secondary" TextWrapping="Wrap" />
+                    </StackPanel>
+                </DockPanel>
+                <Border Classes="row" IsEnabled="{Binding RemindersEnabled}">
+                    <StackPanel Spacing="8">
+                        <TextBlock Text="Reminder time" />
+                        <TextBlock Text="The day's reminder comes at this hour, or when the phone next checks after it." Classes="secondary" TextWrapping="Wrap" />
+                        <ComboBox HorizontalAlignment="Stretch" ItemsSource="{Binding ReminderHourNames}" SelectedIndex="{Binding ReminderHourIndex}"
+                                  AutomationProperties.Name="Reminder time" />
+                        <Button Content="Remind me now" Command="{Binding RemindNowCommand}" />
+                    </StackPanel>
+                </Border>
+            </StackPanel>
+        </Border>
+
         <!-- New missions -->
         <TextBlock Text="New missions" Classes="section" />
+        <Border Classes="card">
+            <StackPanel Spacing="8">
+                <TextBlock Text="Share an AI's answer to Helm" Classes="title" />
+                <TextBlock Text="In ChatGPT, Gemini or Claude, share the answer and pick Save to Helm: the mission in it is saved, ready to start. Needs Quick Capture on." Classes="secondary" TextWrapping="Wrap" />
+            </StackPanel>
+        </Border>
         <Border Classes="card">
             <StackPanel Spacing="8">
                 <TextBlock Text="Copy the prompt template" Classes="title" />

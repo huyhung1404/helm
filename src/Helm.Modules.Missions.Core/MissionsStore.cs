@@ -443,6 +443,76 @@ public sealed class MissionsStore
     private bool IsOpenForChanges(string missionId) =>
         _missions.Get(missionId) is { Status: MissionStatus.Planned or MissionStatus.Active or MissionStatus.Paused };
 
+    /// <summary>
+    /// Replaces every step not done yet (the current one too) with the steps of <paramref name="plan"/>, usually an AI's
+    /// new plan for the rest of the way. Done and skipped steps stay as they are, with their phases. A phase of the
+    /// plan whose title matches a phase that is not finished keeps that phase (its done steps stay in it); the others
+    /// are added after the phases that have done steps. Phases left with no step are removed. The plan's deadline and
+    /// note replace the mission's when it has them; its title, goal and reward do not.
+    /// </summary>
+    /// <returns>False when the mission is finished or abandoned, or the plan has no step.</returns>
+    public bool Replan(string missionId, MissionDraft plan)
+    {
+        lock (_gate)
+        {
+            if (_missions.Get(missionId) is not { } mission || !IsOpenForChanges(missionId)) return false;
+            var planPhases = plan.Phases.Where(p => p.Steps.Count > 0).ToList();
+            if (planPhases.Count == 0) return false;
+            var steps = Steps(missionId);
+            var done = steps.Where(s => s.Value.IsDone).ToList();
+            if (done.Count + planPhases.Sum(p => p.Steps.Count) > MissionLimits.Steps) return false;
+
+            // Phases that keep done steps stay first, in their order.
+            var donePhaseKeys = done.Select(s => s.Value.PhaseKey).ToHashSet(StringComparer.Ordinal);
+            var finishedKeys = mission.Phases.Where(p => steps.Where(s => s.Value.PhaseKey == p.Key).All(s => s.Value.IsDone)).Select(p => p.Key).ToHashSet(StringComparer.Ordinal);
+            var order = mission.Phases.Where(p => donePhaseKeys.Contains(p.Key)).ToList();
+            var newSteps = new List<(string Key, StepDraft Step)>();
+            foreach (var p in planPhases)
+            {
+                var title = MissionLimits.Clip(p.Title, MissionLimits.Title);
+                // Same title as a phase still under way (or to come): the plan continues it.
+                var existing = mission.Phases.FirstOrDefault(x => !finishedKeys.Contains(x.Key)
+                    && string.Equals(x.Title.Trim(), title, StringComparison.CurrentCultureIgnoreCase));
+                MissionPhase phase;
+                if (existing is not null && order.FirstOrDefault(x => x.Key == existing.Key) is { } kept)
+                    phase = kept;
+                else if (existing is not null && order.All(x => x.Key != existing.Key))
+                {
+                    phase = existing with { Reward = p.Reward.Length > 0 ? MissionLimits.Clip(p.Reward, MissionLimits.Reward) : existing.Reward };
+                    order.Add(phase);
+                }
+                else
+                {
+                    phase = new MissionPhase
+                    {
+                        Key = NewKey(),
+                        Title = title.Length > 0 ? title : $"Phase {order.Count + 1}",
+                        Reward = MissionLimits.Clip(p.Reward, MissionLimits.Reward),
+                    };
+                    order.Add(phase);
+                }
+                newSteps.AddRange(p.Steps.Select(s => (phase.Key, s)));
+            }
+            if (order.Count > MissionLimits.Phases) return false;
+
+            foreach (var s in steps.Where(s => !s.Value.IsDone)) _steps.Delete(s.Id);
+            // New steps come after the done ones, phase by phase in the new order.
+            var next = done.Count == 0 ? 0 : done.Max(s => s.Value.Order) + 1;
+            foreach (var phase in order)
+                foreach (var (key, step) in newSteps.Where(s => s.Key == phase.Key))
+                    _steps.Add(NewStep(missionId, key, next++, step));
+
+            var updated = mission with
+            {
+                Phases = order,
+                Deadline = plan.Deadline ?? mission.Deadline,
+                Note = plan.Note.Length > 0 ? MissionLimits.Clip(plan.Note, MissionLimits.Note) : mission.Note,
+            };
+            _missions.Upsert(missionId, updated);
+            return true;
+        }
+    }
+
     /// <summary>Moves a mission up (-1) or down (+1) in the picker.</summary>
     public bool Move(string missionId, int direction)
     {

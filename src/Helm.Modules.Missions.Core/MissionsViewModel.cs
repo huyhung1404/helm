@@ -2,6 +2,7 @@ using System.Collections.ObjectModel;
 using System.Globalization;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using Helm.Core.Capture;
 using Helm.Core.Services;
 using Helm.Core.Settings;
 using Helm.Core.Sync;
@@ -17,12 +18,17 @@ namespace Helm.Modules.Missions;
 /// </summary>
 public sealed partial class MissionsViewModel : ObservableObject
 {
+    private const string NoteTargetId = "note";
+
     private readonly MissionsStore _store;
+    private readonly ISettingsStoreFactory _settingsFactory;
     private readonly ISettingsStore<MissionsSettings> _settings;
     private readonly IUiDispatcher _ui;
     private readonly IDialogService _dialogs;
     private readonly IClipboardService _clipboard;
     private readonly IProcessLauncher _launcher;
+    private readonly MissionReminderService _reminders;
+    private readonly Func<IEnumerable<ICaptureTarget>> _captureTargets;
     private readonly ILogger<MissionsViewModel> _logger;
     private readonly TimeZoneInfo _zone;
     private readonly Dictionary<string, MissionChoice> _choices = new(StringComparer.Ordinal);
@@ -100,12 +106,22 @@ public sealed partial class MissionsViewModel : ObservableObject
     [ObservableProperty] private bool _playCelebrations;
     [ObservableProperty] private bool _confirmUntickedChecklist;
     [ObservableProperty] private bool _showFinishedMissions;
+    [ObservableProperty] private bool _remindersEnabled;
+    [ObservableProperty] private int _reminderHourIndex;
 
     // Editing the selected mission (settings page)
     [ObservableProperty] private string _editTitle = "";
     [ObservableProperty] private string _editGoal = "";
     [ObservableProperty] private string _editReward = "";
     [ObservableProperty] private DateTime? _editDeadline;
+
+    // Planning the rest of the way again (the import panel then takes the new plan)
+    [ObservableProperty] private bool _isReplanOpen;
+    [ObservableProperty] private bool _isReplan;
+    [ObservableProperty] private string _replanReason = "";
+
+    // Notes is there and on: the summary can be saved as a note
+    [ObservableProperty] private bool _canSaveToNotes;
 
     public MissionsViewModel(
         MissionsStore store,
@@ -114,8 +130,12 @@ public sealed partial class MissionsViewModel : ObservableObject
         IDialogService dialogs,
         IClipboardService clipboard,
         IProcessLauncher launcher,
+        MissionReminderService reminders,
+        IServiceProvider services,
         ILogger<MissionsViewModel> logger)
-        : this(store, settings, ui, dialogs, clipboard, launcher, logger, TimeZoneInfo.Local)
+        // Capture targets are resolved when used: Notes may register after Missions, and its target is optional.
+        : this(store, settings, ui, dialogs, clipboard, launcher, reminders, () => (IEnumerable<ICaptureTarget>?)services.GetService(typeof(IEnumerable<ICaptureTarget>)) ?? [],
+            logger, TimeZoneInfo.Local)
     {
     }
 
@@ -126,15 +146,20 @@ public sealed partial class MissionsViewModel : ObservableObject
         IDialogService dialogs,
         IClipboardService clipboard,
         IProcessLauncher launcher,
+        MissionReminderService reminders,
+        Func<IEnumerable<ICaptureTarget>> captureTargets,
         ILogger<MissionsViewModel> logger,
         TimeZoneInfo zone)
     {
         _store = store;
+        _settingsFactory = settings;
         _settings = settings.Get<MissionsSettings>(MissionsIds.ModuleId);
         _ui = ui;
         _dialogs = dialogs;
         _clipboard = clipboard;
         _launcher = launcher;
+        _reminders = reminders;
+        _captureTargets = captureTargets;
         _logger = logger;
         _zone = zone;
 
@@ -143,6 +168,8 @@ public sealed partial class MissionsViewModel : ObservableObject
         PlayCelebrations = s.PlayCelebrations;
         ConfirmUntickedChecklist = s.ConfirmUntickedChecklist;
         ShowFinishedMissions = s.ShowFinishedMissions;
+        RemindersEnabled = s.RemindersEnabled;
+        ReminderHourIndex = Math.Clamp(s.ReminderHour, 0, 23);
         _loading = false;
 
         _store.Changed += (_, _) => ScheduleRefresh();
@@ -166,13 +193,24 @@ public sealed partial class MissionsViewModel : ObservableObject
     public bool HasMissions => Missions.Count > 0;
     public bool HasNoMissions => Missions.Count == 0 && !IsNewOpen;
     public bool HasSelection => SelectedMission is not null;
-    public bool IsNewOpen => IsPromptOpen || IsImportOpen;
+    public bool IsNewOpen => IsPromptOpen || IsImportOpen || IsReplanOpen;
     public bool ShowMission => HasSelection && !IsNewOpen;
     public bool HasImportErrors => ImportErrors.Length > 0;
     public bool HasImportWarnings => ImportWarnings.Length > 0;
     public bool HasPreviewNote => PreviewNote.Length > 0;
     public bool CanCopyPrompt => PromptGoal.Trim().Length > 0;
-    public bool CanCreate => HasPreview && PreviewTitle.Trim().Length > 0 && PreviewPhases.Any(p => p.Steps.Any(s => s.Include));
+    public bool CanCreate => HasPreview && (IsReplan || PreviewTitle.Trim().Length > 0) && PreviewPhases.Any(p => p.Steps.Any(s => s.Include));
+
+    /// <summary>The import panel takes a new mission (title, goal and reward to edit), not a new plan for this one.</summary>
+    public bool IsNewMission => !IsReplan;
+
+    public string ImportHeading => IsReplan ? "2. Paste the AI's new plan" : "2. Paste the AI's answer";
+
+    public string CreateLabel => IsReplan ? "Replace the remaining steps" : "Create mission";
+
+    /// <summary>"00:00" … "23:00" in the current culture's short time format; the index is the hour.</summary>
+    public IReadOnlyList<string> ReminderHourNames { get; } =
+        Enumerable.Range(0, 24).Select(h => new DateTime(2000, 1, 1, h, 0, 0).ToString("t", CultureInfo.CurrentCulture)).ToList();
 
     public bool IsPlanned => Status == MissionStatus.Planned;
     public bool IsActive => Status == MissionStatus.Active;
@@ -218,7 +256,9 @@ public sealed partial class MissionsViewModel : ObservableObject
     [RelayCommand]
     private void OpenPrompt()
     {
+        SetReplan(false);
         IsImportOpen = false;
+        IsReplanOpen = false;
         IsPromptOpen = true;
         PromptCopied = false;
     }
@@ -226,8 +266,18 @@ public sealed partial class MissionsViewModel : ObservableObject
     [RelayCommand]
     private void OpenImport()
     {
+        SetReplan(false);
         IsPromptOpen = false;
+        IsReplanOpen = false;
         IsImportOpen = true;
+    }
+
+    /// <summary>"Back" in the import panel: to the prompt it came from.</summary>
+    [RelayCommand]
+    private void BackToPrompt()
+    {
+        if (IsReplan) OpenReplan();
+        else OpenPrompt();
     }
 
     [RelayCommand]
@@ -235,18 +285,72 @@ public sealed partial class MissionsViewModel : ObservableObject
     {
         IsPromptOpen = false;
         IsImportOpen = false;
+        IsReplanOpen = false;
+        SetReplan(false);
         ImportText = "";
+    }
+
+    /// <summary>Switches the import panel between a new mission and a new plan for the selected one.</summary>
+    private void SetReplan(bool replan)
+    {
+        if (IsReplan == replan) return;
+        IsReplan = replan;
+        ImportText = "";
+        ParseImport();
     }
 
     partial void OnIsPromptOpenChanged(bool value) => OnNewChanged();
 
     partial void OnIsImportOpenChanged(bool value) => OnNewChanged();
 
+    partial void OnIsReplanOpenChanged(bool value) => OnNewChanged();
+
+    partial void OnIsReplanChanged(bool value)
+    {
+        OnPropertyChanged(nameof(IsNewMission));
+        OnPropertyChanged(nameof(ImportHeading));
+        OnPropertyChanged(nameof(CreateLabel));
+        OnPropertyChanged(nameof(CanCreate));
+    }
+
     private void OnNewChanged()
     {
         OnPropertyChanged(nameof(IsNewOpen));
         OnPropertyChanged(nameof(ShowMission));
         OnPropertyChanged(nameof(HasNoMissions));
+    }
+
+    // ---- Planning the rest again ---------------------------------------------------------------------------------
+
+    /// <summary>Opens the re-plan panel for the selected mission (what changed, then the prompt to copy).</summary>
+    [RelayCommand]
+    private void OpenReplan()
+    {
+        if (SelectedMission is null || !IsOpenForChanges) return;
+        IsPromptOpen = false;
+        IsImportOpen = false;
+        SetReplan(true);
+        IsReplanOpen = true;
+        PromptCopied = false;
+    }
+
+    [RelayCommand]
+    private void CopyReplanPrompt()
+    {
+        if (SelectedMission is not { } m || _store.GetMission(m.Id) is not { } mission) return;
+        var steps = _store.Steps(m.Id).Select(s => s.Value).ToList();
+        var pace = MissionPace.Compute(mission, steps, _store.History(m.Id), _store.Now, _zone);
+        _clipboard.SetText(MissionPrompt.BuildReplan(mission, steps, pace, Today, ReplanReason));
+        PromptCopied = true;
+        Message = "Prompt copied, with your progress in it. Paste it into any AI, then paste its new plan here.";
+    }
+
+    /// <summary>From the re-plan prompt to the box for the AI's new plan.</summary>
+    [RelayCommand]
+    private void OpenReplanImport()
+    {
+        IsReplanOpen = false;
+        IsImportOpen = true;
     }
 
     partial void OnPromptGoalChanged(string value) => OnPropertyChanged(nameof(CanCopyPrompt));
@@ -273,7 +377,8 @@ public sealed partial class MissionsViewModel : ObservableObject
 
     private void ParseImport()
     {
-        _import = ImportText.Trim().Length == 0 ? null : MissionImport.Parse(ImportText);
+        // A new plan for a mission keeps the mission's title, so it may come without one.
+        _import = ImportText.Trim().Length == 0 ? null : MissionImport.Parse(ImportText, requireTitle: !IsReplan);
         ImportErrors = _import is { Errors.Count: > 0 } bad ? string.Join("\n", bad.Errors) : "";
         ImportWarnings = _import is { Warnings.Count: > 0 } warn ? string.Join("\n", warn.Warnings) : "";
         PreviewPhases.Clear();
@@ -282,7 +387,8 @@ public sealed partial class MissionsViewModel : ObservableObject
             PreviewTitle = draft.Title;
             PreviewGoal = draft.Goal;
             PreviewReward = draft.Reward;
-            PreviewDeadline = draft.Deadline?.ToDateTime(TimeOnly.MinValue);
+            var keep = IsReplan && SelectedMission is { } sel ? _store.GetMission(sel.Id)?.Deadline : null;
+            PreviewDeadline = (draft.Deadline ?? keep)?.ToDateTime(TimeOnly.MinValue);
             PreviewNote = draft.Note;
             var number = 0;
             foreach (var phase in draft.Phases)
@@ -322,6 +428,12 @@ public sealed partial class MissionsViewModel : ObservableObject
         var today = Today;
         var finish = today.AddDays((int)Math.Ceiling(days));
         var text = $"{Plural(phases, "phase")} · {Plural(steps.Count, "step")} · about {MissionsFormat.Days(days)}. Started today, it ends around {MissionsFormat.Date(finish, today)}";
+        if (IsReplan && SelectedMission is { } m)
+        {
+            var left = _store.Steps(m.Id).Count(s => !s.Value.IsDone);
+            text = $"Replaces the {Plural(left, "step")} not done yet (the one you are on too) with {Plural(steps.Count, "step")}, about {MissionsFormat.Days(days)}. " +
+                   $"From today it ends around {MissionsFormat.Date(finish, today)}";
+        }
         if (PreviewDeadline is { } d)
         {
             var late = finish.DayNumber - DateOnly.FromDateTime(d).DayNumber;
@@ -349,6 +461,19 @@ public sealed partial class MissionsViewModel : ObservableObject
                 Deadline = PreviewDeadline is { } d ? DateOnly.FromDateTime(d) : null,
                 Phases = phases,
             };
+            if (IsReplan)
+            {
+                if (SelectedMission is not { } sel) return;
+                if (!_store.Replan(sel.Id, edited))
+                {
+                    Message = $"The new plan cannot be used: a mission has at most {MissionLimits.Steps} steps in {MissionLimits.Phases} phases, and a finished one cannot be planned again.";
+                    return;
+                }
+                CloseNew();
+                Refresh();
+                Message = $"The rest of the plan is replaced: {Plural(edited.StepCount, "step")} to go.";
+                return;
+            }
             var id = _store.Create(edited, MissionSource.Import);
             CloseNew();
             Refresh();
@@ -490,6 +615,40 @@ public sealed partial class MissionsViewModel : ObservableObject
     private void ClaimPhaseReward(PhaseRow? phase)
     {
         if (SelectedMission is { } m && phase is not null && _store.ClaimReward(m.Id, phase.Key)) Message = "Enjoy it, you earned it.";
+    }
+
+    /// <summary>Notes' capture target while Notes is on (Missions does not reference Notes; Quick Capture's target does it).</summary>
+    private ICaptureTarget? NoteTarget()
+    {
+        try
+        {
+            var enabled = _settingsFactory.Get<GeneralSettings>(GeneralSettings.StoreId).Current.EnabledModules;
+            return _captureTargets().FirstOrDefault(t => t.Id == NoteTargetId && (!enabled.TryGetValue(t.ModuleId, out var on) || on));
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Looking for Notes failed");
+            return null;
+        }
+    }
+
+    /// <summary>The summary as a new note: "Mission: title" on the first line, the summary under it.</summary>
+    [RelayCommand]
+    private void SaveSummaryToNotes()
+    {
+        if (SelectedMission is not { } m || _store.GetMission(m.Id) is not { } mission) return;
+        if (NoteTarget() is not { } notes)
+        {
+            Message = "Turn on Notes to save the summary there.";
+            return;
+        }
+        var steps = _store.Steps(m.Id).Select(s => s.Value).ToList();
+        var pace = MissionPace.Compute(mission, steps, _store.History(m.Id), _store.Now, _zone);
+        var summary = MissionsFormat.Summary(mission, steps, pace, _store.Now, _zone);
+        // The summary's own heading becomes the note's title.
+        var body = string.Join('\n', summary.Split('\n').Skip(1)).Trim();
+        var result = notes.Capture($"Mission: {mission.Title}\n{body}");
+        Message = result.Message;
     }
 
     [RelayCommand]
@@ -672,6 +831,31 @@ public sealed partial class MissionsViewModel : ObservableObject
     partial void OnConfirmUntickedChecklistChanged(bool value)
     {
         if (!_loading) _settings.Update(s => s.ConfirmUntickedChecklist = value);
+    }
+
+    partial void OnRemindersEnabledChanged(bool value)
+    {
+        if (!_loading) _settings.Update(s => s.RemindersEnabled = value);
+    }
+
+    partial void OnReminderHourIndexChanged(int value)
+    {
+        if (!_loading && value >= 0) _settings.Update(s => s.ReminderHour = Math.Clamp(value, 0, 23));
+    }
+
+    /// <summary>Shows today's reminder right away (to try the notification), whatever the hour.</summary>
+    [RelayCommand]
+    private void RemindNow()
+    {
+        try
+        {
+            Message = _reminders.RemindNow(_zone) ? null : "No mission in progress is waiting for a step, so there is nothing to remind you about.";
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Missions reminder failed");
+            Message = $"Could not show the reminder: {ex.Message}";
+        }
     }
 
     partial void OnShowFinishedMissionsChanged(bool value)
@@ -866,6 +1050,7 @@ public sealed partial class MissionsViewModel : ObservableObject
                 : "";
             CanUndo = mission.Status is MissionStatus.Active or MissionStatus.Completed && steps.Any(s => s.IsDone);
             CanAddStep = mission.Status is MissionStatus.Planned or MissionStatus.Active or MissionStatus.Paused;
+            CanSaveToNotes = steps.Any(s => s.IsDone) && NoteTarget() is not null;
 
             EditTitle = mission.Title;
             EditGoal = mission.Goal;

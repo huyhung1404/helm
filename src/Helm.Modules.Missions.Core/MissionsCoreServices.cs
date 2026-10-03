@@ -31,6 +31,10 @@ public static class MissionsCoreServices
             sp.GetRequiredService<ISyncedCollection<Mission>>(),
             sp.GetRequiredService<ISyncedCollection<MissionStep>>(),
             sp.GetRequiredService<ISyncedLog<MissionEvent>>()));
+        services.AddSingleton(sp => new MissionReminderService(
+            sp.GetRequiredService<MissionsStore>(), sp.GetRequiredService<Helm.Core.Settings.ISettingsStoreFactory>()));
+        // Quick Capture and Android's Share → "Save to Helm": an AI's answer with a mission in it.
+        services.AddSingleton<Helm.Core.Capture.ICaptureTarget, MissionCaptureTarget>();
         // Claude's tools for the missions (Helm's MCP server, Windows).
         services.AddSingleton<Helm.Core.Mcp.IMcpToolProvider, MissionsMcpTools>();
         // Windows registers it again through AddHelmModule; one instance either way.

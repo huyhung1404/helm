@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Status-bar icon for Missions reminders: the Missions icon (a flag at the end of a winding road), white on
+     transparent (Android tints it). The same shapes as MissionsIconShape, scaled from 100 to 24. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="100"
+    android:viewportHeight="100">
+    <path
+        android:strokeColor="#FFFFFFFF"
+        android:strokeWidth="9"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round"
+        android:pathData="M6,94C26,94 30,76 46,76C58,76 60,68 60,60" />
+    <path
+        android:strokeColor="#FFFFFFFF"
+        android:strokeWidth="9"
+        android:strokeLineCap="round"
+        android:pathData="M60,6V60" />
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:strokeColor="#FFFFFFFF"
+        android:strokeWidth="6"
+        android:strokeLineJoin="round"
+        android:pathData="M60,8H90L80,21L90,34H60Z" />
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M0,94a6,6 0,1 0,12 0a6,6 0,1 0,-12 0" />
+</vector>

@@ -73,6 +73,67 @@ public static class MissionPrompt
         return b.ToString();
     }
 
+    /// <summary>
+    /// The prompt to plan the rest of the way again: the mission, what is done (with how long it took and the notes),
+    /// the pace, what is left, and what changed. The AI answers with only the steps not done yet, in the same format;
+    /// <see cref="MissionsStore.Replan"/> puts them in place of the remaining ones.
+    /// </summary>
+    public static string BuildReplan(Mission mission, IReadOnlyList<MissionStep> steps, MissionPaceInfo pace, DateOnly today, string reason)
+    {
+        static string Day(DateOnly d) => d.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
+        var b = new StringBuilder();
+        b.AppendLine("You are an expert coach. I am working through a step-by-step roadmap in my app, Helm Missions. Plan the rest of the way again from where I am, and return it as JSON the app will import.");
+        b.AppendLine();
+        b.AppendLine($"Mission: {Line(mission.Title, "")}");
+        if (mission.Goal.Length > 0) b.AppendLine($"Goal: {Line(mission.Goal, "")}");
+        b.AppendLine($"Today: {Day(today)}");
+        b.AppendLine(mission.Deadline is { } deadline ? $"Deadline: {Day(deadline)}" : "Deadline: none");
+        if (mission.StartedAt is not null)
+        {
+            var off = pace.DaysOff switch { 1 => ", 1 day behind the plan", > 1 => $", {pace.DaysOff} days behind the plan", -1 => ", 1 day ahead of the plan", < 0 => $", {-pace.DaysOff} days ahead of the plan", _ => ", on track" };
+            b.AppendLine($"Progress: {pace.Done} of {pace.Total} steps done in {Math.Round(pace.ElapsedDays, 1).ToString(CultureInfo.InvariantCulture)} days{off}.");
+        }
+        b.AppendLine($"What changed, or what I want: {Line(reason, "nothing in particular; fit the rest to my real pace")}");
+
+        var doneSteps = steps.Where(s => s.IsDone).ToList();
+        if (doneSteps.Count > 0)
+        {
+            b.AppendLine();
+            b.AppendLine("Done so far (do not repeat these):");
+            foreach (var s in doneSteps)
+            {
+                var line = $"- {Line(s.Title, "")}";
+                if (s.Skipped) line += " (skipped)";
+                else if (s.StartedAt is { } st && s.CompletedAt is { } c) line += $" (took {Math.Max(0.1, Math.Round((c - st).TotalDays, 1)).ToString(CultureInfo.InvariantCulture)} days, planned {s.EstimateDays.ToString(CultureInfo.InvariantCulture)})";
+                if (s.Note.Length > 0) line += $": {Line(s.Note, "")}";
+                b.AppendLine(line);
+            }
+        }
+
+        b.AppendLine();
+        b.AppendLine("Still to do, as planned until now (JSON):");
+        b.AppendLine("```json");
+        var left = steps.Where(s => !s.IsDone).ToList();
+        b.AppendLine(MissionsFormat.Json(mission with { Phases = mission.Phases.Where(p => left.Any(s => s.PhaseKey == p.Key)).ToList() }, left));
+        b.AppendLine("```");
+        b.AppendLine();
+        b.AppendLine("Rules:");
+        b.AppendLine("- Reply with ONE ```json code block and nothing else.");
+        b.AppendLine("- List ONLY the steps still to do, starting with the one I should do next. Never include the done steps.");
+        b.AppendLine("- Keep a phase's exact title to go on with it; give a new phase a new title.");
+        b.AppendLine("- Write every title, description, checklist item and reward in the language of my mission.");
+        b.AppendLine("- Each step is one concrete piece of work that takes 0.5-3 days at my real pace (see how long the done steps took).");
+        b.AppendLine("- \"doneWhen\" says how I can check the step is done: a number, a test, something I produce.");
+        b.AppendLine("- If the deadline cannot be met any more, set a realistic new \"deadline\" and explain in \"note\".");
+        b.AppendLine("- \"checklist\" (optional, up to 7 items) splits a step into ticks. \"resources\" (optional) are well-known, real links or book titles.");
+        b.AppendLine();
+        b.AppendLine("Use exactly this shape:");
+        b.AppendLine("```json");
+        b.AppendLine(Example);
+        b.Append("```");
+        return b.ToString();
+    }
+
     /// <summary>The template with placeholders, for use outside the form.</summary>
     public static string Template => Build(new MissionPromptInput("<describe your goal>", "<where you are now>", "<e.g. 1 hour a day>", null, "<anything else>"));
 

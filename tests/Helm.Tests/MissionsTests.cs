@@ -1,5 +1,6 @@
 using System.Text.Json;
 using System.Text.Json.Nodes;
+using Helm.Core.Capture;
 using Helm.Core.Mcp;
 using Helm.Core.Services;
 using Helm.Core.Settings;
@@ -438,9 +439,9 @@ public sealed class MissionsTests : IDisposable
 
     // ---- Page ----------------------------------------------------------------------------------------------------
 
-    private MissionsViewModel ViewModel(MemoryClipboard? clipboard = null, Helm.Shell.Services.IDialogService? dialogs = null) =>
+    private MissionsViewModel ViewModel(MemoryClipboard? clipboard = null, Helm.Shell.Services.IDialogService? dialogs = null, params ICaptureTarget[] targets) =>
         new(_store, _settings, new InlineUi(), dialogs ?? new AcceptDialogs(), clipboard ?? new MemoryClipboard(), new NullLauncher(),
-            NullLogger<MissionsViewModel>.Instance, TimeZoneInfo.Utc);
+            new MissionReminderService(_store, _settings, _time), () => targets, NullLogger<MissionsViewModel>.Instance, TimeZoneInfo.Utc);
 
     [Fact]
     public void The_page_copies_the_prompt_imports_the_answer_and_creates_the_mission()
@@ -636,6 +637,215 @@ public sealed class MissionsTests : IDisposable
         Assert.Contains("Pass HSK3", unknown.Text);
 
         Assert.Equal(["mission_get", "missions_list"], Server(readOnly: true).ToolNames.OrderBy(n => n));
+        Assert.Contains("mission_replan", Server().ToolNames);
+    }
+
+    // ---- v2: planning the rest again -----------------------------------------------------------------------------
+
+    private static MissionDraft Plan(DateOnly? deadline = null, string note = "", params (string Phase, string[] Steps)[] phases) =>
+        new("", "", note, "", deadline, phases.Select(p => new PhaseDraft(p.Phase, "", p.Steps.Select(s => new StepDraft(s)).ToList())).ToList());
+
+    [Fact]
+    public void Replan_keeps_the_done_steps_and_replaces_the_rest()
+    {
+        var id = CreateHsk();
+        _store.Complete(id, "done");
+        var foundations = _store.GetMission(id)!.Phases[0].Key;
+
+        Assert.True(_store.Replan(id, Plan(new DateOnly(2027, 4, 1), "Slower than planned",
+            ("foundations", ["HSK1 review again"]), ("HSK2 + HSK3", ["HSK2 words", "HSK3 words"]))));
+
+        var mission = _store.GetMission(id)!;
+        var steps = _store.Steps(id).Select(s => s.Value).ToList();
+        Assert.Equal(["HSK1 words", "HSK1 review again", "HSK2 words", "HSK3 words"], steps.Select(s => s.Title));
+        Assert.Equal(["Foundations", "HSK2 + HSK3"], mission.Phases.Select(p => p.Title)); // the old "HSK2" phase is gone
+        Assert.Equal(foundations, mission.Phases[0].Key);
+        Assert.Equal([foundations, foundations], steps.Take(2).Select(s => s.PhaseKey));
+        Assert.True(steps[0].IsDone);
+        Assert.Equal("done", steps[0].Note);
+        Assert.Equal((new DateOnly(2027, 4, 1), "Slower than planned", "Pass HSK3"), (mission.Deadline, mission.Note, mission.Title));
+        Assert.Equal("HSK1 review again", _store.CurrentStep(id)!.Value.Title);
+        Assert.Equal(MissionStatus.Active, mission.Status);
+    }
+
+    [Fact]
+    public void A_finished_mission_or_one_too_big_cannot_be_planned_again()
+    {
+        var id = CreateHsk();
+        for (var i = 0; i < 4; i++) _store.Complete(id);
+        Assert.False(_store.Replan(id, Plan(phases: ("More", ["x"]))));
+
+        var other = CreateHsk();
+        var tooMany = Enumerable.Range(0, MissionLimits.Steps).Select(i => $"Step {i}").ToArray();
+        _store.Complete(other);
+        Assert.False(_store.Replan(other, Plan(phases: ("Big", tooMany))));
+        Assert.Equal(4, _store.Steps(other).Count);
+    }
+
+    [Fact]
+    public void The_replan_prompt_carries_the_progress_and_its_answer_needs_no_title()
+    {
+        var id = CreateHsk();
+        _time.Advance(TimeSpan.FromDays(4));
+        _store.Complete(id, "Anki done");
+        var mission = _store.GetMission(id)!;
+        var steps = _store.Steps(id).Select(s => s.Value).ToList();
+
+        var prompt = MissionPrompt.BuildReplan(mission, steps, MissionPace.Compute(mission, steps, [], _store.Now, TimeZoneInfo.Utc),
+            new DateOnly(2026, 10, 5), "I was ill for a week");
+
+        Assert.Contains("Mission: Pass HSK3", prompt);
+        Assert.Contains("1 of 4 steps done in 4 days, on track", prompt);
+        Assert.Contains("- HSK1 words (took 4 days, planned 3): Anki done", prompt);
+        Assert.Contains("What changed, or what I want: I was ill for a week", prompt);
+        Assert.Contains("\"title\": \"HSK1 review\"", prompt);
+        Assert.DoesNotContain("\"title\": \"HSK1 words\"", prompt);
+
+        var answer = "```json\n{ \"phases\": [ { \"title\": \"HSK2\", \"steps\": [ { \"title\": \"HSK2 words\" } ] } ] }\n```";
+        Assert.False(MissionImport.Parse(answer).Ok);
+        Assert.True(MissionImport.Parse(answer, requireTitle: false).Ok);
+    }
+
+    [Fact]
+    public void The_page_plans_the_rest_again_from_an_ai_answer()
+    {
+        var id = CreateHsk();
+        _store.Complete(id);
+        var clipboard = new MemoryClipboard();
+        var vm = ViewModel(clipboard);
+
+        vm.OpenReplanCommand.Execute(null);
+        Assert.True(vm.IsReplanOpen);
+        vm.ReplanReason = "Tôi bận cả tuần";
+        vm.CopyReplanPromptCommand.Execute(null);
+        Assert.Contains("What changed, or what I want: Tôi bận cả tuần", clipboard.Text);
+
+        vm.OpenReplanImportCommand.Execute(null);
+        Assert.True(vm.IsImportOpen && vm.IsReplan && !vm.IsNewMission);
+        Assert.Equal("Replace the remaining steps", vm.CreateLabel);
+        vm.ImportText = "{ \"phases\": [ { \"title\": \"HSK2\", \"steps\": [ \"HSK2 words\", \"HSK2 mock test\" ] } ] }";
+        Assert.True(vm.CanCreate);
+        Assert.StartsWith("Replaces the 3 steps not done yet", vm.PreviewSummary);
+        Assert.Equal(new DateTime(2027, 3, 1), vm.PreviewDeadline); // the mission's own deadline is kept
+
+        vm.CreateMissionCommand.Execute(null);
+
+        Assert.False(vm.IsNewOpen);
+        Assert.False(vm.IsReplan);
+        Assert.Equal(["HSK1 words", "HSK2 words", "HSK2 mock test"], _store.Steps(id).Select(s => s.Value.Title));
+        Assert.Single(_store.Missions());
+        Assert.Equal("HSK2 words", vm.CurrentTitle);
+        Assert.Contains("2 steps to go", vm.Message);
+    }
+
+    // ---- v2: share, reminders, Notes ------------------------------------------------------------------------------
+
+    [Fact]
+    public void A_shared_ai_answer_with_a_mission_becomes_a_new_mission()
+    {
+        var target = new MissionCaptureTarget(_store);
+
+        Assert.True(target.Claims(Hsk));
+        Assert.False(target.Claims("https://youtu.be/dQw4w9WgXcQ"));
+        Assert.False(target.Claims("{ \"steps\": \"nope\" }"));
+        Assert.Equal("New mission “Pass HSK3”: 2 phases, 4 steps, about 9 days", target.Preview(Hsk).Text);
+        Assert.False(target.Preview("buy milk").CanSave);
+
+        var result = target.Capture(Hsk);
+
+        Assert.True(result.Saved);
+        var mission = Assert.Single(_store.Missions()).Value;
+        Assert.Equal((MissionStatus.Planned, MissionSource.Import), (mission.Status, mission.Source));
+    }
+
+    [Fact]
+    public void The_daily_reminder_names_each_mission_s_step_once_a_day_and_skips_missions_with_progress_today()
+    {
+        var reminders = new MissionReminderService(_store, _settings, _time);
+        reminders.Settings.Update(s => s.ReminderHour = 9);
+        var id = CreateHsk();
+        CreateHsk(start: false); // planned: no reminder
+
+        Assert.Null(reminders.TakeDue(TimeZoneInfo.Utc)); // 08:00, before the hour
+        _time.Advance(TimeSpan.FromHours(2));
+        var reminder = reminders.TakeDue(TimeZoneInfo.Utc);
+        Assert.Equal(("Today's step", "Pass HSK3: HSK1 words"), (reminder?.Title, reminder?.Message));
+        Assert.Null(reminders.TakeDue(TimeZoneInfo.Utc)); // once a day
+
+        _time.Advance(TimeSpan.FromDays(1));
+        _store.Complete(id);
+        Assert.Null(reminders.TakeDue(TimeZoneInfo.Utc)); // progress today: nothing to nudge
+        Assert.True(reminders.RemindNow(TimeZoneInfo.Utc)); // "Remind me now" shows it anyway
+
+        reminders.Settings.Update(s => s.RemindersEnabled = false);
+        _time.Advance(TimeSpan.FromDays(1));
+        Assert.Null(reminders.TakeDue(TimeZoneInfo.Utc));
+    }
+
+    [Fact]
+    public void The_summary_is_saved_to_notes_when_notes_is_there()
+    {
+        var id = CreateHsk();
+        Assert.False(ViewModel().CanSaveToNotes); // no Notes
+
+        var notes = new RecordingNotes();
+        var vm = ViewModel(targets: notes);
+        Assert.False(vm.CanSaveToNotes); // nothing done yet
+        _store.Complete(id, "Anki done");
+        Assert.True(vm.CanSaveToNotes);
+
+        vm.SaveSummaryToNotesCommand.Execute(null);
+
+        Assert.StartsWith("Mission: Pass HSK3\n", notes.Captured);
+        Assert.Contains("- ✓ HSK1 words", notes.Captured);
+        Assert.DoesNotContain("# Mission", notes.Captured);
+        Assert.Equal("Saved to Notes.", vm.Message);
+
+        _settings.Get<GeneralSettings>(GeneralSettings.StoreId).Update(s => s.EnabledModules["notes"] = false);
+        vm.Refresh();
+        Assert.False(vm.CanSaveToNotes);
+    }
+
+    [Fact]
+    public async Task Claude_plans_the_rest_of_a_mission_again()
+    {
+        var server = Server();
+        var id = CreateHsk();
+        _store.Complete(id);
+
+        var replanned = await Call(server, "mission_replan", new JsonObject
+        {
+            ["mission"] = "Pass HSK3",
+            ["deadline"] = "2027-05-01",
+            ["phases"] = new JsonArray(new JsonObject { ["title"] = "Foundations", ["steps"] = new JsonArray(new JsonObject { ["title"] = "Review, slower" }) }),
+        });
+
+        Assert.False(replanned.IsError, replanned.Text);
+        Assert.Equal(["HSK1 words", "Review, slower"], _store.Steps(id).Select(s => s.Value.Title));
+        Assert.Equal(new DateOnly(2027, 5, 1), _store.GetMission(id)!.Deadline);
+
+        _store.Complete(id);
+        var finished = await Call(server, "mission_replan", new JsonObject { ["mission"] = id, ["phases"] = new JsonArray(new JsonObject { ["title"] = "X", ["steps"] = new JsonArray("y") }) });
+        Assert.True(finished.IsError);
+        Assert.Contains("nothing left to plan", finished.Text);
+    }
+
+    private sealed class RecordingNotes : ICaptureTarget
+    {
+        public string Captured { get; private set; } = "";
+        public string Id => "note";
+        public string ModuleId => "notes";
+        public string Name => "Note";
+        public string Prefix => "n";
+        public string Example => "";
+        public int Order => 0;
+        public CapturePreview Preview(string text) => new(true, "");
+
+        public CaptureResult Capture(string text)
+        {
+            Captured = text;
+            return new(true, "Saved to Notes.");
+        }
     }
 
     private static async Task<(bool IsError, string Text)> Call(McpServer server, string tool, JsonObject args)

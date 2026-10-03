@@ -32,7 +32,25 @@ public sealed class MissionsMcpTools(MissionsStore store) : IMcpToolProvider
                 ("mission", McpArgs.Text("The mission's id or title."), true),
                 ("note", McpArgs.Text("What was done, a result or a link (optional)."), false)),
             (args, _) => Task.FromResult<object?>(CompleteStep(args))),
+        new("mission_replan",
+            "Plan the rest of a mission again, e.g. when the user is behind or something changed: every step not done yet (the current one " +
+            "too) is replaced by these phases and steps; done steps stay. Read mission_get first to see what is done and how long steps took. " +
+            "Keep a phase's exact title to go on with it. Ask the user before replacing their plan.",
+            ReplanSchema(), (args, _) => Task.FromResult<object?>(Replan(args))),
     ];
+
+    private object Replan(JsonElement args)
+    {
+        var mission = Require(McpArgs.RequiredString(args, "mission"));
+        if (mission.Value.Status is MissionStatus.Completed or MissionStatus.Abandoned)
+            throw new McpToolException($"“{mission.Value.Title}” is {mission.Value.Status.ToString().ToLowerInvariant()}; there is nothing left to plan.");
+        var result = MissionImport.Read(args, requireTitle: false);
+        if (!result.Ok) throw new McpToolException(string.Join(" ", result.Errors));
+        if (!store.Replan(mission.Id, result.Draft!)) throw new McpToolException($"The plan is too big: at most {MissionLimits.Steps} steps and {MissionLimits.Phases} phases in all.");
+        var updated = (JsonObject)Get(mission.Id);
+        if (result.Warnings.Count > 0) updated["warnings"] = new JsonArray(result.Warnings.Select(w => (JsonNode?)w).ToArray());
+        return updated;
+    }
 
     private object List()
     {
@@ -146,9 +164,38 @@ public sealed class MissionsMcpTools(MissionsStore store) : IMcpToolProvider
     private static string? Day(DateOnly? day) => day?.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
 
     /// <summary>The import format as a JSON Schema.</summary>
-    private static JsonObject CreateSchema()
+    private static JsonObject CreateSchema() => new()
     {
-        JsonObject Str(string description) => McpArgs.Text(description);
+        ["type"] = "object",
+        ["properties"] = new JsonObject
+        {
+            ["title"] = McpArgs.Text("Short name of the mission."),
+            ["goal"] = McpArgs.Text("The measurable end result."),
+            ["deadline"] = McpArgs.Text("Optional: 2027-03-01."),
+            ["reward"] = McpArgs.Text("A bigger reward for finishing the whole mission."),
+            ["note"] = McpArgs.Text("Optional: anything the user should know, e.g. the deadline is tight."),
+            ["phases"] = PhasesSchema("The phases in order."),
+            ["start"] = McpArgs.Flag("Start the mission now (default: the user starts it in Helm)."),
+        },
+        ["required"] = new JsonArray("title", "phases"),
+    };
+
+    private static JsonObject ReplanSchema() => new()
+    {
+        ["type"] = "object",
+        ["properties"] = new JsonObject
+        {
+            ["mission"] = McpArgs.Text("The mission's id or title."),
+            ["phases"] = PhasesSchema("Only the steps still to do, in order, starting with the next one. Keep a phase's exact title to go on with it."),
+            ["deadline"] = McpArgs.Text("Optional: a new deadline, 2027-03-01, when the old one cannot be met."),
+            ["note"] = McpArgs.Text("Optional: why the plan changed, shown on the mission."),
+        },
+        ["required"] = new JsonArray("mission", "phases"),
+    };
+
+    private static JsonObject PhasesSchema(string description)
+    {
+        JsonObject Str(string text) => McpArgs.Text(text);
         JsonObject Strings(string description) => McpArgs.List(description);
         var step = new JsonObject
         {
@@ -175,20 +222,6 @@ public sealed class MissionsMcpTools(MissionsStore store) : IMcpToolProvider
             },
             ["required"] = new JsonArray("title", "steps"),
         };
-        return new JsonObject
-        {
-            ["type"] = "object",
-            ["properties"] = new JsonObject
-            {
-                ["title"] = Str("Short name of the mission."),
-                ["goal"] = Str("The measurable end result."),
-                ["deadline"] = Str("Optional: 2027-03-01."),
-                ["reward"] = Str("A bigger reward for finishing the whole mission."),
-                ["note"] = Str("Optional: anything the user should know, e.g. the deadline is tight."),
-                ["phases"] = new JsonObject { ["type"] = "array", ["items"] = phase, ["description"] = "The phases in order." },
-                ["start"] = McpArgs.Flag("Start the mission now (default: the user starts it in Helm)."),
-            },
-            ["required"] = new JsonArray("title", "phases"),
-        };
+        return new JsonObject { ["type"] = "array", ["items"] = phase, ["description"] = description };
     }
 }

@@ -190,10 +190,36 @@
                 </StackPanel>
             </Border>
 
-            <!-- New mission, 2: the import and its preview -->
+            <!-- Planning the rest again, 1: what changed, and the prompt with the progress in it -->
+            <Border Classes="card" IsVisible="{Binding IsReplanOpen}">
+                <StackPanel Spacing="4">
+                    <TextBlock Classes="title" TextWrapping="Wrap">
+                        <Run Text="1. Plan the rest of " /><Run Text="{Binding Title}" /><Run Text=" again" />
+                    </TextBlock>
+                    <TextBlock Classes="secondary" TextWrapping="Wrap"
+                               Text="Behind, ahead, or something changed? Helm writes a prompt with what you have done and what is left; the AI answers with a new plan for the steps not done yet. Done steps stay." />
+                    <TextBlock Text="What changed, or what you want (optional)" Classes="label" />
+                    <TextBox PlaceholderText="e.g. I can only do 30 minutes a day now" Text="{Binding ReplanReason}" AcceptsReturn="True" TextWrapping="Wrap"
+                             AutomationProperties.Name="What changed" />
+                    <Button Classes="accent wide" Margin="0,12,0,0" Command="{Binding CopyReplanPromptCommand}">
+                        <StackPanel Orientation="Horizontal" Spacing="6">
+                            <ic:SymbolIcon Symbol="Copy" FontSize="16" />
+                            <TextBlock Text="Copy prompt" />
+                        </StackPanel>
+                    </Button>
+                    <TextBlock Classes="secondary" TextWrapping="Wrap" IsVisible="{Binding PromptCopied}"
+                               Text="Copied. Paste it into any AI app, then tap I have the new plan and paste its answer." />
+                    <Grid ColumnDefinitions="*,8,*" Margin="0,4,0,0">
+                        <Button Classes="wide" Content="I have the new plan" Command="{Binding OpenReplanImportCommand}" />
+                        <Button Grid.Column="2" Classes="wide" Content="Cancel" Command="{Binding CloseNewCommand}" />
+                    </Grid>
+                </StackPanel>
+            </Border>
+
+            <!-- New mission (or a new plan), 2: the import and its preview -->
             <Border Classes="card" IsVisible="{Binding IsImportOpen}">
                 <StackPanel Spacing="6">
-                    <TextBlock Text="2. Paste the AI's answer" Classes="title" />
+                    <TextBlock Text="{Binding ImportHeading}" Classes="title" />
                     <TextBlock Classes="secondary" TextWrapping="Wrap"
                                Text="Long-press the box and Paste. The whole answer is fine: Helm finds the JSON in it." />
                     <TextBox x:Name="ImportBox" Classes="mono" PlaceholderText="Paste the whole answer here" Text="{Binding ImportText}"
@@ -206,12 +232,14 @@
                         <Border Classes="infobar warning" IsVisible="{Binding HasPreviewNote}">
                             <TextBlock Text="{Binding PreviewNote}" TextWrapping="Wrap" />
                         </Border>
-                        <TextBlock Text="Title" Classes="label" />
-                        <TextBox Text="{Binding PreviewTitle}" AutomationProperties.Name="Mission title" />
-                        <TextBlock Text="Goal" Classes="label" />
-                        <TextBox Text="{Binding PreviewGoal}" AcceptsReturn="True" TextWrapping="Wrap" AutomationProperties.Name="Mission goal" />
-                        <TextBlock Text="Reward for finishing" Classes="label" />
-                        <TextBox Text="{Binding PreviewReward}" AutomationProperties.Name="Mission reward" />
+                        <StackPanel Spacing="4" IsVisible="{Binding IsNewMission}">
+                            <TextBlock Text="Title" Classes="label" />
+                            <TextBox Text="{Binding PreviewTitle}" AutomationProperties.Name="Mission title" />
+                            <TextBlock Text="Goal" Classes="label" />
+                            <TextBox Text="{Binding PreviewGoal}" AcceptsReturn="True" TextWrapping="Wrap" AutomationProperties.Name="Mission goal" />
+                            <TextBlock Text="Reward for finishing" Classes="label" />
+                            <TextBox Text="{Binding PreviewReward}" AutomationProperties.Name="Mission reward" />
+                        </StackPanel>
                         <TextBlock Text="Deadline" Classes="label" />
                         <CalendarDatePicker HorizontalAlignment="Stretch" SelectedDate="{Binding PreviewDeadline}" PlaceholderText="No deadline" />
                         <TextBlock Text="{Binding PreviewSummary}" FontWeight="SemiBold" TextWrapping="Wrap" Margin="0,8,0,0" />
@@ -243,11 +271,11 @@
                     <Button Classes="accent wide" Margin="0,8,0,0" Command="{Binding CreateMissionCommand}" IsEnabled="{Binding CanCreate}">
                         <StackPanel Orientation="Horizontal" Spacing="6">
                             <ic:SymbolIcon Symbol="Flag" FontSize="16" />
-                            <TextBlock Text="Create mission" />
+                            <TextBlock Text="{Binding CreateLabel}" />
                         </StackPanel>
                     </Button>
                     <Grid ColumnDefinitions="*,8,*">
-                        <Button Classes="wide" Content="Back to the prompt" Command="{Binding OpenPromptCommand}" />
+                        <Button Classes="wide" Content="Back" Command="{Binding BackToPromptCommand}" AutomationProperties.Name="Back to the prompt" />
                         <Button Grid.Column="2" Classes="wide" Content="Cancel" Command="{Binding CloseNewCommand}" />
                     </Grid>
                 </StackPanel>
@@ -278,6 +306,14 @@
                                 </StackPanel>
                             </Button>
                             <Button Classes="wide" Content="Copy summary" Command="{Binding CopySummaryCommand}" IsVisible="{Binding IsMissionCelebration}" />
+                            <Button Classes="wide" Content="Save to Notes" Command="{Binding SaveSummaryToNotesCommand}">
+                                <Button.IsVisible>
+                                    <MultiBinding Converter="{x:Static BoolConverters.And}">
+                                        <Binding Path="IsMissionCelebration" />
+                                        <Binding Path="CanSaveToNotes" />
+                                    </MultiBinding>
+                                </Button.IsVisible>
+                            </Button>
                             <Button Classes="wide" Content="Close" Command="{Binding DismissCelebrationCommand}" />
                         </StackPanel>
                     </Border>
@@ -328,6 +364,13 @@
                             </StackPanel>
                         </Button>
                         <Button Classes="wide" Content="Undo last step" Command="{Binding UndoStepCommand}" IsVisible="{Binding IsCompleted}" />
+                        <Button Classes="wide" Command="{Binding OpenReplanCommand}" IsVisible="{Binding IsOpenForChanges}">
+                            <StackPanel Orientation="Horizontal" Spacing="6">
+                                <ic:SymbolIcon Symbol="Sparkle" FontSize="16" />
+                                <TextBlock Text="Re-plan with an AI" />
+                            </StackPanel>
+                        </Button>
+                        <Button Classes="wide" Content="Save summary to Notes" Command="{Binding SaveSummaryToNotesCommand}" IsVisible="{Binding CanSaveToNotes}" />
                         <WrapPanel Margin="-8,0,0,0">
                             <Button Classes="icon flat" Command="{Binding PauseCommand}" IsVisible="{Binding IsActive}" AutomationProperties.Name="Pause">
                                 <ic:SymbolIcon Symbol="Pause" FontSize="18" />
