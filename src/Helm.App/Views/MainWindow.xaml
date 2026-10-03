@@ -48,33 +48,32 @@
                 <ui:Button x:Name="SyncButton" Margin="8,6,0,6" Padding="8" Appearance="Transparent" VerticalAlignment="Center"
                            WindowChrome.IsHitTestVisibleInChrome="True" Command="{Binding SyncNowCommand}" ToolTip="{Binding ToolTip}"
                            AutomationProperties.Name="Sync now" AutomationProperties.HelpText="{Binding ToolTip}">
-                    <Grid>
-                        <ui:SymbolIcon FontSize="18" Visibility="{Binding IsSyncing, Converter={StaticResource InverseBoolToVisibility}}">
-                            <ui:SymbolIcon.Style>
-                                <Style TargetType="ui:SymbolIcon">
-                                    <Setter Property="Symbol" Value="ArrowSync24" />
-                                    <Style.Triggers>
-                                        <DataTrigger Binding="{Binding IsSynced}" Value="True">
-                                            <Setter Property="Symbol" Value="ArrowSyncCheckmark24" />
-                                            <Setter Property="Foreground" Value="{DynamicResource SystemFillColorSuccessBrush}" />
-                                        </DataTrigger>
-                                        <DataTrigger Binding="{Binding IsOffline}" Value="True">
-                                            <Setter Property="Symbol" Value="CloudOff24" />
-                                        </DataTrigger>
-                                        <DataTrigger Binding="{Binding HasProblem}" Value="True">
-                                            <Setter Property="Symbol" Value="Warning24" />
-                                            <Setter Property="Foreground" Value="{DynamicResource SystemFillColorCautionBrush}" />
-                                        </DataTrigger>
-                                        <DataTrigger Binding="{Binding IsNotSetUp}" Value="True">
-                                            <Setter Property="Symbol" Value="ArrowSyncOff20" />
-                                            <Setter Property="Foreground" Value="{DynamicResource TextFillColorSecondaryBrush}" />
-                                        </DataTrigger>
-                                    </Style.Triggers>
-                                </Style>
-                            </ui:SymbolIcon.Style>
-                        </ui:SymbolIcon>
-                        <ui:ProgressRing Width="18" Height="18" IsIndeterminate="True" Visibility="{Binding IsSyncing, Converter={StaticResource BoolToVisibility}}" />
-                    </Grid>
+                    <!-- One plain glyph in the text colour, the same set as the Android app: arrows while syncing, a
+                         tick when synced, a cloud when offline, a warning on a problem, crossed arrows when not set up. -->
+                    <ui:SymbolIcon FontSize="18">
+                        <ui:SymbolIcon.Style>
+                            <Style TargetType="ui:SymbolIcon">
+                                <Setter Property="Symbol" Value="ArrowSync24" />
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding IsSynced}" Value="True">
+                                        <Setter Property="Symbol" Value="ArrowSyncCheckmark24" />
+                                    </DataTrigger>
+                                    <DataTrigger Binding="{Binding IsOffline}" Value="True">
+                                        <Setter Property="Symbol" Value="CloudOff24" />
+                                    </DataTrigger>
+                                    <DataTrigger Binding="{Binding HasProblem}" Value="True">
+                                        <Setter Property="Symbol" Value="Warning24" />
+                                    </DataTrigger>
+                                    <DataTrigger Binding="{Binding IsNotSetUp}" Value="True">
+                                        <Setter Property="Symbol" Value="ArrowSyncOff20" />
+                                    </DataTrigger>
+                                    <DataTrigger Binding="{Binding IsSyncing}" Value="True">
+                                        <Setter Property="Symbol" Value="ArrowSync24" />
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </ui:SymbolIcon.Style>
+                    </ui:SymbolIcon>
                 </ui:Button>
                 </StackPanel>
             </ui:TitleBar.CenterContent>

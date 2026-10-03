@@ -44,11 +44,23 @@ internal partial class MainWindow : FluentWindow
         SearchBox.SuggestionChosen += (_, e) => NavigateTo(e.SelectedItem as SearchResult);
 
         Loaded += (_, _) => Navigation.Navigate(StartupPage());
+        // The search box gives way on a narrow window, so the sync button never slides under the window buttons.
+        SizeChanged += (_, _) => FitSearchBox();
         Navigation.Navigated += (_, e) =>
         {
             UseThemeForeground(e.Page);
             Dispatcher.BeginInvoke(System.Windows.Threading.DispatcherPriority.Loaded, ConstrainPageWidth);
         };
+    }
+
+    /// <summary>
+    /// The title bar lays out the header (title, 16 + 292), the search box and the sync button from the left, and the
+    /// window buttons (minimise, maximise, close: 3 × 46) on the right: the search box takes what is left, up to 520.
+    /// </summary>
+    private void FitSearchBox()
+    {
+        const double header = 16 + 292, windowButtons = 3 * 46, syncButton = 8 + 34, gap = 24;
+        SearchBox.Width = Math.Clamp(ActualWidth - header - windowButtons - syncButton - gap, 160, 520);
     }
 
     /// <summary>
