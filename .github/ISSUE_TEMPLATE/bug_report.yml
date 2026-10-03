@@ -31,6 +31,7 @@ body:
       options:
         - Claude Chat
         - Command Palette
+        - Missions
         - Notes
         - Quick Capture
         - Tracker

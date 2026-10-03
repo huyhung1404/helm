@@ -30,8 +30,9 @@ Notes, tasks, a password vault, a command palette and a Claude Code chat in one 
 
 | Tool | Platforms | What it does |
 |---|---|---|
-| Claude Chat | PC | Chat with Claude Code in its own window, several projects side by side; **Helm tools for Claude** (MCP): Claude can read and write your notes and Tracker, in Helm's chats and in Claude Code (`Helm.exe --mcp`) |
+| Claude Chat | PC | Chat with Claude Code in its own window, several projects side by side; **Helm tools for Claude** (MCP): Claude can read and write your notes, Tracker and Missions, in Helm's chats and in Claude Code (`Helm.exe --mcp`) |
 | Command Palette | PC | Alt+Space: one search box, Helm first (notes, tasks, vault items while unlocked, settings), then Windows: apps, files, open windows, Windows Settings, the web |
+| Missions | PC + Android | Reach a goal one step at a time: describe it, copy the prompt Helm writes into any AI and import the roadmap it answers (or ask Claude in Helm); steps are done in order, each with its start and finish dates; the pace against the plan and the deadline; celebrations and the rewards you chose for each phase and the whole mission ([design](docs/missions-design.md)) |
 | Notes | PC + Android | Notes that save as you type and sync end-to-end encrypted; a note edited on two devices keeps both versions; 30-day trash; Markdown export; notes link to tasks and people in the debt book |
 | Quick Capture | PC + Android | Save a note, task or debt from anywhere: Win+Alt+N on PC, Share → "Save to Helm" or a Quick Settings tile on Android, with short forms like `/t buy milk tomorrow 9h` |
 | Tracker | PC + Android | To-do lists and debt books in workspaces, synced across devices; completions are logged with their start and finish times for reports and CSV export; a month/week calendar with .ics export; linked notes; Android has a home-screen widget |

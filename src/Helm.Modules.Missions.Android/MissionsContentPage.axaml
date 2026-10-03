@@ -1,0 +1,516 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:ic="using:FluentIcons.Avalonia"
+             xmlns:vm="using:Helm.Modules.Missions"
+             x:Class="Helm.Modules.Missions.MissionsContentPage"
+             x:DataType="vm:MissionsViewModel">
+
+    <!-- Missions itself (drawer and Quick access): the mission picker, a new mission (prompt, then import), the current
+         step with its actions, and the roadmap. Its options live on MissionsPage (Home → Utilities). -->
+    <UserControl.Styles>
+        <!-- Square icon button (44 dp touch target) -->
+        <Style Selector="Button.icon">
+            <Setter Property="Width" Value="44" />
+            <Setter Property="Height" Value="44" />
+            <Setter Property="Padding" Value="0" />
+            <Setter Property="HorizontalContentAlignment" Value="Center" />
+            <Setter Property="VerticalContentAlignment" Value="Center" />
+        </Style>
+        <!-- A wide button with its text centred -->
+        <Style Selector="Button.wide">
+            <Setter Property="HorizontalAlignment" Value="Stretch" />
+            <Setter Property="HorizontalContentAlignment" Value="Center" />
+            <Setter Property="MinHeight" Value="44" />
+        </Style>
+        <!-- A small label: status, pace, deadline, streak -->
+        <Style Selector="Border.chip">
+            <Setter Property="Background" Value="{DynamicResource HelmSubtleFill}" />
+            <Setter Property="CornerRadius" Value="10" />
+            <Setter Property="Padding" Value="10,3" />
+            <Setter Property="Margin" Value="0,0,6,6" />
+        </Style>
+        <Style Selector="Border.chip.behind">
+            <Setter Property="Background" Value="{DynamicResource HelmWarningBackground}" />
+        </Style>
+        <Style Selector="TextBlock.label">
+            <Setter Property="Foreground" Value="{DynamicResource HelmSecondaryText}" />
+            <Setter Property="Margin" Value="0,6,0,0" />
+        </Style>
+        <Style Selector="TextBlock.error">
+            <Setter Property="Foreground" Value="{DynamicResource HelmDanger}" />
+        </Style>
+        <Style Selector="TextBlock.big">
+            <Setter Property="FontSize" Value="20" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+        </Style>
+        <Style Selector="TextBlock.link">
+            <Setter Property="Foreground" Value="{DynamicResource SystemAccentColor}" />
+            <Setter Property="TextDecorations" Value="Underline" />
+        </Style>
+        <Style Selector="TextBlock.skipped">
+            <Setter Property="TextDecorations" Value="Strikethrough" />
+            <Setter Property="Foreground" Value="{DynamicResource HelmSecondaryText}" />
+        </Style>
+        <Style Selector="TextBlock.current">
+            <Setter Property="FontWeight" Value="SemiBold" />
+        </Style>
+        <!-- The card of the current step and of a celebration: an accent edge -->
+        <Style Selector="Border.card.focus">
+            <Setter Property="BorderBrush" Value="{DynamicResource SystemAccentColor}" />
+            <Setter Property="BorderThickness" Value="2" />
+        </Style>
+        <!-- The round marker in front of a step: done, skipped, current, or its number -->
+        <Style Selector="Border.marker">
+            <Setter Property="Width" Value="26" />
+            <Setter Property="Height" Value="26" />
+            <Setter Property="CornerRadius" Value="13" />
+            <Setter Property="BorderThickness" Value="1.5" />
+            <Setter Property="BorderBrush" Value="{DynamicResource HelmSecondaryText}" />
+        </Style>
+        <Style Selector="Border.marker.done">
+            <Setter Property="Background" Value="{DynamicResource HelmSuccess}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource HelmSuccess}" />
+        </Style>
+        <Style Selector="Border.marker.skipped">
+            <Setter Property="Background" Value="{DynamicResource HelmSecondaryText}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource HelmSecondaryText}" />
+        </Style>
+        <Style Selector="Border.marker.current">
+            <Setter Property="Background" Value="{DynamicResource SystemAccentColor}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource SystemAccentColor}" />
+        </Style>
+        <Style Selector="Border.marker > TextBlock">
+            <Setter Property="FontSize" Value="12" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="HorizontalAlignment" Value="Center" />
+            <Setter Property="VerticalAlignment" Value="Center" />
+        </Style>
+        <Style Selector="Border.marker.done > TextBlock, Border.marker.skipped > TextBlock, Border.marker.current > TextBlock">
+            <Setter Property="Foreground" Value="{DynamicResource TextOnAccentFillColorPrimaryBrush}" />
+        </Style>
+    </UserControl.Styles>
+
+    <StackPanel>
+        <!-- Shown while the tool is turned off -->
+        <Border x:Name="OffBar" Classes="infobar warning" IsVisible="False">
+            <TextBlock Text="Missions is turned off. Your missions are kept; turn it on in its settings to work on them." TextWrapping="Wrap" />
+        </Border>
+
+        <!-- What happened: copied, created, a step done, a problem -->
+        <Border Classes="infobar" IsVisible="{Binding HasMessage}">
+            <DockPanel>
+                <Button DockPanel.Dock="Right" Classes="icon flat" Command="{Binding DismissMessageCommand}" AutomationProperties.Name="Dismiss">
+                    <ic:SymbolIcon Symbol="Dismiss" FontSize="16" />
+                </Button>
+                <TextBlock Text="{Binding Message}" TextWrapping="Wrap" VerticalAlignment="Center" />
+            </DockPanel>
+        </Border>
+
+        <StackPanel x:Name="Body" Spacing="8">
+            <!-- Which mission you are looking at, first and easy to see -->
+            <Border Classes="card" IsVisible="{Binding HasMissions}">
+                <StackPanel Spacing="8">
+                    <ComboBox HorizontalAlignment="Stretch" ItemsSource="{Binding Missions}" SelectedItem="{Binding SelectedMission}" AutomationProperties.Name="Current mission">
+                        <ComboBox.ItemTemplate>
+                            <DataTemplate DataType="vm:MissionChoice">
+                                <TextBlock Text="{Binding Name}" TextTrimming="CharacterEllipsis" />
+                            </DataTemplate>
+                        </ComboBox.ItemTemplate>
+                    </ComboBox>
+                    <Grid ColumnDefinitions="*,8,*">
+                        <Button Classes="wide" Command="{Binding OpenPromptCommand}" AutomationProperties.Name="New mission">
+                            <StackPanel Orientation="Horizontal" Spacing="6">
+                                <ic:SymbolIcon Symbol="Add" FontSize="16" />
+                                <TextBlock Text="New mission" />
+                            </StackPanel>
+                        </Button>
+                        <Button Grid.Column="2" Classes="wide" Command="{Binding OpenImportCommand}" AutomationProperties.Name="Import JSON">
+                            <StackPanel Orientation="Horizontal" Spacing="6">
+                                <ic:SymbolIcon Symbol="ArrowImport" FontSize="16" />
+                                <TextBlock Text="Import" />
+                            </StackPanel>
+                        </Button>
+                    </Grid>
+                </StackPanel>
+            </Border>
+
+            <!-- First run: no mission yet -->
+            <Border Classes="card" IsVisible="{Binding HasNoMissions}">
+                <StackPanel Spacing="6">
+                    <TextBlock Text="Start your first mission" Classes="title" />
+                    <TextBlock Classes="secondary" TextWrapping="Wrap"
+                               Text="A mission is a goal reached one step at a time, like passing HSK3 or running 10 km. An AI writes the steps; Helm keeps you on them." />
+                    <TextBlock TextWrapping="Wrap" Text="1. Describe your goal and copy the prompt Helm writes from it." />
+                    <TextBlock TextWrapping="Wrap" Text="2. Paste it into ChatGPT, Gemini or Claude, and copy the JSON it answers." />
+                    <TextBlock TextWrapping="Wrap" Text="3. Import it here, check the steps, and start." />
+                    <Button Classes="accent wide" Command="{Binding OpenPromptCommand}" Margin="0,4,0,0">
+                        <StackPanel Orientation="Horizontal" Spacing="6">
+                            <ic:SymbolIcon Symbol="Sparkle" FontSize="16" />
+                            <TextBlock Text="Write the prompt" />
+                        </StackPanel>
+                    </Button>
+                    <Button Classes="wide" Content="Import JSON" Command="{Binding OpenImportCommand}" />
+                </StackPanel>
+            </Border>
+
+            <!-- New mission, 1: the prompt -->
+            <Border Classes="card" IsVisible="{Binding IsPromptOpen}">
+                <StackPanel Spacing="4">
+                    <TextBlock Text="1. Describe your goal" Classes="title" />
+                    <TextBlock Classes="secondary" TextWrapping="Wrap"
+                               Text="Helm turns this into a prompt for any AI. The more you say, the better the steps fit you. Write in your own language." />
+                    <TextBlock Text="Goal" Classes="label" />
+                    <TextBox PlaceholderText="e.g. Pass HSK3 with 210 points or more" Text="{Binding PromptGoal}" AcceptsReturn="True" TextWrapping="Wrap"
+                             AutomationProperties.Name="Goal" />
+                    <TextBlock Text="Where you are now" Classes="label" />
+                    <TextBox PlaceholderText="e.g. I know about 300 words" Text="{Binding PromptLevel}" AutomationProperties.Name="Where you are now" />
+                    <TextBlock Text="Time you can spend" Classes="label" />
+                    <TextBox PlaceholderText="e.g. 1 hour a day, 3 on weekends" Text="{Binding PromptTime}" AutomationProperties.Name="Time you can spend" />
+                    <TextBlock Text="Deadline (optional)" Classes="label" />
+                    <CalendarDatePicker HorizontalAlignment="Stretch" SelectedDate="{Binding PromptDeadline}" PlaceholderText="No deadline" />
+                    <TextBlock Text="Anything else" Classes="label" />
+                    <TextBox PlaceholderText="e.g. I learn best with videos" Text="{Binding PromptNotes}" AutomationProperties.Name="Anything else" />
+                    <Button Classes="accent wide" Margin="0,12,0,0" Command="{Binding CopyPromptCommand}" IsEnabled="{Binding CanCopyPrompt}">
+                        <StackPanel Orientation="Horizontal" Spacing="6">
+                            <ic:SymbolIcon Symbol="Copy" FontSize="16" />
+                            <TextBlock Text="Copy prompt" />
+                        </StackPanel>
+                    </Button>
+                    <TextBlock Classes="secondary" TextWrapping="Wrap" IsVisible="{Binding PromptCopied}"
+                               Text="Copied. Paste it into any AI app, then tap I have the JSON and paste its answer." />
+                    <Grid ColumnDefinitions="*,8,*" Margin="0,4,0,0">
+                        <Button Classes="wide" Content="I have the JSON" Command="{Binding OpenImportCommand}" />
+                        <Button Grid.Column="2" Classes="wide" Content="Cancel" Command="{Binding CloseNewCommand}" />
+                    </Grid>
+                </StackPanel>
+            </Border>
+
+            <!-- New mission, 2: the import and its preview -->
+            <Border Classes="card" IsVisible="{Binding IsImportOpen}">
+                <StackPanel Spacing="6">
+                    <TextBlock Text="2. Paste the AI's answer" Classes="title" />
+                    <TextBlock Classes="secondary" TextWrapping="Wrap"
+                               Text="Long-press the box and Paste. The whole answer is fine: Helm finds the JSON in it." />
+                    <TextBox x:Name="ImportBox" Classes="mono" PlaceholderText="Paste the whole answer here" Text="{Binding ImportText}"
+                             AcceptsReturn="True" TextWrapping="Wrap" Height="140" AutomationProperties.Name="Mission JSON" />
+                    <TextBlock Text="{Binding ImportErrors}" Classes="error" TextWrapping="Wrap" IsVisible="{Binding HasImportErrors}" />
+                    <TextBlock Text="{Binding ImportWarnings}" Classes="secondary" TextWrapping="Wrap" IsVisible="{Binding HasImportWarnings}" />
+
+                    <!-- Preview: edit the mission's own fields and leave out steps before creating it -->
+                    <StackPanel Spacing="4" IsVisible="{Binding HasPreview}">
+                        <Border Classes="infobar warning" IsVisible="{Binding HasPreviewNote}">
+                            <TextBlock Text="{Binding PreviewNote}" TextWrapping="Wrap" />
+                        </Border>
+                        <TextBlock Text="Title" Classes="label" />
+                        <TextBox Text="{Binding PreviewTitle}" AutomationProperties.Name="Mission title" />
+                        <TextBlock Text="Goal" Classes="label" />
+                        <TextBox Text="{Binding PreviewGoal}" AcceptsReturn="True" TextWrapping="Wrap" AutomationProperties.Name="Mission goal" />
+                        <TextBlock Text="Reward for finishing" Classes="label" />
+                        <TextBox Text="{Binding PreviewReward}" AutomationProperties.Name="Mission reward" />
+                        <TextBlock Text="Deadline" Classes="label" />
+                        <CalendarDatePicker HorizontalAlignment="Stretch" SelectedDate="{Binding PreviewDeadline}" PlaceholderText="No deadline" />
+                        <TextBlock Text="{Binding PreviewSummary}" FontWeight="SemiBold" TextWrapping="Wrap" Margin="0,8,0,0" />
+                        <TextBlock Text="Untick a step to leave it out." Classes="secondary" />
+                        <ItemsControl ItemsSource="{Binding PreviewPhases}">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate DataType="vm:PreviewPhase">
+                                    <StackPanel Margin="0,6,0,0">
+                                        <TextBlock Text="{Binding Title}" FontWeight="SemiBold" TextWrapping="Wrap" />
+                                        <TextBlock Text="{Binding Reward}" Classes="secondary" TextWrapping="Wrap" IsVisible="{Binding HasReward}" />
+                                        <ItemsControl ItemsSource="{Binding Steps}">
+                                            <ItemsControl.ItemTemplate>
+                                                <DataTemplate DataType="vm:PreviewStep">
+                                                    <CheckBox IsChecked="{Binding Include}" AutomationProperties.Name="{Binding Title}">
+                                                        <StackPanel>
+                                                            <TextBlock Text="{Binding Title}" TextWrapping="Wrap" />
+                                                            <TextBlock Text="{Binding Details}" Classes="secondary" TextWrapping="Wrap" />
+                                                        </StackPanel>
+                                                    </CheckBox>
+                                                </DataTemplate>
+                                            </ItemsControl.ItemTemplate>
+                                        </ItemsControl>
+                                    </StackPanel>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </StackPanel>
+
+                    <Button Classes="accent wide" Margin="0,8,0,0" Command="{Binding CreateMissionCommand}" IsEnabled="{Binding CanCreate}">
+                        <StackPanel Orientation="Horizontal" Spacing="6">
+                            <ic:SymbolIcon Symbol="Flag" FontSize="16" />
+                            <TextBlock Text="Create mission" />
+                        </StackPanel>
+                    </Button>
+                    <Grid ColumnDefinitions="*,8,*">
+                        <Button Classes="wide" Content="Back to the prompt" Command="{Binding OpenPromptCommand}" />
+                        <Button Grid.Column="2" Classes="wide" Content="Cancel" Command="{Binding CloseNewCommand}" />
+                    </Grid>
+                </StackPanel>
+            </Border>
+
+            <!-- The selected mission -->
+            <StackPanel Spacing="8" IsVisible="{Binding ShowMission}">
+                <!-- A phase or the whole mission is done -->
+                <Panel x:Name="CelebrationPanel" IsVisible="{Binding HasCelebration}">
+                    <Border Classes="card focus">
+                        <StackPanel Spacing="6" HorizontalAlignment="Stretch">
+                            <Image Source="{x:Static vm:MissionsIcon.Image}" Width="44" Height="44" HorizontalAlignment="Center" />
+                            <TextBlock Text="{Binding Celebration.Title}" Classes="big" HorizontalAlignment="Center" TextAlignment="Center" TextWrapping="Wrap" />
+                            <TextBlock Text="{Binding Celebration.Message}" HorizontalAlignment="Center" TextAlignment="Center" TextWrapping="Wrap" />
+                            <ItemsControl ItemsSource="{Binding Celebration.Stats}" HorizontalAlignment="Center">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate x:DataType="x:String">
+                                        <TextBlock Text="{Binding}" Classes="secondary" HorizontalAlignment="Center" TextAlignment="Center" TextWrapping="Wrap" />
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                            <TextBlock Text="{Binding Celebration.RewardText}" FontSize="16" FontWeight="SemiBold" HorizontalAlignment="Center" TextAlignment="Center"
+                                       TextWrapping="Wrap" Foreground="{DynamicResource SystemAccentColor}" IsVisible="{Binding Celebration.HasReward}" />
+                            <Button Classes="accent wide" Margin="0,6,0,0" Command="{Binding ClaimCelebrationRewardCommand}" IsVisible="{Binding Celebration.HasReward}">
+                                <StackPanel Orientation="Horizontal" Spacing="6">
+                                    <ic:SymbolIcon Symbol="Gift" FontSize="16" />
+                                    <TextBlock Text="I took my reward" />
+                                </StackPanel>
+                            </Button>
+                            <Button Classes="wide" Content="Copy summary" Command="{Binding CopySummaryCommand}" IsVisible="{Binding IsMissionCelebration}" />
+                            <Button Classes="wide" Content="Close" Command="{Binding DismissCelebrationCommand}" />
+                        </StackPanel>
+                    </Border>
+                    <vm:ConfettiView x:Name="Confetti" />
+                </Panel>
+
+                <!-- Overview: progress, pace, deadline, reward, and what can be done with the mission -->
+                <Border Classes="card">
+                    <StackPanel Spacing="6">
+                        <TextBlock Text="{Binding Title}" Classes="big" TextWrapping="Wrap" />
+                        <TextBlock Text="{Binding Goal}" Classes="secondary" TextWrapping="Wrap" IsVisible="{Binding HasGoal}" />
+                        <ProgressBar Minimum="0" Maximum="100" Value="{Binding ProgressPercent}" Margin="0,6,0,0" />
+                        <TextBlock Text="{Binding ProgressText}" />
+                        <WrapPanel>
+                            <Border Classes="chip">
+                                <TextBlock Text="{Binding StatusText}" />
+                            </Border>
+                            <Border Classes="chip" Classes.behind="{Binding IsBehind}" IsVisible="{Binding HasPace}">
+                                <TextBlock Text="{Binding PaceText}" />
+                            </Border>
+                            <Border Classes="chip" IsVisible="{Binding HasDeadline}">
+                                <TextBlock Text="{Binding DeadlineText}" />
+                            </Border>
+                            <Border Classes="chip" IsVisible="{Binding HasStreak}">
+                                <TextBlock Text="{Binding StreakText}" />
+                            </Border>
+                        </WrapPanel>
+                        <TextBlock Text="{Binding ProjectionText}" Classes="secondary" TextWrapping="Wrap" IsVisible="{Binding HasProjection}" />
+                        <TextBlock Text="{Binding Note}" Classes="secondary" FontStyle="Italic" TextWrapping="Wrap" IsVisible="{Binding HasNote}" />
+                        <TextBlock TextWrapping="Wrap" IsVisible="{Binding HasReward}">
+                            <Run Text="Reward: " FontWeight="SemiBold" /><Run Text="{Binding RewardText}" />
+                        </TextBlock>
+                        <TextBlock Text="{Binding FinishedText}" TextWrapping="Wrap" IsVisible="{Binding IsCompleted}" />
+                        <TextBlock Text="{Binding PlannedText}" TextWrapping="Wrap" IsVisible="{Binding IsPlanned}" />
+
+                        <Button Classes="accent wide" Margin="0,6,0,0" Command="{Binding StartMissionCommand}" IsVisible="{Binding IsPlanned}">
+                            <StackPanel Orientation="Horizontal" Spacing="6">
+                                <ic:SymbolIcon Symbol="Play" FontSize="16" />
+                                <TextBlock Text="Start mission" />
+                            </StackPanel>
+                        </Button>
+                        <Button Classes="accent wide" Content="Resume" Command="{Binding ResumeCommand}" IsVisible="{Binding IsPaused}" />
+                        <Button Classes="accent wide" Content="Take it up again" Command="{Binding ResumeCommand}" IsVisible="{Binding IsAbandoned}" />
+                        <Button Classes="accent wide" Command="{Binding ClaimRewardCommand}" IsVisible="{Binding CanClaimReward}">
+                            <StackPanel Orientation="Horizontal" Spacing="6">
+                                <ic:SymbolIcon Symbol="Gift" FontSize="16" />
+                                <TextBlock Text="I took my reward" />
+                            </StackPanel>
+                        </Button>
+                        <Button Classes="wide" Content="Undo last step" Command="{Binding UndoStepCommand}" IsVisible="{Binding IsCompleted}" />
+                        <WrapPanel Margin="-8,0,0,0">
+                            <Button Classes="icon flat" Command="{Binding PauseCommand}" IsVisible="{Binding IsActive}" AutomationProperties.Name="Pause">
+                                <ic:SymbolIcon Symbol="Pause" FontSize="18" />
+                            </Button>
+                            <Button Classes="icon flat" Command="{Binding CopySummaryCommand}" AutomationProperties.Name="Copy summary">
+                                <ic:SymbolIcon Symbol="DocumentText" FontSize="18" />
+                            </Button>
+                            <Button Classes="icon flat" Command="{Binding CopyJsonCommand}" AutomationProperties.Name="Copy as JSON">
+                                <ic:SymbolIcon Symbol="Code" FontSize="18" />
+                            </Button>
+                            <Button Classes="icon flat danger" Command="{Binding AbandonCommand}" IsVisible="{Binding IsOpenForChanges}" AutomationProperties.Name="Abandon">
+                                <ic:SymbolIcon Symbol="Dismiss" FontSize="18" />
+                            </Button>
+                        </WrapPanel>
+                    </StackPanel>
+                </Border>
+
+                <!-- The current step: what to do now -->
+                <Border Classes="card focus" IsVisible="{Binding ShowCurrentStep}">
+                    <StackPanel Spacing="6">
+                        <TextBlock Text="{Binding CurrentNumberText}" Classes="secondary" />
+                        <TextBlock Text="{Binding CurrentPhaseText}" Classes="secondary" TextWrapping="Wrap" />
+                        <TextBlock Text="{Binding CurrentTitle}" Classes="big" TextWrapping="Wrap" />
+                        <TextBlock Text="{Binding CurrentStartedText}" Classes="secondary" />
+                        <TextBlock Text="{Binding CurrentDescription}" TextWrapping="Wrap" IsVisible="{Binding HasCurrentDescription}" />
+                        <Border Background="{DynamicResource HelmSubtleFill}" CornerRadius="6" Padding="10,8" IsVisible="{Binding HasCurrentDoneWhen}">
+                            <TextBlock TextWrapping="Wrap">
+                                <Run Text="Done when: " FontWeight="SemiBold" /><Run Text="{Binding CurrentDoneWhen}" />
+                            </TextBlock>
+                        </Border>
+                        <ItemsControl ItemsSource="{Binding CurrentChecklist}" IsVisible="{Binding HasCurrentChecklist}" IsEnabled="{Binding IsActive}">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate DataType="vm:ChecklistRow">
+                                    <CheckBox IsChecked="{Binding IsDone}" MinHeight="40" AutomationProperties.Name="{Binding Text}">
+                                        <TextBlock Text="{Binding Text}" TextWrapping="Wrap" />
+                                    </CheckBox>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                        <StackPanel IsVisible="{Binding HasCurrentResources}">
+                            <TextBlock Text="Resources" FontWeight="SemiBold" />
+                            <ItemsControl ItemsSource="{Binding CurrentResources}">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate DataType="vm:ResourceRow">
+                                        <Panel>
+                                            <Button Classes="flat" Padding="0,6" HorizontalAlignment="Left" IsVisible="{Binding IsLink}" AutomationProperties.Name="{Binding Text}"
+                                                    Command="{Binding $parent[UserControl].((vm:MissionsViewModel)DataContext).OpenResourceCommand}" CommandParameter="{Binding}">
+                                                <TextBlock Text="{Binding Text}" Classes="link" TextWrapping="Wrap" />
+                                            </Button>
+                                            <TextBlock Text="{Binding Text}" TextWrapping="Wrap" Margin="0,6" IsVisible="{Binding !IsLink}" />
+                                        </Panel>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </StackPanel>
+                        <Border Classes="infobar" IsVisible="{Binding IsPaused}">
+                            <TextBlock Text="Paused. Resume the mission to carry on with this step." TextWrapping="Wrap" />
+                        </Border>
+                        <StackPanel Spacing="8" IsEnabled="{Binding IsActive}">
+                            <TextBox PlaceholderText="Note (optional): what you did, a result, a link" Text="{Binding CompleteNote}" AcceptsReturn="True" TextWrapping="Wrap"
+                                     AutomationProperties.Name="Note for this step" />
+                            <Button Classes="accent wide" Command="{Binding CompleteStepCommand}">
+                                <StackPanel Orientation="Horizontal" Spacing="6">
+                                    <ic:SymbolIcon Symbol="Checkmark" FontSize="16" />
+                                    <TextBlock Text="Complete step" />
+                                </StackPanel>
+                            </Button>
+                            <Button Classes="wide" Command="{Binding StartStepCommand}" IsVisible="{Binding CanStartStep}">
+                                <StackPanel Orientation="Horizontal" Spacing="6">
+                                    <ic:SymbolIcon Symbol="Play" FontSize="16" />
+                                    <TextBlock Text="Start (log when you begin)" />
+                                </StackPanel>
+                            </Button>
+                            <Grid ColumnDefinitions="*,8,*">
+                                <Button Classes="wide flat" Content="Skip" Command="{Binding SkipStepCommand}" />
+                                <Button Grid.Column="2" Classes="wide flat" Content="Undo last step" Command="{Binding UndoStepCommand}" IsVisible="{Binding CanUndo}" />
+                            </Grid>
+                        </StackPanel>
+                    </StackPanel>
+                </Border>
+
+                <!-- The roadmap: every phase and step, done, current and to come -->
+                <TextBlock Text="Roadmap" Classes="section" />
+                <ItemsControl ItemsSource="{Binding Phases}">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate DataType="vm:PhaseRow">
+                            <Border Classes="card" Margin="0,0,0,8" Padding="8,10">
+                                <StackPanel>
+                                    <StackPanel Margin="6,0,6,6">
+                                        <TextBlock Text="{Binding Title}" Classes="title" TextWrapping="Wrap" />
+                                        <TextBlock Text="{Binding Details}" Classes="secondary" TextWrapping="Wrap" />
+                                        <TextBlock Text="{Binding RewardText}" Classes="secondary" TextWrapping="Wrap" IsVisible="{Binding HasReward}" />
+                                        <Button Margin="0,6,0,0" Command="{Binding $parent[UserControl].((vm:MissionsViewModel)DataContext).ClaimPhaseRewardCommand}"
+                                                CommandParameter="{Binding}" IsVisible="{Binding CanClaimReward}">
+                                            <StackPanel Orientation="Horizontal" Spacing="6">
+                                                <ic:SymbolIcon Symbol="Gift" FontSize="16" />
+                                                <TextBlock Text="I took it" />
+                                            </StackPanel>
+                                        </Button>
+                                    </StackPanel>
+                                    <ItemsControl ItemsSource="{Binding Steps}">
+                                        <ItemsControl.ItemTemplate>
+                                            <DataTemplate DataType="vm:StepRow">
+                                                <StackPanel>
+                                                    <!-- Tap a step to see its details -->
+                                                    <Button Classes="flat" Padding="6,6" HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch" AutomationProperties.Name="{Binding Title}"
+                                                            Command="{Binding $parent[UserControl].((vm:MissionsViewModel)DataContext).ToggleStepCommand}" CommandParameter="{Binding}">
+                                                        <Grid ColumnDefinitions="Auto,*">
+                                                            <Border Classes="marker" Classes.done="{Binding IsDone}" Classes.skipped="{Binding IsSkipped}" Classes.current="{Binding IsCurrent}"
+                                                                    Margin="0,0,10,0" VerticalAlignment="Center">
+                                                                <TextBlock Text="{Binding Marker}" />
+                                                            </Border>
+                                                            <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                                                <TextBlock Text="{Binding Title}" TextWrapping="Wrap" Classes.current="{Binding IsCurrent}" Classes.skipped="{Binding IsSkipped}" />
+                                                                <TextBlock Text="{Binding Details}" Classes="secondary" TextWrapping="Wrap" />
+                                                            </StackPanel>
+                                                        </Grid>
+                                                    </Button>
+
+                                                    <!-- Details -->
+                                                    <StackPanel Margin="42,0,6,8" Spacing="6" IsVisible="{Binding ShowBody}">
+                                                        <TextBlock Text="{Binding Description}" TextWrapping="Wrap" IsVisible="{Binding HasDescription}" />
+                                                        <TextBlock TextWrapping="Wrap" IsVisible="{Binding HasDoneWhen}">
+                                                            <Run Text="Done when: " FontWeight="SemiBold" /><Run Text="{Binding DoneWhen}" />
+                                                        </TextBlock>
+                                                        <TextBlock Classes="secondary" FontStyle="Italic" TextWrapping="Wrap" IsVisible="{Binding ShowNote}">
+                                                            <Run Text="Note: " /><Run Text="{Binding Note}" />
+                                                        </TextBlock>
+                                                        <StackPanel Spacing="6" IsVisible="{Binding IsEditingNote}">
+                                                            <TextBox PlaceholderText="What you did, a result, a link" Text="{Binding NoteDraft}" AcceptsReturn="True" TextWrapping="Wrap"
+                                                                     AutomationProperties.Name="Step note" />
+                                                            <Grid ColumnDefinitions="*,8,*">
+                                                                <Button Classes="accent wide" Content="Save"
+                                                                        Command="{Binding $parent[UserControl].((vm:MissionsViewModel)DataContext).SaveNoteCommand}" CommandParameter="{Binding}" />
+                                                                <Button Grid.Column="2" Classes="wide" Content="Cancel"
+                                                                        Command="{Binding $parent[UserControl].((vm:MissionsViewModel)DataContext).CancelNoteCommand}" CommandParameter="{Binding}" />
+                                                            </Grid>
+                                                        </StackPanel>
+                                                        <WrapPanel Margin="-8,0,0,0">
+                                                            <Button Classes="icon flat" IsVisible="{Binding CanEdit}" AutomationProperties.Name="Edit step"
+                                                                    Command="{Binding $parent[UserControl].((vm:MissionsViewModel)DataContext).EditStepCommand}" CommandParameter="{Binding}">
+                                                                <ic:SymbolIcon Symbol="Edit" FontSize="18" />
+                                                            </Button>
+                                                            <Button Classes="icon flat danger" IsVisible="{Binding CanDelete}" AutomationProperties.Name="Delete step"
+                                                                    Command="{Binding $parent[UserControl].((vm:MissionsViewModel)DataContext).DeleteStepCommand}" CommandParameter="{Binding}">
+                                                                <ic:SymbolIcon Symbol="Delete" FontSize="18" />
+                                                            </Button>
+                                                            <Button Classes="icon flat" IsVisible="{Binding CanEditNote}" AutomationProperties.Name="Edit note"
+                                                                    Command="{Binding $parent[UserControl].((vm:MissionsViewModel)DataContext).EditNoteCommand}" CommandParameter="{Binding}">
+                                                                <ic:SymbolIcon Symbol="Note" FontSize="18" />
+                                                            </Button>
+                                                        </WrapPanel>
+                                                    </StackPanel>
+
+                                                    <!-- Editor -->
+                                                    <StackPanel Margin="42,0,6,10" Spacing="6" IsVisible="{Binding IsEditing}">
+                                                        <TextBox PlaceholderText="Title" Text="{Binding EditTitle}" AutomationProperties.Name="Step title" />
+                                                        <TextBox PlaceholderText="How to do it" Text="{Binding EditDescription}" AcceptsReturn="True" TextWrapping="Wrap"
+                                                                 AutomationProperties.Name="Step description" />
+                                                        <TextBox PlaceholderText="Done when…" Text="{Binding EditDoneWhen}" AutomationProperties.Name="Done when" />
+                                                        <TextBox PlaceholderText="Days, e.g. 2" Text="{Binding EditDays}" AutomationProperties.Name="Days" />
+                                                        <Grid ColumnDefinitions="*,8,*">
+                                                            <Button Classes="accent wide" Content="Save"
+                                                                    Command="{Binding $parent[UserControl].((vm:MissionsViewModel)DataContext).SaveStepCommand}" CommandParameter="{Binding}" />
+                                                            <Button Grid.Column="2" Classes="wide" Content="Cancel"
+                                                                    Command="{Binding $parent[UserControl].((vm:MissionsViewModel)DataContext).CancelStepCommand}" CommandParameter="{Binding}" />
+                                                        </Grid>
+                                                    </StackPanel>
+                                                </StackPanel>
+                                            </DataTemplate>
+                                        </ItemsControl.ItemTemplate>
+                                    </ItemsControl>
+                                </StackPanel>
+                            </Border>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+
+                <!-- Add a step at the end -->
+                <Border Classes="card" IsVisible="{Binding CanAddStep}">
+                    <StackPanel Spacing="8">
+                        <TextBlock Text="Add a step" Classes="title" />
+                        <TextBlock Text="Added at the end of the last phase; open it above to add details." Classes="secondary" TextWrapping="Wrap" />
+                        <TextBox PlaceholderText="What to do" Text="{Binding NewStepTitle}" AutomationProperties.Name="New step" />
+                        <Button Classes="wide" Content="Add" Command="{Binding AddStepCommand}" />
+                    </StackPanel>
+                </Border>
+            </StackPanel>
+        </StackPanel>
+    </StackPanel>
+</UserControl>

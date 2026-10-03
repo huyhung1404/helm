@@ -36,6 +36,7 @@
     <ProjectReference Include="..\..\src\Helm.Modules.QuickCapture\Helm.Modules.QuickCapture.csproj" />
     <ProjectReference Include="..\..\src\Helm.Modules.CommandPalette\Helm.Modules.CommandPalette.csproj" />
     <ProjectReference Include="..\..\src\Helm.Modules.WatchLater\Helm.Modules.WatchLater.csproj" />
+    <ProjectReference Include="..\..\src\Helm.Modules.Missions\Helm.Modules.Missions.csproj" />
   </ItemGroup>
 
 </Project>

@@ -3,6 +3,19 @@
 All notable changes to Helm. The top section is used as the GitHub release body and as the Velopack release notes.
 Format: [Keep a Changelog](https://keepachangelog.com), versions follow [SemVer](https://semver.org).
 
+## [Unreleased]
+
+### Added
+- **Missions** (PC and Android): reach a goal one step at a time. Describe the goal and Helm writes a prompt for any AI
+  (ChatGPT, Gemini, Claude…); paste its answer and Helm finds the mission in it, shows the phases and steps to check
+  (untick the ones you do not want), and creates it. Steps are done in order: the page shows the step you are on, with
+  how to tell it is done, its checklist and links; Complete (with a note), Skip and Undo. Every step's start and
+  finish dates are kept, the roadmap shows them, and the pace says how far ahead of the plan or behind you are, when
+  you should finish at that pace and how that compares with the deadline. Finishing a phase or the whole mission is
+  celebrated, with the reward you chose and a summary to copy. Missions sync end-to-end encrypted between your devices.
+- Helm tools for Claude: **Claude can make a mission for you** ("make me a mission to pass HSK3 by March"), read your
+  missions and progress, and complete the step you are on.
+
 ## [0.20.0] - 2026-09-30
 
 ### Changed

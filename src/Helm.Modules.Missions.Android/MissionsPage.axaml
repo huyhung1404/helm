@@ -1,0 +1,132 @@
+<ui:ModulePageBase xmlns="https://github.com/avaloniaui"
+                   xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                   xmlns:ui="using:Helm.Core.Ui"
+                   xmlns:vm="using:Helm.Modules.Missions"
+                   x:Class="Helm.Modules.Missions.MissionsPage"
+                   x:DataType="vm:MissionsViewModel">
+
+    <!-- Missions' settings (Home → Utilities). The missions themselves are on MissionsContentPage. -->
+    <StackPanel>
+        <Border Classes="infobar" IsVisible="{Binding HasMessage}">
+            <TextBlock Text="{Binding Message}" TextWrapping="Wrap" />
+        </Border>
+        <Border Classes="card">
+            <StackPanel Spacing="8">
+                <TextBlock Text="Open Missions" Classes="title" />
+                <TextBlock Text="Your missions, the step you are on and the roadmap. Also in the menu and on Home." Classes="secondary" TextWrapping="Wrap" />
+                <Button Classes="accent" Content="Open Missions" Click="Open_Click" />
+            </StackPanel>
+        </Border>
+
+        <!-- Missions -->
+        <TextBlock Text="Missions" Classes="section" />
+        <Border Classes="card" IsVisible="{Binding HasMissions}">
+            <StackPanel Spacing="8">
+                <TextBlock Text="Edit a mission" Classes="title" />
+                <TextBlock Text="Rename it, change its goal, reward or deadline, move it in the list, or delete it." Classes="secondary" TextWrapping="Wrap" />
+                <ComboBox HorizontalAlignment="Stretch" ItemsSource="{Binding Missions}" SelectedItem="{Binding SelectedMission}"
+                          AutomationProperties.Name="Mission to edit">
+                    <ComboBox.ItemTemplate>
+                        <DataTemplate DataType="vm:MissionChoice">
+                            <TextBlock Text="{Binding Name}" TextTrimming="CharacterEllipsis" />
+                        </DataTemplate>
+                    </ComboBox.ItemTemplate>
+                </ComboBox>
+                <Border Classes="row">
+                    <StackPanel Spacing="8">
+                        <TextBlock Text="Mission title" />
+                        <TextBox Text="{Binding EditTitle, UpdateSourceTrigger=LostFocus}" AutomationProperties.Name="Mission title" />
+                    </StackPanel>
+                </Border>
+                <Border Classes="row">
+                    <StackPanel Spacing="8">
+                        <TextBlock Text="Goal" />
+                        <TextBlock Text="The measurable end result." Classes="secondary" />
+                        <TextBox Text="{Binding EditGoal, UpdateSourceTrigger=LostFocus}" AcceptsReturn="True" TextWrapping="Wrap" AutomationProperties.Name="Goal" />
+                    </StackPanel>
+                </Border>
+                <Border Classes="row">
+                    <StackPanel Spacing="8">
+                        <TextBlock Text="Reward" />
+                        <TextBlock Text="What you treat yourself to when the mission is done." Classes="secondary" TextWrapping="Wrap" />
+                        <TextBox Text="{Binding EditReward, UpdateSourceTrigger=LostFocus}" AutomationProperties.Name="Reward" />
+                    </StackPanel>
+                </Border>
+                <Border Classes="row">
+                    <StackPanel Spacing="8">
+                        <TextBlock Text="Deadline" />
+                        <TextBlock Text="The pace shows how far ahead of it or behind you are. Clear it for none." Classes="secondary" TextWrapping="Wrap" />
+                        <CalendarDatePicker HorizontalAlignment="Stretch" SelectedDate="{Binding EditDeadline}" PlaceholderText="No deadline" />
+                    </StackPanel>
+                </Border>
+                <Border Classes="row">
+                    <StackPanel Spacing="8">
+                        <TextBlock Text="Position in the list" />
+                        <TextBlock Text="Missions in progress come first; this orders them within that." Classes="secondary" TextWrapping="Wrap" />
+                        <Grid ColumnDefinitions="*,8,*">
+                            <Button HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Content="Up" Command="{Binding MoveUpCommand}" />
+                            <Button Grid.Column="2" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Content="Down" Command="{Binding MoveDownCommand}" />
+                        </Grid>
+                    </StackPanel>
+                </Border>
+                <Border Classes="row">
+                    <StackPanel Spacing="8">
+                        <TextBlock Text="Delete this mission" />
+                        <TextBlock Text="Removes it and its steps from all your devices. To stop for now, pause or abandon it instead." Classes="secondary" TextWrapping="Wrap" />
+                        <Button Classes="danger" Content="Delete mission" Command="{Binding DeleteMissionCommand}" />
+                    </StackPanel>
+                </Border>
+            </StackPanel>
+        </Border>
+        <TextBlock Text="No missions yet. Create one on the Missions page." Classes="secondary" Margin="4,0,4,8" IsVisible="{Binding !HasMissions}" />
+
+        <!-- Behavior -->
+        <TextBlock Text="Behavior" Classes="section" />
+        <Border Classes="card">
+            <StackPanel>
+                <DockPanel>
+                    <ToggleSwitch DockPanel.Dock="Right" IsChecked="{Binding PlayCelebrations}" OnContent="" OffContent="" AutomationProperties.Name="Play celebrations" />
+                    <StackPanel VerticalAlignment="Center">
+                        <TextBlock Text="Play celebrations" Classes="title" />
+                        <TextBlock Text="Confetti when you finish a phase or a whole mission. The summary and your reward show either way." Classes="secondary" TextWrapping="Wrap" />
+                    </StackPanel>
+                </DockPanel>
+                <Border Classes="row">
+                    <DockPanel>
+                        <ToggleSwitch DockPanel.Dock="Right" IsChecked="{Binding ConfirmUntickedChecklist}" OnContent="" OffContent=""
+                                      AutomationProperties.Name="Ask before completing an unfinished checklist" />
+                        <StackPanel VerticalAlignment="Center">
+                            <TextBlock Text="Ask before completing an unfinished checklist" Classes="title" TextWrapping="Wrap" />
+                            <TextBlock Text="When a step's checklist is not all ticked, ask before completing it." Classes="secondary" TextWrapping="Wrap" />
+                        </StackPanel>
+                    </DockPanel>
+                </Border>
+                <Border Classes="row">
+                    <DockPanel>
+                        <ToggleSwitch DockPanel.Dock="Right" IsChecked="{Binding ShowFinishedMissions}" OnContent="" OffContent="" AutomationProperties.Name="Show finished missions" />
+                        <StackPanel VerticalAlignment="Center">
+                            <TextBlock Text="Show finished missions" Classes="title" />
+                            <TextBlock Text="List completed and abandoned missions in the picker, after the ones in progress." Classes="secondary" TextWrapping="Wrap" />
+                        </StackPanel>
+                    </DockPanel>
+                </Border>
+            </StackPanel>
+        </Border>
+
+        <!-- New missions -->
+        <TextBlock Text="New missions" Classes="section" />
+        <Border Classes="card">
+            <StackPanel Spacing="8">
+                <TextBlock Text="Copy the prompt template" Classes="title" />
+                <TextBlock Text="The prompt Helm fills in on the Missions page, with blanks to fill in yourself; any AI answers it with a mission to import." Classes="secondary" TextWrapping="Wrap" />
+                <Button Content="Copy template" Command="{Binding CopyTemplateCommand}" />
+            </StackPanel>
+        </Border>
+        <Border Classes="card">
+            <StackPanel Spacing="8">
+                <TextBlock Text="Ask Claude" Classes="title" />
+                <TextBlock Text="On your PC, with Helm tools for Claude on, Claude can make a mission for you and complete its steps. It syncs here." Classes="secondary" TextWrapping="Wrap" />
+            </StackPanel>
+        </Border>
+    </StackPanel>
+</ui:ModulePageBase>

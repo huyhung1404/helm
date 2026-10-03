@@ -1,4 +1,5 @@
 using Helm.Core.Modules;
+using Helm.Modules.Missions;
 using Helm.Modules.Notes;
 using Helm.Modules.QuickCapture;
 using Helm.Modules.Tracker;
@@ -20,6 +21,7 @@ internal static class AndroidModules
     {
         services.AddVaultModule();
         services.AddTrackerModule();
+        services.AddMissionsModule();
         services.AddNotesModule();
         services.AddWatchLaterModule();
         services.AddQuickCaptureModule();

@@ -1,0 +1,221 @@
+using System.Text.Json.Serialization;
+
+namespace Helm.Modules.Missions;
+
+public enum MissionStatus
+{
+    /// <summary>Created (imported or by Claude) but not started: the pace counts from Start.</summary>
+    Planned,
+
+    Active,
+
+    /// <summary>On hold: paused time is left out of the pace.</summary>
+    Paused,
+
+    Completed,
+
+    /// <summary>Given up; can be restored.</summary>
+    Abandoned,
+}
+
+/// <summary>Where a mission came from.</summary>
+public enum MissionSource
+{
+    Import,
+    Claude,
+    Manual,
+}
+
+/// <summary>A named group of steps inside a mission, in order, with its own reward.</summary>
+public sealed record MissionPhase
+{
+    /// <summary>Short random id; steps point to their phase with it.</summary>
+    public string Key { get; init; } = "";
+
+    public string Title { get; init; } = "";
+
+    public string Reward { get; init; } = "";
+
+    /// <summary>When the user marked the phase's reward as taken.</summary>
+    public DateTimeOffset? RewardClaimedAt { get; init; }
+}
+
+/// <summary>A goal reached through ordered steps (synced record in <c>missions.missions</c>).</summary>
+public sealed record Mission
+{
+    public string Title { get; init; } = "";
+
+    /// <summary>The measurable end result.</summary>
+    public string Goal { get; init; } = "";
+
+    /// <summary>The AI's caveat from the import (e.g. "the deadline is tight").</summary>
+    public string Note { get; init; } = "";
+
+    /// <summary>The user's reward for the whole mission.</summary>
+    public string Reward { get; init; } = "";
+
+    public DateOnly? Deadline { get; init; }
+
+    /// <summary>The phases in order.</summary>
+    public IReadOnlyList<MissionPhase> Phases { get; init; } = [];
+
+    public MissionStatus Status { get; init; }
+
+    public MissionSource Source { get; init; }
+
+    /// <summary>Position in the mission picker (ascending).</summary>
+    public double Order { get; init; }
+
+    public DateTimeOffset CreatedAt { get; init; }
+
+    /// <summary>When the user pressed Start mission; the pace counts from here.</summary>
+    public DateTimeOffset? StartedAt { get; init; }
+
+    public DateTimeOffset? CompletedAt { get; init; }
+
+    /// <summary>Since when the mission is paused or abandoned (null while it runs).</summary>
+    public DateTimeOffset? PausedAt { get; init; }
+
+    /// <summary>Paused time already over (left out of the pace).</summary>
+    public TimeSpan PausedTotal { get; init; }
+
+    public DateTimeOffset? RewardClaimedAt { get; init; }
+
+    public MissionPhase? Phase(string key) => Phases.FirstOrDefault(p => p.Key == key);
+
+    public int PhaseIndex(string key)
+    {
+        for (var i = 0; i < Phases.Count; i++)
+            if (Phases[i].Key == key) return i;
+        return -1;
+    }
+}
+
+/// <summary>A tick inside a step.</summary>
+public sealed record ChecklistItem
+{
+    public string Text { get; init; } = "";
+
+    public DateTimeOffset? DoneAt { get; init; }
+
+    [JsonIgnore]
+    public bool IsDone => DoneAt is not null;
+}
+
+/// <summary>
+/// One step of a mission (synced record in <c>missions.steps</c>). One record per step, so ticking a step on the phone
+/// and editing another on the PC never collide.
+/// </summary>
+public sealed record MissionStep
+{
+    public string MissionId { get; init; } = "";
+
+    public string PhaseKey { get; init; } = "";
+
+    /// <summary>Position in the whole mission (ascending; a phase's steps are contiguous).</summary>
+    public double Order { get; init; }
+
+    public string Title { get; init; } = "";
+
+    public string Description { get; init; } = "";
+
+    /// <summary>How the user checks that the step is done.</summary>
+    public string DoneWhen { get; init; } = "";
+
+    public double EstimateDays { get; init; } = 1;
+
+    /// <summary>Links or book titles.</summary>
+    public IReadOnlyList<string> Resources { get; init; } = [];
+
+    public IReadOnlyList<ChecklistItem> Checklist { get; init; } = [];
+
+    /// <summary>Set by Start, or on completion from the previous step's finish when Start was never pressed.</summary>
+    public DateTimeOffset? StartedAt { get; init; }
+
+    public bool StartedExplicitly { get; init; }
+
+    /// <summary>Done or skipped.</summary>
+    public DateTimeOffset? CompletedAt { get; init; }
+
+    public bool Skipped { get; init; }
+
+    /// <summary>Written when completing (what was done, a result, a link).</summary>
+    public string Note { get; init; } = "";
+
+    [JsonIgnore]
+    public bool IsDone => CompletedAt is not null;
+}
+
+public enum MissionEventKind
+{
+    MissionCreated,
+    MissionStarted,
+    StepStarted,
+    ChecklistTicked,
+    StepCompleted,
+    StepSkipped,
+    StepReopened,
+    PhaseCompleted,
+    MissionCompleted,
+    Paused,
+    Resumed,
+    Abandoned,
+    RewardClaimed,
+}
+
+/// <summary>
+/// One line of the append-only history (<c>missions.history</c>), with the titles at the time, so the timeline survives
+/// edits and deletions.
+/// </summary>
+public sealed record MissionEvent
+{
+    public MissionEventKind Kind { get; init; }
+
+    public DateTimeOffset At { get; init; }
+
+    public string MissionId { get; init; } = "";
+
+    public string MissionTitle { get; init; } = "";
+
+    public string? StepId { get; init; }
+
+    public string StepTitle { get; init; } = "";
+
+    public string? PhaseKey { get; init; }
+
+    public string Note { get; init; } = "";
+}
+
+/// <summary>A mission to create: from the import, Claude, or the preview after edits.</summary>
+public sealed record MissionDraft(
+    string Title,
+    string Goal,
+    string Note,
+    string Reward,
+    DateOnly? Deadline,
+    IReadOnlyList<PhaseDraft> Phases)
+{
+    public int StepCount => Phases.Sum(p => p.Steps.Count);
+
+    public double EstimateDays => Phases.Sum(p => p.Steps.Sum(s => s.EstimateDays));
+}
+
+public sealed record PhaseDraft(string Title, string Reward, IReadOnlyList<StepDraft> Steps);
+
+public sealed record StepDraft(
+    string Title,
+    string Description = "",
+    string DoneWhen = "",
+    double EstimateDays = 1,
+    IReadOnlyList<string>? Checklist = null,
+    IReadOnlyList<string>? Resources = null);
+
+/// <summary>What completing or skipping a step led to, so the page knows which celebration to play.</summary>
+public sealed record StepOutcome(
+    string StepId,
+    string StepTitle,
+    int Done,
+    int Total,
+    MissionPhase? PhaseCompleted,
+    bool MissionCompleted,
+    string? NextStepTitle);

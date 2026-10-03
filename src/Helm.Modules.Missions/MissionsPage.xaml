@@ -1,0 +1,110 @@
+<core:ModulePageBase
+    x:Class="Helm.Modules.Missions.MissionsPage"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
+    xmlns:core="clr-namespace:Helm.Core.Ui;assembly=Helm.Core.Windows"
+    xmlns:local="clr-namespace:Helm.Modules.Missions"
+    ExtraMessage="{Binding Message}">
+
+    <!-- Missions' settings (Home → Utilities). The missions themselves are on MissionsContentPage. -->
+    <StackPanel>
+        <ui:CardControl Margin="0,0,0,4">
+            <ui:CardControl.Icon>
+                <ui:ImageIcon Width="24" Height="24" Source="{x:Static local:MissionsLogo.Image}" />
+            </ui:CardControl.Icon>
+            <ui:CardControl.Header>
+                <core:CardHeader Title="Open Missions" Description="Your missions, the step you are on and the roadmap. Also in the menu and on Home." />
+            </ui:CardControl.Header>
+            <ui:Button Appearance="Primary" Content="Open Missions" Click="Open_Click" />
+        </ui:CardControl>
+
+        <!-- Missions -->
+        <TextBlock Text="Missions" Style="{DynamicResource HelmSectionHeader}" />
+        <ui:CardExpander Margin="0,0,0,4" Icon="{ui:SymbolIcon Edit24}" IsEnabled="{Binding HasMissions}">
+            <ui:CardExpander.Header>
+                <core:RowLayout>
+                    <core:CardHeader Title="Edit a mission" Description="Rename it, change its goal, reward or deadline, move it in the list, or delete it." />
+                    <ComboBox Width="240" Margin="0,0,16,0" AutomationProperties.Name="Mission to edit" ItemsSource="{Binding Missions}"
+                              DisplayMemberPath="Name" SelectedItem="{Binding SelectedMission}" />
+                </core:RowLayout>
+            </ui:CardExpander.Header>
+            <StackPanel>
+                <Border Style="{DynamicResource HelmExpanderRow}" BorderThickness="0">
+                    <core:RowLayout>
+                        <core:CardHeader Title="Mission title" />
+                        <ui:TextBox Width="280" AutomationProperties.Name="Mission title" Text="{Binding EditTitle, UpdateSourceTrigger=LostFocus}" />
+                    </core:RowLayout>
+                </Border>
+                <Border Style="{DynamicResource HelmExpanderRow}">
+                    <core:RowLayout>
+                        <core:CardHeader Title="Goal" Description="The measurable end result." />
+                        <ui:TextBox Width="280" AutomationProperties.Name="Goal" AcceptsReturn="True" TextWrapping="Wrap" Text="{Binding EditGoal, UpdateSourceTrigger=LostFocus}" />
+                    </core:RowLayout>
+                </Border>
+                <Border Style="{DynamicResource HelmExpanderRow}">
+                    <core:RowLayout>
+                        <core:CardHeader Title="Reward" Description="What you treat yourself to when the mission is done." />
+                        <ui:TextBox Width="280" AutomationProperties.Name="Reward" Text="{Binding EditReward, UpdateSourceTrigger=LostFocus}" />
+                    </core:RowLayout>
+                </Border>
+                <Border Style="{DynamicResource HelmExpanderRow}">
+                    <core:RowLayout>
+                        <core:CardHeader Title="Deadline" Description="The pace shows how far ahead of it or behind you are. Clear it for none." />
+                        <DatePicker Width="170" AutomationProperties.Name="Deadline" SelectedDate="{Binding EditDeadline}" />
+                    </core:RowLayout>
+                </Border>
+                <Border Style="{DynamicResource HelmExpanderRow}">
+                    <core:RowLayout>
+                        <core:CardHeader Title="Position in the list" Description="Missions in progress come first; this orders them within that." />
+                        <StackPanel Orientation="Horizontal">
+                            <ui:Button Margin="0,0,8,0" Content="Up" Icon="{ui:SymbolIcon ArrowUp24}" Command="{Binding MoveUpCommand}" />
+                            <ui:Button Content="Down" Icon="{ui:SymbolIcon ArrowDown24}" Command="{Binding MoveDownCommand}" />
+                        </StackPanel>
+                    </core:RowLayout>
+                </Border>
+                <Border Style="{DynamicResource HelmExpanderRow}">
+                    <core:RowLayout>
+                        <core:CardHeader Title="Delete this mission" Description="Removes it and its steps from all your devices. To stop for now, pause or abandon it instead." />
+                        <ui:Button Content="Delete" Icon="{ui:SymbolIcon Delete24}" Command="{Binding DeleteMissionCommand}" />
+                    </core:RowLayout>
+                </Border>
+            </StackPanel>
+        </ui:CardExpander>
+
+        <!-- Behavior -->
+        <TextBlock Text="Behavior" Style="{DynamicResource HelmSectionHeader}" />
+        <ui:CardControl Margin="0,0,0,4" Icon="{ui:SymbolIcon Sparkle24}">
+            <ui:CardControl.Header>
+                <core:CardHeader Title="Play celebrations" Description="Confetti when you finish a phase or a whole mission. The summary and your reward show either way." />
+            </ui:CardControl.Header>
+            <ui:ToggleSwitch AutomationProperties.Name="Play celebrations" IsChecked="{Binding PlayCelebrations}" />
+        </ui:CardControl>
+        <ui:CardControl Margin="0,0,0,4" Icon="{ui:SymbolIcon CheckboxChecked24}">
+            <ui:CardControl.Header>
+                <core:CardHeader Title="Ask before completing an unfinished checklist" Description="When a step's checklist is not all ticked, ask before completing it." />
+            </ui:CardControl.Header>
+            <ui:ToggleSwitch AutomationProperties.Name="Ask before completing an unfinished checklist" IsChecked="{Binding ConfirmUntickedChecklist}" />
+        </ui:CardControl>
+        <ui:CardControl Margin="0,0,0,4" Icon="{ui:SymbolIcon CheckmarkCircle24}">
+            <ui:CardControl.Header>
+                <core:CardHeader Title="Show finished missions" Description="List completed and abandoned missions in the picker, after the ones in progress." />
+            </ui:CardControl.Header>
+            <ui:ToggleSwitch AutomationProperties.Name="Show finished missions" IsChecked="{Binding ShowFinishedMissions}" />
+        </ui:CardControl>
+
+        <!-- New missions -->
+        <TextBlock Text="New missions" Style="{DynamicResource HelmSectionHeader}" />
+        <ui:CardControl Margin="0,0,0,4" Icon="{ui:SymbolIcon Copy24}">
+            <ui:CardControl.Header>
+                <core:CardHeader Title="Copy the prompt template" Description="The prompt Helm fills in on the Missions page, with blanks to fill in yourself; any AI answers it with a mission to import." />
+            </ui:CardControl.Header>
+            <ui:Button Content="Copy template" Icon="{ui:SymbolIcon Copy24}" Command="{Binding CopyTemplateCommand}" />
+        </ui:CardControl>
+        <ui:CardControl Margin="0,0,0,4" Icon="{ui:SymbolIcon Chat24}">
+            <ui:CardControl.Header>
+                <core:CardHeader Title="Ask Claude" Description="With Helm tools for Claude on (Claude Chat settings), Claude in Helm or Claude Code can make a mission for you, read your progress and complete the current step: try &quot;make me a mission to pass HSK3 by March&quot;." />
+            </ui:CardControl.Header>
+        </ui:CardControl>
+    </StackPanel>
+</core:ModulePageBase>

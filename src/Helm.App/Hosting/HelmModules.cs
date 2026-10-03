@@ -1,5 +1,6 @@
 using Helm.Modules.ClaudeChat;
 using Helm.Modules.CommandPalette;
+using Helm.Modules.Missions;
 using Helm.Modules.Notes;
 using Helm.Modules.QuickCapture;
 using Helm.Modules.Vault;
@@ -20,6 +21,7 @@ internal static class HelmModules
         services.AddClaudeChatModule();
         services.AddVaultModule();
         services.AddTrackerModule();
+        services.AddMissionsModule();
         services.AddNotesModule();
         services.AddWatchLaterModule();
         services.AddQuickCaptureModule();

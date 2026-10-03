@@ -16,7 +16,7 @@ public sealed class McpSettings : IVersionedSettings
 
     public int Version { get; set; }
 
-    /// <summary>Claude (Helm's chats, and Claude Code where it is added) can use the notes and Tracker tools.</summary>
+    /// <summary>Claude (Helm's chats, and Claude Code where it is added) can use the notes, Tracker and Missions tools.</summary>
     public bool Enabled { get; set; } = true;
 
     /// <summary>Off: only the tools that read are offered.</summary>
@@ -34,7 +34,8 @@ public static class McpEndpoint
 
     /// <summary>What Claude is told about Helm when it connects.</summary>
     public const string Instructions =
-        "Helm is the user's own toolkit. These tools read and change the user's notes and their Tracker: to-do lists " +
-        "and a debt book (who owes whom). Changes sync to the user's other devices. Dates and times are the user's " +
+        "Helm is the user's own toolkit. These tools read and change the user's notes, their Tracker (to-do lists " +
+        "and a debt book: who owes whom) and their Missions (goals reached through ordered steps). Changes sync to " +
+        "the user's other devices. Dates and times are the user's " +
         "local ones. Nothing here deletes for good: notes go to a 30-day trash. Ask before changing many things at once.";
 }

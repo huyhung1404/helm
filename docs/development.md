@@ -56,11 +56,14 @@ src/
   Helm.Modules.Tracker.Core/ net8.0: Tracker data (on Helm Sync), reports, CSV, shared view model
   Helm.Modules.Tracker/      Windows: Tracker page
   Helm.Modules.Tracker.Android/ Android: Tracker page and home-screen widget (not in Helm.sln)
+  Helm.Modules.Missions.Core/ net8.0: missions (on Helm Sync), JSON import, prompt, pace, MCP tools, shared view model
+  Helm.Modules.Missions/     Windows: Missions pages and confetti
+  Helm.Modules.Missions.Android/ Android: Missions pages and confetti (not in Helm.sln)
   Helm.Modules.Vault.Core/   net8.0: vault keys, items, locking, backups, KDBX export, shared view models
   Helm.Modules.Vault/        Windows: vault window and page, Windows Hello, protected clipboard
   Helm.Modules.Vault.Android/ Android: vault page, fingerprint unlock, FLAG_SECURE, SAF backups (not in Helm.sln)
   Helm.VaultRestore/         helm-vault-restore: opens a vault backup without Helm
-tests/Helm.Tests/            xUnit: settings, sync (+ end-to-end against a local worker), updates, hotkeys, Claude Chat, Tracker, Vault
+tests/Helm.Tests/            xUnit: settings, sync (+ end-to-end against a local worker), updates, hotkeys, Claude Chat, Tracker, Missions, Vault
 ```
 
 Windows modules reference `Helm.Core.Windows`, Android modules reference `Helm.Core.Android`, and shared tool logic references `Helm.Core`; `Helm.App` / `Helm.App.Android` reference everything they ship.
