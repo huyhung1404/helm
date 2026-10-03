@@ -20,7 +20,12 @@
         <Style Selector="Button.wide">
             <Setter Property="HorizontalAlignment" Value="Stretch" />
             <Setter Property="HorizontalContentAlignment" Value="Center" />
+            <Setter Property="VerticalContentAlignment" Value="Center" />
             <Setter Property="MinHeight" Value="44" />
+        </Style>
+        <!-- An icon next to the text: both on the same middle line -->
+        <Style Selector="Button.wide StackPanel > TextBlock, Button.wide StackPanel > ic|SymbolIcon">
+            <Setter Property="VerticalAlignment" Value="Center" />
         </Style>
         <!-- A small label: status, pace, deadline, streak -->
         <Style Selector="Border.chip">
@@ -356,7 +361,7 @@
                         <ItemsControl ItemsSource="{Binding CurrentChecklist}" IsVisible="{Binding HasCurrentChecklist}" IsEnabled="{Binding IsActive}">
                             <ItemsControl.ItemTemplate>
                                 <DataTemplate DataType="vm:ChecklistRow">
-                                    <CheckBox IsChecked="{Binding IsDone}" MinHeight="40" AutomationProperties.Name="{Binding Text}">
+                                    <CheckBox IsChecked="{Binding IsDone}" MinHeight="40" VerticalContentAlignment="Center" AutomationProperties.Name="{Binding Text}">
                                         <TextBlock Text="{Binding Text}" TextWrapping="Wrap" />
                                     </CheckBox>
                                 </DataTemplate>
