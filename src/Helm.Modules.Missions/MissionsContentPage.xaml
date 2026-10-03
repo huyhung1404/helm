@@ -98,6 +98,23 @@
             </Style.Triggers>
         </Style>
 
+        <!-- The ready-made missions, as buttons that open the import preview with one (the content is the view model) -->
+        <DataTemplate x:Key="TemplateButtons">
+            <ItemsControl ItemsSource="{Binding Templates}" Focusable="False">
+                <ItemsControl.ItemsPanel>
+                    <ItemsPanelTemplate>
+                        <WrapPanel />
+                    </ItemsPanelTemplate>
+                </ItemsControl.ItemsPanel>
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate DataType="{x:Type local:MissionTemplate}">
+                        <ui:Button Margin="0,0,8,8" Content="{Binding Name}" ToolTip="{Binding Description}" AutomationProperties.Name="{Binding Name}"
+                                   Command="{Binding DataContext.UseTemplateCommand, RelativeSource={RelativeSource AncestorType=Page}}" CommandParameter="{Binding}" />
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+        </DataTemplate>
+
         <!-- A step in the roadmap: click to see its details; edit the ones not done yet -->
         <DataTemplate x:Key="StepTemplate" DataType="{x:Type local:StepRow}">
             <StackPanel>
@@ -238,6 +255,52 @@
                         <ui:Button Margin="0,0,8,0" Appearance="Primary" Content="Write the prompt" Icon="{ui:SymbolIcon Sparkle24}" Command="{Binding OpenPromptCommand}" />
                         <ui:Button Content="Import JSON" Icon="{ui:SymbolIcon ArrowImport24}" Command="{Binding OpenImportCommand}" />
                     </WrapPanel>
+                    <TextBlock Text="Or start from a ready-made mission:" Style="{StaticResource FieldLabel}" Margin="0,16,0,6" />
+                    <ContentControl Content="{Binding}" ContentTemplate="{StaticResource TemplateButtons}" Focusable="False" />
+                </StackPanel>
+            </Border>
+
+            <!-- Today: the step each mission in progress is on, when more than one runs -->
+            <Border Style="{DynamicResource HelmSurface}" Margin="0,8,0,4">
+                <Border.Visibility>
+                    <MultiBinding Converter="{x:Static self:AllTrueToVisibility.Instance}">
+                        <Binding Path="HasToday" />
+                        <Binding Path="ShowMission" />
+                    </MultiBinding>
+                </Border.Visibility>
+                <StackPanel>
+                    <TextBlock Text="Today" FontSize="16" FontWeight="SemiBold" Margin="0,0,0,6" />
+                    <ItemsControl ItemsSource="{Binding Today}" Focusable="False">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate DataType="{x:Type local:TodayRow}">
+                                <Border BorderThickness="0,1,0,0" BorderBrush="{DynamicResource CardStrokeColorDefaultBrush}" Padding="0,8">
+                                    <DockPanel>
+                                        <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center" Margin="12,0,0,0">
+                                            <ui:Button Margin="0,0,6,0" Content="Open" AutomationProperties.Name="Open the mission"
+                                                       Command="{Binding DataContext.OpenTodayCommand, RelativeSource={RelativeSource AncestorType=Page}}" CommandParameter="{Binding}" />
+                                            <ui:Button Appearance="Success" Content="Complete" Icon="{ui:SymbolIcon Checkmark24}" AutomationProperties.Name="{Binding Step}"
+                                                       Command="{Binding DataContext.CompleteTodayCommand, RelativeSource={RelativeSource AncestorType=Page}}" CommandParameter="{Binding}" />
+                                        </StackPanel>
+                                        <StackPanel VerticalAlignment="Center">
+                                            <TextBlock Text="{Binding Mission}" Style="{DynamicResource HelmSecondaryText}" TextTrimming="CharacterEllipsis" />
+                                            <TextBlock Text="{Binding Step}" FontWeight="SemiBold" TextWrapping="Wrap" />
+                                            <TextBlock Text="{Binding Details}" TextTrimming="CharacterEllipsis">
+                                                <TextBlock.Style>
+                                                    <Style TargetType="TextBlock" BasedOn="{StaticResource HelmSecondaryText}">
+                                                        <Style.Triggers>
+                                                            <DataTrigger Binding="{Binding IsBehind}" Value="True">
+                                                                <Setter Property="Foreground" Value="{DynamicResource SystemFillColorCriticalBrush}" />
+                                                            </DataTrigger>
+                                                        </Style.Triggers>
+                                                    </Style>
+                                                </TextBlock.Style>
+                                            </TextBlock>
+                                        </StackPanel>
+                                    </DockPanel>
+                                </Border>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
                 </StackPanel>
             </Border>
 
@@ -289,6 +352,8 @@
                         <ui:Button Margin="0,0,8,0" Content="I have the JSON" Icon="{ui:SymbolIcon ArrowRight24}" Command="{Binding OpenImportCommand}" />
                         <ui:Button Content="Cancel" Command="{Binding CloseNewCommand}" />
                     </WrapPanel>
+                    <TextBlock Text="No AI at hand? Start from a ready-made mission:" Style="{StaticResource FieldLabel}" Margin="0,16,0,6" />
+                    <ContentControl Content="{Binding}" ContentTemplate="{StaticResource TemplateButtons}" Focusable="False" />
                     <TextBlock Margin="0,10,0,0" Style="{DynamicResource HelmSecondaryText}" TextWrapping="Wrap"
                                Visibility="{Binding PromptCopied, Converter={StaticResource BoolToVisibility}}"
                                Text="Copied. Paste it into any AI, then press I have the JSON and paste its answer." />
@@ -566,9 +631,14 @@
                                 <ui:Button Margin="0,0,8,0" Content="Start" Icon="{ui:SymbolIcon Play24}" ToolTip="Log when you begin, to see how long the step takes"
                                            Command="{Binding StartStepCommand}" Visibility="{Binding CanStartStep, Converter={StaticResource BoolToVisibility}}" />
                                 <ui:Button Margin="0,0,8,0" Appearance="Transparent" Content="Skip" Icon="{ui:SymbolIcon ArrowForward24}" Command="{Binding SkipStepCommand}" />
-                                <ui:Button Appearance="Transparent" Content="Undo last step" Icon="{ui:SymbolIcon ArrowUndo24}" Command="{Binding UndoStepCommand}"
+                                <ui:Button Margin="0,0,8,0" Appearance="Transparent" Content="Undo last step" Icon="{ui:SymbolIcon ArrowUndo24}" Command="{Binding UndoStepCommand}"
                                            Visibility="{Binding CanUndo, Converter={StaticResource BoolToVisibility}}" />
+                                <ui:Button Appearance="Transparent" Content="{Binding SendToTasksLabel}" Icon="{ui:SymbolIcon TaskListLtr24}"
+                                           ToolTip="Add this step to your to-do list, due when it should be done; finishing either one finishes the other"
+                                           Command="{Binding SendToTasksCommand}" Visibility="{Binding CanSendToTasks, Converter={StaticResource BoolToVisibility}}" />
                             </WrapPanel>
+                            <TextBlock Margin="0,8,0,0" Text="{Binding TaskText}" Style="{DynamicResource HelmSecondaryText}" TextWrapping="Wrap"
+                                       Visibility="{Binding HasTask, Converter={StaticResource BoolToVisibility}}" />
                         </StackPanel>
                     </StackPanel>
                 </Border>
@@ -617,6 +687,17 @@
                         <ui:Button Content="Add" Icon="{ui:SymbolIcon Add24}" Command="{Binding AddStepCommand}" />
                     </StackPanel>
                 </ui:CardControl>
+
+                <!-- Statistics across all missions -->
+                <TextBlock Text="Statistics" Style="{DynamicResource HelmSectionHeader}" />
+                <Border Style="{DynamicResource HelmSurface}" Margin="0,0,0,4">
+                    <StackPanel>
+                        <TextBlock Text="{Binding StatsThisWeek}" FontSize="16" FontWeight="SemiBold" />
+                        <TextBlock Text="{Binding StatsWeeks}" Style="{DynamicResource HelmSecondaryText}" Margin="0,2,0,0" TextWrapping="Wrap" />
+                        <TextBlock Text="{Binding StatsPace}" Margin="0,6,0,0" TextWrapping="Wrap" Visibility="{Binding StatsPace, Converter={StaticResource NotEmptyToVisibility}}" />
+                        <TextBlock Text="{Binding StatsMissions}" Margin="0,2,0,0" TextWrapping="Wrap" />
+                    </StackPanel>
+                </Border>
 
                 <!-- Badges across all missions -->
                 <TextBlock Text="Badges" Style="{DynamicResource HelmSectionHeader}" />

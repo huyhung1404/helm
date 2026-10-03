@@ -18,15 +18,18 @@ public sealed class MissionsModule : HelmModuleBase, IModuleContent, IDisposable
     private static readonly TimeSpan CheckEvery = TimeSpan.FromMinutes(10);
 
     private readonly MissionReminderService _reminders;
+    // Steps sent to Tracker and their tasks finish together while this lives.
+    private readonly MissionTaskSync _tasks;
     private readonly IServiceProvider _services;
     private readonly ILogger<MissionsModule> _logger;
     private readonly Timer _timer;
 
     // IUserNotifications and IShellNavigation are resolved when a reminder is shown: both depend on the module list,
     // which contains this module.
-    public MissionsModule(MissionReminderService reminders, IServiceProvider services, ILogger<MissionsModule> logger)
+    public MissionsModule(MissionReminderService reminders, MissionTaskSync tasks, IServiceProvider services, ILogger<MissionsModule> logger)
     {
         _reminders = reminders;
+        _tasks = tasks;
         _services = services;
         _logger = logger;
         _timer = new Timer(_ => CheckReminder(), null, Timeout.Infinite, Timeout.Infinite);
@@ -50,6 +53,7 @@ public sealed class MissionsModule : HelmModuleBase, IModuleContent, IDisposable
         StatusMessage = null;
         // First check shortly after start (Helm usually starts with Windows), then every few minutes.
         _timer.Change(TimeSpan.FromSeconds(40), CheckEvery);
+        _tasks.Sync();
         return Task.CompletedTask;
     }
 

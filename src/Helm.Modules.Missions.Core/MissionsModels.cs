@@ -142,6 +142,12 @@ public sealed record MissionStep
     /// <summary>Written when completing (what was done, a result, a link).</summary>
     public string Note { get; init; } = "";
 
+    /// <summary>
+    /// The task this step was sent to in another tool (Tracker), through <c>ITaskBridge</c>; finishing either one
+    /// finishes the other. Older Helm versions do not know it and may drop it when they edit the step.
+    /// </summary>
+    public string? TaskId { get; init; }
+
     [JsonIgnore]
     public bool IsDone => CompletedAt is not null;
 }

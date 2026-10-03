@@ -31,6 +31,7 @@ public sealed partial class MissionsViewModel : ObservableObject
     private readonly MissionReminderService _reminders;
     private readonly Func<IEnumerable<ICaptureTarget>> _captureTargets;
     private readonly LinkHub? _links;
+    private readonly MissionTaskSync? _tasks;
     private readonly ILogger<MissionsViewModel> _logger;
     private readonly TimeZoneInfo _zone;
     private readonly Dictionary<string, MissionChoice> _choices = new(StringComparer.Ordinal);
@@ -111,6 +112,17 @@ public sealed partial class MissionsViewModel : ObservableObject
     [ObservableProperty] private string _badgesSummary = "";
     [ObservableProperty] private bool _showBadges;
 
+    // Statistics across all missions
+    [ObservableProperty] private string _statsThisWeek = "";
+    [ObservableProperty] private string _statsWeeks = "";
+    [ObservableProperty] private string _statsPace = "";
+    [ObservableProperty] private string _statsMissions = "";
+
+    // The current step in another tool's to-do list (Tracker)
+    [ObservableProperty] private bool _canSendToTasks;
+    [ObservableProperty] private string _sendToTasksLabel = "";
+    [ObservableProperty] private string _taskText = "";
+
     // Settings
     [ObservableProperty] private bool _playCelebrations;
     [ObservableProperty] private bool _confirmUntickedChecklist;
@@ -147,7 +159,7 @@ public sealed partial class MissionsViewModel : ObservableObject
         ILogger<MissionsViewModel> logger)
         // Capture targets are resolved when used: Notes may register after Missions, and its target is optional.
         : this(store, settings, ui, dialogs, clipboard, launcher, reminders, () => (IEnumerable<ICaptureTarget>?)services.GetService(typeof(IEnumerable<ICaptureTarget>)) ?? [],
-            logger, TimeZoneInfo.Local, services.GetService(typeof(LinkHub)) as LinkHub)
+            logger, TimeZoneInfo.Local, services.GetService(typeof(LinkHub)) as LinkHub, services.GetService(typeof(MissionTaskSync)) as MissionTaskSync)
     {
     }
 
@@ -162,9 +174,11 @@ public sealed partial class MissionsViewModel : ObservableObject
         Func<IEnumerable<ICaptureTarget>> captureTargets,
         ILogger<MissionsViewModel> logger,
         TimeZoneInfo zone,
-        LinkHub? links = null)
+        LinkHub? links = null,
+        MissionTaskSync? tasks = null)
     {
         _links = links;
+        _tasks = tasks;
         _store = store;
         _settingsFactory = settings;
         _settings = settings.Get<MissionsSettings>(MissionsIds.ModuleId);
@@ -206,6 +220,16 @@ public sealed partial class MissionsViewModel : ObservableObject
 
     /// <summary>Every badge, earned or not, in a fixed order.</summary>
     public ObservableCollection<BadgeRow> Badges { get; } = [];
+
+    /// <summary>Each mission in progress with the step it is on (the Today card, when more than one runs).</summary>
+    public ObservableCollection<TodayRow> Today { get; } = [];
+
+    /// <summary>Ready-made missions to start from without an AI.</summary>
+    public IReadOnlyList<MissionTemplate> Templates => MissionTemplates.All;
+
+    public bool HasToday => Today.Count > 1;
+    public bool HasTask => TaskText.Length > 0;
+    public bool HasStats => StatsMissions.Length > 0;
 
     public bool HasMessage => !string.IsNullOrEmpty(Message);
     public bool HasMissions => Missions.Count > 0;
@@ -362,7 +386,7 @@ public sealed partial class MissionsViewModel : ObservableObject
         if (SelectedMission is not { } m || _store.GetMission(m.Id) is not { } mission) return;
         var steps = _store.Steps(m.Id).Select(s => s.Value).ToList();
         var pace = MissionPace.Compute(mission, steps, _store.History(m.Id), _store.Now, _zone);
-        _clipboard.SetText(MissionPrompt.BuildReplan(mission, steps, pace, Today, ReplanReason));
+        _clipboard.SetText(MissionPrompt.BuildReplan(mission, steps, pace, TodayDate, ReplanReason));
         PromptCopied = true;
         Message = "Prompt copied, with your progress in it. Paste it into any AI, then paste its new plan here.";
     }
@@ -447,7 +471,7 @@ public sealed partial class MissionsViewModel : ObservableObject
         var steps = PreviewPhases.SelectMany(p => p.Steps).Where(s => s.Include).ToList();
         var phases = PreviewPhases.Count(p => p.Steps.Any(s => s.Include));
         var days = steps.Sum(s => s.Draft.EstimateDays);
-        var today = Today;
+        var today = TodayDate;
         var finish = today.AddDays((int)Math.Ceiling(days));
         var text = $"{Plural(phases, "phase")} · {Plural(steps.Count, "step")} · about {MissionsFormat.Days(days)}. Started today, it ends around {MissionsFormat.Date(finish, today)}";
         if (IsReplan && SelectedMission is { } m)
@@ -955,11 +979,112 @@ public sealed partial class MissionsViewModel : ObservableObject
     [RelayCommand]
     private void ToggleBadges() => ShowBadges = !ShowBadges;
 
+    // ---- Today, Tracker, statistics, templates -------------------------------------------------------------------
+
+    /// <summary>The Today card and the statistics, across all missions.</summary>
+    private void RefreshOverview()
+    {
+        var now = _store.Now;
+        var rows = new List<TodayRow>();
+        foreach (var m in _store.Missions().Where(m => m.Value.Status == MissionStatus.Active))
+        {
+            var steps = _store.Steps(m.Id).Select(s => s.Value).ToList();
+            if (steps.FirstOrDefault(s => !s.IsDone) is not { } current) continue;
+            var pace = MissionPace.Compute(m.Value, steps, [], now, _zone);
+            var row = Today.FirstOrDefault(r => r.MissionId == m.Id) ?? new TodayRow(m.Id);
+            row.Mission = m.Value.Title;
+            row.Step = current.Title;
+            row.Details = $"Step {pace.Done + 1} of {pace.Total}" + (pace.DaysOff != 0 ? " · " + MissionsFormat.Pace(pace).ToLowerInvariant() : "")
+                + (current.Checklist.Count > 0 ? $" · {current.Checklist.Count(c => c.IsDone)}/{current.Checklist.Count} ticked" : "");
+            row.IsBehind = pace.DaysOff > 0;
+            rows.Add(row);
+        }
+        SyncCollection(Today, rows);
+        OnPropertyChanged(nameof(HasToday));
+
+        var stats = MissionStats.Compute(_store, now, _zone);
+        StatsThisWeek = stats.StepsThisWeek == 1 ? "1 step this week" : $"{stats.StepsThisWeek} steps this week";
+        StatsWeeks = $"Last {MissionStats.Weeks} weeks: {stats.WeeksText} · {Plural(stats.StepsDone, "step")} in all";
+        StatsPace = MissionStats.PaceText(stats);
+        var missions = $"{Plural(stats.MissionsDone, "mission")} done";
+        if (stats.MissionsWithDeadline > 0) missions += $" · {stats.MissionsOnTime} of {stats.MissionsWithDeadline} by the deadline";
+        missions += $" · {stats.MissionsRunning} in progress";
+        StatsMissions = missions;
+    }
+
+    partial void OnStatsMissionsChanged(string value) => OnPropertyChanged(nameof(HasStats));
+    partial void OnTaskTextChanged(string value) => OnPropertyChanged(nameof(HasTask));
+
+    /// <summary>Goes to a mission from the Today card.</summary>
+    [RelayCommand]
+    private void OpenToday(TodayRow? row)
+    {
+        if (row is not null) Select(row.MissionId);
+    }
+
+    /// <summary>Completes a mission's current step from the Today card (asks first when its checklist is not all ticked).</summary>
+    [RelayCommand]
+    private async Task CompleteTodayAsync(TodayRow? row)
+    {
+        if (row is null || _store.CurrentStep(row.MissionId) is not { } current) return;
+        var open = current.Value.Checklist.Count(c => !c.IsDone);
+        if (open > 0 && ConfirmUntickedChecklist
+            && !await _dialogs.ConfirmAsync("Complete this step?", $"{Plural(open, "checklist item")} of “{current.Value.Title}” {(open == 1 ? "is" : "are")} not ticked. Complete the step anyway?", "Complete"))
+            return;
+        _justEarned.Clear();
+        if (_store.Complete(row.MissionId) is not { } outcome) return;
+        // The rest (message, celebrations) as on the mission itself, which is shown so the celebration has its place.
+        Select(row.MissionId);
+        Finished(row.MissionId, outcome, skipped: false);
+    }
+
+    /// <summary>Sends the current step to the to-do list (Tracker) as a task due when the step should be done.</summary>
+    [RelayCommand]
+    private void SendToTasks()
+    {
+        if (SelectedMission is not { } m || _tasks is null) return;
+        Message = _tasks.Send(m.Id, _zone) is { } name
+            ? $"“{CurrentTitle}” is in {name} now. Finish it there or here: the other one follows."
+            : "The step could not be sent: turn on Tracker and make sure the mission is in progress.";
+        RefreshDetails();
+    }
+
+    /// <summary>The Send button and the "In Tracker" line for the current step.</summary>
+    private void RefreshTask(MissionStep? current, MissionStatus status)
+    {
+        var bridge = _tasks?.Bridge;
+        var state = current is not null && bridge is not null ? _tasks!.TaskState(current) : null;
+        TaskText = state is not null ? $"In {bridge!.Name}: finishing it there completes this step." : "";
+        CanSendToTasks = bridge is not null && current is not null && status == MissionStatus.Active && state is null;
+        SendToTasksLabel = bridge is null ? "" : $"Send to {bridge.Name}";
+    }
+
+    /// <summary>Opens the import preview with a ready-made mission.</summary>
+    [RelayCommand]
+    private void UseTemplate(MissionTemplate? template)
+    {
+        if (template is null) return;
+        OpenImport();
+        ImportText = template.Json;
+    }
+
+    /// <summary>Every step of every mission as CSV (the page saves or shares it).</summary>
+    public string Csv() => MissionStats.Csv(_store);
+
+    /// <summary>After the page wrote the CSV.</summary>
+    public void ReportExport(string where) => Message = $"Exported every step to {where}.";
+
+    public void ReportExportFailure(Exception ex)
+    {
+        _logger.LogWarning(ex, "Exporting missions failed");
+        Message = $"Could not export: {ex.Message}";
+    }
+
     partial void OnMessageChanged(string? value) => OnPropertyChanged(nameof(HasMessage));
 
     // ---- Refresh -------------------------------------------------------------------------------------------------
 
-    private DateOnly Today => MissionPace.Day(_store.Now, _zone);
+    private DateOnly TodayDate => MissionPace.Day(_store.Now, _zone);
 
     private void ScheduleRefresh()
     {
@@ -1011,6 +1136,7 @@ public sealed partial class MissionsViewModel : ObservableObject
             RefreshPicker();
             RefreshDetails();
             RefreshBadges();
+            RefreshOverview();
         }
         catch (Exception ex)
         {
@@ -1088,7 +1214,7 @@ public sealed partial class MissionsViewModel : ObservableObject
         var steps = items.Select(s => s.Value).ToList();
         var history = _store.History(id);
         var now = _store.Now;
-        var today = Today;
+        var today = TodayDate;
         var pace = MissionPace.Compute(mission, steps, history, now, _zone);
 
         _loading = true;
@@ -1166,6 +1292,7 @@ public sealed partial class MissionsViewModel : ObservableObject
                 break;
             }
         HasCurrentStep = index >= 0;
+        RefreshTask(index >= 0 ? items[index].Value : null, mission.Status);
         if (index < 0)
         {
             CurrentChecklist.Clear();

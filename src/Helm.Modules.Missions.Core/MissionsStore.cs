@@ -380,6 +380,17 @@ public sealed class MissionsStore
         }
     }
 
+    /// <summary>Records (or clears, with null) the task a step was sent to in another tool.</summary>
+    public bool SetTask(string stepId, string? taskId)
+    {
+        lock (_gate)
+        {
+            if (_steps.Get(stepId) is not { } s || s.TaskId == taskId) return false;
+            _steps.Upsert(stepId, s with { TaskId = taskId });
+            return true;
+        }
+    }
+
     /// <summary>The note of any step (also a done one).</summary>
     public bool SetNote(string stepId, string note)
     {

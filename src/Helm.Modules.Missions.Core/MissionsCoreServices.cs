@@ -35,6 +35,10 @@ public static class MissionsCoreServices
             sp.GetRequiredService<ISyncedLog<MissionEvent>>()));
         services.AddSingleton(sp => new MissionReminderService(
             sp.GetRequiredService<MissionsStore>(), sp.GetRequiredService<Helm.Core.Settings.ISettingsStoreFactory>()));
+        // A step sent to Tracker (or another to-do list) and its task finish together. Resolved lazily: Tracker may
+        // register after Missions, or not at all.
+        services.AddSingleton(sp => new MissionTaskSync(sp.GetRequiredService<MissionsStore>(), sp.GetServices<Helm.Core.Tasks.ITaskBridge>,
+            sp.GetRequiredService<Helm.Core.Settings.ISettingsStoreFactory>(), sp.GetService<Microsoft.Extensions.Logging.ILogger<MissionTaskSync>>()));
         // Quick Capture and Android's Share → "Save to Helm": an AI's answer with a mission in it.
         services.AddSingleton<Helm.Core.Capture.ICaptureTarget, MissionCaptureTarget>();
         // Claude's tools for the missions (Helm's MCP server, Windows).

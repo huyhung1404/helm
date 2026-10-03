@@ -169,6 +169,17 @@ public sealed partial class PhaseRow(string key) : ObservableObject
     partial void OnRewardTextChanged(string value) => OnPropertyChanged(nameof(HasReward));
 }
 
+/// <summary>A mission in progress on the Today card: the step it is on, to finish right there.</summary>
+public sealed partial class TodayRow(string missionId) : ObservableObject
+{
+    [ObservableProperty] private string _mission = "";
+    [ObservableProperty] private string _step = "";
+    [ObservableProperty] private string _details = "";
+    [ObservableProperty] private bool _isBehind;
+
+    public string MissionId { get; } = missionId;
+}
+
 /// <summary>A badge on the page: earned (with when) or what it takes.</summary>
 public sealed partial class BadgeRow(string id) : ObservableObject
 {

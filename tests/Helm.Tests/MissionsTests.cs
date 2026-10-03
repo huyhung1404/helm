@@ -964,6 +964,130 @@ public sealed class MissionsTests : IDisposable
         Assert.Equal(0, model.More);
     }
 
+    // ---- v4: templates, statistics, Tracker, Today -----------------------------------------------------------------
+
+    [Fact]
+    public void Every_template_imports_cleanly()
+    {
+        Assert.NotEmpty(MissionTemplates.All);
+        Assert.Equal(MissionTemplates.All.Count, MissionTemplates.All.Select(t => t.Id).Distinct().Count());
+        foreach (var t in MissionTemplates.All)
+        {
+            var result = MissionImport.Parse(t.Json);
+            Assert.True(result.Ok, $"{t.Id}: {string.Join("; ", result.Errors)}");
+            Assert.Empty(result.Warnings);
+            Assert.True(result.Draft!.Phases.Count >= 3, t.Id);
+        }
+    }
+
+    [Fact]
+    public void A_template_opens_the_import_preview()
+    {
+        var vm = ViewModel();
+        vm.UseTemplateCommand.Execute(MissionTemplates.All[0]);
+
+        Assert.True(vm.IsImportOpen);
+        Assert.True(vm.HasPreview);
+        Assert.Equal("Run 5 km", vm.PreviewTitle);
+    }
+
+    [Fact]
+    public void Statistics_count_steps_per_week_the_pace_and_missions_by_their_deadline()
+    {
+        // T0 is Thursday 1 October 2026.
+        var id = CreateHsk();
+        _time.Advance(TimeSpan.FromDays(6)); // Wednesday 7 October: the first step took 6 days for 3 planned
+        _store.Complete(id);
+        _store.Skip(id); // skipped steps count in neither
+        _time.Advance(TimeSpan.FromDays(7)); // Wednesday 14 October
+        _store.Complete(id);
+        _store.Complete(id);
+
+        var stats = MissionStats.Compute(_store, _store.Now, TimeZoneInfo.Utc);
+
+        Assert.Equal([0, 0, 1, 2], stats.StepsPerWeek);
+        Assert.Equal((2, 3), (stats.StepsThisWeek, stats.StepsDone));
+        Assert.Equal((1, 1, 1, 0), (stats.MissionsDone, stats.MissionsWithDeadline, stats.MissionsOnTime, stats.MissionsRunning));
+        Assert.Equal((6 + 7 + 0) / (3 + 4 + 1.0), stats.PaceRatio!.Value, 3);
+        Assert.StartsWith("Steps take 1.6", MissionStats.PaceText(stats).Replace(',', '.'));
+    }
+
+    [Fact]
+    public void The_csv_has_every_step_with_its_status_and_quotes_what_needs_it()
+    {
+        var id = CreateHsk();
+        _time.Advance(TimeSpan.FromDays(2));
+        _store.Complete(id, "Anki, 94%");
+
+        var csv = MissionStats.Csv(_store).Split("\r\n", StringSplitOptions.RemoveEmptyEntries);
+
+        Assert.StartsWith("mission,mission_status,phase,step_number,step,status,planned_days", csv[0]);
+        Assert.Equal(5, csv.Length);
+        Assert.StartsWith("Pass HSK3,active,Foundations,1,HSK1 words,done,3,", csv[1]);
+        Assert.Contains(",2,90% on a self-test,\"Anki, 94%\",", csv[1]);
+        Assert.StartsWith("Pass HSK3,active,Foundations,2,HSK1 review,current,1,", csv[2]);
+        Assert.Contains(",open,", csv[3]);
+    }
+
+    [Fact]
+    public void A_step_sent_to_tracker_and_its_task_finish_together()
+    {
+        var tracker = new Helm.Modules.Tracker.TrackerStore(new MemorySynced<Helm.Modules.Tracker.TrackerWorkspace>(), new MemorySynced<Helm.Modules.Tracker.TrackerItem>(),
+            new MemorySyncedLog<Helm.Modules.Tracker.TrackerEvent>(), _time);
+        var bridge = new Helm.Modules.Tracker.TrackerTaskBridge(tracker);
+        var sync = new MissionTaskSync(_store, () => [bridge], _settings);
+        var id = CreateHsk();
+
+        Assert.Equal("Tracker", sync.Send(id, TimeZoneInfo.Utc));
+        var step = _store.Steps(id)[0].Value;
+        var task = tracker.GetItem(step.TaskId!)!;
+        Assert.Equal(("HSK1 words", new DateOnly(2026, 10, 4)), (task.Title, task.DueDate)); // due when the 3-day step should end
+        Assert.Contains("Mission: Pass HSK3", task.Notes);
+        Assert.Equal(Helm.Modules.Tracker.TrackerTaskBridge.DefaultListName, tracker.Workspaces().Single().Value.Name);
+        Assert.Equal("Tracker", sync.Send(id, TimeZoneInfo.Utc)); // sent already: no second task
+        Assert.Single(tracker.AllItems());
+
+        // Done in Tracker: the step is done here.
+        tracker.Complete(step.TaskId!);
+        Assert.True(_store.Steps(id)[0].Value.IsDone);
+        Assert.Equal("Done in Tracker.", _store.Steps(id)[0].Value.Note);
+
+        // Done here: the task is done there.
+        sync.Send(id, TimeZoneInfo.Utc);
+        var second = _store.Steps(id)[1].Value.TaskId!;
+        _store.Complete(id);
+        Assert.True(tracker.GetItem(second)!.IsCompleted);
+
+        // Tracker off: nothing to send to.
+        _settings.Get<GeneralSettings>(GeneralSettings.StoreId).Update(s => s.EnabledModules["tracker"] = false);
+        Assert.Null(sync.Bridge);
+        Assert.Null(sync.Send(id, TimeZoneInfo.Utc));
+    }
+
+    [Fact]
+    public async Task The_today_card_lists_each_running_mission_and_completes_its_step()
+    {
+        var first = CreateHsk();
+        var vm = ViewModel();
+        vm.ConfirmUntickedChecklist = false;
+        Assert.False(vm.HasToday); // one mission: its own card is enough
+        var second = CreateHsk();
+        _store.Complete(second);
+
+        Assert.True(vm.HasToday);
+        Assert.Equal([first, second], vm.Today.Select(r => r.MissionId).OrderBy(x => x));
+        var row = vm.Today.Single(r => r.MissionId == second);
+        Assert.Equal("HSK1 review", row.Step);
+        Assert.StartsWith("Step 2 of 4", row.Details);
+
+        await vm.CompleteTodayCommand.ExecuteAsync(row);
+
+        Assert.Equal(second, vm.SelectedMission?.Id);
+        Assert.Equal(CelebrationKind.Phase, vm.Celebration?.Kind);
+        Assert.Equal("HSK2 words", vm.Today.Single(r => r.MissionId == second).Step);
+        Assert.Equal("2 steps this week", vm.StatsThisWeek);
+    }
+
     private sealed class RecordingNotes : ICaptureTarget
     {
         public string Captured { get; private set; } = "";

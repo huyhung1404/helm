@@ -118,6 +118,15 @@
             </StackPanel>
         </ui:CardExpander>
 
+        <!-- Data -->
+        <TextBlock Text="Data" Style="{DynamicResource HelmSectionHeader}" />
+        <ui:CardControl Margin="0,0,0,4" Icon="{ui:SymbolIcon ArrowDownload24}">
+            <ui:CardControl.Header>
+                <core:CardHeader Title="Export to CSV" Description="Every step of every mission, with its status, planned and actual days, dates and note, for a spreadsheet." />
+            </ui:CardControl.Header>
+            <ui:Button Content="Export…" Icon="{ui:SymbolIcon TableSimple24}" Click="ExportCsv_Click" />
+        </ui:CardControl>
+
         <!-- New missions -->
         <TextBlock Text="New missions" Style="{DynamicResource HelmSectionHeader}" />
         <ui:CardControl Margin="0,0,0,4" Icon="{ui:SymbolIcon Copy24}">

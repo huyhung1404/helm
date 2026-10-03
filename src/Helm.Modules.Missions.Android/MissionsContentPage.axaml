@@ -160,6 +160,21 @@
                         </StackPanel>
                     </Button>
                     <Button Classes="wide" Content="Import JSON" Command="{Binding OpenImportCommand}" />
+                    <TextBlock Text="Or start from a ready-made mission:" Classes="label" Margin="0,12,0,4" />
+                    <ItemsControl ItemsSource="{Binding Templates}">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate DataType="vm:MissionTemplate">
+                                <Button Padding="12,8" Margin="0,0,0,6" HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch"
+                                        AutomationProperties.Name="{Binding Name}"
+                                        Command="{Binding $parent[UserControl].((vm:MissionsViewModel)DataContext).UseTemplateCommand}" CommandParameter="{Binding}">
+                                    <StackPanel>
+                                        <TextBlock Text="{Binding Name}" FontWeight="SemiBold" />
+                                        <TextBlock Text="{Binding Description}" Classes="secondary" TextWrapping="Wrap" />
+                                    </StackPanel>
+                                </Button>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
                 </StackPanel>
             </Border>
 
@@ -192,6 +207,21 @@
                         <Button Classes="wide" Content="I have the JSON" Command="{Binding OpenImportCommand}" />
                         <Button Grid.Column="2" Classes="wide" Content="Cancel" Command="{Binding CloseNewCommand}" />
                     </Grid>
+                    <TextBlock Text="No AI at hand? Start from a ready-made mission:" Classes="label" Margin="0,12,0,4" />
+                    <ItemsControl ItemsSource="{Binding Templates}">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate DataType="vm:MissionTemplate">
+                                <Button Padding="12,8" Margin="0,0,0,6" HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch"
+                                        AutomationProperties.Name="{Binding Name}"
+                                        Command="{Binding $parent[UserControl].((vm:MissionsViewModel)DataContext).UseTemplateCommand}" CommandParameter="{Binding}">
+                                    <StackPanel>
+                                        <TextBlock Text="{Binding Name}" FontWeight="SemiBold" />
+                                        <TextBlock Text="{Binding Description}" Classes="secondary" TextWrapping="Wrap" />
+                                    </StackPanel>
+                                </Button>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
                 </StackPanel>
             </Border>
 
@@ -283,6 +313,45 @@
                         <Button Classes="wide" Content="Back" Command="{Binding BackToPromptCommand}" AutomationProperties.Name="Back to the prompt" />
                         <Button Grid.Column="2" Classes="wide" Content="Cancel" Command="{Binding CloseNewCommand}" />
                     </Grid>
+                </StackPanel>
+            </Border>
+
+            <!-- Today: the step each mission in progress is on, when more than one runs -->
+            <Border Classes="card">
+                <Border.IsVisible>
+                    <MultiBinding Converter="{x:Static BoolConverters.And}">
+                        <Binding Path="HasToday" />
+                        <Binding Path="ShowMission" />
+                    </MultiBinding>
+                </Border.IsVisible>
+                <StackPanel Spacing="4">
+                    <TextBlock Text="Today" Classes="title" />
+                    <ItemsControl ItemsSource="{Binding Today}">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate DataType="vm:TodayRow">
+                                <Border Classes="row">
+                                    <StackPanel Spacing="6">
+                                        <StackPanel>
+                                            <TextBlock Text="{Binding Mission}" Classes="secondary" TextTrimming="CharacterEllipsis" />
+                                            <TextBlock Text="{Binding Step}" FontWeight="SemiBold" TextWrapping="Wrap" />
+                                            <TextBlock Text="{Binding Details}" Classes="secondary" Classes.error="{Binding IsBehind}" TextWrapping="Wrap" />
+                                        </StackPanel>
+                                        <Grid ColumnDefinitions="*,8,*">
+                                            <Button Classes="wide" Content="Open" AutomationProperties.Name="Open the mission"
+                                                    Command="{Binding $parent[UserControl].((vm:MissionsViewModel)DataContext).OpenTodayCommand}" CommandParameter="{Binding}" />
+                                            <Button Grid.Column="2" Classes="accent wide" AutomationProperties.Name="{Binding Step}"
+                                                    Command="{Binding $parent[UserControl].((vm:MissionsViewModel)DataContext).CompleteTodayCommand}" CommandParameter="{Binding}">
+                                                <StackPanel Orientation="Horizontal" Spacing="6">
+                                                    <ic:SymbolIcon Symbol="Checkmark" FontSize="16" />
+                                                    <TextBlock Text="Complete" />
+                                                </StackPanel>
+                                            </Button>
+                                        </Grid>
+                                    </StackPanel>
+                                </Border>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
                 </StackPanel>
             </Border>
 
@@ -456,6 +525,13 @@
                                 <Button Classes="wide flat" Content="Skip" Command="{Binding SkipStepCommand}" />
                                 <Button Grid.Column="2" Classes="wide flat" Content="Undo last step" Command="{Binding UndoStepCommand}" IsVisible="{Binding CanUndo}" />
                             </Grid>
+                            <Button Classes="wide" Command="{Binding SendToTasksCommand}" IsVisible="{Binding CanSendToTasks}">
+                                <StackPanel Orientation="Horizontal" Spacing="6">
+                                    <ic:SymbolIcon Symbol="TaskList" FontSize="16" />
+                                    <TextBlock Text="{Binding SendToTasksLabel}" />
+                                </StackPanel>
+                            </Button>
+                            <TextBlock Text="{Binding TaskText}" Classes="secondary" TextWrapping="Wrap" IsVisible="{Binding HasTask}" />
                         </StackPanel>
                     </StackPanel>
                 </Border>
@@ -564,6 +640,18 @@
                         <TextBlock Text="Added at the end of the last phase; open it above to add details." Classes="secondary" TextWrapping="Wrap" />
                         <TextBox PlaceholderText="What to do" Text="{Binding NewStepTitle}" AutomationProperties.Name="New step" />
                         <Button Classes="wide" Content="Add" Command="{Binding AddStepCommand}" />
+                    </StackPanel>
+                </Border>
+
+                <!-- Statistics across all missions -->
+                <TextBlock Text="Statistics" Classes="section" />
+                <Border Classes="card">
+                    <StackPanel Spacing="2">
+                        <TextBlock Text="{Binding StatsThisWeek}" Classes="title" />
+                        <TextBlock Text="{Binding StatsWeeks}" Classes="secondary" TextWrapping="Wrap" />
+                        <TextBlock Text="{Binding StatsPace}" TextWrapping="Wrap" Margin="0,4,0,0"
+                                   IsVisible="{Binding StatsPace, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+                        <TextBlock Text="{Binding StatsMissions}" TextWrapping="Wrap" />
                     </StackPanel>
                 </Border>
 

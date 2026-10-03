@@ -307,7 +307,25 @@ CHANGELOG/README rows, icon.
   `mission_id`); the mission card shows its notes in a `LinksPanel` (*Link a note…*, *New note*) while Notes is
   there.
 
-**Later**: badges as notifications, a widget size with one big mission, a mission template gallery.
+**v4** (built):
+- *Today* (`MissionsViewModel.Today`, `TodayRow`): with two or more missions in progress, a card at the top lists
+  each one's current step ("Step 3 of 10 · 2 days behind · 1/3 ticked"), with *Open* and *Complete* (asks first when
+  the checklist is not all ticked; the mission is selected so its celebration has its place).
+- *Send to Tracker*: `ITaskBridge` in Helm.Core (`Add`, `IsDone`, `Complete`, `Changed`), implemented by Tracker
+  (`TrackerTaskBridge`: the first to-do list, "To-do" made when there is none), so Missions does not reference
+  Tracker. `MissionTaskSync` sends the current step as a task due on the day the step should end (its estimate
+  less the time already on it) and records `MissionStep.TaskId`; a task done in Tracker completes its step when it
+  is the current one ("Done in Tracker."), and a step done in Missions (any device) completes its task. It works
+  while both tools are on, from the modules' start. Older Helm versions drop `TaskId` when they edit that step.
+- *Statistics* (`MissionStats`): steps this week and in each of the last 4 weeks (Monday-based), actual against
+  planned time over the steps done (skipped ones left out), missions done and how many by their deadline, missions
+  in progress. *CSV* of every step: mission, status, phase, number, step, status (done, skipped, current, open),
+  planned and actual days, dates, done-when, note, ids; *Export…* on the PC settings page (UTF-8 with BOM),
+  *Share CSV* on Android.
+- *Ready-made missions* (`MissionTemplates`): five English roadmaps in the import format (a test imports each one);
+  picking one opens the import preview, from the empty state or the prompt form.
+
+**Later**: badges as notifications, a widget size with one big mission, completing a step from the widget.
 
 Verification: the Windows part is built and tested locally (`dotnet build -c Release -warnaserror`,
 `dotnet test`, smoke test with `--page Missions`). The Android project is not in `Helm.sln` and this machine has no

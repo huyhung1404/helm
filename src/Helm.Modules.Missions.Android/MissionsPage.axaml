@@ -113,6 +113,17 @@
             </StackPanel>
         </Border>
 
+        <!-- Data -->
+        <TextBlock Text="Data" Classes="section" />
+        <Border Classes="card">
+            <StackPanel Spacing="8">
+                <TextBlock Text="Export to CSV" Classes="title" />
+                <TextBlock Text="Every step of every mission, with its status, planned and actual days, dates and note, for a spreadsheet. Shared to the app you pick (Drive, mail…)."
+                           Classes="secondary" TextWrapping="Wrap" />
+                <Button Content="Share CSV" Click="ShareCsv_Click" />
+            </StackPanel>
+        </Border>
+
         <!-- Home-screen widget -->
         <TextBlock Text="Home screen" Classes="section" />
         <Border Classes="card">

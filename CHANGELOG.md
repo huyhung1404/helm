@@ -18,6 +18,14 @@ Format: [Keep a Changelog](https://keepachangelog.com), versions follow [SemVer]
   of plan, beat the clock, comeback…), at the bottom of the Missions page; a step that earns one says so.
 - Missions: a **home-screen widget** on Android with the missions in progress, the step each one is on and its
   progress; tap it to open Missions. Add it from the Missions settings or the launcher's widget list.
+- Missions: **Today**. When more than one mission runs, a card at the top lists the step each one is on; complete it
+  right there or open the mission.
+- Missions and Tracker: **Send to Tracker** puts the step you are on in your to-do list, due when it should be done.
+  Finishing it in Tracker completes the step, and completing the step finishes the task.
+- Missions: **statistics** across all missions (steps per week, how long steps take against their plan, missions done
+  by their deadline) and **CSV export** of every step (Save on the PC, Share on the phone).
+- Missions: **ready-made missions** to start without an AI (run 5 km, read 12 books, language basics, a 30-day habit,
+  ship a side project); each opens the import preview to adjust before creating it.
 - Notes and Missions **link to each other**: link a note to a mission from the note (or Claude does it), and the
   mission page lists its notes, with Link a note… and New note.
 

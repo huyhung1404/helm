@@ -15,12 +15,15 @@ namespace Helm.Modules.Missions;
 public sealed class MissionsModule : AndroidModuleBase, IModuleContent, IBackHandler, IDisposable
 {
     private readonly MissionsViewModel _viewModel;
+    // Steps sent to Tracker and their tasks finish together while this lives.
+    private readonly MissionTaskSync _tasks;
     private readonly ILogger<MissionsModule> _logger;
     private readonly Timer _widgetTimer;
 
-    public MissionsModule(MissionsViewModel viewModel, MissionsStore store, MissionReminderService reminders, ILogger<MissionsModule> logger)
+    public MissionsModule(MissionsViewModel viewModel, MissionsStore store, MissionReminderService reminders, MissionTaskSync tasks, ILogger<MissionsModule> logger)
     {
         _viewModel = viewModel;
+        _tasks = tasks;
         _logger = logger;
         // "Remind me now" on the settings page.
         reminders.Requested += (_, reminder) => MissionReminders.Post(AndroidApp.Context, reminder);
@@ -66,6 +69,7 @@ public sealed class MissionsModule : AndroidModuleBase, IModuleContent, IBackHan
     {
         StatusMessage = null;
         RefreshWidgets();
+        _tasks.Sync();
         try
         {
             MissionReminders.Schedule(AndroidApp.Context);

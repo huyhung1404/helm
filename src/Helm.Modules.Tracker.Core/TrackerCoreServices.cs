@@ -38,6 +38,8 @@ public static class TrackerCoreServices
         // Quick Capture: "/t buy milk tomorrow 9h" and "/d Nam 200k".
         services.AddSingleton<Helm.Core.Capture.ICaptureTarget, TaskCaptureTarget>();
         services.AddSingleton<Helm.Core.Capture.ICaptureTarget, DebtCaptureTarget>();
+        // Other tools hand tasks over (Missions sends a step here).
+        services.AddSingleton<Helm.Core.Tasks.ITaskBridge, TrackerTaskBridge>();
         // Claude's tools for the lists and the debt book (Helm's MCP server, Windows).
         services.AddSingleton<Helm.Core.Mcp.IMcpToolProvider, TrackerMcpTools>();
         // Windows registers it again through AddHelmModule; one instance either way.
