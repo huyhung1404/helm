@@ -3,7 +3,7 @@
 All notable changes to Helm. The top section is used as the GitHub release body and as the Velopack release notes.
 Format: [Keep a Changelog](https://keepachangelog.com), versions follow [SemVer](https://semver.org).
 
-## [Unreleased]
+## [0.22.0] - 2026-10-03
 
 ### Added
 - Missions: **Re-plan**. Behind, ahead, or something changed? Say what (optional) and copy the prompt: it carries
