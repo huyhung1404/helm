@@ -3,7 +3,7 @@
 All notable changes to Helm. The top section is used as the GitHub release body and as the Velopack release notes.
 Format: [Keep a Changelog](https://keepachangelog.com), versions follow [SemVer](https://semver.org).
 
-## [Unreleased]
+## [0.21.0] - 2026-10-03
 
 ### Added
 - **Missions** (PC and Android): reach a goal one step at a time. Describe the goal and Helm writes a prompt for any AI
