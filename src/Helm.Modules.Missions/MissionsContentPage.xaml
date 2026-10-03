@@ -474,6 +474,9 @@
                         </TextBlock>
                         <TextBlock Text="{Binding FinishedText}" Margin="0,8,0,0" TextWrapping="Wrap" Visibility="{Binding IsCompleted, Converter={StaticResource BoolToVisibility}}" />
                         <TextBlock Text="{Binding PlannedText}" Margin="0,8,0,0" TextWrapping="Wrap" Visibility="{Binding IsPlanned, Converter={StaticResource BoolToVisibility}}" />
+                        <!-- Notes linked to this mission: open one, link another, or write a new one -->
+                        <TextBlock Text="Notes" FontWeight="SemiBold" Margin="0,12,0,4" Visibility="{Binding MissionLinks, Converter={StaticResource NotEmptyToVisibility}}" />
+                        <core:LinksPanel DataContext="{Binding MissionLinks}" ShowActions="True" />
 
                         <WrapPanel Margin="0,12,0,0">
                             <ui:Button Margin="0,0,8,8" Appearance="Primary" Content="Start mission" Icon="{ui:SymbolIcon Play24}" Command="{Binding StartMissionCommand}"
@@ -614,6 +617,68 @@
                         <ui:Button Content="Add" Icon="{ui:SymbolIcon Add24}" Command="{Binding AddStepCommand}" />
                     </StackPanel>
                 </ui:CardControl>
+
+                <!-- Badges across all missions -->
+                <TextBlock Text="Badges" Style="{DynamicResource HelmSectionHeader}" />
+                <ui:CardControl Margin="0,0,0,4" Icon="{ui:SymbolIcon Trophy24}">
+                    <ui:CardControl.Header>
+                        <core:CardHeader Title="Badges" Description="{Binding BadgesSummary}" />
+                    </ui:CardControl.Header>
+                    <ui:Button Command="{Binding ToggleBadgesCommand}">
+                        <ui:Button.Style>
+                            <Style TargetType="ui:Button" BasedOn="{StaticResource {x:Type ui:Button}}">
+                                <Setter Property="Content" Value="Show" />
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding ShowBadges}" Value="True">
+                                        <Setter Property="Content" Value="Hide" />
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </ui:Button.Style>
+                    </ui:Button>
+                </ui:CardControl>
+                <ItemsControl ItemsSource="{Binding Badges}" Focusable="False" Visibility="{Binding ShowBadges, Converter={StaticResource BoolToVisibility}}">
+                    <ItemsControl.ItemsPanel>
+                        <ItemsPanelTemplate>
+                            <WrapPanel />
+                        </ItemsPanelTemplate>
+                    </ItemsControl.ItemsPanel>
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate DataType="{x:Type local:BadgeRow}">
+                            <Border Width="220" Margin="0,0,8,8" Padding="12,10" AutomationProperties.Name="{Binding Title}">
+                                <Border.Style>
+                                    <Style TargetType="Border" BasedOn="{StaticResource HelmSurface}">
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding Locked}" Value="True">
+                                                <Setter Property="Opacity" Value="0.55" />
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </Border.Style>
+                                <DockPanel>
+                                    <ui:SymbolIcon DockPanel.Dock="Left" FontSize="24" Margin="0,0,10,0" VerticalAlignment="Center">
+                                        <ui:SymbolIcon.Style>
+                                            <Style TargetType="ui:SymbolIcon">
+                                                <Setter Property="Symbol" Value="Ribbon24" />
+                                                <Setter Property="Foreground" Value="{DynamicResource AccentTextFillColorPrimaryBrush}" />
+                                                <Style.Triggers>
+                                                    <DataTrigger Binding="{Binding Locked}" Value="True">
+                                                        <Setter Property="Symbol" Value="LockClosed24" />
+                                                        <Setter Property="Foreground" Value="{DynamicResource TextFillColorSecondaryBrush}" />
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </ui:SymbolIcon.Style>
+                                    </ui:SymbolIcon>
+                                    <StackPanel VerticalAlignment="Center">
+                                        <TextBlock Text="{Binding Title}" FontWeight="SemiBold" TextWrapping="Wrap" />
+                                        <TextBlock Text="{Binding Detail}" Style="{DynamicResource HelmSecondaryText}" TextWrapping="Wrap" />
+                                    </StackPanel>
+                                </DockPanel>
+                            </Border>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
             </StackPanel>
         </StackPanel>
     </StackPanel>

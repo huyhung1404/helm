@@ -113,6 +113,17 @@
             </StackPanel>
         </Border>
 
+        <!-- Home-screen widget -->
+        <TextBlock Text="Home screen" Classes="section" />
+        <Border Classes="card">
+            <StackPanel Spacing="8">
+                <TextBlock Text="Missions widget" Classes="title" />
+                <TextBlock Text="The missions in progress and the step each one is on, on your home screen. Tap it to open Missions. You can also add it from the launcher's widget list."
+                           Classes="secondary" TextWrapping="Wrap" />
+                <Button x:Name="AddWidgetButton" Content="Add to home screen" Click="AddWidget_Click" />
+            </StackPanel>
+        </Border>
+
         <!-- Reminders -->
         <TextBlock Text="Reminders" Classes="section" />
         <Border Classes="card">

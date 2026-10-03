@@ -290,7 +290,24 @@ CHANGELOG/README rows, icon.
 - *Save summary to Notes*: through Notes' Quick Capture target ("note"), so Missions does not reference Notes; shown
   when Notes is on and a step is done. The note's title is "Mission: title".
 
-**v3**: Android home-screen widget with the current step, badges across missions, links from notes to missions.
+**v3** (built):
+- *Badges* (`MissionBadges`): 13 fixed badges — first step; 10, 50, 100 steps; 3, 7, 30 days in a row; a phase; 1
+  and 3 missions; a mission finished in less time than planned; one finished by its deadline; a step after resuming a
+  paused or abandoned mission. Worked out from the history and the missions on each refresh (earned at the moment
+  the condition was first met), so nothing new is stored or synced; a reopened step stops counting until it is done
+  again. The page lists them under *Badges* (collapsed by default) and a step that earns one adds "New badge: …" to
+  its message or to the phase or mission celebration.
+- *Android widget* (`MissionWidgetModel` in the core, `Widget/MissionsWidgets.cs`): up to three missions (in
+  progress first, then paused), each with its title, current step, a progress bar and "3/10 · 2 days behind" (in red
+  when behind); "+n more"; a short text when nothing runs or Missions is off. A fixed layout (no list, so no
+  RemoteViewsService), redrawn 400 ms after store changes settle, when the tool is turned on or off, and hourly; a tap
+  opens Missions. *Add to home screen* on the Android settings page when the launcher supports pinning.
+- *Links*: `LinkKinds.Mission`; `MissionLinkProvider` (title and goal search, "Mission · step 3 of 10") registered
+  with `AddMissionLinks`; notes link to tasks, people and missions (Notes' picker and `notes_link` with
+  `mission_id`); the mission card shows its notes in a `LinksPanel` (*Link a note…*, *New note*) while Notes is
+  there.
+
+**Later**: badges as notifications, a widget size with one big mission, a mission template gallery.
 
 Verification: the Windows part is built and tested locally (`dotnet build -c Release -warnaserror`,
 `dotnet test`, smoke test with `--page Missions`). The Android project is not in `Helm.sln` and this machine has no

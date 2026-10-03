@@ -1,3 +1,5 @@
+using Helm.Core.Links;
+using Helm.Core.Services;
 using Helm.Core.Sync;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
@@ -41,4 +43,16 @@ public static class MissionsCoreServices
         services.TryAddSingleton<MissionsViewModel>();
         return services;
     }
+
+    /// <summary>
+    /// Missions as link targets (notes link to them). The platform passes its Missions content page, which shows a
+    /// linked mission.
+    /// </summary>
+    public static IServiceCollection AddMissionLinks(this IServiceCollection services, Type contentPage) =>
+        services.AddHelmLinks()
+            .AddSingleton<ILinkProvider>(sp => new MissionLinkProvider(sp.GetRequiredService<MissionsStore>(), id =>
+            {
+                sp.GetRequiredService<IShellNavigation>().ShowPage(contentPage);
+                sp.GetRequiredService<MissionsViewModel>().Select(id);
+            }));
 }

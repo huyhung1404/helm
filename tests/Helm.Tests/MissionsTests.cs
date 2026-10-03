@@ -1,10 +1,12 @@
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using Helm.Core.Capture;
+using Helm.Core.Links;
 using Helm.Core.Mcp;
 using Helm.Core.Services;
 using Helm.Core.Settings;
 using Helm.Modules.Missions;
+using Helm.Modules.Notes;
 using Microsoft.Extensions.Logging.Abstractions;
 
 namespace Helm.Tests;
@@ -439,9 +441,10 @@ public sealed class MissionsTests : IDisposable
 
     // ---- Page ----------------------------------------------------------------------------------------------------
 
-    private MissionsViewModel ViewModel(MemoryClipboard? clipboard = null, Helm.Shell.Services.IDialogService? dialogs = null, params ICaptureTarget[] targets) =>
+    private MissionsViewModel ViewModel(MemoryClipboard? clipboard = null, Helm.Shell.Services.IDialogService? dialogs = null, LinkHub? links = null,
+        params ICaptureTarget[] targets) =>
         new(_store, _settings, new InlineUi(), dialogs ?? new AcceptDialogs(), clipboard ?? new MemoryClipboard(), new NullLauncher(),
-            new MissionReminderService(_store, _settings, _time), () => targets, NullLogger<MissionsViewModel>.Instance, TimeZoneInfo.Utc);
+            new MissionReminderService(_store, _settings, _time), () => targets, NullLogger<MissionsViewModel>.Instance, TimeZoneInfo.Utc, links);
 
     [Fact]
     public void The_page_copies_the_prompt_imports_the_answer_and_creates_the_mission()
@@ -828,6 +831,137 @@ public sealed class MissionsTests : IDisposable
         var finished = await Call(server, "mission_replan", new JsonObject { ["mission"] = id, ["phases"] = new JsonArray(new JsonObject { ["title"] = "X", ["steps"] = new JsonArray("y") }) });
         Assert.True(finished.IsError);
         Assert.Contains("nothing left to plan", finished.Text);
+    }
+
+    // ---- v3: badges ----------------------------------------------------------------------------------------------
+
+    private IReadOnlyDictionary<string, DateTimeOffset?> Badges() =>
+        MissionBadges.Compute(_store, TimeZoneInfo.Utc).ToDictionary(b => b.Id, b => b.EarnedAt);
+
+    [Fact]
+    public void Badges_are_earned_from_the_history_at_the_moment_they_were_met()
+    {
+        Assert.All(Badges().Values, Assert.Null);
+        var id = CreateHsk(); // deadline 2027-03-01, estimates 3 + 1 + 4 + 1 days
+
+        for (var day = 0; day < 4; day++)
+        {
+            _time.Advance(TimeSpan.FromDays(1));
+            _store.Complete(id);
+        }
+
+        var badges = Badges();
+        Assert.Equal(T0.AddDays(1), badges["first-step"]);
+        Assert.Equal(T0.AddDays(2), badges["phase-1"]);
+        Assert.Equal(T0.AddDays(3), badges["streak-3"]); // days 1, 2, 3
+        Assert.Equal(T0.AddDays(4), badges["mission-1"]);
+        Assert.Equal(T0.AddDays(4), badges["ahead"]); // 4 days against 9 planned
+        Assert.Equal(T0.AddDays(4), badges["deadline"]);
+        Assert.Null(badges["streak-7"]);
+        Assert.Null(badges["steps-10"]);
+        Assert.Null(badges["comeback"]);
+        Assert.Equal(MissionBadges.Count, badges.Count);
+    }
+
+    [Fact]
+    public void A_reopened_step_does_not_count_twice_and_a_comeback_needs_a_step_after_resuming()
+    {
+        var id = CreateHsk();
+        _store.Complete(id);
+        _store.ReopenLast(id);
+        _store.Complete(id);
+        Assert.Single(_store.History(id), e => e.Kind == MissionEventKind.StepReopened);
+
+        _store.Pause(id);
+        _store.Resume(id);
+        Assert.Null(Badges()["comeback"]);
+        _time.Advance(TimeSpan.FromHours(1));
+        _store.Complete(id);
+        Assert.Equal(T0.AddHours(1), Badges()["comeback"]);
+    }
+
+    [Fact]
+    public async Task The_page_lists_the_badges_and_names_a_new_one_when_a_step_earns_it()
+    {
+        CreateHsk();
+        var vm = ViewModel();
+        vm.ConfirmUntickedChecklist = false;
+        Assert.Equal($"0 of {MissionBadges.Count} earned", vm.BadgesSummary);
+        Assert.All(vm.Badges, b => Assert.True(b.Locked));
+
+        await vm.CompleteStepCommand.ExecuteAsync(null);
+
+        Assert.Contains("New badge: First step!", vm.Message);
+        Assert.Equal($"1 of {MissionBadges.Count} earned", vm.BadgesSummary);
+        Assert.StartsWith("Earned ", vm.Badges[0].Detail);
+
+        await vm.CompleteStepCommand.ExecuteAsync(null); // finishes the first phase
+        Assert.Contains("New badge: Phase cleared!", vm.Celebration!.Stats);
+    }
+
+    // ---- v3: links -----------------------------------------------------------------------------------------------
+
+    [Fact]
+    public async Task Notes_link_to_missions_and_the_mission_page_shows_them()
+    {
+        var notes = new NotesStore(new MemorySynced<NoteItem>(), _time);
+        var opened = new List<string>();
+        var hub = new LinkHub(new MemorySynced<HelmLink>(), () =>
+        [
+            new NoteLinkProvider(notes, id => opened.Add("note " + id)),
+            new MissionLinkProvider(_store, id => opened.Add("mission " + id)),
+        ], _time);
+        var id = CreateHsk();
+        var provider = hub.Provider(LinkKinds.Mission)!;
+
+        Assert.Equal(("Pass HSK3", "Mission · step 1 of 4"), (provider.Resolve(id)!.Title, provider.Resolve(id)!.Subtitle));
+        Assert.Equal(id, Assert.Single(provider.Search("hsk", 5)).Ref.Id);
+        Assert.Empty(provider.Search("marathon", 5));
+        Assert.Null(provider.Resolve("gone"));
+        provider.Open(id);
+        Assert.Equal(["mission " + id], opened);
+
+        var vm = ViewModel(links: hub);
+        Assert.NotNull(vm.MissionLinks);
+        Assert.Empty(vm.MissionLinks!.Items);
+        var tips = notes.Add("Vocab tips", "Learn in context");
+        hub.Link(new LinkRef(LinkKinds.Note, tips), new LinkRef(LinkKinds.Mission, id));
+        Assert.Equal("Vocab tips", Assert.Single(vm.MissionLinks.Items).Title);
+
+        // Claude links a note to the mission too.
+        var server = new McpServer(new Helm.Modules.Notes.NotesMcpTools(notes, hub).Tools, "0.22.0", McpEndpoint.Instructions);
+        var exam = notes.Add("Exam day", "Bring ID");
+        var linked = await Call(server, "notes_link", new JsonObject { ["id"] = exam, ["mission_id"] = id });
+        Assert.False(linked.IsError, linked.Text);
+        Assert.Equal(2, vm.MissionLinks.Items.Count);
+        Assert.True((await Call(server, "notes_link", new JsonObject { ["id"] = exam, ["mission_id"] = "nope" })).IsError);
+
+        // Without Notes there is nothing to link.
+        Assert.Null(ViewModel().MissionLinks);
+    }
+
+    // ---- v3: widget ----------------------------------------------------------------------------------------------
+
+    [Fact]
+    public void The_widget_shows_the_missions_in_progress_with_their_step_and_progress()
+    {
+        Assert.True(MissionWidgetModel.Build(_store, _store.Now, TimeZoneInfo.Utc).IsEmpty);
+        var planned = CreateHsk(start: false);
+        Assert.Contains("press Start mission", MissionWidgetModel.Build(_store, _store.Now, TimeZoneInfo.Utc).EmptyText);
+
+        var paused = CreateHsk();
+        _store.Pause(paused);
+        var active = CreateHsk();
+        _store.Complete(active);
+        _time.Advance(TimeSpan.FromDays(6)); // step 2 was due by day 4
+
+        var model = MissionWidgetModel.Build(_store, _store.Now, TimeZoneInfo.Utc);
+
+        Assert.Equal([active, paused], model.Rows.Select(r => r.MissionId)); // in progress first
+        Assert.Equal(("HSK1 review", "1/4 · 2 days behind", true), (model.Rows[0].Step, model.Rows[0].Progress, model.Rows[0].IsBehind));
+        Assert.Equal(("HSK1 words", "0/4 · paused", false), (model.Rows[1].Step, model.Rows[1].Progress, model.Rows[1].IsBehind));
+        Assert.DoesNotContain(model.Rows, r => r.MissionId == planned);
+        Assert.Equal(0, model.More);
     }
 
     private sealed class RecordingNotes : ICaptureTarget

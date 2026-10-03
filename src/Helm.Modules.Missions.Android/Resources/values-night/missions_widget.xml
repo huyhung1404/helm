@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="missions_widget_background">#2B2B2B</color>
+    <color name="missions_widget_stroke">#1D1D1D</color>
+    <color name="missions_widget_text">#FFFFFF</color>
+    <color name="missions_widget_secondary">#C5C5C5</color>
+    <color name="missions_widget_accent">#4CC2FF</color>
+    <color name="missions_widget_track">#26FFFFFF</color>
+    <color name="missions_widget_behind">#FF99A4</color>
+</resources>

@@ -21,6 +21,8 @@ public sealed partial class LinkedItemViewModel(LinksViewModel owner, LinkTarget
 
     public bool IsPerson => Kind == LinkKinds.Person;
 
+    public bool IsMission => Kind == LinkKinds.Mission;
+
     [RelayCommand]
     private void Open() => owner.Open(this);
 

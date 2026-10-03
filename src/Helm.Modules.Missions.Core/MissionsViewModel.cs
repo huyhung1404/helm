@@ -3,6 +3,7 @@ using System.Globalization;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Helm.Core.Capture;
+using Helm.Core.Links;
 using Helm.Core.Services;
 using Helm.Core.Settings;
 using Helm.Core.Sync;
@@ -29,11 +30,15 @@ public sealed partial class MissionsViewModel : ObservableObject
     private readonly IProcessLauncher _launcher;
     private readonly MissionReminderService _reminders;
     private readonly Func<IEnumerable<ICaptureTarget>> _captureTargets;
+    private readonly LinkHub? _links;
     private readonly ILogger<MissionsViewModel> _logger;
     private readonly TimeZoneInfo _zone;
     private readonly Dictionary<string, MissionChoice> _choices = new(StringComparer.Ordinal);
     private readonly Dictionary<string, PhaseRow> _phaseRows = new(StringComparer.Ordinal);
     private readonly Dictionary<string, StepRow> _stepRows = new(StringComparer.Ordinal);
+    private readonly Dictionary<string, BadgeRow> _badgeRows = new(StringComparer.Ordinal);
+    private readonly List<string> _justEarned = [];
+    private HashSet<string>? _earnedBadges;
     private int _refreshQueued;
     private bool _loading;
     private MissionImportResult? _import;
@@ -102,6 +107,10 @@ public sealed partial class MissionsViewModel : ObservableObject
     // The celebration card
     [ObservableProperty] private Celebration? _celebration;
 
+    // Badges across all missions
+    [ObservableProperty] private string _badgesSummary = "";
+    [ObservableProperty] private bool _showBadges;
+
     // Settings
     [ObservableProperty] private bool _playCelebrations;
     [ObservableProperty] private bool _confirmUntickedChecklist;
@@ -123,6 +132,9 @@ public sealed partial class MissionsViewModel : ObservableObject
     // Notes is there and on: the summary can be saved as a note
     [ObservableProperty] private bool _canSaveToNotes;
 
+    /// <summary>The notes linked to the selected mission; null when there is no Notes to link.</summary>
+    [ObservableProperty] private LinksViewModel? _missionLinks;
+
     public MissionsViewModel(
         MissionsStore store,
         ISettingsStoreFactory settings,
@@ -135,7 +147,7 @@ public sealed partial class MissionsViewModel : ObservableObject
         ILogger<MissionsViewModel> logger)
         // Capture targets are resolved when used: Notes may register after Missions, and its target is optional.
         : this(store, settings, ui, dialogs, clipboard, launcher, reminders, () => (IEnumerable<ICaptureTarget>?)services.GetService(typeof(IEnumerable<ICaptureTarget>)) ?? [],
-            logger, TimeZoneInfo.Local)
+            logger, TimeZoneInfo.Local, services.GetService(typeof(LinkHub)) as LinkHub)
     {
     }
 
@@ -149,8 +161,10 @@ public sealed partial class MissionsViewModel : ObservableObject
         MissionReminderService reminders,
         Func<IEnumerable<ICaptureTarget>> captureTargets,
         ILogger<MissionsViewModel> logger,
-        TimeZoneInfo zone)
+        TimeZoneInfo zone,
+        LinkHub? links = null)
     {
+        _links = links;
         _store = store;
         _settingsFactory = settings;
         _settings = settings.Get<MissionsSettings>(MissionsIds.ModuleId);
@@ -173,6 +187,7 @@ public sealed partial class MissionsViewModel : ObservableObject
         _loading = false;
 
         _store.Changed += (_, _) => ScheduleRefresh();
+        if (_links is not null) _links.Changed += (_, _) => _ui.Post(() => MissionLinks?.Refresh());
         Refresh();
     }
 
@@ -188,6 +203,9 @@ public sealed partial class MissionsViewModel : ObservableObject
     public ObservableCollection<PhaseRow> Phases { get; } = [];
 
     public ObservableCollection<PreviewPhase> PreviewPhases { get; } = [];
+
+    /// <summary>Every badge, earned or not, in a fixed order.</summary>
+    public ObservableCollection<BadgeRow> Badges { get; } = [];
 
     public bool HasMessage => !string.IsNullOrEmpty(Message);
     public bool HasMissions => Missions.Count > 0;
@@ -248,6 +266,10 @@ public sealed partial class MissionsViewModel : ObservableObject
         if (!_loading && value is not null) _settings.Update(s => s.SelectedMissionId = value.Id);
         CompleteNote = "";
         NewStepTitle = "";
+        // The notes linked to this mission (when Notes is there to link).
+        MissionLinks = value is not null && _links?.Provider(LinkKinds.Note) is not null
+            ? new LinksViewModel(_links, new LinkRef(LinkKinds.Mission, value.Id), [LinkKinds.Note], () => Title)
+            : null;
         RefreshDetails();
     }
 
@@ -536,6 +558,7 @@ public sealed partial class MissionsViewModel : ObservableObject
         if (open > 0 && ConfirmUntickedChecklist
             && !await _dialogs.ConfirmAsync("Complete this step?", $"{Plural(open, "checklist item")} {(open == 1 ? "is" : "are")} not ticked. Complete the step anyway?", "Complete"))
             return;
+        _justEarned.Clear();
         if (_store.Complete(m.Id, CompleteNote) is { } outcome) Finished(m.Id, outcome, skipped: false);
     }
 
@@ -545,6 +568,7 @@ public sealed partial class MissionsViewModel : ObservableObject
         if (SelectedMission is not { } m || _store.CurrentStep(m.Id) is not { } current) return;
         if (!await _dialogs.ConfirmAsync("Skip this step?", $"“{current.Value.Title}” is marked as skipped and the next step starts. Undo brings it back.", "Skip"))
             return;
+        _justEarned.Clear();
         if (_store.Skip(m.Id, CompleteNote) is { } outcome) Finished(m.Id, outcome, skipped: true);
     }
 
@@ -552,24 +576,33 @@ public sealed partial class MissionsViewModel : ObservableObject
     {
         CompleteNote = "";
         Refresh();
+        var badges = TakeNewBadges();
         Message = outcome.MissionCompleted
             ? null
-            : $"Step {outcome.Done} of {outcome.Total} {(skipped ? "skipped" : "done")}." + (outcome.NextStepTitle is { } next ? $" Next: {next}" : "");
+            : $"Step {outcome.Done} of {outcome.Total} {(skipped ? "skipped" : "done")}." + (outcome.NextStepTitle is { } next ? $" Next: {next}" : "")
+              + (badges.Length > 0 ? " " + badges : "");
         if (outcome.MissionCompleted)
         {
             // The refresh after the store change may have shown it already.
             if (Celebration is not { IsMission: true } shown || shown.MissionId != missionId) ShowMissionCelebration(missionId);
+            AddToCelebration(badges);
             Celebrated?.Invoke(this, CelebrationKind.Mission);
         }
         else if (outcome.PhaseCompleted is { } phase)
         {
             ShowPhaseCelebration(missionId, phase.Key);
+            AddToCelebration(badges);
             Celebrated?.Invoke(this, CelebrationKind.Phase);
         }
         else if (!skipped)
         {
             Celebrated?.Invoke(this, null);
         }
+    }
+
+    private void AddToCelebration(string line)
+    {
+        if (line.Length > 0 && Celebration is { } c) Celebration = c with { Stats = [.. c.Stats, line] };
     }
 
     [RelayCommand]
@@ -919,6 +952,9 @@ public sealed partial class MissionsViewModel : ObservableObject
     [RelayCommand]
     private void DismissMessage() => Message = null;
 
+    [RelayCommand]
+    private void ToggleBadges() => ShowBadges = !ShowBadges;
+
     partial void OnMessageChanged(string? value) => OnPropertyChanged(nameof(HasMessage));
 
     // ---- Refresh -------------------------------------------------------------------------------------------------
@@ -935,6 +971,38 @@ public sealed partial class MissionsViewModel : ObservableObject
         });
     }
 
+    /// <summary>
+    /// The badges across all missions. Badges that appear while the page is open are kept in
+    /// <see cref="_justEarned"/> for the message of the step that earned them.
+    /// </summary>
+    private void RefreshBadges()
+    {
+        var badges = MissionBadges.Compute(_store, _zone);
+        var now = _store.Now;
+        var rows = new List<BadgeRow>();
+        foreach (var b in badges)
+        {
+            if (!_badgeRows.TryGetValue(b.Id, out var row)) _badgeRows[b.Id] = row = new BadgeRow(b.Id);
+            if (b.Earned && _earnedBadges is not null && !_earnedBadges.Contains(b.Id)) _justEarned.Add(b.Title);
+            row.Title = b.Title;
+            row.Earned = b.Earned;
+            row.Detail = b.EarnedAt is { } at ? $"Earned {MissionsFormat.Date(at, now, _zone)}" : b.Description;
+            rows.Add(row);
+        }
+        _earnedBadges = badges.Where(b => b.Earned).Select(b => b.Id).ToHashSet(StringComparer.Ordinal);
+        SyncCollection(Badges, rows);
+        BadgesSummary = $"{_earnedBadges.Count} of {badges.Count} earned";
+    }
+
+    /// <summary>"New badge: Ten steps!" for what the last action earned (and forgets them).</summary>
+    private string TakeNewBadges()
+    {
+        if (_justEarned.Count == 0) return "";
+        var text = _justEarned.Count == 1 ? $"New badge: {_justEarned[0]}!" : $"New badges: {string.Join(", ", _justEarned)}!";
+        _justEarned.Clear();
+        return text;
+    }
+
     /// <summary>Reads the store again: the picker, then the selected mission (also "started 2 days ago").</summary>
     public void Refresh()
     {
@@ -942,6 +1010,7 @@ public sealed partial class MissionsViewModel : ObservableObject
         {
             RefreshPicker();
             RefreshDetails();
+            RefreshBadges();
         }
         catch (Exception ex)
         {

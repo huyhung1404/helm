@@ -14,6 +14,12 @@ Format: [Keep a Changelog](https://keepachangelog.com), versions follow [SemVer]
 - Missions: **share an AI's answer to Helm** on the phone (Share → Save to Helm), or paste it into Quick Capture on
   the PC (`/m`): the mission in it is saved, ready to start.
 - Missions: **save the summary to Notes**.
+- Missions: **badges** across all your missions (first step, ten steps, a full week in a row, mission complete, ahead
+  of plan, beat the clock, comeback…), at the bottom of the Missions page; a step that earns one says so.
+- Missions: a **home-screen widget** on Android with the missions in progress, the step each one is on and its
+  progress; tap it to open Missions. Add it from the Missions settings or the launcher's widget list.
+- Notes and Missions **link to each other**: link a note to a mission from the note (or Claude does it), and the
+  mission page lists its notes, with Link a note… and New note.
 
 ### Fixed
 - Missions on Android: the text and icons of the wide buttons were pushed to the top; they are centered now.

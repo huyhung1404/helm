@@ -169,6 +169,20 @@ public sealed partial class PhaseRow(string key) : ObservableObject
     partial void OnRewardTextChanged(string value) => OnPropertyChanged(nameof(HasReward));
 }
 
+/// <summary>A badge on the page: earned (with when) or what it takes.</summary>
+public sealed partial class BadgeRow(string id) : ObservableObject
+{
+    [ObservableProperty] private string _title = "";
+    [ObservableProperty] private string _detail = "";
+    [ObservableProperty] private bool _earned;
+
+    public string Id { get; } = id;
+
+    public bool Locked => !Earned;
+
+    partial void OnEarnedChanged(bool value) => OnPropertyChanged(nameof(Locked));
+}
+
 /// <summary>A step in the import preview; unticking it leaves it out.</summary>
 public sealed partial class PreviewStep(StepDraft draft) : ObservableObject
 {

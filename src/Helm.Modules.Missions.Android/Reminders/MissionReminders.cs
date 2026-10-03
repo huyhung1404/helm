@@ -109,7 +109,7 @@ internal static class MissionReminders
     }
 
     /// <summary>Opens Helm on the Missions page (MainActivity reads the module extra).</summary>
-    private static PendingIntent? OpenMissionsIntent(Context context, int requestCode)
+    internal static PendingIntent? OpenMissionsIntent(Context context, int requestCode)
     {
         var launch = context.PackageManager?.GetLaunchIntentForPackage(context.PackageName!);
         if (launch is null) return null;
@@ -165,7 +165,11 @@ internal static class R
 
     public static int Drawable(Context context, string name) => Get(context, name, "drawable");
 
-    private static int Get(Context context, string name, string type)
+    public static int Layout(Context context, string name) => Get(context, name, "layout");
+
+    public static int Id(Context context, string name) => Get(context, name, "id");
+
+    public static int Get(Context context, string name, string type)
     {
         var key = type + "/" + name;
         lock (s_cache)

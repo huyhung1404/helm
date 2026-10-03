@@ -7,7 +7,7 @@ namespace Helm.Modules.Notes;
 
 /// <summary>
 /// Notes for Claude over MCP: search, read, write, move to the trash (never delete for good), and link a note to a
-/// task or a person in the debt book. Every change is a normal edit: it syncs, and a note edited meanwhile on another
+/// task, a person in the debt book or a mission. Every change is a normal edit: it syncs, and a note edited meanwhile on another
 /// device is kept as a copy rather than overwritten.
 /// </summary>
 public sealed class NotesMcpTools(NotesStore store, LinkHub? links = null) : IMcpToolProvider
@@ -43,11 +43,12 @@ public sealed class NotesMcpTools(NotesStore store, LinkHub? links = null) : IMc
         new("notes_trash", "Move a note to the trash (the user can restore it for 30 days).",
             McpArgs.Schema(("id", McpArgs.Text("The note's id."), true)),
             (args, _) => Task.FromResult<object?>(Trash(McpArgs.RequiredString(args, "id")))),
-        new("notes_link", "Link a note to a task (task_id from tracker_tasks) or to a person in the debt book (their name). The link shows on both sides.",
+        new("notes_link", "Link a note to a task (task_id from tracker_tasks), a person in the debt book (their name) or a mission (mission_id from missions_list). The link shows on both sides.",
             McpArgs.Schema(
                 ("id", McpArgs.Text("The note's id."), true),
                 ("task_id", McpArgs.Text("A task's id."), false),
                 ("person", McpArgs.Text("A person's name in the debt book."), false),
+                ("mission_id", McpArgs.Text("A mission's id."), false),
                 ("unlink", McpArgs.Flag("Remove the link instead."), false)),
             (args, _) => Task.FromResult<object?>(Link(args))),
     ];
@@ -144,7 +145,12 @@ public sealed class NotesMcpTools(NotesStore store, LinkHub? links = null) : IMc
             target = provider.Search(person, 5).FirstOrDefault(t => string.Equals(t.Title, person.Trim(), StringComparison.CurrentCultureIgnoreCase))?.Ref
                 ?? throw new McpToolException($"There is nobody called {person} in the debt book.");
         }
-        else throw new McpToolException("Give task_id or person.");
+        else if (McpArgs.String(args, "mission_id") is { Length: > 0 } mission)
+        {
+            var provider = links.Provider(LinkKinds.Mission) ?? throw new McpToolException("Missions is not available.");
+            target = provider.Resolve(mission)?.Ref ?? throw new McpToolException($"There is no mission {mission}.");
+        }
+        else throw new McpToolException("Give task_id, person or mission_id.");
         var note = new LinkRef(LinkKinds.Note, id);
         var changed = McpArgs.Bool(args, "unlink") == true ? links.Unlink(note, target) : links.Link(note, target);
         return new { id, linked_to = new { kind = target.Kind, id = target.Id }, changed, unlinked = McpArgs.Bool(args, "unlink") == true };

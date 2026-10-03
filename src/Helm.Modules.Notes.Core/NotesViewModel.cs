@@ -122,9 +122,9 @@ public sealed partial class NotesViewModel : ObservableObject, IDisposable
     {
         if (_editorId == id) return;
         _editorId = id;
-        var canLink = _links is not null && (_links.Provider(LinkKinds.Task) is not null || _links.Provider(LinkKinds.Person) is not null);
+        var canLink = _links is not null && (_links.Provider(LinkKinds.Task) is not null || _links.Provider(LinkKinds.Person) is not null || _links.Provider(LinkKinds.Mission) is not null);
         EditorLinks = id is null || !canLink ? null
-            : new LinksViewModel(_links!, new LinkRef(LinkKinds.Note, id), [LinkKinds.Task, LinkKinds.Person], () => EditTitle);
+            : new LinksViewModel(_links!, new LinkRef(LinkKinds.Note, id), [LinkKinds.Task, LinkKinds.Person, LinkKinds.Mission], () => EditTitle);
     }
 
     /// <summary>The notes shown: search results, or the trash.</summary>

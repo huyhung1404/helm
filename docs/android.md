@@ -57,8 +57,9 @@ Each tool says which platforms it runs on, and is registered in that platform's 
 Android tools use the same Fluent System Icons as the Windows ones (`FluentIcons.Avalonia`, `Symbol.<Name>`).
 
 A tool can open its own page from outside the app (a widget, a shortcut) by launching Helm with the string extra
-`ShellIntents.ExtraModule` set to its module id; `MainActivity` navigates there. Tracker's widget is the example:
-`src/Helm.Modules.Tracker.Android/Widget` (layouts in its `Resources/`, looked up by name at run time).
+`ShellIntents.ExtraModule` set to its module id; `MainActivity` navigates there. Tracker's widget is the example
+(a list with a RemoteViewsService): `src/Helm.Modules.Tracker.Android/Widget` (layouts in its `Resources/`, looked up
+by name at run time); Missions' widget (`src/Helm.Modules.Missions.Android/Widget`) is a simpler fixed layout.
 
 Parts that run without Helm's activity (a widget, a broadcast, Quick Capture's share dialog and Quick Settings tile)
 get services from `HelmAndroidServices.Current`, and read whether a tool is on from `GeneralSettings.EnabledModules`

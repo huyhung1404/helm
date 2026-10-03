@@ -39,6 +39,7 @@
                                         <ic:SymbolIcon Symbol="Note" FontSize="16" IsVisible="{Binding IsNote}" Foreground="{DynamicResource SystemAccentColor}" />
                                         <ic:SymbolIcon Symbol="TaskList" FontSize="16" IsVisible="{Binding IsTask}" Foreground="{DynamicResource SystemAccentColor}" />
                                         <ic:SymbolIcon Symbol="Person" FontSize="16" IsVisible="{Binding IsPerson}" Foreground="{DynamicResource SystemAccentColor}" />
+                                        <ic:SymbolIcon Symbol="Flag" FontSize="16" IsVisible="{Binding IsMission}" Foreground="{DynamicResource SystemAccentColor}" />
                                     </Panel>
                                     <TextBlock Text="{Binding Title}" MaxWidth="220" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
                                 </StackPanel>

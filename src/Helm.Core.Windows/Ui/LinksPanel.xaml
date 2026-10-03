@@ -40,6 +40,9 @@
                                                     <DataTrigger Binding="{Binding IsPerson}" Value="True">
                                                         <Setter Property="Symbol" Value="Person24" />
                                                     </DataTrigger>
+                                                    <DataTrigger Binding="{Binding IsMission}" Value="True">
+                                                        <Setter Property="Symbol" Value="Flag24" />
+                                                    </DataTrigger>
                                                 </Style.Triggers>
                                             </Style>
                                         </ui:SymbolIcon.Style>

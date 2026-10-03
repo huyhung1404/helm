@@ -1,6 +1,7 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:ic="using:FluentIcons.Avalonia"
+             xmlns:core="using:Helm.Core.Ui"
              xmlns:vm="using:Helm.Modules.Missions"
              x:Class="Helm.Modules.Missions.MissionsContentPage"
              x:DataType="vm:MissionsViewModel">
@@ -60,6 +61,10 @@
             <Setter Property="FontWeight" Value="SemiBold" />
         </Style>
         <!-- The card of the current step and of a celebration: an accent edge -->
+        <!-- A badge not earned yet: dimmed -->
+        <Style Selector="Border.card.locked">
+            <Setter Property="Opacity" Value="0.55" />
+        </Style>
         <Style Selector="Border.card.focus">
             <Setter Property="BorderBrush" Value="{DynamicResource SystemAccentColor}" />
             <Setter Property="BorderThickness" Value="2" />
@@ -348,6 +353,9 @@
                         </TextBlock>
                         <TextBlock Text="{Binding FinishedText}" TextWrapping="Wrap" IsVisible="{Binding IsCompleted}" />
                         <TextBlock Text="{Binding PlannedText}" TextWrapping="Wrap" IsVisible="{Binding IsPlanned}" />
+                        <!-- Notes linked to this mission: open one, link another, or write a new one -->
+                        <TextBlock Text="Notes" FontWeight="SemiBold" Margin="0,6,0,0" IsVisible="{Binding MissionLinks, Converter={x:Static ObjectConverters.IsNotNull}}" />
+                        <core:LinksPanel DataContext="{Binding MissionLinks}" ShowActions="True" />
 
                         <Button Classes="accent wide" Margin="0,6,0,0" Command="{Binding StartMissionCommand}" IsVisible="{Binding IsPlanned}">
                             <StackPanel Orientation="Horizontal" Spacing="6">
@@ -558,6 +566,44 @@
                         <Button Classes="wide" Content="Add" Command="{Binding AddStepCommand}" />
                     </StackPanel>
                 </Border>
+
+                <!-- Badges across all missions -->
+                <TextBlock Text="Badges" Classes="section" />
+                <Border Classes="card">
+                    <DockPanel>
+                        <Button DockPanel.Dock="Right" Command="{Binding ToggleBadgesCommand}" VerticalAlignment="Center">
+                            <Panel>
+                                <TextBlock Text="Show" IsVisible="{Binding !ShowBadges}" />
+                                <TextBlock Text="Hide" IsVisible="{Binding ShowBadges}" />
+                            </Panel>
+                        </Button>
+                        <StackPanel Orientation="Horizontal" Spacing="10" VerticalAlignment="Center">
+                            <ic:SymbolIcon Symbol="Trophy" FontSize="22" VerticalAlignment="Center" />
+                            <StackPanel VerticalAlignment="Center">
+                                <TextBlock Text="Badges" Classes="title" />
+                                <TextBlock Text="{Binding BadgesSummary}" Classes="secondary" />
+                            </StackPanel>
+                        </StackPanel>
+                    </DockPanel>
+                </Border>
+                <ItemsControl ItemsSource="{Binding Badges}" IsVisible="{Binding ShowBadges}">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate DataType="vm:BadgeRow">
+                            <Border Classes="card" Classes.locked="{Binding Locked}" AutomationProperties.Name="{Binding Title}">
+                                <DockPanel>
+                                    <Panel DockPanel.Dock="Left" Margin="0,0,12,0" VerticalAlignment="Center">
+                                        <ic:SymbolIcon Symbol="Ribbon" FontSize="24" Foreground="{DynamicResource SystemAccentColor}" IsVisible="{Binding Earned}" />
+                                        <ic:SymbolIcon Symbol="LockClosed" FontSize="24" Foreground="{DynamicResource HelmSecondaryText}" IsVisible="{Binding Locked}" />
+                                    </Panel>
+                                    <StackPanel VerticalAlignment="Center">
+                                        <TextBlock Text="{Binding Title}" Classes="title" />
+                                        <TextBlock Text="{Binding Detail}" Classes="secondary" TextWrapping="Wrap" />
+                                    </StackPanel>
+                                </DockPanel>
+                            </Border>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
             </StackPanel>
         </StackPanel>
     </StackPanel>

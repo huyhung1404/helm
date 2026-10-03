@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Missions widget colours (light); values-night has the dark ones. The same surfaces as the app's cards. -->
+<resources>
+    <color name="missions_widget_background">#FBFBFB</color>
+    <color name="missions_widget_stroke">#E5E5E5</color>
+    <color name="missions_widget_text">#1A1A1A</color>
+    <color name="missions_widget_secondary">#5F5F5F</color>
+    <color name="missions_widget_accent">#0067C0</color>
+    <color name="missions_widget_track">#1A000000</color>
+    <color name="missions_widget_behind">#C42B1C</color>
+    <string name="missions_widget_description">The missions in progress and the step each one is on. Tap to open Missions.</string>
+</resources>

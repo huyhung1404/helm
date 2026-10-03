@@ -9,19 +9,45 @@ namespace Helm.Modules.Missions;
 
 /// <summary>
 /// Missions on Android. The data lives in Helm Sync; the module sets the hourly alarm behind the daily step reminder
-/// while the tool is on. Back closes the celebration and the new-mission or re-plan panel before leaving the page.
+/// while the tool is on, and keeps the home-screen widgets in step with the data. Back closes the celebration and the
+/// new-mission or re-plan panel before leaving the page.
 /// </summary>
-public sealed class MissionsModule : AndroidModuleBase, IModuleContent, IBackHandler
+public sealed class MissionsModule : AndroidModuleBase, IModuleContent, IBackHandler, IDisposable
 {
     private readonly MissionsViewModel _viewModel;
     private readonly ILogger<MissionsModule> _logger;
+    private readonly Timer _widgetTimer;
 
-    public MissionsModule(MissionsViewModel viewModel, MissionReminderService reminders, ILogger<MissionsModule> logger)
+    public MissionsModule(MissionsViewModel viewModel, MissionsStore store, MissionReminderService reminders, ILogger<MissionsModule> logger)
     {
         _viewModel = viewModel;
         _logger = logger;
         // "Remind me now" on the settings page.
         reminders.Requested += (_, reminder) => MissionReminders.Post(AndroidApp.Context, reminder);
+        _widgetTimer = new Timer(_ => RefreshWidgets(), null, Timeout.Infinite, Timeout.Infinite);
+        // A sync can change many records in a row: redraw the widgets once it has settled.
+        store.Changed += (_, _) => _widgetTimer.Change(TimeSpan.FromMilliseconds(400), Timeout.InfiniteTimeSpan);
+    }
+
+    public void Dispose() => _widgetTimer.Dispose();
+
+    /// <summary>Whether the launcher can place the widget when asked (settings page button).</summary>
+    public bool CanPinWidget => MissionsWidgets.CanRequestPin(AndroidApp.Context);
+
+    /// <summary>Asks the launcher to add the Missions widget to the home screen.</summary>
+    public void PinWidget() => MissionsWidgets.RequestPin(AndroidApp.Context);
+
+    private void RefreshWidgets()
+    {
+        try
+        {
+            MissionsWidgets.RefreshAll(AndroidApp.Context);
+        }
+        catch (Exception ex)
+        {
+            // Timer callback: never let an exception escape.
+            _logger.LogWarning(ex, "Could not refresh the Missions widgets");
+        }
     }
 
     public override string Id => MissionsIds.ModuleId;
@@ -39,6 +65,7 @@ public sealed class MissionsModule : AndroidModuleBase, IModuleContent, IBackHan
     public override Task EnableAsync(CancellationToken ct)
     {
         StatusMessage = null;
+        RefreshWidgets();
         try
         {
             MissionReminders.Schedule(AndroidApp.Context);
@@ -53,6 +80,8 @@ public sealed class MissionsModule : AndroidModuleBase, IModuleContent, IBackHan
 
     public override Task DisableAsync()
     {
+        // They show "Missions is turned off".
+        RefreshWidgets();
         try
         {
             MissionReminders.Cancel(AndroidApp.Context);

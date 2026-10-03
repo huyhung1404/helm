@@ -28,6 +28,9 @@ public static class LinkKinds
 
     /// <summary>A person in the debt book, by <c>DebtLedger.Key</c> of their name (all their entries).</summary>
     public const string Person = "person";
+
+    /// <summary>A mission (all its steps).</summary>
+    public const string Mission = "mission";
 }
 
 /// <summary>
