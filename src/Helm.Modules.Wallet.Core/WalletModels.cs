@@ -85,6 +85,12 @@ public sealed record WalletCategory
 
     /// <summary>Left out of the pickers; transactions already in it keep it.</summary>
     public bool Hidden { get; init; }
+
+    /// <summary>A Fluent icon name from <see cref="WalletIcons.Choices"/>; empty keeps a built-in category's own.</summary>
+    public string Icon { get; init; } = "";
+
+    /// <summary>A colour slot of <see cref="WalletPalette"/> (1–8); 0 keeps a built-in category's own.</summary>
+    public int Color { get; init; }
 }
 
 /// <summary>Spending limits shared by every device (synced record <see cref="WalletStore.BudgetId"/> in <c>wallet.budget</c>).</summary>
@@ -95,7 +101,9 @@ public sealed record WalletBudget
 }
 
 /// <summary>A category as the pages see it: a built-in one with the user's changes, or one the user added.</summary>
-public sealed record CategoryInfo(string Id, string Name, CategoryKind Kind, double Order, bool IsBuiltIn, bool Hidden)
+/// <param name="Color">The colour slot of <see cref="WalletPalette"/> (1–8; 0 is the neutral grey).</param>
+public sealed record CategoryInfo(string Id, string Name, CategoryKind Kind, double Order, bool IsBuiltIn, bool Hidden,
+    string Icon = WalletIcons.Fallback, int Color = 0)
 {
     /// <summary>Whether a transaction in that direction can go in this category.</summary>
     public bool Fits(decimal amount) => Kind switch
@@ -140,23 +148,50 @@ public static class WalletCategories
 
     public static IReadOnlyList<CategoryInfo> BuiltIn { get; } =
     [
-        new(Food, "Food & drinks", CategoryKind.Expense, 0, true, false),
-        new(Groceries, "Groceries", CategoryKind.Expense, 1, true, false),
-        new(Transport, "Transport", CategoryKind.Expense, 2, true, false),
-        new(Shopping, "Shopping", CategoryKind.Expense, 3, true, false),
-        new(Bills, "Bills & utilities", CategoryKind.Expense, 4, true, false),
-        new(Housing, "Housing", CategoryKind.Expense, 5, true, false),
-        new(Health, "Health", CategoryKind.Expense, 6, true, false),
-        new(Entertainment, "Entertainment", CategoryKind.Expense, 7, true, false),
-        new(Education, "Education", CategoryKind.Expense, 8, true, false),
-        new(Family, "Family & gifts", CategoryKind.Expense, 9, true, false),
-        new(Travel, "Travel", CategoryKind.Expense, 10, true, false),
-        new(OtherExpense, "Other spending", CategoryKind.Expense, 11, true, false),
-        new(Salary, "Salary", CategoryKind.Income, 20, true, false),
-        new(Bonus, "Bonus", CategoryKind.Income, 21, true, false),
-        new(OtherIncome, "Other income", CategoryKind.Income, 22, true, false),
-        new(Transfer, "Between my accounts", CategoryKind.Transfer, 30, true, false),
+        new(Food, "Food & drinks", CategoryKind.Expense, 0, true, false, "Food", 2),
+        new(Groceries, "Groceries", CategoryKind.Expense, 1, true, false, "Cart", 3),
+        new(Transport, "Transport", CategoryKind.Expense, 2, true, false, "VehicleCar", 1),
+        new(Shopping, "Shopping", CategoryKind.Expense, 3, true, false, "ShoppingBag", 5),
+        new(Bills, "Bills & utilities", CategoryKind.Expense, 4, true, false, "Receipt", 4),
+        new(Housing, "Housing", CategoryKind.Expense, 5, true, false, "Home", 7),
+        new(Health, "Health", CategoryKind.Expense, 6, true, false, "HeartPulse", 8),
+        new(Entertainment, "Entertainment", CategoryKind.Expense, 7, true, false, "MoviesAndTv", 6),
+        new(Education, "Education", CategoryKind.Expense, 8, true, false, "HatGraduation", 1),
+        new(Family, "Family & gifts", CategoryKind.Expense, 9, true, false, "Gift", 5),
+        new(Travel, "Travel", CategoryKind.Expense, 10, true, false, "Airplane", 3),
+        new(OtherExpense, "Other spending", CategoryKind.Expense, 11, true, false, "MoreHorizontal", 0),
+        new(Salary, "Salary", CategoryKind.Income, 20, true, false, "Money", 6),
+        new(Bonus, "Bonus", CategoryKind.Income, 21, true, false, "Trophy", 4),
+        new(OtherIncome, "Other income", CategoryKind.Income, 22, true, false, "MoneyHand", 3),
+        new(Transfer, "Between my accounts", CategoryKind.Transfer, 30, true, false, "ArrowSwap", 0),
     ];
 
     public static bool IsBuiltIn(string id) => BuiltIn.Any(c => c.Id == id);
+}
+
+/// <summary>
+/// The icons a category can have: Fluent System Icons names that exist on both platforms (WPF-UI's
+/// <c>SymbolRegular.&lt;Name&gt;24</c>, below U+FFFF so WPF-UI draws them, and Avalonia's <c>Symbol.&lt;Name&gt;</c>;
+/// a test checks the Windows side).
+/// </summary>
+public static class WalletIcons
+{
+    /// <summary>A category without an icon of its own (or one this version does not know).</summary>
+    public const string Fallback = "Tag";
+
+    /// <summary>A transaction still to categorize.</summary>
+    public const string Uncategorized = "QuestionCircle";
+
+    public static IReadOnlyList<string> Choices { get; } =
+    [
+        "Food", "FoodPizza", "DrinkCoffee", "Cart", "ShoppingBag", "Receipt", "Home", "Building", "Lightbulb", "Drop",
+        "Phone", "Laptop", "VehicleCar", "VehicleBus", "VehicleBicycle", "GasPump", "Airplane", "Beach", "HeartPulse",
+        "Pill", "Stethoscope", "Dumbbell", "MoviesAndTv", "Games", "MusicNote2", "HatGraduation", "Book", "Gift", "Heart",
+        "PersonHeart", "People", "AnimalDog", "Cut", "Sparkle", "Wrench", "Briefcase", "Money", "MoneyHand", "Trophy",
+        "Savings", "Payment", "BuildingBank", "ArrowSwap", "MoreHorizontal", "Tag",
+    ];
+
+    /// <summary>The icon to show: a known one, else <see cref="Fallback"/>.</summary>
+    public static string Normalize(string? icon) =>
+        icon is { Length: > 0 } && (Choices.Contains(icon, StringComparer.Ordinal) || icon == Uncategorized) ? icon : Fallback;
 }

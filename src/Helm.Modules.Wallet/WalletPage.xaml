@@ -33,24 +33,65 @@
         <TextBlock Text="Categories" Style="{DynamicResource HelmSectionHeader}" />
         <ui:CardExpander Margin="0,0,0,4" Icon="{ui:SymbolIcon Tag24}">
             <ui:CardExpander.Header>
-                <core:CardHeader Title="Categories" Description="Rename them, hide the ones you do not use, or add your own. Between my accounts counts neither as spending nor as money in." />
+                <core:CardHeader Title="Categories" Description="Rename them, give them an icon and a colour (click the icon), hide the ones you do not use, or add your own. Between my accounts counts neither as spending nor as money in." />
             </ui:CardExpander.Header>
             <StackPanel>
                 <ItemsControl ItemsSource="{Binding CategoryRows}" Focusable="False">
                     <ItemsControl.ItemTemplate>
                         <DataTemplate DataType="{x:Type local:CategoryEditRow}">
                             <Border Style="{DynamicResource HelmExpanderRow}" BorderThickness="0,0,0,1">
-                                <core:RowLayout>
-                                    <StackPanel Orientation="Horizontal">
-                                        <ui:TextBox Width="220" AutomationProperties.Name="Category name" Text="{Binding Name, UpdateSourceTrigger=LostFocus}" />
-                                        <TextBlock Text="{Binding KindText}" Style="{DynamicResource HelmSecondaryText}" VerticalAlignment="Center" Margin="12,0,0,0" />
+                                <StackPanel>
+                                    <core:RowLayout>
+                                        <StackPanel Orientation="Horizontal">
+                                            <!-- The badge opens the icon and colour choices -->
+                                            <Button Command="{Binding ToggleLookCommand}" Background="Transparent" BorderThickness="0" Padding="0" Cursor="Hand"
+                                                    ToolTip="Change the icon and colour" AutomationProperties.Name="Change the icon and colour">
+                                                <self:CategoryBadge Icon="{Binding Icon}" Color="{Binding Color}" Size="34" />
+                                            </Button>
+                                            <ui:TextBox Width="220" Margin="10,0,0,0" AutomationProperties.Name="Category name" Text="{Binding Name, UpdateSourceTrigger=LostFocus}" />
+                                            <TextBlock Text="{Binding KindText}" Style="{DynamicResource HelmSecondaryText}" VerticalAlignment="Center" Margin="12,0,0,0" />
+                                        </StackPanel>
+                                        <StackPanel Orientation="Horizontal">
+                                            <ui:ToggleSwitch IsChecked="{Binding IsShown}" ToolTip="Shown in the pickers" AutomationProperties.Name="Shown" />
+                                            <ui:Button Margin="12,0,0,0" Appearance="Transparent" Icon="{ui:SymbolIcon Delete24}" ToolTip="Delete this category" AutomationProperties.Name="Delete category"
+                                                       Command="{Binding DeleteCommand}" Visibility="{Binding CanDelete, Converter={StaticResource BoolToVisibility}}" />
+                                        </StackPanel>
+                                    </core:RowLayout>
+                                    <StackPanel Margin="44,10,0,4" Visibility="{Binding IsEditingLook, Converter={StaticResource BoolToVisibility}}">
+                                        <TextBlock Text="Colour" Style="{DynamicResource HelmSecondaryText}" Margin="0,0,0,6" />
+                                        <ItemsControl ItemsSource="{Binding ColorChoices}" Focusable="False">
+                                            <ItemsControl.ItemsPanel>
+                                                <ItemsPanelTemplate>
+                                                    <WrapPanel />
+                                                </ItemsPanelTemplate>
+                                            </ItemsControl.ItemsPanel>
+                                            <ItemsControl.ItemTemplate>
+                                                <DataTemplate DataType="{x:Type local:ColorChoice}">
+                                                    <Button Command="{Binding PickCommand}" Margin="0,0,8,8" Padding="0" Background="Transparent" BorderThickness="0" Cursor="Hand"
+                                                            AutomationProperties.Name="Colour">
+                                                        <Border Width="28" Height="28" CornerRadius="14" Background="{Binding Color, Converter={x:Static self:WalletConverters.Ink}}" />
+                                                    </Button>
+                                                </DataTemplate>
+                                            </ItemsControl.ItemTemplate>
+                                        </ItemsControl>
+                                        <TextBlock Text="Icon" Style="{DynamicResource HelmSecondaryText}" Margin="0,4,0,6" />
+                                        <ItemsControl ItemsSource="{Binding IconChoices}" Focusable="False">
+                                            <ItemsControl.ItemsPanel>
+                                                <ItemsPanelTemplate>
+                                                    <WrapPanel />
+                                                </ItemsPanelTemplate>
+                                            </ItemsControl.ItemsPanel>
+                                            <ItemsControl.ItemTemplate>
+                                                <DataTemplate DataType="{x:Type local:IconChoice}">
+                                                    <ui:Button Command="{Binding PickCommand}" Margin="0,0,4,4" Padding="6" MinWidth="0" Appearance="Transparent"
+                                                               ToolTip="{Binding Name}" AutomationProperties.Name="{Binding Name}">
+                                                        <ui:SymbolIcon Symbol="{Binding Name, Converter={x:Static self:WalletConverters.Symbol}}" FontSize="20" />
+                                                    </ui:Button>
+                                                </DataTemplate>
+                                            </ItemsControl.ItemTemplate>
+                                        </ItemsControl>
                                     </StackPanel>
-                                    <StackPanel Orientation="Horizontal">
-                                        <ui:ToggleSwitch IsChecked="{Binding IsShown}" ToolTip="Shown in the pickers" AutomationProperties.Name="Shown" />
-                                        <ui:Button Margin="12,0,0,0" Appearance="Transparent" Icon="{ui:SymbolIcon Delete24}" ToolTip="Delete this category" AutomationProperties.Name="Delete category"
-                                                   Command="{Binding DeleteCommand}" Visibility="{Binding CanDelete, Converter={StaticResource BoolToVisibility}}" />
-                                    </StackPanel>
-                                </core:RowLayout>
+                                </StackPanel>
                             </Border>
                         </DataTemplate>
                     </ItemsControl.ItemTemplate>

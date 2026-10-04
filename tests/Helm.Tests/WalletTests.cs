@@ -402,7 +402,9 @@ public sealed class WalletTests : IDisposable
         Assert.Empty(vm.ToCategorize);
         Assert.False(vm.HasSimilar);
         Assert.Equal("115,000 ₫".Replace(",", System.Globalization.CultureInfo.CurrentCulture.NumberFormat.NumberGroupSeparator), vm.SpentText);
-        Assert.Equal("Food & drinks", vm.Spending.Single().Name);
+        Assert.Equal("Food & drinks", vm.SpendingDonut.Segments.Single().Name);
+        Assert.Equal("Food", vm.SpendingDonut.Segments.Single().Icon);
+        Assert.True(vm.HasDailyChart);
     }
 
     [Fact]
@@ -433,6 +435,72 @@ public sealed class WalletTests : IDisposable
         Assert.Single(vm.Days);
     }
 
+    [Theory]
+    [InlineData("14:30", 14, 30)]
+    [InlineData("1430", 14, 30)]
+    [InlineData("9h", 9, 0)]
+    [InlineData("9h30", 9, 30)]
+    [InlineData("7", 7, 0)]
+    public void Reads_typed_times(string text, int hours, int minutes)
+    {
+        Assert.True(WalletText.TryParseTime(text, out var time));
+        Assert.Equal(new TimeSpan(hours, minutes, 0), time);
+    }
+
+    [Theory]
+    [InlineData("25:00")]
+    [InlineData("abc")]
+    [InlineData("12:75")]
+    public void Rejects_typed_times(string text) => Assert.False(WalletText.TryParseTime(text, out _));
+
+    [Fact]
+    public void Page_adds_with_a_time_and_a_new_category()
+    {
+        var vm = ViewModel();
+        vm.OpenAddCommand.Execute(null);
+        Assert.Equal("09:00", vm.NewTimeText); // now
+        vm.NewAmount = "120k";
+        vm.NewDescription = "vet";
+        vm.NewDate = new DateTime(2026, 10, 2);
+        vm.NewTimeText = "18h45";
+        Assert.Equal(new TimeSpan(18, 45, 0), vm.NewTime);
+        vm.AddCategoryName = "Pets";
+        vm.AddCommand.Execute(null);
+        Assert.False(vm.IsAddOpen);
+        var t = _store.Transactions().Single().Value;
+        Assert.Equal(new DateTimeOffset(2026, 10, 2, 18, 45, 0, TimeSpan.FromHours(7)), t.OccurredAt);
+        var category = _store.Category(t.CategoryId!)!;
+        Assert.Equal(("Pets", CategoryKind.Expense), (category.Name, category.Kind));
+
+        // The same name again is refused, and nothing is saved.
+        vm.OpenAddCommand.Execute(null);
+        vm.NewAmount = "50k";
+        vm.AddCategoryName = "pets";
+        vm.AddCommand.Execute(null);
+        Assert.True(vm.IsAddOpen);
+        Assert.Contains("already a category", vm.Message);
+        Assert.Single(_store.Transactions());
+
+        // A bad time is refused too.
+        vm.AddCategoryName = "";
+        vm.NewTimeText = "25:99";
+        vm.AddCommand.Execute(null);
+        Assert.True(vm.IsAddOpen);
+    }
+
+    [Fact]
+    public void Page_edits_the_time()
+    {
+        var id = _store.AddManual(-100_000, "lunch", T0, WalletCategories.Food);
+        var vm = ViewModel();
+        var row = vm.Days[0].Rows[0];
+        row.BeginEditCommand.Execute(null);
+        Assert.Equal("09:00", row.EditTimeText);
+        row.EditTimeText = "12:15";
+        row.SaveEditCommand.Execute(null);
+        Assert.Equal(new DateTimeOffset(2026, 10, 4, 12, 15, 0, TimeSpan.FromHours(7)), _store.Get(id)!.OccurredAt);
+    }
+
     [Fact]
     public void Page_edits_and_saves_the_budget()
     {
@@ -452,6 +520,180 @@ public sealed class WalletTests : IDisposable
         row.SaveEditCommand.Execute(null);
         Assert.Equal(-120_000m, _store.Get(row.Id)!.Amount);
         Assert.False(row.IsEditing);
+    }
+}
+
+public sealed class WalletChartTests
+{
+    private static readonly TimeZoneInfo Ict = TimeZoneInfo.CreateCustomTimeZone("ICT", TimeSpan.FromHours(7), "ICT", "ICT");
+    private static readonly DateTimeOffset T0 = new(2026, 10, 4, 9, 0, 0, TimeSpan.FromHours(7));
+
+    [Fact]
+    public void Every_icon_exists_in_wpf_ui_below_ffff()
+    {
+        // Android's FluentIcons has the same names (checked when the list was made); WPF-UI draws a symbol as one
+        // 16-bit char, so a value above U+FFFF would show a stray letter.
+        foreach (var name in WalletIcons.Choices.Append(WalletIcons.Uncategorized).Concat(WalletCategories.BuiltIn.Select(c => c.Icon)))
+        {
+            Assert.True(Enum.TryParse<Wpf.Ui.Controls.SymbolRegular>(name + "24", out var symbol), name);
+            Assert.True((int)symbol <= 0xFFFF, name);
+        }
+        Assert.All(WalletCategories.BuiltIn, c => Assert.InRange(c.Color, 0, WalletPalette.Slots));
+    }
+
+    [Theory]
+    [InlineData(0, 1)]
+    [InlineData(0.7, 1)]
+    [InlineData(1.2, 2)]
+    [InlineData(2.2, 2.5)]
+    [InlineData(3, 5)]
+    [InlineData(6, 10)]
+    [InlineData(1_250_000, 2_000_000)]
+    [InlineData(2_000_000, 2_000_000)]
+    public void Nice_max(double value, double expected) => Assert.Equal(expected, WalletCharts.NiceMax(value), 6);
+
+    [Fact]
+    public void Layout_caps_columns_and_keeps_a_gap()
+    {
+        var model = new BarChartModel([new("1", 100, "a"), new("", 50, "b"), new("", 0, "c"), new("4", 25, "d", IsEmpty: true)], 80, "ref", 0);
+        var g = WalletCharts.Layout(model, 400, 200, 20, 20);
+        Assert.Equal(2, g.Bars.Count); // a zero and an empty slot draw nothing
+        Assert.All(g.Bars, b => Assert.True(b.Width <= WalletCharts.MaxBarWidth));
+        Assert.Equal(180, g.BaselineY);
+        Assert.Equal(20, g.Bars[0].Y, 6); // 100 is the top of a 0–100 scale
+        Assert.Equal(100, g.Bars[1].Y, 6);
+        Assert.Equal(180 - 160 * 0.8, g.ReferenceY!.Value, 6);
+        Assert.Equal(1, g.IndexAt(150));
+        Assert.Equal(-1, g.IndexAt(401));
+        Assert.Equal(["1", "4"], g.Labels.Select(l => l.Text));
+        // Narrow: many slots, columns stay at least 1 px apart.
+        var many = new BarChartModel(Enumerable.Range(1, 31).Select(i => new ChartBar("", i, "")).ToList(), null, "", 0);
+        var narrow = WalletCharts.Layout(many, 300, 100, 0, 0);
+        Assert.All(narrow.Bars.Zip(narrow.Bars.Skip(1)), p => Assert.True(p.Second.X - (p.First.X + p.First.Width) >= 1.9));
+    }
+
+    private static WalletStore Store() => new(new MemorySynced<WalletTransaction>(), new MemorySynced<WalletCategory>(), new MemorySynced<WalletBudget>(), new ManualTime(T0));
+
+    [Fact]
+    public void Daily_chart_with_days_to_come_and_the_budget_a_day()
+    {
+        var store = Store();
+        store.AddManual(-100_000, "lunch", T0, WalletCategories.Food);
+        store.AddManual(-50_000, "grab", T0.AddDays(-1), null);
+        store.AddManual(-9_000_000, "savings", T0, WalletCategories.Transfer);
+        var chart = WalletCharts.Daily(store.Transactions(), store.Categories(true), new DateOnly(2026, 10, 1), T0, Ict, 3_100_000);
+        Assert.Equal(31, chart.Bars.Count);
+        Assert.Equal(100_000, chart.Bars[3].Value); // transfers left out
+        Assert.Equal(50_000, chart.Bars[2].Value);
+        Assert.True(chart.Bars[4].IsEmpty);
+        Assert.Equal(3, chart.DefaultIndex); // today
+        Assert.Equal(100_000, chart.Reference!.Value, 3);
+        Assert.StartsWith("Today · ", chart.Bars[3].Caption);
+    }
+
+    [Fact]
+    public void Months_chart_opens_a_month()
+    {
+        var store = Store();
+        store.AddManual(-100_000, "lunch", T0, WalletCategories.Food);
+        store.AddManual(-300_000, "shoes", T0.AddMonths(-1), WalletCategories.Shopping);
+        DateOnly? opened = null;
+        var chart = WalletCharts.Months(store.Transactions(), store.Categories(true), new DateOnly(2026, 10, 1), T0, Ict, 6, m => opened = m);
+        Assert.Equal(6, chart.Bars.Count);
+        Assert.True(chart.Bars[5].IsEmphasis);
+        Assert.False(chart.Bars[4].IsEmphasis);
+        Assert.Equal(0, chart.Bars[4].Value); // money in
+        Assert.Equal(300_000, chart.Bars[4].Value2); // spent
+        Assert.True(chart.IsGrouped);
+        Assert.Equal((CashFlowColors.MoneyIn, CashFlowColors.Spent, "Money in", "Spent"), (chart.Color, chart.Color2, chart.Name, chart.Name2));
+        Assert.Null(chart.Bars[5].Command); // the month shown
+        chart.Bars[4].Command!.Execute(null);
+        Assert.Equal(new DateOnly(2026, 9, 1), opened);
+    }
+
+    [Fact]
+    public void Grouped_columns_sit_side_by_side_with_a_gap()
+    {
+        var model = new BarChartModel([new("a", 100, "", Value2: 50), new("b", 0, "", Value2: 25)], null, "", 0);
+        var g = WalletCharts.Layout(model, 200, 120, 20, 0);
+        Assert.Equal(3, g.Bars.Count); // b has no money in
+        var (first, second) = (g.Bars[0], g.Bars[1]);
+        Assert.Equal((0, 1), (first.Series, second.Series));
+        Assert.Equal(WalletCharts.BarGap, second.X - (first.X + first.Width), 6);
+        Assert.Equal(first.Height / 2, second.Height, 6);
+        Assert.True(first.X >= 0 && second.X + second.Width <= 100); // inside the first slot
+    }
+
+    [Fact]
+    public void Cash_flow_bars_share_one_scale()
+    {
+        var store = Store();
+        store.AddManual(10_000_000, "salary", T0, WalletCategories.Salary);
+        store.AddManual(-12_500_000, "rent", T0, WalletCategories.Housing);
+        var summary = WalletStats.Month(store.Transactions(), store.Categories(true), new DateOnly(2026, 10, 1), T0, Ict);
+        var rows = WalletCharts.CashFlow(summary);
+        Assert.Equal(["Money in", "Spent", "Net (spent more)"], rows.Select(r => r.Name));
+        Assert.Equal([0.8, 1.0, 0.2], rows.Select(r => Math.Round(r.Fraction, 3)));
+        Assert.StartsWith("−", rows[2].AmountText);
+        Assert.Equal([CashFlowColors.MoneyIn, CashFlowColors.Spent, CashFlowColors.Net], rows.Select(r => r.Color));
+    }
+
+    [Fact]
+    public void Donut_keeps_six_slices_and_folds_the_rest()
+    {
+        var store = Store();
+        var ids = new[] { WalletCategories.Food, WalletCategories.Groceries, WalletCategories.Transport, WalletCategories.Shopping,
+            WalletCategories.Bills, WalletCategories.Housing, WalletCategories.Health };
+        for (var i = 0; i < ids.Length; i++) store.AddManual(-(i + 1) * 100_000, "x", T0, ids[i]);
+        var summary = WalletStats.Month(store.Transactions(), store.Categories(true), new DateOnly(2026, 10, 1), T0, Ict);
+        var donut = WalletCharts.Spending(summary, store.Categories(true));
+        Assert.Equal(DonutModel.MaxSegments, donut.Segments.Count);
+        Assert.Equal("Health", donut.Segments[0].Name);
+        Assert.Equal(8, donut.Segments[0].Color);
+        Assert.Equal("Other (2)", donut.Segments[^1].Name);
+        Assert.Equal(-1, donut.Segments[^1].Color);
+        Assert.Equal(300_000m, donut.Segments[^1].Amount); // 100k + 200k
+        Assert.Equal(1, donut.Segments.Sum(s => s.Share), 6);
+    }
+
+    [Fact]
+    public void Category_icon_and_colour()
+    {
+        var store = Store();
+        Assert.True(store.SetCategoryLook(WalletCategories.Food, "DrinkCoffee", 7));
+        var food = store.Category(WalletCategories.Food)!;
+        Assert.Equal(("DrinkCoffee", 7, "Food & drinks"), (food.Icon, food.Color, food.Name));
+        Assert.True(store.RenameCategory(WalletCategories.Food, "Cafe"));
+        Assert.Equal("DrinkCoffee", store.Category(WalletCategories.Food)!.Icon); // kept by a rename
+        store.SetCategoryLook(WalletCategories.Food, "NoSuchIcon", 99);
+        Assert.Equal((WalletIcons.Fallback, 7), (store.Category(WalletCategories.Food)!.Icon, store.Category(WalletCategories.Food)!.Color));
+
+        // A new category gets the colour its kind uses least.
+        var pets = store.AddCategory("Pets", CategoryKind.Expense, "AnimalDog");
+        var p = store.Category(pets)!;
+        Assert.Equal("AnimalDog", p.Icon);
+        Assert.InRange(p.Color, 1, WalletPalette.Slots);
+        Assert.Equal(6, WalletPalette.NextSlot([1, 2, 3, 4, 5, 7, 8, 1, 2]));
+    }
+
+    [Fact]
+    public void Page_makes_a_new_category_from_a_transaction()
+    {
+        var store = Store();
+        var dir = new TempDir();
+        using var settings = new SettingsStoreFactory(new HelmPaths(dir.Path));
+        store.AddManual(-200_000, "vet", T0, null);
+        var vm = new WalletViewModel(store, new WalletCapture(store, settings), settings, new InlineUi(), new AcceptDialogs(), new MemoryClipboard(), null,
+            NullLogger<WalletViewModel>.Instance, Ict);
+        var row = vm.ToCategorize.Single();
+        row.NewCategoryName = "Pets";
+        row.CreateCategoryCommand.Execute(null);
+        Assert.Empty(vm.ToCategorize);
+        var category = store.Category(store.Get(row.Id)!.CategoryId!)!;
+        Assert.Equal(("Pets", CategoryKind.Expense), (category.Name, category.Kind));
+        Assert.Equal("Pets", vm.SpendingDonut.Segments.Single().Name);
+        settings.Dispose();
+        dir.Dispose();
     }
 }
 

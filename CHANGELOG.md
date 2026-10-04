@@ -3,7 +3,7 @@
 All notable changes to Helm. The top section is used as the GitHub release body and as the Velopack release notes.
 Format: [Keep a Changelog](https://keepachangelog.com), versions follow [SemVer](https://semver.org).
 
-## [0.23.0] - 2026-10-04
+## [0.23.1] - 2026-10-04
 
 ### Added
 - **Wallet** (PC and Android): see where your money goes. Helm on the phone reads **Techcombank** and **ACB** balance
@@ -12,19 +12,30 @@ Format: [Keep a Changelog](https://keepachangelog.com), versions follow [SemVer]
   sync end-to-end encrypted to your PC.
   - **To categorize**: each new transaction waits with a few likely categories as buttons (those of similar earlier
     ones first); one tap files it, and Helm offers to file the similar ones too. A description you always put in the
-    same category is filed by itself (marked *auto*).
+    same category is filed by itself (marked *auto*). Need a category that is not there? Type its name right on the
+    transaction (or when adding one by hand) and it is made and used.
   - **What was it?** After a payment the phone shows a quiet notification with three categories as buttons, so you can
     file it without opening Helm.
-  - The month at a glance: spent, money in, net, today, the change against last month by the same day, a **monthly
-    budget** with what is left per day, and spending and money in **by category**. Every transaction of the month by
-    day, with filters and search; tap one to change its category, edit it, see the bank's notification, or delete it.
-  - Add cash by hand, or with `/s 50k coffee` (`/s +2tr bonus` for money in) in Quick Capture.
-  - Categories: rename or hide the built-in ones, add your own; *Between my accounts* counts neither as spending nor
-    as money in.
+  - **Charts**: the month's **cash flow** (money in, spent and net as bars on one scale), the **budget** meter with a
+    mark where spending would be on track today, **spending by category** as a donut with its legend, **spending by
+    day** with the budget per day, and the **last 6 months** of money in and spent side by side (click a month to
+    open it). Point at (or tap) a slice or a column to read its numbers.
+  - **Categories with an icon and a colour**, everywhere they appear: rename, hide or recolour the built-in ones, add
+    your own and pick from 45 icons and 8 colours (chosen to stay apart for colour-blind eyes). *Between my accounts*
+    counts neither as spending nor as money in.
+  - Add cash by hand with its day and time, or with `/s 50k coffee` (`/s +2tr bonus` for money in) in Quick Capture.
+    Every transaction of the month by day, with filters and search; click one to change its category, edit it, see the
+    bank's notification, or delete it.
   - An Android **home-screen widget**: this month's spending against the budget, today's, how many transactions wait
     for a category and the top categories.
   - Settings: notification access (with the steps for Android's *Restricted setting*), which banks to read, **Try a
     notification** (paste one to see what Helm reads), the notifications Helm could not read, and CSV export.
+
+### Changed
+- **One box for a day and a time**, everywhere (Wallet, Tracker's due dates, Missions' deadlines). On PC, type it the
+  way you say it ("hôm qua 18h45", "mai 9h", "thứ 6", "3/10 14:30", "3h chiều") and the line under the box shows what
+  Helm read; or tap a shortcut (Now, Yesterday, Tomorrow, In a week…); or open the panel with the month, the times and
+  the exact minutes. On the phone the box opens one sheet: a strip of days to swipe and hour and minute columns.
 
 ### Fixed
 - On a narrow window the sync button no longer slips under the minimise button; it is one plain glyph, as on Android.

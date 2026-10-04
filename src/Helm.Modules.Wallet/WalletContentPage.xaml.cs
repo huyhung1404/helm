@@ -1,6 +1,8 @@
 using System.ComponentModel;
+using System.Globalization;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Data;
 using System.Windows.Threading;
 using Helm.Core.Modules;
 
@@ -27,6 +29,17 @@ public partial class WalletContentPage : Page
         ApplyEnabled();
         // Transactions the phone saved meanwhile, and "today" after midnight.
         Loaded += (_, _) => viewModel.Refresh();
+    }
+
+    /// <summary>A legend bar's width: its share of the room it has (view glue for the donut's legend).</summary>
+    public static IMultiValueConverter ShareWidth { get; } = new ShareWidthConverter();
+
+    private sealed class ShareWidthConverter : IMultiValueConverter
+    {
+        public object Convert(object[] values, Type targetType, object? parameter, CultureInfo culture) =>
+            values is [double share, double width] && width > 0 ? Math.Max(4, share * width) : 4.0;
+
+        public object[] ConvertBack(object value, Type[] targetTypes, object? parameter, CultureInfo culture) => [];
     }
 
     private void OnViewModelChanged(object? sender, PropertyChangedEventArgs e)

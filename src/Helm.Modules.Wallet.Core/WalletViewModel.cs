@@ -79,6 +79,13 @@ public sealed partial class WalletViewModel : ObservableObject
     [ObservableProperty] private DateTime? _newDate;
     [ObservableProperty] private CategoryChoice? _newCategory;
 
+    /// <summary>The time of day (Android's time picker); <see cref="NewTimeText"/> is the same as typed text (PC).</summary>
+    [ObservableProperty] private TimeSpan? _newTime;
+    [ObservableProperty] private string _newTimeText = "";
+
+    /// <summary>A category to make for this transaction instead of picking one.</summary>
+    [ObservableProperty] private string _addCategoryName = "";
+
     // Settings
     [ObservableProperty] private string _monthlyBudgetText = "";
     [ObservableProperty] private bool _listenEnabled;
@@ -158,8 +165,20 @@ public sealed partial class WalletViewModel : ObservableObject
 
     partial void OnMessageChanged(string? value) => OnPropertyChanged(nameof(HasMessage));
 
-    /// <summary>The spending by category, largest first.</summary>
-    public ObservableCollection<CategorySpendRow> Spending { get; } = [];
+    /// <summary>The month's spending by category: the donut and its legend (largest first, at most six plus Other).</summary>
+    [ObservableProperty] private DonutModel _spendingDonut = DonutModel.Empty;
+
+    /// <summary>The month's money in, spent and net as bars on one scale.</summary>
+    [ObservableProperty] private IReadOnlyList<CashFlowRow> _cashFlow = [];
+
+    /// <summary>What was spent each day of the month, with the budget per day.</summary>
+    [ObservableProperty] private BarChartModel _dailyChart = BarChartModel.Empty;
+
+    /// <summary>The last six months' spending, the month shown in the accent; a click opens a month.</summary>
+    [ObservableProperty] private BarChartModel _monthsChart = BarChartModel.Empty;
+
+    /// <summary>How far into the month today is (0–100), the budget meter's "on track" mark; -1 outside the current month.</summary>
+    [ObservableProperty] private double _budgetPacePercent = -1;
 
     /// <summary>The money in by category, largest first.</summary>
     public ObservableCollection<CategorySpendRow> Earning { get; } = [];
@@ -175,7 +194,17 @@ public sealed partial class WalletViewModel : ObservableObject
 
     public ObservableCollection<UnreadRow> Unread { get; } = [];
 
-    public bool HasSpending => Spending.Count > 0;
+    public bool HasSpending => !SpendingDonut.IsEmpty;
+
+    public bool HasDailyChart => !DailyChart.IsEmpty;
+
+    public bool HasMonthsChart => !MonthsChart.IsEmpty;
+
+    partial void OnSpendingDonutChanged(DonutModel value) => OnPropertyChanged(nameof(HasSpending));
+
+    partial void OnDailyChartChanged(BarChartModel value) => OnPropertyChanged(nameof(HasDailyChart));
+
+    partial void OnMonthsChartChanged(BarChartModel value) => OnPropertyChanged(nameof(HasMonthsChart));
 
     public bool HasEarning => Earning.Count > 0;
 
@@ -295,10 +324,14 @@ public sealed partial class WalletViewModel : ObservableObject
             Message = "Enter the amount, e.g. 50000, 50k or 1.5tr.";
             return false;
         }
+        if (!WalletText.TryParseTime(row.EditTimeText, out var typed))
+        {
+            Message = "Enter the time as 14:30.";
+            return false;
+        }
         var date = row.EditDate?.Date ?? LocalDate(row.Transaction.OccurredAt);
-        // Keep the time of day; only the day changes.
-        var local = TimeZoneInfo.ConvertTime(row.Transaction.OccurredAt, _zone);
-        var at = ToInstant(date + local.TimeOfDay);
+        // No time given: keep the one it had.
+        var at = At(date, typed ?? row.EditTime, LocalTime(row.Transaction.OccurredAt));
         try
         {
             _store.Update(row.Id, row.EditIsIncome ? amount : -amount, row.EditDescription, at, row.EditNote);
@@ -337,6 +370,8 @@ public sealed partial class WalletViewModel : ObservableObject
 
     internal DateTime LocalDate(DateTimeOffset at) => TimeZoneInfo.ConvertTime(at, _zone).Date;
 
+    internal TimeSpan LocalTime(DateTimeOffset at) => TimeZoneInfo.ConvertTime(at, _zone).TimeOfDay;
+
     private DateTimeOffset ToInstant(DateTime local)
     {
         var unspecified = DateTime.SpecifyKind(local, DateTimeKind.Unspecified);
@@ -365,10 +400,34 @@ public sealed partial class WalletViewModel : ObservableObject
         NewDescription = "";
         NewIsIncome = false;
         NewDate = LocalDate(_store.Now);
+        var now = TimeZoneInfo.ConvertTime(_store.Now, _zone).TimeOfDay;
+        NewTime = new TimeSpan(now.Hours, now.Minutes, 0);
         NewCategory = null;
+        AddCategoryName = "";
         RefreshNewCategories(Categories());
         IsAddOpen = true;
     }
+
+    private bool _syncingTime;
+
+    partial void OnNewTimeChanged(TimeSpan? value)
+    {
+        if (_syncingTime) return;
+        _syncingTime = true;
+        NewTimeText = value is { } t ? WalletText.FormatTime(t) : "";
+        _syncingTime = false;
+    }
+
+    partial void OnNewTimeTextChanged(string value)
+    {
+        if (_syncingTime || !WalletText.TryParseTime(value, out var time)) return;
+        _syncingTime = true;
+        NewTime = time;
+        _syncingTime = false;
+    }
+
+    /// <summary>A day and a time of day (the zone's) as an instant; no time keeps the time it already had, or now.</summary>
+    internal DateTimeOffset At(DateTime day, TimeSpan? time, TimeSpan fallback) => ToInstant(day.Date + (time ?? fallback));
 
     [RelayCommand]
     private void CancelAdd() => IsAddOpen = false;
@@ -381,13 +440,28 @@ public sealed partial class WalletViewModel : ObservableObject
             Message = "Enter the amount, e.g. 50000, 50k or 1.5tr.";
             return;
         }
+        if (!WalletText.TryParseTime(NewTimeText, out var typed))
+        {
+            Message = "Enter the time as 14:30 (or leave it empty for now).";
+            return;
+        }
         var now = TimeZoneInfo.ConvertTime(_store.Now, _zone);
         var day = NewDate?.Date ?? now.Date;
-        var at = day == now.Date ? _store.Now : ToInstant(day.AddHours(12));
+        var at = At(day, typed ?? NewTime, now.TimeOfDay);
         try
         {
             var signed = NewIsIncome ? amount : -amount;
-            var category = NewCategory?.Id ?? _store.SureCategory(NewDescription, signed);
+            string? category;
+            if (AddCategoryName.Trim().Length > 0)
+            {
+                // A new category for it, of its direction.
+                category = _store.AddCategory(AddCategoryName, NewIsIncome ? CategoryKind.Income : CategoryKind.Expense);
+                AddCategoryName = "";
+            }
+            else
+            {
+                category = NewCategory?.Id ?? _store.SureCategory(NewDescription, signed);
+            }
             _store.AddManual(signed, NewDescription, at, category);
             IsAddOpen = false;
             Message = null;
@@ -395,7 +469,12 @@ public sealed partial class WalletViewModel : ObservableObject
             _month = new DateOnly(day.Year, day.Month, 1);
             Refresh();
         }
-        catch (Exception ex) when (ex is InvalidOperationException or ArgumentException)
+        catch (ArgumentException ex)
+        {
+            // A new category whose name is taken, or no amount: say so as it is.
+            Message = ex.Message.Split(" (Parameter", StringSplitOptions.None)[0];
+        }
+        catch (InvalidOperationException ex)
         {
             Report(ex, "Could not save the transaction.");
         }
@@ -406,7 +485,7 @@ public sealed partial class WalletViewModel : ObservableObject
         var selected = NewCategory?.Id;
         var sign = NewIsIncome ? 1m : -1m;
         NewCategories.Clear();
-        foreach (var c in categories.Where(c => c.Fits(sign))) NewCategories.Add(new CategoryChoice(c.Id, c.Name));
+        foreach (var c in categories.Where(c => c.Fits(sign) && !c.Hidden)) NewCategories.Add(new CategoryChoice(c.Id, c.Name, c.Icon, c.Color));
         NewCategory = NewCategories.FirstOrDefault(c => c.Id == selected);
     }
 
@@ -447,9 +526,11 @@ public sealed partial class WalletViewModel : ObservableObject
             SpentTodayText = IsCurrentMonth && summary.SpentToday > 0 ? $"Today {WalletFormat.Money(summary.SpentToday)}" : "";
             CompareText = Compare(summary);
             RefreshBudget(summary, now);
-            Fill(Spending, summary.Spending.Select(Row).ToList());
-            Fill(Earning, summary.Earning.Select(Row).ToList());
-            OnPropertyChanged(nameof(HasSpending));
+            CashFlow = WalletCharts.CashFlow(summary);
+            SpendingDonut = WalletCharts.Spending(summary, categories);
+            DailyChart = WalletCharts.Daily(transactions, categories, _month, now, _zone, _store.MonthlyBudget);
+            MonthsChart = WalletCharts.Months(transactions, categories, _month, now, _zone, 6, OpenMonth);
+            Fill(Earning, summary.Earning.Select(s => Row(s, categories)).ToList());
             OnPropertyChanged(nameof(HasEarning));
 
             RefreshToCategorize(transactions, categories);
@@ -467,17 +548,29 @@ public sealed partial class WalletViewModel : ObservableObject
         }
     }
 
-    private static CategorySpendRow Row(CategorySpend s) => new(
-        s.Name,
-        WalletFormat.Money(s.Amount),
-        Math.Round(s.Share * 100, 1),
-        s.Share > 0 && s.Share < 0.005 ? "<1%" : $"{Math.Round(s.Share * 100):0}%",
-        WalletFormat.Count(s.Count, "transaction"),
-        s.CategoryId is null);
+    private static CategorySpendRow Row(CategorySpend s, IReadOnlyList<CategoryInfo> categories)
+    {
+        var c = s.CategoryId is { } id ? categories.FirstOrDefault(x => x.Id == id) : null;
+        return new CategorySpendRow(
+            s.Name,
+            c?.Icon ?? WalletIcons.Uncategorized,
+            c?.Color ?? 0,
+            WalletFormat.Money(s.Amount),
+            Math.Round(s.Share * 100, 1),
+            s.Share > 0 && s.Share < 0.005 ? "<1%" : $"{Math.Round(s.Share * 100):0}%",
+            WalletFormat.Count(s.Count, "transaction"));
+    }
+
+    /// <summary>A month picked on the six-month chart.</summary>
+    private void OpenMonth(DateOnly month)
+    {
+        _month = month;
+        Refresh();
+    }
 
     private string Compare(MonthSummary summary)
     {
-        var previous = WalletFormat.Month(summary.Month.AddMonths(-1)).Split(' ')[0];
+        var previous = summary.Month.AddMonths(-1).ToString("MMMM", CultureInfo.CurrentCulture);
         if (IsCurrentMonth)
         {
             if (summary.PreviousSpentSameDay <= 0) return "";
@@ -500,12 +593,15 @@ public sealed partial class WalletViewModel : ObservableObject
         if (budget is null)
         {
             BudgetPercent = 0;
+            BudgetPacePercent = -1;
             IsOverBudget = false;
             BudgetText = "";
             BudgetDetail = "";
             return;
         }
         BudgetPercent = budget.Percent;
+        var today = WalletFormat.LocalDay(now, _zone);
+        BudgetPacePercent = IsCurrentMonth ? Math.Round(today.Day * 100.0 / DateTime.DaysInMonth(today.Year, today.Month), 1) : -1;
         IsOverBudget = budget.IsOver;
         BudgetText = $"{WalletFormat.Money(budget.Spent)} of {WalletFormat.Money(budget.Budget)}";
         BudgetDetail = budget.IsOver
@@ -578,7 +674,7 @@ public sealed partial class WalletViewModel : ObservableObject
         if (t.Bank.Length > 0) parts.Add(t.Bank);
         else if (t.Source == TransactionSource.Manual) parts.Add("Added by hand");
         var choices = categories.Where(x => x.Fits(t.Amount) && (!x.Hidden || x.Id == t.CategoryId)).ToList();
-        row.Update(t, title, string.Join(" · ", parts), category?.Name, choices);
+        row.Update(t, title, string.Join(" · ", parts), category, choices);
         return row;
     }
 
@@ -731,6 +827,41 @@ public sealed partial class WalletViewModel : ObservableObject
         }
     }
 
+    internal void SetCategoryLook(string id, string icon, int color)
+    {
+        try
+        {
+            _store.SetCategoryLook(id, icon, color);
+        }
+        catch (InvalidOperationException ex)
+        {
+            Report(ex, "Could not change the category.");
+        }
+    }
+
+    /// <summary>"New category" in a transaction's row: made for its direction, and the transaction goes in it.</summary>
+    internal bool CreateCategoryFor(TransactionRow row, string name)
+    {
+        var kind = row.Transaction.Amount > 0 ? CategoryKind.Income : CategoryKind.Expense;
+        try
+        {
+            var id = _store.AddCategory(name, kind);
+            Message = $"Category “{WalletLimits.Clip(name, WalletLimits.CategoryName)}” added. Change its icon and colour in Wallet's settings.";
+            Categorize(row, id);
+            return true;
+        }
+        catch (ArgumentException ex)
+        {
+            Message = ex.Message.Split(" (Parameter", StringSplitOptions.None)[0];
+            return false;
+        }
+        catch (InvalidOperationException ex)
+        {
+            Report(ex, "Could not add the category.");
+            return false;
+        }
+    }
+
     internal void SetCategoryShown(string id, bool shown)
     {
         try
@@ -764,10 +895,12 @@ public sealed partial class WalletViewModel : ObservableObject
         var kind = NewCategoryKindIndex switch { 1 => CategoryKind.Income, 2 => CategoryKind.Transfer, _ => CategoryKind.Expense };
         try
         {
-            _store.AddCategory(NewCategoryName, kind);
+            var id = _store.AddCategory(NewCategoryName, kind);
             NewCategoryName = "";
             Message = null;
             Refresh();
+            // Straight to its icon and colour.
+            if (_categoryRows.TryGetValue(id, out var row)) row.IsEditingLook = true;
         }
         catch (ArgumentException ex)
         {

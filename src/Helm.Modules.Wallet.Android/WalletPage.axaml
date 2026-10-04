@@ -2,6 +2,7 @@
                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
                    xmlns:ui="using:Helm.Core.Ui"
                    xmlns:vm="using:Helm.Modules.Wallet"
+                   xmlns:ic="using:FluentIcons.Avalonia"
                    x:Class="Helm.Modules.Wallet.WalletPage"
                    x:DataType="vm:WalletViewModel">
 
@@ -117,20 +118,60 @@
         <TextBlock Text="Categories" Classes="section" />
         <Border Classes="card">
             <StackPanel Spacing="8">
-                <TextBlock Text="Rename them, hide the ones you do not use, or add your own. Between my accounts counts neither as spending nor as money in."
+                <TextBlock Text="Rename them, give them an icon and a colour (tap the icon), hide the ones you do not use, or add your own. Between my accounts counts neither as spending nor as money in."
                            Classes="secondary" TextWrapping="Wrap" />
                 <ItemsControl ItemsSource="{Binding CategoryRows}">
                     <ItemsControl.ItemTemplate>
                         <DataTemplate DataType="vm:CategoryEditRow">
                             <Border Classes="row">
-                                <Grid ColumnDefinitions="*,Auto,Auto">
-                                    <StackPanel VerticalAlignment="Center">
-                                        <TextBox Text="{Binding Name, UpdateSourceTrigger=LostFocus}" AutomationProperties.Name="Category name" />
-                                        <TextBlock Text="{Binding KindText}" Classes="secondary" FontSize="12" Margin="2,2,0,0" />
+                                <StackPanel Spacing="8">
+                                    <Grid ColumnDefinitions="Auto,*,Auto,Auto">
+                                        <!-- The badge opens the icon and colour choices -->
+                                        <Button Classes="flat" Padding="2" Command="{Binding ToggleLookCommand}" VerticalAlignment="Center"
+                                                AutomationProperties.Name="Change the icon and colour">
+                                            <vm:CategoryBadge Icon="{Binding Icon}" Color="{Binding Color}" Size="36" />
+                                        </Button>
+                                        <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="8,0,0,0">
+                                            <TextBox Text="{Binding Name, UpdateSourceTrigger=LostFocus}" AutomationProperties.Name="Category name" />
+                                            <TextBlock Text="{Binding KindText}" Classes="secondary" FontSize="12" Margin="2,2,0,0" />
+                                        </StackPanel>
+                                        <ToggleSwitch Grid.Column="2" IsChecked="{Binding IsShown}" OnContent="" OffContent="" Margin="8,0,0,0" AutomationProperties.Name="Shown" />
+                                        <Button Grid.Column="3" Classes="flat danger" Content="Delete" Command="{Binding DeleteCommand}" IsVisible="{Binding CanDelete}" VerticalAlignment="Center" />
+                                    </Grid>
+                                    <StackPanel Spacing="6" IsVisible="{Binding IsEditingLook}">
+                                        <TextBlock Text="Colour" Classes="secondary" />
+                                        <ItemsControl ItemsSource="{Binding ColorChoices}">
+                                            <ItemsControl.ItemsPanel>
+                                                <ItemsPanelTemplate>
+                                                    <WrapPanel />
+                                                </ItemsPanelTemplate>
+                                            </ItemsControl.ItemsPanel>
+                                            <ItemsControl.ItemTemplate>
+                                                <DataTemplate DataType="vm:ColorChoice">
+                                                    <Button Classes="flat" Padding="4" Margin="0,0,4,4" Command="{Binding PickCommand}" AutomationProperties.Name="Colour">
+                                                        <Border Width="30" Height="30" CornerRadius="15" Background="{Binding Color, Converter={x:Static vm:WalletConverters.Ink}}" />
+                                                    </Button>
+                                                </DataTemplate>
+                                            </ItemsControl.ItemTemplate>
+                                        </ItemsControl>
+                                        <TextBlock Text="Icon" Classes="secondary" />
+                                        <ItemsControl ItemsSource="{Binding IconChoices}">
+                                            <ItemsControl.ItemsPanel>
+                                                <ItemsPanelTemplate>
+                                                    <WrapPanel />
+                                                </ItemsPanelTemplate>
+                                            </ItemsControl.ItemsPanel>
+                                            <ItemsControl.ItemTemplate>
+                                                <DataTemplate DataType="vm:IconChoice">
+                                                    <Button Classes="flat" Width="44" Height="44" Padding="0" HorizontalContentAlignment="Center" VerticalContentAlignment="Center"
+                                                            Command="{Binding PickCommand}" AutomationProperties.Name="{Binding Name}">
+                                                        <ic:SymbolIcon Symbol="{Binding Name, Converter={x:Static vm:WalletConverters.Symbol}}" FontSize="22" />
+                                                    </Button>
+                                                </DataTemplate>
+                                            </ItemsControl.ItemTemplate>
+                                        </ItemsControl>
                                     </StackPanel>
-                                    <ToggleSwitch Grid.Column="1" IsChecked="{Binding IsShown}" OnContent="" OffContent="" Margin="8,0,0,0" AutomationProperties.Name="Shown" />
-                                    <Button Grid.Column="2" Classes="flat danger" Content="Delete" Command="{Binding DeleteCommand}" IsVisible="{Binding CanDelete}" VerticalAlignment="Center" />
-                                </Grid>
+                                </StackPanel>
                             </Border>
                         </DataTemplate>
                     </ItemsControl.ItemTemplate>

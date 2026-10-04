@@ -108,6 +108,33 @@ public static class WalletText
     }
 
     /// <summary>
+    /// A time of day as typed: "14:30", "1430", "9", "9h", "9h30", "2:05 PM". Empty text is no time (true, null).
+    /// </summary>
+    public static bool TryParseTime(string? text, out TimeSpan? time)
+    {
+        time = null;
+        if (string.IsNullOrWhiteSpace(text)) return true;
+        var s = text.Trim().ToLowerInvariant().Replace('h', ':').Replace('.', ':');
+        if (s.EndsWith(':')) s = s[..^1];
+        if (DateTime.TryParse(s, CultureInfo.CurrentCulture, DateTimeStyles.NoCurrentDateDefault, out var parsed)
+            || DateTime.TryParse(s, CultureInfo.InvariantCulture, DateTimeStyles.NoCurrentDateDefault, out parsed))
+        {
+            time = new TimeSpan(parsed.Hour, parsed.Minute, 0);
+            return true;
+        }
+        var digits = new string(s.Where(char.IsAsciiDigit).ToArray());
+        if (digits.Length is < 1 or > 4 || digits.Length != s.Replace(":", "").Length) return false;
+        var hours = int.Parse(digits.Length <= 2 ? digits : digits[..^2], CultureInfo.InvariantCulture);
+        var minutes = digits.Length <= 2 ? 0 : int.Parse(digits[^2..], CultureInfo.InvariantCulture);
+        if (hours > 23 || minutes > 59) return false;
+        time = new TimeSpan(hours, minutes, 0);
+        return true;
+    }
+
+    /// <summary>"14:30" (24-hour, so it reads the same as it is typed).</summary>
+    public static string FormatTime(TimeSpan time) => $"{(int)time.TotalHours % 24:00}:{time.Minutes:00}";
+
+    /// <summary>
     /// The words of a description that tell transactions apart ("THANH TOAN QR GRAB 0912" → grab): folded, without
     /// numbers, references and the words every bank adds.
     /// </summary>

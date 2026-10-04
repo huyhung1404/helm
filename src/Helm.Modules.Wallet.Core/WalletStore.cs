@@ -246,18 +246,29 @@ public sealed class WalletStore
         foreach (var b in WalletCategories.BuiltIn)
         {
             list.Add(stored.TryGetValue(b.Id, out var changed)
-                ? b with { Name = changed.Name.Length > 0 ? changed.Name : b.Name, Hidden = changed.Hidden, Order = changed.Order }
+                ? b with
+                {
+                    Name = changed.Name.Length > 0 ? changed.Name : b.Name,
+                    Hidden = changed.Hidden,
+                    Order = changed.Order,
+                    Icon = changed.Icon.Length > 0 ? WalletIcons.Normalize(changed.Icon) : b.Icon,
+                    Color = changed.Color is >= 1 and <= WalletPalette.Slots ? changed.Color : b.Color,
+                }
                 : b);
             stored.Remove(b.Id);
         }
-        list.AddRange(stored.Select(s => new CategoryInfo(s.Key, s.Value.Name, s.Value.Kind, s.Value.Order, false, s.Value.Hidden)));
+        list.AddRange(stored.Select(s => new CategoryInfo(s.Key, s.Value.Name, s.Value.Kind, s.Value.Order, false, s.Value.Hidden,
+            WalletIcons.Normalize(s.Value.Icon), s.Value.Color is >= 0 and <= WalletPalette.Slots ? s.Value.Color : 0)));
         return list.Where(c => includeHidden || !c.Hidden).OrderBy(c => c.Kind).ThenBy(c => c.Order).ThenBy(c => c.Name, StringComparer.CurrentCultureIgnoreCase).ToList();
     }
 
     public CategoryInfo? Category(string id) => Categories(includeHidden: true).FirstOrDefault(c => c.Id == id);
 
-    /// <summary>Adds a category of the user's; returns its id.</summary>
-    public string AddCategory(string name, CategoryKind kind)
+    /// <summary>
+    /// Adds a category of the user's; returns its id. Without a colour it gets the one its kind uses least, so new
+    /// categories do not all look alike.
+    /// </summary>
+    public string AddCategory(string name, CategoryKind kind, string? icon = null, int? color = null)
     {
         var clipped = WalletLimits.Clip(name, WalletLimits.CategoryName);
         if (clipped.Length == 0) throw new ArgumentException("A category needs a name.", nameof(name));
@@ -267,7 +278,8 @@ public sealed class WalletStore
             if (all.Any(c => string.Equals(c.Name, clipped, StringComparison.CurrentCultureIgnoreCase) && c.Kind == kind))
                 throw new ArgumentException($"There is already a category called “{clipped}”.", nameof(name));
             var order = all.Where(c => c.Kind == kind).Select(c => c.Order).DefaultIfEmpty(0).Max() + 1;
-            return _categories.Add(new WalletCategory { Name = clipped, Kind = kind, Order = order });
+            var slot = color is >= 1 and <= WalletPalette.Slots ? color.Value : WalletPalette.NextSlot(all.Where(c => c.Kind == kind && !c.Hidden).Select(c => c.Color));
+            return _categories.Add(new WalletCategory { Name = clipped, Kind = kind, Order = order, Icon = WalletIcons.Normalize(icon), Color = slot });
         }
     }
 
@@ -275,21 +287,24 @@ public sealed class WalletStore
     {
         var clipped = WalletLimits.Clip(name, WalletLimits.CategoryName);
         if (clipped.Length == 0) return false;
-        lock (_gate)
-        {
-            if (Category(id) is not { } c) return false;
-            _categories.Upsert(id, new WalletCategory { Name = clipped, Kind = c.Kind, Order = c.Order, Hidden = c.Hidden });
-            return true;
-        }
+        return Change(id, c => c with { Name = clipped });
     }
 
     /// <summary>Hides a category from the pickers (or shows it again); its transactions keep it.</summary>
-    public bool SetCategoryHidden(string id, bool hidden)
+    public bool SetCategoryHidden(string id, bool hidden) => Change(id, c => c with { Hidden = hidden });
+
+    /// <summary>Changes a category's icon (one of <see cref="WalletIcons.Choices"/>) and colour slot (1–8).</summary>
+    public bool SetCategoryLook(string id, string icon, int color) =>
+        Change(id, c => c with { Icon = WalletIcons.Normalize(icon), Color = color is >= 0 and <= WalletPalette.Slots ? color : c.Color });
+
+    /// <summary>Writes a category's whole record (a built-in one gets a record under its own id).</summary>
+    private bool Change(string id, Func<CategoryInfo, CategoryInfo> change)
     {
         lock (_gate)
         {
             if (Category(id) is not { } c) return false;
-            _categories.Upsert(id, new WalletCategory { Name = c.Name, Kind = c.Kind, Order = c.Order, Hidden = hidden });
+            var n = change(c);
+            _categories.Upsert(id, new WalletCategory { Name = n.Name, Kind = n.Kind, Order = n.Order, Hidden = n.Hidden, Icon = n.Icon, Color = n.Color });
             return true;
         }
     }
