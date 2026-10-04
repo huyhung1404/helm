@@ -1,0 +1,115 @@
+<core:ModulePageBase
+    x:Class="Helm.Modules.Wallet.WalletPage"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
+    xmlns:core="clr-namespace:Helm.Core.Ui;assembly=Helm.Core.Windows"
+    xmlns:local="clr-namespace:Helm.Modules.Wallet;assembly=Helm.Modules.Wallet.Core"
+    xmlns:self="clr-namespace:Helm.Modules.Wallet"
+    ExtraMessage="{Binding Message}">
+
+    <!-- Wallet's settings (Home → Utilities). The transactions themselves are on WalletContentPage. -->
+    <StackPanel>
+        <ui:CardControl Margin="0,0,0,4">
+            <ui:CardControl.Icon>
+                <ui:ImageIcon Width="24" Height="24" Source="{x:Static self:WalletLogo.Image}" />
+            </ui:CardControl.Icon>
+            <ui:CardControl.Header>
+                <core:CardHeader Title="Open Wallet" Description="This month's spending, the transactions to categorize and where the money went. Also in the menu and on Home." />
+            </ui:CardControl.Header>
+            <ui:Button Appearance="Primary" Content="Open Wallet" Click="Open_Click" />
+        </ui:CardControl>
+
+        <!-- Budget -->
+        <TextBlock Text="Budget" Style="{DynamicResource HelmSectionHeader}" />
+        <ui:CardControl Margin="0,0,0,4" Icon="{ui:SymbolIcon Target24}">
+            <ui:CardControl.Header>
+                <core:CardHeader Title="Monthly budget" Description="What you mean to spend in a month at most; Wallet and its widget show how much is left and per day. Empty for none. Synced to all your devices." />
+            </ui:CardControl.Header>
+            <ui:TextBox Width="180" PlaceholderText="e.g. 10tr" AutomationProperties.Name="Monthly budget" Text="{Binding MonthlyBudgetText, UpdateSourceTrigger=LostFocus}" />
+        </ui:CardControl>
+
+        <!-- Categories -->
+        <TextBlock Text="Categories" Style="{DynamicResource HelmSectionHeader}" />
+        <ui:CardExpander Margin="0,0,0,4" Icon="{ui:SymbolIcon Tag24}">
+            <ui:CardExpander.Header>
+                <core:CardHeader Title="Categories" Description="Rename them, hide the ones you do not use, or add your own. Between my accounts counts neither as spending nor as money in." />
+            </ui:CardExpander.Header>
+            <StackPanel>
+                <ItemsControl ItemsSource="{Binding CategoryRows}" Focusable="False">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate DataType="{x:Type local:CategoryEditRow}">
+                            <Border Style="{DynamicResource HelmExpanderRow}" BorderThickness="0,0,0,1">
+                                <core:RowLayout>
+                                    <StackPanel Orientation="Horizontal">
+                                        <ui:TextBox Width="220" AutomationProperties.Name="Category name" Text="{Binding Name, UpdateSourceTrigger=LostFocus}" />
+                                        <TextBlock Text="{Binding KindText}" Style="{DynamicResource HelmSecondaryText}" VerticalAlignment="Center" Margin="12,0,0,0" />
+                                    </StackPanel>
+                                    <StackPanel Orientation="Horizontal">
+                                        <ui:ToggleSwitch IsChecked="{Binding IsShown}" ToolTip="Shown in the pickers" AutomationProperties.Name="Shown" />
+                                        <ui:Button Margin="12,0,0,0" Appearance="Transparent" Icon="{ui:SymbolIcon Delete24}" ToolTip="Delete this category" AutomationProperties.Name="Delete category"
+                                                   Command="{Binding DeleteCommand}" Visibility="{Binding CanDelete, Converter={StaticResource BoolToVisibility}}" />
+                                    </StackPanel>
+                                </core:RowLayout>
+                            </Border>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+                <Border Style="{DynamicResource HelmExpanderRow}" BorderThickness="0">
+                    <core:RowLayout>
+                        <core:CardHeader Title="New category" />
+                        <StackPanel Orientation="Horizontal">
+                            <ui:TextBox Width="200" PlaceholderText="Name" AutomationProperties.Name="New category name" Text="{Binding NewCategoryName, UpdateSourceTrigger=PropertyChanged}" />
+                            <ComboBox Width="190" Margin="8,0" ItemsSource="{x:Static local:WalletViewModel.KindNames}" SelectedIndex="{Binding NewCategoryKindIndex}"
+                                      AutomationProperties.Name="New category kind" />
+                            <ui:Button Content="Add" Icon="{ui:SymbolIcon Add24}" Command="{Binding AddCategoryCommand}" />
+                        </StackPanel>
+                    </core:RowLayout>
+                </Border>
+            </StackPanel>
+        </ui:CardExpander>
+
+        <!-- Bank notifications -->
+        <TextBlock Text="Bank notifications" Style="{DynamicResource HelmSectionHeader}" />
+        <ui:CardControl Margin="0,0,0,4" Icon="{ui:SymbolIcon Phone24}">
+            <ui:CardControl.Header>
+                <core:CardHeader Title="Read on your phone" Description="Helm on your Android phone reads Techcombank's and ACB's balance notifications (their apps or SMS) and saves each transaction; they sync here. Set it up in Wallet's settings on the phone." />
+            </ui:CardControl.Header>
+        </ui:CardControl>
+        <ui:CardExpander Margin="0,0,0,4" Icon="{ui:SymbolIcon TextBulletListSquare24}">
+            <ui:CardExpander.Header>
+                <core:CardHeader Title="Try a notification" Description="Paste a bank notification to see what Helm reads in it: the amount, the balance, the account and the description." />
+            </ui:CardExpander.Header>
+            <StackPanel>
+                <Border Style="{DynamicResource HelmExpanderRow}" BorderThickness="0">
+                    <core:RowLayout>
+                        <core:CardHeader Title="Bank" />
+                        <ComboBox Width="180" ItemsSource="{x:Static local:WalletViewModel.TestBankNames}" SelectedIndex="{Binding TestBankIndex}" AutomationProperties.Name="Bank" />
+                    </core:RowLayout>
+                </Border>
+                <Border Style="{DynamicResource HelmExpanderRow}">
+                    <StackPanel>
+                        <ui:TextBox AcceptsReturn="True" TextWrapping="Wrap" MinHeight="64" PlaceholderText="TK 1903xxxx0123 So tien GD:-150,000 So du:1,234,567 THANH TOAN QR…"
+                                    AutomationProperties.Name="Notification text" Text="{Binding TestText, UpdateSourceTrigger=PropertyChanged}" />
+                        <TextBlock Margin="0,8,0,0" Text="{Binding TestResult}" TextWrapping="Wrap"
+                                   Visibility="{Binding HasTestResult, Converter={StaticResource BoolToVisibility}}" />
+                    </StackPanel>
+                </Border>
+            </StackPanel>
+        </ui:CardExpander>
+
+        <!-- Data -->
+        <TextBlock Text="Data" Style="{DynamicResource HelmSectionHeader}" />
+        <ui:CardControl Margin="0,0,0,4" Icon="{ui:SymbolIcon ArrowDownload24}">
+            <ui:CardControl.Header>
+                <core:CardHeader Title="Export to CSV" Description="Every transaction with its date, amount, category, description, bank and note, for a spreadsheet." />
+            </ui:CardControl.Header>
+            <ui:Button Content="Export…" Icon="{ui:SymbolIcon TableSimple24}" Click="ExportCsv_Click" />
+        </ui:CardControl>
+        <ui:CardControl Margin="0,0,0,4" Icon="{ui:SymbolIcon Flash24}">
+            <ui:CardControl.Header>
+                <core:CardHeader Title="Add spending from anywhere" Description="In Quick Capture (Win+Alt+N), type /s 50k coffee for money out or /s +2tr bonus for money in." />
+            </ui:CardControl.Header>
+        </ui:CardControl>
+    </StackPanel>
+</core:ModulePageBase>

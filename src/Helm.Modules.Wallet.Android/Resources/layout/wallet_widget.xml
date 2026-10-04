@@ -1,0 +1,241 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The Wallet widget: this month's spending, the budget bar, today, how many transactions wait for a category and
+     the top three categories. A fixed layout (no list), so it needs no RemoteViewsService; a tap opens Wallet. -->
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/wallet_widget_root"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent">
+
+    <ImageView
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:scaleType="fitXY"
+        android:src="@drawable/wallet_widget_background"
+        android:importantForAccessibility="no" />
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:orientation="vertical"
+        android:padding="12dp">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:gravity="center_vertical"
+            android:orientation="horizontal">
+            <ImageView
+                android:layout_width="18dp"
+                android:layout_height="18dp"
+                android:layout_marginEnd="8dp"
+                android:src="@drawable/wallet_notification"
+                android:tint="@color/wallet_widget_brand"
+                android:importantForAccessibility="no" />
+            <TextView
+                android:id="@+id/wallet_widget_title"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="Wallet"
+                android:textColor="@color/wallet_widget_secondary"
+                android:textSize="13sp"
+                android:singleLine="true"
+                android:ellipsize="end" />
+            <TextView
+                android:id="@+id/wallet_widget_pending"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:textColor="@color/wallet_widget_accent"
+                android:textSize="12sp"
+                android:textStyle="bold"
+                android:singleLine="true" />
+        </LinearLayout>
+
+        <TextView
+            android:id="@+id/wallet_widget_off"
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="1"
+            android:gravity="center"
+            android:textColor="@color/wallet_widget_secondary"
+            android:textSize="13sp"
+            android:visibility="gone" />
+
+        <LinearLayout
+            android:id="@+id/wallet_widget_body"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical">
+            <TextView
+                android:id="@+id/wallet_widget_spent"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="2dp"
+                android:textColor="@color/wallet_widget_text"
+                android:textSize="22sp"
+                android:textStyle="bold"
+                android:singleLine="true"
+                android:ellipsize="end" />
+            <ProgressBar
+                android:id="@+id/wallet_widget_bar"
+                style="?android:attr/progressBarStyleHorizontal"
+                android:layout_width="match_parent"
+                android:layout_height="6dp"
+                android:layout_marginTop="4dp"
+                android:max="100"
+                android:progressTint="@color/wallet_widget_brand"
+                android:progressBackgroundTint="@color/wallet_widget_track" />
+            <ProgressBar
+                android:id="@+id/wallet_widget_bar_over"
+                style="?android:attr/progressBarStyleHorizontal"
+                android:layout_width="match_parent"
+                android:layout_height="6dp"
+                android:layout_marginTop="4dp"
+                android:max="100"
+                android:progress="100"
+                android:progressTint="@color/wallet_widget_over"
+                android:progressBackgroundTint="@color/wallet_widget_track"
+                android:visibility="gone" />
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="2dp"
+                android:orientation="horizontal">
+                <TextView
+                    android:id="@+id/wallet_widget_detail"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:textColor="@color/wallet_widget_secondary"
+                    android:textSize="11sp"
+                    android:singleLine="true"
+                    android:ellipsize="end" />
+                <TextView
+                    android:id="@+id/wallet_widget_today"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="8dp"
+                    android:textColor="@color/wallet_widget_secondary"
+                    android:textSize="11sp"
+                    android:singleLine="true" />
+            </LinearLayout>
+            <LinearLayout
+                android:id="@+id/wallet_widget_row1"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="6dp"
+                android:orientation="vertical">
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal">
+                    <TextView
+                        android:id="@+id/wallet_widget_name1"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:textColor="@color/wallet_widget_text"
+                        android:textSize="12sp"
+                        android:singleLine="true"
+                        android:ellipsize="end" />
+                    <TextView
+                        android:id="@+id/wallet_widget_amount1"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="8dp"
+                        android:textColor="@color/wallet_widget_text"
+                        android:textSize="12sp"
+                        android:textStyle="bold"
+                        android:singleLine="true" />
+                </LinearLayout>
+                <ProgressBar
+                    android:id="@+id/wallet_widget_share1"
+                    style="?android:attr/progressBarStyleHorizontal"
+                    android:layout_width="match_parent"
+                    android:layout_height="3dp"
+                    android:layout_marginTop="2dp"
+                    android:max="100"
+                    android:progressTint="@color/wallet_widget_accent"
+                    android:progressBackgroundTint="@color/wallet_widget_track" />
+            </LinearLayout>
+            <LinearLayout
+                android:id="@+id/wallet_widget_row2"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="6dp"
+                android:orientation="vertical">
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal">
+                    <TextView
+                        android:id="@+id/wallet_widget_name2"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:textColor="@color/wallet_widget_text"
+                        android:textSize="12sp"
+                        android:singleLine="true"
+                        android:ellipsize="end" />
+                    <TextView
+                        android:id="@+id/wallet_widget_amount2"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="8dp"
+                        android:textColor="@color/wallet_widget_text"
+                        android:textSize="12sp"
+                        android:textStyle="bold"
+                        android:singleLine="true" />
+                </LinearLayout>
+                <ProgressBar
+                    android:id="@+id/wallet_widget_share2"
+                    style="?android:attr/progressBarStyleHorizontal"
+                    android:layout_width="match_parent"
+                    android:layout_height="3dp"
+                    android:layout_marginTop="2dp"
+                    android:max="100"
+                    android:progressTint="@color/wallet_widget_accent"
+                    android:progressBackgroundTint="@color/wallet_widget_track" />
+            </LinearLayout>
+            <LinearLayout
+                android:id="@+id/wallet_widget_row3"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="6dp"
+                android:orientation="vertical">
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal">
+                    <TextView
+                        android:id="@+id/wallet_widget_name3"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:textColor="@color/wallet_widget_text"
+                        android:textSize="12sp"
+                        android:singleLine="true"
+                        android:ellipsize="end" />
+                    <TextView
+                        android:id="@+id/wallet_widget_amount3"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="8dp"
+                        android:textColor="@color/wallet_widget_text"
+                        android:textSize="12sp"
+                        android:textStyle="bold"
+                        android:singleLine="true" />
+                </LinearLayout>
+                <ProgressBar
+                    android:id="@+id/wallet_widget_share3"
+                    style="?android:attr/progressBarStyleHorizontal"
+                    android:layout_width="match_parent"
+                    android:layout_height="3dp"
+                    android:layout_marginTop="2dp"
+                    android:max="100"
+                    android:progressTint="@color/wallet_widget_accent"
+                    android:progressBackgroundTint="@color/wallet_widget_track" />
+            </LinearLayout>
+        </LinearLayout>
+    </LinearLayout>
+</FrameLayout>

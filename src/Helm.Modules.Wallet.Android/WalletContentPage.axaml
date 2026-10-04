@@ -1,0 +1,337 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:ic="using:FluentIcons.Avalonia"
+             xmlns:vm="using:Helm.Modules.Wallet"
+             x:Class="Helm.Modules.Wallet.WalletContentPage"
+             x:DataType="vm:WalletViewModel">
+
+    <!-- Wallet itself (drawer and Quick access). Its options live on WalletPage (Home → Utilities). -->
+    <UserControl.Styles>
+        <Style Selector="TextBlock.figure">
+            <Setter Property="FontSize" Value="26" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+        </Style>
+        <Style Selector="TextBlock.figureSmall">
+            <Setter Property="FontSize" Value="17" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+        </Style>
+        <Style Selector="TextBlock.income">
+            <Setter Property="Foreground" Value="{DynamicResource HelmSuccess}" />
+        </Style>
+        <Style Selector="TextBlock.over">
+            <Setter Property="Foreground" Value="{DynamicResource HelmDanger}" />
+        </Style>
+        <Style Selector="TextBlock.uncategorized">
+            <Setter Property="FontStyle" Value="Italic" />
+        </Style>
+        <Style Selector="ProgressBar.over">
+            <Setter Property="Foreground" Value="{DynamicResource HelmDanger}" />
+        </Style>
+        <Style Selector="Border.badge">
+            <Setter Property="Background" Value="{DynamicResource HelmSubtleFill}" />
+            <Setter Property="CornerRadius" Value="4" />
+            <Setter Property="Padding" Value="6,0" />
+            <Setter Property="Margin" Value="0,2,6,0" />
+            <Setter Property="VerticalAlignment" Value="Center" />
+        </Style>
+        <Style Selector="Border.badge > TextBlock">
+            <Setter Property="FontSize" Value="11" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+        </Style>
+        <Style Selector="Button.chip">
+            <Setter Property="Margin" Value="0,0,6,6" />
+            <Setter Property="Padding" Value="12,6" />
+            <Setter Property="CornerRadius" Value="16" />
+            <Setter Property="VerticalContentAlignment" Value="Center" />
+        </Style>
+        <!-- Square icon button in a row (44 dp touch target) -->
+        <Style Selector="Button.icon">
+            <Setter Property="Width" Value="44" />
+            <Setter Property="Height" Value="44" />
+            <Setter Property="Padding" Value="0" />
+            <Setter Property="HorizontalContentAlignment" Value="Center" />
+            <Setter Property="VerticalContentAlignment" Value="Center" />
+        </Style>
+        <Style Selector="Button.icon:disabled /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="Transparent" />
+        </Style>
+        <Style Selector="Button.icon:disabled">
+            <Setter Property="Opacity" Value="0.35" />
+        </Style>
+        <Style Selector="Button.wide">
+            <Setter Property="HorizontalAlignment" Value="Stretch" />
+            <Setter Property="HorizontalContentAlignment" Value="Center" />
+            <Setter Property="VerticalContentAlignment" Value="Center" />
+        </Style>
+    </UserControl.Styles>
+
+    <UserControl.DataTemplates>
+        <!-- A category's share of the month -->
+        <DataTemplate DataType="vm:CategorySpendRow">
+            <StackPanel Margin="0,4">
+                <Grid ColumnDefinitions="*,Auto,Auto">
+                    <TextBlock Text="{Binding Name}" TextTrimming="CharacterEllipsis" Classes.uncategorized="{Binding IsUncategorized}" VerticalAlignment="Center" />
+                    <TextBlock Grid.Column="1" Text="{Binding AmountText}" FontWeight="SemiBold" Margin="8,0,0,0" VerticalAlignment="Center" />
+                    <TextBlock Grid.Column="2" Text="{Binding ShareText}" Classes="secondary" Width="40" TextAlignment="Right" VerticalAlignment="Center" />
+                </Grid>
+                <ProgressBar Margin="0,4,0,0" Height="6" MinHeight="6" Minimum="0" Maximum="100" Value="{Binding Percent}" />
+                <TextBlock Text="{Binding CountText}" Classes="secondary" FontSize="12" />
+            </StackPanel>
+        </DataTemplate>
+
+        <!-- A transaction: one tap on a suggested category files it; tap the row for the rest -->
+        <DataTemplate DataType="vm:TransactionRow">
+            <Border BorderThickness="0,1,0,0" BorderBrush="{DynamicResource HelmCardStroke}" Padding="0,4">
+                <StackPanel>
+                    <Button Classes="flat" HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch" Padding="4,6"
+                            Command="{Binding ToggleExpandedCommand}" AutomationProperties.Name="{Binding Title}">
+                        <Grid ColumnDefinitions="*,Auto">
+                            <StackPanel VerticalAlignment="Center">
+                                <TextBlock Text="{Binding Title}" TextTrimming="CharacterEllipsis" />
+                                <WrapPanel>
+                                    <Border Classes="badge" IsVisible="{Binding IsCategorized}">
+                                        <TextBlock Text="{Binding CategoryName}" Foreground="{DynamicResource SystemAccentColor}" />
+                                    </Border>
+                                    <Border Classes="badge" IsVisible="{Binding IsAuto}">
+                                        <TextBlock Text="auto" />
+                                    </Border>
+                                    <TextBlock Text="{Binding Details}" Classes="secondary" FontSize="12" VerticalAlignment="Center" Margin="0,2,0,0" />
+                                </WrapPanel>
+                            </StackPanel>
+                            <TextBlock Grid.Column="1" Text="{Binding AmountText}" FontWeight="SemiBold" VerticalAlignment="Center" Margin="8,0,4,0"
+                                       Classes.income="{Binding IsIncome}" />
+                        </Grid>
+                    </Button>
+
+                    <!-- One-tap categories while it waits for one -->
+                    <ItemsControl ItemsSource="{Binding Suggestions}" Margin="4,2,0,0" IsVisible="{Binding !IsCategorized}">
+                        <ItemsControl.ItemsPanel>
+                            <ItemsPanelTemplate>
+                                <WrapPanel />
+                            </ItemsPanelTemplate>
+                        </ItemsControl.ItemsPanel>
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate DataType="vm:CategoryChip">
+                                <Button Classes="chip" Content="{Binding Name}" Command="{Binding PickCommand}" />
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+
+                    <!-- Expanded: the category, the details, edit and delete -->
+                    <StackPanel Spacing="8" Margin="4,4,4,8" IsVisible="{Binding IsExpanded}">
+                        <ComboBox HorizontalAlignment="Stretch" ItemsSource="{Binding Choices}" SelectedItem="{Binding SelectedChoice}"
+                                  PlaceholderText="Category" AutomationProperties.Name="Category">
+                            <ComboBox.ItemTemplate>
+                                <DataTemplate DataType="vm:CategoryChoice">
+                                    <TextBlock Text="{Binding Name}" />
+                                </DataTemplate>
+                            </ComboBox.ItemTemplate>
+                        </ComboBox>
+                        <TextBlock Text="{Binding BalanceText}" Classes="secondary" IsVisible="{Binding HasBalance}" />
+                        <TextBlock Text="{Binding Note}" TextWrapping="Wrap" IsVisible="{Binding HasNote}" />
+                        <Border Classes="infobar" IsVisible="{Binding HasOriginal}">
+                            <Grid ColumnDefinitions="*,Auto">
+                                <StackPanel>
+                                    <TextBlock Text="The bank's notification" Classes="secondary" FontSize="12" />
+                                    <TextBlock Text="{Binding OriginalText}" TextWrapping="Wrap" />
+                                </StackPanel>
+                                <Button Grid.Column="1" Classes="icon flat" Command="{Binding CopyOriginalCommand}" AutomationProperties.Name="Copy the notification">
+                                    <ic:SymbolIcon Symbol="Copy" FontSize="18" />
+                                </Button>
+                            </Grid>
+                        </Border>
+                        <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Spacing="2" IsVisible="{Binding !IsEditing}">
+                            <Button Classes="icon flat" Command="{Binding UncategorizeCommand}" IsVisible="{Binding IsCategorized}" AutomationProperties.Name="Back to the ones to categorize">
+                                <ic:SymbolIcon Symbol="ArrowUndo" FontSize="18" />
+                            </Button>
+                            <Button Classes="icon flat" Command="{Binding BeginEditCommand}" AutomationProperties.Name="Edit">
+                                <ic:SymbolIcon Symbol="Edit" FontSize="18" />
+                            </Button>
+                            <Button Classes="icon flat danger" Command="{Binding DeleteCommand}" AutomationProperties.Name="Delete">
+                                <ic:SymbolIcon Symbol="Delete" FontSize="18" />
+                            </Button>
+                        </StackPanel>
+
+                        <!-- Editor -->
+                        <StackPanel Spacing="8" IsVisible="{Binding IsEditing}">
+                            <Grid ColumnDefinitions="*,8,Auto">
+                                <TextBox PlaceholderText="Amount" Text="{Binding EditAmount}" AutomationProperties.Name="Amount" />
+                                <CheckBox Grid.Column="2" Content="Money in" IsChecked="{Binding EditIsIncome}" />
+                            </Grid>
+                            <TextBox PlaceholderText="Description" Text="{Binding EditDescription}" AutomationProperties.Name="Description" />
+                            <CalendarDatePicker HorizontalAlignment="Stretch" SelectedDate="{Binding EditDate}" PlaceholderText="Date" />
+                            <TextBox PlaceholderText="Note" Text="{Binding EditNote}" AcceptsReturn="True" TextWrapping="Wrap" MinHeight="56" AutomationProperties.Name="Note" />
+                            <WrapPanel>
+                                <Button Classes="accent" Content="Save" Command="{Binding SaveEditCommand}" Margin="0,0,8,0" />
+                                <Button Content="Cancel" Command="{Binding CancelEditCommand}" />
+                            </WrapPanel>
+                        </StackPanel>
+                    </StackPanel>
+                </StackPanel>
+            </Border>
+        </DataTemplate>
+
+        <!-- One day of the month: its title, what was spent, its transactions -->
+        <DataTemplate DataType="vm:DayGroup">
+            <StackPanel Margin="0,0,0,8">
+                <Grid ColumnDefinitions="*,Auto" Margin="4,8,4,4">
+                    <TextBlock Text="{Binding Title}" FontWeight="SemiBold" />
+                    <TextBlock Grid.Column="1" Text="{Binding TotalText}" Classes="secondary" />
+                </Grid>
+                <Border Classes="card" Padding="12,0">
+                    <ItemsControl ItemsSource="{Binding Rows}" />
+                </Border>
+            </StackPanel>
+        </DataTemplate>
+    </UserControl.DataTemplates>
+
+    <StackPanel>
+        <!-- Shown while the tool is turned off -->
+        <Border x:Name="OffBar" Classes="infobar" IsVisible="False">
+            <StackPanel>
+                <TextBlock Text="Wallet is turned off" Classes="title" />
+                <TextBlock Text="Your transactions are kept, but new ones are not saved. Turn Wallet on in its settings." TextWrapping="Wrap" />
+            </StackPanel>
+        </Border>
+
+        <!-- The month, first and easy to see -->
+        <Border Classes="card">
+            <Grid ColumnDefinitions="Auto,Auto,*,Auto">
+                <Button Classes="icon flat" Command="{Binding PreviousMonthCommand}" AutomationProperties.Name="Previous month">
+                    <ic:SymbolIcon Symbol="ChevronLeft" FontSize="18" />
+                </Button>
+                <Button Grid.Column="1" Classes="icon flat" Command="{Binding NextMonthCommand}" IsEnabled="{Binding CanGoNext}" AutomationProperties.Name="Next month">
+                    <ic:SymbolIcon Symbol="ChevronRight" FontSize="18" />
+                </Button>
+                <Button Grid.Column="2" Classes="flat" HorizontalAlignment="Stretch" HorizontalContentAlignment="Left" VerticalContentAlignment="Center"
+                        Command="{Binding ThisMonthCommand}" AutomationProperties.Name="This month">
+                    <TextBlock Text="{Binding MonthTitle}" FontSize="18" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+                </Button>
+                <Button x:Name="AddButton" Grid.Column="3" Classes="icon accent" Command="{Binding OpenAddCommand}" AutomationProperties.Name="Add a transaction">
+                    <ic:SymbolIcon Symbol="Add" FontSize="18" />
+                </Button>
+            </Grid>
+        </Border>
+
+        <StackPanel x:Name="Body">
+            <!-- What happened: saved, copied, a problem -->
+            <Border Classes="infobar" IsVisible="{Binding HasMessage}">
+                <Grid ColumnDefinitions="*,Auto">
+                    <TextBlock Text="{Binding Message}" TextWrapping="Wrap" VerticalAlignment="Center" />
+                    <Button Grid.Column="1" Classes="icon flat" Command="{Binding DismissMessageCommand}" AutomationProperties.Name="Dismiss">
+                        <ic:SymbolIcon Symbol="Dismiss" FontSize="16" />
+                    </Button>
+                </Grid>
+            </Border>
+
+            <!-- Helm cannot read the banks' notifications yet -->
+            <Border Classes="infobar warning" IsVisible="{Binding NeedsAccess}">
+                <StackPanel Spacing="8">
+                    <TextBlock Text="Turn on notification access" Classes="title" />
+                    <TextBlock Text="To save your transactions by itself, Helm needs to read your bank's notifications. Nothing else is read or sent anywhere."
+                               TextWrapping="Wrap" />
+                    <Button Classes="accent wide" Content="Open notification access" Command="{Binding OpenNotificationAccessCommand}" />
+                </StackPanel>
+            </Border>
+
+            <!-- Adding a transaction by hand -->
+            <Border Classes="card" IsVisible="{Binding IsAddOpen}">
+                <StackPanel Spacing="8">
+                    <TextBlock Text="New transaction" Classes="title" FontSize="16" />
+                    <Grid ColumnDefinitions="*,8,Auto">
+                        <TextBox x:Name="NewAmountBox" PlaceholderText="Amount: 50k, 1.5tr" Text="{Binding NewAmount}" AutomationProperties.Name="Amount" />
+                        <CheckBox Grid.Column="2" Content="Money in" IsChecked="{Binding NewIsIncome}" />
+                    </Grid>
+                    <TextBox PlaceholderText="What it was for" Text="{Binding NewDescription}" AutomationProperties.Name="Description" />
+                    <ComboBox HorizontalAlignment="Stretch" ItemsSource="{Binding NewCategories}" SelectedItem="{Binding NewCategory}"
+                              PlaceholderText="Category (optional)" AutomationProperties.Name="Category">
+                        <ComboBox.ItemTemplate>
+                            <DataTemplate DataType="vm:CategoryChoice">
+                                <TextBlock Text="{Binding Name}" />
+                            </DataTemplate>
+                        </ComboBox.ItemTemplate>
+                    </ComboBox>
+                    <CalendarDatePicker HorizontalAlignment="Stretch" SelectedDate="{Binding NewDate}" PlaceholderText="Date" />
+                    <Grid ColumnDefinitions="*,8,*">
+                        <Button Classes="accent wide" Content="Add" Command="{Binding AddCommand}" IsEnabled="{Binding CanAdd}" />
+                        <Button Grid.Column="2" Classes="wide" Content="Cancel" Command="{Binding CancelAddCommand}" />
+                    </Grid>
+                </StackPanel>
+            </Border>
+
+            <!-- The month in numbers -->
+            <Border Classes="card">
+                <StackPanel Spacing="4">
+                    <TextBlock Text="Spent" Classes="secondary" />
+                    <TextBlock Text="{Binding SpentText}" Classes="figure" />
+                    <TextBlock Text="{Binding SpentTodayText}" Classes="secondary" IsVisible="{Binding HasSpentToday}" />
+                    <Grid ColumnDefinitions="*,*" Margin="0,8,0,0">
+                        <StackPanel>
+                            <TextBlock Text="Money in" Classes="secondary" />
+                            <TextBlock Text="{Binding IncomeText}" Classes="figureSmall income" />
+                        </StackPanel>
+                        <StackPanel Grid.Column="1">
+                            <TextBlock Text="Net" Classes="secondary" />
+                            <TextBlock Text="{Binding NetText}" Classes="figureSmall" Classes.over="{Binding IsNetNegative}" />
+                        </StackPanel>
+                    </Grid>
+                    <TextBlock Text="{Binding CountText}" Classes="secondary" />
+                    <TextBlock Text="{Binding CompareText}" Classes="secondary" IsVisible="{Binding HasCompare}" TextWrapping="Wrap" />
+
+                    <!-- The budget -->
+                    <Border Classes="row" IsVisible="{Binding HasBudget}">
+                        <StackPanel Spacing="6">
+                            <Grid ColumnDefinitions="*,Auto">
+                                <TextBlock Text="Monthly budget" FontWeight="SemiBold" />
+                                <TextBlock Grid.Column="1" Text="{Binding BudgetText}" Classes="secondary" FontSize="12" VerticalAlignment="Center" />
+                            </Grid>
+                            <ProgressBar Height="8" MinHeight="8" Minimum="0" Maximum="100" Value="{Binding BudgetPercent}" Classes.over="{Binding IsOverBudget}" />
+                            <TextBlock Text="{Binding BudgetDetail}" TextWrapping="Wrap" Classes.over="{Binding IsOverBudget}" />
+                        </StackPanel>
+                    </Border>
+                </StackPanel>
+            </Border>
+
+            <!-- Waiting for a category -->
+            <StackPanel IsVisible="{Binding HasToCategorize}">
+                <TextBlock Text="{Binding ToCategorizeTitle}" Classes="section" />
+                <Border Classes="infobar" IsVisible="{Binding HasSimilar}">
+                    <StackPanel Spacing="8">
+                        <TextBlock Text="{Binding SimilarText}" TextWrapping="Wrap" />
+                        <Grid ColumnDefinitions="*,8,*">
+                            <Button Classes="accent wide" Content="Yes" Command="{Binding ApplySimilarCommand}" />
+                            <Button Grid.Column="2" Classes="wide" Content="No" Command="{Binding DismissSimilarCommand}" />
+                        </Grid>
+                    </StackPanel>
+                </Border>
+                <Border Classes="card" Padding="12,0">
+                    <ItemsControl ItemsSource="{Binding ToCategorize}" />
+                </Border>
+                <TextBlock Text="{Binding MoreToCategorizeText}" Classes="secondary" Margin="4,0,4,8" IsVisible="{Binding HasMoreToCategorize}" />
+            </StackPanel>
+
+            <!-- Where the money went -->
+            <StackPanel IsVisible="{Binding HasSpending}">
+                <TextBlock Text="Spending by category" Classes="section" />
+                <Border Classes="card">
+                    <ItemsControl ItemsSource="{Binding Spending}" />
+                </Border>
+            </StackPanel>
+            <StackPanel IsVisible="{Binding HasEarning}">
+                <TextBlock Text="Money in by category" Classes="section" />
+                <Border Classes="card">
+                    <ItemsControl ItemsSource="{Binding Earning}" />
+                </Border>
+            </StackPanel>
+
+            <!-- The month's transactions -->
+            <TextBlock Text="Transactions" Classes="section" />
+            <Grid ColumnDefinitions="Auto,8,*">
+                <ComboBox MinWidth="120" ItemsSource="{x:Static vm:WalletViewModel.FilterNames}" SelectedIndex="{Binding FilterIndex}" AutomationProperties.Name="Show" />
+                <TextBox Grid.Column="2" PlaceholderText="Search" Text="{Binding SearchText}" AutomationProperties.Name="Search" />
+            </Grid>
+            <TextBlock Text="{Binding EmptyText}" Classes="secondary" Margin="4,12,4,8" TextWrapping="Wrap" IsVisible="{Binding !HasDays}" />
+            <ItemsControl ItemsSource="{Binding Days}" />
+        </StackPanel>
+    </StackPanel>
+</UserControl>

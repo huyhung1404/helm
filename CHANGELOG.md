@@ -3,6 +3,32 @@
 All notable changes to Helm. The top section is used as the GitHub release body and as the Velopack release notes.
 Format: [Keep a Changelog](https://keepachangelog.com), versions follow [SemVer](https://semver.org).
 
+## [Unreleased]
+
+### Added
+- **Wallet** (PC and Android): see where your money goes. Helm on the phone reads **Techcombank** and **ACB** balance
+  notifications (their apps, or their SMS) and saves each transaction by itself: the amount, the balance after it, the
+  account, the description and the time. The same transaction from the app and the SMS is saved once. Transactions
+  sync end-to-end encrypted to your PC.
+  - **To categorize**: each new transaction waits with a few likely categories as buttons (those of similar earlier
+    ones first); one tap files it, and Helm offers to file the similar ones too. A description you always put in the
+    same category is filed by itself (marked *auto*).
+  - **What was it?** After a payment the phone shows a quiet notification with three categories as buttons, so you can
+    file it without opening Helm.
+  - The month at a glance: spent, money in, net, today, the change against last month by the same day, a **monthly
+    budget** with what is left per day, and spending and money in **by category**. Every transaction of the month by
+    day, with filters and search; tap one to change its category, edit it, see the bank's notification, or delete it.
+  - Add cash by hand, or with `/s 50k coffee` (`/s +2tr bonus` for money in) in Quick Capture.
+  - Categories: rename or hide the built-in ones, add your own; *Between my accounts* counts neither as spending nor
+    as money in.
+  - An Android **home-screen widget**: this month's spending against the budget, today's, how many transactions wait
+    for a category and the top categories.
+  - Settings: notification access (with the steps for Android's *Restricted setting*), which banks to read, **Try a
+    notification** (paste one to see what Helm reads), the notifications Helm could not read, and CSV export.
+
+### Fixed
+- On a narrow window the sync button no longer slips under the minimise button; it is one plain glyph, as on Android.
+
 ## [0.22.0] - 2026-10-03
 
 ### Added

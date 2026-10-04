@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Status-bar icon for Wallet: the Wallet icon (a wallet with a card and a clasp), white on transparent (Android
+     tints it). The same shapes as WalletIconShape, scaled from 100 to 24. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="100"
+    android:viewportHeight="100">
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M16 27L64 6Q71 3 74 10L81 27Z" />
+    <path
+        android:strokeColor="#FFFFFFFF"
+        android:strokeWidth="9"
+        android:strokeLineJoin="round"
+        android:pathData="M18.5 27.5H81.5A14 14 0 0 1 95.5 41.5V80.5A14 14 0 0 1 81.5 94.5H18.5A14 14 0 0 1 4.5 80.5V41.5A14 14 0 0 1 18.5 27.5Z" />
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:fillType="evenOdd"
+        android:pathData="M68 51H96V71H68A10 10 0 0 1 68 51Z M71 61m-4 0a4 4 0 1 0 8 0a4 4 0 1 0 -8 0" />
+</vector>

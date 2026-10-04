@@ -1,0 +1,216 @@
+<ui:ModulePageBase xmlns="https://github.com/avaloniaui"
+                   xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                   xmlns:ui="using:Helm.Core.Ui"
+                   xmlns:vm="using:Helm.Modules.Wallet"
+                   x:Class="Helm.Modules.Wallet.WalletPage"
+                   x:DataType="vm:WalletViewModel">
+
+    <!-- Wallet's settings (Home → Utilities). The transactions themselves are on WalletContentPage. -->
+    <ui:ModulePageBase.Styles>
+        <Style Selector="Button.wide">
+            <Setter Property="HorizontalAlignment" Value="Stretch" />
+            <Setter Property="HorizontalContentAlignment" Value="Center" />
+            <Setter Property="VerticalContentAlignment" Value="Center" />
+        </Style>
+        <Style Selector="TextBlock.ok">
+            <Setter Property="Foreground" Value="{DynamicResource HelmSuccess}" />
+        </Style>
+    </ui:ModulePageBase.Styles>
+
+    <StackPanel>
+        <Border Classes="infobar" IsVisible="{Binding HasMessage}">
+            <TextBlock Text="{Binding Message}" TextWrapping="Wrap" />
+        </Border>
+        <Border Classes="card">
+            <StackPanel Spacing="8">
+                <TextBlock Text="Open Wallet" Classes="title" />
+                <TextBlock Text="This month's spending, the transactions to categorize and where the money went. Also in the menu and on Home." Classes="secondary" TextWrapping="Wrap" />
+                <Button Classes="accent" Content="Open Wallet" Click="Open_Click" />
+            </StackPanel>
+        </Border>
+
+        <!-- Bank notifications -->
+        <TextBlock Text="Bank notifications" Classes="section" />
+        <Border Classes="card">
+            <StackPanel>
+                <DockPanel>
+                    <ToggleSwitch DockPanel.Dock="Right" IsChecked="{Binding ListenEnabled}" OnContent="" OffContent="" AutomationProperties.Name="Read bank notifications" />
+                    <StackPanel VerticalAlignment="Center">
+                        <TextBlock Text="Read bank notifications" Classes="title" />
+                        <TextBlock Text="Each balance change your bank's app or SMS tells you about is saved as a transaction, once. Only the banks below are read; nothing leaves your devices except through Helm's encrypted sync."
+                                   Classes="secondary" TextWrapping="Wrap" />
+                    </StackPanel>
+                </DockPanel>
+                <Border Classes="row" IsEnabled="{Binding ListenEnabled}">
+                    <StackPanel Spacing="8">
+                        <TextBlock Text="Notification access" />
+                        <TextBlock Text="{Binding AccessText}" Classes="secondary" Classes.ok="{Binding HasNotificationAccess}" TextWrapping="Wrap" />
+                        <Button Classes="wide" Classes.accent="{Binding !HasNotificationAccess}" Content="Open notification access" Command="{Binding OpenNotificationAccessCommand}" />
+                    </StackPanel>
+                </Border>
+                <Border Classes="row" IsEnabled="{Binding ListenEnabled}">
+                    <StackPanel Spacing="8">
+                        <TextBlock Text="If Android says “Restricted setting”" />
+                        <TextBlock Text="Android 13 and later block notification access for apps installed from a file. Open App info, tap ⋮ (top right) → Allow restricted settings, then turn Helm on in Notification access again."
+                                   Classes="secondary" TextWrapping="Wrap" />
+                        <TextBlock Text="On Xiaomi, OPPO, Samsung and others, also set Battery to No restrictions (or turn on Autostart) in App info, or the phone may stop Helm from listening."
+                                   Classes="secondary" TextWrapping="Wrap" />
+                        <Button Classes="wide" Content="Open App info" Command="{Binding OpenAppDetailsCommand}" />
+                    </StackPanel>
+                </Border>
+                <Border Classes="row" IsEnabled="{Binding ListenEnabled}">
+                    <DockPanel>
+                        <ToggleSwitch DockPanel.Dock="Right" IsChecked="{Binding TechcombankEnabled}" OnContent="" OffContent="" AutomationProperties.Name="Techcombank" />
+                        <StackPanel VerticalAlignment="Center">
+                            <TextBlock Text="Techcombank" />
+                            <TextBlock Text="The Techcombank Mobile app and SMS from Techcombank." Classes="secondary" TextWrapping="Wrap" />
+                        </StackPanel>
+                    </DockPanel>
+                </Border>
+                <Border Classes="row" IsEnabled="{Binding ListenEnabled}">
+                    <DockPanel>
+                        <ToggleSwitch DockPanel.Dock="Right" IsChecked="{Binding AcbEnabled}" OnContent="" OffContent="" AutomationProperties.Name="ACB" />
+                        <StackPanel VerticalAlignment="Center">
+                            <TextBlock Text="ACB" />
+                            <TextBlock Text="The ACB ONE app and SMS from ACB." Classes="secondary" TextWrapping="Wrap" />
+                        </StackPanel>
+                    </DockPanel>
+                </Border>
+            </StackPanel>
+        </Border>
+
+        <!-- Categorizing -->
+        <TextBlock Text="Categorizing" Classes="section" />
+        <Border Classes="card">
+            <StackPanel>
+                <DockPanel>
+                    <ToggleSwitch DockPanel.Dock="Right" IsChecked="{Binding AskForCategory}" OnContent="" OffContent="" AutomationProperties.Name="Ask what it was" />
+                    <StackPanel VerticalAlignment="Center">
+                        <TextBlock Text="Ask what it was" Classes="title" />
+                        <TextBlock Text="After a payment, a quiet notification with the likeliest categories as buttons: one tap files it." Classes="secondary" TextWrapping="Wrap" />
+                    </StackPanel>
+                </DockPanel>
+                <Border Classes="row">
+                    <DockPanel>
+                        <ToggleSwitch DockPanel.Dock="Right" IsChecked="{Binding AutoCategorize}" OnContent="" OffContent="" AutomationProperties.Name="Categorize by itself" />
+                        <StackPanel VerticalAlignment="Center">
+                            <TextBlock Text="Categorize by itself" />
+                            <TextBlock Text="A transaction with the same description as earlier ones that you all put in one category goes there too, marked auto." Classes="secondary" TextWrapping="Wrap" />
+                        </StackPanel>
+                    </DockPanel>
+                </Border>
+            </StackPanel>
+        </Border>
+
+        <!-- Budget -->
+        <TextBlock Text="Budget" Classes="section" />
+        <Border Classes="card">
+            <StackPanel Spacing="8">
+                <TextBlock Text="Monthly budget" Classes="title" />
+                <TextBlock Text="What you mean to spend in a month at most; Wallet and its widget show how much is left and per day. Empty for none. Synced to all your devices."
+                           Classes="secondary" TextWrapping="Wrap" />
+                <TextBox Text="{Binding MonthlyBudgetText, UpdateSourceTrigger=LostFocus}" PlaceholderText="e.g. 10tr" AutomationProperties.Name="Monthly budget" />
+            </StackPanel>
+        </Border>
+
+        <!-- Categories -->
+        <TextBlock Text="Categories" Classes="section" />
+        <Border Classes="card">
+            <StackPanel Spacing="8">
+                <TextBlock Text="Rename them, hide the ones you do not use, or add your own. Between my accounts counts neither as spending nor as money in."
+                           Classes="secondary" TextWrapping="Wrap" />
+                <ItemsControl ItemsSource="{Binding CategoryRows}">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate DataType="vm:CategoryEditRow">
+                            <Border Classes="row">
+                                <Grid ColumnDefinitions="*,Auto,Auto">
+                                    <StackPanel VerticalAlignment="Center">
+                                        <TextBox Text="{Binding Name, UpdateSourceTrigger=LostFocus}" AutomationProperties.Name="Category name" />
+                                        <TextBlock Text="{Binding KindText}" Classes="secondary" FontSize="12" Margin="2,2,0,0" />
+                                    </StackPanel>
+                                    <ToggleSwitch Grid.Column="1" IsChecked="{Binding IsShown}" OnContent="" OffContent="" Margin="8,0,0,0" AutomationProperties.Name="Shown" />
+                                    <Button Grid.Column="2" Classes="flat danger" Content="Delete" Command="{Binding DeleteCommand}" IsVisible="{Binding CanDelete}" VerticalAlignment="Center" />
+                                </Grid>
+                            </Border>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+                <Border Classes="row">
+                    <StackPanel Spacing="8">
+                        <TextBlock Text="New category" />
+                        <TextBox Text="{Binding NewCategoryName}" PlaceholderText="Name" AutomationProperties.Name="New category name" />
+                        <ComboBox HorizontalAlignment="Stretch" ItemsSource="{x:Static vm:WalletViewModel.KindNames}" SelectedIndex="{Binding NewCategoryKindIndex}"
+                                  AutomationProperties.Name="New category kind" />
+                        <Button Content="Add category" Command="{Binding AddCategoryCommand}" />
+                    </StackPanel>
+                </Border>
+            </StackPanel>
+        </Border>
+
+        <!-- Home-screen widget -->
+        <TextBlock Text="Home screen" Classes="section" />
+        <Border Classes="card">
+            <StackPanel Spacing="8">
+                <TextBlock Text="Wallet widget" Classes="title" />
+                <TextBlock Text="This month's spending against your budget, today's, how many transactions wait for a category and the top categories. Tap it to open Wallet. You can also add it from the launcher's widget list."
+                           Classes="secondary" TextWrapping="Wrap" />
+                <Button x:Name="AddWidgetButton" Content="Add to home screen" Command="{Binding PinWidgetCommand}" />
+            </StackPanel>
+        </Border>
+
+        <!-- Checking what Helm reads -->
+        <TextBlock Text="Troubleshooting" Classes="section" />
+        <Border Classes="card">
+            <StackPanel Spacing="8">
+                <TextBlock Text="Try a notification" Classes="title" />
+                <TextBlock Text="Paste a bank notification to see what Helm reads in it: the amount, the balance, the account and the description." Classes="secondary" TextWrapping="Wrap" />
+                <ComboBox HorizontalAlignment="Stretch" ItemsSource="{x:Static vm:WalletViewModel.TestBankNames}" SelectedIndex="{Binding TestBankIndex}" AutomationProperties.Name="Bank" />
+                <TextBox Text="{Binding TestText}" AcceptsReturn="True" TextWrapping="Wrap" MinHeight="64" PlaceholderText="Paste the notification text" AutomationProperties.Name="Notification text" />
+                <TextBlock Text="{Binding TestResult}" TextWrapping="Wrap" IsVisible="{Binding HasTestResult}" />
+            </StackPanel>
+        </Border>
+        <Border Classes="card">
+            <StackPanel Spacing="8">
+                <TextBlock Text="Notifications Helm could not read" Classes="title" />
+                <TextBlock Text="Your bank's notifications that talk about money but that Helm did not understand, kept on this phone only. Copy one and add it by hand, or send it to the developer so Helm learns the format."
+                           Classes="secondary" TextWrapping="Wrap" />
+                <TextBlock Text="None." Classes="secondary" IsVisible="{Binding !HasUnread}" />
+                <ItemsControl ItemsSource="{Binding Unread}">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate DataType="vm:UnreadRow">
+                            <Border Classes="row">
+                                <Grid ColumnDefinitions="*,Auto">
+                                    <StackPanel>
+                                        <TextBlock Text="{Binding Bank}" FontWeight="SemiBold" />
+                                        <TextBlock Text="{Binding When}" Classes="secondary" FontSize="12" />
+                                        <TextBlock Text="{Binding Text}" TextWrapping="Wrap" />
+                                    </StackPanel>
+                                    <Button Grid.Column="1" Classes="flat" Content="Copy" Command="{Binding CopyCommand}" VerticalAlignment="Top" />
+                                </Grid>
+                            </Border>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+                <Button Content="Clear the list" Command="{Binding ClearUnreadCommand}" IsVisible="{Binding HasUnread}" />
+            </StackPanel>
+        </Border>
+
+        <!-- Data -->
+        <TextBlock Text="Data" Classes="section" />
+        <Border Classes="card">
+            <StackPanel Spacing="8">
+                <TextBlock Text="Export to CSV" Classes="title" />
+                <TextBlock Text="Every transaction with its date, amount, category, description, bank and note, for a spreadsheet. Shared to the app you pick (Drive, mail…)."
+                           Classes="secondary" TextWrapping="Wrap" />
+                <Button Content="Share CSV" Click="ShareCsv_Click" />
+            </StackPanel>
+        </Border>
+        <Border Classes="card">
+            <StackPanel Spacing="8">
+                <TextBlock Text="Add spending from anywhere" Classes="title" />
+                <TextBlock Text="In Quick Capture (Share → Save to Helm, or the Quick Settings tile), type /s 50k coffee for money out or /s +2tr bonus for money in."
+                           Classes="secondary" TextWrapping="Wrap" />
+            </StackPanel>
+        </Border>
+    </StackPanel>
+</ui:ModulePageBase>

@@ -4,6 +4,7 @@ using Helm.Modules.Notes;
 using Helm.Modules.QuickCapture;
 using Helm.Modules.Tracker;
 using Helm.Modules.Vault;
+using Helm.Modules.Wallet;
 using Helm.Modules.WatchLater;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -22,6 +23,7 @@ internal static class AndroidModules
         services.AddVaultModule();
         services.AddTrackerModule();
         services.AddMissionsModule();
+        services.AddWalletModule();
         services.AddNotesModule();
         services.AddWatchLaterModule();
         services.AddQuickCaptureModule();

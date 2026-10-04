@@ -61,6 +61,12 @@ A tool can open its own page from outside the app (a widget, a shortcut) by laun
 (a list with a RemoteViewsService): `src/Helm.Modules.Tracker.Android/Widget` (layouts in its `Resources/`, looked up
 by name at run time); Missions' widget (`src/Helm.Modules.Missions.Android/Widget`) is a simpler fixed layout.
 
+Wallet reads other apps' notifications with a `NotificationListenerService`
+(`src/Helm.Modules.Wallet.Android/Capture`, fixed `Name` so the access the user granted survives updates). Android
+binds it in the app process once the user turns Helm on in *Notification access*; on Android 13+ a sideloaded APK
+first needs *Allow restricted settings* in App info. The listener drops every notification that is not from a bank on
+the spot and hands the rest to `WalletCapture` in the shared core, which is where the reading is tested.
+
 Parts that run without Helm's activity (a widget, a broadcast, Quick Capture's share dialog and Quick Settings tile)
 get services from `HelmAndroidServices.Current`, and read whether a tool is on from `GeneralSettings.EnabledModules`
 (missing means on): the module registry only starts with the activity. Quick Capture

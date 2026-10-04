@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Wallet widget colours (light); values-night has the dark ones. The same surfaces as the app's cards. -->
+<resources>
+    <color name="wallet_widget_background">#FBFBFB</color>
+    <color name="wallet_widget_stroke">#E5E5E5</color>
+    <color name="wallet_widget_text">#1A1A1A</color>
+    <color name="wallet_widget_secondary">#5F5F5F</color>
+    <color name="wallet_widget_accent">#0067C0</color>
+    <color name="wallet_widget_brand">#047857</color>
+    <color name="wallet_widget_track">#1A000000</color>
+    <color name="wallet_widget_over">#C42B1C</color>
+    <string name="wallet_widget_description">This month's spending against your budget, and where the money went. Tap to open Wallet.</string>
+</resources>
