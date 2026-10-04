@@ -56,7 +56,7 @@
                     <StackPanel Spacing="8">
                         <TextBlock Text="Deadline" />
                         <TextBlock Text="The pace shows how far ahead of it or behind you are. Clear it for none." Classes="secondary" TextWrapping="Wrap" />
-                        <CalendarDatePicker HorizontalAlignment="Stretch" SelectedDate="{Binding EditDeadline}" PlaceholderText="No deadline" />
+                        <ui:DateTimeBox Date="{Binding EditDeadline}" ShowTime="False" Lean="Future" AllowEmpty="True" PlaceholderText="No deadline" />
                     </StackPanel>
                 </Border>
                 <Border Classes="row">

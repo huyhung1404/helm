@@ -109,8 +109,8 @@
                             <ui:Button Margin="0,0,6,8" Content="+1 day" Command="{Binding ExtendCommand}" CommandParameter="1" ToolTip="Due one day later" />
                             <ui:Button Margin="0,0,6,8" Content="+1 week" Command="{Binding ExtendCommand}" CommandParameter="7" ToolTip="Due a week later" />
                             <ui:Button Margin="0,0,12,8" Content="+1 month" Command="{Binding ExtendCommand}" CommandParameter="30" ToolTip="Due 30 days later" />
-                            <DatePicker Width="150" Margin="0,0,6,8" SelectedDate="{Binding EditDueDate}" AutomationProperties.Name="Due date" />
-                            <ui:TextBox Width="92" Margin="0,0,6,8" PlaceholderText="HH:mm" AutomationProperties.Name="Due time" Text="{Binding EditDueTimeText, UpdateSourceTrigger=PropertyChanged}" />
+                            <core:DateTimeBox Width="260" Margin="0,0,6,8" Date="{Binding EditDueDate}" Time="{Binding EditDueTime}" Lean="Future" AllowEmpty="True"
+                                              ShowChips="False" PlaceholderText="Due: mai 9h, thứ 6" AutomationProperties.Name="Due date and time" />
                             <ui:Button Margin="0,0,6,8" Appearance="Primary" Content="Set" Command="{Binding SetDueCommand}" />
                             <ui:Button Margin="0,0,6,8" Content="No due date" Command="{Binding ClearDueCommand}" />
                         </WrapPanel>
@@ -313,13 +313,9 @@
                                           SelectedIndex="{Binding EditPriorityIndex}" AutomationProperties.Name="Edit priority" />
                             </StackPanel>
                             <StackPanel Margin="0,0,8,8">
-                                <TextBlock Text="Due date" Style="{DynamicResource HelmSecondaryText}" Margin="0,0,0,4" />
-                                <DatePicker Width="160" SelectedDate="{Binding EditDueDate}" ToolTip="Due date" AutomationProperties.Name="Edit due date" />
-                            </StackPanel>
-                            <StackPanel Margin="0,0,8,8">
-                                <TextBlock Text="Time" Style="{DynamicResource HelmSecondaryText}" Margin="0,0,0,4" />
-                                <ui:TextBox Width="92" PlaceholderText="HH:mm" ToolTip="Due time (optional)" AutomationProperties.Name="Edit due time"
-                                            Text="{Binding EditDueTimeText, UpdateSourceTrigger=PropertyChanged}" />
+                                <TextBlock Text="Due" Style="{DynamicResource HelmSecondaryText}" Margin="0,0,0,4" />
+                                <core:DateTimeBox Width="300" Date="{Binding EditDueDate}" Time="{Binding EditDueTime}" Lean="Future" AllowEmpty="True"
+                                                  PlaceholderText="No due date" AutomationProperties.Name="Edit due date and time" />
                             </StackPanel>
                             <StackPanel Margin="0,0,8,8" Visibility="{Binding IsRepeating, Converter={StaticResource BoolToVisibility}}">
                                 <TextBlock Text="Repeat" Style="{DynamicResource HelmSecondaryText}" Margin="0,0,0,4" />
@@ -651,13 +647,9 @@
                                         Text="{Binding NewRepeatDays, UpdateSourceTrigger=PropertyChanged}" />
                         </StackPanel>
                         <StackPanel Margin="0,0,8,0">
-                            <TextBlock Text="Due date" Style="{DynamicResource HelmSecondaryText}" Margin="0,0,0,4" />
-                            <DatePicker Width="160" SelectedDate="{Binding NewDueDate}" ToolTip="Due date (optional)" AutomationProperties.Name="Due date" />
-                        </StackPanel>
-                        <StackPanel Margin="0,0,8,0">
-                            <TextBlock Text="Time" Style="{DynamicResource HelmSecondaryText}" Margin="0,0,0,4" />
-                            <ui:TextBox Width="92" PlaceholderText="HH:mm" ToolTip="Due time (optional)" AutomationProperties.Name="Due time"
-                                        Text="{Binding NewDueTimeText, UpdateSourceTrigger=PropertyChanged}" />
+                            <TextBlock Text="Due (optional)" Style="{DynamicResource HelmSecondaryText}" Margin="0,0,0,4" />
+                            <core:DateTimeBox Width="300" Date="{Binding NewDueDate}" Time="{Binding NewDueTime}" Lean="Future" AllowEmpty="True"
+                                              PlaceholderText="No due date" AutomationProperties.Name="Due date and time" />
                         </StackPanel>
                         <ui:Button VerticalAlignment="Bottom" Appearance="Primary" Content="Add" Icon="{ui:SymbolIcon Add24}" Command="{Binding AddCommand}" />
                     </WrapPanel>

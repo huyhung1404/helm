@@ -192,7 +192,7 @@
                     <TextBlock Text="Time you can spend" Classes="label" />
                     <TextBox PlaceholderText="e.g. 1 hour a day, 3 on weekends" Text="{Binding PromptTime}" AutomationProperties.Name="Time you can spend" />
                     <TextBlock Text="Deadline (optional)" Classes="label" />
-                    <CalendarDatePicker HorizontalAlignment="Stretch" SelectedDate="{Binding PromptDeadline}" PlaceholderText="No deadline" />
+                    <core:DateTimeBox Date="{Binding PromptDeadline}" ShowTime="False" Lean="Future" AllowEmpty="True" PlaceholderText="No deadline" />
                     <TextBlock Text="Anything else" Classes="label" />
                     <TextBox PlaceholderText="e.g. I learn best with videos" Text="{Binding PromptNotes}" AutomationProperties.Name="Anything else" />
                     <Button Classes="accent wide" Margin="0,12,0,0" Command="{Binding CopyPromptCommand}" IsEnabled="{Binding CanCopyPrompt}">
@@ -276,7 +276,7 @@
                             <TextBox Text="{Binding PreviewReward}" AutomationProperties.Name="Mission reward" />
                         </StackPanel>
                         <TextBlock Text="Deadline" Classes="label" />
-                        <CalendarDatePicker HorizontalAlignment="Stretch" SelectedDate="{Binding PreviewDeadline}" PlaceholderText="No deadline" />
+                        <core:DateTimeBox Date="{Binding PreviewDeadline}" ShowTime="False" Lean="Future" AllowEmpty="True" PlaceholderText="No deadline" />
                         <TextBlock Text="{Binding PreviewSummary}" FontWeight="SemiBold" TextWrapping="Wrap" Margin="0,8,0,0" />
                         <TextBlock Text="Untick a step to leave it out." Classes="secondary" />
                         <ItemsControl ItemsSource="{Binding PreviewPhases}">

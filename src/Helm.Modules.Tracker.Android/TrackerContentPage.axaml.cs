@@ -76,7 +76,6 @@ public partial class TrackerContentPage : UserControl
     {
         base.OnAttachedToVisualTree(e);
         _module.PropertyChanged += OnModuleChanged;
-        _viewModel.PropertyChanged += OnViewModelChanged;
         ApplyEnabled();
         // Opening Tracker is the moment to ask for notifications (Android 13+, once) and to catch today's reminder.
         var context = Android.App.Application.Context;
@@ -87,27 +86,12 @@ public partial class TrackerContentPage : UserControl
     protected override void OnDetachedFromVisualTree(VisualTreeAttachmentEventArgs e)
     {
         _module.PropertyChanged -= OnModuleChanged;
-        _viewModel.PropertyChanged -= OnViewModelChanged;
         base.OnDetachedFromVisualTree(e);
     }
 
     private void OnModuleChanged(object? sender, PropertyChangedEventArgs e)
     {
         if (e.PropertyName == nameof(IModule.IsEnabled)) Dispatcher.UIThread.Post(ApplyEnabled);
-    }
-
-    /// <summary>
-    /// After Add the view model clears the due date, but CalendarDatePicker keeps a date that was typed into its box
-    /// (it looks as if the next item had that date). Clear the box once the tap on Add has been handled.
-    /// </summary>
-    private void OnViewModelChanged(object? sender, PropertyChangedEventArgs e)
-    {
-        if (e.PropertyName != nameof(TrackerViewModel.NewDueDate) || _viewModel.NewDueDate is not null) return;
-        Dispatcher.UIThread.Post(() =>
-        {
-            NewDuePicker.Text = string.Empty;
-            NewDuePicker.SelectedDate = null;
-        }, DispatcherPriority.Background);
     }
 
     private void ApplyEnabled()

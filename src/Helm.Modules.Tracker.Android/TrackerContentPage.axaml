@@ -117,8 +117,7 @@
                                 <Button Grid.Column="2" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Content="+1 week" Command="{Binding ExtendCommand}" CommandParameter="7" />
                                 <Button Grid.Column="4" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Content="+1 month" Command="{Binding ExtendCommand}" CommandParameter="30" />
                             </Grid>
-                            <CalendarDatePicker HorizontalAlignment="Stretch" SelectedDate="{Binding EditDueDate}" PlaceholderText="Due date" />
-                            <TimePicker HorizontalAlignment="Stretch" SelectedTime="{Binding EditDueTime}" ClockIdentifier="24HourClock" />
+                            <core:DateTimeBox Date="{Binding EditDueDate}" Time="{Binding EditDueTime}" Lean="Future" AllowEmpty="True" PlaceholderText="Due date" />
                             <WrapPanel>
                                 <Button Classes="accent" Content="Set" Command="{Binding SetDueCommand}" Margin="0,0,8,0" />
                                 <Button Content="No due date" Command="{Binding ClearDueCommand}" />
@@ -261,8 +260,7 @@
                         <ComboBox HorizontalAlignment="Stretch" IsVisible="{Binding !IsDebt}"
                                   ItemsSource="{Binding $parent[UserControl].((vm:TrackerViewModel)DataContext).PriorityNames}"
                                   SelectedIndex="{Binding EditPriorityIndex}" />
-                        <CalendarDatePicker HorizontalAlignment="Stretch" SelectedDate="{Binding EditDueDate}" PlaceholderText="Due date (optional)" />
-                        <TimePicker HorizontalAlignment="Stretch" SelectedTime="{Binding EditDueTime}" ClockIdentifier="24HourClock" />
+                        <core:DateTimeBox Date="{Binding EditDueDate}" Time="{Binding EditDueTime}" Lean="Future" AllowEmpty="True" PlaceholderText="Due date (optional)" />
                         <Grid ColumnDefinitions="*,Auto" IsVisible="{Binding IsRepeating}">
                             <ComboBox HorizontalAlignment="Stretch" SelectedIndex="{Binding EditRepeatIndex}"
                                       ItemsSource="{Binding $parent[UserControl].((vm:TrackerViewModel)DataContext).RepeatNames}" />
@@ -496,8 +494,7 @@
                         <TextBox Grid.Column="1" Width="96" Margin="8,0,0,0" PlaceholderText="Days" Text="{Binding NewRepeatDays}" IsVisible="{Binding NewRepeatsForDays}"
                                  AutomationProperties.Name="Repeat days" />
                     </Grid>
-                    <CalendarDatePicker x:Name="NewDuePicker" HorizontalAlignment="Stretch" SelectedDate="{Binding NewDueDate}" PlaceholderText="Due date (optional)" />
-                    <TimePicker HorizontalAlignment="Stretch" SelectedTime="{Binding NewDueTime}" ClockIdentifier="24HourClock" IsVisible="{Binding NewDueDate, Converter={x:Static ObjectConverters.IsNotNull}}" />
+                    <core:DateTimeBox Date="{Binding NewDueDate}" Time="{Binding NewDueTime}" Lean="Future" AllowEmpty="True" PlaceholderText="Due date (optional)" />
                     <Button Classes="accent" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Content="Add" Command="{Binding AddCommand}" />
                 </StackPanel>
             </Border>

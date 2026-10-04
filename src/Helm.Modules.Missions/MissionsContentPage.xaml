@@ -338,7 +338,7 @@
                         </Grid.ColumnDefinitions>
                         <StackPanel>
                             <TextBlock Text="Deadline (optional)" Style="{StaticResource FieldLabel}" />
-                            <DatePicker Width="170" AutomationProperties.Name="Deadline" SelectedDate="{Binding PromptDeadline}" />
+                            <core:DateTimeBox Width="280" AutomationProperties.Name="Deadline" Date="{Binding PromptDeadline}" ShowTime="False" Lean="Future" AllowEmpty="True" PlaceholderText="No deadline" />
                         </StackPanel>
                         <StackPanel Grid.Column="2">
                             <TextBlock Text="Anything else" Style="{StaticResource FieldLabel}" />
@@ -418,7 +418,7 @@
                             </StackPanel>
                             <StackPanel Grid.Column="2">
                                 <TextBlock Text="Deadline" Style="{StaticResource FieldLabel}" />
-                                <DatePicker Width="170" AutomationProperties.Name="Mission deadline" SelectedDate="{Binding PreviewDeadline}" />
+                                <core:DateTimeBox Width="280" AutomationProperties.Name="Mission deadline" Date="{Binding PreviewDeadline}" ShowTime="False" Lean="Future" AllowEmpty="True" PlaceholderText="No deadline" />
                             </StackPanel>
                         </Grid>
                         <TextBlock Margin="0,12,0,8" Text="{Binding PreviewSummary}" TextWrapping="Wrap" FontWeight="SemiBold" />

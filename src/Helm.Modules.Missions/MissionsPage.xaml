@@ -51,7 +51,7 @@
                 <Border Style="{DynamicResource HelmExpanderRow}">
                     <core:RowLayout>
                         <core:CardHeader Title="Deadline" Description="The pace shows how far ahead of it or behind you are. Clear it for none." />
-                        <DatePicker Width="170" AutomationProperties.Name="Deadline" SelectedDate="{Binding EditDeadline}" />
+                        <core:DateTimeBox Width="280" AutomationProperties.Name="Deadline" Date="{Binding EditDeadline}" ShowTime="False" Lean="Future" AllowEmpty="True" PlaceholderText="No deadline" />
                     </core:RowLayout>
                 </Border>
                 <Border Style="{DynamicResource HelmExpanderRow}">
