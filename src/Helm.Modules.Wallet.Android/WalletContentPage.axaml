@@ -61,6 +61,8 @@
             <Setter Property="VerticalContentAlignment" Value="Center" />
         </Style>
         <Style Selector="ProgressBar.share">
+            <!-- Fluent's 200 px minimum is wider than the legend's middle column: the bar spilled over the badge. -->
+            <Setter Property="MinWidth" Value="0" />
             <Setter Property="Height" Value="6" />
             <Setter Property="MinHeight" Value="6" />
             <Setter Property="Minimum" Value="0" />
@@ -187,7 +189,7 @@
                         <!-- Editor -->
                         <StackPanel Spacing="8" IsVisible="{Binding IsEditing}">
                             <Grid ColumnDefinitions="*,8,Auto">
-                                <TextBox PlaceholderText="Amount" Text="{Binding EditAmount}" AutomationProperties.Name="Amount" />
+                                <TextBox Classes="amount" PlaceholderText="Amount" Text="{Binding EditAmount}" AutomationProperties.Name="Amount" />
                                 <CheckBox Grid.Column="2" Content="Money in" IsChecked="{Binding EditIsIncome}" />
                             </Grid>
                             <TextBox PlaceholderText="Description" Text="{Binding EditDescription}" AutomationProperties.Name="Description" />
@@ -280,7 +282,7 @@
                 <StackPanel Spacing="8">
                     <TextBlock Text="New transaction" Classes="cardTitle" />
                     <Grid ColumnDefinitions="*,8,Auto">
-                        <TextBox x:Name="NewAmountBox" PlaceholderText="Amount: 50k, 1.5tr" Text="{Binding NewAmount}" AutomationProperties.Name="Amount" />
+                        <TextBox x:Name="NewAmountBox" Classes="amount" PlaceholderText="Amount: 50k, 1.5tr" Text="{Binding NewAmount}" AutomationProperties.Name="Amount" />
                         <CheckBox Grid.Column="2" Content="Money in" IsChecked="{Binding NewIsIncome}" />
                     </Grid>
                     <TextBox PlaceholderText="What it was for" Text="{Binding NewDescription}" AutomationProperties.Name="Description" />
@@ -312,7 +314,7 @@
                                             <TextBlock Text="{Binding Name}" Classes="secondary" VerticalAlignment="Center" />
                                             <TextBlock Grid.Column="1" Text="{Binding AmountText}" Classes="figureSmall" />
                                         </Grid>
-                                        <ProgressBar Height="12" MinHeight="12" Minimum="0" Maximum="1" Value="{Binding Fraction}" Background="Transparent"
+                                        <ProgressBar MinWidth="0" Height="12" MinHeight="12" Minimum="0" Maximum="1" Value="{Binding Fraction}" Background="Transparent"
                                                      Foreground="{Binding Color, Converter={x:Static vm:WalletConverters.Ink}}" />
                                     </StackPanel>
                                 </Grid>
