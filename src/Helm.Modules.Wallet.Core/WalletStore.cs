@@ -30,6 +30,15 @@ public enum CaptureKind
 public sealed record CaptureOutcome(CaptureKind Kind, string Id, WalletTransaction Transaction);
 
 /// <summary>
+/// Money that moved in an account without a notification: the balance the bank gave does not follow from the one
+/// before it. Techcombank, for one, says nothing about a payment made in its own app.
+/// </summary>
+/// <param name="Amount">Signed: negative went out, positive came in.</param>
+/// <param name="After">When the bank gave the earlier balance.</param>
+/// <param name="Before">When the bank gave the balance that showed the gap.</param>
+public sealed record BalanceGap(string Bank, string Account, decimal Amount, DateTimeOffset After, DateTimeOffset Before);
+
+/// <summary>
 /// Transactions, categories and the budget on top of Helm Sync. Every write is local and immediate (the sync engine
 /// uploads it in the background). Callable from any thread (the phone's notification listener writes here while the
 /// pages read); <see cref="Changed"/> may be raised on a background thread after a sync.
@@ -129,6 +138,62 @@ public sealed class WalletStore
                 OccurredAt = occurredAt,
                 CategoryId = categoryId,
                 Note = WalletLimits.Clip(note, WalletLimits.Note),
+                Source = TransactionSource.Manual,
+                CreatedAt = Now,
+            });
+        }
+    }
+
+    /// <summary>A balance older than this says nothing useful about what is missing (Helm may not have been listening).</summary>
+    public static readonly TimeSpan GapWindow = TimeSpan.FromDays(31);
+
+    /// <summary>What a gap is saved as, so the pages say where it came from.</summary>
+    public const string GapDescription = "Not in a bank notification (from the balance)";
+
+    /// <summary>
+    /// The money that moved without a notification before transaction <paramref name="id"/>: its balance minus the
+    /// account's previous balance and its own amount. Null when nothing is missing, when the account has no earlier
+    /// balance within <see cref="GapWindow"/>, or when an entry typed by hand between the two already has that amount
+    /// (the user wrote it down, or answered an earlier reminder).
+    /// </summary>
+    public BalanceGap? FindGap(string id)
+    {
+        lock (_gate)
+        {
+            if (_transactions.Get(id) is not { Balance: { } balance, Bank.Length: > 0 } t) return null;
+            WalletTransaction? previous = null;
+            foreach (var other in _transactions.All())
+            {
+                var o = other.Value;
+                if (other.Id == id || o.Balance is null || o.Bank != t.Bank || o.Account != t.Account) continue;
+                if (o.OccurredAt > t.OccurredAt || o.OccurredAt == t.OccurredAt && o.CreatedAt >= t.CreatedAt) continue;
+                if (previous is null || o.OccurredAt > previous.OccurredAt || o.OccurredAt == previous.OccurredAt && o.CreatedAt > previous.CreatedAt)
+                    previous = o;
+            }
+            if (previous is null || t.OccurredAt - previous.OccurredAt > GapWindow) return null;
+            var gap = balance - (previous.Balance!.Value + t.Amount);
+            if (Math.Abs(gap) < 1) return null;
+            var after = previous.OccurredAt;
+            var noted = _transactions.All().Any(o => o.Value.Source == TransactionSource.Manual && o.Value.Amount == gap
+                && o.Value.OccurredAt >= after && o.Value.OccurredAt <= t.OccurredAt);
+            return noted ? null : new BalanceGap(t.Bank, t.Account, gap, after, t.OccurredAt);
+        }
+    }
+
+    /// <summary>Saves a gap the user confirmed, just before the notification that showed it (the real time is unknown).</summary>
+    public string AddGap(BalanceGap gap, string? categoryId)
+    {
+        if (gap.Amount == 0) throw new ArgumentException("Nothing is missing.", nameof(gap));
+        lock (_gate)
+        {
+            return _transactions.Add(new WalletTransaction
+            {
+                Amount = ClampAmount(gap.Amount),
+                Bank = gap.Bank,
+                Account = gap.Account,
+                Description = GapDescription,
+                OccurredAt = gap.Before.AddSeconds(-1),
+                CategoryId = categoryId,
                 Source = TransactionSource.Manual,
                 CreatedAt = Now,
             });

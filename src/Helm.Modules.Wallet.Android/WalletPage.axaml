@@ -93,6 +93,15 @@
                 </DockPanel>
                 <Border Classes="row">
                     <DockPanel>
+                        <ToggleSwitch DockPanel.Dock="Right" IsChecked="{Binding AskForMissing}" OnContent="" OffContent="" AutomationProperties.Name="Ask about missing payments" />
+                        <StackPanel VerticalAlignment="Center">
+                            <TextBlock Text="Ask about missing payments" />
+                            <TextBlock Text="Some banks say nothing about a payment you make in their app (Techcombank). When the next balance shows money that went out or came in without a notification, a notification offers to write it down." Classes="secondary" TextWrapping="Wrap" />
+                        </StackPanel>
+                    </DockPanel>
+                </Border>
+                <Border Classes="row">
+                    <DockPanel>
                         <ToggleSwitch DockPanel.Dock="Right" IsChecked="{Binding AutoCategorize}" OnContent="" OffContent="" AutomationProperties.Name="Categorize by itself" />
                         <StackPanel VerticalAlignment="Center">
                             <TextBlock Text="Categorize by itself" />

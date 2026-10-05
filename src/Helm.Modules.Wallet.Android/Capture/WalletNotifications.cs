@@ -29,6 +29,12 @@ internal static class WalletNotifications
     public const string ActionCategorize = "com.huyhung1404.helm.wallet.CATEGORIZE";
     public const string ExtraTransaction = "com.huyhung1404.helm.wallet.extra.TRANSACTION";
     public const string ExtraCategory = "com.huyhung1404.helm.wallet.extra.CATEGORY";
+    public const string ActionAddGap = "com.huyhung1404.helm.wallet.ADD_GAP";
+    public const string ExtraBank = "com.huyhung1404.helm.wallet.extra.BANK";
+    public const string ExtraAccount = "com.huyhung1404.helm.wallet.extra.ACCOUNT";
+    public const string ExtraAmount = "com.huyhung1404.helm.wallet.extra.AMOUNT";
+    public const string ExtraAfter = "com.huyhung1404.helm.wallet.extra.AFTER";
+    public const string ExtraBefore = "com.huyhung1404.helm.wallet.extra.BEFORE";
     private const string ChannelId = "wallet_categorize";
     private const int PermissionRequestCode = 0x5A13;
     private const string PermissionAskedKey = "notification_permission_asked";
@@ -76,6 +82,67 @@ internal static class WalletNotifications
         {
             Log(ex, "Could not ask for the category of a transaction");
         }
+    }
+
+    /// <summary>
+    /// Money moved without a notification (the balance says so): offers the likeliest categories and "Later" (saved to
+    /// categorize). Nothing is saved unless a button is tapped; swiping it away forgets it.
+    /// </summary>
+    public static void AskGap(Context context, BalanceGap gap, IReadOnlyList<CategoryInfo> suggestions)
+    {
+        try
+        {
+            if (!CanNotify(context) || context.GetSystemService(Context.NotificationService) is not NotificationManager manager) return;
+            var channel = new NotificationChannel(ChannelId, "What was it?", NotificationImportance.Default)
+            {
+                Description = "After a payment, a few categories to pick from.",
+            };
+            channel.SetSound(null, null);
+            channel.EnableVibration(false);
+            manager.CreateNotificationChannel(channel);
+
+            var id = NotificationId(GapKey(gap));
+            var title = $"{WalletFormat.Signed(gap.Amount)} · {gap.Bank}";
+            var text = (gap.Amount < 0 ? "Went out" : "Came in") + " without a notification: the bank's balance says so. What was it?";
+            var builder = new Notification.Builder(context, ChannelId)
+                .SetSmallIcon(R.Drawable(context, "wallet_notification"))
+                .SetContentTitle(title)
+                .SetContentText(text)
+                .SetStyle(new Notification.BigTextStyle().BigText(text))
+                .SetAutoCancel(true)
+                .SetOnlyAlertOnce(true)
+                .SetWhen(gap.Before.ToUnixTimeMilliseconds())
+                .SetShowWhen(true);
+            if (OpenWalletIntent(context, id) is { } open) builder.SetContentIntent(open);
+            var icon = Icon.CreateWithResource(context, R.Drawable(context, "wallet_notification"));
+            var buttons = suggestions.Take(MaxActions - 1).Select(c => (c.Name, (string?)c.Id)).Append(("Later", null)).ToList();
+            for (var i = 0; i < buttons.Count; i++)
+            {
+                var intent = new Intent(context, Java.Lang.Class.FromType(typeof(WalletGapReceiver)))
+                    .SetAction(ActionAddGap)
+                    .PutExtra(ExtraBank, gap.Bank)
+                    .PutExtra(ExtraAccount, gap.Account)
+                    .PutExtra(ExtraAmount, gap.Amount.ToString(System.Globalization.CultureInfo.InvariantCulture))
+                    .PutExtra(ExtraAfter, gap.After.ToUnixTimeMilliseconds())
+                    .PutExtra(ExtraBefore, gap.Before.ToUnixTimeMilliseconds())
+                    .PutExtra(ExtraCategory, buttons[i].Item2);
+                var pending = PendingIntent.GetBroadcast(context, id * 4 + i, intent, PendingIntentFlags.UpdateCurrent | PendingIntentFlags.Immutable);
+                builder.AddAction(new Notification.Action.Builder(icon, buttons[i].Name, pending).Build());
+            }
+            manager.Notify(id, builder.Build());
+        }
+        catch (Exception ex)
+        {
+            Log(ex, "Could not ask about money that moved without a notification");
+        }
+    }
+
+    /// <summary>The same notification id for the same gap, so answering it clears it.</summary>
+    internal static string GapKey(BalanceGap gap) => $"gap|{gap.Bank}|{gap.Account}|{gap.Before.ToUnixTimeMilliseconds()}";
+
+    public static void CancelGap(Context context, BalanceGap gap)
+    {
+        if (context.GetSystemService(Context.NotificationService) is NotificationManager manager) manager.Cancel(NotificationId(GapKey(gap)));
     }
 
     public static void Cancel(Context context, string transactionId)
@@ -152,6 +219,40 @@ public sealed class WalletCategoryReceiver : BroadcastReceiver
             WalletNotifications.Log(ex, "Could not file a transaction from its notification");
         }
     }
+}
+
+/// <summary>A button of the "went out without a notification" reminder: saves the missing amount and clears it.</summary>
+[BroadcastReceiver(Name = "com.huyhung1404.helm.wallet.GapReceiver", Exported = false)]
+public sealed class WalletGapReceiver : BroadcastReceiver
+{
+    public override void OnReceive(Context? context, Intent? intent)
+    {
+        if (context is null || intent?.Action != WalletNotifications.ActionAddGap) return;
+        var bank = intent.GetStringExtra(WalletNotifications.ExtraBank);
+        var amountText = intent.GetStringExtra(WalletNotifications.ExtraAmount);
+        if (string.IsNullOrEmpty(bank)
+            || !decimal.TryParse(amountText, System.Globalization.NumberStyles.Number, System.Globalization.CultureInfo.InvariantCulture, out var amount)
+            || amount == 0) return;
+        var gap = new BalanceGap(bank, intent.GetStringExtra(WalletNotifications.ExtraAccount) ?? "", amount,
+            DateTimeOffset.FromUnixTimeMilliseconds(intent.GetLongExtra(WalletNotifications.ExtraAfter, 0)),
+            DateTimeOffset.FromUnixTimeMilliseconds(intent.GetLongExtra(WalletNotifications.ExtraBefore, 0)));
+        try
+        {
+            var store = HelmAndroidServices.Current.GetRequiredService<WalletStore>();
+            // A second tap (or another device that saved it meanwhile) finds it noted and saves nothing.
+            if (StillMissing(store, gap)) store.AddGap(gap, intent.GetStringExtra(WalletNotifications.ExtraCategory));
+            WalletNotifications.CancelGap(context, gap);
+            WalletWidgets.RefreshAll(context);
+        }
+        catch (Exception ex)
+        {
+            WalletNotifications.Log(ex, "Could not save money that moved without a notification");
+        }
+    }
+
+    private static bool StillMissing(WalletStore store, BalanceGap gap) =>
+        !store.Transactions().Any(t => t.Value.Source == TransactionSource.Manual && t.Value.Amount == gap.Amount
+            && t.Value.OccurredAt >= gap.After && t.Value.OccurredAt <= gap.Before);
 }
 
 /// <summary>Resource ids looked up by name (the layouts and drawables live in this project's Resources).</summary>

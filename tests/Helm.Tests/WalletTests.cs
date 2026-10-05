@@ -417,6 +417,56 @@ public sealed class WalletTests : IDisposable
     }
 
     [Fact]
+    public void A_balance_that_does_not_follow_shows_a_missing_payment()
+    {
+        // 5,000,000 after the salary; then +1,000,000 in, but the bank says 5,550,000: 450,000 went out unseen (a
+        // payment made in Techcombank's app, which sends no notification for it).
+        var first = _store.AddCaptured(Parsed(2_000_000, "salary", 5_000_000, T0.AddDays(-2)), false);
+        Assert.Null(_store.FindGap(first.Id)); // nothing earlier to compare with
+        var second = _store.AddCaptured(Parsed(1_000_000, "refund", 5_550_000, T0), false);
+
+        var gap = _store.FindGap(second.Id);
+        Assert.NotNull(gap);
+        Assert.Equal(-450_000m, gap.Amount);
+        Assert.Equal(("Techcombank", "1903xxxx0123"), (gap.Bank, gap.Account));
+        Assert.Equal(T0.AddDays(-2), gap.After);
+        Assert.Equal(T0, gap.Before);
+
+        // Saved from the reminder: in the account, just before the notification, and never asked again.
+        var id = _store.AddGap(gap, WalletCategories.Shopping);
+        var saved = _store.Transactions().Single(t => t.Id == id).Value;
+        Assert.Equal(-450_000m, saved.Amount);
+        Assert.Equal(WalletStore.GapDescription, saved.Description);
+        Assert.Equal(T0.AddSeconds(-1), saved.OccurredAt);
+        Assert.Null(saved.Balance);
+        Assert.Null(_store.FindGap(second.Id));
+
+        // A balance that follows: nothing missing.
+        var third = _store.AddCaptured(Parsed(-50_000, "coffee", 5_500_000, T0.AddHours(1)), false);
+        Assert.Null(_store.FindGap(third.Id));
+    }
+
+    [Fact]
+    public void A_payment_typed_in_by_hand_is_not_asked_about()
+    {
+        _store.AddCaptured(Parsed(2_000_000, "salary", 5_000_000, T0.AddDays(-2)), false);
+        _store.AddManual(-450_000, "supermarket", T0.AddDays(-1), WalletCategories.Groceries);
+        var second = _store.AddCaptured(Parsed(1_000_000, "refund", 5_550_000, T0), false);
+        Assert.Null(_store.FindGap(second.Id));
+    }
+
+    [Fact]
+    public void Gaps_compare_one_account_with_itself_and_only_recently()
+    {
+        _store.AddCaptured(new ParsedTransaction("ACB", "12345678", 1_000_000, 9_000_000, "x", T0.AddDays(-1), "x"), false);
+        var tcb = _store.AddCaptured(Parsed(-100_000, "lunch", 900_000, T0), false);
+        Assert.Null(_store.FindGap(tcb.Id)); // the ACB balance says nothing about Techcombank
+
+        var acb = _store.AddCaptured(new ParsedTransaction("ACB", "12345678", -10_000, 1_000_000, "y", T0.AddDays(40), "y"), false);
+        Assert.Null(_store.FindGap(acb.Id)); // more than a month since the last balance: Helm may not have been listening
+    }
+
+    [Fact]
     public void Csv_quotes_and_defuses_formulas()
     {
         _store.AddManual(-100_000, "=HYPERLINK(\"x\")", T0, WalletCategories.Food, "a, b");

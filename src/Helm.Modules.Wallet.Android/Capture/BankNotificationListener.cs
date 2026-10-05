@@ -130,6 +130,10 @@ public sealed class BankNotificationListener : NotificationListenerService
                 // Money out that Helm could not file by itself: ask what it was.
                 if (capture.Settings.Current.AskForCategory && saved.Transaction.Amount < 0 && !saved.Transaction.IsCategorized)
                     WalletNotifications.AskCategory(context, saved.Id, saved.Transaction, store.Suggest(saved.Transaction, WalletNotifications.MaxActions));
+                // The balance shows money that moved without a notification (a payment made in the bank's own app).
+                if (capture.Settings.Current.AskForMissing && store.FindGap(saved.Id) is { } gap)
+                    WalletNotifications.AskGap(context, gap,
+                        store.Suggest(new WalletTransaction { Amount = gap.Amount }, WalletNotifications.MaxActions - 1));
             }
             if (added) WalletWidgets.RefreshAll(context);
         }

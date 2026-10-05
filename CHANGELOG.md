@@ -5,6 +5,12 @@ Format: [Keep a Changelog](https://keepachangelog.com), versions follow [SemVer]
 
 ## [Unreleased]
 
+### Added
+- **Wallet** (Android): Techcombank sends no notification for a payment you make in its app. When the next balance
+  a bank gives shows money that went out (or came in) without a notification, Helm asks what it was, with the likeliest
+  categories and *Later* (saved to categorize). Nothing is saved unless you tap a button, and it does not ask about an
+  amount you already typed in. Settings → Wallet → *Ask about missing payments* turns it off.
+
 ### Fixed
 - **Wallet** widget (Android): a large balance no longer spills out of the ring. The balance is now drawn inside the
   ring, in full when it fits and shortened (12.4M ₫) when it does not, whatever size the launcher really gives the

@@ -21,6 +21,12 @@ public sealed class WalletSettings : IVersionedSettings
     /// <summary>After a payment, a notification with a few categories to pick from.</summary>
     public bool AskForCategory { get; set; } = true;
 
+    /// <summary>
+    /// When a bank's balance shows money that moved without a notification (Techcombank says nothing about payments made
+    /// in its app), a notification offers to write it down.
+    /// </summary>
+    public bool AskForMissing { get; set; } = true;
+
     /// <summary>A transaction with the same description as earlier ones that all went in one category goes there too.</summary>
     public bool AutoCategorize { get; set; } = true;
 

@@ -93,6 +93,7 @@ public sealed partial class WalletViewModel : ObservableObject
     [ObservableProperty] private bool _acbEnabled;
     [ObservableProperty] private bool _askForCategory;
     [ObservableProperty] private bool _autoCategorize;
+    [ObservableProperty] private bool _askForMissing;
     [ObservableProperty] private int _widgetChartIndex;
     [ObservableProperty] private int _widgetBackgroundIndex;
     [ObservableProperty] private int _widgetOpacity = 100;
@@ -719,6 +720,7 @@ public sealed partial class WalletViewModel : ObservableObject
         AcbEnabled = s.IsBankEnabled(BankSources.Acb.Id);
         AskForCategory = s.AskForCategory;
         AutoCategorize = s.AutoCategorize;
+        AskForMissing = s.AskForMissing;
         WidgetChartIndex = (int)s.WidgetChart;
         WidgetBackgroundIndex = (int)s.WidgetBackground;
         WidgetOpacity = Math.Clamp(s.WidgetOpacity, 0, 100);
@@ -768,6 +770,11 @@ public sealed partial class WalletViewModel : ObservableObject
     partial void OnAutoCategorizeChanged(bool value)
     {
         if (!_loading) _settings.Update(s => s.AutoCategorize = value);
+    }
+
+    partial void OnAskForMissingChanged(bool value)
+    {
+        if (!_loading) _settings.Update(s => s.AskForMissing = value);
     }
 
     partial void OnWidgetChartIndexChanged(int value)
