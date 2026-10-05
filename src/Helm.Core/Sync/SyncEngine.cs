@@ -273,7 +273,7 @@ public sealed class SyncEngine : ISyncService, IDisposable
         _pollInterval = every;
         _periodic = new Timer(_ =>
         {
-            if (!_transport.IsConfigured) return;
+            if (!_transport.IsConfigured || PollGate?.Invoke() == false) return;
             // Live: changes are announced, so polling is only a safety net.
             if (IsLive && Environment.TickCount64 - Interlocked.Read(ref _lastRunTicks) < BackgroundPollInterval.TotalMilliseconds) return;
             _ = RunScheduledAsync();
@@ -284,6 +284,19 @@ public sealed class SyncEngine : ISyncService, IDisposable
     public static readonly TimeSpan ForegroundPollInterval = TimeSpan.FromSeconds(30);
 
     public static readonly TimeSpan BackgroundPollInterval = TimeSpan.FromMinutes(5);
+
+    /// <summary>
+    /// How often a phone pulls while Helm is in the background (30 min). Wallet's notification listener keeps the
+    /// process alive all day, so a 5-minute poll would wake the radio about 300 times a day; local changes are still
+    /// pushed within seconds, and coming back to the front pulls at once.
+    /// </summary>
+    public static readonly TimeSpan PhoneBackgroundPollInterval = TimeSpan.FromMinutes(30);
+
+    /// <summary>
+    /// Whether the periodic pull may run now (null: always), e.g. not in the background while the phone saves battery.
+    /// Pushes of local changes and <see cref="RequestSync"/> are never held back. Called on a timer thread.
+    /// </summary>
+    public Func<bool>? PollGate { get; set; }
 
     /// <summary>
     /// Changes how often the periodic sync pulls (see <see cref="Start"/>), e.g. <see cref="ForegroundPollInterval"/>

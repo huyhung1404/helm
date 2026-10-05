@@ -5,6 +5,13 @@ Format: [Keep a Changelog](https://keepachangelog.com), versions follow [SemVer]
 
 ## [Unreleased]
 
+### Changed
+- **Android** uses less battery in the background. Wallet's notification reader keeps Helm running all day, so sync
+  now checks for other devices' changes every 30 minutes in the background instead of every 5 (and not at all while
+  Battery Saver is on). Your own changes are still sent within seconds, and opening Helm fetches the rest at once.
+- **Vault**: the one-time codes count down only while the vault is open, instead of waking Helm every second for as
+  long as it runs (on the PC too).
+
 ### Fixed
 - **Wallet** widget (Android): the middle of the ring always shows your balance, never the period's spending. The
   balance is everything received minus everything spent, not the banks' own balances: cash you take out is still your

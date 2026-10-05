@@ -3,6 +3,7 @@ using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Markup.Xaml;
 using Helm.App.Android.Hosting;
 using Helm.Core.Modules;
+using Helm.Core.Platform;
 using Helm.App.Android.Services;
 using Helm.App.Android.ViewModels;
 using Helm.App.Android.Views;
@@ -55,6 +56,21 @@ public partial class App : Avalonia.Application
 
     private static MainView CreateMainView() => new() { DataContext = Services.GetRequiredService<MainViewModel>() };
 
+    /// <summary>The periodic pull waits while Helm is in the background and the phone is in Battery Saver.</summary>
+    private static bool MayPoll()
+    {
+        if (ActivityHost.Current is not null) return true;
+        try
+        {
+            var power = global::Android.App.Application.Context.GetSystemService(global::Android.Content.Context.PowerService) as global::Android.OS.PowerManager;
+            return power?.IsPowerSaveMode != true;
+        }
+        catch (Exception)
+        {
+            return true;
+        }
+    }
+
     /// <summary>Same order as Windows: modules, then background sync, then update checks.</summary>
     private static async Task StartAsync(IServiceProvider services)
     {
@@ -64,7 +80,10 @@ public partial class App : Avalonia.Application
             logger.LogInformation("Helm {Version} starting on Android {Release} ({Device})", AppInfo.Version,
                 global::Android.OS.Build.VERSION.Release, services.GetRequiredService<IDeviceInfo>().DeviceName);
             await services.GetRequiredService<IModuleHost<IAndroidModule>>().StartAsync(CancellationToken.None).ConfigureAwait(true);
-            services.GetRequiredService<SyncEngine>().Start();
+            var sync = services.GetRequiredService<SyncEngine>();
+            sync.PollGate = MayPoll;
+            // Started from a widget or a bank notification, Helm is in the background: the phone's slow poll.
+            sync.Start(ActivityHost.Current is null ? SyncEngine.PhoneBackgroundPollInterval : SyncEngine.ForegroundPollInterval);
             services.GetRequiredService<AndroidUpdateService>().StartBackgroundChecks();
         }
         catch (Exception ex)

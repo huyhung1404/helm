@@ -64,14 +64,15 @@ public sealed class MainActivity : AvaloniaMainActivity
 
     /// <summary>
     /// In front: the live channel is open and the poll runs every 30 s (and right away), so other devices' changes
-    /// arrive within seconds; in the background the socket is closed (battery) and the poll runs every 5 min.
+    /// arrive within seconds; in the background the socket is closed and the poll runs every 30 min (battery: Wallet's
+    /// notification listener keeps the process alive all day), not at all while Battery Saver is on.
     /// </summary>
     private static void SetSyncPolling(bool foreground)
     {
         try
         {
             var engine = App.Services.GetRequiredService<Helm.Core.Sync.SyncEngine>();
-            engine.SetPollInterval(foreground ? Helm.Core.Sync.SyncEngine.ForegroundPollInterval : Helm.Core.Sync.SyncEngine.BackgroundPollInterval);
+            engine.SetPollInterval(foreground ? Helm.Core.Sync.SyncEngine.ForegroundPollInterval : Helm.Core.Sync.SyncEngine.PhoneBackgroundPollInterval);
             engine.SetLive(foreground);
         }
         catch (Exception ex)

@@ -72,10 +72,17 @@ public sealed partial class VaultAppViewModel : ObservableObject
         _logger = (ILogger?)logger ?? NullLogger.Instance;
         Items = new ItemsViewModel(store, files, session, platform);
         // One-time codes change every 30 s: the list and the open item show the current one with a countdown.
+        // The codes count down once a second, but only while the items show: locked (or never opened) the timer
+        // sleeps, instead of waking the phone every second for as long as Helm runs.
         _totpTimer = new Timer(_ => _ui.Post(() =>
         {
             if (IsItems) Items.TickTotp(DateTimeOffset.UtcNow);
-        }), null, TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(1));
+        }), null, Timeout.Infinite, Timeout.Infinite);
+        PropertyChanged += (_, e) =>
+        {
+            if (e.PropertyName == nameof(IsItems)) UpdateTotpTimer();
+        };
+        UpdateTotpTimer();
 
         session.PropertyChanged += OnSessionChanged;
         session.Locking += (_, _) => _ui.Post(Items.Clear);
@@ -125,6 +132,18 @@ public sealed partial class VaultAppViewModel : ObservableObject
         : $"No device has backed up this vault for {(DateTimeOffset.UtcNow - last).Days} days." + (_backup.LastError is { } e ? " " + e : "");
 
     partial void OnNewPasswordChanged(string value) => OnPropertyChanged(nameof(PasswordStrength));
+
+    private void UpdateTotpTimer()
+    {
+        try
+        {
+            if (IsItems) _totpTimer.Change(TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(1));
+            else _totpTimer.Change(Timeout.Infinite, Timeout.Infinite);
+        }
+        catch (ObjectDisposedException)
+        {
+        }
+    }
 
     partial void OnScreenChanged(VaultScreen value)
     {
