@@ -3,6 +3,13 @@
 All notable changes to Helm. The top section is used as the GitHub release body and as the Velopack release notes.
 Format: [Keep a Changelog](https://keepachangelog.com), versions follow [SemVer](https://semver.org).
 
+## [Unreleased]
+
+### Fixed
+- **Wallet** widget (Android): a large balance no longer spills out of the ring. The balance is now drawn inside the
+  ring, in full when it fits and shortened (12.4M ₫) when it does not, whatever size the launcher really gives the
+  widget.
+
 ## [0.24.1] - 2026-10-05
 
 ### Changed

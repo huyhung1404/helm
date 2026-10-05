@@ -7,7 +7,6 @@ using Helm.Core;
 using Helm.Core.Settings;
 using Microsoft.Extensions.DependencyInjection;
 using Color = Android.Graphics.Color;
-using ComplexUnitType = Android.Util.ComplexUnitType;
 using IntentFilterAttribute = Android.App.IntentFilterAttribute;
 using MetaDataAttribute = Android.App.MetaDataAttribute;
 using PendingIntent = Android.App.PendingIntent;
@@ -70,8 +69,8 @@ internal static class WalletWidgets
     private const float RingRadius = 0.42f;
     private const float RingWidth = 0.095f;
 
-    // The largest ring bitmap, in pixels: plenty for a sharp ring and small for the launcher (widget bitmaps are limited).
-    private const int MaxRingPixels = 480;
+    // The largest ring bitmap, in pixels: sharp text at any size, still small for the launcher (widget bitmaps are limited).
+    private const int MaxRingPixels = 720;
 
     private static readonly WalletWidgetPeriod[] s_periods = Enum.GetValues<WalletWidgetPeriod>();
 
@@ -164,27 +163,23 @@ internal static class WalletWidgets
 
     // ---- Parts ---------------------------------------------------------------------------------------------------
 
-    /// <summary>The ring bitmap, the words in its middle (the full amount when it fits, else the short one) and the red dot.</summary>
+    /// <summary>
+    /// The ring bitmap with the balance drawn inside it, and the red dot. The words are part of the bitmap, so they
+    /// scale with the ring and stay inside it whatever size the launcher really gives the widget.
+    /// </summary>
     private static void DrawRing(Context context, RemoteViews views, WalletWidgetModel model, Size size, Colours colours, bool hideBalance)
     {
         var density = context.Resources?.DisplayMetrics?.Density ?? 2f;
-        var pixels = Math.Clamp((int)(size.RingDp * density), 64, MaxRingPixels);
+        var pixels = Math.Clamp((int)(size.RingDp * density), 96, MaxRingPixels);
         var ring = R.Id(context, "wallet_widget_ring");
-        views.SetImageViewBitmap(ring, RingBitmap(model, pixels, colours));
+        // Always the balance (dots when hidden), never the spending; the small widget adds "−1.7M · +500K" under it.
+        var centre = new CentreText(
+            WalletWidgetModel.CenterLabel,
+            hideBalance ? "••••••" : model.BalanceText,
+            hideBalance ? "••••••" : model.BalanceShortText,
+            size.Small ? model.CenterDetail : "");
+        views.SetImageViewBitmap(ring, RingBitmap(model, pixels, colours, centre));
         views.SetContentDescription(ring, Describe(model, hideBalance));
-
-        var label = R.Id(context, "wallet_widget_center_label");
-        views.SetTextViewText(label, WalletWidgetModel.CenterLabel);
-        views.SetTextColor(label, colours.Secondary);
-
-        // Always the balance (dots when hidden), never the spending.
-        var full = hideBalance ? "••••••" : model.BalanceText;
-        var brief = hideBalance ? "••••••" : model.BalanceShortText;
-        var (text, sp) = FitCenter(context, full, brief, size.RingDp * (RingRadius - RingWidth / 2) * 2 * 0.86f, size.Tall ? 22 : 19);
-        var value = R.Id(context, "wallet_widget_center_value");
-        views.SetTextViewText(value, text);
-        views.SetTextViewTextSize(value, (int)ComplexUnitType.Sp, sp);
-        views.SetTextColor(value, colours.Main);
 
         var badge = R.Id(context, "wallet_widget_badge");
         views.SetViewVisibility(badge, model.BadgeText is null ? ViewStates.Gone : ViewStates.Visible);
@@ -205,12 +200,6 @@ internal static class WalletWidgets
         views.SetInt(cycle, "setBackgroundResource", colours.Pill(context));
         views.SetContentDescription(cycle, $"{model.PeriodName}. Tap for {WalletWidgetModel.TabName(WalletWidgetModel.Next(model.Period))}");
         views.SetOnClickPendingIntent(cycle, PeriodIntent(context, widgetId, WalletWidgetModel.Next(model.Period)));
-
-        var detail = R.Id(context, "wallet_widget_center_detail");
-        var text = model.CenterDetail;
-        views.SetViewVisibility(detail, text.Length > 0 ? ViewStates.Visible : ViewStates.Gone);
-        views.SetTextViewText(detail, text);
-        views.SetTextColor(detail, colours.Secondary);
     }
 
     /// <summary>
@@ -281,8 +270,11 @@ internal static class WalletWidgets
         views.SetTextColor(id, value > 0 ? colours.Main : colours.Secondary);
     }
 
-    /// <summary>The ring: a faint track, then each slice clockwise from the top with a thin gap between slices.</summary>
-    private static Bitmap RingBitmap(WalletWidgetModel model, int pixels, Colours colours)
+    /// <summary>
+    /// The ring: a faint track, then each slice clockwise from the top with a thin gap between slices, and the words
+    /// in its middle.
+    /// </summary>
+    private static Bitmap RingBitmap(WalletWidgetModel model, int pixels, Colours colours, CentreText text)
     {
         var bitmap = Bitmap.CreateBitmap(pixels, pixels, Bitmap.Config.Argb8888!)!;
         using var canvas = new Canvas(bitmap);
@@ -314,7 +306,80 @@ internal static class WalletWidgets
                 start += sweep;
             }
         }
+        DrawCentre(canvas, pixels, colours, text);
         return bitmap;
+    }
+
+    /// <summary>The words in the ring: the label, the balance and (small widget) the period's spending and income.</summary>
+    private readonly record struct CentreText(string Label, string Full, string Short, string Detail);
+
+    /// <summary>
+    /// Lays the words out inside the ring's hole. Each line must fit the hole's width at its own height (a chord of the
+    /// inner circle), with a margin: the balance in full at the largest size that fits, else the short amount, and only
+    /// then smaller. The label and the detail shrink if they must.
+    /// </summary>
+    private static void DrawCentre(Canvas canvas, int pixels, Colours colours, CentreText text)
+    {
+        var centre = pixels / 2f;
+        var hole = pixels * (RingRadius - RingWidth / 2); // radius of the space inside the stroke
+        using var paint = new Paint(PaintFlags.AntiAlias);
+        paint.TextAlign = Paint.Align.Center;
+        paint.FontFeatureSettings = "tnum";
+        var regular = Typeface.Create(Typeface.SansSerif, TypefaceStyle.Normal);
+        var bold = Typeface.Create(Typeface.SansSerif, TypefaceStyle.Bold);
+
+        var label = pixels * 0.075f;
+        var detail = text.Detail.Length > 0 ? pixels * 0.068f : 0f;
+        var gapAbove = label * 0.35f;
+        var gapBelow = detail > 0 ? detail * 0.45f : 0f;
+
+        // The usable width at a distance y from the centre, with a margin from the ring.
+        float Chord(float y) => Math.Abs(y) >= hole ? 0 : 2 * MathF.Sqrt(hole * hole - y * y) * 0.86f;
+
+        // The top of the whole block (label, balance, detail) centred in the hole, for a balance of this size.
+        float Top(float value) => centre - (label + gapAbove + value + gapBelow + detail) / 2;
+
+        bool Fits(string s, float value)
+        {
+            var top = Top(value) + label + gapAbove;
+            paint.SetTypeface(bold);
+            paint.TextSize = value;
+            // The balance is narrowest where the hole is: at its edge furthest from the centre.
+            var far = Math.Max(Math.Abs(top - centre), Math.Abs(top + value - centre));
+            return paint.MeasureText(s) <= Chord(far);
+        }
+
+        var largest = pixels * 0.16f;
+        var (shown, size) = (text.Short, pixels * 0.06f);
+        foreach (var (candidate, floor) in new[] { (text.Full, pixels * 0.10f), (text.Short, pixels * 0.06f) })
+        {
+            var v = largest;
+            while (v >= floor && !Fits(candidate, v)) v *= 0.96f;
+            if (v < floor) continue;
+            (shown, size) = (candidate, v);
+            break;
+        }
+
+        var y = Top(size);
+        DrawLine(canvas, paint, text.Label, label, regular, colours.Secondary, centre, y, Chord);
+        y += label + gapAbove;
+        DrawLine(canvas, paint, shown, size, bold, colours.Main, centre, y, Chord);
+        y += size + gapBelow;
+        if (detail > 0) DrawLine(canvas, paint, text.Detail, detail, regular, colours.Secondary, centre, y, Chord);
+    }
+
+    /// <summary>One centred line whose box starts at <paramref name="top"/>, made smaller if it is wider than the hole there.</summary>
+    private static void DrawLine(Canvas canvas, Paint paint, string s, float size, Typeface? typeface, Color colour, float centre, float top,
+        Func<float, float> chord)
+    {
+        paint.SetTypeface(typeface);
+        paint.Color = colour;
+        paint.TextSize = size;
+        var room = chord(Math.Max(Math.Abs(top - centre), Math.Abs(top + size - centre)));
+        var width = paint.MeasureText(s);
+        if (width > room && width > 0) paint.TextSize = size * room / width;
+        // Vertically centred in its box: the middle of the digits (about 0.36 of the text size above the baseline).
+        canvas.DrawText(s, centre, top + size / 2 + paint.TextSize * 0.36f, paint);
     }
 
     /// <summary>What the ring says, for screen readers: the balance and each slice.</summary>
@@ -327,24 +392,6 @@ internal static class WalletWidgets
             .Where(s => !(hideBalance && s.Color == WalletWidgetModel.BalanceColor))
             .Select(s => $"{s.Name} {WalletFormat.Money(s.Amount)}, {s.ShareText}"));
         return string.Join(". ", parts);
-    }
-
-    /// <summary>The full amount at the largest size that fits inside the ring, else the short one (down to 12 sp).</summary>
-    private static (string Text, int Sp) FitCenter(Context context, string full, string brief, float widthDp, int largest)
-    {
-        const int Smallest = 12;
-        var fontScale = context.Resources?.Configuration?.FontScale ?? 1f;
-        using var paint = new Paint(PaintFlags.AntiAlias);
-        paint.SetTypeface(Typeface.DefaultBold);
-        foreach (var text in new[] { full, brief })
-        {
-            for (var sp = largest; sp >= Smallest; sp--)
-            {
-                paint.TextSize = sp * fontScale; // in dp, like widthDp
-                if (paint.MeasureText(text) <= widthDp) return (text, sp);
-            }
-        }
-        return (brief, Smallest);
     }
 
     private static PendingIntent PeriodIntent(Context context, int widgetId, WalletWidgetPeriod period)
