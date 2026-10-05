@@ -3,6 +3,18 @@
 All notable changes to Helm. The top section is used as the GitHub release body and as the Velopack release notes.
 Format: [Keep a Changelog](https://keepachangelog.com), versions follow [SemVer](https://semver.org).
 
+## [0.26.1] - 2026-10-05
+
+### Changed
+- **Wallet**: an amount gets its thousands separators as you type it, in a new transaction and when you edit one
+  (1000000 reads 1.000.000), as in Tracker's debt book. *50k*, *10tr* and *1.5tr* still work as before.
+
+### Fixed
+- **Wallet** (Android): in *Spending by category*, the bar of a large share no longer runs left over the
+  category's icon; every bar starts under the name.
+- **Tracker**: a '.' or ',' you type in a debt's amount is kept, so *1.5k* can be typed; before, it vanished
+  as soon as you typed it.
+
 ## [0.26.0] - 2026-10-05
 
 ### Added
