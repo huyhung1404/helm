@@ -43,6 +43,7 @@ public sealed class AutofillActivity : AppCompatActivity
     private const string ExtraCode = "helm.autofill.code";
     private const string ExtraHost = "helm.autofill.host";
     private const string ExtraApp = "helm.autofill.app";
+    private const string ExtraAppCert = "helm.autofill.appcert";
     private const string ExtraPackage = "helm.autofill.package";
 
     private AutofillForm _form = null!;
@@ -62,6 +63,7 @@ public sealed class AutofillActivity : AppCompatActivity
         if (form.Code is { } c) intent.PutExtra(ExtraCode, c);
         intent.PutExtra(ExtraHost, form.Target.Host);
         intent.PutExtra(ExtraApp, form.Target.AppId);
+        intent.PutExtra(ExtraAppCert, form.Target.AppCert);
         intent.PutExtra(ExtraPackage, form.PackageName);
         return intent;
     }
@@ -80,7 +82,8 @@ public sealed class AutofillActivity : AppCompatActivity
             _store = services.GetRequiredService<VaultStore>();
             _mode = (Mode)(Intent?.GetIntExtra(ExtraMode, 0) ?? 0);
             _form = new AutofillForm(Id(ExtraUsername), Id(ExtraPassword), Id(ExtraCode),
-                new AutofillTarget(Intent?.GetStringExtra(ExtraHost), Intent?.GetStringExtra(ExtraApp)), Intent?.GetStringExtra(ExtraPackage) ?? "");
+                new AutofillTarget(Intent?.GetStringExtra(ExtraHost), Intent?.GetStringExtra(ExtraApp), AppCert: Intent?.GetStringExtra(ExtraAppCert)),
+                Intent?.GetStringExtra(ExtraPackage) ?? "");
             if (_session.State == VaultState.Unlocked) AfterUnlock();
             else if (_session.State == VaultState.NotSetUp) Fail("Set up the Vault in Helm first.");
             else ShowUnlock();
@@ -173,7 +176,12 @@ public sealed class AutofillActivity : AppCompatActivity
         }
         catch (Exception ex) when (ex is Crypto.VaultKeyException or VaultThrottledException or InvalidOperationException)
         {
-            error.Text = ex is VaultThrottledException t ? $"Too many tries. Wait {Math.Ceiling(t.RetryAfter.TotalSeconds)} s." : "That is not the vault password.";
+            error.Text = ex switch
+            {
+                VaultThrottledException { FirstTry: true } t => $"First unlock on this phone: wait {Math.Ceiling(t.RetryAfter.TotalSeconds)} s.",
+                VaultThrottledException t => $"Too many tries. Wait {Math.Ceiling(t.RetryAfter.TotalSeconds)} s.",
+                _ => "That is not the vault password.",
+            };
             error.Visibility = ViewStates.Visible;
         }
     }
@@ -199,10 +207,11 @@ public sealed class AutofillActivity : AppCompatActivity
     {
         _session.Touch();
         var matches = VaultAutofill.Match(_store.Items(), _form.Target);
-        if (_mode == Mode.Unlock && matches.Count > 0)
+        var verified = matches.Where(m => m.Verified).ToList();
+        if (_mode == Mode.Unlock && verified.Count > 0)
         {
             var response = new FillResponse.Builder();
-            foreach (var match in matches.Take(5)) response.AddDataset(AutofillResponses.Dataset(this, _form, match));
+            foreach (var match in verified.Take(5)) response.AddDataset(AutofillResponses.Dataset(this, _form, match));
             response.AddDataset(AutofillResponses.AuthDataset(this, _form, Create(this, _form, Mode.Pick), "Choose from Helm Vault…"));
             Answer(response.Build()!);
             return;
@@ -253,7 +262,8 @@ public sealed class AutofillActivity : AppCompatActivity
                 try
                 {
                     if (_form.Target.Host is { } site) RememberSite(entry, site);
-                    else if (_form.Target.AppId is { Length: > 0 } app) VaultAutofill.RememberApp(_store, entry.Uid, VaultAutofill.AndroidAppScheme, app);
+                    else if (_form.Target.AppId is { Length: > 0 } app)
+                        VaultAutofill.RememberApp(_store, entry.Uid, VaultAutofill.AndroidAppScheme, app, _form.Target.AppCert);
                 }
                 catch (Exception ex) when (ex is InvalidOperationException or Crypto.VaultKeyException)
                 {

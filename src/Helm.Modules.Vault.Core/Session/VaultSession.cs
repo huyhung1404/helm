@@ -26,10 +26,18 @@ public sealed record VaultKitConfirmation(string VaultId, string RecoveryId, lon
 }
 
 /// <summary>Too many wrong passwords in a row: try again after <see cref="RetryAfter"/>.</summary>
-public sealed class VaultThrottledException(TimeSpan retryAfter)
-    : Exception($"Too many wrong passwords. Try again in {Math.Ceiling(retryAfter.TotalSeconds)} seconds.")
+/// <param name="firstTry">
+/// No wrong password was typed: this device has no unlock count yet (new device, reinstall, settings reset, update) or
+/// it was changed, so Helm waits once before the first try.
+/// </param>
+public sealed class VaultThrottledException(TimeSpan retryAfter, bool firstTry = false)
+    : Exception(firstTry
+        ? $"Helm waits a moment before the first unlock on this device. Try again in {Math.Ceiling(retryAfter.TotalSeconds)} seconds."
+        : $"Too many wrong passwords. Try again in {Math.Ceiling(retryAfter.TotalSeconds)} seconds.")
 {
     public TimeSpan RetryAfter { get; } = retryAfter;
+
+    public bool FirstTry { get; } = firstTry;
 }
 
 /// <summary>
@@ -55,6 +63,12 @@ public sealed partial class VaultSession : ObservableObject, IDisposable
     private readonly ILogger _logger;
     private readonly object _gate = new();
     private readonly ITimer _autoLock;
+    private readonly ProtectedThrottleStore? _throttle;
+    private readonly object _throttleGate = new();
+    // The brute-force count of this process when the protected store is used (see ReadThrottle).
+    private (int Failures, long LastFailedMs)? _throttleState;
+    // The count above was set by fail-closed, not by a wrong password (see VaultThrottledException.FirstTry).
+    private bool _throttleFirstTry;
     private VaultKey? _key;
 
     [ObservableProperty]
@@ -74,7 +88,8 @@ public sealed partial class VaultSession : ObservableObject, IDisposable
         ISyncService sync,
         TimeProvider? time = null,
         ILogger<VaultSession>? logger = null,
-        ISyncedCollection<VaultKitConfirmation>? kits = null)
+        ISyncedCollection<VaultKitConfirmation>? kits = null,
+        ISecretProtector? protector = null)
     {
         _keyrings = keyrings;
         _kits = kits;
@@ -85,6 +100,10 @@ public sealed partial class VaultSession : ObservableObject, IDisposable
         _sync = sync;
         _time = time ?? TimeProvider.System;
         _logger = (ILogger?)logger ?? NullLogger.Instance;
+        // The brute-force counter goes in a protected file (not the plaintext settings) so it cannot be reset by hand.
+        // Without a protector (tests, a platform that has none) it stays in VaultDeviceState as before.
+        _throttle = protector is null ? null
+            : new ProtectedThrottleStore(Path.Combine(settings.Paths.ModuleDataDirectory("vault"), "throttle.bin"), protector);
         _autoLock = _time.CreateTimer(_ => Lock("inactivity"), null, Timeout.InfiniteTimeSpan, Timeout.InfiniteTimeSpan);
         _keyrings.Changed += (_, _) => RefreshKeyring();
         RefreshKeyring();
@@ -168,12 +187,7 @@ public sealed partial class VaultSession : ObservableObject, IDisposable
         }
         catch (VaultKeyException)
         {
-            _device.Update(d =>
-            {
-                d.FailedPasswordAttempts++;
-                d.LastFailedAttemptMs = Now();
-            });
-            _logger.LogWarning("Wrong vault password ({Count} in a row)", _device.Current.FailedPasswordAttempts);
+            _logger.LogWarning("Wrong vault password ({Count} in a row)", BumpFailure());
             throw;
         }
         OnPasswordUnlocked();
@@ -192,11 +206,7 @@ public sealed partial class VaultSession : ObservableObject, IDisposable
         }
         catch (VaultKeyException)
         {
-            _device.Update(d =>
-            {
-                d.FailedPasswordAttempts++;
-                d.LastFailedAttemptMs = Now();
-            });
+            BumpFailure();
             throw;
         }
         _logger.LogWarning("Vault unlocked with the recovery key");
@@ -289,11 +299,7 @@ public sealed partial class VaultSession : ObservableObject, IDisposable
             }
             catch (VaultKeyException)
             {
-                _device.Update(d =>
-                {
-                    d.FailedPasswordAttempts++;
-                    d.LastFailedAttemptMs = Now();
-                });
+                BumpFailure();
                 throw;
             }
         }
@@ -442,22 +448,98 @@ public sealed partial class VaultSession : ObservableObject, IDisposable
         }
     }
 
-    private void OnPasswordUnlocked() => _device.Update(d =>
+    private void OnPasswordUnlocked()
     {
-        d.LastPasswordUnlockMs = Now();
-        d.FailedPasswordAttempts = 0;
-        d.FailedDeviceUnlocks = 0;
-    });
+        // FailedDeviceUnlocks and the last-unlock time stay in the (plaintext) device state; the brute-force counter
+        // moves to the protected store, which is seeded here so "a vault exists but throttle.bin is gone" means deletion.
+        _device.Update(d =>
+        {
+            d.LastPasswordUnlockMs = Now();
+            d.FailedDeviceUnlocks = 0;
+            if (_throttle is null) d.FailedPasswordAttempts = 0;
+        });
+        if (_throttle is not null)
+        {
+            lock (_throttleGate) WriteThrottle(0, 0);
+        }
+    }
+
+    /// <summary>
+    /// The current failure count and the time of the last one. With the protected store the count lives in memory for
+    /// the life of the process (editing or deleting the file changes nothing until a restart) and is read from the file
+    /// once: a file gone while a vault exists (deleted) or unreadable (tampered) counts as a wrong password just now, so
+    /// resetting it costs one backoff, never a bypass. The time is held in memory, so a file that cannot be written
+    /// (full disk, broken keystore) never turns that backoff into a lock-out.
+    /// </summary>
+    private (int Failures, long LastFailedMs) ReadThrottle()
+    {
+        if (_throttle is null) return (_device.Current.FailedPasswordAttempts, _device.Current.LastFailedAttemptMs);
+        lock (_throttleGate)
+        {
+            var now = Now();
+            if (_throttleState is not { } state)
+            {
+                var read = _throttle.Load();
+                if (read.FileMissing && Keyring is null) return (0, 0); // No vault yet: a brand-new user is never throttled.
+                if (read.FileMissing || read.Tampered)
+                {
+                    if (read.Tampered) _logger.LogWarning("The vault throttle file is unreadable; treating it as a recent wrong password");
+                    state = (FreePasswordAttempts, now);
+                    WriteThrottle(state.Failures, state.LastFailedMs);
+                    _throttleFirstTry = true;
+                }
+                else _throttleState = state = (read.Failed, read.LastFailedMs);
+            }
+            // A failure "in the future" (a wrong clock, or one that went back) would hold the backoff that long: start it now.
+            if (state.LastFailedMs > now)
+            {
+                state.LastFailedMs = now;
+                WriteThrottle(state.Failures, now);
+            }
+            return state;
+        }
+    }
+
+    /// <summary>The count in memory first, then in the file (best effort). The caller holds the throttle lock.</summary>
+    private void WriteThrottle(int failures, long lastFailedMs)
+    {
+        _throttleFirstTry = false;
+        _throttleState = (failures, lastFailedMs);
+        _throttle!.Save(failures, lastFailedMs);
+    }
+
+    /// <summary>Records one more wrong password. Returns the new count (for the log line).</summary>
+    private int BumpFailure()
+    {
+        if (_throttle is null)
+        {
+            _device.Update(d =>
+            {
+                d.FailedPasswordAttempts++;
+                d.LastFailedAttemptMs = Now();
+            });
+            return _device.Current.FailedPasswordAttempts;
+        }
+        lock (_throttleGate)
+        {
+            var next = ReadThrottle().Failures + 1;
+            WriteThrottle(next, Now());
+            return next;
+        }
+    }
 
     private void ThrowIfThrottled()
     {
-        var failures = _device.Current.FailedPasswordAttempts;
+        var (failures, lastFailedMs) = ReadThrottle();
         if (failures < FreePasswordAttempts) return;
         // 2 s, 4 s, 8 s … up to 5 minutes after the third wrong password in a row.
         var wait = TimeSpan.FromSeconds(Math.Min(300, Math.Pow(2, failures - FreePasswordAttempts + 1)));
-        var until = DateTimeOffset.FromUnixTimeMilliseconds(_device.Current.LastFailedAttemptMs) + wait;
+        var until = DateTimeOffset.FromUnixTimeMilliseconds(lastFailedMs) + wait;
         var left = until - _time.GetUtcNow();
-        if (left > TimeSpan.Zero) throw new VaultThrottledException(left);
+        if (left <= TimeSpan.Zero) return;
+        bool firstTry;
+        lock (_throttleGate) firstTry = _throttleFirstTry;
+        throw new VaultThrottledException(left, firstTry);
     }
 
     private VaultKeyringData RequireKeyring() => Keyring ?? throw new InvalidOperationException("Create the vault first.");

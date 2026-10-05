@@ -39,6 +39,8 @@ public sealed class HelmAutofillService : AutofillService
                 callback.OnSuccess(null);
                 return;
             }
+            // An app (not a web page): who signed it decides which remembered logins it may be offered.
+            if (form.Target.AppId is { } app) form = form with { Target = form.Target with { AppCert = AppSigning.CertOf(this, app) } };
             var session = HelmAndroidServices.Current.GetRequiredService<VaultSession>();
             // No vault on this phone (yet): offer nothing rather than a dead end on every sign-in form.
             if (session.State == VaultState.NotSetUp)
@@ -58,7 +60,8 @@ public sealed class HelmAutofillService : AutofillService
 
             var store = HelmAndroidServices.Current.GetRequiredService<VaultStore>();
             var builder = new FillResponse.Builder();
-            foreach (var match in VaultAutofill.Match(store.Items(), form.Target).Take(MaxDatasets))
+            // One tap only for logins sure to be this site's or this app's; the rest are in the picker below.
+            foreach (var match in VaultAutofill.Match(store.Items(), form.Target).Where(m => m.Verified).Take(MaxDatasets))
                 builder.AddDataset(AutofillResponses.Dataset(this, form, match));
             // Another login (or one for an app Helm does not know yet): the picker, which remembers the app.
             builder.AddDataset(AutofillResponses.AuthDataset(this, form, AutofillActivity.Create(this, form, AutofillActivity.Mode.Pick),

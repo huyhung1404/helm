@@ -6,6 +6,7 @@ using AndroidX.Biometric;
 using AndroidX.Core.Content;
 using Helm.Core.Platform;
 using Helm.Core.Settings;
+using Helm.Core.Sync;
 using Helm.Modules.Vault.Session;
 using Java.Security;
 using Javax.Crypto;
@@ -19,12 +20,14 @@ namespace Helm.Modules.Vault.Platform;
 /// <summary>
 /// Quick unlock with a fingerprint or the face: an AES-256-GCM key in the Android Keystore that works only right after
 /// a strong biometric check (BiometricPrompt with a CryptoObject), and that Android deletes when a new fingerprint or
-/// face is enrolled. It wraps the vault key in settings/vault/biometric.bin. The key never leaves the secure hardware.
+/// face is enrolled. It wraps the vault key in settings/vault/biometric.bin, which is itself protected by the Keystore
+/// (<see cref="ISecretProtector"/>) so the file reveals nothing and cannot be swapped. The key never leaves the secure hardware.
 /// </summary>
-internal sealed class BiometricUnlock(HelmPaths paths, ILogger<BiometricUnlock> logger) : IVaultDeviceUnlock
+internal sealed class BiometricUnlock(ISecretProtector protector, HelmPaths paths, ILogger<BiometricUnlock> logger) : IVaultDeviceUnlock
 {
     private const string Alias = "helm.vault.biometric.v1";
     private const string Transformation = "AES/GCM/NoPadding";
+    private const string Purpose = "helm-vault/biometric.v1";
     private string FilePath => Path.Combine(paths.ModuleDataDirectory("vault"), "biometric.bin");
 
     public string Name => "Fingerprint or face";
@@ -43,7 +46,7 @@ internal sealed class BiometricUnlock(HelmPaths paths, ILogger<BiometricUnlock> 
         var wrapped = authenticated.DoFinal(vaultKey.ToArray())!;
         var stored = new Stored(vaultId, authenticated.GetIV()!, wrapped);
         Directory.CreateDirectory(Path.GetDirectoryName(FilePath)!);
-        await File.WriteAllBytesAsync(FilePath, JsonSerializer.SerializeToUtf8Bytes(stored), ct).ConfigureAwait(true);
+        await File.WriteAllBytesAsync(FilePath, protector.Protect(JsonSerializer.SerializeToUtf8Bytes(stored), Purpose), ct).ConfigureAwait(true);
         logger.LogInformation("Biometric quick unlock turned on");
         return true;
     }
@@ -145,10 +148,13 @@ internal sealed class BiometricUnlock(HelmPaths paths, ILogger<BiometricUnlock> 
     {
         try
         {
-            return File.Exists(FilePath) ? JsonSerializer.Deserialize<Stored>(File.ReadAllBytes(FilePath)) : null;
+            if (!File.Exists(FilePath)) return null;
+            return JsonSerializer.Deserialize<Stored>(protector.Unprotect(File.ReadAllBytes(FilePath), Purpose));
         }
-        catch (Exception ex) when (ex is JsonException or IOException)
+        catch (Exception ex) when (ex is CryptographicException or JsonException or IOException)
         {
+            // Also an older plaintext biometric.bin (pre-hardening): it no longer unprotects, so quick unlock turns
+            // itself off and the password is asked once, after which Enroll writes a protected file.
             logger.LogWarning(ex, "The biometric quick unlock file is unreadable");
             return null;
         }

@@ -14,6 +14,8 @@ public sealed record EmergencyKit(string VaultId, string RecoveryId, string Reco
         "HELM VAULT — EMERGENCY KIT",
         "",
         "Keep this page somewhere safe and offline (a drawer, a safe). Anyone with it and your backups can open your vault.",
+        "If you saved it as a file (PDF or text), print it and delete the file: never keep it in a folder that syncs to the",
+        "cloud, in email or in chat.",
         "",
         $"Created:          {CreatedAt.ToLocalTime().ToString("f", CultureInfo.CurrentCulture)}",
         $"Vault id:         {VaultId}",

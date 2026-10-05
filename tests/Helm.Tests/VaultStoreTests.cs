@@ -271,9 +271,156 @@ public sealed class VaultStoreTests : IDisposable
 
         var throttled = await Assert.ThrowsAsync<VaultThrottledException>(() => a.Session.UnlockAsync(Password));
         Assert.True(throttled.RetryAfter > TimeSpan.Zero);
+        Assert.False(throttled.FirstTry);
+        Assert.StartsWith("Too many wrong passwords", throttled.Message);
         _clock.Advance(TimeSpan.FromSeconds(3));
         await a.Session.UnlockAsync(Password);
         Assert.Equal(VaultState.Unlocked, a.Session.State);
+    }
+
+    [Fact]
+    public async Task Picking_a_login_for_an_app_records_its_certificate_in_place_of_the_old_remembered_app()
+    {
+        var a = NewDevice("a");
+        await a.Session.CreateAsync(Password);
+        var uid = a.Store.Add(Login("Bank", "pw") with
+        {
+            Fields = [.. Login("Bank", "pw").Fields, new VaultField("App", "androidapp://vn.bank.app", VaultFieldKind.Url)],
+        });
+
+        Assert.True(VaultAutofill.RememberApp(a.Store, uid, VaultAutofill.AndroidAppScheme, "vn.bank.app", "AA11"));
+        var apps = a.Store.Get(uid)!.Item.Fields.Where(f => f.Value.StartsWith("androidapp://")).Select(f => f.Value).ToList();
+        Assert.Equal(["androidapp://vn.bank.app#aa11"], apps);
+        Assert.False(VaultAutofill.RememberApp(a.Store, uid, VaultAutofill.AndroidAppScheme, "vn.bank.app", "aa11"));
+        Assert.True(Assert.Single(VaultAutofill.Match(a.Store.Items(), new AutofillTarget(null, "vn.bank.app", AppCert: "aa11"))).Verified);
+    }
+
+    [Fact]
+    public async Task Garbling_the_throttle_file_does_not_reset_the_backoff()
+    {
+        var a = NewDevice("a", protector: new PlainSecretProtector());
+        await a.Session.CreateAsync(Password);
+        a.Session.Lock("test");
+        for (var i = 0; i < 3; i++) await Assert.ThrowsAsync<VaultKeyException>(() => a.Session.UnlockAsync("definitely the wrong one"));
+
+        // While Helm runs the count is in memory: garbling the file changes nothing.
+        File.WriteAllBytes(ThrottlePath(a), [1, 2, 3, 4, 5]);
+        await Assert.ThrowsAsync<VaultThrottledException>(() => a.Session.UnlockAsync(Password));
+
+        // After a restart the garbled file reads as tampered: one first-tier backoff, then the user gets in.
+        var restarted = Restart(a, new PlainSecretProtector());
+        var throttled = await Assert.ThrowsAsync<VaultThrottledException>(() => restarted.UnlockAsync(Password));
+        Assert.True(throttled.RetryAfter > TimeSpan.Zero);
+        _clock.Advance(TimeSpan.FromSeconds(3));
+        await restarted.UnlockAsync(Password);
+        Assert.Equal(VaultState.Unlocked, restarted.State);
+    }
+
+    [Fact]
+    public async Task Deleting_the_throttle_file_does_not_reset_the_backoff()
+    {
+        var a = NewDevice("a", protector: new PlainSecretProtector());
+        await a.Session.CreateAsync(Password);
+        Assert.True(File.Exists(ThrottlePath(a)), "creating the vault seeds the throttle file");
+        a.Session.Lock("test");
+        for (var i = 0; i < 3; i++) await Assert.ThrowsAsync<VaultKeyException>(() => a.Session.UnlockAsync("definitely the wrong one"));
+
+        File.Delete(ThrottlePath(a));
+        Assert.False((await Assert.ThrowsAsync<VaultThrottledException>(() => a.Session.UnlockAsync(Password))).FirstTry);
+
+        // Restarted, a vault exists but its throttle file is gone: that can only be a deletion, so still throttled.
+        var restarted = Restart(a, new PlainSecretProtector());
+        await Assert.ThrowsAsync<VaultThrottledException>(() => restarted.UnlockAsync(Password));
+        _clock.Advance(TimeSpan.FromSeconds(3));
+        await restarted.UnlockAsync(Password);
+        Assert.Equal(VaultState.Unlocked, restarted.State);
+    }
+
+    [Fact]
+    public async Task A_brand_new_user_is_not_throttled_without_a_throttle_file()
+    {
+        var a = NewDevice("a", protector: new PlainSecretProtector());
+        Assert.False(File.Exists(ThrottlePath(a)));
+        Assert.Equal(VaultState.NotSetUp, a.Session.State);
+        await a.Session.CreateAsync(Password);
+        Assert.Equal(VaultState.Unlocked, a.Session.State);
+
+        // The first unlock after locking (no failures yet) is immediate.
+        a.Session.Lock("test");
+        await a.Session.UnlockAsync(Password);
+        Assert.Equal(VaultState.Unlocked, a.Session.State);
+    }
+
+    [Fact]
+    public async Task A_new_device_waits_once_with_a_message_that_does_not_blame_wrong_passwords()
+    {
+        var a = NewDevice("a", protector: new PlainSecretProtector());
+        await a.Session.CreateAsync(Password);
+        a.Session.Lock("test");
+        // As on a second device that synced the vault down, or after an update: no throttle file, no wrong password.
+        File.Delete(ThrottlePath(a));
+
+        var restarted = Restart(a, new PlainSecretProtector());
+        var throttled = await Assert.ThrowsAsync<VaultThrottledException>(() => restarted.UnlockAsync(Password));
+        Assert.True(throttled.FirstTry);
+        Assert.DoesNotContain("wrong password", throttled.Message, StringComparison.OrdinalIgnoreCase);
+
+        // A real wrong password after that wait is reported as one.
+        _clock.Advance(TimeSpan.FromSeconds(3));
+        await Assert.ThrowsAsync<VaultKeyException>(() => restarted.UnlockAsync("definitely the wrong one"));
+        Assert.False((await Assert.ThrowsAsync<VaultThrottledException>(() => restarted.UnlockAsync(Password))).FirstTry);
+    }
+
+    [Fact]
+    public async Task A_throttle_file_that_cannot_be_written_never_locks_the_user_out()
+    {
+        var a = NewDevice("a", protector: new PlainSecretProtector());
+        await a.Session.CreateAsync(Password);
+        a.Session.Lock("test");
+        // A folder where the file should be: every write fails, as with a full disk or a broken keystore.
+        File.Delete(ThrottlePath(a));
+        Directory.CreateDirectory(ThrottlePath(a));
+
+        var restarted = Restart(a, new PlainSecretProtector());
+        await Assert.ThrowsAsync<VaultThrottledException>(() => restarted.UnlockAsync(Password));
+        // The fail-closed time is held in memory, not re-armed on every read, so the wait ends.
+        _clock.Advance(TimeSpan.FromSeconds(3));
+        await restarted.UnlockAsync(Password);
+        restarted.Lock("test");
+        await restarted.UnlockAsync(Password);
+        Assert.Equal(VaultState.Unlocked, restarted.State);
+    }
+
+    [Fact]
+    public async Task A_throttle_time_in_the_future_does_not_hold_the_backoff_that_long()
+    {
+        var a = NewDevice("a", protector: new PlainSecretProtector());
+        await a.Session.CreateAsync(Password);
+        a.Session.Lock("test");
+        // Three failures stamped a year ahead (the clock was wrong when they happened).
+        new ProtectedThrottleStore(ThrottlePath(a), new PlainSecretProtector()).Save(3, _clock.GetUtcNow().AddYears(1).ToUnixTimeMilliseconds());
+
+        var restarted = Restart(a, new PlainSecretProtector());
+        var throttled = await Assert.ThrowsAsync<VaultThrottledException>(() => restarted.UnlockAsync(Password));
+        Assert.True(throttled.RetryAfter <= TimeSpan.FromSeconds(2));
+        _clock.Advance(TimeSpan.FromSeconds(3));
+        await restarted.UnlockAsync(Password);
+        Assert.Equal(VaultState.Unlocked, restarted.State);
+    }
+
+    [Fact]
+    public async Task The_throttle_count_is_not_kept_in_the_plaintext_device_state()
+    {
+        var a = NewDevice("a", protector: new PlainSecretProtector());
+        await a.Session.CreateAsync(Password);
+        a.Session.Lock("test");
+        for (var i = 0; i < 3; i++) await Assert.ThrowsAsync<VaultKeyException>(() => a.Session.UnlockAsync("definitely the wrong one"));
+
+        // The failures go to the protected file only; the readable settings JSON never learns about them.
+        var device = a.Settings.Get<VaultDeviceState>(VaultDeviceState.StoreId).Current;
+        Assert.Equal(0, device.FailedPasswordAttempts);
+        Assert.Equal(0, device.LastFailedAttemptMs);
+        Assert.True(File.Exists(ThrottlePath(a)));
     }
 
     [Fact]
@@ -409,9 +556,10 @@ public sealed class VaultStoreTests : IDisposable
 
     private sealed record Device(
         SyncEngine Engine, VaultSession Session, VaultStore Store,
-        SyncedCollection<VaultItemRecord> Records, SyncedCollection<VaultKeyringData> Keyrings);
+        SyncedCollection<VaultItemRecord> Records, SyncedCollection<VaultKeyringData> Keyrings, SettingsStoreFactory Settings);
 
-    private Device NewDevice(string name, FakeSyncServer.Transport? transport = null, IVaultDeviceUnlock? deviceUnlock = null)
+    private Device NewDevice(string name, FakeSyncServer.Transport? transport = null, IVaultDeviceUnlock? deviceUnlock = null,
+        ISecretProtector? protector = null)
     {
         var paths = new HelmPaths(Path.Combine(_dir, name));
         var db = Own(new SyncDatabase(paths.SyncDatabaseFile, TestKeys.Local));
@@ -424,13 +572,21 @@ public sealed class VaultStoreTests : IDisposable
         }));
         var kits = Own(new SyncedCollection<VaultKitConfirmation>(engine, new SyncedCollectionOptions<VaultKitConfirmation> { Name = VaultSession.KitCollection }));
         var settings = Own(new SettingsStoreFactory(paths));
-        var session = Own(new VaultSession(keyrings, settings, deviceUnlock ?? new NoDeviceUnlock(), engine, _clock, kits: kits)
+        var session = Own(new VaultSession(keyrings, settings, deviceUnlock ?? new NoDeviceUnlock(), engine, _clock, kits: kits, protector: protector)
         {
             NewKdf = VaultCryptoTests.CheapKdf,
         });
         var store = Own(new VaultStore(records, session, _clock));
-        return new Device(engine, session, store, records, keyrings);
+        return new Device(engine, session, store, records, keyrings, settings);
     }
+
+    /// <summary>A new session over the same device's data and files, as after restarting Helm (nothing kept in memory).</summary>
+    private VaultSession Restart(Device device, ISecretProtector protector) =>
+        Own(new VaultSession(device.Keyrings, Own(new SettingsStoreFactory(device.Settings.Paths)), new NoDeviceUnlock(), device.Engine, _clock,
+            protector: protector) { NewKdf = VaultCryptoTests.CheapKdf });
+
+    /// <summary>The protected throttle file of a device created with a protector.</summary>
+    private static string ThrottlePath(Device device) => Path.Combine(device.Settings.Paths.ModuleDataDirectory("vault"), "throttle.bin");
 
     private static async Task Sync(params Device[] devices)
     {

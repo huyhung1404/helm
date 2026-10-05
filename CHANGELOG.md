@@ -17,6 +17,22 @@ Format: [Keep a Changelog](https://keepachangelog.com), versions follow [SemVer]
   opacity you choose (35 % when you first pick it) instead of being fully clear, so the text stays readable on any
   wallpaper. A Tracker widget already set to Transparent switches to 35 %.
 
+### Security
+- **Vault**: the count of wrong vault passwords (which makes Helm wait longer after each one) is now kept in a file
+  only this Windows user (or this phone) can read, instead of the readable settings file, so it can no longer be reset
+  by editing or deleting a file. A deleted or damaged count is treated as a recent wrong password: one short wait. The
+  first password unlock after updating, on a new device, or after resetting settings may ask you to wait 2 seconds once
+  (it says so, instead of claiming wrong passwords).
+- **Vault** (Android): the fingerprint quick-unlock file is now protected by the phone's keystore too. Quick unlock
+  turns itself off once after updating: unlock with the password and turn it on again in Vault settings.
+- **Vault** (Android autofill): a login remembered for an app is now tied to who signed that app, so a fake app that
+  took the same name (installed from a file) is never offered it. Logins remembered before this update are offered
+  in one tap again after you pick them once with *Choose from Helm Vault…* in that app.
+- **Vault** (PC): the key Windows Hello quick unlock keeps is now made with a random salt, like every other key in the
+  vault. Quick unlock keeps working; the file is updated by itself the next time you use it.
+- **Vault**: saving the Emergency Kit as a file (on the phone, or as a PDF) now says plainly that it opens the whole
+  vault without the password: print it or move it to a USB stick, then delete the file.
+
 ## [0.23.2] - 2026-10-05
 
 ### Fixed

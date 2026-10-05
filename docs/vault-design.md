@@ -99,6 +99,30 @@ Checked and holding: a hostile server cannot read, forge, reorder or move record
 id, uid, epoch, trash state, blob list and chunk index); renaming an old snapshot to look newer fails; a planted
 backup keyring does not open with the user's password; the recovery id reveals nothing about the key.
 
+## Security review (2026-10-05)
+
+A second pass, from an attacker who can change the device's files (tests in tests/Helm.Tests/VaultStoreTests.cs).
+
+| # | Attack | Before | Fix |
+|---|---|---|---|
+| S9 | Reset the wrong-password backoff by editing or deleting settings/vault-device.json | The count and its time were plain JSON | The count lives in memory while Helm runs and in settings/vault/throttle.bin under `ISecretProtector` (DPAPI / Android Keystore). A file gone while a vault exists, or unreadable, counts as a wrong password just now (one 2 s wait; also once after updating, on a new device or after a settings reset). The time is held in memory, so a file that cannot be written never locks the user out, and a time in the future (a wrong clock) starts the wait now |
+| S10 | Read or swap the Android quick-unlock file | biometric.bin was plain JSON (vault id, IV, wrapped key) | Protected like hello.bin on Windows; an older file no longer opens, so quick unlock turns off once |
+| S11 | A fake app installed from a file takes a real app's package name and gets its login from autofill | Apps were matched by package name only | A picked login remembers the app as `androidapp://package#sha256` of its signing certificate (`AppSigning`; a launcher `<queries>` makes apps visible on Android 11+). Only the same signature is offered in one tap; a certificate that cannot be read matches nothing; logins remembered without one are in the picker only, and picking one there records it (tests in VaultAutofillTests.cs) |
+
+| S12 | Windows Hello quick unlock: the wrapping key was SHA-256(purpose, signature) | Unsalted, unlike every other key here | HKDF-SHA256 of the signature with a random salt in hello.bin; older files still open and are rewritten salted at the next quick unlock, with no extra prompt (WindowsHelloUnlockTests.cs) |
+| S13 | Find the Emergency Kit saved as a file (Drive, Downloads, a PDF) and open the vault with the recovery key | The kit said to keep the page offline, nothing about files | Android asks before saving and says to print it or move it to a USB stick, then delete the file; the kit itself says the same |
+
+Known limits, not fixed in code:
+- Decrypted items (passwords, notes, two-factor keys) are .NET strings while the vault is unlocked. Strings cannot be
+  wiped, so after locking they stay in memory until the garbage collector reuses it. Zeroing the TOTP secret's byte
+  array would not help: the same key stays in the item's field text. Reading it needs access to Helm's memory, which
+  also reveals the unlocked vault itself.
+- The autofill one-tap list trusts the first certificate seen for an app picked by hand: if a fake app is the first
+  one picked for a package, its certificate is the one remembered (S11).
+
+The backoff only slows guessing on the device itself. Whoever copies the replica or a backup guesses offline with no
+backoff at all: there the strength of the vault password and Argon2id are the lock (S1).
+
 Residual risks (documented, not fixed):
 - Malware running as the user while the vault is unlocked can read it (memory, screen); .NET strings cannot be wiped.
 - A compromised device that holds the sync key and token can overwrite records with garbage, which the guard cannot

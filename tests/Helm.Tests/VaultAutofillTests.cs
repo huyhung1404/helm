@@ -20,7 +20,38 @@ public sealed class VaultAutofillTests
         Login("Facebook", "fb", "https://facebook.com", "androidapp://com.facebook.katana"),
         Login("Slack", "sl", "app://slack"),
         Login("No password", "", "https://nopass.example"),
+        Login("Bank", "bk", "androidapp://vn.bank.app#aa11bb22"),
     ];
+
+    [Fact]
+    public void An_app_remembered_with_its_certificate_matches_only_that_signature()
+    {
+        var real = Assert.Single(VaultAutofill.Match(Entries, new AutofillTarget(null, "vn.bank.app", AppCert: "AA11BB22")));
+        Assert.Equal("Bank", real.Title);
+        Assert.True(real.Verified);
+        // A fake app installed from a file can take the bank's package name, never its signing key.
+        Assert.Empty(VaultAutofill.Match(Entries, new AutofillTarget(null, "vn.bank.app", AppCert: "ffff0000")));
+        // A certificate that could not be read is not trusted either.
+        Assert.Empty(VaultAutofill.Match(Entries, new AutofillTarget(null, "vn.bank.app")));
+    }
+
+    [Fact]
+    public void An_app_remembered_without_a_certificate_is_only_offered_in_the_picker()
+    {
+        var facebook = Assert.Single(VaultAutofill.Match(Entries, new AutofillTarget(null, "com.facebook.katana", AppCert: "aa")));
+        Assert.False(facebook.Verified);
+        // Sites and Windows apps are unaffected.
+        Assert.True(Assert.Single(VaultAutofill.Match(Entries, new AutofillTarget("www.paypal.com"))).Verified);
+        Assert.True(Assert.Single(VaultAutofill.Match(Entries, new AutofillTarget(null, "slack"))).Verified);
+    }
+
+    [Fact]
+    public void App_urls_carry_the_certificate_on_android_only()
+    {
+        Assert.Equal("androidapp://vn.bank.app#aa11", VaultAutofill.AppUrl(VaultAutofill.AndroidAppScheme, "Vn.Bank.App", "AA11"));
+        Assert.Equal("androidapp://vn.bank.app", VaultAutofill.AppUrl(VaultAutofill.AndroidAppScheme, "vn.bank.app"));
+        Assert.Equal("app://slack", VaultAutofill.AppUrl(VaultAutofill.WindowsAppScheme, "Slack", "aa11"));
+    }
 
     [Fact]
     public void Sites_match_exactly_or_by_parent_domain_and_never_by_look_alike()

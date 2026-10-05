@@ -6,10 +6,18 @@ namespace Helm.Modules.Vault.Items;
 /// <param name="Host">The page's host ("accounts.google.com"); null for an app.</param>
 /// <param name="AppId">Android package ("com.facebook.katana") or Windows process name ("slack").</param>
 /// <param name="Title">A window title (Windows), used when nothing else matches.</param>
-public sealed record AutofillTarget(string? Host, string? AppId = null, string? Title = null);
+/// <param name="AppCert">
+/// Android: the SHA-256 of the asking app's signing certificate (<see cref="VaultAutofill.AppUrl"/>); null when it
+/// could not be read. An app with the same package name but another signature is another app.
+/// </param>
+public sealed record AutofillTarget(string? Host, string? AppId = null, string? Title = null, string? AppCert = null);
 
 /// <summary>One login offered for a target, best first.</summary>
-public sealed record AutofillMatch(VaultEntry Entry, int Score)
+/// <param name="Verified">
+/// False for an Android app remembered before Helm kept its signing certificate: it is not offered in one tap, only in
+/// the picker, where choosing it records the certificate.
+/// </param>
+public sealed record AutofillMatch(VaultEntry Entry, int Score, bool Verified = true)
 {
     public string Title => Entry.Item.Title;
 
@@ -22,6 +30,8 @@ public sealed record AutofillMatch(VaultEntry Entry, int Score)
 /// Which vault logins fit a site or an app, for Android autofill and Windows auto-type. A login's Website fields decide:
 /// the same site (www. and sub-sites of the saved one count), or an app remembered as "androidapp://package" (Android) or
 /// "app://process" (Windows). Nothing is ever matched by a look-alike name: "paypa1.com" never gets PayPal's password.
+/// An Android app is remembered with its signing certificate ("androidapp://package#sha256"), so another app that took
+/// the same package name (a fake one installed from a file) is never offered the login.
 /// </summary>
 public static class VaultAutofill
 {
@@ -37,16 +47,27 @@ public static class VaultAutofill
         foreach (var entry in entries)
         {
             if (entry.Trashed || entry.Item.Kind != VaultItemKind.Login || entry.Item.Password is not { Length: > 0 }) continue;
-            var best = 0;
+            int best = 0, unverified = 0;
             foreach (var url in entry.Item.Fields.Where(f => f.Kind == VaultFieldKind.Url).Select(f => f.Value.Trim()))
             {
-                if (app is { Length: > 0 } && (IsApp(url, AndroidAppScheme, app) || IsApp(url, WindowsAppScheme, app))) best = Math.Max(best, 90);
-                if (host is null || HostOf(url) is not { } saved) continue;
-                if (saved == host) best = Math.Max(best, 100);
-                else if (host.EndsWith("." + saved, StringComparison.Ordinal)) best = Math.Max(best, 80); // login.example.com for example.com
-                else if (saved.EndsWith("." + host, StringComparison.Ordinal)) best = Math.Max(best, 60);  // saved app.example.com, page example.com
+                if (app is { Length: > 0 })
+                {
+                    if (IsApp(url, WindowsAppScheme, app)) best = Math.Max(best, 90);
+                    else if (AndroidAppOf(url) is { } saved && saved.Package == app)
+                    {
+                        // Remembered with a certificate: only that signature. Without one (older Helm): the picker only.
+                        if (saved.Cert is null) unverified = 90;
+                        else if (target.AppCert is { } cert && string.Equals(saved.Cert, cert, StringComparison.OrdinalIgnoreCase)) best = Math.Max(best, 90);
+                    }
+                }
+                if (host is null || HostOf(url) is not { } savedHost) continue;
+                if (savedHost == host) best = Math.Max(best, 100);
+                else if (host.EndsWith("." + savedHost, StringComparison.Ordinal)) best = Math.Max(best, 80); // login.example.com for example.com
+                else if (savedHost.EndsWith("." + host, StringComparison.Ordinal)) best = Math.Max(best, 60);  // saved app.example.com, page example.com
             }
-            if (best > 0) matches.Add(new AutofillMatch(entry, best + (entry.Item.Favorite ? 1 : 0)));
+            var favorite = entry.Item.Favorite ? 1 : 0;
+            if (best > 0) matches.Add(new AutofillMatch(entry, best + favorite));
+            else if (unverified > 0) matches.Add(new AutofillMatch(entry, unverified + favorite, Verified: false));
         }
         return matches.OrderByDescending(m => m.Score).ThenBy(m => m.Title, StringComparer.CurrentCultureIgnoreCase).ToList();
     }
@@ -79,23 +100,44 @@ public static class VaultAutofill
     }
 
     /// <summary>
-    /// After the user picked a login for an app by hand: adds "androidapp://package" (or "app://process") to it, so it
-    /// is offered there next time. False when it was remembered already.
+    /// After the user picked a login for an app by hand: adds "androidapp://package#cert" (or "app://process") to it, so
+    /// it is offered there next time. An Android app already remembered without a certificate, or with another one,
+    /// is updated in place. False when it was remembered already.
     /// </summary>
-    public static bool RememberApp(VaultStore store, string uid, string scheme, string appId)
+    public static bool RememberApp(VaultStore store, string uid, string scheme, string appId, string? appCert = null)
     {
         if (store.Get(uid) is not { } entry) return false;
-        var url = AppUrl(scheme, appId);
-        if (entry.Item.Fields.Any(f => f.Kind == VaultFieldKind.Url && string.Equals(f.Value.Trim(), url, StringComparison.OrdinalIgnoreCase))) return false;
-        store.Save(uid, entry.Item with { Fields = [.. entry.Item.Fields, new VaultField("App", url, VaultFieldKind.Url)] });
+        var url = AppUrl(scheme, appId, appCert);
+        var fields = entry.Item.Fields;
+        if (fields.Any(f => f.Kind == VaultFieldKind.Url && string.Equals(f.Value.Trim(), url, StringComparison.OrdinalIgnoreCase))) return false;
+        var package = appId.Trim().ToLowerInvariant();
+        var same = scheme == AndroidAppScheme
+            ? fields.FirstOrDefault(f => f.Kind == VaultFieldKind.Url && AndroidAppOf(f.Value.Trim())?.Package == package)
+            : null;
+        store.Save(uid, entry.Item with
+        {
+            Fields = same is null ? [.. fields, new VaultField("App", url, VaultFieldKind.Url)] : [.. fields.Select(f => ReferenceEquals(f, same) ? f with { Value = url } : f)],
+        });
         return true;
     }
 
-    /// <summary>The field value that remembers an app for a login.</summary>
-    public static string AppUrl(string scheme, string appId) => scheme + appId.Trim().ToLowerInvariant();
+    /// <summary>The field value that remembers an app for a login; an Android app with its certificate when known.</summary>
+    public static string AppUrl(string scheme, string appId, string? appCert = null) =>
+        scheme + appId.Trim().ToLowerInvariant() + (scheme == AndroidAppScheme && appCert is { Length: > 0 } ? "#" + appCert.Trim().ToLowerInvariant() : "");
 
     private static bool IsApp(string url, string scheme, string app) =>
         url.StartsWith(scheme, StringComparison.OrdinalIgnoreCase) && string.Equals(url[scheme.Length..].Trim().TrimEnd('/'), app, StringComparison.OrdinalIgnoreCase);
+
+    /// <summary>"androidapp://com.example#ab12…" → (package, certificate or null); null for anything else.</summary>
+    private static (string Package, string? Cert)? AndroidAppOf(string url)
+    {
+        if (!url.StartsWith(AndroidAppScheme, StringComparison.OrdinalIgnoreCase)) return null;
+        var rest = url[AndroidAppScheme.Length..].Trim();
+        var hash = rest.IndexOf('#');
+        var package = (hash < 0 ? rest : rest[..hash]).Trim().TrimEnd('/').ToLowerInvariant();
+        var cert = hash < 0 ? "" : rest[(hash + 1)..].Trim();
+        return (package, cert.Length > 0 ? cert : null);
+    }
 
     private static string? NormalizeHost(string? host)
     {
