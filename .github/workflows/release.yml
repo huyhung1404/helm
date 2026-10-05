@@ -18,11 +18,14 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  # Helm for Android: the same version as the Windows app, signed with the release keystore from the repository
-  # secrets (ANDROID_KEYSTORE_BASE64, ANDROID_KEYSTORE_PASSWORD; see docs/android.md). The key must never change,
-  # otherwise phones cannot install the update over the version they have.
+  # Helm for Android: the same version as the Windows app, signed with the release keystore from the secrets
+  # (ANDROID_KEYSTORE_BASE64, ANDROID_KEYSTORE_PASSWORD; see docs/android.md). The key must never change, otherwise
+  # phones cannot install the update over the version they have.
+  # The "release" environment holds those secrets and waits for the owner's approval; the Windows job needs this one,
+  # so nothing is published without that approval (docs/development.md, "Who can release").
   android:
     runs-on: ubuntu-latest
+    environment: release
     env:
       TAG: ${{ github.event.inputs.tag || github.ref_name }}
     steps:
@@ -141,14 +144,16 @@ jobs:
         shell: pwsh
         run: ./scripts/release-local.ps1 -Version '${{ steps.meta.outputs.version }}' -Channel '${{ steps.meta.outputs.channel }}' -OutputDir releases
 
-      - name: Upload release to GitHub
+      # As a draft: the last step publishes it once every file is attached, so no one ever sees a release with files
+      # missing, and an immutable release (which cannot take more files once published) works.
+      - name: Upload release to GitHub (draft)
         shell: pwsh
         run: |
           $vpkArgs = @('vpk', 'upload', 'github',
                     '--repoUrl', $env:REPO_URL, '--token', $env:GH_TOKEN,
                     '--outputDir', 'releases', '--channel', '${{ steps.meta.outputs.channel }}',
                     '--tag', $env:TAG, '--releaseName', 'Helm ${{ steps.meta.outputs.version }}',
-                    '--publish', '--merge')
+                    '--merge')
           if ('${{ steps.meta.outputs.prerelease }}' -eq 'true') { $vpkArgs += '--pre' }
           dotnet @vpkArgs
           if ($LASTEXITCODE -ne 0) { throw 'vpk upload failed' }
@@ -165,14 +170,15 @@ jobs:
           dotnet publish src/Helm.VaultRestore -c Release -r win-x64 --self-contained -p:PublishSingleFile=true
           -p:Version=${{ steps.meta.outputs.version }} -o artifacts/vault-restore
 
-      - name: Friendly installer name, Android APK, restore tool, release notes from CHANGELOG
+      - name: Friendly installer name, Android APK, restore tool, release notes from CHANGELOG, publish
         shell: pwsh
         run: |
           $channel = '${{ steps.meta.outputs.channel }}'
           Copy-Item "releases/HelmApp-$channel-Setup.exe" 'releases/Helm-win-Setup.exe'
           Copy-Item 'artifacts/vault-restore/helm-vault-restore.exe' 'releases/helm-vault-restore-win-x64.exe'
           gh release upload $env:TAG 'releases/Helm-win-Setup.exe' 'releases/Helm-android.apk' 'releases/helm-vault-restore-win-x64.exe' --clobber
+          if ($LASTEXITCODE -ne 0) { throw 'gh release upload failed' }
           $notes = 'artifacts/notes-${{ steps.meta.outputs.version }}.md'
-          $flags = @('--notes-file', $notes)
+          $flags = @('--notes-file', $notes, '--draft=false')
           if ('${{ steps.meta.outputs.prerelease }}' -eq 'true') { $flags += '--prerelease' } else { $flags += '--latest' }
           gh release edit $env:TAG @flags

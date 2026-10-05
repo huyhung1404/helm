@@ -3,6 +3,22 @@
 All notable changes to Helm. The top section is used as the GitHub release body and as the Velopack release notes.
 Format: [Keep a Changelog](https://keepachangelog.com), versions follow [SemVer](https://semver.org).
 
+## [0.23.2] - 2026-10-05
+
+### Fixed
+- **Wallet** (Android): when Android 13 or later blocks notification access for Helm ("Restricted setting", because
+  Helm is installed from a file), the Wallet page now says how to allow it: try turning Helm on once and close the
+  message, then App info → ⋮ → *Allow restricted settings*, then turn Helm on again. A button opens App info.
+
+### Security
+- **Wallet** never keeps a one-time code (OTP, verification code, password) from a bank's notification, not even in
+  the list of notifications it could not read. Codes that 0.23.0 and 0.23.1 kept there are deleted.
+- **Wallet** reads only the banks' own apps, by their exact package name, and SMS whose sender is exactly the bank's
+  name, shown by the phone's SMS app. Another app can no longer add transactions by naming itself like a bank or an
+  SMS app, and a contact called "ACB …" is no longer read.
+- Releases wait for the owner's approval before anything is built with the signing key, and a release is published
+  only once all its files are attached.
+
 ## [0.23.1] - 2026-10-04
 
 ### Added

@@ -124,7 +124,31 @@ Helm checks GitHub Releases 30 seconds after it starts and then every 6 hours, d
    git push origin HEAD --follow-tags
    ```
 
-3. The tag push runs [.github/workflows/release.yml](../.github/workflows/release.yml). Its `android` job builds `Helm-android.apk` with the same version, signed with the release keystore from the `ANDROID_KEYSTORE_BASE64` / `ANDROID_KEYSTORE_PASSWORD` secrets ([android.md](android.md#release-signing)). The `release` job then tests, publishes `win-x64`, packs with `vpk` (packId `HelmApp`, title "Helm", channel from the tag), uploads to GitHub Releases (pre-release for suffixed tags) and attaches `Helm-win-Setup.exe` and `Helm-android.apk`.
+3. The tag push runs [.github/workflows/release.yml](../.github/workflows/release.yml). Its `android` job builds `Helm-android.apk` with the same version, signed with the release keystore from the `ANDROID_KEYSTORE_BASE64` / `ANDROID_KEYSTORE_PASSWORD` secrets ([android.md](android.md#release-signing)). The `release` job then tests, publishes `win-x64`, packs with `vpk` (packId `HelmApp`, title "Helm", channel from the tag), uploads to a draft GitHub Release, attaches `Helm-win-Setup.exe`, `Helm-android.apk` and the Vault restore tool, and only then publishes it (pre-release for suffixed tags). No one sees a release with files missing.
+
+4. The `android` job runs in the `release` environment and waits for the owner's approval: open the run under
+   **Actions** → **Review deployments** → **Approve and deploy**. Nothing is published until then (the `release` job
+   needs the `android` one). To rebuild with **Run workflow**, pick the tag itself under *Use workflow from*: the
+   environment only accepts tags. A published release is final (see *Immutable releases* below): rebuild only a
+   release a failed run left as a draft, and fix a published one with a new version.
+
+### Who can release
+
+Windows updates are trusted because they come from this repository's releases; Android ones also need the release
+key. So only the owner may publish, and these GitHub settings make sure of it:
+
+- **No one else has write access**: Settings → Collaborators, Deploy keys and GitHub Apps; on the account, Developer
+  settings → Personal access tokens (revoke unused ones). The account uses two-factor sign-in (a passkey or an app).
+- **Release tags**: Settings → Rules → Rulesets → *New tag ruleset*, target `v*`, rules *Restrict creations*,
+  *Restrict updates* and *Restrict deletions*, bypass list *Repository admin*.
+- **The `release` environment**: Settings → Environments → `release`: *Required reviewers* = the owner (leave
+  *Prevent self-review* off), *Deployment branches and tags* = *Selected*, tag rule `v*`, and the two
+  `ANDROID_KEYSTORE_*` secrets as environment secrets (then delete the repository-level ones). Only an approved job
+  on a release tag can read the key.
+- **Branches**: a branch ruleset on `main` and `develop` with *Restrict updates*, *Restrict deletions* and *Block
+  force pushes*, bypass *Repository admin*: only the owner pushes there; anyone else goes through a pull request.
+- **Immutable releases**: Settings → General → Releases → *Enable release immutability*. Once published, a
+  release's files and tag cannot change, so no one can swap an update after the fact.
 
 The version has one source: `<Version>` in `Directory.Build.props`. CI overrides it from the tag (`v1.2.3` → `1.2.3`). Home and General display it.
 

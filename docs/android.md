@@ -134,7 +134,8 @@ The release APK is signed with one RSA 4096 key (PKCS12, alias `helm`, valid 100
 can install updates any more** (users would have to uninstall and reinstall). Keep the keystore and its password
 in a password manager or another safe backup.
 
-CI reads two repository secrets (GitHub → Settings → Secrets and variables → Actions):
+CI reads two secrets of the `release` environment (GitHub → Settings → Environments → `release` → Environment
+secrets; see [development.md](development.md#who-can-release)), or repository secrets until they are moved there:
 
 | Secret | Value |
 |---|---|
