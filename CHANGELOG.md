@@ -3,7 +3,7 @@
 All notable changes to Helm. The top section is used as the GitHub release body and as the Velopack release notes.
 Format: [Keep a Changelog](https://keepachangelog.com), versions follow [SemVer](https://semver.org).
 
-## [Unreleased]
+## [0.26.0] - 2026-10-05
 
 ### Added
 - **Missions**: a step's resources can carry what you need to study, not only links. A resource can have a label
