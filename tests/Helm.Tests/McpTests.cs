@@ -7,28 +7,32 @@ using Helm.Core.Mcp;
 using Helm.Core.Settings;
 using Helm.Modules.Notes;
 using Helm.Modules.Tracker;
+using Helm.Modules.Wallet;
 using Microsoft.Extensions.Logging.Abstractions;
 
 namespace Helm.Tests;
 
-/// <summary>Helm's MCP server: the JSON-RPC protocol, the notes and Tracker tools, and the named pipe.</summary>
+/// <summary>Helm's MCP server: the JSON-RPC protocol, the notes, Tracker and Wallet tools, and the named pipe.</summary>
 public sealed class McpTests
 {
     private readonly ManualTime _time = new(new DateTimeOffset(2026, 9, 29, 8, 0, 0, TimeSpan.Zero));
     private readonly NotesStore _notes;
     private readonly TrackerStore _tracker;
+    private readonly DebtBook _debts;
     private readonly LinkHub _links;
 
     public McpTests()
     {
         _notes = new NotesStore(new MemorySynced<NoteItem>(), _time);
         _tracker = new TrackerStore(new MemorySynced<TrackerWorkspace>(), new MemorySynced<TrackerItem>(), new MemorySyncedLog<TrackerEvent>(), _time);
+        var wallet = new WalletStore(new MemorySynced<WalletTransaction>(), new MemorySynced<WalletCategory>(), new MemorySynced<WalletBudget>(), _time);
+        _debts = new DebtBook(new MemorySynced<WalletDebt>(), wallet, _time);
         _links = new LinkHub(new MemorySynced<HelmLink>(), () =>
-            [new NoteLinkProvider(_notes, _ => { }), new TaskLinkProvider(_tracker, (_, _) => { }), new PersonLinkProvider(_tracker, (_, _) => { })], _time);
+            [new NoteLinkProvider(_notes, _ => { }), new TaskLinkProvider(_tracker, (_, _) => { }), new DebtLinkProvider(_debts, _ => { })], _time);
     }
 
     private McpServer Server(bool readOnly = false) =>
-        new(new IMcpToolProvider[] { new NotesMcpTools(_notes, _links), new TrackerMcpTools(_tracker) }.SelectMany(p => p.Tools).Where(t => !readOnly || t.ReadOnly),
+        new(new IMcpToolProvider[] { new NotesMcpTools(_notes, _links), new TrackerMcpTools(_tracker), new WalletMcpTools(_debts) }.SelectMany(p => p.Tools).Where(t => !readOnly || t.ReadOnly),
             "0.17.0", McpEndpoint.Instructions);
 
     [Fact]
@@ -60,7 +64,7 @@ public sealed class McpTests
 
         var readOnly = await Server(readOnly: true).HandleAsync("""{"jsonrpc":"2.0","id":1,"method":"tools/list"}""", default);
         var names = readOnly!["result"]!["tools"]!.AsArray().Select(t => t!["name"]!.GetValue<string>()).ToList();
-        Assert.Equal(["notes_read", "notes_search", "tracker_debts", "tracker_lists", "tracker_tasks"], names);
+        Assert.Equal(["notes_read", "notes_search", "tracker_lists", "tracker_tasks", "wallet_debts"], names);
     }
 
     [Fact]
@@ -103,11 +107,10 @@ public sealed class McpTests
     }
 
     [Fact]
-    public async Task Claude_can_manage_tasks_and_the_debt_book()
+    public async Task Claude_can_manage_tasks_and_the_wallet_debt_book()
     {
         var server = Server();
         _tracker.AddWorkspace("Work", WorkspaceKind.Tasks);
-        _tracker.AddWorkspace("Debts", WorkspaceKind.Debts);
 
         var added = await Call(server, "tracker_add_task", new { title = "Ship", list = "work", priority = "high", due = "2026-10-01T09:30", subtasks = new[] { "Tests", "Notes" } });
         Assert.False(added.IsError, added.Text);
@@ -130,13 +133,15 @@ public sealed class McpTests
         await Call(server, "tracker_reopen_task", new { id });
         Assert.False(_tracker.GetItem(id)!.IsCompleted);
 
-        var debt = await Call(server, "tracker_add_debt", new { person = "Nam", amount = "150k", kind = "owes_me", note = "lunch" });
+        var debt = await Call(server, "wallet_add_debt", new { person = "Nam", amount = "150k", kind = "owes_me", note = "lunch", due = "2026-10-03" });
         Assert.False(debt.IsError, debt.Text);
-        await Call(server, "tracker_add_debt", new { person = "nam", amount = 50000, kind = "repayment" });
-        var debts = await Call(server, "tracker_debts", new { });
+        await Call(server, "wallet_add_debt", new { person = "nam", amount = 50000, kind = "repayment" });
+        var debts = await Call(server, "wallet_debts", new { });
         Assert.Contains("\"balance\":100000", debts.Text);
         Assert.Contains("owes the user", debts.Text);
-        Assert.True((await Call(server, "tracker_add_debt", new { person = "Nam", amount = "lots", kind = "owes_me" })).IsError);
+        Assert.Equal(100_000m, _debts.Balance("Nam"));
+        Assert.True((await Call(server, "wallet_add_debt", new { person = "Nam", amount = "lots", kind = "owes_me" })).IsError);
+        Assert.True((await Call(server, "wallet_add_debt", new { person = "Lan", amount = "5k", kind = "repayment" })).IsError); // nothing to repay
     }
 
     [Fact]

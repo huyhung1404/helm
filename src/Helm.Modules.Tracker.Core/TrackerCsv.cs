@@ -13,13 +13,13 @@ public static class TrackerCsv
     private static readonly string[] ItemHeader =
     [
         "workspace", "kind", "title", "priority", "status", "created", "started", "completed", "due",
-        "lead_minutes", "work_minutes", "person", "amount", "direction", "notes", "id",
+        "lead_minutes", "work_minutes", "notes", "id",
     ];
 
     private static readonly string[] HistoryHeader =
     [
         "event", "at", "workspace", "kind", "title", "priority", "created", "started", "completed", "due",
-        "lead_minutes", "work_minutes", "person", "amount", "direction", "item_id",
+        "lead_minutes", "work_minutes", "item_id",
     ];
 
     public static string Items(IEnumerable<SyncedItem<TrackerItem>> items, IReadOnlyDictionary<string, TrackerWorkspace> workspaces)
@@ -42,9 +42,6 @@ public static class TrackerCsv
                 item.DueAt is { } dueAt ? Time(dueAt) : item.DueDate?.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) ?? "",
                 Minutes(item.CompletedAt - item.CreatedAt),
                 Minutes(item.StartedExplicitly ? item.CompletedAt - item.StartedAt : null),
-                item.Person,
-                workspace?.Kind == WorkspaceKind.Debts ? item.Amount.ToString(CultureInfo.InvariantCulture) : "",
-                workspace?.Kind == WorkspaceKind.Debts ? item.Direction.ToString() : "",
                 item.Notes,
                 id,
             ]);
@@ -56,9 +53,9 @@ public static class TrackerCsv
     {
         var sb = new StringBuilder();
         Row(sb, HistoryHeader);
-        foreach (var e in events.OrderBy(e => e.At))
+        // The old debt book's events (Helm 0.26 and older) are left out: the debts are in Wallet now.
+        foreach (var e in events.Where(e => e.WorkspaceKind == WorkspaceKind.Tasks).OrderBy(e => e.At))
         {
-            var debts = e.WorkspaceKind == WorkspaceKind.Debts;
             Row(sb,
             [
                 e.Kind.ToString(),
@@ -73,9 +70,6 @@ public static class TrackerCsv
                 e.DueDate?.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) ?? "",
                 e.Kind == TrackerEventKind.Completed ? Minutes(e.CompletedAt - e.CreatedAt) : "",
                 e.Kind == TrackerEventKind.Completed && e.StartedExplicitly ? Minutes(e.CompletedAt - e.StartedAt) : "",
-                e.Person,
-                debts ? e.Amount.ToString(CultureInfo.InvariantCulture) : "",
-                debts ? e.Direction.ToString() : "",
                 e.ItemId,
             ]);
         }

@@ -146,6 +146,12 @@ public static class WalletCategories
     public const string OtherIncome = "other-income";
     public const string Transfer = "transfer";
 
+    /// <summary>
+    /// Money lent, borrowed or paid back (a transaction in the debt book). Neither spending nor income, and left out of
+    /// the pickers: a transaction gets it from the debt book.
+    /// </summary>
+    public const string Debts = "debts";
+
     public static IReadOnlyList<CategoryInfo> BuiltIn { get; } =
     [
         new(Food, "Food & drinks", CategoryKind.Expense, 0, true, false, "Food", 2),
@@ -164,6 +170,7 @@ public static class WalletCategories
         new(Bonus, "Bonus", CategoryKind.Income, 21, true, false, "Trophy", 4),
         new(OtherIncome, "Other income", CategoryKind.Income, 22, true, false, "MoneyHand", 3),
         new(Transfer, "Between my accounts", CategoryKind.Transfer, 30, true, false, "ArrowSwap", 0),
+        new(Debts, "Debts & loans", CategoryKind.Transfer, 31, true, true, "People", 0),
     ];
 
     public static bool IsBuiltIn(string id) => BuiltIn.Any(c => c.Id == id);

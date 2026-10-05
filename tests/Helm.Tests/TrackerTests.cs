@@ -3,6 +3,7 @@ using Helm.Core.Services;
 using Helm.Core.Settings;
 using Helm.Core.Sync;
 using Helm.Modules.Tracker;
+using Helm.Modules.Wallet;
 using Helm.Shell.Services;
 using Microsoft.Extensions.Logging.Abstractions;
 
@@ -143,71 +144,58 @@ public sealed class TrackerTests
     }
 
     [Fact]
-    public void There_is_one_debt_book_in_vnd_but_any_number_of_to_do_lists()
+    public void The_old_debt_book_is_hidden_refused_and_handed_over_to_wallet_once()
     {
-        var book = _store.AddWorkspace("Sổ nợ", WorkspaceKind.Debts);
-        Assert.Equal("₫", _store.GetWorkspace(book)!.Currency);
-        Assert.True(_store.HasDebtBook);
+        // A debt book as Helm 0.26 wrote it: a workspace of kind Debts and its entries.
+        var book = _workspaces.Add(new TrackerWorkspace { Name = "Sổ nợ", Kind = WorkspaceKind.Debts, Currency = "₫", CreatedAt = T0 });
+        var lunch = _items.Add(new TrackerItem { WorkspaceId = book, Person = "Minh Anh", Amount = 500_000, Direction = DebtDirection.TheyOweMe, Title = "lunch", CreatedAt = T0 });
+        var paid = _items.Add(new TrackerItem
+        {
+            WorkspaceId = book, Person = "Lan", Amount = 50_000, Direction = DebtDirection.IOwe, CreatedAt = T0,
+            DueDate = new DateOnly(2026, 10, 1), CompletedAt = T0.AddDays(1),
+        });
+        _history.Append(TrackerEvent.For(TrackerEventKind.Created, T0, lunch, _items.Get(lunch)!, WorkspaceKind.Debts));
+        var tasks = _store.AddWorkspace("To-do");
+        _store.Complete(_store.AddItem(tasks, new TrackerItemDraft("Ship it")));
 
-        var refused = Assert.Throws<InvalidOperationException>(() => _store.AddWorkspace("Nợ bạn bè", WorkspaceKind.Debts));
-        Assert.Contains("Sổ nợ", refused.Message);
+        // The Tracker shows only to-do lists now, and makes no new debt book.
+        Assert.Equal([tasks], _store.Workspaces().Select(w => w.Id));
+        Assert.Single(_store.AllItems());
+        Assert.Throws<InvalidOperationException>(() => _store.AddWorkspace("Debts", WorkspaceKind.Debts));
+        Assert.Throws<InvalidOperationException>(() => _store.AddItem(book, new TrackerItemDraft("x")));
+        Assert.Equal(1, TrackerReport.Build(_store.History(), ReportRange.AllTime, _time.Now, TimeZoneInfo.Utc).CreatedCount);
+        Assert.DoesNotContain("lunch", TrackerCsv.History(_store.History(), _store.Workspaces().ToDictionary(w => w.Id, w => w.Value)));
 
-        _store.AddWorkspace("Work", WorkspaceKind.Tasks);
-        _store.AddWorkspace("Home", WorkspaceKind.Tasks);
-        Assert.Equal(3, _store.Workspaces().Count);
-        Assert.Equal("", _store.Workspaces().First(w => w.Value.Name == "Work").Value.Currency);
+        // Handed over with the same ids, once: a deletion in Wallet stays deleted.
+        var wallet = new WalletStore(new MemorySynced<WalletTransaction>(), new MemorySynced<WalletCategory>(), new MemorySynced<WalletBudget>(), _time);
+        var debts = new DebtBook(new MemorySynced<WalletDebt>(), wallet, _time);
+        var handover = new TrackerDebtHandover(_store, debts);
+        Assert.Equal(2, handover.Run());
+        var moved = debts.Get(lunch)!;
+        Assert.Equal(("Minh Anh", 500_000m, DebtDirection.TheyOweMe, "lunch"), (moved.Person, moved.Amount, moved.Direction, moved.Note));
+        Assert.Equal(T0.AddDays(1), debts.Get(paid)!.SettledAt);
+        Assert.Equal(new DateOnly(2026, 10, 1), debts.Get(paid)!.DueDate);
+        Assert.Equal(500_000m, debts.Balance("minh anh"));
+        Assert.All(_items.All().Where(i => i.Value.WorkspaceId == book), i => Assert.True(i.Value.MovedToWallet));
+        Assert.NotNull(_workspaces.Get(book)); // kept for older versions
 
-        // Once it is deleted, a new one can be made.
-        _store.DeleteWorkspace(book);
-        _store.AddWorkspace("Debts", WorkspaceKind.Debts, "USD");
-        Assert.Equal("USD", _store.Workspaces().Single(w => w.Value.Kind == WorkspaceKind.Debts).Value.Currency);
+        debts.Delete(lunch);
+        Assert.Equal(0, handover.Run());
+        Assert.Null(debts.Get(lunch));
+
+        // An older Helm adds an entry meanwhile: the next run copies just that one.
+        var later = _items.Add(new TrackerItem { WorkspaceId = book, Person = "Lan", Amount = 20_000, Direction = DebtDirection.TheyOweMe, CreatedAt = T0.AddDays(2) });
+        Assert.Equal(1, handover.Run());
+        Assert.Equal(20_000m, debts.Get(later)!.Amount);
     }
 
     [Fact]
-    public void Debts_need_a_person_or_a_reason_and_sum_per_direction()
+    public void A_task_needs_a_title()
     {
-        var book = _store.AddWorkspace("Debts", WorkspaceKind.Debts, "₫");
-        Assert.Throws<ArgumentException>(() => _store.AddItem(book, new TrackerItemDraft("")));
         var tasks = _store.AddWorkspace("To-do", WorkspaceKind.Tasks);
         Assert.Throws<ArgumentException>(() => _store.AddItem(tasks, new TrackerItemDraft("  ")));
-
-        _store.AddItem(book, new TrackerItemDraft("Lunch", Person: "An", Amount: 150_000, Direction: DebtDirection.TheyOweMe));
-        _store.AddItem(book, new TrackerItemDraft("", Person: "Binh", Amount: -50_000, Direction: DebtDirection.IOwe));
-        var settled = _store.AddItem(book, new TrackerItemDraft("Taxi", Person: "An", Amount: 30_000));
-        _store.Complete(settled);
-
-        var totals = DebtTotals.From(_store.Items(book).Select(i => i.Value));
-        Assert.Equal(150_000m, totals.OwedToMe);
-        Assert.Equal(50_000m, totals.IOwe); // amounts are stored positive
-        Assert.Equal(100_000m, totals.Net);
-        Assert.Equal(2, totals.OpenCount);
+        Assert.Throws<ArgumentException>(() => _store.AddWorkspace(" "));
     }
-
-    [Theory]
-    [InlineData("150000", 150000)]
-    [InlineData("150,000", 150000)]
-    [InlineData("1.500.000", 1500000)]
-    [InlineData("150k", 150000)]
-    [InlineData("1.5k", 1500)]
-    [InlineData("2tr", 2000000)]
-    [InlineData("2M", 2000000)]
-    [InlineData("12,50", 12.5)]
-    [InlineData("1,234.56", 1234.56)]
-    [InlineData("1.234,56", 1234.56)]
-    [InlineData(" 200 000 ", 200000)]
-    public void Amounts_parse_the_way_people_type_them(string text, double expected)
-    {
-        Assert.True(TrackerFormat.TryParseAmount(text, out var amount));
-        Assert.Equal((decimal)expected, amount);
-    }
-
-    [Theory]
-    [InlineData("")]
-    [InlineData("abc")]
-    [InlineData("-5")]
-    [InlineData("k")]
-    [InlineData("1a2")]
-    public void Nonsense_is_not_an_amount(string text) => Assert.False(TrackerFormat.TryParseAmount(text, out _));
 
     [Theory]
     [InlineData(0.4, "<1m")]
@@ -252,14 +240,15 @@ public sealed class TrackerTests
         Assert.Equal("\"say \"\"hi\"\"\"", TrackerCsv.Escape("say \"hi\""));
         Assert.Equal("'=SUM(A1)", TrackerCsv.Escape("=SUM(A1)"));
 
-        var ws = _store.AddWorkspace("Debts", WorkspaceKind.Debts);
-        var id = _store.AddItem(ws, new TrackerItemDraft("Dinner, drinks", Person: "An", Amount: 1500.5m));
+        var ws = _store.AddWorkspace("To-do", WorkspaceKind.Tasks);
+        var id = _store.AddItem(ws, new TrackerItemDraft("Dinner, drinks", Notes: "=1+1"));
         var csv = TrackerCsv.Items(_store.AllItems(), _store.Workspaces().ToDictionary(w => w.Id, w => w.Value));
         var lines = csv.Split("\r\n", StringSplitOptions.RemoveEmptyEntries);
         Assert.Equal(2, lines.Length);
         Assert.StartsWith("workspace,kind,title,priority,status,", lines[0]);
+        Assert.EndsWith(",lead_minutes,work_minutes,notes,id", lines[0]);
         Assert.Contains("\"Dinner, drinks\"", lines[1]);
-        Assert.Contains(",1500.5,TheyOweMe,", lines[1]);
+        Assert.Contains(",'=1+1,", lines[1]);
         Assert.EndsWith(id, lines[1]);
     }
 
@@ -272,23 +261,19 @@ public sealed class TrackerTests
         Assert.Null(TrackerWidgetModel.Build(_store, null, true, _time.Now, TimeZoneInfo.Utc).WorkspaceId);
 
         var tasks = _store.AddWorkspace("To-do", WorkspaceKind.Tasks);
-        var debts = _store.AddWorkspace("Debts", WorkspaceKind.Debts, "₫");
+        var home = _store.AddWorkspace("Home", WorkspaceKind.Tasks);
         _store.AddItem(tasks, new TrackerItemDraft("later", TrackerPriority.Low));
         _store.AddItem(tasks, new TrackerItemDraft("now", TrackerPriority.Urgent, new DateOnly(2026, 9, 28)));
-        _store.AddItem(debts, new TrackerItemDraft("", Person: "An", Amount: 20_000, Direction: DebtDirection.IOwe));
+        _store.AddItem(home, new TrackerItemDraft("water plants"));
 
         var first = TrackerWidgetModel.Build(_store, "deleted-workspace", true, _time.Now, TimeZoneInfo.Utc);
         Assert.Equal(tasks, first.WorkspaceId);
         Assert.Equal(["now", "later"], first.Rows.Select(r => r.Title));
         Assert.Equal("Urgent · Due today", first.Rows[0].Details);
 
-        Assert.Equal(debts, TrackerWidgetModel.NextWorkspace(_store, tasks));
-        Assert.Equal(tasks, TrackerWidgetModel.NextWorkspace(_store, debts));
-        var book = TrackerWidgetModel.Build(_store, debts, true, _time.Now, TimeZoneInfo.Utc);
-        var row = Assert.Single(book.Rows);
-        Assert.Equal("An", row.Title);
-        Assert.False(row.OwedToMe);
-        Assert.StartsWith("−", row.Amount);
+        Assert.Equal(home, TrackerWidgetModel.NextWorkspace(_store, tasks));
+        Assert.Equal(tasks, TrackerWidgetModel.NextWorkspace(_store, home));
+        Assert.Equal("water plants", Assert.Single(TrackerWidgetModel.Build(_store, home, true, _time.Now, TimeZoneInfo.Utc).Rows).Title);
     }
 
     [Fact]
@@ -302,101 +287,28 @@ public sealed class TrackerTests
                 new YesDialogs(), new NullClipboard(), new TrackerReminderService(_store, settings, _time), NullLogger<TrackerViewModel>.Instance);
             Assert.True(vm.HasNoWorkspaces);
 
-            vm.CreateDebtWorkspaceCommand.Execute(null);
-            Assert.True(vm.IsDebtWorkspace);
-            vm.NewPerson = "An";
-            vm.NewAmount = "lots";
+            vm.CreateTasksWorkspaceCommand.Execute(null);
+            Assert.True(vm.IsTaskWorkspace);
+            Assert.False(vm.AddCommand.CanExecute(null)); // no title yet
+            vm.NewTitle = "Pay rent";
+            vm.NewDueTimeText = "soon";
             vm.AddCommand.Execute(null);
             Assert.True(vm.HasMessage);
-            Assert.Empty(vm.DebtPeople);
+            Assert.Empty(vm.OpenItems);
 
-            vm.NewAmount = "150k";
+            vm.NewDueTimeText = "";
             vm.AddCommand.Execute(null);
-            var an = Assert.Single(vm.DebtPeople);
-            Assert.Equal("An", an.Name);
-            Assert.StartsWith("+", an.BalanceText);
-            Assert.Equal("", vm.NewPerson);
-
-            // A repayment of all of it settles An: no tick box.
-            vm.NewPerson = "an";
-            vm.NewDebtKindIndex = (int)DebtEntryKind.Repayment;
-            vm.NewAmount = "150,000";
-            vm.AddCommand.Execute(null);
-            Assert.Empty(vm.DebtPeople);
-            var settled = Assert.Single(vm.SettledPeople);
-            Assert.Equal("Settled", settled.BalanceText);
-            Assert.Equal(2, settled.Entries.Count);
+            var row = Assert.Single(vm.OpenItems);
+            Assert.Equal("Pay rent", row.Title);
+            Assert.Equal("", vm.NewTitle);
+            row.ToggleCompleteCommand.Execute(null);
+            Assert.Empty(vm.OpenItems);
         }
         finally
         {
             try { if (Directory.Exists(dir)) Directory.Delete(dir, recursive: true); }
             catch (IOException) { } // a settings write may still be finishing; it is only a temp folder
         }
-    }
-
-    [Fact]
-    public void Debts_of_the_same_person_add_up_whatever_the_case_and_spacing_and_settle_at_zero()
-    {
-        var ws = _store.AddWorkspace("Debts", WorkspaceKind.Debts);
-        _store.AddDebt(ws, "Minh  Anh", 500_000, DebtEntryKind.OwesMe, "lunch");
-        _time.Advance(TimeSpan.FromMinutes(1));
-        _store.AddDebt(ws, "minh anh", 200_000, DebtEntryKind.OwesMe);
-        _time.Advance(TimeSpan.FromMinutes(1));
-        _store.AddDebt(ws, "Minh Anh", 100_000, DebtEntryKind.IOwe);
-        Assert.Equal(600_000m, _store.DebtBalance(ws, "MINH ANH"));
-
-        var person = Assert.Single(DebtLedger.Open(_store.Items(ws)));
-        Assert.Equal("Minh  Anh".Replace("  ", " "), person.Name);
-        Assert.Equal([500_000m, 700_000m, 600_000m], person.Entries.Select(e => e.BalanceAfter));
-        Assert.All(_store.Items(ws), i => Assert.Equal("Minh Anh", i.Value.Person)); // one spelling, the first one (tidied)
-
-        // A repayment pulls toward 0 and is stored as the opposite direction, so older versions add up the same.
-        _time.Advance(TimeSpan.FromMinutes(1));
-        var repaid = _store.AddDebt(ws, "Minh Anh", 250_000, DebtEntryKind.Repayment);
-        Assert.Equal(DebtDirection.IOwe, _store.GetItem(repaid)!.Direction);
-        Assert.True(_store.GetItem(repaid)!.IsRepayment);
-        Assert.Equal(350_000m, _store.DebtBalance(ws, "Minh Anh"));
-        Assert.All(_store.Items(ws), i => Assert.False(i.Value.IsCompleted));
-
-        _time.Advance(TimeSpan.FromMinutes(1));
-        _store.AddDebt(ws, "Minh Anh", 350_000, DebtEntryKind.Repayment);
-        Assert.Empty(DebtLedger.Open(_store.Items(ws)));
-        var settled = Assert.Single(DebtLedger.Settled(_store.Items(ws)));
-        Assert.Equal(5, settled.Entries.Count);
-        Assert.All(_store.Items(ws), i => Assert.Equal(T0.AddMinutes(4), i.Value.CompletedAt)); // settled together
-        Assert.Equal(5, _store.History().Count(e => e.Kind == TrackerEventKind.Created)); // every amount change
-        Assert.Equal(5, _store.History().Count(e => e.Kind == TrackerEventKind.Completed));
-
-        // Nothing left to repay; a new debt starts a new account for the same person.
-        Assert.Throws<InvalidOperationException>(() => _store.AddDebt(ws, "Minh Anh", 1, DebtEntryKind.Repayment));
-        _time.Advance(TimeSpan.FromMinutes(1));
-        _store.AddDebt(ws, "Minh Anh", 10_000, DebtEntryKind.IOwe);
-        Assert.Equal(-10_000m, _store.DebtBalance(ws, "Minh Anh"));
-        var repay = _store.AddDebt(ws, "Minh Anh", 10_000, DebtEntryKind.Repayment);
-        Assert.Equal(DebtDirection.TheyOweMe, _store.GetItem(repay)!.Direction); // when I owe, my repayment adds back
-        Assert.Equal(2, DebtLedger.Settled(_store.Items(ws)).Count);
-        Assert.Throws<ArgumentException>(() => _store.AddDebt(ws, "  ", 5, DebtEntryKind.OwesMe));
-        Assert.Throws<ArgumentException>(() => _store.AddDebt(ws, "Lan", 0, DebtEntryKind.OwesMe));
-    }
-
-    [Fact]
-    public void A_persons_due_time_is_set_and_extended_on_all_their_open_entries()
-    {
-        var ws = _store.AddWorkspace("Debts", WorkspaceKind.Debts);
-        _store.AddDebt(ws, "Lan", 100, DebtEntryKind.OwesMe);
-        _store.AddDebt(ws, "Lan", 50, DebtEntryKind.OwesMe);
-        var due = new DateTimeOffset(2026, 10, 1, 18, 30, 0, TimeSpan.FromHours(7));
-        Assert.Equal(2, _store.SetDebtDue(ws, "lan", due));
-        Assert.All(_store.Items(ws), i =>
-        {
-            Assert.Equal(due, i.Value.DueAt);
-            Assert.NotNull(i.Value.DueDate); // older versions still see the day
-        });
-        // A new entry for Lan keeps her due time.
-        var later = _store.AddDebt(ws, "Lan", 25, DebtEntryKind.OwesMe);
-        Assert.Equal(due, _store.GetItem(later)!.DueAt);
-        _store.SetDebtDue(ws, "Lan", null);
-        Assert.All(_store.Items(ws), i => Assert.Null(i.Value.DueAt));
     }
 
     [Fact]
@@ -437,25 +349,6 @@ public sealed class TrackerTests
     }
 
     [Theory]
-    [InlineData("1500000", 7, "", "1,500,000", 9)]
-    [InlineData("1,500,0007", 10, "1,500,000", "15,000,007", 10)]
-    [InlineData("1,50", 4, "1,500", "150", 3)] // a digit deleted
-    [InlineData("007", 3, "00", "7", 1)]
-    [InlineData("150k", 4, "150", "150k", 4)]
-    [InlineData("1234", 2, "134", "1,234", 3)]
-    [InlineData("1.", 2, "1", "1.", 2)] // a '.' typed on the way to "1.5k"
-    [InlineData("1.5", 3, "1.", "1.5", 3)]
-    public void Amounts_get_thousands_separators_while_typed_keeping_the_caret(string text, int caret, string previous, string expected, int expectedCaret)
-    {
-        var (grouped, newCaret) = TrackerFormat.GroupDigits(text, caret, previous, CultureInfo.GetCultureInfo("en-US"));
-        Assert.Equal(expected, grouped);
-        Assert.Equal(expectedCaret, newCaret);
-        Assert.Equal("1.500.000", TrackerFormat.GroupDigits("1500000", 7, "", CultureInfo.GetCultureInfo("vi-VN")).Text);
-        Assert.True(TrackerFormat.TryParseAmount("1.5k", out var typed) && typed == 1_500);
-        Assert.True(TrackerFormat.TryParseAmount("1.500.000", out var amount) && amount == 1_500_000);
-    }
-
-    [Theory]
     [InlineData("14:30", 14, 30)]
     [InlineData("1430", 14, 30)]
     [InlineData("9", 9, 0)]
@@ -471,7 +364,7 @@ public sealed class TrackerTests
     }
 
     [Fact]
-    public void The_widget_counts_open_items_shows_one_row_per_person_and_shrinks_when_empty()
+    public void The_widget_counts_open_items_and_shrinks_when_empty()
     {
         var tasks = _store.AddWorkspace("To-do", WorkspaceKind.Tasks);
         var model = TrackerWidgetModel.Build(_store, tasks, enabled: true, T0, TimeZoneInfo.Utc);
@@ -484,18 +377,6 @@ public sealed class TrackerTests
         model = TrackerWidgetModel.Build(_store, tasks, enabled: true, T0, TimeZoneInfo.Utc);
         Assert.Equal(2, model.OpenCount);
         Assert.False(model.IsEmpty);
-        Assert.All(model.Rows, r => Assert.True(r.CanComplete));
-
-        var debts = _store.AddWorkspace("Debts", WorkspaceKind.Debts);
-        _store.AddDebt(debts, "An", 100, DebtEntryKind.OwesMe);
-        _store.AddDebt(debts, "an", 50, DebtEntryKind.OwesMe);
-        _store.AddDebt(debts, "Binh", 30, DebtEntryKind.IOwe);
-        model = TrackerWidgetModel.Build(_store, debts, enabled: true, T0, TimeZoneInfo.Utc);
-        Assert.Equal(2, model.OpenCount);
-        Assert.Equal(["An", "Binh"], model.Rows.Select(r => r.Title));
-        Assert.All(model.Rows, r => Assert.False(r.CanComplete)); // a debt is settled by repaying it
-        Assert.True(model.Rows[0].OwedToMe);
-        Assert.StartsWith("+", model.Rows[0].Amount);
     }
 
     [Fact]
@@ -687,7 +568,6 @@ public sealed class TrackerTests
     public void Reminder_lists_overdue_today_and_soon_items_but_not_done_or_undated_ones()
     {
         var tasks = _store.AddWorkspace("To-do", WorkspaceKind.Tasks);
-        var book = _store.AddWorkspace("Debts", WorkspaceKind.Debts);
         var today = new DateOnly(2026, 9, 28);
         _store.AddItem(tasks, new TrackerItemDraft("late", DueDate: today.AddDays(-2)));
         _store.AddItem(tasks, new TrackerItemDraft("now", TrackerPriority.Urgent, today));
@@ -695,18 +575,24 @@ public sealed class TrackerTests
         _store.AddItem(tasks, new TrackerItemDraft("next week", DueDate: today.AddDays(7)));
         _store.AddItem(tasks, new TrackerItemDraft("no date"));
         _store.Complete(_store.AddItem(tasks, new TrackerItemDraft("done", DueDate: today)));
-        _store.AddItem(book, new TrackerItemDraft("", Person: "An", Amount: 50_000, DueDate: today));
+        // Debts due are in Wallet's debt book now; the reminder still lists them.
+        var wallet = new WalletStore(new MemorySynced<WalletTransaction>(), new MemorySynced<WalletCategory>(), new MemorySynced<WalletBudget>(), _time);
+        var debts = new DebtBook(new MemorySynced<WalletDebt>(), wallet, _time);
+        debts.Add("An", 50_000, DebtEntryKind.OwesMe, dueAt: DebtDue.FromLocal(today.ToDateTime(TimeOnly.MinValue), null, TimeZoneInfo.Local));
+        debts.Add("Binh", 10_000, DebtEntryKind.IOwe);
 
-        var reminder = TrackerReminderService.Build(_store, today, daysBefore: 1)!;
+        var reminder = TrackerReminderService.Build(_store, today, daysBefore: 1, debts)!;
         Assert.Equal((1, 2, 1), (reminder.Overdue, reminder.DueToday, reminder.DueSoon));
         Assert.Equal("Tracker: 1 overdue · 2 due today · 1 due soon", reminder.Title);
         var lines = reminder.Message.Split('\n');
         Assert.Equal("late (overdue by 2 days)", lines[0]);
         Assert.Equal("now (due today)", lines[1]); // urgent before the debt due the same day
-        Assert.Equal("An (due today)", lines[2]);
+        Assert.StartsWith("An pays back 50", lines[2]);
+        Assert.EndsWith("(due today)", lines[2]);
         Assert.StartsWith("tomorrow (", lines[3]);
 
-        Assert.Equal(3, TrackerReminderService.Build(_store, today, daysBefore: 0)!.Total);
+        Assert.Equal(3, TrackerReminderService.Build(_store, today, daysBefore: 0, debts)!.Total);
+        Assert.Equal(2, TrackerReminderService.Build(_store, today, daysBefore: 0)!.Total);
         Assert.Null(TrackerReminderService.Build(new TrackerStore(new MemoryCollection<TrackerWorkspace>(), new MemoryCollection<TrackerItem>(),
             new MemoryLog<TrackerEvent>(), _time), today, 3));
     }

@@ -2,6 +2,7 @@ using Helm.Core.Capture;
 using Helm.Core.Settings;
 using Helm.Modules.QuickCapture;
 using Helm.Modules.Tracker;
+using Helm.Modules.Wallet;
 
 namespace Helm.Tests;
 
@@ -69,7 +70,7 @@ public sealed class CaptureTests
     [InlineData("An 150,000", "An", 150_000, DebtEntryKind.OwesMe, "")]
     public void Debts_read_person_amount_and_direction(string text, string person, int amount, DebtEntryKind kind, string note)
     {
-        var debt = TrackerCaptureParser.ParseDebt(text);
+        var debt = DebtCaptureParser.Parse(text);
         Assert.NotNull(debt);
         Assert.Equal((person, (decimal)amount, kind, note), (debt.Person, debt.Amount, debt.Kind, debt.Note));
     }
@@ -79,23 +80,25 @@ public sealed class CaptureTests
     [InlineData("Nam")]
     [InlineData("Nam abc")]
     [InlineData("")]
-    public void A_debt_needs_a_person_and_an_amount(string text) => Assert.Null(TrackerCaptureParser.ParseDebt(text));
+    public void A_debt_needs_a_person_and_an_amount(string text) => Assert.Null(DebtCaptureParser.Parse(text));
 
     [Fact]
-    public void Task_and_debt_targets_save_into_tracker()
+    public void Task_target_saves_into_tracker_and_debt_target_into_wallet()
     {
         using var dir = new TempDir();
         using var settings = new SettingsStoreFactory(new HelmPaths(dir.Path));
         var store = new TrackerStore(new MemorySynced<TrackerWorkspace>(), new MemorySynced<TrackerItem>(), new MemorySyncedLog<TrackerEvent>());
+        var wallet = new WalletStore(new MemorySynced<WalletTransaction>(), new MemorySynced<WalletCategory>(), new MemorySynced<WalletBudget>());
+        var book = new DebtBook(new MemorySynced<WalletDebt>(), wallet);
         var tasks = new TaskCaptureTarget(store, settings);
-        var debts = new DebtCaptureTarget(store);
+        var debts = new DebtCaptureTarget(book);
+        Assert.Equal((DebtCaptureTarget.TargetId, "d", WalletIds.ModuleId), (debts.Id, debts.Prefix, debts.ModuleId));
 
         Assert.Equal("Create a to-do list in Tracker first.", tasks.Preview("anything").Text);
-        Assert.False(debts.Capture("Nam 200k").Saved);
+        Assert.False(debts.Capture("Nam").Saved);
 
         var todo = store.AddWorkspace("To-do", WorkspaceKind.Tasks);
         var work = store.AddWorkspace("Công việc", WorkspaceKind.Tasks);
-        var book = store.AddWorkspace("Debts", WorkspaceKind.Debts);
 
         var preview = tasks.Preview("fix bug #cong !");
         Assert.True(preview.CanSave);
@@ -117,7 +120,7 @@ public sealed class CaptureTests
         Assert.StartsWith("Nam pays you back ", repay.Text);
         Assert.StartsWith("You owe Nam ", debts.Preview("Nam -10k").Text);
         Assert.True(debts.Capture("Nam trả 50k").Saved);
-        Assert.Equal(150_000m, store.DebtBalance(book, "Nam"));
+        Assert.Equal(150_000m, book.Balance("Nam"));
     }
 
     [Fact]

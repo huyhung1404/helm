@@ -64,26 +64,4 @@ public partial class TrackerContentPage : Page
             viewModel.ReportExportFailure(ex);
         }
     }
-
-    private bool _grouping;
-    private string _amountText = "";
-
-    /// <summary>Thousands separators while an amount is typed, so 1500000 reads 1,500,000; the caret stays put.</summary>
-    private void OnAmountTextChanged(object sender, TextChangedEventArgs e)
-    {
-        if (_grouping || sender is not TextBox box) return;
-        var (text, caret) = TrackerFormat.GroupDigits(box.Text, box.CaretIndex, _amountText);
-        _amountText = text;
-        if (text == box.Text) return;
-        _grouping = true;
-        try
-        {
-            box.Text = text;
-            box.CaretIndex = caret;
-        }
-        finally
-        {
-            _grouping = false;
-        }
-    }
 }

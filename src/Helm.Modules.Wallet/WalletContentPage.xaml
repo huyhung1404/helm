@@ -140,6 +140,126 @@
             </Grid>
         </DataTemplate>
 
+        <!-- Money / Debts: the one shown is the accent button -->
+        <Style x:Key="MoneyTab" TargetType="ui:Button" BasedOn="{StaticResource {x:Type ui:Button}}">
+            <Setter Property="Margin" Value="0,0,8,0" />
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding IsMoneyView}" Value="True">
+                    <Setter Property="Appearance" Value="Primary" />
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+        <Style x:Key="DebtsTab" TargetType="ui:Button" BasedOn="{StaticResource {x:Type ui:Button}}">
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding IsDebtsView}" Value="True">
+                    <Setter Property="Appearance" Value="Primary" />
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+
+        <!-- Signed amount of a person or a debt entry: + in green, - in red -->
+        <Style x:Key="SignedText" TargetType="TextBlock">
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="VerticalAlignment" Value="Center" />
+            <Setter Property="Foreground" Value="{DynamicResource TextFillColorSecondaryBrush}" />
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding OwedToMe}" Value="True">
+                    <Setter Property="Foreground" Value="{DynamicResource SystemFillColorSuccessBrush}" />
+                </DataTrigger>
+                <DataTrigger Binding="{Binding IOwe}" Value="True">
+                    <Setter Property="Foreground" Value="{DynamicResource SystemFillColorCriticalBrush}" />
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+
+        <!-- A person in the debt book: click to see their history and set when it is due; click again to close. -->
+        <DataTemplate x:Key="PersonRow" DataType="{x:Type local:DebtPersonViewModel}">
+            <Border BorderThickness="0,0,0,1" BorderBrush="{DynamicResource CardStrokeColorDefaultBrush}">
+                <StackPanel>
+                    <Button Style="{StaticResource RowButton}" Command="{Binding ToggleExpandedCommand}" AutomationProperties.Name="{Binding Name}">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <ui:SymbolIcon Symbol="Person24" FontSize="20" Margin="0,0,12,0" VerticalAlignment="Center" />
+                            <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                <TextBlock Text="{Binding Name}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+                                <TextBlock Text="{Binding Details}" TextTrimming="CharacterEllipsis">
+                                    <TextBlock.Style>
+                                        <Style TargetType="TextBlock" BasedOn="{StaticResource HelmSecondaryText}">
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding IsOverdue}" Value="True">
+                                                    <Setter Property="Foreground" Value="{DynamicResource SystemFillColorCriticalBrush}" />
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </TextBlock.Style>
+                                </TextBlock>
+                            </StackPanel>
+                            <TextBlock Grid.Column="2" Text="{Binding BalanceText}" FontSize="15" Margin="12,0,4,0" Style="{StaticResource SignedText}" />
+                        </Grid>
+                    </Button>
+
+                    <StackPanel Margin="44,0,12,12" Visibility="{Binding IsExpanded, Converter={StaticResource BoolToVisibility}}">
+                        <!-- When it is due: extend, or set a date and time -->
+                        <WrapPanel Margin="0,4,0,8" Visibility="{Binding IsSettled, Converter={StaticResource InverseBoolToVisibility}}">
+                            <TextBlock Text="Due" VerticalAlignment="Center" Margin="0,0,8,8" />
+                            <ui:Button Margin="0,0,6,8" Content="+1 day" Command="{Binding ExtendCommand}" CommandParameter="1" ToolTip="Due one day later" />
+                            <ui:Button Margin="0,0,6,8" Content="+1 week" Command="{Binding ExtendCommand}" CommandParameter="7" ToolTip="Due a week later" />
+                            <ui:Button Margin="0,0,12,8" Content="+1 month" Command="{Binding ExtendCommand}" CommandParameter="30" ToolTip="Due 30 days later" />
+                            <core:DateTimeBox Width="260" Margin="0,0,6,8" Date="{Binding EditDueDate}" Time="{Binding EditDueTime}" Lean="Future" AllowEmpty="True"
+                                              ShowChips="False" PlaceholderText="Due: mai 9h, thứ 6" AutomationProperties.Name="Due date and time" />
+                            <ui:Button Margin="0,0,6,8" Appearance="Primary" Content="Set" Command="{Binding SetDueCommand}" />
+                            <ui:Button Margin="0,0,6,8" Content="No due date" Command="{Binding ClearDueCommand}" />
+                        </WrapPanel>
+                        <!-- Notes about this person (bank details, what was agreed…) -->
+                        <core:LinksPanel DataContext="{Binding Links}" ShowActions="True" Margin="0,0,0,10" />
+                        <!-- Every change of the amount, newest first, with the balance after it -->
+                        <ItemsControl ItemsSource="{Binding Entries}" Focusable="False">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate DataType="{x:Type local:DebtEntryRow}">
+                                    <Grid Margin="0,3">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="150" />
+                                            <ColumnDefinition Width="100" />
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                            <ColumnDefinition Width="Auto" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Text="{Binding When}" Style="{DynamicResource HelmSecondaryText}" VerticalAlignment="Center" />
+                                        <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+                                            <TextBlock Text="{Binding KindText}" VerticalAlignment="Center" />
+                                            <ui:SymbolIcon Symbol="BuildingBank24" FontSize="14" Margin="6,0,0,0" ToolTip="From a Wallet transaction"
+                                                           Visibility="{Binding FromTransaction, Converter={StaticResource BoolToVisibility}}" />
+                                        </StackPanel>
+                                        <TextBlock Grid.Column="2" Text="{Binding Note}" Style="{DynamicResource HelmSecondaryText}" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
+                                        <TextBlock Grid.Column="3" Text="{Binding AmountText}" FontWeight="SemiBold" Margin="12,0,0,0" VerticalAlignment="Center">
+                                            <TextBlock.Style>
+                                                <Style TargetType="TextBlock">
+                                                    <Setter Property="Foreground" Value="{DynamicResource SystemFillColorCriticalBrush}" />
+                                                    <Style.Triggers>
+                                                        <DataTrigger Binding="{Binding IsIncrease}" Value="True">
+                                                            <Setter Property="Foreground" Value="{DynamicResource SystemFillColorSuccessBrush}" />
+                                                        </DataTrigger>
+                                                    </Style.Triggers>
+                                                </Style>
+                                            </TextBlock.Style>
+                                        </TextBlock>
+                                        <TextBlock Grid.Column="4" Text="{Binding BalanceText}" Style="{DynamicResource HelmSecondaryText}" Margin="12,0,0,0" VerticalAlignment="Center" />
+                                        <ui:Button Grid.Column="5" Style="{StaticResource RowAction}" Icon="{ui:SymbolIcon Delete24}" ToolTip="Delete this entry" AutomationProperties.Name="Delete entry" Margin="16,0,0,0"
+                                                   Command="{Binding DeleteCommand}" />
+                                    </Grid>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </StackPanel>
+                </StackPanel>
+            </Border>
+        </DataTemplate>
+
         <!-- A transaction: one click on a suggested category files it; click the row for the rest -->
         <DataTemplate x:Key="TransactionRow" DataType="{x:Type local:TransactionRow}">
             <Border BorderThickness="0,0,0,1" BorderBrush="{DynamicResource CardStrokeColorDefaultBrush}">
@@ -214,9 +334,46 @@
                             <ui:Button Content="To categorize" Icon="{ui:SymbolIcon ArrowUndo24}" Command="{Binding UncategorizeCommand}" Margin="0,0,6,0"
                                        ToolTip="Back to the transactions to categorize"
                                        Visibility="{Binding IsCategorized, Converter={StaticResource BoolToVisibility}}" />
+                            <ui:Button Content="Lent, borrowed, paid back…" Icon="{ui:SymbolIcon PersonMoney24}" Command="{Binding OpenDebtFormCommand}" Margin="0,0,6,0"
+                                       ToolTip="Put this money in the debt book: it then counts neither as spending nor as income"
+                                       Visibility="{Binding CanBeDebt, Converter={StaticResource BoolToVisibility}}" />
                             <ui:Button Content="Edit" Icon="{ui:SymbolIcon Edit24}" Command="{Binding BeginEditCommand}" Margin="0,0,6,0" />
                             <ui:Button Content="Delete" Icon="{ui:SymbolIcon Delete24}" Command="{Binding DeleteCommand}" Margin="16,0,0,0" />
                         </StackPanel>
+                        <!-- In the debt book: who it is with, one click away -->
+                        <StackPanel Orientation="Horizontal" Margin="0,0,0,8" Visibility="{Binding IsDebt, Converter={StaticResource BoolToVisibility}}">
+                            <ui:SymbolIcon Symbol="People24" FontSize="16" Margin="0,0,6,0" VerticalAlignment="Center" />
+                            <TextBlock Text="{Binding DebtText}" VerticalAlignment="Center" Margin="0,0,8,0" />
+                            <ui:Button Content="Open in Debts" Command="{Binding OpenDebtCommand}" />
+                        </StackPanel>
+                        <!-- This money in the debt book -->
+                        <Border Style="{DynamicResource HelmSurface}" Margin="0,0,0,8" Padding="12,10"
+                                Visibility="{Binding IsDebtFormOpen, Converter={StaticResource BoolToVisibility}}">
+                            <StackPanel>
+                                <TextBlock Text="Put it in the debt book" FontWeight="SemiBold" Margin="0,0,0,8" />
+                                <WrapPanel>
+                                    <StackPanel Margin="0,0,12,8">
+                                        <TextBlock Text="Person" Style="{StaticResource FieldLabel}" />
+                                        <ComboBox Width="220" IsEditable="True" IsTextSearchEnabled="True" ItemsSource="{Binding DebtNames}"
+                                                  Text="{Binding DebtPerson, UpdateSourceTrigger=PropertyChanged}" AutomationProperties.Name="Person"
+                                                  ToolTip="Who it is with. A name already in the book adds to that person." />
+                                    </StackPanel>
+                                    <StackPanel Margin="0,0,12,8">
+                                        <TextBlock Text="Kind" Style="{StaticResource FieldLabel}" />
+                                        <ComboBox Width="150" ItemsSource="{x:Static local:TransactionRow.DebtKindNames}" SelectedIndex="{Binding DebtKindIndex}"
+                                                  AutomationProperties.Name="Kind" ToolTip="Owes me: you lent it. I owe: you borrowed it. Repayment: it brings the balance back toward 0." />
+                                    </StackPanel>
+                                    <StackPanel Margin="0,0,12,8">
+                                        <TextBlock Text="Note (optional)" Style="{StaticResource FieldLabel}" />
+                                        <ui:TextBox Width="240" AutomationProperties.Name="Debt note" Text="{Binding DebtNote, UpdateSourceTrigger=PropertyChanged}" />
+                                    </StackPanel>
+                                </WrapPanel>
+                                <StackPanel Orientation="Horizontal">
+                                    <ui:Button Appearance="Primary" Content="Save" Icon="{ui:SymbolIcon Checkmark24}" Command="{Binding SaveDebtCommand}" Margin="0,0,8,0" />
+                                    <ui:Button Content="Cancel" Command="{Binding CancelDebtFormCommand}" />
+                                </StackPanel>
+                            </StackPanel>
+                        </Border>
                         <TextBlock Text="{Binding BalanceText}" Style="{DynamicResource HelmSecondaryText}"
                                    Visibility="{Binding HasBalance, Converter={StaticResource BoolToVisibility}}" />
                         <TextBlock Text="{Binding Note}" TextWrapping="Wrap" Margin="0,4,0,0"
@@ -279,12 +436,18 @@
             <TextBlock Text="Wallet" FontSize="28" FontWeight="SemiBold" VerticalAlignment="Center" />
         </StackPanel>
 
+        <!-- Money (the month) or Debts (who owes whom) -->
+        <StackPanel Orientation="Horizontal" Margin="0,0,0,12" Visibility="{Binding HasDebts, Converter={StaticResource BoolToVisibility}}">
+            <ui:Button Style="{StaticResource MoneyTab}" Content="Money" Icon="{ui:SymbolIcon Wallet24}" Command="{Binding ShowMoneyCommand}" />
+            <ui:Button Style="{StaticResource DebtsTab}" Content="Debts" Icon="{ui:SymbolIcon People24}" Command="{Binding ShowDebtsCommand}" />
+        </StackPanel>
+
         <!-- Shown while the tool is turned off -->
         <ui:InfoBar x:Name="OffBar" Severity="Informational" IsClosable="False" IsOpen="False" Visibility="Collapsed" Margin="0,0,0,12"
                     Title="Wallet is turned off" Message="Your transactions are kept. Turn Wallet on in its settings to work with them; the phone stops saving new ones meanwhile." />
 
         <!-- The month, first and easy to see -->
-        <Border Style="{DynamicResource HelmSurface}" Margin="0,0,0,8" Padding="12,8">
+        <Border Style="{DynamicResource HelmSurface}" Margin="0,0,0,8" Padding="12,8" Visibility="{Binding IsMoneyView, Converter={StaticResource BoolToVisibility}}">
             <DockPanel>
                 <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center">
                     <ui:Button Content="This month" Command="{Binding ThisMonthCommand}" Margin="0,0,8,0"
@@ -309,6 +472,127 @@
                     <ui:Button Style="{StaticResource RowAction}" Icon="{ui:SymbolIcon Dismiss24}" ToolTip="Dismiss" AutomationProperties.Name="Dismiss" Command="{Binding DismissMessageCommand}" />
                 </core:RowLayout>
             </Border>
+
+            <!-- The debt book: who owes whom -->
+            <StackPanel DataContext="{Binding Debts}" Visibility="{Binding DataContext.IsDebtsView, RelativeSource={RelativeSource AncestorType=Page}, Converter={StaticResource BoolToVisibility}}">
+                <Border Style="{DynamicResource HelmSurface}" Margin="0,0,0,8" Padding="12,8" Visibility="{Binding HasMessage, Converter={StaticResource BoolToVisibility}}">
+                    <core:RowLayout>
+                        <TextBlock Text="{Binding Message}" TextWrapping="Wrap" VerticalAlignment="Center" />
+                        <ui:Button Style="{StaticResource RowAction}" Icon="{ui:SymbolIcon Dismiss24}" ToolTip="Dismiss" AutomationProperties.Name="Dismiss" Command="{Binding DismissMessageCommand}" />
+                    </core:RowLayout>
+                </Border>
+
+                <UniformGrid Columns="3" Margin="0,0,0,8">
+                    <Border Style="{DynamicResource HelmSurface}" Margin="0,0,4,0">
+                        <StackPanel>
+                            <TextBlock Text="{Binding OwedToMeText}" Style="{StaticResource Figure}" Foreground="{DynamicResource SystemFillColorSuccessBrush}" />
+                            <TextBlock Text="Owed to me" Style="{DynamicResource HelmSecondaryText}" />
+                        </StackPanel>
+                    </Border>
+                    <Border Style="{DynamicResource HelmSurface}" Margin="2,0,2,0">
+                        <StackPanel>
+                            <TextBlock Text="{Binding IOweText}" Style="{StaticResource Figure}" Foreground="{DynamicResource SystemFillColorCriticalBrush}" />
+                            <TextBlock Text="I owe" Style="{DynamicResource HelmSecondaryText}" />
+                        </StackPanel>
+                    </Border>
+                    <Border Style="{DynamicResource HelmSurface}" Margin="4,0,0,0">
+                        <StackPanel>
+                            <TextBlock Text="{Binding NetText}" Style="{StaticResource Figure}" />
+                            <TextBlock Text="Net" Style="{DynamicResource HelmSecondaryText}" />
+                        </StackPanel>
+                    </Border>
+                </UniformGrid>
+
+                <!-- Add -->
+                <TextBlock Text="Add a debt" Style="{DynamicResource HelmSectionHeader}" />
+                <Border Style="{DynamicResource HelmSurface}" Margin="0,0,0,4">
+                    <StackPanel>
+                        <WrapPanel>
+                            <!-- Typing a name already in the book adds to that person -->
+                            <StackPanel Margin="0,0,8,8">
+                                <TextBlock Text="Person" Style="{StaticResource FieldLabel}" />
+                                <ui:TextBox Width="220" PlaceholderText="Person" AutomationProperties.Name="Person" Icon="{ui:SymbolIcon Person24}"
+                                            ToolTip="Who it is with. A name already in the book adds to that person." Text="{Binding NewPerson, UpdateSourceTrigger=PropertyChanged}">
+                                    <ui:TextBox.InputBindings>
+                                        <KeyBinding Key="Enter" Command="{Binding AddCommand}" />
+                                    </ui:TextBox.InputBindings>
+                                </ui:TextBox>
+                            </StackPanel>
+                            <StackPanel Margin="0,0,8,8">
+                                <TextBlock Text="Amount" Style="{StaticResource FieldLabel}" />
+                                <ui:TextBox Width="180" PlaceholderText="150k, 1.5tr" AutomationProperties.Name="Amount" Icon="{ui:SymbolIcon Money24}"
+                                            Text="{Binding NewAmount, UpdateSourceTrigger=PropertyChanged}" TextChanged="OnAmountTextChanged">
+                                    <ui:TextBox.InputBindings>
+                                        <KeyBinding Key="Enter" Command="{Binding AddCommand}" />
+                                    </ui:TextBox.InputBindings>
+                                </ui:TextBox>
+                            </StackPanel>
+                            <StackPanel Margin="0,0,8,8">
+                                <TextBlock Text="Kind" Style="{StaticResource FieldLabel}" />
+                                <ComboBox Width="140" ItemsSource="{x:Static local:DebtsViewModel.KindNames}" SelectedIndex="{Binding NewKindIndex}" AutomationProperties.Name="Kind"
+                                          ToolTip="Owes me adds, I owe subtracts, a repayment brings the balance back toward 0" />
+                            </StackPanel>
+                        </WrapPanel>
+                        <!-- Names already in the book that match what is typed: one click picks it -->
+                        <ItemsControl Margin="0,0,0,8" ItemsSource="{Binding PersonSuggestions}" Focusable="False"
+                                      Visibility="{Binding HasPersonSuggestions, Converter={StaticResource BoolToVisibility}}">
+                            <ItemsControl.ItemsPanel>
+                                <ItemsPanelTemplate>
+                                    <WrapPanel />
+                                </ItemsPanelTemplate>
+                            </ItemsControl.ItemsPanel>
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <ui:Button Margin="0,0,6,6" Padding="10,3" Content="{Binding}" Icon="{ui:SymbolIcon Person24}" AutomationProperties.Name="{Binding}"
+                                               Command="{Binding DataContext.Debts.PickPersonCommand, RelativeSource={RelativeSource AncestorType=Page}}" CommandParameter="{Binding}" />
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                        <WrapPanel>
+                            <StackPanel Margin="0,0,8,0">
+                                <TextBlock Text="What it was for (optional)" Style="{StaticResource FieldLabel}" />
+                                <ui:TextBox Width="300" AutomationProperties.Name="Note" Text="{Binding NewNote, UpdateSourceTrigger=PropertyChanged}">
+                                    <ui:TextBox.InputBindings>
+                                        <KeyBinding Key="Enter" Command="{Binding AddCommand}" />
+                                    </ui:TextBox.InputBindings>
+                                </ui:TextBox>
+                            </StackPanel>
+                            <StackPanel Margin="0,0,8,0">
+                                <TextBlock Text="Due (optional)" Style="{StaticResource FieldLabel}" />
+                                <core:DateTimeBox Width="300" Date="{Binding NewDueDate}" Time="{Binding NewDueTime}" Lean="Future" AllowEmpty="True"
+                                                  PlaceholderText="No due date" AutomationProperties.Name="Due date and time" />
+                            </StackPanel>
+                            <ui:Button VerticalAlignment="Bottom" Appearance="Primary" Content="Add" Icon="{ui:SymbolIcon Add24}" Command="{Binding AddCommand}" />
+                        </WrapPanel>
+                        <TextBlock Margin="0,10,0,0" Style="{DynamicResource HelmSecondaryText}" TextWrapping="Wrap"
+                                   Text="Lent or borrowed by bank transfer? Open that transaction in Money and choose Lent, borrowed, paid back: it then counts neither as spending nor as income." />
+                    </StackPanel>
+                </Border>
+
+                <!-- Outstanding -->
+                <core:RowLayout Margin="0,20,0,8">
+                    <TextBlock Text="Outstanding" FontSize="14" FontWeight="SemiBold" VerticalAlignment="Center" />
+                    <TextBlock Text="{Binding OpenSummary}" Style="{DynamicResource HelmSecondaryText}" VerticalAlignment="Center" />
+                </core:RowLayout>
+                <Border Style="{DynamicResource HelmSurface}" Padding="0">
+                    <StackPanel>
+                        <TextBlock Margin="16" Text="Nothing outstanding. Everyone is square." Style="{DynamicResource HelmSecondaryText}"
+                                   Visibility="{Binding HasNoPeople, Converter={StaticResource BoolToVisibility}}" />
+                        <ItemsControl ItemsSource="{Binding People}" ItemTemplate="{StaticResource PersonRow}" Focusable="False" />
+                    </StackPanel>
+                </Border>
+
+                <!-- Settled -->
+                <core:RowLayout Margin="0,20,0,8" Visibility="{Binding HasSettled, Converter={StaticResource BoolToVisibility}}">
+                    <TextBlock Text="Settled" FontSize="14" FontWeight="SemiBold" VerticalAlignment="Center" />
+                    <ui:Button Content="Show or hide" Command="{Binding ToggleSettledCommand}" />
+                </core:RowLayout>
+                <Border Style="{DynamicResource HelmSurface}" Padding="0" Visibility="{Binding ShowSettled, Converter={StaticResource BoolToVisibility}}">
+                    <ItemsControl ItemsSource="{Binding SettledPeople}" ItemTemplate="{StaticResource PersonRow}" Focusable="False" />
+                </Border>
+            </StackPanel>
+
+            <StackPanel Visibility="{Binding IsMoneyView, Converter={StaticResource BoolToVisibility}}">
 
             <!-- Adding a transaction by hand -->
             <Border Style="{DynamicResource HelmSurface}" Margin="0,0,0,8" Visibility="{Binding IsAddOpen, Converter={StaticResource BoolToVisibility}}">
@@ -536,6 +820,7 @@
                     </DataTemplate>
                 </ItemsControl.ItemTemplate>
             </ItemsControl>
+            </StackPanel>
         </StackPanel>
     </StackPanel>
 </Page>

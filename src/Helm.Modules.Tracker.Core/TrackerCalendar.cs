@@ -1,6 +1,7 @@
 using System.Globalization;
 using System.Text;
 using Helm.Core.Sync;
+using Helm.Modules.Wallet;
 
 namespace Helm.Modules.Tracker;
 
@@ -10,8 +11,9 @@ public sealed record CalendarEntry(string Title, string Detail, DateTimeOffset? 
     string? ItemId, string? WorkspaceId, string? PersonKey, string TimeText = "");
 
 /// <summary>
-/// The Tracker's calendar: every task with a due date and every open debt with a due time, on its day, across all
-/// workspaces (or one). A task that repeats every day also shows on its coming days, until it stops.
+/// The Tracker's calendar: every task with a due date, on its day, across all to-do lists (or one), and every person in
+/// Wallet's debt book whose balance is due (with all lists). A task that repeats every day also shows on its coming
+/// days, until it stops.
 /// </summary>
 public static class TrackerCalendar
 {
@@ -32,7 +34,7 @@ public static class TrackerCalendar
 
     /// <summary>The entries of each day from <paramref name="from"/> to <paramref name="to"/> (inclusive), timed ones first by time.</summary>
     public static IReadOnlyDictionary<DateOnly, IReadOnlyList<CalendarEntry>> Entries(
-        TrackerStore store, DateOnly from, DateOnly to, string? workspaceId, TimeZoneInfo zone)
+        TrackerStore store, DateOnly from, DateOnly to, string? workspaceId, TimeZoneInfo zone, DebtBook? debts = null)
     {
         var now = store.Now;
         var today = DateOnly.FromDateTime(TimeZoneInfo.ConvertTime(now, zone).DateTime);
@@ -49,37 +51,34 @@ public static class TrackerCalendar
         {
             if (workspaceId is not null && wsId != workspaceId) continue;
             var items = store.Items(wsId);
-            if (ws.Kind == WorkspaceKind.Tasks)
+            foreach (var (id, item, _) in items)
             {
-                foreach (var (id, item, _) in items)
+                if (item.IsSubtask || item.DueMoment(zone) is not { } due) continue;
+                var day = DateOnly.FromDateTime(TimeZoneInfo.ConvertTime(due, zone).DateTime);
+                var timed = item.DueAt is not null ? due : (DateTimeOffset?)null;
+                Add(day, new CalendarEntry(item.Title, ws.Name, timed, item.IsCompleted, !item.IsCompleted && due < now, false, false, id, wsId, null));
+            }
+            // A daily task exists only up to today; its coming days are shown from the latest one.
+            foreach (var series in items.Where(i => i.Value.IsRepeating).GroupBy(i => i.Value.SeriesId))
+            {
+                var latest = series.OrderByDescending(i => i.Value.OccurrenceDate ?? DateOnly.MinValue).First().Value;
+                if (!latest.RepeatDaily || latest.OccurrenceDate is not { } last) continue;
+                var end = latest.RepeatUntil is { } until && until < to ? until : to;
+                for (var day = (last > today ? last : today).AddDays(1); day <= end; day = day.AddDays(1))
                 {
-                    if (item.IsSubtask || item.DueMoment(zone) is not { } due) continue;
-                    var day = DateOnly.FromDateTime(TimeZoneInfo.ConvertTime(due, zone).DateTime);
-                    var timed = item.DueAt is not null ? due : (DateTimeOffset?)null;
-                    Add(day, new CalendarEntry(item.Title, ws.Name, timed, item.IsCompleted, !item.IsCompleted && due < now, false, false, id, wsId, null));
-                }
-                // A daily task exists only up to today; its coming days are shown from the latest one.
-                foreach (var series in items.Where(i => i.Value.IsRepeating).GroupBy(i => i.Value.SeriesId))
-                {
-                    var latest = series.OrderByDescending(i => i.Value.OccurrenceDate ?? DateOnly.MinValue).First().Value;
-                    if (!latest.RepeatDaily || latest.OccurrenceDate is not { } last) continue;
-                    var end = latest.RepeatUntil is { } until && until < to ? until : to;
-                    for (var day = (last > today ? last : today).AddDays(1); day <= end; day = day.AddDays(1))
-                    {
-                        var timed = latest.DueAt is { } at ? at.AddDays(day.DayNumber - last.DayNumber) : (DateTimeOffset?)null;
-                        Add(day, new CalendarEntry(latest.Title, ws.Name, timed, false, false, false, true, null, wsId, null));
-                    }
+                    var timed = latest.DueAt is { } at ? at.AddDays(day.DayNumber - last.DayNumber) : (DateTimeOffset?)null;
+                    Add(day, new CalendarEntry(latest.Title, ws.Name, timed, false, false, false, true, null, wsId, null));
                 }
             }
-            else
+        }
+        if (debts is not null && workspaceId is null)
+        {
+            foreach (var person in debts.Open().Where(p => !p.IsSettled))
             {
-                foreach (var person in DebtLedger.Open(items).Where(p => !p.IsSettled))
-                {
-                    if (person.Due(zone) is not { } due) continue;
-                    var day = DateOnly.FromDateTime(TimeZoneInfo.ConvertTime(due, zone).DateTime);
-                    var timed = person.Entries.Any(e => e.Item.DueAt is not null) ? due : (DateTimeOffset?)null;
-                    Add(day, new CalendarEntry(person.Name, TrackerFormat.Balance(person.Balance, ws.Currency), timed, false, due < now, true, false, null, wsId, person.Key));
-                }
+                if (person.Due(zone) is not { } due) continue;
+                var day = DateOnly.FromDateTime(TimeZoneInfo.ConvertTime(due, zone).DateTime);
+                var timed = person.HasDueTime ? due : (DateTimeOffset?)null;
+                Add(day, new CalendarEntry(person.Name, DebtFormat.Balance(person.Balance), timed, false, due < now, true, false, null, null, person.Key));
             }
         }
         return days.ToDictionary(d => d.Key, d => (IReadOnlyList<CalendarEntry>)d.Value
@@ -91,12 +90,12 @@ public static class TrackerCalendar
 }
 
 /// <summary>
-/// The open tasks and debts with a due date as an iCalendar file (RFC 5545), to import into Google Calendar, Outlook or
+/// The open tasks and the debts (Wallet's debt book) with a due date as an iCalendar file (RFC 5545), to import into Google Calendar, Outlook or
 /// a phone's calendar. Every event keeps the item's id, so importing again updates the events rather than doubling them.
 /// </summary>
 public static class TrackerIcs
 {
-    public static string Build(TrackerStore store, TimeZoneInfo zone)
+    public static string Build(TrackerStore store, TimeZoneInfo zone, DebtBook? debts = null)
     {
         var now = store.Now;
         var ics = new StringBuilder();
@@ -127,49 +126,44 @@ public static class TrackerIcs
         foreach (var (wsId, ws, _) in store.Workspaces())
         {
             var items = store.Items(wsId);
-            if (ws.Kind == WorkspaceKind.Tasks)
+            // A repeating task is one event that repeats, from its latest day.
+            var latestOfSeries = items.Where(i => i.Value.IsRepeating)
+                .GroupBy(i => i.Value.SeriesId!)
+                .ToDictionary(g => g.Key, g => g.OrderByDescending(i => i.Value.OccurrenceDate ?? DateOnly.MinValue).First().Id);
+            foreach (var (id, item, _) in items)
             {
-                // A repeating task is one event that repeats, from its latest day.
-                var latestOfSeries = items.Where(i => i.Value.IsRepeating)
-                    .GroupBy(i => i.Value.SeriesId!)
-                    .ToDictionary(g => g.Key, g => g.OrderByDescending(i => i.Value.OccurrenceDate ?? DateOnly.MinValue).First().Id);
-                foreach (var (id, item, _) in items)
-                {
-                    if (item.IsCompleted || item.IsSubtask || item.DueMoment(zone) is null) continue;
-                    if (item.SeriesId is { } series && latestOfSeries[series] != id) continue;
-                    Line("BEGIN:VEVENT");
-                    Line($"UID:{Escape(item.SeriesId ?? id)}@helm-tracker");
-                    Line("DTSTAMP:" + stamp);
-                    Time(item.DueAt, item.DueDate ?? TrackerDue.Day(item.DueAt, zone));
-                    if (item.RepeatDaily)
-                        Line("RRULE:FREQ=DAILY" + (item.RepeatUntil is { } until ? $";UNTIL={until:yyyyMMdd}" : ""));
-                    Line("SUMMARY:" + Escape(item.Title));
-                    var description = ws.Name + (item.Notes.Length > 0 ? "\n" + item.Notes : "");
-                    Line("DESCRIPTION:" + Escape(description));
-                    Line("CATEGORIES:" + Escape(ws.Name));
-                    if (item.Priority >= TrackerPriority.High) Line("PRIORITY:" + (item.Priority == TrackerPriority.Urgent ? "1" : "3"));
-                    Alarm(item.DueAt);
-                    Line("END:VEVENT");
-                }
+                if (item.IsCompleted || item.IsSubtask || item.DueMoment(zone) is null) continue;
+                if (item.SeriesId is { } series && latestOfSeries[series] != id) continue;
+                Line("BEGIN:VEVENT");
+                Line($"UID:{Escape(item.SeriesId ?? id)}@helm-tracker");
+                Line("DTSTAMP:" + stamp);
+                Time(item.DueAt, item.DueDate ?? TrackerDue.Day(item.DueAt, zone));
+                if (item.RepeatDaily)
+                    Line("RRULE:FREQ=DAILY" + (item.RepeatUntil is { } until ? $";UNTIL={until:yyyyMMdd}" : ""));
+                Line("SUMMARY:" + Escape(item.Title));
+                var description = ws.Name + (item.Notes.Length > 0 ? "\n" + item.Notes : "");
+                Line("DESCRIPTION:" + Escape(description));
+                Line("CATEGORIES:" + Escape(ws.Name));
+                if (item.Priority >= TrackerPriority.High) Line("PRIORITY:" + (item.Priority == TrackerPriority.Urgent ? "1" : "3"));
+                Alarm(item.DueAt);
+                Line("END:VEVENT");
             }
-            else
-            {
-                foreach (var person in DebtLedger.Open(items).Where(p => !p.IsSettled))
-                {
-                    if (person.Due(zone) is not { } due) continue;
-                    var timed = person.Entries.Any(e => e.Item.DueAt is not null) ? due : (DateTimeOffset?)null;
-                    var amount = TrackerFormat.Money(Math.Abs(person.Balance), ws.Currency);
-                    Line("BEGIN:VEVENT");
-                    Line($"UID:debt-{Escape(person.Key.Replace(' ', '-'))}@helm-tracker");
-                    Line("DTSTAMP:" + stamp);
-                    Time(timed, DateOnly.FromDateTime(TimeZoneInfo.ConvertTime(due, zone).DateTime));
-                    Line("SUMMARY:" + Escape(person.Balance > 0 ? $"{person.Name} pays back {amount}" : $"Pay {person.Name} {amount}"));
-                    Line("DESCRIPTION:" + Escape(ws.Name));
-                    Line("CATEGORIES:" + Escape(ws.Name));
-                    Alarm(timed);
-                    Line("END:VEVENT");
-                }
-            }
+        }
+        // The same UID as when the debt book was the Tracker's, so importing again updates those events.
+        foreach (var person in debts?.Open().Where(p => !p.IsSettled) ?? [])
+        {
+            if (person.Due(zone) is not { } due) continue;
+            var timed = person.HasDueTime ? due : (DateTimeOffset?)null;
+            var amount = WalletFormat.Money(Math.Abs(person.Balance));
+            Line("BEGIN:VEVENT");
+            Line($"UID:debt-{Escape(person.Key.Replace(' ', '-'))}@helm-tracker");
+            Line("DTSTAMP:" + stamp);
+            Time(timed, DateOnly.FromDateTime(TimeZoneInfo.ConvertTime(due, zone).DateTime));
+            Line("SUMMARY:" + Escape(person.Balance > 0 ? $"{person.Name} pays back {amount}" : $"Pay {person.Name} {amount}"));
+            Line("DESCRIPTION:" + Escape("Debts (Wallet)"));
+            Line("CATEGORIES:" + Escape("Debts"));
+            Alarm(timed);
+            Line("END:VEVENT");
         }
         Line("END:VCALENDAR");
         return ics.ToString();

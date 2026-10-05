@@ -23,20 +23,18 @@
         <TextBlock Text="Workspaces" Style="{DynamicResource HelmSectionHeader}" />
         <ui:CardControl Margin="0,0,0,4" Icon="{ui:SymbolIcon Add24}">
             <ui:CardControl.Header>
-                <core:CardHeader Title="New workspace" Description="{Binding NewWorkspaceHint}" />
+                <core:CardHeader Title="New workspace" Description="Another to-do list. Debts are kept in Wallet." />
             </ui:CardControl.Header>
             <StackPanel Width="440" Orientation="Horizontal" HorizontalAlignment="Right">
                 <ui:TextBox Width="180" Margin="0,0,8,0" PlaceholderText="Name" AutomationProperties.Name="New workspace name"
                             Text="{Binding NewWorkspaceName, UpdateSourceTrigger=PropertyChanged}" />
-                <ComboBox Width="140" Margin="0,0,8,0" AutomationProperties.Name="New workspace kind" ItemsSource="{Binding KindNames}"
-                          SelectedIndex="{Binding NewWorkspaceKindIndex}" IsEnabled="{Binding CanAddDebtBook}" />
                 <ui:Button Content="Create" Icon="{ui:SymbolIcon Add24}" Command="{Binding CreateWorkspaceCommand}" />
             </StackPanel>
         </ui:CardControl>
         <ui:CardExpander Margin="0,0,0,4" Icon="{ui:SymbolIcon Edit24}" IsEnabled="{Binding HasWorkspaces}">
             <ui:CardExpander.Header>
                 <core:RowLayout>
-                    <core:CardHeader Title="Edit a workspace" Description="Rename it, set its currency, or delete it." />
+                    <core:CardHeader Title="Edit a workspace" Description="Rename it or delete it." />
                     <ComboBox Width="220" Margin="0,0,16,0" AutomationProperties.Name="Workspace to edit" ItemsSource="{Binding Workspaces}"
                               DisplayMemberPath="Name" SelectedItem="{Binding SelectedWorkspace}" />
                 </core:RowLayout>
@@ -46,12 +44,6 @@
                     <core:RowLayout>
                         <core:CardHeader Title="Workspace name" />
                         <ui:TextBox Width="240" AutomationProperties.Name="Workspace name" Text="{Binding WorkspaceName, UpdateSourceTrigger=LostFocus}" />
-                    </core:RowLayout>
-                </Border>
-                <Border Style="{DynamicResource HelmExpanderRow}" Visibility="{Binding IsDebtWorkspace, Converter={StaticResource BoolToVisibility}}">
-                    <core:RowLayout>
-                        <core:CardHeader Title="Currency" Description="Shown after every amount in this debt book, e.g. ₫ or USD." />
-                        <ui:TextBox Width="120" AutomationProperties.Name="Currency" Text="{Binding WorkspaceCurrency, UpdateSourceTrigger=LostFocus}" />
                     </core:RowLayout>
                 </Border>
                 <Border Style="{DynamicResource HelmExpanderRow}">

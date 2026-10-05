@@ -169,10 +169,10 @@ public sealed partial class TrackerViewModel
 
     internal void OpenCalendarEntry(CalendarEntry entry)
     {
-        if (entry.PersonKey is { } key && entry.WorkspaceId is { } book)
+        if (entry.PersonKey is { } key)
         {
-            IsCalendar = false;
-            ShowPerson(book, key);
+            // A debt due: it is in Wallet's debt book.
+            ShowPerson(key);
         }
         else if (entry.ItemId is { } id && entry.WorkspaceId is { } ws)
         {
@@ -208,7 +208,7 @@ public sealed partial class TrackerViewModel
         var from = days[0];
         var to = days[^1];
         if (CalendarSelectedDay is { } picked && (picked < from || picked > to)) CalendarSelectedDay = null;
-        var entries = TrackerCalendar.Entries(_store, from, to, workspace, TimeZoneInfo.Local);
+        var entries = TrackerCalendar.Entries(_store, from, to, workspace, TimeZoneInfo.Local, _debts);
         var today = TodayLocal;
         var perCell = IsWeekView ? WeekCellEntries : MonthCellEntries;
 
@@ -256,5 +256,5 @@ public sealed partial class TrackerViewModel
     }
 
     /// <summary>The open tasks and debts with a due date as an iCalendar file (Google Calendar, Outlook, phones).</summary>
-    public string CalendarIcs() => TrackerIcs.Build(_store, TimeZoneInfo.Local);
+    public string CalendarIcs() => TrackerIcs.Build(_store, TimeZoneInfo.Local, _debts);
 }

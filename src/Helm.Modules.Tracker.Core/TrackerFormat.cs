@@ -16,47 +16,6 @@ public static class TrackerFormat
         return s.Hours == 0 ? $"{(int)s.TotalDays}d" : $"{(int)s.TotalDays}d {s.Hours}h";
     }
 
-    /// <summary>"1,500,000 ₫" (no decimals unless there are any).</summary>
-    public static string Money(decimal amount, string currency, CultureInfo? culture = null)
-    {
-        var text = amount.ToString("#,0.##", culture ?? CultureInfo.CurrentCulture);
-        return string.IsNullOrWhiteSpace(currency) ? text : $"{text} {currency.Trim()}";
-    }
-
-    /// <summary>
-    /// Reads an amount as people type it: "1500000", "1,500,000", "1.500.000", "1.5k", "500k", "2m", "2tr".
-    /// A single '.' or ',' followed by 1–2 digits is a decimal point; otherwise separators group thousands.
-    /// </summary>
-    public static bool TryParseAmount(string? text, out decimal amount)
-    {
-        amount = 0;
-        if (string.IsNullOrWhiteSpace(text)) return false;
-        var s = text.Trim().ToLowerInvariant().Replace(" ", "").Replace(" ", "");
-
-        decimal multiplier = 1;
-        if (s.EndsWith("tr", StringComparison.Ordinal)) { multiplier = 1_000_000; s = s[..^2]; }
-        else if (s.EndsWith('m')) { multiplier = 1_000_000; s = s[..^1]; }
-        else if (s.EndsWith('k')) { multiplier = 1_000; s = s[..^1]; }
-        if (s.Length == 0) return false;
-
-        var separators = s.Count(c => c is '.' or ',');
-        var last = s.LastIndexOfAny(['.', ',']);
-        string normalized;
-        if (separators == 0)
-            normalized = s;
-        else if (separators == 1 && (s.Length - last - 1 is 1 or 2 || multiplier != 1))
-            normalized = s.Remove(last, 1).Insert(last, "."); // decimal point ("1.5k", "12,50")
-        else if (last >= 0 && s.Length - last - 1 is 1 or 2 && s.Count(c => c == s[last]) == 1)
-            normalized = new string(s[..last].Where(char.IsDigit).ToArray()) + "." + s[(last + 1)..]; // "1,234.56"
-        else
-            normalized = new string(s.Where(char.IsDigit).ToArray()); // thousands groups only
-
-        if (!normalized.All(c => char.IsDigit(c) || c == '.') || normalized.Count(c => c == '.') > 1) return false;
-        if (!decimal.TryParse(normalized, NumberStyles.AllowDecimalPoint, CultureInfo.InvariantCulture, out var value)) return false;
-        amount = decimal.Round(value * multiplier, 2);
-        return true;
-    }
-
     public static string Priority(TrackerPriority priority) => priority switch
     {
         TrackerPriority.Urgent => "Urgent",
@@ -72,10 +31,6 @@ public static class TrackerFormat
         WorkspaceKind.Debts => "Debt book",
         _ => kind.ToString(),
     };
-
-    /// <summary>"+1,500,000 ₫" (owed to the user), "−200,000 ₫" (the user owes), "0 ₫".</summary>
-    public static string Balance(decimal balance, string currency) =>
-        (balance > 0 ? "+" : balance < 0 ? "−" : "") + Money(Math.Abs(balance), currency);
 
     /// <summary>"14:30" (culture short time) or "" for none.</summary>
     public static string Time(TimeSpan? time) =>
@@ -101,57 +56,6 @@ public static class TrackerFormat
         time = new TimeSpan(hours, minutes, 0);
         return true;
     }
-
-    public static string DebtKind(DebtEntryKind kind) => kind switch
-    {
-        DebtEntryKind.OwesMe => "Owes me",
-        DebtEntryKind.IOwe => "I owe",
-        DebtEntryKind.Repayment => "Repayment",
-        _ => kind.ToString(),
-    };
-
-    /// <summary>
-    /// Thousands separators while an amount is typed ("1500000" becomes "1,500,000" or "1.500.000" by culture), keeping
-    /// the caret after the same digit. Left as typed: text with anything but digits and separators in it ("150k", "2tr"),
-    /// and a '.' or ',' the person typed themselves (on the way to "1.5k"), which is any separator added by this edit or
-    /// kept from text that was not grouped before it. <paramref name="previous"/> is the text before this edit.
-    /// </summary>
-    public static (string Text, int Caret) GroupDigits(string text, int caret, string previous, CultureInfo? culture = null)
-    {
-        culture ??= CultureInfo.CurrentCulture;
-        if (text.Length == 0 || !text.All(c => char.IsDigit(c) || IsSeparator(c))) return (text, caret);
-        var separators = text.Count(IsSeparator);
-        if (separators > 0 && (separators > previous.Count(IsSeparator) || Grouped(previous, culture) != previous)) return (text, caret);
-
-        var raw = new string(text.Where(char.IsDigit).ToArray());
-        if (raw.Length == 0) return ("", 0);
-        var digits = raw.TrimStart('0');
-        if (digits.Length == 0) digits = "0";
-        // Leading zeros are dropped; they came before the caret.
-        var digitsBefore = Math.Max(0, text.Take(Math.Clamp(caret, 0, text.Length)).Count(char.IsDigit) - (raw.Length - digits.Length));
-        var grouped = decimal.Parse(digits, CultureInfo.InvariantCulture).ToString("#,0", culture);
-        var newCaret = 0;
-        for (var seen = 0; newCaret < grouped.Length && seen < digitsBefore; newCaret++)
-            if (char.IsDigit(grouped[newCaret])) seen++;
-        return (grouped, newCaret);
-    }
-
-    private static bool IsSeparator(char c) => c is '.' or ',' or ' ' or '\u00a0' or '\u202f';
-
-    /// <summary>The text as <see cref="GroupDigits"/> would show it ("" stays ""); anything else comes back unchanged.</summary>
-    private static string Grouped(string text, CultureInfo culture)
-    {
-        if (text.Length == 0 || !text.All(c => char.IsDigit(c) || IsSeparator(c)) || !text.Any(char.IsDigit)) return text;
-        var digits = new string(text.Where(char.IsDigit).ToArray()).TrimStart('0');
-        return decimal.Parse(digits.Length == 0 ? "0" : digits, CultureInfo.InvariantCulture).ToString("#,0", culture);
-    }
-
-    public static string Direction(DebtDirection direction) => direction switch
-    {
-        DebtDirection.TheyOweMe => "Owes me",
-        DebtDirection.IOwe => "I owe",
-        _ => direction.ToString(),
-    };
 
     /// <summary>Local date and time in the current culture's short pattern.</summary>
     public static string When(DateTimeOffset at, TimeZoneInfo? zone = null) =>

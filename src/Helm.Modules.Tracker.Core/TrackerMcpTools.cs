@@ -6,8 +6,8 @@ using Helm.Core.Text;
 namespace Helm.Modules.Tracker;
 
 /// <summary>
-/// Tracker for Claude over MCP: the to-do lists (read, add, edit, tick, reopen) and the debt book (read, add an entry).
-/// Nothing is ever deleted through here. Dates are the user's local ones: "2026-10-01" or "2026-10-01T09:30".
+/// Tracker for Claude over MCP: the to-do lists (read, add, edit, tick, reopen); the debt book is Wallet's
+/// (<c>wallet_debts</c>). Nothing is ever deleted through here. Dates are the user's local ones: "2026-10-01" or "2026-10-01T09:30".
 /// </summary>
 public sealed class TrackerMcpTools(TrackerStore store) : IMcpToolProvider
 {
@@ -19,7 +19,7 @@ public sealed class TrackerMcpTools(TrackerStore store) : IMcpToolProvider
 
     public IEnumerable<McpTool> Tools =>
     [
-        new("tracker_lists", "The user's Tracker workspaces: to-do lists (kind tasks) and the debt book (kind debts), with how many items are open.",
+        new("tracker_lists", "The user's Tracker to-do lists, with how many tasks are open. Debts are in Wallet (wallet_debts).",
             McpTool.NoArguments(), (_, _) => Task.FromResult<object?>(Lists())) { ReadOnly = true },
         new("tracker_tasks", "Tasks from the to-do lists, with their subtasks. By default the open ones of every list.",
             McpArgs.Schema(
@@ -53,26 +53,14 @@ public sealed class TrackerMcpTools(TrackerStore store) : IMcpToolProvider
         new("tracker_reopen_task", "Open a done task again.",
             McpArgs.Schema(("id", McpArgs.Text("The task's id."), true)),
             (args, _) => Task.FromResult<object?>(SetDone(McpArgs.RequiredString(args, "id"), done: false))),
-        new("tracker_debts", "The debt book: each person's balance (positive: they owe the user; negative: the user owes them), due date and entries.",
-            McpArgs.Schema(("include_settled", McpArgs.Flag("Also people whose balance is back to 0."), false)),
-            (args, _) => Task.FromResult<object?>(Debts(McpArgs.Bool(args, "include_settled") == true))) { ReadOnly = true },
-        new("tracker_add_debt", "Add an entry to the debt book: someone owes the user, the user owes someone, or a repayment (brings the balance back toward 0).",
-            McpArgs.Schema(
-                ("person", McpArgs.Text("The person's name (the same name adds to their balance)."), true),
-                ("amount", McpArgs.Text("The amount, e.g. 150000, 150,000 or 150k."), true),
-                ("kind", McpArgs.OneOf("Which way the money goes.", "owes_me", "i_owe", "repayment"), true),
-                ("note", McpArgs.Text("What it was for."), false),
-                ("due", McpArgs.Text("When it should be paid back: 2026-10-01 or 2026-10-01T18:00."), false)),
-            (args, _) => Task.FromResult<object?>(AddDebt(args))),
     ];
 
     private object Lists() => store.Workspaces().Select(w => new
     {
         id = w.Id,
         name = w.Value.Name,
-        kind = w.Value.Kind == WorkspaceKind.Tasks ? "tasks" : "debts",
+        kind = "tasks",
         open = store.OpenItems(w.Id).Count(i => !i.Value.IsSubtask),
-        currency = w.Value.Kind == WorkspaceKind.Debts ? w.Value.Currency : null,
     }).ToList();
 
     private object Tasks(JsonElement args)
@@ -155,57 +143,6 @@ public sealed class TrackerMcpTools(TrackerStore store) : IMcpToolProvider
         return Describe(id, store.GetItem(id)!, store.GetWorkspace(item.WorkspaceId)?.Name ?? "");
     }
 
-    private object Debts(bool includeSettled)
-    {
-        var book = store.Workspaces().FirstOrDefault(w => w.Value.Kind == WorkspaceKind.Debts);
-        if (book is null) return Array.Empty<object>();
-        var zone = TimeZoneInfo.Local;
-        var items = store.Items(book.Id);
-        var people = DebtLedger.Open(items).Where(p => includeSettled || !p.IsSettled);
-        if (includeSettled) people = people.Concat(DebtLedger.Settled(items));
-        return people.Select(p => new
-        {
-            person = p.Name,
-            balance = p.Balance,
-            currency = book.Value.Currency,
-            meaning = p.Balance > 0 ? "owes the user" : p.Balance < 0 ? "the user owes them" : "settled",
-            settled = p.SettledAt,
-            due = p.Due(zone),
-            entries = p.Entries.Select(e => new
-            {
-                when = e.Item.CreatedAt,
-                kind = e.Kind switch { DebtEntryKind.OwesMe => "owes_me", DebtEntryKind.IOwe => "i_owe", _ => "repayment" },
-                amount = e.Item.Amount,
-                note = e.Item.Title.Length > 0 ? e.Item.Title : null,
-                balance_after = e.BalanceAfter,
-            }).ToList(),
-        }).ToList();
-    }
-
-    private object AddDebt(JsonElement args)
-    {
-        var person = McpArgs.RequiredString(args, "person").Trim();
-        var amountText = args.TryGetProperty("amount", out var raw) && raw.ValueKind == JsonValueKind.Number ? raw.GetDecimal().ToString(CultureInfo.InvariantCulture) : McpArgs.RequiredString(args, "amount");
-        if (!TrackerFormat.TryParseAmount(amountText, out var amount) || amount <= 0) throw new McpToolException($"{amountText} is not an amount. Try 150000, 150,000 or 150k.");
-        var kind = McpArgs.RequiredString(args, "kind") switch
-        {
-            "owes_me" => DebtEntryKind.OwesMe,
-            "i_owe" => DebtEntryKind.IOwe,
-            "repayment" => DebtEntryKind.Repayment,
-            var other => throw new McpToolException($"kind is owes_me, i_owe or repayment, not {other}."),
-        };
-        var book = store.Workspaces().FirstOrDefault(w => w.Value.Kind == WorkspaceKind.Debts) ?? throw new McpToolException("There is no debt book yet; the user can create one in Helm.");
-        DateTimeOffset? dueAt = null;
-        if (McpArgs.String(args, "due") is { } due)
-        {
-            var (day, at) = ParseDue(due);
-            dueAt = at ?? TrackerDue.FromLocal(day!.Value.ToDateTime(TimeOnly.MinValue), null, TimeZoneInfo.Local);
-        }
-        var id = store.AddDebt(book.Id, person, amount, kind, McpArgs.String(args, "note") ?? "", dueAt);
-        var balance = store.DebtBalance(book.Id, person);
-        return new { id, person = DebtLedger.Clean(person), balance, currency = book.Value.Currency };
-    }
-
     // ---- helpers ------------------------------------------------------------------------------------------------
 
     private List<Helm.Core.Sync.SyncedItem<TrackerWorkspace>> TaskLists(string? list)
@@ -219,7 +156,7 @@ public sealed class TrackerMcpTools(TrackerStore store) : IMcpToolProvider
     private TrackerItem RequireTask(string id)
     {
         var item = store.GetItem(id) ?? throw new McpToolException($"There is no task {id}.");
-        if (store.GetWorkspace(item.WorkspaceId)?.Kind != WorkspaceKind.Tasks) throw new McpToolException($"{id} is a debt entry, not a task.");
+        if (store.GetWorkspace(item.WorkspaceId)?.Kind != WorkspaceKind.Tasks) throw new McpToolException($"There is no task {id}.");
         return item;
     }
 

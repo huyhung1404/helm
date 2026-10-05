@@ -60,6 +60,15 @@
             <Setter Property="HorizontalContentAlignment" Value="Center" />
             <Setter Property="VerticalContentAlignment" Value="Center" />
         </Style>
+        <Style Selector="TextBlock.owed">
+            <Setter Property="Foreground" Value="{DynamicResource HelmSuccess}" />
+        </Style>
+        <Style Selector="TextBlock.iowe">
+            <Setter Property="Foreground" Value="{DynamicResource HelmDanger}" />
+        </Style>
+        <Style Selector="TextBlock.secondary.overdue">
+            <Setter Property="Foreground" Value="{DynamicResource HelmDanger}" />
+        </Style>
         <Style Selector="ProgressBar.share">
             <!-- Fluent's 200 px minimum is wider than the legend's middle column: the bar spilled over the badge. -->
             <Setter Property="MinWidth" Value="0" />
@@ -108,6 +117,70 @@
                     <TextBlock Text="{Binding ShareText}" Classes="secondary" FontSize="12" HorizontalAlignment="Right" />
                 </StackPanel>
             </Grid>
+        </DataTemplate>
+
+        <!-- A person in the debt book: tap for their history and when it is due; tap again to close. -->
+        <DataTemplate DataType="vm:DebtPersonViewModel">
+            <Border BorderThickness="0,1,0,0" BorderBrush="{DynamicResource HelmCardStroke}" Padding="0,4">
+                <StackPanel>
+                    <Button Classes="flat" HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch" Padding="4,6"
+                            Command="{Binding ToggleExpandedCommand}" AutomationProperties.Name="{Binding Name}">
+                        <Grid ColumnDefinitions="Auto,*,Auto">
+                            <ic:SymbolIcon Symbol="Person" FontSize="20" Margin="0,0,10,0" VerticalAlignment="Center" />
+                            <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                <TextBlock Text="{Binding Name}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+                                <TextBlock Text="{Binding Details}" Classes="secondary" Classes.overdue="{Binding IsOverdue}" FontSize="12" TextWrapping="Wrap" />
+                            </StackPanel>
+                            <TextBlock Grid.Column="2" Text="{Binding BalanceText}" FontWeight="SemiBold" VerticalAlignment="Center" Margin="8,0,4,0"
+                                       Classes.owed="{Binding OwedToMe}" Classes.iowe="{Binding IOwe}" />
+                        </Grid>
+                    </Button>
+                    <StackPanel Spacing="6" Margin="4,4,4,8" IsVisible="{Binding IsExpanded}">
+                        <!-- When it is due -->
+                        <StackPanel Spacing="6" IsVisible="{Binding !IsSettled}">
+                            <TextBlock Text="Due" FontWeight="SemiBold" />
+                            <Grid ColumnDefinitions="*,6,*,6,*">
+                                <Button Classes="wide" Content="+1 day" Command="{Binding ExtendCommand}" CommandParameter="1" />
+                                <Button Grid.Column="2" Classes="wide" Content="+1 week" Command="{Binding ExtendCommand}" CommandParameter="7" />
+                                <Button Grid.Column="4" Classes="wide" Content="+1 month" Command="{Binding ExtendCommand}" CommandParameter="30" />
+                            </Grid>
+                            <core:DateTimeBox Date="{Binding EditDueDate}" Time="{Binding EditDueTime}" Lean="Future" AllowEmpty="True" PlaceholderText="Due date" />
+                            <WrapPanel>
+                                <Button Classes="accent" Content="Set" Command="{Binding SetDueCommand}" Margin="0,0,8,0" />
+                                <Button Content="No due date" Command="{Binding ClearDueCommand}" />
+                            </WrapPanel>
+                        </StackPanel>
+                        <!-- Notes about this person (bank details, what was agreed…) -->
+                        <TextBlock Text="Notes" FontWeight="SemiBold" Margin="0,6,0,0" IsVisible="{Binding Links, Converter={x:Static ObjectConverters.IsNotNull}}" />
+                        <core:LinksPanel DataContext="{Binding Links}" ShowActions="True" />
+                        <!-- Every change of the amount, newest first -->
+                        <TextBlock Text="History" FontWeight="SemiBold" Margin="0,6,0,0" />
+                        <ItemsControl ItemsSource="{Binding Entries}">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate DataType="vm:DebtEntryRow">
+                                    <Grid ColumnDefinitions="*,Auto,Auto" Margin="0,3">
+                                        <StackPanel VerticalAlignment="Center">
+                                            <StackPanel Orientation="Horizontal" Spacing="6">
+                                                <TextBlock Text="{Binding KindText}" />
+                                                <ic:SymbolIcon Symbol="BuildingBank" FontSize="14" IsVisible="{Binding FromTransaction}" VerticalAlignment="Center" />
+                                            </StackPanel>
+                                            <TextBlock Text="{Binding When}" Classes="secondary" FontSize="12" />
+                                            <TextBlock Text="{Binding Note}" Classes="secondary" FontSize="12" IsVisible="{Binding HasNote}" TextWrapping="Wrap" />
+                                        </StackPanel>
+                                        <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="8,0,0,0">
+                                            <TextBlock Text="{Binding AmountText}" FontWeight="SemiBold" HorizontalAlignment="Right" Classes.owed="{Binding IsIncrease}" Classes.iowe="{Binding !IsIncrease}" />
+                                            <TextBlock Text="{Binding BalanceText}" Classes="secondary" FontSize="12" HorizontalAlignment="Right" />
+                                        </StackPanel>
+                                        <Button Grid.Column="2" Classes="icon flat danger" Command="{Binding DeleteCommand}" AutomationProperties.Name="Delete entry">
+                                            <ic:SymbolIcon Symbol="Delete" FontSize="16" />
+                                        </Button>
+                                    </Grid>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </StackPanel>
+                </StackPanel>
+            </Border>
         </DataTemplate>
 
         <!-- A transaction: one tap on a suggested category files it; tap the row for the rest -->
@@ -178,6 +251,9 @@
                             <Button Classes="icon flat" Command="{Binding UncategorizeCommand}" IsVisible="{Binding IsCategorized}" AutomationProperties.Name="Back to the ones to categorize">
                                 <ic:SymbolIcon Symbol="ArrowUndo" FontSize="18" />
                             </Button>
+                            <Button Classes="icon flat" Command="{Binding OpenDebtFormCommand}" IsVisible="{Binding CanBeDebt}" AutomationProperties.Name="Lent, borrowed or paid back">
+                                <ic:SymbolIcon Symbol="PersonMoney" FontSize="18" />
+                            </Button>
                             <Button Classes="icon flat" Command="{Binding BeginEditCommand}" AutomationProperties.Name="Edit">
                                 <ic:SymbolIcon Symbol="Edit" FontSize="18" />
                             </Button>
@@ -185,6 +261,28 @@
                                 <ic:SymbolIcon Symbol="Delete" FontSize="18" />
                             </Button>
                         </StackPanel>
+                        <!-- In the debt book: who it is with, one tap away -->
+                        <Grid ColumnDefinitions="Auto,*,Auto" IsVisible="{Binding IsDebt}">
+                            <ic:SymbolIcon Symbol="People" FontSize="16" Margin="0,0,6,0" VerticalAlignment="Center" />
+                            <TextBlock Grid.Column="1" Text="{Binding DebtText}" VerticalAlignment="Center" TextWrapping="Wrap" />
+                            <Button Grid.Column="2" Content="Open in Debts" Command="{Binding OpenDebtCommand}" />
+                        </Grid>
+                        <!-- This money in the debt book -->
+                        <Border Classes="infobar" IsVisible="{Binding IsDebtFormOpen}">
+                            <StackPanel Spacing="8">
+                                <TextBlock Text="Put it in the debt book" Classes="title" />
+                                <TextBlock Text="It then counts neither as spending nor as income." Classes="secondary" FontSize="12" TextWrapping="Wrap" />
+                                <AutoCompleteBox PlaceholderText="Person" Text="{Binding DebtPerson}" ItemsSource="{Binding DebtNames}" FilterMode="ContainsOrdinal"
+                                                 MinimumPrefixLength="1" AutomationProperties.Name="Person" />
+                                <ComboBox HorizontalAlignment="Stretch" ItemsSource="{x:Static vm:TransactionRow.DebtKindNames}" SelectedIndex="{Binding DebtKindIndex}"
+                                          AutomationProperties.Name="Kind" />
+                                <TextBox PlaceholderText="Note (optional)" Text="{Binding DebtNote}" AutomationProperties.Name="Debt note" />
+                                <Grid ColumnDefinitions="*,8,*">
+                                    <Button Classes="accent wide" Content="Save" Command="{Binding SaveDebtCommand}" />
+                                    <Button Grid.Column="2" Classes="wide" Content="Cancel" Command="{Binding CancelDebtFormCommand}" />
+                                </Grid>
+                            </StackPanel>
+                        </Border>
 
                         <!-- Editor -->
                         <StackPanel Spacing="8" IsVisible="{Binding IsEditing}">
@@ -220,6 +318,22 @@
     </UserControl.DataTemplates>
 
     <StackPanel>
+        <!-- Money (the month) or Debts (who owes whom) -->
+        <Grid ColumnDefinitions="*,8,*" Margin="0,0,0,8" IsVisible="{Binding HasDebts}">
+            <Button Classes="wide" Classes.accent="{Binding IsMoneyView}" Command="{Binding ShowMoneyCommand}" AutomationProperties.Name="Show the money">
+                <StackPanel Orientation="Horizontal" Spacing="6">
+                    <ic:SymbolIcon Symbol="Wallet" FontSize="16" />
+                    <TextBlock Text="Money" />
+                </StackPanel>
+            </Button>
+            <Button Grid.Column="2" Classes="wide" Classes.accent="{Binding IsDebtsView}" Command="{Binding ShowDebtsCommand}" AutomationProperties.Name="Show the debts">
+                <StackPanel Orientation="Horizontal" Spacing="6">
+                    <ic:SymbolIcon Symbol="People" FontSize="16" />
+                    <TextBlock Text="Debts" />
+                </StackPanel>
+            </Button>
+        </Grid>
+
         <!-- Shown while the tool is turned off -->
         <Border x:Name="OffBar" Classes="infobar" IsVisible="False">
             <StackPanel>
@@ -229,7 +343,7 @@
         </Border>
 
         <!-- The month, first and easy to see -->
-        <Border Classes="card">
+        <Border Classes="card" IsVisible="{Binding IsMoneyView}">
             <Grid ColumnDefinitions="Auto,Auto,*,Auto">
                 <Button Classes="icon flat" Command="{Binding PreviousMonthCommand}" AutomationProperties.Name="Previous month">
                     <ic:SymbolIcon Symbol="ChevronLeft" FontSize="18" />
@@ -257,6 +371,88 @@
                     </Button>
                 </Grid>
             </Border>
+
+
+            <!-- The debt book: who owes whom -->
+            <!-- The inner panel's DataContext binding is read as the page's (WalletViewModel); what is inside it, as the debt book's. -->
+            <Panel IsVisible="{Binding IsDebtsView}">
+                <Panel DataContext="{Binding Debts}">
+                <StackPanel x:DataType="vm:DebtsViewModel">
+                    <Border Classes="infobar" IsVisible="{Binding HasMessage}">
+                        <Grid ColumnDefinitions="*,Auto">
+                            <TextBlock Text="{Binding Message}" TextWrapping="Wrap" VerticalAlignment="Center" />
+                            <Button Grid.Column="1" Classes="icon flat" Command="{Binding DismissMessageCommand}" AutomationProperties.Name="Dismiss">
+                                <ic:SymbolIcon Symbol="Dismiss" FontSize="16" />
+                            </Button>
+                        </Grid>
+                    </Border>
+
+                    <Grid ColumnDefinitions="*,4,*,4,*">
+                        <Border Classes="card" Padding="12,10">
+                            <StackPanel>
+                                <Viewbox StretchDirection="DownOnly" HorizontalAlignment="Left"><TextBlock Text="{Binding OwedToMeText}" Classes="figureSmall owed" FontSize="15" /></Viewbox>
+                                <TextBlock Text="Owed to me" Classes="secondary" FontSize="12" />
+                            </StackPanel>
+                        </Border>
+                        <Border Grid.Column="2" Classes="card" Padding="12,10">
+                            <StackPanel>
+                                <Viewbox StretchDirection="DownOnly" HorizontalAlignment="Left"><TextBlock Text="{Binding IOweText}" Classes="figureSmall iowe" FontSize="15" /></Viewbox>
+                                <TextBlock Text="I owe" Classes="secondary" FontSize="12" />
+                            </StackPanel>
+                        </Border>
+                        <Border Grid.Column="4" Classes="card" Padding="12,10">
+                            <StackPanel>
+                                <Viewbox StretchDirection="DownOnly" HorizontalAlignment="Left"><TextBlock Text="{Binding NetText}" Classes="figureSmall" FontSize="15" /></Viewbox>
+                                <TextBlock Text="Net" Classes="secondary" FontSize="12" />
+                            </StackPanel>
+                        </Border>
+                    </Grid>
+
+                    <!-- Add -->
+                    <TextBlock Text="Add a debt" Classes="section" />
+                    <Border Classes="card">
+                        <StackPanel Spacing="8">
+                            <!-- A name already in the book adds to that person -->
+                            <AutoCompleteBox PlaceholderText="Person" Text="{Binding NewPerson}" ItemsSource="{Binding PersonNames}" FilterMode="ContainsOrdinal"
+                                             MinimumPrefixLength="1" AutomationProperties.Name="Person" />
+                            <Grid ColumnDefinitions="*,8,Auto">
+                                <TextBox Classes="amount" PlaceholderText="Amount: 150k, 1.5tr" Text="{Binding NewAmount}" AutomationProperties.Name="Amount" />
+                                <ComboBox Grid.Column="2" MinWidth="130" ItemsSource="{x:Static vm:DebtsViewModel.KindNames}" SelectedIndex="{Binding NewKindIndex}"
+                                          AutomationProperties.Name="Kind" />
+                            </Grid>
+                            <TextBox PlaceholderText="What it was for (optional)" Text="{Binding NewNote}" AutomationProperties.Name="Note" />
+                            <core:DateTimeBox Date="{Binding NewDueDate}" Time="{Binding NewDueTime}" Lean="Future" AllowEmpty="True" PlaceholderText="Due date (optional)" />
+                            <Button Classes="accent wide" Content="Add" Command="{Binding AddCommand}" />
+                            <TextBlock Classes="secondary" FontSize="12" TextWrapping="Wrap"
+                                       Text="Lent or borrowed by bank transfer? Open that transaction in Money and tap the person icon: it then counts neither as spending nor as income." />
+                        </StackPanel>
+                    </Border>
+
+                    <!-- Outstanding -->
+                    <Grid ColumnDefinitions="*,Auto" Margin="4,20,4,8">
+                        <TextBlock Text="Outstanding" FontWeight="SemiBold" VerticalAlignment="Center" />
+                        <TextBlock Grid.Column="1" Text="{Binding OpenSummary}" Classes="secondary" VerticalAlignment="Center" />
+                    </Grid>
+                    <Border Classes="card" Padding="12,0">
+                        <StackPanel>
+                            <TextBlock Margin="0,12" Text="Nothing outstanding. Everyone is square." Classes="secondary" IsVisible="{Binding HasNoPeople}" />
+                            <ItemsControl ItemsSource="{Binding People}" Margin="0,-1,0,0" />
+                        </StackPanel>
+                    </Border>
+
+                    <!-- Settled -->
+                    <Grid ColumnDefinitions="*,Auto" Margin="4,20,4,8" IsVisible="{Binding HasSettled}">
+                        <TextBlock Text="Settled" FontWeight="SemiBold" VerticalAlignment="Center" />
+                        <Button Grid.Column="1" Content="Show or hide" Command="{Binding ToggleSettledCommand}" />
+                    </Grid>
+                    <Border Classes="card" Padding="12,0" IsVisible="{Binding ShowSettled}">
+                        <ItemsControl ItemsSource="{Binding SettledPeople}" Margin="0,-1,0,0" />
+                    </Border>
+                </StackPanel>
+                </Panel>
+            </Panel>
+
+            <StackPanel IsVisible="{Binding IsMoneyView}">
 
             <!-- Helm cannot read the banks' notifications yet -->
             <Border Classes="infobar warning" IsVisible="{Binding NeedsAccess}">
@@ -417,6 +613,7 @@
             </Grid>
             <TextBlock Text="{Binding EmptyText}" Classes="secondary" Margin="4,12,4,8" TextWrapping="Wrap" IsVisible="{Binding !HasDays}" />
             <ItemsControl ItemsSource="{Binding Days}" />
+            </StackPanel>
         </StackPanel>
     </StackPanel>
 </UserControl>

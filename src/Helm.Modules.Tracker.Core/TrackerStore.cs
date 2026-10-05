@@ -41,36 +41,34 @@ public sealed class TrackerStore
 
     // ---- Workspaces ----------------------------------------------------------------------------------------------
 
-    /// <summary>Workspaces in display order.</summary>
+    /// <summary>
+    /// The to-do lists in display order. The old debt book (<see cref="WorkspaceKind.Debts"/>) is left out: its entries
+    /// are in Wallet's debt book now.
+    /// </summary>
     public IReadOnlyList<SyncedItem<TrackerWorkspace>> Workspaces() =>
-        _workspaces.All().OrderBy(w => w.Value.Order).ThenBy(w => w.Value.CreatedAt).ThenBy(w => w.Id, StringComparer.Ordinal).ToList();
+        _workspaces.All().Where(w => w.Value.Kind == WorkspaceKind.Tasks)
+            .OrderBy(w => w.Value.Order).ThenBy(w => w.Value.CreatedAt).ThenBy(w => w.Id, StringComparer.Ordinal).ToList();
 
     public TrackerWorkspace? GetWorkspace(string id) => _workspaces.Get(id);
 
-    /// <summary>True when the (single) debt book exists.</summary>
-    public bool HasDebtBook => _workspaces.All().Any(w => w.Value.Kind == WorkspaceKind.Debts);
+    /// <summary>What adding to the old debt book says: debts moved to Wallet.</summary>
+    public const string DebtsMoved = "Debts are kept in Wallet now: open Wallet, then Debts.";
 
-    /// <summary>Currency of a new debt book unless the caller gives one.</summary>
-    public const string DefaultCurrency = "₫";
-
-    /// <exception cref="InvalidOperationException">
-    /// A debt book already exists: there is one debt book, with everyone in it (people are a field of each debt).
-    /// </exception>
-    public string AddWorkspace(string name, WorkspaceKind kind, string? currency = null)
+    /// <summary>Adds a to-do list.</summary>
+    /// <exception cref="InvalidOperationException">A debt book was asked for: debts are kept in Wallet now.</exception>
+    public string AddWorkspace(string name, WorkspaceKind kind = WorkspaceKind.Tasks)
     {
         name = name.Trim();
         if (name.Length == 0) throw new ArgumentException("A workspace needs a name.", nameof(name));
+        if (kind != WorkspaceKind.Tasks) throw new InvalidOperationException(DebtsMoved);
         lock (_gate)
         {
             var existing = _workspaces.All();
-            if (kind == WorkspaceKind.Debts && existing.FirstOrDefault(w => w.Value.Kind == WorkspaceKind.Debts) is { } book)
-                throw new InvalidOperationException($"You already have a debt book, \u201c{book.Value.Name}\u201d. Add everyone to it: each debt has its own person.");
             var order = existing.Count == 0 ? 0 : existing.Max(w => w.Value.Order) + 1;
             return _workspaces.Add(new TrackerWorkspace
             {
                 Name = name,
                 Kind = kind,
-                Currency = (currency ?? (kind == WorkspaceKind.Debts ? DefaultCurrency : "")).Trim(),
                 Order = order,
                 CreatedAt = Now,
             });
@@ -108,10 +106,10 @@ public sealed class TrackerStore
     public IReadOnlyList<SyncedItem<TrackerItem>> Items(string workspaceId) =>
         _items.All().Where(i => i.Value.WorkspaceId == workspaceId).ToList();
 
-    /// <summary>Every item of every existing workspace (items of deleted workspaces are left out).</summary>
+    /// <summary>Every item of every to-do list (items of deleted workspaces and of the old debt book are left out).</summary>
     public IReadOnlyList<SyncedItem<TrackerItem>> AllItems()
     {
-        var workspaces = _workspaces.All().Select(w => w.Id).ToHashSet(StringComparer.Ordinal);
+        var workspaces = Workspaces().Select(w => w.Id).ToHashSet(StringComparer.Ordinal);
         return _items.All().Where(i => workspaces.Contains(i.Value.WorkspaceId)).ToList();
     }
 
@@ -133,6 +131,7 @@ public sealed class TrackerStore
         lock (_gate)
         {
             var workspace = _workspaces.Get(workspaceId) ?? throw new InvalidOperationException("That workspace no longer exists.");
+            if (workspace.Kind != WorkspaceKind.Tasks) throw new InvalidOperationException(DebtsMoved);
             if (draft.ParentId is { } parentId)
             {
                 if (_items.Get(parentId) is not { } parent || parent.WorkspaceId != workspaceId || parent.IsSubtask)
@@ -140,10 +139,7 @@ public sealed class TrackerStore
                 if (workspace.Kind != WorkspaceKind.Tasks) throw new InvalidOperationException("Only tasks have subtasks.");
             }
             var title = draft.Title.Trim();
-            var person = draft.Person.Trim();
-            if (workspace.Kind == WorkspaceKind.Tasks && title.Length == 0) throw new ArgumentException("A task needs a title.", nameof(draft));
-            if (workspace.Kind == WorkspaceKind.Debts && person.Length == 0 && title.Length == 0)
-                throw new ArgumentException("A debt needs a person or a description.", nameof(draft));
+            if (title.Length == 0) throw new ArgumentException("A task needs a title.", nameof(draft));
 
             var siblings = draft.ParentId is { } p
                 ? Subtasks(p)
@@ -159,12 +155,9 @@ public sealed class TrackerStore
                 DueAt = draft.DueAt,
                 DueDate = draft.DueAt is { } at ? TrackerDue.Day(at, TimeZoneInfo.Local) : draft.DueDate,
                 CreatedAt = Now,
-                Person = person,
-                Amount = Math.Abs(draft.Amount),
-                Direction = draft.Direction,
             };
             string id;
-            if (draft.RepeatDaily && draft.ParentId is null && workspace.Kind == WorkspaceKind.Tasks)
+            if (draft.RepeatDaily && draft.ParentId is null)
             {
                 // A repeating task: today's occurrence of a new series.
                 var today = Today();
@@ -271,7 +264,7 @@ public sealed class TrackerStore
         }
     }
 
-    /// <summary>Edits the fields the user can change (title, notes, priority, due date, debt details).</summary>
+    /// <summary>Edits the fields the user can change (title, notes, priority, due date).</summary>
     public bool UpdateItem(string id, Func<TrackerItem, TrackerItem> change)
     {
         lock (_gate)
@@ -286,7 +279,7 @@ public sealed class TrackerStore
                 CompletedAt = current.CompletedAt,
                 StartedExplicitly = current.StartedExplicitly,
             };
-            updated = updated with { Title = updated.Title.Trim(), Person = updated.Person.Trim(), Notes = updated.Notes.Trim(), Amount = Math.Abs(updated.Amount) };
+            updated = updated with { Title = updated.Title.Trim(), Notes = updated.Notes.Trim() };
             // The day older versions read follows the due time.
             if (updated.DueAt is { } at) updated = updated with { DueDate = TrackerDue.Day(at, TimeZoneInfo.Local) };
             if (updated.Priority != current.Priority && !current.IsCompleted)
@@ -372,93 +365,26 @@ public sealed class TrackerStore
         Log(TrackerEventKind.Completed, id, done);
     }
 
-    // ---- Debt book -----------------------------------------------------------------------------------------------
-
-    /// <summary>What a person owes the user (+) or the user owes them (-), over their open entries.</summary>
-    public decimal DebtBalance(string workspaceId, string person) =>
-        OpenDebts(workspaceId, person).Sum(i => i.Value.SignedAmount);
-
-    private List<SyncedItem<TrackerItem>> OpenDebts(string workspaceId, string person)
-    {
-        var key = DebtLedger.Key(person);
-        return Items(workspaceId).Where(i => !i.Value.IsCompleted && DebtLedger.Key(i.Value.Person) == key).ToList();
-    }
+    // ---- The old debt book ---------------------------------------------------------------------------------------
 
     /// <summary>
-    /// Adds money to a person in the debt book: owes me (+), I owe (-) or a repayment (toward 0). The same person
-    /// (whatever the case and spacing of the name) shares one balance; when it reaches 0 every open entry of that person
-    /// is settled together. Each entry is its own record and history event, so every change of the amount is in the
-    /// history.
+    /// Entries of the old debt book (Helm 0.26 and older) not yet copied into Wallet's debt book. Older versions may
+    /// still add some on a device that was not updated.
     /// </summary>
-    /// <returns>The new entry's id.</returns>
-    public string AddDebt(string workspaceId, string person, decimal amount, DebtEntryKind kind, string note = "", DateTimeOffset? dueAt = null)
+    public IReadOnlyList<(string Id, TrackerItem Item)> DebtsToMove()
     {
-        lock (_gate)
-        {
-            var workspace = _workspaces.Get(workspaceId) ?? throw new InvalidOperationException("That workspace no longer exists.");
-            if (workspace.Kind != WorkspaceKind.Debts) throw new InvalidOperationException("Debts go in the debt book.");
-            person = DebtLedger.Clean(person);
-            if (person.Length == 0) throw new ArgumentException("Who is it with? A debt needs a person.", nameof(person));
-            amount = Math.Abs(amount);
-            if (amount == 0) throw new ArgumentException("Enter an amount.", nameof(amount));
-
-            var open = OpenDebts(workspaceId, person);
-            var balance = open.Sum(i => i.Value.SignedAmount);
-            // The name as it was first written, so one person does not show up twice.
-            if (open.Count > 0) person = open.OrderBy(i => i.Value.CreatedAt).First().Value.Person;
-            DebtDirection direction;
-            switch (kind)
-            {
-                case DebtEntryKind.Repayment when balance == 0:
-                    throw new InvalidOperationException($"{person} has nothing to repay: the balance is 0.");
-                case DebtEntryKind.Repayment:
-                    direction = balance > 0 ? DebtDirection.IOwe : DebtDirection.TheyOweMe;
-                    break;
-                case DebtEntryKind.IOwe:
-                    direction = DebtDirection.IOwe;
-                    break;
-                default:
-                    direction = DebtDirection.TheyOweMe;
-                    break;
-            }
-            var due = dueAt ?? open.Select(i => i.Value.DueAt).Where(d => d is not null).Max();
-            var item = new TrackerItem
-            {
-                WorkspaceId = workspaceId,
-                Title = note.Trim(),
-                Person = person,
-                Amount = amount,
-                Direction = direction,
-                IsRepayment = kind == DebtEntryKind.Repayment,
-                DueAt = due,
-                DueDate = due is { } at ? TrackerDue.Day(at, TimeZoneInfo.Local) : open.Select(i => i.Value.DueDate).Where(d => d is not null).Max(),
-                CreatedAt = Now,
-            };
-            var id = _items.Add(item);
-            Log(TrackerEventKind.Created, id, item, WorkspaceKind.Debts);
-
-            if (balance + item.SignedAmount == 0)
-            {
-                var now = Now;
-                foreach (var (entryId, entry, _) in OpenDebts(workspaceId, person)) CompleteOne(entryId, entry, now);
-            }
-            return id;
-        }
+        var books = _workspaces.All().Where(w => w.Value.Kind == WorkspaceKind.Debts).Select(w => w.Id).ToHashSet(StringComparer.Ordinal);
+        if (books.Count == 0) return [];
+        return _items.All().Where(i => books.Contains(i.Value.WorkspaceId) && !i.Value.MovedToWallet).Select(i => (i.Id, i.Value)).ToList();
     }
 
-    /// <summary>Sets (or clears) when a person's open debts are due: every open entry of that person gets the new time.</summary>
-    public int SetDebtDue(string workspaceId, string person, DateTimeOffset? dueAt)
+    /// <summary>Marks old debt entries as copied into Wallet, so they are not copied again (a deletion there stays).</summary>
+    public void MarkMoved(IEnumerable<string> ids)
     {
         lock (_gate)
         {
-            var open = OpenDebts(workspaceId, person);
-            var day = TrackerDue.Day(dueAt, TimeZoneInfo.Local);
-            foreach (var (id, entry, _) in open)
-            {
-                var updated = entry with { DueAt = dueAt, DueDate = day };
-                if (updated != entry) _items.Upsert(id, updated);
-            }
-            return open.Count;
+            foreach (var id in ids)
+                if (_items.Get(id) is { MovedToWallet: false } item) _items.Upsert(id, item with { MovedToWallet = true });
         }
     }
 

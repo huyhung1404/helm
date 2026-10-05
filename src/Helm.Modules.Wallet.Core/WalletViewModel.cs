@@ -29,6 +29,7 @@ public sealed partial class WalletViewModel : ObservableObject
     private readonly IClipboardService _clipboard;
     private readonly IWalletPlatform? _platform;
     private readonly ILogger<WalletViewModel> _logger;
+    private readonly DebtsViewModel? _debts;
     private readonly TimeZoneInfo _zone;
     private readonly Dictionary<string, TransactionRow> _rows = new(StringComparer.Ordinal);
     private readonly Dictionary<string, CategoryEditRow> _categoryRows = new(StringComparer.Ordinal);
@@ -37,6 +38,9 @@ public sealed partial class WalletViewModel : ObservableObject
     private DateOnly _month;
     private IReadOnlyList<string> _similarIds = [];
     private string? _similarCategory;
+
+    /// <summary>The debt book is shown instead of the month.</summary>
+    [ObservableProperty] private bool _isDebtsView;
 
     [ObservableProperty] private string _monthTitle = "";
     [ObservableProperty] private bool _canGoNext;
@@ -117,7 +121,8 @@ public sealed partial class WalletViewModel : ObservableObject
         IServiceProvider services,
         ILogger<WalletViewModel> logger)
         // The phone's notification access and widget; none on Windows.
-        : this(store, capture, settings, ui, dialogs, clipboard, services.GetService(typeof(IWalletPlatform)) as IWalletPlatform, logger, TimeZoneInfo.Local)
+        : this(store, capture, settings, ui, dialogs, clipboard, services.GetService(typeof(IWalletPlatform)) as IWalletPlatform, logger, TimeZoneInfo.Local,
+            services.GetService(typeof(DebtsViewModel)) as DebtsViewModel)
     {
     }
 
@@ -130,7 +135,8 @@ public sealed partial class WalletViewModel : ObservableObject
         IClipboardService clipboard,
         IWalletPlatform? platform,
         ILogger<WalletViewModel> logger,
-        TimeZoneInfo zone)
+        TimeZoneInfo zone,
+        DebtsViewModel? debts = null)
     {
         _store = store;
         _capture = capture;
@@ -141,10 +147,13 @@ public sealed partial class WalletViewModel : ObservableObject
         _platform = platform;
         _logger = logger;
         _zone = zone;
+        _debts = debts;
         _month = WalletFormat.MonthOf(store.Now, zone);
 
         LoadSettings();
         _store.Changed += (_, _) => ScheduleRefresh();
+        // A transaction shows the debt entry made from it.
+        if (_debts is not null) _debts.Book.Changed += (_, _) => ScheduleRefresh();
         // Unread notifications arrive from the listener; toggles may change on the other page.
         _settings.Changed += (_, _) => _ui.Post(() =>
         {
@@ -263,6 +272,53 @@ public sealed partial class WalletViewModel : ObservableObject
     partial void OnCompareTextChanged(string value) => OnPropertyChanged(nameof(HasCompare));
 
     partial void OnTestResultChanged(string value) => OnPropertyChanged(nameof(HasTestResult));
+
+    // ---- Money or debts ------------------------------------------------------------------------------------------
+
+    /// <summary>The debt book (who owes whom); null where the app has none.</summary>
+    public DebtsViewModel? Debts => _debts;
+
+    public bool HasDebts => _debts is not null;
+
+    public bool IsMoneyView => !IsDebtsView;
+
+    partial void OnIsDebtsViewChanged(bool value)
+    {
+        OnPropertyChanged(nameof(IsMoneyView));
+        if (value) _debts?.Refresh();
+    }
+
+    [RelayCommand]
+    private void ShowMoney() => IsDebtsView = false;
+
+    [RelayCommand]
+    private void ShowDebts() => IsDebtsView = _debts is not null;
+
+    /// <summary>Opens the debt book on a person (a linked note, the Tracker's calendar, a transaction).</summary>
+    public void ShowPerson(string key)
+    {
+        if (_debts is null) return;
+        IsDebtsView = true;
+        _debts.ShowPerson(key);
+    }
+
+    /// <summary>A transaction's money goes in the debt book (lent, borrowed or paid back).</summary>
+    internal bool AddDebt(TransactionRow row, string person, DebtEntryKind kind, string note)
+    {
+        if (_debts is null) return false;
+        if (!_debts.AddFromTransaction(row.Id, person, kind, note))
+        {
+            Message = _debts.Message;
+            _debts.Message = null;
+            return false;
+        }
+        row.IsExpanded = false;
+        Message = null;
+        Refresh();
+        return true;
+    }
+
+    internal IReadOnlyList<string> DebtNames() => _debts?.PersonNames.ToList() ?? [];
 
     // ---- The month -----------------------------------------------------------------------------------------------
 
@@ -693,6 +749,7 @@ public sealed partial class WalletViewModel : ObservableObject
         else if (t.Source == TransactionSource.Manual) parts.Add("Added by hand");
         var choices = categories.Where(x => x.Fits(t.Amount) && (!x.Hidden || x.Id == t.CategoryId)).ToList();
         row.Update(t, title, string.Join(" · ", parts), category, choices);
+        row.SetDebt(_debts?.Book.ForTransaction(id)?.Value, _debts is not null);
         return row;
     }
 

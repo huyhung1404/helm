@@ -38,9 +38,6 @@ public sealed partial class TrackerItemViewModel : ObservableObject
     [ObservableProperty] private int _editRepeatIndex;
     [ObservableProperty] private string _editRepeatDays = "";
     private bool _syncingTime;
-    [ObservableProperty] private string _editPerson = "";
-    [ObservableProperty] private string _editAmount = "";
-    [ObservableProperty] private int _editDirectionIndex;
     [ObservableProperty] private bool _canMoveUp;
     [ObservableProperty] private bool _canMoveDown;
 
@@ -94,7 +91,7 @@ public sealed partial class TrackerItemViewModel : ObservableObject
     /// <summary>How many days of this repeating task were done (all its days).</summary>
     public int Completions { get; internal set; }
 
-    public bool CanHaveSubtasks => !IsDebt && !Item.IsSubtask;
+    public bool CanHaveSubtasks => !Item.IsSubtask;
 
     public bool HasSubtasks => Subtasks.Count > 0;
 
@@ -114,7 +111,6 @@ public sealed partial class TrackerItemViewModel : ObservableObject
 
     private DateOnly Today { get; set; }
 
-    public bool IsDebt => Workspace.Kind == WorkspaceKind.Debts;
 
     public bool IsCompleted => Item.IsCompleted;
 
@@ -137,7 +133,7 @@ public sealed partial class TrackerItemViewModel : ObservableObject
 
     public bool IsStarted => Item.StartedExplicitly && !Item.IsCompleted;
 
-    public bool CanStart => !Item.IsCompleted && Item.StartedAt is null && !IsDebt;
+    public bool CanStart => !Item.IsCompleted && Item.StartedAt is null;
 
     public bool HasNotes => Item.Notes.Length > 0;
 
@@ -147,25 +143,8 @@ public sealed partial class TrackerItemViewModel : ObservableObject
 
     public bool IsOverdue => IsOpen && Item.DueMoment(TimeZoneInfo.Local) is { } due && due < DateTimeOffset.Now;
 
-    /// <summary>Main line: the title, or for a debt "Person — reason".</summary>
-    public string Title
-    {
-        get
-        {
-            if (!IsDebt) return Item.Title;
-            if (Item.Person.Length == 0) return Item.Title;
-            return Item.Title.Length == 0 ? Item.Person : $"{Item.Person} — {Item.Title}";
-        }
-    }
-
-    /// <summary>Right-hand amount for debts ("+1,500,000 ₫" owed to me, "−200,000 ₫" I owe).</summary>
-    public string AmountText => IsDebt
-        ? (Item.Direction == DebtDirection.TheyOweMe ? "+" : "−") + TrackerFormat.Money(Item.Amount, Workspace.Currency)
-        : "";
-
-    public bool OwedToMe => IsDebt && Item.Direction == DebtDirection.TheyOweMe;
-
-    public bool IOwe => IsDebt && Item.Direction == DebtDirection.IOwe;
+    /// <summary>Main line: the title.</summary>
+    public string Title => Item.Title;
 
     public string PriorityText => TrackerFormat.Priority(Item.Priority);
 
@@ -181,18 +160,14 @@ public sealed partial class TrackerItemViewModel : ObservableObject
                 if (RepeatText.Length > 0) parts.Add(RepeatText);
                 parts.Add(Completions == 1 ? "done 1 time" : $"done {Completions} times");
             }
-            if (IsDebt) parts.Add(TrackerFormat.Direction(Item.Direction));
             // Urgent and High already show as a badge next to the title.
-            else if (Item.Priority == TrackerPriority.Low) parts.Add(PriorityText);
+            if (Item.Priority == TrackerPriority.Low) parts.Add(PriorityText);
             if (Item.CompletedAt is { } done)
             {
-                parts.Add((IsDebt ? "Settled " : "Done ") + TrackerFormat.WhenRelative(done, now));
-                if (!IsDebt)
-                {
-                    // Same meaning as the history and the report: "took" counts from when it was added.
-                    parts.Add("took " + TrackerFormat.Duration(done - Item.CreatedAt));
-                    if (Item.StartedExplicitly && Item.StartedAt is { } started) parts.Add("worked " + TrackerFormat.Duration(done - started));
-                }
+                parts.Add("Done " + TrackerFormat.WhenRelative(done, now));
+                // Same meaning as the history and the report: "took" counts from when it was added.
+                parts.Add("took " + TrackerFormat.Duration(done - Item.CreatedAt));
+                if (Item.StartedExplicitly && Item.StartedAt is { } started) parts.Add("worked " + TrackerFormat.Duration(done - started));
             }
             else
             {
@@ -245,9 +220,6 @@ public sealed partial class TrackerItemViewModel : ObservableObject
         EditDueTime = dueLocal?.TimeOfDay;
         EditDueTimeText = TrackerFormat.Time(EditDueTime);
         _syncingTime = false;
-        EditPerson = Item.Person;
-        EditAmount = Item.Amount == 0 ? "" : Item.Amount.ToString("0.##", System.Globalization.CultureInfo.CurrentCulture);
-        EditDirectionIndex = (int)Item.Direction;
         EditRepeatIndex = !Item.RepeatDaily ? 0 : Item.RepeatUntil is null ? 1 : 2;
         EditRepeatDays = Item.RepeatUntil is { } until && Item.OccurrenceDate is { } day
             ? (until.DayNumber - day.DayNumber + 1).ToString(System.Globalization.CultureInfo.CurrentCulture) : "";

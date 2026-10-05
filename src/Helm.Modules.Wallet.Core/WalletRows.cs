@@ -171,6 +171,72 @@ public sealed partial class TransactionRow : ObservableObject
     [ObservableProperty] private string _editNote = "";
     private bool _syncingTime;
 
+    // The debt book: this transaction's money lent, borrowed or paid back
+    [ObservableProperty] private bool _isDebtFormOpen;
+    [ObservableProperty] private string _debtPerson = "";
+    [ObservableProperty] private int _debtKindIndex;
+    [ObservableProperty] private string _debtNote = "";
+    [ObservableProperty] private string _debtText = "";
+    [ObservableProperty] private bool _canBeDebt;
+    private string? _debtKey;
+
+    public static IReadOnlyList<string> DebtKindNames => DebtFormat.KindNames;
+
+    /// <summary>Names already in the debt book, for the person box.</summary>
+    public ObservableCollection<string> DebtNames { get; } = [];
+
+    /// <summary>The transaction is in the debt book ("Lent to Nam").</summary>
+    public bool IsDebt => DebtText.Length > 0;
+
+    partial void OnDebtTextChanged(string value) => OnPropertyChanged(nameof(IsDebt));
+
+    internal void SetDebt(WalletDebt? debt, bool available)
+    {
+        DebtText = debt is null ? "" : DebtFormat.ForTransaction(debt);
+        _debtKey = debt is null ? null : DebtLedger.Key(debt.Person);
+        CanBeDebt = available && debt is null;
+        if (!CanBeDebt) IsDebtFormOpen = false;
+    }
+
+    /// <summary>Opens the form that puts this money in the debt book; money out is most often lent, money in paid back.</summary>
+    [RelayCommand]
+    private void OpenDebtForm()
+    {
+        DebtPerson = "";
+        DebtKindIndex = (int)(IsIncome ? DebtEntryKind.Repayment : DebtEntryKind.OwesMe);
+        DebtNote = Transaction.Note.Length > 0 ? Transaction.Note : "";
+        var names = _owner.DebtNames();
+        if (!DebtNames.SequenceEqual(names))
+        {
+            DebtNames.Clear();
+            foreach (var n in names) DebtNames.Add(n);
+        }
+        IsDebtFormOpen = true;
+    }
+
+    [RelayCommand]
+    private void CancelDebtForm() => IsDebtFormOpen = false;
+
+    [RelayCommand]
+    private void PickDebtPerson(string? name)
+    {
+        if (name is { Length: > 0 }) DebtPerson = name;
+    }
+
+    [RelayCommand]
+    private void SaveDebt()
+    {
+        var kind = (DebtEntryKind)Math.Clamp(DebtKindIndex, 0, DebtKindNames.Count - 1);
+        if (_owner.AddDebt(this, DebtPerson, kind, DebtNote)) IsDebtFormOpen = false;
+    }
+
+    /// <summary>Shows the person this transaction's money is with in the debt book.</summary>
+    [RelayCommand]
+    private void OpenDebt()
+    {
+        if (_debtKey is { } key) _owner.ShowPerson(key);
+    }
+
     partial void OnEditTimeChanged(TimeSpan? value)
     {
         if (_syncingTime) return;

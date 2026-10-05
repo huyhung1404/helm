@@ -13,7 +13,7 @@ public static class TrackerIds
 
     public const string DisplayName = "Tracker";
 
-    public const string Description = "Keep to-do lists, debt books and other lists in workspaces, synced across your devices. Every completion is logged with its start and finish times for reports.";
+    public const string Description = "Keep to-do lists in workspaces, synced across your devices. Every completion is logged with its start and finish times for reports.";
 }
 
 public static class TrackerCoreServices
@@ -33,14 +33,15 @@ public static class TrackerCoreServices
             sp.GetRequiredService<ISyncedCollection<TrackerWorkspace>>(),
             sp.GetRequiredService<ISyncedCollection<TrackerItem>>(),
             sp.GetRequiredService<ISyncedLog<TrackerEvent>>()));
+        // The reminder also covers debts due in Wallet's debt book, and copies the Tracker's old debt book there.
         services.AddSingleton(sp => new TrackerReminderService(
-            sp.GetRequiredService<TrackerStore>(), sp.GetRequiredService<Helm.Core.Settings.ISettingsStoreFactory>()));
-        // Quick Capture: "/t buy milk tomorrow 9h" and "/d Nam 200k".
+            sp.GetRequiredService<TrackerStore>(), sp.GetRequiredService<Helm.Core.Settings.ISettingsStoreFactory>(),
+            debts: sp.GetService<Helm.Modules.Wallet.DebtBook>()));
+        // Quick Capture: "/t buy milk tomorrow 9h".
         services.AddSingleton<Helm.Core.Capture.ICaptureTarget, TaskCaptureTarget>();
-        services.AddSingleton<Helm.Core.Capture.ICaptureTarget, DebtCaptureTarget>();
         // Other tools hand tasks over (Missions sends a step here).
         services.AddSingleton<Helm.Core.Tasks.ITaskBridge, TrackerTaskBridge>();
-        // Claude's tools for the lists and the debt book (Helm's MCP server, Windows).
+        // Claude's tools for the to-do lists (Helm's MCP server, Windows).
         services.AddSingleton<Helm.Core.Mcp.IMcpToolProvider, TrackerMcpTools>();
         // Windows registers it again through AddHelmModule; one instance either way.
         services.TryAddSingleton<TrackerViewModel>();
@@ -48,8 +49,8 @@ public static class TrackerCoreServices
     }
 
     /// <summary>
-    /// Tasks and people in the debt book as link targets (notes link to them). The platform passes its Tracker content
-    /// page, which opens a linked task or person.
+    /// Tasks as link targets (notes link to them). The platform passes its Tracker content page, which opens a linked
+    /// task.
     /// </summary>
     public static IServiceCollection AddTrackerLinks(this IServiceCollection services, Type contentPage)
     {
@@ -59,7 +60,6 @@ public static class TrackerCoreServices
             show(sp.GetRequiredService<TrackerViewModel>());
         }
         return services.AddHelmLinks()
-            .AddSingleton<ILinkProvider>(sp => new TaskLinkProvider(sp.GetRequiredService<TrackerStore>(), (ws, item) => Show(sp, vm => vm.ShowItem(ws, item))))
-            .AddSingleton<ILinkProvider>(sp => new PersonLinkProvider(sp.GetRequiredService<TrackerStore>(), (book, key) => Show(sp, vm => vm.ShowPerson(book, key))));
+            .AddSingleton<ILinkProvider>(sp => new TaskLinkProvider(sp.GetRequiredService<TrackerStore>(), (ws, item) => Show(sp, vm => vm.ShowItem(ws, item))));
     }
 }

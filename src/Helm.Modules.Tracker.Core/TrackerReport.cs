@@ -82,7 +82,8 @@ public sealed class TrackerReport
     {
         var (from, to) = Bounds(range, now, zone);
         var relevant = events
-            .Where(e => workspaceId is null || e.WorkspaceId == workspaceId)
+            // The old debt book's events (Helm 0.26 and older) are not tasks.
+            .Where(e => e.WorkspaceKind == WorkspaceKind.Tasks && (workspaceId is null || e.WorkspaceId == workspaceId))
             .OrderBy(e => e.At)
             .ToList();
 
@@ -146,23 +147,4 @@ public sealed class TrackerReport
     private static TimeSpan Median(IReadOnlyList<TimeSpan> sorted) => sorted.Count % 2 == 1
         ? sorted[sorted.Count / 2]
         : TimeSpan.FromTicks((sorted[sorted.Count / 2 - 1].Ticks + sorted[sorted.Count / 2].Ticks) / 2);
-}
-
-/// <summary>Open debts of a debt book, summed per direction.</summary>
-public sealed record DebtTotals(decimal OwedToMe, decimal IOwe, int OpenCount)
-{
-    public decimal Net => OwedToMe - IOwe;
-
-    public static DebtTotals From(IEnumerable<TrackerItem> items)
-    {
-        decimal owedToMe = 0, iOwe = 0;
-        var count = 0;
-        foreach (var item in items.Where(i => !i.IsCompleted))
-        {
-            count++;
-            if (item.Direction == DebtDirection.TheyOweMe) owedToMe += item.Amount;
-            else iOwe += item.Amount;
-        }
-        return new DebtTotals(owedToMe, iOwe, count);
-    }
 }

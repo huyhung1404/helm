@@ -13,6 +13,8 @@
     <ProjectReference Include="..\Helm.Core\Helm.Core.csproj" />
     <!-- IDialogService / IClipboardService: the portable seams both apps already implement. -->
     <ProjectReference Include="..\Helm.Shell\Helm.Shell.csproj" />
+    <!-- The debt book moved to Wallet: Tracker hands its old one over and shows debts on its calendar. -->
+    <ProjectReference Include="..\Helm.Modules.Wallet.Core\Helm.Modules.Wallet.Core.csproj" />
   </ItemGroup>
 
   <ItemGroup>

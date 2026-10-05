@@ -18,19 +18,6 @@
             <Setter Property="VerticalAlignment" Value="Center" />
         </Style>
 
-        <!-- Signed amount: owed to me in green, I owe in red (theme colours) -->
-        <Style x:Key="AmountText" TargetType="TextBlock">
-            <Setter Property="FontWeight" Value="SemiBold" />
-            <Setter Property="VerticalAlignment" Value="Center" />
-            <Setter Property="Margin" Value="12,0,4,0" />
-            <Setter Property="Foreground" Value="{DynamicResource SystemFillColorCriticalBrush}" />
-            <Style.Triggers>
-                <DataTrigger Binding="{Binding OwedToMe}" Value="True">
-                    <Setter Property="Foreground" Value="{DynamicResource SystemFillColorSuccessBrush}" />
-                </DataTrigger>
-            </Style.Triggers>
-        </Style>
-
         <!-- A whole row as one flat button (hover shading, keyboard focus) -->
         <Style x:Key="RowButton" TargetType="Button">
             <Setter Property="Background" Value="Transparent" />
@@ -56,105 +43,6 @@
                 </Setter.Value>
             </Setter>
         </Style>
-
-        <!-- Signed amount of a person or an entry: + in green, - in red -->
-        <Style x:Key="SignedText" TargetType="TextBlock">
-            <Setter Property="FontWeight" Value="SemiBold" />
-            <Setter Property="VerticalAlignment" Value="Center" />
-            <Setter Property="Foreground" Value="{DynamicResource TextFillColorSecondaryBrush}" />
-            <Style.Triggers>
-                <DataTrigger Binding="{Binding OwedToMe}" Value="True">
-                    <Setter Property="Foreground" Value="{DynamicResource SystemFillColorSuccessBrush}" />
-                </DataTrigger>
-                <DataTrigger Binding="{Binding IOwe}" Value="True">
-                    <Setter Property="Foreground" Value="{DynamicResource SystemFillColorCriticalBrush}" />
-                </DataTrigger>
-            </Style.Triggers>
-        </Style>
-
-        <!-- A person in the debt book: click to see their history and set when it is due; click again to close. -->
-        <DataTemplate x:Key="PersonRow" DataType="{x:Type local:DebtPersonViewModel}">
-            <Border BorderThickness="0,0,0,1" BorderBrush="{DynamicResource CardStrokeColorDefaultBrush}">
-                <StackPanel>
-                    <Button Style="{StaticResource RowButton}" Command="{Binding ToggleExpandedCommand}" AutomationProperties.Name="{Binding Name}">
-                        <Grid>
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="Auto" />
-                                <ColumnDefinition Width="*" />
-                                <ColumnDefinition Width="Auto" />
-                            </Grid.ColumnDefinitions>
-                            <ui:SymbolIcon Symbol="Person24" FontSize="20" Margin="0,0,12,0" VerticalAlignment="Center" />
-                            <StackPanel Grid.Column="1" VerticalAlignment="Center">
-                                <TextBlock Text="{Binding Name}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
-                                <TextBlock Text="{Binding Details}" TextTrimming="CharacterEllipsis">
-                                    <TextBlock.Style>
-                                        <Style TargetType="TextBlock" BasedOn="{StaticResource HelmSecondaryText}">
-                                            <Style.Triggers>
-                                                <DataTrigger Binding="{Binding IsOverdue}" Value="True">
-                                                    <Setter Property="Foreground" Value="{DynamicResource SystemFillColorCriticalBrush}" />
-                                                </DataTrigger>
-                                            </Style.Triggers>
-                                        </Style>
-                                    </TextBlock.Style>
-                                </TextBlock>
-                            </StackPanel>
-                            <TextBlock Grid.Column="2" Text="{Binding BalanceText}" FontSize="15" Margin="12,0,4,0" Style="{StaticResource SignedText}" />
-                        </Grid>
-                    </Button>
-
-                    <StackPanel Margin="44,0,12,12" Visibility="{Binding IsExpanded, Converter={StaticResource BoolToVisibility}}">
-                        <!-- When it is due: extend, or set a date and time -->
-                        <WrapPanel Margin="0,4,0,8" Visibility="{Binding IsSettled, Converter={StaticResource InverseBoolToVisibility}}">
-                            <TextBlock Text="Due" VerticalAlignment="Center" Margin="0,0,8,8" />
-                            <ui:Button Margin="0,0,6,8" Content="+1 day" Command="{Binding ExtendCommand}" CommandParameter="1" ToolTip="Due one day later" />
-                            <ui:Button Margin="0,0,6,8" Content="+1 week" Command="{Binding ExtendCommand}" CommandParameter="7" ToolTip="Due a week later" />
-                            <ui:Button Margin="0,0,12,8" Content="+1 month" Command="{Binding ExtendCommand}" CommandParameter="30" ToolTip="Due 30 days later" />
-                            <core:DateTimeBox Width="260" Margin="0,0,6,8" Date="{Binding EditDueDate}" Time="{Binding EditDueTime}" Lean="Future" AllowEmpty="True"
-                                              ShowChips="False" PlaceholderText="Due: mai 9h, thứ 6" AutomationProperties.Name="Due date and time" />
-                            <ui:Button Margin="0,0,6,8" Appearance="Primary" Content="Set" Command="{Binding SetDueCommand}" />
-                            <ui:Button Margin="0,0,6,8" Content="No due date" Command="{Binding ClearDueCommand}" />
-                        </WrapPanel>
-                        <!-- Notes about this person (bank details, what was agreed…) -->
-                        <core:LinksPanel DataContext="{Binding Links}" ShowActions="True" Margin="0,0,0,10" />
-                        <!-- Every change of the amount, newest first, with the balance after it -->
-                        <ItemsControl ItemsSource="{Binding Entries}">
-                            <ItemsControl.ItemTemplate>
-                                <DataTemplate DataType="{x:Type local:DebtEntryRow}">
-                                    <Grid Margin="0,3">
-                                        <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="150" />
-                                            <ColumnDefinition Width="100" />
-                                            <ColumnDefinition Width="*" />
-                                            <ColumnDefinition Width="Auto" />
-                                            <ColumnDefinition Width="Auto" />
-                                            <ColumnDefinition Width="Auto" />
-                                        </Grid.ColumnDefinitions>
-                                        <TextBlock Text="{Binding When}" Style="{DynamicResource HelmSecondaryText}" VerticalAlignment="Center" />
-                                        <TextBlock Grid.Column="1" Text="{Binding KindText}" VerticalAlignment="Center" />
-                                        <TextBlock Grid.Column="2" Text="{Binding Note}" Style="{DynamicResource HelmSecondaryText}" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
-                                        <TextBlock Grid.Column="3" Text="{Binding AmountText}" FontWeight="SemiBold" Margin="12,0,0,0" VerticalAlignment="Center">
-                                            <TextBlock.Style>
-                                                <Style TargetType="TextBlock">
-                                                    <Setter Property="Foreground" Value="{DynamicResource SystemFillColorCriticalBrush}" />
-                                                    <Style.Triggers>
-                                                        <DataTrigger Binding="{Binding IsIncrease}" Value="True">
-                                                            <Setter Property="Foreground" Value="{DynamicResource SystemFillColorSuccessBrush}" />
-                                                        </DataTrigger>
-                                                    </Style.Triggers>
-                                                </Style>
-                                            </TextBlock.Style>
-                                        </TextBlock>
-                                        <TextBlock Grid.Column="4" Text="{Binding BalanceText}" Style="{DynamicResource HelmSecondaryText}" Margin="12,0,0,0" VerticalAlignment="Center" />
-                                        <ui:Button Grid.Column="5" Style="{StaticResource RowAction}" Icon="{ui:SymbolIcon Delete24}" ToolTip="Delete this entry" AutomationProperties.Name="Delete entry" Margin="16,0,0,0"
-                                                   Command="{Binding DeleteCommand}" />
-                                    </Grid>
-                                </DataTemplate>
-                            </ItemsControl.ItemTemplate>
-                        </ItemsControl>
-                    </StackPanel>
-                </StackPanel>
-            </Border>
-        </DataTemplate>
 
         <DataTemplate x:Key="ItemRow" DataType="{x:Type local:TrackerItemViewModel}">
             <Border BorderThickness="0,0,0,1" BorderBrush="{DynamicResource CardStrokeColorDefaultBrush}">
@@ -229,9 +117,6 @@
                             <core:LinksPanel DataContext="{Binding Links}" />
                         </StackPanel>
 
-                        <TextBlock Grid.Column="2" Text="{Binding AmountText}" Style="{StaticResource AmountText}"
-                                   Visibility="{Binding IsDebt, Converter={StaticResource BoolToVisibility}}" />
-
                         <StackPanel Grid.Column="3" Orientation="Horizontal" VerticalAlignment="Center">
                             <ui:Button Style="{StaticResource RowAction}" Icon="{ui:SymbolIcon Play24}" ToolTip="Start now (records the start time)" AutomationProperties.Name="Start"
                                        Command="{Binding StartCommand}" Visibility="{Binding CanStart, Converter={StaticResource BoolToVisibility}}" />
@@ -286,27 +171,11 @@
 
                     <!-- Inline editor -->
                     <StackPanel Margin="32,8,0,6" Visibility="{Binding IsEditing, Converter={StaticResource BoolToVisibility}}">
-                        <WrapPanel Visibility="{Binding IsDebt, Converter={StaticResource BoolToVisibility}}">
-                            <StackPanel Margin="0,0,8,8">
-                                <TextBlock Text="Person" Style="{DynamicResource HelmSecondaryText}" Margin="0,0,0,4" />
-                                <ui:TextBox Width="200" PlaceholderText="Person" AutomationProperties.Name="Edit person" Text="{Binding EditPerson, UpdateSourceTrigger=PropertyChanged}" />
-                            </StackPanel>
-                            <StackPanel Margin="0,0,8,8">
-                                <TextBlock Text="Amount" Style="{DynamicResource HelmSecondaryText}" Margin="0,0,0,4" />
-                                <ui:TextBox Width="160" PlaceholderText="Amount" AutomationProperties.Name="Edit amount" Text="{Binding EditAmount, UpdateSourceTrigger=PropertyChanged}" />
-                            </StackPanel>
-                            <StackPanel Margin="0,0,8,8">
-                                <TextBlock Text="Direction" Style="{DynamicResource HelmSecondaryText}" Margin="0,0,0,4" />
-                                <ComboBox Width="140"
-                                          ItemsSource="{Binding DataContext.DirectionNames, RelativeSource={RelativeSource AncestorType=Page}}"
-                                          SelectedIndex="{Binding EditDirectionIndex}" AutomationProperties.Name="Edit direction" />
-                            </StackPanel>
-                        </WrapPanel>
                         <ui:TextBox Margin="0,0,0,8" PlaceholderText="Title" AutomationProperties.Name="Edit title" Text="{Binding EditTitle, UpdateSourceTrigger=PropertyChanged}" />
                         <ui:TextBox Margin="0,0,0,8" PlaceholderText="Notes" AutomationProperties.Name="Edit notes" AcceptsReturn="True" TextWrapping="Wrap" MinHeight="60"
                                     Text="{Binding EditNotes, UpdateSourceTrigger=PropertyChanged}" />
                         <WrapPanel>
-                            <StackPanel Margin="0,0,8,8" Visibility="{Binding IsDebt, Converter={StaticResource InverseBoolToVisibility}}">
+                            <StackPanel Margin="0,0,8,8">
                                 <TextBlock Text="Priority" Style="{DynamicResource HelmSecondaryText}" Margin="0,0,0,4" />
                                 <ComboBox Width="140"
                                           ItemsSource="{Binding DataContext.PriorityNames, RelativeSource={RelativeSource AncestorType=Page}}"
@@ -366,11 +235,10 @@
                 <StackPanel>
                     <TextBlock Text="Create your first workspace" FontSize="16" FontWeight="SemiBold" />
                     <TextBlock Style="{DynamicResource HelmSecondaryText}" Margin="0,4,0,12"
-                               Text="A workspace is one list: a to-do list for tasks, or a debt book for who owes whom. You can add more later." />
+                               Text="A workspace is one to-do list. You can add more later. Debts are kept in Wallet." />
                     <WrapPanel>
                         <ui:Button Margin="0,0,8,0" Appearance="Primary" Content="New to-do list" Icon="{ui:SymbolIcon TaskListSquareLtr24}"
                                    Command="{Binding CreateTasksWorkspaceCommand}" />
-                        <ui:Button Content="New debt book" Icon="{ui:SymbolIcon PersonMoney24}" Command="{Binding CreateDebtWorkspaceCommand}" />
                     </WrapPanel>
                 </StackPanel>
             </Border>
@@ -582,50 +450,10 @@
 
             <StackPanel Visibility="{Binding ShowListsView, Converter={StaticResource BoolToVisibility}}">
             <!-- Add -->
-            <TextBlock Text="{Binding AddHeader}" Style="{DynamicResource HelmSectionHeader}" />
+            <TextBlock Text="Add a task" Style="{DynamicResource HelmSectionHeader}" />
             <Border Style="{DynamicResource HelmSurface}" Margin="0,0,0,4">
                 <StackPanel>
-                    <WrapPanel Visibility="{Binding IsDebtWorkspace, Converter={StaticResource BoolToVisibility}}">
-                        <!-- Typing a name already in the book adds to that person -->
-                        <StackPanel Margin="0,0,8,8">
-                            <TextBlock Text="Person" Style="{DynamicResource HelmSecondaryText}" Margin="0,0,0,4" />
-                            <ui:TextBox Width="220" PlaceholderText="Person" AutomationProperties.Name="Person" Icon="{ui:SymbolIcon Person24}"
-                                        ToolTip="Who it is with. A name already in the book adds to that person." Text="{Binding NewPerson, UpdateSourceTrigger=PropertyChanged}">
-                                <ui:TextBox.InputBindings>
-                                    <KeyBinding Key="Enter" Command="{Binding AddCommand}" />
-                                </ui:TextBox.InputBindings>
-                            </ui:TextBox>
-                        </StackPanel>
-                        <StackPanel Margin="0,0,8,8">
-                            <TextBlock Text="Amount" Style="{DynamicResource HelmSecondaryText}" Margin="0,0,0,4" />
-                            <ui:TextBox x:Name="AmountBox" Width="180" PlaceholderText="Amount, e.g. 150k" AutomationProperties.Name="Amount" Icon="{ui:SymbolIcon Money24}"
-                                        Text="{Binding NewAmount, UpdateSourceTrigger=PropertyChanged}" TextChanged="OnAmountTextChanged">
-                                <ui:TextBox.InputBindings>
-                                    <KeyBinding Key="Enter" Command="{Binding AddCommand}" />
-                                </ui:TextBox.InputBindings>
-                            </ui:TextBox>
-                        </StackPanel>
-                        <StackPanel Margin="0,0,8,8">
-                            <TextBlock Text="Kind" Style="{DynamicResource HelmSecondaryText}" Margin="0,0,0,4" />
-                            <ComboBox Width="140" ItemsSource="{Binding DebtKindNames}" SelectedIndex="{Binding NewDebtKindIndex}" AutomationProperties.Name="Kind"
-                                      ToolTip="Owes me adds, I owe subtracts, a repayment brings the balance back toward 0" />
-                        </StackPanel>
-                    </WrapPanel>
-                    <!-- Names already in the book that match what is typed: one click picks it -->
-                    <ItemsControl Margin="0,0,0,8" ItemsSource="{Binding PersonSuggestions}" Visibility="{Binding HasPersonSuggestions, Converter={StaticResource BoolToVisibility}}">
-                        <ItemsControl.ItemsPanel>
-                            <ItemsPanelTemplate>
-                                <WrapPanel />
-                            </ItemsPanelTemplate>
-                        </ItemsControl.ItemsPanel>
-                        <ItemsControl.ItemTemplate>
-                            <DataTemplate>
-                                <ui:Button Margin="0,0,6,6" Padding="10,3" Content="{Binding}" Icon="{ui:SymbolIcon Person24}" AutomationProperties.Name="{Binding}"
-                                           Command="{Binding DataContext.PickPersonCommand, RelativeSource={RelativeSource AncestorType=Page}}" CommandParameter="{Binding}" />
-                            </DataTemplate>
-                        </ItemsControl.ItemTemplate>
-                    </ItemsControl>
-                    <ui:TextBox Margin="0,0,0,8" AutomationProperties.Name="Title" PlaceholderText="{Binding TitlePlaceholder}" Text="{Binding NewTitle, UpdateSourceTrigger=PropertyChanged}">
+                    <ui:TextBox Margin="0,0,0,8" AutomationProperties.Name="Title" PlaceholderText="What needs doing?" Text="{Binding NewTitle, UpdateSourceTrigger=PropertyChanged}">
                         <ui:TextBox.InputBindings>
                             <KeyBinding Key="Enter" Command="{Binding AddCommand}" />
                         </ui:TextBox.InputBindings>
@@ -663,52 +491,28 @@
                 </core:RowLayout>
             </Border>
 
-            <!-- Debt totals -->
-            <UniformGrid Columns="3" Margin="0,20,0,0" Visibility="{Binding IsDebtWorkspace, Converter={StaticResource BoolToVisibility}}">
-                <Border Style="{DynamicResource HelmSurface}" Margin="0,0,4,0">
-                    <StackPanel>
-                        <TextBlock Text="{Binding OwedToMeText}" Style="{StaticResource StatValue}" Foreground="{DynamicResource SystemFillColorSuccessBrush}" />
-                        <TextBlock Text="Owed to me" Style="{DynamicResource HelmSecondaryText}" />
-                    </StackPanel>
-                </Border>
-                <Border Style="{DynamicResource HelmSurface}" Margin="2,0,2,0">
-                    <StackPanel>
-                        <TextBlock Text="{Binding IOweText}" Style="{StaticResource StatValue}" Foreground="{DynamicResource SystemFillColorCriticalBrush}" />
-                        <TextBlock Text="I owe" Style="{DynamicResource HelmSecondaryText}" />
-                    </StackPanel>
-                </Border>
-                <Border Style="{DynamicResource HelmSurface}" Margin="4,0,0,0">
-                    <StackPanel>
-                        <TextBlock Text="{Binding NetText}" Style="{StaticResource StatValue}" />
-                        <TextBlock Text="Net" Style="{DynamicResource HelmSecondaryText}" />
-                    </StackPanel>
-                </Border>
-            </UniformGrid>
-
             <!-- Open -->
             <core:RowLayout Margin="0,24,0,8">
-                <TextBlock Text="{Binding OpenHeader}" FontSize="14" FontWeight="SemiBold" VerticalAlignment="Center" />
+                <TextBlock Text="To do" FontSize="14" FontWeight="SemiBold" VerticalAlignment="Center" />
                 <TextBlock Text="{Binding OpenSummary}" Style="{DynamicResource HelmSecondaryText}" VerticalAlignment="Center" />
             </core:RowLayout>
             <Border Style="{DynamicResource HelmSurface}" Padding="0">
                 <StackPanel>
-                    <TextBlock Margin="16" Text="{Binding EmptyOpenText}" Style="{DynamicResource HelmSecondaryText}"
+                    <TextBlock Margin="16" Text="Nothing to do. Add a task above." Style="{DynamicResource HelmSecondaryText}"
                                Visibility="{Binding HasNoOpen, Converter={StaticResource BoolToVisibility}}" />
                     <ItemsControl ItemsSource="{Binding OpenItems}" ItemTemplate="{StaticResource ItemRow}" />
-                    <ItemsControl ItemsSource="{Binding DebtPeople}" ItemTemplate="{StaticResource PersonRow}" />
                 </StackPanel>
             </Border>
 
             <!-- Completed -->
-            <TextBlock Text="{Binding CompletedHeader}" Style="{DynamicResource HelmSectionHeader}"
+            <TextBlock Text="Completed" Style="{DynamicResource HelmSectionHeader}"
                        Visibility="{Binding ShowCompleted, Converter={StaticResource BoolToVisibility}}" />
             <Border Style="{DynamicResource HelmSurface}" Padding="0" Visibility="{Binding ShowCompleted, Converter={StaticResource BoolToVisibility}}">
                 <StackPanel>
-                    <TextBlock Margin="16" Text="{Binding EmptyCompletedText}"
+                    <TextBlock Margin="16" Text="Nothing finished yet. Tick an item and it moves here, with its times recorded."
                                Style="{DynamicResource HelmSecondaryText}"
                                Visibility="{Binding HasCompleted, Converter={StaticResource InverseBoolToVisibility}}" />
                     <ItemsControl ItemsSource="{Binding CompletedItems}" ItemTemplate="{StaticResource ItemRow}" />
-                    <ItemsControl ItemsSource="{Binding SettledPeople}" ItemTemplate="{StaticResource PersonRow}" />
                 </StackPanel>
             </Border>
             </StackPanel>
@@ -729,7 +533,7 @@
                 <Border Style="{DynamicResource HelmSurface}" Margin="0,0,4,4">
                     <StackPanel>
                         <TextBlock Text="{Binding ReportCompleted}" Style="{StaticResource StatValue}" />
-                        <TextBlock Text="{Binding ReportCompletedLabel}" Style="{DynamicResource HelmSecondaryText}" />
+                        <TextBlock Text="Completed" Style="{DynamicResource HelmSecondaryText}" />
                     </StackPanel>
                 </Border>
                 <Border Style="{DynamicResource HelmSurface}" Margin="0,0,4,4">
@@ -747,16 +551,16 @@
                 <Border Style="{DynamicResource HelmSurface}" Margin="0,0,4,4">
                     <StackPanel>
                         <TextBlock Text="{Binding ReportAverageLead}" Style="{StaticResource StatValue}" />
-                        <TextBlock Text="{Binding ReportLeadLabel}" Style="{DynamicResource HelmSecondaryText}" />
+                        <TextBlock Text="Average time from added to done" Style="{DynamicResource HelmSecondaryText}" />
                     </StackPanel>
                 </Border>
                 <Border Style="{DynamicResource HelmSurface}" Margin="0,0,4,4">
                     <StackPanel>
                         <TextBlock Text="{Binding ReportMedianLead}" Style="{StaticResource StatValue}" />
-                        <TextBlock Text="{Binding ReportMedianLabel}" Style="{DynamicResource HelmSecondaryText}" />
+                        <TextBlock Text="Median time from added to done" Style="{DynamicResource HelmSecondaryText}" />
                     </StackPanel>
                 </Border>
-                <Border Style="{DynamicResource HelmSurface}" Margin="0,0,0,4" Visibility="{Binding ShowTaskReport, Converter={StaticResource BoolToVisibility}}">
+                <Border Style="{DynamicResource HelmSurface}" Margin="0,0,0,4">
                     <StackPanel>
                         <TextBlock Text="{Binding ReportAverageWork}" Style="{StaticResource StatValue}" />
                         <TextBlock Text="Average time from start to done" Style="{DynamicResource HelmSecondaryText}" />
@@ -799,9 +603,8 @@
                             </DataTemplate>
                         </ItemsControl.ItemTemplate>
                     </ItemsControl>
-                    <TextBlock Text="By priority" FontWeight="SemiBold" Margin="0,16,0,6"
-                               Visibility="{Binding ShowTaskReport, Converter={StaticResource BoolToVisibility}}" />
-                    <ItemsControl ItemsSource="{Binding ReportPriorities}" Visibility="{Binding ShowTaskReport, Converter={StaticResource BoolToVisibility}}">
+                    <TextBlock Text="By priority" FontWeight="SemiBold" Margin="0,16,0,6" />
+                    <ItemsControl ItemsSource="{Binding ReportPriorities}">
                         <ItemsControl.ItemsPanel>
                             <ItemsPanelTemplate>
                                 <WrapPanel />

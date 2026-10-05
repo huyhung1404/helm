@@ -1,6 +1,7 @@
 using Helm.Core.Links;
 using Helm.Modules.Notes;
 using Helm.Modules.Tracker;
+using Helm.Modules.Wallet;
 
 namespace Helm.Tests;
 
@@ -12,6 +13,7 @@ public sealed class LinksTests
     private readonly MemorySynced<HelmLink> _links = new();
     private readonly NotesStore _notes;
     private readonly TrackerStore _tracker;
+    private readonly DebtBook _debts;
     private readonly List<string> _opened = [];
     private readonly LinkHub _hub;
 
@@ -19,11 +21,13 @@ public sealed class LinksTests
     {
         _notes = new NotesStore(new MemorySynced<NoteItem>(), _time);
         _tracker = new TrackerStore(new MemorySynced<TrackerWorkspace>(), new MemorySynced<TrackerItem>(), new MemorySyncedLog<TrackerEvent>(), _time);
+        var wallet = new WalletStore(new MemorySynced<WalletTransaction>(), new MemorySynced<WalletCategory>(), new MemorySynced<WalletBudget>(), _time);
+        _debts = new DebtBook(new MemorySynced<WalletDebt>(), wallet, _time);
         _hub = new LinkHub(_links, () =>
         [
             new NoteLinkProvider(_notes, id => _opened.Add("note " + id)),
             new TaskLinkProvider(_tracker, (ws, item) => _opened.Add($"task {ws} {item}")),
-            new PersonLinkProvider(_tracker, (book, key) => _opened.Add($"person {book} {key}")),
+            new DebtLinkProvider(_debts, key => _opened.Add($"person {key}")),
         ], _time);
     }
 
@@ -50,9 +54,8 @@ public sealed class LinksTests
     public void A_task_shows_its_notes_and_a_note_its_task_and_person()
     {
         var list = _tracker.AddWorkspace("Work", WorkspaceKind.Tasks);
-        var book = _tracker.AddWorkspace("Debts", WorkspaceKind.Debts);
         var task = _tracker.AddItem(list, new TrackerItemDraft("Ship v1"));
-        _tracker.AddDebt(book, "Nam", 200_000, DebtEntryKind.OwesMe, "lunch");
+        _debts.Add("Nam", 200_000, DebtEntryKind.OwesMe, "lunch");
         var note = _notes.Add("Release notes", "what changed");
 
         var taskLinks = new LinksViewModel(_hub, new LinkRef(LinkKinds.Task, task), [LinkKinds.Note], () => "Ship v1");
@@ -77,7 +80,7 @@ public sealed class LinksTests
 
         noteLinks.Items[1].OpenCommand.Execute(null);
         noteLinks.Items[0].OpenCommand.Execute(null);
-        Assert.Equal([$"person {book} nam", $"task {list} {task}"], _opened);
+        Assert.Equal(["person nam", $"task {list} {task}"], _opened);
     }
 
     [Fact]

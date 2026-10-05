@@ -5,8 +5,8 @@ using Microsoft.Extensions.DependencyInjection;
 namespace Helm.Modules.Tracker;
 
 /// <summary>
-/// Tracker in the command palette: open tasks and the people in the debt book whose names match, and the tasks that
-/// are overdue or due today when nothing is typed. Choosing one opens its workspace. The shell navigation is resolved
+/// Tracker in the command palette: open tasks whose title or notes match, and the tasks that are overdue or due today
+/// when nothing is typed. Choosing one opens its workspace. The shell navigation is resolved
 /// when a result runs (it depends on the module list, which the palette module is part of).
 /// </summary>
 internal sealed class TrackerPaletteProvider(TrackerStore store, TrackerViewModel viewModel, IServiceProvider services) : IPaletteProvider
@@ -44,18 +44,6 @@ internal sealed class TrackerPaletteProvider(TrackerStore store, TrackerViewMode
             if (workspaces.GetValueOrDefault(item.WorkspaceId) is not { Kind: WorkspaceKind.Tasks } ws) continue;
             var score = query.Score(item.Title, item.Notes);
             if (score > 0) results.Add(Task(id, item, ws, now, score));
-        }
-
-        // The debt book: one result per person with an open balance.
-        if (workspaces.FirstOrDefault(w => w.Value.Kind == WorkspaceKind.Debts) is { Key: { } bookId, Value: { } book })
-        {
-            foreach (var person in DebtLedger.Open(store.Items(bookId)).Where(p => !p.IsSettled))
-            {
-                var score = query.Score(person.Name);
-                if (score <= 0) continue;
-                results.Add(new PaletteItem(person.Name, $"Debt · {TrackerFormat.Balance(person.Balance, book.Currency)}", PaletteKind.Debt, score,
-                    () => Show(bookId)));
-            }
         }
 
         foreach (var item in results.OrderByDescending(r => r.Score).Take(MaxResults)) yield return item;

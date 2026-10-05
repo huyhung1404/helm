@@ -150,7 +150,7 @@ internal static class TrackerWidgets
         manager.UpdateAppWidget(widgetId, views);
     }
 
-    /// <summary>One row: title, details, amount, and (tasks) the priority-tinted circle that ticks the item off.</summary>
+    /// <summary>One row: title, details, and the priority-tinted circle that ticks the task off.</summary>
     public static RemoteViews BuildRow(Context context, TrackerWidgetRow row)
     {
         var views = new RemoteViews(context.PackageName, R.Layout(context, "tracker_widget_item"));
@@ -166,22 +166,14 @@ internal static class TrackerWidgets
             views.SetTextColor(details, new Color(unchecked((int)secondary)));
         }
 
-        var amount = R.Id(context, "tracker_item_amount");
-        views.SetTextViewText(amount, row.Amount);
-        views.SetViewVisibility(amount, row.IsDebt ? ViewStates.Visible : ViewStates.Gone);
-        if (row.IsDebt) views.SetTextColor(amount, Colour(context, row.OwedToMe ? "tracker_widget_positive" : "tracker_widget_urgent"));
+        views.SetViewVisibility(R.Id(context, "tracker_item_amount"), ViewStates.Gone);
 
         var check = R.Id(context, "tracker_item_check");
-        // A debt has no tick: it is settled by repaying it, in the app.
-        views.SetViewVisibility(check, row.CanComplete ? ViewStates.Visible : ViewStates.Gone);
-        if (row.CanComplete)
-        {
-            views.SetInt(check, "setColorFilter", PriorityColor(context, row.Priority).ToArgb());
-            var fillIn = new Intent();
-            fillIn.PutExtra(ExtraCommand, CommandComplete);
-            fillIn.PutExtra(ExtraItemId, row.Id);
-            views.SetOnClickFillInIntent(check, fillIn);
-        }
+        views.SetInt(check, "setColorFilter", PriorityColor(context, row.Priority).ToArgb());
+        var fillIn = new Intent();
+        fillIn.PutExtra(ExtraCommand, CommandComplete);
+        fillIn.PutExtra(ExtraItemId, row.Id);
+        views.SetOnClickFillInIntent(check, fillIn);
         return views;
     }
 

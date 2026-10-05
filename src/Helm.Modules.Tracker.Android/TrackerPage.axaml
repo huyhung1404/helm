@@ -23,10 +23,8 @@
         <Border Classes="card">
             <StackPanel Spacing="8">
                 <TextBlock Text="New workspace" Classes="title" />
-                <TextBlock Text="{Binding NewWorkspaceHint}" Classes="secondary" />
+                <TextBlock Text="Another to-do list. Debts are kept in Wallet." Classes="secondary" />
                 <TextBox PlaceholderText="Name" Text="{Binding NewWorkspaceName}" AutomationProperties.Name="New workspace name" />
-                <ComboBox HorizontalAlignment="Stretch" ItemsSource="{Binding KindNames}" SelectedIndex="{Binding NewWorkspaceKindIndex}"
-                          IsEnabled="{Binding CanAddDebtBook}" AutomationProperties.Name="New workspace kind" />
                 <Button Content="Create" Command="{Binding CreateWorkspaceCommand}" />
             </StackPanel>
         </Border>
@@ -45,13 +43,6 @@
                     <StackPanel Spacing="8">
                         <TextBlock Text="Workspace name" />
                         <TextBox Text="{Binding WorkspaceName, UpdateSourceTrigger=LostFocus}" AutomationProperties.Name="Workspace name" />
-                    </StackPanel>
-                </Border>
-                <Border Classes="row" IsVisible="{Binding IsDebtWorkspace}">
-                    <StackPanel Spacing="8">
-                        <TextBlock Text="Currency" />
-                        <TextBlock Text="Shown after every amount in the debt book, e.g. ₫ or USD." Classes="secondary" />
-                        <TextBox Text="{Binding WorkspaceCurrency, UpdateSourceTrigger=LostFocus}" AutomationProperties.Name="Currency" />
                     </StackPanel>
                 </Border>
                 <Border Classes="row">

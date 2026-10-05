@@ -92,67 +92,6 @@
     </UserControl.Styles>
 
     <UserControl.DataTemplates>
-        <!-- A person in the debt book: tap for their history and when it is due; tap again to close. -->
-        <DataTemplate DataType="vm:DebtPersonViewModel">
-            <Border BorderThickness="0,1,0,0" BorderBrush="{DynamicResource HelmCardStroke}" Padding="0,4">
-                <StackPanel>
-                    <Button Classes="flat" HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch" Padding="4,6"
-                            Command="{Binding ToggleExpandedCommand}" AutomationProperties.Name="{Binding Name}">
-                        <Grid ColumnDefinitions="Auto,*,Auto">
-                            <ic:SymbolIcon Symbol="Person" FontSize="20" Margin="0,0,10,0" VerticalAlignment="Center" />
-                            <StackPanel Grid.Column="1" VerticalAlignment="Center">
-                                <TextBlock Text="{Binding Name}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
-                                <TextBlock Text="{Binding Details}" Classes="secondary" Classes.overdue="{Binding IsOverdue}" TextWrapping="Wrap" />
-                            </StackPanel>
-                            <TextBlock Grid.Column="2" Text="{Binding BalanceText}" FontWeight="SemiBold" VerticalAlignment="Center" Margin="8,0,4,0"
-                                       Classes.owed="{Binding OwedToMe}" Classes.iowe="{Binding IOwe}" />
-                        </Grid>
-                    </Button>
-                    <StackPanel Spacing="6" Margin="4,4,4,8" IsVisible="{Binding IsExpanded}">
-                        <!-- When it is due -->
-                        <StackPanel Spacing="6" IsVisible="{Binding !IsSettled}">
-                            <TextBlock Text="Due" FontWeight="SemiBold" />
-                            <Grid ColumnDefinitions="*,6,*,6,*">
-                                <Button HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Content="+1 day" Command="{Binding ExtendCommand}" CommandParameter="1" />
-                                <Button Grid.Column="2" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Content="+1 week" Command="{Binding ExtendCommand}" CommandParameter="7" />
-                                <Button Grid.Column="4" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Content="+1 month" Command="{Binding ExtendCommand}" CommandParameter="30" />
-                            </Grid>
-                            <core:DateTimeBox Date="{Binding EditDueDate}" Time="{Binding EditDueTime}" Lean="Future" AllowEmpty="True" PlaceholderText="Due date" />
-                            <WrapPanel>
-                                <Button Classes="accent" Content="Set" Command="{Binding SetDueCommand}" Margin="0,0,8,0" />
-                                <Button Content="No due date" Command="{Binding ClearDueCommand}" />
-                            </WrapPanel>
-                        </StackPanel>
-                        <!-- Notes about this person (bank details, what was agreed…) -->
-                        <TextBlock Text="Notes" FontWeight="SemiBold" Margin="0,6,0,0" IsVisible="{Binding Links, Converter={x:Static ObjectConverters.IsNotNull}}" />
-                        <core:LinksPanel DataContext="{Binding Links}" ShowActions="True" />
-                        <!-- Every change of the amount, newest first -->
-                        <TextBlock Text="History" FontWeight="SemiBold" Margin="0,6,0,0" />
-                        <ItemsControl ItemsSource="{Binding Entries}">
-                            <ItemsControl.ItemTemplate>
-                                <DataTemplate DataType="vm:DebtEntryRow">
-                                    <Grid ColumnDefinitions="*,Auto,Auto" Margin="0,3">
-                                        <StackPanel VerticalAlignment="Center">
-                                            <TextBlock Text="{Binding KindText}" />
-                                            <TextBlock Text="{Binding When}" Classes="secondary" />
-                                            <TextBlock Text="{Binding Note}" Classes="secondary" IsVisible="{Binding HasNote}" TextWrapping="Wrap" />
-                                        </StackPanel>
-                                        <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="8,0,0,0">
-                                            <TextBlock Text="{Binding AmountText}" FontWeight="SemiBold" HorizontalAlignment="Right" Classes.owed="{Binding IsIncrease}" Classes.iowe="{Binding !IsIncrease}" />
-                                            <TextBlock Text="{Binding BalanceText}" Classes="secondary" HorizontalAlignment="Right" />
-                                        </StackPanel>
-                                        <Button Grid.Column="2" Classes="icon flat danger" Command="{Binding DeleteCommand}" AutomationProperties.Name="Delete entry">
-                                            <ic:SymbolIcon Symbol="Delete" FontSize="16" />
-                                        </Button>
-                                    </Grid>
-                                </DataTemplate>
-                            </ItemsControl.ItemTemplate>
-                        </ItemsControl>
-                    </StackPanel>
-                </StackPanel>
-            </Border>
-        </DataTemplate>
-
         <DataTemplate DataType="vm:TrackerItemViewModel">
             <Border BorderThickness="0,1,0,0" BorderBrush="{DynamicResource HelmCardStroke}" Padding="0,6">
                 <StackPanel>
@@ -185,8 +124,6 @@
                                 <TextBlock Text="{Binding Item.Notes}" Classes="secondary" IsVisible="{Binding HasNotes}" Margin="0,2,0,0" />
                             </StackPanel>
                         </Button>
-                        <TextBlock Grid.Column="2" Text="{Binding AmountText}" FontWeight="SemiBold" VerticalAlignment="Center" Margin="8,0,4,0"
-                                   IsVisible="{Binding IsDebt}" Classes.owed="{Binding OwedToMe}" Classes.iowe="{Binding IOwe}" />
                     </Grid>
 
                     <!-- Linked notes: tap one to open it in Notes -->
@@ -246,18 +183,9 @@
 
                     <!-- Inline editor -->
                     <StackPanel Spacing="8" Margin="0,8,0,4" IsVisible="{Binding IsEditing}">
-                        <StackPanel Spacing="8" IsVisible="{Binding IsDebt}">
-                            <TextBox PlaceholderText="Person" Text="{Binding EditPerson}" />
-                            <Grid ColumnDefinitions="*,8,Auto">
-                                <TextBox PlaceholderText="Amount" Text="{Binding EditAmount}" />
-                                <ComboBox Grid.Column="2" MinWidth="120"
-                                          ItemsSource="{Binding $parent[UserControl].((vm:TrackerViewModel)DataContext).DirectionNames}"
-                                          SelectedIndex="{Binding EditDirectionIndex}" />
-                            </Grid>
-                        </StackPanel>
                         <TextBox PlaceholderText="Title" Text="{Binding EditTitle}" />
                         <TextBox PlaceholderText="Notes" Text="{Binding EditNotes}" AcceptsReturn="True" TextWrapping="Wrap" MinHeight="64" />
-                        <ComboBox HorizontalAlignment="Stretch" IsVisible="{Binding !IsDebt}"
+                        <ComboBox HorizontalAlignment="Stretch"
                                   ItemsSource="{Binding $parent[UserControl].((vm:TrackerViewModel)DataContext).PriorityNames}"
                                   SelectedIndex="{Binding EditPriorityIndex}" />
                         <core:DateTimeBox Date="{Binding EditDueDate}" Time="{Binding EditDueTime}" Lean="Future" AllowEmpty="True" PlaceholderText="Due date (optional)" />
@@ -308,11 +236,9 @@
             <Border Classes="card" IsVisible="{Binding HasNoWorkspaces}" Margin="0,16,0,4">
                 <StackPanel Spacing="8">
                     <TextBlock Text="Create your first workspace" Classes="title" FontSize="16" />
-                    <TextBlock Classes="secondary" Text="A workspace is one list: a to-do list for tasks, or a debt book for who owes whom. You can add more later." />
+                    <TextBlock Classes="secondary" Text="A workspace is one to-do list. You can add more later. Debts are kept in Wallet." />
                     <Button Classes="accent" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Content="New to-do list"
                             Command="{Binding CreateTasksWorkspaceCommand}" />
-                    <Button HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Content="New debt book"
-                            Command="{Binding CreateDebtWorkspaceCommand}" />
                 </StackPanel>
             </Border>
 
@@ -470,19 +396,10 @@
 
             <StackPanel IsVisible="{Binding ShowListsView}">
             <!-- Add -->
-            <TextBlock Text="{Binding AddHeader}" Classes="section" />
+            <TextBlock Text="Add a task" Classes="section" />
             <Border Classes="card">
                 <StackPanel Spacing="8">
-                    <StackPanel Spacing="8" IsVisible="{Binding IsDebtWorkspace}">
-                        <!-- A name already in the book adds to that person -->
-                        <AutoCompleteBox PlaceholderText="Person" Text="{Binding NewPerson}" ItemsSource="{Binding PersonNames}" FilterMode="ContainsOrdinal"
-                                         MinimumPrefixLength="1" AutomationProperties.Name="Person" />
-                        <Grid ColumnDefinitions="*,8,Auto">
-                            <TextBox x:Name="AmountBox" PlaceholderText="Amount, e.g. 150k" Text="{Binding NewAmount}" AutomationProperties.Name="Amount" />
-                            <ComboBox Grid.Column="2" MinWidth="130" ItemsSource="{Binding DebtKindNames}" SelectedIndex="{Binding NewDebtKindIndex}" AutomationProperties.Name="Kind" />
-                        </Grid>
-                    </StackPanel>
-                    <TextBox PlaceholderText="{Binding TitlePlaceholder}" Text="{Binding NewTitle}" AutomationProperties.Name="Title">
+                    <TextBox PlaceholderText="What needs doing?" Text="{Binding NewTitle}" AutomationProperties.Name="Title">
                         <TextBox.KeyBindings>
                             <KeyBinding Gesture="Enter" Command="{Binding AddCommand}" />
                         </TextBox.KeyBindings>
@@ -507,49 +424,25 @@
                 </Grid>
             </Border>
 
-            <!-- Debt totals -->
-            <Grid ColumnDefinitions="*,4,*,4,*" Margin="0,16,0,0" IsVisible="{Binding IsDebtWorkspace}">
-                <Border Classes="card" Padding="12,10">
-                    <StackPanel>
-                        <Viewbox StretchDirection="DownOnly" HorizontalAlignment="Left"><TextBlock Text="{Binding OwedToMeText}" Classes="stat owed" FontSize="15" /></Viewbox>
-                        <TextBlock Text="Owed to me" Classes="secondary" />
-                    </StackPanel>
-                </Border>
-                <Border Grid.Column="2" Classes="card" Padding="12,10">
-                    <StackPanel>
-                        <Viewbox StretchDirection="DownOnly" HorizontalAlignment="Left"><TextBlock Text="{Binding IOweText}" Classes="stat iowe" FontSize="15" /></Viewbox>
-                        <TextBlock Text="I owe" Classes="secondary" />
-                    </StackPanel>
-                </Border>
-                <Border Grid.Column="4" Classes="card" Padding="12,10">
-                    <StackPanel>
-                        <Viewbox StretchDirection="DownOnly" HorizontalAlignment="Left"><TextBlock Text="{Binding NetText}" Classes="stat" FontSize="15" /></Viewbox>
-                        <TextBlock Text="Net" Classes="secondary" />
-                    </StackPanel>
-                </Border>
-            </Grid>
-
             <!-- Open -->
             <Grid ColumnDefinitions="*,Auto" Margin="4,20,0,8">
-                <TextBlock Text="{Binding OpenHeader}" FontWeight="SemiBold" VerticalAlignment="Center" />
+                <TextBlock Text="To do" FontWeight="SemiBold" VerticalAlignment="Center" />
                 <TextBlock Grid.Column="1" Text="{Binding OpenSummary}" Classes="secondary" VerticalAlignment="Center" />
             </Grid>
             <Border Classes="card" Padding="12,0">
                 <StackPanel>
-                    <TextBlock Margin="0,12" Text="{Binding EmptyOpenText}" Classes="secondary" IsVisible="{Binding HasNoOpen}" />
+                    <TextBlock Margin="0,12" Text="Nothing to do. Add a task above." Classes="secondary" IsVisible="{Binding HasNoOpen}" />
                     <ItemsControl ItemsSource="{Binding OpenItems}" Margin="0,-1,0,0" />
-                    <ItemsControl ItemsSource="{Binding DebtPeople}" Margin="0,-1,0,0" />
                 </StackPanel>
             </Border>
 
             <!-- Completed -->
-            <TextBlock Text="{Binding CompletedHeader}" Classes="section" IsVisible="{Binding ShowCompleted}" />
+            <TextBlock Text="Completed" Classes="section" IsVisible="{Binding ShowCompleted}" />
             <Border Classes="card" Padding="12,0" IsVisible="{Binding ShowCompleted}">
                 <StackPanel>
-                    <TextBlock Margin="0,12" Text="{Binding EmptyCompletedText}"
+                    <TextBlock Margin="0,12" Text="Nothing finished yet. Tick an item and it moves here, with its times recorded."
                                Classes="secondary" IsVisible="{Binding !HasCompleted}" />
                     <ItemsControl ItemsSource="{Binding CompletedItems}" Margin="0,-1,0,0" />
-                    <ItemsControl ItemsSource="{Binding SettledPeople}" Margin="0,-1,0,0" />
                 </StackPanel>
             </Border>
             </StackPanel>
@@ -574,7 +467,7 @@
                 <Border Classes="card" Margin="0,0,2,4">
                     <StackPanel>
                         <TextBlock Text="{Binding ReportCompleted}" Classes="stat" />
-                        <TextBlock Text="{Binding ReportCompletedLabel}" Classes="secondary" />
+                        <TextBlock Text="Completed" Classes="secondary" />
                     </StackPanel>
                 </Border>
                 <Border Classes="card" Margin="2,0,0,4">
@@ -586,16 +479,16 @@
                 <Border Classes="card" Margin="0,0,2,4">
                     <StackPanel>
                         <TextBlock Text="{Binding ReportAverageLead}" Classes="stat" />
-                        <TextBlock Text="{Binding ReportLeadLabel}" Classes="secondary" />
+                        <TextBlock Text="Average time from added to done" Classes="secondary" />
                     </StackPanel>
                 </Border>
                 <Border Classes="card" Margin="2,0,0,4">
                     <StackPanel>
                         <TextBlock Text="{Binding ReportMedianLead}" Classes="stat" />
-                        <TextBlock Text="{Binding ReportMedianLabel}" Classes="secondary" />
+                        <TextBlock Text="Median time from added to done" Classes="secondary" />
                     </StackPanel>
                 </Border>
-                <Border Classes="card" Margin="0,0,2,4" IsVisible="{Binding ShowTaskReport}">
+                <Border Classes="card" Margin="0,0,2,4">
                     <StackPanel>
                         <TextBlock Text="{Binding ReportAverageWork}" Classes="stat" />
                         <TextBlock Text="Average time from start to done" Classes="secondary" />
@@ -639,8 +532,8 @@
                             </DataTemplate>
                         </ItemsControl.ItemTemplate>
                     </ItemsControl>
-                    <TextBlock Text="By priority" Classes="title" Margin="0,16,0,6" IsVisible="{Binding ShowTaskReport}" />
-                    <ItemsControl ItemsSource="{Binding ReportPriorities}" IsVisible="{Binding ShowTaskReport}">
+                    <TextBlock Text="By priority" Classes="title" Margin="0,16,0,6" />
+                    <ItemsControl ItemsSource="{Binding ReportPriorities}">
                         <ItemsControl.ItemsPanel>
                             <ItemsPanelTemplate>
                                 <WrapPanel />

@@ -31,7 +31,6 @@ public partial class TrackerContentPage : UserControl
         _viewModel = viewModel;
         DataContext = viewModel;
         InitializeComponent();
-        AmountBox.TextChanged += OnAmountTextChanged;
     }
 
     /// <summary>The calendar as an .ics file through the share sheet (a calendar app, mail, Drive…).</summary>
@@ -48,28 +47,6 @@ public partial class TrackerContentPage : UserControl
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException)
         {
             _viewModel.ReportExportFailure(ex);
-        }
-    }
-
-    private bool _grouping;
-    private string _amountText = "";
-
-    /// <summary>Thousands separators while an amount is typed, so 1500000 reads 1,500,000; the caret stays put.</summary>
-    private void OnAmountTextChanged(object? sender, TextChangedEventArgs e)
-    {
-        if (_grouping || AmountBox.Text is not { } current) return;
-        var (text, caret) = TrackerFormat.GroupDigits(current, AmountBox.CaretIndex, _amountText);
-        _amountText = text;
-        if (text == current) return;
-        _grouping = true;
-        try
-        {
-            AmountBox.Text = text;
-            AmountBox.CaretIndex = caret;
-        }
-        finally
-        {
-            _grouping = false;
         }
     }
 

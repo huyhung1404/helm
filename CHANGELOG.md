@@ -3,6 +3,24 @@
 All notable changes to Helm. The top section is used as the GitHub release body and as the Velopack release notes.
 Format: [Keep a Changelog](https://keepachangelog.com), versions follow [SemVer](https://semver.org).
 
+## [Unreleased]
+
+### Changed
+- **Wallet**: the debt book moved here from Tracker. *Money* and *Debts* sit side by side at the top of Wallet;
+  *Debts* has the same book as before: who owes you and whom you owe, repayments that bring a balance back to 0,
+  due dates (+1 day, +1 week, +1 month), notes linked to a person, and *Settled*. Your debts are copied over by
+  themselves the first time this version runs, with nothing to do; notes linked to a person still are. Update Helm
+  on every device: an older version keeps showing the Tracker's old book, and a debt added there is copied over the
+  next time a new version checks.
+- **Wallet**: a transaction can go in the debt book. Open it and choose *Lent, borrowed, paid back* (the person icon
+  on the phone): pick the person and the kind, and its money becomes a debt entry. It then counts neither as
+  spending nor as income, and the entry shows the bank icon. Deleting the entry puts the transaction back with the
+  ones to categorize.
+- **Tracker** is for to-do lists only. Its calendar, its .ics file and its daily reminder still show the debts that
+  are due, from Wallet; tap one to open it there. *Quick Capture* `/d Nam 200k` and Claude's tools (`wallet_debts`,
+  `wallet_add_debt`, which replace `tracker_debts` and `tracker_add_debt`) write to Wallet. Tracker's CSV no longer
+  has the person, amount and direction columns.
+
 ## [0.26.1] - 2026-10-05
 
 ### Changed

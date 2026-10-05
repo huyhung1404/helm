@@ -5,6 +5,7 @@ using CommunityToolkit.Mvvm.Input;
 using Helm.Core.Links;
 using Helm.Core.Services;
 using Helm.Core.Settings;
+using Helm.Modules.Wallet;
 using Helm.Shell.Services;
 using Microsoft.Extensions.Logging;
 
@@ -38,6 +39,7 @@ public sealed partial class TrackerViewModel : ObservableObject
     private readonly TrackerReminderService _reminders;
     private readonly ILogger<TrackerViewModel> _logger;
     private readonly LinkHub? _links;
+    private readonly DebtBook? _debts;
     private int _linksQueued;
     private readonly Dictionary<string, TrackerItemViewModel> _rows = new(StringComparer.Ordinal);
     private int _refreshQueued;
@@ -46,30 +48,21 @@ public sealed partial class TrackerViewModel : ObservableObject
     // Workspace
     [ObservableProperty] private WorkspaceOption? _selectedWorkspace;
     [ObservableProperty] private string _workspaceName = "";
-    [ObservableProperty] private string _workspaceCurrency = "";
     [ObservableProperty] private string _newWorkspaceName = "";
-    [ObservableProperty] private int _newWorkspaceKindIndex;
 
     // Add form
     [ObservableProperty] [NotifyCanExecuteChangedFor(nameof(AddCommand))] private string _newTitle = "";
-    [ObservableProperty] [NotifyCanExecuteChangedFor(nameof(AddCommand))] private string _newPerson = "";
-    [ObservableProperty] private string _newAmount = "";
     [ObservableProperty] private int _newPriorityIndex = (int)TrackerPriority.Normal;
-    [ObservableProperty] private int _newDebtKindIndex;
     [ObservableProperty] private int _newRepeatIndex;
     [ObservableProperty] private string _newRepeatDays = "7";
     [ObservableProperty] private DateTime? _newDueDate;
     [ObservableProperty] private string _newDueTimeText = "";
     [ObservableProperty] private TimeSpan? _newDueTime;
     private bool _syncingTime;
-    private readonly Dictionary<string, DebtPersonViewModel> _people = new(StringComparer.Ordinal);
 
     // Lists, totals, report
     [ObservableProperty] private bool _showCompleted;
     [ObservableProperty] private string _openSummary = "";
-    [ObservableProperty] private string _owedToMeText = "";
-    [ObservableProperty] private string _iOweText = "";
-    [ObservableProperty] private string _netText = "";
     [ObservableProperty] private int _reportRangeIndex;
     [ObservableProperty] private bool _reportAllWorkspaces;
     [ObservableProperty] private string _reportCompleted = "0";
@@ -101,10 +94,12 @@ public sealed partial class TrackerViewModel : ObservableObject
         IClipboardService clipboard,
         TrackerReminderService reminders,
         ILogger<TrackerViewModel> logger,
-        LinkHub? links = null)
+        LinkHub? links = null,
+        DebtBook? debts = null)
     {
         _store = store;
         _links = links;
+        _debts = debts;
         _settings = settings.Get<TrackerSettings>(TrackerIds.ModuleId);
         _ui = ui;
         _dialogs = dialogs;
@@ -126,6 +121,8 @@ public sealed partial class TrackerViewModel : ObservableObject
         _loading = false;
 
         _store.Changed += (_, _) => ScheduleRefresh();
+        // The calendar shows when debts are due.
+        if (_debts is not null) _debts.Changed += (_, _) => ScheduleRefresh();
         if (_links is not null) _links.Changed += (_, _) => ScheduleLinksRefresh();
         Refresh();
     }
@@ -135,14 +132,10 @@ public sealed partial class TrackerViewModel : ObservableObject
     /// <summary>True when notes can be linked (the Notes tool is there).</summary>
     public bool CanLink => _links?.Provider(LinkKinds.Note) is not null;
 
-    /// <summary>The notes of a task (not of a subtask or a debt entry: those belong to their task or person).</summary>
+    /// <summary>The notes of a task (not of a subtask: those belong to their task).</summary>
     internal LinksViewModel? LinksFor(TrackerItemViewModel row) =>
-        !CanLink || row.IsDebt || row.IsSubtask ? null
+        !CanLink || row.IsSubtask ? null
             : new LinksViewModel(_links!, new LinkRef(LinkKinds.Task, TaskLinkProvider.LinkId(row.Id, row.Item)), [LinkKinds.Note], () => row.Item.Title);
-
-    /// <summary>The notes of a person in the debt book (all their entries).</summary>
-    internal LinksViewModel? LinksFor(DebtPersonViewModel person) =>
-        !CanLink ? null : new LinksViewModel(_links!, new LinkRef(LinkKinds.Person, person.Key), [LinkKinds.Note], () => person.Name);
 
     /// <summary>Shows a task, e.g. from a note linked to it: its list, with the row open.</summary>
     public void ShowItem(string workspaceId, string itemId)
@@ -151,12 +144,8 @@ public sealed partial class TrackerViewModel : ObservableObject
         if (_rows.TryGetValue(itemId, out var row)) row.IsExpanded = true;
     }
 
-    /// <summary>Shows a person of the debt book with their details open.</summary>
-    public void ShowPerson(string bookId, string key)
-    {
-        ShowWorkspace(bookId);
-        if (DebtPeople.Concat(SettledPeople).FirstOrDefault(p => p.Key == key) is { } person) person.Open();
-    }
+    /// <summary>Shows a person of Wallet's debt book (a debt due on the calendar).</summary>
+    private void ShowPerson(string key) => _links?.Provider(LinkKinds.Person)?.Open(key);
 
     private void ScheduleLinksRefresh()
     {
@@ -165,7 +154,6 @@ public sealed partial class TrackerViewModel : ObservableObject
         {
             Interlocked.Exchange(ref _linksQueued, 0);
             foreach (var row in _rows.Values) row.RefreshLinks();
-            foreach (var person in _people.Values) person.RefreshLinks();
         });
     }
 
@@ -173,39 +161,6 @@ public sealed partial class TrackerViewModel : ObservableObject
     public ObservableCollection<TrackerItemViewModel> OpenItems { get; } = [];
     public ObservableCollection<TrackerItemViewModel> CompletedItems { get; } = [];
 
-    /// <summary>Debt book: people with a balance, the largest first.</summary>
-    public ObservableCollection<DebtPersonViewModel> DebtPeople { get; } = [];
-
-    /// <summary>Debt book: people whose balance reached 0, most recently settled first.</summary>
-    public ObservableCollection<DebtPersonViewModel> SettledPeople { get; } = [];
-
-    /// <summary>Names already in the debt book, for the person box (the same name adds to that person).</summary>
-    public ObservableCollection<string> PersonNames { get; } = [];
-
-    /// <summary>Up to 6 names that contain what is typed in the person box (not shown once it is an exact name).</summary>
-    public ObservableCollection<string> PersonSuggestions { get; } = [];
-
-    public bool HasPersonSuggestions => PersonSuggestions.Count > 0;
-
-    partial void OnNewPersonChanged(string value) => UpdatePersonSuggestions();
-
-    private void UpdatePersonSuggestions()
-    {
-        var typed = DebtLedger.Clean(NewPerson);
-        var matches = typed.Length == 0 || PersonNames.Any(n => DebtLedger.Key(n) == DebtLedger.Key(typed))
-            ? []
-            : PersonNames.Where(n => n.Contains(typed, StringComparison.CurrentCultureIgnoreCase)).Take(6).ToList();
-        if (PersonSuggestions.SequenceEqual(matches)) return;
-        PersonSuggestions.Clear();
-        foreach (var name in matches) PersonSuggestions.Add(name);
-        OnPropertyChanged(nameof(HasPersonSuggestions));
-    }
-
-    [RelayCommand]
-    private void PickPerson(string? name)
-    {
-        if (name is { Length: > 0 }) NewPerson = name;
-    }
     public ObservableCollection<ReportBar> ReportDays { get; } = [];
     public ObservableCollection<ReportCount> ReportPriorities { get; } = [];
 
@@ -216,8 +171,6 @@ public sealed partial class TrackerViewModel : ObservableObject
     public ObservableCollection<HistoryRow> History { get; } = [];
 
     public IReadOnlyList<string> PriorityNames { get; } = Enum.GetValues<TrackerPriority>().Select(TrackerFormat.Priority).ToList();
-    public IReadOnlyList<string> DirectionNames { get; } = Enum.GetValues<DebtDirection>().Select(TrackerFormat.Direction).ToList();
-    public IReadOnlyList<string> DebtKindNames { get; } = Enum.GetValues<DebtEntryKind>().Select(TrackerFormat.DebtKind).ToList();
 
     /// <summary>Index 0: once, 1: every day for ever, 2: every day for a number of days.</summary>
     public IReadOnlyList<string> RepeatNames { get; } = ["Does not repeat", "Every day", "Every day, for a number of days"];
@@ -240,7 +193,6 @@ public sealed partial class TrackerViewModel : ObservableObject
         until = firstDay.AddDays(n - 1);
         return true;
     }
-    public IReadOnlyList<string> KindNames { get; } = Enum.GetValues<WorkspaceKind>().Select(TrackerFormat.Kind).ToList();
     public IReadOnlyList<string> ReportRangeNames { get; } = ["Last 7 days", "Last 30 days", "Last 90 days", "All time"];
     public IReadOnlyList<string> WidgetBackgroundNames { get; } = WidgetLook.BackgroundNames;
     public IReadOnlyList<string> WidgetTextNames { get; } = WidgetLook.TextNames;
@@ -296,35 +248,14 @@ public sealed partial class TrackerViewModel : ObservableObject
 
     public bool ShowCalendarView => HasWorkspaces && IsCalendar;
 
-    /// <summary>There is one debt book; once it exists only to-do lists can be added.</summary>
-    public bool CanAddDebtBook => !Workspaces.Any(w => w.Kind == WorkspaceKind.Debts);
-    public string NewWorkspaceHint => CanAddDebtBook
-        ? "A to-do list for tasks, or the debt book for who owes whom."
-        : "Another to-do list. Debts all go in your one debt book.";
-    public bool IsDebtWorkspace => SelectedWorkspace?.Kind == WorkspaceKind.Debts;
     public bool IsTaskWorkspace => SelectedWorkspace is { Kind: WorkspaceKind.Tasks };
-    public bool HasOpen => IsDebtWorkspace ? DebtPeople.Count > 0 : OpenItems.Count > 0;
+    public bool HasOpen => OpenItems.Count > 0;
     public bool HasNoOpen => SelectedWorkspace is not null && !HasOpen;
-    public bool HasCompleted => IsDebtWorkspace ? SettledPeople.Count > 0 : CompletedItems.Count > 0;
+    public bool HasCompleted => CompletedItems.Count > 0;
     public bool HasHistory => History.Count > 0;
     public bool HasMessage => !string.IsNullOrEmpty(Message);
     public bool HasReportData => ReportDays.Any(d => d.Count > 0);
 
-    /// <summary>"Owes me" / "Done" wording for the current workspace.</summary>
-    public string CompletedHeader => IsDebtWorkspace ? "Settled" : "Completed";
-    public string OpenHeader => IsDebtWorkspace ? "Outstanding" : "To do";
-    public string AddHeader => IsDebtWorkspace ? "Add a debt" : "Add a task";
-    public string TitlePlaceholder => IsDebtWorkspace ? "What it was for (optional)" : "What needs doing?";
-    public string EmptyOpenText => IsDebtWorkspace ? "Nothing outstanding. Everyone is square." : "Nothing to do. Add a task above.";
-    public string EmptyCompletedText => IsDebtWorkspace
-        ? "Nobody settled yet. When a balance reaches 0 (add a repayment), the person moves here with the date."
-        : "Nothing finished yet. Tick an item and it moves here, with its times recorded.";
-
-    /// <summary>Priorities and working time mean nothing for a debt book; its report shows only counts and times.</summary>
-    public bool ShowTaskReport => ReportAllWorkspaces || !IsDebtWorkspace;
-    public string ReportCompletedLabel => ShowTaskReport ? "Completed" : "Settled";
-    public string ReportLeadLabel => ShowTaskReport ? "Average time from added to done" : "Average time until paid back";
-    public string ReportMedianLabel => ShowTaskReport ? "Median time from added to done" : "Median time until paid back";
 
     // ---- Workspaces ----------------------------------------------------------------------------------------------
 
@@ -332,9 +263,7 @@ public sealed partial class TrackerViewModel : ObservableObject
     private void CreateWorkspace()
     {
         var name = NewWorkspaceName.Trim();
-        var kind = (WorkspaceKind)Math.Clamp(NewWorkspaceKindIndex, 0, KindNames.Count - 1);
-        if (name.Length == 0) name = kind == WorkspaceKind.Debts ? "Debts" : "To-do";
-        CreateAndSelect(name, kind);
+        CreateAndSelect(name.Length == 0 ? "To-do" : name);
         NewWorkspaceName = "";
     }
 
@@ -345,10 +274,7 @@ public sealed partial class TrackerViewModel : ObservableObject
     }
 
     [RelayCommand]
-    private void CreateTasksWorkspace() => CreateAndSelect("To-do", WorkspaceKind.Tasks);
-
-    [RelayCommand]
-    private void CreateDebtWorkspace() => CreateAndSelect("Debts", WorkspaceKind.Debts);
+    private void CreateTasksWorkspace() => CreateAndSelect("To-do");
 
     [RelayCommand]
     private async Task DeleteWorkspaceAsync()
@@ -372,7 +298,8 @@ public sealed partial class TrackerViewModel : ObservableObject
         LoadWorkspaceFields();
         RefreshItems();
         RefreshReport();
-        OnWorkspaceKindChanged();
+        OnPropertyChanged(nameof(IsTaskWorkspace));
+        AddCommand.NotifyCanExecuteChanged();
     }
 
     partial void OnWorkspaceNameChanged(string value)
@@ -381,16 +308,9 @@ public sealed partial class TrackerViewModel : ObservableObject
         Try(() => _store.UpdateWorkspace(ws.Id, w => w with { Name = value }));
     }
 
-    partial void OnWorkspaceCurrencyChanged(string value)
-    {
-        if (_loading || SelectedWorkspace is not { } ws) return;
-        Try(() => _store.UpdateWorkspace(ws.Id, w => w with { Currency = value }));
-    }
-
     // ---- Items ---------------------------------------------------------------------------------------------------
 
-    private bool CanAdd() => SelectedWorkspace is not null
-        && (IsDebtWorkspace ? NewPerson.Trim().Length > 0 : NewTitle.Trim().Length > 0);
+    private bool CanAdd() => SelectedWorkspace is not null && NewTitle.Trim().Length > 0;
 
     partial void OnNewDueTimeTextChanged(string value)
     {
@@ -426,32 +346,17 @@ public sealed partial class TrackerViewModel : ObservableObject
     {
         if (SelectedWorkspace is not { } ws) return;
         if (!TryNewDue(out var dueAt)) return;
-        if (ws.Kind == WorkspaceKind.Debts)
-        {
-            if (!TrackerFormat.TryParseAmount(NewAmount, out var amount) || amount == 0)
-            {
-                Message = string.IsNullOrWhiteSpace(NewAmount) ? "Enter an amount." : $"\u201c{NewAmount}\u201d is not an amount. Try 150000, 150,000 or 150k.";
-                return;
-            }
-            var kind = (DebtEntryKind)Math.Clamp(NewDebtKindIndex, 0, DebtKindNames.Count - 1);
-            if (!Try(() => _store.AddDebt(ws.Id, NewPerson, amount, kind, NewTitle, dueAt))) return;
-        }
-        else
-        {
-            var today = DateOnly.FromDateTime(TimeZoneInfo.ConvertTime(_store.Now, TimeZoneInfo.Local).DateTime);
-            if (!TryRepeat(NewRepeatIndex, NewRepeatDays, today, out var repeat, out var until)) return;
-            var draft = new TrackerItemDraft(
-                NewTitle,
-                (TrackerPriority)Math.Clamp(NewPriorityIndex, 0, PriorityNames.Count - 1),
-                NewDueDate is { } day ? DateOnly.FromDateTime(day) : null,
-                DueAt: NewDueTime is null && string.IsNullOrWhiteSpace(NewDueTimeText) ? null : dueAt,
-                RepeatDaily: repeat,
-                RepeatUntil: until);
-            if (!Try(() => _store.AddItem(ws.Id, draft))) return;
-        }
+        var today = DateOnly.FromDateTime(TimeZoneInfo.ConvertTime(_store.Now, TimeZoneInfo.Local).DateTime);
+        if (!TryRepeat(NewRepeatIndex, NewRepeatDays, today, out var repeat, out var until)) return;
+        var draft = new TrackerItemDraft(
+            NewTitle,
+            (TrackerPriority)Math.Clamp(NewPriorityIndex, 0, PriorityNames.Count - 1),
+            NewDueDate is { } day ? DateOnly.FromDateTime(day) : null,
+            DueAt: NewDueTime is null && string.IsNullOrWhiteSpace(NewDueTimeText) ? null : dueAt,
+            RepeatDaily: repeat,
+            RepeatUntil: until);
+        if (!Try(() => _store.AddItem(ws.Id, draft))) return;
         NewTitle = "";
-        NewPerson = "";
-        NewAmount = "";
         NewDueDate = null;
         NewDueTimeText = "";
         NewRepeatIndex = 0;
@@ -469,27 +374,12 @@ public sealed partial class TrackerViewModel : ObservableObject
         return Try(() => _store.AddItem(ws.Id, new TrackerItemDraft(title, parent.Item.Priority, ParentId: parent.Id)));
     }
 
-    internal void SetDebtDue(DebtPersonViewModel person, DateTimeOffset? due)
-    {
-        if (SelectedWorkspace is not { } ws) return;
-        Try(() => _store.SetDebtDue(ws.Id, person.Name, due));
-    }
-
-    internal async Task DeleteDebtEntryAsync(DebtPersonViewModel person, DebtEntryRow entry)
-    {
-        var ok = await _dialogs.ConfirmAsync(
-            "Delete this entry?",
-            $"{entry.KindText} {entry.AmountText} for {person.Name} will be removed from all your devices and the balance changes by that much. The history keeps a record.",
-            "Delete").ConfigureAwait(true);
-        if (ok) Try(() => _store.DeleteItem(entry.Id));
-    }
-
     internal void Move(TrackerItemViewModel row, int delta) => Try(() => _store.Move(row.Id, delta));
 
     internal async Task DeleteAsync(TrackerItemViewModel row)
     {
         var ok = await _dialogs.ConfirmAsync(
-            row.IsDebt ? "Delete this debt?" : "Delete this task?",
+            "Delete this task?",
             row.Item.RepeatDaily
                 ? $"\u201c{row.Title}\u201d repeats every day. Deleting it removes today's and stops the repeating on all your devices; the days already done stay in the reports."
                 : $"\u201c{row.Title}\u201d will be removed from all your devices. Its history stays in the reports.",
@@ -499,17 +389,7 @@ public sealed partial class TrackerViewModel : ObservableObject
 
     internal bool SaveEdit(TrackerItemViewModel row)
     {
-        decimal amount = row.Item.Amount;
-        if (row.IsDebt && !TrackerFormat.TryParseAmount(row.EditAmount, out amount))
-        {
-            if (!string.IsNullOrWhiteSpace(row.EditAmount))
-            {
-                Message = $"“{row.EditAmount}” is not an amount. Try 150000, 150,000 or 150k.";
-                return false;
-            }
-            amount = 0;
-        }
-        if (!row.IsDebt && row.EditTitle.Trim().Length == 0)
+        if (row.EditTitle.Trim().Length == 0)
         {
             Message = "A task needs a title.";
             return false;
@@ -526,9 +406,6 @@ public sealed partial class TrackerViewModel : ObservableObject
             Priority = (TrackerPriority)Math.Clamp(row.EditPriorityIndex, 0, PriorityNames.Count - 1),
             DueDate = row.EditDueDate is { } due ? DateOnly.FromDateTime(due) : null,
             DueAt = row.EditDueDate is not null && row.EditDueTime is not null ? TrackerDue.FromLocal(row.EditDueDate, row.EditDueTime, TimeZoneInfo.Local) : null,
-            Person = row.EditPerson,
-            Amount = amount,
-            Direction = (DebtDirection)Math.Clamp(row.EditDirectionIndex, 0, DirectionNames.Count - 1),
             RepeatDaily = repeat,
             RepeatUntil = until,
         }));
@@ -588,7 +465,6 @@ public sealed partial class TrackerViewModel : ObservableObject
     {
         if (_loading) return;
         _settings.Update(s => s.ReportAllWorkspaces = value);
-        OnReportScopeChanged();
         RefreshReport();
     }
 
@@ -691,10 +567,8 @@ public sealed partial class TrackerViewModel : ObservableObject
         OnPropertyChanged(nameof(HasNoWorkspaces));
         OnPropertyChanged(nameof(ShowListsView));
         OnPropertyChanged(nameof(ShowCalendarView));
-        OnPropertyChanged(nameof(CanAddDebtBook));
-        OnPropertyChanged(nameof(NewWorkspaceHint));
-        if (!CanAddDebtBook) NewWorkspaceKindIndex = (int)WorkspaceKind.Tasks;
-        OnWorkspaceKindChanged();
+        OnPropertyChanged(nameof(IsTaskWorkspace));
+        AddCommand.NotifyCanExecuteChanged();
     }
 
     private void LoadWorkspaceFields()
@@ -702,7 +576,6 @@ public sealed partial class TrackerViewModel : ObservableObject
         _loading = true;
         var ws = SelectedWorkspace is { } s ? _store.GetWorkspace(s.Id) : null;
         WorkspaceName = ws?.Name ?? "";
-        WorkspaceCurrency = ws?.Currency ?? "";
         _loading = false;
     }
 
@@ -712,15 +585,8 @@ public sealed partial class TrackerViewModel : ObservableObject
         if (ws is null || SelectedWorkspace is null)
         {
             _rows.Clear();
-            _people.Clear();
             Reconcile(OpenItems, []);
             Reconcile(CompletedItems, []);
-            Reconcile(DebtPeople, []);
-            Reconcile(SettledPeople, []);
-        }
-        else if (ws.Kind == WorkspaceKind.Debts)
-        {
-            RefreshDebts(SelectedWorkspace.Id, ws);
         }
         else
         {
@@ -732,9 +598,6 @@ public sealed partial class TrackerViewModel : ObservableObject
             var live = new HashSet<string>(items.Select(i => i.Id), StringComparer.Ordinal);
             foreach (var stale in _rows.Keys.Where(k => !live.Contains(k)).ToList()) _rows.Remove(stale);
 
-            _people.Clear();
-            Reconcile(DebtPeople, []);
-            Reconcile(SettledPeople, []);
             var openRows = open.Select(i => Row(i.Id, i.Value, ws, today)).ToList();
             foreach (var row in openRows)
                 row.SetSubtasks(_store.Subtasks(row.Id).Select(sub => Row(sub.Id, sub.Value, ws, today)).ToList());
@@ -750,54 +613,12 @@ public sealed partial class TrackerViewModel : ObservableObject
             Reconcile(CompletedItems, doneRows);
 
             var started = open.Count(i => i.Value.StartedExplicitly);
-            OpenSummary = ws.Kind == WorkspaceKind.Debts
-                ? $"{open.Count} outstanding"
-                : started > 0 ? $"{open.Count} open · {started} in progress" : $"{open.Count} open";
+            OpenSummary = started > 0 ? $"{open.Count} open · {started} in progress" : $"{open.Count} open";
 
         }
         OnPropertyChanged(nameof(HasOpen));
         OnPropertyChanged(nameof(HasNoOpen));
         OnPropertyChanged(nameof(HasCompleted));
-    }
-
-    /// <summary>The debt book: people and their balances (see <see cref="DebtLedger"/>).</summary>
-    private void RefreshDebts(string workspaceId, TrackerWorkspace ws)
-    {
-        _rows.Clear();
-        Reconcile(OpenItems, []);
-        Reconcile(CompletedItems, []);
-        var items = _store.Items(workspaceId);
-        var now = _store.Now;
-        var open = DebtLedger.Open(items);
-        var settled = DebtLedger.Settled(items).Take(CompletedLimit);
-
-        var seen = new HashSet<string>(StringComparer.Ordinal);
-        DebtPersonViewModel Person(DebtPerson p, string key)
-        {
-            seen.Add(key);
-            if (_people.TryGetValue(key, out var vm)) vm.Update(p, ws.Currency, now);
-            else _people[key] = vm = new DebtPersonViewModel(this, p, ws.Currency, now);
-            return vm;
-        }
-        // A balance already back at 0 (entries from older versions, or edits on two devices) counts as settled.
-        var owing = open.Where(p => !p.IsSettled).Select(p => Person(p, "open|" + p.Key)).ToList();
-        var square = open.Where(p => p.IsSettled).Select(p => Person(p, "zero|" + p.Key))
-            .Concat(settled.Select(p => Person(p, $"settled|{p.Key}|{p.SettledAt:O}"))).ToList();
-        foreach (var stale in _people.Keys.Where(k => !seen.Contains(k)).ToList()) _people.Remove(stale);
-        Reconcile(DebtPeople, owing);
-        Reconcile(SettledPeople, square);
-
-        var names = items.Select(i => DebtLedger.Clean(i.Value.Person)).Where(n => n.Length > 0)
-            .DistinctBy(DebtLedger.Key).Order(StringComparer.CurrentCultureIgnoreCase).ToList();
-        Reconcile(PersonNames, names.Select(n => PersonNames.FirstOrDefault(x => x == n) ?? n).ToList());
-        UpdatePersonSuggestions();
-
-        OpenSummary = owing.Count == 1 ? "1 person" : $"{owing.Count} people";
-        var owedToMe = open.Where(p => p.Balance > 0).Sum(p => p.Balance);
-        var iOwe = -open.Where(p => p.Balance < 0).Sum(p => p.Balance);
-        OwedToMeText = TrackerFormat.Money(owedToMe, ws.Currency);
-        IOweText = TrackerFormat.Money(iOwe, ws.Currency);
-        NetText = TrackerFormat.Balance(owedToMe - iOwe, ws.Currency);
     }
 
     /// <summary>Re-reads every row's secondary line so "just now" becomes "1 min ago" without a reload.</summary>
@@ -860,7 +681,7 @@ public sealed partial class TrackerViewModel : ObservableObject
     {
         var names = WorkspaceMap();
         var rows = _store.History()
-            .AsEnumerable()
+            .Where(e => e.WorkspaceKind == WorkspaceKind.Tasks)
             .Reverse()
             .Take(HistoryLimit)
             .Select(e => new HistoryRow(
@@ -874,15 +695,11 @@ public sealed partial class TrackerViewModel : ObservableObject
 
     private static string Describe(TrackerEvent e)
     {
-        var debt = e.WorkspaceKind == WorkspaceKind.Debts;
-        var what = debt
-            ? string.Join(" — ", new[] { e.Person, e.Title }.Where(s => s.Length > 0))
-            : e.Title;
+        var what = e.Title;
         return e.Kind switch
         {
             TrackerEventKind.Created => $"Added “{what}”",
             TrackerEventKind.Started => $"Started “{what}”",
-            TrackerEventKind.Completed when debt => $"Settled “{what}”",
             TrackerEventKind.Completed => $"Completed “{what}” in {TrackerFormat.Duration((e.CompletedAt ?? e.At) - e.CreatedAt)}",
             TrackerEventKind.Reopened => $"Reopened “{what}”",
             TrackerEventKind.Deleted => $"Deleted “{what}”",
@@ -890,32 +707,10 @@ public sealed partial class TrackerViewModel : ObservableObject
         };
     }
 
-    private void OnWorkspaceKindChanged()
-    {
-        OnPropertyChanged(nameof(IsDebtWorkspace));
-        OnPropertyChanged(nameof(IsTaskWorkspace));
-        OnPropertyChanged(nameof(CompletedHeader));
-        OnPropertyChanged(nameof(OpenHeader));
-        OnPropertyChanged(nameof(AddHeader));
-        OnPropertyChanged(nameof(TitlePlaceholder));
-        OnPropertyChanged(nameof(EmptyOpenText));
-        OnPropertyChanged(nameof(EmptyCompletedText));
-        OnReportScopeChanged();
-        AddCommand.NotifyCanExecuteChanged();
-    }
-
-    private void OnReportScopeChanged()
-    {
-        OnPropertyChanged(nameof(ShowTaskReport));
-        OnPropertyChanged(nameof(ReportCompletedLabel));
-        OnPropertyChanged(nameof(ReportLeadLabel));
-        OnPropertyChanged(nameof(ReportMedianLabel));
-    }
-
-    private void CreateAndSelect(string name, WorkspaceKind kind)
+    private void CreateAndSelect(string name)
     {
         string? id = null;
-        if (!Try(() => id = _store.AddWorkspace(name, kind))) return;
+        if (!Try(() => id = _store.AddWorkspace(name))) return;
         Refresh();
         SelectedWorkspace = Workspaces.FirstOrDefault(w => w.Id == id) ?? SelectedWorkspace;
     }

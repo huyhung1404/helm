@@ -1,4 +1,5 @@
 using System.Text.Json.Serialization;
+using Helm.Modules.Wallet;
 
 namespace Helm.Modules.Tracker;
 
@@ -8,7 +9,10 @@ public enum WorkspaceKind
     /// <summary>Things to do: title, priority, due date.</summary>
     Tasks,
 
-    /// <summary>A debt book: who, how much and which way; "done" means settled.</summary>
+    /// <summary>
+    /// The old debt book (Helm 0.26 and older). Its entries moved to Wallet's debt book; the workspace is kept for those
+    /// versions and no longer shown.
+    /// </summary>
     Debts,
 }
 
@@ -20,27 +24,6 @@ public enum TrackerPriority
     Urgent,
 }
 
-public enum DebtDirection
-{
-    /// <summary>The person owes the user.</summary>
-    TheyOweMe,
-
-    /// <summary>The user owes the person.</summary>
-    IOwe,
-}
-
-/// <summary>
-/// What the user adds to a person's debts. A repayment is stored as the direction that pulls the balance toward 0 (plus
-/// <see cref="TrackerItem.IsRepayment"/>), so older Helm versions, which know only the two directions, still add up the
-/// same balance.
-/// </summary>
-public enum DebtEntryKind
-{
-    OwesMe,
-    IOwe,
-    Repayment,
-}
-
 /// <summary>A named list (synced record in <c>tracker.workspaces</c>).</summary>
 public sealed record TrackerWorkspace
 {
@@ -48,7 +31,7 @@ public sealed record TrackerWorkspace
 
     public WorkspaceKind Kind { get; init; }
 
-    /// <summary>Debts only: the unit shown after amounts, e.g. "₫" or "USD".</summary>
+    /// <summary>The old debt book only: the unit shown after amounts, e.g. "₫".</summary>
     public string Currency { get; init; } = "";
 
     /// <summary>Position in the workspace list (ascending).</summary>
@@ -62,7 +45,7 @@ public sealed record TrackerItem
 {
     public string WorkspaceId { get; init; } = "";
 
-    /// <summary>Tasks: what to do. Debts: what the money was for (may be empty).</summary>
+    /// <summary>Tasks: what to do. An old debt entry: what the money was for (may be empty).</summary>
     public string Title { get; init; } = "";
 
     public string Notes { get; init; } = "";
@@ -81,7 +64,7 @@ public sealed record TrackerItem
     /// <summary>Tasks: the item this is a subtask of (subtasks are items of their own, so older versions keep them).</summary>
     public string? ParentId { get; init; }
 
-    /// <summary>Debts: this entry is a repayment (its <see cref="Direction"/> pulls the balance toward 0).</summary>
+    /// <summary>An old debt entry: a repayment (its <see cref="Direction"/> pulls the balance toward 0).</summary>
     public bool IsRepayment { get; init; }
 
     /// <summary>
@@ -109,12 +92,15 @@ public sealed record TrackerItem
     /// <summary>True when <see cref="StartedAt"/> came from the Start button rather than from completion.</summary>
     public bool StartedExplicitly { get; init; }
 
-    // Debts
+    // An entry of the old debt book (Helm 0.26 and older), read once to hand it over to Wallet.
     public string Person { get; init; } = "";
 
     public decimal Amount { get; init; }
 
     public DebtDirection Direction { get; init; }
+
+    /// <summary>An old debt entry already copied into Wallet's debt book (under the same id).</summary>
+    public bool MovedToWallet { get; init; }
 
     [JsonIgnore]
     public bool IsCompleted => CompletedAt is not null;
@@ -124,10 +110,6 @@ public sealed record TrackerItem
 
     [JsonIgnore]
     public bool IsRepeating => SeriesId is not null;
-
-    /// <summary>+Amount when the person owes the user, −Amount when the user owes them.</summary>
-    [JsonIgnore]
-    public decimal SignedAmount => Direction == DebtDirection.TheyOweMe ? Amount : -Amount;
 
     /// <summary>When the item is due: its time, or the end of its due day (local) when only a day was set.</summary>
     public DateTimeOffset? DueMoment(TimeZoneInfo zone) => TrackerDue.Moment(DueAt, DueDate, zone);
@@ -240,9 +222,6 @@ public sealed record TrackerItemDraft(
     TrackerPriority Priority = TrackerPriority.Normal,
     DateOnly? DueDate = null,
     string Notes = "",
-    string Person = "",
-    decimal Amount = 0,
-    DebtDirection Direction = DebtDirection.TheyOweMe,
     DateTimeOffset? DueAt = null,
     string? ParentId = null,
     bool RepeatDaily = false,

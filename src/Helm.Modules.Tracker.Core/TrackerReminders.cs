@@ -1,4 +1,5 @@
 using Helm.Core.Settings;
+using Helm.Modules.Wallet;
 
 namespace Helm.Modules.Tracker;
 
@@ -12,21 +13,27 @@ public sealed record TrackerReminder(int Overdue, int DueToday, int DueSoon, str
 /// Decides when to remind about due items and what to say. Platform-free: the Windows module shows the result as a
 /// tray notification, the Android side as a system notification (from its daily alarm, even with the app closed).
 /// At most one reminder per day and device; the day's reminder comes from <see cref="TrackerSettings.ReminderHour"/>.
+/// Debts due in Wallet's debt book are in the same reminder (they were in the Tracker until Helm 0.26).
 /// </summary>
 public sealed class TrackerReminderService
 {
     public const int MaxLines = 5;
 
     private readonly TrackerStore _store;
+    private readonly DebtBook? _debts;
+    private readonly TrackerDebtHandover? _handover;
     private readonly ISettingsStore<TrackerSettings> _settings;
     private readonly TimeProvider _time;
     private readonly object _gate = new();
 
-    public TrackerReminderService(TrackerStore store, ISettingsStoreFactory settings, TimeProvider? time = null)
+    public TrackerReminderService(TrackerStore store, ISettingsStoreFactory settings, TimeProvider? time = null, DebtBook? debts = null)
     {
         _store = store;
+        _debts = debts;
+        _handover = debts is null ? null : new TrackerDebtHandover(store, debts);
         _settings = settings.Get<TrackerSettings>(TrackerIds.ModuleId);
         _time = time ?? TimeProvider.System;
+        MoveOldDebts();
     }
 
     /// <summary>Raised by <see cref="RemindNow"/>; the platform module shows it.</summary>
@@ -49,7 +56,7 @@ public sealed class TrackerReminderService
             var today = DateOnly.FromDateTime(local.DateTime);
             if (local.Hour < Math.Clamp(s.ReminderHour, 0, 23) || s.LastReminderDate == today) return null;
 
-            var reminder = Build(_store, today, s.RemindDaysBefore);
+            var reminder = Build(_store, today, s.RemindDaysBefore, _debts);
             // Nothing due: keep checking, so an item added later today can still be reminded about.
             if (reminder is null) return null;
             _settings.Update(x => x.LastReminderDate = today);
@@ -57,18 +64,30 @@ public sealed class TrackerReminderService
         }
     }
 
-    /// <summary>"Remind me now": shows the reminder whatever the hour. False when nothing is due.</summary>
-    /// <summary>Called on the reminder timer (PC every 10 minutes, Android every hour): also makes today's repeating tasks.</summary>
+    /// <summary>
+    /// Called on the reminder timer (PC every 10 minutes, Android every hour): also makes today's repeating tasks and
+    /// copies into Wallet any debt an older Helm added to the old debt book meanwhile.
+    /// </summary>
     private void MakeTodaysRepeats()
     {
         try { _store.EnsureRepeats(); }
         catch (Exception) { /* a sync store problem must not stop the reminder */ }
+        MoveOldDebts();
     }
+
+    /// <summary>Copies the old debt book into Wallet (see <see cref="TrackerDebtHandover"/>).</summary>
+    public int MoveOldDebts()
+    {
+        try { return _handover?.Run() ?? 0; }
+        catch (Exception) { return 0; /* tried again on the next check */ }
+    }
+
+    /// <summary>"Remind me now": shows the reminder whatever the hour. False when nothing is due.</summary>
 
     public bool RemindNow(TimeZoneInfo? zone = null)
     {
         var today = DateOnly.FromDateTime(TimeZoneInfo.ConvertTime(_time.GetUtcNow(), zone ?? TimeZoneInfo.Local).DateTime);
-        if (Build(_store, today, _settings.Current.RemindDaysBefore) is not { } reminder) return false;
+        if (Build(_store, today, _settings.Current.RemindDaysBefore, _debts) is not { } reminder) return false;
         Requested?.Invoke(this, reminder);
         return true;
     }
@@ -83,24 +102,38 @@ public sealed class TrackerReminderService
         return new DateTimeOffset(at, tz.GetUtcOffset(at));
     }
 
-    /// <summary>What is due: open items of every workspace with a due date on or before today + <paramref name="daysBefore"/>.</summary>
-    public static TrackerReminder? Build(TrackerStore store, DateOnly today, int daysBefore)
+    /// <summary>
+    /// What is due: open items of every to-do list with a due date on or before today + <paramref name="daysBefore"/>,
+    /// and the people in the debt book whose balance is due by then.
+    /// </summary>
+    public static TrackerReminder? Build(TrackerStore store, DateOnly today, int daysBefore, DebtBook? debts = null)
     {
         var horizon = today.AddDays(Math.Clamp(daysBefore, 0, 30));
-        var workspaces = store.Workspaces().ToDictionary(w => w.Id, w => w.Value, StringComparer.Ordinal);
+        var zone = TimeZoneInfo.Local;
         var due = store.AllItems()
-            .Where(i => !i.Value.IsCompleted && i.Value.DueDate is { } d && d <= horizon && workspaces.ContainsKey(i.Value.WorkspaceId))
+            .Where(i => !i.Value.IsCompleted && i.Value.DueDate is { } d && d <= horizon)
             .OrderBy(i => i.Value.DueDate)
             .ThenByDescending(i => i.Value.Priority)
             .ThenBy(i => i.Value.CreatedAt)
+            .Select(i => (Day: i.Value.DueDate!.Value, Name: i.Value.Title))
             .ToList();
+        if (debts is not null)
+        {
+            foreach (var person in debts.Open().Where(p => !p.IsSettled))
+            {
+                if (DebtDue.Day(person.Due(zone), zone) is not { } day || day > horizon) continue;
+                var money = WalletFormat.Money(Math.Abs(person.Balance));
+                due.Add((day, person.Balance > 0 ? $"{person.Name} pays back {money}" : $"Pay {person.Name} back {money}"));
+            }
+            due = due.OrderBy(d => d.Day).ToList();
+        }
         if (due.Count == 0) return null;
 
         int overdue = 0, dueToday = 0, soon = 0;
-        foreach (var (_, item, _) in due)
+        foreach (var (day, _) in due)
         {
-            if (item.DueDate < today) overdue++;
-            else if (item.DueDate == today) dueToday++;
+            if (day < today) overdue++;
+            else if (day == today) dueToday++;
             else soon++;
         }
 
@@ -110,14 +143,7 @@ public sealed class TrackerReminderService
         if (soon > 0) parts.Add($"{soon} due soon");
         var title = "Tracker: " + string.Join(" · ", parts);
 
-        var lines = due.Take(MaxLines).Select(i =>
-        {
-            var item = i.Value;
-            var name = workspaces[item.WorkspaceId].Kind == WorkspaceKind.Debts && item.Person.Length > 0
-                ? (item.Title.Length > 0 ? $"{item.Person} — {item.Title}" : item.Person)
-                : item.Title;
-            return $"{name} ({TrackerFormat.Due(item.DueDate!.Value, today).ToLowerInvariant()})";
-        }).ToList();
+        var lines = due.Take(MaxLines).Select(d => $"{d.Name} ({TrackerFormat.Due(d.Day, today).ToLowerInvariant()})").ToList();
         if (due.Count > MaxLines) lines.Add($"and {due.Count - MaxLines} more");
         return new TrackerReminder(overdue, dueToday, soon, title, string.Join("\n", lines));
     }
