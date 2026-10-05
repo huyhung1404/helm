@@ -1,5 +1,6 @@
 using System.ComponentModel;
 using System.Globalization;
+using System.Runtime.CompilerServices;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Data;
@@ -40,6 +41,29 @@ public partial class WalletContentPage : Page
             values is [double share, double width] && width > 0 ? Math.Max(4, share * width) : 4.0;
 
         public object[] ConvertBack(object value, Type[] targetTypes, object? parameter, CultureInfo culture) => [];
+    }
+
+    private readonly ConditionalWeakTable<TextBox, string> _amountTexts = [];
+    private bool _grouping;
+
+    /// <summary>Thousands separators while an amount is typed, so 1000000 reads 1.000.000; the caret stays put.</summary>
+    private void OnAmountTextChanged(object sender, TextChangedEventArgs e)
+    {
+        if (_grouping || sender is not TextBox box) return;
+        var previous = _amountTexts.TryGetValue(box, out var before) ? before : "";
+        var (text, caret) = WalletFormat.GroupDigits(box.Text, box.CaretIndex, previous);
+        _amountTexts.AddOrUpdate(box, text);
+        if (text == box.Text) return;
+        _grouping = true;
+        try
+        {
+            box.Text = text;
+            box.CaretIndex = caret;
+        }
+        finally
+        {
+            _grouping = false;
+        }
     }
 
     private void OnViewModelChanged(object? sender, PropertyChangedEventArgs e)

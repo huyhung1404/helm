@@ -248,7 +248,7 @@
                                             <ColumnDefinition Width="*" />
                                             <ColumnDefinition Width="Auto" />
                                         </Grid.ColumnDefinitions>
-                                        <ui:TextBox AutomationProperties.Name="Amount" Text="{Binding EditAmount, UpdateSourceTrigger=PropertyChanged}" />
+                                        <ui:TextBox AutomationProperties.Name="Amount" Text="{Binding EditAmount, UpdateSourceTrigger=PropertyChanged}" TextChanged="OnAmountTextChanged" />
                                         <CheckBox Grid.Column="1" Content="Money in" IsChecked="{Binding EditIsIncome}" VerticalAlignment="Center" Margin="12,0,0,0" />
                                     </Grid>
                                 </StackPanel>
@@ -335,7 +335,7 @@
                                     <ColumnDefinition Width="Auto" />
                                 </Grid.ColumnDefinitions>
                                 <ui:TextBox x:Name="NewAmountBox" PlaceholderText="50k, 1.5tr" AutomationProperties.Name="Amount"
-                                            Text="{Binding NewAmount, UpdateSourceTrigger=PropertyChanged}" />
+                                            Text="{Binding NewAmount, UpdateSourceTrigger=PropertyChanged}" TextChanged="OnAmountTextChanged" />
                                 <CheckBox Grid.Column="1" Content="Money in" IsChecked="{Binding NewIsIncome}" VerticalAlignment="Center" Margin="12,0,0,0" />
                             </Grid>
                         </StackPanel>

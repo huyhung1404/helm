@@ -1,4 +1,5 @@
 using System.ComponentModel;
+using System.Runtime.CompilerServices;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Threading;
@@ -31,6 +32,31 @@ public partial class WalletContentPage : UserControl
         _viewModel = viewModel;
         DataContext = viewModel;
         InitializeComponent();
+        // The new transaction's amount and every row's editor: TextChanged bubbles up from the templates.
+        AddHandler(TextBox.TextChangedEvent, OnAmountTextChanged);
+    }
+
+    private readonly ConditionalWeakTable<TextBox, string> _amountTexts = [];
+    private bool _grouping;
+
+    /// <summary>Thousands separators while an amount is typed, so 1000000 reads 1.000.000; the caret stays put.</summary>
+    private void OnAmountTextChanged(object? sender, TextChangedEventArgs e)
+    {
+        if (_grouping || e.Source is not TextBox { Text: { } current } box || !box.Classes.Contains("amount")) return;
+        var previous = _amountTexts.TryGetValue(box, out var before) ? before : "";
+        var (text, caret) = WalletFormat.GroupDigits(current, box.CaretIndex, previous);
+        _amountTexts.AddOrUpdate(box, text);
+        if (text == current) return;
+        _grouping = true;
+        try
+        {
+            box.Text = text;
+            box.CaretIndex = caret;
+        }
+        finally
+        {
+            _grouping = false;
+        }
     }
 
     // Pages are transient and the module and view model are singletons: listen only while shown.

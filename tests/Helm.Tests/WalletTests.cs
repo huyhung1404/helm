@@ -1,3 +1,4 @@
+using System.Globalization;
 using Helm.Core.Settings;
 using Helm.Modules.Wallet;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -185,6 +186,41 @@ public sealed class WalletTests : IDisposable
     {
         Assert.True(WalletText.TryParseAmount(text, out var amount));
         Assert.Equal(expected, amount);
+    }
+
+    [Theory]
+    [InlineData("1000000", 7, "", "1.000.000", 9)] // typed or pasted digits
+    [InlineData("1.000.0000", 10, "1.000.000", "10.000.000", 10)] // one more digit
+    [InlineData("1.00", 4, "1.000", "100", 3)] // a digit deleted
+    [InlineData("1000", 1, "1.000", "1.000", 1)] // a separator deleted comes back
+    [InlineData("1.", 2, "1", "1.", 2)] // a '.' typed on the way to "1.5tr"
+    [InlineData("1.5", 3, "1.", "1.5", 3)]
+    [InlineData("1.5t", 4, "1.5", "1.5t", 4)]
+    [InlineData("500k", 4, "500", "500k", 4)]
+    [InlineData("10tr", 4, "10t", "10tr", 4)]
+    [InlineData("007", 3, "00", "7", 1)]
+    [InlineData("6.000.000", 9, "", "6.000.000", 9)] // the editor filled in
+    public void Amounts_get_thousands_separators_while_typed(string text, int caret, string previous, string expected, int expectedCaret)
+    {
+        var (grouped, newCaret) = WalletFormat.GroupDigits(text, caret, previous, CultureInfo.GetCultureInfo("vi-VN"));
+        Assert.Equal(expected, grouped);
+        Assert.Equal(expectedCaret, newCaret);
+        Assert.Equal("1,000,000", WalletFormat.GroupDigits("1000000", 7, "", CultureInfo.GetCultureInfo("en-US")).Text);
+    }
+
+    [Fact]
+    public void Typing_digit_by_digit_groups_and_still_reads()
+    {
+        var vi = CultureInfo.GetCultureInfo("vi-VN");
+        var text = "";
+        foreach (var key in "1000000")
+            text = WalletFormat.GroupDigits(text + key, text.Length + 1, text, vi).Text;
+        Assert.Equal("1.000.000", text);
+        Assert.True(WalletText.TryParseAmount(text, out var amount) && amount == 1_000_000);
+        // Backspace from the end: still grouped, still the number on screen.
+        text = WalletFormat.GroupDigits(text[..^1], text.Length - 1, text, vi).Text;
+        Assert.Equal("100.000", text);
+        Assert.True(WalletText.TryParseAmount(text, out amount) && amount == 100_000);
     }
 
     [Theory]
