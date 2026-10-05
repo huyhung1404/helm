@@ -3,7 +3,7 @@
 All notable changes to Helm. The top section is used as the GitHub release body and as the Velopack release notes.
 Format: [Keep a Changelog](https://keepachangelog.com), versions follow [SemVer](https://semver.org).
 
-## [Unreleased]
+## [0.24.0] - 2026-10-05
 
 ### Changed
 - **Wallet** (Android): the home-screen widget is new. Your balance (the latest balance each bank gave, added up over
