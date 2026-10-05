@@ -455,7 +455,11 @@ public sealed class SyncServerTests : IDisposable
         // Cloudflare overwrites CF-Connecting-IP with the real address in production, so clients cannot pick it.
         var ip = $"198.51.100.{Random.Shared.Next(1, 255)}";
         var statuses = new List<int>();
-        for (var i = 0; i < 25; i++)
+        // REDEEM_LIMITER allows 20 a minute in windows aligned to the clock, so 25 tries that span the turn of a minute
+        // could fit both windows (10 + 15) and never be refused. 41 tries take a few seconds, so they span at most one
+        // turn, and one of its two windows always gets more than 20.
+        const int Limit = 20;
+        for (var i = 0; i < 2 * Limit + 1 && !statuses.Contains(429); i++)
         {
             var body = SyncToken.InvitePrefix + new string('Q', 40);
             using var request = new HttpRequestMessage(HttpMethod.Post, new Uri(ServerUrl!, "v1/redeem"))
