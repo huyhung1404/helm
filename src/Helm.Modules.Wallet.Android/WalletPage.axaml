@@ -193,9 +193,24 @@
         <Border Classes="card">
             <StackPanel Spacing="8">
                 <TextBlock Text="Wallet widget" Classes="title" />
-                <TextBlock Text="This month's spending against your budget, today's, how many transactions wait for a category and the top categories. Tap it to open Wallet. You can also add it from the launcher's widget list."
+                <TextBlock Text="Your balance in the middle of a ring, with what you spent and earned today, this week, this month or in total (tap the tabs to switch). A red dot counts the transactions waiting for a category. Tap it to open Wallet. You can also add it from the launcher's widget list."
                            Classes="secondary" TextWrapping="Wrap" />
                 <Button x:Name="AddWidgetButton" Content="Add to home screen" Command="{Binding PinWidgetCommand}" />
+                <TextBlock Text="Ring" Margin="0,4,0,0" />
+                <ComboBox HorizontalAlignment="Stretch" ItemsSource="{Binding WidgetChartNames}" SelectedIndex="{Binding WidgetChartIndex}" AutomationProperties.Name="Widget ring" />
+                <TextBlock Text="Background" />
+                <ComboBox HorizontalAlignment="Stretch" ItemsSource="{Binding WidgetBackgroundNames}" SelectedIndex="{Binding WidgetBackgroundIndex}" AutomationProperties.Name="Widget background" />
+                <TextBlock Text="{Binding WidgetOpacity, StringFormat='Opacity {0}%'}" />
+                <Slider Minimum="0" Maximum="100" TickFrequency="5" IsSnapToTickEnabled="True" Value="{Binding WidgetOpacity}" AutomationProperties.Name="Widget opacity" />
+                <TextBlock Text="Text" />
+                <ComboBox HorizontalAlignment="Stretch" ItemsSource="{Binding WidgetTextNames}" SelectedIndex="{Binding WidgetTextIndex}" AutomationProperties.Name="Widget text colour" />
+                <DockPanel Margin="0,4,0,0">
+                    <ToggleSwitch DockPanel.Dock="Right" IsChecked="{Binding WidgetHideBalance}" OnContent="" OffContent="" AutomationProperties.Name="Hide the balance" />
+                    <StackPanel VerticalAlignment="Center">
+                        <TextBlock Text="Hide the balance" />
+                        <TextBlock Text="Dots instead of the balance, for anyone who sees your home screen." Classes="secondary" TextWrapping="Wrap" />
+                    </StackPanel>
+                </DockPanel>
             </StackPanel>
         </Border>
 

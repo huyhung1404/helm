@@ -242,19 +242,28 @@ public sealed partial class TrackerViewModel : ObservableObject
     }
     public IReadOnlyList<string> KindNames { get; } = Enum.GetValues<WorkspaceKind>().Select(TrackerFormat.Kind).ToList();
     public IReadOnlyList<string> ReportRangeNames { get; } = ["Last 7 days", "Last 30 days", "Last 90 days", "All time"];
-    public IReadOnlyList<string> WidgetBackgroundNames { get; } = TrackerWidgetStyle.BackgroundNames;
-    public IReadOnlyList<string> WidgetTextNames { get; } = TrackerWidgetStyle.TextNames;
+    public IReadOnlyList<string> WidgetBackgroundNames { get; } = WidgetLook.BackgroundNames;
+    public IReadOnlyList<string> WidgetTextNames { get; } = WidgetLook.TextNames;
 
     /// <summary>Raised after the widget's look changed, so the platform redraws its widgets.</summary>
     public event EventHandler? WidgetStyleChanged;
 
-    public bool IsWidgetOpacityAdjustable => WidgetBackgroundIndex != (int)TrackerWidgetBackground.Transparent;
-
-    partial void OnWidgetBackgroundIndexChanged(int value)
+    partial void OnWidgetBackgroundIndexChanged(int oldValue, int newValue)
     {
-        OnPropertyChanged(nameof(IsWidgetOpacityAdjustable));
-        if (_loading || value < 0) return;
-        _settings.Update(s => s.WidgetBackground = (TrackerWidgetBackground)Math.Clamp(value, 0, WidgetBackgroundNames.Count - 1));
+        if (_loading || newValue < 0) return;
+        var background = (WidgetBackground)Math.Clamp(newValue, 0, WidgetBackgroundNames.Count - 1);
+        var opacity = WidgetLook.OpacityAfter((WidgetBackground)Math.Max(oldValue, 0), background, WidgetOpacity);
+        _settings.Update(s =>
+        {
+            s.WidgetBackground = background;
+            s.WidgetOpacity = opacity;
+        });
+        if (opacity != WidgetOpacity)
+        {
+            _loading = true;
+            WidgetOpacity = opacity;
+            _loading = false;
+        }
         WidgetStyleChanged?.Invoke(this, EventArgs.Empty);
     }
 
@@ -268,7 +277,7 @@ public sealed partial class TrackerViewModel : ObservableObject
     partial void OnWidgetTextIndexChanged(int value)
     {
         if (_loading || value < 0) return;
-        _settings.Update(s => s.WidgetText = (TrackerWidgetText)Math.Clamp(value, 0, WidgetTextNames.Count - 1));
+        _settings.Update(s => s.WidgetText = (WidgetText)Math.Clamp(value, 0, WidgetTextNames.Count - 1));
         WidgetStyleChanged?.Invoke(this, EventArgs.Empty);
     }
 

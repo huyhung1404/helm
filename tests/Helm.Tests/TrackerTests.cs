@@ -503,15 +503,44 @@ public sealed class TrackerTests
         Assert.Null(TrackerWidgetStyle.Text(s));
         Assert.Equal(255, TrackerWidgetStyle.Alpha(s));
 
-        s.WidgetBackground = TrackerWidgetBackground.Dark;
+        s.WidgetBackground = WidgetBackground.Dark;
         s.WidgetOpacity = 50;
         Assert.Equal(128, TrackerWidgetStyle.Alpha(s));
         Assert.Equal(0xFFFFFFFFu, TrackerWidgetStyle.Text(s)!.Value.Main); // light text on dark, automatically
-        s.WidgetText = TrackerWidgetText.Dark;
+        s.WidgetText = WidgetText.Dark;
         Assert.Equal(0xFF1A1A1Au, TrackerWidgetStyle.Text(s)!.Value.Main);
 
-        s.WidgetBackground = TrackerWidgetBackground.Transparent;
-        Assert.Equal(0, TrackerWidgetStyle.Alpha(s));
+        // Transparent: the theme's card colour at the chosen opacity, with the theme's text, never a clear widget.
+        s.WidgetBackground = WidgetBackground.Transparent;
+        s.WidgetText = WidgetText.Automatic;
+        s.WidgetOpacity = 35;
+        Assert.Null(TrackerWidgetStyle.Background(s));
+        Assert.Null(TrackerWidgetStyle.Text(s));
+        Assert.Equal(89, TrackerWidgetStyle.Alpha(s));
+    }
+
+    [Fact]
+    public void Picking_transparent_starts_see_through()
+    {
+        Assert.Equal(WidgetLook.TransparentOpacity, WidgetLook.OpacityAfter(WidgetBackground.Card, WidgetBackground.Transparent, 100));
+        Assert.Equal(40, WidgetLook.OpacityAfter(WidgetBackground.Dark, WidgetBackground.Transparent, 40)); // already see-through
+        Assert.Equal(100, WidgetLook.OpacityAfter(WidgetBackground.Transparent, WidgetBackground.Transparent, 100));
+        Assert.Equal(100, WidgetLook.OpacityAfter(WidgetBackground.Card, WidgetBackground.Dark, 100));
+    }
+
+    [Fact]
+    public void Old_transparent_widget_settings_stay_see_through()
+    {
+        using var dir = new TempDir();
+        var paths = new HelmPaths(dir.Path);
+        var path = paths.SettingsFile(TrackerIds.ModuleId);
+        Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+        File.WriteAllText(path, """{"version":1,"widgetBackground":"transparent","widgetOpacity":100}""");
+        using var factory = new SettingsStoreFactory(paths);
+        var s = factory.Get<TrackerSettings>(TrackerIds.ModuleId).Current;
+        Assert.Equal(WidgetBackground.Transparent, s.WidgetBackground);
+        Assert.Equal(WidgetLook.TransparentOpacity, s.WidgetOpacity);
+        Assert.Equal(TrackerSettings.CurrentVersion, s.Version);
     }
 
     [Fact]

@@ -124,7 +124,7 @@
                     <Button x:Name="AddWidgetButton" Content="Add to home screen" Click="AddWidget_Click" IsVisible="False" />
                     <TextBlock Text="Background" Margin="0,4,0,0" />
                     <ComboBox HorizontalAlignment="Stretch" ItemsSource="{Binding WidgetBackgroundNames}" SelectedIndex="{Binding WidgetBackgroundIndex}" AutomationProperties.Name="Widget background" />
-                    <StackPanel IsVisible="{Binding IsWidgetOpacityAdjustable}">
+                    <StackPanel>
                         <TextBlock Text="{Binding WidgetOpacity, StringFormat='Opacity {0}%'}" />
                         <Slider Minimum="0" Maximum="100" TickFrequency="10" IsSnapToTickEnabled="True" Value="{Binding WidgetOpacity}" AutomationProperties.Name="Widget opacity" />
                     </StackPanel>

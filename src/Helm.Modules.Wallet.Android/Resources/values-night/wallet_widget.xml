@@ -4,8 +4,5 @@
     <color name="wallet_widget_stroke">#1D1D1D</color>
     <color name="wallet_widget_text">#FFFFFF</color>
     <color name="wallet_widget_secondary">#C5C5C5</color>
-    <color name="wallet_widget_accent">#4CC2FF</color>
     <color name="wallet_widget_brand">#2DD4BF</color>
-    <color name="wallet_widget_track">#26FFFFFF</color>
-    <color name="wallet_widget_over">#FF99A4</color>
 </resources>

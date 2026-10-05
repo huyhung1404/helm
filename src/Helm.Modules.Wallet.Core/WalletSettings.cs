@@ -27,5 +27,21 @@ public sealed class WalletSettings : IVersionedSettings
     /// <summary>Bank notifications Helm could not read (newest first, at most <see cref="WalletCapture.MaxUnread"/>).</summary>
     public List<UnreadNotification> Unread { get; set; } = [];
 
+    /// <summary>What the Android widget's ring shows (see <see cref="WalletWidgetModel"/>).</summary>
+    public WalletWidgetChart WidgetChart { get; set; } = WalletWidgetChart.Categories;
+
+    /// <summary>Android widget background (see <see cref="WidgetLook"/>).</summary>
+    public WidgetBackground WidgetBackground { get; set; } = WidgetBackground.Card;
+
+    /// <summary>Android widget background opacity, 0 (see-through) to 100 (solid).</summary>
+    public int WidgetOpacity { get; set; } = 100;
+
+    public WidgetText WidgetText { get; set; } = WidgetText.Automatic;
+
+    /// <summary>The widget shows dots instead of the balance (the home screen is seen by anyone holding the phone).</summary>
+    public bool WidgetHideBalance { get; set; }
+
+    public WidgetLook WidgetLook => new(WidgetBackground, WidgetOpacity, WidgetText);
+
     public bool IsBankEnabled(string bankId) => !DisabledBanks.Contains(bankId, StringComparer.Ordinal);
 }

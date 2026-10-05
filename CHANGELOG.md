@@ -3,6 +3,20 @@
 All notable changes to Helm. The top section is used as the GitHub release body and as the Velopack release notes.
 Format: [Keep a Changelog](https://keepachangelog.com), versions follow [SemVer](https://semver.org).
 
+## [Unreleased]
+
+### Changed
+- **Wallet** (Android): the home-screen widget is new. Your balance (the latest balance each bank gave, added up over
+  your accounts) sits in the middle of a ring; tabs pick **today, this week (from Monday), this month or all time**, and
+  the widget shows what you spent and earned in that period. The ring splits the spending by category, or, if you
+  prefer, compares it with the balance. A red dot counts the transactions waiting for a category and disappears when
+  there are none. It fits from 2 × 2 (one button steps through the periods) to 4 × 3 (a title, full tab names and
+  five categories with their shares). Settings → Wallet → Home screen sets the ring, background, opacity, text colour,
+  and can hide the balance from anyone who sees your home screen.
+- **Tracker** and **Wallet** widgets (Android): the *Transparent* background now takes the phone theme's colour at the
+  opacity you choose (35 % when you first pick it) instead of being fully clear, so the text stays readable on any
+  wallpaper. A Tracker widget already set to Transparent switches to 35 %.
+
 ## [0.23.2] - 2026-10-05
 
 ### Fixed

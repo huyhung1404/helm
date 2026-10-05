@@ -40,14 +40,18 @@ public partial class WalletPage : ModulePageBase
     {
         base.OnAttachedToVisualTree(e);
         ActivityHost.Resumed += OnResumed;
+        _viewModel.WidgetStyleChanged += OnWidgetStyleChanged;
         _module.PageShown();
     }
 
     protected override void OnDetachedFromVisualTree(VisualTreeAttachmentEventArgs e)
     {
         ActivityHost.Resumed -= OnResumed;
+        _viewModel.WidgetStyleChanged -= OnWidgetStyleChanged;
         base.OnDetachedFromVisualTree(e);
     }
+
+    private void OnWidgetStyleChanged(object? sender, EventArgs e) => WalletWidgets.RefreshAll(Android.App.Application.Context);
 
     /// <summary>Back from Android's Notification access or App info: show whether access is on now.</summary>
     private void OnResumed(object? sender, EventArgs e) => Dispatcher.UIThread.Post(_module.PageShown);

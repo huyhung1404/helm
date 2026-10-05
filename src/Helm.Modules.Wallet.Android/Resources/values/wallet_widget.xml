@@ -5,9 +5,6 @@
     <color name="wallet_widget_stroke">#E5E5E5</color>
     <color name="wallet_widget_text">#1A1A1A</color>
     <color name="wallet_widget_secondary">#5F5F5F</color>
-    <color name="wallet_widget_accent">#0067C0</color>
     <color name="wallet_widget_brand">#047857</color>
-    <color name="wallet_widget_track">#1A000000</color>
-    <color name="wallet_widget_over">#C42B1C</color>
-    <string name="wallet_widget_description">This month\'s spending against your budget, and where the money went. Tap to open Wallet.</string>
+    <string name="wallet_widget_description">Your balance in a ring with what you spent and earned today, this week, this month or in total. Tap to open Wallet.</string>
 </resources>

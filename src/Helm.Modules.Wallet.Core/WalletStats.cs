@@ -22,6 +22,9 @@ public sealed record MonthSummary(
     public decimal Net => Income - Spent;
 }
 
+/// <summary>Money out and in over a stretch of days (the widget's Today / Week / Month / All).</summary>
+public sealed record PeriodSummary(decimal Spent, decimal Income, IReadOnlyList<CategorySpend> Spending);
+
 /// <summary>Where the month stands against the monthly budget.</summary>
 /// <param name="Percent">Spent as a share of the budget, 0–100 (more is clamped; see <see cref="IsOver"/>).</param>
 /// <param name="PerDay">What can still be spent each day until the month ends; 0 when nothing is left.</param>
@@ -85,6 +88,55 @@ public static class WalletStats
         var isCurrent = month.Year == today.Year && month.Month == today.Month;
         return new MonthSummary(month, spent, income, count, uncategorized, isCurrent ? spentToday : 0, Rows(spending, spent), Rows(earning, income),
             previousSpent, isCurrent ? previousSameDay : previousSpent);
+    }
+
+    /// <summary>
+    /// Spending (by category, largest first) and income from <paramref name="from"/> (null: since the first
+    /// transaction) to <paramref name="to"/>, both local days, inclusive. Transfers between the user's own accounts
+    /// count as neither, as in <see cref="Month"/>.
+    /// </summary>
+    public static PeriodSummary Period(IEnumerable<SyncedItem<WalletTransaction>> transactions, IReadOnlyList<CategoryInfo> categories,
+        DateOnly? from, DateOnly to, TimeZoneInfo zone)
+    {
+        var byId = categories.ToDictionary(c => c.Id, StringComparer.Ordinal);
+        decimal spent = 0, income = 0;
+        var spending = new Dictionary<string, (decimal Amount, int Count)>(StringComparer.Ordinal);
+        foreach (var t in transactions.Select(t => t.Value))
+        {
+            var day = WalletFormat.LocalDay(t.OccurredAt, zone);
+            if (day > to || from is { } f && day < f) continue;
+            var kind = t.CategoryId is { } c && byId.TryGetValue(c, out var info) ? info.Kind : (CategoryKind?)null;
+            if (kind == CategoryKind.Transfer) continue;
+            if (t.Amount >= 0)
+            {
+                income += t.Amount;
+                continue;
+            }
+            spent -= t.Amount;
+            var key = t.CategoryId is { } id && byId.ContainsKey(id) ? id : "";
+            var s = spending.GetValueOrDefault(key);
+            spending[key] = (s.Amount - t.Amount, s.Count + 1);
+        }
+        var rows = spending
+            .Select(kv => new CategorySpend(kv.Key.Length == 0 ? null : kv.Key, kv.Key.Length == 0 ? UncategorizedName : byId[kv.Key].Name,
+                kv.Value.Amount, kv.Value.Count, spent == 0 ? 0 : (double)(kv.Value.Amount / spent)))
+            .OrderByDescending(r => r.Amount)
+            .ToList();
+        return new PeriodSummary(spent, income, rows);
+    }
+
+    /// <summary>
+    /// The money in the accounts now: for each account (bank and account number), the balance its bank gave with its
+    /// latest transaction, added up. Null when no bank has given a balance yet (manual entries carry none).
+    /// </summary>
+    public static (decimal Balance, int Accounts)? Balance(IEnumerable<SyncedItem<WalletTransaction>> transactions)
+    {
+        var latest = transactions.Select(t => t.Value)
+            .Where(t => t.Balance is not null)
+            .GroupBy(t => (t.Bank, t.Account))
+            .Select(g => g.OrderByDescending(t => t.OccurredAt).ThenByDescending(t => t.CreatedAt).First().Balance!.Value)
+            .ToList();
+        return latest.Count == 0 ? null : (latest.Sum(), latest.Count);
     }
 
     /// <summary>The month against the budget; null without a budget.</summary>

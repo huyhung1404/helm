@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The notification-style dot that counts the transactions waiting for a category. -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android" android:shape="rectangle">
+    <solid android:color="#FFD93B3B" />
+    <corners android:radius="10dp" />
+</shape>

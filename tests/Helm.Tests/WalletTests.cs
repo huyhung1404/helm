@@ -330,18 +330,88 @@ public sealed class WalletTests : IDisposable
     }
 
     [Fact]
-    public void Widget_model()
+    public void Widget_balance_is_the_latest_balance_of_each_account()
     {
-        _store.AddManual(-100_000, "lunch", T0, WalletCategories.Food);
-        _store.AddManual(-50_000, "grab", T0, null);
-        var w = WalletWidgetModel.Build(_store, _time.Now, Ict);
-        Assert.False(w.HasBudget);
-        Assert.Equal(1, w.ToCategorize);
-        Assert.Equal("1 to categorize", w.ToCategorizeText);
-        Assert.Equal(2, w.Rows.Count);
-        Assert.Equal(67, w.Rows[0].Percent);
-        _store.SetMonthlyBudget(100_000);
-        Assert.True(WalletWidgetModel.Build(_store, _time.Now, Ict).IsOver);
+        _store.AddCaptured(Parsed(-100_000, "lunch", 900_000, T0.AddHours(-2)), false);
+        _store.AddCaptured(Parsed(-50_000, "coffee", 850_000, T0), false);
+        _store.AddCaptured(new ParsedTransaction("ACB", "12345678", 2_000_000, 5_000_000, "salary", T0.AddDays(-5), "salary"), false);
+        _store.AddManual(-300_000, "rent", T0.AddDays(-10), WalletCategories.Housing); // no balance: not counted
+
+        var balance = WalletStats.Balance(_store.Transactions());
+        Assert.Equal((5_850_000m, 2), balance);
+
+        var w = WalletWidgetModel.Build(_store, WalletWidgetPeriod.Week, WalletWidgetChart.Categories, _time.Now, Ict);
+        Assert.Equal(5_850_000m, w.CenterAmount);
+        Assert.Equal("Balance", w.CenterLabel(wide: false));
+        Assert.Equal("Balance · 2 accounts", w.CenterLabel(wide: true));
+        Assert.Equal(150_000m, w.Spent);
+        Assert.Equal(2_000_000m, w.Earned); // Tuesday 29 September: this week (from Monday), not this month
+        Assert.Equal("−150K · +2M", w.CenterDetail);
+        Assert.Equal("3", w.BadgeText); // the three captured transactions wait for a category
+
+        var month = WalletWidgetModel.Build(_store, WalletWidgetPeriod.Month, WalletWidgetChart.Categories, _time.Now, Ict);
+        Assert.Equal(0m, month.Earned);
+        var all = WalletWidgetModel.Build(_store, WalletWidgetPeriod.All, WalletWidgetChart.Categories, _time.Now, Ict);
+        Assert.Equal(450_000m, all.Spent);
+        Assert.Equal("Housing", all.Slices[0].Name);
+        Assert.Equal(WalletStats.UncategorizedName, all.Slices[1].Name);
+        Assert.Equal(0, all.Slices[1].Color); // the neutral grey
+    }
+
+    [Fact]
+    public void Widget_balance_ring_and_no_balance()
+    {
+        _store.AddManual(-200_000, "lunch", T0, WalletCategories.Food);
+        _store.AddManual(-1_000_000, "to savings", T0, WalletCategories.Transfer); // neither spending nor income
+
+        // Manual entries carry no balance: the middle shows the spending and the balance ring falls back to categories.
+        var w = WalletWidgetModel.Build(_store, WalletWidgetPeriod.Today, WalletWidgetChart.BalanceAndSpent, _time.Now, Ict);
+        Assert.False(w.HasBalance);
+        Assert.Equal("Spent today", w.CenterLabel(wide: true));
+        Assert.Equal(200_000m, w.CenterAmount);
+        Assert.Equal("Food & drinks", Assert.Single(w.Slices).Name);
+        Assert.Null(w.BadgeText);
+
+        _store.AddCaptured(Parsed(-50_000, "coffee", 750_000, T0), false);
+        w = WalletWidgetModel.Build(_store, WalletWidgetPeriod.Today, WalletWidgetChart.BalanceAndSpent, _time.Now, Ict);
+        Assert.Equal(2, w.Slices.Count);
+        Assert.Equal(250_000m, w.Slices[0].Amount);
+        Assert.Equal(WalletWidgetModel.SpentColor, w.Slices[0].Color);
+        Assert.Equal(WalletWidgetModel.BalanceColor, w.Slices[1].Color);
+        Assert.Equal(0.25, w.Slices[0].Share, 3); // 250K of 750K + 250K
+    }
+
+    [Fact]
+    public void Widget_folds_small_categories_and_counts_the_waiting_ones()
+    {
+        foreach (var (category, amount) in new[]
+                 {
+                     (WalletCategories.Food, 600_000), (WalletCategories.Groceries, 500_000), (WalletCategories.Shopping, 400_000),
+                     (WalletCategories.Bills, 300_000), (WalletCategories.Transport, 200_000), (WalletCategories.Health, 100_000),
+                 })
+            _store.AddManual(-amount, category, T0, category);
+        var w = WalletWidgetModel.Build(_store, WalletWidgetPeriod.Month, WalletWidgetChart.Categories, _time.Now, Ict);
+        Assert.Equal(WalletWidgetModel.MaxSlices, w.Slices.Count);
+        Assert.Equal("Other (2)", w.Slices[^1].Name);
+        Assert.Equal(300_000m, w.Slices[^1].Amount);
+        Assert.Equal(WalletWidgetModel.OtherColor, w.Slices[^1].Color);
+        Assert.Equal(1.0, w.Slices.Sum(s => s.Share), 6);
+
+        for (var i = 0; i < 120; i++) _store.AddManual(-1_000, "?", T0, null);
+        Assert.Equal("99+", WalletWidgetModel.Build(_store, WalletWidgetPeriod.Month, WalletWidgetChart.Categories, _time.Now, Ict).BadgeText);
+    }
+
+    [Theory]
+    [InlineData("2026-10-04", WalletWidgetPeriod.Week, "2026-09-28")] // Sunday: since Monday
+    [InlineData("2026-10-05", WalletWidgetPeriod.Week, "2026-10-05")] // Monday: only today
+    [InlineData("2026-10-04", WalletWidgetPeriod.Month, "2026-10-01")]
+    [InlineData("2026-10-04", WalletWidgetPeriod.Today, "2026-10-04")]
+    public void Widget_periods(string today, WalletWidgetPeriod period, string from)
+    {
+        var day = DateOnly.Parse(today, System.Globalization.CultureInfo.InvariantCulture);
+        Assert.Equal((DateOnly.Parse(from, System.Globalization.CultureInfo.InvariantCulture), day), WalletWidgetModel.Range(period, day));
+        Assert.Null(WalletWidgetModel.Range(WalletWidgetPeriod.All, day).From);
+        Assert.Equal(WalletWidgetPeriod.Today, WalletWidgetModel.Next(WalletWidgetPeriod.All));
     }
 
     [Fact]

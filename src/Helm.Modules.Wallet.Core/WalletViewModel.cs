@@ -93,6 +93,11 @@ public sealed partial class WalletViewModel : ObservableObject
     [ObservableProperty] private bool _acbEnabled;
     [ObservableProperty] private bool _askForCategory;
     [ObservableProperty] private bool _autoCategorize;
+    [ObservableProperty] private int _widgetChartIndex;
+    [ObservableProperty] private int _widgetBackgroundIndex;
+    [ObservableProperty] private int _widgetOpacity = 100;
+    [ObservableProperty] private int _widgetTextIndex;
+    [ObservableProperty] private bool _widgetHideBalance;
     [ObservableProperty] private bool _hasNotificationAccess;
     [ObservableProperty] private string _newCategoryName = "";
     [ObservableProperty] private int _newCategoryKindIndex;
@@ -153,6 +158,15 @@ public sealed partial class WalletViewModel : ObservableObject
     public static IReadOnlyList<string> KindNames { get; } = ["Spending", "Money in", "Between my accounts"];
 
     public static IReadOnlyList<string> TestBankNames { get; } = BankSources.All.Select(b => b.Name).ToList();
+
+    public static IReadOnlyList<string> WidgetChartNames => WalletWidgetModel.ChartNames;
+
+    public static IReadOnlyList<string> WidgetBackgroundNames => WidgetLook.BackgroundNames;
+
+    public static IReadOnlyList<string> WidgetTextNames => WidgetLook.TextNames;
+
+    /// <summary>Raised after the widget's look changed, so the platform redraws its widgets.</summary>
+    public event EventHandler? WidgetStyleChanged;
 
     public static string KindName(CategoryKind kind) => kind switch
     {
@@ -705,6 +719,11 @@ public sealed partial class WalletViewModel : ObservableObject
         AcbEnabled = s.IsBankEnabled(BankSources.Acb.Id);
         AskForCategory = s.AskForCategory;
         AutoCategorize = s.AutoCategorize;
+        WidgetChartIndex = (int)s.WidgetChart;
+        WidgetBackgroundIndex = (int)s.WidgetBackground;
+        WidgetOpacity = Math.Clamp(s.WidgetOpacity, 0, 100);
+        WidgetTextIndex = (int)s.WidgetText;
+        WidgetHideBalance = s.WidgetHideBalance;
         _loading = false;
         RefreshBudgetText();
     }
@@ -749,6 +768,52 @@ public sealed partial class WalletViewModel : ObservableObject
     partial void OnAutoCategorizeChanged(bool value)
     {
         if (!_loading) _settings.Update(s => s.AutoCategorize = value);
+    }
+
+    partial void OnWidgetChartIndexChanged(int value)
+    {
+        if (_loading || value < 0) return;
+        UpdateWidget(s => s.WidgetChart = (WalletWidgetChart)Math.Clamp(value, 0, WidgetChartNames.Count - 1));
+    }
+
+    partial void OnWidgetBackgroundIndexChanged(int oldValue, int newValue)
+    {
+        if (_loading || newValue < 0) return;
+        var background = (WidgetBackground)Math.Clamp(newValue, 0, WidgetBackgroundNames.Count - 1);
+        var opacity = WidgetLook.OpacityAfter((WidgetBackground)Math.Max(oldValue, 0), background, WidgetOpacity);
+        if (opacity != WidgetOpacity)
+        {
+            _loading = true;
+            WidgetOpacity = opacity;
+            _loading = false;
+        }
+        UpdateWidget(s =>
+        {
+            s.WidgetBackground = background;
+            s.WidgetOpacity = opacity;
+        });
+    }
+
+    partial void OnWidgetOpacityChanged(int value)
+    {
+        if (!_loading) UpdateWidget(s => s.WidgetOpacity = Math.Clamp(value, 0, 100));
+    }
+
+    partial void OnWidgetTextIndexChanged(int value)
+    {
+        if (_loading || value < 0) return;
+        UpdateWidget(s => s.WidgetText = (WidgetText)Math.Clamp(value, 0, WidgetTextNames.Count - 1));
+    }
+
+    partial void OnWidgetHideBalanceChanged(bool value)
+    {
+        if (!_loading) UpdateWidget(s => s.WidgetHideBalance = value);
+    }
+
+    private void UpdateWidget(Action<WalletSettings> change)
+    {
+        _settings.Update(change);
+        WidgetStyleChanged?.Invoke(this, EventArgs.Empty);
     }
 
     partial void OnMonthlyBudgetTextChanged(string value)
