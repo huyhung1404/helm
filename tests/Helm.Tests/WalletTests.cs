@@ -330,20 +330,19 @@ public sealed class WalletTests : IDisposable
     }
 
     [Fact]
-    public void Widget_balance_is_the_latest_balance_of_each_account()
+    public void Widget_balance_is_everything_received_minus_everything_spent()
     {
+        // The banks' own balances are ignored: cash taken out is still the user's money.
         _store.AddCaptured(Parsed(-100_000, "lunch", 900_000, T0.AddHours(-2)), false);
         _store.AddCaptured(Parsed(-50_000, "coffee", 850_000, T0), false);
         _store.AddCaptured(new ParsedTransaction("ACB", "12345678", 2_000_000, 5_000_000, "salary", T0.AddDays(-5), "salary"), false);
-        _store.AddManual(-300_000, "rent", T0.AddDays(-10), WalletCategories.Housing); // no balance: not counted
-
-        var balance = WalletStats.Balance(_store.Transactions());
-        Assert.Equal((5_850_000m, 2), balance);
+        _store.AddManual(-300_000, "rent", T0.AddDays(-10), WalletCategories.Housing);
+        _store.AddManual(-1_000_000, "to savings", T0, WalletCategories.Transfer); // neither spending nor income
 
         var w = WalletWidgetModel.Build(_store, WalletWidgetPeriod.Week, WalletWidgetChart.Categories, _time.Now, Ict);
-        Assert.Equal(5_850_000m, w.CenterAmount);
-        Assert.Equal("Balance", w.CenterLabel(wide: false));
-        Assert.Equal("Balance · 2 accounts", w.CenterLabel(wide: true));
+        Assert.Equal(1_550_000m, w.Balance); // 2M in, 450K out
+        Assert.Equal("Balance", WalletWidgetModel.CenterLabel);
+        Assert.Equal("1,550,000 ₫", w.BalanceText.Replace('.', ','));
         Assert.Equal(150_000m, w.Spent);
         Assert.Equal(2_000_000m, w.Earned); // Tuesday 29 September: this week (from Monday), not this month
         Assert.Equal("−150K · +2M", w.CenterDetail);
@@ -351,34 +350,37 @@ public sealed class WalletTests : IDisposable
 
         var month = WalletWidgetModel.Build(_store, WalletWidgetPeriod.Month, WalletWidgetChart.Categories, _time.Now, Ict);
         Assert.Equal(0m, month.Earned);
+        Assert.Equal(1_550_000m, month.Balance); // the same whatever the tab
         var all = WalletWidgetModel.Build(_store, WalletWidgetPeriod.All, WalletWidgetChart.Categories, _time.Now, Ict);
         Assert.Equal(450_000m, all.Spent);
         Assert.Equal("Housing", all.Slices[0].Name);
         Assert.Equal(WalletStats.UncategorizedName, all.Slices[1].Name);
         Assert.Equal(0, all.Slices[1].Color); // the neutral grey
+
+        _store.AddManual(-2_000_000, "phone", T0, WalletCategories.Shopping);
+        w = WalletWidgetModel.Build(_store, WalletWidgetPeriod.Today, WalletWidgetChart.Categories, _time.Now, Ict);
+        Assert.Equal(-450_000m, w.Balance);
+        Assert.StartsWith("−", w.BalanceText);
     }
 
     [Fact]
-    public void Widget_balance_ring_and_no_balance()
+    public void Widget_balance_ring()
     {
-        _store.AddManual(-200_000, "lunch", T0, WalletCategories.Food);
-        _store.AddManual(-1_000_000, "to savings", T0, WalletCategories.Transfer); // neither spending nor income
-
-        // Manual entries carry no balance: the middle shows the spending and the balance ring falls back to categories.
+        _store.AddManual(1_000_000, "salary", T0.AddDays(-20), WalletCategories.Salary);
+        _store.AddManual(-250_000, "lunch", T0, WalletCategories.Food);
         var w = WalletWidgetModel.Build(_store, WalletWidgetPeriod.Today, WalletWidgetChart.BalanceAndSpent, _time.Now, Ict);
-        Assert.False(w.HasBalance);
-        Assert.Equal("Spent today", w.CenterLabel(wide: true));
-        Assert.Equal(200_000m, w.CenterAmount);
-        Assert.Equal("Food & drinks", Assert.Single(w.Slices).Name);
-        Assert.Null(w.BadgeText);
-
-        _store.AddCaptured(Parsed(-50_000, "coffee", 750_000, T0), false);
-        w = WalletWidgetModel.Build(_store, WalletWidgetPeriod.Today, WalletWidgetChart.BalanceAndSpent, _time.Now, Ict);
+        Assert.Equal(750_000m, w.Balance);
         Assert.Equal(2, w.Slices.Count);
         Assert.Equal(250_000m, w.Slices[0].Amount);
         Assert.Equal(WalletWidgetModel.SpentColor, w.Slices[0].Color);
         Assert.Equal(WalletWidgetModel.BalanceColor, w.Slices[1].Color);
         Assert.Equal(0.25, w.Slices[0].Share, 3); // 250K of 750K + 250K
+        Assert.Null(w.BadgeText);
+
+        // More spent than received: no balance slice, the spending fills the ring.
+        _store.AddManual(-2_000_000, "phone", T0, WalletCategories.Shopping);
+        w = WalletWidgetModel.Build(_store, WalletWidgetPeriod.Today, WalletWidgetChart.BalanceAndSpent, _time.Now, Ict);
+        Assert.Equal(WalletWidgetModel.SpentColor, Assert.Single(w.Slices).Color);
     }
 
     [Fact]

@@ -37,11 +37,13 @@ public sealed record WalletWidgetSlice(string Name, decimal Amount, double Share
 /// category, or against the balance) and income, and how many transactions wait for a category. Platform-free, so it
 /// is tested here; the Android side only draws it.
 /// </summary>
-/// <param name="Balance">The money in the accounts now; null when no bank has given a balance.</param>
+/// <param name="Balance">
+/// The money there is now: everything received minus everything spent. Not a bank's balance: cash taken out stays the
+/// user's money, and spending from the bank is read as a transaction and subtracted anyway.
+/// </param>
 public sealed record WalletWidgetModel(
     WalletWidgetPeriod Period,
-    decimal? Balance,
-    int Accounts,
+    decimal Balance,
     decimal Spent,
     decimal Earned,
     IReadOnlyList<WalletWidgetSlice> Slices,
@@ -97,14 +99,8 @@ public sealed record WalletWidgetModel(
         _ => "in total",
     };
 
-    public bool HasBalance => Balance is not null;
-
-    /// <summary>The words above the amount in the ring: the balance, or the spending when no balance is known.</summary>
-    public string CenterLabel(bool wide) => Balance is null
-        ? $"Spent {PeriodWords}"
-        : wide && Accounts > 1 ? $"Balance · {Accounts} accounts" : "Balance";
-
-    public decimal CenterAmount => Balance ?? Spent;
+    /// <summary>The words above the amount in the ring: always the balance (the widget's main figure).</summary>
+    public const string CenterLabel = "Balance";
 
     /// <summary>"−1.7M · +500K" under the balance on the small widget; empty when there is nothing to say.</summary>
     public string CenterDetail
@@ -112,7 +108,7 @@ public sealed record WalletWidgetModel(
         get
         {
             var parts = new List<string>(2);
-            if (Balance is not null && Spent > 0) parts.Add("−" + Bare(Spent));
+            if (Spent > 0) parts.Add("−" + Bare(Spent));
             if (Earned > 0) parts.Add("+" + Bare(Earned));
             return string.Join(" · ", parts);
         }
@@ -153,14 +149,14 @@ public sealed record WalletWidgetModel(
         var categories = store.Categories(includeHidden: true);
         var (from, to) = Range(period, WalletFormat.LocalDay(now, zone));
         var summary = WalletStats.Period(transactions, categories, from, to, zone);
-        var balance = WalletStats.Balance(transactions);
+        var balance = Net(transactions, categories, to, zone);
         var toCategorize = transactions.Count(t => !t.Value.IsCategorized);
 
         IReadOnlyList<WalletWidgetSlice> slices;
-        if (chart == WalletWidgetChart.BalanceAndSpent && balance is { } b)
+        if (chart == WalletWidgetChart.BalanceAndSpent)
         {
-            var model = new WalletWidgetModel(period, b.Balance, b.Accounts, summary.Spent, summary.Income, [], toCategorize);
-            var held = Math.Max(b.Balance, 0);
+            var model = new WalletWidgetModel(period, balance, summary.Spent, summary.Income, [], toCategorize);
+            var held = Math.Max(balance, 0);
             var total = held + summary.Spent;
             slices = total <= 0 ? [] : new[]
                 {
@@ -185,8 +181,22 @@ public sealed record WalletWidgetModel(
             var amount = rest.Sum(r => r.Amount);
             list.Add(new WalletWidgetSlice($"Other ({rest.Count})", amount, (double)(amount / summary.Spent), OtherColor));
         }
-        return new WalletWidgetModel(period, balance?.Balance, balance?.Accounts ?? 0, summary.Spent, summary.Income, list, toCategorize);
+        return new WalletWidgetModel(period, balance, summary.Spent, summary.Income, list, toCategorize);
     }
+
+    /// <summary>All money in minus all money out until <paramref name="to"/> (transfers between own accounts are neither).</summary>
+    private static decimal Net(IReadOnlyList<Helm.Core.Sync.SyncedItem<WalletTransaction>> transactions, IReadOnlyList<CategoryInfo> categories,
+        DateOnly to, TimeZoneInfo zone)
+    {
+        var all = WalletStats.Period(transactions, categories, null, to, zone);
+        return all.Income - all.Spent;
+    }
+
+    /// <summary>The balance in full ("12,370,000 ₫"), with a minus sign when more went out than came in.</summary>
+    public string BalanceText => (Balance < 0 ? "−" : "") + WalletFormat.Money(Balance);
+
+    /// <summary>The balance in short ("12.4M ₫").</summary>
+    public string BalanceShortText => (Balance < 0 ? "−" : "") + WalletFormat.Short(Balance);
 
     /// <summary>A short amount without the currency sign ("1.7M", "500K").</summary>
     private static string Bare(decimal amount) => WalletFormat.Short(amount).Replace(" " + WalletFormat.Currency, "", StringComparison.Ordinal);

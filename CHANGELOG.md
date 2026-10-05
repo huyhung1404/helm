@@ -3,6 +3,14 @@
 All notable changes to Helm. The top section is used as the GitHub release body and as the Velopack release notes.
 Format: [Keep a Changelog](https://keepachangelog.com), versions follow [SemVer](https://semver.org).
 
+## [Unreleased]
+
+### Fixed
+- **Wallet** widget (Android): the middle of the ring always shows your balance, never the period's spending. The
+  balance is everything received minus everything spent, not the banks' own balances: cash you take out is still your
+  money, and what you spend from the bank is subtracted as it is read. Transfers between your own accounts count as
+  neither.
+
 ## [0.24.0] - 2026-10-05
 
 ### Changed

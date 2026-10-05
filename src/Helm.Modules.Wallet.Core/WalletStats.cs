@@ -125,20 +125,6 @@ public static class WalletStats
         return new PeriodSummary(spent, income, rows);
     }
 
-    /// <summary>
-    /// The money in the accounts now: for each account (bank and account number), the balance its bank gave with its
-    /// latest transaction, added up. Null when no bank has given a balance yet (manual entries carry none).
-    /// </summary>
-    public static (decimal Balance, int Accounts)? Balance(IEnumerable<SyncedItem<WalletTransaction>> transactions)
-    {
-        var latest = transactions.Select(t => t.Value)
-            .Where(t => t.Balance is not null)
-            .GroupBy(t => (t.Bank, t.Account))
-            .Select(g => g.OrderByDescending(t => t.OccurredAt).ThenByDescending(t => t.CreatedAt).First().Balance!.Value)
-            .ToList();
-        return latest.Count == 0 ? null : (latest.Sum(), latest.Count);
-    }
-
     /// <summary>The month against the budget; null without a budget.</summary>
     public static BudgetStatus? Budget(decimal budget, MonthSummary month, DateTimeOffset now, TimeZoneInfo zone)
     {

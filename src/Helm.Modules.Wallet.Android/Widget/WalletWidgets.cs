@@ -174,12 +174,12 @@ internal static class WalletWidgets
         views.SetContentDescription(ring, Describe(model, hideBalance));
 
         var label = R.Id(context, "wallet_widget_center_label");
-        views.SetTextViewText(label, model.CenterLabel(wide: size.Tall));
+        views.SetTextViewText(label, WalletWidgetModel.CenterLabel);
         views.SetTextColor(label, colours.Secondary);
 
-        var hidden = hideBalance && model.HasBalance;
-        var full = hidden ? "••••••" : WalletFormat.Money(model.CenterAmount);
-        var brief = hidden ? "••••••" : WalletFormat.Short(model.CenterAmount);
+        // Always the balance (dots when hidden), never the spending.
+        var full = hideBalance ? "••••••" : model.BalanceText;
+        var brief = hideBalance ? "••••••" : model.BalanceShortText;
         var (text, sp) = FitCenter(context, full, brief, size.RingDp * (RingRadius - RingWidth / 2) * 2 * 0.86f, size.Tall ? 22 : 19);
         var value = R.Id(context, "wallet_widget_center_value");
         views.SetTextViewText(value, text);
@@ -321,7 +321,7 @@ internal static class WalletWidgets
     private static string Describe(WalletWidgetModel model, bool hideBalance)
     {
         var parts = new List<string>();
-        if (model.Balance is { } balance && !hideBalance) parts.Add("Balance " + WalletFormat.Money(balance));
+        if (!hideBalance) parts.Add("Balance " + model.BalanceText);
         parts.Add($"Spent {model.PeriodWords} {WalletFormat.Money(model.Spent)}, earned {WalletFormat.Money(model.Earned)}");
         parts.AddRange(model.Slices
             .Where(s => !(hideBalance && s.Color == WalletWidgetModel.BalanceColor))
