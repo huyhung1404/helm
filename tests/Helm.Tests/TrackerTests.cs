@@ -437,18 +437,21 @@ public sealed class TrackerTests
     }
 
     [Theory]
-    [InlineData("1500000", 7, "1,500,000", 9)]
-    [InlineData("1,500,0007", 10, "15,000,007", 10)]
-    [InlineData("1,50", 4, "150", 3)]
-    [InlineData("007", 3, "7", 1)]
-    [InlineData("150k", 4, "150k", 4)]
-    [InlineData("1234", 2, "1,234", 3)]
-    public void Amounts_get_thousands_separators_while_typed_keeping_the_caret(string text, int caret, string expected, int expectedCaret)
+    [InlineData("1500000", 7, "", "1,500,000", 9)]
+    [InlineData("1,500,0007", 10, "1,500,000", "15,000,007", 10)]
+    [InlineData("1,50", 4, "1,500", "150", 3)] // a digit deleted
+    [InlineData("007", 3, "00", "7", 1)]
+    [InlineData("150k", 4, "150", "150k", 4)]
+    [InlineData("1234", 2, "134", "1,234", 3)]
+    [InlineData("1.", 2, "1", "1.", 2)] // a '.' typed on the way to "1.5k"
+    [InlineData("1.5", 3, "1.", "1.5", 3)]
+    public void Amounts_get_thousands_separators_while_typed_keeping_the_caret(string text, int caret, string previous, string expected, int expectedCaret)
     {
-        var (grouped, newCaret) = TrackerFormat.GroupDigits(text, caret, CultureInfo.GetCultureInfo("en-US"));
+        var (grouped, newCaret) = TrackerFormat.GroupDigits(text, caret, previous, CultureInfo.GetCultureInfo("en-US"));
         Assert.Equal(expected, grouped);
         Assert.Equal(expectedCaret, newCaret);
-        Assert.Equal("1.500.000", TrackerFormat.GroupDigits("1500000", 7, CultureInfo.GetCultureInfo("vi-VN")).Text);
+        Assert.Equal("1.500.000", TrackerFormat.GroupDigits("1500000", 7, "", CultureInfo.GetCultureInfo("vi-VN")).Text);
+        Assert.True(TrackerFormat.TryParseAmount("1.5k", out var typed) && typed == 1_500);
         Assert.True(TrackerFormat.TryParseAmount("1.500.000", out var amount) && amount == 1_500_000);
     }
 

@@ -112,12 +112,17 @@ public static class TrackerFormat
 
     /// <summary>
     /// Thousands separators while an amount is typed ("1500000" becomes "1,500,000" or "1.500.000" by culture), keeping
-    /// the caret after the same digit. Text with anything else in it (decimals, "150k", "2tr") is left as typed.
+    /// the caret after the same digit. Left as typed: text with anything but digits and separators in it ("150k", "2tr"),
+    /// and a '.' or ',' the person typed themselves (on the way to "1.5k"), which is any separator added by this edit or
+    /// kept from text that was not grouped before it. <paramref name="previous"/> is the text before this edit.
     /// </summary>
-    public static (string Text, int Caret) GroupDigits(string text, int caret, CultureInfo? culture = null)
+    public static (string Text, int Caret) GroupDigits(string text, int caret, string previous, CultureInfo? culture = null)
     {
         culture ??= CultureInfo.CurrentCulture;
-        if (text.Length == 0 || !text.All(c => char.IsDigit(c) || c is '.' or ',' or ' ' or '\u00a0' or '\u202f')) return (text, caret);
+        if (text.Length == 0 || !text.All(c => char.IsDigit(c) || IsSeparator(c))) return (text, caret);
+        var separators = text.Count(IsSeparator);
+        if (separators > 0 && (separators > previous.Count(IsSeparator) || Grouped(previous, culture) != previous)) return (text, caret);
+
         var raw = new string(text.Where(char.IsDigit).ToArray());
         if (raw.Length == 0) return ("", 0);
         var digits = raw.TrimStart('0');
@@ -129,6 +134,16 @@ public static class TrackerFormat
         for (var seen = 0; newCaret < grouped.Length && seen < digitsBefore; newCaret++)
             if (char.IsDigit(grouped[newCaret])) seen++;
         return (grouped, newCaret);
+    }
+
+    private static bool IsSeparator(char c) => c is '.' or ',' or ' ' or '\u00a0' or '\u202f';
+
+    /// <summary>The text as <see cref="GroupDigits"/> would show it ("" stays ""); anything else comes back unchanged.</summary>
+    private static string Grouped(string text, CultureInfo culture)
+    {
+        if (text.Length == 0 || !text.All(c => char.IsDigit(c) || IsSeparator(c)) || !text.Any(char.IsDigit)) return text;
+        var digits = new string(text.Where(char.IsDigit).ToArray()).TrimStart('0');
+        return decimal.Parse(digits.Length == 0 ? "0" : digits, CultureInfo.InvariantCulture).ToString("#,0", culture);
     }
 
     public static string Direction(DebtDirection direction) => direction switch

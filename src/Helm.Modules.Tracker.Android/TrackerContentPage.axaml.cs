@@ -52,12 +52,14 @@ public partial class TrackerContentPage : UserControl
     }
 
     private bool _grouping;
+    private string _amountText = "";
 
     /// <summary>Thousands separators while an amount is typed, so 1500000 reads 1,500,000; the caret stays put.</summary>
     private void OnAmountTextChanged(object? sender, TextChangedEventArgs e)
     {
         if (_grouping || AmountBox.Text is not { } current) return;
-        var (text, caret) = TrackerFormat.GroupDigits(current, AmountBox.CaretIndex);
+        var (text, caret) = TrackerFormat.GroupDigits(current, AmountBox.CaretIndex, _amountText);
+        _amountText = text;
         if (text == current) return;
         _grouping = true;
         try
