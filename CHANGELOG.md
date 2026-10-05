@@ -3,7 +3,7 @@
 All notable changes to Helm. The top section is used as the GitHub release body and as the Velopack release notes.
 Format: [Keep a Changelog](https://keepachangelog.com), versions follow [SemVer](https://semver.org).
 
-## [Unreleased]
+## [0.25.0] - 2026-10-05
 
 ### Added
 - **Wallet** (Android): Techcombank sends no notification for a payment you make in its app. When the next balance
