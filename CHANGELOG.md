@@ -3,6 +3,16 @@
 All notable changes to Helm. The top section is used as the GitHub release body and as the Velopack release notes.
 Format: [Keep a Changelog](https://keepachangelog.com), versions follow [SemVer](https://semver.org).
 
+## [Unreleased]
+
+### Added
+- **Missions**: a step's resources can carry what you need to study, not only links. A resource can have a label
+  (*Vocabulary*, *Grammar*, *Mock test*… in your own words), a text (the theory, where the test is and how to open it)
+  and a table whose columns the plan names for its subject (*Word / Pinyin / Meaning*, *Formula / When to use*). Tap a
+  resource to open it on the current step or in the roadmap; *Copy* puts it on the clipboard, with the table as columns
+  that paste into a spreadsheet or a flashcard app. The prompt asks the AI to write this content in, and Claude can
+  write it through `mission_create` and `mission_replan`. Older Helm versions still show each resource as one line.
+
 ## [0.25.0] - 2026-10-05
 
 ### Added

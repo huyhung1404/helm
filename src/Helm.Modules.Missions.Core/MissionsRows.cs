@@ -1,5 +1,4 @@
 using System.Collections.ObjectModel;
-using System.Text.RegularExpressions;
 using CommunityToolkit.Mvvm.ComponentModel;
 
 namespace Helm.Modules.Missions;
@@ -47,17 +46,85 @@ public sealed partial class ChecklistRow(int index, Action<ChecklistRow, bool> c
     }
 }
 
-/// <summary>A link or a book title of the current step.</summary>
-public sealed partial class ResourceRow(string text) : ObservableObject
+/// <summary>
+/// A resource of a step: its label, title and link, and when opened its text and table. The table is shown row by row
+/// (the first cell large, the others after it), with the column names above, so any number of columns fits a phone.
+/// </summary>
+public sealed partial class ResourceRow : ObservableObject
 {
-    private static readonly Regex Link = new(@"https?://[^\s<>""')\]]+", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
+    [ObservableProperty] private bool _isExpanded;
 
-    public string Text { get; } = text;
+    public ResourceRow(MissionResource resource)
+    {
+        Resource = resource;
+        Url = MissionResources.IsWebAddress(resource.Url) ? resource.Url : null;
+        Title = resource.Title.Length > 0 ? resource.Title
+            : Url is not null ? Url
+            : resource.Label.Length > 0 ? resource.Label
+            : MissionResources.Line(resource);
+        var host = Url is not null && Title != Url && Uri.TryCreate(Url, UriKind.Absolute, out var uri) ? uri.Host : "";
+        Summary = string.Join(" · ", new[] { MissionResources.Count(resource), host }.Where(s => s.Length > 0));
+        Header = string.Join(" · ", resource.Columns.Where(c => c.Length > 0));
+        Rows = resource.Rows.Select(r => new ResourceTableRow(r)).ToList();
+    }
 
-    /// <summary>The first web address in the text, or null for a plain book title.</summary>
-    public string? Url { get; } = Link.Match(text) is { Success: true } m ? m.Value.TrimEnd('.', ',', ';') : null;
+    public MissionResource Resource { get; }
+
+    public string Label => Resource.Label;
+
+    public bool HasLabel => Label.Length > 0;
+
+    public string Title { get; }
+
+    /// <summary>The http(s) address to open, or null.</summary>
+    public string? Url { get; }
 
     public bool IsLink => Url is not null;
+
+    /// <summary>"45 rows · hanzii.net".</summary>
+    public string Summary { get; }
+
+    public bool HasSummary => Summary.Length > 0;
+
+    public string Text => Resource.Text;
+
+    public bool HasText => Text.Length > 0;
+
+    /// <summary>The column names, "Word · Pinyin · Meaning".</summary>
+    public string Header { get; }
+
+    public bool HasHeader => Header.Length > 0;
+
+    public IReadOnlyList<ResourceTableRow> Rows { get; }
+
+    public bool HasRows => Rows.Count > 0;
+
+    /// <summary>A text or a table to open.</summary>
+    public bool HasDetails => HasText || HasRows;
+
+    public bool ShowDetails => IsExpanded && HasDetails;
+
+    /// <summary>Details there to open, not open now.</summary>
+    public bool ShowClosed => !IsExpanded && HasDetails;
+
+    /// <summary>A link with nothing to open in the page: its title opens the link.</summary>
+    public bool IsPlainLink => IsLink && !HasDetails;
+
+    partial void OnIsExpandedChanged(bool value)
+    {
+        OnPropertyChanged(nameof(ShowDetails));
+        OnPropertyChanged(nameof(ShowClosed));
+    }
+}
+
+/// <summary>A row of a resource's table: its first cell, then the other cells on one line.</summary>
+public sealed class ResourceTableRow(IReadOnlyList<string> cells)
+{
+    public string First { get; } = cells.FirstOrDefault(c => c.Length > 0) ?? "";
+
+    public string Rest { get; } = string.Join(" · ", cells.SkipWhile(c => c.Length == 0).Skip(1).Where(c => c.Length > 0));
+
+    public bool HasRest => Rest.Length > 0;
 }
 
 public enum StepState
@@ -92,7 +159,34 @@ public sealed partial class StepRow(string id) : ObservableObject
     [ObservableProperty] private bool _isEditingNote;
     [ObservableProperty] private string _noteDraft = "";
 
+    private IReadOnlyList<MissionResource> _resourceSource = [];
+    private string _resourceKey = "";
+    private string? _builtKey;
+
     public string Id { get; } = id;
+
+    /// <summary>The step's resources, made when the step is first opened (a roadmap can hold hundreds of steps).</summary>
+    public ObservableCollection<ResourceRow> Resources { get; } = [];
+
+    public bool HasResources => _resourceSource.Count > 0;
+
+    /// <summary>Takes the step's resources; <paramref name="key"/> tells when they changed.</summary>
+    internal void SetResources(IReadOnlyList<MissionResource> resources, string key)
+    {
+        if (key == _resourceKey) return;
+        _resourceSource = resources;
+        _resourceKey = key;
+        OnPropertyChanged(nameof(HasResources));
+        if (IsExpanded) BuildResources();
+    }
+
+    private void BuildResources()
+    {
+        if (_builtKey == _resourceKey) return;
+        _builtKey = _resourceKey;
+        Resources.Clear();
+        foreach (var r in _resourceSource) Resources.Add(new ResourceRow(r));
+    }
 
     public bool IsDone => State == StepState.Done;
     public bool IsSkipped => State == StepState.Skipped;
@@ -145,7 +239,12 @@ public sealed partial class StepRow(string id) : ObservableObject
         OnPropertyChanged(nameof(CanEditNote));
     }
 
-    partial void OnIsExpandedChanged(bool value) => OnPropertyChanged(nameof(ShowBody));
+    partial void OnIsExpandedChanged(bool value)
+    {
+        OnPropertyChanged(nameof(ShowBody));
+        if (value) BuildResources();
+    }
+
     partial void OnIsEditingChanged(bool value) => OnPropertyChanged(nameof(ShowBody));
 }
 
@@ -210,6 +309,7 @@ public sealed partial class PreviewStep(StepDraft draft) : ObservableObject
             var parts = new List<string> { MissionsFormat.Days(Draft.EstimateDays) };
             if (Draft.DoneWhen.Length > 0) parts.Add("done when: " + Draft.DoneWhen);
             if (Draft.Checklist is { Count: > 0 } c) parts.Add(c.Count == 1 ? "1 tick" : $"{c.Count} ticks");
+            if (Draft.Resources is { Count: > 0 } r) parts.Add(r.Count == 1 ? "1 resource" : $"{r.Count} resources");
             return string.Join(" · ", parts);
         }
     }

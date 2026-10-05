@@ -115,6 +115,92 @@
             </ItemsControl>
         </DataTemplate>
 
+        <!-- A resource of a step: its label, title and link; opened, its text and table (each row: the first cell large,
+             the other cells after it, the column names above) -->
+        <DataTemplate x:Key="ResourceTemplate" DataType="{x:Type local:ResourceRow}">
+            <Border Margin="0,0,0,6" CornerRadius="6" BorderThickness="1" BorderBrush="{DynamicResource ControlStrokeColorDefaultBrush}">
+                <StackPanel>
+                    <DockPanel>
+                        <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" Margin="0,0,4,0">
+                            <ui:Button Style="{StaticResource RowAction}" Icon="{ui:SymbolIcon Open24}" ToolTip="{Binding Url}" AutomationProperties.Name="Open the link"
+                                       Visibility="{Binding IsLink, Converter={StaticResource BoolToVisibility}}"
+                                       Command="{Binding DataContext.OpenResourceCommand, RelativeSource={RelativeSource AncestorType=Page}}" CommandParameter="{Binding}" />
+                            <ui:Button Style="{StaticResource RowAction}" Icon="{ui:SymbolIcon Copy24}" ToolTip="Copy (a table pastes as columns)" AutomationProperties.Name="Copy"
+                                       Command="{Binding DataContext.CopyResourceCommand, RelativeSource={RelativeSource AncestorType=Page}}" CommandParameter="{Binding}" />
+                        </StackPanel>
+                        <Button Style="{StaticResource RowButton}" AutomationProperties.Name="{Binding Title}"
+                                Command="{Binding DataContext.ActivateResourceCommand, RelativeSource={RelativeSource AncestorType=Page}}" CommandParameter="{Binding}">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="*" />
+                                </Grid.ColumnDefinitions>
+                                <ui:SymbolIcon Margin="0,1,10,0" FontSize="16" VerticalAlignment="Top" Foreground="{DynamicResource TextFillColorSecondaryBrush}">
+                                    <ui:SymbolIcon.Style>
+                                        <Style TargetType="ui:SymbolIcon">
+                                            <Setter Property="Symbol" Value="Document24" />
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding IsLink}" Value="True">
+                                                    <Setter Property="Symbol" Value="Link24" />
+                                                </DataTrigger>
+                                                <DataTrigger Binding="{Binding HasDetails}" Value="True">
+                                                    <Setter Property="Symbol" Value="ChevronRight24" />
+                                                </DataTrigger>
+                                                <DataTrigger Binding="{Binding ShowDetails}" Value="True">
+                                                    <Setter Property="Symbol" Value="ChevronDown24" />
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </ui:SymbolIcon.Style>
+                                </ui:SymbolIcon>
+                                <StackPanel Grid.Column="1">
+                                    <WrapPanel>
+                                        <Border Style="{StaticResource Chip}" Padding="8,1" Margin="0,0,8,2" VerticalAlignment="Center"
+                                                Visibility="{Binding HasLabel, Converter={StaticResource BoolToVisibility}}">
+                                            <TextBlock Text="{Binding Label}" FontSize="12" />
+                                        </Border>
+                                        <TextBlock Text="{Binding Title}" TextWrapping="Wrap" VerticalAlignment="Center">
+                                            <TextBlock.Style>
+                                                <Style TargetType="TextBlock">
+                                                    <Setter Property="FontWeight" Value="SemiBold" />
+                                                    <Style.Triggers>
+                                                        <DataTrigger Binding="{Binding IsPlainLink}" Value="True">
+                                                            <Setter Property="FontWeight" Value="Normal" />
+                                                            <Setter Property="Foreground" Value="{DynamicResource AccentTextFillColorPrimaryBrush}" />
+                                                        </DataTrigger>
+                                                    </Style.Triggers>
+                                                </Style>
+                                            </TextBlock.Style>
+                                        </TextBlock>
+                                    </WrapPanel>
+                                    <TextBlock Text="{Binding Summary}" Style="{DynamicResource HelmSecondaryText}" Visibility="{Binding HasSummary, Converter={StaticResource BoolToVisibility}}" />
+                                </StackPanel>
+                            </Grid>
+                        </Button>
+                    </DockPanel>
+                    <StackPanel Margin="34,0,12,10" Visibility="{Binding ShowDetails, Converter={StaticResource BoolToVisibility}}">
+                        <TextBlock Text="{Binding Text}" TextWrapping="Wrap" Margin="0,0,0,8" Visibility="{Binding HasText, Converter={StaticResource BoolToVisibility}}" />
+                        <TextBlock Text="{Binding Header}" Style="{DynamicResource HelmSecondaryText}" FontWeight="SemiBold" TextWrapping="Wrap" Margin="0,0,0,4"
+                                   Visibility="{Binding HasHeader, Converter={StaticResource BoolToVisibility}}" />
+                        <ItemsControl ItemsSource="{Binding Rows}" Focusable="False" Grid.IsSharedSizeScope="True">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate DataType="{x:Type local:ResourceTableRow}">
+                                    <Grid Margin="0,3">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="Auto" SharedSizeGroup="First" />
+                                            <ColumnDefinition Width="*" />
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Text="{Binding First}" FontSize="16" FontWeight="SemiBold" TextWrapping="Wrap" MaxWidth="280" Margin="0,0,16,0" />
+                                        <TextBlock Grid.Column="1" Text="{Binding Rest}" TextWrapping="Wrap" VerticalAlignment="Center" />
+                                    </Grid>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </StackPanel>
+                </StackPanel>
+            </Border>
+        </DataTemplate>
+
         <!-- A step in the roadmap: click to see its details; edit the ones not done yet -->
         <DataTemplate x:Key="StepTemplate" DataType="{x:Type local:StepRow}">
             <StackPanel>
@@ -168,6 +254,8 @@
                     <TextBlock TextWrapping="Wrap" Margin="0,0,0,6" Visibility="{Binding HasDoneWhen, Converter={StaticResource BoolToVisibility}}">
                         <Run Text="Done when: " FontWeight="SemiBold" /><Run Text="{Binding DoneWhen, Mode=OneWay}" />
                     </TextBlock>
+                    <ItemsControl ItemsSource="{Binding Resources}" ItemTemplate="{StaticResource ResourceTemplate}" Focusable="False" Margin="0,0,0,2"
+                                  Visibility="{Binding HasResources, Converter={StaticResource BoolToVisibility}}" />
                     <TextBlock TextWrapping="Wrap" Margin="0,0,0,6" FontStyle="Italic" Style="{DynamicResource HelmSecondaryText}"
                                Visibility="{Binding ShowNote, Converter={StaticResource BoolToVisibility}}">
                         <Run Text="Note: " /><Run Text="{Binding Note, Mode=OneWay}" />
@@ -603,21 +691,7 @@
 
                         <StackPanel Margin="0,10,0,0" Visibility="{Binding HasCurrentResources, Converter={StaticResource BoolToVisibility}}">
                             <TextBlock Text="Resources" FontWeight="SemiBold" Margin="0,0,0,4" />
-                            <ItemsControl ItemsSource="{Binding CurrentResources}" Focusable="False">
-                                <ItemsControl.ItemTemplate>
-                                    <DataTemplate DataType="{x:Type local:ResourceRow}">
-                                        <Grid Margin="0,1">
-                                            <TextBlock Visibility="{Binding IsLink, Converter={StaticResource BoolToVisibility}}" TextWrapping="Wrap">
-                                                <Hyperlink Command="{Binding DataContext.OpenResourceCommand, RelativeSource={RelativeSource AncestorType=Page}}" CommandParameter="{Binding}"
-                                                           Foreground="{DynamicResource AccentTextFillColorPrimaryBrush}" ToolTip="{Binding Url}">
-                                                    <Run Text="{Binding Text, Mode=OneWay}" />
-                                                </Hyperlink>
-                                            </TextBlock>
-                                            <TextBlock Text="{Binding Text}" TextWrapping="Wrap" Visibility="{Binding IsLink, Converter={StaticResource InverseBoolToVisibility}}" />
-                                        </Grid>
-                                    </DataTemplate>
-                                </ItemsControl.ItemTemplate>
-                            </ItemsControl>
+                            <ItemsControl ItemsSource="{Binding CurrentResources}" ItemTemplate="{StaticResource ResourceTemplate}" Focusable="False" />
                         </StackPanel>
 
                         <ui:InfoBar Margin="0,12,0,0" Severity="Informational" IsClosable="False" IsOpen="{Binding IsPaused, Mode=OneWay}" Title="Paused"

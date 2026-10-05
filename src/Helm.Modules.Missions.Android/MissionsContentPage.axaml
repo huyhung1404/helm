@@ -100,6 +100,58 @@
         </Style>
     </UserControl.Styles>
 
+    <UserControl.Resources>
+        <!-- A resource of a step: its label, title and link; opened, its text and table (each row: the first cell large,
+             the other cells under it, the column names above) -->
+        <DataTemplate x:Key="ResourceTemplate" DataType="vm:ResourceRow">
+            <Border Margin="0,0,0,6" CornerRadius="6" BorderThickness="1" BorderBrush="{DynamicResource HelmSubtleFill}">
+                <StackPanel>
+                    <Grid ColumnDefinitions="*,Auto,Auto">
+                        <Button Classes="flat" Padding="8,8" HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch" AutomationProperties.Name="{Binding Title}"
+                                Command="{Binding $parent[UserControl].((vm:MissionsViewModel)DataContext).ActivateResourceCommand}" CommandParameter="{Binding}">
+                            <Grid ColumnDefinitions="Auto,*">
+                                <Panel Margin="0,1,8,0" VerticalAlignment="Top">
+                                    <ic:SymbolIcon Symbol="ChevronRight" FontSize="16" IsVisible="{Binding ShowClosed}" />
+                                    <ic:SymbolIcon Symbol="ChevronDown" FontSize="16" IsVisible="{Binding ShowDetails}" />
+                                    <ic:SymbolIcon Symbol="Link" FontSize="16" IsVisible="{Binding IsPlainLink}" />
+                                </Panel>
+                                <StackPanel Grid.Column="1" Spacing="2">
+                                    <Border Classes="chip" Padding="8,1" Margin="0" HorizontalAlignment="Left" IsVisible="{Binding HasLabel}">
+                                        <TextBlock Text="{Binding Label}" FontSize="12" />
+                                    </Border>
+                                    <TextBlock Text="{Binding Title}" TextWrapping="Wrap" FontWeight="SemiBold" Classes.link="{Binding IsPlainLink}" />
+                                    <TextBlock Text="{Binding Summary}" Classes="secondary" IsVisible="{Binding HasSummary}" />
+                                </StackPanel>
+                            </Grid>
+                        </Button>
+                        <Button Grid.Column="1" Classes="icon flat" IsVisible="{Binding IsLink}" AutomationProperties.Name="Open the link"
+                                Command="{Binding $parent[UserControl].((vm:MissionsViewModel)DataContext).OpenResourceCommand}" CommandParameter="{Binding}">
+                            <ic:SymbolIcon Symbol="Open" FontSize="18" />
+                        </Button>
+                        <Button Grid.Column="2" Classes="icon flat" AutomationProperties.Name="Copy"
+                                Command="{Binding $parent[UserControl].((vm:MissionsViewModel)DataContext).CopyResourceCommand}" CommandParameter="{Binding}">
+                            <ic:SymbolIcon Symbol="Copy" FontSize="18" />
+                        </Button>
+                    </Grid>
+                    <StackPanel Margin="32,0,10,10" Spacing="4" IsVisible="{Binding ShowDetails}">
+                        <TextBlock Text="{Binding Text}" TextWrapping="Wrap" Margin="0,0,0,4" IsVisible="{Binding HasText}" />
+                        <TextBlock Text="{Binding Header}" Classes="secondary" FontWeight="SemiBold" TextWrapping="Wrap" IsVisible="{Binding HasHeader}" />
+                        <ItemsControl ItemsSource="{Binding Rows}">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate DataType="vm:ResourceTableRow">
+                                    <StackPanel Margin="0,4">
+                                        <TextBlock Text="{Binding First}" FontSize="17" FontWeight="SemiBold" TextWrapping="Wrap" />
+                                        <TextBlock Text="{Binding Rest}" TextWrapping="Wrap" IsVisible="{Binding HasRest}" />
+                                    </StackPanel>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </StackPanel>
+                </StackPanel>
+            </Border>
+        </DataTemplate>
+    </UserControl.Resources>
+
     <StackPanel>
         <!-- Shown while the tool is turned off -->
         <Border x:Name="OffBar" Classes="infobar warning" IsVisible="False">
@@ -488,20 +540,8 @@
                             </ItemsControl.ItemTemplate>
                         </ItemsControl>
                         <StackPanel IsVisible="{Binding HasCurrentResources}">
-                            <TextBlock Text="Resources" FontWeight="SemiBold" />
-                            <ItemsControl ItemsSource="{Binding CurrentResources}">
-                                <ItemsControl.ItemTemplate>
-                                    <DataTemplate DataType="vm:ResourceRow">
-                                        <Panel>
-                                            <Button Classes="flat" Padding="0,6" HorizontalAlignment="Left" IsVisible="{Binding IsLink}" AutomationProperties.Name="{Binding Text}"
-                                                    Command="{Binding $parent[UserControl].((vm:MissionsViewModel)DataContext).OpenResourceCommand}" CommandParameter="{Binding}">
-                                                <TextBlock Text="{Binding Text}" Classes="link" TextWrapping="Wrap" />
-                                            </Button>
-                                            <TextBlock Text="{Binding Text}" TextWrapping="Wrap" Margin="0,6" IsVisible="{Binding !IsLink}" />
-                                        </Panel>
-                                    </DataTemplate>
-                                </ItemsControl.ItemTemplate>
-                            </ItemsControl>
+                            <TextBlock Text="Resources" FontWeight="SemiBold" Margin="0,0,0,4" />
+                            <ItemsControl ItemsSource="{Binding CurrentResources}" ItemTemplate="{StaticResource ResourceTemplate}" />
                         </StackPanel>
                         <Border Classes="infobar" IsVisible="{Binding IsPaused}">
                             <TextBlock Text="Paused. Resume the mission to carry on with this step." TextWrapping="Wrap" />
@@ -580,6 +620,7 @@
                                                         <TextBlock TextWrapping="Wrap" IsVisible="{Binding HasDoneWhen}">
                                                             <Run Text="Done when: " FontWeight="SemiBold" /><Run Text="{Binding DoneWhen}" />
                                                         </TextBlock>
+                                                        <ItemsControl ItemsSource="{Binding Resources}" ItemTemplate="{StaticResource ResourceTemplate}" IsVisible="{Binding HasResources}" />
                                                         <TextBlock Classes="secondary" FontStyle="Italic" TextWrapping="Wrap" IsVisible="{Binding ShowNote}">
                                                             <Run Text="Note: " /><Run Text="{Binding Note}" />
                                                         </TextBlock>

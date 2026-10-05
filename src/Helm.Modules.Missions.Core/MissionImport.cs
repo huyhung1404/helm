@@ -163,38 +163,100 @@ public static class MissionImport
                 warnings.Add($"{at}: {e.ToString(CultureInfo.InvariantCulture)} days was changed to {MissionsStore.ClampEstimate(e).ToString(CultureInfo.InvariantCulture)} (between {MissionLimits.MinEstimateDays.ToString(CultureInfo.InvariantCulture)} and {MissionLimits.MaxEstimateDays}).");
             var checklist = Strings(s, ["checklist", "subtasks", "items", "todo"], "text", "title", "name");
             if (checklist.Count > MissionLimits.ChecklistItems) warnings.Add($"{at}: only the first {MissionLimits.ChecklistItems} checklist items were kept.");
-            var resources = Resources(s);
-            if (resources.Count > MissionLimits.Resources) warnings.Add($"{at}: only the first {MissionLimits.Resources} resources were kept.");
             list.Add(new StepDraft(
                 title,
                 Text(s, "description", "details", "how", "instructions"),
                 Text(s, "doneWhen", "done_when", "doneCriteria", "done_criteria", "criteria", "definitionOfDone"),
                 MissionsStore.ClampEstimate(days),
                 checklist.Take(MissionLimits.ChecklistItems).ToList(),
-                resources.Take(MissionLimits.Resources).ToList()));
+                Resources(s, at, warnings)));
         }
         return list;
     }
 
-    /// <summary>Links or book titles; an object becomes "title — url".</summary>
-    private static List<string> Resources(JsonElement step)
+    /// <summary>
+    /// A step's resources: a string is a link or a book title; an object may also carry a label, a text (the theory,
+    /// where the test is) and a table with columns the plan names itself. Kept within <see cref="MissionLimits"/>.
+    /// </summary>
+    private static List<MissionResource> Resources(JsonElement step, string at, List<string> warnings)
     {
-        var list = new List<string>();
-        if (Array(step, "resources", "links", "materials", "references") is not { } array) return list;
+        var raw = new List<MissionResource>();
+        if (Array(step, "resources", "links", "materials", "references") is not { } array) return raw;
         foreach (var r in array.EnumerateArray())
         {
             if (r.ValueKind == JsonValueKind.String && r.GetString() is { } s && s.Trim().Length > 0)
-                list.Add(s.Trim());
+                raw.Add(MissionResources.FromLine(s));
             else if (r.ValueKind == JsonValueKind.Object)
             {
-                var name = Text(r, "title", "name", "text");
                 var url = Text(r, "url", "link", "href");
-                var both = name.Length > 0 && url.Length > 0 ? $"{name} — {url}" : name.Length > 0 ? name : url;
-                if (both.Length > 0) list.Add(both);
+                if (url.Length > 0 && !MissionResources.IsWebAddress(url)) warnings.Add($"{at}: \"{Short(url, 60)}\" is not a web address; the link was left out.");
+                var (columns, rows) = Table(r);
+                var resource = new MissionResource
+                {
+                    Label = Text(r, "label", "kind", "type", "category", "tag"),
+                    Title = Text(r, "title", "name"),
+                    Url = url,
+                    Text = Text(r, "text", "content", "body", "details", "description", "explanation", "notes"),
+                    Columns = columns,
+                    Rows = rows,
+                };
+                // The old form { "text": "A book" } (or with a url): a title, not a text.
+                if (resource is { Title.Length: 0, Label.Length: 0, Rows.Count: 0 } && resource.Text.Length <= MissionLimits.ResourceTitle && !resource.Text.Contains('\n'))
+                    resource = resource with { Title = resource.Text, Text = "" };
+                raw.Add(resource);
             }
         }
-        return list;
+        var clean = MissionResources.Clean(raw);
+        if (raw.Count > MissionLimits.Resources) warnings.Add($"{at}: only the first {MissionLimits.Resources} resources were kept.");
+        if (raw.Take(MissionLimits.Resources).Sum(r => r.Rows.Count(row => row.Any(c => c.Length > 0))) > clean.Sum(r => r.Rows.Count))
+            warnings.Add($"{at}: some table rows were left out (at most {MissionLimits.ResourceRows} in a resource and {MissionLimits.StepResourceRows} in a step).");
+        if (raw.Any(r => r.Columns.Count > MissionLimits.ResourceColumns || r.Rows.Any(row => row.Count > MissionLimits.ResourceColumns)))
+            warnings.Add($"{at}: a table has more than {MissionLimits.ResourceColumns} columns; the others were left out.");
+        return clean;
     }
+
+    /// <summary>
+    /// A resource's table in any of the shapes AIs write: <c>columns</c> + <c>rows</c> (rows as arrays or as objects),
+    /// or a list (<c>items</c>, <c>rows</c>, <c>entries</c>…) of objects (their keys become the columns, in the order first
+    /// seen), of arrays, or of plain strings (one column).
+    /// </summary>
+    private static (List<string> Columns, List<IReadOnlyList<string>> Rows) Table(JsonElement resource)
+    {
+        var columns = Array(resource, "columns", "headers", "header") is { } head
+            ? head.EnumerateArray().Select(Cell).ToList()
+            : [];
+        var rows = new List<IReadOnlyList<string>>();
+        if (Array(resource, "rows", "items", "entries", "table", "list", "words", "terms") is not { } array) return (columns, rows);
+        // Objects first: their keys add to the columns.
+        foreach (var item in array.EnumerateArray().Where(i => i.ValueKind == JsonValueKind.Object))
+            foreach (var p in item.EnumerateObject())
+                if (!columns.Contains(p.Name, StringComparer.OrdinalIgnoreCase)) columns.Add(p.Name);
+        foreach (var item in array.EnumerateArray())
+        {
+            switch (item.ValueKind)
+            {
+                case JsonValueKind.Object:
+                    rows.Add(columns.Select(c => item.EnumerateObject().FirstOrDefault(p => string.Equals(p.Name, c, StringComparison.OrdinalIgnoreCase)) is { Value: var v } ? Cell(v) : "").ToList());
+                    break;
+                case JsonValueKind.Array:
+                    rows.Add(item.EnumerateArray().Select(Cell).ToList());
+                    break;
+                case JsonValueKind.String or JsonValueKind.Number:
+                    rows.Add([Cell(item)]);
+                    break;
+            }
+        }
+        return (columns, rows);
+    }
+
+    /// <summary>A table cell: text, a number, or a list of texts on one line.</summary>
+    private static string Cell(JsonElement e) => e.ValueKind switch
+    {
+        JsonValueKind.String => e.GetString()!.Trim(),
+        JsonValueKind.Number or JsonValueKind.True or JsonValueKind.False => e.GetRawText(),
+        JsonValueKind.Array => string.Join(", ", e.EnumerateArray().Select(Cell).Where(c => c.Length > 0)),
+        _ => "",
+    };
 
     // ---- Finding the JSON ----------------------------------------------------------------------------------------
 
@@ -314,6 +376,8 @@ public static class MissionImport
         day = default;
         return false;
     }
+
+    private static string Short(string text, int max) => text.Length <= max ? text : text[..max] + "…";
 
     private static string Short(string message)
     {

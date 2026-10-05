@@ -150,7 +150,7 @@ public static class MissionsFormat
                     ["estimateDays"] = s.EstimateDays,
                 };
                 if (s.Checklist.Count > 0) step["checklist"] = new JsonArray(s.Checklist.Select(c => (JsonNode?)c.Text).ToArray());
-                if (s.Resources.Count > 0) step["resources"] = new JsonArray(s.Resources.Select(r => (JsonNode?)r).ToArray());
+                if (MissionResources.Of(s) is { Count: > 0 } resources) step["resources"] = new JsonArray(resources.Select(r => (JsonNode?)MissionResources.ToJson(r)).ToArray());
                 if (s.CompletedAt is not null) step[s.Skipped ? "skippedAt" : "completedAt"] = Iso(s.CompletedAt);
                 if (s.Note.Length > 0) step["note"] = s.Note;
                 list.Add(step);

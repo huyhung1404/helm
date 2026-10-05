@@ -214,6 +214,8 @@ public sealed partial class MissionsViewModel : ObservableObject
 
     public ObservableCollection<ResourceRow> CurrentResources { get; } = [];
 
+    private string _currentResourcesKey = "";
+
     public ObservableCollection<PhaseRow> Phases { get; } = [];
 
     public ObservableCollection<PreviewPhase> PreviewPhases { get; } = [];
@@ -572,6 +574,25 @@ public sealed partial class MissionsViewModel : ObservableObject
             _logger.LogWarning(ex, "Opening a mission resource failed");
             Message = $"Could not open the link: {ex.Message}";
         }
+    }
+
+    /// <summary>The title of a resource: opens its text and table, or its link when it has nothing else.</summary>
+    [RelayCommand]
+    private void ActivateResource(ResourceRow? row)
+    {
+        if (row is null) return;
+        if (row.HasDetails) row.IsExpanded = !row.IsExpanded;
+        else OpenResource(row);
+    }
+
+    [RelayCommand]
+    private void CopyResource(ResourceRow? row)
+    {
+        if (row is null) return;
+        _clipboard.SetText(MissionResources.ToText(row.Resource));
+        Message = row.HasRows
+            ? $"“{row.Title}” is copied; its table pastes as columns into a spreadsheet or a flashcard app."
+            : $"“{row.Title}” is copied.";
     }
 
     [RelayCommand]
@@ -1297,6 +1318,7 @@ public sealed partial class MissionsViewModel : ObservableObject
         {
             CurrentChecklist.Clear();
             CurrentResources.Clear();
+            _currentResourcesKey = "";
             CurrentTitle = CurrentDescription = CurrentDoneWhen = CurrentStartedText = CurrentPhaseText = CurrentNumberText = "";
             CanStartStep = false;
             NotifyCurrent();
@@ -1321,10 +1343,14 @@ public sealed partial class MissionsViewModel : ObservableObject
             if (CurrentChecklist.Count <= i) CurrentChecklist.Add(new ChecklistRow(i, OnChecklistChanged));
             CurrentChecklist[i].Load(rows[i].c.Text, rows[i].c.IsDone);
         }
-        if (!CurrentResources.Select(r => r.Text).SequenceEqual(step.Resources))
+        var resources = MissionResources.Of(step);
+        var key = items[index].Id + MissionResources.Signature(resources);
+        if (key != _currentResourcesKey)
         {
+            // Rebuilt only when they change, so a resource the user opened stays open.
+            _currentResourcesKey = key;
             CurrentResources.Clear();
-            foreach (var r in step.Resources) CurrentResources.Add(new ResourceRow(r));
+            foreach (var r in resources) CurrentResources.Add(new ResourceRow(r));
         }
         NotifyCurrent();
     }
@@ -1364,6 +1390,8 @@ public sealed partial class MissionsViewModel : ObservableObject
                 stepRow.Note = s.Note;
                 stepRow.CanEdit = open && !s.IsDone;
                 stepRow.Details = StepDetails(s, stepRow.State, now);
+                var resources = MissionResources.Of(s);
+                stepRow.SetResources(resources, MissionResources.Signature(resources));
                 if (!stepRow.CanEdit) stepRow.IsEditing = false;
                 steps.Add(stepRow);
             }
@@ -1403,6 +1431,7 @@ public sealed partial class MissionsViewModel : ObservableObject
         CanUndo = CanAddStep = CanClaimReward = false;
         CurrentChecklist.Clear();
         CurrentResources.Clear();
+        _currentResourcesKey = "";
         Phases.Clear();
         NotifyCurrent();
     }

@@ -145,7 +145,7 @@ public sealed class MissionsMcpTools(MissionsStore store) : IMcpToolProvider
             ["done_when"] = s.DoneWhen.Length > 0 ? s.DoneWhen : null,
             ["estimate_days"] = s.EstimateDays,
             ["checklist"] = s.Checklist.Count > 0 ? new JsonArray(s.Checklist.Select(c => (JsonNode?)((c.IsDone ? "[x] " : "[ ] ") + c.Text)).ToArray()) : null,
-            ["resources"] = s.Resources.Count > 0 ? new JsonArray(s.Resources.Select(r => (JsonNode?)r).ToArray()) : null,
+            ["resources"] = MissionResources.Of(s) is { Count: > 0 } resources ? new JsonArray(resources.Select(r => (JsonNode?)MissionResources.ToJson(r)).ToArray()) : null,
             ["state"] = s.Skipped ? "skipped" : s.IsDone ? "done" : "open",
             ["started"] = s.StartedExplicitly && s.StartedAt is { } st ? Day(MissionPace.Day(st, zone)) : null,
             ["done"] = s.CompletedAt is { } c ? Day(MissionPace.Day(c, zone)) : null,
@@ -207,7 +207,7 @@ public sealed class MissionsMcpTools(MissionsStore store) : IMcpToolProvider
                 ["doneWhen"] = Str("How the user can check it is done: a number, a test, something produced."),
                 ["estimateDays"] = new JsonObject { ["type"] = "number", ["description"] = "Realistic days at the user's pace (0.25-60)." },
                 ["checklist"] = Strings("Optional ticks that split the step (up to 7)."),
-                ["resources"] = Strings("Optional real links or book titles."),
+                ["resources"] = ResourcesSchema(),
             },
             ["required"] = new JsonArray("title"),
         };
@@ -223,5 +223,35 @@ public sealed class MissionsMcpTools(MissionsStore store) : IMcpToolProvider
             ["required"] = new JsonArray("title", "steps"),
         };
         return new JsonObject { ["type"] = "array", ["items"] = phase, ["description"] = description };
+    }
+
+    /// <summary>A step's resources: a real link or book title, or an object with what to study (a label, a text, a table).</summary>
+    private static JsonObject ResourcesSchema()
+    {
+        JsonObject Strings(string description) => McpArgs.List(description);
+        var resource = new JsonObject
+        {
+            ["type"] = "object",
+            ["properties"] = new JsonObject
+            {
+                ["label"] = McpArgs.Text("A short label in the user's language, e.g. Vocabulary, Grammar, Mock test, Formulas."),
+                ["title"] = McpArgs.Text("What it is."),
+                ["url"] = McpArgs.Text("Optional: a real, well-known http(s) link. Leave it out rather than invent one."),
+                ["text"] = McpArgs.Text("The content itself: the theory explained, how to get to the test, tips."),
+                ["columns"] = Strings("Names of the table's columns, chosen for the subject (e.g. Word, Pinyin, Meaning)."),
+                ["rows"] = new JsonObject
+                {
+                    ["type"] = "array",
+                    ["items"] = Strings("One row: a cell per column."),
+                    ["description"] = $"The table: the full list to learn or the patterns with examples (up to {MissionLimits.ResourceRows} rows).",
+                },
+            },
+        };
+        return new JsonObject
+        {
+            ["type"] = "array",
+            ["items"] = new JsonObject { ["anyOf"] = new JsonArray(new JsonObject { ["type"] = "string" }, resource) },
+            ["description"] = "Optional: what the step needs, with its content written in: the list to learn as a table, the theory as a text, where the test is.",
+        };
     }
 }

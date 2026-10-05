@@ -102,7 +102,8 @@ phone and renaming another on the PC never collide):
 | Order | double | position in the whole mission (phases are contiguous) |
 | Title / Description / DoneWhen | string | ≤ 200 / 4000 / 500 |
 | EstimateDays | double | 0.25 – 60, default 1 |
-| Resources | List&lt;string&gt; | URLs or plain text (book titles); URLs open with `IProcessLauncher` |
+| Resources | List&lt;string&gt; | one line per resource ("Title — https://…", a book title): all Helm 0.25 and older read; URLs open with `IProcessLauncher` |
+| Materials | List&lt;MissionResource&gt; | the resources with their details (§3.4), written only when one has more than its line; older versions drop it when they edit the step, and `Resources` is read then (`MissionResources.Of`) |
 | Checklist | List&lt;ChecklistItem&gt; | `{ Text, DoneAt? }`, ≤ 20 |
 | StartedAt? / StartedExplicitly | | as Tracker: set by *Start*, else on completion from the previous step's finish |
 | CompletedAt? / Skipped | | a skipped step has `CompletedAt` and `Skipped = true` |
@@ -175,6 +176,37 @@ The import accepts exactly what the prompt asks for, and forgives what AIs usual
 
 *Copy as JSON* on a mission writes the same format (plus `status`, `startedAt`, `completedAt` per step), so a
 mission can be backed up, shared or handed back to an AI.
+
+### 3.4 Resources with their content
+
+A resource is a string (a real link or a book title, as before) or an object that carries what the step needs to
+study, so the user does not have to look for it. Nothing in it is tied to a subject: the label and the columns are the
+plan's own words.
+
+```json
+{
+  "label": "Vocabulary",
+  "title": "Words 1-45",
+  "url": "https://…",
+  "text": "The theory explained, where the test is and how to open it, tips.",
+  "columns": ["Word", "Pinyin", "Meaning"],
+  "rows": [["担心", "dānxīn", "to worry"], ["附近", "fùjìn", "nearby"]]
+}
+```
+
+- The import also reads the shapes AIs write instead: a list (`items`, `rows`, `entries`…) of objects with any keys (the
+  keys become the columns, in the order first seen), of arrays, or of strings (one column); `kind`/`type` for `label`;
+  numbers as text. The old `{ "text": "A book" }` is still a title.
+- Limits (`MissionLimits`): 10 resources a step, label 40, title 200, url 1000 (http/https only, else left out with a
+  warning), text 4000, 8 columns, 60 rows, 300 characters a cell; per step at most 150 rows and 12 000 characters of
+  text, so a step record stays far below the sync server's 1 MB.
+- Stored as `MissionStep.Materials` next to the `Resources` lines, so older versions keep showing something.
+- Page: each resource is a row with its label chip, title and "45 rows · host"; tapping it opens its text and table
+  (each row's first cell large, the other cells after it, the column names above, so any number of columns fits a
+  phone), or opens the link when there is nothing else. *Open* and *Copy* sit next to it; *Copy* writes the table as
+  tab-separated lines. The roadmap shows a step's resources too, made only when the step is opened.
+- The prompt and Claude's `mission_create` / `mission_replan` schema ask for the content itself (the full list to
+  learn, the rules with an example each, where the test is) and still say to leave a link out rather than invent one.
 
 ## 4. The prompt template
 

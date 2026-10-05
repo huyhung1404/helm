@@ -92,7 +92,7 @@ public sealed class MissionsTests : IDisposable
         var first = draft.Phases[0].Steps[0];
         Assert.Equal("90% on a self-test", first.DoneWhen);
         Assert.Equal(["1-50", "51-100"], first.Checklist!);
-        Assert.Equal(["https://example.com/hsk1"], first.Resources!);
+        Assert.Equal("https://example.com/hsk1", Assert.Single(first.Resources!).Url);
     }
 
     [Fact]
@@ -437,6 +437,188 @@ public sealed class MissionsTests : IDisposable
         Assert.Contains("- ✓ HSK1 words", summary);
         Assert.Contains(": Anki deck done", summary);
         Assert.Contains("- ⤼ HSK1 review", summary);
+    }
+
+    // ---- Resources -----------------------------------------------------------------------------------------------
+
+    /// <summary>A step whose resources carry their content: a table with the plan's own columns, a text, a link.</summary>
+    private const string WithResources = """
+        {
+          "title": "Learn things",
+          "steps": [
+            {
+              "title": "Words, part 1",
+              "resources": [
+                "Course book — https://example.com/book",
+                {
+                  "label": "Vocabulary",
+                  "title": "Words 1-3",
+                  "columns": ["Word", "Pinyin", "Meaning"],
+                  "rows": [["担心", "dānxīn", "to worry"], ["附近", "fùjìn", "nearby"], ["根据", "gēnjù"]]
+                },
+                {
+                  "kind": "Formulas",
+                  "title": "Areas",
+                  "text": "Learn these two.\nThen solve 10 problems.",
+                  "items": [{ "shape": "Circle", "formula": "πr²" }, { "shape": "Square", "formula": "a²", "note": 4 }]
+                },
+                { "label": "Mock test", "title": "Test 1", "url": "https://example.com/test", "text": "Open Tests, then Level 3, then Test 1." },
+                { "title": "Plain list", "items": ["one", "two"] },
+                { "text": "An old-style book title" }
+              ]
+            }
+          ]
+        }
+        """;
+
+    [Fact]
+    public void Import_reads_resources_with_a_label_a_text_and_a_table_of_any_columns()
+    {
+        var result = MissionImport.Parse(WithResources);
+
+        Assert.True(result.Ok, string.Join("; ", result.Errors));
+        Assert.Empty(result.Warnings);
+        var r = result.Draft!.Phases[0].Steps[0].Resources!;
+        Assert.Equal(6, r.Count);
+
+        Assert.Equal(("Course book", "https://example.com/book"), (r[0].Title, r[0].Url));
+        Assert.False(MissionResources.HasDetails(r[0]));
+
+        Assert.Equal("Vocabulary", r[1].Label);
+        Assert.Equal(["Word", "Pinyin", "Meaning"], r[1].Columns);
+        Assert.Equal(["根据", "gēnjù", ""], r[1].Rows[2]); // a short row is filled up to the columns
+
+        // Objects of any keys: the keys are the columns, in the order first seen; numbers are text.
+        Assert.Equal("Formulas", r[2].Label);
+        Assert.Equal(["shape", "formula", "note"], r[2].Columns);
+        Assert.Equal(["Square", "a²", "4"], r[2].Rows[1]);
+        Assert.Equal("Learn these two.\nThen solve 10 problems.", r[2].Text);
+
+        Assert.Equal(("Mock test", "https://example.com/test"), (r[3].Label, r[3].Url));
+        Assert.Equal(["one", "two"], r[4].Rows.Select(row => Assert.Single(row)));
+        Assert.Empty(r[4].Columns);
+        Assert.Equal(("An old-style book title", ""), (r[5].Title, r[5].Text));
+    }
+
+    [Fact]
+    public void Resources_are_kept_within_their_limits_with_warnings()
+    {
+        var rows = new JsonArray(Enumerable.Range(1, 70).Select(i => (JsonNode?)new JsonArray($"w{i}", "x")).ToArray());
+        var wide = new JsonArray((JsonNode?)new JsonArray(Enumerable.Range(1, 10).Select(i => (JsonNode?)$"c{i}").ToArray()));
+        var step = new JsonObject
+        {
+            ["title"] = "S",
+            ["resources"] = new JsonArray(
+                new JsonObject { ["title"] = "Long", ["rows"] = rows },
+                new JsonObject { ["title"] = "Bad link", ["url"] = "javascript:alert(1)" },
+                new JsonObject { ["title"] = "Wide", ["rows"] = wide }),
+        };
+        var result = MissionImport.Parse(new JsonObject { ["title"] = "T", ["steps"] = new JsonArray(step) }.ToJsonString());
+
+        Assert.True(result.Ok);
+        var r = result.Draft!.Phases[0].Steps[0].Resources!;
+        Assert.Equal(MissionLimits.ResourceRows, r[0].Rows.Count);
+        Assert.Equal("", r[1].Url);
+        Assert.Equal(MissionLimits.ResourceColumns, r[2].Rows[0].Count);
+        Assert.Contains(result.Warnings, w => w.Contains("rows were left out"));
+        Assert.Contains(result.Warnings, w => w.Contains("not a web address"));
+        Assert.Contains(result.Warnings, w => w.Contains("more than 8 columns"));
+
+        // The whole step keeps to its row budget.
+        var many = Enumerable.Range(0, 4).Select(_ => new MissionResource { Title = "T", Rows = Enumerable.Range(0, 60).Select(i => (IReadOnlyList<string>)[$"r{i}"]).ToList() });
+        Assert.Equal(MissionLimits.StepResourceRows, MissionResources.Clean(many).Sum(x => x.Rows.Count));
+    }
+
+    [Fact]
+    public void A_step_keeps_details_for_new_versions_and_a_line_for_old_ones()
+    {
+        var id = _store.Create(MissionImport.Parse(WithResources).Draft!, MissionSource.Import);
+        var step = _store.Steps(id)[0].Value;
+
+        Assert.Equal(6, step.Materials.Count);
+        Assert.Equal("Course book — https://example.com/book", step.Resources[0]);
+        Assert.Equal("Words 1-3", step.Resources[1]);
+        Assert.Equal("Test 1 — https://example.com/test", step.Resources[3]);
+        Assert.Same(step.Materials, MissionResources.Of(step));
+
+        // The record goes through sync as JSON, table and all.
+        var json = JsonSerializer.Serialize(step, Helm.Core.Sync.SyncJson.Options);
+        var back = JsonSerializer.Deserialize<MissionStep>(json, Helm.Core.Sync.SyncJson.Options)!;
+        Assert.Equal(["附近", "fùjìn", "nearby"], back.Materials[1].Rows[1]);
+
+        // An older Helm that edited the step dropped Materials: its lines are read instead.
+        var old = step with { Materials = [] };
+        var fromLines = MissionResources.Of(old);
+        Assert.Equal(("Course book", "https://example.com/book"), (fromLines[0].Title, fromLines[0].Url));
+        Assert.Equal("Words 1-3", fromLines[1].Title);
+
+        // Plain links only: the record looks as it always did.
+        var plain = _store.Steps(CreateHsk(start: false))[0].Value;
+        Assert.Empty(plain.Materials);
+        Assert.Equal(["https://example.com/hsk1"], plain.Resources);
+    }
+
+    [Fact]
+    public void Resources_copy_as_json_and_as_text_and_reach_claude()
+    {
+        var id = _store.Create(MissionImport.Parse(WithResources).Draft!, MissionSource.Import);
+        var mission = _store.GetMission(id)!;
+        var steps = _store.Steps(id).Select(s => s.Value).ToList();
+
+        var again = MissionImport.Parse(MissionsFormat.Json(mission, steps));
+        Assert.True(again.Ok, string.Join("; ", again.Errors));
+        Assert.Equal(
+            MissionResources.Signature(steps[0].Materials),
+            MissionResources.Signature(MissionResources.Clean(again.Draft!.Phases[0].Steps[0].Resources)));
+
+        var text = MissionResources.ToText(steps[0].Materials[1]);
+        Assert.Equal("Words 1-3 (Vocabulary)\n\nWord\tPinyin\tMeaning\n担心\tdānxīn\tto worry\n附近\tfùjìn\tnearby\n根据\tgēnjù\t\n", text);
+    }
+
+    [Fact]
+    public async Task Claude_writes_and_reads_resources_with_their_tables()
+    {
+        var server = Server();
+        var args = JsonNode.Parse(WithResources)!.AsObject();
+
+        var created = await Call(server, "mission_create", args);
+        Assert.False(created.IsError, created.Text);
+        Assert.Contains("\"columns\":[\"Word\",\"Pinyin\",\"Meaning\"]", created.Text);
+        Assert.Contains("\"label\":\"Mock test\"", created.Text);
+        Assert.Contains("\"Course book — https://example.com/book\"", created.Text);
+    }
+
+    [Fact]
+    public void The_page_shows_resources_opens_their_details_and_copies_them()
+    {
+        _store.Start(_store.Create(MissionImport.Parse(WithResources).Draft!, MissionSource.Import));
+        var clipboard = new MemoryClipboard();
+        var vm = ViewModel(clipboard);
+
+        var words = vm.CurrentResources[1];
+        Assert.Equal(("Vocabulary", "Words 1-3", "3 rows"), (words.Label, words.Title, words.Summary));
+        Assert.Equal("Word · Pinyin · Meaning", words.Header);
+        Assert.Equal(("担心", "dānxīn · to worry"), (words.Rows[0].First, words.Rows[0].Rest));
+        Assert.False(words.ShowDetails);
+
+        vm.ActivateResourceCommand.Execute(words);
+        Assert.True(words.ShowDetails);
+        vm.ActivateResourceCommand.Execute(words);
+        Assert.False(words.ShowDetails);
+
+        var link = vm.CurrentResources[0];
+        Assert.True(link.IsPlainLink);
+        Assert.Equal("example.com", link.Summary);
+
+        vm.CopyResourceCommand.Execute(words);
+        Assert.StartsWith("Words 1-3 (Vocabulary)", clipboard.Text);
+
+        // The roadmap makes a step's resource rows only when the step is opened.
+        var row = vm.Phases[0].Steps[0];
+        Assert.True(row.HasResources);
+        Assert.Empty(row.Resources);
+        vm.ToggleStepCommand.Execute(row);
+        Assert.Equal(6, row.Resources.Count);
     }
 
     // ---- Page ----------------------------------------------------------------------------------------------------

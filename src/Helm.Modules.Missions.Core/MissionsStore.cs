@@ -17,6 +17,21 @@ public static class MissionLimits
     public const int DoneWhen = 500;
     public const int ChecklistText = 200;
     public const int ResourceText = 500;
+    public const int ResourceLabel = 40;
+    public const int ResourceTitle = 200;
+    public const int ResourceUrl = 1000;
+    public const int ResourceBody = 4000;
+    public const int ResourceColumns = 8;
+    public const int ColumnName = 40;
+    public const int ResourceRows = 60;
+    public const int Cell = 300;
+
+    /// <summary>Rows in all the resources of one step, so a step record stays far below the sync server's 1 MB.</summary>
+    public const int StepResourceRows = 150;
+
+    /// <summary>Characters of resource texts in one step, for the same reason.</summary>
+    public const int StepResourceBody = 12000;
+
     public const double MinEstimateDays = 0.25;
     public const double MaxEstimateDays = 60;
 
@@ -137,20 +152,25 @@ public sealed class MissionsStore
         }
     }
 
-    private static MissionStep NewStep(string missionId, string phaseKey, double order, StepDraft step) => new()
+    private static MissionStep NewStep(string missionId, string phaseKey, double order, StepDraft step)
     {
-        MissionId = missionId,
-        PhaseKey = phaseKey,
-        Order = order,
-        Title = MissionLimits.Clip(step.Title, MissionLimits.Title),
-        Description = MissionLimits.Clip(step.Description, MissionLimits.Description),
-        DoneWhen = MissionLimits.Clip(step.DoneWhen, MissionLimits.DoneWhen),
-        EstimateDays = ClampEstimate(step.EstimateDays),
-        Checklist = (step.Checklist ?? []).Select(c => MissionLimits.Clip(c, MissionLimits.ChecklistText)).Where(c => c.Length > 0)
-            .Take(MissionLimits.ChecklistItems).Select(c => new ChecklistItem { Text = c }).ToList(),
-        Resources = (step.Resources ?? []).Select(r => MissionLimits.Clip(r, MissionLimits.ResourceText)).Where(r => r.Length > 0)
-            .Take(MissionLimits.Resources).ToList(),
-    };
+        var resources = MissionResources.Clean(step.Resources);
+        return new()
+        {
+            MissionId = missionId,
+            PhaseKey = phaseKey,
+            Order = order,
+            Title = MissionLimits.Clip(step.Title, MissionLimits.Title),
+            Description = MissionLimits.Clip(step.Description, MissionLimits.Description),
+            DoneWhen = MissionLimits.Clip(step.DoneWhen, MissionLimits.DoneWhen),
+            EstimateDays = ClampEstimate(step.EstimateDays),
+            Checklist = (step.Checklist ?? []).Select(c => MissionLimits.Clip(c, MissionLimits.ChecklistText)).Where(c => c.Length > 0)
+                .Take(MissionLimits.ChecklistItems).Select(c => new ChecklistItem { Text = c }).ToList(),
+            Resources = resources.Select(MissionResources.Line).ToList(),
+            // Plain lines say it all: only details need the record older versions do not know.
+            Materials = resources.Any(MissionResources.HasDetails) ? resources : [],
+        };
+    }
 
     public static double ClampEstimate(double days) =>
         double.IsFinite(days) ? Math.Clamp(Math.Round(days * 4) / 4, MissionLimits.MinEstimateDays, MissionLimits.MaxEstimateDays) : 1;

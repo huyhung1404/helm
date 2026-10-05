@@ -91,6 +91,32 @@ public sealed record Mission
     }
 }
 
+/// <summary>
+/// What a step needs to study or where to practise, in any field: a link, a list to learn, the theory with examples,
+/// where the test is. Nothing in it is tied to a subject: the label and the table's columns are whatever the plan
+/// names them ("Vocabulary" with Word / Pinyin / Meaning, "Formulas" with Formula / When to use). Every field is
+/// optional; a resource has at least a title, a link, a text or a row.
+/// </summary>
+public sealed record MissionResource
+{
+    /// <summary>A short free label shown as a chip ("Vocabulary", "Grammar", "Mock test"); empty for a plain line.</summary>
+    public string Label { get; init; } = "";
+
+    public string Title { get; init; } = "";
+
+    /// <summary>An http or https address.</summary>
+    public string Url { get; init; } = "";
+
+    /// <summary>The explanation: the theory, how to get to the test, tips.</summary>
+    public string Text { get; init; } = "";
+
+    /// <summary>The table's column names, in order; empty when the rows have one unnamed column.</summary>
+    public IReadOnlyList<string> Columns { get; init; } = [];
+
+    /// <summary>The table: one list of cells per row, in the order of <see cref="Columns"/>.</summary>
+    public IReadOnlyList<IReadOnlyList<string>> Rows { get; init; } = [];
+}
+
 /// <summary>A tick inside a step.</summary>
 public sealed record ChecklistItem
 {
@@ -124,8 +150,18 @@ public sealed record MissionStep
 
     public double EstimateDays { get; init; } = 1;
 
-    /// <summary>Links or book titles.</summary>
+    /// <summary>
+    /// The resources as one line each ("title — url", a book title): all Helm 0.25 and older read. Written next to
+    /// <see cref="Materials"/>, so a step stays readable there.
+    /// </summary>
     public IReadOnlyList<string> Resources { get; init; } = [];
+
+    /// <summary>
+    /// The resources with their details (a word list, a grammar rule, where the test is), when any has more than a line
+    /// holds. Older Helm versions do not know it and drop it when they edit the step; <see cref="Resources"/> is then used.
+    /// Read both through <see cref="MissionResources.Of"/>.
+    /// </summary>
+    public IReadOnlyList<MissionResource> Materials { get; init; } = [];
 
     public IReadOnlyList<ChecklistItem> Checklist { get; init; } = [];
 
@@ -214,7 +250,7 @@ public sealed record StepDraft(
     string DoneWhen = "",
     double EstimateDays = 1,
     IReadOnlyList<string>? Checklist = null,
-    IReadOnlyList<string>? Resources = null);
+    IReadOnlyList<MissionResource>? Resources = null);
 
 /// <summary>What completing or skipping a step led to, so the page knows which celebration to play.</summary>
 public sealed record StepOutcome(

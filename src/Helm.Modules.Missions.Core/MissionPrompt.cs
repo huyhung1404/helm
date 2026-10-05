@@ -33,7 +33,16 @@ public static class MissionPrompt
                   "doneWhen": "How I can check that it is done",
                   "estimateDays": 2,
                   "checklist": ["Part 1", "Part 2"],
-                  "resources": ["https://example.com or a book title"]
+                  "resources": [
+                    "https://example.com or a book title",
+                    {
+                      "label": "Short label, e.g. Vocabulary",
+                      "title": "What it is",
+                      "text": "The content itself: the theory, where the test is and how to open it, tips",
+                      "columns": ["Column 1", "Column 2", "Column 3"],
+                      "rows": [["cell", "cell", "cell"], ["cell", "cell", "cell"]]
+                    }
+                  ]
                 }
               ]
             }
@@ -62,7 +71,8 @@ public static class MissionPrompt
         b.AppendLine("- Each step is one concrete piece of work that takes 0.5-3 days at my pace. No vague steps like \"practise more\".");
         b.AppendLine("- \"doneWhen\" says how I can check the step is done: a number, a test, something I produce.");
         b.AppendLine("- \"estimateDays\" must be realistic for my time; the total must fit the deadline. If it cannot, still give the plan and explain in \"note\".");
-        b.AppendLine("- \"checklist\" (optional, up to 7 items) splits a step into ticks. \"resources\" (optional) are well-known, real links or book titles; leave it out rather than invent one.");
+        b.AppendLine("- \"checklist\" (optional, up to 7 items) splits a step into ticks.");
+        AppendResourceRules(b);
         b.AppendLine("- End each phase with a short review or test step.");
         b.AppendLine("- Give each phase a small \"reward\" and the whole mission a bigger one.");
         b.AppendLine();
@@ -125,13 +135,24 @@ public static class MissionPrompt
         b.AppendLine("- Each step is one concrete piece of work that takes 0.5-3 days at my real pace (see how long the done steps took).");
         b.AppendLine("- \"doneWhen\" says how I can check the step is done: a number, a test, something I produce.");
         b.AppendLine("- If the deadline cannot be met any more, set a realistic new \"deadline\" and explain in \"note\".");
-        b.AppendLine("- \"checklist\" (optional, up to 7 items) splits a step into ticks. \"resources\" (optional) are well-known, real links or book titles.");
+        b.AppendLine("- \"checklist\" (optional, up to 7 items) splits a step into ticks.");
+        AppendResourceRules(b);
         b.AppendLine();
         b.AppendLine("Use exactly this shape:");
         b.AppendLine("```json");
         b.AppendLine(Example);
         b.Append("```");
         return b.ToString();
+    }
+
+    /// <summary>How to write a step's resources: the content itself, in a table whose columns fit the subject.</summary>
+    private static void AppendResourceRules(StringBuilder b)
+    {
+        b.AppendLine($"- \"resources\" (optional, up to {MissionLimits.Resources} per step) give what the step needs, with the content written in, so I do not have to look for it:");
+        b.AppendLine("  - a string is a real, well-known link or a book title;");
+        b.AppendLine("  - an object has a short \"label\" (e.g. Vocabulary, Grammar, Mock test, Formulas), a \"title\", an optional \"url\", a \"text\" (the theory explained, where the test is and how to open it, tips) and a table: \"columns\" named for the subject and \"rows\" with one cell per column;");
+        b.AppendLine($"  - put the full list to learn in the rows (up to {MissionLimits.ResourceRows} rows), and the patterns or rules with an example each;");
+        b.AppendLine("  - only use links you are sure exist; leave \"url\" out rather than invent one.");
     }
 
     /// <summary>The template with placeholders, for use outside the form.</summary>
