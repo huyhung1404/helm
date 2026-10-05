@@ -37,6 +37,8 @@ internal sealed class AndroidWalletPlatform : IWalletPlatform
         Start(new Intent(Settings.ActionNotificationListenerSettings));
     }
 
+    public bool MayRestrictNotificationAccess => OperatingSystem.IsAndroidVersionAtLeast(33);
+
     public void OpenAppDetails() =>
         Start(new Intent(Settings.ActionApplicationDetailsSettings, Uri.Parse("package:" + Context.PackageName)));
 

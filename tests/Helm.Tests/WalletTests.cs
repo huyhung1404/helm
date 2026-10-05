@@ -116,6 +116,23 @@ public sealed class WalletTests : IDisposable
     [InlineData("")]
     public void Not_a_transaction(string text) => Assert.Null(Parse(text));
 
+    [Theory]
+    [InlineData("Ma OTP 482913 de chuyen tien so tien 5,000,000 VND den TK 0123456789. Khong chia se ma nay.")]
+    [InlineData("Ma xac thuc giao dich: 771204. So tien: 2,000,000 VND. Hieu luc 3 phut.")]
+    [InlineData("482913 la ma OTP cua Quy khach. Tuyet doi khong cung cap cho bat ky ai.")]
+    [InlineData("Mã xác nhận của bạn là 4821")]
+    [InlineData("SmartOTP: 556677 cho giao dich 1,500,000 VND")]
+    [InlineData("Your OTP is 123456")]
+    public void A_one_time_code_is_recognised(string text) => Assert.True(BankNotificationParser.HasOneTimeCode("", text));
+
+    [Theory]
+    [InlineData("TK 1903xxxx0123 -50,000 VND luc 08:00 04/10/2026 SD 900,000 VND ND: THANH TOAN QR")]
+    // The warning some banks add to every message has no code in it.
+    [InlineData("TK 1903xxxx0123 -50,000 VND luc 08:00 SD 900,000 VND. Techcombank khong bao gio yeu cau cung cap OTP.")]
+    [InlineData("So du 5000000. Khong chia se OTP voi bat ky ai")]
+    [InlineData("TK 12345678 +2,000,000 SD 9,000,000 Ma GD 87654321 ND: luong thang 10")]
+    public void A_transaction_is_not_a_one_time_code(string text) => Assert.False(BankNotificationParser.HasOneTimeCode("", text));
+
     [Fact]
     public void A_date_far_from_the_notification_is_not_trusted()
     {
@@ -133,8 +150,26 @@ public sealed class WalletTests : IDisposable
     [InlineData("com.zing.zalo", "ACB", null)]
     [InlineData("com.google.android.apps.messaging", "Mẹ", null)]
     [InlineData("com.google.android.apps.messaging", "ACBS Securities", null)]
+    // A contact named after the bank is not the bank.
+    [InlineData("com.google.android.apps.messaging", "ACB Nam", null)]
+    [InlineData("com.google.android.apps.messaging", "TCB: Lan", null)]
+    // Any app can choose a package name that looks like a bank's or an SMS app's.
+    [InlineData("com.evil.techcombank.fake", "Techcombank", null)]
+    [InlineData("Vn.com.techcombank.bb.app", "Techcombank", null)]
+    [InlineData("com.game.acb", "ACB", null)]
+    [InlineData("com.fake.sms", "Techcombank", null)]
+    [InlineData("com.example.messages", "TCB", null)]
+    [InlineData("org.telegram.messenger", "TCB", null)]
     public void Identifies_the_bank(string app, string title, string? bank) =>
         Assert.Equal(bank, BankSources.Identify(app, title)?.Id);
+
+    [Fact]
+    public void The_default_SMS_app_counts_as_an_SMS_app()
+    {
+        Assert.Null(BankSources.Identify("com.textra", "Techcombank"));
+        Assert.Equal("techcombank", BankSources.Identify("com.textra", "Techcombank", smsApp: "com.textra")?.Id);
+        Assert.Null(BankSources.Identify("com.fake.sms", "Techcombank", smsApp: "com.textra"));
+    }
 
     [Theory]
     [InlineData("50000", 50_000)]
@@ -347,6 +382,49 @@ public sealed class WalletTests : IDisposable
         Assert.Equal(NotificationOutcome.Ignored, capture.Handle("com.google.android.apps.messaging", "ACB", sms.Replace("55,000", "66,000"), T0, Ict).Outcome);
         capture.Settings.Update(s => s.ListenEnabled = false);
         Assert.Equal(NotificationOutcome.Ignored, capture.Handle("vn.com.techcombank.bb.app", "", "TK 1903 -1,000 SD 5,000", T0, Ict).Outcome);
+    }
+
+    [Fact]
+    public void A_one_time_code_is_never_kept()
+    {
+        var capture = Capture();
+        Assert.Equal(NotificationOutcome.Ignored, capture.Handle("vn.com.techcombank.bb.app", "Techcombank",
+            "Ma OTP 482913 de chuyen tien so tien 5,000,000 VND den TK 0123456789.", T0, Ict).Outcome);
+        Assert.Equal(NotificationOutcome.Ignored, capture.Handle("com.google.android.apps.messaging", "TCB",
+            "Ma xac thuc giao dich: 771204. So tien: 2,000,000 VND.", T0, Ict).Outcome);
+        Assert.Empty(capture.Settings.Current.Unread);
+        Assert.Empty(_store.Transactions());
+        Assert.False(WalletCapture.Try(BankSources.Techcombank, "OTP: 482913, so tien 5,000,000 VND", T0, Ict).Ok);
+
+        // A transaction that ends with the bank's warning about OTPs is still saved.
+        Assert.Equal(NotificationOutcome.Added, capture.Handle("vn.com.techcombank.bb.app", "Techcombank",
+            "TK 1903xxxx0123 -50,000 VND luc 08:00 SD 900,000 VND. Techcombank khong bao gio yeu cau cung cap OTP.", T0, Ict).Outcome);
+    }
+
+    [Fact]
+    public void One_time_codes_kept_by_an_older_version_are_forgotten()
+    {
+        _settings.Get<WalletSettings>(WalletIds.ModuleId).Update(s =>
+        {
+            s.Unread.Add(new UnreadNotification { Bank = "Techcombank", Text = "Ma OTP 482913 de chuyen tien so tien 5,000,000 VND" });
+            s.Unread.Add(new UnreadNotification { Bank = "ACB", Text = "Tai khoan vua bien dong so du (VND) 1" });
+        });
+        var unread = Assert.Single(Capture().Settings.Current.Unread);
+        Assert.Equal("ACB", unread.Bank);
+    }
+
+    [Fact]
+    public void Another_app_cannot_add_transactions()
+    {
+        var capture = Capture();
+        const string fake = "TK 1903xxxx0123 -9,999,000 VND luc 08:00 SD 1,000 VND ND: TEST";
+        Assert.Equal(NotificationOutcome.Ignored, capture.Handle("com.evil.techcombank.fake", "Techcombank", fake, T0, Ict).Outcome);
+        Assert.Equal(NotificationOutcome.Ignored, capture.Handle("com.fake.sms", "Techcombank", fake, T0, Ict).Outcome);
+        Assert.Equal(NotificationOutcome.Ignored, capture.Handle("com.google.android.apps.messaging", "ACB Nam", fake, T0, Ict).Outcome);
+        Assert.Empty(_store.Transactions());
+        Assert.Empty(capture.Settings.Current.Unread);
+        // The phone's default SMS app is trusted like the common ones.
+        Assert.Equal(NotificationOutcome.Added, capture.Handle("com.textra", "Techcombank", fake, T0, Ict, smsApp: "com.textra").Outcome);
     }
 
     [Fact]

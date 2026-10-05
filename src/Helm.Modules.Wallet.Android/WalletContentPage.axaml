@@ -263,6 +263,15 @@
                     <TextBlock Text="To save your transactions by itself, Helm needs to read your bank's notifications. Nothing else is read or sent anywhere."
                                TextWrapping="Wrap" />
                     <Button Classes="accent wide" Content="Open notification access" Command="{Binding OpenNotificationAccessCommand}" />
+                    <StackPanel Spacing="8" IsVisible="{Binding ShowRestrictedHelp}">
+                        <TextBlock Text="Android blocked it (“Restricted setting”)?" Classes="title" />
+                        <TextBlock Text="Android 13 and later block this for apps installed from a file, until you allow it once:" TextWrapping="Wrap" />
+                        <TextBlock Text="1. Try turning Helm on in Notification access and close the block message. Android only offers the next step after that."
+                                   TextWrapping="Wrap" />
+                        <TextBlock Text="2. Open App info, tap ⋮ (top right) → Allow restricted settings, and confirm." TextWrapping="Wrap" />
+                        <TextBlock Text="3. Open notification access again and turn Helm on." TextWrapping="Wrap" />
+                        <Button Classes="wide" Content="Open App info" Command="{Binding OpenAppDetailsCommand}" />
+                    </StackPanel>
                 </StackPanel>
             </Border>
 

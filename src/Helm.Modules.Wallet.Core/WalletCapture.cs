@@ -6,7 +6,7 @@ namespace Helm.Modules.Wallet;
 
 public enum NotificationOutcome
 {
-    /// <summary>Not from a bank Helm listens to (or listening is off).</summary>
+    /// <summary>Not from a bank Helm listens to (or listening is off), or a one-time code, which is never kept.</summary>
     Ignored,
 
     /// <summary>From a bank, but not a transaction Helm could read; kept in the settings for the user to check.</summary>
@@ -39,6 +39,9 @@ public sealed class WalletCapture
         _settingsFactory = settings;
         _settings = settings.Get<WalletSettings>(WalletIds.ModuleId);
         _logger = (ILogger?)logger ?? NullLogger.Instance;
+        // Older versions kept a one-time code that talked about money in the unread list: forget it.
+        if (_settings.Current.Unread.Any(u => BankNotificationParser.HasOneTimeCode(u.Title, u.Text)))
+            _settings.Update(s => s.Unread.RemoveAll(u => BankNotificationParser.HasOneTimeCode(u.Title, u.Text)));
     }
 
     public ISettingsStore<WalletSettings> Settings => _settings;
@@ -60,13 +63,15 @@ public sealed class WalletCapture
     /// <param name="title">Its title (the sender for an SMS).</param>
     /// <param name="text">Its text; the big text when there is one.</param>
     /// <param name="postedAt">When it was posted.</param>
-    public NotificationResult Handle(string app, string? title, string? text, DateTimeOffset postedAt, TimeZoneInfo zone)
+    /// <param name="smsApp">The phone's default SMS app, when the platform knows it (see <see cref="BankSources.Identify"/>).</param>
+    public NotificationResult Handle(string app, string? title, string? text, DateTimeOffset postedAt, TimeZoneInfo zone, string? smsApp = null)
     {
         try
         {
             var settings = _settings.Current;
             if (!settings.ListenEnabled || !IsToolEnabled) return new(NotificationOutcome.Ignored);
-            if (BankSources.Identify(app, title ?? "") is not { } bank || !settings.IsBankEnabled(bank.Id)) return new(NotificationOutcome.Ignored);
+            if (BankSources.Identify(app, title ?? "", smsApp) is not { } bank || !settings.IsBankEnabled(bank.Id)) return new(NotificationOutcome.Ignored);
+            if (BankNotificationParser.HasOneTimeCode(title, text)) return new(NotificationOutcome.Ignored, bank);
 
             var parsed = BankNotificationParser.Parse(bank.Name, title, text, postedAt, zone);
             if (parsed is null)
@@ -124,6 +129,8 @@ public sealed class WalletCapture
     public static (bool Ok, string Text) Try(BankSource bank, string text, DateTimeOffset now, TimeZoneInfo zone)
     {
         if (string.IsNullOrWhiteSpace(text)) return (false, "");
+        if (BankNotificationParser.HasOneTimeCode("", text))
+            return (false, "This looks like a one-time code (OTP). Helm never reads or keeps those.");
         var parsed = BankNotificationParser.Parse(bank.Name, "", text, now, zone);
         if (parsed is null)
             return (false, "Helm cannot read a transaction in this text: it needs a signed amount (like -150,000 or +5,000,000, or an amount with “ghi nợ / ghi có”) and a balance or an account.");

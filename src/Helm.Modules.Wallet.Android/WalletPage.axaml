@@ -52,7 +52,7 @@
                 <Border Classes="row" IsEnabled="{Binding ListenEnabled}">
                     <StackPanel Spacing="8">
                         <TextBlock Text="If Android says “Restricted setting”" />
-                        <TextBlock Text="Android 13 and later block notification access for apps installed from a file. Open App info, tap ⋮ (top right) → Allow restricted settings, then turn Helm on in Notification access again."
+                        <TextBlock Text="Android 13 and later block notification access for apps installed from a file. First try turning Helm on in Notification access and close the block message (Android only offers the next step after that). Then open App info, tap ⋮ (top right) → Allow restricted settings, confirm, and turn Helm on in Notification access again."
                                    Classes="secondary" TextWrapping="Wrap" />
                         <TextBlock Text="On Xiaomi, OPPO, Samsung and others, also set Battery to No restrictions (or turn on Autostart) in App info, or the phone may stop Helm from listening."
                                    Classes="secondary" TextWrapping="Wrap" />

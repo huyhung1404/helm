@@ -232,6 +232,9 @@ public sealed partial class WalletViewModel : ObservableObject
     /// <summary>Notification access is missing while listening is on: the page asks for it first.</summary>
     public bool NeedsAccess => CanListen && ListenEnabled && !HasNotificationAccess;
 
+    /// <summary>The banner also explains how to get past Android's "Restricted setting" block.</summary>
+    public bool ShowRestrictedHelp => NeedsAccess && _platform?.MayRestrictNotificationAccess == true;
+
     public string AccessText => HasNotificationAccess
         ? "Helm can read notifications. New transactions from your banks are saved by themselves."
         : "Helm cannot read notifications yet. Turn Helm on in Notification access.";
@@ -720,6 +723,7 @@ public sealed partial class WalletViewModel : ObservableObject
     partial void OnListenEnabledChanged(bool value)
     {
         OnPropertyChanged(nameof(NeedsAccess));
+        OnPropertyChanged(nameof(ShowRestrictedHelp));
         if (!_loading) _settings.Update(s => s.ListenEnabled = value);
     }
 
@@ -774,6 +778,7 @@ public sealed partial class WalletViewModel : ObservableObject
     partial void OnHasNotificationAccessChanged(bool value)
     {
         OnPropertyChanged(nameof(NeedsAccess));
+        OnPropertyChanged(nameof(ShowRestrictedHelp));
         OnPropertyChanged(nameof(AccessText));
     }
 

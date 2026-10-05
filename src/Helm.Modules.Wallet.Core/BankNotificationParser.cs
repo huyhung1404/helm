@@ -75,6 +75,22 @@ public static partial class BankNotificationParser
     [GeneratedRegex(@"\s+", RegexOptions.CultureInvariant)]
     private static partial Regex Spaces();
 
+    // A one-time code and the word for it close together, in either order: "Ma OTP cua Quy khach la 123456",
+    // "SmartOTP: 556677", "123456 la ma xac thuc". A warning without a code ("khong cung cap OTP cho ai") is not one,
+    // and neither is a date, an amount or a long account number.
+    private const string CodeWord = @"(?:otp|(?<![\p{L}])(?:ma xac thuc|ma xac nhan|ma kich hoat|ma bao mat|mat khau|ma pin|passcode|password|verification code|security code))(?![\p{L}])";
+    private const string Code = @"(?<![\d.,/+-])\d{4,8}(?!\d|[.,/]\d)";
+
+    [GeneratedRegex(CodeWord + @"(?:[^.!?\n]|(?<=\d)[.,](?=\d)){0,40}?" + Code + "|" + Code + @"[^.!?\n]{0,20}?" + CodeWord, RegexOptions.CultureInvariant)]
+    private static partial Regex OneTimeCode();
+
+    /// <summary>
+    /// Whether the notification carries a one-time code (OTP, verification code, password). Helm never keeps those,
+    /// not even as a notification it could not read.
+    /// </summary>
+    public static bool HasOneTimeCode(string? title, string? text) =>
+        OneTimeCode().IsMatch(WalletText.Fold(WalletText.Clean(title + "\n" + text)));
+
     /// <summary>Reads one notification; null when it is not a transaction Helm can read with confidence.</summary>
     /// <param name="bank">The bank's name as stored on the transaction.</param>
     /// <param name="title">The notification's title (an amount in it is read too).</param>

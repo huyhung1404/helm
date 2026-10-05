@@ -12,6 +12,12 @@ public interface IWalletPlatform
     /// <summary>Opens Android's "Notification access" list, where the user turns Helm on.</summary>
     void OpenNotificationAccess();
 
+    /// <summary>
+    /// Whether Android may refuse notification access to Helm as a "restricted setting" (Android 13 and later, for an
+    /// APK installed from a file) until the user allows restricted settings in App info.
+    /// </summary>
+    bool MayRestrictNotificationAccess { get; }
+
     /// <summary>Opens Helm's App info page (Allow restricted settings, battery).</summary>
     void OpenAppDetails();
 

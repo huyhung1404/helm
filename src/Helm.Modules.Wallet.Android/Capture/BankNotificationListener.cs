@@ -1,4 +1,5 @@
 using Android.Content;
+using Android.Provider;
 using Android.Service.Notification;
 using Helm.Core;
 using Microsoft.Extensions.DependencyInjection;
@@ -69,7 +70,8 @@ public sealed class BankNotificationListener : NotificationListenerService
         if ((notification.Flags & NotificationFlags.GroupSummary) != 0) return;
         var extras = notification.Extras;
         var title = extras?.GetCharSequence(Notification.ExtraTitle)?.ToString() ?? "";
-        if (BankSources.Identify(app, title) is null) return;
+        var smsApp = DefaultSmsApp();
+        if (BankSources.Identify(app, title, smsApp) is null) return;
 
         // The big text is the whole message; an inbox-style notification has one line per message.
         var texts = new List<string>();
@@ -89,10 +91,30 @@ public sealed class BankNotificationListener : NotificationListenerService
         var posted = DateTimeOffset.FromUnixTimeMilliseconds(sbn.PostTime);
         var context = ApplicationContext ?? this;
         // Off the main thread: the first notification after a cold start builds Helm's services.
-        _ = Task.Run(() => Save(context, app, title, texts, posted));
+        _ = Task.Run(() => Save(context, app, title, texts, posted, smsApp));
     }
 
-    private static void Save(Context context, string app, string title, List<string> texts, DateTimeOffset posted)
+    private string? _smsApp;
+    private long _smsAppUntil;
+
+    /// <summary>The phone's default SMS app (it shows the banks' SMS), asked of Android at most once a minute.</summary>
+    private string? DefaultSmsApp()
+    {
+        var now = Environment.TickCount64;
+        if (now < _smsAppUntil) return _smsApp;
+        try
+        {
+            _smsApp = Telephony.Sms.GetDefaultSmsPackage(this);
+        }
+        catch (Exception)
+        {
+            _smsApp = null; // no telephony (a tablet): the common SMS apps still count
+        }
+        _smsAppUntil = now + 60_000;
+        return _smsApp;
+    }
+
+    private static void Save(Context context, string app, string title, List<string> texts, DateTimeOffset posted, string? smsApp)
     {
         try
         {
@@ -102,7 +124,7 @@ public sealed class BankNotificationListener : NotificationListenerService
             var added = false;
             foreach (var text in texts)
             {
-                var result = capture.Handle(app, title, text, posted, TimeZoneInfo.Local);
+                var result = capture.Handle(app, title, text, posted, TimeZoneInfo.Local, smsApp);
                 if (result is not { Outcome: NotificationOutcome.Added, Capture: { } saved }) continue;
                 added = true;
                 // Money out that Helm could not file by itself: ask what it was.

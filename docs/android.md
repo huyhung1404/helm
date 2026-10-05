@@ -65,7 +65,11 @@ Wallet reads other apps' notifications with a `NotificationListenerService`
 (`src/Helm.Modules.Wallet.Android/Capture`, fixed `Name` so the access the user granted survives updates). Android
 binds it in the app process once the user turns Helm on in *Notification access*; on Android 13+ a sideloaded APK
 first needs *Allow restricted settings* in App info. The listener drops every notification that is not from a bank on
-the spot and hands the rest to `WalletCapture` in the shared core, which is where the reading is tested.
+the spot and hands the rest to `WalletCapture` in the shared core, which is where the reading is tested. "From a bank"
+is strict (`BankSources.Identify`): the bank's own app by its exact package name, or an SMS app (the common ones, or
+the phone's default one, made visible by a `<queries>` entry in the app manifest) whose sender is exactly the bank's
+name; never a guess from a package name, which any app can choose. A notification with a one-time code (OTP) is never
+kept, not even as one Helm could not read.
 
 Parts that run without Helm's activity (a widget, a broadcast, Quick Capture's share dialog and Quick Settings tile)
 get services from `HelmAndroidServices.Current`, and read whether a tool is on from `GeneralSettings.EnabledModules`
