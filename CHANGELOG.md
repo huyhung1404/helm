@@ -3,7 +3,7 @@
 All notable changes to Helm. The top section is used as the GitHub release body and as the Velopack release notes.
 Format: [Keep a Changelog](https://keepachangelog.com), versions follow [SemVer](https://semver.org).
 
-## [Unreleased]
+## [0.28.0] - 2026-10-06
 
 ### Added
 - **SSH** (PC and Android): a terminal on your servers, in Helm. Add a server as `user@host` (or `user@host:port`), choose it and
