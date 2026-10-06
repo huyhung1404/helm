@@ -187,7 +187,8 @@ public sealed partial class SshViewModel : ObservableObject, IDisposable
 
     public bool CanConnect => _enabled && SelectedHost is not null && !IsConnecting && !IsConnected;
 
-    public bool CanInstallKey => IsConnected && SelectedHost?.Host.Auth == SshAuthKind.Password;
+    /// <summary>Signed in some other way than this device's key (a password, Vault, a key file): the key can be added.</summary>
+    public bool CanInstallKey => IsConnected && SelectedHost is { Host.Auth: not SshAuthKind.DeviceKey };
 
     public string EditorTitle => EditingId is null ? "Add a server" : "Edit server";
 
@@ -493,7 +494,7 @@ public sealed partial class SshViewModel : ObservableObject, IDisposable
                 Message = $"The key could not be added (exit code {exit}). {output}".Trim();
                 return;
             }
-            SaveHost(row.Host with { Auth = SshAuthKind.DeviceKey });
+            SaveHost(row.Host with { Auth = SshAuthKind.DeviceKey, KeyFile = null, VaultItemUid = null, VaultItemTitle = null, VaultField = null });
             Message = $"This device's key is now on {row.Host.Target}. Next time Helm signs in with it, without a password.";
         }
         catch (Exception ex) when (ex is not OutOfMemoryException)

@@ -3,6 +3,13 @@
 All notable changes to Helm. The top section is used as the GitHub release body and as the Velopack release notes.
 Format: [Keep a Changelog](https://keepachangelog.com), versions follow [SemVer](https://semver.org).
 
+## [Unreleased]
+
+### Fixed
+- **SSH**: *Install this device's key* now shows for every server that signs in without this device's key, also with
+  a password or key from Vault and with a key file (0.28.0 offered it only after typing a password). Once installed,
+  the server signs in with the key and forgets the Vault field or key file it used.
+
 ## [0.28.0] - 2026-10-06
 
 ### Added
