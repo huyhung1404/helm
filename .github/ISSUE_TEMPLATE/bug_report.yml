@@ -34,6 +34,7 @@ body:
         - Missions
         - Notes
         - Quick Capture
+        - SSH
         - Tracker
         - Vault
         - Wallet

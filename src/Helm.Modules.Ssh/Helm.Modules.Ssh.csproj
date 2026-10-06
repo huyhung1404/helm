@@ -1,0 +1,31 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <UseWPF>true</UseWPF>
+    <RootNamespace>Helm.Modules.Ssh</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Helm.Core.Windows\Helm.Core.Windows.csproj" />
+    <ProjectReference Include="..\Helm.Modules.Ssh.Core\Helm.Modules.Ssh.Core.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="Helm.Tests" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- The terminal (xterm.js). -->
+    <PackageReference Include="Microsoft.Web.WebView2" Version="1.0.4258.31" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Served to WebView2 straight from the assembly (TerminalView), never written to disk. -->
+    <EmbeddedResource Include="Terminal\terminal.html" LogicalName="Helm.Ssh.terminal.html" />
+    <EmbeddedResource Include="Terminal\terminal.js" LogicalName="Helm.Ssh.terminal.js" />
+    <EmbeddedResource Include="Terminal\vendor\xterm.js" LogicalName="Helm.Ssh.xterm.js" />
+    <EmbeddedResource Include="Terminal\vendor\xterm.css" LogicalName="Helm.Ssh.xterm.css" />
+    <EmbeddedResource Include="Terminal\vendor\addon-fit.js" LogicalName="Helm.Ssh.addon-fit.js" />
+  </ItemGroup>
+
+</Project>

@@ -3,6 +3,24 @@
 All notable changes to Helm. The top section is used as the GitHub release body and as the Velopack release notes.
 Format: [Keep a Changelog](https://keepachangelog.com), versions follow [SemVer](https://semver.org).
 
+## [Unreleased]
+
+### Added
+- **SSH** (PC): a terminal on your servers, in Helm. Add a server as `user@host` (or `user@host:port`), choose it and
+  *Connect*; the session keeps running while you use the rest of Helm, and each server keeps its own. Helm signs in
+  with an Ed25519 key it makes for this device (*SSH settings → This device's key*: copy the public line into
+  `~/.ssh/authorized_keys`), or with a password you type each time. Signed in with a password, *Install this
+  device's key* adds the key to the server for you and the next sign-in uses it. Copy and paste as in Windows
+  Terminal (Ctrl+C with a selection, Ctrl+V, right click); the text size is in the settings.
+
+### Security
+- **SSH**: the device key's private half is encrypted for your Windows account (DPAPI) and never synced, exported or
+  shown; passwords are never saved. A server's key is shown with its fingerprint the first time and pinned; if it
+  changes later Helm refuses to connect (there is no "connect anyway"). Algorithms OpenSSH retired (SHA-1, CBC, DSA)
+  are not offered. The terminal page is served from Helm itself with a strict content policy: no network, no links
+  that open, no browser shortcuts; pasting text with line breaks asks first. Nothing typed or shown is written to
+  disk or to Helm's logs.
+
 ## [0.27.0] - 2026-10-06
 
 ### Changed

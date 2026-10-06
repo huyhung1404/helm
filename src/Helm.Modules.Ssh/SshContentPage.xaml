@@ -1,0 +1,100 @@
+<Page
+    x:Class="Helm.Modules.Ssh.SshContentPage"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
+    xmlns:core="clr-namespace:Helm.Core.Ui;assembly=Helm.Core.Windows"
+    xmlns:local="clr-namespace:Helm.Modules.Ssh;assembly=Helm.Modules.Ssh.Core"
+    xmlns:self="clr-namespace:Helm.Modules.Ssh"
+    xmlns:term="clr-namespace:Helm.Modules.Ssh.Terminal"
+    Title="SSH" ScrollViewer.CanContentScroll="False">
+
+    <!-- SSH itself (menu and Quick access): pick a server, connect, and the terminal fills the rest. The servers, this
+         device's key and the known server keys are managed on SshPage (Home → Utilities). -->
+    <Page.Resources>
+        <DataTemplate x:Key="HostItem" DataType="{x:Type local:SshHostRow}">
+            <StackPanel Orientation="Horizontal">
+                <TextBlock Text="{Binding Title}" VerticalAlignment="Center" />
+                <TextBlock Text="{Binding Target}" Margin="8,0,0,0" VerticalAlignment="Center" Style="{StaticResource HelmSecondaryText}" />
+                <TextBlock Text="{Binding State}" Margin="8,0,0,0" VerticalAlignment="Center" Foreground="{DynamicResource AccentTextFillColorPrimaryBrush}"
+                           Visibility="{Binding State, Converter={StaticResource NotEmptyToVisibility}}" />
+            </StackPanel>
+        </DataTemplate>
+    </Page.Resources>
+
+    <Grid Margin="24,16,24,16">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+
+        <DockPanel Margin="0,0,0,16">
+            <ui:Button DockPanel.Dock="Right" Content="Servers and key" Icon="{ui:SymbolIcon Server24}" VerticalAlignment="Center"
+                       ToolTip="Add or edit servers, and this device's key" Click="Settings_Click" />
+            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                <Image Source="{x:Static self:SshLogo.Image}" Width="32" Height="32" Margin="0,0,12,0" />
+                <TextBlock Text="SSH" FontSize="28" FontWeight="SemiBold" VerticalAlignment="Center" />
+            </StackPanel>
+        </DockPanel>
+
+        <!-- Shown while the tool is turned off -->
+        <ui:InfoBar x:Name="OffBar" Grid.Row="1" Severity="Informational" IsClosable="False" IsOpen="False" Visibility="Collapsed" Margin="0,0,0,12"
+                    Title="SSH is turned off" Message="Your servers are kept. Turn SSH on in its settings to connect." />
+
+        <!-- What happened: a refused key, a server that could not be reached, a key that changed -->
+        <Border Grid.Row="2" Style="{DynamicResource HelmSurface}" Margin="0,0,0,12" Padding="12,8"
+                Visibility="{Binding HasMessage, Converter={StaticResource BoolToVisibility}}">
+            <core:RowLayout>
+                <TextBlock Text="{Binding Message}" TextWrapping="Wrap" VerticalAlignment="Center" />
+                <ui:Button Appearance="Transparent" Padding="8,6" MinWidth="0" Icon="{ui:SymbolIcon Dismiss24}" ToolTip="Dismiss" AutomationProperties.Name="Dismiss"
+                           Command="{Binding DismissMessageCommand}" />
+            </core:RowLayout>
+        </Border>
+
+        <!-- The server picker: the tool's main choice -->
+        <Border x:Name="Picker" Grid.Row="3" Style="{DynamicResource HelmSurface}" Margin="0,0,0,12" Padding="12">
+            <Grid>
+                <!-- No servers yet -->
+                <core:RowLayout Visibility="{Binding HasHosts, Converter={StaticResource InverseBoolToVisibility}}">
+                    <core:CardHeader Title="No servers yet" Description="Add the servers you connect to. Helm signs in with a key made for this device, or a password you type each time." />
+                    <ui:Button Appearance="Primary" Content="Add a server" Icon="{ui:SymbolIcon Add24}" Click="AddServer_Click" />
+                </core:RowLayout>
+
+                <WrapPanel Visibility="{Binding HasHosts, Converter={StaticResource BoolToVisibility}}" Orientation="Horizontal">
+                    <ComboBox Width="320" Margin="0,0,8,0" VerticalAlignment="Center" AutomationProperties.Name="Server"
+                              ItemsSource="{Binding Hosts}" SelectedItem="{Binding SelectedHost}" ItemTemplate="{StaticResource HostItem}" />
+                    <ui:PasswordBox x:Name="PasswordBox" Width="200" Margin="0,0,8,0" VerticalAlignment="Center" PlaceholderText="Password"
+                                    AutomationProperties.Name="Password" KeyDown="Password_KeyDown"
+                                    Visibility="{Binding NeedsPassword, Converter={StaticResource BoolToVisibility}}" />
+                    <ui:Button Appearance="Primary" Margin="0,0,8,0" VerticalAlignment="Center" Content="Connect" Icon="{ui:SymbolIcon PlugConnected24}"
+                               IsEnabled="{Binding CanConnect}" Click="Connect_Click"
+                               Visibility="{Binding IsConnected, Converter={StaticResource InverseBoolToVisibility}}" />
+                    <ui:Button Margin="0,0,8,0" VerticalAlignment="Center" Content="Disconnect" Icon="{ui:SymbolIcon PlugDisconnected24}"
+                               Command="{Binding DisconnectCommand}"
+                               Visibility="{Binding IsConnected, Converter={StaticResource BoolToVisibility}}" />
+                    <ui:Button Margin="0,0,8,0" VerticalAlignment="Center" Content="Install this device's key" Icon="{ui:SymbolIcon Key24}"
+                               ToolTip="Add this device's key to the server's authorized_keys, then sign in with it instead of the password"
+                               Command="{Binding InstallKeyCommand}"
+                               Visibility="{Binding CanInstallKey, Converter={StaticResource BoolToVisibility}}" />
+                    <TextBlock Text="{Binding SessionStatus}" VerticalAlignment="Center" Margin="4,0,0,0" Style="{StaticResource HelmSecondaryText}" />
+                </WrapPanel>
+            </Grid>
+        </Border>
+
+        <Grid x:Name="Body" Grid.Row="4">
+            <Border CornerRadius="8" ClipToBounds="True" BorderThickness="1" BorderBrush="{DynamicResource CardStrokeColorDefaultBrush}"
+                    Visibility="{Binding HasSession, Converter={StaticResource BoolToVisibility}}">
+                <term:TerminalView x:Name="Terminal" />
+            </Border>
+            <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center" Margin="24" MaxWidth="420"
+                        Visibility="{Binding HasSession, Converter={StaticResource InverseBoolToVisibility}}">
+                <Image Source="{x:Static self:SshLogo.Image}" Width="48" Height="48" Opacity="0.6" />
+                <TextBlock Margin="0,12,0,0" TextAlignment="Center" TextWrapping="Wrap" Style="{StaticResource HelmSecondaryText}"
+                           Text="Choose a server and connect. The session keeps running while you use the rest of Helm." />
+            </StackPanel>
+        </Grid>
+    </Grid>
+</Page>

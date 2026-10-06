@@ -4,3 +4,5 @@
 *.ps1 text eol=crlf
 *.ico binary
 *.png binary
+# Vendored third-party files stay byte-for-byte as published (see their README for the checked hashes).
+src/Helm.Modules.Ssh/Terminal/vendor/** -text

@@ -1,0 +1,152 @@
+<core:ModulePageBase
+    x:Class="Helm.Modules.Ssh.SshPage"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
+    xmlns:core="clr-namespace:Helm.Core.Ui;assembly=Helm.Core.Windows"
+    xmlns:local="clr-namespace:Helm.Modules.Ssh;assembly=Helm.Modules.Ssh.Core"
+    xmlns:self="clr-namespace:Helm.Modules.Ssh"
+    ExtraMessage="{Binding Message}">
+
+    <!-- SSH's settings (Home → Utilities): the servers, this device's key, the server keys it trusts and the terminal's
+         look. Connecting and the terminal are on SshContentPage. -->
+    <StackPanel>
+        <ui:CardControl Margin="0,0,0,4">
+            <ui:CardControl.Icon>
+                <ui:ImageIcon Width="24" Height="24" Source="{x:Static self:SshLogo.Image}" />
+            </ui:CardControl.Icon>
+            <ui:CardControl.Header>
+                <core:CardHeader Title="Open SSH" Description="Connect to a server and work in its terminal. Also in the menu and on Home." />
+            </ui:CardControl.Header>
+            <ui:Button Appearance="Primary" Content="Open SSH" Click="OpenSsh_Click" />
+        </ui:CardControl>
+
+        <!-- Servers -->
+        <TextBlock Text="Servers" Style="{DynamicResource HelmSectionHeader}" />
+        <ItemsControl ItemsSource="{Binding Hosts}">
+            <ItemsControl.ItemTemplate>
+                <DataTemplate DataType="{x:Type local:SshHostRow}">
+                    <ui:CardControl Margin="0,0,0,4" Icon="{ui:SymbolIcon Server24}">
+                        <ui:CardControl.Header>
+                            <StackPanel>
+                                <TextBlock Text="{Binding Title}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+                                <TextBlock Text="{Binding Detail}" Style="{StaticResource HelmSecondaryText}" TextTrimming="CharacterEllipsis" />
+                            </StackPanel>
+                        </ui:CardControl.Header>
+                        <StackPanel Orientation="Horizontal">
+                            <ui:Button Content="Edit" Icon="{ui:SymbolIcon Edit24}" Margin="0,0,8,0" AutomationProperties.Name="Edit server"
+                                       Command="{Binding DataContext.EditHostCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}" CommandParameter="{Binding}" />
+                            <ui:Button Icon="{ui:SymbolIcon Delete24}" ToolTip="Delete" AutomationProperties.Name="Delete server"
+                                       Command="{Binding DataContext.DeleteHostCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}" CommandParameter="{Binding}" />
+                        </StackPanel>
+                    </ui:CardControl>
+                </DataTemplate>
+            </ItemsControl.ItemTemplate>
+        </ItemsControl>
+
+        <ui:CardControl Margin="0,0,0,4" Icon="{ui:SymbolIcon Add24}"
+                        Visibility="{Binding IsEditing, Converter={StaticResource InverseBoolToVisibility}}">
+            <ui:CardControl.Header>
+                <core:CardHeader Title="Add a server" Description="Its address, and how Helm signs in. Servers stay on this device." />
+            </ui:CardControl.Header>
+            <ui:Button Content="Add a server" Icon="{ui:SymbolIcon Add24}" Command="{Binding NewHostCommand}" />
+        </ui:CardControl>
+
+        <!-- The server being added or edited -->
+        <Border Style="{DynamicResource HelmSurface}" Margin="0,0,0,4" Padding="16"
+                Visibility="{Binding IsEditing, Converter={StaticResource BoolToVisibility}}">
+            <StackPanel>
+                <TextBlock Text="{Binding EditorTitle}" FontWeight="SemiBold" Margin="0,0,0,12" />
+                <core:RowLayout Margin="0,0,0,8">
+                    <core:CardHeader Title="Address" Description="user@host, or user@host:port when SSH is not on port 22." />
+                    <ui:TextBox Width="280" PlaceholderText="user@example.com" AutomationProperties.Name="Address"
+                                Text="{Binding EditAddress, UpdateSourceTrigger=PropertyChanged}" />
+                </core:RowLayout>
+                <core:RowLayout Margin="0,0,0,8">
+                    <core:CardHeader Title="Name" Description="Optional; shown in the list instead of the address." />
+                    <ui:TextBox Width="280" PlaceholderText="My server" AutomationProperties.Name="Name"
+                                Text="{Binding EditName, UpdateSourceTrigger=PropertyChanged}" />
+                </core:RowLayout>
+                <core:RowLayout Margin="0,0,0,8">
+                    <core:CardHeader Title="Sign in with" Description="This device's key once it is on the server, or a password typed each time (never saved)." />
+                    <ComboBox Width="280" AutomationProperties.Name="Sign in with" ItemsSource="{Binding AuthNames}" SelectedIndex="{Binding EditAuthIndex}" />
+                </core:RowLayout>
+                <TextBlock Text="{Binding EditError}" TextWrapping="Wrap" Margin="0,0,0,8" Foreground="{DynamicResource SystemFillColorCriticalBrush}"
+                           Visibility="{Binding EditError, Converter={StaticResource NotEmptyToVisibility}}" />
+                <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                    <ui:Button Content="Cancel" Margin="0,0,8,0" Command="{Binding CancelEditCommand}" />
+                    <ui:Button Appearance="Primary" Content="Save" Command="{Binding SaveEditCommand}" />
+                </StackPanel>
+            </StackPanel>
+        </Border>
+
+        <!-- This device's key -->
+        <TextBlock Text="This device's key" Style="{DynamicResource HelmSectionHeader}" />
+        <ui:CardExpander Margin="0,0,0,4" Icon="{ui:SymbolIcon Key24}" IsExpanded="True">
+            <ui:CardExpander.Header>
+                <core:CardHeader Title="Public key" Description="An Ed25519 key made for this device. Its private half is encrypted for your Windows account and never leaves this device." />
+            </ui:CardExpander.Header>
+            <StackPanel>
+                <Border Style="{DynamicResource HelmExpanderRow}" BorderThickness="0">
+                    <StackPanel>
+                        <TextBlock TextWrapping="Wrap" Style="{StaticResource HelmSecondaryText}" Margin="0,0,0,8"
+                                   Text="Add this line to ~/.ssh/authorized_keys on a server, or connect once with a password and choose Install this device's key." />
+                        <ui:TextBox IsReadOnly="True" TextWrapping="Wrap" FontFamily="Cascadia Mono, Consolas, Courier New" AutomationProperties.Name="Public key"
+                                    Text="{Binding PublicKey, Mode=OneWay}" Visibility="{Binding HasKey, Converter={StaticResource BoolToVisibility}}" />
+                        <TextBlock TextWrapping="Wrap" Visibility="{Binding HasKey, Converter={StaticResource InverseBoolToVisibility}}"
+                                   Text="No key yet: Helm makes it the first time you copy it or sign in with it." />
+                        <TextBlock Text="{Binding KeyFingerprint}" Margin="0,6,0,0" Style="{StaticResource HelmSecondaryText}" FontFamily="Cascadia Mono, Consolas, Courier New"
+                                   Visibility="{Binding HasKey, Converter={StaticResource BoolToVisibility}}" />
+                    </StackPanel>
+                </Border>
+                <Border Style="{DynamicResource HelmExpanderRow}">
+                    <core:RowLayout>
+                        <core:CardHeader Title="Copy public key" Description="The public half only; it is safe to share with servers." />
+                        <ui:Button Content="Copy" Icon="{ui:SymbolIcon Copy24}" Command="{Binding CopyPublicKeyCommand}" />
+                    </core:RowLayout>
+                </Border>
+                <Border Style="{DynamicResource HelmExpanderRow}">
+                    <core:RowLayout>
+                        <core:CardHeader Title="Make a new key" Description="If this device's key may have leaked. Servers then need the new key." />
+                        <ui:Button Content="New key" Icon="{ui:SymbolIcon KeyReset24}" Command="{Binding NewKeyCommand}" />
+                    </core:RowLayout>
+                </Border>
+            </StackPanel>
+        </ui:CardExpander>
+
+        <!-- Known servers -->
+        <TextBlock Text="Known servers" Style="{DynamicResource HelmSectionHeader}" />
+        <ui:CardExpander Margin="0,0,0,4" Icon="{ui:SymbolIcon ShieldCheckmark24}">
+            <ui:CardExpander.Header>
+                <core:CardHeader Title="Trusted server keys" Description="Each server's key is checked on every connection; Helm refuses to connect when it changes." />
+            </ui:CardExpander.Header>
+            <StackPanel>
+                <TextBlock Margin="0,4" Style="{StaticResource HelmSecondaryText}" Text="None yet. A server's key is added the first time you trust it."
+                           Visibility="{Binding HasKnownHosts, Converter={StaticResource InverseBoolToVisibility}}" />
+                <ItemsControl ItemsSource="{Binding KnownHosts}">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate DataType="{x:Type local:SshKnownHostRow}">
+                            <Border Style="{DynamicResource HelmExpanderRow}">
+                                <core:RowLayout>
+                                    <core:CardHeader Title="{Binding Title}" Description="{Binding Detail}" />
+                                    <ui:Button Content="Forget" AutomationProperties.Name="Forget server key"
+                                               Command="{Binding DataContext.ForgetKnownHostCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}"
+                                               CommandParameter="{Binding}" />
+                                </core:RowLayout>
+                            </Border>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+            </StackPanel>
+        </ui:CardExpander>
+
+        <!-- Terminal -->
+        <TextBlock Text="Terminal" Style="{DynamicResource HelmSectionHeader}" />
+        <ui:CardControl Margin="0,0,0,4" Icon="{ui:SymbolIcon TextFont24}">
+            <ui:CardControl.Header>
+                <core:CardHeader Title="Text size" Description="In points, for the terminal's text." />
+            </ui:CardControl.Header>
+            <ComboBox Width="100" AutomationProperties.Name="Text size" ItemsSource="{Binding FontSizes}" SelectedItem="{Binding FontSize}" />
+        </ui:CardControl>
+    </StackPanel>
+</core:ModulePageBase>

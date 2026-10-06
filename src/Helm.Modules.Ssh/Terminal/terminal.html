@@ -1,0 +1,20 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<!-- Only Helm's own files run here: no network, no frames, no plugins. xterm.js adds style elements, hence 'unsafe-inline' for styles only. -->
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data:; connect-src 'none'; frame-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'">
+<link rel="stylesheet" href="xterm.css">
+<style>
+  html, body { margin: 0; height: 100%; overflow: hidden; background: #0c0c0c; }
+  #term { position: absolute; inset: 6px 4px 4px 8px; }
+  .xterm .xterm-viewport { scrollbar-width: thin; scrollbar-color: #5a5a5a transparent; }
+</style>
+</head>
+<body>
+<div id="term"></div>
+<script src="xterm.js"></script>
+<script src="addon-fit.js"></script>
+<script src="terminal.js"></script>
+</body>
+</html>
