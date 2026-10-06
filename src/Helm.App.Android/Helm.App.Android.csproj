@@ -85,6 +85,7 @@
     <ProjectReference Include="..\Helm.Modules.Tracker.Android\Helm.Modules.Tracker.Android.csproj" />
     <ProjectReference Include="..\Helm.Modules.Missions.Android\Helm.Modules.Missions.Android.csproj" />
     <ProjectReference Include="..\Helm.Modules.Notes.Android\Helm.Modules.Notes.Android.csproj" />
+    <ProjectReference Include="..\Helm.Modules.Ssh.Android\Helm.Modules.Ssh.Android.csproj" />
     <ProjectReference Include="..\Helm.Modules.QuickCapture.Android\Helm.Modules.QuickCapture.Android.csproj" />
     <ProjectReference Include="..\Helm.Modules.WatchLater.Android\Helm.Modules.WatchLater.Android.csproj" />
     <ProjectReference Include="..\Helm.Modules.Wallet.Android\Helm.Modules.Wallet.Android.csproj" />

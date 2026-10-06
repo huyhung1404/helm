@@ -6,7 +6,7 @@ Format: [Keep a Changelog](https://keepachangelog.com), versions follow [SemVer]
 ## [Unreleased]
 
 ### Added
-- **SSH** (PC): a terminal on your servers, in Helm. Add a server as `user@host` (or `user@host:port`), choose it and
+- **SSH** (PC and Android): a terminal on your servers, in Helm. Add a server as `user@host` (or `user@host:port`), choose it and
   *Connect*; the session keeps running while you use the rest of Helm, and each server keeps its own. Helm signs in
   with an Ed25519 key it makes for this device (*SSH settings → This device's key*: copy the public line into
   `~/.ssh/authorized_keys`), or with a password you type each time. Signed in with a password, *Install this
@@ -17,6 +17,10 @@ Format: [Keep a Changelog](https://keepachangelog.com), versions follow [SemVer]
   one click. A server can also sign in with a key file you choose (its passphrase is asked when needed), or with a
   password or private key kept in **Vault**: pick the item and field, and Helm reads it when connecting (Windows
   Hello opens a locked vault when quick unlock is on; otherwise *Open Vault*).
+- **SSH on Android**: the same terminal on the phone, with a key bar for what a phone keyboard lacks (Ctrl, Esc,
+  Tab, arrows, Home/End, `| ~ / -`, paste, show the keyboard); Enter and Backspace from the keyboard work, and the
+  terminal fits the screen above the keyboard. The phone's own key is protected by the Android Keystore; a password or
+  key can also come from Vault (fingerprint unlock). Key files and *Import from SSH config* are on PC only.
 
 ### Security
 - **SSH**: the device key's private half is encrypted for your Windows account (DPAPI) and never synced, exported or

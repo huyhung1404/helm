@@ -45,6 +45,17 @@ public sealed class MainActivity : AvaloniaMainActivity
         return base.DispatchTouchEvent(finger);
     }
 
+    /// <summary>
+    /// Avalonia's view takes every key for its own input. A WebView a tool hosts inside it (the SSH terminal) gets the
+    /// keys while it has the focus, so typing, Enter and Backspace reach it; Back stays with Helm's navigation, and
+    /// Avalonia's own text boxes are untouched.
+    /// </summary>
+    public override bool DispatchKeyEvent(KeyEvent? e)
+    {
+        if (e is not null && e.KeyCode != Keycode.Back && CurrentFocus is global::Android.Webkit.WebView web && web.DispatchKeyEvent(e)) return true;
+        return base.DispatchKeyEvent(e);
+    }
+
     private View? _avaloniaView;
     private ContentInsetsListener? _layoutListener;
 

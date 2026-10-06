@@ -193,21 +193,10 @@ public partial class TerminalView
             return;
         }
         if (text.Length == 0 || _viewModel?.ActiveSession?.IsConnected != true) return;
-        text = text.ReplaceLineEndings("\n");
-        if (!bracketed && text.Contains('\n') && _dialogs is { } dialogs
-            && !await dialogs.ConfirmAsync("Paste text with line breaks?", PasteWarning(text), "Paste").ConfigureAwait(true)) return;
-        // A terminal's Enter is a carriage return.
-        Post(new { t = "paste", d = text.Replace('\n', '\r') });
+        if (TerminalPaste.NeedsConfirmation(text, bracketed) && _dialogs is { } dialogs
+            && !await dialogs.ConfirmAsync("Paste text with line breaks?", TerminalPaste.Warning(text), "Paste").ConfigureAwait(true)) return;
+        Post(new { t = "paste", d = TerminalPaste.ForTerminal(text) });
         FocusTerminal();
-    }
-
-    /// <summary>What the paste confirmation says about <paramref name="text"/> (its line breaks already \n).</summary>
-    internal static string PasteWarning(string text)
-    {
-        var lines = text.TrimEnd('\n').Count(c => c == '\n') + 1;
-        return lines == 1
-            ? "The text ends with a line break, so it runs as soon as it is pasted."
-            : $"The text has {lines} lines. Each line break runs what comes before it, as if you pressed Enter.";
     }
 
     /// <summary>Shows the selected server's session: redraws from its buffer and takes its output from now on.</summary>

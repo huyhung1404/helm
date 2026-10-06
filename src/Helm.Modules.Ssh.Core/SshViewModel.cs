@@ -45,6 +45,12 @@ public sealed partial class SshHostRow : ObservableObject
     }
 }
 
+/// <summary>A way to sign in, as the editor offers it.</summary>
+public sealed record SshAuthChoice(SshAuthKind Kind, string Name)
+{
+    public override string ToString() => Name;
+}
+
 /// <summary>A server key this device accepted.</summary>
 public sealed class SshKnownHostRow(SshKnownHost known)
 {
@@ -85,6 +91,12 @@ public sealed partial class SshViewModel : ObservableObject, IDisposable
     [ObservableProperty] private string? _message;
     [ObservableProperty] private int _fontSize;
 
+    /// <summary>The phone's Ctrl key: on, the next key typed is sent with Ctrl (then it turns off).</summary>
+    [ObservableProperty] private bool _ctrlArmed;
+
+    /// <summary>A question is on screen. The terminal steps aside meanwhile: on Android it is a native view that would cover the dialog.</summary>
+    [ObservableProperty] private bool _isAskingUser;
+
     // The server editor (settings page).
     [ObservableProperty] private bool _isEditing;
     [ObservableProperty] private string? _editingId;
@@ -122,6 +134,28 @@ public sealed partial class SshViewModel : ObservableObject, IDisposable
     public IReadOnlyList<int> FontSizes { get; } = Enumerable.Range(SshSettings.MinFontSize, SshSettings.MaxFontSize - SshSettings.MinFontSize + 1).ToList();
 
     public IReadOnlyList<string> AuthNames { get; } = ["This device's key", "Password", "A key file on this device", "A password or key in Vault"];
+
+    /// <summary>
+    /// The ways to sign in this platform offers, in <see cref="AuthNames"/> order. A key file needs a file system the
+    /// user manages (Windows); on Android the key comes from Vault instead.
+    /// </summary>
+    public IReadOnlyList<SshAuthChoice> AuthChoices => _authChoices ??=
+        AuthNames.Select((name, i) => new SshAuthChoice((SshAuthKind)i, name)).Where(c => AllowKeyFiles || c.Kind != SshAuthKind.KeyFile).ToList();
+
+    private IReadOnlyList<SshAuthChoice>? _authChoices;
+
+    /// <summary>False on Android, which leaves the key file choice out. Set by the platform before the pages bind.</summary>
+    public bool AllowKeyFiles { get; set; } = true;
+
+    /// <summary>The editor's choice as a <see cref="SshAuthChoice"/> (Android's picker); the same as <see cref="EditAuthIndex"/>.</summary>
+    public SshAuthChoice? EditAuthChoice
+    {
+        get => AuthChoices.FirstOrDefault(c => (int)c.Kind == EditAuthIndex);
+        set
+        {
+            if (value is not null) EditAuthIndex = (int)value.Kind;
+        }
+    }
 
     /// <summary>The fields of Vault items the editor offers (names only; values are read when connecting).</summary>
     public ObservableCollection<VaultSecretRef> VaultFields { get; } = [];
@@ -163,7 +197,30 @@ public sealed partial class SshViewModel : ObservableObject, IDisposable
     /// <summary>The selected server has a session (open, or ended with its output still on screen).</summary>
     public bool HasSession => ActiveSession is not null;
 
-    partial void OnActiveSessionChanged(SshSession? value) => OnPropertyChanged(nameof(HasSession));
+    partial void OnActiveSessionChanged(SshSession? value)
+    {
+        OnPropertyChanged(nameof(HasSession));
+        OnPropertyChanged(nameof(ShowTerminal));
+    }
+
+    partial void OnIsAskingUserChanged(bool value) => OnPropertyChanged(nameof(ShowTerminal));
+
+    /// <summary>The terminal is shown: there is a session and no question on screen.</summary>
+    public bool ShowTerminal => HasSession && !IsAskingUser;
+
+    /// <summary>Asks a yes/no question with the terminal out of the way (see <see cref="IsAskingUser"/>).</summary>
+    public async Task<bool> AskAsync(string title, string message, string confirmText)
+    {
+        IsAskingUser = true;
+        try
+        {
+            return await _dialogs.ConfirmAsync(title, message, confirmText).ConfigureAwait(true);
+        }
+        finally
+        {
+            IsAskingUser = false;
+        }
+    }
 
     partial void OnMessageChanged(string? value) => OnPropertyChanged(nameof(HasMessage));
 
@@ -173,6 +230,7 @@ public sealed partial class SshViewModel : ObservableObject, IDisposable
 
     partial void OnEditAuthIndexChanged(int value)
     {
+        OnPropertyChanged(nameof(EditAuthChoice));
         OnPropertyChanged(nameof(IsKeyFileAuth));
         OnPropertyChanged(nameof(IsVaultAuth));
         if (IsVaultAuth) RefreshVaultFields();
@@ -219,10 +277,16 @@ public sealed partial class SshViewModel : ObservableObject, IDisposable
         ActiveSession?.Resize(columns, rows);
     }
 
-    /// <summary>Keys or a paste from the terminal.</summary>
+    /// <summary>Keys or a paste from the terminal. With <see cref="CtrlArmed"/>, one typed key goes with Ctrl.</summary>
     public void Send(string text)
     {
-        if (_enabled) ActiveSession?.Send(text);
+        if (!_enabled) return;
+        if (CtrlArmed && text.Length == 1)
+        {
+            CtrlArmed = false;
+            text = TerminalKeys.Ctrl(text[0]) ?? text;
+        }
+        ActiveSession?.Send(text);
     }
 
     /// <summary>Connects to the selected server. <paramref name="password"/> is used for this connection only.</summary>
@@ -396,7 +460,7 @@ public sealed partial class SshViewModel : ObservableObject, IDisposable
     }
 
     private Task<bool> AskTrustAsync(SshHostKey key) =>
-        _dialogs.ConfirmAsync("Trust this server?",
+        AskAsync("Trust this server?",
             $"This is the first connection to {key.Address} from this device. The server's {key.Algorithm} key is:\n\n{key.DisplayFingerprint}\n\n"
             + $"Trust it only if it matches what the server shows for: ssh-keygen -lf {SshKnownHosts.ServerKeyFile(key.Algorithm)}",
             "Trust and connect");
@@ -457,7 +521,7 @@ public sealed partial class SshViewModel : ObservableObject, IDisposable
     [RelayCommand]
     private async Task NewKeyAsync()
     {
-        if (!await _dialogs.ConfirmAsync("Make a new key for this device?",
+        if (!await AskAsync("Make a new key for this device?",
                 "Servers that have the current key will refuse this device until you add the new one. The old key is deleted from this device.",
                 "Make new key").ConfigureAwait(true)) return;
         try
@@ -476,7 +540,7 @@ public sealed partial class SshViewModel : ObservableObject, IDisposable
     private async Task ForgetKnownHostAsync(SshKnownHostRow? row)
     {
         if (row is null) return;
-        if (!await _dialogs.ConfirmAsync($"Forget the key of {row.Title}?",
+        if (!await AskAsync($"Forget the key of {row.Title}?",
                 "The next connection will show the server's key again and ask you to trust it. Do this only if you know the server's key changed.",
                 "Forget").ConfigureAwait(true)) return;
         _settings.Update(s => s.KnownHosts = s.KnownHosts.Where(k => k != row.Known).ToList());
@@ -618,7 +682,7 @@ public sealed partial class SshViewModel : ObservableObject, IDisposable
     private async Task DeleteHostAsync(SshHostRow? row)
     {
         if (row is null) return;
-        if (!await _dialogs.ConfirmAsync($"Delete {row.Title}?", "The server is removed from the list and its session is closed. Its known key is kept.", "Delete")
+        if (!await AskAsync($"Delete {row.Title}?", "The server is removed from the list and its session is closed. Its known key is kept.", "Delete")
                 .ConfigureAwait(true)) return;
         if (_sessions.Remove(row.Id, out var session)) session.Dispose();
         _settings.Update(s => s.Hosts = s.Hosts.Where(h => h.Id != row.Id).ToList());

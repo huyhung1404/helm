@@ -2,6 +2,7 @@ using Helm.Core.Modules;
 using Helm.Modules.Missions;
 using Helm.Modules.Notes;
 using Helm.Modules.QuickCapture;
+using Helm.Modules.Ssh;
 using Helm.Modules.Tracker;
 using Helm.Modules.Vault;
 using Helm.Modules.Wallet;
@@ -27,5 +28,6 @@ internal static class AndroidModules
         services.AddNotesModule();
         services.AddWatchLaterModule();
         services.AddQuickCaptureModule();
+        services.AddSshModule();
     }
 }

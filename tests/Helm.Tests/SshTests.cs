@@ -298,10 +298,27 @@ public sealed class SshTests : IDisposable
     [Fact]
     public void Pastes_with_line_breaks_are_described()
     {
-        Assert.Contains("runs as soon as", TerminalView.PasteWarning("ls\n"), StringComparison.Ordinal);
-        Assert.Contains("3 lines", TerminalView.PasteWarning("a\nb\nc"), StringComparison.Ordinal);
-        Assert.Contains("2 lines", TerminalView.PasteWarning("a\nb\n"), StringComparison.Ordinal);
+        Assert.Contains("runs as soon as", TerminalPaste.Warning("ls\n"), StringComparison.Ordinal);
+        Assert.Contains("3 lines", TerminalPaste.Warning("a\r\nb\nc"), StringComparison.Ordinal);
+        Assert.Contains("2 lines", TerminalPaste.Warning("a\nb\n"), StringComparison.Ordinal);
+        Assert.False(TerminalPaste.NeedsConfirmation("ls -la", bracketed: false));
+        Assert.True(TerminalPaste.NeedsConfirmation("ls\r\n", bracketed: false));
+        Assert.False(TerminalPaste.NeedsConfirmation("a\nb", bracketed: true));
+        Assert.Equal("a\rb\r", TerminalPaste.ForTerminal("a\r\nb\n"));
     }
+
+    [Theory]
+    [InlineData('c', "\u0003")]
+    [InlineData('C', "\u0003")]
+    [InlineData('d', "\u0004")]
+    [InlineData('z', "\u001a")]
+    [InlineData('[', "\u001b")]
+    [InlineData('?', "\u007f")]
+    [InlineData(' ', "\0")]
+    public void The_phone_Ctrl_key_makes_control_codes(char key, string code) => Assert.Equal(code, TerminalKeys.Ctrl(key));
+
+    [Fact]
+    public void Keys_without_a_control_form_are_left_alone() => Assert.Null(TerminalKeys.Ctrl('é'));
 
     // ---- The view model --------------------------------------------------------------------------------------------
 
@@ -381,6 +398,35 @@ public sealed class SshTests : IDisposable
         Assert.True(vm.HasKey);
         Assert.StartsWith("ssh-ed25519 ", clipboard.Text, StringComparison.Ordinal);
         Assert.Equal(vm.PublicKey, clipboard.Text);
+    }
+
+    [Fact]
+    public async Task The_terminal_steps_aside_while_a_question_is_on_screen()
+    {
+        var asked = new List<bool>();
+        var dialogs = new WatchingDialogs();
+        var key = new SshDeviceKey(Path.Combine(_dir.Path, "k.bin"), new PlainSecretProtector(), "pc");
+        using var vm = new SshViewModel(_settings, key, new InlineUi(), dialogs, new MemoryClipboard(), NullLogger<SshViewModel>.Instance);
+        dialogs.During = () => asked.Add(vm.IsAskingUser);
+        vm.EditAddress = "me@example.com";
+        vm.SaveEditCommand.Execute(null);
+        Assert.False(vm.IsAskingUser);
+        await vm.DeleteHostCommand.ExecuteAsync(vm.Hosts[0]);
+        Assert.True(await vm.AskAsync("t", "m", "ok"));
+        Assert.Equal([true, true], asked);
+        Assert.False(vm.IsAskingUser);
+        Assert.False(vm.ShowTerminal);
+    }
+
+    private sealed class WatchingDialogs : IDialogService
+    {
+        public Action? During { get; set; }
+
+        public Task<bool> ConfirmAsync(string title, string message, string confirmText)
+        {
+            During?.Invoke();
+            return Task.FromResult(true);
+        }
     }
 
     private SshViewModel NewViewModel(out MemoryClipboard clipboard)

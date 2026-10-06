@@ -38,6 +38,10 @@ public static class VaultServices
         services.AddSingleton<IVaultDeviceUnlock, BiometricUnlock>();
         services.AddSingleton<IVaultBackupLocation, SafBackupLocation>();
         services.AddSingleton<IVaultPlatform, AndroidVaultPlatform>();
+        // A tool that needs a vault secret while the vault is locked (SSH) can open Vault for the password.
+        services.AddSingleton<Helm.Core.Secrets.IVaultSecrets>(sp => new Helm.Modules.Vault.Items.VaultSecrets(
+            sp.GetRequiredService<VaultSession>(), sp.GetRequiredService<Helm.Modules.Vault.Items.VaultStore>(),
+            () => sp.GetRequiredService<IShellNavigation>().ShowPage(typeof(VaultContentPage))));
         services.AddVaultCore();
         services.AddSingleton<VaultPageViewModel>();
         services.AddTransient<VaultContentPage>();

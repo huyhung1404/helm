@@ -1,0 +1,44 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- SSH on Android: the module, its Avalonia pages and the terminal (xterm.js in Android's WebView, the same page as
+       on Windows). The logic and the view model come from Helm.Modules.Ssh.Core. Not in Helm.sln; CI builds it with
+       the app. -->
+  <PropertyGroup>
+    <TargetFramework>net10.0-android</TargetFramework>
+    <SupportedOSPlatformVersion>26</SupportedOSPlatformVersion>
+    <PlatformTarget>AnyCPU</PlatformTarget>
+    <!-- Same namespace as the Windows project. Never a namespace ending in ".Android": it would hide the
+         Android.* SDK namespaces inside this project. -->
+    <RootNamespace>Helm.Modules.Ssh</RootNamespace>
+    <AvaloniaUseCompiledBindingsByDefault>true</AvaloniaUseCompiledBindingsByDefault>
+  </PropertyGroup>
+
+  <!-- The Android SDK's implicit usings clash with Avalonia/BCL names (Application, OperationCanceledException). -->
+  <ItemGroup>
+    <Using Remove="Android.App" />
+    <Using Remove="Android.Widget" />
+    <Using Remove="Android.OS.Bundle" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Avalonia" Version="12.1.3" />
+    <PackageReference Include="Avalonia.Android" Version="12.1.3" />
+    <PackageReference Include="FluentIcons.Avalonia" Version="2.1.343" />
+    <PackageReference Include="SQLitePCLRaw.bundle_e_sqlite3" Version="2.1.13" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Helm.Core.Android\Helm.Core.Android.csproj" />
+    <ProjectReference Include="..\Helm.Modules.Ssh.Core\Helm.Modules.Ssh.Core.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- The terminal page shared with Windows, served to WebView from the assembly (never written to disk). -->
+    <EmbeddedResource Include="..\Helm.Modules.Ssh\Terminal\terminal.html" Link="Terminal\terminal.html" LogicalName="Helm.Ssh.terminal.html" />
+    <EmbeddedResource Include="..\Helm.Modules.Ssh\Terminal\terminal.js" Link="Terminal\terminal.js" LogicalName="Helm.Ssh.terminal.js" />
+    <EmbeddedResource Include="..\Helm.Modules.Ssh\Terminal\vendor\xterm.js" Link="Terminal\xterm.js" LogicalName="Helm.Ssh.xterm.js" />
+    <EmbeddedResource Include="..\Helm.Modules.Ssh\Terminal\vendor\xterm.css" Link="Terminal\xterm.css" LogicalName="Helm.Ssh.xterm.css" />
+    <EmbeddedResource Include="..\Helm.Modules.Ssh\Terminal\vendor\addon-fit.js" Link="Terminal\addon-fit.js" LogicalName="Helm.Ssh.addon-fit.js" />
+  </ItemGroup>
+
+</Project>

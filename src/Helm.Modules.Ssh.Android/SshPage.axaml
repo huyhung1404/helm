@@ -1,0 +1,158 @@
+<ui:ModulePageBase xmlns="https://github.com/avaloniaui"
+                   xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                   xmlns:ui="using:Helm.Core.Ui"
+                   xmlns:ic="using:FluentIcons.Avalonia"
+                   xmlns:vm="using:Helm.Modules.Ssh"
+                   xmlns:sec="using:Helm.Core.Secrets"
+                   x:Class="Helm.Modules.Ssh.SshPage"
+                   x:DataType="vm:SshViewModel">
+
+    <!-- SSH's settings (Home → Utilities): the servers, this phone's key, the server keys it trusts and the terminal's
+         text size. Connecting and the terminal are on SshContentPage. -->
+    <StackPanel>
+        <Border Classes="infobar" IsVisible="{Binding HasMessage}">
+            <TextBlock Text="{Binding Message}" TextWrapping="Wrap" />
+        </Border>
+        <Border Classes="card">
+            <StackPanel Spacing="8">
+                <TextBlock Text="Open SSH" Classes="title" />
+                <TextBlock Text="Connect to a server and work in its terminal. Also in the menu and on Home." Classes="secondary" TextWrapping="Wrap" />
+                <Button Classes="accent" Content="Open SSH" Click="OpenSsh_Click" />
+            </StackPanel>
+        </Border>
+
+        <!-- Servers -->
+        <TextBlock Text="Servers" Classes="section" />
+        <ItemsControl ItemsSource="{Binding Hosts}">
+            <ItemsControl.ItemTemplate>
+                <DataTemplate x:DataType="vm:SshHostRow">
+                    <Border Classes="card">
+                        <DockPanel>
+                            <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" Spacing="4" VerticalAlignment="Center">
+                                <Button Classes="flat" Width="44" Height="44" Padding="0" AutomationProperties.Name="Edit server"
+                                        Command="{Binding $parent[ItemsControl].((vm:SshViewModel)DataContext).EditHostCommand}" CommandParameter="{Binding}">
+                                    <ic:SymbolIcon Symbol="Edit" FontSize="18" />
+                                </Button>
+                                <Button Classes="flat" Width="44" Height="44" Padding="0" AutomationProperties.Name="Delete server"
+                                        Command="{Binding $parent[ItemsControl].((vm:SshViewModel)DataContext).DeleteHostCommand}" CommandParameter="{Binding}">
+                                    <ic:SymbolIcon Symbol="Delete" FontSize="18" />
+                                </Button>
+                            </StackPanel>
+                            <StackPanel VerticalAlignment="Center">
+                                <TextBlock Text="{Binding Title}" Classes="title" TextTrimming="CharacterEllipsis" />
+                                <TextBlock Text="{Binding Detail}" Classes="secondary" TextTrimming="CharacterEllipsis" />
+                            </StackPanel>
+                        </DockPanel>
+                    </Border>
+                </DataTemplate>
+            </ItemsControl.ItemTemplate>
+        </ItemsControl>
+
+        <Button Classes="accent" Margin="0,4,0,0" Command="{Binding NewHostCommand}" IsVisible="{Binding !IsEditing}">
+            <StackPanel Orientation="Horizontal" Spacing="6">
+                <ic:SymbolIcon Symbol="Add" FontSize="16" />
+                <TextBlock Text="Add a server" />
+            </StackPanel>
+        </Button>
+
+        <!-- The server being added or edited -->
+        <Border Classes="card" IsVisible="{Binding IsEditing}">
+            <StackPanel Spacing="8">
+                <TextBlock Text="{Binding EditorTitle}" Classes="title" />
+                <TextBlock Text="Address" />
+                <TextBox PlaceholderText="user@host or user@host:port" Text="{Binding EditAddress}" AutomationProperties.Name="Address" />
+                <TextBlock Text="Name (optional)" />
+                <TextBox PlaceholderText="My server" Text="{Binding EditName}" AutomationProperties.Name="Name" />
+                <TextBlock Text="Sign in with" />
+                <ComboBox HorizontalAlignment="Stretch" ItemsSource="{Binding AuthChoices}" SelectedItem="{Binding EditAuthChoice}" AutomationProperties.Name="Sign in with" />
+                <StackPanel Spacing="8" IsVisible="{Binding IsVaultAuth}">
+                    <TextBlock Classes="secondary" TextWrapping="Wrap"
+                               Text="The Vault item and field that hold the password or private key. Helm reads it when connecting; Vault must be unlocked." />
+                    <ComboBox HorizontalAlignment="Stretch" ItemsSource="{Binding VaultFields}" SelectedItem="{Binding EditVaultRef}" AutomationProperties.Name="Vault field">
+                        <ComboBox.ItemTemplate>
+                            <DataTemplate x:DataType="sec:VaultSecretRef">
+                                <TextBlock Text="{Binding DisplayName}" />
+                            </DataTemplate>
+                        </ComboBox.ItemTemplate>
+                    </ComboBox>
+                    <Button IsVisible="{Binding IsVaultLocked}" Command="{Binding UnlockVaultCommand}">
+                        <StackPanel Orientation="Horizontal" Spacing="6">
+                            <ic:SymbolIcon Symbol="LockOpen" FontSize="16" />
+                            <TextBlock Text="Unlock Vault" />
+                        </StackPanel>
+                    </Button>
+                </StackPanel>
+                <TextBlock Text="{Binding EditError}" TextWrapping="Wrap" Foreground="{DynamicResource SystemFillColorCriticalBrush}"
+                           IsVisible="{Binding EditError, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+                <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Right">
+                    <Button Content="Cancel" Command="{Binding CancelEditCommand}" />
+                    <Button Classes="accent" Content="Save" Command="{Binding SaveEditCommand}" />
+                </StackPanel>
+            </StackPanel>
+        </Border>
+
+        <!-- This phone's key -->
+        <TextBlock Text="This phone's key" Classes="section" />
+        <Border Classes="card">
+            <StackPanel Spacing="8">
+                <TextBlock Text="Public key" Classes="title" />
+                <TextBlock Classes="secondary" TextWrapping="Wrap"
+                           Text="An Ed25519 key made for this phone; its private half is protected by the Android Keystore and never leaves the phone. Add the public line to ~/.ssh/authorized_keys on a server, or connect once with a password and choose Install this phone's key." />
+                <SelectableTextBlock Text="{Binding PublicKey}" TextWrapping="Wrap" FontFamily="monospace" FontSize="12" IsVisible="{Binding HasKey}" />
+                <TextBlock Text="{Binding KeyFingerprint}" Classes="secondary" FontFamily="monospace" FontSize="12" TextWrapping="Wrap" IsVisible="{Binding HasKey}" />
+                <TextBlock Text="No key yet: Helm makes it the first time you copy it or sign in with it." TextWrapping="Wrap" IsVisible="{Binding !HasKey}" />
+                <StackPanel Orientation="Horizontal" Spacing="8">
+                    <Button Command="{Binding CopyPublicKeyCommand}">
+                        <StackPanel Orientation="Horizontal" Spacing="6">
+                            <ic:SymbolIcon Symbol="Copy" FontSize="16" />
+                            <TextBlock Text="Copy" />
+                        </StackPanel>
+                    </Button>
+                    <Button Classes="danger" Command="{Binding NewKeyCommand}">
+                        <StackPanel Orientation="Horizontal" Spacing="6">
+                            <ic:SymbolIcon Symbol="KeyReset" FontSize="16" />
+                            <TextBlock Text="New key" />
+                        </StackPanel>
+                    </Button>
+                </StackPanel>
+            </StackPanel>
+        </Border>
+
+        <!-- Known servers -->
+        <TextBlock Text="Known servers" Classes="section" />
+        <Border Classes="card">
+            <StackPanel Spacing="8">
+                <TextBlock Text="Trusted server keys" Classes="title" />
+                <TextBlock Classes="secondary" TextWrapping="Wrap"
+                           Text="Each server's key is checked on every connection; Helm refuses to connect when it changes." />
+                <TextBlock Classes="secondary" Text="None yet. A server's key is added the first time you trust it." IsVisible="{Binding !HasKnownHosts}" TextWrapping="Wrap" />
+                <ItemsControl ItemsSource="{Binding KnownHosts}">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate x:DataType="vm:SshKnownHostRow">
+                            <Border Classes="row">
+                                <DockPanel>
+                                    <Button DockPanel.Dock="Right" Content="Forget" VerticalAlignment="Center" AutomationProperties.Name="Forget server key"
+                                            Command="{Binding $parent[ItemsControl].((vm:SshViewModel)DataContext).ForgetKnownHostCommand}" CommandParameter="{Binding}" />
+                                    <StackPanel>
+                                        <TextBlock Text="{Binding Title}" />
+                                        <TextBlock Text="{Binding Detail}" Classes="secondary" FontSize="12" TextWrapping="Wrap" />
+                                    </StackPanel>
+                                </DockPanel>
+                            </Border>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+            </StackPanel>
+        </Border>
+
+        <!-- Terminal -->
+        <TextBlock Text="Terminal" Classes="section" />
+        <Border Classes="card">
+            <StackPanel Spacing="8">
+                <TextBlock Text="Text size" Classes="title" />
+                <TextBlock Text="For the terminal's text." Classes="secondary" />
+                <ComboBox HorizontalAlignment="Stretch" ItemsSource="{Binding FontSizes}" SelectedItem="{Binding FontSize}" AutomationProperties.Name="Text size" />
+            </StackPanel>
+        </Border>
+    </StackPanel>
+</ui:ModulePageBase>

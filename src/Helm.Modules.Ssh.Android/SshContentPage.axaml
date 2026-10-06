@@ -1,0 +1,132 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:ic="using:FluentIcons.Avalonia"
+             xmlns:vm="using:Helm.Modules.Ssh"
+             x:Class="Helm.Modules.Ssh.SshContentPage"
+             x:DataType="vm:SshViewModel">
+
+    <!-- SSH itself (drawer and Quick access): pick a server, connect, and work in the terminal with a key bar for the
+         keys a phone keyboard lacks. Servers, this device's key and the known server keys are on SshPage. -->
+    <UserControl.Styles>
+        <!-- A key of the key bar (44 dp touch target) -->
+        <Style Selector="Button.key, ToggleButton.key">
+            <Setter Property="MinWidth" Value="44" />
+            <Setter Property="Height" Value="40" />
+            <Setter Property="Padding" Value="10,0" />
+            <Setter Property="HorizontalContentAlignment" Value="Center" />
+            <Setter Property="VerticalContentAlignment" Value="Center" />
+            <Setter Property="FontFamily" Value="monospace" />
+        </Style>
+    </UserControl.Styles>
+
+    <StackPanel Spacing="8">
+        <!-- Shown while the tool is turned off -->
+        <Border x:Name="OffBar" Classes="infobar warning" IsVisible="False">
+            <TextBlock Text="SSH is turned off. Your servers are kept; turn SSH on in its settings to connect." TextWrapping="Wrap" />
+        </Border>
+
+        <!-- What happened: a refused key, a server that could not be reached, a key that changed -->
+        <Border Classes="infobar" IsVisible="{Binding HasMessage}">
+            <StackPanel Spacing="8">
+                <DockPanel>
+                    <Button DockPanel.Dock="Right" Classes="flat" Width="44" Height="44" Padding="0" Command="{Binding DismissMessageCommand}" AutomationProperties.Name="Dismiss">
+                        <ic:SymbolIcon Symbol="Dismiss" FontSize="16" />
+                    </Button>
+                    <TextBlock Text="{Binding Message}" TextWrapping="Wrap" VerticalAlignment="Center" />
+                </DockPanel>
+                <Button Classes="accent" HorizontalAlignment="Left" Command="{Binding OpenVaultCommand}" IsVisible="{Binding CanOpenVault}">
+                    <StackPanel Orientation="Horizontal" Spacing="6">
+                        <ic:SymbolIcon Symbol="LockOpen" FontSize="16" />
+                        <TextBlock Text="Open Vault" />
+                    </StackPanel>
+                </Button>
+            </StackPanel>
+        </Border>
+
+        <!-- No servers yet -->
+        <Border Classes="card" IsVisible="{Binding !HasHosts}">
+            <StackPanel Spacing="8">
+                <TextBlock Text="No servers yet" Classes="title" />
+                <TextBlock Classes="secondary" TextWrapping="Wrap"
+                           Text="Add the servers you connect to. Helm signs in with a password or key kept in Vault, a key made for this phone, or a password you type." />
+                <Button Classes="accent" HorizontalAlignment="Left" Click="AddServer_Click">
+                    <StackPanel Orientation="Horizontal" Spacing="6">
+                        <ic:SymbolIcon Symbol="Add" FontSize="16" />
+                        <TextBlock Text="Add a server" />
+                    </StackPanel>
+                </Button>
+            </StackPanel>
+        </Border>
+
+        <!-- The server picker: the tool's main choice -->
+        <Border x:Name="Picker" Classes="card" IsVisible="{Binding HasHosts}">
+            <StackPanel Spacing="8">
+                <ComboBox HorizontalAlignment="Stretch" ItemsSource="{Binding Hosts}" SelectedItem="{Binding SelectedHost}" AutomationProperties.Name="Server">
+                    <ComboBox.ItemTemplate>
+                        <DataTemplate x:DataType="vm:SshHostRow">
+                            <StackPanel>
+                                <TextBlock Text="{Binding Title}" />
+                                <TextBlock Classes="secondary" FontSize="12">
+                                    <Run Text="{Binding Target}" /><Run Text="  " /><Run Text="{Binding State}" />
+                                </TextBlock>
+                            </StackPanel>
+                        </DataTemplate>
+                    </ComboBox.ItemTemplate>
+                </ComboBox>
+                <TextBox x:Name="PasswordBox" PasswordChar="●" PlaceholderText="{Binding PasswordPrompt}" IsVisible="{Binding NeedsPassword}"
+                         AutomationProperties.Name="Password" KeyDown="Password_KeyDown" />
+                <DockPanel>
+                    <TextBlock DockPanel.Dock="Right" Text="{Binding SessionStatus}" Classes="secondary" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" MaxWidth="170" />
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                        <Button Classes="accent" IsEnabled="{Binding CanConnect}" IsVisible="{Binding !IsConnected}" Click="Connect_Click">
+                            <StackPanel Orientation="Horizontal" Spacing="6">
+                                <ic:SymbolIcon Symbol="PlugConnected" FontSize="16" />
+                                <TextBlock Text="Connect" />
+                            </StackPanel>
+                        </Button>
+                        <Button Command="{Binding DisconnectCommand}" IsVisible="{Binding IsConnected}">
+                            <StackPanel Orientation="Horizontal" Spacing="6">
+                                <ic:SymbolIcon Symbol="PlugDisconnected" FontSize="16" />
+                                <TextBlock Text="Disconnect" />
+                            </StackPanel>
+                        </Button>
+                    </StackPanel>
+                </DockPanel>
+                <Button HorizontalAlignment="Left" Command="{Binding InstallKeyCommand}" IsVisible="{Binding CanInstallKey}">
+                    <StackPanel Orientation="Horizontal" Spacing="6">
+                        <ic:SymbolIcon Symbol="Key" FontSize="16" />
+                        <TextBlock Text="Install this phone's key" />
+                    </StackPanel>
+                </Button>
+            </StackPanel>
+        </Border>
+
+        <!-- The terminal and the keys a phone keyboard lacks -->
+        <StackPanel x:Name="TerminalArea" Spacing="6" IsVisible="{Binding ShowTerminal}">
+            <Border x:Name="TerminalFrame" CornerRadius="8" ClipToBounds="True" Height="360" />
+            <ScrollViewer HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Disabled">
+                <StackPanel Orientation="Horizontal" Spacing="4">
+                    <ToggleButton Classes="key" Content="Ctrl" IsChecked="{Binding CtrlArmed}" Click="Ctrl_Click" AutomationProperties.Name="Control key" />
+                    <Button Classes="key" Content="Esc" Tag="esc" Click="Key_Click" />
+                    <Button Classes="key" Content="Tab" Tag="tab" Click="Key_Click" />
+                    <Button Classes="key" Tag="up" Click="Key_Click" AutomationProperties.Name="Up"><ic:SymbolIcon Symbol="ArrowUp" FontSize="16" /></Button>
+                    <Button Classes="key" Tag="down" Click="Key_Click" AutomationProperties.Name="Down"><ic:SymbolIcon Symbol="ArrowDown" FontSize="16" /></Button>
+                    <Button Classes="key" Tag="left" Click="Key_Click" AutomationProperties.Name="Left"><ic:SymbolIcon Symbol="ArrowLeft" FontSize="16" /></Button>
+                    <Button Classes="key" Tag="right" Click="Key_Click" AutomationProperties.Name="Right"><ic:SymbolIcon Symbol="ArrowRight" FontSize="16" /></Button>
+                    <Button Classes="key" Content="|" Tag="|" Click="Char_Click" />
+                    <Button Classes="key" Content="~" Tag="~" Click="Char_Click" />
+                    <Button Classes="key" Content="/" Tag="/" Click="Char_Click" />
+                    <Button Classes="key" Content="-" Tag="-" Click="Char_Click" />
+                    <Button Classes="key" Content="Home" Tag="home" Click="Key_Click" />
+                    <Button Classes="key" Content="End" Tag="end" Click="Key_Click" />
+                    <Button Classes="key" Click="Paste_Click" AutomationProperties.Name="Paste"><ic:SymbolIcon Symbol="ClipboardPaste" FontSize="16" /></Button>
+                    <Button Classes="key" Click="Keyboard_Click" AutomationProperties.Name="Show the keyboard"><ic:SymbolIcon Symbol="Keyboard" FontSize="16" /></Button>
+                </StackPanel>
+            </ScrollViewer>
+        </StackPanel>
+
+        <TextBlock Classes="secondary" TextWrapping="Wrap" HorizontalAlignment="Center" TextAlignment="Center" Margin="0,24"
+                   IsVisible="{Binding !HasSession}"
+                   Text="Choose a server and connect. The session keeps running while you use the rest of Helm." />
+    </StackPanel>
+</UserControl>
