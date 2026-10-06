@@ -24,7 +24,7 @@ public enum SshSessionState
 /// <see cref="TerminalBuffer"/> and handed to whichever terminal is attached; keys and resizes are sent from a queue,
 /// so a slow network never blocks the UI thread. Events are raised on background threads.
 /// </summary>
-public sealed class SshSession : IDisposable
+public sealed class SshSession : IDisposable, IMenuRunner
 {
     /// <summary>A keep-alive is sent this often, so idle connections are not dropped by NATs and firewalls.</summary>
     public static readonly TimeSpan KeepAlive = TimeSpan.FromSeconds(30);
@@ -205,6 +205,68 @@ public sealed class SshSession : IDisposable
             cmd.Execute();
             return (cmd.ExitStatus ?? -1, (cmd.Result + cmd.Error).Trim());
         });
+    }
+
+    /// <summary>
+    /// Runs a command on its own channel and hands its standard output to <paramref name="output"/> as it arrives
+    /// (UTF-8, on a background thread). Cancelling stops the command (the server gets TERM, then the channel closes).
+    /// </summary>
+    public async Task<MenuRunResult> RunStreamingAsync(string command, Action<string>? output, CancellationToken ct)
+    {
+        SshClient? client;
+        lock (_gate) client = _client;
+        if (client is null || !IsConnected) return new MenuRunResult(null, "Not connected.");
+        using var cmd = client.CreateCommand(command);
+        cmd.CommandTimeout = Timeout.InfiniteTimeSpan;
+        var run = cmd.BeginExecute();
+        await using var stop = ct.Register(() =>
+        {
+            try
+            {
+                cmd.CancelAsync(forceKill: false, millisecondsTimeout: 2000);
+            }
+            catch (Exception ex) when (ex is ObjectDisposedException or InvalidOperationException or SshException)
+            {
+                // Already over.
+            }
+        }).ConfigureAwait(false);
+        await Task.Run(() =>
+        {
+            var decoder = Encoding.UTF8.GetDecoder();
+            var bytes = new byte[8192];
+            var chars = new char[Encoding.UTF8.GetMaxCharCount(bytes.Length)];
+            try
+            {
+                int read;
+                while ((read = cmd.OutputStream.Read(bytes, 0, bytes.Length)) > 0)
+                {
+                    var count = decoder.GetChars(bytes, 0, read, chars, 0, flush: false);
+                    if (count > 0) output?.Invoke(new string(chars, 0, count));
+                }
+            }
+            catch (Exception ex) when (ex is ObjectDisposedException or IOException or SshException or InvalidOperationException)
+            {
+                // The channel closed (cancelled or the connection went away).
+            }
+        }, CancellationToken.None).ConfigureAwait(false);
+        try
+        {
+            cmd.EndExecute(run);
+        }
+        catch (Exception ex) when (ex is SshException or ObjectDisposedException or InvalidOperationException or OperationCanceledException)
+        {
+            return new MenuRunResult(null, ct.IsCancellationRequested ? "Stopped." : SshErrors.Describe(ex, Host));
+        }
+        string error;
+        try
+        {
+            error = cmd.Error;
+        }
+        catch (Exception ex) when (ex is ObjectDisposedException or InvalidOperationException)
+        {
+            error = "";
+        }
+        return new MenuRunResult(ct.IsCancellationRequested ? null : cmd.ExitStatus, ct.IsCancellationRequested ? "Stopped." : error.Trim());
     }
 
     /// <summary>Ends the session from Helm's side.</summary>

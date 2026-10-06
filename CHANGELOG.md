@@ -5,6 +5,14 @@ Format: [Keep a Changelog](https://keepachangelog.com), versions follow [SemVer]
 
 ## [Unreleased]
 
+### Added
+- **SSH menu** (PC): a *Menu* tab next to the terminal shows what the server offers to run, as the server itself
+  describes it: one program on the server (`~/.helm/menu`, or a path set per server) lists its items as JSON and runs
+  them, so the menu always matches that server ([protocol](docs/ssh-menu.md)). Items are buttons with a form (lists the
+  server fills, text, numbers, switches) or views that refresh themselves; output is a live log, a table with buttons
+  on each row, or a few figures. Items marked dangerous ask first, and the riskiest show the exact command. Helm
+  checks every value against what the menu declared and quotes each argument, so nothing typed can run as a command.
+
 ### Fixed
 - **SSH**: *Install this device's key* now shows for every server that signs in without this device's key, also with
   a password or key from Vault and with a key file (0.28.0 offered it only after typing a password). Once installed,

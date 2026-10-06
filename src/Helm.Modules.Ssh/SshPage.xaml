@@ -91,6 +91,11 @@
                                    Command="{Binding UnlockVaultCommand}" Visibility="{Binding IsVaultLocked, Converter={StaticResource BoolToVisibility}}" />
                     </StackPanel>
                 </core:RowLayout>
+                <core:RowLayout Margin="0,0,0,8">
+                    <core:CardHeader Title="Menu" Description="The program on the server that lists what the Menu tab offers (see docs/ssh-menu.md). Empty means ~/.helm/menu." />
+                    <ui:TextBox Width="280" PlaceholderText="~/.helm/menu" AutomationProperties.Name="Menu path"
+                                Text="{Binding EditMenuPath, UpdateSourceTrigger=PropertyChanged}" />
+                </core:RowLayout>
                 <TextBlock Text="{Binding EditError}" TextWrapping="Wrap" Margin="0,0,0,8" Foreground="{DynamicResource SystemFillColorCriticalBrush}"
                            Visibility="{Binding EditError, Converter={StaticResource NotEmptyToVisibility}}" />
                 <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">

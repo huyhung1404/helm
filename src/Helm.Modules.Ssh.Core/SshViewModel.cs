@@ -105,6 +105,10 @@ public sealed partial class SshViewModel : ObservableObject, IDisposable
     [ObservableProperty] private int _editAuthIndex;
     [ObservableProperty] private string? _editError;
     [ObservableProperty] private string _editKeyFile = "";
+    [ObservableProperty] private string _editMenuPath = "";
+
+    /// <summary>The page shows the server's menu instead of the terminal.</summary>
+    [ObservableProperty] private bool _showMenu;
     [ObservableProperty] private VaultSecretRef? _editVaultRef;
     [ObservableProperty] private bool _canOpenVault;
 
@@ -124,10 +128,20 @@ public sealed partial class SshViewModel : ObservableObject, IDisposable
         _clipboard = clipboard;
         _logger = logger;
         _deviceKey.Changed += (_, _) => _ui.Post(RefreshKey);
+        Menu = new SshMenuViewModel(ui, AskAsync, logger);
         Load();
     }
 
     public ObservableCollection<SshHostRow> Hosts { get; } = [];
+
+    /// <summary>The menu of the server shown (see <see cref="SshMenu"/>).</summary>
+    public SshMenuViewModel Menu { get; }
+
+    /// <summary>The terminal is on screen: a session, no question, and not the menu.</summary>
+    public bool ShowTerminalPane => ShowTerminal && !ShowMenu;
+
+    /// <summary>The menu is on screen.</summary>
+    public bool ShowMenuPane => HasSession && ShowMenu && !IsAskingUser;
 
     public ObservableCollection<SshKnownHostRow> KnownHosts { get; } = [];
 
@@ -202,9 +216,24 @@ public sealed partial class SshViewModel : ObservableObject, IDisposable
     {
         OnPropertyChanged(nameof(HasSession));
         OnPropertyChanged(nameof(ShowTerminal));
+        OnPropertyChanged(nameof(ShowTerminalPane));
+        OnPropertyChanged(nameof(ShowMenuPane));
+        AttachMenu();
     }
 
-    partial void OnIsAskingUserChanged(bool value) => OnPropertyChanged(nameof(ShowTerminal));
+    partial void OnIsAskingUserChanged(bool value)
+    {
+        OnPropertyChanged(nameof(ShowTerminal));
+        OnPropertyChanged(nameof(ShowTerminalPane));
+        OnPropertyChanged(nameof(ShowMenuPane));
+    }
+
+    partial void OnShowMenuChanged(bool value)
+    {
+        OnPropertyChanged(nameof(ShowTerminalPane));
+        OnPropertyChanged(nameof(ShowMenuPane));
+        Menu.IsVisible = value && IsConnected;
+    }
 
     /// <summary>The terminal is shown: there is a session and no question on screen.</summary>
     public bool ShowTerminal => HasSession && !IsAskingUser;
@@ -241,6 +270,7 @@ public sealed partial class SshViewModel : ObservableObject, IDisposable
 
     partial void OnIsConnectedChanged(bool value)
     {
+        AttachMenu();
         OnPropertyChanged(nameof(CanConnect));
         OnPropertyChanged(nameof(NeedsPassword));
         OnPropertyChanged(nameof(CanInstallKey));
@@ -618,6 +648,7 @@ public sealed partial class SshViewModel : ObservableObject, IDisposable
         EditAuthIndex = 0;
         EditKeyFile = "";
         EditVaultRef = null;
+        EditMenuPath = "";
         EditError = null;
         IsEditing = true;
     }
@@ -631,6 +662,7 @@ public sealed partial class SshViewModel : ObservableObject, IDisposable
         EditAddress = row.Host.Target;
         EditAuthIndex = (int)row.Host.Auth;
         EditKeyFile = row.Host.KeyFile ?? "";
+        EditMenuPath = row.Host.MenuPath ?? "";
         EditVaultRef = row.Host is { VaultItemUid: { } uid, VaultField: { } field } ? new VaultSecretRef(uid, row.Host.VaultItemTitle ?? "", field) : null;
         if (row.Host.Auth == SshAuthKind.Vault) RefreshVaultFields();
         EditError = null;
@@ -664,6 +696,12 @@ public sealed partial class SshViewModel : ObservableObject, IDisposable
             EditError = IsVaultLocked ? "Unlock Vault, then choose the item and field that hold the password or key." : "Choose the Vault item and field that hold the password or key.";
             return;
         }
+        var menuPath = EditMenuPath.Trim();
+        if (menuPath.Length > 0 && !SshMenu.IsValidPath(menuPath))
+        {
+            EditError = "Write the menu path as a plain path, e.g. ~/.helm/menu (letters, digits, . _ - and /).";
+            return;
+        }
         var vaultRef = auth == SshAuthKind.Vault ? EditVaultRef : null;
         var existing = EditingId is null ? null : _settings.Current.Hosts.FirstOrDefault(h => h.Id == EditingId);
         var host = (existing ?? new SshHost()) with
@@ -671,6 +709,7 @@ public sealed partial class SshViewModel : ObservableObject, IDisposable
             Name = EditName.Trim(), User = user, Address = address, Port = port, Auth = auth,
             KeyFile = auth == SshAuthKind.KeyFile ? keyFile : null,
             VaultItemUid = vaultRef?.ItemUid, VaultItemTitle = vaultRef?.ItemTitle, VaultField = vaultRef?.FieldName,
+            MenuPath = menuPath.Length == 0 || menuPath == SshMenu.DefaultPath ? null : menuPath,
         };
         _passphraseNeeded.Remove(host.Id);
         SaveHost(host);
@@ -770,6 +809,14 @@ public sealed partial class SshViewModel : ObservableObject, IDisposable
         };
     }
 
+    /// <summary>The menu follows the session shown, while it is connected.</summary>
+    private void AttachMenu()
+    {
+        var session = ActiveSession is { IsConnected: true } s ? s : null;
+        Menu.Attach(session, session?.Host.MenuPath, session?.Host.DisplayName ?? "");
+        Menu.IsVisible = ShowMenu && session is not null;
+    }
+
     private void CloseAll()
     {
         foreach (var session in _sessions.Values) session.Dispose();
@@ -778,5 +825,9 @@ public sealed partial class SshViewModel : ObservableObject, IDisposable
         RefreshSession();
     }
 
-    public void Dispose() => CloseAll();
+    public void Dispose()
+    {
+        CloseAll();
+        Menu.Dispose();
+    }
 }

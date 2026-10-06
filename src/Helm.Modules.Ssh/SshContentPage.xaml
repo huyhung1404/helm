@@ -12,6 +12,27 @@
     <!-- SSH itself (menu and Quick access): pick a server, connect, and the terminal fills the rest. The servers, this
          device's key and the known server keys are managed on SshPage (Home → Utilities). -->
     <Page.Resources>
+        <!-- The menu's items, grouped as the server declared them -->
+        <CollectionViewSource x:Key="MenuEntries" Source="{Binding Menu.Entries}">
+            <CollectionViewSource.GroupDescriptions>
+                <PropertyGroupDescription PropertyName="Group" />
+            </CollectionViewSource.GroupDescriptions>
+        </CollectionViewSource>
+
+        <!-- The buttons of a table row (e.g. Restart on a process) -->
+        <DataTemplate x:Key="RowActions" DataType="{x:Type local:MenuTableRow}">
+            <ItemsControl ItemsSource="{Binding Actions}">
+                <ItemsControl.ItemsPanel>
+                    <ItemsPanelTemplate><StackPanel Orientation="Horizontal" /></ItemsPanelTemplate>
+                </ItemsControl.ItemsPanel>
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate DataType="{x:Type local:MenuRowAction}">
+                        <ui:Button Content="{Binding Title}" Padding="10,2" Margin="0,0,6,0" Click="RowAction_Click" />
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+        </DataTemplate>
+
         <DataTemplate x:Key="HostItem" DataType="{x:Type local:SshHostRow}">
             <StackPanel Orientation="Horizontal">
                 <TextBlock Text="{Binding Title}" VerticalAlignment="Center" />
@@ -91,11 +112,174 @@
         </Border>
 
         <Grid x:Name="Body" Grid.Row="4">
-            <Border CornerRadius="8" ClipToBounds="True" BorderThickness="1" BorderBrush="{DynamicResource CardStrokeColorDefaultBrush}"
-                    Visibility="{Binding HasSession, Converter={StaticResource BoolToVisibility}}">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="*" />
+            </Grid.RowDefinitions>
+
+            <!-- Terminal | Menu -->
+            <StackPanel Orientation="Horizontal" Margin="0,0,0,8" Visibility="{Binding IsConnected, Converter={StaticResource BoolToVisibility}}">
+                <RadioButton Style="{StaticResource {x:Type ToggleButton}}" GroupName="SshPane" MinWidth="110" Margin="0,0,6,0"
+                             IsChecked="{Binding ShowMenu, Converter={StaticResource InverseBool}}" AutomationProperties.Name="Terminal">
+                    <StackPanel Orientation="Horizontal">
+                        <ui:SymbolIcon Symbol="WindowConsole20" Margin="0,0,6,0" />
+                        <TextBlock Text="Terminal" />
+                    </StackPanel>
+                </RadioButton>
+                <RadioButton Style="{StaticResource {x:Type ToggleButton}}" GroupName="SshPane" MinWidth="110"
+                             IsChecked="{Binding ShowMenu}" AutomationProperties.Name="Menu">
+                    <StackPanel Orientation="Horizontal">
+                        <ui:SymbolIcon Symbol="AppsList24" Margin="0,0,6,0" />
+                        <TextBlock Text="Menu" />
+                    </StackPanel>
+                </RadioButton>
+            </StackPanel>
+
+            <Border Grid.Row="1" CornerRadius="8" ClipToBounds="True" BorderThickness="1" BorderBrush="{DynamicResource CardStrokeColorDefaultBrush}"
+                    Visibility="{Binding ShowTerminalPane, Converter={StaticResource BoolToVisibility}}">
                 <term:TerminalView x:Name="Terminal" />
             </Border>
-            <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center" Margin="24" MaxWidth="420"
+
+            <!-- The server's menu (see docs/ssh-menu.md) -->
+            <Grid Grid.Row="1" DataContext="{Binding Menu}"
+                  Visibility="{Binding DataContext.ShowMenuPane, RelativeSource={RelativeSource AncestorType=Page}, Converter={StaticResource BoolToVisibility}}">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="*" />
+                </Grid.RowDefinitions>
+
+                <!-- Reading the menu, or why there is none -->
+                <TextBlock Text="Reading the server's menu…" Style="{StaticResource HelmSecondaryText}" Margin="0,4,0,8"
+                           Visibility="{Binding IsLoading, Converter={StaticResource BoolToVisibility}}" />
+                <Border Style="{DynamicResource HelmSurface}" Padding="12,8" Margin="0,0,0,8" Visibility="{Binding HasProblem, Converter={StaticResource BoolToVisibility}}">
+                    <core:RowLayout>
+                        <TextBlock Text="{Binding Problem}" TextWrapping="Wrap" VerticalAlignment="Center" />
+                        <ui:Button Content="Try again" Icon="{ui:SymbolIcon ArrowSync24}" Command="{Binding LoadCommand}" />
+                    </core:RowLayout>
+                </Border>
+
+                <Grid Grid.Row="1" Visibility="{Binding IsReady, Converter={StaticResource BoolToVisibility}}">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="230" />
+                        <ColumnDefinition Width="12" />
+                        <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+
+                    <!-- The items -->
+                    <DockPanel>
+                        <ui:Button DockPanel.Dock="Bottom" Margin="0,8,0,0" HorizontalAlignment="Stretch" Content="Read the menu again" Icon="{ui:SymbolIcon ArrowSync24}"
+                                   Command="{Binding LoadCommand}" IsEnabled="{Binding IsRunning, Converter={StaticResource InverseBool}}" />
+                        <ListBox ItemsSource="{Binding Source={StaticResource MenuEntries}}" SelectedItem="{Binding Selected}" AutomationProperties.Name="Menu items"
+                                 IsEnabled="{Binding IsRunning, Converter={StaticResource InverseBool}}">
+                            <ListBox.GroupStyle>
+                                <GroupStyle>
+                                    <GroupStyle.HeaderTemplate>
+                                        <DataTemplate>
+                                            <TextBlock Text="{Binding Name}" Style="{DynamicResource HelmSectionHeader}" Margin="4,8,0,4" />
+                                        </DataTemplate>
+                                    </GroupStyle.HeaderTemplate>
+                                </GroupStyle>
+                            </ListBox.GroupStyle>
+                            <ListBox.ItemTemplate>
+                                <DataTemplate DataType="{x:Type local:MenuEntry}">
+                                    <DockPanel>
+                                        <ui:SymbolIcon DockPanel.Dock="Right" Symbol="Warning24" FontSize="14" Foreground="{DynamicResource SystemFillColorCautionBrush}"
+                                                       ToolTip="Asks before it runs" Visibility="{Binding IsDangerous, Converter={StaticResource BoolToVisibility}}" />
+                                        <TextBlock Text="{Binding Title}" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
+                                    </DockPanel>
+                                </DataTemplate>
+                            </ListBox.ItemTemplate>
+                        </ListBox>
+                    </DockPanel>
+
+                    <!-- The chosen item: its form, Run, and what it printed -->
+                    <Grid Grid.Column="2">
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="*" />
+                        </Grid.RowDefinitions>
+                        <TextBlock Text="Choose an item on the left." Style="{StaticResource HelmSecondaryText}"
+                                   Visibility="{Binding Selected, Converter={StaticResource EmptyToVisibility}}" />
+                        <StackPanel Visibility="{Binding Selected, Converter={StaticResource NotEmptyToVisibility}}">
+                            <TextBlock Text="{Binding Selected.Title}" FontSize="20" FontWeight="SemiBold" />
+                            <TextBlock Text="{Binding Selected.Item.Description}" TextWrapping="Wrap" Style="{StaticResource HelmSecondaryText}" Margin="0,2,0,0"
+                                       Visibility="{Binding Selected.Item.Description, Converter={StaticResource NotEmptyToVisibility}}" />
+                        </StackPanel>
+
+                        <ItemsControl Grid.Row="1" ItemsSource="{Binding Fields}" Margin="0,12,0,0" Visibility="{Binding HasFields, Converter={StaticResource BoolToVisibility}}"
+                                      IsEnabled="{Binding IsRunning, Converter={StaticResource InverseBool}}">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate DataType="{x:Type local:MenuParamField}">
+                                    <StackPanel Margin="0,0,0,8">
+                                        <core:RowLayout>
+                                            <core:CardHeader Title="{Binding Title}" />
+                                            <Grid Width="260">
+                                                <ComboBox ItemsSource="{Binding Choices}" SelectedItem="{Binding Value}" AutomationProperties.Name="{Binding Title}"
+                                                          Visibility="{Binding IsChoice, Converter={StaticResource BoolToVisibility}}" />
+                                                <ui:TextBox Text="{Binding Value, UpdateSourceTrigger=PropertyChanged}" AutomationProperties.Name="{Binding Title}"
+                                                            Visibility="{Binding IsText, Converter={StaticResource BoolToVisibility}}" />
+                                                <ui:ToggleSwitch IsChecked="{Binding BoolValue}" AutomationProperties.Name="{Binding Title}"
+                                                                 Visibility="{Binding IsBool, Converter={StaticResource BoolToVisibility}}" />
+                                            </Grid>
+                                        </core:RowLayout>
+                                        <TextBlock Text="{Binding Error}" HorizontalAlignment="Right" Foreground="{DynamicResource SystemFillColorCriticalBrush}"
+                                                   Visibility="{Binding Error, Converter={StaticResource NotEmptyToVisibility}}" />
+                                    </StackPanel>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+
+                        <DockPanel Grid.Row="2" Margin="0,8,0,8" Visibility="{Binding Selected, Converter={StaticResource NotEmptyToVisibility}}">
+                            <ui:Button Appearance="Primary" Content="Run" Icon="{ui:SymbolIcon Play24}" Margin="0,0,8,0" Command="{Binding RunCommand}"
+                                       IsEnabled="{Binding CanRun}" Visibility="{Binding IsRunning, Converter={StaticResource InverseBoolToVisibility}}" />
+                            <ui:Button Content="Stop" Icon="{ui:SymbolIcon Stop24}" Margin="0,0,8,0" Command="{Binding StopCommand}"
+                                       ToolTip="Stops the command (a job the menu runs on its own, such as a deploy, may keep going on the server)"
+                                       Visibility="{Binding IsRunning, Converter={StaticResource BoolToVisibility}}" />
+                            <ui:ProgressRing IsIndeterminate="True" Width="18" Height="18" Margin="0,0,8,0" VerticalAlignment="Center"
+                                             Visibility="{Binding IsRunning, Converter={StaticResource BoolToVisibility}}" />
+                            <TextBlock x:Name="MenuStatus" Text="{Binding Status}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
+                        </DockPanel>
+
+                        <!-- What it printed: a log, a table or a few figures -->
+                        <Grid Grid.Row="3">
+                            <TextBox x:Name="MenuOutput" Text="{Binding Output, Mode=OneWay}" IsReadOnly="True" TextWrapping="NoWrap" AcceptsReturn="True"
+                                     FontFamily="Cascadia Mono, Consolas, Courier New" FontSize="13" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto"
+                                     AutomationProperties.Name="Output" Visibility="{Binding ShowsText, Converter={StaticResource BoolToVisibility}}" />
+                            <ui:DataGrid x:Name="MenuTable" ItemsSource="{Binding Rows}" AutoGenerateColumns="False" IsReadOnly="True" HeadersVisibility="Column"
+                                         CanUserAddRows="False" AutomationProperties.Name="Table" Visibility="{Binding ShowsTable, Converter={StaticResource BoolToVisibility}}" />
+                            <ItemsControl ItemsSource="{Binding Stats}" Visibility="{Binding ShowsStats, Converter={StaticResource BoolToVisibility}}">
+                                <ItemsControl.ItemsPanel>
+                                    <ItemsPanelTemplate><WrapPanel /></ItemsPanelTemplate>
+                                </ItemsControl.ItemsPanel>
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate DataType="{x:Type local:MenuStat}">
+                                        <Border Style="{DynamicResource HelmSurface}" Padding="14,10" Margin="0,0,8,8" MinWidth="150">
+                                            <StackPanel>
+                                                <TextBlock Text="{Binding Label}" Style="{StaticResource HelmSecondaryText}" />
+                                                <TextBlock x:Name="StatValue" Text="{Binding Value}" FontSize="22" FontWeight="SemiBold" />
+                                            </StackPanel>
+                                        </Border>
+                                        <DataTemplate.Triggers>
+                                            <DataTrigger Binding="{Binding Level}" Value="warn">
+                                                <Setter TargetName="StatValue" Property="Foreground" Value="{DynamicResource SystemFillColorCautionBrush}" />
+                                            </DataTrigger>
+                                            <DataTrigger Binding="{Binding Level}" Value="bad">
+                                                <Setter TargetName="StatValue" Property="Foreground" Value="{DynamicResource SystemFillColorCriticalBrush}" />
+                                            </DataTrigger>
+                                            <DataTrigger Binding="{Binding Level}" Value="ok">
+                                                <Setter TargetName="StatValue" Property="Foreground" Value="{DynamicResource SystemFillColorSuccessBrush}" />
+                                            </DataTrigger>
+                                        </DataTemplate.Triggers>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </Grid>
+                    </Grid>
+                </Grid>
+            </Grid>
+            <StackPanel Grid.Row="1" VerticalAlignment="Center" HorizontalAlignment="Center" Margin="24" MaxWidth="420"
                         Visibility="{Binding HasSession, Converter={StaticResource InverseBoolToVisibility}}">
                 <Image Source="{x:Static self:SshLogo.Image}" Width="48" Height="48" Opacity="0.6" />
                 <TextBlock Margin="0,12,0,0" TextAlignment="Center" TextWrapping="Wrap" Style="{StaticResource HelmSecondaryText}"
