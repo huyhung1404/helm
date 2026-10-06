@@ -33,7 +33,7 @@ public partial class SshContentPage : Page
         Terminal.Attach(viewModel, dialogs, clipboard, logger, Path.Combine(settings.Paths.Root, "cache", SshIds.ModuleId, "webview2"));
         // Module, view model and page are singletons, so the subscriptions live as long as the page.
         module.PropertyChanged += OnModuleChanged;
-        viewModel.Menu.PropertyChanged += OnMenuChanged;
+        viewModel.Menu.Typed += OnMenuTyped;
         ApplyEnabled();
     }
 
@@ -77,61 +77,45 @@ public partial class SshContentPage : Page
 
     private void Settings_Click(object sender, RoutedEventArgs e) => _navigation.ShowPage(typeof(SshPage));
 
-    private void OnMenuChanged(object? sender, PropertyChangedEventArgs e)
+    /// <summary>Opens the server's menu over the terminal (read from the server the first time).</summary>
+    private async void Menu_Click(object sender, RoutedEventArgs e)
     {
-        switch (e.PropertyName)
-        {
-            case nameof(SshMenuViewModel.Columns):
-                Dispatcher.BeginInvoke(BuildTableColumns);
-                break;
-            case nameof(SshMenuViewModel.Output):
-                // A log follows its end, unless the reader scrolled up.
-                Dispatcher.BeginInvoke(() =>
-                {
-                    if (MenuOutput.VerticalOffset + MenuOutput.ViewportHeight >= MenuOutput.ExtentHeight - 24) MenuOutput.ScrollToEnd();
-                });
-                break;
-            case nameof(SshMenuViewModel.Succeeded):
-                Dispatcher.BeginInvoke(() => MenuStatus.Foreground = _viewModel.Menu.Succeeded switch
-                {
-                    true => (System.Windows.Media.Brush)FindResource("SystemFillColorSuccessBrush"),
-                    false => (System.Windows.Media.Brush)FindResource("SystemFillColorCriticalBrush"),
-                    _ => (System.Windows.Media.Brush)FindResource("TextFillColorPrimaryBrush"),
-                });
-                break;
-        }
-    }
-
-    /// <summary>View glue: the table's columns come from the server, so the grid is built when a table arrives.</summary>
-    private void BuildTableColumns()
-    {
-        MenuTable.Columns.Clear();
-        foreach (var column in _viewModel.Menu.Columns)
-            MenuTable.Columns.Add(new DataGridTextColumn { Header = column.Title, Binding = new System.Windows.Data.Binding($"[{column.Id}]") });
-        if (_viewModel.Menu.Rows.Any(r => r.Actions.Count > 0))
-            MenuTable.Columns.Add(new DataGridTemplateColumn { Header = "", CellTemplate = (DataTemplate)FindResource("RowActions") });
-    }
-
-    private async void RowAction_Click(object sender, RoutedEventArgs e)
-    {
-        if (sender is not FrameworkElement { DataContext: MenuRowAction action } button) return;
-        var row = FindRow(button);
-        if (row is null) return;
+        MenuPopup.IsOpen = true;
         try
         {
-            await _viewModel.Menu.RunRowActionAsync(row, action.Id);
+            await _viewModel.Menu.OpenAsync();
         }
         catch (Exception ex) when (ex is not OutOfMemoryException)
         {
-            _viewModel.Menu.Status = "Could not run: " + ex.Message;
+            _viewModel.Message = "The menu could not be read: " + ex.Message;
         }
     }
 
-    private static MenuTableRow? FindRow(DependencyObject element)
+    private async void MenuItem_Click(object sender, RoutedEventArgs e)
     {
-        for (var e = element; e is not null; e = System.Windows.Media.VisualTreeHelper.GetParent(e))
-            if (e is FrameworkElement { DataContext: MenuTableRow row }) return row;
-        return null;
+        if (sender is not FrameworkElement { DataContext: MenuEntry entry }) return;
+        // A question about a dangerous item is a window of its own: the popup gets out of its way first.
+        if (!entry.HasParams && entry.Item.Danger != MenuDanger.None) MenuPopup.IsOpen = false;
+        try
+        {
+            await _viewModel.Menu.ChooseAsync(entry);
+        }
+        catch (Exception ex) when (ex is not OutOfMemoryException)
+        {
+            _viewModel.Message = "Could not run: " + ex.Message;
+        }
+    }
+
+    // The command is in the terminal: the popup closes and the keys go back there.
+    private void OnMenuTyped(object? sender, EventArgs e)
+    {
+        MenuPopup.IsOpen = false;
+        Dispatcher.BeginInvoke(Terminal.FocusTerminal);
+    }
+
+    private void MenuPopup_Closed(object? sender, EventArgs e)
+    {
+        if (_viewModel.Menu.IsFormOpen && !_viewModel.IsAskingUser) _viewModel.Menu.BackCommand.Execute(null);
     }
 
     private void Import_Click(object sender, RoutedEventArgs e) => _viewModel.ImportOpenSsh(SshPage.OpenSshFolder);

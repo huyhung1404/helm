@@ -3,6 +3,15 @@
 All notable changes to Helm. The top section is used as the GitHub release body and as the Velopack release notes.
 Format: [Keep a Changelog](https://keepachangelog.com), versions follow [SemVer](https://semver.org).
 
+## [Unreleased]
+
+### Changed
+- **SSH menu**: no longer a tab that replaces the terminal. The **Menu** button next to *Disconnect* opens a popup over
+  the terminal; choosing an item types its command into the terminal, so its output shows there next to everything
+  else and Ctrl+C stops it. An item with parameters (Restart app) opens a small form in the popup first; dangerous
+  items still ask, showing the line Helm will type. The command starts with a space, which keeps it out of bash's
+  history.
+
 ## [0.29.0] - 2026-10-06
 
 ### Added

@@ -1,6 +1,5 @@
 using System.Diagnostics;
 using Helm.Modules.Ssh;
-using Microsoft.Extensions.Logging.Abstractions;
 
 namespace Helm.Tests;
 
@@ -174,123 +173,134 @@ public sealed class SshMenuTests
         Assert.NotNull(SshMenu.Validate(flag, "yes", []));
     }
 
-    // ---- The page's view model -------------------------------------------------------------------------------------
+    // ---- The popup's view model ------------------------------------------------------------------------------------
 
     [Fact]
-    public async Task The_menu_loads_runs_views_and_row_actions()
+    public async Task Choosing_an_item_types_its_command_into_the_terminal()
     {
         var server = new FakeMenu();
+        var typed = new List<string>();
         var asked = new List<string>();
-        using var vm = new SshMenuViewModel(new InlineUi(), (title, message, _) => { asked.Add(message); return Task.FromResult(true); }, NullLogger.Instance);
+        var vm = new SshMenuViewModel((_, message, _) => { asked.Add(message); return Task.FromResult(true); }, typed.Add);
+        var closed = 0;
+        vm.Typed += (_, _) => closed++;
+        Assert.False(vm.CanOpen);
         vm.Attach(server, null, "vps");
-        Assert.Equal(MenuState.Idle, vm.State);
-        vm.IsVisible = true; // opening the menu reads it
-        await Until(() => vm.State == MenuState.Ready);
+        Assert.True(vm.CanOpen);
+        await vm.OpenAsync();
+        Assert.Equal(MenuState.Ready, vm.State);
         Assert.Equal("WebAdmin", vm.Title);
-        Assert.Equal(5, vm.Entries.Count);
-        Assert.Equal("~/.helm/menu 'describe'", server.Commands[0]);
+        Assert.Equal(["deploy", "restart", "logs", "pm2", "health"], vm.Entries.Select(e => e.Item.Id));
+        Assert.Equal([true, false, false, true, false], vm.Entries.Select(e => e.StartsGroup));
+        Assert.True(vm.IsListOpen);
 
-        // A view runs as soon as it is chosen.
-        vm.Selected = vm.Entries.Single(e => e.Item.Id == "pm2");
-        await Until(() => vm.ShowsTable && !vm.IsRunning);
-        Assert.Equal(["backend", "web"], vm.Rows.Select(r => r["name"]));
-        Assert.Equal("Restart app", vm.Rows[0].Actions.Single().Title);
+        // No parameters, not dangerous: typed at once, with a leading space (kept out of history) and Enter.
+        await vm.ChooseAsync(vm.Entries.Single(e => e.Item.Id == "pm2"));
+        Assert.Equal(" ~/.helm/menu 'run' 'pm2'\r", typed.Single());
+        Assert.Empty(asked);
+        Assert.Equal(1, closed);
 
-        // Its row button asks (danger: confirm), restarts that process, then reads the view again.
-        await vm.RunRowActionAsync(vm.Rows[1], "restart");
-        Assert.Single(asked);
-        Assert.Contains("~/.helm/menu 'choices' 'restart' 'app'", server.Commands);
-        Assert.Contains("~/.helm/menu 'run' 'restart' '--app=web'", server.Commands);
-        Assert.Equal("~/.helm/menu 'run' 'pm2'", server.Commands[^1]);
-        Assert.Contains("Restart app (web): Done", vm.Status, StringComparison.Ordinal);
+        // Dangerous: the question shows the exact line first.
+        await vm.ChooseAsync(vm.Entries.Single(e => e.Item.Id == "deploy"));
+        Assert.Contains("Deploy main to production?", asked.Single(), StringComparison.Ordinal);
+        Assert.Contains("~/.helm/menu 'run' 'deploy'", asked.Single(), StringComparison.Ordinal);
+        Assert.Equal(" ~/.helm/menu 'run' 'deploy'\r", typed[^1]);
+        Assert.Equal(2, closed);
 
-        // A dangerous item shows its warning and the exact command before it runs; its output streams in.
-        vm.Selected = vm.Entries.Single(e => e.Item.Id == "deploy");
-        Assert.True(vm.CanRun);
-        await vm.RunCommand.ExecuteAsync(null);
-        Assert.Contains("Deploy main to production?", asked[^1], StringComparison.Ordinal);
-        Assert.Contains("~/.helm/menu 'run' 'deploy'", asked[^1], StringComparison.Ordinal);
-        Assert.Equal("=== Pulling ===\n=== Done ===\n", vm.Output);
-        Assert.Equal((true, "Done"), (vm.Succeeded, vm.Status));
+        // The menu is read once; opening again does not ask the server.
+        await vm.OpenAsync();
+        Assert.Single(server.Commands, c => c.EndsWith("'describe'", StringComparison.Ordinal));
     }
 
     [Fact]
-    public async Task Choices_come_from_the_server_and_the_form_is_checked()
+    public async Task An_item_with_parameters_opens_its_form_with_the_servers_choices()
     {
         var server = new FakeMenu();
-        using var vm = new SshMenuViewModel(new InlineUi(), (_, _, _) => Task.FromResult(true), NullLogger.Instance);
+        var typed = new List<string>();
+        var vm = new SshMenuViewModel((_, _, _) => Task.FromResult(true), typed.Add);
         vm.Attach(server, null, "vps");
-        await vm.LoadAsync();
-        vm.Selected = vm.Entries.Single(e => e.Item.Id == "restart");
+        await vm.OpenAsync();
+        await vm.ChooseAsync(vm.Entries.Single(e => e.Item.Id == "restart"));
+        Assert.True(vm.IsFormOpen);
+        Assert.False(vm.IsListOpen);
         await Until(() => vm.Fields.Single().Choices.Count == 2);
-        var app = Assert.Single(vm.Fields);
+        var app = vm.Fields.Single();
         Assert.Equal(["backend", "web"], app.Choices);
 
+        // Nothing chosen, or something not offered: refused, nothing typed.
         await vm.RunCommand.ExecuteAsync(null);
         Assert.Contains("needed", app.Error, StringComparison.Ordinal);
-        Assert.DoesNotContain(server.Commands, c => c.Contains("'run' 'restart'", StringComparison.Ordinal));
-
-        app.Value = "backend";
+        app.Value = "web; rm -rf ~";
         await vm.RunCommand.ExecuteAsync(null);
-        Assert.Contains("~/.helm/menu 'run' 'restart' '--app=backend'", server.Commands);
-        Assert.Equal("Restarted backend.\n", vm.Output);
+        Assert.Contains("list", app.Error, StringComparison.Ordinal);
+        Assert.Empty(typed);
+
+        app.Value = "web";
+        await vm.RunCommand.ExecuteAsync(null);
+        Assert.Equal(" ~/.helm/menu 'run' 'restart' '--app=web'\r", typed.Single());
+        Assert.False(vm.IsFormOpen);
+
+        // Back returns to the list; values are quoted whatever they hold.
+        await vm.ChooseAsync(vm.Entries.Single(e => e.Item.Id == "logs"));
+        Assert.Equal("50", vm.Fields[0].Value);
+        vm.BackCommand.Execute(null);
+        Assert.True(vm.IsListOpen);
+        await vm.ChooseAsync(vm.Entries.Single(e => e.Item.Id == "logs"));
+        vm.Fields[1].Value = "it s";
+        await vm.RunCommand.ExecuteAsync(null);
+        Assert.Equal(" ~/.helm/menu 'run' 'logs' '--lines=50' '--grep=it s'\r", typed[^1]);
     }
 
     [Fact]
-    public async Task Declining_a_dangerous_item_runs_nothing()
+    public async Task Declining_a_dangerous_item_types_nothing()
     {
-        var server = new FakeMenu();
-        using var vm = new SshMenuViewModel(new InlineUi(), (_, _, _) => Task.FromResult(false), NullLogger.Instance);
-        vm.Attach(server, null, "vps");
-        await vm.LoadAsync();
-        vm.Selected = vm.Entries.Single(e => e.Item.Id == "deploy");
-        await vm.RunCommand.ExecuteAsync(null);
-        Assert.DoesNotContain(server.Commands, c => c.Contains("'run' 'deploy'", StringComparison.Ordinal));
-        Assert.Null(vm.Succeeded);
+        var typed = new List<string>();
+        var vm = new SshMenuViewModel((_, _, _) => Task.FromResult(false), typed.Add);
+        var closed = 0;
+        vm.Typed += (_, _) => closed++;
+        vm.Attach(new FakeMenu(), null, "vps");
+        await vm.OpenAsync();
+        await vm.ChooseAsync(vm.Entries.Single(e => e.Item.Id == "deploy"));
+        Assert.Empty(typed);
+        Assert.Equal(0, closed);
     }
 
     [Fact]
-    public async Task Failures_and_missing_menus_are_explained()
+    public async Task A_missing_or_broken_menu_is_explained_and_read_again_on_the_next_open()
     {
         var server = new FakeMenu { DescribeExit = 127 };
-        using var vm = new SshMenuViewModel(new InlineUi(), (_, _, _) => Task.FromResult(true), NullLogger.Instance);
+        var vm = new SshMenuViewModel((_, _, _) => Task.FromResult(true), _ => { });
         vm.Attach(server, "~/bin/menu", "vps");
-        await vm.LoadAsync();
+        await vm.OpenAsync();
         Assert.Equal(MenuState.Missing, vm.State);
         Assert.Contains("~/bin/menu", vm.Problem, StringComparison.Ordinal);
+        Assert.False(vm.IsListOpen);
 
         server.DescribeExit = 0;
         server.DescribeJson = """{ "protocol": 9, "groups": [] }""";
-        await vm.LoadAsync();
+        await vm.OpenAsync();
         Assert.Equal(MenuState.Failed, vm.State);
         Assert.Contains("protocol", vm.Problem, StringComparison.Ordinal);
 
         server.DescribeJson = Description;
-        await vm.LoadAsync();
+        await vm.OpenAsync();
         Assert.Equal(MenuState.Ready, vm.State);
         Assert.False(vm.HasProblem);
-        server.FailDeploy = true;
-        vm.Selected = vm.Entries.Single(e => e.Item.Id == "deploy");
-        await vm.RunCommand.ExecuteAsync(null);
-        Assert.Equal(false, vm.Succeeded);
-        Assert.Contains("exit 2", vm.Status, StringComparison.Ordinal);
-        Assert.EndsWith("npm ERR! build failed\n", vm.Output, StringComparison.Ordinal);
     }
 
     [Fact]
     public async Task Switching_servers_reads_the_other_menu()
     {
-        var first = new FakeMenu();
-        var second = new FakeMenu { DescribeJson = """{ "protocol": 1, "title": "Other", "groups": [] }""" };
-        using var vm = new SshMenuViewModel(new InlineUi(), (_, _, _) => Task.FromResult(true), NullLogger.Instance);
-        vm.IsVisible = true;
-        vm.Attach(first, null, "a");
-        await Until(() => vm.Title == "WebAdmin");
-        vm.Attach(second, null, "b");
-        await Until(() => vm.Title == "Other");
-        Assert.Empty(vm.Entries);
-        vm.Attach(null, null, "");
+        var vm = new SshMenuViewModel((_, _, _) => Task.FromResult(true), _ => { });
+        vm.Attach(new FakeMenu(), null, "a");
+        await vm.OpenAsync();
+        Assert.Equal("WebAdmin", vm.Title);
+        vm.Attach(new FakeMenu { DescribeJson = """{ "protocol": 1, "title": "Other", "groups": [] }""" }, null, "b");
         Assert.Equal(MenuState.Idle, vm.State);
+        await vm.OpenAsync();
+        Assert.Equal(("Other", 0), (vm.Title, vm.Entries.Count));
+        vm.Attach(null, null, "");
+        Assert.False(vm.CanOpen);
     }
 
     /// <summary>Waits for the view model to finish what the fake server answered (its continuations run on the pool).</summary>

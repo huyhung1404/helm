@@ -1,8 +1,9 @@
 # SSH menu (protocol 1)
 
-The **Menu** tab of Helm's SSH tool shows what a server offers to run: deploy, backups, restarts, status tables. The
-server itself defines it, with one program next to the code it runs, so the menu always matches that server and works
-the same from every device. Helm only reads the menu, draws it, checks what goes in and asks before dangerous items.
+The **Menu** button of Helm's SSH tool opens a popup over the terminal with what a server offers to run: deploy,
+backups, restarts, status. The server itself defines it, with one program next to the code it runs, so the menu always
+matches that server and works the same from every device. Helm only reads the menu, shows it, checks what goes in and
+asks before dangerous items.
 
 ## Where Helm looks
 
@@ -15,10 +16,18 @@ may only hold letters, digits, `. _ - /` and a leading `~/`.
 |---|---|
 | `menu describe` | the menu, as JSON (below) |
 | `menu choices <item> <param>` | a JSON list of strings: the values the parameter may take now |
-| `menu run <item> [--<param>=<value>...]` | the item's output, in the form its `output` says |
+| `menu run <item> [--<param>=<value>...]` | runs the item (see *How Helm runs an item*) |
 
 The exit code tells Helm whether it worked: 0 is success; anything else is a failure, shown with the standard error.
 `127` from `describe` means "no menu here", `126` "not executable".
+
+## How Helm runs an item
+
+`describe` and `choices` go over Helm's own channel and never show in the terminal. Choosing an item (and filling its
+form, if it has parameters) **types its `run` line into the terminal**, after a leading space so bash leaves it out of
+its history: the output shows there, the user reads it next to everything else, and Ctrl+C stops it as usual. In the
+terminal the menu's standard output is a TTY, so a menu should print for people there (WebAdmin's prints its tables as
+aligned text) and keep JSON for when it is not (another client, or a script).
 
 ## describe
 
@@ -72,25 +81,24 @@ anywhere, and only the server knows what is valid now (Restart app checks that t
 
 ## Outputs
 
-- **stream**: text shown as it arrives, with *Stop* (which ends the command; see *Jobs*).
-- **text**: the same, for short outputs.
+`output` says what an item prints when its output is not a terminal (Helm's own channel, or another client):
+
+- **stream** and **text**: plain text (stream for long work, such as a deploy).
 - **table**: `{ "columns": [ { "id": "name", "title": "Name" } ], "rows": [ { "key": "web", "cells": { "name": "web" } } ] }`
 - **stats**: `{ "stats": [ { "label": "Disk", "value": "78%", "level": "warn" } ] }`, where `level` is `ok`, `warn` or `bad`.
 
-## Row actions
-
-A table row's button runs the named item with values taken from the row: each parameter gets the row's cell with the
-same id, and the row's `key` fills the parameters no cell names. The view is read again afterwards.
+`kind`, `refresh` and `rowActions` describe how a client that shows tables may refresh them and put buttons on rows
+(a row's button runs the named item; each parameter takes the row's cell of the same id, and the row's `key` fills the
+others). Helm's popup runs every item in the terminal and does not use them yet.
 
 ## Jobs
 
 Long work (a deploy) should not depend on the SSH connection: if the phone loses its signal, the command would die
 halfway. WebAdmin's menu runs such items as jobs: started in their own session with their output in a log, so they
 finish whatever happens to the connection; running the item again while the job runs follows its log instead of
-starting a second one, and *Stop* in Helm only stops following. See `ops/helm/menu.js` in WebAdmin for one way to do it.
+starting a second one, and Ctrl+C only stops following. See `ops/helm/menu.js` in WebAdmin for one way to do it.
 
 ## Limits
 
 Helm accepts at most 32 groups, 200 items, 16 parameters per item, 500 choices, 20 columns, 2000 rows and 50 stats,
-texts up to 500 characters and 512 KB of output on screen; anything larger is refused or cut, so a broken menu cannot
-flood Helm.
+and texts up to 500 characters; anything larger is refused or cut, so a broken menu cannot flood Helm.

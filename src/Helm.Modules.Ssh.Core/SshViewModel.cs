@@ -107,8 +107,6 @@ public sealed partial class SshViewModel : ObservableObject, IDisposable
     [ObservableProperty] private string _editKeyFile = "";
     [ObservableProperty] private string _editMenuPath = "";
 
-    /// <summary>The page shows the server's menu instead of the terminal.</summary>
-    [ObservableProperty] private bool _showMenu;
     [ObservableProperty] private VaultSecretRef? _editVaultRef;
     [ObservableProperty] private bool _canOpenVault;
 
@@ -128,7 +126,7 @@ public sealed partial class SshViewModel : ObservableObject, IDisposable
         _clipboard = clipboard;
         _logger = logger;
         _deviceKey.Changed += (_, _) => _ui.Post(RefreshKey);
-        Menu = new SshMenuViewModel(ui, AskAsync, logger);
+        Menu = new SshMenuViewModel(AskAsync, Send);
         Load();
     }
 
@@ -137,11 +135,6 @@ public sealed partial class SshViewModel : ObservableObject, IDisposable
     /// <summary>The menu of the server shown (see <see cref="SshMenu"/>).</summary>
     public SshMenuViewModel Menu { get; }
 
-    /// <summary>The terminal is on screen: a session, no question, and not the menu.</summary>
-    public bool ShowTerminalPane => ShowTerminal && !ShowMenu;
-
-    /// <summary>The menu is on screen.</summary>
-    public bool ShowMenuPane => HasSession && ShowMenu && !IsAskingUser;
 
     public ObservableCollection<SshKnownHostRow> KnownHosts { get; } = [];
 
@@ -216,24 +209,10 @@ public sealed partial class SshViewModel : ObservableObject, IDisposable
     {
         OnPropertyChanged(nameof(HasSession));
         OnPropertyChanged(nameof(ShowTerminal));
-        OnPropertyChanged(nameof(ShowTerminalPane));
-        OnPropertyChanged(nameof(ShowMenuPane));
         AttachMenu();
     }
 
-    partial void OnIsAskingUserChanged(bool value)
-    {
-        OnPropertyChanged(nameof(ShowTerminal));
-        OnPropertyChanged(nameof(ShowTerminalPane));
-        OnPropertyChanged(nameof(ShowMenuPane));
-    }
-
-    partial void OnShowMenuChanged(bool value)
-    {
-        OnPropertyChanged(nameof(ShowTerminalPane));
-        OnPropertyChanged(nameof(ShowMenuPane));
-        Menu.IsVisible = value && IsConnected;
-    }
+    partial void OnIsAskingUserChanged(bool value) => OnPropertyChanged(nameof(ShowTerminal));
 
     /// <summary>The terminal is shown: there is a session and no question on screen.</summary>
     public bool ShowTerminal => HasSession && !IsAskingUser;
@@ -814,7 +793,6 @@ public sealed partial class SshViewModel : ObservableObject, IDisposable
     {
         var session = ActiveSession is { IsConnected: true } s ? s : null;
         Menu.Attach(session, session?.Host.MenuPath, session?.Host.DisplayName ?? "");
-        Menu.IsVisible = ShowMenu && session is not null;
     }
 
     private void CloseAll()
@@ -825,9 +803,5 @@ public sealed partial class SshViewModel : ObservableObject, IDisposable
         RefreshSession();
     }
 
-    public void Dispose()
-    {
-        CloseAll();
-        Menu.Dispose();
-    }
+    public void Dispose() => CloseAll();
 }
