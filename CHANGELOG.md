@@ -12,6 +12,11 @@ Format: [Keep a Changelog](https://keepachangelog.com), versions follow [SemVer]
   `~/.ssh/authorized_keys`), or with a password you type each time. Signed in with a password, *Install this
   device's key* adds the key to the server for you and the next sign-in uses it. Copy and paste as in Windows
   Terminal (Ctrl+C with a selection, Ctrl+V, right click); the text size is in the settings.
+- **SSH**: *Import from SSH config* adds the servers you already use with the ssh command (`.ssh\config`), with
+  their key files (Helm keeps only the path) and the server keys `known_hosts` already trusts, so they connect with
+  one click. A server can also sign in with a key file you choose (its passphrase is asked when needed), or with a
+  password or private key kept in **Vault**: pick the item and field, and Helm reads it when connecting (Windows
+  Hello opens a locked vault when quick unlock is on; otherwise *Open Vault*).
 
 ### Security
 - **SSH**: the device key's private half is encrypted for your Windows account (DPAPI) and never synced, exported or
@@ -19,7 +24,8 @@ Format: [Keep a Changelog](https://keepachangelog.com), versions follow [SemVer]
   changes later Helm refuses to connect (there is no "connect anyway"). Algorithms OpenSSH retired (SHA-1, CBC, DSA)
   are not offered. The terminal page is served from Helm itself with a strict content policy: no network, no links
   that open, no browser shortcuts; pasting text with line breaks asks first. Nothing typed or shown is written to
-  disk or to Helm's logs.
+  disk or to Helm's logs. A server signing in with Vault keeps only which item and field; the value is read once per
+  connection while the vault is unlocked, and other tools see field names, never values, two-factor secrets or files.
 
 ## [0.27.0] - 2026-10-06
 

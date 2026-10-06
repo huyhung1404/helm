@@ -76,6 +76,8 @@ public partial class SshContentPage : Page
 
     private void Settings_Click(object sender, RoutedEventArgs e) => _navigation.ShowPage(typeof(SshPage));
 
+    private void Import_Click(object sender, RoutedEventArgs e) => _viewModel.ImportOpenSsh(SshPage.OpenSshFolder);
+
     private void AddServer_Click(object sender, RoutedEventArgs e)
     {
         _viewModel.NewHostCommand.Execute(null);

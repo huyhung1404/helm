@@ -6,27 +6,55 @@ namespace Helm.Modules.Ssh;
 public static class SshConnection
 {
     /// <summary>
-    /// Builds the connection for <paramref name="host"/>. With a password, both "password" and "keyboard-interactive"
+    /// Builds the connection for <paramref name="host"/>. <paramref name="password"/> is the password, or the key file's
+    /// passphrase. With a password, both "password" and "keyboard-interactive"
     /// are offered (many servers ask for the password through the second). The password is only held by SSH.NET for
     /// this connection; Helm never writes it anywhere.
     /// </summary>
-    internal static ConnectionInfo Create(SshHost host, SshDeviceKey deviceKey, string? password)
+    /// <param name="vaultSecret">With <see cref="SshAuthKind.Vault"/>: the value read from Vault, a password or a private key.</param>
+    internal static ConnectionInfo Create(SshHost host, SshDeviceKey deviceKey, string? password, string? vaultSecret = null)
     {
         AuthenticationMethod[] methods;
-        if (host.Auth == SshAuthKind.Password)
+        if (host.Auth == SshAuthKind.Password) methods = PasswordMethods(host.User, password);
+        else if (host.Auth == SshAuthKind.Vault)
         {
-            var keyboard = new KeyboardInteractiveAuthenticationMethod(host.User);
-            keyboard.AuthenticationPrompt += (_, e) =>
+            if (string.IsNullOrEmpty(vaultSecret)) throw new ArgumentException("Nothing was read from Vault.", nameof(vaultSecret));
+            if (IsPrivateKey(vaultSecret))
             {
-                // Only hidden prompts get the password; a visible one (a question) is answered with nothing.
-                foreach (var prompt in e.Prompts) prompt.Response = prompt.IsEchoed ? "" : password ?? "";
-            };
-            methods = [new PasswordAuthenticationMethod(host.User, password ?? ""), keyboard];
+                using var stream = new MemoryStream(System.Text.Encoding.UTF8.GetBytes(vaultSecret.Trim() + "\n"));
+                methods = [new PrivateKeyAuthenticationMethod(host.User, new PrivateKeyFile(stream, string.IsNullOrEmpty(password) ? null : password))];
+            }
+            else methods = PasswordMethods(host.User, vaultSecret);
+        }
+        else if (host.Auth == SshAuthKind.KeyFile)
+        {
+            if (string.IsNullOrEmpty(host.KeyFile) || !File.Exists(host.KeyFile))
+                throw new FileNotFoundException($"The key file {host.KeyFile} was not found.", host.KeyFile);
+            // Read now and kept only in memory for this connection; an empty passphrase means "none".
+            methods = [new PrivateKeyAuthenticationMethod(host.User, new PrivateKeyFile(host.KeyFile, string.IsNullOrEmpty(password) ? null : password))];
         }
         else methods = [new PrivateKeyAuthenticationMethod(host.User, deviceKey.CreateKeySource())];
         var info = new ConnectionInfo(host.Address, host.Port, host.User, methods);
         Harden(info);
         return info;
+    }
+
+    /// <summary>True for a private key's text (PEM or OpenSSH): Vault may hold a key instead of a password.</summary>
+    internal static bool IsPrivateKey(string secret)
+    {
+        var s = secret.TrimStart();
+        return s.StartsWith("-----BEGIN ", StringComparison.Ordinal) && s.Contains("PRIVATE KEY-----", StringComparison.Ordinal);
+    }
+
+    private static AuthenticationMethod[] PasswordMethods(string user, string? password)
+    {
+        var keyboard = new KeyboardInteractiveAuthenticationMethod(user);
+        keyboard.AuthenticationPrompt += (_, e) =>
+        {
+            // Only hidden prompts get the password; a visible one (a question) is answered with nothing.
+            foreach (var prompt in e.Prompts) prompt.Response = prompt.IsEchoed ? "" : password ?? "";
+        };
+        return [new PasswordAuthenticationMethod(user, password ?? ""), keyboard];
     }
 
     /// <summary>

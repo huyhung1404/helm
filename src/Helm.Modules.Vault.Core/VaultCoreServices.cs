@@ -32,6 +32,8 @@ public static class VaultCoreServices
         services.TryAddSingleton<IVaultDeviceUnlock, NoDeviceUnlock>();
         services.AddSingleton<VaultSession>();
         services.AddSingleton<VaultStore>();
+        // Other tools (SSH) may use a field of an item without a second copy; the platform may register its own first.
+        services.TryAddSingleton<Helm.Core.Secrets.IVaultSecrets>(sp => new VaultSecrets(sp.GetRequiredService<VaultSession>(), sp.GetRequiredService<VaultStore>()));
         services.AddSingleton<VaultFiles>();
         services.TryAddSingleton<IVaultBackupLocation, FolderBackupLocation>();
         services.AddSingleton<VaultBackupService>();

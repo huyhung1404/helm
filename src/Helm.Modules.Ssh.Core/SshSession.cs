@@ -354,6 +354,8 @@ public static class SshErrors
     {
         SshAuthenticationException when host.Auth == SshAuthKind.DeviceKey =>
             "The server did not accept this device's key. Add it to ~/.ssh/authorized_keys on the server, or sign in with a password once and choose Install this device's key.",
+        SshAuthenticationException when host.Auth == SshAuthKind.KeyFile => $"The server did not accept the key {Path.GetFileName(host.KeyFile)} for {host.User}.",
+        SshAuthenticationException when host.Auth == SshAuthKind.Vault => $"The server did not accept the {host.VaultField} of {host.VaultItemTitle} in Vault for {host.User}.",
         SshAuthenticationException => "The server did not accept the user name or password.",
         SocketException s when s.SocketErrorCode == SocketError.HostNotFound => $"No server called {host.Address} was found.",
         SocketException s when s.SocketErrorCode == SocketError.ConnectionRefused => $"{host.Address} refused the connection on port {host.Port}. Is SSH running there?",

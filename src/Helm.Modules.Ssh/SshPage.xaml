@@ -47,9 +47,12 @@
         <ui:CardControl Margin="0,0,0,4" Icon="{ui:SymbolIcon Add24}"
                         Visibility="{Binding IsEditing, Converter={StaticResource InverseBoolToVisibility}}">
             <ui:CardControl.Header>
-                <core:CardHeader Title="Add a server" Description="Its address, and how Helm signs in. Servers stay on this device." />
+                <core:CardHeader Title="Add a server" Description="By hand, or from your SSH config (.ssh\config): the same servers and key files, and the server keys you already trust. Servers stay on this device." />
             </ui:CardControl.Header>
-            <ui:Button Content="Add a server" Icon="{ui:SymbolIcon Add24}" Command="{Binding NewHostCommand}" />
+            <StackPanel Orientation="Horizontal">
+                <ui:Button Margin="0,0,8,0" Content="Import from SSH config" Icon="{ui:SymbolIcon ArrowDownload24}" Click="Import_Click" />
+                <ui:Button Content="Add a server" Icon="{ui:SymbolIcon Add24}" Command="{Binding NewHostCommand}" />
+            </StackPanel>
         </ui:CardControl>
 
         <!-- The server being added or edited -->
@@ -68,8 +71,25 @@
                                 Text="{Binding EditName, UpdateSourceTrigger=PropertyChanged}" />
                 </core:RowLayout>
                 <core:RowLayout Margin="0,0,0,8">
-                    <core:CardHeader Title="Sign in with" Description="This device's key once it is on the server, or a password typed each time (never saved)." />
+                    <core:CardHeader Title="Sign in with" Description="This device's key once it is on the server, a password typed each time (never saved), a key file you already use with ssh, or a password or key kept in Vault." />
                     <ComboBox Width="280" AutomationProperties.Name="Sign in with" ItemsSource="{Binding AuthNames}" SelectedIndex="{Binding EditAuthIndex}" />
+                </core:RowLayout>
+                <core:RowLayout Margin="0,0,0,8" Visibility="{Binding IsKeyFileAuth, Converter={StaticResource BoolToVisibility}}">
+                    <core:CardHeader Title="Key file" Description="The private key, e.g. .ssh\id_ed25519. Helm reads it when connecting and keeps only its path." />
+                    <StackPanel Orientation="Horizontal">
+                        <ui:TextBox Width="196" Margin="0,0,8,0" PlaceholderText="Path to the key" AutomationProperties.Name="Key file"
+                                    Text="{Binding EditKeyFile, UpdateSourceTrigger=PropertyChanged}" />
+                        <ui:Button Content="Browse…" Click="BrowseKey_Click" />
+                    </StackPanel>
+                </core:RowLayout>
+                <core:RowLayout Margin="0,0,0,8" Visibility="{Binding IsVaultAuth, Converter={StaticResource BoolToVisibility}}">
+                    <core:CardHeader Title="From Vault" Description="The item and field that hold the password or private key. Helm reads it when connecting; Vault must be unlocked." />
+                    <StackPanel>
+                        <ComboBox Width="280" AutomationProperties.Name="Vault field" ItemsSource="{Binding VaultFields}" SelectedItem="{Binding EditVaultRef}"
+                                  DisplayMemberPath="DisplayName" />
+                        <ui:Button Margin="0,6,0,0" HorizontalAlignment="Right" Content="Unlock Vault" Icon="{ui:SymbolIcon LockOpen24}"
+                                   Command="{Binding UnlockVaultCommand}" Visibility="{Binding IsVaultLocked, Converter={StaticResource BoolToVisibility}}" />
+                    </StackPanel>
                 </core:RowLayout>
                 <TextBlock Text="{Binding EditError}" TextWrapping="Wrap" Margin="0,0,0,8" Foreground="{DynamicResource SystemFillColorCriticalBrush}"
                            Visibility="{Binding EditError, Converter={StaticResource NotEmptyToVisibility}}" />

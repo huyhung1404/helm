@@ -49,6 +49,8 @@
                 Visibility="{Binding HasMessage, Converter={StaticResource BoolToVisibility}}">
             <core:RowLayout>
                 <TextBlock Text="{Binding Message}" TextWrapping="Wrap" VerticalAlignment="Center" />
+                <ui:Button Margin="8,0,0,0" Content="Open Vault" Icon="{ui:SymbolIcon LockOpen24}" Command="{Binding OpenVaultCommand}"
+                           Visibility="{Binding CanOpenVault, Converter={StaticResource BoolToVisibility}}" />
                 <ui:Button Appearance="Transparent" Padding="8,6" MinWidth="0" Icon="{ui:SymbolIcon Dismiss24}" ToolTip="Dismiss" AutomationProperties.Name="Dismiss"
                            Command="{Binding DismissMessageCommand}" />
             </core:RowLayout>
@@ -59,15 +61,19 @@
             <Grid>
                 <!-- No servers yet -->
                 <core:RowLayout Visibility="{Binding HasHosts, Converter={StaticResource InverseBoolToVisibility}}">
-                    <core:CardHeader Title="No servers yet" Description="Add the servers you connect to. Helm signs in with a key made for this device, or a password you type each time." />
-                    <ui:Button Appearance="Primary" Content="Add a server" Icon="{ui:SymbolIcon Add24}" Click="AddServer_Click" />
+                    <core:CardHeader Title="No servers yet" Description="Already use ssh on this PC? Import your SSH config: same servers, same keys. Or add a server by hand." />
+                    <StackPanel Orientation="Horizontal">
+                        <ui:Button Appearance="Primary" Margin="0,0,8,0" Content="Import from SSH config" Icon="{ui:SymbolIcon ArrowDownload24}"
+                                   ToolTip="Adds the servers in .ssh\config with their key files, and trusts the server keys in .ssh\known_hosts" Click="Import_Click" />
+                        <ui:Button Content="Add a server" Icon="{ui:SymbolIcon Add24}" Click="AddServer_Click" />
+                    </StackPanel>
                 </core:RowLayout>
 
                 <WrapPanel Visibility="{Binding HasHosts, Converter={StaticResource BoolToVisibility}}" Orientation="Horizontal">
                     <ComboBox Width="320" Margin="0,0,8,0" VerticalAlignment="Center" AutomationProperties.Name="Server"
                               ItemsSource="{Binding Hosts}" SelectedItem="{Binding SelectedHost}" ItemTemplate="{StaticResource HostItem}" />
-                    <ui:PasswordBox x:Name="PasswordBox" Width="200" Margin="0,0,8,0" VerticalAlignment="Center" PlaceholderText="Password"
-                                    AutomationProperties.Name="Password" KeyDown="Password_KeyDown"
+                    <ui:PasswordBox x:Name="PasswordBox" Width="200" Margin="0,0,8,0" VerticalAlignment="Center" PlaceholderText="{Binding PasswordPrompt}"
+                                    AutomationProperties.Name="{Binding PasswordPrompt}" KeyDown="Password_KeyDown"
                                     Visibility="{Binding NeedsPassword, Converter={StaticResource BoolToVisibility}}" />
                     <ui:Button Appearance="Primary" Margin="0,0,8,0" VerticalAlignment="Center" Content="Connect" Icon="{ui:SymbolIcon PlugConnected24}"
                                IsEnabled="{Binding CanConnect}" Click="Connect_Click"

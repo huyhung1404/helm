@@ -547,6 +547,45 @@ public sealed class VaultStoreTests : IDisposable
         Assert.False(a.Session.IsDeviceUnlockEnrolled);
     }
 
+    [Fact]
+    public async Task Other_tools_read_one_named_field_and_only_while_unlocked()
+    {
+        var a = NewDevice("a");
+        await a.Session.CreateAsync(Password);
+        var showed = 0;
+        var secrets = new VaultSecrets(a.Session, a.Store, () => showed++);
+        var uid = a.Store.Add(VaultItem.New(VaultItemKind.Token, "VPS") with
+        {
+            Fields =
+            [
+                new VaultField("token", "s3cret-token", VaultFieldKind.Secret),
+                new VaultField("2fa", "JBSWY3DPEHPK3PXP", VaultFieldKind.Totp),
+                new VaultField("key file", "id_rsa", VaultFieldKind.TextFile, "att1"),
+                new VaultField("empty", ""),
+            ],
+        });
+        var trashed = a.Store.Add(Login("Old", "gone"));
+        a.Store.MoveToTrash(trashed);
+
+        // Names only, and only fields a tool may use: no two-factor secret, no file, nothing empty, nothing trashed.
+        var fields = secrets.ListFields();
+        Assert.Equal([new Helm.Core.Secrets.VaultSecretRef(uid, "VPS", "token")], fields);
+        Assert.Equal("s3cret-token", secrets.Read(uid, "token"));
+        Assert.Null(secrets.Read(uid, "2fa"));
+        Assert.Null(secrets.Read(uid, "key file"));
+        Assert.Null(secrets.Read(uid, "missing"));
+        Assert.Null(secrets.Read(trashed, "Password"));
+
+        a.Session.Lock("test");
+        Assert.False(secrets.IsUnlocked);
+        Assert.Empty(secrets.ListFields());
+        Assert.Null(secrets.Read(uid, "token"));
+        // No quick unlock on this device: the caller opens Vault instead.
+        Assert.False(await secrets.TryQuickUnlockAsync());
+        secrets.ShowVault();
+        Assert.Equal(1, showed);
+    }
+
     private static VaultItem Login(string title, string password) => VaultItem.New(VaultItemKind.Login, title) with
     {
         Fields = [new VaultField("Username", "anh"), new VaultField("Password", password, VaultFieldKind.Password)],

@@ -21,6 +21,18 @@ public enum SshAuthKind
 
     /// <summary>A password typed each time; Helm never stores it.</summary>
     Password,
+
+    /// <summary>
+    /// A private key file already on this device (e.g. ~/.ssh/id_rsa, used by the ssh command). Helm keeps only its
+    /// path and reads it when connecting; a passphrase, if the key has one, is typed each time.
+    /// </summary>
+    KeyFile,
+
+    /// <summary>
+    /// A field of a Vault item: a password, or a private key pasted there. Helm keeps only which item and field, reads
+    /// the value when connecting (the vault must be unlocked) and never stores a copy.
+    /// </summary>
+    Vault,
 }
 
 /// <summary>A server in the list (stored in settings/ssh.json on this device).</summary>
@@ -39,6 +51,16 @@ public sealed record SshHost
     public string User { get; init; } = "";
 
     public SshAuthKind Auth { get; init; } = SshAuthKind.DeviceKey;
+
+    /// <summary>With <see cref="SshAuthKind.KeyFile"/>: the private key's full path.</summary>
+    public string? KeyFile { get; init; }
+
+    /// <summary>With <see cref="SshAuthKind.Vault"/>: the item's id, its title when chosen (for display) and the field.</summary>
+    public string? VaultItemUid { get; init; }
+
+    public string? VaultItemTitle { get; init; }
+
+    public string? VaultField { get; init; }
 
     /// <summary>user@host, with :port when it is not 22.</summary>
     [JsonIgnore]
