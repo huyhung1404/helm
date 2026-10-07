@@ -11,7 +11,7 @@ Format: [Keep a Changelog](https://keepachangelog.com), versions follow [SemVer]
   On the PC there are no buttons: Ctrl+V adds the files, screenshot or text you copied, or drop files on the page.
   Everything shows as a wall of cards with its content (a text in full, a photo at its shape). On PC click a card
   (Shift+click or Ctrl+click for more, Ctrl+A for all), then Ctrl+C copies (several texts as one, files all at once),
-  Delete deletes, Enter opens; right-click for Save as. On the phone each card has Copy and Delete, and a tap shows Open, Share and Save to phone. Drag a card onto
+  Delete moves to the trash, Shift+Delete deletes for good (asked first), Enter opens; right-click for Save as. On the phone each card has Copy and Delete, and a tap shows Open, Share and Save to phone. Drag a card onto
   another to move it (hold, then drag, on the phone); the order syncs. Files are encrypted on the device before they
   upload, like Vault attachments. Deleting moves to the trash (the bin filter); deleting from the trash removes it
   from every device. *Free up space* drops this device's copies of uploaded files (they download again when opened).

@@ -492,6 +492,24 @@ public sealed class ScratchTests : IDisposable
     }
 
     [Fact]
+    public async Task Shift_delete_skips_the_trash()
+    {
+        var device = NewLocal("a");
+        var vm = NewViewModel(device.Store, new FakePlatform(Path.Combine(_dir, "open")), out _);
+        await vm.AddTextAsync("keep");
+        await vm.AddTextAsync("gone");
+        await vm.AddSourcesAsync([new ScratchSource("x.pdf", null, 1, () => new MemoryStream([1]))]);
+        vm.SelectCommand.Execute(vm.Rows.Single(r => r.Name == "gone"));
+        vm.ToggleSelect(vm.Rows.Single(r => r.Name == "x.pdf"));
+
+        await vm.DeleteSelectedForeverAsync();
+
+        Assert.Equal(["keep"], vm.Rows.Select(r => r.Name));
+        Assert.Empty(device.Store.Items(ScratchFilter.Trash));
+        Assert.Equal(0, vm.SelectionCount);
+    }
+
+    [Fact]
     public async Task Trash_restore_and_delete_for_good_follow_the_filter()
     {
         var device = NewLocal("a");

@@ -457,6 +457,22 @@ public sealed partial class ScratchViewModel : ObservableObject
         }
     }
 
+    /// <summary>Shift+Delete on the selection: for good, without the trash, after one question.</summary>
+    public async Task DeleteSelectedForeverAsync()
+    {
+        var rows = InWallOrder(_selection);
+        if (rows.Count == 0) return;
+        var what = rows.Count == 1 ? $"“{rows[0].Name}”" : $"{rows.Count} things";
+        var ok = await _dialogs.ConfirmAsync($"Delete {what} for good?",
+            "It skips the trash: removed from all your devices, and it cannot be restored.", "Delete").ConfigureAwait(true);
+        if (!ok) return;
+        // Only the trash is ever deleted for good, so each goes there first, then out.
+        Try(() => rows.Count(r => (r.Trashed || _store.MoveToTrash(r.Id)) && _store.DeleteForever(r.Id)));
+        foreach (var row in rows) DeleteOpenedCopy(row.Id);
+        Select(null);
+        Message = $"Deleted {what} for good.";
+    }
+
     /// <summary>Delete on the selection: into the trash; in the trash, for good after one question.</summary>
     public async Task DeleteSelectedAsync()
     {
