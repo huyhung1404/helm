@@ -17,7 +17,7 @@ namespace Helm.Modules.Stash;
 /// </summary>
 internal sealed class WindowsStashPlatform : IStashPlatform
 {
-    private const int ThumbnailSide = 256;
+    private const int ThumbnailSide = 360;
 
     private readonly ILogger _logger;
 
@@ -225,7 +225,10 @@ internal sealed class WindowsStashPlatform : IStashPlatform
         }
     }
 
-    /// <summary>JPEG, quality 75; transparent parts become white (JPEG has no transparency).</summary>
+    /// <summary>
+    /// JPEG, quality 80 or lower until it fits in a record (<see cref="StashItem.MaxThumbnailBytes"/>); transparent
+    /// parts become white (JPEG has no transparency).
+    /// </summary>
     private static byte[] Jpeg(BitmapSource source)
     {
         var bgra = new FormatConvertedBitmap(source, PixelFormats.Bgra32, null, 0);
@@ -239,11 +242,17 @@ internal sealed class WindowsStashPlatform : IStashPlatform
             for (var c = 0; c < 3; c++) rgb[j + c] = (byte)((pixels[i + c] * alpha + 255 * (255 - alpha)) / 255);
         }
         var opaque = BitmapSource.Create(width, height, 96, 96, PixelFormats.Bgr24, null, rgb, width * 3);
-        var encoder = new JpegBitmapEncoder { QualityLevel = 75 };
-        encoder.Frames.Add(BitmapFrame.Create(opaque));
-        using var memory = new MemoryStream();
-        encoder.Save(memory);
-        return memory.ToArray();
+        byte[] bytes = [];
+        foreach (var quality in new[] { 80, 70, 60, 50 })
+        {
+            var encoder = new JpegBitmapEncoder { QualityLevel = quality };
+            encoder.Frames.Add(BitmapFrame.Create(opaque));
+            using var memory = new MemoryStream();
+            encoder.Save(memory);
+            bytes = memory.ToArray();
+            if (bytes.Length <= StashItem.MaxThumbnailBytes) break;
+        }
+        return bytes;
     }
 
     /// <summary>WIC needs to seek; a stream that cannot is read into memory (at most 128 MB).</summary>

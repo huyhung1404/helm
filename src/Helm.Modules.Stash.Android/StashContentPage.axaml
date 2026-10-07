@@ -5,8 +5,8 @@
              x:Class="Helm.Modules.Stash.StashContentPage"
              x:DataType="vm:StashViewModel">
 
-    <!-- Stash itself (drawer and Quick access): adding, the filters and the list, or one thing's details (Back returns
-         to the list). Its options live on StashPage (Home → Utilities). -->
+    <!-- Stash itself (drawer and Quick access): adding, the filters and a wall of cards showing their content, or one
+         thing's details (Back returns to the wall). Its options live on StashPage (Home → Utilities). -->
     <UserControl.Styles>
         <!-- A filter: the selected one is filled -->
         <Style Selector="Button.filter">
@@ -18,6 +18,29 @@
             <Setter Property="HorizontalAlignment" Value="Stretch" />
             <Setter Property="HorizontalContentAlignment" Value="Center" />
             <Setter Property="Padding" Value="8,10" />
+        </Style>
+        <!-- One thing on the wall: a card as tall as what it shows -->
+        <Style Selector="Border.tile">
+            <Setter Property="Background" Value="{DynamicResource CardBackgroundFillColorDefaultBrush}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource CardStrokeColorDefaultBrush}" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="CornerRadius" Value="8" />
+            <Setter Property="Padding" Value="8,8,4,4" />
+        </Style>
+        <!-- The card's content as a tap target, without button chrome -->
+        <Style Selector="Button.bare">
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="Padding" Value="0" />
+            <Setter Property="HorizontalAlignment" Value="Stretch" />
+            <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+        </Style>
+        <Style Selector="Button.small">
+            <Setter Property="Width" Value="36" />
+            <Setter Property="Height" Value="36" />
+            <Setter Property="Padding" Value="0" />
+            <Setter Property="HorizontalContentAlignment" Value="Center" />
+            <Setter Property="VerticalContentAlignment" Value="Center" />
         </Style>
         <Style Selector="Border.thumb">
             <Setter Property="Width" Value="56" />
@@ -109,46 +132,78 @@
                             IsVisible="{Binding ShowingTrash}" IsEnabled="{Binding HasTrash}" AutomationProperties.Name="Empty the trash" />
                 </Grid>
 
-                <Border Classes="card" Padding="4" IsVisible="{Binding HasRows}">
-                    <ItemsControl ItemsSource="{Binding Rows}">
-                        <ItemsControl.ItemTemplate>
-                            <DataTemplate DataType="vm:StashRowViewModel">
-                                <Button Classes="flat" Padding="8" HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch" AutomationProperties.Name="{Binding Name}"
-                                        Command="{Binding $parent[ItemsControl].((vm:StashViewModel)DataContext).SelectCommand}" CommandParameter="{Binding}">
-                                    <Grid ColumnDefinitions="56,12,*">
-                                        <Border Classes="thumb" VerticalAlignment="Top">
-                                            <Panel>
-                                                <ic:SymbolIcon Symbol="TextDescription" FontSize="24" Foreground="{DynamicResource TextFillColorSecondaryBrush}" IsVisible="{Binding IsText}" />
-                                                <ic:SymbolIcon Symbol="Image" FontSize="24" Foreground="{DynamicResource TextFillColorSecondaryBrush}" IsVisible="{Binding IsImage}" />
-                                                <ic:SymbolIcon Symbol="Video" FontSize="24" Foreground="{DynamicResource TextFillColorSecondaryBrush}" IsVisible="{Binding IsVideo}" />
-                                                <ic:SymbolIcon Symbol="Document" FontSize="24" Foreground="{DynamicResource TextFillColorSecondaryBrush}" IsVisible="{Binding IsDocument}" />
-                                                <Image Source="{Binding Thumbnail, Converter={x:Static vm:StashThumbnailConverter.Instance}}" Stretch="UniformToFill"
-                                                       IsVisible="{Binding HasThumbnail}" />
-                                                <Border Width="22" Height="22" CornerRadius="11" HorizontalAlignment="Center" VerticalAlignment="Center" Opacity="0.85"
-                                                        Background="{DynamicResource SolidBackgroundFillColorBaseBrush}">
-                                                    <Border.IsVisible>
-                                                        <MultiBinding Converter="{x:Static BoolConverters.And}">
-                                                            <Binding Path="IsVideo" />
-                                                            <Binding Path="HasThumbnail" />
-                                                        </MultiBinding>
-                                                    </Border.IsVisible>
-                                                    <ic:SymbolIcon Symbol="Play" IconVariant="Filled" FontSize="12" />
+                <!-- The wall of cards: each shows what it holds and is as tall as that; a tap shows its details -->
+                <!-- Hold a card, then drag it onto another one to move it there (code-behind) -->
+                <ItemsControl x:Name="Wall" ItemsSource="{Binding Rows}" IsVisible="{Binding HasRows}">
+                    <ItemsControl.ItemsPanel>
+                        <ItemsPanelTemplate>
+                            <vm:MasonryPanel MinColumnWidth="150" Spacing="8" />
+                        </ItemsPanelTemplate>
+                    </ItemsControl.ItemsPanel>
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate DataType="vm:StashRowViewModel">
+                            <Border Classes="tile">
+                                <StackPanel Spacing="4">
+                                    <Button Classes="bare" AutomationProperties.Name="{Binding Name}"
+                                            Command="{Binding $parent[ItemsControl].((vm:StashViewModel)DataContext).SelectCommand}" CommandParameter="{Binding}">
+                                        <Panel>
+                                            <!-- A photo or a video: the picture at its own shape -->
+                                            <Panel IsVisible="{Binding HasThumbnail}">
+                                                <Image Source="{Binding Thumbnail, Converter={x:Static vm:StashThumbnailConverter.Instance}}" Stretch="Uniform" />
+                                                <Border Width="32" Height="32" CornerRadius="16" HorizontalAlignment="Center" VerticalAlignment="Center" Opacity="0.85"
+                                                        Background="{DynamicResource SolidBackgroundFillColorBaseBrush}" IsVisible="{Binding IsVideo}">
+                                                    <ic:SymbolIcon Symbol="Play" IconVariant="Filled" FontSize="14" />
                                                 </Border>
                                             </Panel>
-                                        </Border>
-                                        <StackPanel Grid.Column="2" Spacing="2" VerticalAlignment="Center">
-                                            <TextBlock Text="{Binding Name}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
-                                            <TextBlock Text="{Binding TextPreview}" Classes="secondary" TextWrapping="Wrap" MaxLines="2" TextTrimming="CharacterEllipsis"
-                                                       IsVisible="{Binding HasTextPreview}" />
-                                            <TextBlock Text="{Binding Meta}" Classes="secondary" TextWrapping="Wrap" MaxLines="2" TextTrimming="CharacterEllipsis" />
-                                            <TextBlock Text="{Binding Status}" FontSize="12" Foreground="{DynamicResource SystemAccentColor}" IsVisible="{Binding HasStatus}" />
+                                            <!-- A text: all of it -->
+                                            <TextBlock Text="{Binding FullText}" TextWrapping="Wrap" FontSize="14" IsVisible="{Binding IsText}" />
+                                            <!-- Any other file: its icon and name -->
+                                            <StackPanel Spacing="6">
+                                                <StackPanel.IsVisible>
+                                                    <MultiBinding Converter="{x:Static BoolConverters.And}">
+                                                        <Binding Path="IsFile" />
+                                                        <Binding Path="HasNoThumbnail" />
+                                                    </MultiBinding>
+                                                </StackPanel.IsVisible>
+                                                <Border Classes="thumb" HorizontalAlignment="Left">
+                                                    <Panel>
+                                                        <ic:SymbolIcon Symbol="Image" FontSize="22" Foreground="{DynamicResource TextFillColorSecondaryBrush}" IsVisible="{Binding IsImage}" />
+                                                        <ic:SymbolIcon Symbol="Video" FontSize="22" Foreground="{DynamicResource TextFillColorSecondaryBrush}" IsVisible="{Binding IsVideo}" />
+                                                        <ic:SymbolIcon Symbol="Document" FontSize="22" Foreground="{DynamicResource TextFillColorSecondaryBrush}" IsVisible="{Binding IsDocument}" />
+                                                    </Panel>
+                                                </Border>
+                                                <TextBlock Text="{Binding Name}" FontWeight="SemiBold" TextWrapping="Wrap" MaxLines="3" TextTrimming="CharacterEllipsis" />
+                                            </StackPanel>
+                                        </Panel>
+                                    </Button>
+
+                                    <!-- Footer: when, the upload state, Copy and Delete -->
+                                    <DockPanel>
+                                        <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
+                                            <Button Classes="flat small" AutomationProperties.Name="Copy"
+                                                    Command="{Binding $parent[ItemsControl].((vm:StashViewModel)DataContext).CopyCommand}" CommandParameter="{Binding}">
+                                                <ic:SymbolIcon Symbol="Copy" FontSize="16" />
+                                            </Button>
+                                            <Button Classes="flat small" AutomationProperties.Name="Move to the trash" IsVisible="{Binding IsLive}"
+                                                    Command="{Binding $parent[ItemsControl].((vm:StashViewModel)DataContext).TrashCommand}" CommandParameter="{Binding}">
+                                                <ic:SymbolIcon Symbol="Delete" FontSize="16" />
+                                            </Button>
+                                            <Button Classes="flat small" AutomationProperties.Name="Restore" IsVisible="{Binding Trashed}"
+                                                    Command="{Binding $parent[ItemsControl].((vm:StashViewModel)DataContext).RestoreCommand}" CommandParameter="{Binding}">
+                                                <ic:SymbolIcon Symbol="ArrowUndo" FontSize="16" />
+                                            </Button>
                                         </StackPanel>
-                                    </Grid>
-                                </Button>
-                            </DataTemplate>
-                        </ItemsControl.ItemTemplate>
-                    </ItemsControl>
-                </Border>
+                                        <StackPanel VerticalAlignment="Center">
+                                            <TextBlock Text="{Binding Footer}" FontSize="11" Classes="secondary" TextTrimming="CharacterEllipsis" />
+                                            <TextBlock Text="{Binding Status}" FontSize="11" Foreground="{DynamicResource SystemAccentColor}" TextTrimming="CharacterEllipsis"
+                                                       IsVisible="{Binding HasStatus}" />
+                                        </StackPanel>
+                                    </DockPanel>
+                                </StackPanel>
+                            </Border>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
 
                 <TextBlock Text="{Binding EmptyListText}" Classes="secondary" TextWrapping="Wrap" Margin="4,8" IsVisible="{Binding IsListEmpty}" />
                 <TextBlock Text="Tip: in Gallery or any app, tap Share → Helm Stash to put photos, videos and files here."

@@ -24,8 +24,8 @@ public sealed class StashWindowsTests : IDisposable
         Assert.NotNull(thumbnail);
         Assert.True(thumbnail.Length <= StashItem.MaxThumbnailBytes);
         var frame = BitmapDecoder.Create(new MemoryStream(thumbnail), BitmapCreateOptions.None, BitmapCacheOption.OnLoad).Frames[0];
-        Assert.Equal(256, frame.PixelWidth);
-        Assert.Equal(128, frame.PixelHeight);
+        Assert.Equal(360, frame.PixelWidth);
+        Assert.Equal(180, frame.PixelHeight);
         Assert.IsType<JpegBitmapDecoder>(frame.Decoder);
     }
 

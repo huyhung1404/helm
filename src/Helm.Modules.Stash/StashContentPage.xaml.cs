@@ -43,10 +43,83 @@ public partial class StashContentPage : Page
         InputBindings.Add(new KeyBinding(ApplicationCommands.Paste, Key.V, ModifierKeys.Control));
         DragOver += OnDragOver;
         Drop += OnDrop;
+        Wall.PreviewMouseLeftButtonDown += OnCardPressed;
+        Wall.PreviewMouseMove += OnCardMoved;
+        Wall.PreviewMouseLeftButtonUp += (_, _) => _pressed = null;
+        Wall.DragOver += OnCardDragOver;
+        Wall.Drop += OnCardDrop;
         ApplyEnabled();
     }
 
     private bool CanAdd => _module.IsEnabled && _viewModel.IsNotBusy;
+
+    // ---- Reordering: drag a card onto another one ----------------------------------------------------------------
+
+    private const string CardFormat = "Helm.Stash.Card";
+    private StashRowViewModel? _pressed;
+    private Point _pressedAt;
+
+    private void OnCardPressed(object sender, MouseButtonEventArgs e)
+    {
+        // The card's own buttons (Copy, Delete…) stay buttons.
+        _pressed = InsideActionButton(e.OriginalSource as DependencyObject) ? null : RowAt(e.OriginalSource as DependencyObject);
+        _pressedAt = e.GetPosition(Wall);
+    }
+
+    private void OnCardMoved(object sender, MouseEventArgs e)
+    {
+        if (_pressed is not { } row || e.LeftButton != MouseButtonState.Pressed || !_viewModel.CanReorder || !_module.IsEnabled) return;
+        var moved = e.GetPosition(Wall) - _pressedAt;
+        if (Math.Abs(moved.X) < SystemParameters.MinimumHorizontalDragDistance && Math.Abs(moved.Y) < SystemParameters.MinimumVerticalDragDistance) return;
+        _pressed = null;
+        var card = Wall.ItemContainerGenerator.ContainerFromItem(row) as UIElement;
+        if (card is not null) card.Opacity = 0.45;
+        try
+        {
+            DragDrop.DoDragDrop(Wall, new DataObject(CardFormat, row.Id), DragDropEffects.Move);
+        }
+        finally
+        {
+            if (card is not null) card.Opacity = 1;
+        }
+    }
+
+    private void OnCardDragOver(object sender, DragEventArgs e)
+    {
+        if (!e.Data.GetDataPresent(CardFormat)) return;
+        e.Effects = _viewModel.CanReorder && RowAt(e.OriginalSource as DependencyObject) is not null ? DragDropEffects.Move : DragDropEffects.None;
+        e.Handled = true;
+    }
+
+    private void OnCardDrop(object sender, DragEventArgs e)
+    {
+        if (e.Data.GetData(CardFormat) is not string id) return;
+        e.Handled = true;
+        if (RowAt(e.OriginalSource as DependencyObject) is { } target) _viewModel.Move(id, target.Id);
+    }
+
+    /// <summary>The card under an element of the wall.</summary>
+    private static StashRowViewModel? RowAt(DependencyObject? element)
+    {
+        for (var current = element; current is not null; current = ParentOf(current))
+            if (current is FrameworkElement { DataContext: StashRowViewModel row }) return row;
+        return null;
+    }
+
+    private static bool InsideActionButton(DependencyObject? element)
+    {
+        for (var current = element; current is not null; current = ParentOf(current))
+        {
+            if (current is Wpf.Ui.Controls.Button) return true;
+            if (current is ItemsControl) return false;
+        }
+        return false;
+    }
+
+    private static DependencyObject? ParentOf(DependencyObject element) =>
+        element is System.Windows.Media.Visual or System.Windows.Media.Media3D.Visual3D
+            ? System.Windows.Media.VisualTreeHelper.GetParent(element)
+            : LogicalTreeHelper.GetParent(element);
 
     private void Paste_Click(object sender, RoutedEventArgs e) => PasteFromClipboard();
 

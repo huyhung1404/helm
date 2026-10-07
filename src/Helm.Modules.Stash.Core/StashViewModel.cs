@@ -18,11 +18,16 @@ public sealed partial class StashRowViewModel : ObservableObject
     [ObservableProperty] private string _status = "";
     [ObservableProperty] private string _kindName = "";
     [ObservableProperty] private string _textPreview = "";
+    [ObservableProperty] private string _fullText = "";
+    [ObservableProperty] private string _footer = "";
     [ObservableProperty] private byte[]? _thumbnail;
     [ObservableProperty] private bool _isText;
     [ObservableProperty] private bool _isVideo;
     [ObservableProperty] private bool _isImage;
     [ObservableProperty] private bool _trashed;
+
+    /// <summary>Characters of a text a card shows.</summary>
+    public const int MaxCardText = 1500;
 
     public StashRowViewModel(string id) => Id = id;
 
@@ -71,6 +76,10 @@ public sealed partial class StashRowViewModel : ObservableObject
         Meta = string.Join(" · ", new[] { KindName, size, item.AddedFrom.Length > 0 ? $"from {item.AddedFrom}" : "", when }.Where(p => p.Length > 0));
         Status = status;
         TextPreview = item.Kind == StashKind.Text ? Preview(item.Text ?? "") : "";
+        // A card shows the whole text (very long ones are cut; Copy and the details have all of it).
+        var text = item.Text ?? "";
+        FullText = item.Kind != StashKind.Text ? "" : text.Length <= MaxCardText ? text : text[..MaxCardText].TrimEnd() + "…";
+        Footer = item.Kind == StashKind.Text ? when : $"{size} · {when}";
         if (!ReferenceEquals(Thumbnail, item.Thumbnail)) Thumbnail = item.Thumbnail;
         IsText = item.Kind == StashKind.Text;
         IsVideo = item.IsVideo;
@@ -236,10 +245,15 @@ public sealed partial class StashViewModel : ObservableObject
         if (!_loading && value != StashFilter.Trash) _settings.Update(s => s.Filter = value);
         OnPropertyChanged(nameof(ShowingTrash));
         OnPropertyChanged(nameof(NotShowingTrash));
+        OnPropertyChanged(nameof(CanReorder));
         RefreshList();
     }
 
-    partial void OnSearchChanged(string value) => RefreshList();
+    partial void OnSearchChanged(string value)
+    {
+        OnPropertyChanged(nameof(CanReorder));
+        RefreshList();
+    }
 
     // ---- Adding --------------------------------------------------------------------------------------------------
 
@@ -444,6 +458,39 @@ public sealed partial class StashViewModel : ObservableObject
     partial void OnReceiveClipboardChanged(bool value)
     {
         if (!_loading) _settings.Update(s => s.ReceiveClipboard = value);
+    }
+
+    /// <summary>Cards can be dragged to reorder them, except in the trash and while searching (the order would be unclear).</summary>
+    public bool CanReorder => !ShowingTrash && Search.Trim().Length == 0;
+
+    /// <summary>A card dropped on another card's place (dragged on PC, held and dragged on Android).</summary>
+    public void Move(string id, string targetId)
+    {
+        if (!CanReorder) return;
+        if (Try(() => _store.Move(id, targetId))) RefreshList();
+    }
+
+    /// <summary>The card's Copy: text as text, a file onto this device's clipboard.</summary>
+    [RelayCommand]
+    private async Task CopyAsync(StashRowViewModel? row)
+    {
+        if (row is null || _store.Get(row.Id) is not { } item) return;
+        if (item.Kind == StashKind.Text)
+        {
+            _clipboard.SetText(item.Text ?? "");
+            Message = "Text copied.";
+            return;
+        }
+        if (await ExportAsync(row.Id, item).ConfigureAwait(true) is not { } file) return;
+        try
+        {
+            await _platform.CopyToClipboardAsync(file, CancellationToken.None).ConfigureAwait(true);
+            Message = $"Copied “{item.Name}”. Paste it into a folder, a chat or an email.";
+        }
+        catch (Exception ex)
+        {
+            Fail($"Could not copy “{item.Name}”", ex);
+        }
     }
 
     [RelayCommand]

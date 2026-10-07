@@ -20,7 +20,7 @@ namespace Helm.Modules.Stash;
 /// </summary>
 internal sealed class AndroidStashPlatform : IStashPlatform
 {
-    private const int ThumbnailSide = 256;
+    private const int ThumbnailSide = 360;
 
     /// <summary>The FileProvider declared by the app (see update_paths.xml, "stash-open").</summary>
     private static string Authority => Context.PackageName + ".updates";
@@ -306,7 +306,7 @@ internal sealed class AndroidStashPlatform : IStashPlatform
         }
     }
 
-    /// <summary>At most <see cref="ThumbnailSide"/> on the longer side, JPEG quality 75.</summary>
+    /// <summary>At most <see cref="ThumbnailSide"/> on the longer side, JPEG quality 80 or lower until it fits in a record.</summary>
     private static byte[] Jpeg(Bitmap bitmap)
     {
         var scale = Math.Min(1.0, (double)ThumbnailSide / Math.Max(bitmap.Width, bitmap.Height));
@@ -315,9 +315,15 @@ internal sealed class AndroidStashPlatform : IStashPlatform
             : bitmap;
         try
         {
-            using var memory = new MemoryStream();
-            sized.Compress(Bitmap.CompressFormat.Jpeg!, 75, memory);
-            return memory.ToArray();
+            byte[] bytes = [];
+            foreach (var quality in new[] { 80, 70, 60, 50 })
+            {
+                using var memory = new MemoryStream();
+                sized.Compress(Bitmap.CompressFormat.Jpeg!, quality, memory);
+                bytes = memory.ToArray();
+                if (bytes.Length <= StashItem.MaxThumbnailBytes) break;
+            }
+            return bytes;
         }
         finally
         {

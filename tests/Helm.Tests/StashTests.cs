@@ -156,6 +156,36 @@ public sealed class StashTests : IDisposable
     }
 
     [Fact]
+    public async Task Dragging_a_card_moves_it_up_before_or_down_after_the_target()
+    {
+        var store = NewLocal("a").Store;
+        var ids = new List<string>();
+        foreach (var text in new[] { "d", "c", "b", "a" })
+        {
+            ids.Add(await store.AddTextAsync(text, "PC"));
+            _clock.Advance(TimeSpan.FromSeconds(1));
+        }
+        string Wall() => string.Concat(store.Items(StashFilter.All).Select(i => i.Value.Text));
+        string Id(string text) => store.Items(StashFilter.All).Single(i => i.Value.Text == text).Id;
+        Assert.Equal("abcd", Wall());
+
+        Assert.True(store.Move(Id("d"), Id("b")));
+        Assert.Equal("adbc", Wall());
+        Assert.True(store.Move(Id("a"), Id("b")));
+        Assert.Equal("dbac", Wall());
+        Assert.True(store.Move(Id("c"), Id("d")));
+        Assert.Equal("cdba", Wall());
+        Assert.True(store.Move(Id("c"), Id("a")));
+        Assert.Equal("dbac", Wall());
+        Assert.False(store.Move(Id("c"), Id("c")));
+
+        // Something new still goes on top.
+        _clock.Advance(TimeSpan.FromMinutes(1));
+        await store.AddTextAsync("n", "PC");
+        Assert.Equal("ndbac", Wall());
+    }
+
+    [Fact]
     public async Task Renaming_keeps_a_safe_file_name()
     {
         var store = NewLocal("a").Store;

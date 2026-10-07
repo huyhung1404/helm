@@ -11,6 +11,8 @@ Format: [Keep a Changelog](https://keepachangelog.com), versions follow [SemVer]
   the PC (*Open*, *Copy* puts the file on the clipboard, *Save as*), or the other way round (drop files on the page,
   Ctrl+V pastes files, a screenshot or text). Files are encrypted on the device before they upload, like Vault
   attachments; photos and videos show a thumbnail. Filters for photos and videos, files and text, and a search.
+  Everything shows as a wall of cards with its content (a text in full, a photo at its shape), each with Copy and
+  Delete; drag a card onto another to move it (hold, then drag, on the phone), and the order syncs.
   Deleting moves to the trash; deleting from the trash removes it from every device. *Free up space* drops this
   device's copies of uploaded files (they download again when opened).
 - **Stash: Send to clipboard**: puts a thing on this device's clipboard and on every other device that is syncing at

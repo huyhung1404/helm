@@ -25,7 +25,7 @@ public interface IStashPlatform
 
     Task<IReadOnlyList<StashSource>> PickFilesAsync(CancellationToken ct);
 
-    /// <summary>A small JPEG (at most 256 px on its longer side) for a photo or a video; null when none can be made.</summary>
+    /// <summary>A small JPEG (at most 360 px on its longer side) for a photo or a video; null when none can be made.</summary>
     Task<byte[]?> ThumbnailAsync(StashSource source, CancellationToken ct);
 
     /// <summary>Opens the file with the app the system picks for its type.</summary>

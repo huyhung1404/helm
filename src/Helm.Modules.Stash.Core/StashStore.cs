@@ -55,7 +55,7 @@ public sealed class StashStore
         if (filter == StashFilter.Trash)
             return all.Where(i => i.Value.Trashed).OrderByDescending(i => i.Value.TrashedAt).ThenBy(i => i.Id, StringComparer.Ordinal).ToList();
         return all.Where(i => !i.Value.Trashed && Matches(i.Value, filter))
-            .OrderByDescending(i => i.Value.AddedAt).ThenByDescending(i => i.Id, StringComparer.Ordinal).ToList();
+            .OrderByDescending(i => i.Value.Position).ThenByDescending(i => i.Id, StringComparer.Ordinal).ToList();
     }
 
     /// <summary>How many things each filter shows.</summary>
@@ -143,6 +143,46 @@ public sealed class StashStore
         if (name.Trim().Length == 0) throw new ArgumentException("A name cannot be empty.", nameof(name));
         var safe = StashFormat.SafeFileName(name);
         return Change(id, i => i.Kind != StashKind.File ? i : i with { Name = safe });
+    }
+
+    /// <summary>
+    /// Drags a thing onto another one's place on the wall: it goes just before <paramref name="targetId"/> when moved up,
+    /// just after it when moved down. Only the moved record changes (its key goes between its new neighbours), so two
+    /// devices reordering at once never clash.
+    /// </summary>
+    /// <returns>False when either is gone, in the trash, or they are the same.</returns>
+    public bool Move(string id, string targetId)
+    {
+        lock (_gate)
+        {
+            if (id == targetId) return false;
+            var wall = Items(StashFilter.All);
+            var from = IndexOf(wall, id);
+            var to = IndexOf(wall, targetId);
+            if (from < 0 || to < 0) return false;
+            var others = wall.Where(i => i.Id != id).ToList();
+            var at = IndexOf(others, targetId);
+            // Moving down lands after the target, moving up before it.
+            var slot = from < to ? at + 1 : at;
+            var above = slot > 0 ? others[slot - 1].Value.Position : (double?)null;
+            var below = slot < others.Count ? others[slot].Value.Position : (double?)null;
+            var key = (above, below) switch
+            {
+                ({ } a, { } b) => (a + b) / 2,
+                ({ } a, null) => a - 1000,
+                (null, { } b) => b + 1000,
+                _ => 0,
+            };
+            _items.Upsert(id, wall[from].Value with { SortKey = key });
+            return true;
+        }
+    }
+
+    private static int IndexOf(IReadOnlyList<SyncedItem<StashItem>> items, string id)
+    {
+        for (var i = 0; i < items.Count; i++)
+            if (items[i].Id == id) return i;
+        return -1;
     }
 
     public bool MoveToTrash(string id) => Change(id, i => i.Trashed ? i : i with { Trashed = true, TrashedAt = Now });

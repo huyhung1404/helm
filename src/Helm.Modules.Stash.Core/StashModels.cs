@@ -64,6 +64,16 @@ public sealed record StashItem
 
     public DateTimeOffset AddedAt { get; init; }
 
+    /// <summary>
+    /// Where it sits on the wall, higher first; set when the user drags it somewhere else. Unset: by when it was added
+    /// (<see cref="Position"/>).
+    /// </summary>
+    public double? SortKey { get; init; }
+
+    /// <summary>The key the wall is sorted by, newest (highest) first.</summary>
+    [JsonIgnore]
+    public double Position => SortKey ?? AddedAt.ToUnixTimeMilliseconds();
+
     /// <summary>The name of the device it was added on.</summary>
     public string AddedFrom { get; init; } = "";
 
