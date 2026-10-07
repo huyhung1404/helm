@@ -6,7 +6,7 @@ using Helm.Core.Text;
 namespace Helm.Modules.Tracker;
 
 /// <summary>
-/// Tracker for Claude over MCP: the to-do lists (read, add, edit, tick, reopen); the debt book is Wallet's
+/// Tracker for Claude over MCP: the to-do lists (read, add lists and tasks, edit, start, tick, reopen); the debt book is Wallet's
 /// (<c>wallet_debts</c>). Nothing is ever deleted through here. Dates are the user's local ones: "2026-10-01" or "2026-10-01T09:30".
 /// </summary>
 public sealed class TrackerMcpTools(TrackerStore store) : IMcpToolProvider
@@ -29,31 +29,61 @@ public sealed class TrackerMcpTools(TrackerStore store) : IMcpToolProvider
                 ("due_before", McpArgs.Text("Only tasks due before this day, e.g. 2026-10-01 (overdue and due today: tomorrow's date)."), false),
                 ("limit", McpArgs.Number($"How many at most (default {DefaultLimit})."), false)),
             (args, _) => Task.FromResult<object?>(Tasks(args))) { ReadOnly = true },
-        new("tracker_add_task", "Add a task to a to-do list, optionally with a due date or time, a priority, notes and subtasks.",
+        new("tracker_add_task",
+            "Add a task to a to-do list, optionally with a due date or time, a priority, notes, subtasks, or repeating every day. " +
+            "With parent, the task is added as a subtask of that task instead.",
             McpArgs.Schema(
                 ("title", McpArgs.Text("What to do."), true),
                 ("list", McpArgs.Text("A list's id or name (default: the first to-do list)."), false),
+                ("parent", McpArgs.Text("A task's id: add this as one of its subtasks (in the task's list)."), false),
                 ("notes", McpArgs.Text("Details."), false),
                 ("priority", McpArgs.OneOf("Default normal.", Priorities), false),
                 ("due", McpArgs.Text("Due day or time in the user's time zone: 2026-10-01 or 2026-10-01T09:30."), false),
-                ("subtasks", McpArgs.List("Titles of subtasks."), false)),
+                ("subtasks", McpArgs.List("Titles of subtasks."), false),
+                ("repeat_daily", McpArgs.Flag("A new copy of the task appears every day, starting today."), false),
+                ("repeat_until", McpArgs.Text("With repeat_daily: the last day, e.g. 2026-12-31 (default: no end)."), false)),
             (args, _) => Task.FromResult<object?>(AddTask(args))),
-        new("tracker_update_task", "Change a task's title, notes, priority or due date.",
+        new("tracker_update_task", "Change a task's title, notes, priority or due date, or stop it repeating.",
             McpArgs.Schema(
                 ("id", McpArgs.Text("The task's id."), true),
                 ("title", McpArgs.Text("New title."), false),
                 ("notes", McpArgs.Text("New notes (replace the old ones)."), false),
                 ("priority", McpArgs.OneOf("New priority.", Priorities), false),
                 ("due", McpArgs.Text("New due day or time: 2026-10-01 or 2026-10-01T09:30."), false),
-                ("clear_due", McpArgs.Flag("Remove the due date."), false)),
+                ("clear_due", McpArgs.Flag("Remove the due date."), false),
+                ("stop_repeating", McpArgs.Flag("A repeating task: no new day appears (the days already there stay)."), false)),
             (args, _) => Task.FromResult<object?>(UpdateTask(args))),
-        new("tracker_complete_task", "Mark a task done (its finish time is recorded; its subtasks are done too).",
+        new("tracker_start_task", "Record that work on a task (or subtask) started now; its time to finish is then counted from here.",
+            McpArgs.Schema(("id", McpArgs.Text("The task's id."), true)),
+            (args, _) => Task.FromResult<object?>(StartTask(McpArgs.RequiredString(args, "id")))),
+        new("tracker_complete_task", "Mark a task or subtask done (its finish time is recorded; a task's subtasks are done too).",
             McpArgs.Schema(("id", McpArgs.Text("The task's id."), true)),
             (args, _) => Task.FromResult<object?>(SetDone(McpArgs.RequiredString(args, "id"), done: true))),
-        new("tracker_reopen_task", "Open a done task again.",
+        new("tracker_reopen_task", "Open a done task or subtask again.",
             McpArgs.Schema(("id", McpArgs.Text("The task's id."), true)),
             (args, _) => Task.FromResult<object?>(SetDone(McpArgs.RequiredString(args, "id"), done: false))),
+        new("tracker_add_list", "Add a to-do list (for tasks; debts are in Wallet).",
+            McpArgs.Schema(("name", McpArgs.Text("The list's name."), true)),
+            (args, _) => Task.FromResult<object?>(AddList(McpArgs.RequiredString(args, "name")))),
     ];
+
+    private object AddList(string name)
+    {
+        name = name.Trim();
+        if (name.Length == 0) throw new McpToolException("name is required.");
+        if (store.Workspaces().FirstOrDefault(w => string.Equals(w.Value.Name.Trim(), name, StringComparison.CurrentCultureIgnoreCase)) is { } same)
+            throw new McpToolException($"There is already a list {same.Value.Name} ({same.Id}).");
+        var id = store.AddWorkspace(name);
+        return new { id, name, kind = "tasks", open = 0 };
+    }
+
+    private object StartTask(string id)
+    {
+        var item = RequireTask(id);
+        if (item.IsCompleted) throw new McpToolException($"“{item.Title}” is done; reopen it first.");
+        store.Start(id);
+        return Describe(id, store.GetItem(id)!, store.GetWorkspace(item.WorkspaceId)?.Name ?? "");
+    }
 
     private object Lists() => store.Workspaces().Select(w => new
     {
@@ -102,9 +132,19 @@ public sealed class TrackerMcpTools(TrackerStore store) : IMcpToolProvider
     private object AddTask(JsonElement args)
     {
         var title = McpArgs.RequiredString(args, "title").Trim();
-        var list = TaskLists(McpArgs.String(args, "list")).FirstOrDefault() ?? throw new McpToolException("There is no to-do list yet; the user can create one in Helm.");
+        var parentId = McpArgs.String(args, "parent");
+        var parent = parentId is null ? null : RequireTask(parentId);
+        if (parent is { IsSubtask: true }) throw new McpToolException("A subtask cannot have subtasks; add it to its task instead.");
+        var list = parent is not null
+            ? store.Workspaces().First(w => w.Id == parent.WorkspaceId)
+            : TaskLists(McpArgs.String(args, "list")).FirstOrDefault() ?? throw new McpToolException("There is no to-do list yet; add one with tracker_add_list.");
         var (day, at) = McpArgs.String(args, "due") is { } due ? ParseDue(due) : (null, null);
-        var draft = new TrackerItemDraft(title, ParsePriority(McpArgs.String(args, "priority")) ?? TrackerPriority.Normal, day, McpArgs.String(args, "notes") ?? "", DueAt: at);
+        var repeat = McpArgs.Bool(args, "repeat_daily") == true;
+        var until = McpArgs.String(args, "repeat_until") is { } last ? ParseDay(last) : (DateOnly?)null;
+        if (until is not null && !repeat) throw new McpToolException("repeat_until goes with repeat_daily.");
+        if (repeat && parent is not null) throw new McpToolException("A subtask cannot repeat; its task can.");
+        var draft = new TrackerItemDraft(title, ParsePriority(McpArgs.String(args, "priority")) ?? TrackerPriority.Normal, day, McpArgs.String(args, "notes") ?? "",
+            DueAt: at, ParentId: parentId, RepeatDaily: repeat, RepeatUntil: until);
         var id = store.AddItem(list.Id, draft);
         foreach (var subtask in McpArgs.Strings(args, "subtasks").Where(s => s.Trim().Length > 0))
             store.AddItem(list.Id, new TrackerItemDraft(subtask.Trim(), ParentId: id));
@@ -129,6 +169,7 @@ public sealed class TrackerMcpTools(TrackerStore store) : IMcpToolProvider
             DueDate = clear ? null : due is { } d ? d.Item1 : i.DueDate,
             DueAt = clear ? null : due is { } t ? t.Item2 : i.DueAt,
         });
+        if (McpArgs.Bool(args, "stop_repeating") == true && store.GetItem(id) is { SeriesId: { } series }) store.StopRepeating(series);
         return Describe(id, store.GetItem(id)!, store.GetWorkspace(item.WorkspaceId)?.Name ?? "");
     }
 

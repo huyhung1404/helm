@@ -9,7 +9,7 @@ namespace Helm.Modules.Ssh;
 public static class SshCoreServices
 {
     /// <summary>
-    /// The platform-neutral part of SSH: this device's key and the view model. The platform module (Windows, later
+    /// The platform-neutral part of SSH: this device's key, the open sessions and the view model. The platform module (Windows, later
     /// Android) calls this from its own <c>AddSshModule()</c>.
     /// </summary>
     public static IServiceCollection AddSshCore(this IServiceCollection services)
@@ -18,6 +18,7 @@ public static class SshCoreServices
             Path.Combine(sp.GetRequiredService<ISettingsStoreFactory>().Paths.ModuleDataDirectory(SshIds.ModuleId), "device-key.bin"),
             sp.GetRequiredService<ISecretProtector>(),
             sp.GetService<IDeviceInfo>()?.DeviceName ?? Environment.MachineName));
+        services.TryAddSingleton<SshSessions>();
         // Windows registers it again through AddHelmModule; one instance either way.
         services.TryAddSingleton<SshViewModel>();
         return services;

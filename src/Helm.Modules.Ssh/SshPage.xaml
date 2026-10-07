@@ -96,6 +96,11 @@
                     <ui:TextBox Width="280" PlaceholderText="~/.helm/menu" AutomationProperties.Name="Menu path"
                                 Text="{Binding EditMenuPath, UpdateSourceTrigger=PropertyChanged}" />
                 </core:RowLayout>
+                <core:RowLayout Margin="0,0,0,8">
+                    <core:CardHeader Title="Claude may use this server's menu"
+                                     Description="Claude (MCP) can then run this menu's items while the server is connected here, never a shell; Helm asks you before each run." />
+                    <ui:ToggleSwitch HorizontalAlignment="Right" AutomationProperties.Name="Claude may use this server's menu" IsChecked="{Binding EditAllowMcp}" />
+                </core:RowLayout>
                 <TextBlock Text="{Binding EditError}" TextWrapping="Wrap" Margin="0,0,0,8" Foreground="{DynamicResource SystemFillColorCriticalBrush}"
                            Visibility="{Binding EditError, Converter={StaticResource NotEmptyToVisibility}}" />
                 <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">

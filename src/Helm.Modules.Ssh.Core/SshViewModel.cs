@@ -76,6 +76,8 @@ public sealed partial class SshViewModel : ObservableObject, IDisposable
     private readonly ILogger<SshViewModel> _logger;
     private readonly IVaultSecrets? _vault;
     private readonly Dictionary<string, SshSession> _sessions = new(StringComparer.Ordinal);
+    // The same sessions, for Claude's tools (SshMcpTools) to find the connected servers.
+    private readonly SshSessions _live;
     // Servers whose key file turned out to need a passphrase: the page then shows the box for it.
     private readonly HashSet<string> _passphraseNeeded = new(StringComparer.Ordinal);
     private int _columns = 120;
@@ -106,6 +108,7 @@ public sealed partial class SshViewModel : ObservableObject, IDisposable
     [ObservableProperty] private string? _editError;
     [ObservableProperty] private string _editKeyFile = "";
     [ObservableProperty] private string _editMenuPath = "";
+    [ObservableProperty] private bool _editAllowMcp;
 
     [ObservableProperty] private VaultSecretRef? _editVaultRef;
     [ObservableProperty] private bool _canOpenVault;
@@ -115,10 +118,12 @@ public sealed partial class SshViewModel : ObservableObject, IDisposable
     [ObservableProperty] private string _keyFingerprint = "";
 
     /// <param name="vault">Vault, when Helm has it: servers may sign in with a password or key kept there.</param>
+    /// <param name="live">Where the open sessions are published for Claude's tools (a private one when not given).</param>
     public SshViewModel(ISettingsStoreFactory settings, SshDeviceKey deviceKey, IUiDispatcher ui, IDialogService dialogs, IClipboardService clipboard,
-        ILogger<SshViewModel> logger, IVaultSecrets? vault = null)
+        ILogger<SshViewModel> logger, IVaultSecrets? vault = null, SshSessions? live = null)
     {
         _vault = vault;
+        _live = live ?? new SshSessions();
         _settings = settings.Get<SshSettings>(SshIds.ModuleId);
         _deviceKey = deviceKey;
         _ui = ui;
@@ -321,6 +326,7 @@ public sealed partial class SshViewModel : ObservableObject, IDisposable
         var session = new SshSession(host, _columns, _rows);
         session.StateChanged += (_, _) => _ui.Post(RefreshSession);
         _sessions[host.Id] = session;
+        _live.Register(host.Id, session);
         if (SelectedHost == row) ActiveSession = session;
         IsConnecting = true;
         try
@@ -337,6 +343,7 @@ public sealed partial class SshViewModel : ObservableObject, IDisposable
                 {
                     Message = KeyProblem(host, ex, password);
                     _sessions.Remove(host.Id);
+                    _live.Unregister(host.Id, session);
                     session.Dispose();
                     if (ActiveSession == session) ActiveSession = null;
                     OnPropertyChanged(nameof(NeedsPassword));
@@ -368,6 +375,7 @@ public sealed partial class SshViewModel : ObservableObject, IDisposable
                 if (!session.HasOutput && _sessions.GetValueOrDefault(host.Id) == session)
                 {
                     _sessions.Remove(host.Id);
+                    _live.Unregister(host.Id, session);
                     session.Dispose();
                     if (ActiveSession == session) ActiveSession = null;
                 }
@@ -628,6 +636,7 @@ public sealed partial class SshViewModel : ObservableObject, IDisposable
         EditKeyFile = "";
         EditVaultRef = null;
         EditMenuPath = "";
+        EditAllowMcp = false;
         EditError = null;
         IsEditing = true;
     }
@@ -642,6 +651,7 @@ public sealed partial class SshViewModel : ObservableObject, IDisposable
         EditAuthIndex = (int)row.Host.Auth;
         EditKeyFile = row.Host.KeyFile ?? "";
         EditMenuPath = row.Host.MenuPath ?? "";
+        EditAllowMcp = row.Host.AllowMcp;
         EditVaultRef = row.Host is { VaultItemUid: { } uid, VaultField: { } field } ? new VaultSecretRef(uid, row.Host.VaultItemTitle ?? "", field) : null;
         if (row.Host.Auth == SshAuthKind.Vault) RefreshVaultFields();
         EditError = null;
@@ -689,6 +699,7 @@ public sealed partial class SshViewModel : ObservableObject, IDisposable
             KeyFile = auth == SshAuthKind.KeyFile ? keyFile : null,
             VaultItemUid = vaultRef?.ItemUid, VaultItemTitle = vaultRef?.ItemTitle, VaultField = vaultRef?.FieldName,
             MenuPath = menuPath.Length == 0 || menuPath == SshMenu.DefaultPath ? null : menuPath,
+            AllowMcp = EditAllowMcp,
         };
         _passphraseNeeded.Remove(host.Id);
         SaveHost(host);
@@ -704,6 +715,7 @@ public sealed partial class SshViewModel : ObservableObject, IDisposable
         if (!await AskAsync($"Delete {row.Title}?", "The server is removed from the list and its session is closed. Its known key is kept.", "Delete")
                 .ConfigureAwait(true)) return;
         if (_sessions.Remove(row.Id, out var session)) session.Dispose();
+        _live.Unregister(row.Id);
         _settings.Update(s => s.Hosts = s.Hosts.Where(h => h.Id != row.Id).ToList());
         Hosts.Remove(row);
         if (SelectedHost == row) SelectedHost = Hosts.FirstOrDefault();
@@ -799,6 +811,7 @@ public sealed partial class SshViewModel : ObservableObject, IDisposable
     {
         foreach (var session in _sessions.Values) session.Dispose();
         _sessions.Clear();
+        _live.Clear();
         ActiveSession = null;
         RefreshSession();
     }
