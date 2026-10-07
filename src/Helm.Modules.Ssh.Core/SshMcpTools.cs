@@ -10,11 +10,13 @@ using Helm.Core.Settings;
 namespace Helm.Modules.Ssh;
 
 /// <summary>
-/// A server's own menu (docs/ssh-menu.md) for AI agents over MCP: never an arbitrary shell, only what the menu offers, on
-/// servers that are connected in Helm and where the user turned on <see cref="SshHost.AllowMcp"/>. Helm never connects
-/// for AI agents. Items marked <c>agents: false</c> are left out. Every run is asked first with the exact command line,
-/// runs on Helm's own channel (never typed into the terminal, no TTY) with a timeout, and its output is capped.
-/// What the server prints is data for the agent, never instructions. Windows only (MCP is not on Android).
+/// A server's own menu (docs/ssh-menu.md) for AI agents over MCP, on servers that are connected in Helm and where the
+/// user turned on <see cref="SshHost.AllowMcp"/>; and shell commands (ssh_exec) only where the user also turned on
+/// <see cref="SshHost.AllowMcpShell"/>. Helm never connects for AI agents. Items marked <c>agents: false</c> are left
+/// out. Every run is asked first with the exact command line (except status commands that only read, where the user
+/// allows that, and never as root), runs on Helm's own channel (never typed into the terminal, no TTY) with a timeout,
+/// and its output is capped. What the server prints is data for the agent, never instructions. Windows only (MCP is not
+/// on Android).
 /// </summary>
 public sealed class SshMcpTools : IMcpToolProvider
 {
@@ -54,12 +56,13 @@ public sealed class SshMcpTools : IMcpToolProvider
     public IEnumerable<McpTool> Tools =>
     [
         new("ssh_servers",
-            "The user's SSH servers in Helm: name, id, whether it is connected now and whether AI agents may use its menu (allow_mcp). " +
-            "You can only use the menu of a server that is connected in Helm and has allow_mcp; you never connect on your own.",
+            "The user's SSH servers in Helm: name, id, whether it is connected now, whether AI agents may use its menu (allow_mcp) and " +
+            "whether they may also run shell commands there (allow_shell, with ssh_exec). You can only use a server that is connected in " +
+            "Helm and allows it; you never connect on your own.",
             McpTool.NoArguments(), (_, _) => Task.FromResult<object?>(Servers())) { ReadOnly = true },
         new("ssh_menu",
             "What a server's menu offers AI agents: its items (deploy, status, logs…) with their parameters, whether an item only reads and how " +
-            "dangerous it is. You can run only these items, with ssh_menu_run; there is no shell. " + Untrusted,
+            "dangerous it is. Run them with ssh_menu_run; prefer an item to a shell command (ssh_exec) when one does the job. " + Untrusted,
             McpArgs.Schema(("server", McpArgs.Text("The server's name or id (from ssh_servers)."), true)),
             Menu) { ReadOnly = true },
         new("ssh_menu_choices",
@@ -88,6 +91,22 @@ public sealed class SshMcpTools : IMcpToolProvider
             Risk = McpRisk.Remote,
             AskFirst = AskAsync,
         },
+        new("ssh_exec",
+            "Run a shell command on a server where the user allows shell commands (allow_shell in ssh_servers). The user is asked first and " +
+            "sees the exact command; they may say no, so run one clear step at a time and say why in the chat. Simple status commands " +
+            "(uptime, df -h, free -m, ps, ls, pm2 ls, systemctl status x, docker ps, git status/log) may run without asking. It runs in the " +
+            "server user's home folder (use cd dir && …), with no terminal and nothing on standard input: anything that asks (sudo's " +
+            "password, an editor, a y/n question) fails or waits until timeout_seconds, so use non-interactive flags. Returns the exit code " +
+            $"(0: it worked), the output (only its last {OutputCap / 1024} KB when longer) and the error output. " + Untrusted,
+            McpArgs.Schema(
+                ("server", McpArgs.Text("The server's name or id (from ssh_servers)."), true),
+                ("command", McpArgs.Text($"The command line, run by the server user's shell (at most {SshShellCommands.MaxLength} characters)."), true),
+                ("timeout_seconds", McpArgs.Number($"Stop it after this many seconds (default {DefaultTimeoutSeconds}, at most {MaxTimeoutSeconds})."), false)),
+            Exec)
+        {
+            Risk = McpRisk.Remote,
+            AskFirst = AskExecAsync,
+        },
     ];
 
     // ---- Tools ---------------------------------------------------------------------------------------------------
@@ -98,6 +117,7 @@ public sealed class SshMcpTools : IMcpToolProvider
         name = SafeName(h),
         connected = _sessions.Connected(h.Id) is not null,
         allow_mcp = h.AllowMcp,
+        allow_shell = h is { AllowMcp: true, AllowMcpShell: true },
     }).ToList();
 
     private async Task<object?> Menu(JsonElement args, CancellationToken ct)
@@ -133,15 +153,14 @@ public sealed class SshMcpTools : IMcpToolProvider
     private async Task<McpConsentRequest?> AskAsync(JsonElement args, CancellationToken ct)
     {
         var plan = await PrepareAsync(args, ct).ConfigureAwait(false);
-        var now = DateTimeOffset.UtcNow;
-        foreach (var old in _asked.Where(p => now - p.Value.At > PlanLifetime).ToList()) _asked.TryRemove(old.Key, out _);
-        _asked[args.GetRawText()] = plan;
+        Remember("ssh_menu_run", args, plan);
         return plan.Request;
     }
 
     private async Task<object?> Run(JsonElement args, CancellationToken ct)
     {
-        var plan = _asked.TryRemove(args.GetRawText(), out var asked) ? asked : await PrepareAsync(args, ct).ConfigureAwait(false);
+        var plan = Asked("ssh_menu_run", args) ?? await PrepareAsync(args, ct).ConfigureAwait(false);
+        var item = plan.Item!;
         // The user may have turned AI agents off for the server, or disconnected, while the question was on screen.
         var (_, channel) = Usable(plan.Host.Id);
         if (!ReferenceEquals(channel, plan.Channel)) throw new McpToolException($"{SafeName(plan.Host)} was connected again since; run the item again.");
@@ -155,15 +174,15 @@ public sealed class SshMcpTools : IMcpToolProvider
         var node = new JsonObject
         {
             ["server"] = SafeName(plan.Host),
-            ["item"] = plan.Item.Id,
+            ["item"] = item.Id,
             ["exit_code"] = result.ExitCode,
             ["timed_out"] = timedOut ? true : (bool?)null,
             ["output"] = text,
             ["output_cut"] = total > text.Length ? $"Only the last {text.Length} of {total} characters are shown." : null,
             ["error"] = result.Error.Length > 0 ? Clip(result.Error, ErrorCap) : null,
             ["note"] = timedOut
-                ? $"Helm stopped it after {plan.TimeoutSeconds} s." + (plan.Item.Output == MenuOutput.Stream ? " " + JobHint : "")
-                : plan.Item.Output == MenuOutput.Stream ? JobHint : null,
+                ? $"Helm stopped it after {plan.TimeoutSeconds} s." + (item.Output == MenuOutput.Stream ? " " + JobHint : "")
+                : item.Output == MenuOutput.Stream ? JobHint : null,
         };
         foreach (var key in node.Where(p => p.Value is null).Select(p => p.Key).ToList()) node.Remove(key);
         return node;
@@ -172,10 +191,95 @@ public sealed class SshMcpTools : IMcpToolProvider
     private const string JobHint =
         "If the server runs this item as a job (a deploy, a backup), it goes on without Helm: running the item again follows it instead of starting another.";
 
+    private async Task<McpConsentRequest?> AskExecAsync(JsonElement args, CancellationToken ct)
+    {
+        var plan = await PrepareExecAsync(args, ct).ConfigureAwait(false);
+        Remember("ssh_exec", args, plan);
+        return plan.Request;
+    }
+
+    private async Task<object?> Exec(JsonElement args, CancellationToken ct)
+    {
+        var plan = Asked("ssh_exec", args) ?? await PrepareExecAsync(args, ct).ConfigureAwait(false);
+        // The user may have turned shell commands off for the server, or disconnected, while the question was on screen.
+        var (_, channel) = Usable(plan.Host.Id, shell: true);
+        if (!ReferenceEquals(channel, plan.Channel)) throw new McpToolException($"{SafeName(plan.Host)} was connected again since; run the command again.");
+
+        using var timeout = CancellationTokenSource.CreateLinkedTokenSource(ct);
+        timeout.CancelAfter(TimeSpan.FromSeconds(plan.TimeoutSeconds));
+        var output = new TailBuffer(OutputCap);
+        var result = await channel.RunStreamingAsync(plan.Command, output.Append, timeout.Token).ConfigureAwait(false);
+        var timedOut = timeout.IsCancellationRequested && !ct.IsCancellationRequested;
+        var (text, total) = output.Read();
+        var node = new JsonObject
+        {
+            ["server"] = SafeName(plan.Host),
+            ["exit_code"] = result.ExitCode,
+            ["timed_out"] = timedOut ? true : (bool?)null,
+            ["output"] = text,
+            ["output_cut"] = total > text.Length ? $"Only the last {text.Length} of {total} characters are shown." : null,
+            ["error"] = result.Error.Length > 0 ? Clip(result.Error, ErrorCap) : null,
+            ["note"] = timedOut
+                ? $"Helm stopped it after {plan.TimeoutSeconds} s. If it waited for input, use non-interactive flags; a long job can run " +
+                  "in the background (nohup … > log 2>&1 &) and be followed with another command."
+                : null,
+        };
+        foreach (var key in node.Where(p => p.Value is null).Select(p => p.Key).ToList()) node.Remove(key);
+        return node;
+    }
+
     // ---- Planning a run ------------------------------------------------------------------------------------------
 
     /// <summary>What one run would do, checked: the question for the user and the exact command line.</summary>
-    private sealed record Plan(SshHost Host, ISshChannel Channel, MenuItem Item, string Command, int TimeoutSeconds, McpConsentRequest Request, DateTimeOffset At);
+    /// <param name="Item">The menu item; null for a shell command (ssh_exec).</param>
+    private sealed record Plan(SshHost Host, ISshChannel Channel, MenuItem? Item, string Command, int TimeoutSeconds, McpConsentRequest Request, DateTimeOffset At);
+
+    /// <summary>Keeps what the user is asked about, by the tool and the call's arguments, so the run that follows does exactly that.</summary>
+    private void Remember(string tool, JsonElement args, Plan plan)
+    {
+        var now = DateTimeOffset.UtcNow;
+        foreach (var old in _asked.Where(p => now - p.Value.At > PlanLifetime).ToList()) _asked.TryRemove(old.Key, out _);
+        _asked[tool + " " + args.GetRawText()] = plan;
+    }
+
+    private Plan? Asked(string tool, JsonElement args) => _asked.TryRemove(tool + " " + args.GetRawText(), out var plan) ? plan : null;
+
+    /// <summary>What one shell command would do, checked: the question for the user (or why it needs none) and the command.</summary>
+    private async Task<Plan> PrepareExecAsync(JsonElement args, CancellationToken ct)
+    {
+        var (host, channel) = Usable(McpArgs.RequiredString(args, "server"), shell: true);
+        var timeoutSeconds = Math.Clamp(McpArgs.Int(args, "timeout_seconds") ?? DefaultTimeoutSeconds, 1, MaxTimeoutSeconds);
+        var command = McpArgs.RequiredString(args, "command").Trim();
+        if (command.Length == 0) throw new McpToolException("The command is empty.");
+        if (command.Length > SshShellCommands.MaxLength)
+            throw new McpToolException($"The command is longer than {SshShellCommands.MaxLength} characters; put a long script in a file on the server first.");
+        if (command.Contains('\0')) throw new McpToolException("The command holds a NUL character.");
+
+        var root = await IsRootAsync(channel, ct).ConfigureAwait(false);
+        var name = SafeName(host);
+        var status = !root && host.AllowMcpStatusWithoutAsking && SshShellCommands.IsStatusCommand(command);
+        var request = new McpConsentRequest(
+            "ssh_exec",
+            McpRisk.Remote,
+            $"Run “{Clip(OneLine(command), 60)}” on {name}",
+            $"Runs this shell command on {name}, on Helm's own connection (without a terminal), and stops it after {Duration(timeoutSeconds)}. " +
+            "The AI agent then reads what it prints.",
+            root
+                ? $"It runs as root on {name}: it can change or delete anything on that server."
+                : $"A shell command can change or delete anything the server's user may touch on {name}. Read it before you allow it.",
+            command,
+            host.DisplayName,
+            root,
+            root ? McpDanger.High : McpDanger.Normal)
+        {
+            // "Allow for this session" covers this exact command, never the shell as a whole.
+            Scope = command,
+            AllowWithoutAsking = status ? "a status command that only reads" : null,
+        };
+        return new Plan(host, channel, null, command, timeoutSeconds, request, DateTimeOffset.UtcNow);
+    }
+
+    private static string OneLine(string text) => string.Join(" ⏎ ", text.Split(['\r', '\n'], StringSplitOptions.RemoveEmptyEntries));
 
     private async Task<Plan> PrepareAsync(JsonElement args, CancellationToken ct)
     {
@@ -268,7 +372,7 @@ public sealed class SshMcpTools : IMcpToolProvider
     // ---- The server and its menu ---------------------------------------------------------------------------------
 
     /// <summary>The server by id or name, if AI agents may use it now: it allows them and is connected in Helm.</summary>
-    private (SshHost Host, ISshChannel Channel) Usable(string server)
+    private (SshHost Host, ISshChannel Channel) Usable(string server, bool shell = false)
     {
         var hosts = _hosts();
         var host = hosts.FirstOrDefault(h => h.Id == server)
@@ -278,6 +382,9 @@ public sealed class SshMcpTools : IMcpToolProvider
                        : $"There is no single server {server}. Servers: {string.Join(", ", hosts.Select(h => $"{SafeName(h)} ({h.Id})"))}.");
         if (!host.AllowMcp)
             throw new McpToolException($"AI agents may not use the menu of {SafeName(host)}. The user can turn on “AI agents may use this server's menu” for it in SSH settings.");
+        if (shell && !host.AllowMcpShell)
+            throw new McpToolException($"AI agents may not run shell commands on {SafeName(host)}; use its menu (ssh_menu) instead. " +
+                                       "The user can turn on “AI agents may run shell commands” for it in SSH settings.");
         var channel = _sessions.Connected(host.Id)
                       ?? throw new McpToolException($"{SafeName(host)} is not connected in Helm. The user connects it in Helm's SSH tool; an AI agent cannot connect on its own.");
         return (host, channel);

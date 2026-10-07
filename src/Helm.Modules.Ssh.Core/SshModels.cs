@@ -68,6 +68,18 @@ public sealed record SshHost
     /// <summary>AI agents (MCP) may use this server's menu: off unless turned on for this server.</summary>
     public bool AllowMcp { get; init; }
 
+    /// <summary>
+    /// With <see cref="AllowMcp"/>: AI agents may also run shell commands here (ssh_exec), each asked first. Off unless
+    /// turned on for this server.
+    /// </summary>
+    public bool AllowMcpShell { get; init; }
+
+    /// <summary>
+    /// With <see cref="AllowMcpShell"/>: status commands that only read (<see cref="SshShellCommands.IsStatusCommand"/>)
+    /// run without asking, unless the server's user is root. Logged like every other call.
+    /// </summary>
+    public bool AllowMcpStatusWithoutAsking { get; init; } = true;
+
     /// <summary>user@host, with :port when it is not 22.</summary>
     [JsonIgnore]
     public string Target => SshAddress.Format(User, Address, Port);

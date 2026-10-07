@@ -43,7 +43,21 @@ public sealed record McpConsentRequest(
     string? Details,
     string? Target,
     bool Elevated,
-    McpDanger Danger);
+    McpDanger Danger)
+{
+    /// <summary>
+    /// What "Allow for this session" covers within <see cref="Target"/>: null is every call of the tool there; otherwise
+    /// only calls with this same scope (e.g. one exact command line).
+    /// </summary>
+    public string? Scope { get; init; }
+
+    /// <summary>
+    /// Why the tool says this call may run without asking (e.g. a status command that only reads), or null. Honoured
+    /// only for a <see cref="McpRisk.Remote"/> call that is neither elevated nor <see cref="McpDanger.High"/>; the call
+    /// is still logged.
+    /// </summary>
+    public string? AllowWithoutAsking { get; init; }
+}
 
 /// <summary>Who is calling: one MCP connection, named by the client's <c>initialize</c>.</summary>
 public sealed record McpClientInfo(Guid ConnectionId, string Name, string? Version)
@@ -88,8 +102,14 @@ public interface IMcpCallObserver
     void Completed(McpConsentRequest request, McpClientInfo client, McpConsentAnswer answer, bool ok);
 }
 
-/// <summary>"Allow for this session": one connection, one tool, one target; forgotten when the connection ends or Helm restarts.</summary>
-public sealed record McpSessionAllowance(Guid ConnectionId, string ClientName, string Tool, string? Target, string Title, DateTimeOffset Since);
+/// <summary>
+/// "Allow for this session": one connection, one tool, one target (and, when the request has one, one
+/// <see cref="McpConsentRequest.Scope"/>); forgotten when the connection ends or Helm restarts.
+/// </summary>
+public sealed record McpSessionAllowance(Guid ConnectionId, string ClientName, string Tool, string? Target, string Title, DateTimeOffset Since)
+{
+    public string? Scope { get; init; }
+}
 
 /// <summary>
 /// Helm's consent policy (see docs/mcp-security.md):
@@ -97,7 +117,8 @@ public sealed record McpSessionAllowance(Guid ConnectionId, string ClientName, s
 /// <item><see cref="McpRisk.Read"/>: never asked.</item>
 /// <item><see cref="McpRisk.Change"/>: asked when Helm runs as Administrator, the call is elevated, or the user turned on
 /// "Ask before every change"; otherwise it runs (and is logged).</item>
-/// <item><see cref="McpRisk.Remote"/>: always asked.</item>
+/// <item><see cref="McpRisk.Remote"/>: always asked, except a call the tool marks <see cref="McpConsentRequest.AllowWithoutAsking"/>
+/// that is neither elevated nor High (logged, without a notification).</item>
 /// </list>
 /// One question at a time; no answer within <see cref="Timeout"/> is a Deny; more than <see cref="MaxAskedPerMinute"/>
 /// asked calls in a minute are refused without asking. Every call it sees goes to the <see cref="McpActivityLog"/>.
@@ -108,6 +129,7 @@ public sealed class McpConsentPolicy : IMcpConsent, IMcpCallObserver
 
     private const string AllowedWithoutAsking = "Allowed without asking";
     private const string AllowedForSession = "Allowed for this session";
+    private const string AllowedAsStatus = "Allowed without asking: ";
     private readonly IMcpConsentPrompt _prompt;
     private readonly McpActivityLog _log;
     private readonly Func<bool> _askBeforeChanges;
@@ -171,6 +193,8 @@ public sealed class McpConsentPolicy : IMcpConsent, IMcpCallObserver
     {
         if (request.Risk == McpRisk.Read) return McpConsentAnswer.AllowOnce;
         var helmElevated = _helmElevated();
+        if (request is { Risk: McpRisk.Remote, AllowWithoutAsking: { Length: > 0 } because, Elevated: false, Danger: McpDanger.Normal })
+            return Allowed(request, McpConsentAnswer.AllowOnce, AllowedAsStatus + because);
         var mustAsk = request.Risk == McpRisk.Remote || helmElevated || request.Elevated || _askBeforeChanges();
         if (!mustAsk) return Allowed(request, McpConsentAnswer.AllowOnce, AllowedWithoutAsking);
 
@@ -222,7 +246,10 @@ public sealed class McpConsentPolicy : IMcpConsent, IMcpCallObserver
             {
                 case McpConsentAnswer.AllowForSession when offerSession:
                     lock (_gate)
-                        _allowances.Add(new McpSessionAllowance(client.ConnectionId, client.Name, request.Tool, request.Target, request.Title, _time.GetLocalNow()));
+                        _allowances.Add(new McpSessionAllowance(client.ConnectionId, client.Name, request.Tool, request.Target, request.Title, _time.GetLocalNow())
+                        {
+                            Scope = request.Scope,
+                        });
                     AllowancesChanged?.Invoke(this, EventArgs.Empty);
                     return Allowed(request, McpConsentAnswer.AllowForSession, AllowedForSession);
                 case McpConsentAnswer.AllowForSession:
@@ -245,7 +272,7 @@ public sealed class McpConsentPolicy : IMcpConsent, IMcpCallObserver
         var how = _decided.TryGetValue(request, out var decided) ? decided : answer == McpConsentAnswer.AllowForSession ? AllowedForSession : "Allowed";
         _decided.Remove(request);
         Write(request, client, how, ok);
-        if (request.Risk == McpRisk.Remote)
+        if (request.Risk == McpRisk.Remote && !how.StartsWith(AllowedAsStatus, StringComparison.Ordinal))
             _notify?.Invoke(ok ? "An AI agent ran a command" : "An AI agent's command failed", $"{request.Title} ({client.Name})");
     }
 
@@ -258,7 +285,7 @@ public sealed class McpConsentPolicy : IMcpConsent, IMcpCallObserver
     private bool HasAllowance(McpClientInfo client, McpConsentRequest request)
     {
         lock (_gate)
-            return _allowances.Exists(a => a.ConnectionId == client.ConnectionId && a.Tool == request.Tool && a.Target == request.Target);
+            return _allowances.Exists(a => a.ConnectionId == client.ConnectionId && a.Tool == request.Tool && a.Target == request.Target && a.Scope == request.Scope);
     }
 
     private void Write(McpConsentRequest request, McpClientInfo client, string answer, bool? ok) =>

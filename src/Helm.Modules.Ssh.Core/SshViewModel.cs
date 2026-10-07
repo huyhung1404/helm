@@ -108,7 +108,18 @@ public sealed partial class SshViewModel : ObservableObject, IDisposable
     [ObservableProperty] private string? _editError;
     [ObservableProperty] private string _editKeyFile = "";
     [ObservableProperty] private string _editMenuPath = "";
-    [ObservableProperty] private bool _editAllowMcp;
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(ShowStatusWithoutAsking))]
+    private bool _editAllowMcp;
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(ShowStatusWithoutAsking))]
+    private bool _editAllowMcpShell;
+
+    [ObservableProperty] private bool _editAllowMcpStatusWithoutAsking = true;
+
+    /// <summary>The "status commands without asking" switch only means something once shell commands are allowed.</summary>
+    public bool ShowStatusWithoutAsking => EditAllowMcp && EditAllowMcpShell;
 
     [ObservableProperty] private VaultSecretRef? _editVaultRef;
     [ObservableProperty] private bool _canOpenVault;
@@ -637,6 +648,8 @@ public sealed partial class SshViewModel : ObservableObject, IDisposable
         EditVaultRef = null;
         EditMenuPath = "";
         EditAllowMcp = false;
+        EditAllowMcpShell = false;
+        EditAllowMcpStatusWithoutAsking = true;
         EditError = null;
         IsEditing = true;
     }
@@ -652,6 +665,8 @@ public sealed partial class SshViewModel : ObservableObject, IDisposable
         EditKeyFile = row.Host.KeyFile ?? "";
         EditMenuPath = row.Host.MenuPath ?? "";
         EditAllowMcp = row.Host.AllowMcp;
+        EditAllowMcpShell = row.Host.AllowMcpShell;
+        EditAllowMcpStatusWithoutAsking = row.Host.AllowMcpStatusWithoutAsking;
         EditVaultRef = row.Host is { VaultItemUid: { } uid, VaultField: { } field } ? new VaultSecretRef(uid, row.Host.VaultItemTitle ?? "", field) : null;
         if (row.Host.Auth == SshAuthKind.Vault) RefreshVaultFields();
         EditError = null;
@@ -700,6 +715,9 @@ public sealed partial class SshViewModel : ObservableObject, IDisposable
             VaultItemUid = vaultRef?.ItemUid, VaultItemTitle = vaultRef?.ItemTitle, VaultField = vaultRef?.FieldName,
             MenuPath = menuPath.Length == 0 || menuPath == SshMenu.DefaultPath ? null : menuPath,
             AllowMcp = EditAllowMcp,
+            // Shell commands only ever go with the menu: turning the menu off turns them off too.
+            AllowMcpShell = EditAllowMcp && EditAllowMcpShell,
+            AllowMcpStatusWithoutAsking = EditAllowMcpStatusWithoutAsking,
         };
         _passphraseNeeded.Remove(host.Id);
         SaveHost(host);

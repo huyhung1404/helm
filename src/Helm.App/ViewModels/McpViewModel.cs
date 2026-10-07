@@ -248,7 +248,7 @@ internal sealed partial class McpViewModel : ObservableObject
         [
             Group(McpRisk.Read, "Read", "Only read Helm's own data."),
             Group(McpRisk.Change, "Change", "Change Helm's data; changes sync to your other devices."),
-            Group(McpRisk.Remote, "Remote", "Run something on another machine (a server's SSH menu). Always asks you first."),
+            Group(McpRisk.Remote, "Remote", "Run something on another machine (a server's SSH menu, or a shell command where you allow it). Asks you first."),
         ];
         ToolsSummary = !Enabled
             ? "Off: AI agents get no Helm tools, even where Helm is added."

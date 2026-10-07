@@ -122,6 +122,52 @@ public sealed class McpConsentPolicyTests
     }
 
     [Fact]
+    public async Task A_scoped_session_allowance_covers_only_that_scope()
+    {
+        var policy = Policy();
+        _prompt.Answers.Enqueue(McpConsentAnswer.AllowForSession);
+        Assert.Equal(McpConsentAnswer.AllowForSession, await policy.AskAsync(Request(McpRisk.Remote, "web") with { Scope = "df -h" }, Claude, default));
+        Assert.Equal("df -h", Assert.Single(policy.Allowances).Scope);
+
+        // The same command again: no question.
+        Assert.Equal(McpConsentAnswer.AllowForSession, await policy.AskAsync(Request(McpRisk.Remote, "web") with { Scope = "df -h" }, Claude, default));
+        Assert.Single(_prompt.Asked);
+
+        // Another command, or no scope at all (the whole tool), on the same server: asked.
+        _prompt.Answers.Enqueue(McpConsentAnswer.Deny);
+        _prompt.Answers.Enqueue(McpConsentAnswer.Deny);
+        Assert.Equal(McpConsentAnswer.Deny, await policy.AskAsync(Request(McpRisk.Remote, "web") with { Scope = "rm -rf ~" }, Claude, default));
+        Assert.Equal(McpConsentAnswer.Deny, await policy.AskAsync(Request(McpRisk.Remote, "web"), Claude, default));
+        Assert.Equal(3, _prompt.Asked.Count);
+    }
+
+    [Fact]
+    public async Task A_status_call_runs_without_asking_is_logged_and_not_notified()
+    {
+        var policy = Policy();
+        var request = Request(McpRisk.Remote, "web") with { AllowWithoutAsking = "a status command that only reads" };
+        Assert.Equal(McpConsentAnswer.AllowOnce, await policy.AskAsync(request, Claude, default));
+        Assert.Empty(_prompt.Asked);
+        policy.Completed(request, Claude, McpConsentAnswer.AllowOnce, ok: true);
+
+        var entry = Assert.Single(_log.Entries);
+        Assert.Equal("Allowed without asking: a status command that only reads", entry.Answer);
+        Assert.Equal("ok", entry.Result);
+        Assert.Empty(_notified);
+    }
+
+    [Fact]
+    public async Task Without_asking_is_ignored_when_elevated_or_high()
+    {
+        var policy = Policy();
+        _prompt.Answers.Enqueue(McpConsentAnswer.Deny);
+        _prompt.Answers.Enqueue(McpConsentAnswer.Deny);
+        Assert.Equal(McpConsentAnswer.Deny, await policy.AskAsync(Request(McpRisk.Remote, "web", elevated: true) with { AllowWithoutAsking = "status" }, Claude, default));
+        Assert.Equal(McpConsentAnswer.Deny, await policy.AskAsync(Request(McpRisk.Remote, "web", danger: McpDanger.High) with { AllowWithoutAsking = "status" }, Claude, default));
+        Assert.Equal(2, _prompt.Asked.Count);
+    }
+
+    [Fact]
     public async Task A_session_allowance_covers_one_connection_tool_and_target_until_revoked_or_disconnected()
     {
         var policy = Policy();

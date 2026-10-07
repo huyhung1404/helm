@@ -98,8 +98,18 @@
                 </core:RowLayout>
                 <core:RowLayout Margin="0,0,0,8">
                     <core:CardHeader Title="AI agents may use this server's menu"
-                                     Description="AI agents (MCP) can then run this menu's items while the server is connected here, never a shell; Helm asks you before each run." />
+                                     Description="AI agents (MCP) can then run this menu's items while the server is connected here; Helm asks you before each run." />
                     <ui:ToggleSwitch HorizontalAlignment="Right" AutomationProperties.Name="AI agents may use this server's menu" IsChecked="{Binding EditAllowMcp}" />
+                </core:RowLayout>
+                <core:RowLayout Margin="0,0,0,8" Visibility="{Binding EditAllowMcp, Converter={StaticResource BoolToVisibility}}">
+                    <core:CardHeader Title="AI agents may run shell commands"
+                                     Description="Any command this server's user may run. Helm shows you each command and asks first; as root, every command is asked and never allowed for the session." />
+                    <ui:ToggleSwitch HorizontalAlignment="Right" AutomationProperties.Name="AI agents may run shell commands" IsChecked="{Binding EditAllowMcpShell}" />
+                </core:RowLayout>
+                <core:RowLayout Margin="0,0,0,8" Visibility="{Binding ShowStatusWithoutAsking, Converter={StaticResource BoolToVisibility}}">
+                    <core:CardHeader Title="Status commands without asking"
+                                     Description="Plain reads such as uptime, df -h, ps, ls, pm2 ls, systemctl status, docker ps and git status run without a question (not as root). They are still in the activity log." />
+                    <ui:ToggleSwitch HorizontalAlignment="Right" AutomationProperties.Name="Status commands without asking" IsChecked="{Binding EditAllowMcpStatusWithoutAsking}" />
                 </core:RowLayout>
                 <TextBlock Text="{Binding EditError}" TextWrapping="Wrap" Margin="0,0,0,8" Foreground="{DynamicResource SystemFillColorCriticalBrush}"
                            Visibility="{Binding EditError, Converter={StaticResource NotEmptyToVisibility}}" />

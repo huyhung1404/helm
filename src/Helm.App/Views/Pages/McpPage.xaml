@@ -17,13 +17,13 @@
         <ui:CardControl Margin="0,0,0,4" Icon="{ui:SymbolIcon PlugConnected24}">
             <ui:CardControl.Header>
                 <core:CardHeader Title="Let AI agents use Helm's tools"
-                                 Description="AI agents can find, read and write your notes, to-do lists, debt book and missions, and use the menus of the servers you allow in SSH, where you add Helm below. Helm has to be running. The vault is never included." />
+                                 Description="AI agents can find, read and write your notes, to-do lists, debt book and missions, and use the menus (or, where you allow it, the shell) of the servers you allow in SSH, where you add Helm below. Helm has to be running. The vault is never included." />
             </ui:CardControl.Header>
             <ui:ToggleSwitch HorizontalAlignment="Right" IsChecked="{Binding Enabled}" AutomationProperties.Name="Let AI agents use Helm's tools" />
         </ui:CardControl>
         <ui:CardControl Margin="0,0,0,4" Icon="{ui:SymbolIcon Edit24}" IsEnabled="{Binding Enabled}">
             <ui:CardControl.Header>
-                <core:CardHeader Title="AI agents may change things" Description="Off: they can only read. On: they can also add and edit notes and tasks, tick tasks, add debts, create, re-plan and advance missions, and ask to run items of a server's menu (nothing is deleted for good)." />
+                <core:CardHeader Title="AI agents may change things" Description="Off: they can only read. On: they can also add and edit notes and tasks, tick tasks, add debts, create, re-plan and advance missions, and ask to run items of a server's menu or shell commands (nothing is deleted for good)." />
             </ui:CardControl.Header>
             <ui:ToggleSwitch HorizontalAlignment="Right" IsChecked="{Binding AllowChanges}" AutomationProperties.Name="AI agents may change things" />
         </ui:CardControl>

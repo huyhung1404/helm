@@ -35,7 +35,7 @@ internal partial class McpConsentDialog : FluentWindow
         TargetText.Text = request.Target ?? "";
         DetailsPanel.Visibility = string.IsNullOrWhiteSpace(request.Details) ? Visibility.Collapsed : Visibility.Visible;
         DetailsText.Text = request.Details ?? "";
-        if (request.Danger == McpDanger.High || (request.Elevated && request.Risk == McpRisk.Remote))
+        if (request.Danger == McpDanger.High || (request.Risk == McpRisk.Remote && (request.Elevated || request.Scope is not null)))
         {
             // The exact command, prominent: this is what the user is agreeing to.
             DetailsLabel.Text = request.Risk == McpRisk.Remote ? "Exactly what will run" : "Exactly what will be sent";
@@ -44,6 +44,8 @@ internal partial class McpConsentDialog : FluentWindow
         }
 
         AllowSessionButton.Visibility = prompt.OfferSession ? Visibility.Visible : Visibility.Collapsed;
+        // A scoped allowance covers only this exact call (e.g. this command line), not everything the tool can do there.
+        if (request.Scope is not null) AllowSessionButton.Content = "Allow this exact command for this session";
         Loaded += (_, _) =>
         {
             DenyButton.Focus();

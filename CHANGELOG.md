@@ -3,6 +3,16 @@
 All notable changes to Helm. The top section is used as the GitHub release body and as the Velopack release notes.
 Format: [Keep a Changelog](https://keepachangelog.com), versions follow [SemVer](https://semver.org).
 
+## [Unreleased]
+
+### Added
+- **SSH: shell commands for AI agents** (PC). A second switch per server, *AI agents may run shell commands*, lets an
+  AI agent run commands with the new `ssh_exec` tool on a server you connected in Helm. Every command is shown to you
+  exactly and asked first; *Allow this exact command for this session* covers only that one command line. As root,
+  every command is asked each time. Simple status commands (`uptime`, `df -h`, `ps`, `ls`, `pm2 ls`,
+  `systemctl status`, `docker ps`, `git status`…) can run without a question (*Status commands without asking*, per
+  server); they still show in the activity log. See docs/mcp-security.md.
+
 ## [0.31.0] - 2026-10-07
 
 ### Changed

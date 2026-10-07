@@ -17,7 +17,7 @@ the consent policy unless the tool only reads.
 |---|---|---|
 | `Read` | only reads Helm's own data | never |
 | `Change` | changes Helm's data (synced to the other devices) | when Helm runs as Administrator, when the call is marked elevated, or when **Ask before every change** is on |
-| `Remote` | runs something on another machine (SSH) | always |
+| `Remote` | runs something on another machine (SSH) | always, except status commands that only read (see *Shell commands*) |
 
 ## Threats and defences
 
@@ -59,6 +59,30 @@ The agent may follow them. Helm does not try to detect this; instead nothing tha
   another tool is still asked;
 - the server marks `Remote` tools `destructiveHint`/`openWorldHint`, so the client may ask too;
 - SSH menu items marked `agents: false` are never offered to AI agents.
+
+### Shell commands (ssh_exec)
+
+A shell is far more than a menu: one injected command can delete or leak anything the server's user can reach. So:
+
+- it is a second switch per server, **AI agents may run shell commands**, off by default and shown only once the
+  menu switch is on; turning the menu off turns it off too. An agent never connects: the server must be connected in
+  Helm by the user;
+- every command is asked with its exact text, highlighted. "Allow for this session" is offered as **Allow this exact
+  command for this session** (`McpConsentRequest.Scope`): the allowance covers that command line on that server only,
+  never the shell as a whole;
+- as root, every command is High: asked each time, never allowed for the session, never run without asking;
+- it runs on Helm's own channel with no TTY and nothing on standard input (a password prompt fails or times out), is
+  stopped after its timeout (2 min by default, 15 min at most) and its output is capped at 64 KB;
+- **Status commands without asking** (on by default with the shell switch, can be turned off per server): a command
+  that `SshShellCommands.IsStatusCommand` accepts runs without a question (`McpConsentRequest.AllowWithoutAsking`). The
+  check is an allowlist, not a filter: the line may hold only letters, digits, spaces and `-_./:=,@+%` (no quotes,
+  `$`, backticks, `;`, `|`, `&`, redirections, globs, `~` or line breaks), so the shell can only run one program with
+  plain words; the program must be one of `uptime whoami id uname nproc free df ps ls w lsb_release hostname date`,
+  `pm2 ls|list|status`, `systemctl status|is-*|list-units|list-timers|--failed`, `docker ps|images|version|stats
+  --no-stream` or `git status|log|describe|rev-parse|show-branch|branch` (listing flags only), and options that set
+  or write (`hostname x`, `date -s`, `git log --output`, `git branch -D`, `systemctl -H`…) are refused. Files are never
+  read this way (no `cat`, `tail`, `env`, `pm2 jlist`), so a secret cannot leave the server without a question. These
+  calls are still in the activity log, without a notification each.
 
 ### Consent fatigue
 
