@@ -14,9 +14,15 @@ public sealed class McpSettings : IVersionedSettings
 
     public int Version { get; set; }
 
-    /// <summary>Claude (Helm's chats, and Claude Code where it is added) can use the notes, Tracker and Missions tools.</summary>
+    /// <summary>Claude (Claude Code or VS Code, where Helm is added) can use the tools of the modules that are on.</summary>
     public bool Enabled { get; set; } = true;
 
     /// <summary>Off: only the tools that read are offered.</summary>
     public bool AllowChanges { get; set; } = true;
+
+    /// <summary>
+    /// Every call that changes Helm's data asks first, even while Helm is not elevated (elevated, it always asks).
+    /// Added in version 1 with a false default, so no migration.
+    /// </summary>
+    public bool AskBeforeChanges { get; set; }
 }

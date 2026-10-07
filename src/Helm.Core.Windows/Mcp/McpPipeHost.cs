@@ -1,9 +1,11 @@
 using System.Collections.Concurrent;
 using System.IO.Pipes;
+using System.Runtime.InteropServices;
 using System.Security.AccessControl;
 using System.Security.Principal;
 using Helm.Core.Settings;
 using Microsoft.Extensions.Logging;
+using Microsoft.Win32.SafeHandles;
 
 namespace Helm.Core.Mcp;
 
@@ -15,10 +17,16 @@ public sealed record McpConnectionInfo(Guid Id, string ClientName, string? Clien
 /// not, so the pipe grants the user's own SID explicitly). <c>Helm.exe --mcp</c> relays Claude's stdio to it. Each
 /// connection gets its own <see cref="McpServer"/>, built when it connects, so a change of the settings applies to the
 /// next connection.
+/// <para>
+/// Hardening (docs/mcp-security.md): the pipe's ACL allows only this user and denies network logons; each caller's
+/// process is then checked (on this machine, same user) and its elevation passed to the server, so an elevated Helm asks
+/// before every change a non-elevated caller makes; at most <see cref="MaxConnections"/> callers at once, and each
+/// message is capped (<see cref="McpServer.MaxMessageLength"/>).
+/// </para>
 /// </summary>
 public sealed class McpPipeHost : IDisposable
 {
-    private const int MaxConnections = 8;
+    public const int DefaultMaxConnections = 8;
     private readonly string _pipeName;
     private readonly Func<McpServer?> _serverFactory;
     private readonly ILogger _logger;
@@ -27,12 +35,16 @@ public sealed class McpPipeHost : IDisposable
     private Task? _loop;
 
     /// <param name="serverFactory">Null when the server is turned off: the connection is closed at once.</param>
-    public McpPipeHost(HelmPaths paths, Func<McpServer?> serverFactory, ILogger<McpPipeHost> logger)
+    /// <param name="maxConnections">Callers served at once; one more is closed as soon as it connects.</param>
+    public McpPipeHost(HelmPaths paths, Func<McpServer?> serverFactory, ILogger<McpPipeHost> logger, int maxConnections = DefaultMaxConnections)
     {
         _pipeName = McpEndpoint.PipeName(paths);
         _serverFactory = serverFactory;
         _logger = logger;
+        MaxConnections = maxConnections;
     }
+
+    public int MaxConnections { get; }
 
     public string PipeName => _pipeName;
 
@@ -70,7 +82,8 @@ public sealed class McpPipeHost : IDisposable
             NamedPipeServerStream pipe;
             try
             {
-                pipe = NamedPipeServerStreamAcl.Create(_pipeName, PipeDirection.InOut, MaxConnections, PipeTransmissionMode.Byte,
+                // One instance more than the cap, so a caller over it is told (closed) instead of waiting.
+                pipe = NamedPipeServerStreamAcl.Create(_pipeName, PipeDirection.InOut, MaxConnections + 1, PipeTransmissionMode.Byte,
                     PipeOptions.Asynchronous, 0, 0, Security());
             }
             catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
@@ -100,7 +113,18 @@ public sealed class McpPipeHost : IDisposable
         {
             try
             {
+                if (Caller(pipe) is not { } caller)
+                {
+                    _logger.LogWarning("MCP pipe: a caller from another machine or another user was refused");
+                    return;
+                }
+                if (_connections.Count >= MaxConnections)
+                {
+                    _logger.LogWarning("MCP pipe: a caller was refused, {Max} are connected already", MaxConnections);
+                    return;
+                }
                 if (_serverFactory() is not { } server) return;
+                server.SetCallerElevated(caller.Elevated);
                 connection = new Connection(server, DateTimeOffset.Now, CancellationTokenSource.CreateLinkedTokenSource(ct));
                 _connections[server.Client.ConnectionId] = connection;
                 server.Changed += OnConnectionChanged;
@@ -140,6 +164,60 @@ public sealed class McpPipeHost : IDisposable
 
     private sealed record Connection(McpServer Server, DateTimeOffset Since, CancellationTokenSource Stop);
 
+    /// <summary>The caller's process as Windows sees it. <see cref="Elevated"/> is null when its token could not be read.</summary>
+    internal sealed record CallerInfo(int ProcessId, bool? Elevated);
+
+    /// <summary>
+    /// Who is on the other end: null for a caller on another machine (the ACL already denies network logons) or one
+    /// whose token belongs to another user. A token that cannot be read (a non-elevated Helm and an elevated caller)
+    /// leaves only the ACL's word, which is enough for the user check, and an unknown elevation.
+    /// </summary>
+    internal static CallerInfo? Caller(NamedPipeServerStream pipe)
+    {
+        var handle = pipe.SafePipeHandle;
+        // Succeeds only for a remote client; a local one fails with ERROR_PIPE_LOCAL.
+        var name = new char[256];
+        if (Native.GetNamedPipeClientComputerName(handle, name, (uint)(name.Length * sizeof(char)))) return null;
+        if (!Native.GetNamedPipeClientProcessId(handle, out var processId)) return null;
+        using var process = Native.OpenProcess(Native.ProcessQueryLimitedInformation, false, processId);
+        if (process.IsInvalid) return new CallerInfo((int)processId, null);
+        if (!Native.OpenProcessToken(process, Native.TokenQuery, out var token)) return new CallerInfo((int)processId, null);
+        using (token)
+        {
+            using var identity = new WindowsIdentity(token.DangerousGetHandle());
+            using var me = WindowsIdentity.GetCurrent();
+            if (identity.User is null || identity.User != me.User) return null;
+            var elevated = Native.GetTokenInformation(token, Native.TokenElevation, out var isElevated, sizeof(int), out _) ? isElevated != 0 : (bool?)null;
+            return new CallerInfo((int)processId, elevated);
+        }
+    }
+
+    private static class Native
+    {
+        public const uint ProcessQueryLimitedInformation = 0x1000;
+        public const uint TokenQuery = 0x0008;
+        public const int TokenElevation = 20;
+
+        [DllImport("kernel32.dll", SetLastError = true, CharSet = CharSet.Unicode)]
+        [return: MarshalAs(UnmanagedType.Bool)]
+        public static extern bool GetNamedPipeClientComputerName(SafePipeHandle pipe, [Out] char[] name, uint nameBytes);
+
+        [DllImport("kernel32.dll", SetLastError = true)]
+        [return: MarshalAs(UnmanagedType.Bool)]
+        public static extern bool GetNamedPipeClientProcessId(SafePipeHandle pipe, out uint processId);
+
+        [DllImport("kernel32.dll", SetLastError = true)]
+        public static extern SafeProcessHandle OpenProcess(uint access, [MarshalAs(UnmanagedType.Bool)] bool inherit, uint processId);
+
+        [DllImport("advapi32.dll", SetLastError = true)]
+        [return: MarshalAs(UnmanagedType.Bool)]
+        public static extern bool OpenProcessToken(SafeProcessHandle process, uint access, out SafeAccessTokenHandle token);
+
+        [DllImport("advapi32.dll", SetLastError = true)]
+        [return: MarshalAs(UnmanagedType.Bool)]
+        public static extern bool GetTokenInformation(SafeAccessTokenHandle token, int infoClass, out int info, int length, out int returned);
+    }
+
     /// <summary>The user's own SID only (the same in Helm's elevated token and in Claude Code's normal one).</summary>
     private static PipeSecurity Security()
     {
@@ -172,7 +250,7 @@ public static class McpBridge
         {
             var offline = new McpServer([], version,
                 "Helm is not running (or its tools for Claude are turned off), so there are no Helm tools right now. " +
-                "Ask the user to start Helm and to check Claude Chat → Helm tools for Claude.");
+                "Ask the user to start Helm and to check Helm → Claude & MCP.");
             await offline.RunAsync(stdin, stdout, CancellationToken.None).ConfigureAwait(false);
             return 0;
         }

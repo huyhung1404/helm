@@ -313,3 +313,31 @@ The page is a `core:ModulePageBase`. It already renders the title, the icon + de
 - Add a row for the tool to the README tool table (and to the Tool list in `.github/ISSUE_TEMPLATE/bug_report.yml`) and remove it from the roadmap if it was listed there.
 - Bump `<Version>` in `Directory.Build.props` (minor for a new tool). Commit, tag `vX.Y.Z`, and push `main` plus the tag. `.github/workflows/release.yml` publishes the release, and installed copies update from General → Updates.
 - Finish with a short summary: what the tool does, its shortcuts, which settings exist, what was verified, and what the user should test by hand.
+
+### 9. MCP tools (only if the tool offers tools to Claude)
+
+A module offers tools to Claude through an `IMcpToolProvider` singleton (see `NotesMcpTools.cs`). Every tool says what
+a call can do, and Helm's consent policy decides from that whether the user is asked first
+([mcp-security.md](mcp-security.md)):
+
+- **`ReadOnly = true`** for a tool that only reads Helm's data: never asked. Anything else is `McpRisk.Change` by
+  default (asked when Helm runs as Administrator, or when the user turned on *Ask before every change*).
+- **`Risk = McpRisk.Remote`** for anything that runs on another machine: always asked. Never use `Remote` for local
+  work, and never mark something that changes data as `ReadOnly`.
+- **`AskFirst`** builds the question for one exact call when the default one ("Use “tool_name”" with the arguments)
+  would not say enough. Return an `McpConsentRequest`:
+  - `Title`: the action and its target, short: `Run “Deploy” on server “web”`.
+  - `WhatItDoes`: plain words, what happens if the user allows it: "Runs ./deploy.sh in /srv/app on web. The site
+    restarts." Not the tool's description.
+  - `WhyAsk`: the risk, why Helm asks instead of just doing it: "It changes a live server; a wrong deploy takes the
+    site down." Helm adds the Administrator/root line itself when `Elevated` is set.
+  - `Details`: the exact command line or arguments, shown verbatim in a monospace box. **Never put a secret in it**
+    (it is also written to the activity log).
+  - `Target`: the server, list or note it acts on (session allowances are per target).
+  - `Elevated`: Helm runs as Administrator (`Environment.IsPrivilegedProcess`) for local work, or the remote user is
+    root. `Danger = McpDanger.High` for anything destructive or hard to undo. High removes "Allow for this session";
+    so does `Elevated` on a `Remote` call (a `Change` only touches Helm's data, so it keeps the option).
+- A secret argument (password, token, PIN) gets `"writeOnly": true` in its schema, so the default question shows it as
+  `•••`. Names containing password, token, secret, key or OTP are hidden too.
+- Throw `McpToolException` with a sentence Claude can act on when a call cannot run as asked.
+- Test the tool's risk and question in the tool's own tests: a fake `IMcpConsent` sees the `McpConsentRequest`.

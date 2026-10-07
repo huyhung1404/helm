@@ -56,7 +56,8 @@ public sealed class McpServer
     /// <summary>Newest first; a client asking for one of these gets it back, any other gets the newest.</summary>
     public static readonly IReadOnlyList<string> ProtocolVersions = ["2025-06-18", "2025-03-26", "2024-11-05"];
 
-    private const int MaxLineBytes = 4 * 1024 * 1024;
+    /// <summary>The longest message read, in characters: a longer line gets an error reply and is skipped, never held whole.</summary>
+    public const int DefaultMaxMessageLength = 4 * 1024 * 1024;
     // Compact, with Vietnamese letters and quotes as they are (no escapes): fewer tokens for Claude to read.
     private static readonly JsonSerializerOptions Output = new(JsonSerializerDefaults.Web)
     {
@@ -94,18 +95,33 @@ public sealed class McpServer
     /// <summary><see cref="Client"/> or <see cref="Calls"/> changed.</summary>
     public event EventHandler? Changed;
 
+    /// <summary>The longest message this connection reads, in characters.</summary>
+    public int MaxMessageLength { get; init; } = DefaultMaxMessageLength;
+
+    /// <summary>What the transport learnt about the caller's process (the pipe reads its token).</summary>
+    public void SetCallerElevated(bool? elevated) => Client = Client with { Elevated = elevated };
+
     /// <summary>Serves until the input ends (the client closed the connection) or <paramref name="ct"/> is cancelled.</summary>
     public async Task RunAsync(Stream input, Stream output, CancellationToken ct)
     {
         using var reader = new StreamReader(input, new UTF8Encoding(false), detectEncodingFromByteOrderMarks: false, bufferSize: 16 * 1024, leaveOpen: true);
         await using var writer = new StreamWriter(output, new UTF8Encoding(false), bufferSize: 16 * 1024, leaveOpen: true) { NewLine = "\n", AutoFlush = true };
+        var lines = new LineReader(reader, MaxMessageLength);
         while (!ct.IsCancellationRequested)
         {
-            var line = await reader.ReadLineAsync(ct).ConfigureAwait(false);
-            if (line is null) return;
-            line = line.TrimStart('﻿'); // some clients start the stream with a byte order mark
-            if (line.Length == 0) continue;
-            var reply = line.Length > MaxLineBytes ? Error(null, -32600, "Message too large.") : await HandleAsync(line, ct).ConfigureAwait(false);
+            var (line, tooLong) = await lines.ReadAsync(ct).ConfigureAwait(false);
+            JsonObject? reply;
+            if (tooLong)
+            {
+                reply = Error(null, -32600, $"Message too large (over {MaxMessageLength} characters).");
+            }
+            else
+            {
+                if (line is null) return;
+                line = line.TrimStart('﻿'); // some clients start the stream with a byte order mark
+                if (line.Length == 0) continue;
+                reply = await HandleAsync(line, ct).ConfigureAwait(false);
+            }
             if (reply is not null) await writer.WriteLineAsync(reply.ToJsonString(Output)).ConfigureAwait(false);
         }
     }
@@ -184,14 +200,19 @@ public sealed class McpServer
         if (!_tools.TryGetValue(name, out var tool)) throw new JsonRpcException(-32602, $"Unknown tool: {name}");
         using var arguments = JsonDocument.Parse(parameters?["arguments"]?.ToJsonString() ?? "{}");
         Interlocked.Increment(ref _calls);
+        (McpConsentRequest Request, McpConsentAnswer Answer)? allowed = null;
+        var ok = false;
         try
         {
-            if (await RefusalAsync(tool, arguments.RootElement, ct).ConfigureAwait(false) is { } refused)
+            var (refused, asked) = await ConsentAsync(tool, arguments.RootElement, ct).ConfigureAwait(false);
+            if (refused is not null)
             {
                 _logger.LogInformation("MCP tool {Tool} not run: {Message}", name, refused);
                 return ToolResult(refused, isError: true);
             }
+            allowed = asked;
             var result = await tool.Run(arguments.RootElement, ct).ConfigureAwait(false);
+            ok = true;
             return ToolResult(result as string ?? JsonSerializer.Serialize(result, Output), isError: false);
         }
         catch (Exception ex) when (ex is McpToolException or ArgumentException or FormatException or InvalidOperationException or KeyNotFoundException)
@@ -200,20 +221,29 @@ public sealed class McpServer
             _logger.LogInformation("MCP tool {Tool} refused: {Message}", name, ex.Message);
             return ToolResult(ex.Message, isError: true);
         }
+        finally
+        {
+            // The consent logs how an allowed call ended (and tells the user about one on another machine).
+            if (allowed is { } done && _consent is IMcpCallObserver observer)
+            {
+                try { observer.Completed(done.Request, Client, done.Answer, ok); }
+                catch (Exception ex) { _logger.LogWarning(ex, "MCP call observer failed"); }
+            }
+        }
     }
 
     /// <summary>
     /// Asks the consent before a call that is not <see cref="McpRisk.Read"/>: why it may not run (Claude reads it), or
-    /// null when it may.
+    /// the question and answer that let it run (null for a read, or when there is no consent to ask).
     /// </summary>
-    private async Task<string?> RefusalAsync(McpTool tool, JsonElement arguments, CancellationToken ct)
+    private async Task<(string? Refused, (McpConsentRequest, McpConsentAnswer)? Allowed)> ConsentAsync(McpTool tool, JsonElement arguments, CancellationToken ct)
     {
-        if (tool.Risk == McpRisk.Read) return null;
+        if (tool.Risk == McpRisk.Read) return (null, null);
         if (_consent is null)
-            return tool.Risk == McpRisk.Remote ? "Helm cannot ask the user here, so it does not run anything on another machine." : null;
+            return (tool.Risk == McpRisk.Remote ? "Helm cannot ask the user here, so it does not run anything on another machine." : null, null);
         var request = (tool.AskFirst is { } ask ? await ask(arguments, ct).ConfigureAwait(false) : null) ?? DefaultRequest(tool, arguments);
         var answer = await _consent.AskAsync(request, Client, ct).ConfigureAwait(false);
-        return answer == McpConsentAnswer.Deny ? $"The user declined: {request.Title}." : null;
+        return answer == McpConsentAnswer.Deny ? ($"The user declined: {request.Title}.", null) : (null, (request, answer));
     }
 
     private static McpConsentRequest DefaultRequest(McpTool tool, JsonElement arguments) => new(
@@ -224,10 +254,29 @@ public sealed class McpServer
         tool.Risk == McpRisk.Remote
             ? "It runs something on another machine."
             : "It changes your Helm data, and the change syncs to your other devices.",
-        arguments.ValueKind == JsonValueKind.Object && arguments.EnumerateObject().Any() ? arguments.GetRawText() : null,
+        ShownArguments(tool, arguments),
         null,
         Environment.IsPrivilegedProcess,
         McpDanger.Normal);
+
+    private static readonly string[] SecretNames = ["password", "passphrase", "secret", "token", "apikey", "api_key", "privatekey", "private_key", "otp"];
+
+    /// <summary>
+    /// The arguments as the user sees them (and the activity log keeps them). A secret, i.e. a property whose schema says
+    /// <c>"writeOnly": true</c> or whose name is a password, token, secret, key or one-time code, is shown as •••.
+    /// </summary>
+    public static string? ShownArguments(McpTool tool, JsonElement arguments)
+    {
+        if (arguments.ValueKind != JsonValueKind.Object || !arguments.EnumerateObject().Any()) return null;
+        var shown = new JsonObject();
+        foreach (var property in arguments.EnumerateObject())
+            shown[property.Name] = IsSecret(tool, property.Name) ? "•••" : JsonNode.Parse(property.Value.GetRawText());
+        return shown.ToJsonString(Output);
+    }
+
+    private static bool IsSecret(McpTool tool, string name) =>
+        (tool.InputSchema["properties"]?[name]?["writeOnly"] is JsonValue flag && flag.TryGetValue<bool>(out var writeOnly) && writeOnly)
+        || SecretNames.Any(s => name.Contains(s, StringComparison.OrdinalIgnoreCase));
 
     private static JsonObject ToolResult(string text, bool isError) =>
         new() { ["content"] = new JsonArray(new JsonObject { ["type"] = "text", ["text"] = text }), ["isError"] = isError };
@@ -251,6 +300,48 @@ public sealed class McpServer
     private sealed class JsonRpcException(int code, string message) : Exception(message)
     {
         public int Code { get; } = code;
+    }
+
+    /// <summary>Reads lines of at most <c>max</c> characters: a longer one is skipped as it streams in, never held whole.</summary>
+    private sealed class LineReader(StreamReader reader, int max)
+    {
+        private readonly char[] _buffer = new char[16 * 1024];
+        private readonly StringBuilder _line = new();
+        private int _start;
+        private int _end;
+
+        /// <summary>The next line (null at the end of the input), or <c>TooLong</c> for a line that was skipped.</summary>
+        public async Task<(string? Line, bool TooLong)> ReadAsync(CancellationToken ct)
+        {
+            _line.Clear();
+            var tooLong = false;
+            while (true)
+            {
+                if (_start == _end)
+                {
+                    _start = 0;
+                    _end = await reader.ReadAsync(_buffer, ct).ConfigureAwait(false);
+                    if (_end == 0) return tooLong ? (null, true) : (_line.Length > 0 ? _line.ToString() : null, false);
+                }
+                var newline = Array.IndexOf(_buffer, '\n', _start, _end - _start);
+                var stop = newline < 0 ? _end : newline;
+                if (!tooLong && _line.Length + (stop - _start) > max)
+                {
+                    tooLong = true;
+                    _line.Clear();
+                }
+                if (!tooLong) _line.Append(_buffer, _start, stop - _start);
+                if (newline < 0)
+                {
+                    _start = _end;
+                    continue;
+                }
+                _start = newline + 1;
+                if (tooLong) return (null, true);
+                if (_line.Length > 0 && _line[^1] == '\r') _line.Length--;
+                return (_line.ToString(), false);
+            }
+        }
     }
 }
 
