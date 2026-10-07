@@ -3,7 +3,7 @@
 All notable changes to Helm. The top section is used as the GitHub release body and as the Velopack release notes.
 Format: [Keep a Changelog](https://keepachangelog.com), versions follow [SemVer](https://semver.org).
 
-## [Unreleased]
+## [0.30.0] - 2026-10-07
 
 ### Added
 - **Claude & MCP** page (PC, after General): turn Helm's tools for Claude on or off, allow or forbid changes, and see
