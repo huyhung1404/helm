@@ -1,0 +1,92 @@
+<ui:FluentWindow
+    x:Class="Helm.App.Mcp.McpConsentDialog"
+    x:ClassModifier="internal"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
+    Title="Claude asks for your OK"
+    Width="560"
+    SizeToContent="Height"
+    MaxHeight="760"
+    ResizeMode="NoResize"
+    ExtendsContentIntoTitleBar="True"
+    ShowInTaskbar="True"
+    WindowBackdropType="Mica"
+    WindowCornerPreference="Round"
+    WindowStartupLocation="CenterScreen">
+
+    <!-- One question for one tool call: who asks, what happens, why Helm asks, the exact details. Deny is the default
+         (Enter, Esc and closing the window all deny); the Allow buttons wake up a moment after the dialog opens, so a
+         key or click meant for another window never allows anything. -->
+    <ui:FluentWindow.Resources>
+        <Style x:Key="Label" TargetType="TextBlock">
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="Margin" Value="0,14,0,4" />
+        </Style>
+    </ui:FluentWindow.Resources>
+
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <ui:TitleBar Grid.Row="0" Title="Claude asks for your OK" ShowMaximize="False" ShowMinimize="False" CanMaximize="False" />
+
+        <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" Padding="24,4,24,8">
+            <StackPanel>
+                <TextBlock x:Name="CallerText" Style="{DynamicResource HelmSecondaryText}" />
+                <TextBlock x:Name="TitleText" FontSize="18" FontWeight="SemiBold" TextWrapping="Wrap" Margin="0,4,0,0" />
+
+                <Border x:Name="Warning" Margin="0,12,0,0" Padding="12,8" CornerRadius="6" BorderThickness="1"
+                        Background="{DynamicResource SystemFillColorCautionBackgroundBrush}"
+                        BorderBrush="{DynamicResource SystemFillColorCautionBrush}" Visibility="Collapsed">
+                    <DockPanel>
+                        <ui:SymbolIcon DockPanel.Dock="Left" Symbol="Warning24" Margin="0,0,10,0" VerticalAlignment="Top"
+                                       Foreground="{DynamicResource SystemFillColorCautionBrush}" />
+                        <TextBlock x:Name="WarningText" TextWrapping="Wrap" />
+                    </DockPanel>
+                </Border>
+
+                <TextBlock Text="What it will do" Style="{StaticResource Label}" />
+                <TextBlock x:Name="WhatText" TextWrapping="Wrap" />
+
+                <TextBlock Text="Why Helm asks" Style="{StaticResource Label}" />
+                <TextBlock x:Name="WhyText" TextWrapping="Wrap" />
+
+                <StackPanel x:Name="TargetPanel">
+                    <TextBlock Text="On" Style="{StaticResource Label}" />
+                    <TextBlock x:Name="TargetText" TextWrapping="Wrap" />
+                </StackPanel>
+
+                <StackPanel x:Name="DetailsPanel">
+                    <TextBlock x:Name="DetailsLabel" Text="Details" Style="{StaticResource Label}" />
+                    <Border x:Name="DetailsBox" CornerRadius="6" BorderThickness="1" Padding="10,8"
+                            Background="{DynamicResource ControlFillColorDefaultBrush}"
+                            BorderBrush="{DynamicResource CardStrokeColorDefaultBrush}">
+                        <!-- Read-only and selectable: shown exactly as it will run. -->
+                        <TextBox x:Name="DetailsText" IsReadOnly="True" IsTabStop="False" BorderThickness="0" Background="Transparent" Padding="0"
+                                 FontFamily="Cascadia Mono, Consolas, Courier New" FontSize="12" TextWrapping="Wrap"
+                                 MaxHeight="220" VerticalScrollBarVisibility="Auto" AutomationProperties.Name="Details" />
+                    </Border>
+                </StackPanel>
+            </StackPanel>
+        </ScrollViewer>
+
+        <Border Grid.Row="2" Padding="24,14" BorderThickness="0,1,0,0" BorderBrush="{DynamicResource CardStrokeColorDefaultBrush}"
+                Background="{DynamicResource SolidBackgroundFillColorBaseBrush}">
+            <DockPanel LastChildFill="False">
+                <TextBlock x:Name="TimeoutText" DockPanel.Dock="Left" VerticalAlignment="Center" Style="{DynamicResource HelmSecondaryText}"
+                           Text="No answer in 2 minutes means no." />
+                <ui:Button x:Name="DenyButton" DockPanel.Dock="Right" Content="Deny" IsDefault="True" IsCancel="True" MinWidth="90"
+                           Margin="8,0,0,0" Click="Deny_Click" />
+                <ui:Button x:Name="AllowOnceButton" DockPanel.Dock="Right" Content="Allow once" MinWidth="90" Margin="8,0,0,0"
+                           IsEnabled="False" Click="AllowOnce_Click" />
+                <ui:Button x:Name="AllowSessionButton" DockPanel.Dock="Right" Content="Allow for this session" Margin="8,0,0,0"
+                           IsEnabled="False" Click="AllowSession_Click"
+                           ToolTip="Until this connection ends or Helm restarts: the same tool on the same target runs without asking." />
+            </DockPanel>
+        </Border>
+    </Grid>
+</ui:FluentWindow>

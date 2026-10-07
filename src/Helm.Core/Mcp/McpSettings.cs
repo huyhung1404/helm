@@ -19,4 +19,10 @@ public sealed class McpSettings : IVersionedSettings
 
     /// <summary>Off: only the tools that read are offered.</summary>
     public bool AllowChanges { get; set; } = true;
+
+    /// <summary>
+    /// Every call that changes Helm's data asks first, even while Helm is not elevated (elevated, it always asks).
+    /// Added in version 1 with a false default, so no migration.
+    /// </summary>
+    public bool AskBeforeChanges { get; set; }
 }

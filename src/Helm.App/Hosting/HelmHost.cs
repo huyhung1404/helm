@@ -53,20 +53,34 @@ internal static class HelmHost
         builder.Services.AddSingleton<Core.Services.IUpdateService>(sp => sp.GetRequiredService<Updates.VelopackUpdateService>());
 
         // Helm's MCP server: the tools of the modules that are on, for Claude (Helm's chats and Claude Code).
+        // Calls that change things ask first by Helm's policy (docs/mcp-security.md); the activity log stays on this device.
         builder.Services.AddSingleton<Mcp.McpConsentService>();
-        builder.Services.AddSingleton<Core.Mcp.IMcpConsent>(sp => sp.GetRequiredService<Mcp.McpConsentService>());
-        builder.Services.AddSingleton(sp => new Core.Mcp.McpPipeHost(paths, () =>
+        builder.Services.AddSingleton(sp => new Core.Mcp.McpConsentPolicy(
+            sp.GetRequiredService<Mcp.McpConsentService>(),
+            new Core.Mcp.McpActivityLog(Core.Mcp.McpActivityLog.FileIn(paths)),
+            () => sp.GetRequiredService<ISettingsStoreFactory>().Get<Core.Mcp.McpSettings>(Core.Mcp.McpSettings.StoreId).Current.AskBeforeChanges,
+            () => Environment.IsPrivilegedProcess,
+            notify: (title, message) => sp.GetRequiredService<IUserNotifications>().Show(title, message)));
+        builder.Services.AddSingleton<Core.Mcp.IMcpConsent>(sp => sp.GetRequiredService<Core.Mcp.McpConsentPolicy>());
+        builder.Services.AddSingleton(sp =>
         {
-            var settings = sp.GetRequiredService<ISettingsStoreFactory>().Get<Core.Mcp.McpSettings>(Core.Mcp.McpSettings.StoreId).Current;
-            if (!settings.Enabled) return null;
-            var modules = sp.GetRequiredService<Core.Modules.IModuleHost>();
-            var tools = sp.GetServices<Core.Mcp.IMcpToolProvider>()
-                .Where(p => p.ModuleId is not { } id || modules.Find(id)?.IsEnabled == true)
-                .SelectMany(p => p.Tools)
-                .Where(t => settings.AllowChanges || t.ReadOnly);
-            return new Core.Mcp.McpServer(tools, Shell.Services.AppInfo.Version, Core.Mcp.McpEndpoint.Instructions,
-                sp.GetRequiredService<ILoggerFactory>().CreateLogger<Core.Mcp.McpServer>(), sp.GetRequiredService<Core.Mcp.IMcpConsent>());
-        }, sp.GetRequiredService<ILogger<Core.Mcp.McpPipeHost>>()));
+            var host = new Core.Mcp.McpPipeHost(paths, () =>
+            {
+                var settings = sp.GetRequiredService<ISettingsStoreFactory>().Get<Core.Mcp.McpSettings>(Core.Mcp.McpSettings.StoreId).Current;
+                if (!settings.Enabled) return null;
+                var modules = sp.GetRequiredService<Core.Modules.IModuleHost>();
+                var tools = sp.GetServices<Core.Mcp.IMcpToolProvider>()
+                    .Where(p => p.ModuleId is not { } id || modules.Find(id)?.IsEnabled == true)
+                    .SelectMany(p => p.Tools)
+                    .Where(t => settings.AllowChanges || t.ReadOnly);
+                return new Core.Mcp.McpServer(tools, Shell.Services.AppInfo.Version, Core.Mcp.McpEndpoint.Instructions,
+                    sp.GetRequiredService<ILoggerFactory>().CreateLogger<Core.Mcp.McpServer>(), sp.GetRequiredService<Core.Mcp.IMcpConsent>());
+            }, sp.GetRequiredService<ILogger<Core.Mcp.McpPipeHost>>());
+            // "Allow for this session" ends with the connection it was given to.
+            var policy = sp.GetRequiredService<Core.Mcp.McpConsentPolicy>();
+            host.ConnectionsChanged += (_, _) => policy.KeepConnections(host.Connections.Select(c => c.Id));
+            return host;
+        });
 
         // Shell views and view models
         builder.Services.AddSingleton<MainWindowViewModel>();
