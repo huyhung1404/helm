@@ -142,7 +142,7 @@
         </ui:CardControl>
         <ui:CardControl Margin="0,0,0,4" Icon="{ui:SymbolIcon Chat24}">
             <ui:CardControl.Header>
-                <core:CardHeader Title="Ask Claude" Description="With Helm tools for Claude on (Claude Chat settings), Claude in Helm or Claude Code can make a mission for you, read your progress and complete the current step: try &quot;make me a mission to pass HSK3 by March&quot;." />
+                <core:CardHeader Title="Ask Claude" Description="With Helm tools for Claude on (Claude &amp; MCP page), Claude Code can make a mission for you, read your progress and complete the current step: try &quot;make me a mission to pass HSK3 by March&quot;." />
             </ui:CardControl.Header>
         </ui:CardControl>
     </StackPanel>

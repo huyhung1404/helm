@@ -29,7 +29,6 @@ body:
     attributes:
       label: Tool
       options:
-        - Claude Chat
         - Command Palette
         - Missions
         - Notes

@@ -5,7 +5,7 @@ built.
 
 A **mission** is a goal reached through an ordered chain of steps ("pass HSK3", "run a half marathon", "ship the
 v1 of my app"). The user does not type the steps: an AI writes them. Helm gives a prompt template, the user pastes it
-into any AI and imports the JSON that comes back, or asks Claude in Helm, which creates the mission directly over MCP.
+into any AI and imports the JSON that comes back, or asks Claude Code, which creates the mission directly over MCP.
 Helm then shows one step at a time, logs when each one started and finished, keeps track of the pace against the
 deadline, and celebrates phases and the finished mission with the reward the user chose.
 
@@ -24,7 +24,7 @@ Decisions already taken:
    user is now, the time per day, a deadline and free notes; *Copy* fills them into the template (§4) and puts it on
    the clipboard.
 2. **Ask an AI.** The user pastes the prompt into ChatGPT, Gemini, Claude… and copies the JSON answer.
-   Or, on PC, asks Claude Chat directly ("make me a mission to pass HSK3 by March"): Claude calls `mission_create`
+   Or, on PC, asks Claude Code directly ("make me a mission to pass HSK3 by March"): Claude calls `mission_create`
    and step 3 is skipped (the mission appears as *Planned*).
 3. **Import.** *New mission* → *Import JSON* → paste (Android: long-press the box → Paste). Helm parses
    forgivingly (§3.3) and shows a **preview**: title, goal, deadline, reward, phases and steps, total estimated days
