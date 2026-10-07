@@ -53,7 +53,14 @@ public sealed record MenuParam(
 
 public sealed record MenuItem(
     string Id, string Title, string? Description, MenuItemKind Kind, MenuOutput Output, MenuDanger Danger, string? Confirm,
-    IReadOnlyList<MenuParam> Params, int Refresh, IReadOnlyList<string> RowActions);
+    IReadOnlyList<MenuParam> Params, int Refresh, IReadOnlyList<string> RowActions)
+{
+    /// <summary>The item only reads (status, lists, logs): it changes nothing on the server.</summary>
+    public bool ReadOnly { get; init; }
+
+    /// <summary>False hides the item from Claude (MCP): it asks for a password, prompts, or is only ever run by a person.</summary>
+    public bool Agents { get; init; } = true;
+}
 
 public sealed record MenuGroup(string Title, IReadOnlyList<MenuItem> Items);
 
@@ -276,7 +283,11 @@ public static class SshMenu
         var refresh = o.TryGetProperty("refresh", out var r) && r.ValueKind == JsonValueKind.Number ? Math.Clamp(r.GetInt32(), 0, 3600) : 0;
         if (refresh is > 0 and < 2) refresh = 2;
         var rowActions = o.TryGetProperty("rowActions", out var ra) && ra.ValueKind == JsonValueKind.Array ? Strings(ra, 8) : [];
-        return new MenuItem(id, Text(o, "title") ?? id, Text(o, "description"), kind, output, danger, Text(o, "confirm"), parameters, refresh, rowActions);
+        return new MenuItem(id, Text(o, "title") ?? id, Text(o, "description"), kind, output, danger, Text(o, "confirm"), parameters, refresh, rowActions)
+        {
+            ReadOnly = Flag(o, "readOnly", id) ?? false,
+            Agents = Flag(o, "agents", id) ?? true,
+        };
     }
 
     private static MenuParam ParseParam(JsonElement o)
@@ -331,6 +342,12 @@ public static class SshMenu
         var id = Text(o, "id");
         return id is not null && IdPattern.IsMatch(id) ? id : throw new MenuFormatException($"A {what} needs an id of lowercase letters, digits, - and _.");
     }
+
+    /// <summary>An optional true/false field; anything else is refused, so a typo never shows an item to Claude by mistake.</summary>
+    private static bool? Flag(JsonElement o, string name, string id) =>
+        !o.TryGetProperty(name, out var v) ? null
+        : v.ValueKind is JsonValueKind.True or JsonValueKind.False ? v.GetBoolean()
+        : throw new MenuFormatException($"\"{id}\": \"{name}\" must be true or false.");
 
     private static string? Text(JsonElement o, string name) =>
         o.TryGetProperty(name, out var v) && v.ValueKind == JsonValueKind.String ? Clip(v.GetString() ?? "") : null;

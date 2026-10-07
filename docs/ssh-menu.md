@@ -62,6 +62,8 @@ aligned text) and keep JSON for when it is not (another client, or a script).
 | `refresh` | seconds (2 to 3600) | a view is read again this often while it is shown |
 | `rowActions` | item ids | buttons on each row of a table; see *Row actions* |
 | `params` | list | the form; see *Parameters* |
+| `readOnly` | `true`, `false` (default) | the item only reads (status, lists, logs); it changes nothing on the server |
+| `agents` | `true` (default), `false` | `false` hides the item from Claude (MCP): anything that asks for a password, opens an interactive prompt, or should only ever be run by a person |
 
 **Parameters**
 
@@ -91,6 +93,18 @@ anywhere, and only the server knows what is valid now (Restart app checks that t
 (a row's button runs the named item; each parameter takes the row's cell of the same id, and the row's `key` fills the
 others). Helm's popup runs every item in the terminal and does not use them yet.
 
+## Claude (MCP)
+
+Claude (Claude Code, VS Code) can use a server's menu through Helm's MCP server, but only where the user allows it: the
+server must be connected in Helm and have *Claude may use this server's menu* turned on in SSH settings (off for every
+server until it is turned on). Items with `"agents": false` are never offered.
+
+An item Claude runs does not go through the terminal: Helm runs its `run` line on its own channel, and the menu's
+output is **not a TTY**, so it answers with the JSON or text form of its `output`. Nothing can be typed into it, so an
+item must never wait for input; one that would (a password, a prompt) is marked `"agents": false`. Every run is asked
+first, with the exact command line; items with `"danger": "high"`, and any item when the server's user is root, are
+asked with a stronger warning. `readOnly` lets the question say that the item changes nothing.
+
 ## Jobs
 
 Long work (a deploy) should not depend on the SSH connection: if the phone loses its signal, the command would die
@@ -99,6 +113,8 @@ finish whatever happens to the connection; running the item again while the job 
 starting a second one, and Ctrl+C only stops following. See `ops/helm/menu.js` in WebAdmin for one way to do it.
 
 ## Limits
+
+`readOnly` and `agents` must be `true` or `false` when present; any other value makes Helm refuse the menu.
 
 Helm accepts at most 32 groups, 200 items, 16 parameters per item, 500 choices, 20 columns, 2000 rows and 50 stats,
 and texts up to 500 characters; anything larger is refused or cut, so a broken menu cannot flood Helm.
