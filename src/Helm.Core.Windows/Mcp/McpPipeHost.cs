@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using System.IO.Pipes;
 using System.Security.AccessControl;
 using System.Security.Principal;
@@ -5,6 +6,9 @@ using Helm.Core.Settings;
 using Microsoft.Extensions.Logging;
 
 namespace Helm.Core.Mcp;
+
+/// <summary>One client connected to Helm's MCP server now.</summary>
+public sealed record McpConnectionInfo(Guid Id, string ClientName, string? ClientVersion, DateTimeOffset Since, int Calls);
 
 /// <summary>
 /// Serves Helm's MCP tools on a named pipe that only this Windows user can open (Helm runs elevated, Claude Code does
@@ -19,6 +23,7 @@ public sealed class McpPipeHost : IDisposable
     private readonly Func<McpServer?> _serverFactory;
     private readonly ILogger _logger;
     private readonly CancellationTokenSource _stop = new();
+    private readonly ConcurrentDictionary<Guid, Connection> _connections = new();
     private Task? _loop;
 
     /// <param name="serverFactory">Null when the server is turned off: the connection is closed at once.</param>
@@ -30,6 +35,23 @@ public sealed class McpPipeHost : IDisposable
     }
 
     public string PipeName => _pipeName;
+
+    /// <summary>The clients connected now, oldest first.</summary>
+    public IReadOnlyList<McpConnectionInfo> Connections => _connections.Values
+        .Select(c => new McpConnectionInfo(c.Server.Client.ConnectionId, c.Server.Client.Name, c.Server.Client.Version, c.Since, c.Server.Calls))
+        .OrderBy(c => c.Since)
+        .ToList();
+
+    /// <summary>A client connected, introduced itself, called a tool or left. Raised off the UI thread.</summary>
+    public event EventHandler? ConnectionsChanged;
+
+    /// <summary>Closes that client's connection (it may connect again; the next call then starts a new one).</summary>
+    public void Disconnect(Guid id)
+    {
+        if (!_connections.TryGetValue(id, out var connection)) return;
+        try { connection.Stop.Cancel(); }
+        catch (ObjectDisposedException) { } // it was just leaving
+    }
 
     public void Start() => _loop ??= Task.Run(() => AcceptAsync(_stop.Token));
 
@@ -73,13 +95,18 @@ public sealed class McpPipeHost : IDisposable
 
     private async Task ServeAsync(NamedPipeServerStream pipe, CancellationToken ct)
     {
+        Connection? connection = null;
         await using (pipe)
         {
             try
             {
                 if (_serverFactory() is not { } server) return;
+                connection = new Connection(server, DateTimeOffset.Now, CancellationTokenSource.CreateLinkedTokenSource(ct));
+                _connections[server.Client.ConnectionId] = connection;
+                server.Changed += OnConnectionChanged;
+                OnConnectionChanged(server, EventArgs.Empty);
                 _logger.LogInformation("MCP client connected ({Tools} tools)", server.ToolNames.Count);
-                await server.RunAsync(pipe, pipe, ct).ConfigureAwait(false);
+                await server.RunAsync(pipe, pipe, connection.Stop.Token).ConfigureAwait(false);
             }
             catch (Exception ex) when (ex is IOException or OperationCanceledException or ObjectDisposedException)
             {
@@ -90,8 +117,28 @@ public sealed class McpPipeHost : IDisposable
                 _logger.LogError(ex, "MCP connection failed");
             }
         }
+        if (connection is null) return;
+        connection.Server.Changed -= OnConnectionChanged;
+        _connections.TryRemove(connection.Server.Client.ConnectionId, out _);
+        connection.Stop.Dispose();
+        OnConnectionChanged(connection.Server, EventArgs.Empty);
         _logger.LogInformation("MCP client disconnected");
     }
+
+    private void OnConnectionChanged(object? sender, EventArgs e)
+    {
+        try
+        {
+            ConnectionsChanged?.Invoke(this, EventArgs.Empty);
+        }
+        catch (Exception ex)
+        {
+            // A listener's failure must not end the connection.
+            _logger.LogError(ex, "MCP connection listener failed");
+        }
+    }
+
+    private sealed record Connection(McpServer Server, DateTimeOffset Since, CancellationTokenSource Stop);
 
     /// <summary>The user's own SID only (the same in Helm's elevated token and in Claude Code's normal one).</summary>
     private static PipeSecurity Security()
@@ -183,50 +230,4 @@ public static class McpBridge
             // One side closed.
         }
     }
-}
-
-/// <summary>
-/// How Claude reaches Helm's tools: the command it starts (this Helm.exe with --mcp), as an MCP config file for Helm's
-/// own chats and as a <c>claude mcp add</c> line for Claude Code in a terminal.
-/// </summary>
-public sealed class McpClientConfig(HelmPaths paths, ISettingsStoreFactory settings)
-{
-    public bool Enabled => settings.Get<McpSettings>(McpSettings.StoreId).Current.Enabled;
-
-    /// <summary>The running Helm.exe (for an installed Helm, HelmApp\current\Helm.exe, which updates keep in place).</summary>
-    public string Executable => Environment.ProcessPath ?? Path.Combine(AppContext.BaseDirectory, "Helm.exe");
-
-    /// <summary>"--mcp", plus the data folder when it is not the usual one (a test copy).</summary>
-    public IReadOnlyList<string> Arguments =>
-        string.Equals(Path.GetFullPath(paths.Root), Path.GetFullPath(new HelmPaths().Root), StringComparison.OrdinalIgnoreCase)
-            ? ["--mcp"]
-            : ["--mcp", "--data-dir", paths.Root];
-
-    /// <summary>For a terminal: adds Helm to Claude Code for every folder (user scope).</summary>
-    public string ClaudeCodeCommand => $"claude mcp add --scope user helm -- {Quote(Executable)} {string.Join(' ', Arguments.Select(Quote))}";
-
-    /// <summary>Writes the config Helm's chats pass with --mcp-config; null while the tools are off.</summary>
-    public string? WriteConfigFile()
-    {
-        if (!Enabled) return null;
-        var folder = Path.Combine(paths.Root, "mcp");
-        Directory.CreateDirectory(folder);
-        var file = Path.Combine(folder, "claude-mcp.json");
-        var config = new System.Text.Json.Nodes.JsonObject
-        {
-            ["mcpServers"] = new System.Text.Json.Nodes.JsonObject
-            {
-                ["helm"] = new System.Text.Json.Nodes.JsonObject
-                {
-                    ["type"] = "stdio",
-                    ["command"] = Executable,
-                    ["args"] = new System.Text.Json.Nodes.JsonArray(Arguments.Select(a => (System.Text.Json.Nodes.JsonNode)a).ToArray()),
-                },
-            },
-        };
-        File.WriteAllText(file, config.ToJsonString(new System.Text.Json.JsonSerializerOptions { WriteIndented = true }));
-        return file;
-    }
-
-    private static string Quote(string arg) => arg.Contains(' ') || arg.Contains('"') ? "\"" + arg.Replace("\"", "\\\"") + "\"" : arg;
 }

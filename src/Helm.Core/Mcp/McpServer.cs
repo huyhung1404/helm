@@ -13,8 +13,23 @@ namespace Helm.Core.Mcp;
 /// </summary>
 public sealed record McpTool(string Name, string Description, JsonObject InputSchema, Func<JsonElement, CancellationToken, Task<object?>> Run)
 {
+    private readonly McpRisk? _risk;
+
     /// <summary>Only reads (Claude may call it without asking); a tool that writes says so to the client.</summary>
     public bool ReadOnly { get; init; }
+
+    /// <summary>What a call can do; when not set, <see cref="McpRisk.Read"/> for a <see cref="ReadOnly"/> tool, else <see cref="McpRisk.Change"/>.</summary>
+    public McpRisk Risk
+    {
+        get => _risk ?? (ReadOnly ? McpRisk.Read : McpRisk.Change);
+        init => _risk = value;
+    }
+
+    /// <summary>
+    /// Builds the question for this exact call (it may look at the server first). Null, or a null result: the consent
+    /// still sees the call, through a question built from the tool.
+    /// </summary>
+    public Func<JsonElement, CancellationToken, Task<McpConsentRequest?>>? AskFirst { get; init; }
 
     /// <summary>A tool that takes no arguments.</summary>
     public static JsonObject NoArguments() => new() { ["type"] = "object", ["properties"] = new JsonObject() };
@@ -51,17 +66,33 @@ public sealed class McpServer
     private readonly IReadOnlyDictionary<string, McpTool> _tools;
     private readonly string _version;
     private readonly string _instructions;
+    private const int MaxClientName = 100;
     private readonly ILogger _logger;
+    private readonly IMcpConsent? _consent;
+    private int _calls;
 
-    public McpServer(IEnumerable<McpTool> tools, string version, string instructions, ILogger? logger = null)
+    /// <param name="consent">Asked before every call that is not <see cref="McpRisk.Read"/>. Without it, tools that change
+    /// Helm's data run as before and <see cref="McpRisk.Remote"/> tools are refused.</param>
+    public McpServer(IEnumerable<McpTool> tools, string version, string instructions, ILogger? logger = null, IMcpConsent? consent = null)
     {
         _tools = tools.GroupBy(t => t.Name, StringComparer.Ordinal).ToDictionary(g => g.Key, g => g.First(), StringComparer.Ordinal);
         _version = version;
         _instructions = instructions;
         _logger = logger ?? NullLogger.Instance;
+        _consent = consent;
+        Client = new McpClientInfo(Guid.NewGuid(), "Unknown client", null);
     }
 
     public IReadOnlyCollection<string> ToolNames => _tools.Keys.ToList();
+
+    /// <summary>This connection, with the name the client gave in <c>initialize</c>.</summary>
+    public McpClientInfo Client { get; private set; }
+
+    /// <summary>Tool calls so far on this connection.</summary>
+    public int Calls => Volatile.Read(ref _calls);
+
+    /// <summary><see cref="Client"/> or <see cref="Calls"/> changed.</summary>
+    public event EventHandler? Changed;
 
     /// <summary>Serves until the input ends (the client closed the connection) or <paramref name="ct"/> is cancelled.</summary>
     public async Task RunAsync(Stream input, Stream output, CancellationToken ct)
@@ -106,6 +137,7 @@ public sealed class McpServer
                 _ when method.StartsWith("notifications/", StringComparison.Ordinal) => null,
                 _ => throw new JsonRpcException(-32601, $"Method not found: {method}"),
             };
+            if (method is "initialize" or "tools/call") Changed?.Invoke(this, EventArgs.Empty);
             if (isNotification) return null;
             return new JsonObject { ["jsonrpc"] = "2.0", ["id"] = id, ["result"] = result ?? new JsonObject() };
         }
@@ -118,6 +150,8 @@ public sealed class McpServer
     private JsonObject Initialize(JsonObject? parameters)
     {
         var asked = parameters?["protocolVersion"]?.GetValue<string>();
+        if (parameters?["clientInfo"] is JsonObject info && ClientText(info["name"]) is { } name)
+            Client = Client with { Name = name, Version = ClientText(info["version"]) };
         return new JsonObject
         {
             ["protocolVersion"] = asked is not null && ProtocolVersions.Contains(asked) ? asked : ProtocolVersions[0],
@@ -134,7 +168,13 @@ public sealed class McpServer
             ["name"] = t.Name,
             ["description"] = t.Description,
             ["inputSchema"] = t.InputSchema.DeepClone(),
-            ["annotations"] = new JsonObject { ["readOnlyHint"] = t.ReadOnly, ["destructiveHint"] = false, ["openWorldHint"] = false },
+            // A tool that reaches another machine says so: the client may then ask too.
+            ["annotations"] = new JsonObject
+            {
+                ["readOnlyHint"] = t.Risk == McpRisk.Read,
+                ["destructiveHint"] = t.Risk == McpRisk.Remote,
+                ["openWorldHint"] = t.Risk == McpRisk.Remote,
+            },
         }).ToArray()),
     };
 
@@ -143,18 +183,62 @@ public sealed class McpServer
         var name = parameters?["name"]?.GetValue<string>() ?? throw new JsonRpcException(-32602, "Missing tool name.");
         if (!_tools.TryGetValue(name, out var tool)) throw new JsonRpcException(-32602, $"Unknown tool: {name}");
         using var arguments = JsonDocument.Parse(parameters?["arguments"]?.ToJsonString() ?? "{}");
+        Interlocked.Increment(ref _calls);
         try
         {
+            if (await RefusalAsync(tool, arguments.RootElement, ct).ConfigureAwait(false) is { } refused)
+            {
+                _logger.LogInformation("MCP tool {Tool} not run: {Message}", name, refused);
+                return ToolResult(refused, isError: true);
+            }
             var result = await tool.Run(arguments.RootElement, ct).ConfigureAwait(false);
-            var text = result as string ?? JsonSerializer.Serialize(result, Output);
-            return new JsonObject { ["content"] = new JsonArray(new JsonObject { ["type"] = "text", ["text"] = text }), ["isError"] = false };
+            return ToolResult(result as string ?? JsonSerializer.Serialize(result, Output), isError: false);
         }
         catch (Exception ex) when (ex is McpToolException or ArgumentException or FormatException or InvalidOperationException or KeyNotFoundException)
         {
             // What was wrong with the call: Claude reads it and can try again.
             _logger.LogInformation("MCP tool {Tool} refused: {Message}", name, ex.Message);
-            return new JsonObject { ["content"] = new JsonArray(new JsonObject { ["type"] = "text", ["text"] = ex.Message }), ["isError"] = true };
+            return ToolResult(ex.Message, isError: true);
         }
+    }
+
+    /// <summary>
+    /// Asks the consent before a call that is not <see cref="McpRisk.Read"/>: why it may not run (Claude reads it), or
+    /// null when it may.
+    /// </summary>
+    private async Task<string?> RefusalAsync(McpTool tool, JsonElement arguments, CancellationToken ct)
+    {
+        if (tool.Risk == McpRisk.Read) return null;
+        if (_consent is null)
+            return tool.Risk == McpRisk.Remote ? "Helm cannot ask the user here, so it does not run anything on another machine." : null;
+        var request = (tool.AskFirst is { } ask ? await ask(arguments, ct).ConfigureAwait(false) : null) ?? DefaultRequest(tool, arguments);
+        var answer = await _consent.AskAsync(request, Client, ct).ConfigureAwait(false);
+        return answer == McpConsentAnswer.Deny ? $"The user declined: {request.Title}." : null;
+    }
+
+    private static McpConsentRequest DefaultRequest(McpTool tool, JsonElement arguments) => new(
+        tool.Name,
+        tool.Risk,
+        $"Use “{tool.Name}”",
+        tool.Description,
+        tool.Risk == McpRisk.Remote
+            ? "It runs something on another machine."
+            : "It changes your Helm data, and the change syncs to your other devices.",
+        arguments.ValueKind == JsonValueKind.Object && arguments.EnumerateObject().Any() ? arguments.GetRawText() : null,
+        null,
+        Environment.IsPrivilegedProcess,
+        McpDanger.Normal);
+
+    private static JsonObject ToolResult(string text, bool isError) =>
+        new() { ["content"] = new JsonArray(new JsonObject { ["type"] = "text", ["text"] = text }), ["isError"] = isError };
+
+    /// <summary>A name the client gave, as safe to show: a string, without control characters, not too long.</summary>
+    private static string? ClientText(JsonNode? node)
+    {
+        if (node is not JsonValue value || !value.TryGetValue<string>(out var text)) return null;
+        text = new string(text.Where(c => !char.IsControl(c)).ToArray()).Trim();
+        if (text.Length > MaxClientName) text = text[..MaxClientName];
+        return text.Length > 0 ? text : null;
     }
 
     private static JsonObject Error(JsonNode? id, int code, string message) => new()
