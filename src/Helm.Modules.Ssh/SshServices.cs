@@ -1,4 +1,5 @@
 using Helm.Core;
+using Helm.Core.Mcp;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Helm.Modules.Ssh;
@@ -9,5 +10,7 @@ public static class SshServices
         services
             .AddSshCore()
             .AddHelmModule<SshModule, SshPage, SshViewModel>()
-            .AddSingleton<SshContentPage>();
+            .AddSingleton<SshContentPage>()
+            // Claude's tools for the servers' menus: MCP runs on Windows only.
+            .AddSingleton<IMcpToolProvider, SshMcpTools>();
 }

@@ -24,7 +24,7 @@ public enum SshSessionState
 /// <see cref="TerminalBuffer"/> and handed to whichever terminal is attached; keys and resizes are sent from a queue,
 /// so a slow network never blocks the UI thread. Events are raised on background threads.
 /// </summary>
-public sealed class SshSession : IDisposable, IMenuRunner
+public sealed class SshSession : IDisposable, ISshChannel
 {
     /// <summary>A keep-alive is sent this often, so idle connections are not dropped by NATs and firewalls.</summary>
     public static readonly TimeSpan KeepAlive = TimeSpan.FromSeconds(30);
