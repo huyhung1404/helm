@@ -42,6 +42,31 @@ public sealed class SyncIndicatorTests
         Assert.False(vm.IsSynced);
     }
 
+    [Fact]
+    public async Task A_finished_sync_shows_the_tick_for_a_moment()
+    {
+        var sync = new FakeSync(new SyncStatus(SyncState.Idle, DateTimeOffset.Now, null));
+        var vm = new SyncIndicatorViewModel(sync, new Inline(), TimeSpan.FromMilliseconds(50));
+        Assert.False(vm.JustSynced); // already synced at start: plain arrows
+
+        sync.Set(new SyncStatus(SyncState.Offline, null, "timeout"));
+        Assert.True(vm.IsMuted);
+        Assert.False(vm.JustSynced); // offline → idle is not a finished sync
+
+        sync.Set(new SyncStatus(SyncState.Syncing, null, null));
+        Assert.False(vm.IsMuted);
+        sync.Set(new SyncStatus(SyncState.Idle, DateTimeOffset.Now, null));
+        Assert.True(vm.JustSynced);
+
+        await Task.Delay(400);
+        Assert.False(vm.JustSynced);
+
+        sync.Set(new SyncStatus(SyncState.Syncing, null, null));
+        sync.Set(new SyncStatus(SyncState.Idle, DateTimeOffset.Now, null));
+        sync.Set(new SyncStatus(SyncState.Error, null, "boom"));
+        Assert.False(vm.JustSynced); // a problem replaces the tick at once
+    }
+
     private sealed class Inline : IUiDispatcher
     {
         public bool CheckAccess() => true;

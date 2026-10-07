@@ -29,20 +29,27 @@ public static class SyncStatusText
 /// <summary>
 /// The sync button of the shell (Windows title bar, Android app bar), on every page: its look says whether everything
 /// is synced, syncing, offline or has a problem, the tooltip says more, and a click syncs now (or, when sync is not set
-/// up, opens its settings).
+/// up, opens its settings). One sync glyph throughout: it turns while syncing, shows a tick for a moment when a sync
+/// finishes, fades when offline or not set up, and turns red on a problem.
 /// </summary>
 public sealed partial class SyncIndicatorViewModel : ObservableObject
 {
     private readonly ISyncService _sync;
     private readonly IUiDispatcher _ui;
+    private readonly TimeSpan _tickFor;
+    private int _tickRun;
 
     [ObservableProperty] private SyncState _state;
     [ObservableProperty] private string _toolTip = "";
 
-    public SyncIndicatorViewModel(ISyncService sync, IUiDispatcher ui)
+    /// <summary>A sync just finished: the tick shows for a moment, then the glyph goes back to plain arrows.</summary>
+    [ObservableProperty] private bool _justSynced;
+
+    public SyncIndicatorViewModel(ISyncService sync, IUiDispatcher ui, TimeSpan? tickFor = null)
     {
         _sync = sync;
         _ui = ui;
+        _tickFor = tickFor ?? TimeSpan.FromSeconds(1.5);
         _sync.StatusChanged += (_, _) => _ui.Post(Update);
         Update();
     }
@@ -58,16 +65,36 @@ public sealed partial class SyncIndicatorViewModel : ObservableObject
 
     public bool IsOffline => State == SyncState.Offline;
 
+    /// <summary>Nothing goes out right now (offline or not set up): the glyph is faded.</summary>
+    public bool IsMuted => IsOffline || IsNotSetUp;
+
     /// <summary>Anything that needs the user (token, quota, key, held deletions, errors).</summary>
     public bool HasProblem => State is SyncState.Unauthorized or SyncState.QuotaExceeded or SyncState.KeyChanged or SyncState.Held or SyncState.Error;
 
-    partial void OnStateChanged(SyncState value)
+    partial void OnStateChanged(SyncState oldValue, SyncState newValue)
     {
+        if (oldValue == SyncState.Syncing && newValue == SyncState.Idle)
+            ShowTick();
+        else
+            JustSynced = false;
         OnPropertyChanged(nameof(IsSyncing));
         OnPropertyChanged(nameof(IsSynced));
         OnPropertyChanged(nameof(IsNotSetUp));
         OnPropertyChanged(nameof(IsOffline));
+        OnPropertyChanged(nameof(IsMuted));
         OnPropertyChanged(nameof(HasProblem));
+    }
+
+    private async void ShowTick()
+    {
+        var run = ++_tickRun;
+        JustSynced = true;
+        await Task.Delay(_tickFor).ConfigureAwait(false);
+        _ui.Post(() =>
+        {
+            if (run == _tickRun)
+                JustSynced = false;
+        });
     }
 
     private void Update()
