@@ -52,7 +52,7 @@ public sealed class CommandPaletteModule : HelmModuleBase, IDisposable
     public override string Id => ModuleId;
     public override string DisplayName => "Command Palette";
     public override string Description => "One shortcut, one box: your notes and tasks first, then apps, files, open windows and Windows settings, from any app.";
-    public override ModuleGroup Group => ModuleGroup.Advanced;
+    public override ModuleGroup Group => ModuleGroup.WindowsAndDesktop;
     public override SymbolRegular Icon => SymbolRegular.Search24;
     public override System.Windows.Media.ImageSource IconImage => CommandPaletteLogo.Image;
     public override Type SettingsPageType => typeof(CommandPalettePage);

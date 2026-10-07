@@ -15,7 +15,7 @@ public sealed class SshModule(SshViewModel viewModel) : HelmModuleBase, IModuleC
     public override string Id => SshIds.ModuleId;
     public override string DisplayName => SshIds.DisplayName;
     public override string Description => SshIds.Description;
-    public override ModuleGroup Group => ModuleGroup.Advanced;
+    public override ModuleGroup Group => ModuleGroup.SecurityAndServers;
     public override SymbolRegular Icon => SymbolRegular.WindowConsole20;
     public override ImageSource IconImage => SshLogo.Image;
     public override Type SettingsPageType => typeof(SshPage);

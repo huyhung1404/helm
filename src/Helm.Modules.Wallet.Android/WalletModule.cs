@@ -32,7 +32,7 @@ public sealed class WalletModule : AndroidModuleBase, IModuleContent, IBackHandl
     public override string Id => WalletIds.ModuleId;
     public override string DisplayName => WalletIds.DisplayName;
     public override string Description => WalletIds.Description;
-    public override ModuleGroup Group => ModuleGroup.SystemTools;
+    public override ModuleGroup Group => ModuleGroup.MoneyAndMedia;
     public override Symbol Icon => Symbol.Wallet;
 
     /// <summary>The same vector icon as on Windows (<see cref="WalletIconShape"/>).</summary>

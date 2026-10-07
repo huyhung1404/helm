@@ -15,7 +15,7 @@ public sealed class WalletModule : HelmModuleBase, IModuleContent
     public override string Id => WalletIds.ModuleId;
     public override string DisplayName => WalletIds.DisplayName;
     public override string Description => WalletIds.Description;
-    public override ModuleGroup Group => ModuleGroup.SystemTools;
+    public override ModuleGroup Group => ModuleGroup.MoneyAndMedia;
     public override SymbolRegular Icon => SymbolRegular.Wallet24;
     public override ImageSource IconImage => WalletLogo.Image;
     public override Type SettingsPageType => typeof(WalletPage);

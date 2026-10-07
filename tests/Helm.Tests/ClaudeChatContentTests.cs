@@ -136,7 +136,7 @@ public class ClaudeChatContentTests
         public override string Id => "fake";
         public override string DisplayName => "Fake";
         public override string Description => string.Empty;
-        public override Helm.Core.Modules.ModuleGroup Group => Helm.Core.Modules.ModuleGroup.Advanced;
+        public override Helm.Core.Modules.ModuleGroup Group => Helm.Core.Modules.ModuleGroup.Planning;
         public override Wpf.Ui.Controls.SymbolRegular Icon => Wpf.Ui.Controls.SymbolRegular.Pin24;
         public override System.Windows.Media.ImageSource? IconImage => image;
         public override Type SettingsPageType => typeof(object);

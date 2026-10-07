@@ -10,11 +10,10 @@ public static class ModuleGroupIcons
 {
     public static SymbolRegular Icon(this ModuleGroup group) => group switch
     {
-        ModuleGroup.SystemTools => SymbolRegular.Toolbox24,
-        ModuleGroup.WindowingAndLayouts => SymbolRegular.WindowMultiple20,
-        ModuleGroup.InputAndOutput => SymbolRegular.Keyboard24,
-        ModuleGroup.FileManagement => SymbolRegular.Folder24,
-        ModuleGroup.Advanced => SymbolRegular.Wrench24,
+        ModuleGroup.Planning => SymbolRegular.CalendarLtr24,
+        ModuleGroup.MoneyAndMedia => SymbolRegular.Money24,
+        ModuleGroup.SecurityAndServers => SymbolRegular.ShieldLock24,
+        ModuleGroup.WindowsAndDesktop => SymbolRegular.WindowMultiple20,
         _ => SymbolRegular.Apps24,
     };
 }

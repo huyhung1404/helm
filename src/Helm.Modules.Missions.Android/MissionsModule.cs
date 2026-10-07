@@ -56,7 +56,7 @@ public sealed class MissionsModule : AndroidModuleBase, IModuleContent, IBackHan
     public override string Id => MissionsIds.ModuleId;
     public override string DisplayName => MissionsIds.DisplayName;
     public override string Description => MissionsIds.Description;
-    public override ModuleGroup Group => ModuleGroup.SystemTools;
+    public override ModuleGroup Group => ModuleGroup.Planning;
     public override Symbol Icon => Symbol.Flag;
 
     /// <summary>The same vector icon as on Windows (<see cref="MissionsIconShape"/>).</summary>
