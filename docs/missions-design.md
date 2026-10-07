@@ -65,7 +65,7 @@ src/Helm.Modules.Missions.Android/     Avalonia: same set, one column
 tests/Helm.Tests/Missions/             import, store rules, pace, prompt, MCP tools
 ```
 
-- Module id `missions`, display name **Missions**, group `SystemTools`, symbol `Flag24` (U+F40C, exists and is below
+- Module id `missions`, display name **Missions**, group `Planning`, symbol `Flag24` (U+F40C, exists and is below
   U+FFFF; Android `Symbol.Flag`) as the fallback for the picture icon.
 - Description: "Reach a goal one step at a time: import a roadmap written by an AI, work through it in order, and
   see every step's dates and your pace."

@@ -91,7 +91,7 @@ Key infrastructure in `Helm.Core`:
        public override string Id => "color-picker";
        public override string DisplayName => "Color Picker";
        public override string Description => "Pick a color from anywhere on screen.";
-       public override ModuleGroup Group => ModuleGroup.SystemTools;
+       public override ModuleGroup Group => ModuleGroup.Planning;
        public override SymbolRegular Icon => SymbolRegular.Color24;
        public override Type SettingsPageType => typeof(ColorPickerPage);
        public override IReadOnlyList<HotkeyDefinition> Hotkeys => [...];

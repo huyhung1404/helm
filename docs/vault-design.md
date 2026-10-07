@@ -8,7 +8,7 @@ change must keep. The byte-level formats are in [vault-format.md](vault-format.m
 
 | Topic | Decision |
 |---|---|
-| Platforms | PC + Android, module id `vault`, class prefix `Vault`, group `Advanced`, icon `LockClosed` |
+| Platforms | PC + Android, module id `vault`, class prefix `Vault`, group `Security & Servers`, icon `LockClosed` |
 | Password | A **vault password**, separate from the sync passphrase. At least 14 characters, with the same strength check as sync (`SyncKeyVault.ValidateNewPassphrase`) |
 | Recovery | A vault recovery key (`HELMV-…`), shown once and saved in an Emergency Kit. Forgetting the password *and* losing the kit is unrecoverable, by design |
 | Quick unlock | Windows Hello / Android biometric, per device. The password is required again every 14 days (configurable) and after 5 failed quick unlocks |

@@ -61,7 +61,7 @@ public sealed class RemovedModuleTests
         public override string Id => id;
         public override string DisplayName => id;
         public override string Description => "";
-        public override ModuleGroup Group => ModuleGroup.SystemTools;
+        public override ModuleGroup Group => ModuleGroup.Planning;
 
         public override Task EnableAsync(CancellationToken ct)
         {
