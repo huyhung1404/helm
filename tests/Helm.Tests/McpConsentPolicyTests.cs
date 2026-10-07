@@ -64,7 +64,7 @@ public sealed class McpConsentPolicyTests
     }
 
     [Fact]
-    public async Task An_elevated_Helm_asks_every_change_says_who_is_not_elevated_and_offers_no_session()
+    public async Task An_elevated_Helm_asks_every_change_says_who_is_not_elevated_and_may_allow_it_for_the_session()
     {
         _helmElevated = true;
         var policy = Policy();
@@ -72,16 +72,20 @@ public sealed class McpConsentPolicyTests
         _prompt.Answers.Enqueue(McpConsentAnswer.AllowForSession);
         // The server's default question marks the call elevated while Helm is.
         var request = Request(McpRisk.Change, elevated: true);
-        Assert.Equal(McpConsentAnswer.AllowOnce, await policy.AskAsync(request, caller, default));
+        Assert.Equal(McpConsentAnswer.AllowForSession, await policy.AskAsync(request, caller, default));
         var asked = Assert.Single(_prompt.Asked);
         Assert.True(asked.HelmElevated);
         Assert.True(asked.CallerNotElevated);
-        Assert.False(asked.OfferSession);
-        Assert.Empty(policy.Allowances);
+        Assert.True(asked.OfferSession); // a change only touches Helm's data
+        Assert.Single(policy.Allowances);
+
+        // The next change by the same tool on the same connection is not asked again.
+        Assert.Equal(McpConsentAnswer.AllowForSession, await policy.AskAsync(Request(McpRisk.Change, elevated: true), caller, default));
+        Assert.Single(_prompt.Asked);
 
         // An elevated caller is not flagged.
         _prompt.Answers.Enqueue(McpConsentAnswer.AllowOnce);
-        await policy.AskAsync(Request(McpRisk.Change, elevated: true), Claude with { Elevated = true }, default);
+        await policy.AskAsync(Request(McpRisk.Change, elevated: true, tool: "other"), Claude with { Elevated = true }, default);
         Assert.False(_prompt.Asked[1].CallerNotElevated);
     }
 

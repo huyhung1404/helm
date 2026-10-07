@@ -41,10 +41,11 @@ may connect** (Claude Code normally runs without elevation; refusing them would 
 - while Helm runs as Administrator, **every** call that is not a read is asked, whoever the caller is;
 - the pipe reads the caller's token; when Helm is elevated and the caller is not, the dialog says so in a warning
   ("does not run as Administrator, but Helm does: allowing lets it act with Helm's rights");
-- an elevated call (Helm as Administrator, or root on the server) is never "allowed for this session": each one is
-  asked;
-- Helm's own tools never touch the system (no registry, services or files outside Helm's data). The elevation only
-  matters for the SSH tools, which always ask.
+- Helm's own tools never touch the system (no registry, services or files outside Helm's data), so the elevation adds
+  nothing to a `Change`: it may be "allowed for this session" (same connection, same tool), or Claude editing five
+  notes would mean five dialogs;
+- a command run as root (or as Administrator) on another machine is never "allowed for this session": each one is
+  asked.
 
 ### Prompt injection through tool output
 
@@ -66,7 +67,8 @@ A question asked too often stops meaning anything. So:
 - reads are never asked, and changes are asked only when Helm is elevated or the user wants it;
 - every question says in plain words **what will happen**, **why Helm asks** and the exact details, so it can be
   answered in two seconds;
-- "Allow for this session" (normal calls only) stops repeats of the same tool on the same target;
+- "Allow for this session" stops repeats of the same tool on the same target (any change of Helm's data; a command
+  on a server unless it is High danger or runs as root);
 - questions come one at a time; more than **10 asked calls in a minute** are refused without asking, with a message
   Claude reads ("Helm did not ask the user: …"), so a runaway loop cannot flood the user with dialogs.
 

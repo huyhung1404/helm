@@ -331,7 +331,8 @@ a call can do, and Helm's consent policy decides from that whether the user is a
     (it is also written to the activity log).
   - `Target`: the server, list or note it acts on (session allowances are per target).
   - `Elevated`: Helm runs as Administrator (`Environment.IsPrivilegedProcess`) for local work, or the remote user is
-    root. `Danger = McpDanger.High` for anything destructive or hard to undo. Both remove "Allow for this session".
+    root. `Danger = McpDanger.High` for anything destructive or hard to undo. High removes "Allow for this session";
+    so does `Elevated` on a `Remote` call (a `Change` only touches Helm's data, so it keeps the option).
 - A secret argument (password, token, PIN) gets `"writeOnly": true` in its schema, so the default question shows it as
   `•••`. Names containing password, token, secret, key or OTP are hidden too.
 - Throw `McpToolException` with a sentence Claude can act on when a call cannot run as asked.

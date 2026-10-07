@@ -35,7 +35,7 @@ internal partial class McpConsentDialog : FluentWindow
         TargetText.Text = request.Target ?? "";
         DetailsPanel.Visibility = string.IsNullOrWhiteSpace(request.Details) ? Visibility.Collapsed : Visibility.Visible;
         DetailsText.Text = request.Details ?? "";
-        if (request.Danger == McpDanger.High || request.Elevated)
+        if (request.Danger == McpDanger.High || (request.Elevated && request.Risk == McpRisk.Remote))
         {
             // The exact command, prominent: this is what the user is agreeing to.
             DetailsLabel.Text = request.Risk == McpRisk.Remote ? "Exactly what will run" : "Exactly what will be sent";

@@ -70,7 +70,7 @@ public interface IMcpConsent
 }
 
 /// <summary>What the consent dialog shows for one call.</summary>
-/// <param name="OfferSession">"Allow for this session" may be offered (never for <see cref="McpDanger.High"/> or an elevated call).</param>
+/// <param name="OfferSession">"Allow for this session" may be offered (never for <see cref="McpDanger.High"/>, nor for an elevated <see cref="McpRisk.Remote"/> call).</param>
 /// <param name="HelmElevated">Helm runs as Administrator.</param>
 /// <param name="CallerNotElevated">Helm runs as Administrator and the caller does not: allowing lends it Helm's rights.</param>
 public sealed record McpConsentPrompt(McpConsentRequest Request, McpClientInfo Client, bool OfferSession, bool HelmElevated, bool CallerNotElevated);
@@ -174,7 +174,9 @@ public sealed class McpConsentPolicy : IMcpConsent, IMcpCallObserver
         var mustAsk = request.Risk == McpRisk.Remote || helmElevated || request.Elevated || _askBeforeChanges();
         if (!mustAsk) return Allowed(request, McpConsentAnswer.AllowOnce, AllowedWithoutAsking);
 
-        var offerSession = request.Danger == McpDanger.Normal && !request.Elevated;
+        // A change only touches Helm's own data, so Helm's elevation adds nothing to it: it may be allowed for the
+        // session. Root or Administrator on another machine, or High danger, is asked every time.
+        var offerSession = request.Danger == McpDanger.Normal && (request.Risk == McpRisk.Change || !request.Elevated);
         if (offerSession && HasAllowance(client, request)) return Allowed(request, McpConsentAnswer.AllowForSession, AllowedForSession);
 
         lock (_gate)
