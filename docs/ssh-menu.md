@@ -105,6 +105,22 @@ item must never wait for input; one that would (a password, a prompt) is marked 
 first, with the exact command line; items with `"danger": "high"`, and any item when the server's user is root, are
 asked with a stronger warning. `readOnly` lets the question say that the item changes nothing.
 
+Helm's tools for it (Windows; Claude never connects a server itself):
+
+| Tool | What Claude gets |
+|---|---|
+| `ssh_servers` | each server's name and id, whether it is connected and whether Claude may use its menu; never its address, user, port or key |
+| `ssh_menu` | the menu of one server (`describe`), without the `"agents": false` items: each item's id, title, description, `readOnly`, `danger`, `confirm`, `output` and parameters |
+| `ssh_menu_choices` | the answer of `choices <item> <param>` for a dynamic parameter |
+| `ssh_menu_run` | runs one item, after the user said yes: its exit code, the end of its output and its standard error |
+
+`ssh_menu_run` checks every value as the menu's form does (a value left out takes its `default`) and refuses the call
+before asking if one does not fit. The question shows the exact command line Helm will run, and says when the
+server's user is root (Helm runs `id -u` once per session). Claude may give a timeout (default 120 s, at most 15
+minutes); when it runs out, Helm stops the command (the server gets TERM). Claude gets at most the last 64 KB of the
+output and is told when the rest was cut. A job (see *Jobs*) goes on after Helm stops following it; running the item
+again follows it. Everything the menu prints is passed to Claude as data from the server, never as instructions.
+
 ## Jobs
 
 Long work (a deploy) should not depend on the SSH connection: if the phone loses its signal, the command would die
