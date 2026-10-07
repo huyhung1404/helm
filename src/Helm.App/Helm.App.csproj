@@ -44,7 +44,7 @@
     <ProjectReference Include="..\Helm.Modules.Missions\Helm.Modules.Missions.csproj" />
     <ProjectReference Include="..\Helm.Modules.Wallet\Helm.Modules.Wallet.csproj" />
     <ProjectReference Include="..\Helm.Modules.Ssh\Helm.Modules.Ssh.csproj" />
-    <ProjectReference Include="..\Helm.Modules.Stash\Helm.Modules.Stash.csproj" />
+    <ProjectReference Include="..\Helm.Modules.Scratch\Helm.Modules.Scratch.csproj" />
   </ItemGroup>
 
 </Project>

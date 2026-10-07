@@ -6,8 +6,8 @@ Format: [Keep a Changelog](https://keepachangelog.com), versions follow [SemVer]
 ## [Unreleased]
 
 ### Added
-- **Stash** (PC and Android): one place for the photos, videos, files and text you want on every device. Put them in
-  on the phone (Share → *Helm Stash* from Gallery or any app, one or many at once, or *Add files*), take them out on
+- **Scratch** (PC and Android): a scratch space on every device for the photos, videos, files and text you move around. Put them in
+  on the phone (Share → *Helm Scratch* from Gallery or any app, one or many at once, or *Add files*), take them out on
   the PC (*Open*, *Copy* puts the file on the clipboard, *Save as*), or the other way round (drop files on the page,
   Ctrl+V pastes files, a screenshot or text). Files are encrypted on the device before they upload, like Vault
   attachments; photos and videos show a thumbnail. Filters for photos and videos, files and text, and a search.
@@ -15,10 +15,10 @@ Format: [Keep a Changelog](https://keepachangelog.com), versions follow [SemVer]
   Delete; drag a card onto another to move it (hold, then drag, on the phone), and the order syncs.
   Deleting moves to the trash; deleting from the trash removes it from every device. *Free up space* drops this
   device's copies of uploaded files (they download again when opened).
-- **Stash: Send to clipboard**: puts a thing on this device's clipboard and on every other device that is syncing at
+- **Scratch: Send to clipboard**: puts a thing on this device's clipboard and on every other device that is syncing at
   that moment (text as text, a file as a file, a photo also as a picture on PC). Only a fresh signal (under 2 minutes)
   is followed, so a device that comes online later never overwrites its clipboard; files over 100 MB are not copied
-  by themselves. Each device can turn receiving off in Stash's settings.
+  by themselves. Each device can turn receiving off in Scratch's settings.
 
 ## [0.33.0] - 2026-10-07
 

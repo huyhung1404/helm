@@ -53,9 +53,9 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Helm.Modules.Ssh.Core", "sr
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Helm.Modules.Ssh", "src\Helm.Modules.Ssh\Helm.Modules.Ssh.csproj", "{A09325DA-FFE8-44C1-91BD-52C96F1D1C66}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Helm.Modules.Stash.Core", "src\Helm.Modules.Stash.Core\Helm.Modules.Stash.Core.csproj", "{F3153FC9-7084-48FE-8B6E-2477DFC71809}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Helm.Modules.Scratch.Core", "src\Helm.Modules.Scratch.Core\Helm.Modules.Scratch.Core.csproj", "{F3153FC9-7084-48FE-8B6E-2477DFC71809}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Helm.Modules.Stash", "src\Helm.Modules.Stash\Helm.Modules.Stash.csproj", "{A30E1EA5-A68E-4CAC-8736-9CCB832B64C3}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Helm.Modules.Scratch", "src\Helm.Modules.Scratch\Helm.Modules.Scratch.csproj", "{A30E1EA5-A68E-4CAC-8736-9CCB832B64C3}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
