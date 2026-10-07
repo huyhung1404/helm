@@ -16,6 +16,7 @@ public class NavGroupTests
         ["quick-capture"] = ModuleGroup.Planning,
         ["wallet"] = ModuleGroup.MoneyAndMedia,
         ["watch-later"] = ModuleGroup.MoneyAndMedia,
+        ["stash"] = ModuleGroup.MoneyAndMedia,
         ["vault"] = ModuleGroup.SecurityAndServers,
         ["ssh"] = ModuleGroup.SecurityAndServers,
         ["always-on-top"] = ModuleGroup.WindowsAndDesktop,

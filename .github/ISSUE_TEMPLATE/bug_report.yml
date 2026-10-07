@@ -37,6 +37,7 @@ body:
         - Tracker
         - Vault
         - Wallet
+        - Stash
         - Watch Later
         - Sync
         - Updates / install

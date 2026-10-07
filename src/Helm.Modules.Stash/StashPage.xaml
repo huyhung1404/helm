@@ -1,0 +1,49 @@
+<core:ModulePageBase
+    x:Class="Helm.Modules.Stash.StashPage"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
+    xmlns:core="clr-namespace:Helm.Core.Ui;assembly=Helm.Core.Windows"
+    xmlns:local="clr-namespace:Helm.Modules.Stash"
+    ExtraMessage="{Binding Message}">
+
+    <!-- Stash's settings (Home → Utilities). The stash itself is on StashContentPage. -->
+    <StackPanel>
+        <ui:CardControl Margin="0,0,0,4">
+            <ui:CardControl.Icon>
+                <ui:ImageIcon Width="24" Height="24" Source="{x:Static local:StashLogo.Image}" />
+            </ui:CardControl.Icon>
+            <ui:CardControl.Header>
+                <core:CardHeader Title="Open Stash" Description="Your photos, videos, files and text on every device. Also in the menu and on Home." />
+            </ui:CardControl.Header>
+            <ui:Button Appearance="Primary" Content="Open Stash" Click="OpenStash_Click" />
+        </ui:CardControl>
+
+        <!-- Clipboard -->
+        <TextBlock Text="Clipboard" Style="{DynamicResource HelmSectionHeader}" />
+        <ui:CardControl Margin="0,0,0,4" Icon="{ui:SymbolIcon ClipboardArrowRight24}">
+            <ui:CardControl.Header>
+                <core:CardHeader Title="Receive Send to clipboard" Description="When you use Send to clipboard on another device, copy that thing onto this PC's clipboard too (only while Helm runs and syncs)." />
+            </ui:CardControl.Header>
+            <ui:ToggleSwitch AutomationProperties.Name="Receive Send to clipboard" IsChecked="{Binding ReceiveClipboard}" />
+        </ui:CardControl>
+
+        <!-- Storage -->
+        <TextBlock Text="Storage" Style="{DynamicResource HelmSectionHeader}" />
+        <ui:CardControl Margin="0,0,0,4" Icon="{ui:SymbolIcon Storage24}">
+            <ui:CardControl.Header>
+                <core:CardHeader Title="Free up space on this device" Description="{Binding StorageSummary}" />
+            </ui:CardControl.Header>
+            <ui:Button Content="Free up space" Icon="{ui:SymbolIcon Broom24}" Command="{Binding FreeUpSpaceCommand}" />
+        </ui:CardControl>
+
+        <!-- Trash -->
+        <TextBlock Text="Trash" Style="{DynamicResource HelmSectionHeader}" />
+        <ui:CardControl Margin="0,0,0,4" Icon="{ui:SymbolIcon Delete24}">
+            <ui:CardControl.Header>
+                <core:CardHeader Title="Empty the trash" Description="{Binding TrashSummary}" />
+            </ui:CardControl.Header>
+            <ui:Button Content="Empty trash" Icon="{ui:SymbolIcon Delete24}" Command="{Binding EmptyTrashCommand}" IsEnabled="{Binding HasTrash}" />
+        </ui:CardControl>
+    </StackPanel>
+</core:ModulePageBase>

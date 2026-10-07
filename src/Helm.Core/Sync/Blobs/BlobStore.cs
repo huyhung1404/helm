@@ -215,6 +215,11 @@ public sealed class BlobStore : IBlobSync
                     // move on, so one file never blocks the others.
                     _logger.LogWarning("Blob {Id} was refused by the server: {Code}", blob.Id, ex.Code);
                 }
+                catch (IOException) when (_db.GetBlob(blob.Id) is null)
+                {
+                    // Discarded while it was being uploaded (its record was deleted for good): nothing to upload.
+                    _logger.LogInformation("Blob {Id} was discarded during its upload", blob.Id);
+                }
             }
             return true;
         }
@@ -267,6 +272,20 @@ public sealed class BlobStore : IBlobSync
         TryDeleteFolder(Folder(id));
     }
 
+    /// <summary>
+    /// Forgets a blob that no record uses any more, at once: its local chunks go, and one still waiting for its upload
+    /// is never uploaded. A blob already on the server is left to <see cref="CollectGarbageAsync"/>.
+    /// </summary>
+    public void Discard(string id)
+    {
+        TryDeleteFolder(Folder(id));
+        _db.DeleteBlob(id);
+    }
+
+    /// <summary>How many bytes of the blob's (encrypted) chunks are on this device.</summary>
+    public long CachedBytes(BlobRef blob) =>
+        Enumerable.Range(0, blob.ChunkCount).Select(i => new FileInfo(ChunkPath(blob.Id, i))).Where(f => f.Exists).Sum(f => f.Length);
+
     private async Task UploadAsync(LocalBlob blob, CancellationToken ct)
     {
         var sizes = Enumerable.Range(0, blob.ChunkCount).Select(i => new FileInfo(ChunkPath(blob.Id, i))).ToList();
@@ -287,6 +306,8 @@ public sealed class BlobStore : IBlobSync
             }
             await _transport.CommitAsync(blob.Id, ct).ConfigureAwait(false);
         }
+        // Discarded meanwhile: the server copy is left to the garbage collection.
+        if (_db.GetBlob(blob.Id) is null) return;
         _db.UpsertBlob(blob with { State = LocalBlobState.Committed });
         _logger.LogInformation("Uploaded blob {Id}", blob.Id);
         try { Uploaded?.Invoke(this, blob.Id); }

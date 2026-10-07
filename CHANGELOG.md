@@ -3,6 +3,21 @@
 All notable changes to Helm. The top section is used as the GitHub release body and as the Velopack release notes.
 Format: [Keep a Changelog](https://keepachangelog.com), versions follow [SemVer](https://semver.org).
 
+## [Unreleased]
+
+### Added
+- **Stash** (PC and Android): one place for the photos, videos, files and text you want on every device. Put them in
+  on the phone (Share → *Helm Stash* from Gallery or any app, one or many at once, or *Add files*), take them out on
+  the PC (*Open*, *Copy* puts the file on the clipboard, *Save as*), or the other way round (drop files on the page,
+  Ctrl+V pastes files, a screenshot or text). Files are encrypted on the device before they upload, like Vault
+  attachments; photos and videos show a thumbnail. Filters for photos and videos, files and text, and a search.
+  Deleting moves to the trash; deleting from the trash removes it from every device. *Free up space* drops this
+  device's copies of uploaded files (they download again when opened).
+- **Stash: Send to clipboard**: puts a thing on this device's clipboard and on every other device that is syncing at
+  that moment (text as text, a file as a file, a photo also as a picture on PC). Only a fresh signal (under 2 minutes)
+  is followed, so a device that comes online later never overwrites its clipboard; files over 100 MB are not copied
+  by themselves. Each device can turn receiving off in Stash's settings.
+
 ## [0.33.0] - 2026-10-07
 
 ### Added

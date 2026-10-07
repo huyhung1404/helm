@@ -1,0 +1,53 @@
+<ui:ModulePageBase xmlns="https://github.com/avaloniaui"
+                   xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                   xmlns:ui="using:Helm.Core.Ui"
+                   xmlns:vm="using:Helm.Modules.Stash"
+                   x:Class="Helm.Modules.Stash.StashPage"
+                   x:DataType="vm:StashViewModel">
+
+    <!-- Stash's settings (Home → Utilities). The stash itself is on StashContentPage. -->
+    <StackPanel>
+        <Border Classes="infobar" IsVisible="{Binding HasMessage}">
+            <TextBlock Text="{Binding Message}" TextWrapping="Wrap" />
+        </Border>
+        <Border Classes="card">
+            <StackPanel Spacing="8">
+                <TextBlock Text="Open Stash" Classes="title" />
+                <TextBlock Text="Your photos, videos, files and text on every device. Also in the menu and on Home." Classes="secondary" TextWrapping="Wrap" />
+                <Button Classes="accent" Content="Open Stash" Click="OpenStash_Click" />
+            </StackPanel>
+        </Border>
+
+        <!-- Clipboard -->
+        <TextBlock Text="Clipboard" Classes="section" />
+        <Border Classes="card">
+            <DockPanel>
+                <ToggleSwitch DockPanel.Dock="Right" IsChecked="{Binding ReceiveClipboard}" OnContent="" OffContent="" AutomationProperties.Name="Receive Send to clipboard" />
+                <StackPanel VerticalAlignment="Center" Spacing="2">
+                    <TextBlock Text="Receive Send to clipboard" Classes="title" />
+                    <TextBlock Text="When you use Send to clipboard on another device, copy that thing onto this phone's clipboard too (while Helm is open)." Classes="secondary" TextWrapping="Wrap" />
+                </StackPanel>
+            </DockPanel>
+        </Border>
+
+        <!-- Storage -->
+        <TextBlock Text="Storage" Classes="section" />
+        <Border Classes="card">
+            <StackPanel Spacing="8">
+                <TextBlock Text="Free up space on this device" Classes="title" />
+                <TextBlock Text="{Binding StorageSummary}" Classes="secondary" TextWrapping="Wrap" />
+                <Button Content="Free up space" Command="{Binding FreeUpSpaceCommand}" />
+            </StackPanel>
+        </Border>
+
+        <!-- Trash -->
+        <TextBlock Text="Trash" Classes="section" />
+        <Border Classes="card">
+            <StackPanel Spacing="8">
+                <TextBlock Text="Empty the trash" Classes="title" />
+                <TextBlock Text="{Binding TrashSummary}" Classes="secondary" TextWrapping="Wrap" />
+                <Button Classes="danger" Content="Empty trash" Command="{Binding EmptyTrashCommand}" IsEnabled="{Binding HasTrash}" />
+            </StackPanel>
+        </Border>
+    </StackPanel>
+</ui:ModulePageBase>

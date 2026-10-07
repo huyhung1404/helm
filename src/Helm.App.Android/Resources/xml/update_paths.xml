@@ -4,6 +4,8 @@
   <cache-path name="updates" path="updates/" />
   <!-- Vault documents opened in another app: wiped when the vault locks and when Helm starts. -->
   <cache-path name="vault-open" path="vault-open/" />
+  <!-- Stash files opened, shared or put on the clipboard: cleared when Stash starts and by Free up space. -->
+  <cache-path name="stash-open" path="stash-open/" />
   <!-- Files shared from a tool, e.g. the Tracker calendar as .ics (replaced on each share). -->
   <cache-path name="share" path="share/" />
   <!-- Log files shared from General → Logs. -->

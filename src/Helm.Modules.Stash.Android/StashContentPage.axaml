@@ -1,0 +1,270 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:ic="using:FluentIcons.Avalonia"
+             xmlns:vm="using:Helm.Modules.Stash"
+             x:Class="Helm.Modules.Stash.StashContentPage"
+             x:DataType="vm:StashViewModel">
+
+    <!-- Stash itself (drawer and Quick access): adding, the filters and the list, or one thing's details (Back returns
+         to the list). Its options live on StashPage (Home → Utilities). -->
+    <UserControl.Styles>
+        <!-- A filter: the selected one is filled -->
+        <Style Selector="Button.filter">
+            <Setter Property="Margin" Value="0,0,6,6" />
+            <Setter Property="Padding" Value="12,6" />
+        </Style>
+        <!-- An action in the details: full width of its column -->
+        <Style Selector="Button.action">
+            <Setter Property="HorizontalAlignment" Value="Stretch" />
+            <Setter Property="HorizontalContentAlignment" Value="Center" />
+            <Setter Property="Padding" Value="8,10" />
+        </Style>
+        <Style Selector="Border.thumb">
+            <Setter Property="Width" Value="56" />
+            <Setter Property="Height" Value="56" />
+            <Setter Property="CornerRadius" Value="6" />
+            <Setter Property="ClipToBounds" Value="True" />
+            <Setter Property="Background" Value="{DynamicResource ControlFillColorSecondaryBrush}" />
+        </Style>
+    </UserControl.Styles>
+
+    <StackPanel Spacing="8">
+        <!-- Shown while the tool is turned off -->
+        <Border x:Name="OffBar" Classes="infobar warning" IsVisible="False">
+            <TextBlock Text="Stash is turned off. Everything in it is kept; turn Stash on in its settings to add and take things out." TextWrapping="Wrap" />
+        </Border>
+
+        <!-- Sync off, storage full: what you add does not reach the other devices -->
+        <Border Classes="infobar warning" IsVisible="{Binding HasSyncNote}">
+            <TextBlock Text="{Binding SyncNote}" TextWrapping="Wrap" />
+        </Border>
+
+        <!-- What happened -->
+        <Border Classes="infobar" IsVisible="{Binding HasMessage}">
+            <DockPanel>
+                <Button DockPanel.Dock="Right" Classes="flat" Width="44" Height="44" Padding="0" HorizontalContentAlignment="Center"
+                        Command="{Binding DismissMessageCommand}" AutomationProperties.Name="Dismiss">
+                    <ic:SymbolIcon Symbol="Dismiss" FontSize="16" />
+                </Button>
+                <TextBlock Text="{Binding Message}" TextWrapping="Wrap" VerticalAlignment="Center" />
+            </DockPanel>
+        </Border>
+
+        <!-- Adding, downloading -->
+        <Border Classes="card" IsVisible="{Binding IsBusy}">
+            <StackPanel Spacing="8">
+                <TextBlock Text="{Binding BusyText}" TextWrapping="Wrap" MaxLines="2" TextTrimming="CharacterEllipsis" />
+                <ProgressBar Minimum="0" Maximum="100" Value="{Binding Progress}" IsIndeterminate="{Binding !IsProgressKnown}" />
+            </StackPanel>
+        </Border>
+
+        <Panel x:Name="Body">
+            <!-- The list -->
+            <StackPanel IsVisible="{Binding IsDetailClosed}" Spacing="8">
+                <Grid ColumnDefinitions="*,8,*" IsEnabled="{Binding IsNotBusy}">
+                    <Button Classes="accent action" Command="{Binding AddFilesCommand}" AutomationProperties.Name="Add files">
+                        <StackPanel Orientation="Horizontal" Spacing="6">
+                            <ic:SymbolIcon Symbol="Add" FontSize="16" />
+                            <TextBlock Text="Add files" />
+                        </StackPanel>
+                    </Button>
+                    <Button Grid.Column="2" Classes="action" Command="{Binding OpenTextBoxCommand}" AutomationProperties.Name="Add text">
+                        <StackPanel Orientation="Horizontal" Spacing="6">
+                            <ic:SymbolIcon Symbol="TextT" FontSize="16" />
+                            <TextBlock Text="Add text" />
+                        </StackPanel>
+                    </Button>
+                </Grid>
+
+                <!-- Add a piece of text -->
+                <Border Classes="card" IsVisible="{Binding IsTextBoxOpen}">
+                    <StackPanel Spacing="8">
+                        <TextBox x:Name="TextBox" PlaceholderText="A link, an address, a code, a few lines for your PC…" AcceptsReturn="True"
+                                 TextWrapping="Wrap" MinHeight="96" MaxHeight="240" VerticalContentAlignment="Top"
+                                 Text="{Binding NewText}" AutomationProperties.Name="Text to add" />
+                        <Grid ColumnDefinitions="*,8,*">
+                            <Button Classes="accent action" Content="Add" Command="{Binding SaveTextCommand}" />
+                            <Button Grid.Column="2" Classes="action" Content="Cancel" Command="{Binding CancelTextCommand}" />
+                        </Grid>
+                    </StackPanel>
+                </Border>
+
+                <!-- Filters -->
+                <ItemsControl ItemsSource="{Binding FilterTabs}">
+                    <ItemsControl.ItemsPanel>
+                        <ItemsPanelTemplate>
+                            <WrapPanel />
+                        </ItemsPanelTemplate>
+                    </ItemsControl.ItemsPanel>
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate DataType="vm:StashFilterTab">
+                            <Button Classes="filter" Classes.accent="{Binding IsSelected}" Content="{Binding Label}" AutomationProperties.Name="{Binding Name}"
+                                    Command="{Binding $parent[ItemsControl].((vm:StashViewModel)DataContext).ShowFilterCommand}" CommandParameter="{Binding}" />
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+                <Grid ColumnDefinitions="*,Auto">
+                    <TextBox PlaceholderText="Search" Text="{Binding Search}" AutomationProperties.Name="Search the stash" />
+                    <Button Grid.Column="1" Classes="flat danger" Margin="8,0,0,0" Padding="10,6" Content="Empty trash" Command="{Binding EmptyTrashCommand}"
+                            IsVisible="{Binding ShowingTrash}" IsEnabled="{Binding HasTrash}" AutomationProperties.Name="Empty the trash" />
+                </Grid>
+
+                <Border Classes="card" Padding="4" IsVisible="{Binding HasRows}">
+                    <ItemsControl ItemsSource="{Binding Rows}">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate DataType="vm:StashRowViewModel">
+                                <Button Classes="flat" Padding="8" HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch" AutomationProperties.Name="{Binding Name}"
+                                        Command="{Binding $parent[ItemsControl].((vm:StashViewModel)DataContext).SelectCommand}" CommandParameter="{Binding}">
+                                    <Grid ColumnDefinitions="56,12,*">
+                                        <Border Classes="thumb" VerticalAlignment="Top">
+                                            <Panel>
+                                                <ic:SymbolIcon Symbol="TextDescription" FontSize="24" Foreground="{DynamicResource TextFillColorSecondaryBrush}" IsVisible="{Binding IsText}" />
+                                                <ic:SymbolIcon Symbol="Image" FontSize="24" Foreground="{DynamicResource TextFillColorSecondaryBrush}" IsVisible="{Binding IsImage}" />
+                                                <ic:SymbolIcon Symbol="Video" FontSize="24" Foreground="{DynamicResource TextFillColorSecondaryBrush}" IsVisible="{Binding IsVideo}" />
+                                                <ic:SymbolIcon Symbol="Document" FontSize="24" Foreground="{DynamicResource TextFillColorSecondaryBrush}" IsVisible="{Binding IsDocument}" />
+                                                <Image Source="{Binding Thumbnail, Converter={x:Static vm:StashThumbnailConverter.Instance}}" Stretch="UniformToFill"
+                                                       IsVisible="{Binding HasThumbnail}" />
+                                                <Border Width="22" Height="22" CornerRadius="11" HorizontalAlignment="Center" VerticalAlignment="Center" Opacity="0.85"
+                                                        Background="{DynamicResource SolidBackgroundFillColorBaseBrush}">
+                                                    <Border.IsVisible>
+                                                        <MultiBinding Converter="{x:Static BoolConverters.And}">
+                                                            <Binding Path="IsVideo" />
+                                                            <Binding Path="HasThumbnail" />
+                                                        </MultiBinding>
+                                                    </Border.IsVisible>
+                                                    <ic:SymbolIcon Symbol="Play" IconVariant="Filled" FontSize="12" />
+                                                </Border>
+                                            </Panel>
+                                        </Border>
+                                        <StackPanel Grid.Column="2" Spacing="2" VerticalAlignment="Center">
+                                            <TextBlock Text="{Binding Name}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+                                            <TextBlock Text="{Binding TextPreview}" Classes="secondary" TextWrapping="Wrap" MaxLines="2" TextTrimming="CharacterEllipsis"
+                                                       IsVisible="{Binding HasTextPreview}" />
+                                            <TextBlock Text="{Binding Meta}" Classes="secondary" TextWrapping="Wrap" MaxLines="2" TextTrimming="CharacterEllipsis" />
+                                            <TextBlock Text="{Binding Status}" FontSize="12" Foreground="{DynamicResource SystemAccentColor}" IsVisible="{Binding HasStatus}" />
+                                        </StackPanel>
+                                    </Grid>
+                                </Button>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </Border>
+
+                <TextBlock Text="{Binding EmptyListText}" Classes="secondary" TextWrapping="Wrap" Margin="4,8" IsVisible="{Binding IsListEmpty}" />
+                <TextBlock Text="Tip: in Gallery or any app, tap Share → Helm Stash to put photos, videos and files here."
+                           Classes="secondary" TextWrapping="Wrap" Margin="4,0" IsVisible="{Binding NotShowingTrash}" />
+            </StackPanel>
+
+            <!-- One thing's details -->
+            <StackPanel IsVisible="{Binding IsDetailOpen}" Spacing="8">
+                <Button HorizontalAlignment="Left" Classes="flat" Padding="8,6" Command="{Binding CloseDetailCommand}" AutomationProperties.Name="Back to the list">
+                    <StackPanel Orientation="Horizontal" Spacing="6">
+                        <ic:SymbolIcon Symbol="ArrowLeft" FontSize="16" />
+                        <TextBlock Text="Stash" />
+                    </StackPanel>
+                </Button>
+
+                <!-- The picture: a tap opens the file itself -->
+                <Button Classes="flat" Padding="0" HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch" AutomationProperties.Name="Open"
+                        Command="{Binding OpenCommand}" CommandParameter="{Binding Selected}" IsVisible="{Binding Selected.HasThumbnail, FallbackValue=False}">
+                    <Border CornerRadius="8" ClipToBounds="True" Height="240" Background="{DynamicResource ControlFillColorSecondaryBrush}">
+                        <Panel>
+                            <Image Source="{Binding Selected.Thumbnail, Converter={x:Static vm:StashThumbnailConverter.Instance}}" Stretch="Uniform" />
+                            <Border Width="44" Height="44" CornerRadius="22" HorizontalAlignment="Center" VerticalAlignment="Center" Opacity="0.85"
+                                    Background="{DynamicResource SolidBackgroundFillColorBaseBrush}" IsVisible="{Binding Selected.IsVideo, FallbackValue=False}">
+                                <ic:SymbolIcon Symbol="Play" IconVariant="Filled" FontSize="20" />
+                            </Border>
+                        </Panel>
+                    </Border>
+                </Button>
+
+                <Border Classes="card">
+                    <StackPanel Spacing="4">
+                        <SelectableTextBlock Text="{Binding Selected.Name}" FontSize="17" FontWeight="SemiBold" TextWrapping="Wrap" />
+                        <TextBlock Text="{Binding Selected.Meta}" Classes="secondary" TextWrapping="Wrap" />
+                        <TextBlock Text="{Binding Selected.Status}" FontSize="12" Foreground="{DynamicResource SystemAccentColor}"
+                                   IsVisible="{Binding Selected.HasStatus, FallbackValue=False}" />
+                        <!-- The whole text, to read and select -->
+                        <SelectableTextBlock Margin="0,8,0,0" Text="{Binding DetailText}" TextWrapping="Wrap"
+                                             IsVisible="{Binding Selected.IsText, FallbackValue=False}" />
+                    </StackPanel>
+                </Border>
+
+                <!-- Here and on the other devices -->
+                <Button Classes="action" Command="{Binding SendToClipboardCommand}" CommandParameter="{Binding Selected}" AutomationProperties.Name="Send to clipboard"
+                        IsVisible="{Binding Selected.IsLive, FallbackValue=False}">
+                    <StackPanel Orientation="Horizontal" Spacing="6">
+                        <ic:SymbolIcon Symbol="ClipboardArrowRight" FontSize="16" />
+                        <TextBlock Text="Send to clipboard (all devices)" />
+                    </StackPanel>
+                </Button>
+
+                <!-- A file -->
+                <StackPanel Spacing="8">
+                    <StackPanel.IsVisible>
+                        <MultiBinding Converter="{x:Static BoolConverters.And}">
+                            <Binding Path="Selected.IsFile" FallbackValue="False" />
+                            <Binding Path="Selected.IsLive" FallbackValue="False" />
+                        </MultiBinding>
+                    </StackPanel.IsVisible>
+                    <Grid ColumnDefinitions="*,8,*">
+                        <Button Classes="accent action" Command="{Binding OpenCommand}" CommandParameter="{Binding Selected}" AutomationProperties.Name="Open">
+                            <StackPanel Orientation="Horizontal" Spacing="6">
+                                <ic:SymbolIcon Symbol="Open" FontSize="16" />
+                                <TextBlock Text="Open" />
+                            </StackPanel>
+                        </Button>
+                        <Button Grid.Column="2" Classes="action" Command="{Binding SendCommand}" CommandParameter="{Binding Selected}" AutomationProperties.Name="Share">
+                            <StackPanel Orientation="Horizontal" Spacing="6">
+                                <ic:SymbolIcon Symbol="Share" FontSize="16" />
+                                <TextBlock Text="Share" />
+                            </StackPanel>
+                        </Button>
+                    </Grid>
+                    <Grid ColumnDefinitions="*,8,*">
+                        <Button Classes="action" Command="{Binding SaveCommand}" CommandParameter="{Binding Selected}" AutomationProperties.Name="Save to phone">
+                            <StackPanel Orientation="Horizontal" Spacing="6">
+                                <ic:SymbolIcon Symbol="ArrowDownload" FontSize="16" />
+                                <TextBlock Text="Save to phone" />
+                            </StackPanel>
+                        </Button>
+                        <Button Grid.Column="2" Classes="action" Command="{Binding TrashCommand}" CommandParameter="{Binding Selected}" AutomationProperties.Name="Move to the trash">
+                            <StackPanel Orientation="Horizontal" Spacing="6">
+                                <ic:SymbolIcon Symbol="Delete" FontSize="16" />
+                                <TextBlock Text="Trash" />
+                            </StackPanel>
+                        </Button>
+                    </Grid>
+                </StackPanel>
+
+                <!-- A text -->
+                <Grid ColumnDefinitions="*,8,*">
+                    <Grid.IsVisible>
+                        <MultiBinding Converter="{x:Static BoolConverters.And}">
+                            <Binding Path="Selected.IsText" FallbackValue="False" />
+                            <Binding Path="Selected.IsLive" FallbackValue="False" />
+                        </MultiBinding>
+                    </Grid.IsVisible>
+                    <Button Classes="accent action" Command="{Binding CopyTextCommand}" CommandParameter="{Binding Selected}" AutomationProperties.Name="Copy">
+                        <StackPanel Orientation="Horizontal" Spacing="6">
+                            <ic:SymbolIcon Symbol="Copy" FontSize="16" />
+                            <TextBlock Text="Copy" />
+                        </StackPanel>
+                    </Button>
+                    <Button Grid.Column="2" Classes="action" Command="{Binding TrashCommand}" CommandParameter="{Binding Selected}" AutomationProperties.Name="Move to the trash">
+                        <StackPanel Orientation="Horizontal" Spacing="6">
+                            <ic:SymbolIcon Symbol="Delete" FontSize="16" />
+                            <TextBlock Text="Trash" />
+                        </StackPanel>
+                    </Button>
+                </Grid>
+
+                <!-- In the trash: bring it back or delete it for good -->
+                <Grid ColumnDefinitions="*,8,*" IsVisible="{Binding Selected.Trashed, FallbackValue=False}">
+                    <Button Classes="accent action" Content="Restore" Command="{Binding RestoreCommand}" CommandParameter="{Binding Selected}" />
+                    <Button Grid.Column="2" Classes="danger action" Content="Delete for good" Command="{Binding DeleteForeverCommand}" CommandParameter="{Binding Selected}" />
+                </Grid>
+            </StackPanel>
+        </Panel>
+    </StackPanel>
+</UserControl>

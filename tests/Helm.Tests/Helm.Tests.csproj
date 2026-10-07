@@ -38,6 +38,7 @@
     <ProjectReference Include="..\..\src\Helm.Modules.Missions\Helm.Modules.Missions.csproj" />
     <ProjectReference Include="..\..\src\Helm.Modules.Wallet\Helm.Modules.Wallet.csproj" />
     <ProjectReference Include="..\..\src\Helm.Modules.Ssh\Helm.Modules.Ssh.csproj" />
+    <ProjectReference Include="..\..\src\Helm.Modules.Stash\Helm.Modules.Stash.csproj" />
   </ItemGroup>
 
 </Project>
