@@ -26,6 +26,9 @@ public sealed partial class ScratchRowViewModel : ObservableObject
     [ObservableProperty] private bool _isImage;
     [ObservableProperty] private bool _trashed;
 
+    /// <summary>The card the keyboard acts on (PC: Ctrl+C, Ctrl+D, Enter).</summary>
+    [ObservableProperty] private bool _isSelected;
+
     /// <summary>Characters of a text a card shows.</summary>
     public const int MaxCardText = 1500;
 
@@ -378,8 +381,10 @@ public sealed partial class ScratchViewModel : ObservableObject
     [RelayCommand]
     public void CloseDetail() => Select(null);
 
-    partial void OnSelectedChanged(ScratchRowViewModel? value)
+    partial void OnSelectedChanged(ScratchRowViewModel? oldValue, ScratchRowViewModel? newValue)
     {
+        if (oldValue is not null) oldValue.IsSelected = false;
+        if (newValue is not null) newValue.IsSelected = true;
         OnPropertyChanged(nameof(IsDetailOpen));
         OnPropertyChanged(nameof(IsDetailClosed));
     }

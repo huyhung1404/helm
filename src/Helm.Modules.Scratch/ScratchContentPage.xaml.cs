@@ -32,11 +32,6 @@ public partial class ScratchContentPage : Page
         InitializeComponent();
         // Module, view model and page are singletons, so the subscriptions live as long as the page.
         module.PropertyChanged += OnModuleChanged;
-        viewModel.PropertyChanged += (_, e) =>
-        {
-            if (e.PropertyName == nameof(ScratchViewModel.IsTextBoxOpen) && viewModel.IsTextBoxOpen)
-                Dispatcher.BeginInvoke(DispatcherPriority.Input, () => TextBox.Focus());
-        };
         CommandBindings.Add(new CommandBinding(ApplicationCommands.Find, (_, _) => { SearchBox.Focus(); SearchBox.SelectAll(); }));
         InputBindings.Add(new KeyBinding(ApplicationCommands.Find, Key.F, ModifierKeys.Control));
         // Ctrl+V outside a text box adds what is on the clipboard (a text box pastes into itself first).
@@ -51,6 +46,8 @@ public partial class ScratchContentPage : Page
         // The ghost follows the cursor over the whole page, also where nothing can be dropped.
         PreviewDragOver += (_, e) => _ghost?.MoveTo(e.GetPosition(Root));
         Wall.Drop += OnCardDrop;
+        // Keyboard on the selected card: Ctrl+C, Ctrl+Shift+C, Ctrl+D / Delete, Enter, Esc.
+        KeyDown += OnKeyDown;
         ApplyEnabled();
     }
 
@@ -63,11 +60,53 @@ public partial class ScratchContentPage : Page
     private Point _pressedAt;
     private DragGhost? _ghost;
 
+    /// <summary>A click selects the card (the keyboard then acts on it), a double click opens it, a drag moves it.</summary>
     private void OnCardPressed(object sender, MouseButtonEventArgs e)
     {
-        // The card's own buttons (Copy, Delete…) stay buttons.
-        _pressed = InsideActionButton(e.OriginalSource as DependencyObject) ? null : RowAt(e.OriginalSource as DependencyObject);
+        var row = InsideActionButton(e.OriginalSource as DependencyObject) ? null : RowAt(e.OriginalSource as DependencyObject);
+        _pressed = row;
         _pressedAt = e.GetPosition(Wall);
+        Wall.Focus();
+        _viewModel.SelectCommand.Execute(row);
+        if (row is not null && e.ClickCount == 2) _viewModel.OpenCommand.Execute(row);
+    }
+
+    // ---- Keyboard ------------------------------------------------------------------------------------------------
+
+    private void OnKeyDown(object sender, KeyEventArgs e)
+    {
+        // A text box (search) keeps its own keys.
+        if (Keyboard.FocusedElement is System.Windows.Controls.Primitives.TextBoxBase || !_module.IsEnabled) return;
+        var ctrl = Keyboard.Modifiers.HasFlag(ModifierKeys.Control);
+        var shift = Keyboard.Modifiers.HasFlag(ModifierKeys.Shift);
+        if (e.Key == Key.Escape && _viewModel.Selected is not null)
+        {
+            _viewModel.CloseDetail();
+            e.Handled = true;
+            return;
+        }
+        if (_viewModel.Selected is not { } row) return;
+        switch (e.Key)
+        {
+            case Key.C when ctrl && shift:
+                if (row.IsLive) _viewModel.SendToClipboardCommand.Execute(row);
+                break;
+            case Key.C when ctrl:
+                _viewModel.CopyCommand.Execute(row);
+                break;
+            case Key.D when ctrl:
+            case Key.Delete:
+                // In the trash, deleting is for good (it asks first).
+                if (row.Trashed) _viewModel.DeleteForeverCommand.Execute(row);
+                else _viewModel.TrashCommand.Execute(row);
+                break;
+            case Key.Enter:
+                _viewModel.OpenCommand.Execute(row);
+                break;
+            default:
+                return;
+        }
+        e.Handled = true;
     }
 
     private void OnCardMoved(object sender, MouseEventArgs e)
@@ -134,8 +173,6 @@ public partial class ScratchContentPage : Page
         element is System.Windows.Media.Visual or System.Windows.Media.Media3D.Visual3D
             ? System.Windows.Media.VisualTreeHelper.GetParent(element)
             : LogicalTreeHelper.GetParent(element);
-
-    private void Paste_Click(object sender, RoutedEventArgs e) => PasteFromClipboard();
 
     /// <summary>Files copied in Explorer, then a picture (a screenshot), then text.</summary>
     private async void PasteFromClipboard()

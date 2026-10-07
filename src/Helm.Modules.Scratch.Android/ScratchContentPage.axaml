@@ -84,17 +84,24 @@
         <Panel x:Name="Body">
             <!-- The list -->
             <StackPanel IsVisible="{Binding IsDetailClosed}" Spacing="8">
-                <Grid ColumnDefinitions="*,8,*" IsEnabled="{Binding IsNotBusy}">
+                <Grid ColumnDefinitions="*,6,*,6,*" IsEnabled="{Binding IsNotBusy}">
                     <Button Classes="accent action" Command="{Binding AddFilesCommand}" AutomationProperties.Name="Add files">
                         <StackPanel Orientation="Horizontal" Spacing="6">
                             <ic:SymbolIcon Symbol="Add" FontSize="16" />
-                            <TextBlock Text="Add files" />
+                            <TextBlock Text="Files" />
                         </StackPanel>
                     </Button>
                     <Button Grid.Column="2" Classes="action" Command="{Binding OpenTextBoxCommand}" AutomationProperties.Name="Add text">
                         <StackPanel Orientation="Horizontal" Spacing="6">
                             <ic:SymbolIcon Symbol="TextT" FontSize="16" />
-                            <TextBlock Text="Add text" />
+                            <TextBlock Text="Text" />
+                        </StackPanel>
+                    </Button>
+                    <!-- What another app copied: a file or a picture, or text -->
+                    <Button Grid.Column="4" Classes="action" Click="Paste_Click" AutomationProperties.Name="Paste">
+                        <StackPanel Orientation="Horizontal" Spacing="6">
+                            <ic:SymbolIcon Symbol="ClipboardPaste" FontSize="16" />
+                            <TextBlock Text="Paste" />
                         </StackPanel>
                     </Button>
                 </Grid>

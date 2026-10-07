@@ -6,16 +6,16 @@ Format: [Keep a Changelog](https://keepachangelog.com), versions follow [SemVer]
 ## [Unreleased]
 
 ### Added
-- **Scratch** (PC and Android): a scratch space on every device for the photos, videos, files and text you move around. Put them in
-  on the phone (Share → *Helm Scratch* from Gallery or any app, one or many at once, or *Add files*), take them out on
-  the PC (*Open*, *Copy* puts the file on the clipboard, *Save as*), or the other way round (drop files on the page,
-  Ctrl+V pastes files, a screenshot or text). Files are encrypted on the device before they upload, like Vault
-  attachments; photos and videos show a thumbnail. Filters for photos and videos, files and text, and a search.
-  Everything shows as a wall of cards with its content (a text in full, a photo at its shape), each with Copy and
-  Delete; drag a card onto another to move it (hold, then drag, on the phone), and the order syncs.
-  Deleting moves to the trash; deleting from the trash removes it from every device. *Free up space* drops this
-  device's copies of uploaded files (they download again when opened).
-- **Scratch: Send to clipboard**: puts a thing on this device's clipboard and on every other device that is syncing at
+- **Scratch** (PC and Android): a scratch space on every device for the photos, videos, files and text you move around.
+  On the phone: Share → *Helm Scratch* from Gallery or any app (one or many at once), or *Files*, *Text*, *Paste*.
+  On the PC there are no buttons: Ctrl+V adds the files, screenshot or text you copied, or drop files on the page.
+  Everything shows as a wall of cards with its content (a text in full, a photo at its shape). On PC click a card,
+  then Ctrl+C copies it (a file goes to the clipboard as a file), Ctrl+D deletes it, Enter opens it; right-click for
+  Save as. On the phone each card has Copy and Delete, and a tap shows Open, Share and Save to phone. Drag a card onto
+  another to move it (hold, then drag, on the phone); the order syncs. Files are encrypted on the device before they
+  upload, like Vault attachments. Deleting moves to the trash (the bin filter); deleting from the trash removes it
+  from every device. *Free up space* drops this device's copies of uploaded files (they download again when opened).
+- **Scratch: Send to clipboard**: (PC: Ctrl+Shift+C) puts a thing on this device's clipboard and on every other device that is syncing at
   that moment (text as text, a file as a file, a photo also as a picture on PC). Only a fresh signal (under 2 minutes)
   is followed, so a device that comes online later never overwrites its clipboard; files over 100 MB are not copied
   by themselves. Each device can turn receiving off in Scratch's settings.

@@ -23,15 +23,6 @@
             <Setter Property="VerticalAlignment" Value="Center" />
         </Style>
 
-        <!-- Small icon-only action on a card -->
-        <Style x:Key="CardAction" TargetType="ui:Button" BasedOn="{StaticResource {x:Type ui:Button}}">
-            <Setter Property="Appearance" Value="Transparent" />
-            <Setter Property="Padding" Value="6" />
-            <Setter Property="Margin" Value="0" />
-            <Setter Property="MinWidth" Value="0" />
-            <Setter Property="VerticalAlignment" Value="Center" />
-        </Style>
-
         <!-- One thing: a card in the theme's card colours, as tall as what it shows -->
         <Style x:Key="Card" TargetType="Border">
             <Setter Property="Background" Value="{DynamicResource CardBackgroundFillColorDefaultBrush}" />
@@ -43,6 +34,12 @@
                 <Trigger Property="IsMouseOver" Value="True">
                     <Setter Property="Background" Value="{DynamicResource CardBackgroundFillColorSecondaryBrush}" />
                 </Trigger>
+                <!-- The card the keyboard acts on -->
+                <DataTrigger Binding="{Binding IsSelected}" Value="True">
+                    <Setter Property="BorderBrush" Value="{DynamicResource AccentFillColorDefaultBrush}" />
+                    <Setter Property="BorderThickness" Value="2" />
+                    <Setter Property="Padding" Value="7" />
+                </DataTrigger>
             </Style.Triggers>
         </Style>
 
@@ -63,22 +60,7 @@
             </Style.Triggers>
         </Style>
 
-        <!-- A button with no chrome (a picture or a file name that opens the file) -->
-        <Style x:Key="BareButton" TargetType="Button">
-            <Setter Property="Cursor" Value="Hand" />
-            <Setter Property="Foreground" Value="{DynamicResource TextFillColorPrimaryBrush}" />
-            <Setter Property="HorizontalContentAlignment" Value="Stretch" />
-            <Setter Property="Template">
-                <Setter.Value>
-                    <ControlTemplate TargetType="Button">
-                        <Border Background="Transparent">
-                            <ContentPresenter />
-                        </Border>
-                    </ControlTemplate>
-                </Setter.Value>
-            </Setter>
-        </Style>
-    </Page.Resources>
+        </Page.Resources>
 
     <Grid x:Name="Root" Margin="24,16,24,0">
         <Grid.RowDefinitions>
@@ -91,14 +73,9 @@
         </Grid.RowDefinitions>
 
         <DockPanel Margin="0,0,0,16">
-            <StackPanel x:Name="Actions" DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center">
-                <ui:Button Content="Paste" Icon="{ui:SymbolIcon ClipboardPaste24}" Margin="0,0,8,0" Click="Paste_Click"
-                           ToolTip="Add the files, picture or text on the clipboard (Ctrl+V)" IsEnabled="{Binding IsNotBusy}" />
-                <ui:Button Content="Add text" Icon="{ui:SymbolIcon TextT24}" Margin="0,0,8,0" Command="{Binding OpenTextBoxCommand}"
-                           ToolTip="Type or paste a note, a link, an address" IsEnabled="{Binding IsNotBusy}" />
-                <ui:Button Appearance="Primary" Content="Add files" Icon="{ui:SymbolIcon Add24}" Command="{Binding AddFilesCommand}"
-                           ToolTip="Pick files to add (or drop them on this page)" IsEnabled="{Binding IsNotBusy}" />
-            </StackPanel>
+            <!-- No buttons on PC: the keyboard does it (the phone has buttons) -->
+            <TextBlock x:Name="Actions" DockPanel.Dock="Right" VerticalAlignment="Center" Style="{DynamicResource HelmSecondaryText}" TextAlignment="Right"
+                       Text="Ctrl+V or drop to add · Click a card: Ctrl+C copy, Ctrl+D delete, Enter open" />
             <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
                 <Image Source="{x:Static self:ScratchLogo.Image}" Width="32" Height="32" Margin="0,0,12,0" />
                 <TextBlock Text="Scratch" FontSize="28" FontWeight="SemiBold" VerticalAlignment="Center" />
@@ -133,25 +110,6 @@
             </Border>
         </StackPanel>
 
-        <!-- Add a piece of text -->
-        <Border Grid.Row="3" Style="{DynamicResource HelmSurface}" Padding="12" Margin="0,0,0,12"
-                Visibility="{Binding IsTextBoxOpen, Converter={StaticResource BoolToVisibility}}">
-            <StackPanel>
-                <ui:TextBox x:Name="TextBox" PlaceholderText="A link, an address, a code, a few lines to have on your phone…" AcceptsReturn="True"
-                            TextWrapping="Wrap" MinHeight="72" MaxHeight="240" VerticalScrollBarVisibility="Auto" VerticalContentAlignment="Top"
-                            AutomationProperties.Name="Text to add" Text="{Binding NewText, UpdateSourceTrigger=PropertyChanged}">
-                    <ui:TextBox.InputBindings>
-                        <KeyBinding Key="Return" Modifiers="Ctrl" Command="{Binding SaveTextCommand}" />
-                        <KeyBinding Key="Escape" Command="{Binding CancelTextCommand}" />
-                    </ui:TextBox.InputBindings>
-                </ui:TextBox>
-                <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
-                    <ui:Button Appearance="Primary" Content="Add" Icon="{ui:SymbolIcon Add24}" ToolTip="Add (Ctrl+Enter)" Command="{Binding SaveTextCommand}" />
-                    <ui:Button Margin="8,0,0,0" Content="Cancel" Command="{Binding CancelTextCommand}" />
-                </StackPanel>
-            </StackPanel>
-        </Border>
-
         <!-- Filters and search -->
         <Grid Grid.Row="4" Margin="0,0,0,6">
             <Grid.ColumnDefinitions>
@@ -185,7 +143,7 @@
             <StackPanel Margin="4,8,4,16" Visibility="{Binding IsListEmpty, Converter={StaticResource BoolToVisibility}}">
                 <TextBlock Text="{Binding EmptyListText}" Style="{DynamicResource HelmSecondaryText}" TextWrapping="Wrap" />
                 <TextBlock Margin="0,8,0,0" Style="{DynamicResource HelmSecondaryText}" TextWrapping="Wrap"
-                           Text="Tip: drop files on this page, or press Ctrl+V to add the files, picture or text you copied. On your phone, share photos to “Helm Scratch”."
+                           Text="Press Ctrl+V to add the files, picture or text you copied, or drop files on this page. On your phone, share photos to “Helm Scratch”."
                            Visibility="{Binding NotShowingTrash, Converter={StaticResource BoolToVisibility}}" />
             </StackPanel>
 
@@ -193,7 +151,7 @@
             <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" PanningMode="VerticalOnly" Focusable="False"
                           Visibility="{Binding HasRows, Converter={StaticResource BoolToVisibility}}">
                 <!-- Drag a card onto another one to move it there (code-behind) -->
-                <ItemsControl x:Name="Wall" ItemsSource="{Binding Rows}" Focusable="False" Margin="0,4,8,24" AutomationProperties.Name="Scratch" AllowDrop="True">
+                <ItemsControl x:Name="Wall" ItemsSource="{Binding Rows}" Focusable="True" FocusVisualStyle="{x:Null}" Margin="0,4,8,24" AutomationProperties.Name="Scratch" AllowDrop="True">
                     <ItemsControl.ItemsPanel>
                         <ItemsPanelTemplate>
                             <self:MasonryPanel MinColumnWidth="230" Spacing="10" />
@@ -206,54 +164,48 @@
                                 <!-- Right-click: everything else that can be done with it -->
                                 <Border.ContextMenu>
                                     <ContextMenu>
-                                        <MenuItem Header="Open" Command="{Binding PlacementTarget.Tag.OpenCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
+                                        <MenuItem Header="Open" InputGestureText="Enter" Command="{Binding PlacementTarget.Tag.OpenCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
                                                   CommandParameter="{Binding}" Visibility="{Binding IsFile, Converter={StaticResource BoolToVisibility}}" />
-                                        <MenuItem Header="Copy" Command="{Binding PlacementTarget.Tag.CopyCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
+                                        <MenuItem Header="Copy" InputGestureText="Ctrl+C" Command="{Binding PlacementTarget.Tag.CopyCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
                                                   CommandParameter="{Binding}" />
-                                        <MenuItem Header="Send to clipboard on all devices"
+                                        <MenuItem Header="Send to clipboard on all devices" InputGestureText="Ctrl+Shift+C"
                                                   Command="{Binding PlacementTarget.Tag.SendToClipboardCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
                                                   CommandParameter="{Binding}" Visibility="{Binding IsLive, Converter={StaticResource BoolToVisibility}}" />
                                         <MenuItem Header="Save as…" Command="{Binding PlacementTarget.Tag.SaveCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
                                                   CommandParameter="{Binding}" Visibility="{Binding IsFile, Converter={StaticResource BoolToVisibility}}" />
                                         <Separator />
-                                        <MenuItem Header="Move to the trash" Command="{Binding PlacementTarget.Tag.TrashCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
+                                        <MenuItem Header="Move to the trash" InputGestureText="Ctrl+D" Command="{Binding PlacementTarget.Tag.TrashCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
                                                   CommandParameter="{Binding}" Visibility="{Binding IsLive, Converter={StaticResource BoolToVisibility}}" />
                                         <MenuItem Header="Restore" Command="{Binding PlacementTarget.Tag.RestoreCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
                                                   CommandParameter="{Binding}" Visibility="{Binding Trashed, Converter={StaticResource BoolToVisibility}}" />
-                                        <MenuItem Header="Delete for good" Command="{Binding PlacementTarget.Tag.DeleteForeverCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
+                                        <MenuItem Header="Delete for good" InputGestureText="Ctrl+D" Command="{Binding PlacementTarget.Tag.DeleteForeverCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
                                                   CommandParameter="{Binding}" Visibility="{Binding Trashed, Converter={StaticResource BoolToVisibility}}" />
                                     </ContextMenu>
                                 </Border.ContextMenu>
                                 <StackPanel>
-                                    <!-- A photo or a video: the picture itself, at its own shape; a click opens it -->
-                                    <Button Style="{StaticResource BareButton}" ToolTip="Open" AutomationProperties.Name="Open"
-                                            Command="{Binding DataContext.OpenCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}" CommandParameter="{Binding}"
-                                            Visibility="{Binding HasThumbnail, Converter={StaticResource BoolToVisibility}}">
-                                        <Grid>
+                                    <!-- A photo or a video: the picture itself, at its own shape -->
+                                    <Grid Visibility="{Binding HasThumbnail, Converter={StaticResource BoolToVisibility}}">
                                             <Image Source="{Binding Thumbnail, Converter={StaticResource Thumbnail}}" Stretch="Uniform" />
                                             <Border Width="36" Height="36" CornerRadius="18" HorizontalAlignment="Center" VerticalAlignment="Center"
                                                     Background="{DynamicResource SolidBackgroundFillColorBaseBrush}" Opacity="0.85"
                                                     Visibility="{Binding IsVideo, Converter={StaticResource BoolToVisibility}}">
                                                 <ui:SymbolIcon Symbol="Play24" Filled="True" FontSize="16" Foreground="{DynamicResource TextFillColorPrimaryBrush}" />
                                             </Border>
-                                        </Grid>
-                                    </Button>
+                                    </Grid>
 
                                     <!-- A text: all of it -->
                                     <TextBlock Margin="2,0,2,0" Text="{Binding FullText}" TextWrapping="Wrap" FontSize="14" LineHeight="20"
                                                Foreground="{DynamicResource TextFillColorPrimaryBrush}"
                                                Visibility="{Binding IsText, Converter={StaticResource BoolToVisibility}}" />
 
-                                    <!-- Any other file (or a photo without a picture): its icon and name; a click opens it -->
-                                    <Button Style="{StaticResource BareButton}" ToolTip="Open" AutomationProperties.Name="Open"
-                                            Command="{Binding DataContext.OpenCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}" CommandParameter="{Binding}">
-                                        <Button.Visibility>
+                                    <!-- Any other file (or a photo without a picture): its icon and name -->
+                                    <DockPanel Margin="2,2,2,0">
+                                        <DockPanel.Visibility>
                                             <MultiBinding Converter="{x:Static self:AllTrueToVisibility.Instance}">
                                                 <Binding Path="IsFile" />
                                                 <Binding Path="HasNoThumbnail" />
                                             </MultiBinding>
-                                        </Button.Visibility>
-                                        <DockPanel Margin="2,2,2,0">
+                                        </DockPanel.Visibility>
                                             <Border DockPanel.Dock="Left" Width="44" Height="44" CornerRadius="6" Margin="0,0,10,0" VerticalAlignment="Top"
                                                     Background="{DynamicResource ControlFillColorSecondaryBrush}">
                                                 <Grid>
@@ -267,28 +219,10 @@
                                             </Border>
                                             <TextBlock Text="{Binding Name}" TextWrapping="Wrap" FontWeight="SemiBold" VerticalAlignment="Center"
                                                        Foreground="{DynamicResource TextFillColorPrimaryBrush}" />
-                                        </DockPanel>
-                                    </Button>
+                                    </DockPanel>
 
-                                    <!-- Footer: size and time, the upload state, and the card's actions -->
+                                    <!-- Footer: size and time, and the upload state (actions: keyboard and right-click) -->
                                     <DockPanel Margin="2,6,0,0">
-                                        <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
-                                            <ui:Button Style="{StaticResource CardAction}" Icon="{ui:SymbolIcon Copy24}" ToolTip="Copy" AutomationProperties.Name="Copy"
-                                                       Command="{Binding DataContext.CopyCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}" CommandParameter="{Binding}" />
-                                            <ui:Button Style="{StaticResource CardAction}" Icon="{ui:SymbolIcon ClipboardArrowRight24}" AutomationProperties.Name="Send to clipboard"
-                                                       ToolTip="Send to clipboard: copies it here and on your other devices that are syncing"
-                                                       Command="{Binding DataContext.SendToClipboardCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}" CommandParameter="{Binding}"
-                                                       Visibility="{Binding IsLive, Converter={StaticResource BoolToVisibility}}" />
-                                            <ui:Button Style="{StaticResource CardAction}" Icon="{ui:SymbolIcon Delete24}" ToolTip="Move to the trash" AutomationProperties.Name="Move to the trash"
-                                                       Command="{Binding DataContext.TrashCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}" CommandParameter="{Binding}"
-                                                       Visibility="{Binding IsLive, Converter={StaticResource BoolToVisibility}}" />
-                                            <ui:Button Style="{StaticResource CardAction}" Icon="{ui:SymbolIcon ArrowUndo24}" ToolTip="Restore" AutomationProperties.Name="Restore"
-                                                       Command="{Binding DataContext.RestoreCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}" CommandParameter="{Binding}"
-                                                       Visibility="{Binding Trashed, Converter={StaticResource BoolToVisibility}}" />
-                                            <ui:Button Style="{StaticResource CardAction}" Icon="{ui:SymbolIcon Delete24}" ToolTip="Delete for good" AutomationProperties.Name="Delete for good"
-                                                       Command="{Binding DataContext.DeleteForeverCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}" CommandParameter="{Binding}"
-                                                       Visibility="{Binding Trashed, Converter={StaticResource BoolToVisibility}}" />
-                                        </StackPanel>
                                         <StackPanel VerticalAlignment="Center">
                                             <TextBlock Text="{Binding Footer}" FontSize="12" Foreground="{DynamicResource TextFillColorTertiaryBrush}" TextTrimming="CharacterEllipsis" />
                                             <TextBlock Text="{Binding Status}" FontSize="12" Foreground="{DynamicResource AccentTextFillColorPrimaryBrush}" TextTrimming="CharacterEllipsis"

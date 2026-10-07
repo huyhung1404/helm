@@ -176,6 +176,39 @@ public partial class ScratchContentPage : UserControl
 
     private static double Distance(Point a, Point b) => Math.Sqrt((a.X - b.X) * (a.X - b.X) + (a.Y - b.Y) * (a.Y - b.Y));
 
+    // ---- Paste ---------------------------------------------------------------------------------------------------------
+
+    /// <summary>The phone's clipboard: files or pictures another app copied (content URIs), else its text.</summary>
+    private async void Paste_Click(object? sender, RoutedEventArgs e)
+    {
+        try
+        {
+            var context = global::Android.App.Application.Context;
+            if (context.GetSystemService(global::Android.Content.Context.ClipboardService) is not global::Android.Content.ClipboardManager clipboard
+                || clipboard.PrimaryClip is not { ItemCount: > 0 } clip)
+            {
+                _viewModel.Message = "The clipboard is empty. Copy a text, a link or a picture first.";
+                return;
+            }
+            var sources = new List<ScratchSource>();
+            var texts = new List<string>();
+            for (var i = 0; i < clip.ItemCount; i++)
+            {
+                var item = clip.GetItemAt(i);
+                if (item?.Uri is { Scheme: "content" } uri) sources.Add(AndroidScratchPlatform.FromUri(uri));
+                else if (item?.CoerceToText(context)?.ToString() is { Length: > 0 } text) texts.Add(text);
+            }
+            if (sources.Count > 0) await _viewModel.AddSourcesAsync(sources);
+            else if (texts.Count > 0) await _viewModel.AddTextAsync(string.Join('\n', texts));
+            else _viewModel.Message = "The clipboard has nothing Scratch can keep.";
+        }
+        catch (Exception ex)
+        {
+            // Another app's content provider can refuse or vanish.
+            _viewModel.Message = $"Could not paste: {ex.Message}";
+        }
+    }
+
     // ---- Page --------------------------------------------------------------------------------------------------------
 
     private void OnViewModelChanged(object? sender, PropertyChangedEventArgs e)
