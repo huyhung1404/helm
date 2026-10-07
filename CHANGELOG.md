@@ -5,12 +5,51 @@ Format: [Keep a Changelog](https://keepachangelog.com), versions follow [SemVer]
 
 ## [Unreleased]
 
+### Added
+- **Claude & MCP** page (PC, after General): turn Helm's tools for Claude on or off, allow or forbid changes, and see
+  exactly which tools Claude can reach (read / change / remote). Connect Claude Code (terminal and VS Code extension)
+  with one click (*Add for me* runs `claude mcp add`, *Remove* takes it out again), or copy the ready-made config for
+  VS Code's agent mode and Claude Desktop; each client shows whether Helm is added, and says so when it points to
+  another Helm. *Connections* shows which Claude clients are connected now, since when and how many tools they
+  called, and disconnects one. [docs/mcp.md](docs/mcp.md) explains each client.
+- **Permissions** on that page: *Ask before every change*, whether Helm runs as Administrator, the calls allowed for
+  this session (*Revoke*), and an activity log of every call that changes something or runs on a server
+  (device-local, last 500, *Clear*).
+- **SSH for Claude**: `ssh_servers`, `ssh_menu`, `ssh_menu_choices` and `ssh_menu_run` let Claude use a server's
+  menu, never a shell, and only on servers connected in Helm with *Claude may use this server's menu* on (off by
+  default, PC). Every run is asked first with the exact command line, runs without a terminal, with a timeout and at
+  most the last 64 KB of output. Menus can mark items `readOnly`, and `"agents": false` keeps an item away from Claude
+  ([protocol](docs/ssh-menu.md)).
+- **Missions for Claude**: update, start, pause, resume or abandon a mission, skip or reopen a step, tick a step's
+  checklist and edit a step or its note.
+- **Tracker for Claude**: add lists, add subtasks to an existing task, add daily repeating tasks, stop a repeat and
+  mark a task started.
+
 ### Changed
+- **Navigation groups** say what is inside: Planning (Notes, Tracker, Missions, Quick Capture), Money & Media (Wallet,
+  Watch Later), Security & Servers (Vault, SSH) and Windows & Desktop (Always on Top, Command Palette), on PC and
+  Android. "System Tools" and "Advanced" are gone.
+- **Claude asks first when it matters**: changes while Helm runs as Administrator (or when you ask for it), and every
+  command on a server. The dialog says who asks, what will happen, why Helm asks and the exact command; Deny is the
+  default and no answer in 2 minutes means no. *Allow for this session* stops repeats of the same change; commands as
+  root or marked high are asked every time.
 - **SSH menu**: no longer a tab that replaces the terminal. The **Menu** button next to *Disconnect* opens a popup over
   the terminal; choosing an item types its command into the terminal, so its output shows there next to everything
   else and Ctrl+C stops it. An item with parameters (Restart app) opens a small form in the popup first; dangerous
   items still ask, showing the line Helm will type. The command starts with a space, which keeps it out of bash's
   history.
+
+### Removed
+- **Claude Chat**. Use Claude Code in VS Code (or the terminal) instead: it reaches your notes, Tracker, Missions and
+  servers through Helm's MCP server (see the Claude & MCP page). Your chat settings and history stay on disk.
+
+### Security
+- Helm's MCP pipe checks each caller (this machine, this user) and its elevation, serves at most 8 connections and
+  caps message size; more than 10 questions a minute are refused; secret arguments are hidden in the dialog and the
+  log. Switching Helm's tools off, or switching changes off, ends the connections that are open.
+- Helm reads only its own `helm` entry in the clients' config files, never other servers' settings or tokens.
+- A tool that runs something on another machine is refused unless Helm can ask first. Server output is passed to
+  Claude as data, never as instructions; a root user or a high-danger item is asked with a stronger warning.
 
 ## [0.29.0] - 2026-10-06
 
