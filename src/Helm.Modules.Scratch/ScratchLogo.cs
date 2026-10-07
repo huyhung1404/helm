@@ -20,8 +20,9 @@ public static class ScratchLogo
         var group = new DrawingGroup();
         // A transparent box keeps the icon's own margins at any size.
         group.Children.Add(new GeometryDrawing(Brushes.Transparent, null, new RectangleGeometry(new Rect(0, 0, size, size))));
-        group.Children.Add(new GeometryDrawing(null, Stroke(ScratchIconShape.Stroke), Geometry.Parse(ScratchIconShape.Tray)));
-        group.Children.Add(new GeometryDrawing(null, Stroke(ScratchIconShape.ArrowStroke), Geometry.Parse(ScratchIconShape.Arrow)));
+        group.Children.Add(new GeometryDrawing(null, Stroke(ScratchIconShape.Stroke), Geometry.Parse(ScratchIconShape.Note)));
+        group.Children.Add(new GeometryDrawing(null, Stroke(ScratchIconShape.Stroke), Geometry.Parse(ScratchIconShape.Peel)));
+        group.Children.Add(new GeometryDrawing(null, Stroke(ScratchIconShape.Stroke), Geometry.Parse(ScratchIconShape.Scribble)));
         var image = new DrawingImage(group);
         image.Freeze();
         return image;

@@ -25,8 +25,9 @@ public static class ScratchIcon
             {
                 // A transparent box keeps the icon's own margins at any size.
                 new GeometryDrawing { Brush = Brushes.Transparent, Geometry = new RectangleGeometry(new Rect(0, 0, size, size)) },
-                new GeometryDrawing { Pen = Stroke(ScratchIconShape.Stroke), Geometry = Geometry.Parse(ScratchIconShape.Tray) },
-                new GeometryDrawing { Pen = Stroke(ScratchIconShape.ArrowStroke), Geometry = Geometry.Parse(ScratchIconShape.Arrow) },
+                new GeometryDrawing { Pen = Stroke(ScratchIconShape.Stroke), Geometry = Geometry.Parse(ScratchIconShape.Note) },
+                new GeometryDrawing { Pen = Stroke(ScratchIconShape.Stroke), Geometry = Geometry.Parse(ScratchIconShape.Peel) },
+                new GeometryDrawing { Pen = Stroke(ScratchIconShape.Stroke), Geometry = Geometry.Parse(ScratchIconShape.Scribble) },
             },
         };
         return new DrawingImage(group);

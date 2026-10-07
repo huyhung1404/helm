@@ -16,7 +16,7 @@ public sealed class ScratchModule(ScratchViewModel viewModel, ScratchClipboardRe
     public override string DisplayName => ScratchIds.DisplayName;
     public override string Description => ScratchIds.Description;
     public override ModuleGroup Group => ModuleGroup.MoneyAndMedia;
-    public override SymbolRegular Icon => SymbolRegular.Archive24;
+    public override SymbolRegular Icon => SymbolRegular.Note24;
     public override ImageSource IconImage => ScratchLogo.Image;
     public override Type SettingsPageType => typeof(ScratchPage);
     public Type ContentPageType => typeof(ScratchContentPage);

@@ -22,7 +22,7 @@ public sealed class ScratchModule(ScratchViewModel viewModel, ScratchClipboardRe
     public override string DisplayName => ScratchIds.DisplayName;
     public override string Description => ScratchIds.Description;
     public override ModuleGroup Group => ModuleGroup.MoneyAndMedia;
-    public override Symbol Icon => Symbol.Archive;
+    public override Symbol Icon => Symbol.Note;
 
     /// <summary>The same vector icon as on Windows (<see cref="ScratchIconShape"/>).</summary>
     public override IImage? IconImage => ScratchIcon.Image;
