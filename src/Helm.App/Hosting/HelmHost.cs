@@ -53,6 +53,8 @@ internal static class HelmHost
         builder.Services.AddSingleton<Core.Services.IUpdateService>(sp => sp.GetRequiredService<Updates.VelopackUpdateService>());
 
         // Helm's MCP server: the tools of the modules that are on, for Claude (Helm's chats and Claude Code).
+        builder.Services.AddSingleton<Mcp.McpConsentService>();
+        builder.Services.AddSingleton<Core.Mcp.IMcpConsent>(sp => sp.GetRequiredService<Mcp.McpConsentService>());
         builder.Services.AddSingleton(sp => new Core.Mcp.McpPipeHost(paths, () =>
         {
             var settings = sp.GetRequiredService<ISettingsStoreFactory>().Get<Core.Mcp.McpSettings>(Core.Mcp.McpSettings.StoreId).Current;
@@ -63,7 +65,7 @@ internal static class HelmHost
                 .SelectMany(p => p.Tools)
                 .Where(t => settings.AllowChanges || t.ReadOnly);
             return new Core.Mcp.McpServer(tools, Shell.Services.AppInfo.Version, Core.Mcp.McpEndpoint.Instructions,
-                sp.GetRequiredService<ILoggerFactory>().CreateLogger<Core.Mcp.McpServer>());
+                sp.GetRequiredService<ILoggerFactory>().CreateLogger<Core.Mcp.McpServer>(), sp.GetRequiredService<Core.Mcp.IMcpConsent>());
         }, sp.GetRequiredService<ILogger<Core.Mcp.McpPipeHost>>()));
 
         // Shell views and view models
@@ -76,6 +78,9 @@ internal static class HelmHost
         builder.Services.AddSingleton<SyncIndicatorViewModel>();
         builder.Services.AddSingleton<GeneralViewModel>();
         builder.Services.AddSingleton<GeneralPage>();
+        builder.Services.AddSingleton<McpPermissionsViewModel>();
+        builder.Services.AddSingleton<McpViewModel>();
+        builder.Services.AddSingleton<McpPage>();
         builder.Services.AddSingleton<WelcomePage>();
         builder.Services.AddSingleton<WhatsNewPage>();
         builder.Services.AddSingleton<DiagnosticsViewModel>();

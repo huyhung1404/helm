@@ -117,7 +117,7 @@ internal partial class MainWindow : FluentWindow
         var index = Array.FindIndex(args, a => a.Equals("--page", StringComparison.OrdinalIgnoreCase));
         if (index < 0 || index + 1 >= args.Length) return typeof(HomePage);
         var name = args[index + 1];
-        var candidates = new[] { typeof(HomePage), typeof(GeneralPage), typeof(DiagnosticsPage), typeof(WelcomePage), typeof(WhatsNewPage) }
+        var candidates = new[] { typeof(HomePage), typeof(GeneralPage), typeof(McpPage), typeof(DiagnosticsPage), typeof(WelcomePage), typeof(WhatsNewPage) }
             .Concat(_viewModel.Groups.SelectMany(g => g.Modules).Select(m => m.SettingsPageType))
             .Concat(_viewModel.Groups.SelectMany(g => g.Modules).OfType<IModuleContent>().Select(m => m.ContentPageType));
         return candidates.FirstOrDefault(t => t.Name.StartsWith(name, StringComparison.OrdinalIgnoreCase)) ?? typeof(HomePage);
@@ -181,6 +181,7 @@ internal partial class MainWindow : FluentWindow
 
         Navigation.MenuItems.Add(NavItem("Home", SymbolRegular.Home24, typeof(HomePage)));
         Navigation.MenuItems.Add(NavItem("General", SymbolRegular.Settings24, typeof(GeneralPage)));
+        Navigation.MenuItems.Add(NavItem("Claude & MCP", SymbolRegular.PlugConnected24, typeof(McpPage)));
         Navigation.MenuItems.Add(new NavigationViewItemSeparator());
 
         foreach (var group in _viewModel.Groups)

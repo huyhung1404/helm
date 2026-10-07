@@ -1,0 +1,18 @@
+<Page
+    x:Class="Helm.App.Views.Pages.McpPage"
+    x:ClassModifier="internal"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:mcp="clr-namespace:Helm.App.Views.Mcp"
+    Title="Claude &amp; MCP">
+
+    <StackPanel Margin="24,16,24,24">
+        <TextBlock Text="Claude &amp; MCP" FontSize="28" FontWeight="SemiBold" Margin="0,0,0,8" />
+        <TextBlock Text="Connect Claude Code or VS Code to Helm." Style="{DynamicResource HelmSecondaryText}" Margin="0,0,0,8" />
+
+        <TextBlock Text="Permissions" Style="{DynamicResource HelmSectionHeader}" />
+        <Border Style="{DynamicResource HelmSurface}">
+            <mcp:McpPermissionsPanel DataContext="{Binding Permissions}" />
+        </Border>
+    </StackPanel>
+</Page>
