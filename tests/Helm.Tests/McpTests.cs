@@ -182,13 +182,6 @@ public sealed class McpTests
         var config = new McpClientConfig(paths, settings);
         Assert.Equal(["--mcp", "--data-dir", dir.Path], config.Arguments);
         Assert.Contains("claude mcp add --scope user helm -- ", config.ClaudeCodeCommand);
-        var file = config.WriteConfigFile()!;
-        var json = JsonNode.Parse(File.ReadAllText(file))!;
-        Assert.Equal("stdio", json["mcpServers"]!["helm"]!["type"]!.GetValue<string>());
-        Assert.Equal("--mcp", json["mcpServers"]!["helm"]!["args"]![0]!.GetValue<string>());
-
-        settings.Get<McpSettings>(McpSettings.StoreId).Update(s => s.Enabled = false);
-        Assert.Null(config.WriteConfigFile());
     }
 
     private static async Task<(bool IsError, string Text)> Call(McpServer server, string tool, object args)

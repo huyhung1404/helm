@@ -94,29 +94,6 @@ public sealed class McpClientConfig(HelmPaths paths, ISettingsStoreFactory setti
     public static string ClaudeDesktopJson(string command, IReadOnlyList<string> args) =>
         Wrap("mcpServers", new JsonObject { ["command"] = command, ["args"] = ToJsonArray(args) });
 
-    /// <summary>Writes the config Helm's chats pass with --mcp-config; null while the tools are off.</summary>
-    public string? WriteConfigFile()
-    {
-        if (!Enabled) return null;
-        var folder = Path.Combine(paths.Root, "mcp");
-        Directory.CreateDirectory(folder);
-        var file = Path.Combine(folder, "claude-mcp.json");
-        var config = new JsonObject
-        {
-            ["mcpServers"] = new JsonObject
-            {
-                [ServerName] = new JsonObject
-                {
-                    ["type"] = "stdio",
-                    ["command"] = Executable,
-                    ["args"] = ToJsonArray(Arguments),
-                },
-            },
-        };
-        File.WriteAllText(file, config.ToJsonString(new JsonSerializerOptions { WriteIndented = true }));
-        return file;
-    }
-
     /// <summary>The file a client keeps its servers in. Claude Desktop from the Microsoft Store keeps it in its package folder.</summary>
     public static string ConfigFile(McpClientKind kind, McpClientFolders folders)
     {
