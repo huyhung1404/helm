@@ -20,7 +20,11 @@ Print a short plan before you start, then continue without waiting:
 - **Platforms**: PC, Android or both (from the line above; if it is missing, ask). This decides the projects in §2.
 - **Module id**: kebab-case, e.g. `color-picker`. The same id on both platforms.
 - **Class prefix**: PascalCase, e.g. `ColorPicker`.
-- **Group**: one of `SystemTools`, `WindowingAndLayouts`, `InputAndOutput`, `FileManagement`, `Advanced`. Pick the closest.
+- **Group**: what the tool is for — one of `Planning` (notes, to-dos, goals, capture: Notes, Tracker, Missions,
+  Quick Capture), `MoneyAndMedia` (Wallet, Watch Later), `SecurityAndServers` (secrets and remote machines: Vault,
+  SSH), `WindowsAndDesktop` (windows, input and the desktop itself: Always on Top, Command Palette). Pick the closest;
+  the same group on both platforms. If none fits, add a group to `ModuleGroup` with a name that says what is inside
+  (never a generic one like "Tools" or "Advanced") plus its `DisplayName` and PC `Icon`.
 - **Icon**: a `SymbolRegular` value that exists (see §6). On Android the same icon is `FluentIcons.Common.Symbol.<Name>` (no size suffix).
   A tool may also have its own picture icon that replaces the symbol everywhere, exposed as `IconImage` (PC: a frozen
   `ImageSource`; Android: an `IImage`, built once). Keep the symbol as the fallback. Picture icons must all look the

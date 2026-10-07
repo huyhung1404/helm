@@ -8,7 +8,7 @@ using Wpf.Ui.Controls;
 
 namespace Helm.App.ViewModels;
 
-/// <summary>A non-module page listed inside a nav group (e.g. Diagnostics under Advanced).</summary>
+/// <summary>A non-module page listed inside a nav group (e.g. Diagnostics under Windows & Desktop).</summary>
 internal sealed record ExtraNavPage(string Title, SymbolRegular Icon, Type PageType);
 
 internal sealed record NavGroup(ModuleGroup Group, IReadOnlyList<IHelmModule> Modules, IReadOnlyList<ExtraNavPage> ExtraPages);
@@ -46,8 +46,8 @@ internal sealed partial class MainWindowViewModel : ObservableObject
     private void OpenFeedback() => _launcher.OpenUrl(AppInfo.IssuesUrl);
 
     /// <summary>
-    /// Non-module pages inside groups. The Diagnostics page (Advanced) is hidden for now; it still opens with
-    /// "--page Diagnostics". Re-enable: ModuleGroup.Advanced => [new ExtraNavPage("Diagnostics", SymbolRegular.Bug24, typeof(DiagnosticsPage))]
+    /// Non-module pages inside groups. The Diagnostics page (Windows & Desktop) is hidden for now; it still opens with
+    /// "--page Diagnostics". Re-enable: ModuleGroup.WindowsAndDesktop => [new ExtraNavPage("Diagnostics", SymbolRegular.Bug24, typeof(DiagnosticsPage))]
     /// </summary>
     private static IReadOnlyList<ExtraNavPage> ExtraPagesFor(ModuleGroup group) => group switch
     {

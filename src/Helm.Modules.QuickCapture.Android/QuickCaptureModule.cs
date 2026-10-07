@@ -25,7 +25,7 @@ public sealed class QuickCaptureModule(ILogger<QuickCaptureModule> logger) : And
     public override string Id => ModuleId;
     public override string DisplayName => "Quick Capture";
     public override string Description => "Save a note, a task or a debt from any app: Share → Save to Helm, or the Quick Settings tile.";
-    public override ModuleGroup Group => ModuleGroup.Advanced;
+    public override ModuleGroup Group => ModuleGroup.Planning;
     public override Symbol Icon => Symbol.Flash;
 
     /// <summary>The same vector icon as on Windows (<see cref="QuickCaptureIconShape"/>).</summary>

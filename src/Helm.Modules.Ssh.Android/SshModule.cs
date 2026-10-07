@@ -21,7 +21,7 @@ public sealed class SshModule : AndroidModuleBase, IModuleContent
     public override string Id => SshIds.ModuleId;
     public override string DisplayName => SshIds.DisplayName;
     public override string Description => SshIds.Description;
-    public override ModuleGroup Group => ModuleGroup.Advanced;
+    public override ModuleGroup Group => ModuleGroup.SecurityAndServers;
     public override Symbol Icon => Symbol.WindowConsole;
 
     /// <summary>The same vector icon as on Windows (<see cref="SshIconShape"/>).</summary>

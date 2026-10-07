@@ -15,7 +15,7 @@ public sealed class WatchLaterModule(MetadataResolver resolver, WatchLaterViewMo
     public override string Id => WatchLaterIds.ModuleId;
     public override string DisplayName => WatchLaterIds.DisplayName;
     public override string Description => WatchLaterIds.Description;
-    public override ModuleGroup Group => ModuleGroup.SystemTools;
+    public override ModuleGroup Group => ModuleGroup.MoneyAndMedia;
     public override Symbol Icon => Symbol.VideoClip;
 
     /// <summary>The same vector icon as on Windows (<see cref="WatchLaterIconShape"/>).</summary>

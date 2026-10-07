@@ -33,7 +33,7 @@ public sealed class AlwaysOnTopModule : HelmModuleBase
     public override string Id => ModuleId;
     public override string DisplayName => "Always On Top";
     public override string Description => "Pin any window above all others with a shortcut. Pinned windows get a colored border so you always know which ones they are.";
-    public override ModuleGroup Group => ModuleGroup.WindowingAndLayouts;
+    public override ModuleGroup Group => ModuleGroup.WindowsAndDesktop;
     public override SymbolRegular Icon => SymbolRegular.Pin24;
     public override Type SettingsPageType => typeof(AlwaysOnTopPage);
 

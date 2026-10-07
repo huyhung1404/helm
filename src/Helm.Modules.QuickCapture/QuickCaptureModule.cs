@@ -51,7 +51,7 @@ public sealed class QuickCaptureModule : HelmModuleBase, IDisposable
     public override string Id => ModuleId;
     public override string DisplayName => "Quick Capture";
     public override string Description => "Press a shortcut in any app to save a note, a task or a debt in a second, without opening Helm.";
-    public override ModuleGroup Group => ModuleGroup.Advanced;
+    public override ModuleGroup Group => ModuleGroup.Planning;
     public override SymbolRegular Icon => SymbolRegular.Flash24;
     public override System.Windows.Media.ImageSource IconImage => QuickCaptureLogo.Image;
     public override Type SettingsPageType => typeof(QuickCapturePage);

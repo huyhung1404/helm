@@ -41,7 +41,7 @@ public sealed class MissionsModule : HelmModuleBase, IModuleContent, IDisposable
     public override string Id => MissionsIds.ModuleId;
     public override string DisplayName => MissionsIds.DisplayName;
     public override string Description => MissionsIds.Description;
-    public override ModuleGroup Group => ModuleGroup.SystemTools;
+    public override ModuleGroup Group => ModuleGroup.Planning;
     public override SymbolRegular Icon => SymbolRegular.Flag24;
     public override ImageSource IconImage => MissionsLogo.Image;
     public override Type SettingsPageType => typeof(MissionsPage);

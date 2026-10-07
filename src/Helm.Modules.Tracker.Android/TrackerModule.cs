@@ -28,7 +28,7 @@ public sealed class TrackerModule : AndroidModuleBase, IModuleContent, IDisposab
     public override string Id => TrackerIds.ModuleId;
     public override string DisplayName => TrackerIds.DisplayName;
     public override string Description => TrackerIds.Description;
-    public override ModuleGroup Group => ModuleGroup.SystemTools;
+    public override ModuleGroup Group => ModuleGroup.Planning;
     public override Symbol Icon => Symbol.TaskListSquare;
 
     /// <summary>The same vector icon as on Windows (<see cref="TrackerIconShape"/>).</summary>

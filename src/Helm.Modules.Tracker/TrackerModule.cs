@@ -38,7 +38,7 @@ public sealed class TrackerModule : HelmModuleBase, IModuleContent, IDisposable
     public override string Id => TrackerIds.ModuleId;
     public override string DisplayName => TrackerIds.DisplayName;
     public override string Description => TrackerIds.Description;
-    public override ModuleGroup Group => ModuleGroup.SystemTools;
+    public override ModuleGroup Group => ModuleGroup.Planning;
     public override SymbolRegular Icon => SymbolRegular.TaskListSquareLtr24;
     public override ImageSource IconImage => TrackerLogo.Image;
     public override Type SettingsPageType => typeof(TrackerPage);

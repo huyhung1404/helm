@@ -17,7 +17,7 @@ public sealed class WatchLaterModule(MetadataResolver resolver, PcDownloads down
     public override string Id => WatchLaterIds.ModuleId;
     public override string DisplayName => WatchLaterIds.DisplayName;
     public override string Description => WatchLaterIds.Description;
-    public override ModuleGroup Group => ModuleGroup.SystemTools;
+    public override ModuleGroup Group => ModuleGroup.MoneyAndMedia;
     public override SymbolRegular Icon => SymbolRegular.VideoClip24;
     public override ImageSource IconImage => WatchLaterLogo.Image;
     public override Type SettingsPageType => typeof(WatchLaterPage);

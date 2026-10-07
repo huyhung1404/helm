@@ -15,7 +15,7 @@ public sealed class NotesModule(NotesViewModel viewModel) : HelmModuleBase, IMod
     public override string Id => NotesIds.ModuleId;
     public override string DisplayName => NotesIds.DisplayName;
     public override string Description => NotesIds.Description;
-    public override ModuleGroup Group => ModuleGroup.SystemTools;
+    public override ModuleGroup Group => ModuleGroup.Planning;
     public override SymbolRegular Icon => SymbolRegular.Notepad24;
     public override ImageSource IconImage => NotesLogo.Image;
     public override Type SettingsPageType => typeof(NotesPage);

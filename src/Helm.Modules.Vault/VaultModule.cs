@@ -35,7 +35,7 @@ public sealed class VaultModule(
     public override string Id => ModuleId;
     public override string DisplayName => "Vault";
     public override string Description => "Keeps passwords, secure notes, cards and documents encrypted, synced and backed up.";
-    public override ModuleGroup Group => ModuleGroup.Advanced;
+    public override ModuleGroup Group => ModuleGroup.SecurityAndServers;
     public override SymbolRegular Icon => SymbolRegular.ShieldKeyhole24;
     public override System.Windows.Media.ImageSource IconImage => VaultIcon.Image;
     public override Type SettingsPageType => typeof(VaultPage);

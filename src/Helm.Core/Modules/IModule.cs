@@ -2,24 +2,26 @@ using System.ComponentModel;
 
 namespace Helm.Core.Modules;
 
+/// <summary>
+/// What a tool is for. The nav pane, Home and search list the groups in this order; a group with no tool is hidden.
+/// Only the name is shown (see <see cref="ModuleGroups.DisplayName"/>); no group value is saved anywhere.
+/// </summary>
 public enum ModuleGroup
 {
-    SystemTools,
-    WindowingAndLayouts,
-    InputAndOutput,
-    FileManagement,
-    Advanced,
+    Planning,
+    MoneyAndMedia,
+    SecurityAndServers,
+    WindowsAndDesktop,
 }
 
 public static class ModuleGroups
 {
     public static string DisplayName(this ModuleGroup group) => group switch
     {
-        ModuleGroup.SystemTools => "System Tools",
-        ModuleGroup.WindowingAndLayouts => "Windowing & Layouts",
-        ModuleGroup.InputAndOutput => "Input & Output",
-        ModuleGroup.FileManagement => "File Management",
-        ModuleGroup.Advanced => "Advanced",
+        ModuleGroup.Planning => "Planning",
+        ModuleGroup.MoneyAndMedia => "Money & Media",
+        ModuleGroup.SecurityAndServers => "Security & Servers",
+        ModuleGroup.WindowsAndDesktop => "Windows & Desktop",
         _ => group.ToString(),
     };
 }

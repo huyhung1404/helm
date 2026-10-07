@@ -14,7 +14,7 @@ public sealed class NotesModule(NotesViewModel viewModel) : AndroidModuleBase, I
     public override string Id => NotesIds.ModuleId;
     public override string DisplayName => NotesIds.DisplayName;
     public override string Description => NotesIds.Description;
-    public override ModuleGroup Group => ModuleGroup.SystemTools;
+    public override ModuleGroup Group => ModuleGroup.Planning;
     public override Symbol Icon => Symbol.Notepad;
 
     /// <summary>The same vector icon as on Windows (<see cref="NotesIconShape"/>).</summary>

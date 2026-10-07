@@ -47,7 +47,7 @@ public sealed class ClaudeChatModule : HelmModuleBase
     public override string Id => ModuleId;
     public override string DisplayName => "Claude Chat";
     public override string Description => "Chat with Claude Code right inside Helm. It uses the Claude Code you already have installed and signed in, works in the folder you pick, and asks before it changes anything.";
-    public override ModuleGroup Group => ModuleGroup.Advanced;
+    public override ModuleGroup Group => ModuleGroup.Planning;
     public override SymbolRegular Icon => SymbolRegular.ChatSparkle24;
     public override ImageSource IconImage => ClaudeLogo.Image;
     public override Type SettingsPageType => typeof(ClaudeChatPage);
