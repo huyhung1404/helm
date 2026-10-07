@@ -127,9 +127,9 @@ internal sealed class WindowsScratchPlatform : IScratchPlatform
         return Task.FromResult<string?>($"Copied {what}. Paste it into a folder, a chat or an email.");
     }
 
-    public Task CopyToClipboardAsync(ScratchLocalFile file, CancellationToken ct)
+    public Task CopyToClipboardAsync(IReadOnlyList<ScratchLocalFile> files, CancellationToken ct)
     {
-        SetClipboard([file]);
+        SetClipboard(files);
         return Task.CompletedTask;
     }
 

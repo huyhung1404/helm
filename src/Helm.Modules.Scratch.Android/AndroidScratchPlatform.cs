@@ -195,11 +195,14 @@ internal sealed class AndroidScratchPlatform : IScratchPlatform
     /// The file as a content URI on the clipboard: apps that paste files (chats, mail) get it; the app that pastes is
     /// allowed to read it through Helm's FileProvider.
     /// </summary>
-    public Task CopyToClipboardAsync(ScratchLocalFile file, CancellationToken ct)
+    public Task CopyToClipboardAsync(IReadOnlyList<ScratchLocalFile> files, CancellationToken ct)
     {
+        if (files.Count == 0) return Task.CompletedTask;
         if (Context.GetSystemService(Context.ClipboardService) is not ClipboardManager clipboard)
             throw new InvalidOperationException("This phone has no clipboard Helm can use.");
-        clipboard.PrimaryClip = ClipData.NewUri(Context.ContentResolver, file.Name, ProviderUri(file));
+        var clip = ClipData.NewUri(Context.ContentResolver, files[0].Name, ProviderUri(files[0]))!;
+        foreach (var file in files.Skip(1)) clip.AddItem(new ClipData.Item(ProviderUri(file)));
+        clipboard.PrimaryClip = clip;
         return Task.CompletedTask;
     }
 

@@ -69,13 +69,21 @@ public partial class ScratchContentPage : Page
     private Point _pressedAt;
     private DragGhost? _ghost;
 
-    /// <summary>A click selects the card (the keyboard then acts on it), a double click opens it, a drag moves it.</summary>
+    /// <summary>
+    /// A click selects the card (the keyboard then acts on it); Shift or Ctrl + click adds it to the selection or takes
+    /// it out; a double click opens it; a drag moves it.
+    /// </summary>
     private void OnCardPressed(object sender, MouseButtonEventArgs e)
     {
         var row = InsideActionButton(e.OriginalSource as DependencyObject) ? null : RowAt(e.OriginalSource as DependencyObject);
         _pressed = row;
         _pressedAt = e.GetPosition(Wall);
         Wall.Focus();
+        if (row is not null && (Keyboard.Modifiers & (ModifierKeys.Shift | ModifierKeys.Control)) != 0)
+        {
+            _viewModel.ToggleSelect(row);
+            return;
+        }
         _viewModel.SelectCommand.Execute(row);
         if (row is not null && e.ClickCount == 2) _viewModel.OpenCommand.Execute(row);
     }
@@ -100,22 +108,28 @@ public partial class ScratchContentPage : Page
             e.Handled = true;
             return;
         }
-        if (_viewModel.Selected is not { } row) return;
+        if (e.Key == Key.A && ctrl && !shift)
+        {
+            _viewModel.SelectAll();
+            e.Handled = true;
+            return;
+        }
+        if (_viewModel.SelectionCount == 0) return;
+        var single = _viewModel.SelectionCount == 1 ? _viewModel.Selected : null;
         switch (e.Key)
         {
             case Key.C when ctrl && shift:
-                if (row.IsLive) _viewModel.SendToClipboardCommand.Execute(row);
+                if (single is { IsLive: true }) _viewModel.SendToClipboardCommand.Execute(single);
                 break;
             case Key.C when ctrl:
-                _viewModel.CopyCommand.Execute(row);
+                _ = _viewModel.CopySelectedAsync();
                 break;
             case Key.Delete:
                 // In the trash, deleting is for good (it asks first).
-                if (row.Trashed) _viewModel.DeleteForeverCommand.Execute(row);
-                else _viewModel.TrashCommand.Execute(row);
+                _ = _viewModel.DeleteSelectedAsync();
                 break;
             case Key.Enter:
-                _viewModel.OpenCommand.Execute(row);
+                if (single is not null) _viewModel.OpenCommand.Execute(single);
                 break;
             default:
                 return;

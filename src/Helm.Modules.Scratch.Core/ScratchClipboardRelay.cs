@@ -183,7 +183,7 @@ public sealed class ScratchClipboardRelay : IDisposable
                 return;
             }
             var file = await ExportAsync(signal.ItemId, item).ConfigureAwait(true);
-            await _platform.CopyToClipboardAsync(file, CancellationToken.None).ConfigureAwait(true);
+            await _platform.CopyToClipboardAsync([file], CancellationToken.None).ConfigureAwait(true);
             Notice?.Invoke(this, $"Copied “{item.Name}”{from} to the clipboard.");
         }
         catch (Exception ex)
@@ -201,7 +201,7 @@ public sealed class ScratchClipboardRelay : IDisposable
             _clipboard.SetText(item.Text ?? "");
             return;
         }
-        await _platform.CopyToClipboardAsync(await ExportAsync(itemId, item).ConfigureAwait(true), CancellationToken.None).ConfigureAwait(true);
+        await _platform.CopyToClipboardAsync([await ExportAsync(itemId, item).ConfigureAwait(true)], CancellationToken.None).ConfigureAwait(true);
     }
 
     /// <summary>A decrypted copy in the open folder (the same place as Open and Share), reused while complete.</summary>

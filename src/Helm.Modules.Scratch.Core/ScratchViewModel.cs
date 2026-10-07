@@ -374,17 +374,130 @@ public sealed partial class ScratchViewModel : ObservableObject
     [RelayCommand]
     private void Select(ScratchRowViewModel? row)
     {
+        foreach (var other in _selection) other.IsSelected = false;
+        _selection.Clear();
+        if (row is not null)
+        {
+            _selection.Add(row);
+            row.IsSelected = true;
+        }
         Selected = row;
         DetailText = row is not null && _store.Get(row.Id) is { Kind: ScratchKind.Text } item ? item.Text ?? "" : "";
+        OnPropertyChanged(nameof(SelectionCount));
+    }
+
+    // ---- Several cards (PC: Shift or Ctrl + click, Ctrl+A) -------------------------------------------------------
+
+    private readonly List<ScratchRowViewModel> _selection = [];
+
+    /// <summary>The cards the keyboard acts on, in the order they were picked.</summary>
+    public IReadOnlyList<ScratchRowViewModel> SelectedRows => _selection;
+
+    public int SelectionCount => _selection.Count;
+
+    /// <summary>Adds a card to the selection, or takes it out when it is in already.</summary>
+    public void ToggleSelect(ScratchRowViewModel row)
+    {
+        if (_selection.Remove(row))
+        {
+            row.IsSelected = false;
+        }
+        else
+        {
+            _selection.Add(row);
+            row.IsSelected = true;
+        }
+        Selected = _selection.Count > 0 ? _selection[^1] : null;
+        DetailText = "";
+        OnPropertyChanged(nameof(SelectionCount));
+    }
+
+    /// <summary>Every card shown (the filter and the search).</summary>
+    public void SelectAll()
+    {
+        Select(null);
+        foreach (var row in Rows) ToggleSelect(row);
+    }
+
+    /// <summary>
+    /// Ctrl+C on the selection: texts only → one text, a blank line between them; otherwise the files, all at once
+    /// (texts among them are left out and said so).
+    /// </summary>
+    public async Task CopySelectedAsync()
+    {
+        var rows = InWallOrder(_selection);
+        if (rows.Count == 0) return;
+        if (rows.Count == 1)
+        {
+            await CopyCommand.ExecuteAsync(rows[0]).ConfigureAwait(true);
+            return;
+        }
+        var items = rows.Select(r => (Row: r, Item: _store.Get(r.Id))).Where(x => x.Item is not null).ToList();
+        if (items.All(x => x.Item!.Kind == ScratchKind.Text))
+        {
+            _clipboard.SetText(string.Join("\n\n", items.Select(x => x.Item!.Text ?? "")));
+            Message = $"Copied {items.Count} texts as one.";
+            return;
+        }
+        var files = new List<ScratchLocalFile>();
+        foreach (var (row, item) in items.Where(x => x.Item!.Kind == ScratchKind.File))
+        {
+            if (await ExportAsync(row.Id, item!).ConfigureAwait(true) is not { } file) return;
+            files.Add(file);
+        }
+        try
+        {
+            await _platform.CopyToClipboardAsync(files, CancellationToken.None).ConfigureAwait(true);
+            var skipped = items.Count - files.Count;
+            Message = $"Copied {files.Count} files." + (skipped > 0 ? $" {skipped} text{(skipped == 1 ? " was" : "s were")} left out: copy texts on their own." : "");
+        }
+        catch (Exception ex)
+        {
+            Fail("Could not copy the files", ex);
+        }
+    }
+
+    /// <summary>Delete on the selection: into the trash; in the trash, for good after one question.</summary>
+    public async Task DeleteSelectedAsync()
+    {
+        var rows = InWallOrder(_selection);
+        if (rows.Count == 0) return;
+        if (rows.Count == 1)
+        {
+            if (rows[0].Trashed) await DeleteForeverCommand.ExecuteAsync(rows[0]).ConfigureAwait(true);
+            else Trash(rows[0]);
+            return;
+        }
+        var trashed = rows.Where(r => r.Trashed).ToList();
+        var live = rows.Where(r => !r.Trashed).ToList();
+        if (live.Count > 0)
+        {
+            Try(() => live.Count(r => _store.MoveToTrash(r.Id)));
+            Message = $"Moved {live.Count} things to the trash.";
+        }
+        if (trashed.Count > 0)
+        {
+            var ok = await _dialogs.ConfirmAsync($"Delete {trashed.Count} things for good?",
+                "They are removed from all your devices and cannot be restored.", "Delete").ConfigureAwait(true);
+            if (!ok) return;
+            Try(() => trashed.Count(r => _store.DeleteForever(r.Id)));
+            foreach (var row in trashed) DeleteOpenedCopy(row.Id);
+            Message = $"Deleted {trashed.Count} things for good.";
+        }
+        Select(null);
+    }
+
+    private List<ScratchRowViewModel> InWallOrder(IEnumerable<ScratchRowViewModel> rows)
+    {
+        var picked = rows.ToHashSet();
+        return Rows.Where(picked.Contains).ToList();
     }
 
     [RelayCommand]
     public void CloseDetail() => Select(null);
 
-    partial void OnSelectedChanged(ScratchRowViewModel? oldValue, ScratchRowViewModel? newValue)
+    partial void OnSelectedChanged(ScratchRowViewModel? value)
     {
-        if (oldValue is not null) oldValue.IsSelected = false;
-        if (newValue is not null) newValue.IsSelected = true;
         OnPropertyChanged(nameof(IsDetailOpen));
         OnPropertyChanged(nameof(IsDetailClosed));
     }
@@ -497,7 +610,7 @@ public sealed partial class ScratchViewModel : ObservableObject
         if (await ExportAsync(row.Id, item).ConfigureAwait(true) is not { } file) return;
         try
         {
-            await _platform.CopyToClipboardAsync(file, CancellationToken.None).ConfigureAwait(true);
+            await _platform.CopyToClipboardAsync([file], CancellationToken.None).ConfigureAwait(true);
             Message = $"Copied “{item.Name}”. Paste it into a folder, a chat or an email.";
         }
         catch (Exception ex)
@@ -671,6 +784,14 @@ public sealed partial class ScratchViewModel : ObservableObject
 
         // The details follow the thing (moved to the trash or deleted on another device: they close).
         if (Selected is { } selected && (!_rows.ContainsKey(selected.Id) || _store.Get(selected.Id) is null)) CloseDetail();
+        // Cards that left the wall (trashed, deleted, filtered out) leave the selection.
+        var gone = _selection.Where(r => !_rows.ContainsKey(r.Id)).ToList();
+        foreach (var row in gone)
+        {
+            _selection.Remove(row);
+            row.IsSelected = false;
+        }
+        if (gone.Count > 0) OnPropertyChanged(nameof(SelectionCount));
 
         var counts = _store.Counts();
         foreach (var tab in FilterTabs)

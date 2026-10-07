@@ -75,7 +75,7 @@
         <DockPanel Margin="0,0,0,16">
             <!-- No buttons on PC: the keyboard does it (the phone has buttons) -->
             <TextBlock x:Name="Actions" DockPanel.Dock="Right" VerticalAlignment="Center" Style="{DynamicResource HelmSecondaryText}" TextAlignment="Right"
-                       Text="Ctrl+V or drop to add · Click a card: Ctrl+C copy, Del delete, Enter open" />
+                       Text="Ctrl+V or drop to add · Click a card (Shift+click for more): Ctrl+C copy, Del delete, Enter open" />
             <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
                 <Image Source="{x:Static self:ScratchLogo.Image}" Width="32" Height="32" Margin="0,0,12,0" />
                 <TextBlock Text="Scratch" FontSize="28" FontWeight="SemiBold" VerticalAlignment="Center" />
@@ -150,8 +150,9 @@
             <!-- The wall of cards: each shows what it holds and is as tall as that; the cards fill the columns -->
             <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" PanningMode="VerticalOnly" Focusable="False"
                           Visibility="{Binding HasRows, Converter={StaticResource BoolToVisibility}}">
-                <!-- Drag a card onto another one to move it there (code-behind) -->
-                <ItemsControl x:Name="Wall" ItemsSource="{Binding Rows}" Focusable="True" FocusVisualStyle="{x:Null}" Margin="0,4,8,24" AutomationProperties.Name="Scratch" AllowDrop="True">
+                <!-- Drag a card onto another one to move it there (code-behind). The right margin leaves room for the scroll
+                     bar, which WPF-UI draws over the content. -->
+                <ItemsControl x:Name="Wall" ItemsSource="{Binding Rows}" Focusable="True" FocusVisualStyle="{x:Null}" Margin="0,4,18,24" AutomationProperties.Name="Scratch" AllowDrop="True">
                     <ItemsControl.ItemsPanel>
                         <ItemsPanelTemplate>
                             <self:MasonryPanel MinColumnWidth="230" Spacing="10" />

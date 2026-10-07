@@ -38,10 +38,10 @@ public interface IScratchPlatform
     Task<string?> SaveAsync(ScratchLocalFile file, CancellationToken ct);
 
     /// <summary>
-    /// Puts a file on the clipboard, so it can be pasted into another app (Send to clipboard, also when another device
-    /// sent it). On Windows a photo goes there as a picture too.
+    /// Puts files on the clipboard, so they can be pasted into another app (Copy, Send to clipboard, also when another
+    /// device sent it). On Windows a single photo goes there as a picture too.
     /// </summary>
-    Task CopyToClipboardAsync(ScratchLocalFile file, CancellationToken ct);
+    Task CopyToClipboardAsync(IReadOnlyList<ScratchLocalFile> files, CancellationToken ct);
 
     /// <summary>Hands the files on: to the clipboard (Windows) or to the share sheet (Android).</summary>
     /// <returns>A short message for the user, or null.</returns>

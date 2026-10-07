@@ -447,6 +447,51 @@ public sealed class ScratchTests : IDisposable
     }
 
     [Fact]
+    public async Task Several_cards_copy_as_one_text_or_as_files_and_go_to_the_trash_together()
+    {
+        var device = NewLocal("a");
+        var platform = new FakePlatform(Path.Combine(_dir, "open"));
+        var vm = NewViewModel(device.Store, platform, out var clipboard);
+        await vm.AddTextAsync("first");
+        _clock.Advance(TimeSpan.FromSeconds(1));
+        await vm.AddTextAsync("second");
+        _clock.Advance(TimeSpan.FromSeconds(1));
+        await vm.AddSourcesAsync([new ScratchSource("a.pdf", null, 2, () => new MemoryStream([1, 2]))]);
+        _clock.Advance(TimeSpan.FromSeconds(1));
+        await vm.AddSourcesAsync([new ScratchSource("b.zip", null, 1, () => new MemoryStream([3]))]);
+        ScratchRowViewModel Row(string name) => vm.Rows.Single(r => r.Name == name);
+
+        // Texts only: one text, in the wall's order (newest first), whatever order they were picked in.
+        vm.SelectCommand.Execute(Row("first"));
+        vm.ToggleSelect(Row("second"));
+        Assert.Equal(2, vm.SelectionCount);
+        Assert.True(Row("first").IsSelected && Row("second").IsSelected);
+        await vm.CopySelectedAsync();
+        Assert.Equal("second\n\nfirst", clipboard.Text);
+
+        // Taking one out again.
+        vm.ToggleSelect(Row("first"));
+        Assert.False(Row("first").IsSelected);
+        Assert.Equal(1, vm.SelectionCount);
+
+        // Files (and a text, left out): every file at once.
+        vm.SelectAll();
+        Assert.Equal(4, vm.SelectionCount);
+        await vm.CopySelectedAsync();
+        Assert.Equal(["b.zip", "a.pdf"], platform.OnClipboard.Select(f => f.Name));
+        Assert.Contains("2 texts were left out", vm.Message);
+
+        // Delete: all into the trash, then from the trash for good.
+        await vm.DeleteSelectedAsync();
+        Assert.Empty(vm.Rows);
+        Assert.Equal(0, vm.SelectionCount);
+        vm.ShowFilterCommand.Execute(vm.FilterTabs.Single(t => t.IsTrash));
+        vm.SelectAll();
+        await vm.DeleteSelectedAsync();
+        Assert.Empty(device.Store.Items(ScratchFilter.Trash));
+    }
+
+    [Fact]
     public async Task Trash_restore_and_delete_for_good_follow_the_filter()
     {
         var device = NewLocal("a");
@@ -576,9 +621,9 @@ public sealed class ScratchTests : IDisposable
 
         public List<ScratchLocalFile> OnClipboard { get; } = [];
 
-        public Task CopyToClipboardAsync(ScratchLocalFile file, CancellationToken ct)
+        public Task CopyToClipboardAsync(IReadOnlyList<ScratchLocalFile> files, CancellationToken ct)
         {
-            OnClipboard.Add(file);
+            OnClipboard.AddRange(files);
             return Task.CompletedTask;
         }
 
