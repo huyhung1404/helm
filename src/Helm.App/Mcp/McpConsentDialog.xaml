@@ -66,7 +66,8 @@
                             Background="{DynamicResource ControlFillColorDefaultBrush}"
                             BorderBrush="{DynamicResource CardStrokeColorDefaultBrush}">
                         <!-- Read-only and selectable: shown exactly as it will run. -->
-                        <TextBox x:Name="DetailsText" IsReadOnly="True" IsTabStop="False" BorderThickness="0" Background="Transparent" Padding="0"
+                        <TextBox x:Name="DetailsText" Style="{x:Null}" IsReadOnly="True" IsTabStop="False" BorderThickness="0" Background="Transparent" Padding="0"
+                                 Foreground="{DynamicResource TextFillColorPrimaryBrush}" CaretBrush="{DynamicResource TextFillColorPrimaryBrush}"
                                  FontFamily="Cascadia Mono, Consolas, Courier New" FontSize="12" TextWrapping="Wrap"
                                  MaxHeight="220" VerticalScrollBarVisibility="Auto" AutomationProperties.Name="Details" />
                     </Border>
@@ -76,17 +77,20 @@
 
         <Border Grid.Row="2" Padding="24,14" BorderThickness="0,1,0,0" BorderBrush="{DynamicResource CardStrokeColorDefaultBrush}"
                 Background="{DynamicResource SolidBackgroundFillColorBaseBrush}">
-            <DockPanel LastChildFill="False">
-                <TextBlock x:Name="TimeoutText" DockPanel.Dock="Left" VerticalAlignment="Center" Style="{DynamicResource HelmSecondaryText}"
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <TextBlock x:Name="TimeoutText" VerticalAlignment="Center" Margin="0,0,12,0" Style="{DynamicResource HelmSecondaryText}"
                            Text="No answer in 2 minutes means no." />
-                <ui:Button x:Name="DenyButton" DockPanel.Dock="Right" Content="Deny" IsDefault="True" IsCancel="True" MinWidth="90"
-                           Margin="8,0,0,0" Click="Deny_Click" />
-                <ui:Button x:Name="AllowOnceButton" DockPanel.Dock="Right" Content="Allow once" MinWidth="90" Margin="8,0,0,0"
-                           IsEnabled="False" Click="AllowOnce_Click" />
-                <ui:Button x:Name="AllowSessionButton" DockPanel.Dock="Right" Content="Allow for this session" Margin="8,0,0,0"
-                           IsEnabled="False" Click="AllowSession_Click"
-                           ToolTip="Until this connection ends or Helm restarts: the same tool on the same target runs without asking." />
-            </DockPanel>
+                <StackPanel Grid.Column="1" Orientation="Horizontal">
+                    <ui:Button x:Name="AllowSessionButton" Content="Allow for this session" Margin="0,0,8,0" IsEnabled="False" Click="AllowSession_Click"
+                               ToolTip="Until this connection ends or Helm restarts: the same tool on the same target runs without asking." />
+                    <ui:Button x:Name="AllowOnceButton" Content="Allow once" MinWidth="90" Margin="0,0,8,0" IsEnabled="False" Click="AllowOnce_Click" />
+                    <ui:Button x:Name="DenyButton" Content="Deny" IsDefault="True" IsCancel="True" MinWidth="90" Click="Deny_Click" />
+                </StackPanel>
+            </Grid>
         </Border>
     </Grid>
 </ui:FluentWindow>
