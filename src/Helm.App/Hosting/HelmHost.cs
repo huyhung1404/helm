@@ -52,7 +52,7 @@ internal static class HelmHost
         builder.Services.AddSingleton<Updates.VelopackUpdateService>();
         builder.Services.AddSingleton<Core.Services.IUpdateService>(sp => sp.GetRequiredService<Updates.VelopackUpdateService>());
 
-        // Helm's MCP server: the tools of the modules that are on, for Claude (Helm's chats and Claude Code).
+        // Helm's MCP server: the tools of the modules that are on, for Claude (Claude Code, VS Code).
         // Calls that change things ask first by Helm's policy (docs/mcp-security.md); the activity log stays on this device.
         builder.Services.AddSingleton<Mcp.McpConsentService>();
         builder.Services.AddSingleton(sp => new Core.Mcp.McpConsentPolicy(
