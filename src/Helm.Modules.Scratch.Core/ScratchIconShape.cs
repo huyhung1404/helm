@@ -2,7 +2,7 @@ namespace Helm.Modules.Scratch;
 
 /// <summary>
 /// The Scratch icon, drawn the same on both platforms (each builds its own vector image from this): a sticky note with
-/// its bottom-right corner peeling and a quick scribble on it, in an indigo-to-lilac gradient, with no background.
+/// its bottom-right corner peeling and a quick scribble on it, in a coral gradient (rose to peach), with no background.
 /// Path data is in a 100 × 100 box (WPF/Avalonia syntax) and fills it edge to edge, like the Claude symbol, so every
 /// tool icon looks the same size.
 /// </summary>
@@ -23,7 +23,7 @@ public static class ScratchIconShape
     public const double Stroke = 8;
 
     /// <summary>Gradient from the bottom-left corner to the top-right corner of the box (ARGB).</summary>
-    public const uint GradientStart = 0xFF4F46E5;
+    public const uint GradientStart = 0xFFE11D48;
 
-    public const uint GradientEnd = 0xFFC084FC;
+    public const uint GradientEnd = 0xFFFDBA74;
 }
