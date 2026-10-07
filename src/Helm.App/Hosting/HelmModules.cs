@@ -1,4 +1,3 @@
-using Helm.Modules.ClaudeChat;
 using Helm.Modules.CommandPalette;
 using Helm.Modules.Missions;
 using Helm.Modules.Notes;
@@ -20,7 +19,6 @@ internal static class HelmModules
 {
     public static void Register(IServiceCollection services)
     {
-        services.AddClaudeChatModule();
         services.AddVaultModule();
         services.AddTrackerModule();
         services.AddMissionsModule();
