@@ -3,6 +3,20 @@
 All notable changes to Helm. The top section is used as the GitHub release body and as the Velopack release notes.
 Format: [Keep a Changelog](https://keepachangelog.com), versions follow [SemVer](https://semver.org).
 
+## [0.31.0] - 2026-10-07
+
+### Changed
+- **AI & MCP** (was *Claude & MCP*): Helm's tools are for any AI agent, not only Claude. The page, its switches, the
+  approval dialog, notifications, the SSH "AI agents may use this server's menu" switch and the Missions hints now say
+  *AI agents*, and the approval notification names the client that asks.
+- The **sync button** (Windows title bar and Android app bar) keeps one sync icon in every state: it turns while
+  syncing, shows a tick for a moment when a sync finishes, fades when offline or not set up, and turns red with a dot
+  on a problem. Windows and Android now look the same.
+
+### Added
+- **Other MCP clients** card on the AI & MCP page: the command that starts Helm's MCP server and the usual
+  `mcpServers` entry, to connect Cursor, Windsurf, Gemini CLI or any other MCP client.
+
 ## [0.30.0] - 2026-10-07
 
 ### Added
