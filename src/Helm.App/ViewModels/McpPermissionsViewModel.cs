@@ -7,7 +7,7 @@ using Helm.Core.Settings;
 
 namespace Helm.App.ViewModels;
 
-/// <summary>What Claude may do without asking, and what it has asked (the Permissions card of the Claude &amp; MCP page).</summary>
+/// <summary>What AI agents may do without asking, and what they have asked (the Permissions card of the AI &amp; MCP page).</summary>
 internal sealed partial class McpPermissionsViewModel : ObservableObject
 {
     /// <summary>The activity list shows this many of the newest entries (the file keeps <see cref="McpActivityLog.MaxEntries"/>).</summary>
@@ -47,7 +47,7 @@ internal sealed partial class McpPermissionsViewModel : ObservableObject
     public bool HelmElevated => _policy.HelmElevated;
 
     public string ElevationText => HelmElevated
-        ? "Helm runs as Administrator: every change Claude makes through Helm is asked first, and so is every command on a server."
+        ? "Helm runs as Administrator: every change an AI agent makes through Helm is asked first, and so is every command on a server."
         : "Helm does not run as Administrator: changes to your Helm data run without asking (unless the switch above is on). Commands on a server are always asked.";
 
     /// <summary>"Allow for this session" answers still in force.</summary>

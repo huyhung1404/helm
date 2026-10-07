@@ -76,7 +76,7 @@ public sealed partial class SshViewModel : ObservableObject, IDisposable
     private readonly ILogger<SshViewModel> _logger;
     private readonly IVaultSecrets? _vault;
     private readonly Dictionary<string, SshSession> _sessions = new(StringComparer.Ordinal);
-    // The same sessions, for Claude's tools (SshMcpTools) to find the connected servers.
+    // The same sessions, for the AI agents' tools (SshMcpTools) to find the connected servers.
     private readonly SshSessions _live;
     // Servers whose key file turned out to need a passphrase: the page then shows the box for it.
     private readonly HashSet<string> _passphraseNeeded = new(StringComparer.Ordinal);
@@ -118,7 +118,7 @@ public sealed partial class SshViewModel : ObservableObject, IDisposable
     [ObservableProperty] private string _keyFingerprint = "";
 
     /// <param name="vault">Vault, when Helm has it: servers may sign in with a password or key kept there.</param>
-    /// <param name="live">Where the open sessions are published for Claude's tools (a private one when not given).</param>
+    /// <param name="live">Where the open sessions are published for the AI agents' tools (a private one when not given).</param>
     public SshViewModel(ISettingsStoreFactory settings, SshDeviceKey deviceKey, IUiDispatcher ui, IDialogService dialogs, IClipboardService clipboard,
         ILogger<SshViewModel> logger, IVaultSecrets? vault = null, SshSessions? live = null)
     {

@@ -4,7 +4,7 @@ using Helm.Core.Settings;
 
 namespace Helm.Core.Mcp;
 
-/// <summary>The clients the Claude &amp; MCP page knows how to connect.</summary>
+/// <summary>The clients the AI &amp; MCP page knows how to connect (any other client uses the plain command).</summary>
 public enum McpClientKind
 {
     /// <summary>Claude Code in a terminal and in the VS Code extension (both read the user-scope <c>~/.claude.json</c>).</summary>
@@ -46,7 +46,7 @@ public sealed record McpClientFolders(string UserProfile, string AppData, string
 }
 
 /// <summary>
-/// How Claude reaches Helm's tools: the command it starts (this Helm.exe with --mcp), as a <c>claude mcp add</c> line
+/// How AI agents reach Helm's tools: the command it starts (this Helm.exe with --mcp), as a <c>claude mcp add</c> line
 /// for Claude Code, as config snippets for VS Code and Claude Desktop, and whether each of them has Helm already.
 /// </summary>
 public sealed class McpClientConfig(HelmPaths paths, ISettingsStoreFactory settings)
@@ -87,6 +87,12 @@ public sealed class McpClientConfig(HelmPaths paths, ISettingsStoreFactory setti
 
     /// <summary><c>claude_desktop_config.json</c> with only Helm in it.</summary>
     public string ClaudeDesktopSnippet => ClaudeDesktopJson(Executable, Arguments);
+
+    /// <summary>The command any MCP client starts over stdio, for the clients the page has no card for.</summary>
+    public string StartCommand => $"{Quote(Executable)} {string.Join(' ', Arguments.Select(Quote))}";
+
+    /// <summary>The usual <c>mcpServers</c> entry most other clients take (Cursor, Windsurf, Gemini CLI…).</summary>
+    public string McpServersSnippet => ClaudeDesktopJson(Executable, Arguments);
 
     public static string VsCodeJson(string command, IReadOnlyList<string> args) =>
         Wrap("servers", new JsonObject { ["type"] = "stdio", ["command"] = command, ["args"] = ToJsonArray(args) });

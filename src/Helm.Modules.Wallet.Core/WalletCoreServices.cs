@@ -44,7 +44,7 @@ public static class WalletCoreServices
         // Quick Capture: "/s 50k coffee" and "/d Nam 200k".
         services.AddSingleton<Helm.Core.Capture.ICaptureTarget, SpendCaptureTarget>();
         services.AddSingleton<Helm.Core.Capture.ICaptureTarget, DebtCaptureTarget>();
-        // Claude's tools for the debt book (Helm's MCP server, Windows).
+        // The AI agents' tools for the debt book (Helm's MCP server, Windows).
         services.AddSingleton<Helm.Core.Mcp.IMcpToolProvider, WalletMcpTools>();
         services.TryAddSingleton(sp => new DebtsViewModel(
             sp.GetRequiredService<DebtBook>(),

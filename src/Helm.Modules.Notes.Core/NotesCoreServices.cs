@@ -19,7 +19,7 @@ public static class NotesCoreServices
         services.AddSyncGroup("notes.", NotesIds.DisplayName);
         services.AddSingleton(sp => new NotesStore(sp.GetRequiredService<ISyncedCollection<NoteItem>>()));
         services.AddSingleton<ICaptureTarget, NoteCaptureTarget>();
-        // Claude's tools for notes (Helm's MCP server, Windows).
+        // The AI agents' tools for notes (Helm's MCP server, Windows).
         services.AddSingleton<Helm.Core.Mcp.IMcpToolProvider>(sp => new NotesMcpTools(sp.GetRequiredService<NotesStore>(), sp.GetService<LinkHub>()));
         // Windows registers it again through AddHelmModule; one instance either way.
         services.TryAddSingleton<NotesViewModel>();

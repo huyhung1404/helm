@@ -14,7 +14,7 @@ public sealed record McpConnectionInfo(Guid Id, string ClientName, string? Clien
 
 /// <summary>
 /// Serves Helm's MCP tools on a named pipe that only this Windows user can open (Helm runs elevated, Claude Code does
-/// not, so the pipe grants the user's own SID explicitly). <c>Helm.exe --mcp</c> relays Claude's stdio to it. Each
+/// not, so the pipe grants the user's own SID explicitly). <c>Helm.exe --mcp</c> relays the agent's stdio to it. Each
 /// connection gets its own <see cref="McpServer"/>, built when it connects, so a change of the settings applies to the
 /// next connection.
 /// <para>
@@ -249,8 +249,8 @@ public static class McpBridge
         catch (Exception ex) when (ex is TimeoutException or IOException or UnauthorizedAccessException)
         {
             var offline = new McpServer([], version,
-                "Helm is not running (or its tools for Claude are turned off), so there are no Helm tools right now. " +
-                "Ask the user to start Helm and to check Helm → Claude & MCP.");
+                "Helm is not running (or its tools for AI agents are turned off), so there are no Helm tools right now. " +
+                "Ask the user to start Helm and to check Helm → AI & MCP.");
             await offline.RunAsync(stdin, stdout, CancellationToken.None).ConfigureAwait(false);
             return 0;
         }

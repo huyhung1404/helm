@@ -42,7 +42,7 @@ public partial class MissionsContentPage : UserControl
         _module.PropertyChanged += OnModuleChanged;
         _viewModel.PropertyChanged += OnViewModelChanged;
         ApplyEnabled();
-        // Steps done on the PC or by Claude while the app was in the background.
+        // Steps done on the PC or by an AI agent while the app was in the background.
         _viewModel.Refresh();
         _clock.Start();
         try

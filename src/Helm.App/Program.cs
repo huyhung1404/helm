@@ -9,8 +9,8 @@ public static class Program
     [STAThread]
     public static int Main(string[] args)
     {
-        // 0. "--mcp": started by Claude Code as Helm's MCP server. It only relays stdio to the running Helm: no UI, no
-        // elevation, and no Velopack (which could apply a pending update and restart in the middle of Claude's session).
+        // 0. "--mcp": started by an AI agent (Claude Code, VS Code…) as Helm's MCP server. It only relays stdio to the running Helm: no UI, no
+        // elevation, and no Velopack (which could apply a pending update and restart in the middle of the agent's session).
         if (args.Contains("--mcp", StringComparer.OrdinalIgnoreCase))
         {
             var dataDir = Array.FindIndex(args, a => a.Equals("--data-dir", StringComparison.OrdinalIgnoreCase));

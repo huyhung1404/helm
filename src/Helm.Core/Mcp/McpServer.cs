@@ -7,15 +7,15 @@ using Microsoft.Extensions.Logging.Abstractions;
 namespace Helm.Core.Mcp;
 
 /// <summary>
-/// One tool Claude can call. <see cref="InputSchema"/> is a JSON Schema object; <see cref="Run"/> gets the arguments
-/// and returns what goes back to Claude (serialized as JSON text). A <see cref="McpToolException"/> becomes an error
-/// result Claude can read and correct.
+/// One tool an AI agent can call. <see cref="InputSchema"/> is a JSON Schema object; <see cref="Run"/> gets the arguments
+/// and returns what goes back to the agent (serialized as JSON text). A <see cref="McpToolException"/> becomes an error
+/// result the agent can read and correct.
 /// </summary>
 public sealed record McpTool(string Name, string Description, JsonObject InputSchema, Func<JsonElement, CancellationToken, Task<object?>> Run)
 {
     private readonly McpRisk? _risk;
 
-    /// <summary>Only reads (Claude may call it without asking); a tool that writes says so to the client.</summary>
+    /// <summary>Only reads (the agent may call it without asking); a tool that writes says so to the client.</summary>
     public bool ReadOnly { get; init; }
 
     /// <summary>What a call can do; when not set, <see cref="McpRisk.Read"/> for a <see cref="ReadOnly"/> tool, else <see cref="McpRisk.Change"/>.</summary>
@@ -35,7 +35,7 @@ public sealed record McpTool(string Name, string Description, JsonObject InputSc
     public static JsonObject NoArguments() => new() { ["type"] = "object", ["properties"] = new JsonObject() };
 }
 
-/// <summary>A tool call that cannot be done as asked (unknown id, invalid date…): Claude sees the message.</summary>
+/// <summary>A tool call that cannot be done as asked (unknown id, invalid date…): the agent sees the message.</summary>
 public sealed class McpToolException(string message) : Exception(message);
 
 /// <summary>Tools a Helm module offers over MCP (registered as <c>IMcpToolProvider</c> singletons).</summary>
@@ -58,7 +58,7 @@ public sealed class McpServer
 
     /// <summary>The longest message read, in characters: a longer line gets an error reply and is skipped, never held whole.</summary>
     public const int DefaultMaxMessageLength = 4 * 1024 * 1024;
-    // Compact, with Vietnamese letters and quotes as they are (no escapes): fewer tokens for Claude to read.
+    // Compact, with Vietnamese letters and quotes as they are (no escapes): fewer tokens for the agent to read.
     private static readonly JsonSerializerOptions Output = new(JsonSerializerDefaults.Web)
     {
         Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping,
@@ -217,7 +217,7 @@ public sealed class McpServer
         }
         catch (Exception ex) when (ex is McpToolException or ArgumentException or FormatException or InvalidOperationException or KeyNotFoundException)
         {
-            // What was wrong with the call: Claude reads it and can try again.
+            // What was wrong with the call: the agent reads it and can try again.
             _logger.LogInformation("MCP tool {Tool} refused: {Message}", name, ex.Message);
             return ToolResult(ex.Message, isError: true);
         }
@@ -233,7 +233,7 @@ public sealed class McpServer
     }
 
     /// <summary>
-    /// Asks the consent before a call that is not <see cref="McpRisk.Read"/>: why it may not run (Claude reads it), or
+    /// Asks the consent before a call that is not <see cref="McpRisk.Read"/>: why it may not run (the agent reads it), or
     /// the question and answer that let it run (null for a read, or when there is no consent to ask).
     /// </summary>
     private async Task<(string? Refused, (McpConsentRequest, McpConsentAnswer)? Allowed)> ConsentAsync(McpTool tool, JsonElement arguments, CancellationToken ct)

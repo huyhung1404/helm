@@ -43,7 +43,7 @@ public partial class MissionsContentPage : Page
     {
         switch (e.PropertyName)
         {
-            // A celebration that is not from a button here (finished on another device or by Claude) still shows.
+            // A celebration that is not from a button here (finished on another device or by an AI agent) still shows.
             case nameof(MissionsViewModel.Celebration) when _viewModel.Celebration is not null:
                 Dispatcher.BeginInvoke(DispatcherPriority.Loaded, () =>
                 {

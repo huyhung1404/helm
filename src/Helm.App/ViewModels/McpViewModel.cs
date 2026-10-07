@@ -12,7 +12,7 @@ using Microsoft.Extensions.Logging;
 
 namespace Helm.App.ViewModels;
 
-/// <summary>The tools of one risk that Claude is offered now (or that the switches hold back).</summary>
+/// <summary>The tools of one risk that AI agents are offered now (or that the switches hold back).</summary>
 internal sealed record McpToolGroup(string Title, string Description, IReadOnlyList<McpTool> Tools, string? Empty)
 {
     public bool HasTools => Tools.Count > 0;
@@ -43,7 +43,7 @@ internal sealed partial class McpClientRow(McpClientKind kind, string title, str
     }
 }
 
-/// <summary>The Claude &amp; MCP page: how Claude Code and VS Code reach Helm's tools, and what they may do.</summary>
+/// <summary>The AI &amp; MCP page: how AI agents (Claude Code, VS Code, any MCP client) reach Helm's tools, and what they may do.</summary>
 internal sealed partial class McpViewModel : ObservableObject
 {
     private readonly ISettingsStore<McpSettings> _store;
@@ -104,6 +104,8 @@ internal sealed partial class McpViewModel : ObservableObject
     public string ClaudeCodeCommand => _config.ClaudeCodeCommand;
     public string VsCodeSnippet => _config.VsCodeSnippet;
     public string ClaudeDesktopSnippet => _config.ClaudeDesktopSnippet;
+    public string StartCommand => _config.StartCommand;
+    public string McpServersSnippet => _config.McpServersSnippet;
 
     /// <summary>Set when this Helm runs on a test data folder: every client then starts it with --data-dir.</summary>
     public bool IsTestCopy => _config.Arguments.Count > 1;
@@ -249,7 +251,7 @@ internal sealed partial class McpViewModel : ObservableObject
             Group(McpRisk.Remote, "Remote", "Run something on another machine (a server's SSH menu). Always asks you first."),
         ];
         ToolsSummary = !Enabled
-            ? "Off: Claude gets no Helm tools, even where Helm is added."
+            ? "Off: AI agents get no Helm tools, even where Helm is added."
             : offered.Count == 1 ? "1 tool is offered now." : $"{offered.Count} tools are offered now.";
 
         McpToolGroup Group(McpRisk risk, string title, string description)
@@ -260,7 +262,7 @@ internal sealed partial class McpViewModel : ObservableObject
             {
                 var hidden = all.Count(t => t.Risk == risk);
                 empty = !Enabled ? "None while Helm's tools are off."
-                    : hidden > 0 ? $"None now: turn on “Claude may change things” to offer {hidden}."
+                    : hidden > 0 ? $"None now: turn on “AI agents may change things” to offer {hidden}."
                     : "None: no tool that is on does this.";
             }
             return new McpToolGroup($"{title} ({tools.Count})", description, tools, empty);

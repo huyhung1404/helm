@@ -3,7 +3,7 @@ using Helm.Core.Settings;
 namespace Helm.Core.Mcp;
 
 /// <summary>
-/// Helm's MCP server (device-local, settings/mcp.json): whether Claude may use Helm's tools, and whether it may change
+/// Helm's MCP server (device-local, settings/mcp.json): whether AI agents may use Helm's tools, and whether it may change
 /// things or only read them. The Vault is never part of it.
 /// </summary>
 public sealed class McpSettings : IVersionedSettings
@@ -14,7 +14,7 @@ public sealed class McpSettings : IVersionedSettings
 
     public int Version { get; set; }
 
-    /// <summary>Claude (Claude Code or VS Code, where Helm is added) can use the tools of the modules that are on.</summary>
+    /// <summary>AI agents (Claude Code, VS Code or any MCP client where Helm is added) can use the tools of the modules that are on.</summary>
     public bool Enabled { get; set; } = true;
 
     /// <summary>Off: only the tools that read are offered.</summary>

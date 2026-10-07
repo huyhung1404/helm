@@ -246,7 +246,7 @@ public sealed class McpConsentPolicy : IMcpConsent, IMcpCallObserver
         _decided.Remove(request);
         Write(request, client, how, ok);
         if (request.Risk == McpRisk.Remote)
-            _notify?.Invoke(ok ? "Claude ran a command" : "Claude's command failed", $"{request.Title} ({client.Name})");
+            _notify?.Invoke(ok ? "An AI agent ran a command" : "An AI agent's command failed", $"{request.Title} ({client.Name})");
     }
 
     private McpConsentAnswer Allowed(McpConsentRequest request, McpConsentAnswer answer, string how)

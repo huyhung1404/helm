@@ -19,7 +19,7 @@ public static class MissionsIds
 public static class MissionsCoreServices
 {
     /// <summary>
-    /// The platform-neutral part of Missions: its three synced collections, the store, Claude's tools and the page view
+    /// The platform-neutral part of Missions: its three synced collections, the store, the AI agents' tools and the page view
     /// model. The platform module (Windows or Android) calls this from its own <c>AddMissionsModule()</c>.
     /// </summary>
     public static IServiceCollection AddMissionsCore(this IServiceCollection services)
@@ -41,7 +41,7 @@ public static class MissionsCoreServices
             sp.GetRequiredService<Helm.Core.Settings.ISettingsStoreFactory>(), sp.GetService<Microsoft.Extensions.Logging.ILogger<MissionTaskSync>>()));
         // Quick Capture and Android's Share → "Save to Helm": an AI's answer with a mission in it.
         services.AddSingleton<Helm.Core.Capture.ICaptureTarget, MissionCaptureTarget>();
-        // Claude's tools for the missions (Helm's MCP server, Windows).
+        // The AI agents' tools for the missions (Helm's MCP server, Windows).
         services.AddSingleton<Helm.Core.Mcp.IMcpToolProvider, MissionsMcpTools>();
         // Windows registers it again through AddHelmModule; one instance either way.
         services.TryAddSingleton<MissionsViewModel>();

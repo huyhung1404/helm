@@ -11,6 +11,6 @@ public static class SshServices
             .AddSshCore()
             .AddHelmModule<SshModule, SshPage, SshViewModel>()
             .AddSingleton<SshContentPage>()
-            // Claude's tools for the servers' menus: MCP runs on Windows only.
+            // The AI agents' tools for the servers' menus: MCP runs on Windows only.
             .AddSingleton<IMcpToolProvider, SshMcpTools>();
 }

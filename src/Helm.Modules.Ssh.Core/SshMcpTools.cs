@@ -10,18 +10,18 @@ using Helm.Core.Settings;
 namespace Helm.Modules.Ssh;
 
 /// <summary>
-/// A server's own menu (docs/ssh-menu.md) for Claude over MCP: never an arbitrary shell, only what the menu offers, on
+/// A server's own menu (docs/ssh-menu.md) for AI agents over MCP: never an arbitrary shell, only what the menu offers, on
 /// servers that are connected in Helm and where the user turned on <see cref="SshHost.AllowMcp"/>. Helm never connects
-/// for Claude. Items marked <c>agents: false</c> are left out. Every run is asked first with the exact command line,
+/// for AI agents. Items marked <c>agents: false</c> are left out. Every run is asked first with the exact command line,
 /// runs on Helm's own channel (never typed into the terminal, no TTY) with a timeout, and its output is capped.
-/// What the server prints is data for Claude, never instructions. Windows only (MCP is not on Android).
+/// What the server prints is data for the agent, never instructions. Windows only (MCP is not on Android).
 /// </summary>
 public sealed class SshMcpTools : IMcpToolProvider
 {
     public const int DefaultTimeoutSeconds = 120;
     public const int MaxTimeoutSeconds = 15 * 60;
 
-    /// <summary>The most of a run's output Claude gets (the end of it, where a log says how it went).</summary>
+    /// <summary>The most of a run's output the agent gets (the end of it, where a log says how it went).</summary>
     public const int OutputCap = 64 * 1024;
 
     private const int ErrorCap = 4000;
@@ -54,12 +54,12 @@ public sealed class SshMcpTools : IMcpToolProvider
     public IEnumerable<McpTool> Tools =>
     [
         new("ssh_servers",
-            "The user's SSH servers in Helm: name, id, whether it is connected now and whether Claude may use its menu (allow_mcp). " +
-            "Claude can only use the menu of a server that is connected in Helm and has allow_mcp; it never connects on its own.",
+            "The user's SSH servers in Helm: name, id, whether it is connected now and whether AI agents may use its menu (allow_mcp). " +
+            "You can only use the menu of a server that is connected in Helm and has allow_mcp; you never connect on your own.",
             McpTool.NoArguments(), (_, _) => Task.FromResult<object?>(Servers())) { ReadOnly = true },
         new("ssh_menu",
-            "What a server's menu offers Claude: its items (deploy, status, logs…) with their parameters, whether an item only reads and how " +
-            "dangerous it is. Claude can run only these items, with ssh_menu_run; there is no shell. " + Untrusted,
+            "What a server's menu offers AI agents: its items (deploy, status, logs…) with their parameters, whether an item only reads and how " +
+            "dangerous it is. You can run only these items, with ssh_menu_run; there is no shell. " + Untrusted,
             McpArgs.Schema(("server", McpArgs.Text("The server's name or id (from ssh_servers)."), true)),
             Menu) { ReadOnly = true },
         new("ssh_menu_choices",
@@ -142,7 +142,7 @@ public sealed class SshMcpTools : IMcpToolProvider
     private async Task<object?> Run(JsonElement args, CancellationToken ct)
     {
         var plan = _asked.TryRemove(args.GetRawText(), out var asked) ? asked : await PrepareAsync(args, ct).ConfigureAwait(false);
-        // The user may have turned Claude off for the server, or disconnected, while the question was on screen.
+        // The user may have turned AI agents off for the server, or disconnected, while the question was on screen.
         var (_, channel) = Usable(plan.Host.Id);
         if (!ReferenceEquals(channel, plan.Channel)) throw new McpToolException($"{SafeName(plan.Host)} was connected again since; run the item again.");
 
@@ -267,7 +267,7 @@ public sealed class SshMcpTools : IMcpToolProvider
 
     // ---- The server and its menu ---------------------------------------------------------------------------------
 
-    /// <summary>The server by id or name, if Claude may use it now: it allows Claude and is connected in Helm.</summary>
+    /// <summary>The server by id or name, if AI agents may use it now: it allows them and is connected in Helm.</summary>
     private (SshHost Host, ISshChannel Channel) Usable(string server)
     {
         var hosts = _hosts();
@@ -277,15 +277,15 @@ public sealed class SshMcpTools : IMcpToolProvider
                        ? "There are no SSH servers in Helm."
                        : $"There is no single server {server}. Servers: {string.Join(", ", hosts.Select(h => $"{SafeName(h)} ({h.Id})"))}.");
         if (!host.AllowMcp)
-            throw new McpToolException($"Claude may not use the menu of {SafeName(host)}. The user can turn on “Claude may use this server's menu” for it in SSH settings.");
+            throw new McpToolException($"AI agents may not use the menu of {SafeName(host)}. The user can turn on “AI agents may use this server's menu” for it in SSH settings.");
         var channel = _sessions.Connected(host.Id)
-                      ?? throw new McpToolException($"{SafeName(host)} is not connected in Helm. The user connects it in Helm's SSH tool; Claude cannot connect on its own.");
+                      ?? throw new McpToolException($"{SafeName(host)} is not connected in Helm. The user connects it in Helm's SSH tool; an AI agent cannot connect on its own.");
         return (host, channel);
     }
 
     private static MenuItem Item(MenuDescription menu, string id) =>
         menu.Find(id) is { } item
-            ? item.Agents ? item : throw new McpToolException($"“{item.Title}” is not offered to Claude: the server's menu keeps it for a person to run.")
+            ? item.Agents ? item : throw new McpToolException($"“{item.Title}” is not offered to AI agents: the server's menu keeps it for a person to run.")
             : throw new McpToolException($"The menu has no item {id}. Read ssh_menu for its items.");
 
     private static string MenuPath(SshHost host)

@@ -13,7 +13,7 @@ public sealed record MissionImportResult(MissionDraft? Draft, IReadOnlyList<stri
 /// <summary>
 /// Reads a mission from the JSON an AI wrote (see <see cref="MissionPrompt"/>), forgiving what AIs usually get wrong:
 /// text or a ```json fence around it, typographic quotes as JSON quotes, trailing commas, comments, steps without phases,
-/// numbers written as text, missing optional fields. Claude's <c>mission_create</c> goes through the same rules.
+/// numbers written as text, missing optional fields. An AI agent's <c>mission_create</c> goes through the same rules.
 /// </summary>
 public static class MissionImport
 {
@@ -57,7 +57,7 @@ public static class MissionImport
         using (doc) return Read(doc.RootElement, requireTitle);
     }
 
-    /// <summary>Reads an already parsed object (Claude's tool arguments).</summary>
+    /// <summary>Reads an already parsed object (an AI agent's tool arguments).</summary>
     /// <param name="requireTitle">False for a new plan of an existing mission, which keeps its own title.</param>
     public static MissionImportResult Read(JsonElement root, bool requireTitle = true)
     {

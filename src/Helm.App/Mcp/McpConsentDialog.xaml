@@ -4,7 +4,7 @@
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
-    Title="Claude asks for your OK"
+    Title="An AI agent asks for your OK"
     Width="560"
     SizeToContent="Height"
     MaxHeight="760"
@@ -32,7 +32,7 @@
             <RowDefinition Height="Auto" />
         </Grid.RowDefinitions>
 
-        <ui:TitleBar Grid.Row="0" Title="Claude asks for your OK" ShowMaximize="False" ShowMinimize="False" CanMaximize="False" />
+        <ui:TitleBar Grid.Row="0" Title="An AI agent asks for your OK" ShowMaximize="False" ShowMinimize="False" CanMaximize="False" />
 
         <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" Padding="24,4,24,8">
             <StackPanel>

@@ -6,7 +6,7 @@ using Helm.Core.Text;
 namespace Helm.Modules.Notes;
 
 /// <summary>
-/// Notes for Claude over MCP: search, read, write, move to the trash (never delete for good), and link a note to a
+/// Notes for AI agents over MCP: search, read, write, move to the trash (never delete for good), and link a note to a
 /// task, a person in the debt book or a mission. Every change is a normal edit: it syncs, and a note edited meanwhile on another
 /// device is kept as a copy rather than overwritten.
 /// </summary>

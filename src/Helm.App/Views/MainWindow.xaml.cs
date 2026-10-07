@@ -181,7 +181,7 @@ internal partial class MainWindow : FluentWindow
 
         Navigation.MenuItems.Add(NavItem("Home", SymbolRegular.Home24, typeof(HomePage)));
         Navigation.MenuItems.Add(NavItem("General", SymbolRegular.Settings24, typeof(GeneralPage)));
-        Navigation.MenuItems.Add(NavItem("Claude & MCP", SymbolRegular.PlugConnected24, typeof(McpPage)));
+        Navigation.MenuItems.Add(NavItem("AI & MCP", SymbolRegular.PlugConnected24, typeof(McpPage)));
         Navigation.MenuItems.Add(new NavigationViewItemSeparator());
 
         foreach (var group in _viewModel.Groups)

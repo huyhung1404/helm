@@ -1,19 +1,20 @@
-# Claude & MCP
+# AI & MCP
 
-Helm can give Claude its own tools through the [Model Context Protocol](https://modelcontextprotocol.io) (MCP):
-Claude Code in a terminal or in the VS Code extension, VS Code's own agent mode, and Claude Desktop can then find,
+Helm can give AI agents its own tools through the [Model Context Protocol](https://modelcontextprotocol.io) (MCP):
+Claude Code in a terminal or in the VS Code extension, VS Code's own agent mode, Claude Desktop, and any other MCP
+client (Cursor, Windsurf, Gemini CLI…) can then find,
 read and (when you allow it) change your notes, to-do lists, debt book and missions. Everything is set up on the
-**Claude & MCP** page, right after General. Windows only: the server runs inside Helm on the PC.
+**AI & MCP** page, right after General. Windows only: the server runs inside Helm on the PC.
 
-- [What Claude gets](#what-claude-gets)
+- [What AI agents get](#what-ai-agents-get)
 - [Connect a client](#connect-a-client)
 - [See who is connected](#see-who-is-connected)
 - [Switch it off](#switch-it-off)
 - [How it works](#how-it-works)
 
-## What Claude gets
+## What AI agents get
 
-The **Tools Claude can reach** card lists every tool offered right now, in three groups:
+The **Tools AI agents can reach** card lists every tool offered right now, in three groups:
 
 | Group | What a call does |
 |---|---|
@@ -26,7 +27,7 @@ it, whatever the settings.
 
 ## Connect a client
 
-Helm has to be running when Claude uses its tools. Each client starts `Helm.exe --mcp`, which passes Claude's messages
+Helm has to be running when an agent uses its tools. Each client starts `Helm.exe --mcp`, which passes the agent's messages
 to the running Helm. A client that is not connected yet shows **Not added**; after you add Helm it shows **Added**.
 
 ### Claude Code (terminal and VS Code extension)
@@ -61,6 +62,14 @@ If the file already lists other servers, copy only the `helm` entry into its `se
 Open **Settings → Developer → Edit Config** in Claude Desktop (or **Open config folder** on Helm's page), add the
 `helm` entry from the page to `mcpServers`, save, and restart Claude Desktop.
 
+### Other MCP clients
+
+Any agent that can start a local (stdio) MCP server can use Helm. Add a server named `helm` that starts the command
+shown under **Other MCP clients** on the page (`"<Helm folder>\Helm.exe" --mcp`). Most clients (Cursor, Windsurf,
+Gemini CLI…) take the `mcpServers` JSON shown there; the client's own MCP guide says which file it goes in. Helm
+cannot tell whether those clients have it, so this card has no status; the **Connections** card shows them once they
+connect.
+
 ### When Helm moved
 
 If a client's `helm` entry starts another Helm.exe (Helm was installed in another folder, or it is another copy), the
@@ -75,13 +84,13 @@ shows, logs or changes anything else in those files (they can hold other servers
 
 The **Connections** card lists the clients connected now: their name and version, since when, and how many tools they
 called. **Disconnect** ends that connection at once; the client connects again the next time it starts a session.
-Clients usually connect when a session starts, so an empty list just means no Claude session is open with Helm.
+Clients usually connect when a session starts, so an empty list just means no agent session is open with Helm.
 
 ## Switch it off
 
-- **Let Claude use Helm's tools** off: no client gets any Helm tool, even where Helm is added, and the clients
+- **Let AI agents use Helm's tools** off: no client gets any Helm tool, even where Helm is added, and the clients
   connected now are disconnected.
-- **Claude may change things** off: Claude only gets the Read tools. The clients connected now are disconnected too,
+- **AI agents may change things** off: agents only get the Read tools. The clients connected now are disconnected too,
   because they were given the Change tools when they connected; in Claude Code, `/mcp` reconnects with the Read tools.
 - To remove Helm from a client for good, press **Remove** (Claude Code) or delete the `helm` entry from its config
   file.

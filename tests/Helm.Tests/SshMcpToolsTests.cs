@@ -69,7 +69,7 @@ public sealed class SshMcpToolsTests
         {
             var call = await Call(Server(), tool, args);
             Assert.True(call.IsError);
-            Assert.Contains("Claude may use this server's menu", call.Text);
+            Assert.Contains("AI agents may use this server's menu", call.Text);
             Assert.DoesNotContain("example.com", call.Text);
         }
         Assert.Empty(_channel.Commands);
@@ -104,7 +104,7 @@ public sealed class SshMcpToolsTests
 
         var run = await Call(Server(), "ssh_menu_run", new { server = "web", item = "shell" });
         Assert.True(run.IsError);
-        Assert.Contains("not offered to Claude", run.Text);
+        Assert.Contains("not offered to AI agents", run.Text);
         var choices = await Call(Server(), "ssh_menu_choices", new { server = "web", item = "shell", param = "x" });
         Assert.True(choices.IsError);
         Assert.Empty(_consent.Asked);

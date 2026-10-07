@@ -175,8 +175,8 @@
         </Border>
         <Border Classes="card">
             <StackPanel Spacing="8">
-                <TextBlock Text="Ask Claude" Classes="title" />
-                <TextBlock Text="On your PC, with Helm tools for Claude on, Claude can make a mission for you and complete its steps. It syncs here." Classes="secondary" TextWrapping="Wrap" />
+                <TextBlock Text="Ask an AI agent" Classes="title" />
+                <TextBlock Text="On your PC, with Helm tools for AI agents on, an agent can make a mission for you and complete its steps. It syncs here." Classes="secondary" TextWrapping="Wrap" />
             </StackPanel>
         </Border>
     </StackPanel>

@@ -65,7 +65,7 @@ public sealed record SshHost
     /// <summary>The server's menu program; null means <see cref="SshMenu.DefaultPath"/>.</summary>
     public string? MenuPath { get; init; }
 
-    /// <summary>Claude (MCP) may use this server's menu: off unless turned on for this server.</summary>
+    /// <summary>AI agents (MCP) may use this server's menu: off unless turned on for this server.</summary>
     public bool AllowMcp { get; init; }
 
     /// <summary>user@host, with :port when it is not 22.</summary>

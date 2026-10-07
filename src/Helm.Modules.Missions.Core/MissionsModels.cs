@@ -4,7 +4,7 @@ namespace Helm.Modules.Missions;
 
 public enum MissionStatus
 {
-    /// <summary>Created (imported or by Claude) but not started: the pace counts from Start.</summary>
+    /// <summary>Created (imported or by an AI agent) but not started: the pace counts from Start.</summary>
     Planned,
 
     Active,
@@ -22,6 +22,7 @@ public enum MissionStatus
 public enum MissionSource
 {
     Import,
+    /// <summary>Made by an AI agent over MCP (any client; the name is kept because it is stored and synced).</summary>
     Claude,
     Manual,
 }
@@ -228,7 +229,7 @@ public sealed record MissionEvent
     public string Note { get; init; } = "";
 }
 
-/// <summary>A mission to create: from the import, Claude, or the preview after edits.</summary>
+/// <summary>A mission to create: from the import, an AI agent, or the preview after edits.</summary>
 public sealed record MissionDraft(
     string Title,
     string Goal,

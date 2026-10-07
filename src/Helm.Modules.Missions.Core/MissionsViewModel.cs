@@ -1281,7 +1281,7 @@ public sealed partial class MissionsViewModel : ObservableObject
             _loading = false;
         }
 
-        // Finished on another device or by Claude: celebrate once here too (it takes the place of a phase's card).
+        // Finished on another device or by an AI agent: celebrate once here too (it takes the place of a phase's card).
         if (mission.Status == MissionStatus.Completed && !_settings.Current.CelebratedMissionIds.Contains(id) && Celebration is not { IsMission: true })
         {
             Message = null;

@@ -41,7 +41,7 @@ public static class TrackerCoreServices
         services.AddSingleton<Helm.Core.Capture.ICaptureTarget, TaskCaptureTarget>();
         // Other tools hand tasks over (Missions sends a step here).
         services.AddSingleton<Helm.Core.Tasks.ITaskBridge, TrackerTaskBridge>();
-        // Claude's tools for the to-do lists (Helm's MCP server, Windows).
+        // The AI agents' tools for the to-do lists (Helm's MCP server, Windows).
         services.AddSingleton<Helm.Core.Mcp.IMcpToolProvider, TrackerMcpTools>();
         // Windows registers it again through AddHelmModule; one instance either way.
         services.TryAddSingleton<TrackerViewModel>();

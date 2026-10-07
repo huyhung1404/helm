@@ -25,7 +25,7 @@ Notes, tasks, a password vault, a command palette and tools for Claude Code in o
 - **Local-first, end-to-end encrypted sync.** Every device keeps a full copy of your data; the sync server only ever sees encrypted records.
 - **Updates itself.** New versions download in the background from GitHub Releases and install when you choose.
 - **Keyboard-first.** Alt+Space for the command palette, Win+Alt+N to capture a note or task from any app.
-- **Helm tools for Claude (MCP).** Claude Code, in VS Code or the terminal, can read and write your notes, Tracker and Missions through Helm's MCP server (`Helm.exe --mcp`); turn it on in **Claude & MCP**.
+- **Helm tools for AI agents (MCP).** Claude Code, VS Code, Claude Desktop, Cursor or any MCP client can read and write your notes, Tracker and Missions through Helm's MCP server (`Helm.exe --mcp`); turn it on in **AI & MCP**.
 
 ## Tools
 

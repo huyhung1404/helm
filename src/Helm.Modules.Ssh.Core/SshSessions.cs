@@ -8,7 +8,7 @@ public interface ISshChannel : IMenuRunner
 
 /// <summary>
 /// The sessions open now, by server id. <see cref="SshViewModel"/> owns them and keeps this up to date, so other parts
-/// of Helm (Claude's tools) can find a connected server without connecting themselves. Thread-safe.
+/// of Helm (the AI agents' tools) can find a connected server without connecting themselves. Thread-safe.
 /// </summary>
 public sealed class SshSessions
 {

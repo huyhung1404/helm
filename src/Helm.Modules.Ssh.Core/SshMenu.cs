@@ -58,7 +58,7 @@ public sealed record MenuItem(
     /// <summary>The item only reads (status, lists, logs): it changes nothing on the server.</summary>
     public bool ReadOnly { get; init; }
 
-    /// <summary>False hides the item from Claude (MCP): it asks for a password, prompts, or is only ever run by a person.</summary>
+    /// <summary>False hides the item from AI agents (MCP): it asks for a password, prompts, or is only ever run by a person.</summary>
     public bool Agents { get; init; } = true;
 }
 
@@ -343,7 +343,7 @@ public static class SshMenu
         return id is not null && IdPattern.IsMatch(id) ? id : throw new MenuFormatException($"A {what} needs an id of lowercase letters, digits, - and _.");
     }
 
-    /// <summary>An optional true/false field; anything else is refused, so a typo never shows an item to Claude by mistake.</summary>
+    /// <summary>An optional true/false field; anything else is refused, so a typo never shows an item to an AI agent by mistake.</summary>
     private static bool? Flag(JsonElement o, string name, string id) =>
         !o.TryGetProperty(name, out var v) ? null
         : v.ValueKind is JsonValueKind.True or JsonValueKind.False ? v.GetBoolean()

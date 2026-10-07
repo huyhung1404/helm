@@ -2,7 +2,7 @@ using Helm.Core.Sync;
 
 namespace Helm.Modules.Missions;
 
-/// <summary>Sizes a mission may have (the import, Claude and the editors all keep to them).</summary>
+/// <summary>Sizes a mission may have (the import, AI agents and the editors all keep to them).</summary>
 public static class MissionLimits
 {
     public const int Phases = 30;

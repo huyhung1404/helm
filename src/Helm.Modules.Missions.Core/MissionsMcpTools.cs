@@ -7,7 +7,7 @@ using Helm.Core.Sync;
 namespace Helm.Modules.Missions;
 
 /// <summary>
-/// Missions for Claude over MCP: read the missions, create one (the same format and rules as the JSON import), start,
+/// Missions for AI agents over MCP: read the missions, create one (the same format and rules as the JSON import), start,
 /// pause, resume or abandon it, edit it and its steps, and complete, skip or reopen steps. Steps are done in order, so
 /// only the current step can be completed or skipped. Nothing is ever deleted through here (an abandoned mission can be
 /// resumed). Dates are the user's local ones.

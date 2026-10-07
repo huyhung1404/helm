@@ -4,7 +4,7 @@ using Helm.Core.Settings;
 
 namespace Helm.Tests;
 
-/// <summary>The Claude &amp; MCP page's client configs: the snippets, and reading only Helm's entry of a client's file.</summary>
+/// <summary>The AI &amp; MCP page's client configs: the snippets, and reading only Helm's entry of a client's file.</summary>
 public sealed class McpClientConfigTests
 {
     private const string Exe = @"C:\Program Files\Helm App\current\Helm.exe";

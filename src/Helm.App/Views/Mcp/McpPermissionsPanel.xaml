@@ -10,7 +10,7 @@
     <StackPanel>
         <core:RowLayout>
             <core:CardHeader Title="Ask before every change"
-                             Description="Claude asks before it changes your notes, Tracker, Wallet or Missions, even when Helm is not running as Administrator." />
+                             Description="AI agents ask before they change your notes, Tracker, Wallet or Missions, even when Helm is not running as Administrator." />
             <ui:ToggleSwitch HorizontalAlignment="Right" IsChecked="{Binding AskBeforeChanges}" AutomationProperties.Name="Ask before every change" />
         </core:RowLayout>
 
@@ -20,7 +20,7 @@
         </DockPanel>
 
         <TextBlock Text="Allowed for this session" FontWeight="SemiBold" Margin="0,20,0,4" />
-        <TextBlock Text="Nothing yet. A session allowance ends when Claude disconnects or Helm restarts." Style="{DynamicResource HelmSecondaryText}"
+        <TextBlock Text="Nothing yet. A session allowance ends when the agent disconnects or Helm restarts." Style="{DynamicResource HelmSecondaryText}"
                    Visibility="{Binding HasAllowances, Converter={StaticResource InverseBoolToVisibility}}" />
         <ItemsControl ItemsSource="{Binding Allowances}">
             <ItemsControl.ItemTemplate>

@@ -6,32 +6,32 @@
     xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
     xmlns:core="clr-namespace:Helm.Core.Ui;assembly=Helm.Core.Windows"
     xmlns:mcp="clr-namespace:Helm.App.Views.Mcp"
-    Title="Claude &amp; MCP">
+    Title="AI &amp; MCP">
 
     <StackPanel Margin="24,16,24,24">
-        <TextBlock Text="Claude &amp; MCP" FontSize="28" FontWeight="SemiBold" Margin="0,0,0,8" />
-        <TextBlock Text="Connect Claude Code, VS Code or Claude Desktop to Helm, see who is connected, and switch it off." Style="{DynamicResource HelmSecondaryText}" Margin="0,0,0,8" />
+        <TextBlock Text="AI &amp; MCP" FontSize="28" FontWeight="SemiBold" Margin="0,0,0,8" />
+        <TextBlock Text="Connect an AI agent (Claude Code, VS Code, Claude Desktop, Cursor or any MCP client) to Helm, see who is connected, and switch it off." TextWrapping="Wrap" Style="{DynamicResource HelmSecondaryText}" Margin="0,0,0,8" />
 
-        <!-- Status: the two switches and what Claude can reach because of them -->
+        <!-- Status: the two switches and what AI agents can reach because of them -->
         <TextBlock Text="Status" Style="{DynamicResource HelmSectionHeader}" />
         <ui:CardControl Margin="0,0,0,4" Icon="{ui:SymbolIcon PlugConnected24}">
             <ui:CardControl.Header>
-                <core:CardHeader Title="Let Claude use Helm's tools"
-                                 Description="Claude can find, read and write your notes, to-do lists, debt book and missions, and use the menus of the servers you allow in SSH, where you add Helm below. Helm has to be running. The vault is never included." />
+                <core:CardHeader Title="Let AI agents use Helm's tools"
+                                 Description="AI agents can find, read and write your notes, to-do lists, debt book and missions, and use the menus of the servers you allow in SSH, where you add Helm below. Helm has to be running. The vault is never included." />
             </ui:CardControl.Header>
-            <ui:ToggleSwitch HorizontalAlignment="Right" IsChecked="{Binding Enabled}" AutomationProperties.Name="Let Claude use Helm's tools" />
+            <ui:ToggleSwitch HorizontalAlignment="Right" IsChecked="{Binding Enabled}" AutomationProperties.Name="Let AI agents use Helm's tools" />
         </ui:CardControl>
         <ui:CardControl Margin="0,0,0,4" Icon="{ui:SymbolIcon Edit24}" IsEnabled="{Binding Enabled}">
             <ui:CardControl.Header>
-                <core:CardHeader Title="Claude may change things" Description="Off: Claude can only read. On: it can also add and edit notes and tasks, tick tasks, add debts, create, re-plan and advance missions, and ask to run items of a server's menu (nothing is deleted for good)." />
+                <core:CardHeader Title="AI agents may change things" Description="Off: they can only read. On: they can also add and edit notes and tasks, tick tasks, add debts, create, re-plan and advance missions, and ask to run items of a server's menu (nothing is deleted for good)." />
             </ui:CardControl.Header>
-            <ui:ToggleSwitch HorizontalAlignment="Right" IsChecked="{Binding AllowChanges}" AutomationProperties.Name="Claude may change things" />
+            <ui:ToggleSwitch HorizontalAlignment="Right" IsChecked="{Binding AllowChanges}" AutomationProperties.Name="AI agents may change things" />
         </ui:CardControl>
         <ui:CardExpander Margin="0,0,0,4" Icon="{ui:SymbolIcon AppsList24}">
             <ui:CardExpander.Header>
-                <core:CardHeader Title="Tools Claude can reach" Description="{Binding ToolsSummary}" />
+                <core:CardHeader Title="Tools AI agents can reach" Description="{Binding ToolsSummary}" />
             </ui:CardExpander.Header>
-            <ItemsControl ItemsSource="{Binding ToolGroups}" Margin="40,0,0,0" AutomationProperties.Name="Tools Claude can reach">
+            <ItemsControl ItemsSource="{Binding ToolGroups}" Margin="40,0,0,0" AutomationProperties.Name="Tools AI agents can reach">
                 <ItemsControl.ItemTemplate>
                     <DataTemplate>
                         <StackPanel Margin="0,0,0,12">
@@ -165,13 +165,37 @@
             </Border>
         </ui:CardExpander>
 
+        <ui:CardExpander Margin="0,0,0,4" Icon="{ui:SymbolIcon Apps24}">
+            <ui:CardExpander.Header>
+                <core:CardHeader Title="Other MCP clients (Cursor, Windsurf, Gemini CLI…)" Description="Any AI agent that can start a local MCP server (stdio)." />
+            </ui:CardExpander.Header>
+            <Border Style="{DynamicResource HelmExpanderRow}" BorderThickness="0">
+                <StackPanel>
+                    <TextBlock Style="{DynamicResource HelmSecondaryText}" Margin="0,0,0,8" TextWrapping="Wrap"
+                               Text="Add a server named helm that starts this command. Most clients take the JSON below in their mcpServers settings; the client's own MCP guide says which file that is." />
+                    <DockPanel Margin="0,0,0,8">
+                        <ui:Button DockPanel.Dock="Right" Margin="8,0,0,0" Content="Copy" Icon="{ui:SymbolIcon Copy24}"
+                                   Command="{Binding CopyCommand}" CommandParameter="{Binding StartCommand}" />
+                        <ui:TextBox IsReadOnly="True" FontFamily="Consolas" Text="{Binding StartCommand, Mode=OneWay}"
+                                    AutomationProperties.Name="Command that starts Helm's MCP server" />
+                    </DockPanel>
+                    <DockPanel>
+                        <ui:Button DockPanel.Dock="Right" VerticalAlignment="Top" Margin="8,0,0,0" Content="Copy" Icon="{ui:SymbolIcon Copy24}"
+                                   Command="{Binding CopyCommand}" CommandParameter="{Binding McpServersSnippet}" />
+                        <ui:TextBox IsReadOnly="True" FontFamily="Consolas" TextWrapping="Wrap" AcceptsReturn="True"
+                                    Text="{Binding McpServersSnippet, Mode=OneWay}" AutomationProperties.Name="mcpServers entry for other clients" />
+                    </DockPanel>
+                </StackPanel>
+            </Border>
+        </ui:CardExpander>
+
         <!-- Connections: the clients connected now -->
         <TextBlock Text="Connections" Style="{DynamicResource HelmSectionHeader}" />
         <Border Style="{DynamicResource HelmSurface}">
             <StackPanel>
                 <TextBlock Style="{DynamicResource HelmSecondaryText}"
                            Visibility="{Binding HasConnections, Converter={StaticResource InverseBoolToVisibility}}"
-                           Text="Nothing is connected now. Add Helm to a client above, then start a new Claude session there: it connects when the session starts and shows up here." />
+                           Text="Nothing is connected now. Add Helm to a client above, then start a new session there: it connects when the session starts and shows up here." />
                 <ItemsControl ItemsSource="{Binding Connections}" AutomationProperties.Name="Connections">
                     <ItemsControl.ItemTemplate>
                         <DataTemplate>

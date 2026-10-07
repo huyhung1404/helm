@@ -5,7 +5,7 @@ using Helm.Core.Mcp;
 namespace Helm.Modules.Wallet;
 
 /// <summary>
-/// The Wallet's debt book for Claude over MCP: read it, add an entry. Nothing is ever deleted through here. Dates are
+/// The Wallet's debt book for AI agents over MCP: read it, add an entry. Nothing is ever deleted through here. Dates are
 /// the user's local ones: "2026-10-01" or "2026-10-01T18:00".
 /// </summary>
 public sealed class WalletMcpTools(DebtBook book) : IMcpToolProvider

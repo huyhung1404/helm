@@ -6,7 +6,7 @@ using Helm.Core.Text;
 namespace Helm.Modules.Tracker;
 
 /// <summary>
-/// Tracker for Claude over MCP: the to-do lists (read, add lists and tasks, edit, start, tick, reopen); the debt book is Wallet's
+/// Tracker for AI agents over MCP: the to-do lists (read, add lists and tasks, edit, start, tick, reopen); the debt book is Wallet's
 /// (<c>wallet_debts</c>). Nothing is ever deleted through here. Dates are the user's local ones: "2026-10-01" or "2026-10-01T09:30".
 /// </summary>
 public sealed class TrackerMcpTools(TrackerStore store) : IMcpToolProvider

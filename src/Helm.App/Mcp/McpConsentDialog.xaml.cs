@@ -62,7 +62,7 @@ internal partial class McpConsentDialog : FluentWindow
 
     private static string ElevatedLine(McpConsentRequest request) => request.Risk == McpRisk.Remote
         ? "It runs with full rights on that machine (root or Administrator): one wrong command can change the whole machine."
-        : "Helm runs as Administrator, so what Claude does through Helm runs with those rights.";
+        : "Helm runs as Administrator, so what an AI agent does through Helm runs with those rights.";
 
     private void Deny_Click(object sender, RoutedEventArgs e) => Close();
 
