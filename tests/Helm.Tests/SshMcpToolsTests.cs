@@ -343,6 +343,40 @@ public sealed class SshMcpToolsTests
     }
 
     [Fact]
+    public async Task Agent_runs_are_shown_in_the_agent_tab_and_helm_own_checks_are_not()
+    {
+        AllowShell();
+        _channel.Output["uptime"] = " up 32 days\n";
+        await Call(Server(), "ssh_exec", new { server = "web", command = "uptime" });
+        await Call(Server(), "ssh_menu_run", new { server = "web", item = "status" });
+
+        var text = System.Text.Encoding.UTF8.GetString(_channel.Agent.Attach(_ => { }));
+        Assert.Contains("$ uptime", text);
+        Assert.Contains(" up 32 days\r\n", text);
+        Assert.Contains("· Status", text);
+        Assert.Contains("$ ~/.helm/menu 'run' 'status'", text);
+        Assert.DoesNotContain("id -u", text);
+        Assert.DoesNotContain("describe", text);
+        Assert.Equal(0, _channel.Agent.Running);
+    }
+
+    [Fact]
+    public async Task A_run_stopped_in_the_agent_tab_tells_the_agent_the_user_stopped_it()
+    {
+        AllowShell();
+        _channel.Hang = "sleep 999";
+        var call = Call(Server(), "ssh_exec", new { server = "web", command = "sleep 999" });
+        for (var i = 0; i < 200 && _channel.Agent.Running == 0; i++) await Task.Delay(10);
+        _channel.Agent.StopAll();
+
+        var output = JsonNode.Parse((await call).Text)!;
+        Assert.Null(output["timed_out"]);
+        Assert.Contains("The user stopped it in Helm", output["note"]!.GetValue<string>());
+        Assert.True(_channel.Stopped);
+        Assert.Contains("Stopped in Helm", System.Text.Encoding.UTF8.GetString(_channel.Agent.Attach(_ => { })));
+    }
+
+    [Fact]
     public async Task A_menu_run_and_a_shell_command_with_the_same_arguments_do_not_mix()
     {
         AllowShell();
@@ -373,6 +407,8 @@ public sealed class SshMcpToolsTests
     private sealed class FakeChannel : ISshChannel
     {
         public bool IsConnected { get; set; } = true;
+
+        public AgentConsole Agent { get; } = new();
 
         public List<string> Commands { get; } = [];
 

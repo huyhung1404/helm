@@ -3,6 +3,15 @@
 All notable changes to Helm. The top section is used as the GitHub release body and as the Velopack release notes.
 Format: [Keep a Changelog](https://keepachangelog.com), versions follow [SemVer](https://semver.org).
 
+## [Unreleased]
+
+### Added
+- **SSH: AI agent tab** (PC). Once an AI agent runs something on a server (`ssh_exec` or `ssh_menu_run`), the SSH page
+  shows an *AI agent* tab beside *Terminal*: each command, its output as it arrives and how it ended (exit code, time
+  limit, error output). Switch tabs at any time: your shell keeps running and stays yours while the agent works. The
+  tab is read-only, marks new activity with a dot instead of taking over, and has *Stop* (the agent is told you
+  stopped it) and *Clear*.
+
 ## [0.32.0] - 2026-10-07
 
 ### Added

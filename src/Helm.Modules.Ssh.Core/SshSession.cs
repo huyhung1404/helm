@@ -24,7 +24,7 @@ public enum SshSessionState
 /// <see cref="TerminalBuffer"/> and handed to whichever terminal is attached; keys and resizes are sent from a queue,
 /// so a slow network never blocks the UI thread. Events are raised on background threads.
 /// </summary>
-public sealed class SshSession : IDisposable, ISshChannel
+public sealed class SshSession : IDisposable, ISshChannel, ITerminalSource
 {
     /// <summary>A keep-alive is sent this often, so idle connections are not dropped by NATs and firewalls.</summary>
     public static readonly TimeSpan KeepAlive = TimeSpan.FromSeconds(30);
@@ -67,6 +67,9 @@ public sealed class SshSession : IDisposable, ISshChannel
     public HostKeyMatch? RejectedMatch { get; private set; }
 
     public bool IsConnected => State == SshSessionState.Connected;
+
+    /// <summary>What AI agents ran on this session, for the page's AI agent tab.</summary>
+    public AgentConsole Agent { get; } = new();
 
     /// <summary>True once the server printed something (a session that never connected has nothing to show).</summary>
     public bool HasOutput

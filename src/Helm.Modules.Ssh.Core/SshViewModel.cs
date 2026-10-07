@@ -96,6 +96,12 @@ public sealed partial class SshViewModel : ObservableObject, IDisposable
     /// <summary>The phone's Ctrl key: on, the next key typed is sent with Ctrl (then it turns off).</summary>
     [ObservableProperty] private bool _ctrlArmed;
 
+    /// <summary>The AI agent tab is shown instead of the shell: what agents run on this server, read-only.</summary>
+    [ObservableProperty] private bool _showingAgent;
+
+    /// <summary>Agents ran something on the session shown while its tab was not open.</summary>
+    [ObservableProperty] private bool _agentUnseen;
+
     /// <summary>A question is on screen. The terminal steps aside meanwhile: on Android it is a native view that would cover the dialog.</summary>
     [ObservableProperty] private bool _isAskingUser;
 
@@ -142,7 +148,7 @@ public sealed partial class SshViewModel : ObservableObject, IDisposable
         _clipboard = clipboard;
         _logger = logger;
         _deviceKey.Changed += (_, _) => _ui.Post(RefreshKey);
-        Menu = new SshMenuViewModel(AskAsync, Send);
+        Menu = new SshMenuViewModel(AskAsync, TypeIntoShell);
         Load();
     }
 
@@ -228,6 +234,67 @@ public sealed partial class SshViewModel : ObservableObject, IDisposable
         AttachMenu();
     }
 
+    partial void OnActiveSessionChanged(SshSession? oldValue, SshSession? newValue)
+    {
+        if (oldValue is not null) oldValue.Agent.Changed -= OnAgentChanged;
+        if (newValue is not null) newValue.Agent.Changed += OnAgentChanged;
+        // Another server: its shell first.
+        ShowingAgent = false;
+        AgentUnseen = false;
+        RefreshAgent();
+        OnPropertyChanged(nameof(ActiveTerminal));
+    }
+
+    /// <summary>What the terminal shows: the session's shell, or what agents run there (<see cref="ShowingAgent"/>).</summary>
+    public ITerminalSource? ActiveTerminal => ShowingAgent && ActiveSession is { } session ? session.Agent : ActiveSession;
+
+    /// <summary>The shell's tab is shown (the tabs' other half of <see cref="ShowingAgent"/>).</summary>
+    public bool ShowingShell
+    {
+        get => !ShowingAgent;
+        set => ShowingAgent = !value;
+    }
+
+    /// <summary>Agents ran something on the session shown: the page offers its AI agent tab.</summary>
+    public bool HasAgentTab => ActiveSession?.Agent.HasRuns == true;
+
+    /// <summary>An agent's run is going on now on the session shown.</summary>
+    public bool AgentRunning => ActiveSession?.Agent.Running > 0;
+
+    public string AgentTabTitle => AgentRunning ? "AI agent · running" : "AI agent";
+
+    partial void OnShowingAgentChanged(bool value)
+    {
+        if (value) AgentUnseen = false;
+        OnPropertyChanged(nameof(ShowingShell));
+        OnPropertyChanged(nameof(ActiveTerminal));
+        // Back on the shell: typing goes on there.
+        if (!value && ActiveSession is not null) TerminalFocusRequested?.Invoke(this, EventArgs.Empty);
+    }
+
+    private void OnAgentChanged(object? sender, EventArgs e) => _ui.Post(() =>
+    {
+        if (!ReferenceEquals(sender, ActiveSession?.Agent)) return;
+        // A run started or ended while the user looks at the shell: the tab shows a dot until it is opened.
+        if (!ShowingAgent) AgentUnseen = true;
+        RefreshAgent();
+    });
+
+    private void RefreshAgent()
+    {
+        OnPropertyChanged(nameof(HasAgentTab));
+        OnPropertyChanged(nameof(AgentRunning));
+        OnPropertyChanged(nameof(AgentTabTitle));
+    }
+
+    /// <summary>Stops what agents run on the session shown now.</summary>
+    [RelayCommand]
+    private void StopAgent() => ActiveSession?.Agent.StopAll();
+
+    /// <summary>Empties the AI agent tab of the session shown.</summary>
+    [RelayCommand]
+    private void ClearAgent() => ActiveSession?.Agent.Clear();
+
     partial void OnIsAskingUserChanged(bool value) => OnPropertyChanged(nameof(ShowTerminal));
 
     /// <summary>The terminal is shown: there is a session and no question on screen.</summary>
@@ -306,13 +373,29 @@ public sealed partial class SshViewModel : ObservableObject, IDisposable
     /// <summary>Keys or a paste from the terminal. With <see cref="CtrlArmed"/>, one typed key goes with Ctrl.</summary>
     public void Send(string text)
     {
-        if (!_enabled) return;
+        if (!_enabled || ShowingAgent) return;
         if (CtrlArmed && text.Length == 1)
         {
             CtrlArmed = false;
             text = TerminalKeys.Ctrl(text[0]) ?? text;
         }
         ActiveSession?.Send(text);
+    }
+
+    /// <summary>Binary input from the terminal (some mouse reports); dropped while the AI agent tab is shown.</summary>
+    public void Send(byte[] bytes)
+    {
+        if (_enabled && !ShowingAgent) ActiveSession?.Send(bytes);
+    }
+
+    /// <summary>Keys typed into the shell: false while the AI agent tab (read-only) is shown.</summary>
+    public bool CanType => !ShowingAgent;
+
+    /// <summary>A menu item typed into the shell: its tab comes back first, so the user sees it run.</summary>
+    private void TypeIntoShell(string text)
+    {
+        ShowingAgent = false;
+        Send(text);
     }
 
     /// <summary>Connects to the selected server. <paramref name="password"/> is used for this connection only.</summary>

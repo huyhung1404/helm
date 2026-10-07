@@ -167,10 +167,7 @@ public sealed class SshMcpTools : IMcpToolProvider
 
         using var timeout = CancellationTokenSource.CreateLinkedTokenSource(ct);
         timeout.CancelAfter(TimeSpan.FromSeconds(plan.TimeoutSeconds));
-        var output = new TailBuffer(OutputCap);
-        var result = await channel.RunStreamingAsync(plan.Command, output.Append, timeout.Token).ConfigureAwait(false);
-        var timedOut = timeout.IsCancellationRequested && !ct.IsCancellationRequested;
-        var (text, total) = output.Read();
+        var (result, timedOut, stopped, text, total) = await RunShownAsync(channel, item.Title, plan, timeout, ct).ConfigureAwait(false);
         var node = new JsonObject
         {
             ["server"] = SafeName(plan.Host),
@@ -180,12 +177,35 @@ public sealed class SshMcpTools : IMcpToolProvider
             ["output"] = text,
             ["output_cut"] = total > text.Length ? $"Only the last {text.Length} of {total} characters are shown." : null,
             ["error"] = result.Error.Length > 0 ? Clip(result.Error, ErrorCap) : null,
-            ["note"] = timedOut
-                ? $"Helm stopped it after {plan.TimeoutSeconds} s." + (item.Output == MenuOutput.Stream ? " " + JobHint : "")
+            ["note"] = stopped ? StoppedNote
+                : timedOut ? $"Helm stopped it after {plan.TimeoutSeconds} s." + (item.Output == MenuOutput.Stream ? " " + JobHint : "")
                 : item.Output == MenuOutput.Stream ? JobHint : null,
         };
         foreach (var key in node.Where(p => p.Value is null).Select(p => p.Key).ToList()) node.Remove(key);
         return node;
+    }
+
+    private const string StoppedNote = "The user stopped it in Helm. Ask them before running it again.";
+
+    /// <summary>
+    /// Runs the plan's command on Helm's channel and shows it in the session's AI agent tab as it goes, where the user
+    /// can also stop it. Returns how it ended and the end of its output (at most <see cref="OutputCap"/>).
+    /// </summary>
+    private static async Task<(MenuRunResult Result, bool TimedOut, bool Stopped, string Text, long Total)> RunShownAsync(
+        ISshChannel channel, string? title, Plan plan, CancellationTokenSource timeout, CancellationToken ct)
+    {
+        var output = new TailBuffer(OutputCap);
+        using var shown = channel.Agent?.Begin(title, plan.Command, timeout);
+        var result = await channel.RunStreamingAsync(plan.Command, s =>
+        {
+            output.Append(s);
+            shown?.Output(s);
+        }, timeout.Token).ConfigureAwait(false);
+        var stopped = shown?.StoppedByUser == true;
+        var timedOut = !stopped && timeout.IsCancellationRequested && !ct.IsCancellationRequested;
+        shown?.End(result, timedOut, plan.TimeoutSeconds, cancelled: ct.IsCancellationRequested);
+        var (text, total) = output.Read();
+        return (result, timedOut, stopped, text, total);
     }
 
     private const string JobHint =
@@ -207,10 +227,7 @@ public sealed class SshMcpTools : IMcpToolProvider
 
         using var timeout = CancellationTokenSource.CreateLinkedTokenSource(ct);
         timeout.CancelAfter(TimeSpan.FromSeconds(plan.TimeoutSeconds));
-        var output = new TailBuffer(OutputCap);
-        var result = await channel.RunStreamingAsync(plan.Command, output.Append, timeout.Token).ConfigureAwait(false);
-        var timedOut = timeout.IsCancellationRequested && !ct.IsCancellationRequested;
-        var (text, total) = output.Read();
+        var (result, timedOut, stopped, text, total) = await RunShownAsync(channel, null, plan, timeout, ct).ConfigureAwait(false);
         var node = new JsonObject
         {
             ["server"] = SafeName(plan.Host),
@@ -219,7 +236,8 @@ public sealed class SshMcpTools : IMcpToolProvider
             ["output"] = text,
             ["output_cut"] = total > text.Length ? $"Only the last {text.Length} of {total} characters are shown." : null,
             ["error"] = result.Error.Length > 0 ? Clip(result.Error, ErrorCap) : null,
-            ["note"] = timedOut
+            ["note"] = stopped ? StoppedNote
+                : timedOut
                 ? $"Helm stopped it after {plan.TimeoutSeconds} s. If it waited for input, use non-interactive flags; a long job can run " +
                   "in the background (nohup … > log 2>&1 &) and be followed with another command."
                 : null,

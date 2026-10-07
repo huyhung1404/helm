@@ -1,7 +1,7 @@
 // The SSH terminal page, shared by Windows (WebView2) and Android (WebView). It only draws: every byte goes to and from
 // Helm, and Helm alone talks to the server.
 // Messages from Helm: out (base64 output), reset (redraw from base64), font, paste, focus, key (a key from the phone's
-// key bar: esc, tab, up, down, left, right, home, end).
+// key bar: esc, tab, up, down, left, right, home, end), ro (read-only: what AI agents run, nothing typed goes anywhere).
 // Messages to Helm: ready, in (typed text), bin (binary input), size, copy, paste (asks for the clipboard).
 // Windows talks through chrome.webview. Android hands the page a MessagePort ("helm-port") from its own origin; until
 // it arrives, messages wait in a queue.
@@ -73,6 +73,7 @@
       // paste() wraps the text for bracketed paste when the shell asked for it, then sends it as typed text.
       case 'paste': term.paste(m.d); break;
       case 'focus': term.focus(); break;
+      case 'ro': term.options.disableStdin = !!m.v; term.options.cursorBlink = !m.v; term.options.cursorInactiveStyle = m.v ? 'none' : 'outline'; break;
       case 'key': var s = keySequence(m.k); if (s) post({ t: 'in', d: s }); break;
     }
   }

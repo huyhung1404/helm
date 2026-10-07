@@ -28,6 +28,7 @@
             <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
             <RowDefinition Height="*" />
         </Grid.RowDefinitions>
 
@@ -93,7 +94,41 @@
             </Grid>
         </Border>
 
-        <Grid x:Name="Body" Grid.Row="4">
+        <!-- The shell, and what AI agents run on this server: a tab once one ran something. Both keep going whichever is
+             shown; the agent's tab only shows (its runs are on Helm's own channels, never typed into the shell). -->
+        <DockPanel Grid.Row="4" Margin="0,0,0,8" Visibility="{Binding HasAgentTab, Converter={StaticResource BoolToVisibility}}">
+            <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center"
+                        Visibility="{Binding ShowingAgent, Converter={StaticResource BoolToVisibility}}">
+                <ui:Button Margin="0,0,8,0" Content="Stop" Icon="{ui:SymbolIcon RecordStop24}" Command="{Binding StopAgentCommand}"
+                           ToolTip="Stop what the AI agent runs on this server now; it is told you stopped it"
+                           Visibility="{Binding AgentRunning, Converter={StaticResource BoolToVisibility}}" />
+                <ui:Button Content="Clear" Icon="{ui:SymbolIcon Broom24}" Command="{Binding ClearAgentCommand}" ToolTip="Empty this tab" />
+            </StackPanel>
+            <StackPanel Orientation="Horizontal">
+                <RadioButton Style="{StaticResource {x:Type ToggleButton}}" GroupName="SshTabs" MinWidth="120" Margin="0,0,6,0"
+                             IsChecked="{Binding ShowingShell}" AutomationProperties.Name="Terminal" ToolTip="Your shell on this server">
+                    <StackPanel Orientation="Horizontal">
+                        <ui:SymbolIcon Symbol="WindowConsole20" Margin="0,0,6,0" />
+                        <TextBlock Text="Terminal" />
+                    </StackPanel>
+                </RadioButton>
+                <RadioButton Style="{StaticResource {x:Type ToggleButton}}" GroupName="SshTabs" MinWidth="120"
+                             IsChecked="{Binding ShowingAgent}" AutomationProperties.Name="AI agent"
+                             ToolTip="What AI agents run on this server, with their output">
+                    <StackPanel Orientation="Horizontal">
+                        <ui:SymbolIcon Symbol="Bot24" Margin="0,0,6,0" />
+                        <TextBlock Text="{Binding AgentTabTitle}" />
+                        <Ellipse Width="7" Height="7" Margin="6,0,0,0" VerticalAlignment="Center" Fill="{DynamicResource AccentTextFillColorPrimaryBrush}"
+                                 ToolTip="New since you last looked" Visibility="{Binding AgentUnseen, Converter={StaticResource BoolToVisibility}}" />
+                    </StackPanel>
+                </RadioButton>
+                <TextBlock Margin="12,0,0,0" VerticalAlignment="Center" Style="{StaticResource HelmSecondaryText}" TextWrapping="Wrap"
+                           Text="Read-only. Your shell keeps running in Terminal."
+                           Visibility="{Binding ShowingAgent, Converter={StaticResource BoolToVisibility}}" />
+            </StackPanel>
+        </DockPanel>
+
+        <Grid x:Name="Body" Grid.Row="5">
             <Border CornerRadius="8" ClipToBounds="True" BorderThickness="1" BorderBrush="{DynamicResource CardStrokeColorDefaultBrush}"
                     Visibility="{Binding ShowTerminal, Converter={StaticResource BoolToVisibility}}">
                 <term:TerminalView x:Name="Terminal" />

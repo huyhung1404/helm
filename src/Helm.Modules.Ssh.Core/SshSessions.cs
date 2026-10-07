@@ -4,6 +4,9 @@ namespace Helm.Modules.Ssh;
 public interface ISshChannel : IMenuRunner
 {
     bool IsConnected { get; }
+
+    /// <summary>Where the AI agents' runs are shown (the page's AI agent tab); null when nothing shows them.</summary>
+    AgentConsole? Agent => null;
 }
 
 /// <summary>

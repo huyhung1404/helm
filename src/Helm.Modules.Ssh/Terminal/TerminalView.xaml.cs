@@ -41,7 +41,7 @@ public partial class TerminalView
     private CoreWebView2Environment? _environment;
     private Task? _init;
     private bool _ready;
-    private SshSession? _attached;
+    private ITerminalSource? _attached;
     private Action<byte[]>? _sink;
     private int _generation;
     private int _flushQueued;
@@ -75,7 +75,7 @@ public partial class TerminalView
 
     private void OnViewModelChanged(object? sender, PropertyChangedEventArgs e)
     {
-        if (e.PropertyName == nameof(SshViewModel.ActiveSession)) Rebind();
+        if (e.PropertyName == nameof(SshViewModel.ActiveTerminal)) Rebind();
         else if (e.PropertyName == nameof(SshViewModel.FontSize) && _viewModel is { } vm) Post(new { t = "font", s = vm.FontSize });
     }
 
@@ -157,7 +157,7 @@ public partial class TerminalView
                     break;
                 case "bin":
                     // xterm.js hands binary input (some mouse reports) as a string of byte values.
-                    vm.ActiveSession?.Send(Encoding.Latin1.GetBytes(root.GetProperty("d").GetString() ?? ""));
+                    vm.Send(Encoding.Latin1.GetBytes(root.GetProperty("d").GetString() ?? ""));
                     break;
                 case "size":
                     vm.ReportTerminalSize(root.GetProperty("c").GetInt32(), root.GetProperty("r").GetInt32());
@@ -192,14 +192,17 @@ public partial class TerminalView
         {
             return;
         }
-        if (text.Length == 0 || _viewModel?.ActiveSession?.IsConnected != true) return;
+        if (text.Length == 0 || _viewModel is not { CanType: true, ActiveSession.IsConnected: true }) return;
         if (TerminalPaste.NeedsConfirmation(text, bracketed) && _dialogs is { } dialogs
             && !await dialogs.ConfirmAsync("Paste text with line breaks?", TerminalPaste.Warning(text), "Paste").ConfigureAwait(true)) return;
         Post(new { t = "paste", d = TerminalPaste.ForTerminal(text) });
         FocusTerminal();
     }
 
-    /// <summary>Shows the selected server's session: redraws from its buffer and takes its output from now on.</summary>
+    /// <summary>
+    /// Shows the selected server's shell, or what agents run there (its AI agent tab, read-only): redraws from its
+    /// buffer and takes its output from now on.
+    /// </summary>
     private void Rebind()
     {
         if (_attached is { } old && _sink is { } oldSink) old.Detach(oldSink);
@@ -207,8 +210,9 @@ public partial class TerminalView
         _sink = null;
         var generation = Interlocked.Increment(ref _generation);
         if (!_ready || _viewModel is not { } vm) return;
-        var session = vm.ActiveSession;
-        if (session is null)
+        var source = vm.ActiveTerminal;
+        Post(new { t = "ro", v = source is AgentConsole });
+        if (source is null)
         {
             Post(new { t = "reset", d = "" });
             return;
@@ -218,8 +222,8 @@ public partial class TerminalView
             _pending.Enqueue((generation, bytes));
             if (Interlocked.Exchange(ref _flushQueued, 1) == 0) Dispatcher.BeginInvoke(DispatcherPriority.Background, Flush);
         };
-        var snapshot = session.Attach(sink);
-        _attached = session;
+        var snapshot = source.Attach(sink);
+        _attached = source;
         _sink = sink;
         Post(new { t = "reset", d = Convert.ToBase64String(snapshot) });
     }
