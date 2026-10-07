@@ -3,7 +3,7 @@
 All notable changes to Helm. The top section is used as the GitHub release body and as the Velopack release notes.
 Format: [Keep a Changelog](https://keepachangelog.com), versions follow [SemVer](https://semver.org).
 
-## [Unreleased]
+## [0.34.0] - 2026-10-07
 
 ### Added
 - **Scratch** (PC and Android): a scratch space on every device for the photos, videos, files and text you move around.
