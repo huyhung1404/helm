@@ -3,7 +3,7 @@
 All notable changes to Helm. The top section is used as the GitHub release body and as the Velopack release notes.
 Format: [Keep a Changelog](https://keepachangelog.com), versions follow [SemVer](https://semver.org).
 
-## [Unreleased]
+## [0.32.0] - 2026-10-07
 
 ### Added
 - **SSH: shell commands for AI agents** (PC). A second switch per server, *AI agents may run shell commands*, lets an
