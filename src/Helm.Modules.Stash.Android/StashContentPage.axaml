@@ -121,8 +121,14 @@
                     </ItemsControl.ItemsPanel>
                     <ItemsControl.ItemTemplate>
                         <DataTemplate DataType="vm:StashFilterTab">
-                            <Button Classes="filter" Classes.accent="{Binding IsSelected}" Content="{Binding Label}" AutomationProperties.Name="{Binding Name}"
-                                    Command="{Binding $parent[ItemsControl].((vm:StashViewModel)DataContext).ShowFilterCommand}" CommandParameter="{Binding}" />
+                            <Button Classes="filter" Classes.accent="{Binding IsSelected}" AutomationProperties.Name="{Binding Name}"
+                                    Command="{Binding $parent[ItemsControl].((vm:StashViewModel)DataContext).ShowFilterCommand}" CommandParameter="{Binding}">
+                                <!-- The trash: a bin with the count -->
+                                <StackPanel Orientation="Horizontal" Spacing="4">
+                                    <ic:SymbolIcon Symbol="Delete" FontSize="16" IsVisible="{Binding IsTrash}" />
+                                    <TextBlock Text="{Binding Label}" IsVisible="{Binding HasLabel}" VerticalAlignment="Center" />
+                                </StackPanel>
+                            </Button>
                         </DataTemplate>
                     </ItemsControl.ItemTemplate>
                 </ItemsControl>

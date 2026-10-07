@@ -58,6 +58,40 @@ public sealed class StashWindowsTests : IDisposable
         Assert.Null(await platform.ThumbnailAsync(source with { Origin = null }, CancellationToken.None));
     }
 
+    [Fact]
+    public void The_drag_ghost_is_a_picture_of_the_card_itself_not_shifted_by_its_place() => RunSta(() =>
+    {
+        var card = new System.Windows.Controls.Border { Width = 100, Height = 60, Background = Brushes.Red };
+        var wall = new System.Windows.Controls.Canvas { Width = 400, Height = 300, Background = Brushes.Blue };
+        System.Windows.Controls.Canvas.SetLeft(card, 150);
+        System.Windows.Controls.Canvas.SetTop(card, 120);
+        wall.Children.Add(card);
+        wall.Measure(new System.Windows.Size(400, 300));
+        wall.Arrange(new System.Windows.Rect(0, 0, 400, 300));
+
+        var ghost = new DragGhost(wall, card, new System.Windows.Point(10, 10));
+
+        var picture = new FormatConvertedBitmap(ghost.Snapshot, PixelFormats.Bgra32, null, 0);
+        Assert.InRange(picture.PixelWidth, 100, 200); // 100 at 96 dpi, more on a scaled screen
+        var corner = new byte[4];
+        picture.CopyPixels(new System.Windows.Int32Rect(1, 1, 1, 1), corner, 4, 0);
+        Assert.Equal([0, 0, 255, 255], corner); // red (BGRA), not the wall's blue or nothing
+    });
+
+    private static void RunSta(Action body)
+    {
+        Exception? error = null;
+        var thread = new Thread(() =>
+        {
+            try { body(); }
+            catch (Exception ex) { error = ex; }
+        });
+        thread.SetApartmentState(ApartmentState.STA);
+        thread.Start();
+        thread.Join();
+        if (error is not null) throw new Xunit.Sdk.XunitException(error.ToString());
+    }
+
     private static void WritePng(string path, int width, int height, byte alpha)
     {
         var pixels = new byte[width * height * 4];

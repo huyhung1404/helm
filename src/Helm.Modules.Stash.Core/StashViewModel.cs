@@ -99,12 +99,20 @@ public sealed partial class StashRowViewModel : ObservableObject
 /// <summary>A filter button above the list, with its count.</summary>
 public sealed partial class StashFilterTab(StashFilter filter, string name) : ObservableObject
 {
-    [ObservableProperty] private string _label = name;
+    [ObservableProperty] private string _label = filter == StashFilter.Trash ? "" : name;
     [ObservableProperty] private bool _isSelected;
 
     public StashFilter Filter { get; } = filter;
 
+    /// <summary>The filter's name, for screen readers and tooltips (the trash shows only its icon and count).</summary>
     public string Name { get; } = name;
+
+    /// <summary>The trash is a bin icon with the count next to it.</summary>
+    public bool IsTrash => Filter == StashFilter.Trash;
+
+    public bool HasLabel => Label.Length > 0;
+
+    partial void OnLabelChanged(string value) => OnPropertyChanged(nameof(HasLabel));
 }
 
 /// <summary>
@@ -661,7 +669,9 @@ public sealed partial class StashViewModel : ObservableObject
 
         var counts = _store.Counts();
         foreach (var tab in FilterTabs)
-            tab.Label = counts[tab.Filter] > 0 ? $"{tab.Name} ({counts[tab.Filter]})" : tab.Name;
+            tab.Label = tab.IsTrash
+                ? counts[tab.Filter] > 0 ? counts[tab.Filter].ToString(System.Globalization.CultureInfo.CurrentCulture) : ""
+                : counts[tab.Filter] > 0 ? $"{tab.Name} ({counts[tab.Filter]})" : tab.Name;
         foreach (var tab in FilterTabs) tab.IsSelected = tab.Filter == Filter;
 
         SyncNote = state switch

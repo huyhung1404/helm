@@ -4,6 +4,7 @@ using System.IO;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Data;
+using System.Windows.Documents;
 using System.Windows.Input;
 using System.Windows.Threading;
 using Helm.Core.Modules;
@@ -47,6 +48,8 @@ public partial class StashContentPage : Page
         Wall.PreviewMouseMove += OnCardMoved;
         Wall.PreviewMouseLeftButtonUp += (_, _) => _pressed = null;
         Wall.DragOver += OnCardDragOver;
+        // The ghost follows the cursor over the whole page, also where nothing can be dropped.
+        PreviewDragOver += (_, e) => _ghost?.MoveTo(e.GetPosition(Root));
         Wall.Drop += OnCardDrop;
         ApplyEnabled();
     }
@@ -58,6 +61,7 @@ public partial class StashContentPage : Page
     private const string CardFormat = "Helm.Stash.Card";
     private StashRowViewModel? _pressed;
     private Point _pressedAt;
+    private DragGhost? _ghost;
 
     private void OnCardPressed(object sender, MouseButtonEventArgs e)
     {
@@ -72,8 +76,16 @@ public partial class StashContentPage : Page
         var moved = e.GetPosition(Wall) - _pressedAt;
         if (Math.Abs(moved.X) < SystemParameters.MinimumHorizontalDragDistance && Math.Abs(moved.Y) < SystemParameters.MinimumVerticalDragDistance) return;
         _pressed = null;
-        var card = Wall.ItemContainerGenerator.ContainerFromItem(row) as UIElement;
-        if (card is not null) card.Opacity = 0.45;
+        var card = Wall.ItemContainerGenerator.ContainerFromItem(row) as FrameworkElement;
+        var layer = AdornerLayer.GetAdornerLayer(Root);
+        if (card is not null && layer is not null)
+        {
+            // The picture of the card follows the cursor; its place stays, faded, until it is dropped.
+            _ghost = new DragGhost(Root, card, Wall.TranslatePoint(_pressedAt, card));
+            _ghost.MoveTo(e.GetPosition(Root));
+            layer.Add(_ghost);
+        }
+        if (card is not null) card.Opacity = 0.3;
         try
         {
             DragDrop.DoDragDrop(Wall, new DataObject(CardFormat, row.Id), DragDropEffects.Move);
@@ -81,6 +93,8 @@ public partial class StashContentPage : Page
         finally
         {
             if (card is not null) card.Opacity = 1;
+            if (_ghost is not null) layer?.Remove(_ghost);
+            _ghost = null;
         }
     }
 

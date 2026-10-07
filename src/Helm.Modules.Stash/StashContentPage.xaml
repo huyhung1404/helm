@@ -55,6 +55,11 @@
                 <DataTrigger Binding="{Binding IsSelected}" Value="True">
                     <Setter Property="Appearance" Value="Primary" />
                 </DataTrigger>
+                <!-- The trash: a bin with the count -->
+                <DataTrigger Binding="{Binding IsTrash}" Value="True">
+                    <Setter Property="Icon" Value="{ui:SymbolIcon Delete24}" />
+                    <Setter Property="ToolTip" Value="Trash" />
+                </DataTrigger>
             </Style.Triggers>
         </Style>
 
@@ -75,7 +80,7 @@
         </Style>
     </Page.Resources>
 
-    <Grid Margin="24,16,24,0">
+    <Grid x:Name="Root" Margin="24,16,24,0">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />

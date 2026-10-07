@@ -457,7 +457,7 @@ public sealed class StashTests : IDisposable
 
         vm.TrashCommand.Execute(row);
         Assert.Equal(["two"], vm.Rows.Select(r => r.Name));
-        Assert.Equal("Trash (1)", vm.FilterTabs.Single(t => t.Filter == StashFilter.Trash).Label);
+        Assert.Equal("1", vm.FilterTabs.Single(t => t.Filter == StashFilter.Trash).Label);
 
         vm.ShowFilterCommand.Execute(vm.FilterTabs.Single(t => t.Filter == StashFilter.Trash));
         Assert.Equal(["one"], vm.Rows.Select(r => r.Name));
