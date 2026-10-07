@@ -9,5 +9,7 @@ internal partial class McpPage : Page
     {
         DataContext = viewModel;
         InitializeComponent();
+        // The clients' config files and the modules may have changed while the page was away.
+        Loaded += (_, _) => viewModel.Refresh();
     }
 }
