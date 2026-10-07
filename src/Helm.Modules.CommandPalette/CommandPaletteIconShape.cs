@@ -3,7 +3,7 @@ namespace Helm.Modules.CommandPalette;
 /// <summary>
 /// The Command Palette icon: a rounded command box with a prompt and a line of text, in a violet-to-pink gradient,
 /// with no background. Path data is in a 100 × 100 box and its width fills it edge to edge (0 to 100), like the
-/// Claude symbol, so every tool icon looks the same size. PC only, so the shape lives in the PC project.
+/// other tool icons, so every tool icon looks the same size. PC only, so the shape lives in the PC project.
 /// </summary>
 public static class CommandPaletteIconShape
 {

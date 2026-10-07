@@ -46,7 +46,7 @@ Settings and sync data use the same formats on both, so a phone joins the same s
 
 Each tool says which platforms it runs on, and is registered in that platform's list:
 
-- **Windows only** (e.g. Claude Chat): `src/Helm.Modules.<Name>` as today, one line in `HelmModules.cs`.
+- **Windows only** (e.g. Command Palette): `src/Helm.Modules.<Name>` as today, one line in `HelmModules.cs`.
 - **Android only**: `src/Helm.Modules.<Name>.Android` (`net10.0-android`, Avalonia, references
   `Helm.Core.Android`), a module deriving from `AndroidModuleBase` and a `ui:ModulePageBase` page, registered with
   `services.AddAndroidModule<TModule, TPage>()` in `AndroidModules.cs`. Keep the project's root namespace free of

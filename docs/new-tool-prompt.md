@@ -138,7 +138,7 @@ A tool you work in keeps **what it is for** apart from **how it is configured**:
 | Declared by | the module implements `IModuleContent` (`Helm.Core.Modules`): `Type ContentPageType` | `SettingsPageType` (PC) / `PageType` (Android) |
 
 - The shell does the routing from `IModuleContent`; do not change the shell for a new tool. A module with its own Quick
-  access action (`IModuleLauncher`, e.g. Claude Chat opening its window) keeps that action.
+  access action (`IModuleLauncher`, e.g. a tool that opens its own window) keeps that action.
 - PC page margin: the content page's root panel uses `Margin="24,16,24,24"`, the same as Home, General and
   `ModulePageBase`, so the title sits 16 px below the window's title bar on every page.
 - Content page layout: the tool's title (PC; the Android app bar shows it already), then the tool's main picker (e.g.

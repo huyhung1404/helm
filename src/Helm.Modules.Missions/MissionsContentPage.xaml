@@ -338,7 +338,7 @@
                                Text="A mission is a goal reached one step at a time, like passing HSK3 or running 10 km. An AI writes the steps; Helm keeps you on them." />
                     <TextBlock TextWrapping="Wrap" Margin="0,0,0,4" Text="1. Describe your goal and copy the prompt Helm writes from it." />
                     <TextBlock TextWrapping="Wrap" Margin="0,0,0,4" Text="2. Paste it into ChatGPT, Gemini or Claude, and copy the JSON it answers." />
-                    <TextBlock TextWrapping="Wrap" Margin="0,0,0,12" Text="3. Import it here, check the steps, and start. Or ask Claude in Helm to make the mission for you." />
+                    <TextBlock TextWrapping="Wrap" Margin="0,0,0,12" Text="3. Import it here, check the steps, and start. Or ask Claude Code to make the mission for you." />
                     <WrapPanel>
                         <ui:Button Margin="0,0,8,0" Appearance="Primary" Content="Write the prompt" Icon="{ui:SymbolIcon Sparkle24}" Command="{Binding OpenPromptCommand}" />
                         <ui:Button Content="Import JSON" Icon="{ui:SymbolIcon ArrowImport24}" Command="{Binding OpenImportCommand}" />

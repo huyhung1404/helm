@@ -6,7 +6,7 @@
 
 **A personal productivity toolkit for Windows and Android, in the spirit of Microsoft PowerToys.**
 
-Notes, tasks, a password vault, a command palette and a Claude Code chat in one Fluent app, synced end-to-end encrypted between your PC and your phone.
+Notes, tasks, a password vault, a command palette and tools for Claude Code in one Fluent app, synced end-to-end encrypted between your PC and your phone.
 
 [![Latest release](https://img.shields.io/github/v/release/huyhung1404/helm?label=release)](https://github.com/huyhung1404/helm/releases/latest)
 [![CI](https://img.shields.io/github/actions/workflow/status/huyhung1404/helm/ci.yml?branch=main&label=CI)](https://github.com/huyhung1404/helm/actions/workflows/ci.yml)
@@ -25,14 +25,14 @@ Notes, tasks, a password vault, a command palette and a Claude Code chat in one 
 - **Local-first, end-to-end encrypted sync.** Every device keeps a full copy of your data; the sync server only ever sees encrypted records.
 - **Updates itself.** New versions download in the background from GitHub Releases and install when you choose.
 - **Keyboard-first.** Alt+Space for the command palette, Win+Alt+N to capture a note or task from any app.
+- **Helm tools for Claude (MCP).** Claude Code, in VS Code or the terminal, can read and write your notes, Tracker and Missions through Helm's MCP server (`Helm.exe --mcp`); turn it on in **Claude & MCP**.
 
 ## Tools
 
 | Tool | Platforms | What it does |
 |---|---|---|
-| Claude Chat | PC | Chat with Claude Code in its own window, several projects side by side; **Helm tools for Claude** (MCP): Claude can read and write your notes, Tracker and Missions, in Helm's chats and in Claude Code (`Helm.exe --mcp`) |
 | Command Palette | PC | Alt+Space: one search box, Helm first (notes, tasks, vault items while unlocked, settings), then Windows: apps, files, open windows, Windows Settings, the web |
-| Missions | PC + Android | Reach a goal one step at a time: describe it, copy the prompt Helm writes into any AI and import the roadmap it answers (or ask Claude in Helm); steps are done in order, each with its start and finish dates; the pace against the plan and the deadline; celebrations and the rewards you chose; re-plan the rest with an AI when you fall behind; a daily step reminder; share an AI's answer to Helm on the phone; badges; linked notes; an Android home-screen widget; a Today card; send a step to Tracker; statistics and CSV; ready-made missions ([design](docs/missions-design.md)) |
+| Missions | PC + Android | Reach a goal one step at a time: describe it, copy the prompt Helm writes into any AI and import the roadmap it answers (or ask Claude Code, through Helm's tools for Claude); steps are done in order, each with its start and finish dates; the pace against the plan and the deadline; celebrations and the rewards you chose; re-plan the rest with an AI when you fall behind; a daily step reminder; share an AI's answer to Helm on the phone; badges; linked notes; an Android home-screen widget; a Today card; send a step to Tracker; statistics and CSV; ready-made missions ([design](docs/missions-design.md)) |
 | Notes | PC + Android | Notes that save as you type and sync end-to-end encrypted; a note edited on two devices keeps both versions; 30-day trash; Markdown export; notes link to tasks, people in the debt book and missions |
 | Quick Capture | PC + Android | Save a note, task or debt from anywhere: Win+Alt+N on PC, Share → "Save to Helm" or a Quick Settings tile on Android, with short forms like `/t buy milk tomorrow 9h` |
 | SSH | PC + Android | A terminal on your servers: sign in with an Ed25519 key Helm makes for this device (encrypted for your Windows account, never synced) or a password that is never saved; server keys are pinned on first use and a changed key is refused; *Install this device's key* adds the key to a server like ssh-copy-id; *Import from SSH config* brings your ssh servers, key files and known server keys in one click; a password or key can come from Vault; sessions keep running while you use the rest of Helm; on the phone a key bar adds Ctrl, Esc, Tab and arrows |
