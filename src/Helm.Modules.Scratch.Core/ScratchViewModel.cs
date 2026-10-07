@@ -26,7 +26,7 @@ public sealed partial class ScratchRowViewModel : ObservableObject
     [ObservableProperty] private bool _isImage;
     [ObservableProperty] private bool _trashed;
 
-    /// <summary>The card the keyboard acts on (PC: Ctrl+C, Ctrl+D, Enter).</summary>
+    /// <summary>The card the keyboard acts on (PC: Ctrl+C, Delete, Enter).</summary>
     [ObservableProperty] private bool _isSelected;
 
     /// <summary>Characters of a text a card shows.</summary>

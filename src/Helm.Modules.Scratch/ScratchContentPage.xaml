@@ -75,7 +75,7 @@
         <DockPanel Margin="0,0,0,16">
             <!-- No buttons on PC: the keyboard does it (the phone has buttons) -->
             <TextBlock x:Name="Actions" DockPanel.Dock="Right" VerticalAlignment="Center" Style="{DynamicResource HelmSecondaryText}" TextAlignment="Right"
-                       Text="Ctrl+V or drop to add · Click a card: Ctrl+C copy, Ctrl+D delete, Enter open" />
+                       Text="Ctrl+V or drop to add · Click a card: Ctrl+C copy, Del delete, Enter open" />
             <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
                 <Image Source="{x:Static self:ScratchLogo.Image}" Width="32" Height="32" Margin="0,0,12,0" />
                 <TextBlock Text="Scratch" FontSize="28" FontWeight="SemiBold" VerticalAlignment="Center" />
@@ -174,11 +174,11 @@
                                         <MenuItem Header="Save as…" Command="{Binding PlacementTarget.Tag.SaveCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
                                                   CommandParameter="{Binding}" Visibility="{Binding IsFile, Converter={StaticResource BoolToVisibility}}" />
                                         <Separator />
-                                        <MenuItem Header="Move to the trash" InputGestureText="Ctrl+D" Command="{Binding PlacementTarget.Tag.TrashCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
+                                        <MenuItem Header="Move to the trash" InputGestureText="Del" Command="{Binding PlacementTarget.Tag.TrashCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
                                                   CommandParameter="{Binding}" Visibility="{Binding IsLive, Converter={StaticResource BoolToVisibility}}" />
                                         <MenuItem Header="Restore" Command="{Binding PlacementTarget.Tag.RestoreCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
                                                   CommandParameter="{Binding}" Visibility="{Binding Trashed, Converter={StaticResource BoolToVisibility}}" />
-                                        <MenuItem Header="Delete for good" InputGestureText="Ctrl+D" Command="{Binding PlacementTarget.Tag.DeleteForeverCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
+                                        <MenuItem Header="Delete for good" InputGestureText="Del" Command="{Binding PlacementTarget.Tag.DeleteForeverCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
                                                   CommandParameter="{Binding}" Visibility="{Binding Trashed, Converter={StaticResource BoolToVisibility}}" />
                                     </ContextMenu>
                                 </Border.ContextMenu>

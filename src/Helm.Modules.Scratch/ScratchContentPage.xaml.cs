@@ -34,9 +34,6 @@ public partial class ScratchContentPage : Page
         module.PropertyChanged += OnModuleChanged;
         CommandBindings.Add(new CommandBinding(ApplicationCommands.Find, (_, _) => { SearchBox.Focus(); SearchBox.SelectAll(); }));
         InputBindings.Add(new KeyBinding(ApplicationCommands.Find, Key.F, ModifierKeys.Control));
-        // Ctrl+V outside a text box adds what is on the clipboard (a text box pastes into itself first).
-        CommandBindings.Add(new CommandBinding(ApplicationCommands.Paste, (_, _) => PasteFromClipboard(), (_, e) => e.CanExecute = CanAdd));
-        InputBindings.Add(new KeyBinding(ApplicationCommands.Paste, Key.V, ModifierKeys.Control));
         DragOver += OnDragOver;
         Drop += OnDrop;
         Wall.PreviewMouseLeftButtonDown += OnCardPressed;
@@ -46,12 +43,24 @@ public partial class ScratchContentPage : Page
         // The ghost follows the cursor over the whole page, also where nothing can be dropped.
         PreviewDragOver += (_, e) => _ghost?.MoveTo(e.GetPosition(Root));
         Wall.Drop += OnCardDrop;
-        // Keyboard on the selected card: Ctrl+C, Ctrl+Shift+C, Ctrl+D / Delete, Enter, Esc.
-        KeyDown += OnKeyDown;
+        // The keys work on the whole window while this page shows, wherever the focus is (the menu after opening the
+        // page, for one): Ctrl+V adds; Ctrl+C, Ctrl+Shift+C, Delete, Enter, Esc act on the selected card.
+        Loaded += (_, _) =>
+        {
+            _window = Window.GetWindow(this);
+            if (_window is not null) _window.PreviewKeyDown += OnKeyDown;
+        };
+        Unloaded += (_, _) =>
+        {
+            if (_window is not null) _window.PreviewKeyDown -= OnKeyDown;
+            _window = null;
+        };
         ApplyEnabled();
     }
 
     private bool CanAdd => _module.IsEnabled && _viewModel.IsNotBusy;
+
+    private Window? _window;
 
     // ---- Reordering: drag a card onto another one ----------------------------------------------------------------
 
@@ -79,6 +88,12 @@ public partial class ScratchContentPage : Page
         if (Keyboard.FocusedElement is System.Windows.Controls.Primitives.TextBoxBase || !_module.IsEnabled) return;
         var ctrl = Keyboard.Modifiers.HasFlag(ModifierKeys.Control);
         var shift = Keyboard.Modifiers.HasFlag(ModifierKeys.Shift);
+        if (e.Key == Key.V && ctrl && !shift)
+        {
+            if (CanAdd) PasteFromClipboard();
+            e.Handled = true;
+            return;
+        }
         if (e.Key == Key.Escape && _viewModel.Selected is not null)
         {
             _viewModel.CloseDetail();
@@ -94,7 +109,6 @@ public partial class ScratchContentPage : Page
             case Key.C when ctrl:
                 _viewModel.CopyCommand.Execute(row);
                 break;
-            case Key.D when ctrl:
             case Key.Delete:
                 // In the trash, deleting is for good (it asks first).
                 if (row.Trashed) _viewModel.DeleteForeverCommand.Execute(row);
