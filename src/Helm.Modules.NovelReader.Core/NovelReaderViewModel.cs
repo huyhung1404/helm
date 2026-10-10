@@ -1207,7 +1207,11 @@ public sealed partial class NovelReaderViewModel : ObservableObject, IReadAloudH
                     SuggestionStatus = $"{_nameAgent.Name} is reading the possible names…";
                     try
                     {
-                        var progress = new Progress<string>(p => SuggestionStatus = p);
+                        // On the UI thread, and only while it works: a report arriving late must not cover the result.
+                        var progress = new UiProgress<string>(_ui, p =>
+                        {
+                            if (ReferenceEquals(_scanCancel, cts)) SuggestionStatus = p;
+                        });
                         said = await _nameAgent.FindNamesAsync(bookId, BookTitle, progress, cts.Token);
                         sure = [];
                     }
@@ -1640,5 +1644,11 @@ public sealed partial class NovelReaderViewModel : ObservableObject, IReadAloudH
     private void Save(Action<NovelReaderSettings> change)
     {
         if (!_loading) _settings.Update(change);
+    }
+
+    /// <summary>Progress reported from any thread, handled on the UI thread in the order it was reported.</summary>
+    private sealed class UiProgress<T>(IUiDispatcher ui, Action<T> report) : IProgress<T>
+    {
+        public void Report(T value) => ui.Post(() => report(value));
     }
 }

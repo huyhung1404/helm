@@ -353,19 +353,44 @@ public partial class NovelReaderContentPage : Page
         return null;
     }
 
-    /// <summary>Tells the view model which paragraph is at the top, so the place reading stopped is saved and synced.</summary>
+    /// <summary>
+    /// Tells the view model which paragraph is at the top, so the place reading stopped is saved and synced. When the
+    /// text gets wider or narrower (the names panel, the window) every paragraph wraps again: the paragraph at the top
+    /// is put back where it was instead of the page showing other text.
+    /// </summary>
     private void Scroller_ScrollChanged(object sender, ScrollChangedEventArgs e)
     {
-        if (_scrolling || e.VerticalChange == 0 && e.ExtentHeightChange == 0) return;
+        if (_rewrapping) return;
+        if (e.ViewportWidthChange != 0 && _top is { } top)
+        {
+            _rewrapping = true;
+            Dispatcher.BeginInvoke(DispatcherPriority.Loaded, () =>
+            {
+                _rewrapping = false;
+                if (Container(top.Paragraph) is { } container)
+                    SetOffset(Scroller.VerticalOffset + TopOf(container) + top.Within * container.ActualHeight);
+            });
+            return;
+        }
+        if (e.VerticalChange == 0 && e.ExtentHeightChange == 0) return;
         var count = ParagraphList.Items.Count;
         for (var i = 0; i < count; i++)
         {
             if (Container(i) is not { } container) continue;
-            if (TopOf(container) + container.ActualHeight <= 8) continue;
-            _viewModel.ReportVisibleParagraph(i);
+            var at = TopOf(container);
+            if (at + container.ActualHeight <= 8) continue;
+            _top = (i, container.ActualHeight > 0 ? Math.Clamp(-at / container.ActualHeight, 0, 1) : 0);
+            // Scrolling by itself (following the voice, opening a chapter) is not the reader moving.
+            if (!_scrolling) _viewModel.ReportVisibleParagraph(i);
             return;
         }
     }
+
+    /// <summary>The paragraph at the top of the view, and how far down it the view starts (0 to 1).</summary>
+    private (int Paragraph, double Within)? _top;
+
+    /// <summary>The text is wrapping again at a new width; the place is put back once it is laid out.</summary>
+    private bool _rewrapping;
 
     private void OnViewModelChanged(object? sender, PropertyChangedEventArgs e)
     {
