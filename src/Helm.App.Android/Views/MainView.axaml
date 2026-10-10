@@ -22,6 +22,9 @@
         <Style Selector="ic|SymbolIcon.syncglyph.muted">
             <Setter Property="Opacity" Value="0.45" />
         </Style>
+        <Style Selector="ic|SymbolIcon.syncglyph.done">
+            <Setter Property="Foreground" Value="{DynamicResource HelmSuccess}" />
+        </Style>
         <Style Selector="ic|SymbolIcon.syncglyph.problem">
             <Setter Property="Foreground" Value="{DynamicResource HelmDanger}" />
         </Style>
@@ -49,29 +52,28 @@
                     <ic:SymbolIcon Symbol="Navigation" FontSize="22" />
                 </Button>
                 <TextBlock Grid.Column="1" Text="{Binding Navigator.Title}" FontSize="20" FontWeight="SemiBold" VerticalAlignment="Center" Margin="8,0,16,0" />
-                <!-- Sync: its state on every page; tap to sync now (or to set it up) -->
-                <Button Grid.Column="2" Classes="flat" Width="48" Height="48" Margin="0,0,4,0" Padding="0" HorizontalContentAlignment="Center"
+                <!-- Sync: its state on every page; tap to sync now (or to set it up). Just the icon, without a button look (no
+                     press fill), over a 48 dp touch target. -->
+                <Button Grid.Column="2" Width="48" Height="48" Margin="0,0,4,0" Padding="0" Background="Transparent"
                         DataContext="{Binding Sync}" Command="{Binding SyncNowCommand}" ToolTip.Tip="{Binding ToolTip}" AutomationProperties.Name="Sync now">
-                    <!-- One sync glyph, the same rules as the Windows title bar: turns while syncing, a tick for a moment
-                         when done, faded when offline or not set up, red with a dot on a problem. -->
-                    <Panel Width="24" Height="24">
-                        <ic:SymbolIcon Symbol="ArrowSync" FontSize="22" Classes="syncglyph" RenderTransformOrigin="0.5,0.5"
-                                       Classes.turning="{Binding IsSyncing}" Classes.muted="{Binding IsOffline}" Classes.problem="{Binding HasProblem}">
-                            <ic:SymbolIcon.IsVisible>
-                                <MultiBinding Converter="{x:Static BoolConverters.And}">
-                                    <Binding Path="!IsNotSetUp" />
-                                    <Binding Path="!JustSynced" />
-                                </MultiBinding>
-                            </ic:SymbolIcon.IsVisible>
-                            <ic:SymbolIcon.RenderTransform>
-                                <RotateTransform />
-                            </ic:SymbolIcon.RenderTransform>
-                        </ic:SymbolIcon>
-                        <ic:SymbolIcon Symbol="ArrowSyncCheckmark" FontSize="22" Foreground="{DynamicResource HelmSuccess}" IsVisible="{Binding JustSynced}" />
-                        <ic:SymbolIcon Symbol="ArrowSyncOff" FontSize="22" Opacity="0.45" IsVisible="{Binding IsNotSetUp}" />
-                        <Ellipse Width="7" Height="7" HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0,-1,-2,0"
-                                 Fill="{DynamicResource HelmDanger}" IsVisible="{Binding HasProblem}" />
-                    </Panel>
+                    <Button.Template>
+                        <ControlTemplate>
+                            <Panel Background="{TemplateBinding Background}">
+                                <ContentPresenter Name="PART_ContentPresenter" Content="{TemplateBinding Content}"
+                                                  HorizontalAlignment="Center" VerticalAlignment="Center" />
+                            </Panel>
+                        </ControlTemplate>
+                    </Button.Template>
+                    <!-- The same sync glyph in every state, as on Windows; only its colour changes: accent and turning while
+                         syncing, green for a moment when a sync finishes, red on a problem, faded when offline or not set up.
+                         The origin must be in percent: Avalonia reads "0.5,0.5" as pixels, which turned it around its corner. -->
+                    <ic:SymbolIcon Symbol="ArrowSync" Width="24" Height="24" FontSize="22" Classes="syncglyph" RenderTransformOrigin="50%,50%"
+                                   Classes.turning="{Binding IsSyncing}" Classes.done="{Binding JustSynced}"
+                                   Classes.muted="{Binding IsMuted}" Classes.problem="{Binding HasProblem}">
+                        <ic:SymbolIcon.RenderTransform>
+                            <RotateTransform />
+                        </ic:SymbolIcon.RenderTransform>
+                    </ic:SymbolIcon>
                 </Button>
             </Grid>
 

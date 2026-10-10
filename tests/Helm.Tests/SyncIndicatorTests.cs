@@ -43,11 +43,11 @@ public sealed class SyncIndicatorTests
     }
 
     [Fact]
-    public async Task A_finished_sync_shows_the_tick_for_a_moment()
+    public async Task A_finished_sync_turns_green_for_a_moment()
     {
         var sync = new FakeSync(new SyncStatus(SyncState.Idle, DateTimeOffset.Now, null));
         var vm = new SyncIndicatorViewModel(sync, new Inline(), TimeSpan.FromMilliseconds(50));
-        Assert.False(vm.JustSynced); // already synced at start: plain arrows
+        Assert.False(vm.JustSynced); // already synced at start: the usual colour
 
         sync.Set(new SyncStatus(SyncState.Offline, null, "timeout"));
         Assert.True(vm.IsMuted);
@@ -64,7 +64,7 @@ public sealed class SyncIndicatorTests
         sync.Set(new SyncStatus(SyncState.Syncing, null, null));
         sync.Set(new SyncStatus(SyncState.Idle, DateTimeOffset.Now, null));
         sync.Set(new SyncStatus(SyncState.Error, null, "boom"));
-        Assert.False(vm.JustSynced); // a problem replaces the tick at once
+        Assert.False(vm.JustSynced); // a problem replaces the green at once
     }
 
     private sealed class Inline : IUiDispatcher

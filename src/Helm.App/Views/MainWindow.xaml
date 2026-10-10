@@ -44,69 +44,56 @@
                         </ui:IconSourceElement>
                     </ui:AutoSuggestBox.Icon>
                 </ui:AutoSuggestBox>
-                <!-- Sync: its state at a glance on every page; click to sync now (or to set it up) -->
-                <ui:Button x:Name="SyncButton" Margin="8,6,0,6" Padding="8" Appearance="Transparent" VerticalAlignment="Center"
-                           WindowChrome.IsHitTestVisibleInChrome="True" Command="{Binding SyncNowCommand}" ToolTip="{Binding ToolTip}"
-                           AutomationProperties.Name="Sync now" AutomationProperties.HelpText="{Binding ToolTip}">
-                    <!-- One sync glyph in every state: it turns (accent) while syncing, shows a tick for a moment when a sync
-                         finishes, fades when offline, is crossed out (faded) when not set up, and turns red with a dot on a
-                         problem. The tooltip says why; the Android app bar follows the same rules. -->
-                    <Grid>
-                        <ui:SymbolIcon FontSize="18" RenderTransformOrigin="0.5,0.5">
-                            <ui:SymbolIcon.RenderTransform>
-                                <RotateTransform />
-                            </ui:SymbolIcon.RenderTransform>
-                            <ui:SymbolIcon.Style>
-                                <Style TargetType="ui:SymbolIcon">
-                                    <Setter Property="Symbol" Value="ArrowSync24" />
-                                    <Style.Triggers>
-                                        <DataTrigger Binding="{Binding IsMuted}" Value="True">
-                                            <Setter Property="Opacity" Value="0.45" />
-                                        </DataTrigger>
-                                        <DataTrigger Binding="{Binding IsNotSetUp}" Value="True">
-                                            <Setter Property="Symbol" Value="ArrowSyncOff20" />
-                                        </DataTrigger>
-                                        <DataTrigger Binding="{Binding HasProblem}" Value="True">
-                                            <Setter Property="Foreground" Value="{DynamicResource SystemFillColorCriticalBrush}" />
-                                        </DataTrigger>
-                                        <DataTrigger Binding="{Binding JustSynced}" Value="True">
-                                            <Setter Property="Symbol" Value="ArrowSyncCheckmark24" />
-                                            <Setter Property="Foreground" Value="{DynamicResource SystemFillColorSuccessBrush}" />
-                                        </DataTrigger>
-                                        <DataTrigger Binding="{Binding IsSyncing}" Value="True">
-                                            <Setter Property="Foreground" Value="{DynamicResource AccentTextFillColorPrimaryBrush}" />
-                                            <DataTrigger.EnterActions>
-                                                <BeginStoryboard x:Name="Turn">
-                                                    <Storyboard>
-                                                        <DoubleAnimation Storyboard.TargetProperty="RenderTransform.Angle" From="0" To="360"
-                                                                         Duration="0:0:1.1" RepeatBehavior="Forever" />
-                                                    </Storyboard>
-                                                </BeginStoryboard>
-                                            </DataTrigger.EnterActions>
-                                            <DataTrigger.ExitActions>
-                                                <RemoveStoryboard BeginStoryboardName="Turn" />
-                                            </DataTrigger.ExitActions>
-                                        </DataTrigger>
-                                    </Style.Triggers>
-                                </Style>
-                            </ui:SymbolIcon.Style>
-                        </ui:SymbolIcon>
-                        <!-- Problem: a red dot as well, so it does not rely on colour alone -->
-                        <Ellipse Width="6" Height="6" HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0,-1,-2,0"
-                                 Fill="{DynamicResource SystemFillColorCriticalBrush}">
-                            <Ellipse.Style>
-                                <Style TargetType="Ellipse">
-                                    <Setter Property="Visibility" Value="Collapsed" />
-                                    <Style.Triggers>
-                                        <DataTrigger Binding="{Binding HasProblem}" Value="True">
-                                            <Setter Property="Visibility" Value="Visible" />
-                                        </DataTrigger>
-                                    </Style.Triggers>
-                                </Style>
-                            </Ellipse.Style>
-                        </Ellipse>
-                    </Grid>
-                </ui:Button>
+                <!-- Sync: its state at a glance on every page; click to sync now (or to set it up). Just the icon, without a
+                     button look (no hover fill or border); it is still a button for the keyboard and UI Automation. -->
+                <Button x:Name="SyncButton" Margin="10,6,2,6" Padding="4" VerticalAlignment="Center" Cursor="Hand"
+                        WindowChrome.IsHitTestVisibleInChrome="True" Command="{Binding SyncNowCommand}" ToolTip="{Binding ToolTip}"
+                        AutomationProperties.Name="Sync now" AutomationProperties.HelpText="{Binding ToolTip}">
+                    <Button.Template>
+                        <ControlTemplate TargetType="Button">
+                            <Border Background="Transparent" Padding="{TemplateBinding Padding}">
+                                <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+                            </Border>
+                        </ControlTemplate>
+                    </Button.Template>
+                    <!-- The same sync glyph in every state; only its colour changes: accent and turning while syncing, green
+                         for a moment when a sync finishes, red on a problem, faded when offline or not set up. The tooltip
+                         says why; the Android app bar follows the same rules. -->
+                    <ui:SymbolIcon Symbol="ArrowSync24" FontSize="18" RenderTransformOrigin="0.5,0.5">
+                        <ui:SymbolIcon.RenderTransform>
+                            <RotateTransform />
+                        </ui:SymbolIcon.RenderTransform>
+                        <ui:SymbolIcon.Style>
+                            <Style TargetType="ui:SymbolIcon">
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding IsMuted}" Value="True">
+                                        <Setter Property="Opacity" Value="0.45" />
+                                    </DataTrigger>
+                                    <DataTrigger Binding="{Binding HasProblem}" Value="True">
+                                        <Setter Property="Foreground" Value="{DynamicResource SystemFillColorCriticalBrush}" />
+                                    </DataTrigger>
+                                    <DataTrigger Binding="{Binding JustSynced}" Value="True">
+                                        <Setter Property="Foreground" Value="{DynamicResource SystemFillColorSuccessBrush}" />
+                                    </DataTrigger>
+                                    <DataTrigger Binding="{Binding IsSyncing}" Value="True">
+                                        <Setter Property="Foreground" Value="{DynamicResource AccentTextFillColorPrimaryBrush}" />
+                                        <DataTrigger.EnterActions>
+                                            <BeginStoryboard x:Name="Turn">
+                                                <Storyboard>
+                                                    <DoubleAnimation Storyboard.TargetProperty="RenderTransform.Angle" From="0" To="360"
+                                                                     Duration="0:0:1.1" RepeatBehavior="Forever" />
+                                                </Storyboard>
+                                            </BeginStoryboard>
+                                        </DataTrigger.EnterActions>
+                                        <DataTrigger.ExitActions>
+                                            <RemoveStoryboard BeginStoryboardName="Turn" />
+                                        </DataTrigger.ExitActions>
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </ui:SymbolIcon.Style>
+                    </ui:SymbolIcon>
+                </Button>
                 </StackPanel>
             </ui:TitleBar.CenterContent>
         </ui:TitleBar>

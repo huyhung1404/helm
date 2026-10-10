@@ -29,27 +29,27 @@ public static class SyncStatusText
 /// <summary>
 /// The sync button of the shell (Windows title bar, Android app bar), on every page: its look says whether everything
 /// is synced, syncing, offline or has a problem, the tooltip says more, and a click syncs now (or, when sync is not set
-/// up, opens its settings). One sync glyph throughout: it turns while syncing, shows a tick for a moment when a sync
-/// finishes, fades when offline or not set up, and turns red on a problem.
+/// up, opens its settings). The same sync glyph throughout, only its colour changes: it turns while syncing, goes green
+/// for a moment when a sync finishes, fades when offline or not set up, and turns red on a problem.
 /// </summary>
 public sealed partial class SyncIndicatorViewModel : ObservableObject
 {
     private readonly ISyncService _sync;
     private readonly IUiDispatcher _ui;
-    private readonly TimeSpan _tickFor;
-    private int _tickRun;
+    private readonly TimeSpan _doneFor;
+    private int _doneRun;
 
     [ObservableProperty] private SyncState _state;
     [ObservableProperty] private string _toolTip = "";
 
-    /// <summary>A sync just finished: the tick shows for a moment, then the glyph goes back to plain arrows.</summary>
+    /// <summary>A sync just finished: the glyph is green for a moment, then back to its usual colour.</summary>
     [ObservableProperty] private bool _justSynced;
 
-    public SyncIndicatorViewModel(ISyncService sync, IUiDispatcher ui, TimeSpan? tickFor = null)
+    public SyncIndicatorViewModel(ISyncService sync, IUiDispatcher ui, TimeSpan? doneFor = null)
     {
         _sync = sync;
         _ui = ui;
-        _tickFor = tickFor ?? TimeSpan.FromSeconds(1.5);
+        _doneFor = doneFor ?? TimeSpan.FromSeconds(1.5);
         _sync.StatusChanged += (_, _) => _ui.Post(Update);
         Update();
     }
@@ -74,7 +74,7 @@ public sealed partial class SyncIndicatorViewModel : ObservableObject
     partial void OnStateChanged(SyncState oldValue, SyncState newValue)
     {
         if (oldValue == SyncState.Syncing && newValue == SyncState.Idle)
-            ShowTick();
+            ShowDone();
         else
             JustSynced = false;
         OnPropertyChanged(nameof(IsSyncing));
@@ -85,14 +85,14 @@ public sealed partial class SyncIndicatorViewModel : ObservableObject
         OnPropertyChanged(nameof(HasProblem));
     }
 
-    private async void ShowTick()
+    private async void ShowDone()
     {
-        var run = ++_tickRun;
+        var run = ++_doneRun;
         JustSynced = true;
-        await Task.Delay(_tickFor).ConfigureAwait(false);
+        await Task.Delay(_doneFor).ConfigureAwait(false);
         _ui.Post(() =>
         {
-            if (run == _tickRun)
+            if (run == _doneRun)
                 JustSynced = false;
         });
     }
