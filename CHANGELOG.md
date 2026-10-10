@@ -3,6 +3,24 @@
 All notable changes to Helm. The top section is used as the GitHub release body and as the Velopack release notes.
 Format: [Keep a Changelog](https://keepachangelog.com), versions follow [SemVer](https://semver.org).
 
+## [0.36.0] - 2026-10-10
+
+### Added
+- **Novel Reader: names are found by themselves.** The first time a novel is opened, its character names are looked
+  for and the sure ones are added to its names, so "林宛" reads "Lâm Uyển" instead of "Rừng uyển" without saving each
+  name by hand. Two ways to find them (settings → Finding names):
+  - **Logic** (free, offline): from how the words are used in the novel. A name stands next to punctuation, after
+    words like 对/向 and before words like 道/说. Grammar words, pieces of idioms, and words stuck to a name are left
+    out, and so is anything used only a few times.
+  - **AI**: Claude reads each possible name in a couple of its sentences, with your own Anthropic API key. Choose
+    Haiku 4.5 (a few cents a novel), Sonnet 5.5 or Opus 5.5. The cost is shown before it runs. The key stays
+    encrypted on the device, and only the possible names and their sentences are sent, not the novel.
+
+  Found names are marked "found automatically" in the names panel, with *Undo found names*, and sync like the others.
+  A name you saved is never replaced. A found name you delete, or a suggestion you dismiss, is not added again.
+  Doubtful ones (houses like 林府, names without a common surname) are listed under Suggestions. *Scan for names*
+  looks again.
+
 ## [0.35.0] - 2026-10-10
 
 ### Added

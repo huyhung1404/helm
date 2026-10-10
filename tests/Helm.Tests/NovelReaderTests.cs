@@ -188,6 +188,172 @@ public sealed class NovelReaderTests : IDisposable
         Assert.Equal(("林宛", 7, "Lâm Uyển"), (first.Chinese, first.Count, first.Suggested));
     }
 
+    // ---- Finding names ---------------------------------------------------------------------------------------------
+
+    /// <summary>A small novel: names used the way novels use them, and the traps the scan must not fall into.</summary>
+    private static readonly IReadOnlyList<string> NamesNovel =
+    [
+        .. Enumerable.Repeat("林宛道：“走吧。”", 3),
+        .. Enumerable.Repeat("林宛点头。", 3),
+        .. Enumerable.Repeat("他对林宛说：“好。”", 2),
+        .. Enumerable.Repeat("他转身向林宛走去。", 4),
+        .. Enumerable.Repeat("一身雪白的衣裳。", 6),
+        .. Enumerable.Repeat("洛景桓笑了。", 6),
+        .. Enumerable.Repeat("“景桓，你来。”", 4),
+        .. Enumerable.Repeat("他恼羞成怒。", 6),
+        .. Enumerable.Repeat("马车到了林府。", 6),
+    ];
+
+    private static readonly HashSet<string> NamesNovelWords = ["点头", "雪白", "恼羞成怒", "转身", "衣裳", "马车", "走去", "到了"];
+
+    private static string Reading(string chinese) => string.Join(" ", chinese.Select(c => c switch
+    {
+        '林' => "lâm", '宛' => "uyển", '洛' => "lạc", '景' => "cảnh", '桓' => "hoàn", '府' => "phủ", _ => c.ToString(),
+    }));
+
+    [Fact]
+    public void The_logic_scan_keeps_names_and_leaves_out_grammar_idioms_and_words_stuck_to_names()
+    {
+        var result = NameScanner.Scan(NamesNovel, NamesNovelWords.Contains, Reading);
+
+        var sure = result.Sure.Select(f => f.Chinese).ToList();
+        Assert.Contains("林宛", sure);
+        Assert.Contains("洛景桓", sure);
+        // The given name of a sure full name, used on its own.
+        Assert.Contains("景桓", sure);
+        Assert.Equal("Lâm Uyển", result.Sure.Single(f => f.Chinese == "林宛").Vietnamese);
+        Assert.NotEmpty(result.Sure.Single(f => f.Chinese == "林宛").Examples);
+        // "雪白的": a grammar word; "向林宛": a preposition stuck to a name; "恼羞成怒": inside an idiom.
+        Assert.DoesNotContain(result.Sure.Concat(result.Maybe), f => f.Chinese is "白的" or "向林宛" or "成怒");
+        // A house is only suggested.
+        Assert.DoesNotContain("林府", sure);
+        Assert.Contains(result.Maybe, f => f.Chinese == "林府");
+    }
+
+    [Fact]
+    public async Task Found_names_never_replace_the_readers_and_a_deleted_one_is_not_added_again()
+    {
+        var (store, _, _) = NewStore("a");
+        var id = await store.AddBookAsync("Novel", "n.txt", Novel, 3, "PC");
+        store.SaveEntry(id, EntryKind.Name, "林宛", "Lâm Uyển Nhi");
+        store.SaveEntry(null, EntryKind.Phrase, "林府", "Lâm gia");
+
+        var added = store.SaveFoundNames(id, [("林宛", "Lâm Uyển"), ("林府", "Lâm Phủ"), ("洛景桓", "Lạc Cảnh Hoàn"), ("谢珩", "Tạ Hành")]);
+
+        Assert.Equal(2, added);
+        Assert.Equal("Lâm Uyển Nhi", store.GetEntry(id, EntryKind.Name, "林宛")!.Vietnamese);
+        Assert.False(store.GetEntry(id, EntryKind.Name, "林宛")!.Auto);
+        Assert.True(store.GetEntry(id, EntryKind.Name, "洛景桓")!.Auto);
+        Assert.Equal(2, store.FoundNameCount(id));
+
+        // Deleting a found name remembers it.
+        store.RemoveEntry(id, "谢珩");
+        Assert.Contains("谢珩", store.GetBook(id)!.IgnoredNames);
+        Assert.Equal(0, store.SaveFoundNames(id, [("谢珩", "Tạ Hành")]));
+
+        // Editing a found name makes it the reader's: undo leaves it.
+        store.SaveEntry(id, EntryKind.Name, "洛景桓", "Lạc Cảnh Hoàn");
+        store.SaveFoundNames(id, [("萧珩", "Tiêu Hành")]);
+        Assert.Equal(1, store.RemoveFoundNames(id));
+        Assert.NotNull(store.GetEntry(id, EntryKind.Name, "洛景桓"));
+        Assert.Null(store.GetEntry(id, EntryKind.Name, "萧珩"));
+    }
+
+    [Fact]
+    public async Task Claude_is_asked_with_the_candidates_in_their_sentences_and_its_report_is_read()
+    {
+        HttpRequestMessage? sent = null;
+        var http = new FakeHttp(request =>
+        {
+            sent = request;
+            return new HttpResponseMessage(System.Net.HttpStatusCode.OK)
+            {
+                Content = new StringContent("""
+                    {"content":[{"type":"tool_use","name":"report_names","input":{"names":[
+                      {"word":"林宛","kind":"person","vietnamese":"Lâm Uyển"},
+                      {"word":"林府","kind":"group","vietnamese":"Lâm phủ"},
+                      {"word":"侯爷","kind":"title","vietnamese":""},
+                      {"word":"成怒","kind":"not_name","vietnamese":""}]}}],
+                     "usage":{"input_tokens":900,"output_tokens":120}}
+                    """),
+            };
+        });
+        var reviewer = new ClaudeNameReviewer(new HttpClient(http));
+        NameFinding Candidate(string word) => new(word, 5, word, NameConfidence.Maybe, [$"……{word}道：“好。”"]);
+
+        var names = await reviewer.ReviewAsync([Candidate("林宛"), Candidate("林府"), Candidate("侯爷"), Candidate("成怒")], "sk-ant-test",
+            ClaudeNameReviewer.DefaultModel, null, CancellationToken.None);
+
+        Assert.Equal(["林宛", "林府"], names.Select(n => n.Chinese));
+        Assert.Equal(("Lâm Uyển", "person", NameConfidence.Sure), (names[0].Vietnamese, names[0].Kind, names[0].Confidence));
+        Assert.Equal("sk-ant-test", sent!.Headers.GetValues("x-api-key").Single());
+        Assert.Equal("2023-06-01", sent.Headers.GetValues("anthropic-version").Single());
+        var body = System.Text.Json.Nodes.JsonNode.Parse(http.Bodies.Single())!;
+        Assert.Equal("claude-haiku-4-5-20251001", body["model"]!.GetValue<string>());
+        Assert.Equal("report_names", body["tool_choice"]!["name"]!.GetValue<string>());
+        Assert.Contains("林宛道：“好。”", body["messages"]![0]!["content"]!.GetValue<string>());
+    }
+
+    [Fact]
+    public async Task A_refused_key_says_so_and_an_estimate_counts_the_tokens()
+    {
+        var reviewer = new ClaudeNameReviewer(new HttpClient(new FakeHttp(_ => new HttpResponseMessage(System.Net.HttpStatusCode.Unauthorized)
+        {
+            Content = new StringContent("""{"type":"error","error":{"type":"authentication_error","message":"invalid x-api-key"}}"""),
+        })));
+
+        var error = await Assert.ThrowsAsync<NameReviewException>(() => reviewer.CheckKeyAsync("bad", ClaudeNameReviewer.DefaultModel, CancellationToken.None));
+        Assert.Contains("refused", error.Message, StringComparison.Ordinal);
+
+        var candidates = Enumerable.Range(0, 50).Select(i => new NameFinding("林宛", 5, "Lâm Uyển", NameConfidence.Maybe, ["一二三四五六七八九十"])).ToList();
+        var estimate = ClaudeNameReviewer.Estimate(candidates, ClaudeNameReviewer.DefaultModel);
+        Assert.Equal(50, estimate.Candidates);
+        Assert.True(estimate.InputTokens > 2 * 700, "two requests, each with the instructions");
+        Assert.NotNull(estimate.Dollars);
+        Assert.Null(ClaudeNameReviewer.Estimate(candidates, ClaudeNameReviewer.Models[1]).Dollars);
+    }
+
+    [Fact]
+    public async Task Opening_a_novel_the_first_time_adds_its_names_and_undo_takes_them_back()
+    {
+        var page = NewPage("a");
+        var text = "第1章 开始\r\n\r\n" + string.Join("\r\n\r\n", NamesNovel) + "\r\n";
+        var id = await page.Store.AddBookAsync("Novel", "n.txt", text, 1, "PC");
+
+        await page.ViewModel.OpenBookAsync(id);
+        await WaitFor(() => page.Store.GetBook(id)!.NamesScannedAt is not null && !page.ViewModel.IsFindingNames);
+
+        Assert.True(page.Store.GetEntry(id, EntryKind.Name, "林宛")!.Auto);
+        Assert.True(page.ViewModel.HasFoundNames);
+        Assert.Contains(page.ViewModel.Paragraphs, p => p.Text.Contains("Lâm Uyển", StringComparison.Ordinal));
+        Assert.Contains(page.ViewModel.Suggestions, s => s.Chinese == "林府");
+
+        // Not a name: never suggested again.
+        page.ViewModel.DismissSuggestionCommand.Execute(page.ViewModel.Suggestions.First(s => s.Chinese == "林府"));
+        Assert.Contains("林府", page.Store.GetBook(id)!.IgnoredNames);
+
+        await page.ViewModel.UndoFoundNamesCommand.ExecuteAsync(null);
+        Assert.Null(page.Store.GetEntry(id, EntryKind.Name, "林宛"));
+        Assert.False(page.ViewModel.HasFoundNames);
+    }
+
+    [Fact]
+    public async Task The_ai_scan_without_a_key_falls_back_to_the_logic_one()
+    {
+        var page = NewPage("a");
+        page.ViewModel.AutoScanNames = false;
+        page.ViewModel.NameScanModeIndex = (int)NameScanMode.Ai;
+        var text = "第1章 开始\r\n\r\n" + string.Join("\r\n\r\n", NamesNovel) + "\r\n";
+        var id = await page.Store.AddBookAsync("Novel", "n.txt", text, 1, "PC");
+        await page.ViewModel.OpenBookAsync(id);
+        Assert.Null(page.Store.GetBook(id)!.NamesScannedAt);
+
+        await page.ViewModel.ScanNamesAsync(automatic: false);
+
+        Assert.True(page.Store.GetEntry(id, EntryKind.Name, "林宛")!.Auto);
+        Assert.Contains("without AI", page.ViewModel.SuggestionStatus, StringComparison.Ordinal);
+    }
+
     // ---- The synced library ----------------------------------------------------------------------------------------
 
     [Fact]

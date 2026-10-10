@@ -46,6 +46,13 @@ public partial class NovelReaderPage : ModulePageBase
 
     private void Sources_LostFocus(object sender, RoutedEventArgs e) => _viewModel.ApplyDictionarySources(SourcesBox.Text);
 
+    /// <summary>View glue: the key goes from the password box to the view model once, and the box is emptied.</summary>
+    private void SaveClaudeKey_Click(object sender, RoutedEventArgs e)
+    {
+        _viewModel.SetClaudeKey(ClaudeKeyBox.Password);
+        ClaudeKeyBox.Password = "";
+    }
+
     private void ExportNames_Click(object sender, RoutedEventArgs e)
     {
         var dialog = new SaveFileDialog { Title = "Export names for all novels", FileName = "Names.txt", Filter = "Text (*.txt)|*.txt" };

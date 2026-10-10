@@ -40,6 +40,12 @@ public sealed record NovelBook
     public DateTimeOffset AddedAt { get; init; }
 
     public string AddedFrom { get; init; } = "";
+
+    /// <summary>When names were last looked for in this novel (null: never, so opening it looks for them).</summary>
+    public DateTimeOffset? NamesScannedAt { get; init; }
+
+    /// <summary>Names the scan found that the user deleted: a later scan does not add them again.</summary>
+    public IReadOnlyList<string> IgnoredNames { get; init; } = [];
 }
 
 public enum EntryKind
@@ -66,6 +72,9 @@ public sealed record NovelEntry
     public string Vietnamese { get; init; } = "";
 
     public DateTimeOffset UpdatedAt { get; init; }
+
+    /// <summary>Added by the name scan, not typed by the user; editing it makes it the user's.</summary>
+    public bool Auto { get; init; }
 }
 
 /// <summary>Where reading stopped in one novel, to the sentence; the device that read last wins.</summary>

@@ -109,6 +109,42 @@
             </StackPanel>
         </Border>
 
+        <!-- Finding names -->
+        <TextBlock Text="Finding names" Classes="section" />
+        <Border Classes="card">
+            <StackPanel Spacing="8">
+                <DockPanel>
+                    <ToggleSwitch DockPanel.Dock="Right" IsChecked="{Binding AutoScanNames}" OnContent="" OffContent="" AutomationProperties.Name="Find names when a novel is opened" />
+                    <StackPanel VerticalAlignment="Center" Spacing="2">
+                        <TextBlock Text="Find names when a novel is opened" />
+                        <TextBlock Text="The first time, its character names are looked for and the sure ones added, marked as found. Undo them in Names; a name you delete is not added again." Classes="secondary" />
+                    </StackPanel>
+                </DockPanel>
+                <Border Classes="row">
+                    <StackPanel Spacing="6">
+                        <TextBlock Text="How names are found" />
+                        <ComboBox HorizontalAlignment="Stretch" ItemsSource="{Binding NameScanModeNames}" SelectedIndex="{Binding NameScanModeIndex}" AutomationProperties.Name="How names are found" />
+                        <TextBlock Text="Logic: from how words are used, free and offline. AI: Claude reads each possible name in a couple of its sentences, with your Anthropic API key (a few cents a novel with Haiku)." Classes="secondary" />
+                    </StackPanel>
+                </Border>
+                <Border Classes="row" IsVisible="{Binding IsAiScan}">
+                    <StackPanel Spacing="6">
+                        <TextBlock Text="Claude model" />
+                        <ComboBox HorizontalAlignment="Stretch" ItemsSource="{Binding ClaudeModelNames}" SelectedIndex="{Binding ClaudeModelIndex}" AutomationProperties.Name="Claude model" />
+                        <TextBlock Text="Anthropic API key" Margin="0,6,0,0" />
+                        <TextBox x:Name="ClaudeKeyBox" PasswordChar="•" PlaceholderText="sk-ant-…" AutomationProperties.Name="Anthropic API key" />
+                        <WrapPanel>
+                            <Button Classes="accent" Margin="0,0,8,8" Content="Save" Click="SaveClaudeKey_Click" />
+                            <Button Margin="0,0,8,8" Content="Check" Command="{Binding CheckClaudeKeyCommand}" IsEnabled="{Binding HasClaudeKey}" />
+                            <Button Margin="0,0,8,8" Content="Remove" Command="{Binding RemoveClaudeKeyCommand}" IsVisible="{Binding HasClaudeKey}" />
+                        </WrapPanel>
+                        <TextBlock Text="{Binding ClaudeKeyStatus}" Classes="secondary" IsVisible="{Binding ClaudeKeyStatus, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+                        <TextBlock Text="Kept encrypted on this phone only (not synced). The possible names and the sentences around them are sent to Anthropic; the novel itself is not." Classes="secondary" />
+                    </StackPanel>
+                </Border>
+            </StackPanel>
+        </Border>
+
         <!-- In the background -->
         <TextBlock Text="With the screen off" Classes="section" />
         <Border Classes="card">

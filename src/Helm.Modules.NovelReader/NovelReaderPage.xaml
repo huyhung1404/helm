@@ -115,6 +115,46 @@
             </StackPanel>
         </ui:CardControl>
 
+        <!-- Finding names -->
+        <TextBlock Text="Finding names" Style="{DynamicResource HelmSectionHeader}" />
+        <ui:CardControl Margin="0,0,0,4" Icon="{ui:SymbolIcon PeopleSearch24}">
+            <ui:CardControl.Header>
+                <core:CardHeader Title="Find names when a novel is opened" Description="The first time a novel is opened, its character names are looked for and the sure ones are added to its names, marked as found. Undo them in the names panel; a name you delete is not added again." />
+            </ui:CardControl.Header>
+            <ui:ToggleSwitch AutomationProperties.Name="Find names when a novel is opened" IsChecked="{Binding AutoScanNames}" />
+        </ui:CardControl>
+        <ui:CardExpander Margin="0,0,0,4" Icon="{ui:SymbolIcon Sparkle24}">
+            <ui:CardExpander.Header>
+                <core:RowLayout>
+                    <core:CardHeader Title="How names are found" Description="Logic: from how words are used in the novel, free and offline. AI: Claude reads each possible name in a couple of its sentences, with your Anthropic API key (a few cents a novel with Haiku)." />
+                    <ComboBox Width="200" ItemsSource="{Binding NameScanModeNames}" SelectedIndex="{Binding NameScanModeIndex}" AutomationProperties.Name="How names are found" />
+                </core:RowLayout>
+            </ui:CardExpander.Header>
+            <StackPanel>
+                <Border Style="{DynamicResource HelmExpanderRow}" BorderThickness="0">
+                    <core:RowLayout>
+                        <core:CardHeader Title="Claude model" Description="Haiku is fast and cheap; Sonnet and Opus are more careful and cost more." />
+                        <ComboBox Width="260" ItemsSource="{Binding ClaudeModelNames}" SelectedIndex="{Binding ClaudeModelIndex}" AutomationProperties.Name="Claude model" />
+                    </core:RowLayout>
+                </Border>
+                <Border Style="{DynamicResource HelmExpanderRow}">
+                    <StackPanel>
+                        <core:CardHeader Title="Anthropic API key" Description="From console.anthropic.com. Kept encrypted on this PC only (not synced). The possible names and the sentences around them are sent to Anthropic; the novel itself is not." />
+                        <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
+                            <ui:PasswordBox x:Name="ClaudeKeyBox" Width="320" PlaceholderText="sk-ant-…" AutomationProperties.Name="Anthropic API key" />
+                            <ui:Button Margin="8,0,0,0" Content="Save" Appearance="Primary" Click="SaveClaudeKey_Click" />
+                            <ui:Button Margin="8,0,0,0" Content="Check" Command="{Binding CheckClaudeKeyCommand}"
+                                       IsEnabled="{Binding HasClaudeKey}" />
+                            <ui:Button Margin="8,0,0,0" Content="Remove" Command="{Binding RemoveClaudeKeyCommand}"
+                                       Visibility="{Binding HasClaudeKey, Converter={StaticResource BoolToVisibility}}" />
+                        </StackPanel>
+                        <TextBlock Margin="0,6,0,0" Text="{Binding ClaudeKeyStatus}" Style="{DynamicResource HelmSecondaryText}" TextWrapping="Wrap"
+                                   Visibility="{Binding ClaudeKeyStatus, Converter={StaticResource NotEmptyToVisibility}}" />
+                    </StackPanel>
+                </Border>
+            </StackPanel>
+        </ui:CardExpander>
+
         <!-- Read aloud -->
         <TextBlock Text="Read aloud" Style="{DynamicResource HelmSectionHeader}" />
         <ui:InfoBar Margin="0,0,0,4" Severity="Informational" IsClosable="False" IsOpen="{Binding HasNoOfflineVietnameseVoice}"

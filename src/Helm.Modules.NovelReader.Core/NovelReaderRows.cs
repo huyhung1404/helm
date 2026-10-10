@@ -136,7 +136,10 @@ public sealed partial class EntryRowViewModel(NovelEntry entry) : ObservableObje
     partial void OnIsEditingChanged(bool value) => OnPropertyChanged(nameof(IsNotEditing));
     public bool ForAllNovels => Entry.BookId is null;
 
-    public string KindLabel => (Entry.Kind == EntryKind.Name ? "Name" : "Meaning") + (ForAllNovels ? " · all novels" : "");
+    /// <summary>Added by the name scan (not typed): deleting it keeps the scan from adding it again.</summary>
+    public bool IsFound => Entry.Auto;
+
+    public string KindLabel => (Entry.Kind == EntryKind.Name ? "Name" : "Meaning") + (ForAllNovels ? " · all novels" : "") + (Entry.Auto ? " · found automatically" : "");
 }
 
 /// <summary>A suggested name: the Chinese, how often it appears and an editable reading.</summary>

@@ -443,6 +443,12 @@
                                             <ui:Button Content="Export…" Click="ExportBookNames_Click" />
                                             <ui:Button Margin="8,0,0,0" Content="Import…" Click="ImportBookNames_Click" />
                                         </StackPanel>
+                                        <!-- Names the scan added: undo them all at once -->
+                                        <ui:Button Margin="0,0,0,8" Icon="{ui:SymbolIcon ArrowUndo24}" Command="{Binding UndoFoundNamesCommand}"
+                                                   Visibility="{Binding HasFoundNames, Converter={StaticResource BoolToVisibility}}"
+                                                   ToolTip="Remove every name the scan added to this novel (the ones you edited stay)">
+                                            <TextBlock Text="{Binding FoundNameCount, StringFormat=Undo found names ({0})}" />
+                                        </ui:Button>
                                     </StackPanel>
                                     <ScrollViewer VerticalScrollBarVisibility="Auto">
                                         <ItemsControl ItemsSource="{Binding Entries}">
@@ -479,8 +485,9 @@
                             <TabItem Header="Suggestions">
                                 <DockPanel Margin="0,8,0,0">
                                     <StackPanel DockPanel.Dock="Top">
-                                        <ui:Button Content="Find names in this novel" Icon="{ui:SymbolIcon PeopleSearch24}" Command="{Binding FindNamesCommand}"
-                                                   IsEnabled="{Binding IsFindingNames, Converter={StaticResource InverseBool}}" Margin="0,0,0,6" />
+                                        <ui:Button Content="Scan for names" Icon="{ui:SymbolIcon PeopleSearch24}" Command="{Binding FindNamesCommand}"
+                                                   IsEnabled="{Binding IsFindingNames, Converter={StaticResource InverseBool}}" Margin="0,0,0,6"
+                                                   ToolTip="Look through the whole novel: sure names are added, doubtful ones are listed here (how: Novel Reader settings)" />
                                         <TextBlock Text="{Binding SuggestionStatus}" Style="{DynamicResource HelmSecondaryText}" TextWrapping="Wrap" Margin="0,0,0,8" />
                                     </StackPanel>
                                     <ScrollViewer VerticalScrollBarVisibility="Auto">

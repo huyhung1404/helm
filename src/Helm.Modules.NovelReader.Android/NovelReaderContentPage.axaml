@@ -478,6 +478,14 @@
                             <Panel>
                                 <DockPanel x:Name="SavedPanel">
                                     <TextBox DockPanel.Dock="Top" Text="{Binding EntryFilter}" PlaceholderText="Search names" Margin="0,0,0,8" AutomationProperties.Name="Search names" />
+                                    <!-- Names the scan added: undo them all at once -->
+                                    <Button DockPanel.Dock="Top" Margin="0,0,0,8" Command="{Binding UndoFoundNamesCommand}" IsVisible="{Binding HasFoundNames}"
+                                            AutomationProperties.Name="Undo found names">
+                                        <StackPanel Orientation="Horizontal" Spacing="6">
+                                            <ic:SymbolIcon Symbol="ArrowUndo" FontSize="16" />
+                                            <TextBlock Text="{Binding FoundNameCount, StringFormat='Undo found names ({0})'}" />
+                                        </StackPanel>
+                                    </Button>
                                     <ScrollViewer>
                                         <ItemsControl ItemsSource="{Binding Entries}">
                                             <ItemsControl.ItemTemplate>
@@ -516,7 +524,7 @@
                                         <Button Command="{Binding FindNamesCommand}" IsEnabled="{Binding !IsFindingNames}">
                                             <StackPanel Orientation="Horizontal" Spacing="6">
                                                 <ic:SymbolIcon Symbol="PeopleSearch" FontSize="16" />
-                                                <TextBlock Text="Find names in this novel" />
+                                                <TextBlock Text="Scan for names" />
                                             </StackPanel>
                                         </Button>
                                         <TextBlock Text="{Binding SuggestionStatus}" Classes="secondary" />

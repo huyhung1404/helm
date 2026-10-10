@@ -236,13 +236,78 @@ public sealed class NovelStore
         });
     }
 
-    /// <summary>Removes what was saved for <paramref name="chinese"/> (name and meaning).</summary>
+    /// <summary>
+    /// Removes what was saved for <paramref name="chinese"/> (name and meaning). A name the scan added is remembered as
+    /// not a name, so the next scan leaves it out.
+    /// </summary>
     public bool RemoveEntry(string? bookId, string chinese)
     {
         chinese = ChineseText.NormalizeKey(chinese);
+        var wasAuto = GetEntry(bookId, EntryKind.Name, chinese)?.Auto == true;
         var removed = _entries.Delete(EntryIds.For(bookId, EntryKind.Name, chinese));
         removed |= _entries.Delete(EntryIds.For(bookId, EntryKind.Phrase, chinese));
+        if (wasAuto && bookId is not null && _books.Get(bookId) is { } book && !book.IgnoredNames.Contains(chinese, StringComparer.Ordinal))
+            _books.Upsert(bookId, book with { IgnoredNames = [.. book.IgnoredNames, chinese] });
         return removed;
+    }
+
+    // ---- Names found by the scan -----------------------------------------------------------------------------------
+
+    /// <summary>
+    /// Adds the names a scan found to a novel, marked as found: never over anything the user saved (for this novel or
+    /// all novels, name or meaning), nor a name the user deleted after an earlier scan. Returns how many were added.
+    /// </summary>
+    public int SaveFoundNames(string bookId, IEnumerable<(string Chinese, string Vietnamese)> names)
+    {
+        if (_books.Get(bookId) is not { } book) return 0;
+        var ignored = new HashSet<string>(book.IgnoredNames, StringComparer.Ordinal);
+        var added = 0;
+        foreach (var (raw, vietnamese) in names)
+        {
+            var chinese = ChineseText.NormalizeKey(raw);
+            if (chinese.Length == 0 || vietnamese.Trim().Length == 0 || ignored.Contains(chinese)) continue;
+            if (GetEntry(bookId, EntryKind.Name, chinese) is not null || GetEntry(bookId, EntryKind.Phrase, chinese) is not null
+                || GetEntry(null, EntryKind.Name, chinese) is not null || GetEntry(null, EntryKind.Phrase, chinese) is not null) continue;
+            _entries.Upsert(EntryIds.For(bookId, EntryKind.Name, chinese), new NovelEntry
+            {
+                BookId = bookId,
+                Kind = EntryKind.Name,
+                Chinese = chinese,
+                Vietnamese = vietnamese.Trim(),
+                UpdatedAt = Now,
+                Auto = true,
+            });
+            added++;
+        }
+        return added;
+    }
+
+    /// <summary>Removes every name the scan added to a novel (the ones the user edited are theirs and stay).</summary>
+    public int RemoveFoundNames(string bookId)
+    {
+        var ids = new List<string>();
+        lock (_gate)
+            ids.AddRange(Index().Where(e => e.Value.BookId == bookId && e.Value.Auto).Select(e => e.Key));
+        foreach (var id in ids) _entries.Delete(id);
+        return ids.Count;
+    }
+
+    public int FoundNameCount(string bookId)
+    {
+        lock (_gate) return Index().Values.Count(e => e.BookId == bookId && e.Auto);
+    }
+
+    /// <summary>The reader said a suggested word is not a name: later scans leave it out.</summary>
+    public void IgnoreName(string bookId, string chinese)
+    {
+        chinese = ChineseText.NormalizeKey(chinese);
+        if (_books.Get(bookId) is { } book && chinese.Length > 0 && !book.IgnoredNames.Contains(chinese, StringComparer.Ordinal))
+            _books.Upsert(bookId, book with { IgnoredNames = [.. book.IgnoredNames, chinese] });
+    }
+
+    public void MarkNamesScanned(string bookId)
+    {
+        if (_books.Get(bookId) is { } book) _books.Upsert(bookId, book with { NamesScannedAt = Now });
     }
 
     /// <summary>Adds the lines of a Names.txt-style file; existing entries are replaced. Returns how many were added.</summary>

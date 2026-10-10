@@ -64,6 +64,20 @@ public sealed class NovelReaderSettings : IVersionedSettings
     /// <summary>At the end of a chapter, reading aloud goes on with the next one.</summary>
     public bool ContinueToNextChapter { get; set; } = true;
 
+    // ---- Finding names ---------------------------------------------------------------------------------------------
+
+    /// <summary>Opening a novel for the first time looks for its character names and adds the sure ones.</summary>
+    public bool AutoScanNames { get; set; } = true;
+
+    /// <summary>How names are found: from how words are used (free, offline), or by asking Claude.</summary>
+    public NameScanMode NameScanMode { get; set; } = NameScanMode.Logic;
+
+    /// <summary>The Claude model for the AI scan (null: the cheapest).</summary>
+    public string? ClaudeModel { get; set; }
+
+    /// <summary>The Anthropic API key, protected for this user on this device (never synced).</summary>
+    public string? ClaudeKey { get; set; }
+
     // ---- Dictionaries ----------------------------------------------------------------------------------------------
 
     /// <summary>File name → address for "Download dictionaries"; editable in case a source moves.</summary>
@@ -82,4 +96,13 @@ public sealed class NovelReaderSettings : IVersionedSettings
 
     /// <summary>The novel open on this device; null opens the one read most recently on any device.</summary>
     public string? OpenBookId { get; set; }
+}
+
+/// <summary>How the name scan decides what is a name.</summary>
+public enum NameScanMode
+{
+    /// <summary>From how words are used in the novel: free and offline.</summary>
+    Logic,
+    /// <summary>Claude reads each candidate in its sentences (the user's Anthropic API key).</summary>
+    Ai,
 }
