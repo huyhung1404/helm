@@ -22,7 +22,7 @@ public static class SshConnection
             if (IsPrivateKey(vaultSecret))
             {
                 using var stream = new MemoryStream(System.Text.Encoding.UTF8.GetBytes(vaultSecret.Trim() + "\n"));
-                methods = [new PrivateKeyAuthenticationMethod(host.User, new PrivateKeyFile(stream, string.IsNullOrEmpty(password) ? null : password))];
+                methods = [new PrivateKeyAuthenticationMethod(host.User, OpenKey(() => new PrivateKeyFile(stream, string.IsNullOrEmpty(password) ? null : password), password))];
             }
             else methods = PasswordMethods(host.User, vaultSecret);
         }
@@ -31,12 +31,32 @@ public static class SshConnection
             if (string.IsNullOrEmpty(host.KeyFile) || !File.Exists(host.KeyFile))
                 throw new FileNotFoundException($"The key file {host.KeyFile} was not found.", host.KeyFile);
             // Read now and kept only in memory for this connection; an empty passphrase means "none".
-            methods = [new PrivateKeyAuthenticationMethod(host.User, new PrivateKeyFile(host.KeyFile, string.IsNullOrEmpty(password) ? null : password))];
+            methods = [new PrivateKeyAuthenticationMethod(host.User, OpenKey(() => new PrivateKeyFile(host.KeyFile, string.IsNullOrEmpty(password) ? null : password), password))];
         }
         else methods = [new PrivateKeyAuthenticationMethod(host.User, deviceKey.CreateKeySource())];
         var info = new ConnectionInfo(host.Address, host.Port, host.User, methods);
         Harden(info);
         return info;
+    }
+
+    /// <summary>
+    /// Reads a private key. With a passphrase, a key that does not open is a wrong passphrase, however it fails: an
+    /// encrypted PKCS#8 key is decrypted with AES-CBC, and wrong bytes usually fail the padding check (a CryptoException),
+    /// but about one time in 256 they happen to pad correctly and the failure comes later, when the garbage is read as
+    /// ASN.1 (an ArgumentException or IOException such as "failed to construct sequence from byte[]").
+    /// </summary>
+    private static PrivateKeyFile OpenKey(Func<PrivateKeyFile> open, string? passphrase)
+    {
+        try
+        {
+            return open();
+        }
+        catch (Exception ex) when (!string.IsNullOrEmpty(passphrase)
+                                   && ex is ArgumentException or InvalidOperationException or FormatException
+                                       or (IOException and not FileNotFoundException and not DirectoryNotFoundException))
+        {
+            throw new Renci.SshNet.Common.SshException("The key could not be opened with this passphrase.", ex);
+        }
     }
 
     /// <summary>True for a private key's text (PEM or OpenSSH): Vault may hold a key instead of a password.</summary>

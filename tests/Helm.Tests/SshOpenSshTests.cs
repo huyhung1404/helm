@@ -246,6 +246,26 @@ public sealed class SshOpenSshTests : IDisposable
     }
 
     [Fact]
+    public void Every_wrong_passphrase_is_a_wrong_passphrase_even_when_the_wrong_bytes_pad_correctly()
+    {
+        // About one wrong passphrase in 256 decrypts to bytes with valid padding; the failure then comes later, while
+        // reading the garbage. Thousands of tries meet that case (one PBKDF2 round keeps it quick).
+        var keyFile = Path.Combine(_dir.Path, "id_pkcs8");
+        using (var rsa = RSA.Create(2048))
+            File.WriteAllText(keyFile, rsa.ExportEncryptedPkcs8PrivateKeyPem("correct horse", new PbeParameters(PbeEncryptionAlgorithm.Aes256Cbc, HashAlgorithmName.SHA256, 1)));
+        var device = new SshDeviceKey(Path.Combine(_dir.Path, "k.bin"), new PlainSecretProtector(), "pc");
+        var host = new SshHost { User = "root", Address = "example.org", Auth = SshAuthKind.KeyFile, KeyFile = keyFile };
+
+        for (var i = 0; i < 3000; i++)
+        {
+            var error = Record.Exception(() => SshConnection.Create(host, device, $"wrong {i}"));
+            Assert.True(error is Renci.SshNet.Common.SshException or Org.BouncyCastle.Crypto.CryptoException,
+                $"Passphrase {i}: {error?.GetType().Name}: {error?.Message}");
+        }
+        Assert.Equal(["publickey"], SshConnection.Create(host, device, "correct horse").AuthenticationMethods.Select(m => m.Name));
+    }
+
+    [Fact]
     public void A_Vault_value_is_used_as_a_password_or_as_a_private_key()
     {
         var key = new SshDeviceKey(Path.Combine(_dir.Path, "k.bin"), new PlainSecretProtector(), "pc");
