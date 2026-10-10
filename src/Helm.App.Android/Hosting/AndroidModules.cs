@@ -1,6 +1,7 @@
 using Helm.Core.Modules;
 using Helm.Modules.Missions;
 using Helm.Modules.Notes;
+using Helm.Modules.NovelReader;
 using Helm.Modules.QuickCapture;
 using Helm.Modules.Ssh;
 using Helm.Modules.Scratch;
@@ -31,5 +32,6 @@ internal static class AndroidModules
         services.AddScratchModule();
         services.AddQuickCaptureModule();
         services.AddSshModule();
+        services.AddNovelReaderModule();
     }
 }

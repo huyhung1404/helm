@@ -71,6 +71,18 @@ the phone's default one, made visible by a `<queries>` entry in the app manifest
 name; never a guess from a package name, which any app can choose. A notification with a one-time code (OTP) is never
 kept, not even as one Helm could not read.
 
+Novel Reader reads aloud in the background with a foreground service of type `mediaPlayback`
+(`src/Helm.Modules.NovelReader.Android/Playback`). Reading itself is `ReadAloudController` in the shared core; on the
+phone its `IAudioOutput` is `AndroidAudioOutput` (one `MediaPlayer` fed from memory, audio focus), which starts the
+service at the first sentence and stops it when reading stops. The service only keeps the process alive and passes
+buttons on: a `MediaStyle` notification bound to a `MediaSession` (lock screen, headsets, Bluetooth, watches; on
+Android 13+ the controls come from the session's `PlaybackState`, so *Stop* is a custom action there), a partial wake
+lock renewed with every sentence (released while paused), and a pause on `ACTION_AUDIO_BECOMING_NOISY`. Media
+notifications need no notification permission. Going on to the next chapter happens in the view model with the
+screen off, on the main looper (the Avalonia dispatcher keeps running without the activity); the whole next chapter
+downloads ahead so a weak connection later does not stop it. The phone's voices are Android text-to-speech
+(`AndroidTtsEngine`, `synthesizeToFile` → WAV), started only when Novel Reader is opened.
+
 Parts that run without Helm's activity (a widget, a broadcast, Quick Capture's share dialog and Quick Settings tile)
 get services from `HelmAndroidServices.Current`, and read whether a tool is on from `GeneralSettings.EnabledModules`
 (missing means on): the module registry only starts with the activity. Quick Capture

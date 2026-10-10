@@ -17,6 +17,7 @@ public class NavGroupTests
         ["wallet"] = ModuleGroup.MoneyAndMedia,
         ["watch-later"] = ModuleGroup.MoneyAndMedia,
         ["scratch"] = ModuleGroup.MoneyAndMedia,
+        ["novel-reader"] = ModuleGroup.MoneyAndMedia,
         ["vault"] = ModuleGroup.SecurityAndServers,
         ["ssh"] = ModuleGroup.SecurityAndServers,
         ["always-on-top"] = ModuleGroup.WindowsAndDesktop,

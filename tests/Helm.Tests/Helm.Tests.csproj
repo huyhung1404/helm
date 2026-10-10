@@ -39,6 +39,7 @@
     <ProjectReference Include="..\..\src\Helm.Modules.Wallet\Helm.Modules.Wallet.csproj" />
     <ProjectReference Include="..\..\src\Helm.Modules.Ssh\Helm.Modules.Ssh.csproj" />
     <ProjectReference Include="..\..\src\Helm.Modules.Scratch\Helm.Modules.Scratch.csproj" />
+    <ProjectReference Include="..\..\src\Helm.Modules.NovelReader\Helm.Modules.NovelReader.csproj" />
   </ItemGroup>
 
 </Project>

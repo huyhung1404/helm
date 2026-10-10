@@ -1,0 +1,260 @@
+<core:ModulePageBase
+    x:Class="Helm.Modules.NovelReader.NovelReaderPage"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
+    xmlns:core="clr-namespace:Helm.Core.Ui;assembly=Helm.Core.Windows"
+    xmlns:local="clr-namespace:Helm.Modules.NovelReader"
+    ExtraMessage="{Binding Message}">
+
+    <!-- Novel Reader's settings (Home → Utilities). The library and the reader are on NovelReaderContentPage. -->
+    <StackPanel>
+        <ui:CardControl Margin="0,0,0,4">
+            <ui:CardControl.Icon>
+                <ui:ImageIcon Width="24" Height="24" Source="{x:Static local:NovelReaderLogo.Image}" />
+            </ui:CardControl.Icon>
+            <ui:CardControl.Header>
+                <core:CardHeader Title="Open Novel Reader" Description="Your novels, converted to Vietnamese. Also in the menu and on Home." />
+            </ui:CardControl.Header>
+            <ui:Button Appearance="Primary" Content="Open Novel Reader" Click="Open_Click" />
+        </ui:CardControl>
+
+        <!-- Dictionaries -->
+        <TextBlock Text="Dictionaries" Style="{DynamicResource HelmSectionHeader}" />
+        <ui:CardExpander Margin="0,0,0,4" Icon="{ui:SymbolIcon Translate24}" IsExpanded="True">
+            <ui:CardExpander.Header>
+                <core:RowLayout>
+                    <core:CardHeader Title="Dictionaries on this device" Description="{Binding DictionaryStatus}" />
+                    <StackPanel Orientation="Horizontal">
+                        <ui:Button Content="Download" Icon="{ui:SymbolIcon ArrowDownload24}" Command="{Binding DownloadDictionariesCommand}"
+                                   IsEnabled="{Binding IsDownloading, Converter={StaticResource InverseBool}}" />
+                        <ui:Button Margin="8,0,0,0" Content="Import files…" Click="ImportDictionaries_Click" />
+                    </StackPanel>
+                </core:RowLayout>
+            </ui:CardExpander.Header>
+            <StackPanel>
+                <Border Style="{DynamicResource HelmExpanderRow}" BorderThickness="0"
+                        Visibility="{Binding DownloadStatus, Converter={StaticResource NotEmptyToVisibility}}">
+                    <core:RowLayout>
+                        <TextBlock Text="{Binding DownloadStatus}" TextWrapping="Wrap" VerticalAlignment="Center" />
+                        <ui:Button Content="Cancel" Command="{Binding CancelDownloadCommand}"
+                                   Visibility="{Binding IsDownloading, Converter={StaticResource BoolToVisibility}}" />
+                    </core:RowLayout>
+                </Border>
+                <ItemsControl ItemsSource="{Binding DictionaryFiles}">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate>
+                            <Border Style="{DynamicResource HelmExpanderRow}">
+                                <core:RowLayout>
+                                    <core:CardHeader Title="{Binding Name}" Description="{Binding Kind}" />
+                                    <TextBlock Text="{Binding Size, Converter={x:Static local:SizeText.Instance}}" Style="{DynamicResource HelmSecondaryText}" VerticalAlignment="Center" />
+                                </core:RowLayout>
+                            </Border>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+                <Border Style="{DynamicResource HelmExpanderRow}">
+                    <core:RowLayout>
+                        <core:CardHeader Title="Dictionary folder" Description="QuickTranslator files: ChinesePhienAmWords, VietPhrase, Names, LuatNhan, Pronouns. They sync with Helm Sync, so your other devices and a reinstall get them too." />
+                        <ui:Button Content="Open" Icon="{ui:SymbolIcon FolderOpen24}" Command="{Binding OpenDictionaryFolderCommand}" />
+                    </core:RowLayout>
+                </Border>
+            </StackPanel>
+        </ui:CardExpander>
+
+        <ui:CardExpander Margin="0,0,0,4" Icon="{ui:SymbolIcon ArrowDownload24}">
+            <ui:CardExpander.Header>
+                <core:CardHeader Title="Download sources" Description="Where Download gets each file, one “file = address” per line. Change them if a source moves." />
+            </ui:CardExpander.Header>
+            <StackPanel>
+                <Border Style="{DynamicResource HelmExpanderRow}" BorderThickness="0">
+                    <ui:TextBox x:Name="SourcesBox" Text="{Binding DictionarySourcesText, Mode=OneWay}" AcceptsReturn="True" TextWrapping="NoWrap"
+                                FontFamily="Consolas" MinHeight="120" LostFocus="Sources_LostFocus" AutomationProperties.Name="Download sources" />
+                </Border>
+                <Border Style="{DynamicResource HelmExpanderRow}">
+                    <core:RowLayout>
+                        <core:CardHeader Title="Back to the default sources" Description="The QuickTranslator set from GitHub." />
+                        <ui:Button Content="Use default" Command="{Binding ResetDictionarySourcesCommand}" />
+                    </core:RowLayout>
+                </Border>
+            </StackPanel>
+        </ui:CardExpander>
+
+        <!-- Reading -->
+        <TextBlock Text="Reading" Style="{DynamicResource HelmSectionHeader}" />
+        <ui:CardControl Margin="0,0,0,4" Icon="{ui:SymbolIcon Person24}">
+            <ui:CardControl.Header>
+                <core:CardHeader Title="Prioritize names" Description="A phrase is not used when a name starts inside it, as in QuickTranslator." />
+            </ui:CardControl.Header>
+            <ui:ToggleSwitch AutomationProperties.Name="Prioritize names" IsChecked="{Binding PrioritizeNames}" />
+        </ui:CardControl>
+        <ui:CardControl Margin="0,0,0,4" Icon="{ui:SymbolIcon LocalLanguage24}">
+            <ui:CardControl.Header>
+                <core:CardHeader Title="Show the Chinese text" Description="Each paragraph also shows the original under the translation." />
+            </ui:CardControl.Header>
+            <ui:ToggleSwitch AutomationProperties.Name="Show the Chinese text" IsChecked="{Binding ShowChinese}" />
+        </ui:CardControl>
+        <ui:CardControl Margin="0,0,0,4" Icon="{ui:SymbolIcon TextFont24}">
+            <ui:CardControl.Header>
+                <core:CardHeader Title="Text size" Description="The size of the novel's text." />
+            </ui:CardControl.Header>
+            <StackPanel Orientation="Horizontal">
+                <Slider Width="160" Minimum="12" Maximum="40" TickFrequency="1" IsSnapToTickEnabled="True" Value="{Binding FontSize}"
+                        VerticalAlignment="Center" AutomationProperties.Name="Text size" />
+                <TextBlock Width="32" Margin="8,0,0,0" VerticalAlignment="Center" Text="{Binding FontSize, StringFormat={}{0:0}}" />
+            </StackPanel>
+        </ui:CardControl>
+        <ui:CardControl Margin="0,0,0,4" Icon="{ui:SymbolIcon TextBulletListLtr24}">
+            <ui:CardControl.Header>
+                <core:CardHeader Title="Line spacing" Description="Space between lines, as a multiple of the text size." />
+            </ui:CardControl.Header>
+            <StackPanel Orientation="Horizontal">
+                <Slider Width="160" Minimum="1" Maximum="3" TickFrequency="0.1" IsSnapToTickEnabled="True" Value="{Binding LineSpacing}"
+                        VerticalAlignment="Center" AutomationProperties.Name="Line spacing" />
+                <TextBlock Width="32" Margin="8,0,0,0" VerticalAlignment="Center" Text="{Binding LineSpacing, StringFormat={}{0:0.0}}" />
+            </StackPanel>
+        </ui:CardControl>
+
+        <!-- Read aloud -->
+        <TextBlock Text="Read aloud" Style="{DynamicResource HelmSectionHeader}" />
+        <ui:InfoBar Margin="0,0,0,4" Severity="Informational" IsClosable="False" IsOpen="{Binding HasNoOfflineVietnameseVoice}"
+                    Visibility="{Binding HasNoOfflineVietnameseVoice, Converter={StaticResource BoolToVisibility}}"
+                    Title="No offline Vietnamese voice"
+                    Message="The online voice HoaiMy needs the internet. To read offline too, add Vietnamese with Speech in Windows Settings → Time &amp; language → Language &amp; region (the “Microsoft An” voice), then refresh the voices here." />
+        <!-- The voices on this PC: VieNeu-TTS, started and stopped by Helm -->
+        <ui:CardExpander Margin="0,0,0,4" Icon="{ui:SymbolIcon Speaker224}" IsExpanded="True">
+            <ui:CardExpander.Header>
+                <core:RowLayout>
+                    <core:CardHeader Title="Voices on this PC (VieNeu-TTS)" Description="{Binding LocalVoiceStatus, StringFormat=Natural Vietnamese voices that run on your graphics card; nothing leaves the PC. {0}}" />
+                    <StackPanel Orientation="Horizontal">
+                        <ui:Button Content="Start" Icon="{ui:SymbolIcon Play24}" Command="{Binding StartLocalVoiceCommand}"
+                                   IsEnabled="{Binding HasLocalVoice}" />
+                        <ui:Button Margin="8,0,0,0" Content="Stop" Icon="{ui:SymbolIcon Stop24}" Command="{Binding StopLocalVoiceCommand}"
+                                   IsEnabled="{Binding IsLocalVoiceRunning}" />
+                    </StackPanel>
+                </core:RowLayout>
+            </ui:CardExpander.Header>
+            <StackPanel>
+                <Border Style="{DynamicResource HelmExpanderRow}" BorderThickness="0">
+                    <core:RowLayout>
+                        <core:CardHeader Title="VieNeu-TTS folder" Description="{Binding LocalVoiceFolder, TargetNullValue=Not set up}" />
+                        <ui:Button Content="Choose…" Icon="{ui:SymbolIcon FolderOpen24}" Click="ChooseLocalVoiceFolder_Click" />
+                    </core:RowLayout>
+                </Border>
+                <Border Style="{DynamicResource HelmExpanderRow}">
+                    <core:RowLayout>
+                        <core:CardHeader Title="Stop after 10 minutes unused" Description="Frees the graphics card memory when you are not listening; it starts again when you press play." />
+                        <ui:ToggleSwitch AutomationProperties.Name="Stop after 10 minutes unused" IsChecked="{Binding StopLocalVoiceWhenIdle}" />
+                    </core:RowLayout>
+                </Border>
+                <Border Style="{DynamicResource HelmExpanderRow}">
+                    <core:RowLayout>
+                        <core:CardHeader Title="Port" Description="Where the local server listens, on this PC only (127.0.0.1)." />
+                        <ui:NumberBox Width="140" Minimum="1024" Maximum="65535" Value="{Binding LocalVoicePort}" SpinButtonPlacementMode="Hidden"
+                                      AutomationProperties.Name="Port" />
+                    </core:RowLayout>
+                </Border>
+            </StackPanel>
+        </ui:CardExpander>
+
+        <ui:CardExpander Margin="0,0,0,4" Icon="{ui:SymbolIcon Speaker224}" IsExpanded="True">
+            <ui:CardExpander.Header>
+                <core:RowLayout>
+                    <core:CardHeader Title="Voice" Description="HoaiMy (online) is a natural Vietnamese voice; it sends each sentence to Microsoft&apos;s speech service. Windows voices read offline and send nothing." />
+                    <ComboBox Width="240" ItemsSource="{Binding Voices}" SelectedItem="{Binding SelectedVoice}" DisplayMemberPath="Label"
+                              AutomationProperties.Name="Voice" />
+                </core:RowLayout>
+            </ui:CardExpander.Header>
+            <StackPanel>
+                <Border Style="{DynamicResource HelmExpanderRow}" BorderThickness="0">
+                    <core:RowLayout>
+                        <core:CardHeader Title="HoaiMy through a hidden Edge" Description="Microsoft Edge reads HoaiMy in the background, without a window: it starts in about half a second, as on the web. Online only; it cannot be downloaded." />
+                        <ui:ToggleSwitch AutomationProperties.Name="HoaiMy through a hidden Edge" IsChecked="{Binding UseEdgeVoice}" />
+                    </core:RowLayout>
+                </Border>
+                <Border Style="{DynamicResource HelmExpanderRow}">
+                    <core:RowLayout>
+                        <core:CardHeader Title="Read offline when the online voice fails" Description="Without internet, a Vietnamese Windows voice goes on reading if one is installed." />
+                        <ui:ToggleSwitch AutomationProperties.Name="Read offline when the online voice fails" IsChecked="{Binding FallbackToOfflineVoice}" />
+                    </core:RowLayout>
+                </Border>
+                <Border Style="{DynamicResource HelmExpanderRow}">
+                    <core:RowLayout>
+                        <core:CardHeader Title="More voices" Description="Opens Windows speech settings to add offline voices; they show up after Refresh." />
+                        <StackPanel Orientation="Horizontal">
+                            <ui:Button Content="Add voices…" Command="{Binding AddVoicesCommand}" />
+                            <ui:Button Margin="8,0,0,0" Content="Refresh" Icon="{ui:SymbolIcon ArrowSync24}" Command="{Binding RefreshVoicesCommand}" />
+                        </StackPanel>
+                    </core:RowLayout>
+                </Border>
+                <Border Style="{DynamicResource HelmExpanderRow}">
+                    <core:RowLayout>
+                        <core:CardHeader Title="Speed" Description="Also with [ and ] while reading, and on the player bar." />
+                        <StackPanel Orientation="Horizontal">
+                            <Slider Width="160" Minimum="0.5" Maximum="3" TickFrequency="0.1" IsSnapToTickEnabled="True" Value="{Binding SpeechRate}"
+                                    VerticalAlignment="Center" AutomationProperties.Name="Speed" />
+                            <TextBlock Width="40" Margin="8,0,0,0" VerticalAlignment="Center" Text="{Binding SpeechRateLabel}" />
+                        </StackPanel>
+                    </core:RowLayout>
+                </Border>
+                <Border Style="{DynamicResource HelmExpanderRow}">
+                    <core:RowLayout>
+                        <core:CardHeader Title="Pitch" Description="Lower or higher than the voice's own (not for the voices on this PC)." />
+                        <StackPanel Orientation="Horizontal">
+                            <Slider Width="160" Minimum="0" Maximum="2" TickFrequency="0.1" IsSnapToTickEnabled="True" Value="{Binding SpeechPitch}" IsEnabled="{Binding SupportsPitch}"
+                                    VerticalAlignment="Center" AutomationProperties.Name="Pitch" />
+                            <TextBlock Width="40" Margin="8,0,0,0" VerticalAlignment="Center" Text="{Binding SpeechPitch, StringFormat={}{0:0.0}}" />
+                        </StackPanel>
+                    </core:RowLayout>
+                </Border>
+                <Border Style="{DynamicResource HelmExpanderRow}">
+                    <core:RowLayout>
+                        <core:CardHeader Title="Volume" Description="Of the voice, under the system volume." />
+                        <StackPanel Orientation="Horizontal">
+                            <Slider Width="160" Minimum="0" Maximum="1" TickFrequency="0.05" IsSnapToTickEnabled="True" Value="{Binding SpeechVolume}"
+                                    VerticalAlignment="Center" AutomationProperties.Name="Volume" />
+                            <TextBlock Width="40" Margin="8,0,0,0" VerticalAlignment="Center" Text="{Binding SpeechVolume, StringFormat={}{0:P0}}" />
+                        </StackPanel>
+                    </core:RowLayout>
+                </Border>
+                <Border Style="{DynamicResource HelmExpanderRow}">
+                    <core:RowLayout>
+                        <core:CardHeader Title="Pause between paragraphs" Description="Silence after each paragraph, in seconds." />
+                        <StackPanel Orientation="Horizontal">
+                            <Slider Width="160" Minimum="0" Maximum="2" TickFrequency="0.1" IsSnapToTickEnabled="True" Value="{Binding ParagraphPause}"
+                                    VerticalAlignment="Center" AutomationProperties.Name="Pause between paragraphs" />
+                            <TextBlock Width="40" Margin="8,0,0,0" VerticalAlignment="Center" Text="{Binding ParagraphPause, StringFormat={}{0:0.0} s}" />
+                        </StackPanel>
+                    </core:RowLayout>
+                </Border>
+                <Border Style="{DynamicResource HelmExpanderRow}">
+                    <core:RowLayout>
+                        <core:CardHeader Title="Continue to the next chapter" Description="At the end of a chapter, reading aloud opens the next one and goes on." />
+                        <ui:ToggleSwitch AutomationProperties.Name="Continue to the next chapter" IsChecked="{Binding ContinueToNextChapter}" />
+                    </core:RowLayout>
+                </Border>
+                <Border Style="{DynamicResource HelmExpanderRow}">
+                    <core:RowLayout>
+                        <core:CardHeader Title="Downloaded audio" Description="{Binding AudioCacheSize, StringFormat=Sentences kept on this PC so they play at once and offline: {0}. A new voice or speed downloads again.}" />
+                        <StackPanel Orientation="Horizontal">
+                            <ui:Button Content="Open folder" Icon="{ui:SymbolIcon FolderOpen24}" Command="{Binding OpenAudioFolderCommand}" />
+                            <ui:Button Margin="8,0,0,0" Content="Clear" Icon="{ui:SymbolIcon Delete24}" Command="{Binding ClearAudioCommand}" />
+                        </StackPanel>
+                    </core:RowLayout>
+                </Border>
+            </StackPanel>
+        </ui:CardExpander>
+
+        <!-- Names -->
+        <TextBlock Text="Your names" Style="{DynamicResource HelmSectionHeader}" />
+        <ui:CardControl Margin="0,0,0,4" Icon="{ui:SymbolIcon People24}">
+            <ui:CardControl.Header>
+                <core:CardHeader Title="Names for all novels" Description="Export or import them as a QuickTranslator Names.txt. A novel's own names are in its names panel." />
+            </ui:CardControl.Header>
+            <StackPanel Orientation="Horizontal">
+                <ui:Button Content="Export…" Click="ExportNames_Click" />
+                <ui:Button Margin="8,0,0,0" Content="Import…" Click="ImportNames_Click" />
+            </StackPanel>
+        </ui:CardControl>
+    </StackPanel>
+</core:ModulePageBase>

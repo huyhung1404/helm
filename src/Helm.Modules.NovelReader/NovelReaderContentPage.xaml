@@ -1,0 +1,575 @@
+<Page
+    x:Class="Helm.Modules.NovelReader.NovelReaderContentPage"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
+    xmlns:core="clr-namespace:Helm.Core.Ui;assembly=Helm.Core.Windows"
+    xmlns:self="clr-namespace:Helm.Modules.NovelReader"
+    Title="Novel Reader" ScrollViewer.CanContentScroll="False">
+
+    <!-- Novel Reader itself (menu and Quick access): the library of synced novels, and the open novel with its chapter
+         bar, the converted text (click a word to fix it), reading aloud and the names panel. Options live on
+         NovelReaderPage. -->
+    <Page.Resources>
+        <self:LineHeight x:Key="LineHeight" />
+
+        <!-- The paragraph and the sentence being read aloud: the accent colour, light and stronger -->
+        <SolidColorBrush x:Key="ParagraphFill" Color="{DynamicResource SystemAccentColorSecondary}" Opacity="0.14" />
+        <SolidColorBrush x:Key="SentenceFill" Color="{DynamicResource SystemAccentColorSecondary}" Opacity="0.38" />
+
+        <!-- Small icon-only action -->
+        <Style x:Key="IconAction" TargetType="ui:Button" BasedOn="{StaticResource {x:Type ui:Button}}">
+            <Setter Property="Appearance" Value="Transparent" />
+            <Setter Property="Padding" Value="7,5" />
+            <Setter Property="Margin" Value="0,0,2,0" />
+            <Setter Property="MinWidth" Value="0" />
+            <Setter Property="VerticalAlignment" Value="Center" />
+        </Style>
+
+        <Style x:Key="BarItem" TargetType="FrameworkElement">
+            <Setter Property="Margin" Value="0,0,8,8" />
+            <Setter Property="VerticalAlignment" Value="Center" />
+        </Style>
+    </Page.Resources>
+
+    <Grid Margin="24,16,24,0">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+
+        <!-- Title: the tool, or the open novel with a way back to the library -->
+        <DockPanel Margin="0,0,0,16">
+            <ui:Button DockPanel.Dock="Right" Content="Library" Icon="{ui:SymbolIcon Library24}" Command="{Binding ShowLibraryCommand}"
+                       VerticalAlignment="Center" Visibility="{Binding IsBookOpen, Converter={StaticResource BoolToVisibility}}" />
+            <Image Source="{x:Static self:NovelReaderLogo.Image}" Width="32" Height="32" Margin="0,0,12,0"
+                   Visibility="{Binding IsLibraryShown, Converter={StaticResource BoolToVisibility}}" />
+            <!-- The open novel's cover next to its title -->
+            <Grid Width="32" Height="44" Margin="0,0,12,0" DataContext="{Binding OpenBookCard}"
+                  Visibility="{Binding DataContext.IsBookOpen, RelativeSource={RelativeSource AncestorType=Page}, Converter={StaticResource BoolToVisibility}}">
+                <Border CornerRadius="4" Visibility="{Binding HasNoCover, Converter={StaticResource BoolToVisibility}}">
+                    <Border.Background>
+                        <LinearGradientBrush StartPoint="0,1" EndPoint="1,0">
+                            <GradientStop Color="{Binding CoverColorStart}" Offset="0" />
+                            <GradientStop Color="{Binding CoverColorEnd}" Offset="1" />
+                        </LinearGradientBrush>
+                    </Border.Background>
+                    <TextBlock Text="{Binding Initials}" FontSize="13" FontWeight="SemiBold" HorizontalAlignment="Center" VerticalAlignment="Center"
+                               Foreground="{DynamicResource TextOnAccentFillColorPrimaryBrush}" />
+                </Border>
+                <Border CornerRadius="4" Visibility="{Binding HasCover, Converter={StaticResource BoolToVisibility}}">
+                    <Border.Background>
+                        <ImageBrush ImageSource="{Binding Cover, Converter={x:Static self:CoverImage.Instance}}" Stretch="UniformToFill" />
+                    </Border.Background>
+                </Border>
+            </Grid>
+            <TextBlock Text="Novel Reader" FontSize="28" FontWeight="SemiBold" VerticalAlignment="Center"
+                       Visibility="{Binding IsLibraryShown, Converter={StaticResource BoolToVisibility}}" />
+            <TextBlock Text="{Binding BookTitle}" FontSize="24" FontWeight="SemiBold" VerticalAlignment="Center" TextTrimming="CharacterEllipsis"
+                       Visibility="{Binding IsBookOpen, Converter={StaticResource BoolToVisibility}}" />
+        </DockPanel>
+
+        <!-- Shown while the tool is turned off -->
+        <ui:InfoBar x:Name="OffBar" Grid.Row="1" Severity="Informational" IsClosable="False" IsOpen="False" Visibility="Collapsed" Margin="0,0,0,12"
+                    Title="Novel Reader is turned off" Message="Your novels and names are kept. Turn Novel Reader on in its settings to read." />
+
+        <!-- What happened: a problem, an import -->
+        <Border Grid.Row="2" Style="{DynamicResource HelmSurface}" Margin="0,0,0,12" Padding="12,8"
+                Visibility="{Binding HasMessage, Converter={StaticResource BoolToVisibility}}">
+            <core:RowLayout>
+                <TextBlock Text="{Binding Message}" TextWrapping="Wrap" VerticalAlignment="Center" />
+                <ui:Button Style="{StaticResource IconAction}" Icon="{ui:SymbolIcon Dismiss24}" ToolTip="Dismiss" AutomationProperties.Name="Dismiss"
+                           Command="{Binding DismissMessageCommand}" />
+            </core:RowLayout>
+        </Border>
+
+        <!-- Another device read further -->
+        <Border Grid.Row="3" Style="{DynamicResource HelmSurface}" Margin="0,0,0,12" Padding="12,8"
+                Visibility="{Binding HasRemoteProgressOffer, Converter={StaticResource BoolToVisibility}}">
+            <core:RowLayout>
+                <TextBlock Text="{Binding RemoteProgressOffer}" TextWrapping="Wrap" VerticalAlignment="Center" />
+                <StackPanel Orientation="Horizontal">
+                    <ui:Button Appearance="Primary" Content="Continue" Command="{Binding AcceptRemoteProgressCommand}" />
+                    <ui:Button Margin="4,0,0,0" Style="{StaticResource IconAction}" Icon="{ui:SymbolIcon Dismiss24}" ToolTip="Stay here"
+                               AutomationProperties.Name="Stay here" Command="{Binding DismissRemoteProgressCommand}" />
+                </StackPanel>
+            </core:RowLayout>
+        </Border>
+
+        <!-- Busy: opening, downloading, adding -->
+        <StackPanel Grid.Row="4" Margin="0,0,0,12" Visibility="{Binding IsBusy, Converter={StaticResource BoolToVisibility}}">
+            <TextBlock Text="{Binding BusyText}" Style="{DynamicResource HelmSecondaryText}" Margin="0,0,0,4" />
+            <ProgressBar Height="4" Minimum="0" Maximum="1" Value="{Binding BusyProgress}" />
+        </StackPanel>
+
+        <Grid x:Name="Body" Grid.Row="5">
+            <!-- ================================ Library ================================ -->
+            <DockPanel Visibility="{Binding IsLibraryShown, Converter={StaticResource BoolToVisibility}}">
+                <StackPanel DockPanel.Dock="Top">
+                    <!-- No dictionaries yet -->
+                    <ui:InfoBar Margin="0,0,0,12" Severity="Warning" IsClosable="False" IsOpen="{Binding NeedsDictionaries}"
+                                Visibility="{Binding NeedsDictionaries, Converter={StaticResource BoolToVisibility}}"
+                                Title="No dictionaries yet" Message="Novel Reader needs the QuickTranslator dictionaries to convert. Download them once (about 30 MB); they sync to your other devices." />
+                    <StackPanel Orientation="Horizontal" Margin="0,0,0,12" Visibility="{Binding NeedsDictionaries, Converter={StaticResource BoolToVisibility}}">
+                        <ui:Button Appearance="Primary" Content="Download dictionaries" Icon="{ui:SymbolIcon ArrowDownload24}"
+                                   Command="{Binding DownloadDictionariesCommand}" IsEnabled="{Binding IsDownloading, Converter={StaticResource InverseBool}}" />
+                        <TextBlock Margin="12,0,0,0" VerticalAlignment="Center" Text="{Binding DownloadStatus}" Style="{DynamicResource HelmSecondaryText}" />
+                    </StackPanel>
+
+                    <!-- Add a novel -->
+                    <Border Style="{DynamicResource HelmSurface}" Margin="0,0,0,12" Padding="16,12">
+                        <StackPanel>
+                            <core:RowLayout Visibility="{Binding IsAdding, Converter={StaticResource InverseBoolToVisibility}}">
+                                <StackPanel VerticalAlignment="Center">
+                                    <TextBlock Text="Add a novel" FontWeight="SemiBold" />
+                                    <TextBlock Text="A Chinese .txt file in any encoding. It is kept privately and syncs to your other devices. You can also drop the file here."
+                                               Style="{DynamicResource HelmSecondaryText}" TextWrapping="Wrap" />
+                                </StackPanel>
+                                <ui:Button Appearance="Primary" Content="Add a novel (.txt)…" Icon="{ui:SymbolIcon DocumentAdd24}" Click="AddNovel_Click" />
+                            </core:RowLayout>
+                            <StackPanel Visibility="{Binding IsAdding, Converter={StaticResource BoolToVisibility}}">
+                                <TextBlock Text="Add a novel" FontWeight="SemiBold" Margin="0,0,0,4" />
+                                <TextBlock Text="{Binding AddSummary}" Style="{DynamicResource HelmSecondaryText}" TextWrapping="Wrap" Margin="0,0,0,8" />
+                                <ui:TextBox Text="{Binding AddTitle, UpdateSourceTrigger=PropertyChanged}" PlaceholderText="Title" Margin="0,0,0,8"
+                                            AutomationProperties.Name="Title" />
+                                <StackPanel Orientation="Horizontal">
+                                    <ui:Button Appearance="Primary" Content="Add" Icon="{ui:SymbolIcon Add24}" Command="{Binding ConfirmAddCommand}" />
+                                    <ui:Button Margin="8,0,0,0" Content="Cancel" Command="{Binding CancelAddCommand}" />
+                                </StackPanel>
+                            </StackPanel>
+                        </StackPanel>
+                    </Border>
+
+                    <TextBlock Text="Your novels" Style="{DynamicResource HelmSectionHeader}" Visibility="{Binding HasBooks, Converter={StaticResource BoolToVisibility}}" />
+                    <TextBlock Text="No novels yet. Add a .txt file to start reading." Style="{DynamicResource HelmSecondaryText}" Margin="0,8,0,0"
+                               Visibility="{Binding HasNoBooks, Converter={StaticResource BoolToVisibility}}" />
+                </StackPanel>
+
+                <!-- One card per novel: a private folder with its text, names and progress -->
+                <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="0,0,0,24">
+                    <ItemsControl ItemsSource="{Binding Books}">
+                        <ItemsControl.ItemsPanel>
+                            <ItemsPanelTemplate>
+                                <WrapPanel />
+                            </ItemsPanelTemplate>
+                        </ItemsControl.ItemsPanel>
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <!-- A novel: its cover (a picture, or drawn from the title), what was read, and its actions. Drop a picture on it to set the cover. -->
+                                <Border Style="{DynamicResource HelmSurface}" Width="400" Margin="0,0,12,12" Padding="12" AllowDrop="True"
+                                        DragOver="Card_DragOver" Drop="Card_Drop">
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="Auto" />
+                                            <ColumnDefinition Width="*" />
+                                        </Grid.ColumnDefinitions>
+                                        <Grid Width="96" Height="136" Margin="0,0,14,0" VerticalAlignment="Top" Cursor="Hand" ToolTip="Read"
+                                              MouseLeftButtonUp="Cover_Click">
+                                            <Border CornerRadius="6" Visibility="{Binding HasNoCover, Converter={StaticResource BoolToVisibility}}">
+                                                <Border.Background>
+                                                    <LinearGradientBrush StartPoint="0,1" EndPoint="1,0">
+                                                        <GradientStop Color="{Binding CoverColorStart}" Offset="0" />
+                                                        <GradientStop Color="{Binding CoverColorEnd}" Offset="1" />
+                                                    </LinearGradientBrush>
+                                                </Border.Background>
+                                                <TextBlock Text="{Binding Initials}" FontSize="32" FontWeight="SemiBold" HorizontalAlignment="Center" VerticalAlignment="Center"
+                                                           Foreground="{DynamicResource TextOnAccentFillColorPrimaryBrush}" />
+                                            </Border>
+                                            <Border CornerRadius="6" Visibility="{Binding HasCover, Converter={StaticResource BoolToVisibility}}"
+                                                    BorderThickness="1" BorderBrush="{DynamicResource CardStrokeColorDefaultBrush}">
+                                                <Border.Background>
+                                                    <ImageBrush ImageSource="{Binding Cover, Converter={x:Static self:CoverImage.Instance}}" Stretch="UniformToFill" />
+                                                </Border.Background>
+                                            </Border>
+                                        </Grid>
+                                        <DockPanel Grid.Column="1">
+                                        <StackPanel>
+                                            <TextBlock Text="{Binding Title}" FontSize="16" FontWeight="SemiBold" TextWrapping="Wrap"
+                                                       Visibility="{Binding IsNotRenaming, Converter={StaticResource BoolToVisibility}}" />
+                                            <StackPanel Visibility="{Binding IsRenaming, Converter={StaticResource BoolToVisibility}}">
+                                                <ui:TextBox Text="{Binding TitleDraft, UpdateSourceTrigger=PropertyChanged}" AutomationProperties.Name="Title" />
+                                                <StackPanel Orientation="Horizontal" Margin="0,6,0,0">
+                                                    <ui:Button Appearance="Primary" Content="Save"
+                                                               Command="{Binding DataContext.SaveRenameCommand, RelativeSource={RelativeSource AncestorType=Page}}" CommandParameter="{Binding}" />
+                                                    <ui:Button Margin="8,0,0,0" Content="Cancel"
+                                                               Command="{Binding DataContext.CancelRenameCommand, RelativeSource={RelativeSource AncestorType=Page}}" CommandParameter="{Binding}" />
+                                                </StackPanel>
+                                            </StackPanel>
+                                            <TextBlock Text="{Binding Subtitle}" Style="{DynamicResource HelmSecondaryText}" TextWrapping="Wrap" Margin="0,4,0,0" />
+                                            <TextBlock Text="{Binding Names}" Style="{DynamicResource HelmSecondaryText}"
+                                                       Visibility="{Binding HasNames, Converter={StaticResource BoolToVisibility}}" />
+                                            <TextBlock Text="{Binding Status}" Foreground="{DynamicResource AccentTextFillColorPrimaryBrush}"
+                                                       Visibility="{Binding HasStatus, Converter={StaticResource BoolToVisibility}}" />
+                                            <DockPanel Margin="0,10,0,0">
+                                                <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
+                                                    <ui:DropDownButton Padding="7,5" Margin="0,0,2,0" Icon="{ui:SymbolIcon Image24}" ToolTip="Cover picture (or drop a picture on the card)"
+                                                                       AutomationProperties.Name="Cover picture" VerticalAlignment="Center">
+                                                        <ui:DropDownButton.Flyout>
+                                                            <ContextMenu>
+                                                                <MenuItem Header="Change cover…" Click="ChangeCover_Click" />
+                                                                <MenuItem Header="Remove cover" Command="{Binding DataContext.RemoveCoverCommand, RelativeSource={RelativeSource AncestorType=Page}}"
+                                                                          CommandParameter="{Binding}" />
+                                                            </ContextMenu>
+                                                        </ui:DropDownButton.Flyout>
+                                                    </ui:DropDownButton>
+                                                    <ui:Button Style="{StaticResource IconAction}" Icon="{ui:SymbolIcon Rename24}" ToolTip="Rename" AutomationProperties.Name="Rename"
+                                                               Command="{Binding DataContext.StartRenameCommand, RelativeSource={RelativeSource AncestorType=Page}}" CommandParameter="{Binding}" />
+                                                    <ui:Button Style="{StaticResource IconAction}" Icon="{ui:SymbolIcon Delete24}" ToolTip="Delete" AutomationProperties.Name="Delete"
+                                                               Command="{Binding DataContext.DeleteBookCommand, RelativeSource={RelativeSource AncestorType=Page}}" CommandParameter="{Binding}" />
+                                                </StackPanel>
+                                                <ui:Button Appearance="Primary" Content="Read" Icon="{ui:SymbolIcon BookOpen24}" HorizontalAlignment="Left"
+                                                           Command="{Binding DataContext.OpenBookCommand, RelativeSource={RelativeSource AncestorType=Page}}" CommandParameter="{Binding}" />
+                                            </DockPanel>
+                                        </StackPanel>
+                                        </DockPanel>
+                                    </Grid>
+                                </Border>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </ScrollViewer>
+            </DockPanel>
+
+            <!-- ================================ Reader ================================ -->
+            <DockPanel Visibility="{Binding IsBookOpen, Converter={StaticResource BoolToVisibility}}">
+                <!-- Chapter bar, view mode, names -->
+                <WrapPanel DockPanel.Dock="Top" Margin="0,0,0,4">
+                    <StackPanel Orientation="Horizontal" Style="{StaticResource BarItem}">
+                        <ui:Button Style="{StaticResource IconAction}" Icon="{ui:SymbolIcon ChevronLeft24}" ToolTip="Previous chapter (←)"
+                                   AutomationProperties.Name="Previous chapter" Command="{Binding PreviousChapterCommand}" IsEnabled="{Binding CanGoBack}" />
+                        <ComboBox x:Name="ChapterBox" Width="300" ItemsSource="{Binding Chapters}" DisplayMemberPath="DisplayTitle"
+                                  SelectionChanged="Chapter_SelectionChanged" AutomationProperties.Name="Chapter" />
+                        <ui:Button Style="{StaticResource IconAction}" Margin="2,0,0,0" Icon="{ui:SymbolIcon ChevronRight24}" ToolTip="Next chapter (→)"
+                                   AutomationProperties.Name="Next chapter" Command="{Binding NextChapterCommand}" IsEnabled="{Binding CanGoForward}" />
+                        <TextBlock Text="{Binding ChapterPosition}" Style="{DynamicResource HelmSecondaryText}" VerticalAlignment="Center" Margin="4,0,0,0" />
+                    </StackPanel>
+                    <ComboBox Margin="0,0,8,8" VerticalAlignment="Center" Width="130" ItemsSource="{Binding ModeNames}" SelectedIndex="{Binding ModeIndex}"
+                              ToolTip="What the page shows" AutomationProperties.Name="View" />
+                    <ToggleButton Margin="0,0,8,8" VerticalAlignment="Center" IsChecked="{Binding ShowNamesPanel}" Padding="10,5" ToolTip="Names of this novel and suggested names"
+                                  AutomationProperties.Name="Names">
+                        <StackPanel Orientation="Horizontal">
+                            <ui:SymbolIcon Symbol="People24" />
+                            <TextBlock Margin="6,0,0,0" Text="Names" />
+                        </StackPanel>
+                    </ToggleButton>
+                </WrapPanel>
+
+                <ui:InfoBar DockPanel.Dock="Top" Margin="0,0,0,8" Severity="Warning" IsClosable="False" IsOpen="{Binding NeedsDictionaries}"
+                            Visibility="{Binding NeedsDictionaries, Converter={StaticResource BoolToVisibility}}"
+                            Title="No dictionaries yet" Message="The text is shown in Chinese. Download the dictionaries in the library or in the settings." />
+
+                <!-- The player: like an audiobook app, always at the bottom -->
+                <Border DockPanel.Dock="Bottom" Style="{DynamicResource HelmSurface}" Padding="12,8" Margin="0,8,0,16">
+                    <Grid>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                        </Grid.RowDefinitions>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+
+                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                            <ui:Button Style="{StaticResource IconAction}" Icon="{ui:SymbolIcon Previous24}" ToolTip="Previous paragraph (Alt+↑)"
+                                       AutomationProperties.Name="Previous paragraph" Command="{Binding PreviousParagraphCommand}" />
+                            <ui:Button Style="{StaticResource IconAction}" Icon="{ui:SymbolIcon Rewind24}" ToolTip="Previous sentence (Alt+←)"
+                                       AutomationProperties.Name="Previous sentence" Command="{Binding PreviousSentenceCommand}" />
+                            <ui:Button Appearance="Primary" Margin="4,0" Padding="14,8" Command="{Binding PlayPauseCommand}" ToolTip="Read aloud / pause (Space)"
+                                       AutomationProperties.Name="Play or pause">
+                                <Grid>
+                                    <ui:SymbolIcon Symbol="Play24" Visibility="{Binding IsPlaying, Converter={StaticResource InverseBoolToVisibility}}" />
+                                    <ui:SymbolIcon Symbol="Pause24" Visibility="{Binding IsPlaying, Converter={StaticResource BoolToVisibility}}" />
+                                </Grid>
+                            </ui:Button>
+                            <ui:Button Style="{StaticResource IconAction}" Icon="{ui:SymbolIcon FastForward24}" ToolTip="Next sentence (Alt+→)"
+                                       AutomationProperties.Name="Next sentence" Command="{Binding NextSentenceCommand}" />
+                            <ui:Button Style="{StaticResource IconAction}" Icon="{ui:SymbolIcon Next24}" ToolTip="Next paragraph (Alt+↓)"
+                                       AutomationProperties.Name="Next paragraph" Command="{Binding NextParagraphCommand}" />
+                            <ui:Button Style="{StaticResource IconAction}" Icon="{ui:SymbolIcon Stop24}" ToolTip="Stop reading aloud" AutomationProperties.Name="Stop"
+                                       Command="{Binding StopReadingCommand}" Visibility="{Binding IsSpeaking, Converter={StaticResource BoolToVisibility}}" />
+                            <!-- Download the sound for listening offline -->
+                            <ui:DropDownButton Margin="6,0,0,0" Padding="8,5" Icon="{ui:SymbolIcon ArrowDownload24}" ToolTip="Download the audio to listen offline"
+                                               AutomationProperties.Name="Download audio">
+                                <ui:DropDownButton.Flyout>
+                                    <ContextMenu>
+                                        <MenuItem Header="Download this chapter" Command="{Binding DownloadThisChapterCommand}" />
+                                        <MenuItem Header="Download the next 10 chapters" Command="{Binding DownloadNextChaptersCommand}" />
+                                        <MenuItem Header="Download the whole novel" Command="{Binding DownloadWholeNovelCommand}" />
+                                        <Separator />
+                                        <MenuItem Header="Stop downloading" Command="{Binding StopAudioDownloadCommand}" />
+                                    </ContextMenu>
+                                </ui:DropDownButton.Flyout>
+                            </ui:DropDownButton>
+                        </StackPanel>
+
+                        <!-- Seek through the chapter by paragraph; the faint bar behind it is the audio already downloaded -->
+                        <ProgressBar Grid.Column="1" Margin="20,0" Height="4" VerticalAlignment="Center" Opacity="0.45" IsHitTestVisible="False"
+                                     Minimum="0" Maximum="{Binding PlayerParagraphMax}" Value="{Binding PlayerReady}" />
+                        <Slider x:Name="SeekBar" Grid.Column="1" Margin="12,0" VerticalAlignment="Center" Minimum="0" Maximum="{Binding PlayerParagraphMax}"
+                                Value="{Binding PlayerParagraph, Mode=TwoWay}" IsMoveToPointEnabled="True" SmallChange="1" LargeChange="5"
+                                IsSnapToTickEnabled="True" TickFrequency="1" AutomationProperties.Name="Position in the chapter"
+                                Thumb.DragCompleted="SeekBar_DragCompleted" PreviewMouseLeftButtonUp="SeekBar_MouseUp" />
+                        <TextBlock Grid.Column="2" VerticalAlignment="Center" Text="{Binding PlayerPosition}" Style="{DynamicResource HelmSecondaryText}" />
+
+                        <!-- The sentence being read (click: back to it) and the voice settings -->
+                        <DockPanel Grid.Row="1" Grid.ColumnSpan="3" Margin="0,6,0,0">
+                            <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
+                                <ui:Button Style="{StaticResource IconAction}" Content="−" ToolTip="Slower ([)" AutomationProperties.Name="Slower" Command="{Binding SlowerCommand}" />
+                                <TextBlock Width="36" TextAlignment="Center" VerticalAlignment="Center" Text="{Binding SpeechRateLabel}" ToolTip="Reading speed" />
+                                <ui:Button Style="{StaticResource IconAction}" Content="+" ToolTip="Faster (])" AutomationProperties.Name="Faster" Command="{Binding FasterCommand}" />
+                                <ComboBox Width="150" Margin="8,0,0,0" ItemsSource="{Binding Voices}" SelectedItem="{Binding SelectedVoice}" DisplayMemberPath="Label"
+                                          ToolTip="Voice" AutomationProperties.Name="Voice" />
+                                <ComboBox Width="150" Margin="8,0,0,0" ItemsSource="{Binding SleepTimerNames}" SelectedIndex="{Binding SleepTimerIndex}"
+                                          ToolTip="Sleep timer: stop reading after a while" AutomationProperties.Name="Sleep timer" />
+                            </StackPanel>
+                            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                <ui:ProgressRing IsIndeterminate="True" Width="16" Height="16" Margin="0,0,8,0"
+                                                 Visibility="{Binding IsLoadingVoice, Converter={StaticResource BoolToVisibility}}" />
+                                <StackPanel Orientation="Horizontal" Margin="0,0,12,0" VerticalAlignment="Center"
+                                            Visibility="{Binding IsDownloadingAudio, Converter={StaticResource BoolToVisibility}}">
+                                    <ProgressBar Width="80" Height="4" Minimum="0" Maximum="1" Value="{Binding AudioDownloadFraction}" VerticalAlignment="Center" />
+                                    <TextBlock Margin="8,0,4,0" Text="{Binding AudioDownloadText}" Style="{DynamicResource HelmSecondaryText}" VerticalAlignment="Center" />
+                                    <ui:Button Style="{StaticResource IconAction}" Icon="{ui:SymbolIcon Dismiss24}" ToolTip="Stop downloading"
+                                               AutomationProperties.Name="Stop downloading" Command="{Binding StopAudioDownloadCommand}" />
+                                </StackPanel>
+                                <TextBlock Text="{Binding ReadyLabel}" Style="{DynamicResource HelmSecondaryText}" Margin="0,0,12,0" VerticalAlignment="Center"
+                                           Visibility="{Binding IsDownloadingAudio, Converter={StaticResource InverseBoolToVisibility}}" />
+                                <TextBlock Text="{Binding SleepTimerLabel}" Foreground="{DynamicResource AccentTextFillColorPrimaryBrush}" Margin="0,0,12,0" VerticalAlignment="Center"
+                                           Visibility="{Binding HasSleepTimer, Converter={StaticResource BoolToVisibility}}" />
+                            </StackPanel>
+                            <TextBlock x:Name="CurrentSentence" Text="{Binding CurrentSentenceText}" TextTrimming="CharacterEllipsis" VerticalAlignment="Center"
+                                       Style="{DynamicResource HelmSecondaryText}" Cursor="Hand" ToolTip="Back to the sentence being read"
+                                       MouseLeftButtonUp="CurrentSentence_Click" />
+                        </DockPanel>
+                    </Grid>
+                </Border>
+
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+
+                    <!-- The chapter: click a word to fix it; double-click a sentence or use a paragraph's ▶ to read from there -->
+                    <ScrollViewer x:Name="Scroller" VerticalScrollBarVisibility="Auto" ScrollChanged="Scroller_ScrollChanged" Focusable="True"
+                                  PreviewMouseWheel="Scroller_UserScroll" PreviewMouseLeftButtonDown="Scroller_MouseDown">
+                        <ItemsControl x:Name="ParagraphList" ItemsSource="{Binding Paragraphs}" Margin="0,0,16,48" MaxWidth="900" HorizontalAlignment="Left">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <Grid x:Name="Root" Background="Transparent">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="32" />
+                                            <ColumnDefinition Width="*" />
+                                        </Grid.ColumnDefinitions>
+                                        <!-- ▶ in the margin on hover: read from this paragraph -->
+                                        <ui:Button x:Name="PlayHere" Style="{StaticResource IconAction}" Icon="{ui:SymbolIcon Play24}" VerticalAlignment="Top" Margin="0,6,0,0"
+                                                   ToolTip="Read aloud from here" AutomationProperties.Name="Read aloud from here" Visibility="Hidden" Click="ReadFromHere_Click" />
+                                        <Border x:Name="Frame" Grid.Column="1" CornerRadius="6" Padding="12,6" Margin="0,0,0,6" Background="Transparent"
+                                                BorderThickness="3,0,0,0" BorderBrush="Transparent">
+                                            <Border.ContextMenu>
+                                                <ContextMenu>
+                                                    <MenuItem Header="Read aloud from here" Click="ReadFromHere_Click" />
+                                                    <MenuItem Header="Copy the translation" Click="CopyText_Click" />
+                                                    <MenuItem Header="Copy the Chinese" Click="CopyChinese_Click" />
+                                                </ContextMenu>
+                                            </Border.ContextMenu>
+                                            <StackPanel>
+                                                <TextBlock x:Name="ResumeLabel" Text="Continue reading here" FontSize="12" Margin="0,0,0,2" Visibility="Collapsed"
+                                                           Foreground="{DynamicResource AccentTextFillColorPrimaryBrush}" />
+                                                <self:SegmentText x:Name="Text" Line="{Binding Line}" WordClicked="Word_Clicked" ReadFromClicked="Paragraph_ReadFromClicked"
+                                                                  Highlight="{Binding SpeakingSegments}" HighlightBrush="{StaticResource SentenceFill}"
+                                                                  FontSize="{Binding DataContext.FontSize, RelativeSource={RelativeSource AncestorType=Page}}"
+                                                                  LineStackingStrategy="BlockLineHeight">
+                                                    <self:SegmentText.LineHeight>
+                                                        <MultiBinding Converter="{StaticResource LineHeight}">
+                                                            <Binding Path="DataContext.FontSize" RelativeSource="{RelativeSource AncestorType=Page}" />
+                                                            <Binding Path="DataContext.LineSpacing" RelativeSource="{RelativeSource AncestorType=Page}" />
+                                                        </MultiBinding>
+                                                    </self:SegmentText.LineHeight>
+                                                </self:SegmentText>
+                                                <TextBlock Text="{Binding Chinese}" TextWrapping="Wrap" Margin="0,4,0,0" Style="{DynamicResource HelmSecondaryText}"
+                                                           FontSize="{Binding DataContext.FontSize, RelativeSource={RelativeSource AncestorType=Page}}"
+                                                           Visibility="{Binding ShowChinese, Converter={StaticResource BoolToVisibility}}" />
+                                            </StackPanel>
+                                        </Border>
+                                    </Grid>
+                                    <DataTemplate.Triggers>
+                                        <DataTrigger Binding="{Binding IsHeading}" Value="True">
+                                            <Setter TargetName="Text" Property="FontWeight" Value="SemiBold" />
+                                            <Setter TargetName="Frame" Property="Margin" Value="0,0,0,14" />
+                                        </DataTrigger>
+                                        <DataTrigger Binding="{Binding IsSceneBreak}" Value="True">
+                                            <Setter TargetName="PlayHere" Property="IsEnabled" Value="False" />
+                                        </DataTrigger>
+                                        <Trigger SourceName="Root" Property="IsMouseOver" Value="True">
+                                            <Setter TargetName="PlayHere" Property="Visibility" Value="Visible" />
+                                        </Trigger>
+                                        <DataTrigger Binding="{Binding IsResumePoint}" Value="True">
+                                            <Setter TargetName="Frame" Property="BorderBrush" Value="{DynamicResource TextFillColorTertiaryBrush}" />
+                                            <Setter TargetName="ResumeLabel" Property="Visibility" Value="Visible" />
+                                        </DataTrigger>
+                                        <DataTrigger Binding="{Binding IsSpeaking}" Value="True">
+                                            <Setter TargetName="Frame" Property="Background" Value="{StaticResource ParagraphFill}" />
+                                            <Setter TargetName="Frame" Property="BorderBrush" Value="{DynamicResource AccentFillColorDefaultBrush}" />
+                                            <Setter TargetName="ResumeLabel" Property="Visibility" Value="Collapsed" />
+                                        </DataTrigger>
+                                    </DataTemplate.Triggers>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </ScrollViewer>
+
+                    <!-- Scrolled away while listening: one click back to the sentence being read -->
+                    <ui:Button Appearance="Primary" HorizontalAlignment="Right" VerticalAlignment="Bottom" Margin="0,0,28,16"
+                               Icon="{ui:SymbolIcon Location24}" Content="Back to reading position" Command="{Binding FollowReadingCommand}"
+                               Visibility="{Binding ShowBackToReading, Converter={StaticResource BoolToVisibility}}" />
+
+                    <!-- Names panel: this novel's saved names, and names found in it -->
+                    <Border Grid.Column="1" Width="340" Margin="8,0,0,24" Style="{DynamicResource HelmSurface}" Padding="12"
+                            Visibility="{Binding ShowNamesPanel, Converter={StaticResource BoolToVisibility}}">
+                        <TabControl>
+                            <TabItem Header="Saved">
+                                <DockPanel Margin="0,8,0,0">
+                                    <StackPanel DockPanel.Dock="Top">
+                                        <ui:TextBox Text="{Binding EntryFilter, UpdateSourceTrigger=PropertyChanged}" PlaceholderText="Search names"
+                                                    Icon="{ui:SymbolIcon Search24}" Margin="0,0,0,8" AutomationProperties.Name="Search names" />
+                                        <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
+                                            <ui:Button Content="Export…" Click="ExportBookNames_Click" />
+                                            <ui:Button Margin="8,0,0,0" Content="Import…" Click="ImportBookNames_Click" />
+                                        </StackPanel>
+                                    </StackPanel>
+                                    <ScrollViewer VerticalScrollBarVisibility="Auto">
+                                        <ItemsControl ItemsSource="{Binding Entries}">
+                                            <ItemsControl.ItemTemplate>
+                                                <DataTemplate>
+                                                    <Border Padding="4,6" BorderThickness="0,0,0,1" BorderBrush="{DynamicResource CardStrokeColorDefaultBrush}">
+                                                        <DockPanel>
+                                                            <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Top">
+                                                                <ui:Button Style="{StaticResource IconAction}" Icon="{ui:SymbolIcon Edit24}" ToolTip="Edit" AutomationProperties.Name="Edit"
+                                                                           Visibility="{Binding IsNotEditing, Converter={StaticResource BoolToVisibility}}"
+                                                                           Command="{Binding DataContext.EditEntryCommand, RelativeSource={RelativeSource AncestorType=Page}}" CommandParameter="{Binding}" />
+                                                                <ui:Button Style="{StaticResource IconAction}" Icon="{ui:SymbolIcon Checkmark24}" ToolTip="Save" AutomationProperties.Name="Save"
+                                                                           Visibility="{Binding IsEditing, Converter={StaticResource BoolToVisibility}}"
+                                                                           Command="{Binding DataContext.SaveEntryCommand, RelativeSource={RelativeSource AncestorType=Page}}" CommandParameter="{Binding}" />
+                                                                <ui:Button Style="{StaticResource IconAction}" Icon="{ui:SymbolIcon Delete24}" ToolTip="Delete" AutomationProperties.Name="Delete"
+                                                                           Command="{Binding DataContext.DeleteEntryCommand, RelativeSource={RelativeSource AncestorType=Page}}" CommandParameter="{Binding}" />
+                                                            </StackPanel>
+                                                            <StackPanel>
+                                                                <TextBlock Text="{Binding Chinese}" FontWeight="SemiBold" />
+                                                                <TextBlock Text="{Binding Vietnamese}" TextWrapping="Wrap"
+                                                                           Visibility="{Binding IsNotEditing, Converter={StaticResource BoolToVisibility}}" />
+                                                                <ui:TextBox Text="{Binding Draft, UpdateSourceTrigger=PropertyChanged}" Margin="0,2,0,0"
+                                                                            Visibility="{Binding IsEditing, Converter={StaticResource BoolToVisibility}}" AutomationProperties.Name="Meaning" />
+                                                                <TextBlock Text="{Binding KindLabel}" Style="{DynamicResource HelmSecondaryText}" />
+                                                            </StackPanel>
+                                                        </DockPanel>
+                                                    </Border>
+                                                </DataTemplate>
+                                            </ItemsControl.ItemTemplate>
+                                        </ItemsControl>
+                                    </ScrollViewer>
+                                </DockPanel>
+                            </TabItem>
+                            <TabItem Header="Suggestions">
+                                <DockPanel Margin="0,8,0,0">
+                                    <StackPanel DockPanel.Dock="Top">
+                                        <ui:Button Content="Find names in this novel" Icon="{ui:SymbolIcon PeopleSearch24}" Command="{Binding FindNamesCommand}"
+                                                   IsEnabled="{Binding IsFindingNames, Converter={StaticResource InverseBool}}" Margin="0,0,0,6" />
+                                        <TextBlock Text="{Binding SuggestionStatus}" Style="{DynamicResource HelmSecondaryText}" TextWrapping="Wrap" Margin="0,0,0,8" />
+                                    </StackPanel>
+                                    <ScrollViewer VerticalScrollBarVisibility="Auto">
+                                        <ItemsControl ItemsSource="{Binding Suggestions}">
+                                            <ItemsControl.ItemTemplate>
+                                                <DataTemplate>
+                                                    <Border Padding="4,6" BorderThickness="0,0,0,1" BorderBrush="{DynamicResource CardStrokeColorDefaultBrush}">
+                                                        <StackPanel>
+                                                            <DockPanel>
+                                                                <TextBlock DockPanel.Dock="Right" Text="{Binding CountLabel}" Style="{DynamicResource HelmSecondaryText}" />
+                                                                <TextBlock Text="{Binding Chinese}" FontWeight="SemiBold" />
+                                                            </DockPanel>
+                                                            <DockPanel Margin="0,4,0,0">
+                                                                <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
+                                                                    <ui:Button Style="{StaticResource IconAction}" Margin="4,0,0,0" Icon="{ui:SymbolIcon PersonAdd24}" ToolTip="Save as a name of this novel"
+                                                                               AutomationProperties.Name="Save as a name"
+                                                                               Command="{Binding DataContext.AddSuggestionCommand, RelativeSource={RelativeSource AncestorType=Page}}" CommandParameter="{Binding}" />
+                                                                    <ui:Button Style="{StaticResource IconAction}" Icon="{ui:SymbolIcon Dismiss24}" ToolTip="Not a name" AutomationProperties.Name="Not a name"
+                                                                               Command="{Binding DataContext.DismissSuggestionCommand, RelativeSource={RelativeSource AncestorType=Page}}" CommandParameter="{Binding}" />
+                                                                </StackPanel>
+                                                                <ui:TextBox Text="{Binding Vietnamese, UpdateSourceTrigger=PropertyChanged}" AutomationProperties.Name="Name" />
+                                                            </DockPanel>
+                                                        </StackPanel>
+                                                    </Border>
+                                                </DataTemplate>
+                                            </ItemsControl.ItemTemplate>
+                                        </ItemsControl>
+                                    </ScrollViewer>
+                                </DockPanel>
+                            </TabItem>
+                        </TabControl>
+                    </Border>
+                </Grid>
+            </DockPanel>
+        </Grid>
+
+        <!-- The clicked word: its Chinese, Hán Việt, known meanings; save a name or a meaning -->
+        <Popup x:Name="WordPopup" Grid.Row="5" Placement="MousePoint" StaysOpen="False" AllowsTransparency="True"
+               DataContext="{Binding Editor}" IsOpen="{Binding IsOpen, Mode=TwoWay}">
+            <Border Width="380" Padding="14" CornerRadius="8" BorderThickness="1" Margin="8"
+                    Background="{DynamicResource ApplicationBackgroundBrush}" BorderBrush="{DynamicResource SurfaceStrokeColorDefaultBrush}">
+                <StackPanel>
+                    <DockPanel>
+                        <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Top">
+                            <ui:Button Style="{StaticResource IconAction}" Content="◀" ToolTip="One more character on the left" AutomationProperties.Name="Widen left"
+                                       Command="{Binding ExtendLeftCommand}" IsEnabled="{Binding CanExtendLeft}" />
+                            <ui:Button Style="{StaticResource IconAction}" Content="▶" ToolTip="One more character on the right" AutomationProperties.Name="Widen right"
+                                       Command="{Binding ExtendRightCommand}" IsEnabled="{Binding CanExtendRight}" />
+                            <ui:Button Style="{StaticResource IconAction}" Content="⇥" ToolTip="One character less on the left" AutomationProperties.Name="Narrow left"
+                                       Command="{Binding ShrinkLeftCommand}" IsEnabled="{Binding CanShrink}" />
+                            <ui:Button Style="{StaticResource IconAction}" Content="⇤" ToolTip="One character less on the right" AutomationProperties.Name="Narrow right"
+                                       Command="{Binding ShrinkRightCommand}" IsEnabled="{Binding CanShrink}" />
+                            <ui:Button Style="{StaticResource IconAction}" Icon="{ui:SymbolIcon Copy24}" ToolTip="Copy the Chinese" AutomationProperties.Name="Copy the Chinese"
+                                       Command="{Binding CopyChineseCommand}" />
+                        </StackPanel>
+                        <TextBlock Text="{Binding Chinese}" FontSize="22" FontWeight="SemiBold" TextWrapping="Wrap" />
+                    </DockPanel>
+                    <TextBlock Text="{Binding HanViet}" Style="{DynamicResource HelmSecondaryText}" TextWrapping="Wrap" Margin="0,2,0,8" />
+                    <TextBlock Text="{Binding SavedAs}" Foreground="{DynamicResource AccentTextFillColorPrimaryBrush}" TextWrapping="Wrap" Margin="0,0,0,8"
+                               Visibility="{Binding HasSaved, Converter={StaticResource BoolToVisibility}}" />
+                    <ItemsControl ItemsSource="{Binding Meanings}" Margin="0,0,0,8">
+                        <ItemsControl.ItemsPanel>
+                            <ItemsPanelTemplate>
+                                <WrapPanel />
+                            </ItemsPanelTemplate>
+                        </ItemsControl.ItemsPanel>
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <ui:Button Content="{Binding}" Padding="8,3" Margin="0,0,4,4" Appearance="Secondary"
+                                           Command="{Binding DataContext.PickMeaningCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}" CommandParameter="{Binding}" />
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                    <ui:TextBox x:Name="DraftBox" Text="{Binding Draft, UpdateSourceTrigger=PropertyChanged}" Margin="0,0,0,6" AutomationProperties.Name="Meaning"
+                                KeyDown="DraftBox_KeyDown" />
+                    <TextBlock Text="{Binding Error}" Foreground="{DynamicResource SystemFillColorCriticalBrush}" TextWrapping="Wrap" Margin="0,0,0,6"
+                               Visibility="{Binding HasError, Converter={StaticResource BoolToVisibility}}" />
+                    <CheckBox Content="For all my novels" IsChecked="{Binding ForAllNovels}" Margin="0,0,0,8" />
+                    <WrapPanel>
+                        <ui:Button Appearance="Primary" Content="Save as name" Icon="{ui:SymbolIcon PersonAdd24}" Margin="0,0,6,6" Command="{Binding SaveNameCommand}"
+                                   ToolTip="A name wins over the phrases around it (Enter)" />
+                        <ui:Button Content="Save as meaning" Margin="0,0,6,6" Command="{Binding SavePhraseCommand}" ToolTip="The meaning of this phrase (Ctrl+Enter)" />
+                        <ui:Button Content="Read from here" Icon="{ui:SymbolIcon Play24}" Margin="0,0,6,6" Command="{Binding ReadFromHereCommand}"
+                                   ToolTip="Read aloud from the sentence this word is in" />
+                        <ui:Button Content="Remove" Icon="{ui:SymbolIcon Delete24}" Margin="0,0,6,6" Command="{Binding RemoveCommand}"
+                                   Visibility="{Binding HasSaved, Converter={StaticResource BoolToVisibility}}" />
+                    </WrapPanel>
+                </StackPanel>
+            </Border>
+        </Popup>
+    </Grid>
+</Page>

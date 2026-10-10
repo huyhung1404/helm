@@ -1,6 +1,7 @@
 using Helm.Modules.CommandPalette;
 using Helm.Modules.Missions;
 using Helm.Modules.Notes;
+using Helm.Modules.NovelReader;
 using Helm.Modules.QuickCapture;
 using Helm.Modules.Ssh;
 using Helm.Modules.Scratch;
@@ -26,6 +27,7 @@ internal static class HelmModules
         services.AddWalletModule();
         services.AddNotesModule();
         services.AddWatchLaterModule();
+        services.AddNovelReaderModule();
         services.AddScratchModule();
         services.AddSshModule();
         services.AddQuickCaptureModule();

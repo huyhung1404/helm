@@ -3,6 +3,37 @@
 All notable changes to Helm. The top section is used as the GitHub release body and as the Velopack release notes.
 Format: [Keep a Changelog](https://keepachangelog.com), versions follow [SemVer](https://semver.org).
 
+## [0.35.0] - 2026-10-10
+
+### Added
+- **Novel Reader** (PC and Android): read Chinese web novels in Vietnamese. Add a .txt file (UTF-8, UTF-16 or GB18030/GBK; chapters
+  are found by their headings, "第12章", "番外…", or the way downloaders lay them out) and it is converted the
+  QuickTranslator way with the VietPhrase, Names, Hán Việt, LuatNhan and Pronouns dictionaries, a chapter at a time.
+  Click a word to see its Chinese, Hán Việt and known meanings, widen or narrow the selection, and save a name or a
+  meaning for this novel or for all of them; the chapter converts again at once. *Find names* suggests likely
+  character names with their Hán Việt reading. Read aloud like an audiobook with Microsoft's natural Vietnamese voice
+  HoaiMy (online; a Vietnamese Windows voice takes over offline): a player bar to pause mid-sentence, skip by
+  sentence or paragraph and seek through the chapter, a sleep timer that fades out, the media keys and headset
+  buttons, speed ([ and ]), pitch, volume and the pause between paragraphs. The paragraph and sentence being read are
+  highlighted and followed as it reads (scroll away and *Back to reading position* returns); double-click a sentence
+  or use a paragraph's ▶ to read from there, and it goes on with the next chapter. While it reads, the rest of the
+  chapter (and the start of the next) downloads ahead and is kept on the PC, so listening again plays at once and
+  offline; *Download* fetches this chapter, the next ten or the whole novel for listening offline (✓ in the chapter
+  list), and the settings show and clear the downloaded audio. Each novel is a private folder that syncs end-to-end encrypted with Helm Sync: its text,
+  the names and meanings you saved, and where you stopped reading; opening Novel Reader continues the novel read last,
+  where it stopped, and offers to jump ahead when another device read further. The dictionaries download once
+  (*Download dictionaries*, sources editable) or import from files, and sync too, so a new device or a reinstall
+  gets them by itself. Give a novel a cover picture (or keep the drawn one) on its card in the library; covers sync too.
+  Voices on the PC: HoaiMy through a hidden Microsoft Edge (starts in about half a second), HoaiMy online, and the
+  female voices of VieNeu-TTS running on the PC itself (a local server Helm starts and stops; set its folder in the
+  settings).
+- **Novel Reader on Android**: the same library, reading, names and sync on the phone, and reading aloud that keeps
+  going with Helm in the background or the screen off, chapter after chapter (the whole next chapter downloads ahead).
+  Pause, skip and stop from its notification, the lock screen, headphones or a watch; a call or another app playing
+  pauses it and it goes on afterwards, and unplugging headphones pauses it. It reads with the phone's own Vietnamese
+  voices (offline, e.g. Google's; *Get Vietnamese voices* installs them) or HoaiMy online. Tap a word to fix it,
+  double-tap to read aloud from there; chapters, reading options and names open as sheets.
+
 ## [0.34.0] - 2026-10-07
 
 ### Added

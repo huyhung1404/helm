@@ -1,0 +1,169 @@
+<ui:ModulePageBase xmlns="https://github.com/avaloniaui"
+                   xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                   xmlns:ui="using:Helm.Core.Ui"
+                   xmlns:vm="using:Helm.Modules.NovelReader"
+                   xmlns:speech="using:Helm.Modules.NovelReader.Speech"
+                   x:Class="Helm.Modules.NovelReader.NovelReaderPage"
+                   x:DataType="vm:NovelReaderViewModel">
+
+    <!-- Novel Reader's settings (Home → Utilities). Reading is on NovelReaderContentPage. -->
+    <StackPanel>
+        <Border Classes="infobar" IsVisible="{Binding HasMessage}">
+            <TextBlock Text="{Binding Message}" TextWrapping="Wrap" />
+        </Border>
+        <Border Classes="card">
+            <StackPanel Spacing="8">
+                <TextBlock Text="Open Novel Reader" Classes="title" />
+                <TextBlock Text="Your novels, where you stopped reading and the names you fixed, from every device. Also in the menu and on Home." Classes="secondary" />
+                <Button Classes="accent" Content="Open Novel Reader" Click="OpenReader_Click" />
+            </StackPanel>
+        </Border>
+
+        <!-- Dictionaries -->
+        <TextBlock Text="Dictionaries" Classes="section" />
+        <Border Classes="card">
+            <StackPanel Spacing="8">
+                <TextBlock Text="QuickTranslator dictionaries" Classes="title" />
+                <TextBlock Text="{Binding DictionaryStatus}" Classes="secondary" />
+                <TextBlock Text="Dictionaries added on your PC arrive here through Helm Sync. You can also download them on the phone (about 30 MB)." Classes="secondary" />
+                <WrapPanel>
+                    <Button Margin="0,0,8,8" Content="Download dictionaries" Command="{Binding DownloadDictionariesCommand}" IsEnabled="{Binding !IsDownloading}" />
+                    <Button Margin="0,0,8,8" Content="Cancel" Command="{Binding CancelDownloadCommand}" IsVisible="{Binding IsDownloading}" />
+                    <Button Margin="0,0,8,8" Content="Import files" Click="ImportDictionaries_Click" />
+                </WrapPanel>
+                <TextBlock Text="{Binding DownloadStatus}" Classes="secondary" />
+            </StackPanel>
+        </Border>
+
+        <!-- Reading aloud -->
+        <TextBlock Text="Reading aloud" Classes="section" />
+        <Border Classes="card">
+            <StackPanel Spacing="8">
+                <TextBlock Text="Voice" Classes="title" />
+                <ComboBox HorizontalAlignment="Stretch" ItemsSource="{Binding Voices}" SelectedItem="{Binding SelectedVoice}" AutomationProperties.Name="Voice">
+                    <ComboBox.ItemTemplate>
+                        <DataTemplate DataType="speech:SpeechVoice">
+                            <StackPanel>
+                                <TextBlock Text="{Binding Label}" />
+                                <TextBlock Text="{Binding Description}" Classes="secondary" IsVisible="{Binding Description, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+                            </StackPanel>
+                        </DataTemplate>
+                    </ComboBox.ItemTemplate>
+                </ComboBox>
+                <TextBlock Text="The phone's own Vietnamese voices work offline and start at once. HoaiMy (online) needs the network; what it reads is kept on the phone." Classes="secondary" />
+                <WrapPanel>
+                    <Button Margin="0,0,8,8" Content="Listen" Click="Listen_Click" />
+                    <Button Margin="0,0,8,8" Content="Get Vietnamese voices" Click="InstallVoices_Click" />
+                    <Button Margin="0,0,8,8" Content="Text-to-speech settings" Click="VoiceSettings_Click" />
+                </WrapPanel>
+                <TextBlock x:Name="ListenNote" Classes="secondary" IsVisible="False" />
+
+                <Border Classes="row">
+                    <StackPanel Spacing="4">
+                        <DockPanel>
+                            <TextBlock DockPanel.Dock="Right" Text="{Binding SpeechRateLabel}" />
+                            <TextBlock Text="Speed" />
+                        </DockPanel>
+                        <Slider Minimum="0.5" Maximum="3" SmallChange="0.1" LargeChange="0.25" TickFrequency="0.1" IsSnapToTickEnabled="True"
+                                Value="{Binding SpeechRate}" AutomationProperties.Name="Speed" />
+                    </StackPanel>
+                </Border>
+                <Border Classes="row" IsEnabled="{Binding SupportsPitch}">
+                    <StackPanel Spacing="4">
+                        <TextBlock Text="Pitch" />
+                        <Slider Minimum="0.5" Maximum="2" SmallChange="0.1" TickFrequency="0.1" IsSnapToTickEnabled="True"
+                                Value="{Binding SpeechPitch}" AutomationProperties.Name="Pitch" />
+                    </StackPanel>
+                </Border>
+                <Border Classes="row">
+                    <StackPanel Spacing="4">
+                        <TextBlock Text="Volume" />
+                        <Slider Minimum="0" Maximum="1" SmallChange="0.05" Value="{Binding SpeechVolume}" AutomationProperties.Name="Volume" />
+                    </StackPanel>
+                </Border>
+                <Border Classes="row">
+                    <StackPanel Spacing="4">
+                        <TextBlock Text="Pause between paragraphs" />
+                        <Slider Minimum="0" Maximum="2" SmallChange="0.1" TickFrequency="0.1" IsSnapToTickEnabled="True"
+                                Value="{Binding ParagraphPause}" AutomationProperties.Name="Pause between paragraphs" />
+                    </StackPanel>
+                </Border>
+                <Border Classes="row">
+                    <DockPanel>
+                        <ToggleSwitch DockPanel.Dock="Right" IsChecked="{Binding ContinueToNextChapter}" OnContent="" OffContent="" AutomationProperties.Name="Go on to the next chapter" />
+                        <StackPanel VerticalAlignment="Center" Spacing="2">
+                            <TextBlock Text="Go on to the next chapter" />
+                            <TextBlock Text="Keeps reading chapter after chapter, also with the screen off. The next chapter is downloaded ahead in full." Classes="secondary" />
+                        </StackPanel>
+                    </DockPanel>
+                </Border>
+                <Border Classes="row">
+                    <DockPanel>
+                        <ToggleSwitch DockPanel.Dock="Right" IsChecked="{Binding FallbackToOfflineVoice}" OnContent="" OffContent="" AutomationProperties.Name="Use an offline voice when offline" />
+                        <StackPanel VerticalAlignment="Center" Spacing="2">
+                            <TextBlock Text="Use an offline voice when offline" />
+                            <TextBlock Text="When HoaiMy cannot be reached, the phone's Vietnamese voice reads on." Classes="secondary" />
+                        </StackPanel>
+                    </DockPanel>
+                </Border>
+            </StackPanel>
+        </Border>
+
+        <!-- In the background -->
+        <TextBlock Text="With the screen off" Classes="section" />
+        <Border Classes="card">
+            <StackPanel Spacing="8">
+                <TextBlock Text="Reading in the background" Classes="title" />
+                <TextBlock Text="Novel Reader keeps reading with Helm in the background or the screen off, and goes on to the next chapter. Pause, skip and stop from the notification, the lock screen or your headphones. Unplugging headphones or a call pauses it." Classes="secondary" />
+                <TextBlock x:Name="BatteryNote" Classes="secondary" />
+                <Button Content="Battery settings" Click="Battery_Click" />
+            </StackPanel>
+        </Border>
+
+        <!-- Downloaded audio -->
+        <TextBlock Text="Downloaded audio" Classes="section" />
+        <Border Classes="card">
+            <StackPanel Spacing="8">
+                <TextBlock Text="Audio kept on this phone" Classes="title" />
+                <TextBlock Text="{Binding AudioCacheSize}" Classes="secondary" />
+                <Button Classes="danger" Content="Delete downloaded audio" Command="{Binding ClearAudioCommand}" />
+            </StackPanel>
+        </Border>
+
+        <!-- The text -->
+        <TextBlock Text="Text" Classes="section" />
+        <Border Classes="card">
+            <StackPanel Spacing="8">
+                <TextBlock Text="Show" Classes="title" />
+                <ComboBox HorizontalAlignment="Stretch" ItemsSource="{Binding ModeNames}" SelectedIndex="{Binding ModeIndex}" AutomationProperties.Name="What the page shows" />
+                <Border Classes="row">
+                    <DockPanel>
+                        <ToggleSwitch DockPanel.Dock="Right" IsChecked="{Binding PrioritizeNames}" OnContent="" OffContent="" AutomationProperties.Name="Names first" />
+                        <StackPanel VerticalAlignment="Center" Spacing="2">
+                            <TextBlock Text="Names first" />
+                            <TextBlock Text="A name wins over a longer phrase that starts before it." Classes="secondary" />
+                        </StackPanel>
+                    </DockPanel>
+                </Border>
+                <Border Classes="row">
+                    <DockPanel>
+                        <ToggleSwitch DockPanel.Dock="Right" IsChecked="{Binding ShowChinese}" OnContent="" OffContent="" AutomationProperties.Name="Show the Chinese" />
+                        <TextBlock Text="Show the Chinese under each paragraph" VerticalAlignment="Center" TextWrapping="Wrap" />
+                    </DockPanel>
+                </Border>
+                <Border Classes="row">
+                    <StackPanel Spacing="4">
+                        <TextBlock Text="Font size" />
+                        <Slider Minimum="12" Maximum="40" SmallChange="1" TickFrequency="1" IsSnapToTickEnabled="True" Value="{Binding FontSize}" AutomationProperties.Name="Font size" />
+                    </StackPanel>
+                </Border>
+                <Border Classes="row">
+                    <StackPanel Spacing="4">
+                        <TextBlock Text="Line spacing" />
+                        <Slider Minimum="1" Maximum="3" SmallChange="0.1" TickFrequency="0.1" IsSnapToTickEnabled="True" Value="{Binding LineSpacing}" AutomationProperties.Name="Line spacing" />
+                    </StackPanel>
+                </Border>
+            </StackPanel>
+        </Border>
+    </StackPanel>
+</ui:ModulePageBase>

@@ -90,6 +90,7 @@
     <ProjectReference Include="..\Helm.Modules.WatchLater.Android\Helm.Modules.WatchLater.Android.csproj" />
     <ProjectReference Include="..\Helm.Modules.Scratch.Android\Helm.Modules.Scratch.Android.csproj" />
     <ProjectReference Include="..\Helm.Modules.Wallet.Android\Helm.Modules.Wallet.Android.csproj" />
+    <ProjectReference Include="..\Helm.Modules.NovelReader.Android\Helm.Modules.NovelReader.Android.csproj" />
   </ItemGroup>
 
 </Project>

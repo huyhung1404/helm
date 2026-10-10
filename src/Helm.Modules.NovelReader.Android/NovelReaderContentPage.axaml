@@ -1,0 +1,561 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:ic="using:FluentIcons.Avalonia"
+             xmlns:vm="using:Helm.Modules.NovelReader"
+             xmlns:speech="using:Helm.Modules.NovelReader.Speech"
+             x:Class="Helm.Modules.NovelReader.NovelReaderContentPage"
+             x:DataType="vm:NovelReaderViewModel">
+
+    <!-- Novel Reader itself (drawer and Quick access): the library of synced novels, and the open novel with the
+         converted text (tap a word to fix it, double-tap to read aloud from there), the player at the bottom, and
+         sheets for the chapters, the reading options, the names and the tapped word. While a novel is open the page is
+         exactly as tall as the screen, so the text scrolls on its own and the player stays put. Options live on
+         NovelReaderPage (Home → Utilities). -->
+    <UserControl.Resources>
+        <SolidColorBrush x:Key="ParagraphFill" Color="{DynamicResource SystemAccentColor}" Opacity="0.14" />
+        <SolidColorBrush x:Key="AccentText" Color="{DynamicResource SystemAccentColor}" />
+    </UserControl.Resources>
+
+    <UserControl.Styles>
+        <!-- Icon-only action, a 44 dp touch target -->
+        <Style Selector="Button.icon">
+            <Setter Property="Width" Value="44" />
+            <Setter Property="Height" Value="44" />
+            <Setter Property="Padding" Value="0" />
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="HorizontalContentAlignment" Value="Center" />
+            <Setter Property="VerticalContentAlignment" Value="Center" />
+        </Style>
+        <!-- A disabled one (no previous chapter) stays flat instead of turning grey -->
+        <Style Selector="Button.icon:disabled /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="Transparent" />
+        </Style>
+        <Style Selector="Button.play">
+            <Setter Property="Width" Value="56" />
+            <Setter Property="Height" Value="56" />
+            <Setter Property="CornerRadius" Value="28" />
+            <Setter Property="Padding" Value="0" />
+            <Setter Property="HorizontalContentAlignment" Value="Center" />
+            <Setter Property="VerticalContentAlignment" Value="Center" />
+        </Style>
+        <Style Selector="Button.chip">
+            <Setter Property="Margin" Value="0,0,6,6" />
+            <Setter Property="Padding" Value="10,6" />
+        </Style>
+        <Style Selector="Button.action">
+            <Setter Property="HorizontalAlignment" Value="Stretch" />
+            <Setter Property="HorizontalContentAlignment" Value="Center" />
+            <Setter Property="Padding" Value="8,10" />
+        </Style>
+        <!-- A paragraph: the one read aloud is filled, where reading stopped has a bar -->
+        <Style Selector="Border.paragraph">
+            <Setter Property="Padding" Value="10,6" />
+            <Setter Property="Margin" Value="0,0,0,4" />
+            <Setter Property="CornerRadius" Value="6" />
+            <Setter Property="BorderThickness" Value="3,0,0,0" />
+            <Setter Property="BorderBrush" Value="Transparent" />
+            <Setter Property="Background" Value="Transparent" />
+        </Style>
+        <Style Selector="Border.paragraph.heading">
+            <Setter Property="Margin" Value="0,0,0,12" />
+        </Style>
+        <Style Selector="Border.paragraph.resume">
+            <Setter Property="BorderBrush" Value="{DynamicResource HelmSecondaryText}" />
+        </Style>
+        <Style Selector="Border.paragraph.speaking">
+            <Setter Property="Background" Value="{DynamicResource ParagraphFill}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource SystemAccentColor}" />
+        </Style>
+        <Style Selector="TextBlock.heading">
+            <Setter Property="FontWeight" Value="SemiBold" />
+        </Style>
+        <!-- A sheet sliding up from the bottom -->
+        <Style Selector="Border.sheet">
+            <Setter Property="Background" Value="{DynamicResource HelmCardBackground}" />
+            <Setter Property="CornerRadius" Value="12,12,0,0" />
+            <Setter Property="Padding" Value="16,8,16,16" />
+            <Setter Property="BoxShadow" Value="0 -4 24 0 #40000000" />
+        </Style>
+        <Style Selector="Border.cover">
+            <Setter Property="CornerRadius" Value="6" />
+            <Setter Property="ClipToBounds" Value="True" />
+        </Style>
+    </UserControl.Styles>
+
+    <Panel>
+        <DockPanel>
+            <StackPanel DockPanel.Dock="Top">
+                <!-- Shown while the tool is turned off -->
+                <Border x:Name="OffBar" Classes="infobar warning" IsVisible="False">
+                    <TextBlock Text="Novel Reader is turned off. Your novels and names are kept; turn Novel Reader on in its settings to read." TextWrapping="Wrap" />
+                </Border>
+
+                <!-- What happened: a problem, an import -->
+                <Border Classes="infobar" IsVisible="{Binding HasMessage}">
+                    <DockPanel>
+                        <Button DockPanel.Dock="Right" Classes="icon" Command="{Binding DismissMessageCommand}" AutomationProperties.Name="Dismiss">
+                            <ic:SymbolIcon Symbol="Dismiss" FontSize="16" />
+                        </Button>
+                        <TextBlock Text="{Binding Message}" TextWrapping="Wrap" VerticalAlignment="Center" />
+                    </DockPanel>
+                </Border>
+
+                <!-- Another device read further -->
+                <Border Classes="infobar" IsVisible="{Binding HasRemoteProgressOffer}">
+                    <StackPanel Spacing="8">
+                        <TextBlock Text="{Binding RemoteProgressOffer}" TextWrapping="Wrap" />
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                            <Button Classes="accent" Content="Continue" Command="{Binding AcceptRemoteProgressCommand}" />
+                            <Button Content="Stay here" Command="{Binding DismissRemoteProgressCommand}" />
+                        </StackPanel>
+                    </StackPanel>
+                </Border>
+
+                <!-- Busy: opening, downloading, adding -->
+                <StackPanel Margin="0,0,0,8" Spacing="4" IsVisible="{Binding IsBusy}">
+                    <TextBlock Text="{Binding BusyText}" Classes="secondary" />
+                    <ProgressBar Minimum="0" Maximum="1" Value="{Binding BusyProgress}" />
+                </StackPanel>
+            </StackPanel>
+
+            <Panel x:Name="Body">
+                <!-- ================================ Library ================================ -->
+                <StackPanel IsVisible="{Binding IsLibraryShown}" Spacing="8">
+                    <!-- No dictionaries yet -->
+                    <Border Classes="infobar warning" IsVisible="{Binding NeedsDictionaries}">
+                        <StackPanel Spacing="8">
+                            <TextBlock Text="No dictionaries yet" FontWeight="SemiBold" />
+                            <TextBlock Text="Novel Reader needs the QuickTranslator dictionaries to convert. They arrive from your PC through Helm Sync, or download them here once (about 30 MB)." TextWrapping="Wrap" />
+                            <StackPanel Orientation="Horizontal" Spacing="8">
+                                <Button Content="Download dictionaries" Command="{Binding DownloadDictionariesCommand}" IsEnabled="{Binding !IsDownloading}" />
+                            </StackPanel>
+                            <TextBlock Text="{Binding DownloadStatus}" Classes="secondary" />
+                        </StackPanel>
+                    </Border>
+
+                    <!-- Add a novel -->
+                    <Border Classes="card">
+                        <Panel>
+                            <StackPanel Spacing="8" IsVisible="{Binding !IsAdding}">
+                                <TextBlock Text="Add a novel" Classes="title" />
+                                <TextBlock Text="A Chinese .txt file in any encoding. It is kept privately and syncs to your other devices." Classes="secondary" />
+                                <Button Classes="accent" Click="AddNovel_Click" AutomationProperties.Name="Add a novel">
+                                    <StackPanel Orientation="Horizontal" Spacing="6">
+                                        <ic:SymbolIcon Symbol="DocumentAdd" FontSize="16" />
+                                        <TextBlock Text="Add a novel (.txt)" />
+                                    </StackPanel>
+                                </Button>
+                            </StackPanel>
+                            <StackPanel Spacing="8" IsVisible="{Binding IsAdding}">
+                                <TextBlock Text="Add a novel" Classes="title" />
+                                <TextBlock Text="{Binding AddSummary}" Classes="secondary" />
+                                <TextBox Text="{Binding AddTitle}" PlaceholderText="Title" AutomationProperties.Name="Title" />
+                                <Grid ColumnDefinitions="*,8,*">
+                                    <Button Classes="accent action" Content="Add" Command="{Binding ConfirmAddCommand}" />
+                                    <Button Grid.Column="2" Classes="action" Content="Cancel" Command="{Binding CancelAddCommand}" />
+                                </Grid>
+                            </StackPanel>
+                        </Panel>
+                    </Border>
+
+                    <TextBlock Text="Your novels" Classes="section" IsVisible="{Binding HasBooks}" />
+                    <TextBlock Text="No novels yet. Add a .txt file to start reading." Classes="secondary" Margin="4,8,0,0" IsVisible="{Binding HasNoBooks}" />
+
+                    <!-- One card per novel: a private folder with its text, names and progress -->
+                    <ItemsControl x:Name="BookList" ItemsSource="{Binding Books}">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate DataType="vm:BookCardViewModel">
+                                <Border Classes="card" Padding="12">
+                                    <Grid ColumnDefinitions="Auto,*">
+                                        <!-- The cover: a picture, or drawn from the title. Tap to read. -->
+                                        <Button Classes="flat" Padding="0" Width="72" Height="102" VerticalAlignment="Top" AutomationProperties.Name="Read"
+                                                Command="{Binding $parent[ItemsControl].((vm:NovelReaderViewModel)DataContext).OpenBookCommand}" CommandParameter="{Binding}">
+                                            <Panel>
+                                                <Border Classes="cover" Background="{Binding Id, Converter={x:Static vm:CoverGradient.Instance}}" IsVisible="{Binding HasNoCover}">
+                                                    <TextBlock Text="{Binding Initials}" FontSize="24" FontWeight="SemiBold" Foreground="White"
+                                                               HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                                </Border>
+                                                <Border Classes="cover" Background="{Binding Cover, Converter={x:Static vm:CoverImage.Instance}}" IsVisible="{Binding HasCover}" />
+                                            </Panel>
+                                        </Button>
+                                        <StackPanel Grid.Column="1" Margin="12,0,0,0" Spacing="2">
+                                            <TextBlock Text="{Binding Title}" FontSize="16" Classes="title" IsVisible="{Binding IsNotRenaming}" />
+                                            <!-- Editing: the title and the cover -->
+                                            <StackPanel Spacing="6" IsVisible="{Binding IsRenaming}">
+                                                <TextBox Text="{Binding TitleDraft}" AutomationProperties.Name="Title" />
+                                                <WrapPanel>
+                                                    <Button Classes="accent chip" Content="Save"
+                                                            Command="{Binding $parent[ItemsControl].((vm:NovelReaderViewModel)DataContext).SaveRenameCommand}" CommandParameter="{Binding}" />
+                                                    <Button Classes="chip" Content="Cancel"
+                                                            Command="{Binding $parent[ItemsControl].((vm:NovelReaderViewModel)DataContext).CancelRenameCommand}" CommandParameter="{Binding}" />
+                                                    <Button Classes="chip" Content="Change cover" Tag="cover" />
+                                                    <Button Classes="chip" Content="Remove cover" IsVisible="{Binding HasCover}"
+                                                            Command="{Binding $parent[ItemsControl].((vm:NovelReaderViewModel)DataContext).RemoveCoverCommand}" CommandParameter="{Binding}" />
+                                                </WrapPanel>
+                                            </StackPanel>
+                                            <TextBlock Text="{Binding Subtitle}" Classes="secondary" />
+                                            <TextBlock Text="{Binding Names}" Classes="secondary" IsVisible="{Binding HasNames}" />
+                                            <TextBlock Text="{Binding Status}" Foreground="{DynamicResource AccentText}" FontSize="12" IsVisible="{Binding HasStatus}" />
+                                            <StackPanel Orientation="Horizontal" Margin="0,6,0,0" IsVisible="{Binding IsNotRenaming}">
+                                                <Button Classes="accent" Content="Read"
+                                                        Command="{Binding $parent[ItemsControl].((vm:NovelReaderViewModel)DataContext).OpenBookCommand}" CommandParameter="{Binding}" />
+                                                <Button Classes="icon" Margin="4,0,0,0" AutomationProperties.Name="Edit title and cover"
+                                                        Command="{Binding $parent[ItemsControl].((vm:NovelReaderViewModel)DataContext).StartRenameCommand}" CommandParameter="{Binding}">
+                                                    <ic:SymbolIcon Symbol="Edit" FontSize="18" />
+                                                </Button>
+                                                <Button Classes="icon" AutomationProperties.Name="Delete"
+                                                        Command="{Binding $parent[ItemsControl].((vm:NovelReaderViewModel)DataContext).DeleteBookCommand}" CommandParameter="{Binding}">
+                                                    <ic:SymbolIcon Symbol="Delete" FontSize="18" />
+                                                </Button>
+                                            </StackPanel>
+                                        </StackPanel>
+                                    </Grid>
+                                </Border>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </StackPanel>
+
+                <!-- ================================ Reader ================================ -->
+                <DockPanel IsVisible="{Binding IsBookOpen}">
+                    <!-- The novel, the chapter, the sheets -->
+                    <Grid DockPanel.Dock="Top" ColumnDefinitions="Auto,Auto,*,Auto,Auto" Margin="0,0,0,4">
+                        <Button Classes="icon" Command="{Binding ShowLibraryCommand}" AutomationProperties.Name="Library">
+                            <ic:SymbolIcon Symbol="ArrowLeft" FontSize="20" />
+                        </Button>
+                        <Panel Grid.Column="1" Width="28" Height="40" Margin="4,0,10,0" DataContext="{Binding OpenBookCard}" x:DataType="vm:BookCardViewModel">
+                            <Border Classes="cover" CornerRadius="3" Background="{Binding Id, Converter={x:Static vm:CoverGradient.Instance}}" IsVisible="{Binding HasNoCover}">
+                                <TextBlock Text="{Binding Initials}" FontSize="11" FontWeight="SemiBold" Foreground="White" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                            </Border>
+                            <Border Classes="cover" CornerRadius="3" Background="{Binding Cover, Converter={x:Static vm:CoverImage.Instance}}" IsVisible="{Binding HasCover}" />
+                        </Panel>
+                        <StackPanel Grid.Column="2" VerticalAlignment="Center">
+                            <TextBlock Text="{Binding BookTitle}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+                            <TextBlock Text="{Binding ChapterPosition, StringFormat='Chapter {0}'}" Classes="secondary" />
+                        </StackPanel>
+                        <Button Grid.Column="3" Classes="icon" Click="Names_Click" AutomationProperties.Name="Names">
+                            <ic:SymbolIcon Symbol="People" FontSize="20" />
+                        </Button>
+                        <Button Grid.Column="4" Classes="icon" Click="Options_Click" AutomationProperties.Name="Reading options">
+                            <ic:SymbolIcon Symbol="TextFont" FontSize="20" />
+                        </Button>
+                    </Grid>
+
+                    <Grid DockPanel.Dock="Top" ColumnDefinitions="Auto,*,Auto" Margin="0,0,0,6">
+                        <Button Classes="icon" Command="{Binding PreviousChapterCommand}" IsEnabled="{Binding CanGoBack}" AutomationProperties.Name="Previous chapter">
+                            <ic:SymbolIcon Symbol="ChevronLeft" FontSize="18" />
+                        </Button>
+                        <Button x:Name="ChapterButton" Grid.Column="1" HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch" Click="Chapters_Click"
+                                AutomationProperties.Name="Chapters">
+                            <DockPanel>
+                                <ic:SymbolIcon DockPanel.Dock="Right" Symbol="List" FontSize="16" Margin="6,0,0,0" />
+                                <TextBlock x:Name="ChapterTitle" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
+                            </DockPanel>
+                        </Button>
+                        <Button Grid.Column="2" Classes="icon" Command="{Binding NextChapterCommand}" IsEnabled="{Binding CanGoForward}" AutomationProperties.Name="Next chapter">
+                            <ic:SymbolIcon Symbol="ChevronRight" FontSize="18" />
+                        </Button>
+                    </Grid>
+
+                    <Border DockPanel.Dock="Top" Classes="infobar warning" IsVisible="{Binding NeedsDictionaries}">
+                        <TextBlock Text="No dictionaries yet: the text is shown in Chinese. Download them in the library or in the settings." TextWrapping="Wrap" />
+                    </Border>
+
+                    <!-- The player: like an audiobook app, always at the bottom -->
+                    <Border DockPanel.Dock="Bottom" Classes="card" Padding="12,8" Margin="0,8,0,0">
+                        <StackPanel Spacing="2">
+                            <!-- The sentence being read: tap to go back to it -->
+                            <TextBlock x:Name="CurrentSentence" Text="{Binding CurrentSentenceText}" Classes="secondary" MaxLines="2" TextTrimming="CharacterEllipsis"
+                                       IsVisible="{Binding IsSpeaking}" Tapped="CurrentSentence_Tapped" />
+                            <!-- Seek by paragraph; the faint bar behind is the audio already downloaded -->
+                            <Panel>
+                                <ProgressBar Height="4" MinHeight="4" Margin="10,0" VerticalAlignment="Center" Opacity="0.45" IsHitTestVisible="False"
+                                             Minimum="0" Maximum="{Binding PlayerParagraphMax}" Value="{Binding PlayerReady}" />
+                                <Slider x:Name="SeekBar" Minimum="0" Maximum="{Binding PlayerParagraphMax}" Value="{Binding PlayerParagraph}"
+                                        SmallChange="1" LargeChange="5" TickFrequency="1" IsSnapToTickEnabled="True" AutomationProperties.Name="Position in the chapter" />
+                            </Panel>
+                            <DockPanel>
+                                <Button DockPanel.Dock="Right" Padding="8,2" Background="Transparent" BorderThickness="0" Click="Options_Click"
+                                        AutomationProperties.Name="Speed and voice">
+                                    <TextBlock Text="{Binding SpeechRateLabel}" Classes="secondary" />
+                                </Button>
+                                <TextBlock Text="{Binding PlayerPosition}" Classes="secondary" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
+                            </DockPanel>
+                            <Grid ColumnDefinitions="*,Auto,Auto,Auto,Auto,Auto,*">
+                                <Button Grid.Column="1" Classes="icon" Command="{Binding PreviousParagraphCommand}" AutomationProperties.Name="Previous paragraph">
+                                    <ic:SymbolIcon Symbol="Previous" FontSize="20" />
+                                </Button>
+                                <Button Grid.Column="2" Classes="icon" Command="{Binding PreviousSentenceCommand}" AutomationProperties.Name="Previous sentence">
+                                    <ic:SymbolIcon Symbol="Rewind" FontSize="20" />
+                                </Button>
+                                <Button Grid.Column="3" Classes="accent play" Margin="8,0" Command="{Binding PlayPauseCommand}" AutomationProperties.Name="Read aloud or pause">
+                                    <Panel>
+                                        <ic:SymbolIcon Symbol="Play" FontSize="24" IsVisible="{Binding !IsPlaying}" />
+                                        <ic:SymbolIcon Symbol="Pause" FontSize="24" IsVisible="{Binding IsPlaying}" />
+                                    </Panel>
+                                </Button>
+                                <Button Grid.Column="4" Classes="icon" Command="{Binding NextSentenceCommand}" AutomationProperties.Name="Next sentence">
+                                    <ic:SymbolIcon Symbol="FastForward" FontSize="20" />
+                                </Button>
+                                <Button Grid.Column="5" Classes="icon" Command="{Binding NextParagraphCommand}" AutomationProperties.Name="Next paragraph">
+                                    <ic:SymbolIcon Symbol="Next" FontSize="20" />
+                                </Button>
+                                <Button Grid.Column="6" Classes="icon" HorizontalAlignment="Right" Command="{Binding StopReadingCommand}" IsVisible="{Binding IsSpeaking}"
+                                        AutomationProperties.Name="Stop reading aloud">
+                                    <ic:SymbolIcon Symbol="Stop" FontSize="20" />
+                                </Button>
+                            </Grid>
+                            <!-- Loading, downloading, the sleep timer -->
+                            <ProgressBar IsIndeterminate="True" Height="2" MinHeight="2" IsVisible="{Binding IsLoadingVoice}" />
+                            <DockPanel IsVisible="{Binding IsDownloadingAudio}">
+                                <Button DockPanel.Dock="Right" Classes="icon" Width="32" Height="32" Command="{Binding StopAudioDownloadCommand}" AutomationProperties.Name="Stop downloading">
+                                    <ic:SymbolIcon Symbol="Dismiss" FontSize="14" />
+                                </Button>
+                                <StackPanel VerticalAlignment="Center" Spacing="2">
+                                    <TextBlock Text="{Binding AudioDownloadText}" Classes="secondary" />
+                                    <ProgressBar Height="3" MinHeight="3" Minimum="0" Maximum="1" Value="{Binding AudioDownloadFraction}" />
+                                </StackPanel>
+                            </DockPanel>
+                            <TextBlock Text="{Binding SleepTimerLabel}" Foreground="{DynamicResource AccentText}" FontSize="12" IsVisible="{Binding HasSleepTimer}" />
+                        </StackPanel>
+                    </Border>
+
+                    <Panel>
+                        <!-- The chapter: tap a word to fix it; double-tap to read aloud from its sentence -->
+                        <ScrollViewer x:Name="Scroller" HorizontalScrollBarVisibility="Disabled">
+                            <ItemsControl x:Name="ParagraphList" ItemsSource="{Binding Paragraphs}" Padding="0,0,0,48">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate DataType="vm:ParagraphViewModel">
+                                        <Border Classes="paragraph" Classes.heading="{Binding IsHeading}" Classes.resume="{Binding IsResumePoint}"
+                                                Classes.speaking="{Binding IsSpeaking}">
+                                            <StackPanel>
+                                                <TextBlock Text="Continue reading here" FontSize="12" Foreground="{DynamicResource AccentText}" Margin="0,0,0,2">
+                                                    <TextBlock.IsVisible>
+                                                        <MultiBinding Converter="{x:Static BoolConverters.And}">
+                                                            <Binding Path="IsResumePoint" />
+                                                            <Binding Path="!IsSpeaking" />
+                                                        </MultiBinding>
+                                                    </TextBlock.IsVisible>
+                                                </TextBlock>
+                                                <vm:SegmentText Line="{Binding Line}" Highlight="{Binding SpeakingSegments}" Classes.heading="{Binding IsHeading}"
+                                                                FontSize="{Binding $parent[ItemsControl].((vm:NovelReaderViewModel)DataContext).FontSize}"
+                                                                RelativeLineHeight="{Binding $parent[ItemsControl].((vm:NovelReaderViewModel)DataContext).LineSpacing}" />
+                                                <TextBlock Text="{Binding Chinese}" Classes="secondary" Margin="0,4,0,0" IsVisible="{Binding ShowChinese}"
+                                                           FontSize="{Binding $parent[ItemsControl].((vm:NovelReaderViewModel)DataContext).FontSize}" />
+                                            </StackPanel>
+                                        </Border>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </ScrollViewer>
+
+                        <!-- Scrolled away while listening: one tap back to the sentence being read -->
+                        <Button Classes="accent" HorizontalAlignment="Right" VerticalAlignment="Bottom" Margin="0,0,8,8" Command="{Binding FollowReadingCommand}"
+                                IsVisible="{Binding ShowBackToReading}" AutomationProperties.Name="Back to reading position">
+                            <StackPanel Orientation="Horizontal" Spacing="6">
+                                <ic:SymbolIcon Symbol="Location" FontSize="16" />
+                                <TextBlock Text="Back to reading position" />
+                            </StackPanel>
+                        </Button>
+                    </Panel>
+                </DockPanel>
+            </Panel>
+        </DockPanel>
+
+        <!-- ================================ Sheets ================================ -->
+        <Panel x:Name="SheetLayer" IsVisible="False">
+            <Border Background="{DynamicResource HelmScrim}" Tapped="Scrim_Tapped" />
+            <Border x:Name="SheetBox" Classes="sheet" VerticalAlignment="Bottom">
+                <DockPanel>
+                    <!-- The grip: tap to close -->
+                    <Border DockPanel.Dock="Top" Height="20" Background="Transparent" Tapped="Scrim_Tapped">
+                        <Border Width="36" Height="4" CornerRadius="2" Background="{DynamicResource HelmSecondaryText}" Opacity="0.5" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                    </Border>
+                    <Panel>
+                        <!-- The tapped word: its Chinese, Hán Việt, known meanings; save a name or a meaning -->
+                        <ScrollViewer x:Name="WordSheet" DataContext="{Binding Editor}" x:DataType="vm:WordEditorViewModel">
+                            <StackPanel Spacing="6">
+                                <DockPanel>
+                                    <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Top">
+                                        <Button Classes="icon" Width="36" Content="◀" Command="{Binding ExtendLeftCommand}" IsEnabled="{Binding CanExtendLeft}" AutomationProperties.Name="Widen left" />
+                                        <Button Classes="icon" Width="36" Content="▶" Command="{Binding ExtendRightCommand}" IsEnabled="{Binding CanExtendRight}" AutomationProperties.Name="Widen right" />
+                                        <Button Classes="icon" Width="36" Content="⇥" Command="{Binding ShrinkLeftCommand}" IsEnabled="{Binding CanShrink}" AutomationProperties.Name="Narrow left" />
+                                        <Button Classes="icon" Width="36" Content="⇤" Command="{Binding ShrinkRightCommand}" IsEnabled="{Binding CanShrink}" AutomationProperties.Name="Narrow right" />
+                                        <Button Classes="icon" Width="36" Command="{Binding CopyChineseCommand}" AutomationProperties.Name="Copy the Chinese">
+                                            <ic:SymbolIcon Symbol="Copy" FontSize="16" />
+                                        </Button>
+                                    </StackPanel>
+                                    <TextBlock Text="{Binding Chinese}" FontSize="22" FontWeight="SemiBold" TextWrapping="Wrap" VerticalAlignment="Center" />
+                                </DockPanel>
+                                <TextBlock Text="{Binding HanViet}" Classes="secondary" />
+                                <TextBlock Text="{Binding SavedAs}" Foreground="{DynamicResource AccentText}" TextWrapping="Wrap" IsVisible="{Binding HasSaved}" />
+                                <ItemsControl ItemsSource="{Binding Meanings}">
+                                    <ItemsControl.ItemsPanel>
+                                        <ItemsPanelTemplate>
+                                            <WrapPanel />
+                                        </ItemsPanelTemplate>
+                                    </ItemsControl.ItemsPanel>
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate x:DataType="x:String">
+                                            <Button Classes="chip" Content="{Binding}" CommandParameter="{Binding}"
+                                                    Command="{Binding $parent[ItemsControl].((vm:WordEditorViewModel)DataContext).PickMeaningCommand}" />
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                                <TextBox Text="{Binding Draft}" AutomationProperties.Name="Meaning" />
+                                <TextBlock Text="{Binding Error}" Foreground="{DynamicResource HelmDanger}" TextWrapping="Wrap" IsVisible="{Binding HasError}" />
+                                <CheckBox Content="For all my novels" IsChecked="{Binding ForAllNovels}" />
+                                <Grid ColumnDefinitions="*,8,*" RowDefinitions="Auto,8,Auto">
+                                    <Button Classes="accent action" Content="Save as name" Command="{Binding SaveNameCommand}" />
+                                    <Button Grid.Column="2" Classes="action" Content="Save as meaning" Command="{Binding SavePhraseCommand}" />
+                                    <Button Grid.Row="2" Classes="action" Command="{Binding ReadFromHereCommand}" AutomationProperties.Name="Read aloud from here">
+                                        <StackPanel Orientation="Horizontal" Spacing="6">
+                                            <ic:SymbolIcon Symbol="Play" FontSize="16" />
+                                            <TextBlock Text="Read from here" />
+                                        </StackPanel>
+                                    </Button>
+                                    <Button Grid.Row="2" Grid.Column="2" Classes="action danger" Content="Remove" Command="{Binding RemoveCommand}" IsVisible="{Binding HasSaved}" />
+                                </Grid>
+                            </StackPanel>
+                        </ScrollViewer>
+
+                        <!-- Chapters -->
+                        <DockPanel x:Name="ChapterSheet">
+                            <TextBlock DockPanel.Dock="Top" Text="Chapters" Classes="title" Margin="0,0,0,8" />
+                            <ListBox x:Name="ChapterList" ItemsSource="{Binding Chapters}" SelectionChanged="ChapterList_SelectionChanged" Background="Transparent">
+                                <ListBox.ItemTemplate>
+                                    <DataTemplate DataType="vm:ChapterItem">
+                                        <TextBlock Text="{Binding DisplayTitle}" TextTrimming="CharacterEllipsis" />
+                                    </DataTemplate>
+                                </ListBox.ItemTemplate>
+                            </ListBox>
+                        </DockPanel>
+
+                        <!-- Reading options: voice, speed, sleep timer, the text, downloading audio -->
+                        <ScrollViewer x:Name="OptionsSheet">
+                            <StackPanel Spacing="10">
+                                <TextBlock Text="Voice" Classes="title" />
+                                <ComboBox HorizontalAlignment="Stretch" ItemsSource="{Binding Voices}" SelectedItem="{Binding SelectedVoice}" AutomationProperties.Name="Voice">
+                                    <ComboBox.ItemTemplate>
+                                        <DataTemplate DataType="speech:SpeechVoice">
+                                            <TextBlock Text="{Binding Label}" TextTrimming="CharacterEllipsis" />
+                                        </DataTemplate>
+                                    </ComboBox.ItemTemplate>
+                                </ComboBox>
+                                <Grid ColumnDefinitions="Auto,*,Auto,Auto,Auto">
+                                    <TextBlock Text="Speed" VerticalAlignment="Center" />
+                                    <Button Grid.Column="2" Classes="icon" Content="−" FontSize="20" Command="{Binding SlowerCommand}" AutomationProperties.Name="Slower" />
+                                    <TextBlock Grid.Column="3" Width="44" TextAlignment="Center" VerticalAlignment="Center" Text="{Binding SpeechRateLabel}" />
+                                    <Button Grid.Column="4" Classes="icon" Content="+" FontSize="20" Command="{Binding FasterCommand}" AutomationProperties.Name="Faster" />
+                                </Grid>
+                                <TextBlock Text="Sleep timer" Classes="title" />
+                                <ComboBox HorizontalAlignment="Stretch" ItemsSource="{Binding SleepTimerNames}" SelectedIndex="{Binding SleepTimerIndex}" AutomationProperties.Name="Sleep timer" />
+                                <TextBlock Text="Show" Classes="title" />
+                                <ComboBox HorizontalAlignment="Stretch" ItemsSource="{Binding ModeNames}" SelectedIndex="{Binding ModeIndex}" AutomationProperties.Name="What the page shows" />
+                                <DockPanel>
+                                    <TextBlock DockPanel.Dock="Left" Text="Text size" VerticalAlignment="Center" Margin="0,0,12,0" />
+                                    <Slider Minimum="12" Maximum="40" SmallChange="1" TickFrequency="1" IsSnapToTickEnabled="True" Value="{Binding FontSize}" AutomationProperties.Name="Text size" />
+                                </DockPanel>
+                                <TextBlock Text="Download audio to listen offline" Classes="title" />
+                                <WrapPanel>
+                                    <Button Classes="chip" Content="This chapter" Command="{Binding DownloadThisChapterCommand}" />
+                                    <Button Classes="chip" Content="Next 10 chapters" Command="{Binding DownloadNextChaptersCommand}" />
+                                    <Button Classes="chip" Content="Whole novel" Command="{Binding DownloadWholeNovelCommand}" />
+                                    <Button Classes="chip" Content="Stop downloading" Command="{Binding StopAudioDownloadCommand}" IsVisible="{Binding IsDownloadingAudio}" />
+                                </WrapPanel>
+                                <TextBlock Text="{Binding ReadyLabel}" Classes="secondary" />
+                                <Button Content="More settings" Click="Settings_Click" />
+                            </StackPanel>
+                        </ScrollViewer>
+
+                        <!-- Names of this novel, and names found in it -->
+                        <DockPanel x:Name="NamesSheet">
+                            <Grid DockPanel.Dock="Top" ColumnDefinitions="*,8,*" Margin="0,0,0,8">
+                                <Button x:Name="SavedTab" Classes="action accent" Content="Saved" Click="SavedTab_Click" />
+                                <Button x:Name="SuggestionsTab" Grid.Column="2" Classes="action" Content="Suggestions" Click="SuggestionsTab_Click" />
+                            </Grid>
+                            <Panel>
+                                <DockPanel x:Name="SavedPanel">
+                                    <TextBox DockPanel.Dock="Top" Text="{Binding EntryFilter}" PlaceholderText="Search names" Margin="0,0,0,8" AutomationProperties.Name="Search names" />
+                                    <ScrollViewer>
+                                        <ItemsControl ItemsSource="{Binding Entries}">
+                                            <ItemsControl.ItemTemplate>
+                                                <DataTemplate DataType="vm:EntryRowViewModel">
+                                                    <Border Classes="row" Margin="0,0,0,8" Padding="0,8,0,0">
+                                                        <DockPanel>
+                                                            <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Top">
+                                                                <Button Classes="icon" IsVisible="{Binding IsNotEditing}" AutomationProperties.Name="Edit"
+                                                                        Command="{Binding $parent[ItemsControl].((vm:NovelReaderViewModel)DataContext).EditEntryCommand}" CommandParameter="{Binding}">
+                                                                    <ic:SymbolIcon Symbol="Edit" FontSize="16" />
+                                                                </Button>
+                                                                <Button Classes="icon" IsVisible="{Binding IsEditing}" AutomationProperties.Name="Save"
+                                                                        Command="{Binding $parent[ItemsControl].((vm:NovelReaderViewModel)DataContext).SaveEntryCommand}" CommandParameter="{Binding}">
+                                                                    <ic:SymbolIcon Symbol="Checkmark" FontSize="16" />
+                                                                </Button>
+                                                                <Button Classes="icon" AutomationProperties.Name="Delete"
+                                                                        Command="{Binding $parent[ItemsControl].((vm:NovelReaderViewModel)DataContext).DeleteEntryCommand}" CommandParameter="{Binding}">
+                                                                    <ic:SymbolIcon Symbol="Delete" FontSize="16" />
+                                                                </Button>
+                                                            </StackPanel>
+                                                            <StackPanel Spacing="2">
+                                                                <TextBlock Text="{Binding Chinese}" FontWeight="SemiBold" />
+                                                                <TextBlock Text="{Binding Vietnamese}" TextWrapping="Wrap" IsVisible="{Binding IsNotEditing}" />
+                                                                <TextBox Text="{Binding Draft}" IsVisible="{Binding IsEditing}" AutomationProperties.Name="Meaning" />
+                                                                <TextBlock Text="{Binding KindLabel}" Classes="secondary" />
+                                                            </StackPanel>
+                                                        </DockPanel>
+                                                    </Border>
+                                                </DataTemplate>
+                                            </ItemsControl.ItemTemplate>
+                                        </ItemsControl>
+                                    </ScrollViewer>
+                                </DockPanel>
+                                <DockPanel x:Name="SuggestionsPanel" IsVisible="False">
+                                    <StackPanel DockPanel.Dock="Top" Spacing="6" Margin="0,0,0,8">
+                                        <Button Command="{Binding FindNamesCommand}" IsEnabled="{Binding !IsFindingNames}">
+                                            <StackPanel Orientation="Horizontal" Spacing="6">
+                                                <ic:SymbolIcon Symbol="PeopleSearch" FontSize="16" />
+                                                <TextBlock Text="Find names in this novel" />
+                                            </StackPanel>
+                                        </Button>
+                                        <TextBlock Text="{Binding SuggestionStatus}" Classes="secondary" />
+                                    </StackPanel>
+                                    <ScrollViewer>
+                                        <ItemsControl ItemsSource="{Binding Suggestions}">
+                                            <ItemsControl.ItemTemplate>
+                                                <DataTemplate DataType="vm:SuggestionRowViewModel">
+                                                    <Border Classes="row" Margin="0,0,0,8" Padding="0,8,0,0">
+                                                        <StackPanel Spacing="4">
+                                                            <DockPanel>
+                                                                <TextBlock DockPanel.Dock="Right" Text="{Binding CountLabel}" Classes="secondary" />
+                                                                <TextBlock Text="{Binding Chinese}" FontWeight="SemiBold" />
+                                                            </DockPanel>
+                                                            <DockPanel>
+                                                                <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
+                                                                    <Button Classes="icon" AutomationProperties.Name="Save as a name"
+                                                                            Command="{Binding $parent[ItemsControl].((vm:NovelReaderViewModel)DataContext).AddSuggestionCommand}" CommandParameter="{Binding}">
+                                                                        <ic:SymbolIcon Symbol="PersonAdd" FontSize="16" />
+                                                                    </Button>
+                                                                    <Button Classes="icon" AutomationProperties.Name="Not a name"
+                                                                            Command="{Binding $parent[ItemsControl].((vm:NovelReaderViewModel)DataContext).DismissSuggestionCommand}" CommandParameter="{Binding}">
+                                                                        <ic:SymbolIcon Symbol="Dismiss" FontSize="16" />
+                                                                    </Button>
+                                                                </StackPanel>
+                                                                <TextBox Text="{Binding Vietnamese}" AutomationProperties.Name="Name" />
+                                                            </DockPanel>
+                                                        </StackPanel>
+                                                    </Border>
+                                                </DataTemplate>
+                                            </ItemsControl.ItemTemplate>
+                                        </ItemsControl>
+                                    </ScrollViewer>
+                                </DockPanel>
+                            </Panel>
+                        </DockPanel>
+                    </Panel>
+                </DockPanel>
+            </Border>
+        </Panel>
+    </Panel>
+</UserControl>

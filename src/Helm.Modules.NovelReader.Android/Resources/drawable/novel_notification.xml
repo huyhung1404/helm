@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Status-bar icon while Novel Reader reads aloud: the Novel Reader icon (an open book with lines of text), white on
+     transparent (Android tints it). The same shapes as NovelReaderIconShape, scaled from 100 to 24. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="100"
+    android:viewportHeight="100">
+    <path
+        android:strokeColor="#FFFFFFFF"
+        android:strokeWidth="8"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round"
+        android:pathData="M50,22C40,13 24,10 6,12V80C24,78 40,81 50,90C60,81 76,78 94,80V12C76,10 60,13 50,22Z M50,22V90" />
+    <path
+        android:strokeColor="#FFFFFFFF"
+        android:strokeWidth="6"
+        android:strokeLineCap="round"
+        android:pathData="M17,31C26,30 35,32 41,36 M17,45C26,44 35,46 41,50 M17,59C26,58 35,60 41,64 M83,31C74,30 65,32 59,36 M83,45C74,44 65,46 59,50 M83,59C74,58 65,60 59,64" />
+</vector>

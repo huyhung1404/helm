@@ -1,0 +1,24 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- Novel Reader logic with no UI: reading .txt files in any Chinese encoding, the QuickTranslator-style dictionaries
+       (VietPhrase, Names, Hán Việt, LuatNhan, Pronouns), the converter, chapters, the library, the user's own names and
+       the page view model, and reading aloud. No WPF or platform APIs: voices are ISpeechEngine and the sound goes
+       through IAudioOutput, so Windows and Android share all of it. -->
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <SupportedOSPlatformVersion></SupportedOSPlatformVersion>
+    <PlatformTarget>AnyCPU</PlatformTarget>
+    <RootNamespace>Helm.Modules.NovelReader</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Helm.Core\Helm.Core.csproj" />
+    <!-- IDialogService / IClipboardService: the portable seams both apps already implement. -->
+    <ProjectReference Include="..\Helm.Shell\Helm.Shell.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="Helm.Tests" />
+  </ItemGroup>
+
+</Project>
