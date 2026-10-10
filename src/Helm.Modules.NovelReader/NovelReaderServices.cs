@@ -21,6 +21,8 @@ public static class NovelReaderServices
             .AddSingleton<ISpeechEngine>(sp => new LocalSpeechEngine(sp.GetRequiredService<ILocalVoiceServer>(),
                 Path.Combine(sp.GetRequiredService<ISettingsStoreFactory>().Paths.ModuleDataDirectory(NovelReaderIds.ModuleId), "local-voices.json"),
                 sp.GetRequiredService<ILogger<LocalSpeechEngine>>()))
+            // The AI name scan: Claude Code on this PC, through Helm's MCP tools.
+            .AddSingleton<Helm.Modules.NovelReader.Names.INameScanAgent, ClaudeCodeNameAgent>()
             .AddSingleton<WindowsAudioOutput>()
             .AddSingleton<IAudioOutput>(sp => sp.GetRequiredService<WindowsAudioOutput>())
             .AddNovelReaderCore()

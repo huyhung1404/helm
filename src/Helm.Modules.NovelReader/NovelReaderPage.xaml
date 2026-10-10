@@ -123,34 +123,23 @@
             </ui:CardControl.Header>
             <ui:ToggleSwitch AutomationProperties.Name="Find names when a novel is opened" IsChecked="{Binding AutoScanNames}" />
         </ui:CardControl>
-        <ui:CardExpander Margin="0,0,0,4" Icon="{ui:SymbolIcon Sparkle24}">
+        <ui:CardExpander Margin="0,0,0,4" Icon="{ui:SymbolIcon Sparkle24}" Expanded="NameAgent_Expanded">
             <ui:CardExpander.Header>
                 <core:RowLayout>
-                    <core:CardHeader Title="How names are found" Description="Logic: from how words are used in the novel, free and offline. AI: Claude reads each possible name in a couple of its sentences, with your Anthropic API key (a few cents a novel with Haiku)." />
-                    <ComboBox Width="200" ItemsSource="{Binding NameScanModeNames}" SelectedIndex="{Binding NameScanModeIndex}" AutomationProperties.Name="How names are found" />
+                    <core:CardHeader Title="How names are found" Description="Logic: from how words are used in the novel, free and offline. AI: Claude Code on this PC reads each possible name in a couple of its sentences through Helm's MCP tools, with your own Claude plan (no API key)." />
+                    <ComboBox Width="260" ItemsSource="{Binding NameScanModeNames}" SelectedIndex="{Binding NameScanModeIndex}" AutomationProperties.Name="How names are found" />
                 </core:RowLayout>
             </ui:CardExpander.Header>
             <StackPanel>
                 <Border Style="{DynamicResource HelmExpanderRow}" BorderThickness="0">
                     <core:RowLayout>
-                        <core:CardHeader Title="Claude model" Description="Haiku is fast and cheap; Sonnet and Opus are more careful and cost more." />
-                        <ComboBox Width="260" ItemsSource="{Binding ClaudeModelNames}" SelectedIndex="{Binding ClaudeModelIndex}" AutomationProperties.Name="Claude model" />
+                        <core:CardHeader Title="Claude Code" Description="{Binding NameAgentStatus}" />
+                        <ui:Button Content="Check again" Command="{Binding RefreshNameAgentStatusCommand}" />
                     </core:RowLayout>
                 </Border>
                 <Border Style="{DynamicResource HelmExpanderRow}">
-                    <StackPanel>
-                        <core:CardHeader Title="Anthropic API key" Description="From console.anthropic.com. Kept encrypted on this PC only (not synced). The possible names and the sentences around them are sent to Anthropic; the novel itself is not." />
-                        <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
-                            <ui:PasswordBox x:Name="ClaudeKeyBox" Width="320" PlaceholderText="sk-ant-…" AutomationProperties.Name="Anthropic API key" />
-                            <ui:Button Margin="8,0,0,0" Content="Save" Appearance="Primary" Click="SaveClaudeKey_Click" />
-                            <ui:Button Margin="8,0,0,0" Content="Check" Command="{Binding CheckClaudeKeyCommand}"
-                                       IsEnabled="{Binding HasClaudeKey}" />
-                            <ui:Button Margin="8,0,0,0" Content="Remove" Command="{Binding RemoveClaudeKeyCommand}"
-                                       Visibility="{Binding HasClaudeKey, Converter={StaticResource BoolToVisibility}}" />
-                        </StackPanel>
-                        <TextBlock Margin="0,6,0,0" Text="{Binding ClaudeKeyStatus}" Style="{DynamicResource HelmSecondaryText}" TextWrapping="Wrap"
-                                   Visibility="{Binding ClaudeKeyStatus, Converter={StaticResource NotEmptyToVisibility}}" />
-                    </StackPanel>
+                    <TextBlock TextWrapping="Wrap" Style="{DynamicResource HelmSecondaryText}"
+                               Text="It needs Claude Code installed and Helm added to it (AI &amp; MCP page → Add for me). The scan runs Claude Code without a window and lets it use only Novel Reader's tools; the possible names and the sentences around them go to Claude with your plan, the novel itself does not. You can also ask Claude Code yourself, e.g. “find the character names of my novel … in Helm”. The names it finds sync to your phone." />
                 </Border>
             </StackPanel>
         </ui:CardExpander>

@@ -3,6 +3,24 @@
 All notable changes to Helm. The top section is used as the GitHub release body and as the Velopack release notes.
 Format: [Keep a Changelog](https://keepachangelog.com), versions follow [SemVer](https://semver.org).
 
+## [Unreleased]
+
+### Changed
+- **Novel Reader: the AI name scan uses Claude Code on your PC instead of an API key.** Choose *AI: Claude Code on this
+  PC* under Finding names; *Scan for names* then runs Claude Code without a window, allowed only Novel Reader's tools.
+  It reads the possible names through Helm's MCP server and adds the real ones while you watch, with your own Claude
+  plan. It needs Claude Code installed and Helm added to it on the AI & MCP page. On the sample novel it took about two
+  minutes and added 79 names. *Stop* ends it and keeps what it added. The names sync to the phone, which uses the logic
+  scan itself. The Anthropic API key and model settings are gone.
+- **AI & MCP: Novel Reader's tools.** Any AI agent can now find a novel's names: `novel_list`, `novel_name_candidates`
+  (each with its count, Hán Việt reading, the logic scan's opinion and sentences where it appears), `novel_names`,
+  `novel_add_names` and `novel_ignore_names`. Ask Claude Code, for example, "find the character names of my novel … in
+  Helm".
+
+### Fixed
+- **SSH:** a wrong passphrase for a key always says so. About one wrong passphrase in 256 used to show a technical
+  error instead.
+
 ## [0.36.0] - 2026-10-10
 
 ### Added

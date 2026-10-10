@@ -69,13 +69,6 @@ public partial class NovelReaderPage : ModulePageBase
         ListenNote.IsVisible = true;
     }
 
-    /// <summary>The key goes from the box to the view model once, and the box is emptied.</summary>
-    private void SaveClaudeKey_Click(object? sender, RoutedEventArgs e)
-    {
-        _viewModel.SetClaudeKey(ClaudeKeyBox.Text ?? "");
-        ClaudeKeyBox.Text = "";
-    }
-
     private void InstallVoices_Click(object? sender, RoutedEventArgs e) => _platform.InstallVoiceData();
 
     private void VoiceSettings_Click(object? sender, RoutedEventArgs e) => _platform.OpenVoiceSettings();

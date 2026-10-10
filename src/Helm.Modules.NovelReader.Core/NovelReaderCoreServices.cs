@@ -27,6 +27,8 @@ public static class NovelReaderCoreServices
             sp.GetRequiredService<ISyncedCollection<NovelProgress>>(),
             sp.GetRequiredService<BlobStore>()));
         services.AddSingleton<DictionaryLibrary>();
+        // Tools for an AI on this PC (MCP, Windows only: other platforms never ask for them).
+        services.AddSingleton<Helm.Core.Mcp.IMcpToolProvider, NovelReaderMcpTools>();
         // The online HoaiMy voice; platforms add their own engines (Windows voices) as ISpeechEngine too.
         services.AddSingleton<ISpeechEngine, EdgeSpeechEngine>();
         services.AddSingleton(sp => new SpeechCatalog(sp.GetServices<ISpeechEngine>()));

@@ -41,8 +41,8 @@ public sealed partial class NovelReaderViewModel : ObservableObject, IReadAloudH
     private readonly ReadAloudController _reader;
     private readonly AudioCache _audio;
     private readonly ILocalVoiceServer? _localVoice;
-    private readonly ISecretProtector? _secrets;
-    private readonly ClaudeNameReviewer _nameReviewer;
+    private readonly INameScanAgent? _nameAgent;
+    private CancellationTokenSource? _scanCancel;
     private bool _entriesQueued;
     private readonly IProcessLauncher _launcher;
     private readonly ILogger<NovelReaderViewModel> _logger;
@@ -123,9 +123,8 @@ public sealed partial class NovelReaderViewModel : ObservableObject, IReadAloudH
     [ObservableProperty] private string _suggestionStatus = "";
     [ObservableProperty] private bool _autoScanNames;
     [ObservableProperty] private int _nameScanModeIndex;
-    [ObservableProperty] private int _claudeModelIndex;
-    [ObservableProperty] private bool _hasClaudeKey;
-    [ObservableProperty] private string _claudeKeyStatus = "";
+    [ObservableProperty] private bool _isAgentScanning;
+    [ObservableProperty] private string _nameAgentStatus = "";
     [ObservableProperty] private int _foundNameCount;
 
     // Dictionaries (settings page)
@@ -140,7 +139,7 @@ public sealed partial class NovelReaderViewModel : ObservableObject, IReadAloudH
     public NovelReaderViewModel(NovelStore store, DictionaryLibrary dictionaries, ISettingsStoreFactory settings, IUiDispatcher ui,
         IDialogService dialogs, IDeviceInfo device, SpeechCatalog catalog, IAudioOutput audio, AudioCache audioCache, IProcessLauncher launcher,
         IClipboardService clipboard, ILogger<NovelReaderViewModel> logger, TimeProvider? time = null, ILocalVoiceServer? localVoice = null,
-        ISecretProtector? secrets = null, ClaudeNameReviewer? nameReviewer = null)
+        INameScanAgent? nameAgent = null)
     {
         _store = store;
         _dictionaries = dictionaries;
@@ -151,8 +150,7 @@ public sealed partial class NovelReaderViewModel : ObservableObject, IReadAloudH
         _catalog = catalog;
         _audio = audioCache;
         _localVoice = localVoice;
-        _secrets = secrets;
-        _nameReviewer = nameReviewer ?? new ClaudeNameReviewer(SharedHttp);
+        _nameAgent = nameAgent;
         if (localVoice is not null) localVoice.StatusChanged += (_, _) => _ui.Post(OnLocalVoiceChanged);
         _reader = new ReadAloudController(catalog, audio, time, disk: audioCache)
         {
@@ -193,8 +191,6 @@ public sealed partial class NovelReaderViewModel : ObservableObject, IReadAloudH
         UseEdgeVoice = s.UseEdgeVoice;
         AutoScanNames = s.AutoScanNames;
         NameScanModeIndex = (int)s.NameScanMode;
-        ClaudeModelIndex = Math.Max(0, ClaudeNameReviewer.Models.ToList().FindIndex(m => m.Id == s.ClaudeModel));
-        HasClaudeKey = !string.IsNullOrEmpty(s.ClaudeKey);
         DictionarySourcesText = FormatSources(s.DictionarySources);
         LoadVoices();
         OnLocalVoiceChanged();
@@ -1177,6 +1173,7 @@ public sealed partial class NovelReaderViewModel : ObservableObject, IReadAloudH
         if (_converter is not { } converter || _chapters.Count == 0 || OpenBookId != bookId) return;
         IsFindingNames = true;
         SuggestionStatus = "Looking for names…";
+        var foundBefore = _store.FoundNameCount(bookId);
         try
         {
             var chapters = _chapters;
@@ -1186,52 +1183,60 @@ public sealed partial class NovelReaderViewModel : ObservableObject, IReadAloudH
             IReadOnlyList<NameFinding> sure = scan.Sure;
             IReadOnlyList<NameFinding> maybe = scan.Maybe;
             string? note = null;
+            string? said = null;
             if (NameScanModeIndex == (int)NameScanMode.Ai)
             {
-                var model = SelectedClaudeModel;
-                if (ReadClaudeKey() is not { } key)
+                if (_nameAgent is null)
                 {
-                    note = "There is no Anthropic API key, so the names were found without AI.";
+                    note = "Finding names with AI runs in Helm on your PC; the names it finds sync to this device.";
+                }
+                else if (_nameAgent.Unavailable() is { } problem)
+                {
+                    note = problem + " The names were found without AI.";
                 }
                 else
                 {
-                    var candidates = await Task.Run(() => NameScanner.Candidates(paragraphs, Known, converter.HanVietOf, 300)
-                        .Where(c => c.Share >= 0.15).Select(c => c.Finding).ToList());
-                    var estimate = ClaudeNameReviewer.Estimate(candidates, model);
-                    var cost = estimate.Dollars is { } dollars ? $", about ${dollars:0.00}" : "";
-                    var go = candidates.Count > 0 && await _dialogs.ConfirmAsync("Find names with Claude?",
-                        $"{candidates.Count} possible names and a couple of sentences of the novel around each are sent to {model.Name}: " +
-                        $"about {estimate.InputTokens + estimate.OutputTokens:N0} tokens{cost}, paid with your API key.", "Find names");
-                    if (!go)
+                    // The AI adds the names itself through Helm's tools: they arrive in the store while it works.
+                    var cts = new CancellationTokenSource();
+                    _scanCancel = cts;
+                    IsAgentScanning = true;
+                    SuggestionStatus = $"{_nameAgent.Name} is reading the possible names…";
+                    try
                     {
-                        note = "Found without AI.";
+                        var progress = new Progress<string>(p => SuggestionStatus = p);
+                        said = await _nameAgent.FindNamesAsync(bookId, BookTitle, progress, cts.Token);
+                        sure = [];
                     }
-                    else
+                    catch (OperationCanceledException)
                     {
-                        SuggestionStatus = $"Asking Claude about {candidates.Count} words…";
-                        try
-                        {
-                            var progress = new Progress<double>(p => SuggestionStatus = $"Asking Claude about {candidates.Count} words… {p:P0}");
-                            sure = await _nameReviewer.ReviewAsync(candidates, key, model, progress, CancellationToken.None);
-                            maybe = [];
-                        }
-                        catch (NameReviewException ex)
-                        {
-                            _logger.LogWarning(ex, "The AI name scan failed");
-                            note = ex.Message + " The names were found without AI.";
-                        }
+                        sure = [];
+                        note = "Stopped; the names added so far stay.";
+                    }
+                    catch (NameAgentException ex)
+                    {
+                        _logger.LogWarning(ex, "The AI name scan failed");
+                        note = ex.Message + " The names were found without AI.";
+                    }
+                    finally
+                    {
+                        IsAgentScanning = false;
+                        _scanCancel = null;
+                        cts.Dispose();
                     }
                 }
             }
             if (OpenBookId != bookId) return;
-            var added = _store.SaveFoundNames(bookId, sure.Select(f => (f.Chinese, f.Vietnamese)));
+            _store.SaveFoundNames(bookId, sure.Select(f => (f.Chinese, f.Vietnamese)));
+            // Counted from the store: the AI adds its names itself.
+            var added = Math.Max(0, _store.FoundNameCount(bookId) - foundBefore);
             _store.MarkNamesScanned(bookId);
             var ignored = new HashSet<string>(_store.GetBook(bookId)?.IgnoredNames ?? [], StringComparer.Ordinal);
             Suggestions.Clear();
             foreach (var f in maybe.Where(f => !ignored.Contains(f.Chinese) && _store.GetEntry(bookId, EntryKind.Name, f.Chinese) is null))
                 Suggestions.Add(new SuggestionRowViewModel(f.Chinese, f.Count, f.Vietnamese));
             SuggestionStatus = (added == 0 ? "No new names found" : added == 1 ? "Added 1 name" : $"Added {added} names")
-                + (Suggestions.Count > 0 ? $"; {Suggestions.Count} more to check below." : ".") + (note is null ? "" : " " + note);
+                + (Suggestions.Count > 0 ? $"; {Suggestions.Count} more to check below." : ".") + (note is null ? "" : " " + note)
+                + (string.IsNullOrWhiteSpace(said) ? "" : $" {_nameAgent?.Name}: {said.Trim()}");
             if (automatic && added > 0) Message = $"Found {added} character names in this novel and added them (Names shows them; undo there).";
             else if (automatic && note is not null) Message = note;
         }
@@ -1259,20 +1264,14 @@ public sealed partial class NovelReaderViewModel : ObservableObject, IReadAloudH
 
     private void RefreshFoundNames() => FoundNameCount = OpenBookId is { } id ? _store.FoundNameCount(id) : 0;
 
-    // ---- The AI name scan: model and key ---------------------------------------------------------------------------
+    // ---- The AI name scan: an AI on this PC through Helm's MCP tools ----------------------------------------------
 
-    private static readonly HttpClient SharedHttp = new() { Timeout = TimeSpan.FromSeconds(120) };
+    /// <summary>The AI scan can run here (Windows: Claude Code); elsewhere the AI scan is done on the PC.</summary>
+    public bool CanScanWithAi => _nameAgent is not null;
 
-    private const string ClaudeKeyPurpose = "novel-reader.anthropic-key";
-
-    public IReadOnlyList<string> NameScanModeNames { get; } = ["Logic (free, offline)", "AI (Claude)"];
-
-    public IReadOnlyList<string> ClaudeModelNames { get; } = ClaudeNameReviewer.Models.Select(m => m.Name).ToList();
+    public IReadOnlyList<string> NameScanModeNames { get; } = ["Logic (free, offline)", "AI: Claude Code on this PC (through MCP)"];
 
     public bool IsAiScan => NameScanModeIndex == (int)NameScanMode.Ai;
-
-    private ClaudeModel SelectedClaudeModel =>
-        ClaudeModelIndex >= 0 && ClaudeModelIndex < ClaudeNameReviewer.Models.Count ? ClaudeNameReviewer.Models[ClaudeModelIndex] : ClaudeNameReviewer.DefaultModel;
 
     partial void OnAutoScanNamesChanged(bool value) => Save(s => s.AutoScanNames = value);
 
@@ -1280,71 +1279,19 @@ public sealed partial class NovelReaderViewModel : ObservableObject, IReadAloudH
     {
         OnPropertyChanged(nameof(IsAiScan));
         if (value is 0 or 1) Save(s => s.NameScanMode = (NameScanMode)value);
+        RefreshNameAgentStatus();
     }
 
-    partial void OnClaudeModelIndexChanged(int value) => Save(s => s.ClaudeModel = SelectedClaudeModel.Id);
-
-    /// <summary>Keeps the Anthropic API key, protected for this user on this device; an empty one removes it.</summary>
-    public void SetClaudeKey(string key)
-    {
-        key = key.Trim();
-        if (key.Length == 0)
-        {
-            RemoveClaudeKey();
-            return;
-        }
-        if (_secrets is null)
-        {
-            ClaudeKeyStatus = "This device cannot keep a key safely.";
-            return;
-        }
-        var protectedKey = _secrets.Protect(System.Text.Encoding.UTF8.GetBytes(key), ClaudeKeyPurpose);
-        Save(s => s.ClaudeKey = Convert.ToBase64String(protectedKey));
-        HasClaudeKey = true;
-        ClaudeKeyStatus = "Key saved on this device.";
-    }
-
+    /// <summary>Stops the AI scan (the names it added so far stay).</summary>
     [RelayCommand]
-    private void RemoveClaudeKey()
-    {
-        Save(s => s.ClaudeKey = null);
-        HasClaudeKey = false;
-        ClaudeKeyStatus = "Key removed.";
-    }
+    private void StopNameScan() => _scanCancel?.Cancel();
 
+    /// <summary>Whether the AI can run now, in words, for the settings page.</summary>
     [RelayCommand]
-    private async Task CheckClaudeKey()
-    {
-        if (ReadClaudeKey() is not { } key)
-        {
-            ClaudeKeyStatus = "There is no key to check.";
-            return;
-        }
-        ClaudeKeyStatus = "Checking…";
-        try
-        {
-            await _nameReviewer.CheckKeyAsync(key, SelectedClaudeModel, CancellationToken.None);
-            ClaudeKeyStatus = $"The key works with {SelectedClaudeModel.Name}.";
-        }
-        catch (NameReviewException ex)
-        {
-            ClaudeKeyStatus = ex.Message;
-        }
-    }
-
-    private string? ReadClaudeKey()
-    {
-        if (_secrets is null || _settings.Current.ClaudeKey is not { Length: > 0 } stored) return null;
-        try
-        {
-            return System.Text.Encoding.UTF8.GetString(_secrets.Unprotect(Convert.FromBase64String(stored), ClaudeKeyPurpose));
-        }
-        catch (Exception ex) when (ex is System.Security.Cryptography.CryptographicException or FormatException)
-        {
-            // Protected for another user or a reset key: as if there were none.
-            return null;
-        }
-    }
+    private void RefreshNameAgentStatus() =>
+        NameAgentStatus = _nameAgent is null ? ""
+            : _nameAgent.Unavailable() is { } problem ? problem
+            : $"Ready: {_nameAgent.Name} reaches Helm's tools.";
 
     [RelayCommand]
     private void AddSuggestion(SuggestionRowViewModel? row)

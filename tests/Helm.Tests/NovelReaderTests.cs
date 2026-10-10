@@ -204,6 +204,8 @@ public sealed class NovelReaderTests : IDisposable
         .. Enumerable.Repeat("马车到了林府。", 6),
     ];
 
+    private static string NamesText => "第1章 开始\r\n\r\n" + string.Join("\r\n\r\n", NamesNovel) + "\r\n";
+
     private static readonly HashSet<string> NamesNovelWords = ["点头", "雪白", "恼羞成怒", "转身", "衣裳", "马车", "走去", "到了"];
 
     private static string Reading(string chinese) => string.Join(" ", chinese.Select(c => c switch
@@ -260,65 +262,79 @@ public sealed class NovelReaderTests : IDisposable
     }
 
     [Fact]
-    public async Task Claude_is_asked_with_the_candidates_in_their_sentences_and_its_report_is_read()
+    public async Task An_ai_on_this_pc_reads_the_candidates_and_adds_names_through_mcp()
     {
-        HttpRequestMessage? sent = null;
-        var http = new FakeHttp(request =>
+        var page = NewPage("a");
+        page.ViewModel.AutoScanNames = false;
+        var id = await page.Store.AddBookAsync("Thần y đích nữ", "n.txt", NamesText, 1, "PC");
+        page.Store.SaveEntry(id, EntryKind.Name, "洛景桓", "Lạc Cảnh Hoàn Nhi");
+        var tools = new NovelReaderMcpTools(page.Store, page.Dictionaries).Tools.ToDictionary(t => t.Name);
+        async Task<JsonElement> Call(string tool, string args)
         {
-            sent = request;
-            return new HttpResponseMessage(System.Net.HttpStatusCode.OK)
-            {
-                Content = new StringContent("""
-                    {"content":[{"type":"tool_use","name":"report_names","input":{"names":[
-                      {"word":"林宛","kind":"person","vietnamese":"Lâm Uyển"},
-                      {"word":"林府","kind":"group","vietnamese":"Lâm phủ"},
-                      {"word":"侯爷","kind":"title","vietnamese":""},
-                      {"word":"成怒","kind":"not_name","vietnamese":""}]}}],
-                     "usage":{"input_tokens":900,"output_tokens":120}}
-                    """),
-            };
-        });
-        var reviewer = new ClaudeNameReviewer(new HttpClient(http));
-        NameFinding Candidate(string word) => new(word, 5, word, NameConfidence.Maybe, [$"……{word}道：“好。”"]);
+            using var json = JsonDocument.Parse(args);
+            var result = await tools[tool].Run(json.RootElement.Clone(), CancellationToken.None);
+            return JsonDocument.Parse(JsonSerializer.Serialize(result)).RootElement;
+        }
 
-        var names = await reviewer.ReviewAsync([Candidate("林宛"), Candidate("林府"), Candidate("侯爷"), Candidate("成怒")], "sk-ant-test",
-            ClaudeNameReviewer.DefaultModel, null, CancellationToken.None);
+        Assert.True(tools["novel_name_candidates"].ReadOnly);
+        Assert.False(tools["novel_add_names"].ReadOnly);
+        var list = await Call("novel_list", "{}");
+        Assert.Equal(id, list[0].GetProperty("id").GetString());
 
-        Assert.Equal(["林宛", "林府"], names.Select(n => n.Chinese));
-        Assert.Equal(("Lâm Uyển", "person", NameConfidence.Sure), (names[0].Vietnamese, names[0].Kind, names[0].Confidence));
-        Assert.Equal("sk-ant-test", sent!.Headers.GetValues("x-api-key").Single());
-        Assert.Equal("2023-06-01", sent.Headers.GetValues("anthropic-version").Single());
-        var body = System.Text.Json.Nodes.JsonNode.Parse(http.Bodies.Single())!;
-        Assert.Equal("claude-haiku-4-5-20251001", body["model"]!.GetValue<string>());
-        Assert.Equal("report_names", body["tool_choice"]!["name"]!.GetValue<string>());
-        Assert.Contains("林宛道：“好。”", body["messages"]![0]!["content"]!.GetValue<string>());
+        var page1 = await Call("novel_name_candidates", $$"""{"novel":"{{id}}","limit":2}""");
+        Assert.Equal(2, page1.GetProperty("candidates").GetArrayLength());
+        var all = await Call("novel_name_candidates", """{"novel":"Thần y","offset":0,"limit":150}""");
+        var lin = all.GetProperty("candidates").EnumerateArray().First(c => c.GetProperty("word").GetString() == "林宛");
+        Assert.Equal("sure", lin.GetProperty("logic").GetString());
+        Assert.NotEqual(0, lin.GetProperty("examples").GetArrayLength());
+        // A name the reader saved is known already: not a candidate.
+        Assert.DoesNotContain(all.GetProperty("candidates").EnumerateArray(), c => c.GetProperty("word").GetString() == "洛景桓");
+        Assert.Equal(JsonValueKind.Null, all.GetProperty("next_offset").ValueKind);
+
+        var added = await Call("novel_add_names", $$"""{"novel":"{{id}}","names":[{"word":"林宛","vietnamese":"Lâm Uyển"},{"word":"洛景桓","vietnamese":"Lạc Cảnh Hoàn"}]}""");
+        Assert.Equal(1, added.GetProperty("added").GetInt32());
+        Assert.Equal("the user saved it already", added.GetProperty("skipped")[0].GetProperty("reason").GetString());
+        Assert.True(page.Store.GetEntry(id, EntryKind.Name, "林宛")!.Auto);
+        Assert.Equal("Lạc Cảnh Hoàn Nhi", page.Store.GetEntry(id, EntryKind.Name, "洛景桓")!.Vietnamese);
+        Assert.NotNull(page.Store.GetBook(id)!.NamesScannedAt);
+
+        await Call("novel_ignore_names", $$"""{"novel":"{{id}}","words":["成怒"]}""");
+        Assert.Contains("成怒", page.Store.GetBook(id)!.IgnoredNames);
+        var names = await Call("novel_names", $$"""{"novel":"{{id}}"}""");
+        Assert.Contains(names.GetProperty("names").EnumerateArray(), n => n.GetProperty("word").GetString() == "林宛" && n.GetProperty("found").GetBoolean());
+
+        await Assert.ThrowsAsync<Helm.Core.Mcp.McpToolException>(() => Call("novel_names", """{"novel":"no such novel"}"""));
     }
 
     [Fact]
-    public async Task A_refused_key_says_so_and_an_estimate_counts_the_tokens()
+    public async Task Claude_codes_stream_moves_the_progress_on_and_ends_with_its_answer()
     {
-        var reviewer = new ClaudeNameReviewer(new HttpClient(new FakeHttp(_ => new HttpResponseMessage(System.Net.HttpStatusCode.Unauthorized)
-        {
-            Content = new StringContent("""{"type":"error","error":{"type":"authentication_error","message":"invalid x-api-key"}}"""),
-        })));
+        var lines = string.Join("\n",
+            """{"type":"system","subtype":"init"}""",
+            """{"type":"assistant","message":{"content":[{"type":"tool_use","name":"mcp__helm__novel_name_candidates","input":{}}]}}""",
+            """{"type":"assistant","message":{"content":[{"type":"text","text":"Reading."},{"type":"tool_use","name":"mcp__helm__novel_add_names","input":{}}]}}""",
+            "a warning line",
+            """{"type":"result","subtype":"success","is_error":false,"result":"Added 42 names, set aside 17 words."}""");
+        var steps = new List<string>();
 
-        var error = await Assert.ThrowsAsync<NameReviewException>(() => reviewer.CheckKeyAsync("bad", ClaudeNameReviewer.DefaultModel, CancellationToken.None));
-        Assert.Contains("refused", error.Message, StringComparison.Ordinal);
+        var (result, failed, calls) = await ClaudeCodeNameAgent.ReadEventsAsync(new MemoryStream(Encoding.UTF8.GetBytes(lines)), new InlineProgress(steps.Add));
 
-        var candidates = Enumerable.Range(0, 50).Select(i => new NameFinding("林宛", 5, "Lâm Uyển", NameConfidence.Maybe, ["一二三四五六七八九十"])).ToList();
-        var estimate = ClaudeNameReviewer.Estimate(candidates, ClaudeNameReviewer.DefaultModel);
-        Assert.Equal(50, estimate.Candidates);
-        Assert.True(estimate.InputTokens > 2 * 700, "two requests, each with the instructions");
-        Assert.NotNull(estimate.Dollars);
-        Assert.Null(ClaudeNameReviewer.Estimate(candidates, ClaudeNameReviewer.Models[1]).Dollars);
+        Assert.Equal(("Added 42 names, set aside 17 words.", false, 2), (result, failed, calls));
+        Assert.Equal("Claude Code is adding names… (2 steps)", steps[^1]);
+        Assert.All(ClaudeCodeNameAgent.AllowedTools, t => Assert.StartsWith("mcp__helm__novel_", t, StringComparison.Ordinal));
+        Assert.Contains("novel_add_names", ClaudeCodeNameAgent.Instructions("b1", "Novel"), StringComparison.Ordinal);
+    }
+
+    private sealed class InlineProgress(Action<string> report) : IProgress<string>
+    {
+        public void Report(string value) => report(value);
     }
 
     [Fact]
     public async Task Opening_a_novel_the_first_time_adds_its_names_and_undo_takes_them_back()
     {
         var page = NewPage("a");
-        var text = "第1章 开始\r\n\r\n" + string.Join("\r\n\r\n", NamesNovel) + "\r\n";
-        var id = await page.Store.AddBookAsync("Novel", "n.txt", text, 1, "PC");
+        var id = await page.Store.AddBookAsync("Novel", "n.txt", NamesText, 1, "PC");
 
         await page.ViewModel.OpenBookAsync(id);
         await WaitFor(() => page.Store.GetBook(id)!.NamesScannedAt is not null && !page.ViewModel.IsFindingNames);
@@ -338,20 +354,66 @@ public sealed class NovelReaderTests : IDisposable
     }
 
     [Fact]
-    public async Task The_ai_scan_without_a_key_falls_back_to_the_logic_one()
+    public async Task The_ai_scan_without_an_ai_on_this_device_falls_back_to_the_logic_one()
     {
         var page = NewPage("a");
         page.ViewModel.AutoScanNames = false;
         page.ViewModel.NameScanModeIndex = (int)NameScanMode.Ai;
-        var text = "第1章 开始\r\n\r\n" + string.Join("\r\n\r\n", NamesNovel) + "\r\n";
-        var id = await page.Store.AddBookAsync("Novel", "n.txt", text, 1, "PC");
+        var id = await page.Store.AddBookAsync("Novel", "n.txt", NamesText, 1, "PC");
         await page.ViewModel.OpenBookAsync(id);
         Assert.Null(page.Store.GetBook(id)!.NamesScannedAt);
 
         await page.ViewModel.ScanNamesAsync(automatic: false);
 
         Assert.True(page.Store.GetEntry(id, EntryKind.Name, "林宛")!.Auto);
-        Assert.Contains("without AI", page.ViewModel.SuggestionStatus, StringComparison.Ordinal);
+        Assert.Contains("runs in Helm on your PC", page.ViewModel.SuggestionStatus, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task The_ai_scan_lets_the_ai_add_the_names_through_helms_tools()
+    {
+        var agent = new FakeNameAgent();
+        var page = NewPage("a", agent: agent);
+        page.ViewModel.AutoScanNames = false;
+        page.ViewModel.NameScanModeIndex = (int)NameScanMode.Ai;
+        var id = await page.Store.AddBookAsync("Novel", "n.txt", NamesText, 1, "PC");
+        await page.ViewModel.OpenBookAsync(id);
+        // What the AI does through novel_add_names, while Helm waits for it.
+        agent.Work = () => page.Store.SaveFoundNames(id, [("林宛", "Lâm Uyển"), ("洛景桓", "Lạc Cảnh Hoàn")]);
+
+        await page.ViewModel.ScanNamesAsync(automatic: false);
+
+        Assert.Equal((id, "Novel"), agent.Asked);
+        Assert.True(page.Store.GetEntry(id, EntryKind.Name, "洛景桓")!.Auto);
+        // The AI decided: the logic scan's own sure names are not added on top.
+        Assert.Null(page.Store.GetEntry(id, EntryKind.Name, "景桓"));
+        Assert.StartsWith("Added 2 names", page.ViewModel.SuggestionStatus, StringComparison.Ordinal);
+        Assert.Contains("Claude Code: 2 names added.", page.ViewModel.SuggestionStatus, StringComparison.Ordinal);
+
+        agent.Problem = "Claude Code is not installed on this PC.";
+        page.ViewModel.RefreshNameAgentStatusCommand.Execute(null);
+        Assert.Equal("Claude Code is not installed on this PC.", page.ViewModel.NameAgentStatus);
+    }
+
+    private sealed class FakeNameAgent : INameScanAgent
+    {
+        public string Name => "Claude Code";
+
+        public string? Problem { get; set; }
+
+        public Action? Work { get; set; }
+
+        public (string BookId, string Title)? Asked { get; private set; }
+
+        public string? Unavailable() => Problem;
+
+        public Task<string> FindNamesAsync(string bookId, string title, IProgress<string>? progress, CancellationToken ct)
+        {
+            Asked = (bookId, title);
+            progress?.Report("Claude Code is reading the possible names… (1 steps)");
+            Work?.Invoke();
+            return Task.FromResult("2 names added.");
+        }
     }
 
     // ---- The synced library ----------------------------------------------------------------------------------------
@@ -847,7 +909,7 @@ public sealed class NovelReaderTests : IDisposable
     {
         // The phone's text-to-speech starts after Helm: its voices are missing at first.
         var phone = new FakeEngine("android", online: false, voices: []);
-        var page = NewPage("a", "android:vi-vn-x-gft-local", phone);
+        var page = NewPage("a", "android:vi-vn-x-gft-local", null, phone);
         Assert.Equal("test:hoaimy", page.ViewModel.SelectedVoice?.Id);
         // Filling the list again meanwhile does not make the stand-in the saved choice.
         page.ViewModel.RefreshVoicesCommand.Execute(null);
@@ -1203,9 +1265,10 @@ public sealed class NovelReaderTests : IDisposable
         return (new NovelStore(new MemorySynced<NovelBook>(), entries, new MemorySynced<NovelProgress>(), blobs, _clock), entries, blobs);
     }
 
-    private sealed record Page(NovelReaderViewModel ViewModel, NovelStore Store, MemorySynced<NovelProgress> Progress, FakeEngine Engine, FakeOutput Output);
+    private sealed record Page(NovelReaderViewModel ViewModel, NovelStore Store, MemorySynced<NovelProgress> Progress, FakeEngine Engine, FakeOutput Output,
+        DictionaryLibrary Dictionaries);
 
-    private Page NewPage(string name, string voiceId = "test:hoaimy", params ISpeechEngine[] moreEngines)
+    private Page NewPage(string name, string voiceId = "test:hoaimy", INameScanAgent? agent = null, params ISpeechEngine[] moreEngines)
     {
         var paths = new HelmPaths(Path.Combine(_dir, name));
         var db = Own(new SyncDatabase(paths.SyncDatabaseFile, TestKeys.Local));
@@ -1221,8 +1284,8 @@ public sealed class NovelReaderTests : IDisposable
         var output = new FakeOutput();
         var viewModel = new NovelReaderViewModel(store, dictionaries, settings, new InlineUi(), new AcceptDialogs(), new Device(),
             new SpeechCatalog([engine, .. moreEngines]), output, new AudioCache(Path.Combine(paths.Root, "audio")), new Launcher(), new MemoryClipboard(),
-            NullLogger<NovelReaderViewModel>.Instance);
-        return new Page(viewModel, store, progress, engine, output);
+            NullLogger<NovelReaderViewModel>.Instance, nameAgent: agent);
+        return new Page(viewModel, store, progress, engine, output, dictionaries);
     }
 
     private sealed record SyncedDevice(DictionaryLibrary Dictionaries, SyncedCollection<NovelDictionary> Records, SyncEngine Engine);

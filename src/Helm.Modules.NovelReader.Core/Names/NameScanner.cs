@@ -207,7 +207,9 @@ public static class NameScanner
             return false;
         }
         int count = 0, good = 0;
+        // Places where the word stands alone come first: a given name is shown used on its own, not inside its full name.
         var examples = new List<string>(2);
+        var others = new List<string>(2);
         var next = new Dictionary<char, int>();
         foreach (var paragraph in paragraphs)
         {
@@ -220,13 +222,16 @@ public static class NameScanner
                 var inside = Inside(paragraph, i);
                 if (!inside && (Punctuation.Contains(before) || Before.Contains(before) || Punctuation.Contains(after) || After.Contains(after))) good++;
                 if (ChineseText.IsHan(after)) next[after] = next.GetValueOrDefault(after) + 1;
-                if (examples.Count < 2) examples.Add(Excerpt(paragraph, i, word.Length));
+                var alone = !inside && (Punctuation.Contains(before) || Before.Contains(before));
+                if (alone && examples.Count < 2) examples.Add(Excerpt(paragraph, i, word.Length));
+                else if (!alone && others.Count < 2) others.Add(Excerpt(paragraph, i, word.Length));
             }
         }
         var top = next.Count == 0 ? 0 : next.Values.Max();
         var topChar = next.Count == 0 ? '\0' : next.First(kv => kv.Value == top).Key;
         // "景德皇" nearly always goes on as "景德皇帝": part of a longer word (a name goes on with all sorts of words).
         var endsLonger = count >= NameSuggester.MinCount && top >= count * 0.8 && !After.Contains(topChar);
+        examples.AddRange(others.Take(2 - examples.Count));
         return (count, count == 0 ? 0 : (double)good / count, examples, endsLonger);
     }
 

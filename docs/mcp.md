@@ -3,7 +3,8 @@
 Helm can give AI agents its own tools through the [Model Context Protocol](https://modelcontextprotocol.io) (MCP):
 Claude Code in a terminal or in the VS Code extension, VS Code's own agent mode, Claude Desktop, and any other MCP
 client (Cursor, Windsurf, Gemini CLI…) can then find,
-read and (when you allow it) change your notes, to-do lists, debt book and missions. Everything is set up on the
+read and (when you allow it) change your notes, to-do lists, debt book and missions, and find the character names of
+your novels. Everything is set up on the
 **AI & MCP** page, right after General. Windows only: the server runs inside Helm on the PC.
 
 - [What AI agents get](#what-ai-agents-get)
@@ -22,8 +23,14 @@ The **Tools AI agents can reach** card lists every tool offered right now, in th
 | **Change** | Changes Helm's data: add or edit notes and tasks, tick tasks, add debts, create, re-plan and advance missions. Changes sync to your other devices. Nothing is deleted for good: notes go to a 30-day trash. |
 | **Remote** | Runs something on another machine (an item of a server's SSH menu). Only on servers you allowed, and Helm always asks you first. |
 
-Only the tools of Helm tools that are turned on (Notes, Tracker, Wallet, Missions, SSH) are offered. The **Vault is never reachable**: no tool reads or writes
+Only the tools of Helm tools that are turned on (Notes, Tracker, Wallet, Missions, SSH, Novel Reader) are offered. The **Vault is never reachable**: no tool reads or writes
 it, whatever the settings.
+
+Novel Reader's tools (`novel_list`, `novel_name_candidates`, `novel_names`, `novel_add_names`, `novel_ignore_names`)
+let an agent find a novel's character names: it reads the possible names with sentences where they appear and adds
+the real ones, marked as found; it never replaces a name the user saved. Novel Reader's AI name scan runs Claude Code
+without a window with only these tools allowed (`claude -p --allowedTools mcp__helm__novel_…`), so it needs Claude
+Code installed and Helm added to it.
 
 ## Connect a client
 

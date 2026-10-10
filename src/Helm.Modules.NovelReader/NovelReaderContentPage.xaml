@@ -488,6 +488,8 @@
                                         <ui:Button Content="Scan for names" Icon="{ui:SymbolIcon PeopleSearch24}" Command="{Binding FindNamesCommand}"
                                                    IsEnabled="{Binding IsFindingNames, Converter={StaticResource InverseBool}}" Margin="0,0,0,6"
                                                    ToolTip="Look through the whole novel: sure names are added, doubtful ones are listed here (how: Novel Reader settings)" />
+                                        <ui:Button Content="Stop" Icon="{ui:SymbolIcon Stop24}" Command="{Binding StopNameScanCommand}" Margin="0,0,0,6"
+                                                   Visibility="{Binding IsAgentScanning, Converter={StaticResource BoolToVisibility}}" />
                                         <TextBlock Text="{Binding SuggestionStatus}" Style="{DynamicResource HelmSecondaryText}" TextWrapping="Wrap" Margin="0,0,0,8" />
                                     </StackPanel>
                                     <ScrollViewer VerticalScrollBarVisibility="Auto">
