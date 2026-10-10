@@ -3,6 +3,19 @@
 All notable changes to Helm. The top section is used as the GitHub release body and as the Velopack release notes.
 Format: [Keep a Changelog](https://keepachangelog.com), versions follow [SemVer](https://semver.org).
 
+## [0.37.1] - 2026-10-10
+
+### Changed
+- **The sync button is one glyph that only changes colour**, on PC and Android, without a button look: accent and
+  turning while syncing, green for a moment after a sync, red on a problem, faded when offline or not set up. On
+  Android it now turns around its centre instead of its corner.
+
+### Fixed
+- **Novel Reader (PC): closing the names panel gives the text its width back.** The text fills the page beside the
+  panel and all of it without, instead of staying 900 pixels wide. Opening or closing the panel (or resizing the
+  window) keeps the paragraph you are reading at the top, and no longer moves the saved reading place.
+- **Novel Reader:** the AI name scan's result is no longer covered by a progress line arriving late.
+
 ## [0.37.0] - 2026-10-10
 
 ### Changed
