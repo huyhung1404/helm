@@ -3,7 +3,7 @@
 All notable changes to Helm. The top section is used as the GitHub release body and as the Velopack release notes.
 Format: [Keep a Changelog](https://keepachangelog.com), versions follow [SemVer](https://semver.org).
 
-## [Unreleased]
+## [0.37.0] - 2026-10-10
 
 ### Changed
 - **Novel Reader: the AI name scan uses Claude Code on your PC instead of an API key.** Choose *AI: Claude Code on this
