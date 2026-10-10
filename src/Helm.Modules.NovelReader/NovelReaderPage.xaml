@@ -248,11 +248,11 @@
                 </Border>
                 <Border Style="{DynamicResource HelmExpanderRow}">
                     <core:RowLayout>
-                        <core:CardHeader Title="Pause between paragraphs" Description="Silence after each paragraph, in seconds." />
+                        <core:CardHeader Title="Pause between paragraphs" Description="Silence after each paragraph, in seconds. Sentences follow each other without one." />
                         <StackPanel Orientation="Horizontal">
-                            <Slider Width="160" Minimum="0" Maximum="2" TickFrequency="0.1" IsSnapToTickEnabled="True" Value="{Binding ParagraphPause}"
+                            <Slider Width="160" Minimum="0" Maximum="2" TickFrequency="0.05" IsSnapToTickEnabled="True" Value="{Binding ParagraphPause}"
                                     VerticalAlignment="Center" AutomationProperties.Name="Pause between paragraphs" />
-                            <TextBlock Width="40" Margin="8,0,0,0" VerticalAlignment="Center" Text="{Binding ParagraphPause, StringFormat={}{0:0.0} s}" />
+                            <TextBlock Width="40" Margin="8,0,0,0" VerticalAlignment="Center" Text="{Binding ParagraphPause, StringFormat={}{0:0.00} s}" />
                         </StackPanel>
                     </core:RowLayout>
                 </Border>
@@ -260,6 +260,16 @@
                     <core:RowLayout>
                         <core:CardHeader Title="Continue to the next chapter" Description="At the end of a chapter, reading aloud opens the next one and goes on." />
                         <ui:ToggleSwitch AutomationProperties.Name="Continue to the next chapter" IsChecked="{Binding ContinueToNextChapter}" />
+                    </core:RowLayout>
+                </Border>
+                <Border Style="{DynamicResource HelmExpanderRow}" IsEnabled="{Binding ContinueToNextChapter}">
+                    <core:RowLayout>
+                        <core:CardHeader Title="Chapters downloaded ahead" Description="While reading goes on, the sentences ahead are downloaded up to this many chapters past the one being read, no further." />
+                        <StackPanel Orientation="Horizontal">
+                            <Slider Width="160" Minimum="1" Maximum="10" TickFrequency="1" IsSnapToTickEnabled="True" Value="{Binding PrefetchChapters}"
+                                    VerticalAlignment="Center" AutomationProperties.Name="Chapters downloaded ahead" />
+                            <TextBlock Width="40" Margin="8,0,0,0" VerticalAlignment="Center" Text="{Binding PrefetchChapters}" />
+                        </StackPanel>
                     </core:RowLayout>
                 </Border>
                 <Border Style="{DynamicResource HelmExpanderRow}">

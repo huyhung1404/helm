@@ -48,8 +48,9 @@ public sealed record AudioDownloadProgress(bool Active, int Chapter, int FirstCh
 }
 
 /// <summary>
-/// Reading aloud like an audiobook player. It speaks a sentence at a time. While it reads, every sentence to the end of
-/// the chapter (and the start of the next one) is synthesized ahead and kept on the disk (<see cref="AudioCache"/>), so
+/// Reading aloud like an audiobook player. It speaks a sentence at a time, with the voice's silence at both ends cut so
+/// sentences follow each other without a pause. While it reads, the sentences ahead (on into the next chapters, see
+/// <see cref="PrefetchChapters"/>) are synthesized and kept on the disk (<see cref="AudioCache"/>), so
 /// after the first sentence nothing waits for the network, going back or listening again plays at once, and it works
 /// offline. Whole chapters or the whole novel can be downloaded for listening offline. Pause stops in the middle of a
 /// sentence; it skips by sentence or paragraph, goes on with the next chapter, stops on a sleep timer (fading out), and
@@ -60,18 +61,19 @@ public sealed class ReadAloudController
 {
     /// <summary>
     /// Sentences of the next chapter downloaded ahead when reading does not go on by itself, so opening it does not
-    /// wait. When it does go on (<see cref="ContinueToNextChapter"/>), the whole next chapter is downloaded ahead.
+    /// wait. When it does go on (<see cref="ContinueToNextChapter"/>), whole chapters are downloaded ahead
+    /// (<see cref="PrefetchChapters"/>).
     /// </summary>
     public const int NextChapterLead = 5;
+
+    /// <summary>The most chapters past the one being read that may be downloaded ahead.</summary>
+    public const int MaxPrefetchChapters = 10;
 
     /// <summary>How long reading waits before asking an online voice that did not answer again (no offline voice to fall back on).</summary>
     public IReadOnlyList<TimeSpan> OnlineRetryWaits { get; init; } = [TimeSpan.FromSeconds(5), TimeSpan.FromSeconds(15), TimeSpan.FromSeconds(30)];
 
     /// <summary>Sound kept in memory for going back instantly (the disk keeps everything else).</summary>
     public const long MemoryBytes = 16L * 1024 * 1024;
-
-    /// <summary>Background requests to an engine at once; the sentence to play now does not wait for them.</summary>
-    public const int BackgroundSlots = 2;
 
     private readonly SpeechCatalog _catalog;
     private readonly IAudioOutput _output;
@@ -85,11 +87,11 @@ public sealed class ReadAloudController
     private readonly HashSet<string> _onDisk = new(StringComparer.Ordinal);
     private IDirectSpeechEngine? _direct;
     private volatile bool _sleepReached;
-    private readonly SemaphoreSlim _backgroundSlots = new(BackgroundSlots, BackgroundSlots);
+    /// <summary>Background requests per engine (<see cref="ISpeechEngine.Parallel"/>); the sentence to play now does not wait for them.</summary>
+    private readonly Dictionary<string, SemaphoreSlim> _slots = new(StringComparer.Ordinal);
     private IReadAloudHost? _host;
     private CancellationTokenSource? _run;
-    private CancellationTokenSource? _prefetch;
-    private (int Chapter, string Profile)? _prefetching;
+    private PrefetchRun? _prefetch;
     private CancellationTokenSource? _download;
     private TaskCompletionSource? _resumed;
     private SpeechVoice? _fallback;
@@ -112,10 +114,17 @@ public sealed class ReadAloudController
 
     public Func<SpeechOptions> Options { get; set; } = () => new SpeechOptions(1, 1, 1);
 
-    /// <summary>Seconds of silence between paragraphs.</summary>
-    public Func<double> ParagraphPause { get; set; } = () => 0.3;
+    /// <summary>Seconds of silence between paragraphs (sentences follow each other with none: <see cref="SpeechSilence"/>).</summary>
+    public Func<double> ParagraphPause { get; set; } = () => 0.15;
 
     public Func<bool> ContinueToNextChapter { get; set; } = () => true;
+
+    /// <summary>
+    /// How many chapters past the one being read are downloaded ahead while reading goes on by itself (1 to
+    /// <see cref="MaxPrefetchChapters"/>); further ones wait until reading gets nearer, so nothing is downloaded that may
+    /// never be heard.
+    /// </summary>
+    public Func<int> PrefetchChapters { get; set; } = () => 2;
 
     public Func<bool> FallbackToOfflineVoice { get; set; } = () => true;
 
@@ -354,7 +363,7 @@ public sealed class ReadAloudController
                 var done = 0;
                 Report(new AudioDownloadProgress(true, chapter, first, last, 0, texts.Count));
                 var chapterFailed = 0;
-                await RunWorkersAsync(texts, async text =>
+                await RunWorkersAsync(texts, WorkersFor(voice), async text =>
                 {
                     try
                     {
@@ -437,7 +446,7 @@ public sealed class ReadAloudController
                     if (!await host.OpenChapterForReadingAsync(host.ChapterIndex + 1) || ct.IsCancellationRequested) break;
                     position = new ReadingPosition(host.ChapterIndex, 0, 0);
                     SetReadyThrough(-1);
-                    StartPrefetch(position);
+                    KeepPrefetching(position);
                     continue;
                 }
                 var sentences = host.SentencesOf(position.Paragraph);
@@ -456,9 +465,7 @@ public sealed class ReadAloudController
                 PositionChanged?.Invoke(this, position);
                 var (title, subtitle) = host.NowPlaying;
                 _output.ShowNowPlaying(title, subtitle);
-                // A new voice or speed is another recording: download ahead again from here.
-                if (_prefetching is not { } prefetching || prefetching.Chapter != position.Chapter || prefetching.Profile != Profile)
-                    StartPrefetch(position);
+                KeepPrefetching(position);
                 UpdateReady(position);
 
                 if (CurrentVoice() is { } speaking && _catalog.EngineOf(speaking) is IDirectSpeechEngine direct)
@@ -575,7 +582,8 @@ public sealed class ReadAloudController
 
     /// <summary>
     /// The sound of one sentence: from memory, from the disk, from a request already running, or synthesized (and then
-    /// kept on the disk). Background requests share <see cref="BackgroundSlots"/>; the sentence to play does not wait.
+    /// kept on the disk). Background requests share the engine's <see cref="ISpeechEngine.Parallel"/> slots; the
+    /// sentence to play does not wait.
     /// </summary>
     private async Task<SpeechAudio> EnsureAsync(string book, SpeechVoice voice, SpeechOptions options, string text, bool background, CancellationToken ct)
     {
@@ -586,8 +594,10 @@ public sealed class ReadAloudController
             if (_memory.TryGetValue(key, out var kept)) return kept;
             _inFlight.TryGetValue(key, out running);
         }
-        if (running is null && book.Length > 0 && _disk?.TryGet(book, key) is { } stored)
+        if (running is null && book.Length > 0 && _disk?.TryGet(book, key) is { } file)
         {
+            // Kept before silence was cut (it changes nothing on sound cut already).
+            var stored = SpeechSilence.Trim(file);
             lock (_gate) _onDisk.Add(book + "/" + key);
             Remember(key, stored);
             return stored;
@@ -617,12 +627,14 @@ public sealed class ReadAloudController
     private async Task<SpeechAudio> SynthesizeAsync(ISpeechEngine engine, string book, SpeechVoice voice, SpeechOptions options, string text, string key,
         bool background)
     {
+        var slots = background ? SlotsOf(engine) : null;
         try
         {
-            if (background) await _backgroundSlots.WaitAsync().ConfigureAwait(false);
+            if (slots is not null) await slots.WaitAsync().ConfigureAwait(false);
             try
             {
-                var audio = await engine.SynthesizeAsync(text, voice, options, CancellationToken.None).ConfigureAwait(false);
+                // Without the voice's padding at both ends, one sentence follows the last without a pause.
+                var audio = SpeechSilence.Trim(await engine.SynthesizeAsync(text, voice, options, CancellationToken.None).ConfigureAwait(false));
                 if (book.Length > 0)
                 {
                     try
@@ -640,7 +652,7 @@ public sealed class ReadAloudController
             }
             finally
             {
-                if (background) _backgroundSlots.Release();
+                slots?.Release();
             }
         }
         finally
@@ -648,6 +660,20 @@ public sealed class ReadAloudController
             lock (_gate) _inFlight.Remove(key);
         }
     }
+
+    private SemaphoreSlim SlotsOf(ISpeechEngine engine)
+    {
+        lock (_gate)
+        {
+            if (!_slots.TryGetValue(engine.Prefix, out var slots))
+                _slots[engine.Prefix] = slots = new SemaphoreSlim(WorkersFor(engine));
+            return slots;
+        }
+    }
+
+    private static int WorkersFor(ISpeechEngine engine) => Math.Clamp(engine.Parallel, 1, 16);
+
+    private int WorkersFor(SpeechVoice voice) => _catalog.EngineOf(voice) is { } engine ? WorkersFor(engine) : 1;
 
     /// <summary>Keeps recent sound in memory (for going back at once), up to <see cref="MemoryBytes"/>.</summary>
     private void Remember(string key, SpeechAudio audio)
@@ -764,84 +790,199 @@ public sealed class ReadAloudController
     // ---- Downloading ahead -----------------------------------------------------------------------------------------
 
     /// <summary>
-    /// Downloads every sentence from <paramref name="from"/> to the end of the open chapter, then the next chapter (all
-    /// of it when reading goes on by itself), two at a time, skipping what is kept already. Restarted after a jump, a
-    /// new chapter, or a new voice or speed.
+    /// One run of downloading ahead: a single queue from where reading started, through the rest of that chapter and on
+    /// into the next ones with no stop between them, as many at a time as the engine does well. While reading goes on by
+    /// itself it stays <see cref="PrefetchChapters"/> chapters ahead of the chapter being read and waits there until
+    /// reading moves on (<see cref="MoveTo"/>); otherwise it ends with the start of the next chapter.
+    /// </summary>
+    private sealed class PrefetchRun(string profile, int startChapter, int reading, int ahead, bool continuing)
+    {
+        private TaskCompletionSource _moved = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        private int _reading = reading;
+        private int _ahead = ahead;
+
+        public CancellationTokenSource Cancel { get; } = new();
+
+        public string Profile { get; } = profile;
+
+        public int StartChapter { get; } = startChapter;
+
+        public bool Continuing { get; } = continuing;
+
+        public Task Running { get; set; } = Task.CompletedTask;
+
+        public int Reading => Volatile.Read(ref _reading);
+
+        /// <summary>The last chapter it may download now.</summary>
+        public int Limit => Volatile.Read(ref _reading) + Volatile.Read(ref _ahead);
+
+        /// <summary>Reading moved to <paramref name="chapter"/>: the window moves with it.</summary>
+        public void MoveTo(int chapter, int ahead)
+        {
+            Volatile.Write(ref _reading, chapter);
+            Volatile.Write(ref _ahead, ahead);
+            Interlocked.Exchange(ref _moved, new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously)).TrySetResult();
+        }
+
+        /// <summary>Waits until <paramref name="chapter"/> is inside the window.</summary>
+        public async Task WaitForAsync(int chapter, CancellationToken ct)
+        {
+            while (true)
+            {
+                var moved = Volatile.Read(ref _moved);
+                if (chapter <= Limit) return;
+                await moved.Task.WaitAsync(ct).ConfigureAwait(false);
+            }
+        }
+    }
+
+    /// <summary>The sentences of one chapter in the queue; marked downloaded when the last of a whole chapter is done.</summary>
+    private sealed class PrefetchBatch(int chapter, IReadOnlyList<string> texts, bool whole)
+    {
+        public int Chapter { get; } = chapter;
+
+        public IReadOnlyList<string> Texts { get; } = texts;
+
+        public bool Whole { get; } = whole;
+
+        public int Remaining = texts.Count;
+    }
+
+    /// <summary>
+    /// Keeps downloading ahead for <paramref name="position"/>: the run going on follows reading into the next chapter;
+    /// a new run starts after a new voice or speed (another recording), or when the run ended or cannot cover it.
+    /// </summary>
+    private void KeepPrefetching(ReadingPosition position)
+    {
+        if (_prefetch is { } run && run.Profile == Profile && run.Continuing == ContinueToNextChapter() && position.Chapter >= run.StartChapter
+            && (position.Chapter == run.Reading || !run.Running.IsCompleted))
+        {
+            if (position.Chapter != run.Reading) run.MoveTo(position.Chapter, AheadChapters());
+            return;
+        }
+        StartPrefetch(position);
+    }
+
+    private int AheadChapters() => Math.Clamp(PrefetchChapters(), 1, MaxPrefetchChapters);
+
+    /// <summary>
+    /// Downloads every sentence from <paramref name="from"/> to the end of the open chapter, then on through the next
+    /// chapters (<see cref="PrefetchRun"/>), skipping what is kept already. Restarted after a jump, another chapter
+    /// picked, or a new voice or speed.
     /// </summary>
     private void StartPrefetch(ReadingPosition from)
     {
         StopPrefetch();
-        if (_host is not { BookId: { } book } host || CurrentVoice() is not { } voice || _catalog.EngineOf(voice) is IDirectSpeechEngine) return;
+        if (_host is not { BookId: { } book } host || CurrentVoice() is not { } voice || _catalog.EngineOf(voice) is not { } engine
+            || engine is IDirectSpeechEngine) return;
         var options = Options();
         var profile = AudioCache.Profile(voice, options);
-        var items = new List<(int Paragraph, string Text)>();
+        var current = new List<string>();
         for (var p = Math.Max(0, from.Paragraph); p < host.ParagraphCount; p++)
         {
             var sentences = host.SentencesOf(p);
-            for (var s = p == from.Paragraph ? from.Sentence : 0; s < sentences.Count; s++) items.Add((p, sentences[s].Text));
+            for (var s = p == from.Paragraph ? from.Sentence : 0; s < sentences.Count; s++) current.Add(sentences[s].Text);
         }
-        var cts = new CancellationTokenSource();
-        _prefetch = cts;
-        _prefetching = (from.Chapter, profile);
-        var chapter = from.Chapter;
-        var nextChapter = chapter + 1 < host.ChapterCount ? chapter + 1 : -1;
-        var wholeNextChapter = ContinueToNextChapter();
-        _ = Task.Run(async () =>
+        var run = new PrefetchRun(profile, from.Chapter, from.Chapter, AheadChapters(), ContinueToNextChapter());
+        _prefetch = run;
+        var chapterCount = host.ChapterCount;
+        var first = new PrefetchBatch(from.Chapter, current, whole: from.Paragraph == 0 && from.Sentence == 0);
+        run.Running = Task.Run(() => PrefetchAsync(run, host, book, voice, options, WorkersFor(engine), first, chapterCount));
+    }
+
+    private async Task PrefetchAsync(PrefetchRun run, IReadAloudHost host, string book, SpeechVoice voice, SpeechOptions options, int workers,
+        PrefetchBatch first, int chapterCount)
+    {
+        var ct = run.Cancel.Token;
+        var take = new SemaphoreSlim(1, 1);
+        var batch = first;
+        var index = 0;
+        var failures = 0;
+
+        // The next sentence of the queue, moving on to the next chapter when one is done (and waiting while that one is
+        // too far ahead); null when there is nothing more to download.
+        async Task<(PrefetchBatch Batch, string Text)?> TakeAsync()
         {
-            var ct = cts.Token;
-            var failures = 0;
-            async Task FetchAsync(string text)
-            {
-                try
-                {
-                    await EnsureAsync(book, voice, options, text, background: true, ct).ConfigureAwait(false);
-                    failures = 0;
-                }
-                catch (SpeechUnavailableException)
-                {
-                    // Offline: stop downloading ahead; playing will fall back or report it.
-                    if (Interlocked.Increment(ref failures) >= 3) throw new OperationCanceledException();
-                }
-            }
+            await take.WaitAsync(ct).ConfigureAwait(false);
             try
             {
-                await RunWorkersAsync(items, async item =>
+                while (index >= batch.Texts.Count)
                 {
-                    await FetchAsync(item.Text).ConfigureAwait(false);
-                    ReadyChanged?.Invoke(this, EventArgs.Empty);
-                }, ct).ConfigureAwait(false);
-                if (!ct.IsCancellationRequested && items.Count > 0 && from.Paragraph == 0 && from.Sentence == 0 && AllKept(book, profile, items.Select(i => i.Text)))
-                    _disk?.MarkChapter(book, chapter, profile);
-                if (nextChapter >= 0 && !ct.IsCancellationRequested)
-                {
-                    // Reading goes on by itself (a phone in a pocket, the screen off): the whole next chapter, so a
-                    // weak connection later does not stop it. Otherwise only its start, for opening it by hand.
-                    var next = await host.ChapterSentencesAsync(nextChapter, ct).ConfigureAwait(false);
-                    var texts = next.SelectMany(p => p.Select(s => s.Text)).ToList();
-                    if (!wholeNextChapter) texts = texts.Take(NextChapterLead).ToList();
-                    await RunWorkersAsync(texts, FetchAsync, ct).ConfigureAwait(false);
-                    if (wholeNextChapter && texts.Count > 0 && AllKept(book, profile, texts)) _disk?.MarkChapter(book, nextChapter, profile);
+                    var chapter = batch.Chapter + 1;
+                    if (chapter >= chapterCount) return null;
+                    if (!run.Continuing && chapter > first.Chapter + 1) return null;
+                    if (run.Continuing) await run.WaitForAsync(chapter, ct).ConfigureAwait(false);
+                    var paragraphs = await host.ChapterSentencesAsync(chapter, ct).ConfigureAwait(false);
+                    var texts = paragraphs.SelectMany(p => p.Select(s => s.Text)).ToList();
+                    // Reading stops at the chapter's end: only the start of the next, for opening it by hand.
+                    batch = run.Continuing ? new PrefetchBatch(chapter, texts, whole: true) : new PrefetchBatch(chapter, texts.Take(NextChapterLead).ToList(), whole: false);
+                    index = 0;
                 }
+                return (batch, batch.Texts[index++]);
             }
-            catch (Exception ex) when (ex is OperationCanceledException or SpeechUnavailableException)
+            finally
+            {
+                take.Release();
+            }
+        }
+
+        async Task Worker()
+        {
+            while (await TakeAsync().ConfigureAwait(false) is { } item)
+            {
+                var key = AudioCache.Key(run.Profile, item.Text);
+                if (!Kept(book, key))
+                {
+                    try
+                    {
+                        await EnsureAsync(book, voice, options, item.Text, background: true, ct).ConfigureAwait(false);
+                        Volatile.Write(ref failures, 0);
+                        if (item.Batch.Chapter == run.Reading) ReadyChanged?.Invoke(this, EventArgs.Empty);
+                    }
+                    catch (SpeechUnavailableException)
+                    {
+                        // Offline: stop downloading ahead; playing will fall back or report it.
+                        if (Interlocked.Increment(ref failures) >= 3) throw new OperationCanceledException();
+                    }
+                }
+                if (Interlocked.Decrement(ref item.Batch.Remaining) == 0 && item.Batch.Whole && item.Batch.Texts.Count > 0
+                    && AllKept(book, run.Profile, item.Batch.Texts))
+                    _disk?.MarkChapter(book, item.Batch.Chapter, run.Profile);
+            }
+        }
+
+        try
+        {
+            await Task.WhenAll(Enumerable.Range(0, workers).Select(_ => Worker())).ConfigureAwait(false);
+        }
+        catch (Exception ex) when (ex is OperationCanceledException or SpeechUnavailableException)
+        {
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Downloading ahead stopped");
+        }
+        finally
+        {
+            // The other workers stop too (one gave up, or the run was replaced).
+            try
+            {
+                run.Cancel.Cancel();
+            }
+            catch (ObjectDisposedException)
             {
             }
-            catch (Exception ex)
-            {
-                _logger.LogWarning(ex, "Downloading ahead stopped");
-            }
-        });
+        }
     }
 
     private void StopPrefetch()
     {
-        _prefetch?.Cancel();
+        _prefetch?.Cancel.Cancel();
         _prefetch = null;
-        _prefetching = null;
     }
 
-    /// <summary>Two workers taking the items in order.</summary>
-    private static async Task RunWorkersAsync<T>(IReadOnlyList<T> items, Func<T, Task> work, CancellationToken ct)
+    /// <summary>Workers taking the items in order.</summary>
+    private static async Task RunWorkersAsync<T>(IReadOnlyList<T> items, int workers, Func<T, Task> work, CancellationToken ct)
     {
         var next = -1;
         async Task Worker()
@@ -853,23 +994,21 @@ public sealed class ReadAloudController
                 await work(items[i]).ConfigureAwait(false);
             }
         }
-        await Task.WhenAll(Enumerable.Range(0, BackgroundSlots).Select(_ => Worker())).ConfigureAwait(false);
+        await Task.WhenAll(Enumerable.Range(0, workers).Select(_ => Worker())).ConfigureAwait(false);
         ct.ThrowIfCancellationRequested();
     }
 
-    private bool AllKept(string book, string profile, IEnumerable<string> texts)
+    /// <summary>Whether a sentence is in memory or on the disk already (without reading it).</summary>
+    private bool Kept(string book, string key)
     {
-        foreach (var text in texts)
-        {
-            var key = AudioCache.Key(profile, text);
-            bool known;
-            lock (_gate) known = _memory.ContainsKey(key) || _onDisk.Contains(book + "/" + key);
-            if (known) continue;
-            if (_disk?.Contains(book, key) != true) return false;
-            lock (_gate) _onDisk.Add(book + "/" + key);
-        }
+        lock (_gate)
+            if (_memory.ContainsKey(key) || _onDisk.Contains(book + "/" + key)) return true;
+        if (_disk?.Contains(book, key) != true) return false;
+        lock (_gate) _onDisk.Add(book + "/" + key);
         return true;
     }
+
+    private bool AllKept(string book, string profile, IEnumerable<string> texts) => texts.All(text => Kept(book, AudioCache.Key(profile, text)));
 
     /// <summary>How far, from the sentence being read, the sound of the open chapter is ready without a gap.</summary>
     private void UpdateReady(ReadingPosition from)

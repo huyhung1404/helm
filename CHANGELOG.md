@@ -16,6 +16,14 @@ Format: [Keep a Changelog](https://keepachangelog.com), versions follow [SemVer]
   (each with its count, Hán Việt reading, the logic scan's opinion and sentences where it appears), `novel_names`,
   `novel_add_names` and `novel_ignore_names`. Ask Claude Code, for example, "find the character names of my novel … in
   Helm".
+- **Novel Reader: no pause between sentences.** Voices leave silence at both ends of every sentence, which added up
+  to almost half a second between two sentences. It is now cut (also from audio downloaded before), so the next
+  sentence follows at once. Measured from what was heard: from 0.41–0.51 s down to 0.08–0.11 s on the PC (VieNeu),
+  0.10–0.14 s on Android (Google's voice). The pause between paragraphs now starts at 0.15 s and can be 0.
+- **Novel Reader: downloading ahead goes on into the next chapters without stopping**, until it is *Chapters
+  downloaded ahead* (2 by default, 1 to 10 in settings) past the chapter being read. It moves on as reading does, and
+  goes no further, so nothing is downloaded that may never be heard. The voices on this PC (VieNeu) now make four
+  sentences at once.
 
 ### Fixed
 - **SSH:** a wrong passphrase for a key always says so. About one wrong passphrase in 256 used to show a technical

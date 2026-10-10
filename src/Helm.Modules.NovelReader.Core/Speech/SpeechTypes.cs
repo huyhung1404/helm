@@ -48,6 +48,12 @@ public interface ISpeechEngine
     /// <summary>Reads the installed voices again (after the user added one).</summary>
     void RefreshVoices();
 
+    /// <summary>
+    /// Sentences synthesized ahead at once. More is faster only where the engine really works in parallel (a GPU); the
+    /// sentence to play now never waits for these.
+    /// </summary>
+    int Parallel => 2;
+
     /// <exception cref="SpeechUnavailableException">The engine cannot speak now (offline, service changed).</exception>
     Task<SpeechAudio> SynthesizeAsync(string text, SpeechVoice voice, SpeechOptions options, CancellationToken ct);
 }

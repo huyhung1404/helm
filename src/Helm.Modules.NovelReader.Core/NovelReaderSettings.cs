@@ -47,7 +47,7 @@ public sealed class NovelReaderSettings : IVersionedSettings
     public double SpeechVolume { get; set; } = 1;
 
     /// <summary>Silence between paragraphs, in seconds (0 to 2).</summary>
-    public double ParagraphPause { get; set; } = 0.3;
+    public double ParagraphPause { get; set; } = 0.15;
 
     /// <summary>Offer HoaiMy through a hidden Microsoft Edge (fast, online; it cannot be downloaded).</summary>
     public bool UseEdgeVoice { get; set; } = true;
@@ -63,6 +63,12 @@ public sealed class NovelReaderSettings : IVersionedSettings
 
     /// <summary>At the end of a chapter, reading aloud goes on with the next one.</summary>
     public bool ContinueToNextChapter { get; set; } = true;
+
+    /// <summary>
+    /// How many chapters past the one being read are synthesized ahead while reading goes on by itself (1 to 10), so
+    /// nothing is synthesized that may never be heard.
+    /// </summary>
+    public int PrefetchChapters { get; set; } = 2;
 
     // ---- Finding names ---------------------------------------------------------------------------------------------
 

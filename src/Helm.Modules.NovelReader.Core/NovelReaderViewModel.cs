@@ -111,6 +111,7 @@ public sealed partial class NovelReaderViewModel : ObservableObject, IReadAloudH
     [ObservableProperty] private double _speechVolume;
     [ObservableProperty] private double _paragraphPause;
     [ObservableProperty] private bool _continueToNextChapter;
+    [ObservableProperty] private int _prefetchChapters;
 
     // Adding a novel
     [ObservableProperty] private bool _isAdding;
@@ -158,6 +159,7 @@ public sealed partial class NovelReaderViewModel : ObservableObject, IReadAloudH
             Options = () => new SpeechOptions(SpeechRate, SpeechPitch, SpeechVolume),
             ParagraphPause = () => ParagraphPause,
             ContinueToNextChapter = () => ContinueToNextChapter,
+            PrefetchChapters = () => PrefetchChapters,
             FallbackToOfflineVoice = () => FallbackToOfflineVoice,
         };
         _reader.Attach(this);
@@ -184,6 +186,7 @@ public sealed partial class NovelReaderViewModel : ObservableObject, IReadAloudH
         SpeechVolume = Math.Clamp(s.SpeechVolume, 0, 1);
         ParagraphPause = Math.Clamp(s.ParagraphPause, 0, 2);
         ContinueToNextChapter = s.ContinueToNextChapter;
+        PrefetchChapters = Math.Clamp(s.PrefetchChapters, 1, ReadAloudController.MaxPrefetchChapters);
         FallbackToOfflineVoice = s.FallbackToOfflineVoice;
         LocalVoiceFolder = s.LocalVoiceFolder ?? "";
         LocalVoicePort = s.LocalVoicePort;
@@ -315,6 +318,7 @@ public sealed partial class NovelReaderViewModel : ObservableObject, IReadAloudH
     partial void OnSpeechVolumeChanged(double value) => Save(s => s.SpeechVolume = value);
     partial void OnParagraphPauseChanged(double value) => Save(s => s.ParagraphPause = value);
     partial void OnContinueToNextChapterChanged(bool value) => Save(s => s.ContinueToNextChapter = value);
+    partial void OnPrefetchChaptersChanged(int value) => Save(s => s.PrefetchChapters = value);
     partial void OnFallbackToOfflineVoiceChanged(bool value) => Save(s => s.FallbackToOfflineVoice = value);
     partial void OnIsSpeakingChanged(bool value) => OnPropertyChanged(nameof(ShowBackToReading));
     partial void OnIsFollowingChanged(bool value) => OnPropertyChanged(nameof(ShowBackToReading));

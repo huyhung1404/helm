@@ -84,7 +84,7 @@
                 <Border Classes="row">
                     <StackPanel Spacing="4">
                         <TextBlock Text="Pause between paragraphs" />
-                        <Slider Minimum="0" Maximum="2" SmallChange="0.1" TickFrequency="0.1" IsSnapToTickEnabled="True"
+                        <Slider Minimum="0" Maximum="2" SmallChange="0.05" TickFrequency="0.05" IsSnapToTickEnabled="True"
                                 Value="{Binding ParagraphPause}" AutomationProperties.Name="Pause between paragraphs" />
                     </StackPanel>
                 </Border>
@@ -93,9 +93,17 @@
                         <ToggleSwitch DockPanel.Dock="Right" IsChecked="{Binding ContinueToNextChapter}" OnContent="" OffContent="" AutomationProperties.Name="Go on to the next chapter" />
                         <StackPanel VerticalAlignment="Center" Spacing="2">
                             <TextBlock Text="Go on to the next chapter" />
-                            <TextBlock Text="Keeps reading chapter after chapter, also with the screen off. The next chapter is downloaded ahead in full." Classes="secondary" />
+                            <TextBlock Text="Keeps reading chapter after chapter, also with the screen off." Classes="secondary" />
                         </StackPanel>
                     </DockPanel>
+                </Border>
+                <Border Classes="row" IsEnabled="{Binding ContinueToNextChapter}">
+                    <StackPanel Spacing="4">
+                        <TextBlock Text="{Binding PrefetchChapters, StringFormat='Chapters downloaded ahead: {0}'}" />
+                        <TextBlock Text="The sentences ahead are downloaded up to this many chapters past the one being read, no further." Classes="secondary" />
+                        <Slider Minimum="1" Maximum="10" SmallChange="1" TickFrequency="1" IsSnapToTickEnabled="True"
+                                Value="{Binding PrefetchChapters}" AutomationProperties.Name="Chapters downloaded ahead" />
+                    </StackPanel>
                 </Border>
                 <Border Classes="row">
                     <DockPanel>

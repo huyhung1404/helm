@@ -888,6 +888,60 @@ public sealed class NovelReaderTests : IDisposable
     }
 
     [Fact]
+    public async Task Downloading_ahead_stays_the_set_number_of_chapters_ahead_and_follows_reading()
+    {
+        var engine = new FakeEngine();
+        var output = new FakeOutput { Hold = true };
+        var host = new FakeHost([["a1. a2."], ["b1. b2."], ["c1. c2."], ["d1. d2."], ["e1. e2."]]);
+        var cache = new AudioCache(Path.Combine(_dir, "audio"));
+        var reader = NewReader(engine, output, host, cache);
+        reader.PrefetchChapters = () => 2;
+
+        reader.Play(0);
+
+        // The chapter being read and the two after it, with no stop between them; the rest waits.
+        await WaitFor(() => engine.Spoken.Count == 6);
+        await Task.Delay(100);
+        Assert.Equal(["a1.", "a2.", "b1.", "b2.", "c1.", "c2."], engine.Spoken.Select(s => s.Text).Order());
+        await WaitFor(() => cache.DownloadedChapters("book", reader.Profile!).SetEquals([0, 1, 2]));
+
+        // Reading moves into the next chapter: one more chapter is downloaded, and nothing twice.
+        await WaitFor(() => output.Played.Count == 1);
+        output.Finish();
+        await WaitFor(() => output.Played.Count == 2);
+        output.Finish();
+        await WaitFor(() => engine.Spoken.Count == 8);
+        await Task.Delay(100);
+        Assert.Equal(8, engine.Spoken.Count);
+        Assert.Equal(["d1.", "d2."], engine.Spoken.Skip(6).Select(s => s.Text).Order());
+        reader.Stop();
+    }
+
+    [Fact]
+    public void The_silence_a_voice_leaves_around_a_sentence_is_cut()
+    {
+        // Half a second of silence, 0.2 s of sound, half a second of silence (24 kHz, 16-bit mono).
+        const int rate = 24000;
+        var samples = new short[(int)(rate * 1.2)];
+        for (var i = rate / 2; i < rate * 7 / 10; i++) samples[i] = (short)(8000 * Math.Sin(i * 2 * Math.PI * 220 / rate));
+        var audio = new SpeechAudio(TimeStretch.Wav(samples, rate), "audio/wav");
+
+        var cut = SpeechSilence.Trim(audio);
+
+        var expected = 0.2 + SpeechSilence.KeepBefore.TotalSeconds + SpeechSilence.KeepAfter.TotalSeconds;
+        Assert.Equal(expected, ReadAloudController.EstimateLength(cut).TotalSeconds, tolerance: 0.005);
+        Assert.Same(cut, SpeechSilence.Trim(cut));
+        // The sound itself is all there.
+        var kept = Enumerable.Range(0, (cut.Data.Length - 44) / 2).Select(i => BitConverter.ToInt16(cut.Data, 44 + 2 * i)).ToArray();
+        Assert.Equal(samples.Sum(s => Math.Abs((int)s)), kept.Sum(s => Math.Abs((int)s)));
+        // Only WAV is cut; silence alone stays as it is.
+        var mp3 = new SpeechAudio([1, 2, 3], "audio/mpeg");
+        Assert.Same(mp3, SpeechSilence.Trim(mp3));
+        var quiet = new SpeechAudio(TimeStretch.Wav(new short[rate], rate), "audio/wav");
+        Assert.Same(quiet, SpeechSilence.Trim(quiet));
+    }
+
+    [Fact]
     public void A_phones_own_female_vietnamese_voice_comes_before_the_online_one()
     {
         var online = new FakeEngine("edge");

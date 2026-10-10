@@ -65,6 +65,9 @@ public sealed class LocalSpeechEngine : ISpeechEngine
 
     public string Prefix => EnginePrefix;
 
+    /// <summary>The GPU synthesizes several sentences at once much faster than one after another (4060 Ti: 8 at once ≈ 9.5× listening speed).</summary>
+    public int Parallel => 4;
+
     /// <summary>The local voices (none when VieNeu is not installed), women first.</summary>
     public IReadOnlyList<SpeechVoice> Voices => _server.IsInstalled ? _voices : [];
 
