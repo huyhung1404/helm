@@ -3,7 +3,7 @@
 All notable changes to Helm. The top section is used as the GitHub release body and as the Velopack release notes.
 Format: [Keep a Changelog](https://keepachangelog.com), versions follow [SemVer](https://semver.org).
 
-## [Unreleased]
+## [0.40.0] - 2026-10-11
 
 ### Added
 - **Novel Reader: study mode, for learning Chinese while reading** (PC and Android). Choose *Study* in the reader's view
