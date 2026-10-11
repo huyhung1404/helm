@@ -541,6 +541,43 @@ public sealed class NovelReaderTests : IDisposable
     }
 
     [Fact]
+    public async Task Paging_by_hand_after_pausing_stays_paused_and_play_starts_the_open_chapter()
+    {
+        var page = NewPage("a");
+        var id = await page.Store.AddBookAsync("Novel", "n.txt", Novel, 3, "PC");
+        await page.ViewModel.OpenBookAsync(id);
+        page.ViewModel.ParagraphPause = 0;
+        page.Output.Hold = true;
+        page.ViewModel.PlayPauseCommand.Execute(null);
+        await WaitFor(() => page.Output.Played.Count == 1);
+        page.Output.Finish();
+        await WaitFor(() => page.Output.Played.Count == 2);
+
+        // Paused in the middle of the first chapter, then reading on by hand.
+        page.ViewModel.PlayPauseCommand.Execute(null);
+        Assert.Equal(ReadAloudState.Paused, page.ViewModel.Reader.State);
+        await page.ViewModel.NextChapterCommand.ExecuteAsync(null);
+        await page.ViewModel.NextChapterCommand.ExecuteAsync(null);
+        await Task.Delay(200);
+        Assert.Equal(2, page.ViewModel.ChapterIndex);
+        Assert.Equal(2, page.Output.Played.Count);
+        Assert.False(page.ViewModel.IsPlaying);
+
+        // Play reads the chapter now open, from its start.
+        page.ViewModel.PlayPauseCommand.Execute(null);
+        await WaitFor(() => page.Output.Played.Count == 3);
+        Assert.Equal(page.ViewModel.Paragraphs[0].Sentences[0].Text, page.Output.Played[^1]);
+        Assert.True(page.ViewModel.IsPlaying);
+
+        // Stop stops: nothing plays any more.
+        page.ViewModel.StopReadingCommand.Execute(null);
+        page.Output.Finish();
+        await Task.Delay(200);
+        Assert.Equal(3, page.Output.Played.Count);
+        Assert.Equal(ReadAloudState.Stopped, page.ViewModel.Reader.State);
+    }
+
+    [Fact]
     public async Task A_reopened_novel_marks_where_reading_stopped_and_plays_from_that_sentence()
     {
         var page = NewPage("a");

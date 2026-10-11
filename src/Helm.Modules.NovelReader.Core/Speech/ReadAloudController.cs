@@ -227,12 +227,17 @@ public sealed class ReadAloudController
         SetState(ReadAloudState.Stopped);
     }
 
-    /// <summary>The open chapter changed under the reader (another chapter was picked): read on from its start, or just point there.</summary>
+    /// <summary>
+    /// The open chapter changed under the reader (another chapter was picked): while reading, read on from there; while
+    /// paused, stop and point there (the reader paused to read on by hand, and play starts the chapter they reached);
+    /// otherwise just point there.
+    /// </summary>
     public void ChapterChanged(int paragraph = 0)
     {
         if (_host is null) return;
         var position = new ReadingPosition(_host.ChapterIndex, paragraph, 0);
         SetReadyThrough(-1);
+        if (_state == ReadAloudState.Paused) Stop();
         if (IsActive) StartAt(position);
         else SetPosition(position);
     }
