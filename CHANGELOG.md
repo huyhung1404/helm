@@ -3,6 +3,21 @@
 All notable changes to Helm. The top section is used as the GitHub release body and as the Velopack release notes.
 Format: [Keep a Changelog](https://keepachangelog.com), versions follow [SemVer](https://semver.org).
 
+## [Unreleased]
+
+### Added
+- **Novel Reader: study mode, for learning Chinese while reading** (PC and Android). Choose *Study* in the reader's view
+  menu: every word shows its Chinese, its pinyin and its Hán Việt above the Vietnamese, in blocks that wrap like text.
+  Reading aloud still reads only the Vietnamese. The pinyin comes from mozillazg's lists (MIT, about 2 MB, by phrase
+  first so 银行 reads yín háng), downloaded the first time you choose study mode and synced like the other
+  dictionaries. Each row can be hidden (settings on PC, the reading options on the phone), and the word popup shows the
+  pinyin too.
+- **Novel Reader: larger or smaller text from the reader.** A− / A+ next to Names on PC, with Ctrl + mouse wheel,
+  Ctrl + = / Ctrl + − and Ctrl + 0; on the phone A− / A+ in the reading options, or a two-finger pinch on the text.
+
+### Fixed
+- **Novel Reader (PC):** a new text size or another view no longer moves the reading place to another paragraph.
+
 ## [0.39.0] - 2026-10-11
 
 ### Removed

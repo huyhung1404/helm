@@ -37,6 +37,7 @@ public partial class NovelReaderContentPage : UserControl
 
     private readonly NovelReaderModule _module;
     private readonly NovelReaderViewModel _viewModel;
+    private double? _pinchStart;
     private readonly INovelPlatform _platform;
     private readonly IShellNavigation _navigation;
     private ScrollViewer? _pageScroller;
@@ -64,6 +65,15 @@ public partial class NovelReaderContentPage : UserControl
         InitializeComponent();
         ParagraphList.AddHandler(SegmentText.WordTappedEvent, OnWordTapped);
         ParagraphList.AddHandler(SegmentText.WordDoubleTappedEvent, OnWordDoubleTapped);
+        // Two fingers apart or together: larger or smaller text, from the size the pinch started at.
+        Scroller.GestureRecognizers.Add(new PinchGestureRecognizer());
+        Scroller.AddHandler(InputElement.PinchEvent, (_, e) =>
+        {
+            _pinchStart ??= _viewModel.FontSize;
+            _viewModel.ZoomFrom(_pinchStart.Value, e.Scale);
+            e.Handled = true;
+        });
+        Scroller.AddHandler(InputElement.PinchEndedEvent, (_, _) => _pinchStart = null);
         BookList.AddHandler(Button.ClickEvent, OnBookButton);
         Scroller.AddHandler(PointerPressedEvent, (_, _) => _touching = true, RoutingStrategies.Tunnel, handledEventsToo: true);
         Scroller.AddHandler(PointerReleasedEvent, (_, _) => EndTouch(), RoutingStrategies.Tunnel, handledEventsToo: true);
@@ -285,9 +295,12 @@ public partial class NovelReaderContentPage : UserControl
     {
         if (index < 0 || ParagraphList.ContainerFromIndex(index) is not Control container) return null;
         var top = container.Bounds.Top;
-        if (sentence && container.GetVisualDescendants().OfType<SegmentText>().FirstOrDefault() is { } text && text.HighlightTop() is { } inner
-            && text.TranslatePoint(new Point(0, inner), container) is { } point)
-            top += point.Y;
+        if (!sentence) return top;
+        // The text shown: the words, or in study mode the word blocks.
+        (Control Text, double? Inner)? shown = _viewModel.IsStudyMode
+            ? container.GetVisualDescendants().OfType<StudyText>().FirstOrDefault() is { } study ? (study, study.HighlightTop()) : null
+            : container.GetVisualDescendants().OfType<SegmentText>().FirstOrDefault() is { } text ? (text, text.HighlightTop()) : null;
+        if (shown is { Inner: { } inner } found && found.Text.TranslatePoint(new Point(0, inner), container) is { } point) top += point.Y;
         return top;
     }
 

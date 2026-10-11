@@ -10,17 +10,24 @@ namespace Helm.Modules.NovelReader;
 /// </summary>
 internal sealed class ReadingPalette
 {
-    private static readonly ReadingPalette Light = new("#12000000", "#1F2563EB", "#249333EA", "#1D4ED8", "#C2410C", "#15803D");
-    private static readonly ReadingPalette Dark = new("#1CFFFFFF", "#3060A5FA", "#3AC084FC", "#7AB8FF", "#FFA45C", "#5EDB8A");
+    private static readonly ReadingPalette Light = new("#12000000", "#1F2563EB", "#249333EA", "#1D4ED8", "#C2410C", "#15803D", "#8A5A00", "#0E7A6A");
+    private static readonly ReadingPalette Dark = new("#1CFFFFFF", "#3060A5FA", "#3AC084FC", "#7AB8FF", "#FFA45C", "#5EDB8A", "#F0B75A", "#5FD6C1");
 
-    private ReadingPalette(string band0, string band1, string dialogue, string subject, string verb, string @object)
+    private ReadingPalette(string band0, string band1, string dialogue, string subject, string verb, string @object, string pinyin, string hanViet)
     {
         Bands = [Brush(band0), Brush(band1)];
         Dialogue = Brush(dialogue);
         Subject = Brush(subject);
         Verb = Brush(verb);
         Object = Brush(@object);
+        Pinyin = Brush(pinyin);
+        HanViet = Brush(hanViet);
     }
+
+    /// <summary>Study mode's pinyin row (amber) and Hán Việt row (teal).</summary>
+    public Brush Pinyin { get; }
+
+    public Brush HanViet { get; }
 
     public Brush[] Bands { get; }
 
