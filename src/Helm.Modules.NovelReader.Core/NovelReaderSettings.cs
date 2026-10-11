@@ -26,6 +26,12 @@ public sealed class NovelReaderSettings : IVersionedSettings
     /// <summary>Line height as a multiple of the font size.</summary>
     public double LineSpacing { get; set; } = 1.6;
 
+    /// <summary>PC: the paragraph under the mouse shows its sentences apart and what is said in quotation marks.</summary>
+    public bool HoverHighlight { get; set; } = true;
+
+    /// <summary>PC: and colours the subject, the verb and the object of each clause.</summary>
+    public bool GrammarColors { get; set; } = true;
+
     /// <summary>The panel next to the text: names of this novel, or suggested names.</summary>
     public bool ShowNamesPanel { get; set; }
 

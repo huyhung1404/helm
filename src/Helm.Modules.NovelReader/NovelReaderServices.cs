@@ -25,7 +25,15 @@ public static class NovelReaderServices
             .AddSingleton<Helm.Modules.NovelReader.Names.INameScanAgent, ClaudeCodeNameAgent>()
             .AddSingleton<WindowsAudioOutput>()
             .AddSingleton<IAudioOutput>(sp => sp.GetRequiredService<WindowsAudioOutput>())
+            // Word classes for colouring subjects, verbs and objects under the mouse (jieba's list, built into this module).
+            .AddSingleton(_ => new Grammar.WordClassDictionary(OpenWordClasses))
             .AddNovelReaderCore()
             .AddHelmModule<NovelReaderModule, NovelReaderPage, NovelReaderViewModel>()
             .AddSingleton<NovelReaderContentPage>();
+
+    internal static Stream OpenWordClasses() =>
+        new System.IO.Compression.GZipStream(
+            typeof(NovelReaderServices).Assembly.GetManifestResourceStream("Helm.Modules.NovelReader.word-classes.txt.gz")
+                ?? throw new InvalidOperationException("The word classes are missing from the build."),
+            System.IO.Compression.CompressionMode.Decompress);
 }

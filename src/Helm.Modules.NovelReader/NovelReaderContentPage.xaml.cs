@@ -27,6 +27,7 @@ public partial class NovelReaderContentPage : Page
     private readonly NovelReaderModule _module;
     private readonly NovelReaderViewModel _viewModel;
     private readonly IClipboardService _clipboard;
+    private readonly Grammar.WordClassDictionary _wordClasses;
     private readonly DispatcherTimer _scrollTimer;
     private bool _scrolling;
     private bool _choosingChapter;
@@ -34,11 +35,14 @@ public partial class NovelReaderContentPage : Page
     private double _scrollTo;
     private DateTime _scrollStarted;
 
-    public NovelReaderContentPage(NovelReaderModule module, NovelReaderViewModel viewModel, IClipboardService clipboard)
+    public NovelReaderContentPage(NovelReaderModule module, NovelReaderViewModel viewModel, IClipboardService clipboard,
+        Grammar.WordClassDictionary wordClasses)
     {
         _module = module;
         _viewModel = viewModel;
         _clipboard = clipboard;
+        _wordClasses = wordClasses;
+        SegmentText.WordClasses = wordClasses;
         DataContext = viewModel;
         InitializeComponent();
         _scrollTimer = new DispatcherTimer(DispatcherPriority.Render, Dispatcher) { Interval = TimeSpan.FromMilliseconds(15) };
@@ -55,6 +59,7 @@ public partial class NovelReaderContentPage : Page
         };
         Loaded += async (_, _) =>
         {
+            LoadWordClasses();
             await viewModel.ActivateAsync();
             // Back on the page while listening: straight to the sentence being read.
             if (viewModel.IsSpeaking) viewModel.FollowReadingCommand.Execute(null);
@@ -392,8 +397,15 @@ public partial class NovelReaderContentPage : Page
     /// <summary>The text is wrapping again at a new width; the place is put back once it is laid out.</summary>
     private bool _rewrapping;
 
+    /// <summary>The word classes load in the background while the grammar colours are on (once; about 0.15 s).</summary>
+    private void LoadWordClasses()
+    {
+        if (_viewModel.HoverHighlight && _viewModel.GrammarColors) _ = _wordClasses.LoadAsync();
+    }
+
     private void OnViewModelChanged(object? sender, PropertyChangedEventArgs e)
     {
+        if (e.PropertyName is nameof(NovelReaderViewModel.HoverHighlight) or nameof(NovelReaderViewModel.GrammarColors)) LoadWordClasses();
         if (e.PropertyName == nameof(NovelReaderViewModel.ChapterIndex))
         {
             _choosingChapter = true;

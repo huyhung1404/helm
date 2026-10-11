@@ -80,6 +80,8 @@ public sealed partial class NovelReaderViewModel : ObservableObject, IReadAloudH
     [ObservableProperty] private bool _showChinese;
     [ObservableProperty] private double _fontSize;
     [ObservableProperty] private double _lineSpacing;
+    [ObservableProperty] private bool _hoverHighlight;
+    [ObservableProperty] private bool _grammarColors;
     [ObservableProperty] private bool _showNamesPanel;
 
     // Reading aloud
@@ -180,6 +182,8 @@ public sealed partial class NovelReaderViewModel : ObservableObject, IReadAloudH
         ShowChinese = s.ShowChinese;
         FontSize = Math.Clamp(s.FontSize, 12, 40);
         LineSpacing = Math.Clamp(s.LineSpacing, 1, 3);
+        HoverHighlight = s.HoverHighlight;
+        GrammarColors = s.GrammarColors;
         ShowNamesPanel = s.ShowNamesPanel;
         SpeechRate = Math.Clamp(s.SpeechRate, 0.5, 3);
         SpeechPitch = Math.Clamp(s.SpeechPitch, 0, 2);
@@ -295,6 +299,8 @@ public sealed partial class NovelReaderViewModel : ObservableObject, IReadAloudH
 
     partial void OnFontSizeChanged(double value) => Save(s => s.FontSize = value);
     partial void OnLineSpacingChanged(double value) => Save(s => s.LineSpacing = value);
+    partial void OnHoverHighlightChanged(bool value) => Save(s => s.HoverHighlight = value);
+    partial void OnGrammarColorsChanged(bool value) => Save(s => s.GrammarColors = value);
     partial void OnShowNamesPanelChanged(bool value)
     {
         Save(s => s.ShowNamesPanel = value);

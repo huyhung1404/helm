@@ -3,6 +3,22 @@
 All notable changes to Helm. The top section is used as the GitHub release body and as the Velopack release notes.
 Format: [Keep a Changelog](https://keepachangelog.com), versions follow [SemVer](https://semver.org).
 
+## [0.38.0] - 2026-10-11
+
+### Added
+- **Novel Reader (PC): the paragraph under the mouse is marked for reading by eye.** Its sentences show apart in two
+  shades, what is said in quotation marks in violet, and in each clause the subject is bold blue, the verb orange and
+  the object green. The roles come from the Chinese words, through a part-of-speech list (jieba's, MIT) built into
+  Helm, with rules for Chinese word order, so they are usually but not always right. Two switches under Text in
+  Novel Reader's settings turn the marks or only the grammar colours off. The sentence being read aloud keeps its own
+  highlight.
+
+### Fixed
+- **Novel Reader: paging by hand while reading aloud is paused no longer starts reading.** Picking another chapter
+  after a pause read on there in the background, so play then started in the middle of a chapter and pause or stop
+  seemed not to work. Now it stops, and play reads the chapter you reached from its start.
+- **Android: scrolling Novel Reader's chapter list, or opening its settings, no longer closes the app.**
+
 ## [0.37.1] - 2026-10-10
 
 ### Changed

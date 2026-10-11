@@ -114,6 +114,18 @@
                 <TextBlock Width="32" Margin="8,0,0,0" VerticalAlignment="Center" Text="{Binding LineSpacing, StringFormat={}{0:0.0}}" />
             </StackPanel>
         </ui:CardControl>
+        <ui:CardControl Margin="0,0,0,4" Icon="{ui:SymbolIcon Highlight24}">
+            <ui:CardControl.Header>
+                <core:CardHeader Title="Highlight the paragraph under the mouse" Description="Its sentences show apart in two shades, and what is said in quotation marks in violet, for reading by eye." />
+            </ui:CardControl.Header>
+            <ui:ToggleSwitch AutomationProperties.Name="Highlight the paragraph under the mouse" IsChecked="{Binding HoverHighlight}" />
+        </ui:CardControl>
+        <ui:CardControl Margin="0,0,0,4" Icon="{ui:SymbolIcon TextGrammarWand24}" IsEnabled="{Binding HoverHighlight}">
+            <ui:CardControl.Header>
+                <core:CardHeader Title="Colour subjects, verbs and objects" Description="In each clause the subject is bold blue, the verb orange and the object green, found from the Chinese words (not always right)." />
+            </ui:CardControl.Header>
+            <ui:ToggleSwitch AutomationProperties.Name="Colour subjects, verbs and objects" IsChecked="{Binding GrammarColors}" />
+        </ui:CardControl>
 
         <!-- Finding names -->
         <TextBlock Text="Finding names" Style="{DynamicResource HelmSectionHeader}" />

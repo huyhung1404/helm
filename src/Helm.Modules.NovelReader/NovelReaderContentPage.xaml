@@ -385,6 +385,9 @@
                                                            Foreground="{DynamicResource AccentTextFillColorPrimaryBrush}" />
                                                 <self:SegmentText x:Name="Text" Line="{Binding Line}" WordClicked="Word_Clicked" ReadFromClicked="Paragraph_ReadFromClicked"
                                                                   Highlight="{Binding SpeakingSegments}" HighlightBrush="{StaticResource SentenceFill}"
+                                                                  Sentences="{Binding Sentences}"
+                                                                  HoverHighlight="{Binding DataContext.HoverHighlight, RelativeSource={RelativeSource AncestorType=Page}}"
+                                                                  GrammarColors="{Binding DataContext.GrammarColors, RelativeSource={RelativeSource AncestorType=Page}}"
                                                                   FontSize="{Binding DataContext.FontSize, RelativeSource={RelativeSource AncestorType=Page}}"
                                                                   LineStackingStrategy="BlockLineHeight">
                                                     <self:SegmentText.LineHeight>
@@ -410,6 +413,7 @@
                                         </DataTrigger>
                                         <Trigger SourceName="Root" Property="IsMouseOver" Value="True">
                                             <Setter TargetName="PlayHere" Property="Visibility" Value="Visible" />
+                                            <Setter TargetName="Text" Property="IsHot" Value="True" />
                                         </Trigger>
                                         <DataTrigger Binding="{Binding IsResumePoint}" Value="True">
                                             <Setter TargetName="Frame" Property="BorderBrush" Value="{DynamicResource TextFillColorTertiaryBrush}" />
