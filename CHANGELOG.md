@@ -3,6 +3,13 @@
 All notable changes to Helm. The top section is used as the GitHub release body and as the Velopack release notes.
 Format: [Keep a Changelog](https://keepachangelog.com), versions follow [SemVer](https://semver.org).
 
+## [0.39.0] - 2026-10-11
+
+### Removed
+- **Watch Later** is gone from Helm on PC and Android: the tool, its page, its share target and its settings. Videos
+  you saved stay in your sync data but are no longer shown; Helm no longer downloads videos with yt-dlp. Sharing a
+  link from the phone now offers Notes and Tracker.
+
 ## [0.38.0] - 2026-10-11
 
 ### Added

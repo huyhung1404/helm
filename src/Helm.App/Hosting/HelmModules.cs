@@ -8,7 +8,6 @@ using Helm.Modules.Scratch;
 using Helm.Modules.Vault;
 using Helm.Modules.Tracker;
 using Helm.Modules.Wallet;
-using Helm.Modules.WatchLater;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Helm.App.Hosting;
@@ -26,7 +25,6 @@ internal static class HelmModules
         services.AddMissionsModule();
         services.AddWalletModule();
         services.AddNotesModule();
-        services.AddWatchLaterModule();
         services.AddNovelReaderModule();
         services.AddScratchModule();
         services.AddSshModule();

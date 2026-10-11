@@ -21,7 +21,7 @@ Print a short plan before you start, then continue without waiting:
 - **Module id**: kebab-case, e.g. `color-picker`. The same id on both platforms.
 - **Class prefix**: PascalCase, e.g. `ColorPicker`.
 - **Group**: what the tool is for — one of `Planning` (notes, to-dos, goals, capture: Notes, Tracker, Missions,
-  Quick Capture), `MoneyAndMedia` (Wallet, Watch Later), `SecurityAndServers` (secrets and remote machines: Vault,
+  Quick Capture), `MoneyAndMedia` (Wallet, Novel Reader), `SecurityAndServers` (secrets and remote machines: Vault,
   SSH), `WindowsAndDesktop` (windows, input and the desktop itself: Always on Top, Command Palette). Pick the closest;
   the same group on both platforms. If none fits, add a group to `ModuleGroup` with a name that says what is inside
   (never a generic one like "Tools" or "Advanced") plus its `DisplayName` and PC `Icon`.
@@ -263,7 +263,7 @@ The page is a `core:ModulePageBase`. It already renders the title, the icon + de
   search open the settings page (§4).
 - **Quick Capture** (optional, both platforms): a tool whose data can be written from one line of text registers an
   `ICaptureTarget` (`Helm.Core.Capture`) in its `.Core` services, e.g. `services.AddSingleton<ICaptureTarget, MyTarget>()`.
-  Give it a one-letter `Prefix` that is not taken (`n` Notes, `t` task, `d` debt, `w` Watch Later, `m` mission, `s` spending), a `Preview` that says what Enter
+  Give it a one-letter `Prefix` that is not taken (`n` Notes, `t` task, `d` debt, `m` mission, `s` spending), a `Preview` that says what Enter
   will do, and never throw. See `NoteCaptureTarget`, `TaskCaptureTarget`.
 - **Command palette** (optional, PC): a tool with things to find registers an `IPaletteProvider`
   (`Helm.Core.Palette`) in its PC project. Score with `PaletteQuery.Score` (accents and case do not matter), keep it

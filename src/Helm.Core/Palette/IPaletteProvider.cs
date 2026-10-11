@@ -18,7 +18,7 @@ public enum PaletteKind
     Window,
     WindowsSetting,
     Web,
-    /// <summary>A saved video (Watch Later).</summary>
+    /// <summary>A saved video.</summary>
     Video,
 }
 

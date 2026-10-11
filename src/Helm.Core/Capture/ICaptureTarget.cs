@@ -35,7 +35,7 @@ public interface ICaptureTarget
     int Order { get; }
 
     /// <summary>
-    /// True when shared text is clearly for this target (e.g. a video link for Watch Later), so the share sheet picks
+    /// True when shared text is clearly for this target (e.g. a link only it can use), so the share sheet picks
     /// it instead of the default target.
     /// </summary>
     bool Claims(string text) => false;
