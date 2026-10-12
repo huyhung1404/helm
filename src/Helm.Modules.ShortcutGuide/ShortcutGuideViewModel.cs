@@ -271,7 +271,7 @@ public sealed partial class ShortcutGuideViewModel : ObservableObject
         var selectedId = SelectedApp?.Id;
         var library = Module.Library;
         Apps = library.Apps;
-        SelectedApp = Apps.FirstOrDefault(a => a.Id == selectedId) ?? Apps.FirstOrDefault(a => !a.IsGeneral) ?? Apps.FirstOrDefault();
+        SelectedApp = Apps.FirstOrDefault(a => a.Id == selectedId) ?? Apps.FirstOrDefault(); // Windows first
         RebuildGroups();
     }
 

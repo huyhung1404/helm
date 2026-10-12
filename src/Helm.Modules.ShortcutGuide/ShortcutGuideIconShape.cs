@@ -10,10 +10,10 @@ public static class ShortcutGuideIconShape
     public const double Size = 100;
 
     /// <summary>The keycap, stroked with <see cref="Stroke"/>.</summary>
-    public const string Keycap = "M20 6H80A16 16 0 0 1 96 22V78A16 16 0 0 1 80 94H20A16 16 0 0 1 4 78V22A16 16 0 0 1 20 6Z";
+    public const string Keycap = "M20 10H80A16 16 0 0 1 96 26V74A16 16 0 0 1 80 90H20A16 16 0 0 1 4 74V26A16 16 0 0 1 20 10Z";
 
     /// <summary>The four-pointed sparkle in the middle, filled.</summary>
-    public const string Sparkle = "M50 26C52.5 41 59 47.5 74 50C59 52.5 52.5 59 50 74C47.5 59 41 52.5 26 50C41 47.5 47.5 41 50 26Z";
+    public const string Sparkle = "M50 30C52 42.5 57.5 48 70 50C57.5 52 52 57.5 50 70C48 57.5 42.5 52 30 50C42.5 48 48 42.5 50 30Z";
 
     public const double Stroke = 8;
 

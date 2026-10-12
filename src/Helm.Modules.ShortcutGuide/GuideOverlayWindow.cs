@@ -107,6 +107,8 @@ internal sealed class GuideOverlayWindow : Window
             foreach (var column in Layout(view))
             {
                 var panel = new StackPanel { Width = ColumnWidth, Margin = new Thickness(0, 0, ColumnGap, 0) };
+                // The descriptions of a column line up after its longest keys.
+                Grid.SetIsSharedSizeScope(panel, true);
                 foreach (var row in column) panel.Children.Add(row);
                 columns.Children.Add(panel);
             }
@@ -222,7 +224,7 @@ internal sealed class GuideOverlayWindow : Window
     private static FrameworkElement ItemRow(GuideItem item)
     {
         var grid = new Grid { Height = RowHeight };
-        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto, MinWidth = 64 });
+        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto, MinWidth = 40, SharedSizeGroup = "Keys" });
         grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
 
         var keys = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center };
