@@ -541,6 +541,86 @@ public sealed class NovelReaderTests : IDisposable
     }
 
     [Fact]
+    public async Task Study_mode_shows_the_chinese_pinyin_and_han_viet_of_each_word_and_reads_only_the_vietnamese()
+    {
+        var page = NewPage("a");
+        File.WriteAllText(Path.Combine(page.Dictionaries.Folder, "Pinyin.txt"), NovelReaderStudyTests.PinyinFile);
+        var id = await page.Store.AddBookAsync("Novel", "n.txt", Novel, 3, "PC");
+        await page.ViewModel.OpenBookAsync(id);
+        Assert.Null(page.ViewModel.Paragraphs[2].Readings);
+
+        page.ViewModel.ModeIndex = (int)ConvertMode.Study;
+        await WaitFor(() => page.ViewModel.Paragraphs[2].Readings is not null);
+
+        Assert.True(page.ViewModel.IsStudyMode);
+        var paragraph = page.ViewModel.Paragraphs[2];
+        var lin = paragraph.Line!.Segments.Select((s, i) => (s, i)).First(p => p.s.Text.StartsWith("Lâm", StringComparison.Ordinal)).i;
+        // 林宛 is no name in this test's dictionaries: 林 is a word of its own.
+        Assert.Equal(new WordReading("林", "lín", "lâm"), paragraph.Readings![lin]);
+        Assert.False(paragraph.ShowChinese);
+
+        page.ViewModel.ParagraphPause = 0;
+        page.ViewModel.PlayPauseCommand.Execute(null);
+        await WaitFor(() => page.Engine.Spoken.Count > 2);
+        page.ViewModel.StopReadingCommand.Execute(null);
+        // What is read is the Vietnamese line's sentences, never the study rows above it.
+        Assert.Equal("Chương 1 sơn tự họa đoan", page.Engine.Spoken[0].Text);
+        Assert.All(page.Engine.Spoken, s => Assert.False(s.Text.Contains("lín", StringComparison.OrdinalIgnoreCase) || s.Text.Contains("sǎn"), s.Text));
+    }
+
+    [Fact]
+    public void The_text_grows_and_shrinks_within_its_limits()
+    {
+        var page = NewPage("a");
+        page.ViewModel.ResetZoomCommand.Execute(null);
+        page.ViewModel.ZoomInCommand.Execute(null);
+        Assert.Equal(19, page.ViewModel.FontSize);
+        for (var i = 0; i < 40; i++) page.ViewModel.ZoomOutCommand.Execute(null);
+        Assert.Equal(NovelReaderViewModel.MinFontSize, page.ViewModel.FontSize);
+        page.ViewModel.ZoomFrom(20, 3);
+        Assert.Equal(NovelReaderViewModel.MaxFontSize, page.ViewModel.FontSize);
+        page.ViewModel.ZoomFrom(20, 1.26);
+        Assert.Equal(25, page.ViewModel.FontSize);
+    }
+
+    [Fact]
+    public async Task Paging_by_hand_after_pausing_stays_paused_and_play_starts_the_open_chapter()
+    {
+        var page = NewPage("a");
+        var id = await page.Store.AddBookAsync("Novel", "n.txt", Novel, 3, "PC");
+        await page.ViewModel.OpenBookAsync(id);
+        page.ViewModel.ParagraphPause = 0;
+        page.Output.Hold = true;
+        page.ViewModel.PlayPauseCommand.Execute(null);
+        await WaitFor(() => page.Output.Played.Count == 1);
+        page.Output.Finish();
+        await WaitFor(() => page.Output.Played.Count == 2);
+
+        // Paused in the middle of the first chapter, then reading on by hand.
+        page.ViewModel.PlayPauseCommand.Execute(null);
+        Assert.Equal(ReadAloudState.Paused, page.ViewModel.Reader.State);
+        await page.ViewModel.NextChapterCommand.ExecuteAsync(null);
+        await page.ViewModel.NextChapterCommand.ExecuteAsync(null);
+        await Task.Delay(200);
+        Assert.Equal(2, page.ViewModel.ChapterIndex);
+        Assert.Equal(2, page.Output.Played.Count);
+        Assert.False(page.ViewModel.IsPlaying);
+
+        // Play reads the chapter now open, from its start.
+        page.ViewModel.PlayPauseCommand.Execute(null);
+        await WaitFor(() => page.Output.Played.Count == 3);
+        Assert.Equal(page.ViewModel.Paragraphs[0].Sentences[0].Text, page.Output.Played[^1]);
+        Assert.True(page.ViewModel.IsPlaying);
+
+        // Stop stops: nothing plays any more.
+        page.ViewModel.StopReadingCommand.Execute(null);
+        page.Output.Finish();
+        await Task.Delay(200);
+        Assert.Equal(3, page.Output.Played.Count);
+        Assert.Equal(ReadAloudState.Stopped, page.ViewModel.Reader.State);
+    }
+
+    [Fact]
     public async Task A_reopened_novel_marks_where_reading_stopped_and_plays_from_that_sentence()
     {
         var page = NewPage("a");

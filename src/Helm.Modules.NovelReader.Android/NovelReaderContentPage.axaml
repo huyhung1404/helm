@@ -339,8 +339,16 @@
                                                     </TextBlock.IsVisible>
                                                 </TextBlock>
                                                 <vm:SegmentText Line="{Binding Line}" Highlight="{Binding SpeakingSegments}" Classes.heading="{Binding IsHeading}"
+                                                                IsVisible="{Binding !$parent[ItemsControl].((vm:NovelReaderViewModel)DataContext).IsStudyMode}"
                                                                 FontSize="{Binding $parent[ItemsControl].((vm:NovelReaderViewModel)DataContext).FontSize}"
                                                                 RelativeLineHeight="{Binding $parent[ItemsControl].((vm:NovelReaderViewModel)DataContext).LineSpacing}" />
+                                                <!-- Study mode: each word with its Chinese, pinyin and Hán Việt above the Vietnamese -->
+                                                <vm:StudyText Line="{Binding Line}" Readings="{Binding Readings}" Highlight="{Binding SpeakingSegments}"
+                                                              IsVisible="{Binding $parent[ItemsControl].((vm:NovelReaderViewModel)DataContext).IsStudyMode}"
+                                                              TextSize="{Binding $parent[ItemsControl].((vm:NovelReaderViewModel)DataContext).FontSize}"
+                                                              ShowChinese="{Binding $parent[ItemsControl].((vm:NovelReaderViewModel)DataContext).StudyShowChinese}"
+                                                              ShowPinyin="{Binding $parent[ItemsControl].((vm:NovelReaderViewModel)DataContext).StudyShowPinyin}"
+                                                              ShowHanViet="{Binding $parent[ItemsControl].((vm:NovelReaderViewModel)DataContext).StudyShowHanViet}" />
                                                 <TextBlock Text="{Binding Chinese}" Classes="secondary" Margin="0,4,0,0" IsVisible="{Binding ShowChinese}"
                                                            FontSize="{Binding $parent[ItemsControl].((vm:NovelReaderViewModel)DataContext).FontSize}" />
                                             </StackPanel>
@@ -388,6 +396,7 @@
                                     </StackPanel>
                                     <TextBlock Text="{Binding Chinese}" FontSize="22" FontWeight="SemiBold" TextWrapping="Wrap" VerticalAlignment="Center" />
                                 </DockPanel>
+                                <TextBlock Text="{Binding Pinyin}" Classes="secondary" IsVisible="{Binding Pinyin, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
                                 <TextBlock Text="{Binding HanViet}" Classes="secondary" />
                                 <TextBlock Text="{Binding SavedAs}" Foreground="{DynamicResource AccentText}" TextWrapping="Wrap" IsVisible="{Binding HasSaved}" />
                                 <ItemsControl ItemsSource="{Binding Meanings}">
@@ -453,10 +462,19 @@
                                 <ComboBox HorizontalAlignment="Stretch" ItemsSource="{Binding SleepTimerNames}" SelectedIndex="{Binding SleepTimerIndex}" AutomationProperties.Name="Sleep timer" />
                                 <TextBlock Text="Show" Classes="title" />
                                 <ComboBox HorizontalAlignment="Stretch" ItemsSource="{Binding ModeNames}" SelectedIndex="{Binding ModeIndex}" AutomationProperties.Name="What the page shows" />
-                                <DockPanel>
-                                    <TextBlock DockPanel.Dock="Left" Text="Text size" VerticalAlignment="Center" Margin="0,0,12,0" />
-                                    <Slider Minimum="12" Maximum="40" SmallChange="1" TickFrequency="1" IsSnapToTickEnabled="True" Value="{Binding FontSize}" AutomationProperties.Name="Text size" />
-                                </DockPanel>
+                                <!-- Study mode: the rows shown above each Vietnamese word -->
+                                <WrapPanel IsVisible="{Binding IsStudyMode}">
+                                    <CheckBox Content="中文" IsChecked="{Binding StudyShowChinese}" Margin="0,0,16,0" AutomationProperties.Name="Show the Chinese" />
+                                    <CheckBox Content="Pinyin" IsChecked="{Binding StudyShowPinyin}" Margin="0,0,16,0" AutomationProperties.Name="Show the pinyin" />
+                                    <CheckBox Content="Hán Việt" IsChecked="{Binding StudyShowHanViet}" AutomationProperties.Name="Show the Hán Việt" />
+                                </WrapPanel>
+                                <!-- Text size: also a pinch on the text -->
+                                <Grid ColumnDefinitions="Auto,*,Auto,Auto,Auto">
+                                    <TextBlock Text="Text size" VerticalAlignment="Center" />
+                                    <Button Grid.Column="2" Classes="icon" Content="A−" FontSize="16" Command="{Binding ZoomOutCommand}" AutomationProperties.Name="Smaller text" />
+                                    <TextBlock Grid.Column="3" Width="44" TextAlignment="Center" VerticalAlignment="Center" Text="{Binding FontSize, StringFormat='{}{0:0}'}" />
+                                    <Button Grid.Column="4" Classes="icon" Content="A+" FontSize="16" Command="{Binding ZoomInCommand}" AutomationProperties.Name="Larger text" />
+                                </Grid>
                                 <TextBlock Text="Download audio to listen offline" Classes="title" />
                                 <WrapPanel>
                                     <Button Classes="chip" Content="This chapter" Command="{Binding DownloadThisChapterCommand}" />

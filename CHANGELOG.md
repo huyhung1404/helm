@@ -3,24 +3,76 @@
 All notable changes to Helm. The top section is used as the GitHub release body and as the Velopack release notes.
 Format: [Keep a Changelog](https://keepachangelog.com), versions follow [SemVer](https://semver.org).
 
-## [Unreleased]
+## [0.41.0] - 2026-10-12
 
 ### Added
 - **Shortcut Guide (PC): hold Ctrl, Alt or Win to see the shortcuts of the app in front.** After a moment (0.7 s by
   default) a see-through strip along the bottom shows the key you hold with a "+", then a grid of keys with what each
-  does: that app's first (VS Code, Visual
-  Studio, Rider, Unity, Slack, Edge and Chrome, Firefox, Windows Terminal, Teams, Discord, File Explorer), then the
-  ones most apps share, then Windows', leaving out the basics everyone knows (copy, paste, undo, Alt+Tab …). Add Shift while it shows to see the Ctrl+Shift ones. Press any key, click or let
-  go and it is gone; it never takes the focus, so the shortcut still reaches the app, and letting go of Win or Alt
-  afterwards does not open Start or the menu bar. Its page lists every app's shortcuts: edit any of them (keys, what it
-  does), mark the ones everyone knows as Basic, delete what you never use (a built-in one can be restored, an edited
-  one reset), add your own (chords like Ctrl+K Ctrl+C too) or a whole app by its process name, and preview the guide. Settings: which
-  keys open it (Shift is off by default), how long to hold, skip the basics, bottom or centre, background opacity, rows
-  of keys, excluded apps, not over full-screen games.
+  does: that app's first (VS Code, Visual Studio, Rider, Unity, Slack, Edge and Chrome, Firefox, Windows Terminal,
+  Teams, Discord, File Explorer), then the ones most apps share, then Windows', leaving out the basics everyone knows
+  (copy, paste, undo, Alt+Tab …). About 40 at once on a 1080p screen. Add Shift while it shows to see the Ctrl+Shift
+  ones. Press any key, click or let go and it is gone; it never takes the focus, so the shortcut still reaches the
+  app, and letting go of Win or Alt afterwards does not open Start or the menu bar. Its page lists every app's
+  shortcuts: edit any of them (keys, what it does), mark the ones everyone knows as Basic, delete what you never use
+  (a built-in one can be restored, an edited one reset), add your own (chords like Ctrl+K Ctrl+C too) or a whole app
+  by its process name, and preview the guide. Settings: which keys open it (Shift is off by default), how long to
+  hold, skip the basics, bottom or centre, background opacity, rows of keys, excluded apps, not over full-screen
+  games.
 
 ### Removed
 - **Command Palette.** The Alt+Space search box is gone, with the search results the tools offered it. Alt+Space opens
   the Windows window menu again. Its settings file stays on disk and is ignored.
+
+## [0.40.0] - 2026-10-11
+
+### Added
+- **Novel Reader: study mode, for learning Chinese while reading** (PC and Android). Choose *Study* in the reader's view
+  menu: every word shows its Chinese, its pinyin and its Hán Việt above the Vietnamese, in blocks that wrap like text.
+  Reading aloud still reads only the Vietnamese. The pinyin comes from mozillazg's lists (MIT, about 2 MB, by phrase
+  first so 银行 reads yín háng), downloaded the first time you choose study mode and synced like the other
+  dictionaries. Each row can be hidden (settings on PC, the reading options on the phone), and the word popup shows the
+  pinyin too.
+- **Novel Reader: larger or smaller text from the reader.** A− / A+ next to Names on PC, with Ctrl + mouse wheel,
+  Ctrl + = / Ctrl + − and Ctrl + 0; on the phone A− / A+ in the reading options, or a two-finger pinch on the text.
+
+### Fixed
+- **Novel Reader (PC):** a new text size or another view no longer moves the reading place to another paragraph.
+
+## [0.39.0] - 2026-10-11
+
+### Removed
+- **Watch Later** is gone from Helm on PC and Android: the tool, its page, its share target and its settings. Videos
+  you saved stay in your sync data but are no longer shown; Helm no longer downloads videos with yt-dlp. Sharing a
+  link from the phone now offers Notes and Tracker.
+
+## [0.38.0] - 2026-10-11
+
+### Added
+- **Novel Reader (PC): the paragraph under the mouse is marked for reading by eye.** Its sentences show apart in two
+  shades, what is said in quotation marks in violet, and in each clause the subject is bold blue, the verb orange and
+  the object green. The roles come from the Chinese words, through a part-of-speech list (jieba's, MIT) built into
+  Helm, with rules for Chinese word order, so they are usually but not always right. Two switches under Text in
+  Novel Reader's settings turn the marks or only the grammar colours off. The sentence being read aloud keeps its own
+  highlight.
+
+### Fixed
+- **Novel Reader: paging by hand while reading aloud is paused no longer starts reading.** Picking another chapter
+  after a pause read on there in the background, so play then started in the middle of a chapter and pause or stop
+  seemed not to work. Now it stops, and play reads the chapter you reached from its start.
+- **Android: scrolling Novel Reader's chapter list, or opening its settings, no longer closes the app.**
+
+## [0.37.1] - 2026-10-10
+
+### Changed
+- **The sync button is one glyph that only changes colour**, on PC and Android, without a button look: accent and
+  turning while syncing, green for a moment after a sync, red on a problem, faded when offline or not set up. On
+  Android it now turns around its centre instead of its corner.
+
+### Fixed
+- **Novel Reader (PC): closing the names panel gives the text its width back.** The text fills the page beside the
+  panel and all of it without, instead of staying 900 pixels wide. Opening or closing the panel (or resizing the
+  window) keeps the paragraph you are reading at the top, and no longer moves the saved reading place.
+- **Novel Reader:** the AI name scan's result is no longer covered by a progress line arriving late.
 
 ## [0.37.0] - 2026-10-10
 

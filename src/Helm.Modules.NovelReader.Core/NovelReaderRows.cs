@@ -76,6 +76,32 @@ public sealed partial class ChapterItem(int index, string title) : ObservableObj
 /// One paragraph on the page (the first one of a chapter is its title). Its converted line is replaced in place when
 /// names or options change, so the page keeps its scroll position.
 /// </summary>
+/// <summary>A word as study mode shows it above its Vietnamese: the Chinese, the pinyin and the Hán Việt reading.</summary>
+public sealed record WordReading(string Chinese, string Pinyin, string HanViet)
+{
+    /// <summary>The readings of every segment of a converted line (null for punctuation and spaces).</summary>
+    public static IReadOnlyList<WordReading?> Of(ConvertedLine line, Dictionaries.PinyinDictionary pinyin, Func<string, string> hanViet)
+    {
+        var readings = new WordReading?[line.Segments.Count];
+        for (var i = 0; i < line.Segments.Count; i++)
+        {
+            var segment = line.Segments[i];
+            if (!segment.IsWord || segment.Start < 0 || segment.Start + segment.Length > line.Source.Length) continue;
+            var chinese = line.Source.Substring(segment.Start, segment.Length);
+            var py = pinyin.Of(chinese);
+            var hv = hanViet(chinese);
+            // A name reads like one: Lín Wǎn, Lâm Uyển.
+            if (segment.Kind == SegmentKind.Name)
+            {
+                py = Dictionaries.PinyinDictionary.Capitalize(py);
+                hv = Dictionaries.PinyinDictionary.Capitalize(hv);
+            }
+            readings[i] = new WordReading(chinese, py, hv);
+        }
+        return readings;
+    }
+}
+
 public sealed partial class ParagraphViewModel(int index, string chinese, bool isHeading) : ObservableObject
 {
     private IReadOnlyList<Speech.Sentence>? _sentences;
@@ -89,6 +115,9 @@ public sealed partial class ParagraphViewModel(int index, string chinese, bool i
 
     /// <summary>Where reading stopped last time: marked until the reader scrolls away or starts reading.</summary>
     [ObservableProperty] private bool _isResumePoint;
+
+    /// <summary>Study mode: for each segment of <see cref="Line"/>, its Chinese, pinyin and Hán Việt (null for punctuation); null outside study mode.</summary>
+    [ObservableProperty] private IReadOnlyList<WordReading?>? _readings;
 
     /// <summary>The sentences reading aloud speaks, cut from the converted line.</summary>
     public IReadOnlyList<Speech.Sentence> Sentences => _sentences ??= Speech.SentenceSplitter.Split(Line);

@@ -23,6 +23,8 @@ public enum ConvertMode
     VietPhrase,
     HanViet,
     Chinese,
+    /// <summary>For learning Chinese: each VietPhrase word with its Chinese, pinyin and Hán Việt above it.</summary>
+    Study,
 }
 
 /// <summary>

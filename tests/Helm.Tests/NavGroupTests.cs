@@ -15,7 +15,6 @@ public class NavGroupTests
         ["missions"] = ModuleGroup.Planning,
         ["quick-capture"] = ModuleGroup.Planning,
         ["wallet"] = ModuleGroup.MoneyAndMedia,
-        ["watch-later"] = ModuleGroup.MoneyAndMedia,
         ["scratch"] = ModuleGroup.MoneyAndMedia,
         ["novel-reader"] = ModuleGroup.MoneyAndMedia,
         ["vault"] = ModuleGroup.SecurityAndServers,

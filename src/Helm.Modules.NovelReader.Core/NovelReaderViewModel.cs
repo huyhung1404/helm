@@ -80,6 +80,11 @@ public sealed partial class NovelReaderViewModel : ObservableObject, IReadAloudH
     [ObservableProperty] private bool _showChinese;
     [ObservableProperty] private double _fontSize;
     [ObservableProperty] private double _lineSpacing;
+    [ObservableProperty] private bool _hoverHighlight;
+    [ObservableProperty] private bool _grammarColors;
+    [ObservableProperty] private bool _studyShowChinese;
+    [ObservableProperty] private bool _studyShowPinyin;
+    [ObservableProperty] private bool _studyShowHanViet;
     [ObservableProperty] private bool _showNamesPanel;
 
     // Reading aloud
@@ -171,7 +176,11 @@ public sealed partial class NovelReaderViewModel : ObservableObject, IReadAloudH
         audio.MediaButton += (_, button) => _ui.Post(() => OnMediaButton(button));
         _launcher = launcher;
         _logger = logger;
-        Editor = new WordEditorViewModel(store, clipboard, () => _converter, () => OpenBookId) { ReadFrom = ReadFromSegment };
+        Editor = new WordEditorViewModel(store, clipboard, () => _converter, () => OpenBookId)
+        {
+            ReadFrom = ReadFromSegment,
+            PinyinOf = chinese => _dictionaries.Current.Pinyin.Of(chinese),
+        };
 
         _loading = true;
         var s = _settings.Current;
@@ -180,6 +189,11 @@ public sealed partial class NovelReaderViewModel : ObservableObject, IReadAloudH
         ShowChinese = s.ShowChinese;
         FontSize = Math.Clamp(s.FontSize, 12, 40);
         LineSpacing = Math.Clamp(s.LineSpacing, 1, 3);
+        HoverHighlight = s.HoverHighlight;
+        GrammarColors = s.GrammarColors;
+        StudyShowChinese = s.StudyShowChinese;
+        StudyShowPinyin = s.StudyShowPinyin;
+        StudyShowHanViet = s.StudyShowHanViet;
         ShowNamesPanel = s.ShowNamesPanel;
         SpeechRate = Math.Clamp(s.SpeechRate, 0.5, 3);
         SpeechPitch = Math.Clamp(s.SpeechPitch, 0, 2);
@@ -221,7 +235,10 @@ public sealed partial class NovelReaderViewModel : ObservableObject, IReadAloudH
 
     public ObservableCollection<DictionaryFile> DictionaryFiles { get; } = [];
 
-    public IReadOnlyList<string> ModeNames { get; } = ["VietPhrase", "Hán Việt", "中文"];
+    public IReadOnlyList<string> ModeNames { get; } = ["VietPhrase", "Hán Việt", "中文", "Study (中文 · pinyin · Hán Việt)"];
+
+    /// <summary>Each word shows its Chinese, pinyin and Hán Việt above the Vietnamese; reading aloud reads the Vietnamese only.</summary>
+    public bool IsStudyMode => Mode == ConvertMode.Study;
 
     /// <summary>Asks the page to scroll a paragraph (index in <see cref="Paragraphs"/>) to the top.</summary>
     public event EventHandler<int>? ScrollRequested;
@@ -252,7 +269,7 @@ public sealed partial class NovelReaderViewModel : ObservableObject, IReadAloudH
         get => (int)Mode;
         set
         {
-            if (value >= 0 && value <= 2) Mode = (ConvertMode)value;
+            if (value >= 0 && value <= (int)ConvertMode.Study) Mode = (ConvertMode)value;
         }
     }
 
@@ -277,9 +294,55 @@ public sealed partial class NovelReaderViewModel : ObservableObject, IReadAloudH
     partial void OnModeChanged(ConvertMode value)
     {
         OnPropertyChanged(nameof(ModeIndex));
+        OnPropertyChanged(nameof(IsStudyMode));
         Save(s => s.Mode = value);
-        if (!_loading) Reconvert();
+        // Study mode shows the Chinese of every word already.
+        foreach (var p in Paragraphs) p.ShowChinese = ShowChinese && !p.IsSceneBreak && !IsStudyMode;
+        if (_loading) return;
+        Reconvert();
+        if (IsStudyMode) _ = EnsurePinyinAsync();
     }
+
+    /// <summary>
+    /// Study mode needs the pinyin lists (about 2 MB): downloaded the first time it is chosen, then synced like the
+    /// other dictionaries. Reloading the dictionaries converts the chapter again, with the pinyin.
+    /// </summary>
+    private async Task EnsurePinyinAsync()
+    {
+        if (IsDownloading || !_dictionaries.HasFiles || _dictionaries.Files().Any(f => f.Kind == DictionaryKind.Pinyin)) return;
+        IsDownloading = true;
+        var cts = new CancellationTokenSource();
+        _downloading = cts;
+        try
+        {
+            var progress = new Progress<(string File, double Fraction)>(p =>
+                DownloadStatus = p.File.Length > 0 ? $"Downloading {p.File} for study mode… {p.Fraction:P0}" : "Loading…");
+            Message = "Downloading pinyin for study mode (about 2 MB)…";
+            await _dictionaries.DownloadAsync(_settings.Current.PinyinSources(), progress, cts.Token);
+            await _dictionaries.ReloadAsync();
+            Message = null;
+            DownloadStatus = "Downloaded.";
+        }
+        catch (OperationCanceledException)
+        {
+            Message = null;
+        }
+        catch (Exception ex) when (ex is HttpRequestException or IOException or UnauthorizedAccessException)
+        {
+            _logger.LogWarning(ex, "Could not download the pinyin");
+            Message = "Could not download the pinyin for study mode: " + ex.Message;
+        }
+        finally
+        {
+            IsDownloading = false;
+            _downloading = null;
+            RefreshDictionaryStatus();
+        }
+    }
+
+    /// <summary>Study mode: the Chinese, pinyin and Hán Việt of each word of a converted line (null otherwise).</summary>
+    private static IReadOnlyList<WordReading?>? ReadingsFor(ConvertedLine? line, Converter? converter, PinyinDictionary pinyin, bool study) =>
+        study && line is not null && converter is not null ? WordReading.Of(line, pinyin, converter.HanVietOf) : null;
 
     partial void OnPrioritizeNamesChanged(bool value)
     {
@@ -290,11 +353,35 @@ public sealed partial class NovelReaderViewModel : ObservableObject, IReadAloudH
     partial void OnShowChineseChanged(bool value)
     {
         Save(s => s.ShowChinese = value);
-        foreach (var p in Paragraphs) p.ShowChinese = value && !p.IsSceneBreak;
+        foreach (var p in Paragraphs) p.ShowChinese = value && !p.IsSceneBreak && !IsStudyMode;
     }
 
     partial void OnFontSizeChanged(double value) => Save(s => s.FontSize = value);
     partial void OnLineSpacingChanged(double value) => Save(s => s.LineSpacing = value);
+    partial void OnHoverHighlightChanged(bool value) => Save(s => s.HoverHighlight = value);
+    partial void OnGrammarColorsChanged(bool value) => Save(s => s.GrammarColors = value);
+    partial void OnStudyShowChineseChanged(bool value) => Save(s => s.StudyShowChinese = value);
+    partial void OnStudyShowPinyinChanged(bool value) => Save(s => s.StudyShowPinyin = value);
+    partial void OnStudyShowHanVietChanged(bool value) => Save(s => s.StudyShowHanViet = value);
+
+    /// <summary>The text size the reader starts with and goes back to (Ctrl+0 on PC).</summary>
+    public const double DefaultFontSize = 18;
+
+    public const double MinFontSize = 12;
+
+    public const double MaxFontSize = 40;
+
+    [RelayCommand]
+    private void ZoomIn() => FontSize = Math.Min(MaxFontSize, Math.Round(FontSize) + 1);
+
+    [RelayCommand]
+    private void ZoomOut() => FontSize = Math.Max(MinFontSize, Math.Round(FontSize) - 1);
+
+    [RelayCommand]
+    private void ResetZoom() => FontSize = DefaultFontSize;
+
+    /// <summary>A pinch on the phone: the size the pinch started at times how far it has spread, within the limits.</summary>
+    public void ZoomFrom(double startSize, double scale) => FontSize = Math.Clamp(Math.Round(startSize * scale), MinFontSize, MaxFontSize);
     partial void OnShowNamesPanelChanged(bool value)
     {
         Save(s => s.ShowNamesPanel = value);
@@ -594,24 +681,28 @@ public sealed partial class NovelReaderViewModel : ObservableObject, IReadAloudH
         await EnsureConverterAsync();
         var converter = _converter;
         var mode = Mode;
+        var study = IsStudyMode;
+        var pinyin = _dictionaries.Current.Pinyin;
         var lines = await Task.Run(() =>
         {
-            var list = new List<(string Chinese, ConvertedLine? Line, bool Heading)>(chapter.Paragraphs.Count + 1)
+            var list = new List<(string Chinese, ConvertedLine? Line, bool Heading, IReadOnlyList<WordReading?>? Readings)>(chapter.Paragraphs.Count + 1);
+            foreach (var (p, heading) in chapter.Paragraphs.Select(p => (p, false)).Prepend((chapter.Title, true)))
             {
-                (chapter.Title, converter?.ConvertLine(chapter.Title, mode), true),
-            };
-            foreach (var p in chapter.Paragraphs) list.Add((p, converter?.ConvertLine(p, mode), false));
+                var line = converter?.ConvertLine(p, mode);
+                list.Add((p, line, heading, ReadingsFor(line, converter, pinyin, study)));
+            }
             return list;
         });
         if (version != _loadVersion) return;
         Paragraphs.Clear();
         for (var i = 0; i < lines.Count; i++)
         {
-            var (chinese, line, heading) = lines[i];
+            var (chinese, line, heading, readings) = lines[i];
             Paragraphs.Add(new ParagraphViewModel(i, chinese, heading)
             {
                 Line = line ?? new ConvertedLine(chinese, [new Segment(0, chinese.Length, chinese, SegmentKind.Text, "")]),
-                ShowChinese = ShowChinese && !(line?.IsSceneBreak ?? false),
+                Readings = readings,
+                ShowChinese = ShowChinese && !(line?.IsSceneBreak ?? false) && !study,
             });
         }
         ChapterIndex = index;
@@ -1207,7 +1298,11 @@ public sealed partial class NovelReaderViewModel : ObservableObject, IReadAloudH
                     SuggestionStatus = $"{_nameAgent.Name} is reading the possible names…";
                     try
                     {
-                        var progress = new Progress<string>(p => SuggestionStatus = p);
+                        // On the UI thread, and only while it works: a report arriving late must not cover the result.
+                        var progress = new UiProgress<string>(_ui, p =>
+                        {
+                            if (ReferenceEquals(_scanCancel, cts)) SuggestionStatus = p;
+                        });
                         said = await _nameAgent.FindNamesAsync(bookId, BookTitle, progress, cts.Token);
                         sure = [];
                     }
@@ -1505,14 +1600,25 @@ public sealed partial class NovelReaderViewModel : ObservableObject, IReadAloudH
     {
         if (_converter is not { } converter || Paragraphs.Count == 0) return;
         var mode = Mode;
+        var study = IsStudyMode;
+        var pinyin = _dictionaries.Current.Pinyin;
         var items = Paragraphs.ToList();
         var version = _loadVersion;
-        _ = Task.Run(() => items.Select(p => converter.ConvertLine(p.Chinese, mode)).ToList()).ContinueWith(t =>
+        _ = Task.Run(() => items.Select(p =>
+        {
+            var line = converter.ConvertLine(p.Chinese, mode);
+            return (Line: line, Readings: ReadingsFor(line, converter, pinyin, study));
+        }).ToList()).ContinueWith(t =>
         {
             if (t.IsCompletedSuccessfully) _ui.Post(() =>
             {
                 if (version != _loadVersion) return;
-                for (var i = 0; i < items.Count; i++) items[i].Line = t.Result[i];
+                for (var i = 0; i < items.Count; i++)
+                {
+                    // The readings first: the page rebuilds a paragraph when its line changes.
+                    items[i].Readings = t.Result[i].Readings;
+                    items[i].Line = t.Result[i].Line;
+                }
             });
         }, TaskScheduler.Default);
         ConvertChapterTitles();
@@ -1630,7 +1736,7 @@ public sealed partial class NovelReaderViewModel : ObservableObject, IReadAloudH
         DictionaryStatus = NeedsDictionaries
             ? "No dictionaries on this device yet. Download them or import QuickTranslator files (ChinesePhienAmWords, VietPhrase, Names…)."
             : _dictionaries.IsLoaded
-                ? string.Create(System.Globalization.CultureInfo.InvariantCulture, $"{set.VietPhrase.Count:N0} phrases, {set.Names.Count:N0} names, {set.HanViet.Count:N0} Hán Việt readings, {set.LuatNhan.Count:N0} LuatNhan rules.")
+                ? string.Create(System.Globalization.CultureInfo.InvariantCulture, $"{set.VietPhrase.Count:N0} phrases, {set.Names.Count:N0} names, {set.HanViet.Count:N0} Hán Việt readings, {set.LuatNhan.Count:N0} LuatNhan rules{(set.Pinyin.Count > 0 ? $", {set.Pinyin.Count:N0} pinyin readings" : "")}.")
                 : $"{DictionaryFiles.Count} files; loaded when you open a novel.";
     }
 
@@ -1640,5 +1746,11 @@ public sealed partial class NovelReaderViewModel : ObservableObject, IReadAloudH
     private void Save(Action<NovelReaderSettings> change)
     {
         if (!_loading) _settings.Update(change);
+    }
+
+    /// <summary>Progress reported from any thread, handled on the UI thread in the order it was reported.</summary>
+    private sealed class UiProgress<T>(IUiDispatcher ui, Action<T> report) : IProgress<T>
+    {
+        public void Report(T value) => ui.Post(() => report(value));
     }
 }

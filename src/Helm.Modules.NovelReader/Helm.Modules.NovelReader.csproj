@@ -14,4 +14,10 @@
     <InternalsVisibleTo Include="Helm.Tests" />
   </ItemGroup>
 
+  <ItemGroup>
+    <!-- jieba's part-of-speech list (MIT, see Resources/word-classes.LICENSE.txt), for colouring sentences under the mouse -->
+    <EmbeddedResource Include="Resources\word-classes.txt.gz" LogicalName="Helm.Modules.NovelReader.word-classes.txt.gz" />
+    <None Include="Resources\word-classes.LICENSE.txt" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
 </Project>

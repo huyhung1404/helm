@@ -26,6 +26,19 @@ public sealed class NovelReaderSettings : IVersionedSettings
     /// <summary>Line height as a multiple of the font size.</summary>
     public double LineSpacing { get; set; } = 1.6;
 
+    /// <summary>PC: the paragraph under the mouse shows its sentences apart and what is said in quotation marks.</summary>
+    public bool HoverHighlight { get; set; } = true;
+
+    /// <summary>PC: and colours the subject, the verb and the object of each clause.</summary>
+    public bool GrammarColors { get; set; } = true;
+
+    /// <summary>Study mode: the rows shown above each Vietnamese word.</summary>
+    public bool StudyShowChinese { get; set; } = true;
+
+    public bool StudyShowPinyin { get; set; } = true;
+
+    public bool StudyShowHanViet { get; set; } = true;
+
     /// <summary>The panel next to the text: names of this novel, or suggested names.</summary>
     public bool ShowNamesPanel { get; set; }
 
@@ -90,7 +103,15 @@ public sealed class NovelReaderSettings : IVersionedSettings
         ["Names.txt"] = "https://raw.githubusercontent.com/ldhieu304/file-vietphrase/main/Names.txt",
         ["LuatNhan.txt"] = "https://raw.githubusercontent.com/truyencuatui/VietPhrase/master/LuatNhan.txt",
         ["Pronouns.txt"] = "https://raw.githubusercontent.com/ThanhPhuoc91/VietPhrase/main/Pronouns.txt",
+        // Study mode (MIT, github.com/mozillazg): pinyin per character, and per word for characters with several readings.
+        ["Pinyin.txt"] = "https://raw.githubusercontent.com/mozillazg/pinyin-data/master/pinyin.txt",
+        ["PinyinPhrases.txt"] = "https://raw.githubusercontent.com/mozillazg/phrase-pinyin-data/master/pinyin.txt",
     };
+
+    /// <summary>The pinyin files, also for a user whose saved sources predate them.</summary>
+    public IReadOnlyDictionary<string, string> PinyinSources() =>
+        DefaultSources.Where(s => Dictionaries.DictionarySet.KindOf(s.Key) == Dictionaries.DictionaryKind.Pinyin)
+            .ToDictionary(s => s.Key, s => DictionarySources.TryGetValue(s.Key, out var url) ? url : s.Value, StringComparer.OrdinalIgnoreCase);
 
     // ---- This device -----------------------------------------------------------------------------------------------
 

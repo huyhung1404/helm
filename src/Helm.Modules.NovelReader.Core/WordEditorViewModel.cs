@@ -26,6 +26,12 @@ public sealed partial class WordEditorViewModel : ObservableObject
     [ObservableProperty] private bool _isOpen;
     [ObservableProperty] private string _chinese = "";
     [ObservableProperty] private string _hanViet = "";
+
+    /// <summary>The word's pinyin, once the pinyin lists are on this device (shown above the Hán Việt); "" otherwise.</summary>
+    [ObservableProperty] private string _pinyin = "";
+
+    /// <summary>Pinyin of a Chinese word (study mode's lists); null shows none.</summary>
+    public Func<string, string>? PinyinOf { get; init; }
     [ObservableProperty] private string _current = "";
     [ObservableProperty] private string _draft = "";
     [ObservableProperty] private string _savedAs = "";
@@ -170,6 +176,7 @@ public sealed partial class WordEditorViewModel : ObservableObject
         Chinese = _source.Substring(_start, _length);
         var converter = _converter();
         HanViet = converter?.HanVietOf(Chinese) ?? "";
+        Pinyin = PinyinOf?.Invoke(Chinese) ?? "";
         Current = shown ?? converter?.ConvertLine(Chinese).Text ?? Chinese;
         Draft = Current;
 

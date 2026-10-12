@@ -15,6 +15,8 @@ public enum DictionaryKind
     Pronouns,
     /// <summary>LuatNhan.txt: reordering rules with a {0} slot.</summary>
     LuatNhan,
+    /// <summary>Pinyin.txt (per character) and PinyinPhrases.txt (per word), for study mode.</summary>
+    Pinyin,
 }
 
 /// <summary>
@@ -25,13 +27,15 @@ public sealed class DictionarySet
 {
     public static DictionarySet Empty { get; } = new(new PhraseDictionary(), new PhraseDictionary(), new PhraseDictionary(), new PhraseDictionary(), new LuatNhanRules());
 
-    public DictionarySet(PhraseDictionary hanViet, PhraseDictionary vietPhrase, PhraseDictionary names, PhraseDictionary pronouns, LuatNhanRules luatNhan)
+    public DictionarySet(PhraseDictionary hanViet, PhraseDictionary vietPhrase, PhraseDictionary names, PhraseDictionary pronouns, LuatNhanRules luatNhan,
+        PinyinDictionary? pinyin = null)
     {
         HanViet = hanViet;
         VietPhrase = vietPhrase;
         Names = names;
         Pronouns = pronouns;
         LuatNhan = luatNhan;
+        Pinyin = pinyin ?? new PinyinDictionary();
     }
 
     public PhraseDictionary HanViet { get; }
@@ -39,6 +43,7 @@ public sealed class DictionarySet
     public PhraseDictionary Names { get; }
     public PhraseDictionary Pronouns { get; }
     public LuatNhanRules LuatNhan { get; }
+    public PinyinDictionary Pinyin { get; }
 
     /// <summary>Without Hán Việt readings nothing can be converted.</summary>
     public bool IsUsable => HanViet.Count > 0;
@@ -50,6 +55,7 @@ public sealed class DictionarySet
         DictionaryKind.Names => Names.Count,
         DictionaryKind.Pronouns => Pronouns.Count,
         DictionaryKind.LuatNhan => LuatNhan.Count,
+        DictionaryKind.Pinyin => Pinyin.Count,
         _ => 0,
     };
 
@@ -58,6 +64,7 @@ public sealed class DictionarySet
     {
         var name = Path.GetFileNameWithoutExtension(fileName).ToLowerInvariant();
         if (!fileName.EndsWith(".txt", StringComparison.OrdinalIgnoreCase)) return null;
+        if (name.Contains("pinyin")) return DictionaryKind.Pinyin;
         if (name.Contains("phienam") || name.Contains("hanviet") || name.Contains("hán việt")) return DictionaryKind.HanViet;
         if (name.Contains("luatnhan")) return DictionaryKind.LuatNhan;
         if (name.Contains("pronoun")) return DictionaryKind.Pronouns;
@@ -96,7 +103,13 @@ public sealed class DictionarySet
             ct.ThrowIfCancellationRequested();
             foreach (var (key, value) in PhraseDictionary.ParseLines(TextFiles.ReadAllText(file.Path))) luatNhan.Add(key, value);
         }
+        var pinyin = new PinyinDictionary();
+        foreach (var file in files.Where(f => f.Kind == DictionaryKind.Pinyin))
+        {
+            ct.ThrowIfCancellationRequested();
+            pinyin.Load(TextFiles.ReadAllText(file.Path));
+        }
         return new DictionarySet(Merge(DictionaryKind.HanViet), Merge(DictionaryKind.VietPhrase), Merge(DictionaryKind.Names),
-            Merge(DictionaryKind.Pronouns), luatNhan);
+            Merge(DictionaryKind.Pronouns), luatNhan, pinyin);
     }
 }

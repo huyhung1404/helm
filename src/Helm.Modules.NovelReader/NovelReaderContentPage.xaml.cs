@@ -27,6 +27,7 @@ public partial class NovelReaderContentPage : Page
     private readonly NovelReaderModule _module;
     private readonly NovelReaderViewModel _viewModel;
     private readonly IClipboardService _clipboard;
+    private readonly Grammar.WordClassDictionary _wordClasses;
     private readonly DispatcherTimer _scrollTimer;
     private bool _scrolling;
     private bool _choosingChapter;
@@ -34,11 +35,14 @@ public partial class NovelReaderContentPage : Page
     private double _scrollTo;
     private DateTime _scrollStarted;
 
-    public NovelReaderContentPage(NovelReaderModule module, NovelReaderViewModel viewModel, IClipboardService clipboard)
+    public NovelReaderContentPage(NovelReaderModule module, NovelReaderViewModel viewModel, IClipboardService clipboard,
+        Grammar.WordClassDictionary wordClasses)
     {
         _module = module;
         _viewModel = viewModel;
         _clipboard = clipboard;
+        _wordClasses = wordClasses;
+        SegmentText.WordClasses = wordClasses;
         DataContext = viewModel;
         InitializeComponent();
         _scrollTimer = new DispatcherTimer(DispatcherPriority.Render, Dispatcher) { Interval = TimeSpan.FromMilliseconds(15) };
@@ -55,6 +59,7 @@ public partial class NovelReaderContentPage : Page
         };
         Loaded += async (_, _) =>
         {
+            LoadWordClasses();
             await viewModel.ActivateAsync();
             // Back on the page while listening: straight to the sentence being read.
             if (viewModel.IsSpeaking) viewModel.FollowReadingCommand.Execute(null);
@@ -248,6 +253,15 @@ public partial class NovelReaderContentPage : Page
             case Key.Right when Keyboard.Modifiers == ModifierKeys.None:
                 _viewModel.NextChapterCommand.Execute(null);
                 break;
+            case Key.OemPlus or Key.Add when Keyboard.Modifiers == ModifierKeys.Control:
+                _viewModel.ZoomInCommand.Execute(null);
+                break;
+            case Key.OemMinus or Key.Subtract when Keyboard.Modifiers == ModifierKeys.Control:
+                _viewModel.ZoomOutCommand.Execute(null);
+                break;
+            case Key.D0 or Key.NumPad0 when Keyboard.Modifiers == ModifierKeys.Control:
+                _viewModel.ResetZoomCommand.Execute(null);
+                break;
             case Key.OemOpenBrackets:
                 _viewModel.SlowerCommand.Execute(null);
                 break;
@@ -265,8 +279,21 @@ public partial class NovelReaderContentPage : Page
 
     // ---- Scrolling -------------------------------------------------------------------------------------------------
 
-    /// <summary>The wheel or a touchpad: the reader looks elsewhere, so the page stops following the voice.</summary>
-    private void Scroller_UserScroll(object sender, MouseWheelEventArgs e) => _viewModel.StopFollowing();
+    /// <summary>
+    /// The wheel or a touchpad: the reader looks elsewhere, so the page stops following the voice. With Ctrl held it
+    /// makes the text larger or smaller instead.
+    /// </summary>
+    private void Scroller_UserScroll(object sender, MouseWheelEventArgs e)
+    {
+        if (Keyboard.Modifiers == ModifierKeys.Control)
+        {
+            if (e.Delta > 0) _viewModel.ZoomInCommand.Execute(null);
+            else if (e.Delta < 0) _viewModel.ZoomOutCommand.Execute(null);
+            e.Handled = true;
+            return;
+        }
+        _viewModel.StopFollowing();
+    }
 
     /// <summary>Dragging or clicking the scroll bar also stops following.</summary>
     private void Scroller_MouseDown(object sender, MouseButtonEventArgs e)
@@ -285,6 +312,8 @@ public partial class NovelReaderContentPage : Page
     private void JumpTo(int index)
     {
         _scrollTimer.Stop();
+        // The paragraph to keep at the top from now on (another chapter's paragraphs are not the last one's).
+        _top = (Math.Max(0, index), 0);
         if (index <= 0)
         {
             SetOffset(0);
@@ -305,8 +334,14 @@ public partial class NovelReaderContentPage : Page
         var height = container.ActualHeight;
         var view = Scroller.ViewportHeight;
         var target = top;
-        if (height > view * 0.6 && FindSegmentText(container) is { } text && text.HighlightTop() is { } sentenceTop)
-            target = top + text.TranslatePoint(new Point(0, sentenceTop), container).Y;
+        if (height > view * 0.6)
+        {
+            // The text shown: the words, or in study mode the word blocks.
+            (FrameworkElement Text, double? Top)? sentence = _viewModel.IsStudyMode
+                ? Find<StudyText>(container) is { } study ? (study, study.HighlightTop()) : null
+                : Find<SegmentText>(container) is { } text ? (text, text.HighlightTop()) : null;
+            if (sentence is { Top: { } sentenceTop } found) target = top + found.Text.TranslatePoint(new Point(0, sentenceTop), container).Y;
+        }
         var comfortable = target >= view * 0.1 && target <= view * 0.55 && (height <= view * 0.6 || target + 60 <= view);
         if (comfortable) return;
         SmoothScroll(Scroller.VerticalOffset + target - view / 3);
@@ -342,33 +377,68 @@ public partial class NovelReaderContentPage : Page
 
     private double TopOf(FrameworkElement container) => container.TransformToAncestor(Scroller).Transform(new Point(0, 0)).Y;
 
-    private static SegmentText? FindSegmentText(DependencyObject root)
+    private static T? Find<T>(DependencyObject root) where T : DependencyObject
     {
         for (var i = 0; i < VisualTreeHelper.GetChildrenCount(root); i++)
         {
             var child = VisualTreeHelper.GetChild(root, i);
-            if (child is SegmentText text) return text;
-            if (FindSegmentText(child) is { } found) return found;
+            if (child is T found) return found;
+            if (Find<T>(child) is { } deeper) return deeper;
         }
         return null;
     }
 
-    /// <summary>Tells the view model which paragraph is at the top, so the place reading stopped is saved and synced.</summary>
+    /// <summary>
+    /// Tells the view model which paragraph is at the top, so the place reading stopped is saved and synced. When the
+    /// text gets wider or narrower (the names panel, the window) every paragraph wraps again: the paragraph at the top
+    /// is put back where it was instead of the page showing other text.
+    /// </summary>
     private void Scroller_ScrollChanged(object sender, ScrollChangedEventArgs e)
     {
-        if (_scrolling || e.VerticalChange == 0 && e.ExtentHeightChange == 0) return;
+        if (_rewrapping) return;
+        // The text wrapped again without the reader scrolling: a new width (the names panel, the window), a new text
+        // size or another view (study mode, the Chinese under each paragraph). Put the paragraph at the top back.
+        var rewrapped = e.ViewportWidthChange != 0 || e.ExtentHeightChange != 0 && e.VerticalChange == 0 && !_scrolling;
+        if (rewrapped && _top is { } top)
+        {
+            _rewrapping = true;
+            Dispatcher.BeginInvoke(DispatcherPriority.Loaded, () =>
+            {
+                _rewrapping = false;
+                if (Container(top.Paragraph) is { } container)
+                    SetOffset(Scroller.VerticalOffset + TopOf(container) + top.Within * container.ActualHeight);
+            });
+            return;
+        }
+        if (e.VerticalChange == 0 && e.ExtentHeightChange == 0) return;
         var count = ParagraphList.Items.Count;
         for (var i = 0; i < count; i++)
         {
             if (Container(i) is not { } container) continue;
-            if (TopOf(container) + container.ActualHeight <= 8) continue;
-            _viewModel.ReportVisibleParagraph(i);
+            var at = TopOf(container);
+            if (at + container.ActualHeight <= 8) continue;
+            _top = (i, container.ActualHeight > 0 ? Math.Clamp(-at / container.ActualHeight, 0, 1) : 0);
+            // Scrolling by itself (following the voice, opening a chapter) is not the reader moving.
+            if (!_scrolling) _viewModel.ReportVisibleParagraph(i);
             return;
         }
     }
 
+    /// <summary>The paragraph at the top of the view, and how far down it the view starts (0 to 1).</summary>
+    private (int Paragraph, double Within)? _top;
+
+    /// <summary>The text is wrapping again; the place is put back once it is laid out.</summary>
+    private bool _rewrapping;
+
+    /// <summary>The word classes load in the background while the grammar colours are on (once; about 0.15 s).</summary>
+    private void LoadWordClasses()
+    {
+        if (_viewModel.HoverHighlight && _viewModel.GrammarColors) _ = _wordClasses.LoadAsync();
+    }
+
     private void OnViewModelChanged(object? sender, PropertyChangedEventArgs e)
     {
+        if (e.PropertyName is nameof(NovelReaderViewModel.HoverHighlight) or nameof(NovelReaderViewModel.GrammarColors)) LoadWordClasses();
         if (e.PropertyName == nameof(NovelReaderViewModel.ChapterIndex))
         {
             _choosingChapter = true;

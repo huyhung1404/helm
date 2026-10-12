@@ -247,7 +247,7 @@
                                    AutomationProperties.Name="Next chapter" Command="{Binding NextChapterCommand}" IsEnabled="{Binding CanGoForward}" />
                         <TextBlock Text="{Binding ChapterPosition}" Style="{DynamicResource HelmSecondaryText}" VerticalAlignment="Center" Margin="4,0,0,0" />
                     </StackPanel>
-                    <ComboBox Margin="0,0,8,8" VerticalAlignment="Center" Width="130" ItemsSource="{Binding ModeNames}" SelectedIndex="{Binding ModeIndex}"
+                    <ComboBox Margin="0,0,8,8" VerticalAlignment="Center" MinWidth="130" ItemsSource="{Binding ModeNames}" SelectedIndex="{Binding ModeIndex}"
                               ToolTip="What the page shows" AutomationProperties.Name="View" />
                     <ToggleButton Margin="0,0,8,8" VerticalAlignment="Center" IsChecked="{Binding ShowNamesPanel}" Padding="10,5" ToolTip="Names of this novel and suggested names"
                                   AutomationProperties.Name="Names">
@@ -256,6 +256,15 @@
                             <TextBlock Margin="6,0,0,0" Text="Names" />
                         </StackPanel>
                     </ToggleButton>
+                    <!-- Text size: also Ctrl + mouse wheel, Ctrl + = / Ctrl + − and Ctrl + 0 -->
+                    <StackPanel Orientation="Horizontal" Margin="0,0,8,8" VerticalAlignment="Center">
+                        <ui:Button Style="{StaticResource IconAction}" Command="{Binding ZoomOutCommand}"
+                                   ToolTip="Smaller text (Ctrl + −)" AutomationProperties.Name="Smaller text" Content="A−" />
+                        <TextBlock Width="26" TextAlignment="Center" VerticalAlignment="Center" Style="{DynamicResource HelmSecondaryText}"
+                                   Text="{Binding FontSize, StringFormat={}{0:0}}" ToolTip="Text size (Ctrl + 0 resets it)" />
+                        <ui:Button Style="{StaticResource IconAction}" Command="{Binding ZoomInCommand}"
+                                   ToolTip="Larger text (Ctrl + =)" AutomationProperties.Name="Larger text" Content="A+" />
+                    </StackPanel>
                 </WrapPanel>
 
                 <ui:InfoBar DockPanel.Dock="Top" Margin="0,0,0,8" Severity="Warning" IsClosable="False" IsOpen="{Binding NeedsDictionaries}"
@@ -356,10 +365,11 @@
                         <ColumnDefinition Width="Auto" />
                     </Grid.ColumnDefinitions>
 
-                    <!-- The chapter: click a word to fix it; double-click a sentence or use a paragraph's ▶ to read from there -->
+                    <!-- The chapter: click a word to fix it; double-click a sentence or use a paragraph's ▶ to read from there.
+                         The text fills the width left beside the names panel, and all of it when the panel is closed. -->
                     <ScrollViewer x:Name="Scroller" VerticalScrollBarVisibility="Auto" ScrollChanged="Scroller_ScrollChanged" Focusable="True"
                                   PreviewMouseWheel="Scroller_UserScroll" PreviewMouseLeftButtonDown="Scroller_MouseDown">
-                        <ItemsControl x:Name="ParagraphList" ItemsSource="{Binding Paragraphs}" Margin="0,0,16,48" MaxWidth="900" HorizontalAlignment="Left">
+                        <ItemsControl x:Name="ParagraphList" ItemsSource="{Binding Paragraphs}" Margin="0,0,16,48">
                             <ItemsControl.ItemTemplate>
                                 <DataTemplate>
                                     <Grid x:Name="Root" Background="Transparent">
@@ -384,6 +394,9 @@
                                                            Foreground="{DynamicResource AccentTextFillColorPrimaryBrush}" />
                                                 <self:SegmentText x:Name="Text" Line="{Binding Line}" WordClicked="Word_Clicked" ReadFromClicked="Paragraph_ReadFromClicked"
                                                                   Highlight="{Binding SpeakingSegments}" HighlightBrush="{StaticResource SentenceFill}"
+                                                                  Sentences="{Binding Sentences}"
+                                                                  HoverHighlight="{Binding DataContext.HoverHighlight, RelativeSource={RelativeSource AncestorType=Page}}"
+                                                                  GrammarColors="{Binding DataContext.GrammarColors, RelativeSource={RelativeSource AncestorType=Page}}"
                                                                   FontSize="{Binding DataContext.FontSize, RelativeSource={RelativeSource AncestorType=Page}}"
                                                                   LineStackingStrategy="BlockLineHeight">
                                                     <self:SegmentText.LineHeight>
@@ -393,6 +406,17 @@
                                                         </MultiBinding>
                                                     </self:SegmentText.LineHeight>
                                                 </self:SegmentText>
+                                                <!-- Study mode: each word with its Chinese, pinyin and Hán Việt above the Vietnamese -->
+                                                <self:StudyText x:Name="Study" Visibility="Collapsed" Line="{Binding Line}" Readings="{Binding Readings}"
+                                                                WordClicked="Word_Clicked" ReadFromClicked="Paragraph_ReadFromClicked"
+                                                                Highlight="{Binding SpeakingSegments}" HighlightBrush="{StaticResource SentenceFill}"
+                                                                Sentences="{Binding Sentences}"
+                                                                TextSize="{Binding DataContext.FontSize, RelativeSource={RelativeSource AncestorType=Page}}"
+                                                                ShowChinese="{Binding DataContext.StudyShowChinese, RelativeSource={RelativeSource AncestorType=Page}}"
+                                                                ShowPinyin="{Binding DataContext.StudyShowPinyin, RelativeSource={RelativeSource AncestorType=Page}}"
+                                                                ShowHanViet="{Binding DataContext.StudyShowHanViet, RelativeSource={RelativeSource AncestorType=Page}}"
+                                                                HoverHighlight="{Binding DataContext.HoverHighlight, RelativeSource={RelativeSource AncestorType=Page}}"
+                                                                GrammarColors="{Binding DataContext.GrammarColors, RelativeSource={RelativeSource AncestorType=Page}}" />
                                                 <TextBlock Text="{Binding Chinese}" TextWrapping="Wrap" Margin="0,4,0,0" Style="{DynamicResource HelmSecondaryText}"
                                                            FontSize="{Binding DataContext.FontSize, RelativeSource={RelativeSource AncestorType=Page}}"
                                                            Visibility="{Binding ShowChinese, Converter={StaticResource BoolToVisibility}}" />
@@ -409,7 +433,13 @@
                                         </DataTrigger>
                                         <Trigger SourceName="Root" Property="IsMouseOver" Value="True">
                                             <Setter TargetName="PlayHere" Property="Visibility" Value="Visible" />
+                                            <Setter TargetName="Text" Property="IsHot" Value="True" />
+                                            <Setter TargetName="Study" Property="IsHot" Value="True" />
                                         </Trigger>
+                                        <DataTrigger Binding="{Binding DataContext.IsStudyMode, RelativeSource={RelativeSource AncestorType=Page}}" Value="True">
+                                            <Setter TargetName="Text" Property="Visibility" Value="Collapsed" />
+                                            <Setter TargetName="Study" Property="Visibility" Value="Visible" />
+                                        </DataTrigger>
                                         <DataTrigger Binding="{Binding IsResumePoint}" Value="True">
                                             <Setter TargetName="Frame" Property="BorderBrush" Value="{DynamicResource TextFillColorTertiaryBrush}" />
                                             <Setter TargetName="ResumeLabel" Property="Visibility" Value="Visible" />
@@ -547,6 +577,8 @@
                         </StackPanel>
                         <TextBlock Text="{Binding Chinese}" FontSize="22" FontWeight="SemiBold" TextWrapping="Wrap" />
                     </DockPanel>
+                    <TextBlock Text="{Binding Pinyin}" Style="{DynamicResource HelmSecondaryText}" TextWrapping="Wrap" Margin="0,2,0,0"
+                               Visibility="{Binding Pinyin, Converter={StaticResource NotEmptyToVisibility}}" />
                     <TextBlock Text="{Binding HanViet}" Style="{DynamicResource HelmSecondaryText}" TextWrapping="Wrap" Margin="0,2,0,8" />
                     <TextBlock Text="{Binding SavedAs}" Foreground="{DynamicResource AccentTextFillColorPrimaryBrush}" TextWrapping="Wrap" Margin="0,0,0,8"
                                Visibility="{Binding HasSaved, Converter={StaticResource BoolToVisibility}}" />

@@ -17,8 +17,11 @@ public partial class MainView : UserControl
     public MainView()
     {
         InitializeComponent();
-        // A tool's page is whatever control its module names (created fresh from DI each time it is shown).
-        DataTemplates.Add(new FuncDataTemplate<ModulePage>((page, _) => (Control)App.Services.GetRequiredService(page.PageType)));
+        // A tool's page is whatever control its module names (created fresh from DI each time it is shown). The match
+        // leaves out null: Avalonia 12 offers a typed template empty content too, which a list does while it recycles
+        // an item (scrolling Novel Reader's chapter list crashed here).
+        DataTemplates.Add(new FuncDataTemplate<ModulePage>(page => page is not null,
+            (page, _) => (Control)App.Services.GetRequiredService(page.PageType)));
         PageHost.PropertyChanged += (_, e) =>
         {
             if (e.Property == ContentControl.ContentProperty) PageScroller.Offset = default;

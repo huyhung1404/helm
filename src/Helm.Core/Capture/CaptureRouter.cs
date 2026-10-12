@@ -26,7 +26,7 @@ public static class CaptureRouter
     }
 
     /// <summary>
-    /// The target to select first for shared text: the first one that claims it (a video link → Watch Later), else
+    /// The target to select first for shared text: the first one that claims it, else
     /// <paramref name="fallback"/>.
     /// </summary>
     public static ICaptureTarget? Suggest(IReadOnlyList<ICaptureTarget> targets, string text, ICaptureTarget? fallback)
