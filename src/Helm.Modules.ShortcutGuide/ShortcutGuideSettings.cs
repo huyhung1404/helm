@@ -36,7 +36,7 @@ public sealed class ShortcutGuideSettings : IVersionedSettings
     public static int CurrentVersion => 1;
 
     public const int MinHoldDelayMs = 300, MaxHoldDelayMs = 2000, DefaultHoldDelayMs = 700;
-    public const int MinOpacity = 40, MaxOpacity = 100, MinRows = 1, MaxRows = 8;
+    public const int MinOpacity = 40, MaxOpacity = 100, MinRows = 1, MaxRows = 10;
 
     public static readonly IReadOnlyList<string> PositionNames = ["Center", "Bottom"];
 
@@ -61,7 +61,7 @@ public sealed class ShortcutGuideSettings : IVersionedSettings
     public int BackgroundOpacity { get; set; } = 85;
 
     /// <summary>At most this many rows of keys; the rest is summed up as "+N more".</summary>
-    public int Rows { get; set; } = 3;
+    public int Rows { get; set; } = 5;
 
     /// <summary>Leave out what everyone knows: copy, paste, undo, select all, Alt+Tab …</summary>
     public bool SkipBasics { get; set; } = true;

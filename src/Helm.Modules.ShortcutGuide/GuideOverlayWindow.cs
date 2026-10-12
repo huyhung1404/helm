@@ -28,13 +28,13 @@ public sealed record GuideLook(GuidePosition Position, double BackgroundOpacity,
 /// </summary>
 internal sealed class GuideOverlayWindow : Window
 {
-    private const double ShadowSpace = 16, CellWidth = 224, CellHeight = 42, KeyHeight = 32, HeldKeyHeight = 40;
-    private const int MaxColumns = 6;
+    private const double ShadowSpace = 16, CellWidth = 196, CellHeight = 32, KeyHeight = 26, HeldKeyHeight = 36;
+    private const int MaxColumns = 10;
 
     private readonly IWindowService _windows;
     private readonly Border _surface;
     private MonitorInfo? _monitor;
-    private GuideLook _look = new(GuidePosition.Bottom, 0.85, 3);
+    private GuideLook _look = new(GuidePosition.Bottom, 0.85, 5);
 
     public GuideOverlayWindow(IWindowService windows)
     {
@@ -157,8 +157,8 @@ internal sealed class GuideOverlayWindow : Window
         var items = view.Sections.SelectMany(s => s.Items).ToList();
         var scale = _monitor?.Scale ?? 1;
         var workWidth = (_monitor?.WorkArea.Width ?? SystemParameters.WorkArea.Width * scale) / scale;
-        // Three quarters of the screen at most, minus the held keys on the left.
-        var fit = Math.Clamp((int)((workWidth * 0.75 - 2 * ShadowSpace - 28 - 160) / CellWidth), 2, MaxColumns);
+        // Nearly the whole width of the screen, minus the held keys on the left: many keys in few rows.
+        var fit = Math.Clamp((int)((workWidth * 0.94 - 2 * ShadowSpace - 28 - 150) / CellWidth), 2, MaxColumns);
         columns = Math.Max(1, Math.Min(fit, items.Count));
         var capacity = columns * _look.Rows;
 
@@ -181,11 +181,12 @@ internal sealed class GuideOverlayWindow : Window
 
     private static FrameworkElement Cell(GuideItem item)
     {
-        var cell = new DockPanel { Margin = new Thickness(0, 0, 10, 0), VerticalAlignment = VerticalAlignment.Center };
+        var cell = new DockPanel { Margin = new Thickness(0, 0, 8, 0), VerticalAlignment = VerticalAlignment.Center };
         var keys = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center };
         for (var i = 0; i < item.Keys.Count; i++)
         {
-            if (i > 0) keys.Children.Add(Caption("then", secondary: true, size: 11, margin: new Thickness(0, 0, 4, 0)));
+            // A chord: a comma between its presses (short, so the description keeps its room).
+            if (i > 0) keys.Children.Add(Caption(",", secondary: true, size: 13, margin: new Thickness(0, 0, 4, 0)));
             foreach (var cap in item.Keys[i]) keys.Children.Add(Key(cap));
         }
         DockPanel.SetDock(keys, Dock.Left);
@@ -193,8 +194,8 @@ internal sealed class GuideOverlayWindow : Window
         cell.Children.Add(new TextBlock
         {
             Text = item.Does,
-            FontSize = 13,
-            Margin = new Thickness(4, 0, 0, 0),
+            FontSize = 12,
+            Margin = new Thickness(3, 0, 0, 0),
             VerticalAlignment = VerticalAlignment.Center,
             TextTrimming = TextTrimming.CharacterEllipsis,
         });
@@ -208,18 +209,18 @@ internal sealed class GuideOverlayWindow : Window
         {
             MinWidth = KeyHeight,
             Height = KeyHeight - 3,
-            Padding = new Thickness(8, 0, 8, 0),
-            CornerRadius = new CornerRadius(6),
+            Padding = new Thickness(6, 0, 6, 0),
+            CornerRadius = new CornerRadius(5),
             BorderThickness = new Thickness(1),
-            Child = KeyLabel(label, 13, "TextFillColorPrimaryBrush"),
+            Child = KeyLabel(label, 12, "TextFillColorPrimaryBrush"),
         };
         face.SetResourceReference(Border.BackgroundProperty, "ControlSolidFillColorDefaultBrush");
         face.SetResourceReference(Border.BorderBrushProperty, "ControlStrokeColorSecondaryBrush");
         return new Border
         {
-            Margin = new Thickness(0, 0, 4, 0),
+            Margin = new Thickness(0, 0, 3, 0),
             Padding = new Thickness(0, 0, 0, 3),
-            CornerRadius = new CornerRadius(6),
+            CornerRadius = new CornerRadius(5),
             Background = Lip("ControlSolidFillColorDefaultBrush"),
             VerticalAlignment = VerticalAlignment.Center,
             Child = face,
