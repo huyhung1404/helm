@@ -95,7 +95,8 @@ public sealed class ShortcutGuideEngine : IDisposable
         var library = _library();
         var app = library.Find(appId);
         var process = app?.Processes.FirstOrDefault() ?? string.Empty;
-        var view = GuideContent.Build(library, process, held, _settings().IncludeGeneral) with { AppName = app?.Name ?? "Preview" };
+        var settings = _settings();
+        var view = GuideContent.Build(library, process, held, settings.IncludeGeneral, settings.SkipBasics) with { AppName = app?.Name ?? "Preview" };
         var monitor = _monitors.FromWindow(_windows.GetForegroundWindow()) ?? _monitors.FromPoint(_windows.GetCursorPosition());
         int sequence;
         lock (_gate)
@@ -103,8 +104,8 @@ public sealed class ShortcutGuideEngine : IDisposable
             _previewing = true;
             sequence = ++_showSequence;
         }
-        var position = _settings().Position;
-        _ui.Post(() => ShowOnUi(sequence, view, monitor, position));
+        var look = GuideLook.From(settings);
+        _ui.Post(() => ShowOnUi(sequence, view, monitor, look));
         _previewTimer.Change(PreviewTime, Timeout.InfiniteTimeSpan);
     }
 
@@ -184,7 +185,7 @@ public sealed class ShortcutGuideEngine : IDisposable
         if (new ProcessExclusions(settings.ExcludedApps).IsExcluded(process)) return;
         if (settings.HideInFullScreen && _windows.IsFullScreenGameRunning()) return;
 
-        var view = GuideContent.Build(_library(), process, held, settings.IncludeGeneral);
+        var view = GuideContent.Build(_library(), process, held, settings.IncludeGeneral, settings.SkipBasics);
         if (view.IsEmpty) return;
         var monitor = _monitors.FromWindow(foreground) ?? _monitors.FromPoint(_windows.GetCursorPosition());
 
@@ -200,7 +201,8 @@ public sealed class ShortcutGuideEngine : IDisposable
         }
         SuppressMenuKeys(held);
         _watchTimer.Change(WatchInterval, WatchInterval);
-        _ui.Post(() => ShowOnUi(sequence, view, monitor, settings.Position));
+        var look = GuideLook.From(settings);
+        _ui.Post(() => ShowOnUi(sequence, view, monitor, look));
     }
 
     /// <summary>The held modifiers changed while the guide shows (Ctrl, then Shift too).</summary>
@@ -217,7 +219,8 @@ public sealed class ShortcutGuideEngine : IDisposable
             process = _process;
             sequence = _showSequence;
         }
-        var view = GuideContent.Build(_library(), process, held, _settings().IncludeGeneral);
+        var settings = _settings();
+        var view = GuideContent.Build(_library(), process, held, settings.IncludeGeneral, settings.SkipBasics);
         SuppressMenuKeys(held);
         _ui.Post(() =>
         {
@@ -281,13 +284,13 @@ public sealed class ShortcutGuideEngine : IDisposable
         });
     }
 
-    private void ShowOnUi(int sequence, GuideView view, MonitorInfo? monitor, GuidePosition position)
+    private void ShowOnUi(int sequence, GuideView view, MonitorInfo? monitor, GuideLook look)
     {
         if (sequence != Volatile.Read(ref _showSequence)) return;
         try
         {
             _overlay ??= new GuideOverlayWindow(_windows);
-            _overlay.ShowGuide(view, monitor, position);
+            _overlay.ShowGuide(view, monitor, look);
         }
         catch (Exception ex)
         {

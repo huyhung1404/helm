@@ -5,27 +5,36 @@ using System.Windows.Interop;
 using System.Windows.Media;
 using System.Windows.Media.Animation;
 using System.Windows.Media.Effects;
+using System.Windows.Shapes;
 using System.Windows.Threading;
 using Helm.Core.Desktop;
 using Helm.Core.Geometry;
-using Helm.Core.Ui;
 
 namespace Helm.Modules.ShortcutGuide;
 
+/// <summary>How the guide looks: where it sits, how much of the app shows through, how many rows of keys it has.</summary>
+public sealed record GuideLook(GuidePosition Position, double BackgroundOpacity, int Rows)
+{
+    public static GuideLook From(ShortcutGuideSettings settings) => new(
+        settings.Position,
+        Math.Clamp(settings.BackgroundOpacity, ShortcutGuideSettings.MinOpacity, ShortcutGuideSettings.MaxOpacity) / 100.0,
+        Math.Clamp(settings.Rows, ShortcutGuideSettings.MinRows, ShortcutGuideSettings.MaxRows));
+}
+
 /// <summary>
-/// The guide on screen: a panel over the app in front that never takes the focus and lets clicks through, so the
-/// shortcut you are about to press still reaches the app. The shortcuts flow into as many columns as the monitor
-/// needs (at most four). Reused between holds.
+/// The guide on screen: a see-through strip that never takes the focus and lets clicks through, so the shortcut you
+/// are about to press still reaches the app. The held keys sit on the left with a "+", then a grid of keys, each with
+/// what it does. Reused between holds.
 /// </summary>
 internal sealed class GuideOverlayWindow : Window
 {
-    private const double ShadowSpace = 20, ColumnWidth = 300, RowHeight = 30, ColumnGap = 28;
-    private const int MaxColumns = 4;
+    private const double ShadowSpace = 16, CellWidth = 224, CellHeight = 42, KeyHeight = 32, HeldKeyHeight = 40;
+    private const int MaxColumns = 6;
 
     private readonly IWindowService _windows;
     private readonly Border _surface;
     private MonitorInfo? _monitor;
-    private GuidePosition _position;
+    private GuideLook _look = new(GuidePosition.Bottom, 0.85, 3);
 
     public GuideOverlayWindow(IWindowService windows)
     {
@@ -46,12 +55,11 @@ internal sealed class GuideOverlayWindow : Window
         _surface = new Border
         {
             Margin = new Thickness(ShadowSpace),
-            Padding = new Thickness(24, 18, 24, 18),
-            CornerRadius = new CornerRadius(10),
+            Padding = new Thickness(14, 10, 14, 10),
+            CornerRadius = new CornerRadius(12),
             BorderThickness = new Thickness(1),
-            Effect = new DropShadowEffect { BlurRadius = 28, ShadowDepth = 6, Opacity = 0.4, Direction = 270 },
+            Effect = new DropShadowEffect { BlurRadius = 18, ShadowDepth = 3, Opacity = 0.3, Direction = 270 },
         };
-        _surface.SetResourceReference(Border.BackgroundProperty, "ApplicationBackgroundBrush");
         _surface.SetResourceReference(Border.BorderBrushProperty, "CardStrokeColorDefaultBrush");
         _surface.SetResourceReference(TextElement.ForegroundProperty, "TextFillColorPrimaryBrush");
         Content = _surface;
@@ -59,10 +67,11 @@ internal sealed class GuideOverlayWindow : Window
         SourceInitialized += (_, _) => _windows.MakePassiveOverlay(new WindowInteropHelper(this).Handle);
     }
 
-    public void ShowGuide(GuideView view, MonitorInfo? monitor, GuidePosition position)
+    public void ShowGuide(GuideView view, MonitorInfo? monitor, GuideLook look)
     {
         _monitor = monitor;
-        _position = position;
+        _look = look;
+        _surface.Background = SeeThrough("ApplicationBackgroundColor", look.BackgroundOpacity);
         _surface.Child = Build(view);
         if (!IsVisible)
         {
@@ -95,165 +104,222 @@ internal sealed class GuideOverlayWindow : Window
     private UIElement Build(GuideView view)
     {
         var root = new StackPanel();
-        root.Children.Add(BuildHeader(view));
+        root.Children.Add(BuildCaption(view));
 
-        if (view.IsEmpty)
-        {
-            root.Children.Add(Secondary($"Nothing in {view.AppName} starts with {string.Join("+", view.HeldCaps)}.", new Thickness(0, 4, 0, 0)));
-        }
-        else
-        {
-            var columns = new StackPanel { Orientation = Orientation.Horizontal };
-            foreach (var column in Layout(view))
-            {
-                var panel = new StackPanel { Width = ColumnWidth, Margin = new Thickness(0, 0, ColumnGap, 0) };
-                // The descriptions of a column line up after its longest keys.
-                Grid.SetIsSharedSizeScope(panel, true);
-                foreach (var row in column) panel.Children.Add(row);
-                columns.Children.Add(panel);
-            }
-            // The last column needs no gap after it.
-            if (columns.Children.Count > 0) ((FrameworkElement)columns.Children[^1]).Margin = new Thickness(0);
-            root.Children.Add(columns);
-        }
+        var body = new Grid();
+        body.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        body.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
 
-        var footer = BuildFooter(view);
-        if (footer is not null) root.Children.Add(footer);
+        // The held keys, then a big plus: "Ctrl +" reads like the start of every shortcut on the right.
+        var held = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Top, Margin = new Thickness(0, 1, 12, 0) };
+        for (var i = 0; i < view.HeldCaps.Count; i++)
+        {
+            if (i > 0) held.Children.Add(Plus(16));
+            held.Children.Add(HeldKey(view.HeldCaps[i]));
+        }
+        held.Children.Add(Plus(22));
+        body.Children.Add(held);
+
+        var cells = BuildCells(view, out var columns);
+        var grid = new WrapPanel { ItemWidth = CellWidth, ItemHeight = CellHeight, Width = columns * CellWidth };
+        foreach (var cell in cells) grid.Children.Add(cell);
+        Grid.SetColumn(grid, 1);
+        body.Children.Add(grid);
+        root.Children.Add(body);
         return root;
     }
 
-    private static FrameworkElement BuildHeader(GuideView view)
+    /// <summary>The app's name on the left, other modifiers worth holding on the right.</summary>
+    private static FrameworkElement BuildCaption(GuideView view)
     {
-        var header = new DockPanel { Margin = new Thickness(0, 0, 0, 12), LastChildFill = true };
-        var brand = Secondary("Shortcut Guide", new Thickness(24, 0, 0, 0));
-        brand.VerticalAlignment = VerticalAlignment.Center;
-        DockPanel.SetDock(brand, Dock.Right);
-        header.Children.Add(brand);
-
-        var left = new StackPanel { Orientation = Orientation.Horizontal };
-        left.Children.Add(new Keycaps { Keys = view.HeldCaps, IsAccent = true });
-        var name = new TextBlock
-        {
-            Text = view.AppName,
-            FontSize = 18,
-            FontWeight = FontWeights.SemiBold,
-            Margin = new Thickness(8, 0, 0, 0),
-            VerticalAlignment = VerticalAlignment.Center,
-            TextTrimming = TextTrimming.CharacterEllipsis,
-        };
-        left.Children.Add(name);
-        header.Children.Add(left);
-        return header;
-    }
-
-    private static FrameworkElement? BuildFooter(GuideView view)
-    {
-        var footer = new WrapPanel { Margin = new Thickness(0, 12, 0, 0) };
+        var caption = new DockPanel { Margin = new Thickness(2, 0, 2, 6), LastChildFill = true };
         if (view.Hints.Count > 0)
         {
-            footer.Children.Add(Secondary("Also hold", new Thickness(0, 0, 8, 0), center: true));
+            var hints = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(24, 0, 0, 0) };
+            hints.Children.Add(Caption("Also hold", secondary: true));
             foreach (var hint in view.Hints)
-            {
-                footer.Children.Add(new Keycaps { Keys = hint.Caps });
-                footer.Children.Add(Secondary($"{hint.Count} more", new Thickness(0, 0, 16, 0), center: true));
-            }
+                hints.Children.Add(Caption($"{string.Join("+", hint.Caps)} {hint.Count}", secondary: false, margin: new Thickness(8, 0, 0, 0)));
+            DockPanel.SetDock(hints, Dock.Right);
+            caption.Children.Add(hints);
         }
-        if (!view.IsKnownApp)
-        {
-            footer.Children.Add(Secondary($"No shortcuts saved for {view.AppName} yet: add them in Helm → Shortcut Guide.",
-                new Thickness(0, view.Hints.Count > 0 ? 6 : 0, 0, 0), center: true));
-        }
-        return footer.Children.Count > 0 ? footer : null;
+        var name = new StackPanel { Orientation = Orientation.Horizontal };
+        var title = Caption(view.AppName, secondary: false);
+        title.FontWeight = FontWeights.SemiBold;
+        name.Children.Add(title);
+        if (!view.IsKnownApp) name.Children.Add(Caption(" · add its shortcuts in Helm → Shortcut Guide", secondary: true));
+        caption.Children.Add(name);
+        return caption;
     }
 
-    /// <summary>Splits the sections into columns that fit the monitor, keeping a section title above its first line.</summary>
-    private List<List<FrameworkElement>> Layout(GuideView view)
+    /// <summary>One cell per shortcut, as many columns as the monitor allows and at most <see cref="GuideLook.Rows"/> rows.</summary>
+    private List<FrameworkElement> BuildCells(GuideView view, out int columns)
     {
+        var items = view.Sections.SelectMany(s => s.Items).ToList();
         var scale = _monitor?.Scale ?? 1;
-        var workHeight = (_monitor?.WorkArea.Height ?? SystemParameters.WorkArea.Height * scale) / scale;
         var workWidth = (_monitor?.WorkArea.Width ?? SystemParameters.WorkArea.Width * scale) / scale;
-        // Room for the header, the footer and some of the app around the panel.
-        var rowsPerColumn = Math.Max(6, (int)((workHeight * 0.85 - 150) / RowHeight));
-        var maxColumns = Math.Clamp((int)((workWidth * 0.94 - 2 * ShadowSpace - 48 + ColumnGap) / (ColumnWidth + ColumnGap)), 1, MaxColumns);
+        // Three quarters of the screen at most, minus the held keys on the left.
+        var fit = Math.Clamp((int)((workWidth * 0.75 - 2 * ShadowSpace - 28 - 160) / CellWidth), 2, MaxColumns);
+        columns = Math.Max(1, Math.Min(fit, items.Count));
+        var capacity = columns * _look.Rows;
 
-        var rows = new List<(bool IsTitle, FrameworkElement Element)>();
-        foreach (var section in view.Sections)
+        var cells = new List<FrameworkElement>();
+        if (items.Count == 0)
         {
-            rows.Add((true, SectionTitle(section.Title, rows.Count == 0)));
-            foreach (var item in section.Items) rows.Add((false, ItemRow(item)));
+            cells.Add(Caption("Nothing here starts with these keys.", secondary: true));
+            return cells;
         }
-
-        var capacity = rowsPerColumn * maxColumns;
-        if (rows.Count > capacity)
+        var shown = items.Count > capacity ? capacity - 1 : items.Count;
+        foreach (var item in items.Take(shown)) cells.Add(Cell(item));
+        if (items.Count > shown)
         {
-            var hidden = rows.Skip(capacity - 1).Count(r => !r.IsTitle);
-            rows = rows.Take(capacity - 1).ToList();
-            if (rows[^1].IsTitle) rows.RemoveAt(rows.Count - 1);
-            rows.Add((false, Secondary($"…and {hidden} more", new Thickness(0, 6, 0, 0))));
+            var more = Caption($"+{items.Count - shown} more in Helm", secondary: true);
+            more.VerticalAlignment = VerticalAlignment.Center;
+            cells.Add(more);
         }
-
-        var columnCount = Math.Clamp((int)Math.Ceiling(rows.Count / (double)rowsPerColumn), 1, maxColumns);
-        var perColumn = (int)Math.Ceiling(rows.Count / (double)columnCount);
-        var columns = new List<List<FrameworkElement>> { new() };
-        for (var i = 0; i < rows.Count; i++)
-        {
-            var current = columns[^1];
-            var full = current.Count >= perColumn;
-            // A section title never ends a column: it moves to the next one with its lines.
-            var orphanTitle = rows[i].IsTitle && current.Count >= perColumn - 1 && current.Count > 0;
-            if ((full || orphanTitle) && columns.Count < columnCount) columns.Add(current = new List<FrameworkElement>());
-            if (rows[i].IsTitle && current.Count == 0) rows[i].Element.Margin = new Thickness(0, 0, 0, 4);
-            current.Add(rows[i].Element);
-        }
-        return columns;
+        return cells;
     }
 
-    private static FrameworkElement SectionTitle(string title, bool first)
+    private static FrameworkElement Cell(GuideItem item)
     {
-        var text = new TextBlock
-        {
-            Text = title,
-            FontSize = 12,
-            FontWeight = FontWeights.SemiBold,
-            Margin = new Thickness(0, first ? 0 : 12, 0, 4),
-        };
-        text.SetResourceReference(TextBlock.ForegroundProperty, "AccentTextFillColorPrimaryBrush");
-        return text;
-    }
-
-    private static FrameworkElement ItemRow(GuideItem item)
-    {
-        var grid = new Grid { Height = RowHeight };
-        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto, MinWidth = 40, SharedSizeGroup = "Keys" });
-        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
-
+        var cell = new DockPanel { Margin = new Thickness(0, 0, 10, 0), VerticalAlignment = VerticalAlignment.Center };
         var keys = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center };
         for (var i = 0; i < item.Keys.Count; i++)
         {
-            if (i > 0) keys.Children.Add(Secondary("then", new Thickness(0, 0, 4, 0), center: true, size: 11));
-            keys.Children.Add(new Keycaps { Keys = item.Keys[i] });
+            if (i > 0) keys.Children.Add(Caption("then", secondary: true, size: 11, margin: new Thickness(0, 0, 4, 0)));
+            foreach (var cap in item.Keys[i]) keys.Children.Add(Key(cap));
         }
-        grid.Children.Add(keys);
-
-        var does = new TextBlock
+        DockPanel.SetDock(keys, Dock.Left);
+        cell.Children.Add(keys);
+        cell.Children.Add(new TextBlock
         {
             Text = item.Does,
-            Margin = new Thickness(8, 0, 0, 0),
+            FontSize = 13,
+            Margin = new Thickness(4, 0, 0, 0),
             VerticalAlignment = VerticalAlignment.Center,
             TextTrimming = TextTrimming.CharacterEllipsis,
-            ToolTip = item.Does,
+        });
+        return cell;
+    }
+
+    /// <summary>A keyboard key: a face with a darker lip below it.</summary>
+    private static FrameworkElement Key(string label)
+    {
+        var face = new Border
+        {
+            MinWidth = KeyHeight,
+            Height = KeyHeight - 3,
+            Padding = new Thickness(8, 0, 8, 0),
+            CornerRadius = new CornerRadius(6),
+            BorderThickness = new Thickness(1),
+            Child = KeyLabel(label, 13, "TextFillColorPrimaryBrush"),
         };
-        Grid.SetColumn(does, 1);
-        grid.Children.Add(does);
+        face.SetResourceReference(Border.BackgroundProperty, "ControlSolidFillColorDefaultBrush");
+        face.SetResourceReference(Border.BorderBrushProperty, "ControlStrokeColorSecondaryBrush");
+        return new Border
+        {
+            Margin = new Thickness(0, 0, 4, 0),
+            Padding = new Thickness(0, 0, 0, 3),
+            CornerRadius = new CornerRadius(6),
+            Background = Lip("ControlSolidFillColorDefaultBrush"),
+            VerticalAlignment = VerticalAlignment.Center,
+            Child = face,
+        };
+    }
+
+    /// <summary>A held key: bigger, in the accent colour.</summary>
+    private static FrameworkElement HeldKey(string label)
+    {
+        var face = new Border
+        {
+            MinWidth = HeldKeyHeight + 8,
+            Height = HeldKeyHeight - 4,
+            Padding = new Thickness(12, 0, 12, 0),
+            CornerRadius = new CornerRadius(7),
+            Child = KeyLabel(label, 15, "TextOnAccentFillColorPrimaryBrush"),
+        };
+        face.SetResourceReference(Border.BackgroundProperty, "AccentFillColorDefaultBrush");
+        return new Border
+        {
+            Padding = new Thickness(0, 0, 0, 4),
+            CornerRadius = new CornerRadius(7),
+            Background = Lip("AccentFillColorDefaultBrush"),
+            VerticalAlignment = VerticalAlignment.Center,
+            Child = face,
+        };
+    }
+
+    private static UIElement KeyLabel(string label, double size, string brushKey)
+    {
+        if (label == "Win") return WindowsLogo(brushKey, size - 1);
+        var text = new TextBlock
+        {
+            Text = label,
+            FontSize = size,
+            FontWeight = FontWeights.SemiBold,
+            HorizontalAlignment = HorizontalAlignment.Center,
+            VerticalAlignment = VerticalAlignment.Center,
+        };
+        text.SetResourceReference(TextBlock.ForegroundProperty, brushKey);
+        return text;
+    }
+
+    private static UIElement WindowsLogo(string brushKey, double size)
+    {
+        var grid = new Grid { Width = size, Height = size, HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center };
+        var half = (size - 1) / 2;
+        foreach (var (row, col) in new[] { (0, 0), (0, 1), (1, 0), (1, 1) })
+        {
+            var square = new Rectangle
+            {
+                Width = half,
+                Height = half,
+                HorizontalAlignment = col == 0 ? HorizontalAlignment.Left : HorizontalAlignment.Right,
+                VerticalAlignment = row == 0 ? VerticalAlignment.Top : VerticalAlignment.Bottom,
+            };
+            square.SetResourceReference(Shape.FillProperty, brushKey);
+            grid.Children.Add(square);
+        }
+        RenderOptions.SetEdgeMode(grid, EdgeMode.Aliased);
         return grid;
     }
 
-    private static TextBlock Secondary(string text, Thickness margin, bool center = false, double size = 12)
+    private static TextBlock Plus(double size)
     {
-        var block = new TextBlock { Text = text, FontSize = size, Margin = margin, TextWrapping = TextWrapping.Wrap };
-        if (center) block.VerticalAlignment = VerticalAlignment.Center;
-        block.SetResourceReference(TextBlock.ForegroundProperty, "TextFillColorSecondaryBrush");
+        var plus = new TextBlock
+        {
+            Text = "+",
+            FontSize = size,
+            FontWeight = FontWeights.SemiBold,
+            Margin = new Thickness(8, 0, 0, 0),
+            VerticalAlignment = VerticalAlignment.Center,
+        };
+        plus.SetResourceReference(TextBlock.ForegroundProperty, "TextFillColorSecondaryBrush");
+        return plus;
+    }
+
+    private static TextBlock Caption(string text, bool secondary, double size = 12, Thickness margin = default)
+    {
+        var block = new TextBlock { Text = text, FontSize = size, Margin = margin, VerticalAlignment = VerticalAlignment.Center };
+        block.SetResourceReference(TextBlock.ForegroundProperty, secondary ? "TextFillColorSecondaryBrush" : "TextFillColorPrimaryBrush");
         return block;
+    }
+
+    /// <summary>The theme's background colour with <paramref name="opacity"/>, so the app shows through.</summary>
+    private Brush SeeThrough(string colorKey, double opacity)
+    {
+        var color = TryFindResource(colorKey) is Color c ? c : Color.FromRgb(0x20, 0x20, 0x20);
+        var brush = new SolidColorBrush(Color.FromArgb((byte)Math.Round(opacity * 255), color.R, color.G, color.B));
+        brush.Freeze();
+        return brush;
+    }
+
+    /// <summary>The lip under a key: its face colour, a third darker.</summary>
+    private static Brush Lip(string faceKey)
+    {
+        var face = Application.Current?.TryFindResource(faceKey) is SolidColorBrush b ? b.Color : Color.FromRgb(0x45, 0x45, 0x45);
+        var lip = new SolidColorBrush(Color.FromArgb(face.A, (byte)(face.R * 0.62), (byte)(face.G * 0.62), (byte)(face.B * 0.62)));
+        lip.Freeze();
+        return lip;
     }
 
     private void Place()
@@ -261,11 +327,12 @@ internal sealed class GuideOverlayWindow : Window
         if (!IsVisible) return;
         var hwnd = new WindowInteropHelper(this).Handle;
         if (hwnd == 0) return;
+        var bottom = _look.Position == GuidePosition.Bottom;
         if (_monitor is not { } monitor)
         {
             var area = SystemParameters.WorkArea;
             Left = area.Left + (area.Width - ActualWidth) / 2;
-            Top = _position == GuidePosition.Bottom ? area.Bottom - ActualHeight : area.Top + (area.Height - ActualHeight) / 2;
+            Top = bottom ? area.Bottom - ActualHeight - 8 : area.Top + (area.Height - ActualHeight) / 2;
             return;
         }
         var scale = monitor.Scale;
@@ -273,8 +340,8 @@ internal sealed class GuideOverlayWindow : Window
         var height = (int)Math.Round(ActualHeight * scale);
         var work = monitor.WorkArea;
         var x = work.Left + Math.Max(0, (work.Width - width) / 2);
-        var y = _position == GuidePosition.Bottom
-            ? work.Bottom - height - (int)Math.Round(12 * scale) // the shadow space already keeps it off the edge
+        var y = bottom
+            ? work.Bottom - height - (int)Math.Round(8 * scale) // the shadow space already keeps it off the taskbar
             : work.Top + Math.Max(0, (work.Height - height) / 2);
         _windows.SetWindowPosition(hwnd, new PixelPoint(x, Math.Max(work.Top, y)));
     }

@@ -23,6 +23,11 @@
                 <DockPanel>
                     <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
                         <Border CornerRadius="4" Padding="6,0" Margin="8,0,0,0" VerticalAlignment="Center"
+                                Background="{DynamicResource ControlFillColorSecondaryBrush}" ToolTip="The guide skips it while Skip the basics is on (settings)."
+                                Visibility="{Binding IsBasic, Converter={StaticResource BoolToVisibility}}">
+                            <TextBlock Text="Basic" FontSize="12" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+                        </Border>
+                        <Border CornerRadius="4" Padding="6,0" Margin="8,0,0,0" VerticalAlignment="Center"
                                 Background="{DynamicResource ControlFillColorSecondaryBrush}"
                                 Visibility="{Binding IsOwn, Converter={StaticResource BoolToVisibility}}">
                             <TextBlock Text="Yours" FontSize="12" FontWeight="SemiBold" Foreground="{DynamicResource AccentTextFillColorPrimaryBrush}" />

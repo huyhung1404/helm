@@ -34,6 +34,9 @@ public sealed class ShortcutRowViewModel
 
     public bool IsHidden => Shortcut.IsHidden;
 
+    /// <summary>Everyone knows it: the guide skips it while "Skip the basics" is on.</summary>
+    public bool IsBasic => Shortcut.IsBasic;
+
     /// <summary>Hidden shortcuts stay in the list, faded, so they can be shown again.</summary>
     public double RowOpacity => IsHidden ? 0.45 : 1;
 
@@ -75,6 +78,9 @@ public sealed partial class ShortcutGuideViewModel : ObservableObject
     [ObservableProperty] private int _positionIndex;
     [ObservableProperty] private bool _includeGeneral;
     [ObservableProperty] private bool _hideInFullScreen;
+    [ObservableProperty] private bool _skipBasics;
+    [ObservableProperty] [NotifyPropertyChangedFor(nameof(BackgroundOpacityText))] private double _backgroundOpacity;
+    [ObservableProperty] private double _rows;
     [ObservableProperty] private string _excludedAppsText = string.Empty;
 
     [ObservableProperty] private IReadOnlyList<GuideApp> _apps = [];
@@ -106,6 +112,9 @@ public sealed partial class ShortcutGuideViewModel : ObservableObject
         PositionIndex = Math.Clamp((int)s.Position, 0, PositionNames.Count - 1);
         IncludeGeneral = s.IncludeGeneral;
         HideInFullScreen = s.HideInFullScreen;
+        SkipBasics = s.SkipBasics;
+        BackgroundOpacity = Math.Clamp(s.BackgroundOpacity, ShortcutGuideSettings.MinOpacity, ShortcutGuideSettings.MaxOpacity);
+        Rows = Math.Clamp(s.Rows, ShortcutGuideSettings.MinRows, ShortcutGuideSettings.MaxRows);
         ExcludedAppsText = string.Join(Environment.NewLine, s.ExcludedApps);
         _loading = false;
 
@@ -122,6 +131,16 @@ public sealed partial class ShortcutGuideViewModel : ObservableObject
     public double MaxHoldDelay => ShortcutGuideSettings.MaxHoldDelayMs;
 
     public string HoldDelayText => $"{HoldDelay / 1000:0.0} s";
+
+    public double MinOpacity => ShortcutGuideSettings.MinOpacity;
+
+    public double MaxOpacity => ShortcutGuideSettings.MaxOpacity;
+
+    public string BackgroundOpacityText => $"{BackgroundOpacity:0} %";
+
+    public double MinRows => ShortcutGuideSettings.MinRows;
+
+    public double MaxRows => ShortcutGuideSettings.MaxRows;
 
     public bool CanRemoveApp => SelectedApp?.IsOwn == true;
 
@@ -152,6 +171,13 @@ public sealed partial class ShortcutGuideViewModel : ObservableObject
     partial void OnIncludeGeneralChanged(bool value) => Save(s => s.IncludeGeneral = value);
 
     partial void OnHideInFullScreenChanged(bool value) => Save(s => s.HideInFullScreen = value);
+
+    partial void OnSkipBasicsChanged(bool value) => Save(s => s.SkipBasics = value);
+
+    partial void OnBackgroundOpacityChanged(double value) =>
+        Save(s => s.BackgroundOpacity = (int)Math.Clamp(Math.Round(value), MinOpacity, MaxOpacity));
+
+    partial void OnRowsChanged(double value) => Save(s => s.Rows = (int)Math.Clamp(Math.Round(value), MinRows, MaxRows));
 
     partial void OnExcludedAppsTextChanged(string value) => Save(s => s.ExcludedApps = ProcessExclusions.ParseLines(value));
 

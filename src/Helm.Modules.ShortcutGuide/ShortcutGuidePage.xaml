@@ -72,6 +72,12 @@
             </ui:CardControl.Header>
             <ui:ToggleSwitch AutomationProperties.Name="Shortcuts of most apps and Windows" IsChecked="{Binding IncludeGeneral}" />
         </ui:CardControl>
+        <ui:CardControl Margin="0,0,0,4" Icon="{ui:SymbolIcon Filter24}">
+            <ui:CardControl.Header>
+                <core:CardHeader Title="Skip the basics" Description="Leave out what everyone knows: copy, paste, undo, select all, Alt+Tab and the like. They stay in the list, marked Basic." />
+            </ui:CardControl.Header>
+            <ui:ToggleSwitch AutomationProperties.Name="Skip the basics" IsChecked="{Binding SkipBasics}" />
+        </ui:CardControl>
         <ui:CardControl Margin="0,0,0,4" Icon="{ui:SymbolIcon Games24}">
             <ui:CardControl.Header>
                 <core:CardHeader Title="Not over full-screen games" Description="Never shows over a full-screen game or a presentation." />
@@ -86,6 +92,28 @@
                 <core:CardHeader Title="Position" Description="Where the guide appears on the screen of the app in front." />
             </ui:CardControl.Header>
             <ComboBox Width="140" AutomationProperties.Name="Position" ItemsSource="{Binding PositionNames}" SelectedIndex="{Binding PositionIndex}" />
+        </ui:CardControl>
+        <ui:CardControl Margin="0,0,0,4" Icon="{ui:SymbolIcon Eye24}">
+            <ui:CardControl.Header>
+                <core:CardHeader Title="Background opacity" Description="Lower lets more of the app show through the guide." />
+            </ui:CardControl.Header>
+            <StackPanel Orientation="Horizontal">
+                <Slider Width="180" VerticalAlignment="Center" Minimum="{Binding MinOpacity}" Maximum="{Binding MaxOpacity}"
+                        TickFrequency="5" IsSnapToTickEnabled="True" SmallChange="5" LargeChange="10"
+                        Value="{Binding BackgroundOpacity}" AutomationProperties.Name="Background opacity" />
+                <TextBlock Width="44" Margin="12,0,0,0" VerticalAlignment="Center" Text="{Binding BackgroundOpacityText}" />
+            </StackPanel>
+        </ui:CardControl>
+        <ui:CardControl Margin="0,0,0,4" Icon="{ui:SymbolIcon TextAlignJustify24}">
+            <ui:CardControl.Header>
+                <core:CardHeader Title="Rows of keys" Description="The most the guide shows at once; the rest are in the list here." />
+            </ui:CardControl.Header>
+            <StackPanel Orientation="Horizontal">
+                <Slider Width="180" VerticalAlignment="Center" Minimum="{Binding MinRows}" Maximum="{Binding MaxRows}"
+                        TickFrequency="1" IsSnapToTickEnabled="True" SmallChange="1" LargeChange="1"
+                        Value="{Binding Rows}" AutomationProperties.Name="Rows of keys" />
+                <TextBlock Width="44" Margin="12,0,0,0" VerticalAlignment="Center" Text="{Binding Rows}" />
+            </StackPanel>
         </ui:CardControl>
 
         <!-- Excluded apps -->

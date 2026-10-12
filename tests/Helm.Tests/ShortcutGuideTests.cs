@@ -169,6 +169,35 @@ public class ShortcutLibraryTests
     }
 
     [Fact]
+    public void Skipping_the_basics_leaves_out_what_everyone_knows_but_the_app_keeps_its_keys()
+    {
+        IReadOnlyList<CatalogApp> catalog =
+        [
+            new() { Id = "windows", Name = "Windows", Shortcuts = [new() { Keys = "Alt+Tab", Does = "Switch", Basic = true }, new() { Keys = "Alt+F4", Does = "Close", Basic = true }] },
+            new() { Id = "common", Name = "Most apps", Shortcuts = [new() { Keys = "Ctrl+C", Does = "Copy", Basic = true }, new() { Keys = "Ctrl+S", Does = "Save", Basic = true }] },
+            new() { Id = "unity", Name = "Unity", Processes = ["Unity"], Shortcuts = [new() { Keys = "Ctrl+P", Does = "Play" }, new() { Keys = "Ctrl+S", Does = "Save the scene", Basic = true }] },
+        ];
+        var library = new ShortcutLibrary(catalog, new ShortcutGuideSettings());
+
+        var view = GuideContent.Build(library, "Unity.exe", HotkeyModifiers.Ctrl, includeGeneral: true, skipBasics: true);
+        Assert.Equal(["Play"], view.Sections.SelectMany(s => s.Items).Select(i => i.Does));
+        // Nothing but basics with Alt: the guide has nothing to show.
+        Assert.True(GuideContent.Build(library, "Unity.exe", HotkeyModifiers.Alt, true, skipBasics: true).IsEmpty);
+
+        var all = GuideContent.Build(library, "Unity.exe", HotkeyModifiers.Ctrl, includeGeneral: true, skipBasics: false);
+        Assert.Equal(["Play", "Save the scene", "Copy"], all.Sections.SelectMany(s => s.Items).Select(i => i.Does));
+    }
+
+    [Fact]
+    public void The_built_in_catalog_marks_copy_and_paste_as_basic()
+    {
+        var common = new ShortcutLibrary(ShortcutLibrary.LoadBuiltInCatalog(), new ShortcutGuideSettings()).Common;
+        Assert.True(common.Shortcuts.Single(s => s.Keys.Canonical == "Ctrl+C").IsBasic);
+        Assert.True(common.Shortcuts.Single(s => s.Keys.Canonical == "Ctrl+V").IsBasic);
+        Assert.False(common.Shortcuts.Single(s => s.Keys.Canonical == "Ctrl+H").IsBasic);
+    }
+
+    [Fact]
     public void Guide_for_an_unknown_app_shows_only_general_shortcuts_or_nothing()
     {
         var library = new ShortcutLibrary(Catalog, new ShortcutGuideSettings());

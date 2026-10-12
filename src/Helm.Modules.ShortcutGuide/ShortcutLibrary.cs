@@ -21,10 +21,13 @@ public sealed class CatalogShortcut
     public string Keys { get; set; } = string.Empty;
 
     public string Does { get; set; } = string.Empty;
+
+    /// <summary>Everyone knows it (copy, paste, undo …): the guide skips it while "Skip the basics" is on.</summary>
+    public bool Basic { get; set; }
 }
 
 /// <summary>A shortcut as the guide and the library page show it.</summary>
-public sealed record GuideShortcut(string AppId, ShortcutKeys Keys, string Does, bool IsOwn, bool IsHidden);
+public sealed record GuideShortcut(string AppId, ShortcutKeys Keys, string Does, bool IsOwn, bool IsHidden, bool IsBasic = false);
 
 /// <summary>An app with its effective shortcuts: the catalog's, minus those you hid, plus yours.</summary>
 public sealed record GuideApp(string Id, string Name, IReadOnlyList<string> Processes, bool IsOwn, IReadOnlyList<GuideShortcut> Shortcuts)
@@ -66,7 +69,7 @@ public sealed class ShortcutLibrary
                 if (!ShortcutKeys.TryParse(s.Keys, out var keys, out _)) continue;
                 // Yours replaces a built-in shortcut with the same keys (you remapped it).
                 if (mineKeys.Contains(keys.Canonical)) continue;
-                shortcuts.Add(new GuideShortcut(id, keys, s.Does, IsOwn: false, hidden.Contains(HiddenKey(id, keys))));
+                shortcuts.Add(new GuideShortcut(id, keys, s.Does, IsOwn: false, hidden.Contains(HiddenKey(id, keys)), s.Basic));
             }
             shortcuts.AddRange(mine.Select(m => new GuideShortcut(id, m.Keys, m.Does, IsOwn: true, IsHidden: false)));
             return new GuideApp(id, name, processes.Select(NormalizeProcess).Where(p => p.Length > 0).ToList(), isOwn, shortcuts);

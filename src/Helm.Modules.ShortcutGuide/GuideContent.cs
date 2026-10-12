@@ -36,7 +36,8 @@ public static class GuideContent
 
     /// <param name="processName">The process of the window in front ("Code.exe").</param>
     /// <param name="includeGeneral">Also list Most apps and Windows.</param>
-    public static GuideView Build(ShortcutLibrary library, string? processName, HotkeyModifiers held, bool includeGeneral)
+    /// <param name="skipBasics">Leave out what everyone knows (copy, paste, undo …).</param>
+    public static GuideView Build(ShortcutLibrary library, string? processName, HotkeyModifiers held, bool includeGeneral, bool skipBasics = false)
     {
         var app = library.FindByProcess(processName);
         var sources = new List<GuideApp>(3);
@@ -56,7 +57,8 @@ public static class GuideContent
             foreach (var shortcut in source.Visible)
             {
                 if (shortcut.Keys.LeadModifiers != held || !shortcut.Keys.HasLeadKey) continue;
-                if (!taken.Add(shortcut.Keys.Canonical)) continue;
+                // The app owns its keys even when they are skipped as basic: Most apps does not offer them instead.
+                if (!taken.Add(shortcut.Keys.Canonical) || skipBasics && shortcut.IsBasic) continue;
                 items.Add(new GuideItem(shortcut.Keys.RemainingCaps(), shortcut.Does));
             }
             if (items.Count > 0) sections.Add(new GuideSection(source.Name, items));
@@ -70,7 +72,7 @@ public static class GuideContent
                 if (held.HasFlag(extra)) continue;
                 var wanted = held | extra;
                 var count = sources.SelectMany(s => s.Visible)
-                    .Where(s => s.Keys.LeadModifiers == wanted && s.Keys.HasLeadKey)
+                    .Where(s => s.Keys.LeadModifiers == wanted && s.Keys.HasLeadKey && !(skipBasics && s.IsBasic))
                     .Select(s => s.Keys.Canonical)
                     .Distinct(StringComparer.OrdinalIgnoreCase)
                     .Count();
