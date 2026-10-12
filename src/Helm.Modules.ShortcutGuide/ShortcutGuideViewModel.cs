@@ -1,4 +1,3 @@
-using System.Windows.Input;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Helm.Core.Desktop;
@@ -8,18 +7,25 @@ using Helm.Core.Settings;
 
 namespace Helm.Modules.ShortcutGuide;
 
-/// <summary>One press of a shortcut in the library list, with "then" before every press after the first.</summary>
+/// <summary>One press of a shortcut in the library list, with a comma before every press after the first.</summary>
 public sealed record KeyStep(IReadOnlyList<string> Caps, bool ShowThen);
 
-/// <summary>A shortcut row on the library page.</summary>
-public sealed class ShortcutRowViewModel
+/// <summary>A shortcut row on the library page: shown, or open for editing in place.</summary>
+public sealed partial class ShortcutRowViewModel : ObservableObject
 {
+    private readonly ShortcutGuideViewModel _owner;
+
+    [ObservableProperty] private bool _isEditing;
+    [ObservableProperty] private string _editKeys = string.Empty;
+    [ObservableProperty] private string _editDoes = string.Empty;
+    [ObservableProperty] private bool _editBasic;
+    [ObservableProperty] private string _editError = string.Empty;
+
     public ShortcutRowViewModel(ShortcutGuideViewModel owner, GuideShortcut shortcut)
     {
+        _owner = owner;
         Shortcut = shortcut;
         Steps = shortcut.Keys.AllCaps().Select((caps, i) => new KeyStep(caps, i > 0)).ToList();
-        ToggleHiddenCommand = new RelayCommand(() => owner.ToggleHidden(shortcut));
-        DeleteCommand = new RelayCommand(() => owner.DeleteShortcut(shortcut));
     }
 
     public GuideShortcut Shortcut { get; }
@@ -28,25 +34,66 @@ public sealed class ShortcutRowViewModel
 
     public string Does => Shortcut.Does;
 
-    public bool IsOwn => Shortcut.IsOwn;
+    /// <summary>One you added (not an edit of a built-in one).</summary>
+    public bool IsAdded => Shortcut is { IsOwn: true, IsEdited: false };
 
-    public bool IsBuiltIn => !Shortcut.IsOwn;
+    public bool IsEdited => Shortcut.IsEdited;
 
     public bool IsHidden => Shortcut.IsHidden;
 
-    /// <summary>Everyone knows it: the guide skips it while "Skip the basics" is on.</summary>
-    public bool IsBasic => Shortcut.IsBasic;
+    public bool IsShown => !Shortcut.IsHidden;
 
-    /// <summary>Hidden shortcuts stay in the list, faded, so they can be shown again.</summary>
+    /// <summary>Everyone knows it: the guide skips it while "Skip the basics" is on. The check box flips it.</summary>
+    public bool IsBasic
+    {
+        get => Shortcut.IsBasic;
+        set
+        {
+            if (value != Shortcut.IsBasic) _owner.SaveRow(this, Shortcut.Keys, Shortcut.Does, value);
+        }
+    }
+
+    /// <summary>Deleted built-in shortcuts stay in the list, faded, so they can be restored.</summary>
     public double RowOpacity => IsHidden ? 0.45 : 1;
 
-    public string HideToolTip => IsHidden ? "Show it in the guide again" : "Hide it from the guide";
+    [RelayCommand]
+    private void BeginEdit()
+    {
+        EditKeys = Shortcut.Keys.Canonical;
+        EditDoes = Shortcut.Does;
+        EditBasic = Shortcut.IsBasic;
+        EditError = string.Empty;
+        _owner.BeginEditing(this);
+        IsEditing = true;
+    }
 
-    public Wpf.Ui.Controls.SymbolRegular HideIcon => IsHidden ? Wpf.Ui.Controls.SymbolRegular.Eye24 : Wpf.Ui.Controls.SymbolRegular.EyeOff24;
+    [RelayCommand]
+    private void CancelEdit()
+    {
+        IsEditing = false;
+        EditError = string.Empty;
+    }
 
-    public ICommand ToggleHiddenCommand { get; }
+    [RelayCommand]
+    private void SaveEdit()
+    {
+        if (!ShortcutKeys.TryParse(EditKeys, out var keys, out var error))
+        {
+            EditError = error;
+            return;
+        }
+        EditError = _owner.SaveRow(this, keys, EditDoes, EditBasic) ?? string.Empty;
+        if (EditError.Length == 0) IsEditing = false;
+    }
 
-    public ICommand DeleteCommand { get; }
+    [RelayCommand]
+    private void Delete() => _owner.Apply(s => ShortcutEdits.Delete(s, Shortcut));
+
+    [RelayCommand]
+    private void Restore() => _owner.Apply(s => ShortcutEdits.Restore(s, Shortcut));
+
+    [RelayCommand]
+    private void Reset() => _owner.Apply(s => ShortcutEdits.Reset(s, Shortcut));
 }
 
 /// <summary>The shortcuts of the selected app that start with the same modifiers ("Ctrl+Shift").</summary>
@@ -93,6 +140,7 @@ public sealed partial class ShortcutGuideViewModel : ObservableObject
     [ObservableProperty] private string _newKeys = string.Empty;
     [ObservableProperty] private string _newDoes = string.Empty;
     [ObservableProperty] private string _newError = string.Empty;
+    [ObservableProperty] private bool _newBasic;
     [ObservableProperty] private string _newAppName = string.Empty;
     [ObservableProperty] private string _newAppProcesses = string.Empty;
     [ObservableProperty] private string _newAppError = string.Empty;
@@ -211,20 +259,17 @@ public sealed partial class ShortcutGuideViewModel : ObservableObject
             NewError = error;
             return;
         }
-        var does = NewDoes.Trim();
-        if (does.Length == 0)
+        if (ShortcutEdits.Check(_store.Current, app.Id, null, keys, NewDoes) is { } problem)
         {
-            NewError = "Say what the shortcut does.";
+            NewError = problem;
             return;
         }
-        _store.Update(s =>
-        {
-            // Adding the same keys again changes what they do.
-            s.Shortcuts.RemoveAll(u => SameShortcut(u, app.Id, keys));
-            s.Shortcuts.Add(new UserShortcut { AppId = app.Id, Keys = keys.Canonical, Does = does });
-        });
+        var does = NewDoes;
+        var basic = NewBasic;
+        _store.Update(s => ShortcutEdits.Add(s, app.Id, keys, does, basic));
         NewKeys = string.Empty;
         NewDoes = string.Empty;
+        NewBasic = false;
         NewError = string.Empty;
     }
 
@@ -271,26 +316,22 @@ public sealed partial class ShortcutGuideViewModel : ObservableObject
         ReloadLibrary();
     }
 
-    internal void ToggleHidden(GuideShortcut shortcut)
+    /// <summary>Saves a row's keys, description and basic flag; returns why not, or null.</summary>
+    internal string? SaveRow(ShortcutRowViewModel row, ShortcutKeys keys, string does, bool basic)
     {
-        if (shortcut.IsOwn) return;
-        var key = ShortcutLibrary.HiddenKey(shortcut.AppId, shortcut.Keys);
-        _store.Update(s =>
-        {
-            if (s.Hidden.RemoveAll(h => string.Equals(h, key, StringComparison.OrdinalIgnoreCase)) == 0) s.Hidden.Add(key);
-        });
+        if (ShortcutEdits.Check(_store.Current, row.Shortcut.AppId, row.Shortcut, keys, does) is { } problem) return problem;
+        _store.Update(s => ShortcutEdits.Save(s, row.Shortcut, keys, does, basic));
+        return null;
     }
 
-    internal void DeleteShortcut(GuideShortcut shortcut)
+    /// <summary>One row is edited at a time.</summary>
+    internal void BeginEditing(ShortcutRowViewModel row)
     {
-        if (!shortcut.IsOwn) return;
-        _store.Update(s => s.Shortcuts.RemoveAll(u => SameShortcut(u, shortcut.AppId, shortcut.Keys)));
+        foreach (var other in Groups.SelectMany(g => g.Rows))
+            if (!ReferenceEquals(other, row)) other.IsEditing = false;
     }
 
-    private static bool SameShortcut(UserShortcut shortcut, string appId, ShortcutKeys keys) =>
-        string.Equals(shortcut.AppId, appId, StringComparison.OrdinalIgnoreCase) &&
-        ShortcutKeys.TryParse(shortcut.Keys, out var parsed, out _) &&
-        string.Equals(parsed.Canonical, keys.Canonical, StringComparison.OrdinalIgnoreCase);
+    internal void Apply(Action<ShortcutGuideSettings> change) => _store.Update(change);
 
     private void ReloadLibrary()
     {

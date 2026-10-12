@@ -18,53 +18,83 @@
             <Setter Property="VerticalAlignment" Value="Center" />
         </Style>
 
+        <!-- A small label next to a shortcut: Yours, Edited, Deleted -->
+        <Style x:Key="Badge" TargetType="Border">
+            <Setter Property="CornerRadius" Value="4" />
+            <Setter Property="Padding" Value="6,0" />
+            <Setter Property="Margin" Value="8,0,0,0" />
+            <Setter Property="VerticalAlignment" Value="Center" />
+            <Setter Property="Background" Value="{DynamicResource ControlFillColorSecondaryBrush}" />
+        </Style>
+
         <DataTemplate x:Key="ShortcutRow" DataType="{x:Type local:ShortcutRowViewModel}">
             <Border BorderThickness="0,0,0,1" BorderBrush="{DynamicResource CardStrokeColorDefaultBrush}" Padding="12,6">
-                <DockPanel>
-                    <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
-                        <Border CornerRadius="4" Padding="6,0" Margin="8,0,0,0" VerticalAlignment="Center"
-                                Background="{DynamicResource ControlFillColorSecondaryBrush}" ToolTip="The guide skips it while Skip the basics is on (settings)."
-                                Visibility="{Binding IsBasic, Converter={StaticResource BoolToVisibility}}">
-                            <TextBlock Text="Basic" FontSize="12" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
-                        </Border>
-                        <Border CornerRadius="4" Padding="6,0" Margin="8,0,0,0" VerticalAlignment="Center"
-                                Background="{DynamicResource ControlFillColorSecondaryBrush}"
-                                Visibility="{Binding IsOwn, Converter={StaticResource BoolToVisibility}}">
-                            <TextBlock Text="Yours" FontSize="12" FontWeight="SemiBold" Foreground="{DynamicResource AccentTextFillColorPrimaryBrush}" />
-                        </Border>
-                        <ui:Button Style="{StaticResource RowAction}" ToolTip="{Binding HideToolTip}" AutomationProperties.Name="{Binding HideToolTip}"
-                                   Command="{Binding ToggleHiddenCommand}" Visibility="{Binding IsBuiltIn, Converter={StaticResource BoolToVisibility}}">
-                            <ui:Button.Icon>
-                                <ui:SymbolIcon Symbol="{Binding HideIcon}" />
-                            </ui:Button.Icon>
-                        </ui:Button>
-                        <ui:Button Style="{StaticResource RowAction}" Icon="{ui:SymbolIcon Delete24}" ToolTip="Delete your shortcut" AutomationProperties.Name="Delete"
-                                   Command="{Binding DeleteCommand}" Visibility="{Binding IsOwn, Converter={StaticResource BoolToVisibility}}" />
+                <StackPanel>
+                    <!-- Shown -->
+                    <DockPanel Visibility="{Binding IsEditing, Converter={StaticResource InverseBoolToVisibility}}">
+                        <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
+                            <Border Style="{StaticResource Badge}" Visibility="{Binding IsAdded, Converter={StaticResource BoolToVisibility}}">
+                                <TextBlock Text="Yours" FontSize="12" FontWeight="SemiBold" Foreground="{DynamicResource AccentTextFillColorPrimaryBrush}" />
+                            </Border>
+                            <Border Style="{StaticResource Badge}" Visibility="{Binding IsEdited, Converter={StaticResource BoolToVisibility}}"
+                                    ToolTip="You changed this built-in shortcut. Reset brings the original back.">
+                                <TextBlock Text="Edited" FontSize="12" FontWeight="SemiBold" Foreground="{DynamicResource AccentTextFillColorPrimaryBrush}" />
+                            </Border>
+                            <Border Style="{StaticResource Badge}" Visibility="{Binding IsHidden, Converter={StaticResource BoolToVisibility}}">
+                                <TextBlock Text="Deleted" FontSize="12" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+                            </Border>
+                            <CheckBox Content="Basic" MinWidth="0" Margin="12,0,4,0" VerticalAlignment="Center" IsChecked="{Binding IsBasic, Mode=TwoWay}"
+                                      ToolTip="Everyone knows it: the guide skips it while Skip the basics is on."
+                                      AutomationProperties.Name="Basic" Visibility="{Binding IsShown, Converter={StaticResource BoolToVisibility}}" />
+                            <ui:Button Style="{StaticResource RowAction}" Icon="{ui:SymbolIcon ArrowUndo24}" ToolTip="Reset to the built-in shortcut" AutomationProperties.Name="Reset"
+                                       Command="{Binding ResetCommand}" Visibility="{Binding IsEdited, Converter={StaticResource BoolToVisibility}}" />
+                            <ui:Button Style="{StaticResource RowAction}" Icon="{ui:SymbolIcon Edit24}" ToolTip="Edit the keys or what it does" AutomationProperties.Name="Edit"
+                                       Command="{Binding BeginEditCommand}" Visibility="{Binding IsShown, Converter={StaticResource BoolToVisibility}}" />
+                            <ui:Button Style="{StaticResource RowAction}" Icon="{ui:SymbolIcon Delete24}" ToolTip="Delete (a built-in shortcut can be restored)" AutomationProperties.Name="Delete"
+                                       Command="{Binding DeleteCommand}" Visibility="{Binding IsShown, Converter={StaticResource BoolToVisibility}}" />
+                            <ui:Button Style="{StaticResource RowAction}" Icon="{ui:SymbolIcon ArrowUndo24}" Content="Restore" ToolTip="Bring this shortcut back" AutomationProperties.Name="Restore"
+                                       Command="{Binding RestoreCommand}" Visibility="{Binding IsHidden, Converter={StaticResource BoolToVisibility}}" />
+                        </StackPanel>
+                        <Grid Opacity="{Binding RowOpacity}">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto" MinWidth="200" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+                            <ItemsControl ItemsSource="{Binding Steps}" VerticalAlignment="Center" Focusable="False">
+                                <ItemsControl.ItemsPanel>
+                                    <ItemsPanelTemplate>
+                                        <StackPanel Orientation="Horizontal" />
+                                    </ItemsPanelTemplate>
+                                </ItemsControl.ItemsPanel>
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate DataType="{x:Type local:KeyStep}">
+                                        <StackPanel Orientation="Horizontal">
+                                            <TextBlock Text="," Margin="0,0,4,0" VerticalAlignment="Center" Style="{DynamicResource HelmSecondaryText}"
+                                                       Visibility="{Binding ShowThen, Converter={StaticResource BoolToVisibility}}" />
+                                            <core:Keycaps Keys="{Binding Caps}" />
+                                        </StackPanel>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                            <TextBlock Grid.Column="1" Margin="12,0,0,0" VerticalAlignment="Center" Text="{Binding Does}" TextWrapping="Wrap" />
+                        </Grid>
+                    </DockPanel>
+
+                    <!-- Editing in place -->
+                    <StackPanel Visibility="{Binding IsEditing, Converter={StaticResource BoolToVisibility}}">
+                        <WrapPanel>
+                            <ui:TextBox Width="200" Margin="0,0,8,6" PlaceholderText="Keys, e.g. Ctrl+Shift+P" AutomationProperties.Name="Keys"
+                                        Text="{Binding EditKeys, UpdateSourceTrigger=PropertyChanged}" />
+                            <ui:TextBox Width="320" Margin="0,0,8,6" PlaceholderText="What it does" AutomationProperties.Name="What it does"
+                                        Text="{Binding EditDoes, UpdateSourceTrigger=PropertyChanged}" />
+                            <CheckBox Content="Basic" MinWidth="0" Margin="0,0,12,6" VerticalAlignment="Center" IsChecked="{Binding EditBasic}" AutomationProperties.Name="Basic" />
+                            <ui:Button Margin="0,0,6,6" Appearance="Primary" Content="Save" Icon="{ui:SymbolIcon Checkmark24}" Command="{Binding SaveEditCommand}" />
+                            <ui:Button Margin="0,0,0,6" Content="Cancel" Command="{Binding CancelEditCommand}" />
+                        </WrapPanel>
+                        <TextBlock Text="{Binding EditError}" Foreground="{DynamicResource SystemFillColorCriticalBrush}" TextWrapping="Wrap"
+                                   Visibility="{Binding EditError, Converter={StaticResource NotEmptyToVisibility}}" />
                     </StackPanel>
-                    <Grid Opacity="{Binding RowOpacity}">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="Auto" MinWidth="200" />
-                            <ColumnDefinition Width="*" />
-                        </Grid.ColumnDefinitions>
-                        <ItemsControl ItemsSource="{Binding Steps}" VerticalAlignment="Center" Focusable="False">
-                            <ItemsControl.ItemsPanel>
-                                <ItemsPanelTemplate>
-                                    <StackPanel Orientation="Horizontal" />
-                                </ItemsPanelTemplate>
-                            </ItemsControl.ItemsPanel>
-                            <ItemsControl.ItemTemplate>
-                                <DataTemplate DataType="{x:Type local:KeyStep}">
-                                    <StackPanel Orientation="Horizontal">
-                                        <TextBlock Text="then" Margin="0,0,4,0" VerticalAlignment="Center" Style="{DynamicResource HelmSecondaryText}"
-                                                   Visibility="{Binding ShowThen, Converter={StaticResource BoolToVisibility}}" />
-                                        <core:Keycaps Keys="{Binding Caps}" />
-                                    </StackPanel>
-                                </DataTemplate>
-                            </ItemsControl.ItemTemplate>
-                        </ItemsControl>
-                        <TextBlock Grid.Column="1" Margin="12,0,0,0" VerticalAlignment="Center" Text="{Binding Does}" TextWrapping="Wrap" />
-                    </Grid>
-                </DockPanel>
+                </StackPanel>
             </Border>
         </DataTemplate>
     </Page.Resources>
@@ -90,7 +120,7 @@
             </ui:CardControl>
 
             <TextBlock Style="{DynamicResource HelmSecondaryText}" Margin="0,12,0,0"
-                       Text="Hold Ctrl, Alt or Win for a moment in any app to see these over it. Hidden shortcuts stay here, faded." />
+                       Text="Hold Ctrl, Alt or Win for a moment in any app to see these over it. Edit any shortcut, mark the ones everyone knows as Basic, delete what you never use (built-in ones can be restored)." />
 
             <!-- Filter and preview -->
             <DockPanel Margin="0,12,0,4">
@@ -127,6 +157,8 @@
                                     Text="{Binding NewKeys, UpdateSourceTrigger=PropertyChanged}" />
                         <ui:TextBox Width="320" Margin="0,0,8,8" PlaceholderText="What it does" AutomationProperties.Name="What the new shortcut does"
                                     Text="{Binding NewDoes, UpdateSourceTrigger=PropertyChanged}" />
+                        <CheckBox Content="Basic" MinWidth="0" Margin="0,0,12,8" VerticalAlignment="Center" IsChecked="{Binding NewBasic}"
+                                  ToolTip="Everyone knows it: the guide skips it while Skip the basics is on." AutomationProperties.Name="New shortcut is basic" />
                         <ui:Button Margin="0,0,0,8" Appearance="Primary" Content="Add" Icon="{ui:SymbolIcon Add24}" Command="{Binding AddShortcutCommand}" />
                     </WrapPanel>
                     <TextBlock Text="{Binding NewError}" Foreground="{DynamicResource SystemFillColorCriticalBrush}" TextWrapping="Wrap"

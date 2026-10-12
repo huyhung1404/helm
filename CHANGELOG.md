@@ -12,8 +12,9 @@ Format: [Keep a Changelog](https://keepachangelog.com), versions follow [SemVer]
   Studio, Rider, Unity, Slack, Edge and Chrome, Firefox, Windows Terminal, Teams, Discord, File Explorer), then the
   ones most apps share, then Windows', leaving out the basics everyone knows (copy, paste, undo, Alt+Tab …). Add Shift while it shows to see the Ctrl+Shift ones. Press any key, click or let
   go and it is gone; it never takes the focus, so the shortcut still reaches the app, and letting go of Win or Alt
-  afterwards does not open Start or the menu bar. Its page lists every app's shortcuts: hide the ones you know, add
-  your own (chords like Ctrl+K Ctrl+C too) or a whole app by its process name, and preview the guide. Settings: which
+  afterwards does not open Start or the menu bar. Its page lists every app's shortcuts: edit any of them (keys, what it
+  does), mark the ones everyone knows as Basic, delete what you never use (a built-in one can be restored, an edited
+  one reset), add your own (chords like Ctrl+K Ctrl+C too) or a whole app by its process name, and preview the guide. Settings: which
   keys open it (Shift is off by default), how long to hold, skip the basics, bottom or centre, background opacity, rows
   of keys, excluded apps, not over full-screen games.
 

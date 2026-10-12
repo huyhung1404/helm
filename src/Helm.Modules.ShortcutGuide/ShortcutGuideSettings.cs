@@ -21,7 +21,10 @@ public sealed class UserApp
     public List<string> Processes { get; set; } = [];
 }
 
-/// <summary>A shortcut you added to any app, built-in or your own. It replaces a built-in one with the same keys.</summary>
+/// <summary>
+/// A shortcut you added to any app, built-in or your own, or your edit of a built-in one (<see cref="Replaces"/>). It
+/// replaces a built-in one with the same keys.
+/// </summary>
 public sealed class UserShortcut
 {
     public string AppId { get; set; } = string.Empty;
@@ -29,6 +32,12 @@ public sealed class UserShortcut
     public string Keys { get; set; } = string.Empty;
 
     public string Does { get; set; } = string.Empty;
+
+    /// <summary>Everyone knows it: the guide skips it while "Skip the basics" is on.</summary>
+    public bool Basic { get; set; }
+
+    /// <summary>The canonical keys of the built-in shortcut this edit stands for; null for a shortcut you added.</summary>
+    public string? Replaces { get; set; }
 }
 
 public sealed class ShortcutGuideSettings : IVersionedSettings

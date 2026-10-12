@@ -210,6 +210,90 @@ public class ShortcutLibraryTests
     }
 }
 
+public class ShortcutEditsTests
+{
+    private static readonly IReadOnlyList<CatalogApp> Catalog =
+    [
+        new() { Id = "windows", Name = "Windows" },
+        new() { Id = "common", Name = "Most apps" },
+        new()
+        {
+            Id = "vscode", Name = "Visual Studio Code", Processes = ["Code"],
+            Shortcuts =
+            [
+                new() { Keys = "Ctrl+P", Does = "Go to file" },
+                new() { Keys = "Ctrl+B", Does = "Toggle the sidebar" },
+                new() { Keys = "Ctrl+W", Does = "Close the editor", Basic = true },
+            ],
+        },
+    ];
+
+    private static GuideApp Code(ShortcutGuideSettings settings) => new ShortcutLibrary(Catalog, settings).Find("vscode")!;
+
+    private static GuideShortcut Get(ShortcutGuideSettings settings, string keys) =>
+        Code(settings).Shortcuts.Single(s => s.Keys.Canonical == keys);
+
+    [Fact]
+    public void Editing_a_built_in_shortcut_keeps_its_place_and_reset_brings_it_back()
+    {
+        var settings = new ShortcutGuideSettings();
+        ShortcutEdits.Save(settings, Get(settings, "Ctrl+B"), ShortcutKeys.Parse("Ctrl+Alt+B"), "Sidebar", basic: false);
+
+        Assert.Equal(["Ctrl+P", "Ctrl+Alt+B", "Ctrl+W"], Code(settings).Shortcuts.Select(s => s.Keys.Canonical));
+        var edited = Get(settings, "Ctrl+Alt+B");
+        Assert.True(edited.IsEdited);
+        Assert.Equal("Sidebar", edited.Does);
+
+        // Editing the edit changes it in place, still standing for Ctrl+B.
+        ShortcutEdits.Save(settings, edited, ShortcutKeys.Parse("Ctrl+Alt+S"), "Sidebar", basic: true);
+        Assert.True(Get(settings, "Ctrl+Alt+S") is { IsEdited: true, IsBasic: true });
+        Assert.Single(settings.Shortcuts);
+
+        ShortcutEdits.Reset(settings, Get(settings, "Ctrl+Alt+S"));
+        Assert.Equal(["Ctrl+P", "Ctrl+B", "Ctrl+W"], Code(settings).Shortcuts.Select(s => s.Keys.Canonical));
+        Assert.Empty(settings.Shortcuts);
+    }
+
+    [Fact]
+    public void Marking_a_built_in_shortcut_basic_or_not_is_an_edit()
+    {
+        var settings = new ShortcutGuideSettings();
+        ShortcutEdits.Save(settings, Get(settings, "Ctrl+W"), ShortcutKeys.Parse("Ctrl+W"), "Close the editor", basic: false);
+        Assert.True(Get(settings, "Ctrl+W") is { IsBasic: false, IsEdited: true });
+        ShortcutEdits.Save(settings, Get(settings, "Ctrl+P"), ShortcutKeys.Parse("Ctrl+P"), "Go to file", basic: true);
+        Assert.True(Get(settings, "Ctrl+P").IsBasic);
+    }
+
+    [Fact]
+    public void Deleting_a_built_in_shortcut_can_be_undone_yours_go_for_good()
+    {
+        var settings = new ShortcutGuideSettings();
+        ShortcutEdits.Delete(settings, Get(settings, "Ctrl+P"));
+        Assert.True(Get(settings, "Ctrl+P").IsHidden);
+        ShortcutEdits.Restore(settings, Get(settings, "Ctrl+P"));
+        Assert.False(Get(settings, "Ctrl+P").IsHidden);
+
+        ShortcutEdits.Add(settings, "vscode", ShortcutKeys.Parse("Ctrl+Shift+Z"), "Zen", basic: false);
+        ShortcutEdits.Delete(settings, Get(settings, "Ctrl+Shift+Z"));
+        Assert.DoesNotContain(Code(settings).Shortcuts, s => s.Keys.Canonical == "Ctrl+Shift+Z");
+
+        // Deleting your edit of a built-in one deletes the built-in one too (restorable).
+        ShortcutEdits.Save(settings, Get(settings, "Ctrl+B"), ShortcutKeys.Parse("Ctrl+Alt+B"), "Sidebar", basic: false);
+        ShortcutEdits.Delete(settings, Get(settings, "Ctrl+Alt+B"));
+        Assert.True(Get(settings, "Ctrl+B").IsHidden);
+    }
+
+    [Fact]
+    public void An_edit_cannot_land_on_another_of_your_shortcuts()
+    {
+        var settings = new ShortcutGuideSettings();
+        ShortcutEdits.Add(settings, "vscode", ShortcutKeys.Parse("Ctrl+Shift+Z"), "Zen", basic: false);
+        Assert.NotNull(ShortcutEdits.Check(settings, "vscode", Get(settings, "Ctrl+B"), ShortcutKeys.Parse("Ctrl+Shift+Z"), "Sidebar"));
+        Assert.Null(ShortcutEdits.Check(settings, "vscode", Get(settings, "Ctrl+Shift+Z"), ShortcutKeys.Parse("Ctrl+Shift+Z"), "Zen mode"));
+        Assert.NotNull(ShortcutEdits.Check(settings, "vscode", null, ShortcutKeys.Parse("Ctrl+K"), "  "));
+    }
+}
+
 public class HoldTrackerTests
 {
     private const int LCtrl = 0xA2, LShift = 0xA0, LWin = 0x5B, KeyC = 0x43;

@@ -27,7 +27,11 @@ public sealed class CatalogShortcut
 }
 
 /// <summary>A shortcut as the guide and the library page show it.</summary>
-public sealed record GuideShortcut(string AppId, ShortcutKeys Keys, string Does, bool IsOwn, bool IsHidden, bool IsBasic = false);
+public sealed record GuideShortcut(string AppId, ShortcutKeys Keys, string Does, bool IsOwn, bool IsHidden, bool IsBasic = false, string? Replaces = null)
+{
+    /// <summary>Your edit of a built-in shortcut (Reset brings the original back).</summary>
+    public bool IsEdited => Replaces is not null;
+}
 
 /// <summary>An app with its effective shortcuts: the catalog's, minus those you hid, plus yours.</summary>
 public sealed record GuideApp(string Id, string Name, IReadOnlyList<string> Processes, bool IsOwn, IReadOnlyList<GuideShortcut> Shortcuts)
@@ -54,7 +58,7 @@ public sealed class ShortcutLibrary
     {
         var hidden = new HashSet<string>(settings.Hidden, StringComparer.OrdinalIgnoreCase);
         var own = settings.Shortcuts
-            .Select(s => ShortcutKeys.TryParse(s.Keys, out var keys, out _) ? (s.AppId, Keys: keys, s.Does) : default)
+            .Select(s => ShortcutKeys.TryParse(s.Keys, out var keys, out _) ? (s.AppId, Keys: keys, s.Does, s.Basic, s.Replaces) : default)
             .Where(s => s.Keys is not null && s.AppId.Length > 0)
             .GroupBy(s => s.AppId, StringComparer.OrdinalIgnoreCase)
             .ToDictionary(g => g.Key, g => g.ToList(), StringComparer.OrdinalIgnoreCase);
@@ -62,16 +66,24 @@ public sealed class ShortcutLibrary
         GuideApp Build(string id, string name, IEnumerable<string> processes, bool isOwn, IEnumerable<CatalogShortcut> builtIn)
         {
             var mine = own.TryGetValue(id, out var list) ? list : [];
-            var mineKeys = new HashSet<string>(mine.Select(m => m.Keys.Canonical), StringComparer.OrdinalIgnoreCase);
+            var placed = new HashSet<int>();
             var shortcuts = new List<GuideShortcut>();
+            GuideShortcut Mine(int i) => new(id, mine[i].Keys, mine[i].Does, IsOwn: true, IsHidden: false, mine[i].Basic, mine[i].Replaces);
             foreach (var s in builtIn)
             {
                 if (!ShortcutKeys.TryParse(s.Keys, out var keys, out _)) continue;
-                // Yours replaces a built-in shortcut with the same keys (you remapped it).
-                if (mineKeys.Contains(keys.Canonical)) continue;
+                // Yours replaces the built-in shortcut it is an edit of, or the one with the same keys, in its place.
+                var index = mine.FindIndex(m => string.Equals(m.Replaces, keys.Canonical, StringComparison.OrdinalIgnoreCase));
+                if (index < 0) index = mine.FindIndex(m => m.Replaces is null && string.Equals(m.Keys.Canonical, keys.Canonical, StringComparison.OrdinalIgnoreCase));
+                if (index >= 0)
+                {
+                    if (placed.Add(index)) shortcuts.Add(Mine(index));
+                    continue;
+                }
                 shortcuts.Add(new GuideShortcut(id, keys, s.Does, IsOwn: false, hidden.Contains(HiddenKey(id, keys)), s.Basic));
             }
-            shortcuts.AddRange(mine.Select(m => new GuideShortcut(id, m.Keys, m.Does, IsOwn: true, IsHidden: false)));
+            for (var i = 0; i < mine.Count; i++)
+                if (!placed.Contains(i)) shortcuts.Add(Mine(i));
             return new GuideApp(id, name, processes.Select(NormalizeProcess).Where(p => p.Length > 0).ToList(), isOwn, shortcuts);
         }
 
