@@ -267,7 +267,7 @@ public sealed partial class TrackerViewModel : ObservableObject
         NewWorkspaceName = "";
     }
 
-    /// <summary>Shows a workspace, e.g. the one of an item picked in the command palette.</summary>
+    /// <summary>Shows a workspace, e.g. the one of a linked item.</summary>
     public void ShowWorkspace(string workspaceId)
     {
         if (Workspaces.FirstOrDefault(w => w.Id == workspaceId) is { } ws && !ReferenceEquals(ws, SelectedWorkspace)) SelectedWorkspace = ws;

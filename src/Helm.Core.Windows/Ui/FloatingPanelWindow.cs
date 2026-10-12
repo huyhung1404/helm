@@ -11,7 +11,7 @@ using Helm.Core.Geometry;
 namespace Helm.Core.Ui;
 
 /// <summary>
-/// A borderless panel that pops up over every app from a global shortcut (Quick Capture, the command palette): a
+/// A borderless panel that pops up over every app from a global shortcut (Quick Capture): a
 /// fixed width, the height of its content, near the top of the monitor under the mouse, in the app's theme. Esc or a
 /// click elsewhere hides it. The window is reused: <see cref="Summon"/> shows it again and brings it to the front.
 /// </summary>

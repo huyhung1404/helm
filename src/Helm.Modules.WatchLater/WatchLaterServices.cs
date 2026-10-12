@@ -1,5 +1,4 @@
 using Helm.Core;
-using Helm.Core.Palette;
 using Helm.Modules.WatchLater.Player;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -20,6 +19,5 @@ public static class WatchLaterServices
             .AddWatchLaterCore()
             .AddHelmModule<WatchLaterModule, WatchLaterPage, WatchLaterViewModel>()
             .AddSingleton<WatchLaterToolsViewModel>()
-            .AddSingleton<WatchLaterContentPage>()
-            .AddSingleton<IPaletteProvider, WatchLaterPaletteProvider>();
+            .AddSingleton<WatchLaterContentPage>();
 }

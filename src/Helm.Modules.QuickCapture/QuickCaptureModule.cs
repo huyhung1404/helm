@@ -94,10 +94,7 @@ public sealed class QuickCaptureModule : HelmModuleBase, IDisposable
     }
 
     /// <summary>Opens the box (the shortcut). Any thread.</summary>
-    public void Open() => _ui.Post(() => Show(null, null));
-
-    /// <summary>Opens the box with a text and a target already chosen (from the command palette). Any thread.</summary>
-    public void Open(string text, string? targetId) => _ui.Post(() => Show(text, targetId));
+    public void Open() => _ui.Post(Show);
 
     /// <summary>The targets of the tools that are on now.</summary>
     public IReadOnlyList<ICaptureTarget> AvailableTargets()
@@ -112,7 +109,7 @@ public sealed class QuickCaptureModule : HelmModuleBase, IDisposable
         _gate.Dispose();
     }
 
-    private void Show(string? text, string? targetId)
+    private void Show()
     {
         try
         {
@@ -123,7 +120,7 @@ public sealed class QuickCaptureModule : HelmModuleBase, IDisposable
                 _window = new FloatingPanelWindow(_windows, _monitors, 640) { Panel = _panel, Title = "Quick Capture" };
                 _panel.Finished += (_, _) => _window.Dismiss();
             }
-            _panel!.Prepare(text, targetId);
+            _panel!.Prepare();
             _window.Summon();
         }
         catch (Exception ex)

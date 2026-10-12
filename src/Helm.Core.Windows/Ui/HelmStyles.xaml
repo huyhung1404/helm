@@ -37,7 +37,7 @@
         <Setter Property="Padding" Value="16" />
     </Style>
 
-    <!-- A row in a list you pick from (notes, palette results): the selection is a soft fill with an accent bar, so
+    <!-- A row in a list you pick from (notes, link pickers): the selection is a soft fill with an accent bar, so
          secondary text stays readable (the default accent fill turns the text dark on bright blue). -->
     <Style x:Key="HelmListItem" TargetType="ListBoxItem">
         <Setter Property="Foreground" Value="{DynamicResource TextFillColorPrimaryBrush}" />

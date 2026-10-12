@@ -1,5 +1,4 @@
 using Helm.Core;
-using Helm.Core.Palette;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Helm.Modules.Wallet;
@@ -11,6 +10,5 @@ public static class WalletServices
             .AddWalletCore()
             .AddWalletLinks(typeof(WalletContentPage))
             .AddHelmModule<WalletModule, WalletPage, WalletViewModel>()
-            .AddSingleton<WalletContentPage>()
-            .AddSingleton<IPaletteProvider, WalletPaletteProvider>();
+            .AddSingleton<WalletContentPage>();
 }

@@ -4,8 +4,8 @@ using System.Text;
 namespace Helm.Core.Text;
 
 /// <summary>
-/// Search that forgives accents and case, so "ghi chu" finds "Ghi chú" and "dien" finds "Điện". Used by the command
-/// palette and the tools' own search boxes.
+/// Search that forgives accents and case, so "ghi chu" finds "Ghi chú" and "dien" finds "Điện". Used by the tools'
+/// own search boxes and links.
 /// </summary>
 public static class TextSearch
 {
@@ -35,7 +35,7 @@ public static class TextSearch
     /// How well <paramref name="terms"/> match a title (and optionally a longer detail such as a note's text); 0 when
     /// some term matches neither. Every term must match. A term at the start of the title scores highest, then at the
     /// start of a word, then anywhere in the title, then in the detail. A single term can also match the initials of
-    /// the title ("cp" → "Command Palette").
+    /// the title ("qc" → "Quick Capture").
     /// </summary>
     public static double Score(IReadOnlyList<string> terms, string title, string? detail = null)
     {

@@ -39,12 +39,12 @@ public partial class CapturePanel : UserControl
     public event EventHandler? Finished;
 
     /// <summary>The window is shown again: back to the editor, the cursor at the end of the text.</summary>
-    public void Prepare(string? text = null, string? targetId = null)
+    public void Prepare()
     {
         _doneTimer.Stop();
         Done.Visibility = Visibility.Collapsed;
         Editor.Visibility = Visibility.Visible;
-        _viewModel.Reset(text, targetId);
+        _viewModel.Reset();
         Dispatcher.BeginInvoke(DispatcherPriority.Input, () =>
         {
             Input.Focus();

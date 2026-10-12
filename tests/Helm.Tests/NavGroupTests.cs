@@ -21,11 +21,11 @@ public class NavGroupTests
         ["vault"] = ModuleGroup.SecurityAndServers,
         ["ssh"] = ModuleGroup.SecurityAndServers,
         ["always-on-top"] = ModuleGroup.WindowsAndDesktop,
-        ["command-palette"] = ModuleGroup.WindowsAndDesktop,
+        ["shortcut-guide"] = ModuleGroup.WindowsAndDesktop,
     };
 
     /// <summary>Tools on their way out; they only need some group.</summary>
-    private static readonly HashSet<string> Leaving = ["claude-chat"];
+    private static readonly HashSet<string> Leaving = ["claude-chat", "command-palette"];
 
     private static readonly string[] Generic = ["System Tools", "Advanced", "Tools", "Other", "Misc", "More", "General", "Utilities"];
 

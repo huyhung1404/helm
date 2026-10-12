@@ -29,11 +29,11 @@ body:
     attributes:
       label: Tool
       options:
-        - Command Palette
         - Missions
         - Notes
         - Quick Capture
         - SSH
+        - Shortcut Guide
         - Tracker
         - Vault
         - Wallet

@@ -180,10 +180,6 @@ public sealed class CaptureTests
         Assert.Equal("task", vm.Selected?.Target.Id);
         vm.SelectIndex(0);
         Assert.Equal("note", vm.Selected?.Target.Id);
-
-        // From the palette: text and target given.
-        vm.Reset("from the palette", "task");
-        Assert.Equal(("from the palette", "task"), (vm.Text, vm.Selected?.Target.Id));
     }
 
     private sealed class FakeTarget(string id, string prefix) : ICaptureTarget

@@ -54,19 +54,13 @@ public sealed partial class CaptureBoxViewModel : ObservableObject
     /// Called each time the box opens: the targets of the tools that are on now. Text that was typed but not saved is
     /// kept; an empty box starts on the default target.
     /// </summary>
-    /// <param name="text">Text to start with (e.g. from the command palette) instead of what was left in the box.</param>
-    /// <param name="targetId">The target to start on instead of the default one.</param>
-    public void Reset(string? text = null, string? targetId = null)
+    public void Reset()
     {
         var targets = _available();
         var keep = Selected?.Target.Id;
         Targets.Clear();
         for (var i = 0; i < targets.Count; i++) Targets.Add(new CaptureTargetOption(targets[i], i));
-        if (text is not null) Text = text;
         if (Text.Trim().Length == 0 || keep is null) keep = _settings.Current.DefaultTarget;
-        if (targetId is not null) keep = targetId;
-        // Text handed in (e.g. a video link from the palette) goes where it clearly belongs.
-        else if (text is not null && CaptureRouter.Suggest(targets, text, null) is { } claimed) keep = claimed.Id;
         Selected = Targets.FirstOrDefault(t => t.Target.Id == keep) ?? Targets.FirstOrDefault();
         Problem = null;
         OnPropertyChanged(nameof(HasTargets));

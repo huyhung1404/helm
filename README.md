@@ -6,7 +6,7 @@
 
 **A personal productivity toolkit for Windows and Android, in the spirit of Microsoft PowerToys.**
 
-Notes, tasks, a password vault, a command palette and tools for Claude Code in one Fluent app, synced end-to-end encrypted between your PC and your phone.
+Notes, tasks, a password vault, a shortcut guide and tools for Claude Code in one Fluent app, synced end-to-end encrypted between your PC and your phone.
 
 [![Latest release](https://img.shields.io/github/v/release/huyhung1404/helm?label=release)](https://github.com/huyhung1404/helm/releases/latest)
 [![CI](https://img.shields.io/github/actions/workflow/status/huyhung1404/helm/ci.yml?branch=main&label=CI)](https://github.com/huyhung1404/helm/actions/workflows/ci.yml)
@@ -24,18 +24,18 @@ Notes, tasks, a password vault, a command palette and tools for Claude Code in o
 - **PC and Android.** The same Home and General pages on both, and every tool runs on the platforms it is built for.
 - **Local-first, end-to-end encrypted sync.** Every device keeps a full copy of your data; the sync server only ever sees encrypted records.
 - **Updates itself.** New versions download in the background from GitHub Releases and install when you choose.
-- **Keyboard-first.** Alt+Space for the command palette, Win+Alt+N to capture a note or task from any app.
+- **Keyboard-first.** Hold Ctrl, Alt or Win to see the shortcuts of the app in front, Win+Alt+N to capture a note or task from any app.
 - **Helm tools for AI agents (MCP).** Claude Code, VS Code, Claude Desktop, Cursor or any MCP client can read and write your notes, Tracker and Missions through Helm's MCP server (`Helm.exe --mcp`); turn it on in **AI & MCP**.
 
 ## Tools
 
 | Tool | Platforms | What it does |
 |---|---|---|
-| Command Palette | PC | Alt+Space: one search box, Helm first (notes, tasks, vault items while unlocked, settings), then Windows: apps, files, open windows, Windows Settings, the web |
 | Missions | PC + Android | Reach a goal one step at a time: describe it, copy the prompt Helm writes into any AI and import the roadmap it answers (or ask Claude Code, through Helm's tools for Claude); steps are done in order, each with its start and finish dates; the pace against the plan and the deadline; celebrations and the rewards you chose; re-plan the rest with an AI when you fall behind; a daily step reminder; share an AI's answer to Helm on the phone; badges; linked notes; an Android home-screen widget; a Today card; send a step to Tracker; statistics and CSV; ready-made missions ([design](docs/missions-design.md)) |
 | Notes | PC + Android | Notes that save as you type and sync end-to-end encrypted; a note edited on two devices keeps both versions; 30-day trash; Markdown export; notes link to tasks, people in the debt book and missions |
 | Quick Capture | PC + Android | Save a note, task or debt from anywhere: Win+Alt+N on PC, Share → "Save to Helm" or a Quick Settings tile on Android, with short forms like `/t buy milk tomorrow 9h` |
 | SSH | PC + Android | A terminal on your servers: sign in with an Ed25519 key Helm makes for this device (encrypted for your Windows account, never synced) or a password that is never saved; server keys are pinned on first use and a changed key is refused; *Install this device's key* adds the key to a server like ssh-copy-id; *Import from SSH config* brings your ssh servers, key files and known server keys in one click; a password or key can come from Vault; sessions keep running while you use the rest of Helm; on the phone a key bar adds Ctrl, Esc, Tab and arrows |
+| Shortcut Guide | PC | Hold Ctrl, Alt or Win for a moment: a panel over the app in front lists the shortcuts that start with what you hold, for that app first (VS Code, Visual Studio, Rider, Unity, Slack, Edge and Chrome, Firefox, Windows Terminal, Teams, Discord, File Explorer), then the ones most apps share and those of Windows; add your own shortcuts and apps, hide the ones you know |
 | Tracker | PC + Android | To-do lists in workspaces, synced across devices; completions are logged with their start and finish times for reports and CSV export; a month/week calendar (with the debts due) and .ics export; linked notes; Android has a home-screen widget |
 | Wallet | PC + Android | Track your spending: the phone reads Techcombank's and ACB's balance notifications (app or SMS) and saves each transaction; give it a category with one tap (or from the notification; repeat descriptions file themselves); categories with icons and colours; charts of the month's cash flow, spending by category and by day, the budget, and the last 6 months; cash added by hand or with `/s 50k coffee`; a debt book (who owes whom, repayments, due dates, `/d Nam 200k`) that a transfer can go into, so lending is not counted as spending; synced across devices; an Android home-screen widget with the balance and the period's spending and income; CSV |
 | Scratch | PC + Android | One synced place for photos, videos, files and text: Share → *Helm Scratch* on the phone, drop or paste (Ctrl+V) on PC, take them out anywhere (open, copy, save, share); end-to-end encrypted, with a trash. *Send to clipboard* copies a thing onto every device's clipboard at once |

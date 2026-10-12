@@ -3,6 +3,22 @@
 All notable changes to Helm. The top section is used as the GitHub release body and as the Velopack release notes.
 Format: [Keep a Changelog](https://keepachangelog.com), versions follow [SemVer](https://semver.org).
 
+## [Unreleased]
+
+### Added
+- **Shortcut Guide (PC): hold Ctrl, Alt or Win to see the shortcuts of the app in front.** After a moment (0.7 s by
+  default) a panel over the app lists the shortcuts that start with what you hold: that app's first (VS Code, Visual
+  Studio, Rider, Unity, Slack, Edge and Chrome, Firefox, Windows Terminal, Teams, Discord, File Explorer), then the
+  ones most apps share, then Windows'. Add Shift while it shows to see the Ctrl+Shift ones. Press any key, click or let
+  go and it is gone; it never takes the focus, so the shortcut still reaches the app, and letting go of Win or Alt
+  afterwards does not open Start or the menu bar. Its page lists every app's shortcuts: hide the ones you know, add
+  your own (chords like Ctrl+K Ctrl+C too) or a whole app by its process name, and preview the guide. Settings: which
+  keys open it (Shift is off by default), how long to hold, centre or bottom, excluded apps, not over full-screen games.
+
+### Removed
+- **Command Palette.** The Alt+Space search box is gone, with the search results the tools offered it. Alt+Space opens
+  the Windows window menu again. Its settings file stays on disk and is ignored.
+
 ## [0.37.0] - 2026-10-10
 
 ### Changed

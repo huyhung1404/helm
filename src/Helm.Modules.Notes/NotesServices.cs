@@ -1,5 +1,4 @@
 using Helm.Core;
-using Helm.Core.Palette;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Helm.Modules.Notes;
@@ -11,6 +10,5 @@ public static class NotesServices
             .AddNotesCore()
             .AddNoteLinks(typeof(NotesContentPage))
             .AddHelmModule<NotesModule, NotesPage, NotesViewModel>()
-            .AddSingleton<NotesContentPage>()
-            .AddSingleton<IPaletteProvider, NotesPaletteProvider>();
+            .AddSingleton<NotesContentPage>();
 }

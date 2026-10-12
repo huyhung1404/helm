@@ -22,7 +22,7 @@ Print a short plan before you start, then continue without waiting:
 - **Class prefix**: PascalCase, e.g. `ColorPicker`.
 - **Group**: what the tool is for — one of `Planning` (notes, to-dos, goals, capture: Notes, Tracker, Missions,
   Quick Capture), `MoneyAndMedia` (Wallet, Watch Later), `SecurityAndServers` (secrets and remote machines: Vault,
-  SSH), `WindowsAndDesktop` (windows, input and the desktop itself: Always on Top, Command Palette). Pick the closest;
+  SSH), `WindowsAndDesktop` (windows, input and the desktop itself: Always on Top, Shortcut Guide). Pick the closest;
   the same group on both platforms. If none fits, add a group to `ModuleGroup` with a name that says what is inside
   (never a generic one like "Tools" or "Advanced") plus its `DisplayName` and PC `Icon`.
 - **Icon**: a `SymbolRegular` value that exists (see §6). On Android the same icon is `FluentIcons.Common.Symbol.<Name>` (no size suffix).
@@ -44,7 +44,7 @@ Print a short plan before you start, then continue without waiting:
   - A tool on both platforms without a `.Core` project can link the shape file into its Android project
     (`<Compile Include="..\Helm.Modules.<Prefix>\<Prefix>IconShape.cs" Link="…" />`), as Quick Capture does.
   See `ClaudeLogo`, `VaultIconShape` / `VaultIcon`, `TrackerIconShape` / `TrackerLogo` / `TrackerIcon`,
-  `QuickCaptureIconShape`, `CommandPaletteIconShape`.
+  `QuickCaptureIconShape`, `ShortcutGuideIconShape`.
 - **Default hotkey**: only if the tool needs one; choose one that is unlikely to clash.
 - **Content page**: yes if the tool is something you *work in* (lists, a chat, a vault, a viewer), no if it only
   runs in the background and is configured (a hotkey, a hook). See "Content page and settings page" in §4.
@@ -265,13 +265,7 @@ The page is a `core:ModulePageBase`. It already renders the title, the icon + de
   `ICaptureTarget` (`Helm.Core.Capture`) in its `.Core` services, e.g. `services.AddSingleton<ICaptureTarget, MyTarget>()`.
   Give it a one-letter `Prefix` that is not taken (`n` Notes, `t` task, `d` debt, `w` Watch Later, `m` mission, `s` spending), a `Preview` that says what Enter
   will do, and never throw. See `NoteCaptureTarget`, `TaskCaptureTarget`.
-- **Command palette** (optional, PC): a tool with things to find registers an `IPaletteProvider`
-  (`Helm.Core.Palette`) in its PC project. Score with `PaletteQuery.Score` (accents and case do not matter), keep it
-  fast (it runs on every key), resolve `IShellNavigation` from `IServiceProvider` inside `Run` (resolving it in the
-  constructor makes a DI cycle through the module list), and never show secrets. See `NotesPaletteProvider`,
-  `VaultPaletteProvider` (only while unlocked, titles only).
-- Neither Quick Capture nor the palette references a tool: they find targets and providers in DI and offer only those
-  of tools that are on.
+- Quick Capture does not reference a tool: it finds targets in DI and offers only those of tools that are on.
 
 ### 6. Pitfalls this repo has already hit (check them)
 

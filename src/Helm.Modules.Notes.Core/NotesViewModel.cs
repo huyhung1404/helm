@@ -195,7 +195,7 @@ public sealed partial class NotesViewModel : ObservableObject, IDisposable
         if (row is not null) Open(row.Id);
     }
 
-    /// <summary>Opens a note by id (e.g. from the command palette): leaves the trash or a search that hides it.</summary>
+    /// <summary>Opens a note by id (e.g. from a link): leaves the trash or a search that hides it.</summary>
     public void OpenNote(string id)
     {
         if (_store.Get(id) is not { } note) return;
