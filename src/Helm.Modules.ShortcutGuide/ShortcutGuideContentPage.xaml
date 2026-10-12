@@ -1,0 +1,151 @@
+<Page
+    x:Class="Helm.Modules.ShortcutGuide.ShortcutGuideContentPage"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
+    xmlns:core="clr-namespace:Helm.Core.Ui;assembly=Helm.Core.Windows"
+    xmlns:local="clr-namespace:Helm.Modules.ShortcutGuide"
+    Title="Shortcut Guide">
+
+    <!-- The shortcut library (menu and Quick access). Its options live on ShortcutGuidePage (Home → Utilities). -->
+    <Page.Resources>
+        <!-- Small icon-only action button in a list row -->
+        <Style x:Key="RowAction" TargetType="ui:Button" BasedOn="{StaticResource {x:Type ui:Button}}">
+            <Setter Property="Appearance" Value="Transparent" />
+            <Setter Property="Padding" Value="6" />
+            <Setter Property="Margin" Value="4,0,0,0" />
+            <Setter Property="MinWidth" Value="0" />
+            <Setter Property="VerticalAlignment" Value="Center" />
+        </Style>
+
+        <DataTemplate x:Key="ShortcutRow" DataType="{x:Type local:ShortcutRowViewModel}">
+            <Border BorderThickness="0,0,0,1" BorderBrush="{DynamicResource CardStrokeColorDefaultBrush}" Padding="12,6">
+                <DockPanel>
+                    <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
+                        <Border CornerRadius="4" Padding="6,0" Margin="8,0,0,0" VerticalAlignment="Center"
+                                Background="{DynamicResource ControlFillColorSecondaryBrush}"
+                                Visibility="{Binding IsOwn, Converter={StaticResource BoolToVisibility}}">
+                            <TextBlock Text="Yours" FontSize="12" FontWeight="SemiBold" Foreground="{DynamicResource AccentTextFillColorPrimaryBrush}" />
+                        </Border>
+                        <ui:Button Style="{StaticResource RowAction}" ToolTip="{Binding HideToolTip}" AutomationProperties.Name="{Binding HideToolTip}"
+                                   Command="{Binding ToggleHiddenCommand}" Visibility="{Binding IsBuiltIn, Converter={StaticResource BoolToVisibility}}">
+                            <ui:Button.Icon>
+                                <ui:SymbolIcon Symbol="{Binding HideIcon}" />
+                            </ui:Button.Icon>
+                        </ui:Button>
+                        <ui:Button Style="{StaticResource RowAction}" Icon="{ui:SymbolIcon Delete24}" ToolTip="Delete your shortcut" AutomationProperties.Name="Delete"
+                                   Command="{Binding DeleteCommand}" Visibility="{Binding IsOwn, Converter={StaticResource BoolToVisibility}}" />
+                    </StackPanel>
+                    <Grid Opacity="{Binding RowOpacity}">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" MinWidth="200" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        <ItemsControl ItemsSource="{Binding Steps}" VerticalAlignment="Center" Focusable="False">
+                            <ItemsControl.ItemsPanel>
+                                <ItemsPanelTemplate>
+                                    <StackPanel Orientation="Horizontal" />
+                                </ItemsPanelTemplate>
+                            </ItemsControl.ItemsPanel>
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate DataType="{x:Type local:KeyStep}">
+                                    <StackPanel Orientation="Horizontal">
+                                        <TextBlock Text="then" Margin="0,0,4,0" VerticalAlignment="Center" Style="{DynamicResource HelmSecondaryText}"
+                                                   Visibility="{Binding ShowThen, Converter={StaticResource BoolToVisibility}}" />
+                                        <core:Keycaps Keys="{Binding Caps}" />
+                                    </StackPanel>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                        <TextBlock Grid.Column="1" Margin="12,0,0,0" VerticalAlignment="Center" Text="{Binding Does}" TextWrapping="Wrap" />
+                    </Grid>
+                </DockPanel>
+            </Border>
+        </DataTemplate>
+    </Page.Resources>
+
+    <StackPanel Margin="24,16,24,24">
+        <TextBlock Text="Shortcut Guide" FontSize="28" FontWeight="SemiBold" Margin="0,0,0,20" />
+
+        <!-- Shown while the tool is turned off -->
+        <ui:InfoBar x:Name="OffBar" Severity="Informational" IsClosable="False" IsOpen="False" Visibility="Collapsed" Margin="0,8,0,0"
+                    Title="Shortcut Guide is turned off" Message="Your shortcuts are kept. Turn Shortcut Guide on in its settings to see the guide again." />
+
+        <StackPanel x:Name="Body">
+            <!-- Which app you are looking at, first and easy to see -->
+            <ui:CardControl Margin="0,0,0,4" Icon="{ui:SymbolIcon Apps24}">
+                <ui:CardControl.Header>
+                    <core:CardHeader Title="App" Description="{Binding AppDescription}" />
+                </ui:CardControl.Header>
+                <StackPanel Orientation="Horizontal">
+                    <ui:Button Margin="0,0,8,0" Icon="{ui:SymbolIcon Delete24}" ToolTip="Remove this app and its shortcuts" AutomationProperties.Name="Remove the app"
+                               Click="RemoveApp_Click" Visibility="{Binding CanRemoveApp, Converter={StaticResource BoolToVisibility}}" />
+                    <ComboBox Width="280" AutomationProperties.Name="App" ItemsSource="{Binding Apps}" DisplayMemberPath="Name" SelectedItem="{Binding SelectedApp}" />
+                </StackPanel>
+            </ui:CardControl>
+
+            <TextBlock Style="{DynamicResource HelmSecondaryText}" Margin="0,12,0,0"
+                       Text="Hold Ctrl, Alt or Win for a moment in any app to see these over it. Hidden shortcuts stay here, faded." />
+
+            <!-- Filter and preview -->
+            <DockPanel Margin="0,12,0,4">
+                <ui:Button DockPanel.Dock="Right" Margin="8,0,0,0" Content="Preview" Icon="{ui:SymbolIcon Eye24}" Command="{Binding PreviewCommand}"
+                           ToolTip="Show the guide for this app for a few seconds (a key or a click closes it)" />
+                <ui:TextBox PlaceholderText="Filter by keys or what they do" Icon="{ui:SymbolIcon Search24}" AutomationProperties.Name="Filter shortcuts"
+                            Text="{Binding Filter, UpdateSourceTrigger=PropertyChanged}" />
+            </DockPanel>
+            <TextBlock Style="{DynamicResource HelmSecondaryText}" Margin="0,4,0,0" Text="{Binding Summary}" />
+            <TextBlock Style="{DynamicResource HelmSecondaryText}" Margin="0,12,0,0" Text="No shortcut matches the filter."
+                       Visibility="{Binding HasNoMatches, Converter={StaticResource BoolToVisibility}}" />
+
+            <ItemsControl ItemsSource="{Binding Groups}" Focusable="False">
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate DataType="{x:Type local:ShortcutGroupViewModel}">
+                        <StackPanel Margin="0,16,0,0">
+                            <TextBlock Text="{Binding Title}" FontWeight="SemiBold" Margin="0,0,0,6" />
+                            <Border Style="{DynamicResource HelmSurface}" Padding="0">
+                                <ItemsControl ItemsSource="{Binding Rows}" ItemTemplate="{StaticResource ShortcutRow}" Focusable="False" />
+                            </Border>
+                        </StackPanel>
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+
+            <!-- Add a shortcut to the selected app -->
+            <TextBlock Text="Add a shortcut" Style="{DynamicResource HelmSectionHeader}" />
+            <Border Style="{DynamicResource HelmSurface}">
+                <StackPanel>
+                    <TextBlock Style="{DynamicResource HelmSecondaryText}" Margin="0,0,0,8"
+                               Text="Adds to the app above. Separate the presses of a chord with a space, e.g. Ctrl+K Ctrl+C. The same keys as a built-in shortcut replace it." />
+                    <WrapPanel>
+                        <ui:TextBox Width="200" Margin="0,0,8,8" PlaceholderText="Keys, e.g. Ctrl+Shift+P" AutomationProperties.Name="New shortcut keys"
+                                    Text="{Binding NewKeys, UpdateSourceTrigger=PropertyChanged}" />
+                        <ui:TextBox Width="320" Margin="0,0,8,8" PlaceholderText="What it does" AutomationProperties.Name="What the new shortcut does"
+                                    Text="{Binding NewDoes, UpdateSourceTrigger=PropertyChanged}" />
+                        <ui:Button Margin="0,0,0,8" Appearance="Primary" Content="Add" Icon="{ui:SymbolIcon Add24}" Command="{Binding AddShortcutCommand}" />
+                    </WrapPanel>
+                    <TextBlock Text="{Binding NewError}" Foreground="{DynamicResource SystemFillColorCriticalBrush}" TextWrapping="Wrap"
+                               Visibility="{Binding NewError, Converter={StaticResource NotEmptyToVisibility}}" />
+                </StackPanel>
+            </Border>
+
+            <!-- Add an app that is not listed -->
+            <TextBlock Text="Add an app" Style="{DynamicResource HelmSectionHeader}" />
+            <Border Style="{DynamicResource HelmSurface}">
+                <StackPanel>
+                    <TextBlock Style="{DynamicResource HelmSecondaryText}" Margin="0,0,0,8"
+                               Text="For an app that is not in the list. The process name is in Task Manager → Details; separate several with commas." />
+                    <WrapPanel>
+                        <ui:TextBox Width="200" Margin="0,0,8,8" PlaceholderText="Name, e.g. Blender" AutomationProperties.Name="New app name"
+                                    Text="{Binding NewAppName, UpdateSourceTrigger=PropertyChanged}" />
+                        <ui:TextBox Width="320" Margin="0,0,8,8" PlaceholderText="Process, e.g. blender.exe" AutomationProperties.Name="New app process names"
+                                    Text="{Binding NewAppProcesses, UpdateSourceTrigger=PropertyChanged}" />
+                        <ui:Button Margin="0,0,0,8" Content="Add the app" Icon="{ui:SymbolIcon Add24}" Command="{Binding AddAppCommand}" />
+                    </WrapPanel>
+                    <TextBlock Text="{Binding NewAppError}" Foreground="{DynamicResource SystemFillColorCriticalBrush}" TextWrapping="Wrap"
+                               Visibility="{Binding NewAppError, Converter={StaticResource NotEmptyToVisibility}}" />
+                </StackPanel>
+            </Border>
+        </StackPanel>
+    </StackPanel>
+</Page>

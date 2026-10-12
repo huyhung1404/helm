@@ -51,6 +51,12 @@ public interface IWindowService
     /// </summary>
     bool SetExcludedFromCapture(nint hwnd, bool excluded);
 
+    /// <summary>
+    /// Turns one of Helm's own windows into a passive overlay: clicks go through it to the window below, it never
+    /// takes the keyboard focus and it stays out of Alt+Tab. For hints shown over another app while you type.
+    /// </summary>
+    bool MakePassiveOverlay(nint hwnd);
+
     /// <summary>Restores (if minimized) and brings a window to the foreground.</summary>
     bool Activate(nint hwnd);
 
@@ -239,6 +245,16 @@ public sealed class WindowService(ILogger<WindowService> logger) : IWindowServic
 
     public bool SetExcludedFromCapture(nint hwnd, bool excluded) =>
         PInvoke.SetWindowDisplayAffinity(hwnd.ToHwnd(), excluded ? WINDOW_DISPLAY_AFFINITY.WDA_EXCLUDEFROMCAPTURE : WINDOW_DISPLAY_AFFINITY.WDA_NONE);
+
+    public bool MakePassiveOverlay(nint hwnd)
+    {
+        var h = hwnd.ToHwnd();
+        if (!PInvoke.IsWindow(h)) return false;
+        var ex = (WINDOW_EX_STYLE)(uint)PInvoke.GetWindowLongPtr(h, WINDOW_LONG_PTR_INDEX.GWL_EXSTYLE);
+        ex |= WINDOW_EX_STYLE.WS_EX_TRANSPARENT | WINDOW_EX_STYLE.WS_EX_LAYERED | WINDOW_EX_STYLE.WS_EX_NOACTIVATE | WINDOW_EX_STYLE.WS_EX_TOOLWINDOW;
+        PInvoke.SetWindowLongPtr(h, WINDOW_LONG_PTR_INDEX.GWL_EXSTYLE, (nint)(uint)ex);
+        return true;
+    }
 
     public bool IsTopmost(nint hwnd)
     {

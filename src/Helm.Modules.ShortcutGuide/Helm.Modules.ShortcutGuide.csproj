@@ -1,0 +1,22 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- Shortcut Guide: hold a modifier and a passive overlay lists the shortcuts of the app in front. The catalog of
+       built-in shortcuts ships as an embedded JSON file; your own apps and shortcuts live in the tool's settings. -->
+  <PropertyGroup>
+    <UseWPF>true</UseWPF>
+    <RootNamespace>Helm.Modules.ShortcutGuide</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Helm.Core.Windows\Helm.Core.Windows.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <EmbeddedResource Include="ShortcutCatalog.json" LogicalName="Helm.Modules.ShortcutGuide.ShortcutCatalog.json" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="Helm.Tests" />
+  </ItemGroup>
+
+</Project>

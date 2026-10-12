@@ -3,6 +3,7 @@ using Helm.Modules.Missions;
 using Helm.Modules.Notes;
 using Helm.Modules.NovelReader;
 using Helm.Modules.QuickCapture;
+using Helm.Modules.ShortcutGuide;
 using Helm.Modules.Ssh;
 using Helm.Modules.Scratch;
 using Helm.Modules.Vault;
@@ -32,6 +33,7 @@ internal static class HelmModules
         services.AddSshModule();
         services.AddQuickCaptureModule();
         services.AddCommandPaletteModule();
+        services.AddShortcutGuideModule();
 
         // Built but hidden; re-enable with (using Helm.Modules.AlwaysOnTop;):
         // services.AddAlwaysOnTopModule();

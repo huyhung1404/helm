@@ -46,6 +46,7 @@
     <ProjectReference Include="..\Helm.Modules.Ssh\Helm.Modules.Ssh.csproj" />
     <ProjectReference Include="..\Helm.Modules.Scratch\Helm.Modules.Scratch.csproj" />
     <ProjectReference Include="..\Helm.Modules.NovelReader\Helm.Modules.NovelReader.csproj" />
+    <ProjectReference Include="..\Helm.Modules.ShortcutGuide\Helm.Modules.ShortcutGuide.csproj" />
   </ItemGroup>
 
 </Project>

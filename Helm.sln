@@ -61,6 +61,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Helm.Modules.NovelReader.Co
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Helm.Modules.NovelReader", "src\Helm.Modules.NovelReader\Helm.Modules.NovelReader.csproj", "{1CB8E45A-10AE-4F48-9070-B66C8B16C03C}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Helm.Modules.ShortcutGuide", "src\Helm.Modules.ShortcutGuide\Helm.Modules.ShortcutGuide.csproj", "{B61DDEE0-41A1-46A9-BC5C-CFDA5714C87A}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -395,6 +397,18 @@ Global
 		{1CB8E45A-10AE-4F48-9070-B66C8B16C03C}.Release|x64.Build.0 = Release|Any CPU
 		{1CB8E45A-10AE-4F48-9070-B66C8B16C03C}.Release|x86.ActiveCfg = Release|Any CPU
 		{1CB8E45A-10AE-4F48-9070-B66C8B16C03C}.Release|x86.Build.0 = Release|Any CPU
+		{B61DDEE0-41A1-46A9-BC5C-CFDA5714C87A}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{B61DDEE0-41A1-46A9-BC5C-CFDA5714C87A}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{B61DDEE0-41A1-46A9-BC5C-CFDA5714C87A}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{B61DDEE0-41A1-46A9-BC5C-CFDA5714C87A}.Debug|x64.Build.0 = Debug|Any CPU
+		{B61DDEE0-41A1-46A9-BC5C-CFDA5714C87A}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{B61DDEE0-41A1-46A9-BC5C-CFDA5714C87A}.Debug|x86.Build.0 = Debug|Any CPU
+		{B61DDEE0-41A1-46A9-BC5C-CFDA5714C87A}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{B61DDEE0-41A1-46A9-BC5C-CFDA5714C87A}.Release|Any CPU.Build.0 = Release|Any CPU
+		{B61DDEE0-41A1-46A9-BC5C-CFDA5714C87A}.Release|x64.ActiveCfg = Release|Any CPU
+		{B61DDEE0-41A1-46A9-BC5C-CFDA5714C87A}.Release|x64.Build.0 = Release|Any CPU
+		{B61DDEE0-41A1-46A9-BC5C-CFDA5714C87A}.Release|x86.ActiveCfg = Release|Any CPU
+		{B61DDEE0-41A1-46A9-BC5C-CFDA5714C87A}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -427,5 +441,6 @@ Global
 		{A30E1EA5-A68E-4CAC-8736-9CCB832B64C3} = {827E0CD3-B72D-47B6-A68D-7590B98EB39B}
 		{CC15F5DD-FDFC-4C7F-88B0-FCF14749B4C3} = {827E0CD3-B72D-47B6-A68D-7590B98EB39B}
 		{1CB8E45A-10AE-4F48-9070-B66C8B16C03C} = {827E0CD3-B72D-47B6-A68D-7590B98EB39B}
+		{B61DDEE0-41A1-46A9-BC5C-CFDA5714C87A} = {827E0CD3-B72D-47B6-A68D-7590B98EB39B}
 	EndGlobalSection
 EndGlobal
