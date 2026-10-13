@@ -30,6 +30,11 @@ public partial class MainView : UserControl
             var full = PageHost.Content is ModulePage page && typeof(Helm.Core.Ui.IFullPage).IsAssignableFrom(page.PageType);
             PageScroller.VerticalScrollBarVisibility = full ? Avalonia.Controls.Primitives.ScrollBarVisibility.Disabled : Avalonia.Controls.Primitives.ScrollBarVisibility.Auto;
             PageHost.Margin = full ? default : new Thickness(16, 16, 16, 24);
+            AppBar.IsVisible = !full;
+        };
+        Helm.Core.Ui.ShellChrome.OpenNavigation = () =>
+        {
+            if (DataContext is MainViewModel vm) vm.IsPaneOpen = true;
         };
     }
 

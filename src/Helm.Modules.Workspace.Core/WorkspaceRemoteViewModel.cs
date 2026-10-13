@@ -20,10 +20,13 @@ public sealed class WorkspaceRemoteSettings : IVersionedSettings
 
     /// <summary>Session id → the update you last saw (a newer answer is "unseen").</summary>
     public Dictionary<string, DateTimeOffset> Seen { get; set; } = new(StringComparer.Ordinal);
+
+    /// <summary>How large the conversation and plans are drawn (1 = normal).</summary>
+    public double TextScale { get; set; } = 1;
 }
 
 /// <summary>The bottom sheets of the control screen.</summary>
-public enum WorkspaceSheet { None, Pc, Model, Mode, Agents, History, Context }
+public enum WorkspaceSheet { None, Pc, Model, Mode, Agents, History, Context, TextSize }
 
 /// <summary>
 /// The phone's control screen for Workspace Controller, laid out like Claude's panel in VS Code: a tab per VS Code
@@ -282,6 +285,27 @@ public sealed partial class WorkspaceRemoteViewModel : ObservableObject
     public bool IsAgentsSheet => Sheet == WorkspaceSheet.Agents;
     public bool IsHistorySheet => Sheet == WorkspaceSheet.History;
     public bool IsContextSheet => Sheet == WorkspaceSheet.Context;
+    public bool IsTextSizeSheet => Sheet == WorkspaceSheet.TextSize;
+
+    // ---- Text size
+
+    /// <summary>The sizes offered, as a share of normal.</summary>
+    public static IReadOnlyList<double> TextScales { get; } = [0.85, 1, 1.15, 1.3, 1.5, 1.75];
+
+    /// <summary>How large the conversation and plans are drawn (saved on this phone).</summary>
+    public double TextScale => Math.Clamp(_settings.Current.TextScale is > 0 and var t ? t : 1, TextScales[0], TextScales[^1]);
+    public string TextScaleLabel => $"{TextScale:P0}";
+
+    [RelayCommand] private void LargerText() => SetTextScale(TextScales.FirstOrDefault(t => t > TextScale + 0.001, TextScales[^1]));
+    [RelayCommand] private void SmallerText() => SetTextScale(TextScales.LastOrDefault(t => t < TextScale - 0.001, TextScales[0]));
+    [RelayCommand] private void ResetText() => SetTextScale(1);
+
+    private void SetTextScale(double scale)
+    {
+        if (Math.Abs(scale - TextScale) < 0.001) return;
+        _settings.Update(s => s.TextScale = scale);
+        Notify(nameof(TextScale), nameof(TextScaleLabel));
+    }
     public bool ShowsEffort => IsModelSheet || IsModeSheet;
     public string HistoryTitle => SelectedProject is { } p ? $"History · {p.Name}" : "History";
     public string EffortHeading => $"Effort ({(PermissionModes.EffortLabel(CurrentEffort) is { Length: > 0 } e ? e : "default")})";
@@ -292,7 +316,7 @@ public sealed partial class WorkspaceRemoteViewModel : ObservableObject
         if (value is WorkspaceSheet.Model or WorkspaceSheet.Mode) FillChoices();
         if (value == WorkspaceSheet.Agents) FillAgents();
         Notify(nameof(IsSheetOpen), nameof(IsPcSheet), nameof(IsModelSheet), nameof(IsModeSheet), nameof(IsAgentsSheet), nameof(IsHistorySheet),
-            nameof(IsContextSheet), nameof(ShowsEffort));
+            nameof(IsContextSheet), nameof(IsTextSizeSheet), nameof(ShowsEffort));
     }
 
     partial void OnHistoryQueryChanged(string value) => FillHistory();

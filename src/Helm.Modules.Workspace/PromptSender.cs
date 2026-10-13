@@ -134,11 +134,12 @@ public sealed class PromptSender(IPromptKeyboard keyboard, ILogger<PromptSender>
                 if (setup.ModePresses > 0)
                 {
                     if (!keyboard.ForceActivate(target)) throw new PromptSendException("Windows did not let Helm bring VS Code to the front. Nothing was typed.");
+                    await ConfirmFocusAsync(window, "Nothing was typed.", ct).ConfigureAwait(false);
                     await Bridge(window, focus, null, ct).ConfigureAwait(false);
                     await keyboard.Pause(300, ct).ConfigureAwait(false);
                     for (var i = 0; i < setup.ModePresses; i++)
                     {
-                        Guard(target, "The mode was not set; nothing was typed.");
+                        Guard(window, target, "The mode was not set; nothing was typed.");
                         keyboard.NextMode();
                         await keyboard.Pause(150, ct).ConfigureAwait(false);
                     }
@@ -172,11 +173,12 @@ public sealed class PromptSender(IPromptKeyboard keyboard, ILogger<PromptSender>
             target = VsCodeWindows.Find(keyboard.TopWindows(), window.Info.Name);
             if (target == 0) throw new PromptSendException($"The VS Code window “{window.Info.Name}” was not found (or two windows have that name).");
             if (!keyboard.ForceActivate(target)) throw new PromptSendException("Windows did not let Helm bring VS Code to the front. The mode did not change.");
+            await ConfirmFocusAsync(window, "The mode did not change.", ct).ConfigureAwait(false);
             await Bridge(window, "focus", null, ct).ConfigureAwait(false);
             await keyboard.Pause(300, ct).ConfigureAwait(false);
             for (var i = 0; i < presses; i++)
             {
-                Guard(target, i == 0 ? "The mode did not change." : "The mode changed only part of the way.");
+                Guard(window, target, i == 0 ? "The mode did not change." : "The mode changed only part of the way.");
                 keyboard.NextMode();
                 await keyboard.Pause(150, ct).ConfigureAwait(false);
             }
@@ -193,18 +195,19 @@ public sealed class PromptSender(IPromptKeyboard keyboard, ILogger<PromptSender>
     private async Task TypeAndSubmitAsync(BridgeConnection window, nint target, string focus, string text, CancellationToken ct)
     {
         if (!keyboard.ForceActivate(target)) throw new PromptSendException("Windows did not let Helm bring VS Code to the front. Nothing was typed.");
+        await ConfirmFocusAsync(window, "Nothing was typed.", ct).ConfigureAwait(false);
         await Bridge(window, focus, null, ct).ConfigureAwait(false);
         await keyboard.Pause(300, ct).ConfigureAwait(false);
 
         var lines = SessionRegistry.Normalize(text).Split('\n');
         for (var i = 0; i < lines.Length; i++)
         {
-            Guard(target, i == 0 ? "Nothing was typed." : "Part of the prompt was typed; nothing was sent.");
+            Guard(window, target, i == 0 ? "Nothing was typed." : "Part of the prompt was typed; nothing was sent.");
             if (i > 0) keyboard.NewLine();
             if (lines[i].Length > 0) keyboard.Type(lines[i]);
         }
         await keyboard.Pause(400, ct).ConfigureAwait(false);
-        Guard(target, "The prompt was typed but not sent.");
+        Guard(window, target, "The prompt was typed but not sent.");
         keyboard.Submit(window.Info.CtrlEnterSends);
         Interlocked.Exchange(ref _typedUntil, Environment.TickCount64 + 1500);
         logger.LogInformation("Workspace: typed a prompt ({Length} chars) into VS Code window {Name}", text.Length, window.Info.Name);
@@ -219,17 +222,39 @@ public sealed class PromptSender(IPromptKeyboard keyboard, ILogger<PromptSender>
             if (!keyboard.ForceActivate(target)) return;
             await Bridge(window, focus, null, ct).ConfigureAwait(false);
             await keyboard.Pause(300, ct).ConfigureAwait(false);
-            if (keyboard.Foreground() != target || keyboard.ModifierDown()) return;
+            if (keyboard.Foreground() != target || !window.Info.Focused || keyboard.ModifierDown()) return;
             keyboard.Submit(window.Info.CtrlEnterSends);
             logger.LogInformation("Workspace: Claude had not taken the prompt in {Name}; pressed Enter again", window.Info.Name);
         }
     }
 
-    /// <summary>Stops before any key goes to another window, or turns into a shortcut because a modifier is held.</summary>
-    private void Guard(nint target, string state)
+    /// <summary>
+    /// Stops before any key goes to another window, or turns into a shortcut because a modifier is held. The window in
+    /// front must be the one found by its title AND the bridge inside it must say it has the keyboard: a title alone
+    /// can belong to another VS Code window with the same name.
+    /// </summary>
+    private void Guard(BridgeConnection window, nint target, string state)
     {
-        if (keyboard.Foreground() != target) throw new PromptSendException("Another window came to the front. " + state);
+        if (keyboard.Foreground() != target || !window.Info.Focused) throw new PromptSendException("Another window came to the front. " + state);
         if (keyboard.ModifierDown()) throw new PromptSendException("A key (Ctrl, Alt, Shift or Win) is held down on the PC. " + state);
+    }
+
+    /// <summary>How long the bridge may take to report that its window got the keyboard after Helm raised it.</summary>
+    public const int FocusConfirmMilliseconds = 2000;
+
+    /// <summary>
+    /// Waits until Helm Bridge in <paramref name="window"/> reports that its VS Code window has the keyboard (VS Code's
+    /// own window state). Nothing is ever pressed before that: the window Helm raised might be another one whose title
+    /// only looks the same.
+    /// </summary>
+    private async Task ConfirmFocusAsync(BridgeConnection window, string state, CancellationToken ct)
+    {
+        for (var waited = 0; !window.Info.Focused; waited += 50)
+        {
+            if (waited >= FocusConfirmMilliseconds)
+                throw new PromptSendException($"The VS Code window “{window.Info.Name}” did not confirm it has the keyboard. " + state);
+            await keyboard.Pause(50, ct).ConfigureAwait(false);
+        }
     }
 
     private static async Task Bridge(BridgeConnection window, string op, string? session, CancellationToken ct)

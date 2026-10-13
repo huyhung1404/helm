@@ -8,27 +8,14 @@ using Avalonia.Media.Immutable;
 
 namespace Helm.Modules.Workspace;
 
-/// <summary>The colours of the control screen: VS Code's dark theme, whatever Helm's own theme is.</summary>
+/// <summary>The colours of the control screen (VS Code's Light or Dark Modern, following Helm's theme), from its resources.</summary>
 internal static class Vs
 {
-    public static readonly IBrush Bg = Brush("#1f1f1f");
-    public static readonly IBrush Bar = Brush("#181818");
-    public static readonly IBrush Raise = Brush("#252526");
-    public static readonly IBrush Raise2 = Brush("#2d2d2d");
-    public static readonly IBrush Line = Brush("#333333");
-    public static readonly IBrush Line2 = Brush("#454545");
-    public static readonly IBrush Fg = Brush("#cccccc");
-    public static readonly IBrush FgStrong = Brush("#e7e7e7");
-    public static readonly IBrush Muted = Brush("#8b8b8b");
-    public static readonly IBrush Faint = Brush("#6a6a6a");
-    public static readonly IBrush Accent = Brush("#d97757");
-    public static readonly IBrush Link = Brush("#4daafc");
-    public static readonly IBrush Bad = Brush("#f14c4c");
-    public static readonly IBrush CodeBg = Brush("#181818");
-    public static readonly IBrush InlineCode = Brush("#d7ba7d");
     public static readonly FontFamily Mono = new("monospace");
 
-    private static ImmutableSolidColorBrush Brush(string hex) => new(Color.Parse(hex));
+    /// <summary>A brush of the page's palette as seen from <paramref name="control"/>; grey when it is not in the page yet.</summary>
+    public static IBrush Get(Control control, string key) =>
+        control.TryFindResource(key, control.ActualThemeVariant, out var value) && value is IBrush brush ? brush : Brushes.Gray;
 }
 
 /// <summary>Markdown drawn with native controls: headings, lists, code, tables, quotes; selectable text.</summary>
@@ -39,7 +26,17 @@ public sealed class MarkdownView : StackPanel
 
     static MarkdownView() => BlocksProperty.Changed.AddClassHandler<MarkdownView>((view, _) => view.Build());
 
-    public MarkdownView() => Spacing = 6;
+    public MarkdownView()
+    {
+        Spacing = 6;
+        ActualThemeVariantChanged += (_, _) => Build();
+    }
+
+    protected override void OnAttachedToVisualTree(VisualTreeAttachmentEventArgs e)
+    {
+        base.OnAttachedToVisualTree(e);
+        Build();
+    }
 
     public IReadOnlyList<MarkdownBlock>? Blocks
     {
@@ -50,37 +47,47 @@ public sealed class MarkdownView : StackPanel
     private void Build()
     {
         Children.Clear();
-        foreach (var block in Blocks ?? []) Children.Add(Build(block));
+        if (VisualRoot is null) return;
+        var palette = new Palette(this);
+        foreach (var block in Blocks ?? []) Children.Add(Build(block, palette));
     }
 
-    private static Control Build(MarkdownBlock block) => block.Kind switch
+    /// <summary>The brushes of one build.</summary>
+    internal sealed class Palette(Control c)
     {
-        MarkdownBlockKind.Heading => Text(block.Spans, block.Level <= 2 ? 17 : 15, bold: true, strong: true, margin: new Thickness(0, 8, 0, 0)),
-        MarkdownBlockKind.Bullet or MarkdownBlockKind.Numbered => ListItem(block),
-        MarkdownBlockKind.Code => CodeBlock(block.Code),
-        MarkdownBlockKind.Table => Table(block.Rows),
+        public readonly IBrush Fg = Vs.Get(c, "VsFg"), FgStrong = Vs.Get(c, "VsFgStrong"), Muted = Vs.Get(c, "VsMuted"),
+            Line = Vs.Get(c, "VsLine"), Line2 = Vs.Get(c, "VsLine2"), Raise = Vs.Get(c, "VsRaise"), Raise2 = Vs.Get(c, "VsRaise2"),
+            CodeBg = Vs.Get(c, "VsCodeBg"), InlineCode = Vs.Get(c, "VsInlineCode"), Link = Vs.Get(c, "VsLink");
+    }
+
+    private static Control Build(MarkdownBlock block, Palette p) => block.Kind switch
+    {
+        MarkdownBlockKind.Heading => Text(block.Spans, p, block.Level <= 2 ? 17 : 15, bold: true, strong: true, margin: new Thickness(0, 8, 0, 0)),
+        MarkdownBlockKind.Bullet or MarkdownBlockKind.Numbered => ListItem(block, p),
+        MarkdownBlockKind.Code => CodeBlock(block.Code, p),
+        MarkdownBlockKind.Table => Table(block.Rows, p),
         MarkdownBlockKind.Quote => new Border
         {
-            BorderBrush = Vs.Line2,
+            BorderBrush = p.Line2,
             BorderThickness = new Thickness(3, 0, 0, 0),
             Padding = new Thickness(10, 2, 0, 2),
-            Child = Text(block.Spans, foreground: Vs.Muted),
+            Child = Text(block.Spans, p, foreground: p.Muted),
         },
-        MarkdownBlockKind.Rule => new Border { Height = 1, Background = Vs.Line, Margin = new Thickness(0, 6) },
-        _ => Text(block.Spans),
+        MarkdownBlockKind.Rule => new Border { Height = 1, Background = p.Line, Margin = new Thickness(0, 6) },
+        _ => Text(block.Spans, p),
     };
 
-    private static Control ListItem(MarkdownBlock block)
+    private static Control ListItem(MarkdownBlock block, Palette p)
     {
         var grid = new Grid { ColumnDefinitions = new ColumnDefinitions("Auto,*"), Margin = new Thickness(4 + block.Level * 16, 0, 0, 0) };
         var marker = new TextBlock
         {
             Text = block.Kind == MarkdownBlockKind.Bullet ? "•" : block.Marker,
-            Foreground = Vs.Muted,
+            Foreground = p.Muted,
             FontSize = 14,
             MinWidth = block.Kind == MarkdownBlockKind.Bullet ? 14 : 22,
         };
-        var text = Text(block.Spans);
+        var text = Text(block.Spans, p);
         Grid.SetColumn(text, 1);
         grid.Children.Add(marker);
         grid.Children.Add(text);
@@ -88,7 +95,7 @@ public sealed class MarkdownView : StackPanel
     }
 
     /// <summary>One block of text with its styled runs.</summary>
-    internal static TextBlock Text(IReadOnlyList<MarkdownSpan> spans, double size = 14, bool bold = false, bool strong = false,
+    internal static TextBlock Text(IReadOnlyList<MarkdownSpan> spans, Palette p, double size = 14, bool bold = false, bool strong = false,
         IBrush? foreground = null, Thickness margin = default)
     {
         var block = new TextBlock
@@ -96,7 +103,7 @@ public sealed class MarkdownView : StackPanel
             TextWrapping = TextWrapping.Wrap,
             FontSize = size,
             LineHeight = size * 1.45,
-            Foreground = foreground ?? (strong ? Vs.FgStrong : Vs.Fg),
+            Foreground = foreground ?? (strong ? p.FgStrong : p.Fg),
             FontWeight = bold ? FontWeight.SemiBold : FontWeight.Normal,
             Margin = margin,
         };
@@ -104,26 +111,26 @@ public sealed class MarkdownView : StackPanel
         foreach (var span in spans)
         {
             var run = new Run(span.Text);
-            if (span.Bold) { run.FontWeight = FontWeight.SemiBold; run.Foreground = Vs.FgStrong; }
+            if (span.Bold) { run.FontWeight = FontWeight.SemiBold; run.Foreground = p.FgStrong; }
             if (span.Italic) run.FontStyle = FontStyle.Italic;
             if (span.Code)
             {
                 run.FontFamily = Vs.Mono;
                 run.FontSize = size - 2;
-                run.Foreground = Vs.InlineCode;
-                run.Background = Vs.Raise2;
+                run.Foreground = p.InlineCode;
+                run.Background = p.Raise2;
             }
-            if (span.Link) run.Foreground = Vs.Link;
+            if (span.Link) run.Foreground = p.Link;
             inlines.Add(run);
         }
         block.Inlines = inlines;
         return block;
     }
 
-    internal static Control CodeBlock(string code) => new Border
+    internal static Control CodeBlock(string code, Palette p) => new Border
     {
-        Background = Vs.CodeBg,
-        BorderBrush = Vs.Line,
+        Background = p.CodeBg,
+        BorderBrush = p.Line,
         BorderThickness = new Thickness(1),
         CornerRadius = new CornerRadius(4),
         Child = new ScrollViewer
@@ -136,13 +143,13 @@ public sealed class MarkdownView : StackPanel
                 FontFamily = Vs.Mono,
                 FontSize = 12,
                 LineHeight = 18,
-                Foreground = Vs.Fg,
+                Foreground = p.Fg,
                 Margin = new Thickness(10, 8),
             },
         },
     };
 
-    private static Control Table(IReadOnlyList<IReadOnlyList<IReadOnlyList<MarkdownSpan>>> rows)
+    private static Control Table(IReadOnlyList<IReadOnlyList<IReadOnlyList<MarkdownSpan>>> rows, Palette p)
     {
         var columns = rows.Max(r => r.Count);
         var grid = new Grid();
@@ -155,11 +162,11 @@ public sealed class MarkdownView : StackPanel
                 var spans = c < rows[r].Count ? rows[r][c] : [];
                 var cell = new Border
                 {
-                    BorderBrush = Vs.Line2,
+                    BorderBrush = p.Line2,
                     BorderThickness = new Thickness(c == 0 ? 1 : 0, r == 0 ? 1 : 0, 1, 1),
-                    Background = r == 0 ? Vs.Raise : null,
+                    Background = r == 0 ? p.Raise : null,
                     Padding = new Thickness(8, 5),
-                    Child = Text(spans, 13, bold: r == 0, strong: r == 0),
+                    Child = Text(spans, p, 13, bold: r == 0, strong: r == 0),
                 };
                 ((TextBlock)cell.Child).MaxWidth = 260;
                 Grid.SetRow(cell, r);
@@ -183,6 +190,8 @@ public sealed class ContextRing : Control
 
     static ContextRing() => AffectsRender<ContextRing>(FractionProperty);
 
+    public ContextRing() => ActualThemeVariantChanged += (_, _) => InvalidateVisual();
+
     public double Fraction
     {
         get => GetValue(FractionProperty);
@@ -194,10 +203,10 @@ public sealed class ContextRing : Control
         var size = Math.Min(Bounds.Width, Bounds.Height);
         var center = new Point(Bounds.Width / 2, Bounds.Height / 2);
         var radius = size / 2 - 2;
-        context.DrawEllipse(null, new Pen(Vs.Line2, 2.5), center, radius, radius);
+        context.DrawEllipse(null, new Pen(Vs.Get(this, "VsLine2"), 2.5), center, radius, radius);
         var f = Math.Clamp(Fraction, 0, 1);
         if (f <= 0) return;
-        var pen = new Pen(f > 0.85 ? Vs.Bad : Vs.Accent, 2.5, lineCap: PenLineCap.Round);
+        var pen = new Pen(Vs.Get(this, f > 0.85 ? "VsBad" : "VsAccent"), 2.5, lineCap: PenLineCap.Round);
         if (f >= 0.999)
         {
             context.DrawEllipse(null, pen, center, radius, radius);

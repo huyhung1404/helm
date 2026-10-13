@@ -46,7 +46,7 @@
     <Grid>
         <DockPanel>
             <!-- App bar: drawer button + page title (the Windows title bar + nav pane toggle) -->
-            <Grid DockPanel.Dock="Top" ColumnDefinitions="Auto,*,Auto" Height="56" Background="{DynamicResource HelmBarBackground}">
+            <Grid x:Name="AppBar" DockPanel.Dock="Top" ColumnDefinitions="Auto,*,Auto" Height="56" Background="{DynamicResource HelmBarBackground}">
                 <Button Classes="flat" Width="48" Height="48" Margin="4,0,0,0" Padding="0" HorizontalContentAlignment="Center"
                         Command="{Binding TogglePaneCommand}" ToolTip.Tip="Navigation" AutomationProperties.Name="Open navigation">
                     <ic:SymbolIcon Symbol="Navigation" FontSize="22" />

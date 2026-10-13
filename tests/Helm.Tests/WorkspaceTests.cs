@@ -593,11 +593,11 @@ internal sealed class FakeBridge(string pipe) : IAsyncDisposable
 
     public string? FailNext { get; set; }
 
-    public async Task ConnectAsync(string name, string[] folders, string sendKey = "enter")
+    public async Task ConnectAsync(string name, string[] folders, string sendKey = "enter", bool focused = true)
     {
         await _stream.ConnectAsync(5000);
         _writer = new StreamWriter(_stream, new UTF8Encoding(false)) { AutoFlush = true, NewLine = "\n" };
-        await _writer.WriteLineAsync(JsonSerializer.Serialize(new { type = "hello", protocol = 1, pid = 1, name, folders, sendKey, claudeTabs = 0, focused = false }));
+        await _writer.WriteLineAsync(JsonSerializer.Serialize(new { type = "hello", protocol = 1, pid = 1, name, folders, sendKey, claudeTabs = 0, focused }));
         _loop = Task.Run(async () =>
         {
             using var reader = new StreamReader(_stream, new UTF8Encoding(false));
@@ -714,12 +714,29 @@ public class PromptSenderTests
         Assert.Contains("was not found", ex.Message);
     }
 
-    private static async Task<(BridgeHost Host, FakeBridge Bridge, BridgeConnection Window)> ConnectAsync(string sendKey = "enter")
+    [Fact]
+    public async Task Nothing_is_pressed_in_a_window_whose_bridge_does_not_say_it_has_the_keyboard()
+    {
+        // Another VS Code window with the same title is in front: Windows says yes, the bridge of "alpha" says no.
+        var (host, bridge, window) = await ConnectAsync(focused: false);
+        await using var _ = host;
+        await using var __ = bridge;
+        var keys = new FakeKeyboard(target: 42, title: "alpha - Visual Studio Code", previous: 7);
+        var sender = new PromptSender(keys, NullLogger<PromptSender>.Instance);
+
+        var typing = await Assert.ThrowsAsync<PromptSendException>(() => sender.SendAsync(window, "s1", "Hello", null, CancellationToken.None));
+        Assert.Contains("did not confirm", typing.Message);
+        var mode = await Assert.ThrowsAsync<PromptSendException>(() => sender.CycleModeAsync(window, "s1", 2, CancellationToken.None));
+        Assert.Contains("did not confirm", mode.Message);
+        Assert.Empty(keys.Log);
+    }
+
+    private static async Task<(BridgeHost Host, FakeBridge Bridge, BridgeConnection Window)> ConnectAsync(string sendKey = "enter", bool focused = true)
     {
         var pipe = "Helm.Workspace.Test." + Guid.NewGuid().ToString("N");
         var host = new BridgeHost(pipe, NullLogger.Instance);
         var bridge = new FakeBridge(pipe);
-        await bridge.ConnectAsync("alpha", [@"c:\work\alpha"], sendKey);
+        await bridge.ConnectAsync("alpha", [@"c:\work\alpha"], sendKey, focused);
         var window = await WorkspaceBridgeTests.WaitAsync(() => host.Windows.SingleOrDefault());
         return (host, bridge, window);
     }

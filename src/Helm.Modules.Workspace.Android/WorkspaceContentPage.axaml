@@ -5,24 +5,101 @@
              x:Class="Helm.Modules.Workspace.WorkspaceContentPage"
              x:DataType="vm:WorkspaceRemoteViewModel">
 
-    <!-- The control screen, laid out like Claude's panel in VS Code (always its dark theme): the PC, a tab per VS Code
+    <!-- The control screen, laid out like Claude's panel in VS Code (its Light or Dark Modern theme, as Helm's): the PC, a tab per VS Code
          window, a subtab per Claude session open in it, the session's live timeline, and the composer with its chips.
          Sheets slide up from the bottom for the PC, model and effort, mode, subagents, context and history. -->
+    <UserControl.Resources>
+        <ResourceDictionary>
+            <ResourceDictionary.ThemeDictionaries>
+                <ResourceDictionary x:Key="Light">
+                    <SolidColorBrush x:Key="VsBg" Color="#ffffff" />
+                    <SolidColorBrush x:Key="VsBar" Color="#f8f8f8" />
+                    <SolidColorBrush x:Key="VsRaise" Color="#f3f3f3" />
+                    <SolidColorBrush x:Key="VsRaise2" Color="#e8e8e8" />
+                    <SolidColorBrush x:Key="VsSelected" Color="#e4e6f1" />
+                    <SolidColorBrush x:Key="VsLine" Color="#e5e5e5" />
+                    <SolidColorBrush x:Key="VsLine2" Color="#cecece" />
+                    <SolidColorBrush x:Key="VsFg" Color="#3b3b3b" />
+                    <SolidColorBrush x:Key="VsFgStrong" Color="#1f1f1f" />
+                    <SolidColorBrush x:Key="VsMuted" Color="#6e6e6e" />
+                    <SolidColorBrush x:Key="VsFaint" Color="#9a9a9a" />
+                    <SolidColorBrush x:Key="VsAccent" Color="#d97757" />
+                    <SolidColorBrush x:Key="VsLink" Color="#005fb8" />
+                    <SolidColorBrush x:Key="VsBad" Color="#e51400" />
+                    <SolidColorBrush x:Key="VsOk" Color="#388a34" />
+                    <SolidColorBrush x:Key="VsCodeBg" Color="#f8f8f8" />
+                    <SolidColorBrush x:Key="VsCodeOut" Color="#f3f3f3" />
+                    <SolidColorBrush x:Key="VsAnswerDot" Color="#8b8b8b" />
+                    <SolidColorBrush x:Key="VsOptHover" Color="#e8f3fc" />
+                    <SolidColorBrush x:Key="VsButton" Color="#005fb8" />
+                    <SolidColorBrush x:Key="VsKnob" Color="#ffffff" />
+                    <SolidColorBrush x:Key="VsSwitchOff" Color="#c4c4c4" />
+                    <SolidColorBrush x:Key="VsSendDisabled" Color="#efc7b8" />
+                    <SolidColorBrush x:Key="VsInlineCode" Color="#9a6700" />
+                    <SolidColorBrush x:Key="VsScrim" Color="#66000000" />
+                    <SolidColorBrush x:Key="VsOffBar" Color="#fde7e9" />
+                    <SolidColorBrush x:Key="VsFlash" Color="#40e51400" />
+                    <Color x:Key="VsBarColor">#f8f8f8</Color>
+                    <Color x:Key="VsBarClear">#00f8f8f8</Color>
+                    <Color x:Key="VsBgColor">#ffffff</Color>
+                    <Color x:Key="VsBgClear">#00ffffff</Color>
+                    <Color x:Key="VsRaiseColor">#f3f3f3</Color>
+                    <Color x:Key="VsRaiseClear">#00f3f3f3</Color>
+                </ResourceDictionary>
+                <ResourceDictionary x:Key="Dark">
+                    <SolidColorBrush x:Key="VsBg" Color="#1f1f1f" />
+                    <SolidColorBrush x:Key="VsBar" Color="#181818" />
+                    <SolidColorBrush x:Key="VsRaise" Color="#252526" />
+                    <SolidColorBrush x:Key="VsRaise2" Color="#2d2d2d" />
+                    <SolidColorBrush x:Key="VsSelected" Color="#37373d" />
+                    <SolidColorBrush x:Key="VsLine" Color="#333333" />
+                    <SolidColorBrush x:Key="VsLine2" Color="#454545" />
+                    <SolidColorBrush x:Key="VsFg" Color="#cccccc" />
+                    <SolidColorBrush x:Key="VsFgStrong" Color="#e7e7e7" />
+                    <SolidColorBrush x:Key="VsMuted" Color="#8b8b8b" />
+                    <SolidColorBrush x:Key="VsFaint" Color="#6a6a6a" />
+                    <SolidColorBrush x:Key="VsAccent" Color="#d97757" />
+                    <SolidColorBrush x:Key="VsLink" Color="#4daafc" />
+                    <SolidColorBrush x:Key="VsBad" Color="#f14c4c" />
+                    <SolidColorBrush x:Key="VsOk" Color="#89d185" />
+                    <SolidColorBrush x:Key="VsCodeBg" Color="#181818" />
+                    <SolidColorBrush x:Key="VsCodeOut" Color="#1c1c1c" />
+                    <SolidColorBrush x:Key="VsAnswerDot" Color="#c5c5c5" />
+                    <SolidColorBrush x:Key="VsOptHover" Color="#04395e" />
+                    <SolidColorBrush x:Key="VsButton" Color="#0e639c" />
+                    <SolidColorBrush x:Key="VsKnob" Color="#d4d4d4" />
+                    <SolidColorBrush x:Key="VsSwitchOff" Color="#4a4a4a" />
+                    <SolidColorBrush x:Key="VsSendDisabled" Color="#5a3a30" />
+                    <SolidColorBrush x:Key="VsInlineCode" Color="#d7ba7d" />
+                    <SolidColorBrush x:Key="VsScrim" Color="#99000000" />
+                    <SolidColorBrush x:Key="VsOffBar" Color="#5a1d1d" />
+                    <SolidColorBrush x:Key="VsFlash" Color="#55f14c4c" />
+                    <Color x:Key="VsBarColor">#181818</Color>
+                    <Color x:Key="VsBarClear">#00181818</Color>
+                    <Color x:Key="VsBgColor">#1f1f1f</Color>
+                    <Color x:Key="VsBgClear">#001f1f1f</Color>
+                    <Color x:Key="VsRaiseColor">#252526</Color>
+                    <Color x:Key="VsRaiseClear">#00252526</Color>
+                </ResourceDictionary>
+            </ResourceDictionary.ThemeDictionaries>
+        </ResourceDictionary>
+    </UserControl.Resources>
+
     <UserControl.Styles>
         <Style Selector="TextBlock">
-            <Setter Property="Foreground" Value="#cccccc" />
+            <Setter Property="Foreground" Value="{DynamicResource VsFg}" />
         </Style>
         <Style Selector="TextBlock.muted">
-            <Setter Property="Foreground" Value="#8b8b8b" />
+            <Setter Property="Foreground" Value="{DynamicResource VsMuted}" />
         </Style>
         <Style Selector="TextBlock.faint">
-            <Setter Property="Foreground" Value="#6a6a6a" />
+            <Setter Property="Foreground" Value="{DynamicResource VsFaint}" />
         </Style>
         <Style Selector="TextBlock.failed">
-            <Setter Property="Foreground" Value="#f14c4c" />
+            <Setter Property="Foreground" Value="{DynamicResource VsBad}" />
         </Style>
         <Style Selector="TextBlock.strong">
-            <Setter Property="Foreground" Value="#e7e7e7" />
+            <Setter Property="Foreground" Value="{DynamicResource VsFgStrong}" />
         </Style>
         <Style Selector="TextBlock.mono">
             <Setter Property="FontFamily" Value="monospace" />
@@ -33,17 +110,17 @@
             <Setter Property="BorderThickness" Value="0" />
             <Setter Property="Padding" Value="0" />
             <Setter Property="CornerRadius" Value="4" />
-            <Setter Property="Foreground" Value="#cccccc" />
+            <Setter Property="Foreground" Value="{DynamicResource VsFg}" />
             <Setter Property="HorizontalContentAlignment" Value="Stretch" />
         </Style>
         <Style Selector="Button.flat:pointerover /template/ ContentPresenter#PART_ContentPresenter">
-            <Setter Property="Background" Value="#2d2d2d" />
+            <Setter Property="Background" Value="{DynamicResource VsRaise2}" />
         </Style>
         <Style Selector="Button.flat:pressed /template/ ContentPresenter#PART_ContentPresenter">
-            <Setter Property="Background" Value="#37373d" />
+            <Setter Property="Background" Value="{DynamicResource VsSelected}" />
         </Style>
         <Style Selector="Path.icon">
-            <Setter Property="Stroke" Value="#cccccc" />
+            <Setter Property="Stroke" Value="{DynamicResource VsFg}" />
             <Setter Property="StrokeThickness" Value="1.3" />
             <Setter Property="Width" Value="16" />
             <Setter Property="Height" Value="16" />
@@ -51,7 +128,7 @@
             <Setter Property="StrokeJoin" Value="Round" />
         </Style>
         <Style Selector="TextBlock.spin">
-            <Setter Property="Foreground" Value="#d97757" />
+            <Setter Property="Foreground" Value="{DynamicResource VsAccent}" />
             <Setter Property="RenderTransformOrigin" Value="50%,50%" />
             <Setter Property="RenderTransform">
                 <RotateTransform />
@@ -84,17 +161,17 @@
         <Style Selector="Button.tab">
             <Setter Property="Background" Value="Transparent" />
             <Setter Property="BorderThickness" Value="0,0,1,0" />
-            <Setter Property="BorderBrush" Value="#333333" />
+            <Setter Property="BorderBrush" Value="{DynamicResource VsLine}" />
             <Setter Property="CornerRadius" Value="0" />
             <Setter Property="Padding" Value="12,0" />
             <Setter Property="Height" Value="38" />
-            <Setter Property="Foreground" Value="#8b8b8b" />
+            <Setter Property="Foreground" Value="{DynamicResource VsMuted}" />
         </Style>
         <Style Selector="Button.tab.on">
-            <Setter Property="Background" Value="#1f1f1f" />
+            <Setter Property="Background" Value="{DynamicResource VsBg}" />
         </Style>
         <Style Selector="Button.tab.on TextBlock.name">
-            <Setter Property="Foreground" Value="#e7e7e7" />
+            <Setter Property="Foreground" Value="{DynamicResource VsFgStrong}" />
         </Style>
         <Style Selector="Button.stab">
             <Setter Property="Background" Value="Transparent" />
@@ -106,20 +183,20 @@
             <Setter Property="MaxWidth" Value="190" />
         </Style>
         <Style Selector="Button.stab.on">
-            <Setter Property="BorderBrush" Value="#d97757" />
+            <Setter Property="BorderBrush" Value="{DynamicResource VsAccent}" />
         </Style>
         <Style Selector="Button.stab TextBlock.name">
-            <Setter Property="Foreground" Value="#8b8b8b" />
+            <Setter Property="Foreground" Value="{DynamicResource VsMuted}" />
             <Setter Property="FontSize" Value="12.5" />
         </Style>
         <Style Selector="Button.stab.on TextBlock.name">
-            <Setter Property="Foreground" Value="#e7e7e7" />
+            <Setter Property="Foreground" Value="{DynamicResource VsFgStrong}" />
         </Style>
         <Style Selector="Button.tab.flash, Button.stab.flash">
-            <Setter Property="Background" Value="#55f14c4c" />
+            <Setter Property="Background" Value="{DynamicResource VsFlash}" />
         </Style>
         <Style Selector="Border.badge">
-            <Setter Property="Background" Value="#f14c4c" />
+            <Setter Property="Background" Value="{DynamicResource VsBad}" />
             <Setter Property="CornerRadius" Value="8" />
             <Setter Property="MinWidth" Value="16" />
             <Setter Property="Height" Value="16" />
@@ -152,7 +229,7 @@
             <Setter Property="VerticalAlignment" Value="Center" />
         </Style>
         <Style Selector="Button.edge.hot Border.pill">
-            <Setter Property="Background" Value="#f14c4c" />
+            <Setter Property="Background" Value="{DynamicResource VsBad}" />
         </Style>
         <Style Selector="Button.edge.hot Path.icon">
             <Setter Property="Stroke" Value="White" />
@@ -160,43 +237,43 @@
 
         <!-- Timeline -->
         <Style Selector="Border.io">
-            <Setter Property="BorderBrush" Value="#333333" />
+            <Setter Property="BorderBrush" Value="{DynamicResource VsLine}" />
             <Setter Property="BorderThickness" Value="1" />
             <Setter Property="CornerRadius" Value="5" />
-            <Setter Property="Background" Value="#181818" />
+            <Setter Property="Background" Value="{DynamicResource VsBar}" />
             <Setter Property="ClipToBounds" Value="True" />
             <Setter Property="Margin" Value="0,6,0,0" />
         </Style>
         <Style Selector="TextBlock.lbl">
             <Setter Property="FontFamily" Value="monospace" />
             <Setter Property="FontSize" Value="10" />
-            <Setter Property="Foreground" Value="#6a6a6a" />
+            <Setter Property="Foreground" Value="{DynamicResource VsFaint}" />
             <Setter Property="Margin" Value="8,9,0,0" />
         </Style>
         <Style Selector="Border.card">
-            <Setter Property="BorderBrush" Value="#454545" />
+            <Setter Property="BorderBrush" Value="{DynamicResource VsLine2}" />
             <Setter Property="BorderThickness" Value="1" />
             <Setter Property="CornerRadius" Value="6" />
-            <Setter Property="Background" Value="#252526" />
+            <Setter Property="Background" Value="{DynamicResource VsRaise}" />
             <Setter Property="ClipToBounds" Value="True" />
             <Setter Property="Margin" Value="0,12,0,4" />
         </Style>
         <Style Selector="Button.opt">
             <Setter Property="Background" Value="Transparent" />
             <Setter Property="BorderThickness" Value="0,1,0,0" />
-            <Setter Property="BorderBrush" Value="#333333" />
+            <Setter Property="BorderBrush" Value="{DynamicResource VsLine}" />
             <Setter Property="CornerRadius" Value="0" />
             <Setter Property="Padding" Value="12,10" />
             <Setter Property="HorizontalAlignment" Value="Stretch" />
             <Setter Property="HorizontalContentAlignment" Value="Stretch" />
         </Style>
         <Style Selector="Button.opt:pointerover /template/ ContentPresenter#PART_ContentPresenter">
-            <Setter Property="Background" Value="#04395e" />
+            <Setter Property="Background" Value="{DynamicResource VsOptHover}" />
         </Style>
         <Style Selector="Border.num">
             <Setter Property="Width" Value="18" />
             <Setter Property="Height" Value="18" />
-            <Setter Property="BorderBrush" Value="#454545" />
+            <Setter Property="BorderBrush" Value="{DynamicResource VsLine2}" />
             <Setter Property="BorderThickness" Value="1" />
             <Setter Property="CornerRadius" Value="3" />
             <Setter Property="Margin" Value="0,1,10,0" />
@@ -204,7 +281,7 @@
         </Style>
         <Style Selector="Border.num > TextBlock">
             <Setter Property="FontSize" Value="11" />
-            <Setter Property="Foreground" Value="#8b8b8b" />
+            <Setter Property="Foreground" Value="{DynamicResource VsMuted}" />
             <Setter Property="HorizontalAlignment" Value="Center" />
             <Setter Property="VerticalAlignment" Value="Center" />
         </Style>
@@ -213,12 +290,12 @@
             <Setter Property="HorizontalContentAlignment" Value="Stretch" />
             <Setter Property="Background" Value="Transparent" />
             <Setter Property="BorderThickness" Value="0,1,0,0" />
-            <Setter Property="BorderBrush" Value="#333333" />
+            <Setter Property="BorderBrush" Value="{DynamicResource VsLine}" />
             <Setter Property="CornerRadius" Value="0" />
             <Setter Property="Padding" Value="12,10" />
         </Style>
         <Style Selector="ToggleButton.choice:checked /template/ ContentPresenter#PART_ContentPresenter">
-            <Setter Property="Background" Value="#04395e" />
+            <Setter Property="Background" Value="{DynamicResource VsOptHover}" />
         </Style>
 
         <!-- Composer -->
@@ -232,31 +309,31 @@
         </Style>
         <Style Selector="Button.chip TextBlock">
             <Setter Property="FontSize" Value="12" />
-            <Setter Property="Foreground" Value="#8b8b8b" />
+            <Setter Property="Foreground" Value="{DynamicResource VsMuted}" />
             <Setter Property="VerticalAlignment" Value="Center" />
         </Style>
         <Style Selector="Button.chip.model">
-            <Setter Property="Background" Value="#2d2d2d" />
+            <Setter Property="Background" Value="{DynamicResource VsRaise2}" />
         </Style>
         <Style Selector="Button.chip.model TextBlock.name">
-            <Setter Property="Foreground" Value="#cccccc" />
+            <Setter Property="Foreground" Value="{DynamicResource VsFg}" />
         </Style>
         <Style Selector="Button.send">
             <Setter Property="Width" Value="32" />
             <Setter Property="Height" Value="32" />
             <Setter Property="CornerRadius" Value="5" />
             <Setter Property="Padding" Value="0" />
-            <Setter Property="Background" Value="#d97757" />
+            <Setter Property="Background" Value="{DynamicResource VsAccent}" />
             <Setter Property="HorizontalContentAlignment" Value="Center" />
             <Setter Property="VerticalContentAlignment" Value="Center" />
         </Style>
         <Style Selector="Button.send:disabled /template/ ContentPresenter#PART_ContentPresenter">
-            <Setter Property="Background" Value="#5a3a30" />
+            <Setter Property="Background" Value="{DynamicResource VsSendDisabled}" />
         </Style>
         <Style Selector="TextBox.prompt">
             <Setter Property="Background" Value="Transparent" />
             <Setter Property="BorderThickness" Value="0" />
-            <Setter Property="Foreground" Value="#e7e7e7" />
+            <Setter Property="Foreground" Value="{DynamicResource VsFgStrong}" />
             <Setter Property="FontSize" Value="15" />
             <Setter Property="Padding" Value="10,8" />
             <Setter Property="MinHeight" Value="40" />
@@ -279,7 +356,7 @@
             <Setter Property="HorizontalContentAlignment" Value="Stretch" />
         </Style>
         <Style Selector="Button.pick.on">
-            <Setter Property="Background" Value="#37373d" />
+            <Setter Property="Background" Value="{DynamicResource VsSelected}" />
         </Style>
         <Style Selector="Button.dot">
             <Setter Property="Width" Value="24" />
@@ -293,12 +370,12 @@
         <Style Selector="Button.dot Ellipse">
             <Setter Property="Width" Value="5" />
             <Setter Property="Height" Value="5" />
-            <Setter Property="Fill" Value="#6a6a6a" />
+            <Setter Property="Fill" Value="{DynamicResource VsFaint}" />
         </Style>
         <Style Selector="Button.dot.on Ellipse">
             <Setter Property="Width" Value="13" />
             <Setter Property="Height" Value="13" />
-            <Setter Property="Fill" Value="#d4d4d4" />
+            <Setter Property="Fill" Value="{DynamicResource VsKnob}" />
         </Style>
         <Style Selector="Button.dot:disabled">
             <Setter Property="Opacity" Value="0.3" />
@@ -307,20 +384,38 @@
             <Setter Property="Width" Value="36" />
             <Setter Property="Height" Value="20" />
             <Setter Property="CornerRadius" Value="10" />
-            <Setter Property="Background" Value="#4a4a4a" />
+            <Setter Property="Background" Value="{DynamicResource VsSwitchOff}" />
         </Style>
         <Style Selector="Border.switch.on">
-            <Setter Property="Background" Value="#d97757" />
+            <Setter Property="Background" Value="{DynamicResource VsAccent}" />
         </Style>
         <Style Selector="Border.switch > Ellipse">
             <Setter Property="Width" Value="16" />
             <Setter Property="Height" Value="16" />
-            <Setter Property="Fill" Value="#d4d4d4" />
+            <Setter Property="Fill" Value="{DynamicResource VsKnob}" />
             <Setter Property="HorizontalAlignment" Value="Left" />
             <Setter Property="Margin" Value="2,0" />
         </Style>
         <Style Selector="Border.switch.on > Ellipse">
             <Setter Property="HorizontalAlignment" Value="Right" />
+        </Style>
+        <Style Selector="Button.decide">
+            <Setter Property="HorizontalAlignment" Value="Stretch" />
+            <Setter Property="HorizontalContentAlignment" Value="Center" />
+            <Setter Property="Height" Value="38" />
+            <Setter Property="Padding" Value="6,0" />
+            <Setter Property="CornerRadius" Value="5" />
+            <Setter Property="Background" Value="{DynamicResource VsButton}" />
+            <Setter Property="BorderThickness" Value="0" />
+        </Style>
+        <Style Selector="Button.decide TextBlock">
+            <Setter Property="Foreground" Value="White" />
+            <Setter Property="FontSize" Value="13" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="VerticalAlignment" Value="Center" />
+        </Style>
+        <Style Selector="Button.decide Path.icon">
+            <Setter Property="Stroke" Value="White" />
         </Style>
         <Style Selector="Button.seg">
             <Setter Property="Background" Value="Transparent" />
@@ -329,45 +424,42 @@
             <Setter Property="CornerRadius" Value="4" />
         </Style>
         <Style Selector="Button.seg.on">
-            <Setter Property="Background" Value="#2d2d2d" />
+            <Setter Property="Background" Value="{DynamicResource VsRaise2}" />
         </Style>
         <Style Selector="Button.seg TextBlock">
             <Setter Property="FontSize" Value="12" />
-            <Setter Property="Foreground" Value="#8b8b8b" />
+            <Setter Property="Foreground" Value="{DynamicResource VsMuted}" />
         </Style>
         <Style Selector="Button.seg.on TextBlock">
-            <Setter Property="Foreground" Value="#e7e7e7" />
+            <Setter Property="Foreground" Value="{DynamicResource VsFgStrong}" />
         </Style>
     </UserControl.Styles>
 
-    <ThemeVariantScope RequestedThemeVariant="Dark">
-    <Grid x:Name="Root" Background="#1f1f1f" RowDefinitions="Auto,Auto,Auto,Auto,*,Auto">
+    <Grid x:Name="Root" Background="{DynamicResource VsBg}" RowDefinitions="Auto,Auto,Auto,Auto,*,Auto">
 
         <!-- The PC, History, New session -->
-        <Border Grid.Row="0" Background="#181818" BorderBrush="#333333" BorderThickness="0,0,0,1" Padding="10,6">
+        <Border Grid.Row="0" Background="{DynamicResource VsBar}" BorderBrush="{DynamicResource VsLine}" BorderThickness="0,0,0,1" Padding="4,4,10,4">
             <DockPanel>
                 <Button DockPanel.Dock="Right" Classes="flat" Width="40" Height="36" Command="{Binding NewSessionCommand}"
                         AutomationProperties.Name="New session" HorizontalContentAlignment="Center">
                     <Path Classes="icon" Width="18" Height="18" Data="M3 2.5h7l3 3v8H3z M8 6v5M5.5 8.5h5" />
                 </Button>
+                <Button DockPanel.Dock="Right" Classes="flat" Width="40" Height="36" Command="{Binding OpenSheetCommand}" CommandParameter="TextSize"
+                        AutomationProperties.Name="Text size" HorizontalContentAlignment="Center">
+                    <TextBlock Text="Aa" FontSize="15" FontWeight="SemiBold" Foreground="{DynamicResource VsFg}" VerticalAlignment="Center" />
+                </Button>
                 <Button DockPanel.Dock="Right" Classes="flat" Width="40" Height="36" Command="{Binding OpenSheetCommand}" CommandParameter="History"
                         AutomationProperties.Name="History of this project" HorizontalContentAlignment="Center">
                     <Path Classes="icon" Width="18" Height="18" Data="M14.2 8A6.2 6.2 0 1 1 1.8 8A6.2 6.2 0 1 1 14.2 8Z M8 4.5V8l2.5 1.6" />
                 </Button>
-                <StackPanel Orientation="Horizontal" Spacing="10">
-                    <Path Width="22" Height="22" Stretch="Uniform" StrokeThickness="2.2" StrokeLineCap="Round"
-                          Data="M16 4H42A12 12 0 0 1 54 16V84A12 12 0 0 1 42 96H16A12 12 0 0 1 4 84V16A12 12 0 0 1 16 4Z M68.7 35.3A20 20 0 0 1 68.7 64.7M80.9 23.1A38 38 0 0 1 80.9 76.9">
-                        <Path.Stroke>
-                            <LinearGradientBrush StartPoint="0%,100%" EndPoint="100%,0%">
-                                <GradientStop Offset="0" Color="#F97316" />
-                                <GradientStop Offset="1" Color="#DB2777" />
-                            </LinearGradientBrush>
-                        </Path.Stroke>
-                    </Path>
+                <StackPanel Orientation="Horizontal" Spacing="4">
+                    <Button Classes="flat" Width="40" Height="36" Click="Menu_Click" HorizontalContentAlignment="Center" AutomationProperties.Name="Open navigation">
+                        <Path Classes="icon" Width="18" Height="18" Data="M2 4h12M2 8h12M2 12h12" />
+                    </Button>
                     <Button Classes="flat" Padding="8,4" Command="{Binding OpenSheetCommand}" CommandParameter="Pc" AutomationProperties.Name="Choose the PC">
                         <StackPanel Orientation="Horizontal" Spacing="7">
-                            <Ellipse Width="8" Height="8" Fill="#89d185" IsVisible="{Binding HostOnline}" VerticalAlignment="Center" />
-                            <Ellipse Width="8" Height="8" Fill="#6a6a6a" IsVisible="{Binding !HostOnline}" VerticalAlignment="Center" />
+                            <Ellipse Width="8" Height="8" Fill="{DynamicResource VsOk}" IsVisible="{Binding HostOnline}" VerticalAlignment="Center" />
+                            <Ellipse Width="8" Height="8" Fill="{DynamicResource VsFaint}" IsVisible="{Binding !HostOnline}" VerticalAlignment="Center" />
                             <TextBlock Text="{Binding HostName}" Classes="strong" FontWeight="SemiBold" VerticalAlignment="Center" />
                             <Path Classes="icon" Width="12" Height="12" Stretch="Uniform" Data="M3 6l5 5 5-5" />
                         </StackPanel>
@@ -377,7 +469,7 @@
         </Border>
 
         <!-- One tab per VS Code window; scroll sideways; the edges tell what is hidden -->
-        <Panel Grid.Row="1" Background="#181818" IsVisible="{Binding HasProjects}">
+        <Panel Grid.Row="1" Background="{DynamicResource VsBar}" IsVisible="{Binding HasProjects}">
             <ScrollViewer x:Name="ProjectScroller" HorizontalScrollBarVisibility="Hidden" VerticalScrollBarVisibility="Disabled">
                 <ItemsControl x:Name="ProjectStrip" ItemsSource="{Binding Projects}">
                     <ItemsControl.ItemsPanel>
@@ -391,7 +483,7 @@
                                     Command="{Binding $parent[UserControl].((vm:WorkspaceRemoteViewModel)DataContext).SelectProjectCommand}" CommandParameter="{Binding}">
                                 <StackPanel Orientation="Horizontal" Spacing="7">
                                     <TextBlock Text="✻" Classes="spin" FontSize="13" IsVisible="{Binding IsWorking}" VerticalAlignment="Center" />
-                                    <TextBlock Text="✻" Foreground="#d97757" FontSize="13" IsVisible="{Binding !IsWorking}" VerticalAlignment="Center" />
+                                    <TextBlock Text="✻" Foreground="{DynamicResource VsAccent}" FontSize="13" IsVisible="{Binding !IsWorking}" VerticalAlignment="Center" />
                                     <TextBlock Text="{Binding Name}" Classes="name" FontSize="13.5" VerticalAlignment="Center" />
                                     <Border Classes="badge" IsVisible="{Binding HasAttention}" VerticalAlignment="Center">
                                         <TextBlock Text="{Binding Attention}" />
@@ -405,8 +497,8 @@
             <Button x:Name="ProjectLeft" Classes="edge" HorizontalAlignment="Left">
                 <Button.Background>
                     <LinearGradientBrush StartPoint="0%,0%" EndPoint="100%,0%">
-                        <GradientStop Offset="0.45" Color="#181818" />
-                        <GradientStop Offset="1" Color="#00181818" />
+                        <GradientStop Offset="0.45" Color="{DynamicResource VsBarColor}" />
+                        <GradientStop Offset="1" Color="{DynamicResource VsBarClear}" />
                     </LinearGradientBrush>
                 </Button.Background>
                 <Border Classes="pill">
@@ -419,8 +511,8 @@
             <Button x:Name="ProjectRight" Classes="edge" HorizontalAlignment="Right">
                 <Button.Background>
                     <LinearGradientBrush StartPoint="100%,0%" EndPoint="0%,0%">
-                        <GradientStop Offset="0.45" Color="#181818" />
-                        <GradientStop Offset="1" Color="#00181818" />
+                        <GradientStop Offset="0.45" Color="{DynamicResource VsBarColor}" />
+                        <GradientStop Offset="1" Color="{DynamicResource VsBarClear}" />
                     </LinearGradientBrush>
                 </Button.Background>
                 <Border Classes="pill">
@@ -433,7 +525,7 @@
         </Panel>
 
         <!-- One subtab per Claude session open in that window -->
-        <Border Grid.Row="2" BorderBrush="#333333" BorderThickness="0,0,0,1" IsVisible="{Binding HasProjects}">
+        <Border Grid.Row="2" BorderBrush="{DynamicResource VsLine}" BorderThickness="0,0,0,1" IsVisible="{Binding HasProjects}">
             <Panel>
                 <ScrollViewer x:Name="SessionScroller" HorizontalScrollBarVisibility="Hidden" VerticalScrollBarVisibility="Disabled">
                     <StackPanel Orientation="Horizontal">
@@ -450,13 +542,13 @@
                                             ToolTip.Tip="{Binding Title}">
                                         <StackPanel Orientation="Horizontal" Spacing="6">
                                             <TextBlock Text="✻" Classes="spin" FontSize="12" IsVisible="{Binding IsWorking}" VerticalAlignment="Center" />
-                                            <Ellipse Width="6" Height="6" Fill="#f14c4c" IsVisible="{Binding NeedsYou}" VerticalAlignment="Center" />
-                                            <Ellipse Width="6" Height="6" Fill="#4daafc" IsVisible="{Binding Unseen}" VerticalAlignment="Center" />
+                                            <Ellipse Width="6" Height="6" Fill="{DynamicResource VsBad}" IsVisible="{Binding NeedsYou}" VerticalAlignment="Center" />
+                                            <Ellipse Width="6" Height="6" Fill="{DynamicResource VsLink}" IsVisible="{Binding Unseen}" VerticalAlignment="Center" />
                                             <TextBlock Text="{Binding Title}" Classes="name" TextTrimming="CharacterEllipsis" MaxWidth="150" VerticalAlignment="Center" />
                                             <Button Classes="flat" Width="20" Height="20" IsVisible="{Binding CanClose}" HorizontalContentAlignment="Center"
                                                     Command="{Binding $parent[UserControl].((vm:WorkspaceRemoteViewModel)DataContext).CloseTabCommand}" CommandParameter="{Binding}"
                                                     AutomationProperties.Name="Close this tab">
-                                                <Path Classes="icon" Width="10" Height="10" Stretch="Uniform" Stroke="#6a6a6a" Data="M3 3l10 10M13 3L3 13" />
+                                                <Path Classes="icon" Width="10" Height="10" Stretch="Uniform" Stroke="{DynamicResource VsFaint}" Data="M3 3l10 10M13 3L3 13" />
                                             </Button>
                                         </StackPanel>
                                     </Button>
@@ -467,15 +559,15 @@
                             <TextBlock Text="New session" Classes="name" VerticalAlignment="Center" />
                         </Button>
                         <Button Classes="stab" Command="{Binding NewSessionCommand}" AutomationProperties.Name="New session" Padding="12,0">
-                            <TextBlock Text="+" FontSize="17" Foreground="#8b8b8b" VerticalAlignment="Center" />
+                            <TextBlock Text="+" FontSize="17" Foreground="{DynamicResource VsMuted}" VerticalAlignment="Center" />
                         </Button>
                     </StackPanel>
                 </ScrollViewer>
                 <Button x:Name="SessionLeft" Classes="edge" HorizontalAlignment="Left">
                     <Button.Background>
                         <LinearGradientBrush StartPoint="0%,0%" EndPoint="100%,0%">
-                            <GradientStop Offset="0.45" Color="#1f1f1f" />
-                            <GradientStop Offset="1" Color="#001f1f1f" />
+                            <GradientStop Offset="0.45" Color="{DynamicResource VsBgColor}" />
+                            <GradientStop Offset="1" Color="{DynamicResource VsBgClear}" />
                         </LinearGradientBrush>
                     </Button.Background>
                     <Border Classes="pill">
@@ -488,8 +580,8 @@
                 <Button x:Name="SessionRight" Classes="edge" HorizontalAlignment="Right">
                     <Button.Background>
                         <LinearGradientBrush StartPoint="100%,0%" EndPoint="0%,0%">
-                            <GradientStop Offset="0.45" Color="#1f1f1f" />
-                            <GradientStop Offset="1" Color="#001f1f1f" />
+                            <GradientStop Offset="0.45" Color="{DynamicResource VsBgColor}" />
+                            <GradientStop Offset="1" Color="{DynamicResource VsBgClear}" />
                         </LinearGradientBrush>
                     </Button.Background>
                     <Border Classes="pill">
@@ -503,9 +595,9 @@
         </Border>
 
         <!-- The session: title and state on two lines; Chat | Plan while a plan waits -->
-        <Border Grid.Row="3" BorderBrush="#333333" BorderThickness="0,0,0,1" Padding="12,6" MinHeight="44" IsVisible="{Binding HasProjects}">
+        <Border Grid.Row="3" BorderBrush="{DynamicResource VsLine}" BorderThickness="0,0,0,1" Padding="12,6" MinHeight="44" IsVisible="{Binding HasProjects}">
             <DockPanel>
-                <Border DockPanel.Dock="Right" Background="#252526" CornerRadius="5" Padding="2" IsVisible="{Binding HasReview}" VerticalAlignment="Center">
+                <Border DockPanel.Dock="Right" Background="{DynamicResource VsRaise}" CornerRadius="5" Padding="2" IsVisible="{Binding HasReview}" VerticalAlignment="Center">
                     <StackPanel Orientation="Horizontal" Spacing="2">
                         <Button Classes="seg" Classes.on="{Binding ShowChat}" Command="{Binding ShowChatViewCommand}">
                             <TextBlock Text="Chat" />
@@ -513,7 +605,7 @@
                         <Button Classes="seg" Classes.on="{Binding ShowReview}" Command="{Binding ShowReviewViewCommand}">
                             <StackPanel Orientation="Horizontal" Spacing="5">
                                 <TextBlock Text="{Binding ReviewLabel}" />
-                                <Ellipse Width="6" Height="6" Fill="#f14c4c" VerticalAlignment="Center" />
+                                <Ellipse Width="6" Height="6" Fill="{DynamicResource VsBad}" VerticalAlignment="Center" />
                             </StackPanel>
                         </Button>
                     </StackPanel>
@@ -522,7 +614,7 @@
                     <TextBlock Text="{Binding SessionTitle}" Classes="strong" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
                     <StackPanel Orientation="Horizontal" Spacing="5">
                         <TextBlock Text="✻" Classes="spin" FontSize="11" IsVisible="{Binding IsWorking}" VerticalAlignment="Center" />
-                        <Ellipse Width="6" Height="6" Fill="#f14c4c" IsVisible="{Binding NeedsYou}" VerticalAlignment="Center" />
+                        <Ellipse Width="6" Height="6" Fill="{DynamicResource VsBad}" IsVisible="{Binding NeedsYou}" VerticalAlignment="Center" />
                         <TextBlock Text="{Binding SessionStateText}" Classes="muted" FontSize="11.5" TextTrimming="CharacterEllipsis" />
                     </StackPanel>
                 </StackPanel>
@@ -556,6 +648,10 @@
 
             <!-- The conversation -->
             <ScrollViewer x:Name="ChatScroller" IsVisible="{Binding ShowChat}" HorizontalScrollBarVisibility="Disabled">
+                <LayoutTransformControl>
+                    <LayoutTransformControl.LayoutTransform>
+                        <ScaleTransform ScaleX="{Binding TextScale}" ScaleY="{Binding TextScale}" />
+                    </LayoutTransformControl.LayoutTransform>
                 <StackPanel Margin="14,10,14,18" IsVisible="{Binding IsSessionOpen}">
                     <ItemsControl x:Name="TimelineList" ItemsSource="{Binding Timeline}">
                         <ItemsControl.ItemTemplate>
@@ -564,23 +660,23 @@
                                     <!-- Your prompt -->
                                     <StackPanel IsVisible="{Binding IsUser}" Margin="0,8,0,4">
                                         <TextBlock Text="{Binding Time}" Classes="faint" FontSize="11" HorizontalAlignment="Right" Margin="0,0,0,4" IsVisible="{Binding HasTime}" />
-                                        <Border Background="#252526" BorderBrush="#454545" BorderThickness="1" CornerRadius="6" Padding="10,7">
-                                            <TextBlock Text="{Binding Text}" TextWrapping="Wrap" Foreground="#e7e7e7" FontSize="14" />
+                                        <Border Background="{DynamicResource VsRaise}" BorderBrush="{DynamicResource VsLine2}" BorderThickness="1" CornerRadius="6" Padding="10,7">
+                                            <TextBlock Text="{Binding Text}" TextWrapping="Wrap" Foreground="{DynamicResource VsFgStrong}" FontSize="14" />
                                         </Border>
                                         <TextBlock Text="{Binding Delivery}" FontSize="12" Margin="2,4,0,0" IsVisible="{Binding HasDelivery}" TextWrapping="Wrap"
-                                                   Foreground="#8b8b8b" Classes.failed="{Binding DeliveryFailed}" />
+                                                   Foreground="{DynamicResource VsMuted}" Classes.failed="{Binding DeliveryFailed}" />
                                     </StackPanel>
                                     <!-- A step of Claude's: the dot and the rail on the left -->
                                     <Grid ColumnDefinitions="18,*" IsVisible="{Binding !IsUser}">
-                                        <Rectangle Width="1" Fill="#333333" HorizontalAlignment="Left" Margin="4,0,0,0" />
-                                        <Panel Width="15" Height="15" HorizontalAlignment="Left" VerticalAlignment="Top" Margin="-3,10,0,0" Background="#1f1f1f">
-                                            <Ellipse Width="9" Height="9" Fill="#6a6a6a" IsVisible="{Binding IsThought}" />
-                                            <Ellipse Width="9" Height="9" Fill="#c5c5c5" IsVisible="{Binding IsAnswer}" />
-                                            <Ellipse Width="9" Height="9" Fill="#d97757" Classes="pulse" IsVisible="{Binding IsWorking}" />
-                                            <Ellipse Width="9" Height="9" Fill="#d97757" Classes="pulse" IsVisible="{Binding ShowRunning}" />
+                                        <Rectangle Width="1" Fill="{DynamicResource VsLine}" HorizontalAlignment="Left" Margin="4,0,0,0" />
+                                        <Panel Width="15" Height="15" HorizontalAlignment="Left" VerticalAlignment="Top" Margin="-3,10,0,0" Background="{DynamicResource VsBg}">
+                                            <Ellipse Width="9" Height="9" Fill="{DynamicResource VsFaint}" IsVisible="{Binding IsThought}" />
+                                            <Ellipse Width="9" Height="9" Fill="{DynamicResource VsAnswerDot}" IsVisible="{Binding IsAnswer}" />
+                                            <Ellipse Width="9" Height="9" Fill="{DynamicResource VsAccent}" Classes="pulse" IsVisible="{Binding IsWorking}" />
+                                            <Ellipse Width="9" Height="9" Fill="{DynamicResource VsAccent}" Classes="pulse" IsVisible="{Binding ShowRunning}" />
                                             <Panel IsVisible="{Binding IsTool}">
-                                                <Ellipse Width="9" Height="9" Fill="#89d185" IsVisible="{Binding !Running}" />
-                                                <Ellipse Width="9" Height="9" Fill="#f14c4c" IsVisible="{Binding Failed}" />
+                                                <Ellipse Width="9" Height="9" Fill="{DynamicResource VsOk}" IsVisible="{Binding !Running}" />
+                                                <Ellipse Width="9" Height="9" Fill="{DynamicResource VsBad}" IsVisible="{Binding Failed}" />
                                             </Panel>
                                         </Panel>
                                         <StackPanel Grid.Column="1" Margin="0,8,0,2">
@@ -588,30 +684,30 @@
                                             <TextBlock Text="{Binding Text}" Classes="muted" IsVisible="{Binding IsThought}" />
                                             <StackPanel Orientation="Horizontal" Spacing="6" IsVisible="{Binding IsWorking}">
                                                 <TextBlock Text="✻" Classes="spin" />
-                                                <TextBlock Text="{Binding Text}" Foreground="#d97757" />
+                                                <TextBlock Text="{Binding Text}" Foreground="{DynamicResource VsAccent}" />
                                             </StackPanel>
                                             <StackPanel IsVisible="{Binding IsTool}">
                                                 <TextBlock TextWrapping="Wrap">
-                                                    <Run Text="{Binding ToolName}" Foreground="#e7e7e7" FontWeight="SemiBold" />
+                                                    <Run Text="{Binding ToolName}" Foreground="{DynamicResource VsFgStrong}" FontWeight="SemiBold" />
                                                     <Run Text="  " />
-                                                    <Run Text="{Binding Text}" Foreground="#8b8b8b" />
+                                                    <Run Text="{Binding Text}" Foreground="{DynamicResource VsMuted}" />
                                                 </TextBlock>
                                                 <Border Classes="io" IsVisible="{Binding HasIo}">
                                                     <StackPanel>
                                                         <Grid ColumnDefinitions="34,*" IsVisible="{Binding HasInput}">
                                                             <TextBlock Text="IN" Classes="lbl" />
                                                             <ScrollViewer Grid.Column="1" HorizontalScrollBarVisibility="Hidden" VerticalScrollBarVisibility="Disabled">
-                                                                <TextBlock Text="{Binding Input}" Classes="mono" Foreground="#cccccc" Margin="0,7,10,7" />
+                                                                <TextBlock Text="{Binding Input}" Classes="mono" Foreground="{DynamicResource VsFg}" Margin="0,7,10,7" />
                                                             </ScrollViewer>
                                                         </Grid>
-                                                        <Grid ColumnDefinitions="34,*" Background="#1c1c1c" IsVisible="{Binding HasOutput}">
-                                                            <Border Grid.ColumnSpan="2" BorderBrush="#333333" BorderThickness="0,1,0,0" IsVisible="{Binding HasInput}" />
+                                                        <Grid ColumnDefinitions="34,*" Background="{DynamicResource VsCodeOut}" IsVisible="{Binding HasOutput}">
+                                                            <Border Grid.ColumnSpan="2" BorderBrush="{DynamicResource VsLine}" BorderThickness="0,1,0,0" IsVisible="{Binding HasInput}" />
                                                             <TextBlock Text="OUT" Classes="lbl" />
                                                             <ScrollViewer Grid.Column="1" HorizontalScrollBarVisibility="Hidden" VerticalScrollBarVisibility="Disabled">
-                                                                <TextBlock Text="{Binding Output}" Classes="mono" Foreground="#cccccc" Margin="0,7,10,7" />
+                                                                <TextBlock Text="{Binding Output}" Classes="mono" Foreground="{DynamicResource VsFg}" Margin="0,7,10,7" />
                                                             </ScrollViewer>
                                                         </Grid>
-                                                        <Grid ColumnDefinitions="34,*" Background="#1c1c1c" IsVisible="{Binding ShowRunning}">
+                                                        <Grid ColumnDefinitions="34,*" Background="{DynamicResource VsCodeOut}" IsVisible="{Binding ShowRunning}">
                                                             <TextBlock Text="OUT" Classes="lbl" />
                                                             <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="6" Margin="0,7,10,7">
                                                                 <TextBlock Text="✻" Classes="spin" FontSize="12" />
@@ -633,8 +729,8 @@
                     <Border Classes="card" IsVisible="{Binding HasPermission}">
                         <StackPanel>
                             <TextBlock Text="{Binding PendingTitle}" Classes="strong" FontWeight="SemiBold" Margin="12,10,12,6" />
-                            <Border Background="#181818" BorderBrush="#333333" BorderThickness="1" CornerRadius="4" Margin="12,0,12,10" Padding="10,8">
-                                <TextBlock Text="{Binding PendingDetail}" Classes="mono" Foreground="#cccccc" TextWrapping="Wrap" />
+                            <Border Background="{DynamicResource VsBar}" BorderBrush="{DynamicResource VsLine}" BorderThickness="1" CornerRadius="4" Margin="12,0,12,10" Padding="10,8">
+                                <TextBlock Text="{Binding PendingDetail}" Classes="mono" Foreground="{DynamicResource VsFg}" TextWrapping="Wrap" />
                             </Border>
                             <Button Classes="opt" Command="{Binding AllowCommand}">
                                 <DockPanel>
@@ -685,7 +781,7 @@
                                     </DataTemplate>
                                 </ItemsControl.ItemTemplate>
                             </ItemsControl>
-                            <Button Content="Answer" Background="#0e639c" Foreground="White" HorizontalAlignment="Right" Margin="12,6,12,10"
+                            <Button Content="Answer" Background="{DynamicResource VsButton}" Foreground="White" HorizontalAlignment="Right" Margin="12,6,12,10"
                                     Command="{Binding SendAnswersCommand}" AutomationProperties.Name="Send answers" />
                             <TextBlock Text="{Binding PendingExpires}" Classes="muted" FontSize="12" TextWrapping="Wrap" Margin="12,0,12,10" />
                         </StackPanel>
@@ -701,8 +797,8 @@
                                 <Border VerticalAlignment="Bottom" Height="50" IsHitTestVisible="False">
                                     <Border.Background>
                                         <LinearGradientBrush StartPoint="0%,0%" EndPoint="0%,100%">
-                                            <GradientStop Offset="0" Color="#00252526" />
-                                            <GradientStop Offset="1" Color="#252526" />
+                                            <GradientStop Offset="0" Color="{DynamicResource VsRaiseClear}" />
+                                            <GradientStop Offset="1" Color="{DynamicResource VsRaiseColor}" />
                                         </LinearGradientBrush>
                                     </Border.Background>
                                 </Border>
@@ -720,72 +816,61 @@
                         </StackPanel>
                     </Border>
                 </StackPanel>
+                </LayoutTransformControl>
             </ScrollViewer>
 
             <!-- The plan, in full -->
             <ScrollViewer IsVisible="{Binding ShowReview}" HorizontalScrollBarVisibility="Disabled">
-                <local:MarkdownView Blocks="{Binding PlanBlocks}" Margin="16,12,16,20" />
+                <LayoutTransformControl>
+                    <LayoutTransformControl.LayoutTransform>
+                        <ScaleTransform ScaleX="{Binding TextScale}" ScaleY="{Binding TextScale}" />
+                    </LayoutTransformControl.LayoutTransform>
+                    <local:MarkdownView Blocks="{Binding PlanBlocks}" Margin="16,12,16,20" />
+                </LayoutTransformControl>
             </ScrollViewer>
         </Panel>
 
-        <!-- The plan's decision -->
-        <Border Grid.Row="5" Background="#252526" BorderBrush="#333333" BorderThickness="0,1,0,0" Padding="10,8,10,10" IsVisible="{Binding ShowReview}">
+        <!-- The plan's decision: small, so the plan above keeps the screen -->
+        <Border Grid.Row="5" Background="{DynamicResource VsRaise}" BorderBrush="{DynamicResource VsLine}" BorderThickness="0,1,0,0" Padding="10,6,10,8" IsVisible="{Binding ShowReview}">
             <StackPanel Spacing="6">
-                <TextBlock Text="Would you like to proceed?" Classes="strong" FontWeight="SemiBold" Margin="4,2,4,2" />
-                <Border BorderBrush="#454545" BorderThickness="1" CornerRadius="5" IsVisible="{Binding AutoModeAvailable}">
-                    <Button Classes="opt" BorderThickness="0" Command="{Binding ApprovePlanCommand}" CommandParameter="auto">
-                        <DockPanel>
-                            <Border Classes="num"><TextBlock Text="1" /></Border>
-                            <StackPanel>
-                                <TextBlock Text="Yes, and use auto mode" Classes="strong" />
-                                <TextBlock Text="Mode becomes Auto" Classes="muted" FontSize="12" />
-                            </StackPanel>
-                        </DockPanel>
+                <DockPanel>
+                    <Button DockPanel.Dock="Right" Classes="flat" Padding="8,4" Command="{Binding KeepPlanningCommand}" AutomationProperties.Name="No, keep planning">
+                        <TextBlock Text="No, keep planning" FontSize="12.5" Foreground="{DynamicResource VsLink}" />
                     </Button>
-                </Border>
-                <Border BorderBrush="#454545" BorderThickness="1" CornerRadius="5">
-                    <Button Classes="opt" BorderThickness="0" Command="{Binding ApprovePlanCommand}" CommandParameter="acceptEdits">
-                        <DockPanel>
-                            <Border Classes="num"><TextBlock Text="•" /></Border>
-                            <StackPanel>
-                                <TextBlock Text="Yes, and auto-accept edits" Classes="strong" />
-                                <TextBlock Text="Mode becomes Edit automatically" Classes="muted" FontSize="12" />
-                            </StackPanel>
-                        </DockPanel>
+                    <TextBlock Text="Approve and continue in" Classes="strong" FontSize="13" FontWeight="SemiBold" VerticalAlignment="Center" Margin="2,0" />
+                </DockPanel>
+                <UniformGrid Rows="1" ColumnSpacing="6">
+                    <Button Classes="decide" Command="{Binding ApprovePlanCommand}" CommandParameter="auto" IsVisible="{Binding AutoModeAvailable}"
+                            AutomationProperties.Name="Yes, and use auto mode">
+                        <StackPanel Orientation="Horizontal" Spacing="5" HorizontalAlignment="Center">
+                            <Path Classes="icon" Width="13" Height="13" Stretch="Uniform" Data="M9 1.5L3.5 9H8l-1 5.5L12.5 7H8z" />
+                            <TextBlock Text="Auto" />
+                        </StackPanel>
                     </Button>
-                </Border>
-                <Border BorderBrush="#454545" BorderThickness="1" CornerRadius="5">
-                    <Button Classes="opt" BorderThickness="0" Command="{Binding ApprovePlanCommand}" CommandParameter="default">
-                        <DockPanel>
-                            <Border Classes="num"><TextBlock Text="•" /></Border>
-                            <StackPanel>
-                                <TextBlock Text="Yes, and manually approve edits" Classes="strong" />
-                                <TextBlock Text="Mode becomes Manual: each edit asks your phone" Classes="muted" FontSize="12" TextWrapping="Wrap" />
-                            </StackPanel>
-                        </DockPanel>
+                    <Button Classes="decide" Command="{Binding ApprovePlanCommand}" CommandParameter="acceptEdits" AutomationProperties.Name="Yes, and auto-accept edits">
+                        <StackPanel Orientation="Horizontal" Spacing="5" HorizontalAlignment="Center">
+                            <Path Classes="icon" Width="13" Height="13" Stretch="Uniform" Data="M5 4L1.5 8 5 12M11 4l3.5 4L11 12" />
+                            <TextBlock Text="Edits" />
+                        </StackPanel>
                     </Button>
-                </Border>
-                <Border BorderBrush="#454545" BorderThickness="1" CornerRadius="5">
-                    <Button Classes="opt" BorderThickness="0" Command="{Binding KeepPlanningCommand}">
-                        <DockPanel>
-                            <Border Classes="num"><TextBlock Text="•" /></Border>
-                            <StackPanel>
-                                <TextBlock Text="No, keep planning" Classes="strong" />
-                                <TextBlock Text="Back to the chat to tell Claude what to change" Classes="muted" FontSize="12" />
-                            </StackPanel>
-                        </DockPanel>
+                    <Button Classes="decide" Command="{Binding ApprovePlanCommand}" CommandParameter="default" AutomationProperties.Name="Yes, and manually approve edits">
+                        <StackPanel Orientation="Horizontal" Spacing="5" HorizontalAlignment="Center">
+                            <Path Classes="icon" Width="13" Height="13" Stretch="Uniform"
+                                  Data="M5 8V3.5a1 1 0 0 1 2 0V7M7 7V2.5a1 1 0 0 1 2 0V7M9 7V3.5a1 1 0 0 1 2 0V8M11 6.5a1 1 0 0 1 2 0V10c0 2.5-2 4.5-4.5 4.5S4 12.8 3.4 11L2.5 8.6a1 1 0 0 1 1.8-.8L5 9" />
+                            <TextBlock Text="Manual" />
+                        </StackPanel>
                     </Button>
-                </Border>
+                </UniformGrid>
             </StackPanel>
         </Border>
 
         <!-- The composer -->
-        <Border Grid.Row="5" x:Name="Composer" BorderBrush="#333333" BorderThickness="0,1,0,0" Padding="10,8,10,10" Background="#1f1f1f"
+        <Border Grid.Row="5" x:Name="Composer" BorderBrush="{DynamicResource VsLine}" BorderThickness="0,1,0,0" Padding="10,8,10,10" Background="{DynamicResource VsBg}"
                 IsVisible="{Binding ShowChat}">
             <StackPanel Spacing="6">
                 <TextBlock Text="{Binding SendStatus}" FontSize="12" Classes="muted" TextWrapping="Wrap" Margin="4,0" IsVisible="{Binding ShowStatus}" />
                 <!-- "/" suggestions -->
-                <Border Background="#252526" BorderBrush="#454545" BorderThickness="1" CornerRadius="5" MaxHeight="220" IsVisible="{Binding HasSuggestions}">
+                <Border Background="{DynamicResource VsRaise}" BorderBrush="{DynamicResource VsLine2}" BorderThickness="1" CornerRadius="5" MaxHeight="220" IsVisible="{Binding HasSuggestions}">
                     <ScrollViewer>
                         <ItemsControl ItemsSource="{Binding Suggestions}">
                             <ItemsControl.ItemTemplate>
@@ -801,7 +886,7 @@
                         </ItemsControl>
                     </ScrollViewer>
                 </Border>
-                <Border Background="#252526" BorderBrush="#454545" BorderThickness="1" CornerRadius="6">
+                <Border Background="{DynamicResource VsRaise}" BorderBrush="{DynamicResource VsLine2}" BorderThickness="1" CornerRadius="6">
                     <StackPanel>
                         <TextBox x:Name="PromptBox" Classes="prompt" Text="{Binding Prompt}" PlaceholderText="{Binding PromptHint}" AcceptsReturn="True"
                                  TextWrapping="Wrap" MaxHeight="150" IsEnabled="{Binding CanType}" AutomationProperties.Name="Prompt" />
@@ -814,14 +899,14 @@
                             </Button>
                             <Button Grid.Column="2" Classes="chip" x:Name="AgeChip" IsHitTestVisible="False">
                                 <StackPanel Orientation="Horizontal" Spacing="4">
-                                    <Path Classes="icon" Width="12" Height="12" Stretch="Uniform" Stroke="#8b8b8b" Data="M14 8A6 6 0 1 1 2 8A6 6 0 1 1 14 8Z M8 4.8V8l2.2 1.4" />
+                                    <Path Classes="icon" Width="12" Height="12" Stretch="Uniform" Stroke="{DynamicResource VsMuted}" Data="M14 8A6 6 0 1 1 2 8A6 6 0 1 1 14 8Z M8 4.8V8l2.2 1.4" />
                                     <TextBlock Text="{Binding AgeText}" />
                                 </StackPanel>
                             </Button>
                             <Button Grid.Column="3" Classes="chip" Command="{Binding OpenSheetCommand}" CommandParameter="Agents" AutomationProperties.Name="Subagents">
                                 <StackPanel Orientation="Horizontal" Spacing="5">
-                                    <Ellipse Width="6" Height="6" Fill="#d97757" Classes="pulse" IsVisible="{Binding HasAgents}" VerticalAlignment="Center" />
-                                    <Ellipse Width="6" Height="6" Fill="#6a6a6a" IsVisible="{Binding !HasAgents}" VerticalAlignment="Center" />
+                                    <Ellipse Width="6" Height="6" Fill="{DynamicResource VsAccent}" Classes="pulse" IsVisible="{Binding HasAgents}" VerticalAlignment="Center" />
+                                    <Ellipse Width="6" Height="6" Fill="{DynamicResource VsFaint}" IsVisible="{Binding !HasAgents}" VerticalAlignment="Center" />
                                     <TextBlock Text="{Binding AgentsText}" />
                                 </StackPanel>
                             </Button>
@@ -834,11 +919,11 @@
                             <Button Grid.Column="6" Classes="chip" Command="{Binding OpenSheetCommand}" CommandParameter="Mode" AutomationProperties.Name="Permission mode">
                                 <StackPanel Orientation="Horizontal" Spacing="5">
                                     <Panel Width="14" Height="14">
-                                        <Path Classes="icon" Width="14" Height="14" Stretch="Uniform" Stroke="#8b8b8b" IsVisible="{Binding ModeIsManual}"
+                                        <Path Classes="icon" Width="14" Height="14" Stretch="Uniform" Stroke="{DynamicResource VsMuted}" IsVisible="{Binding ModeIsManual}"
                                               Data="M5 8V3.5a1 1 0 0 1 2 0V7M7 7V2.5a1 1 0 0 1 2 0V7M9 7V3.5a1 1 0 0 1 2 0V8M11 6.5a1 1 0 0 1 2 0V10c0 2.5-2 4.5-4.5 4.5S4 12.8 3.4 11L2.5 8.6a1 1 0 0 1 1.8-.8L5 9" />
-                                        <Path Classes="icon" Width="14" Height="14" Stretch="Uniform" Stroke="#8b8b8b" IsVisible="{Binding ModeIsEdits}" Data="M5 4L1.5 8 5 12M11 4l3.5 4L11 12" />
-                                        <Path Classes="icon" Width="14" Height="14" Stretch="Uniform" Stroke="#8b8b8b" IsVisible="{Binding ModeIsPlan}" Data="M3 2.5h10v11H3zM5.5 5.5h5M5.5 8h5M5.5 10.5h3" />
-                                        <Path Classes="icon" Width="14" Height="14" Stretch="Uniform" Stroke="#8b8b8b" IsVisible="{Binding ModeIsAuto}" Data="M9 1.5L3.5 9H8l-1 5.5L12.5 7H8z" />
+                                        <Path Classes="icon" Width="14" Height="14" Stretch="Uniform" Stroke="{DynamicResource VsMuted}" IsVisible="{Binding ModeIsEdits}" Data="M5 4L1.5 8 5 12M11 4l3.5 4L11 12" />
+                                        <Path Classes="icon" Width="14" Height="14" Stretch="Uniform" Stroke="{DynamicResource VsMuted}" IsVisible="{Binding ModeIsPlan}" Data="M3 2.5h10v11H3zM5.5 5.5h5M5.5 8h5M5.5 10.5h3" />
+                                        <Path Classes="icon" Width="14" Height="14" Stretch="Uniform" Stroke="{DynamicResource VsMuted}" IsVisible="{Binding ModeIsAuto}" Data="M9 1.5L3.5 9H8l-1 5.5L12.5 7H8z" />
                                     </Panel>
                                     <TextBlock Text="{Binding ModeName}" x:Name="ModeText" />
                                 </StackPanel>
@@ -854,12 +939,12 @@
 
         <!-- Sheets -->
         <Panel Grid.RowSpan="6" IsVisible="{Binding IsSheetOpen}">
-            <Border Background="#99000000" PointerPressed="Scrim_PointerPressed" />
-            <Border VerticalAlignment="Bottom" Background="#252526" BorderBrush="#454545" BorderThickness="0,1,0,0" CornerRadius="12,12,0,0"
+            <Border Background="{DynamicResource VsScrim}" PointerPressed="Scrim_PointerPressed" />
+            <Border VerticalAlignment="Bottom" Background="{DynamicResource VsRaise}" BorderBrush="{DynamicResource VsLine2}" BorderThickness="0,1,0,0" CornerRadius="12,12,0,0"
                     MaxHeight="{Binding #Root.Bounds.Height, Converter={x:Static local:SheetHeight.Instance}}">
                 <ScrollViewer HorizontalScrollBarVisibility="Disabled">
                     <StackPanel Margin="0,6,0,14">
-                        <Border Width="36" Height="4" CornerRadius="2" Background="#454545" HorizontalAlignment="Center" Margin="0,2,0,6" />
+                        <Border Width="36" Height="4" CornerRadius="2" Background="{DynamicResource VsLine2}" HorizontalAlignment="Center" Margin="0,2,0,6" />
 
                         <!-- The PCs -->
                         <StackPanel IsVisible="{Binding IsPcSheet}">
@@ -869,8 +954,8 @@
                                     <DataTemplate x:DataType="vm:HostChoice">
                                         <Button Classes="pick" Command="{Binding $parent[UserControl].((vm:WorkspaceRemoteViewModel)DataContext).SelectHostCommand}" CommandParameter="{Binding}">
                                             <DockPanel>
-                                                <Ellipse DockPanel.Dock="Left" Width="8" Height="8" Fill="#89d185" Margin="0,0,12,0" IsVisible="{Binding IsOnline}" VerticalAlignment="Center" />
-                                                <Ellipse DockPanel.Dock="Left" Width="8" Height="8" Fill="#6a6a6a" Margin="0,0,12,0" IsVisible="{Binding !IsOnline}" VerticalAlignment="Center" />
+                                                <Ellipse DockPanel.Dock="Left" Width="8" Height="8" Fill="{DynamicResource VsOk}" Margin="0,0,12,0" IsVisible="{Binding IsOnline}" VerticalAlignment="Center" />
+                                                <Ellipse DockPanel.Dock="Left" Width="8" Height="8" Fill="{DynamicResource VsFaint}" Margin="0,0,12,0" IsVisible="{Binding !IsOnline}" VerticalAlignment="Center" />
                                                 <StackPanel>
                                                     <TextBlock Text="{Binding Host.MachineName}" Classes="strong" FontWeight="SemiBold" />
                                                     <TextBlock Text="{Binding Detail}" Classes="muted" FontSize="12" />
@@ -916,11 +1001,11 @@
                                                 Command="{Binding $parent[UserControl].((vm:WorkspaceRemoteViewModel)DataContext).SetModeCommand}" CommandParameter="{Binding}">
                                             <DockPanel>
                                                 <Panel DockPanel.Dock="Left" Width="16" Height="16" Margin="0,2,12,0" VerticalAlignment="Top">
-                                                    <Path Classes="icon" Stretch="Uniform" Stroke="#8b8b8b" IsVisible="{Binding IsManual}"
+                                                    <Path Classes="icon" Stretch="Uniform" Stroke="{DynamicResource VsMuted}" IsVisible="{Binding IsManual}"
                                                           Data="M5 8V3.5a1 1 0 0 1 2 0V7M7 7V2.5a1 1 0 0 1 2 0V7M9 7V3.5a1 1 0 0 1 2 0V8M11 6.5a1 1 0 0 1 2 0V10c0 2.5-2 4.5-4.5 4.5S4 12.8 3.4 11L2.5 8.6a1 1 0 0 1 1.8-.8L5 9" />
-                                                    <Path Classes="icon" Stretch="Uniform" Stroke="#8b8b8b" IsVisible="{Binding IsEdits}" Data="M5 4L1.5 8 5 12M11 4l3.5 4L11 12" />
-                                                    <Path Classes="icon" Stretch="Uniform" Stroke="#8b8b8b" IsVisible="{Binding IsPlan}" Data="M3 2.5h10v11H3zM5.5 5.5h5M5.5 8h5M5.5 10.5h3" />
-                                                    <Path Classes="icon" Stretch="Uniform" Stroke="#8b8b8b" IsVisible="{Binding IsAuto}" Data="M9 1.5L3.5 9H8l-1 5.5L12.5 7H8z" />
+                                                    <Path Classes="icon" Stretch="Uniform" Stroke="{DynamicResource VsMuted}" IsVisible="{Binding IsEdits}" Data="M5 4L1.5 8 5 12M11 4l3.5 4L11 12" />
+                                                    <Path Classes="icon" Stretch="Uniform" Stroke="{DynamicResource VsMuted}" IsVisible="{Binding IsPlan}" Data="M3 2.5h10v11H3zM5.5 5.5h5M5.5 8h5M5.5 10.5h3" />
+                                                    <Path Classes="icon" Stretch="Uniform" Stroke="{DynamicResource VsMuted}" IsVisible="{Binding IsAuto}" Data="M9 1.5L3.5 9H8l-1 5.5L12.5 7H8z" />
                                                 </Panel>
                                                 <Path DockPanel.Dock="Right" Classes="icon" Data="M3 8.5l3 3 7-7" IsVisible="{Binding IsCurrent}" VerticalAlignment="Center" />
                                                 <StackPanel>
@@ -936,9 +1021,9 @@
 
                         <!-- Effort and Ultracode (under models and modes, as in VS Code) -->
                         <StackPanel IsVisible="{Binding ShowsEffort}">
-                            <Border BorderBrush="#333333" BorderThickness="0,1,0,0" Padding="16,10">
+                            <Border BorderBrush="{DynamicResource VsLine}" BorderThickness="0,1,0,0" Padding="16,10">
                                 <DockPanel>
-                                    <Border DockPanel.Dock="Right" Background="#1f1f1f" CornerRadius="12" Padding="4,2">
+                                    <Border DockPanel.Dock="Right" Background="{DynamicResource VsBg}" CornerRadius="12" Padding="4,2">
                                         <ItemsControl ItemsSource="{Binding EffortDots}">
                                             <ItemsControl.ItemsPanel>
                                                 <ItemsPanelTemplate>
@@ -959,7 +1044,7 @@
                                     <TextBlock Text="{Binding EffortHeading}" VerticalAlignment="Center" />
                                 </DockPanel>
                             </Border>
-                            <Button Classes="pick" Command="{Binding ToggleUltracodeCommand}" BorderBrush="#333333" BorderThickness="0,1,0,0" Padding="16,10"
+                            <Button Classes="pick" Command="{Binding ToggleUltracodeCommand}" BorderBrush="{DynamicResource VsLine}" BorderThickness="0,1,0,0" Padding="16,10"
                                     AutomationProperties.Name="Ultracode">
                                 <DockPanel>
                                     <Border DockPanel.Dock="Right" Classes="switch" Classes.on="{Binding IsUltracode}">
@@ -967,7 +1052,7 @@
                                     </Border>
                                     <TextBlock VerticalAlignment="Center" TextWrapping="Wrap">
                                         <Run Text="Ultracode" />
-                                        <Run Text=" · plan, build and verify in parallel" Foreground="#8b8b8b" />
+                                        <Run Text=" · plan, build and verify in parallel" Foreground="{DynamicResource VsMuted}" />
                                     </TextBlock>
                                 </DockPanel>
                             </Button>
@@ -983,7 +1068,7 @@
                             <ItemsControl ItemsSource="{Binding AgentRows}">
                                 <ItemsControl.ItemTemplate>
                                     <DataTemplate x:DataType="vm:AgentRow">
-                                        <Border BorderBrush="#333333" BorderThickness="0,1,0,0" Padding="16,10">
+                                        <Border BorderBrush="{DynamicResource VsLine}" BorderThickness="0,1,0,0" Padding="16,10">
                                             <StackPanel Spacing="3">
                                                 <DockPanel>
                                                     <TextBlock DockPanel.Dock="Right" Text="{Binding Elapsed}" Classes="faint" FontSize="12" />
@@ -994,14 +1079,32 @@
                                                 </DockPanel>
                                                 <TextBlock Text="{Binding Task}" Classes="muted" FontSize="12" TextWrapping="Wrap" />
                                                 <TextBlock FontSize="12" TextWrapping="Wrap" IsVisible="{Binding HasDoing}">
-                                                    <Run Text="Now: " Foreground="#8b8b8b" />
-                                                    <Run Text="{Binding Doing}" FontFamily="monospace" Foreground="#d7ba7d" />
+                                                    <Run Text="Now: " Foreground="{DynamicResource VsMuted}" />
+                                                    <Run Text="{Binding Doing}" FontFamily="monospace" Foreground="{DynamicResource VsInlineCode}" />
                                                 </TextBlock>
                                             </StackPanel>
                                         </Border>
                                     </DataTemplate>
                                 </ItemsControl.ItemTemplate>
                             </ItemsControl>
+                        </StackPanel>
+
+                        <!-- Text size -->
+                        <StackPanel IsVisible="{Binding IsTextSizeSheet}" Spacing="6">
+                            <TextBlock Text="Text size" Classes="strong" FontWeight="SemiBold" Margin="16,6,16,0" />
+                            <TextBlock Text="The conversation and plans; saved on this phone." Classes="muted" FontSize="12" Margin="16,0,16,6" />
+                            <Grid ColumnDefinitions="Auto,*,Auto" Margin="16,4,16,10">
+                                <Button Classes="decide" Width="64" Command="{Binding SmallerTextCommand}" AutomationProperties.Name="Smaller text">
+                                    <TextBlock Text="A−" FontSize="13" />
+                                </Button>
+                                <Button Grid.Column="1" Classes="flat" Height="38" Command="{Binding ResetTextCommand}" HorizontalContentAlignment="Center" AutomationProperties.Name="Normal size">
+                                    <TextBlock Text="{Binding TextScaleLabel}" Classes="strong" FontSize="16" FontWeight="SemiBold" />
+                                </Button>
+                                <Button Grid.Column="2" Classes="decide" Width="64" Command="{Binding LargerTextCommand}" AutomationProperties.Name="Larger text">
+                                    <TextBlock Text="A+" FontSize="17" />
+                                </Button>
+                            </Grid>
+                            <TextBlock Text="Tap the size to go back to 100%." Classes="faint" FontSize="11" Margin="16,0,16,6" />
                         </StackPanel>
 
                         <!-- Context -->
@@ -1023,12 +1126,12 @@
                                                     Command="{Binding $parent[UserControl].((vm:WorkspaceRemoteViewModel)DataContext).OpenHistoryCommand}" CommandParameter="{Binding}">
                                                 <DockPanel>
                                                     <Panel DockPanel.Dock="Left" Width="8" Margin="0,0,12,0" VerticalAlignment="Center">
-                                                        <Ellipse Width="8" Height="8" Fill="#f14c4c" IsVisible="{Binding NeedsYou}" />
-                                                        <Ellipse Width="8" Height="8" Fill="#d97757" IsVisible="{Binding IsWorking}" />
+                                                        <Ellipse Width="8" Height="8" Fill="{DynamicResource VsBad}" IsVisible="{Binding NeedsYou}" />
+                                                        <Ellipse Width="8" Height="8" Fill="{DynamicResource VsAccent}" IsVisible="{Binding IsWorking}" />
                                                     </Panel>
-                                                    <Border DockPanel.Dock="Right" BorderBrush="#d97757" BorderThickness="1" CornerRadius="8" Padding="6,0" Margin="8,0,0,0"
+                                                    <Border DockPanel.Dock="Right" BorderBrush="{DynamicResource VsAccent}" BorderThickness="1" CornerRadius="8" Padding="6,0" Margin="8,0,0,0"
                                                             VerticalAlignment="Center" IsVisible="{Binding IsOpen}">
-                                                        <TextBlock Text="Open" FontSize="11" Foreground="#d97757" />
+                                                        <TextBlock Text="Open" FontSize="11" Foreground="{DynamicResource VsAccent}" />
                                                     </Border>
                                                     <TextBlock DockPanel.Dock="Right" Text="{Binding When}" Classes="faint" FontSize="12" Margin="8,0,0,0" VerticalAlignment="Center" />
                                                     <StackPanel>
@@ -1049,9 +1152,8 @@
             </Border>
         </Panel>
 
-        <Border x:Name="OffBar" Grid.Row="4" VerticalAlignment="Top" Background="#5a1d1d" Padding="12,8" IsVisible="False">
-            <TextBlock Text="Workspace Controller is turned off on this phone. Turn it on in Home → Utilities." TextWrapping="Wrap" Foreground="#e7e7e7" />
+        <Border x:Name="OffBar" Grid.Row="4" VerticalAlignment="Top" Background="{DynamicResource VsOffBar}" Padding="12,8" IsVisible="False">
+            <TextBlock Text="Workspace Controller is turned off on this phone. Turn it on in Home → Utilities." TextWrapping="Wrap" Foreground="{DynamicResource VsFgStrong}" />
         </Border>
     </Grid>
-    </ThemeVariantScope>
 </UserControl>

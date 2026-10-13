@@ -153,6 +153,8 @@ public partial class WorkspaceContentPage : UserControl, IFullPage
         PromptBox.CaretIndex = PromptBox.Text?.Length ?? 0;
     }
 
+    private void Menu_Click(object? sender, RoutedEventArgs e) => ShellChrome.OpenNavigation?.Invoke();
+
     private void Scrim_PointerPressed(object? sender, PointerPressedEventArgs e) => _viewModel.CloseSheetCommand.Execute(null);
 
     private void OnModuleChanged(object? sender, PropertyChangedEventArgs e)
