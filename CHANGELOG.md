@@ -3,6 +3,27 @@
 All notable changes to Helm. The top section is used as the GitHub release body and as the Velopack release notes.
 Format: [Keep a Changelog](https://keepachangelog.com), versions follow [SemVer](https://semver.org).
 
+## [0.44.0] - 2026-10-13
+
+### Fixed
+- **Novel Reader: a novel that fails to download no longer closes Helm on the phone.** Opening it says the connection
+  dropped or took too long, and opening it again tries again.
+- **Novel Reader: syncing to a phone is faster and survives a weak connection.** Files download three parts at a time,
+  a part that drops is asked for again, and a slow connection gets minutes instead of 60 seconds per part. Opening a
+  novel says when it is the dictionaries that are still downloading (with how far), not the novel.
+- **Novel Reader: Chinese characters no longer turn into boxes on some phones.** Android now draws Chinese with the
+  phone's own simplified Chinese font everywhere in Helm (study mode, the 中文 view, the word editor).
+- **Novel Reader: a cover that could not be fetched is fetched again** instead of staying blank.
+
+### Changed
+- **Novel Reader no longer keeps any sound on the disk.** Reading aloud holds the sentences ahead and the ones just
+  heard in memory only; the "Download audio" menu (this chapter, the next 10, the whole novel) and the "Downloaded
+  audio" settings are gone, and the sound older versions kept is deleted (it had grown past 100 MB).
+- **Dictionaries sync gzipped**, about a third of the size to download (VietPhrase 28 MB → 9 MB), for dictionaries
+  downloaded or imported from now on; each device also drops its second, encrypted copy of them (about 35 MB).
+- **The hidden Edge that reads with HoaiMy no longer downloads Edge's own components**, and the ~450 MB they took in
+  Helm's cache is deleted.
+
 ## [0.43.0] - 2026-10-13
 
 ### Changed
