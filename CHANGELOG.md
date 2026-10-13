@@ -3,6 +3,38 @@
 All notable changes to Helm. The top section is used as the GitHub release body and as the Velopack release notes.
 Format: [Keep a Changelog](https://keepachangelog.com), versions follow [SemVer](https://semver.org).
 
+## [0.43.0] - 2026-10-13
+
+### Changed
+- **Workspace Controller on the phone now looks and works like Claude's panel in VS Code**, in VS Code's Light or
+  Dark Modern colours (following Helm's theme). A tab per VS Code window and, under it, a tab per Claude session open
+  in that window (a spinner while Claude works, a red dot when it waits for you, a blue dot for an answer you have not
+  seen); both rows scroll sideways and their edges show how many hidden tabs need you (tap to go there). The
+  conversation follows Claude live, step by step: "Thought for 4s", each tool call with what went in and the start of
+  what came out (and "Running…" while it runs), answers drawn as Markdown with lists, code and tables. Switching tabs
+  is instant once a tab was opened, and closing a tab takes it away at once.
+- **The composer shows Claude Code's chips**: "/" for commands and skills, how much context is used, the session's
+  time, the subagents at work (tap for what each one does now), the model with its effort, and the permission mode.
+  Tap the model for Claude Code's own model list with five effort levels and Ultracode; tap the mode for Manual, Edit
+  automatically, Plan and Auto. The phone switches them in VS Code (/model, /effort, Shift+Tab).
+- **History** (clock button) lists the real sessions Claude Code kept for that project, by day, with a search; tap an
+  earlier one to open it again as a tab in VS Code.
+- **Text size** (Aa button) for the conversation and plans, 85% to 175%, kept on the phone. The page uses the whole
+  screen: Helm's title bar gives way to the page's own bar, whose ☰ button opens the menu.
+
+### Added
+- **Approve a plan from your phone.** When Claude in plan mode presents its plan, the phone shows it in its own Plan
+  tab; approve it into Auto, Edit automatically or Manual, or keep planning and tell Claude what to change.
+- Helm Bridge 1.1 tells Helm which Claude tabs are open in each window and can close one. VS Code picks up the new
+  bridge after *Developer: Reload Window* (or a restart); until then the phone works as before.
+
+### Removed
+- The quick replies under the composer.
+
+### Fixed
+- Helm never presses a key in a VS Code window unless Helm Bridge in that very window says it has the keyboard: a
+  second window with the same title (another VS Code, a test copy) could otherwise get the keys.
+
 ## [0.42.0] - 2026-10-13
 
 ### Added
