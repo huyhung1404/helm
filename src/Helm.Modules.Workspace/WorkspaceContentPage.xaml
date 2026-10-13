@@ -1,0 +1,74 @@
+<Page
+    x:Class="Helm.Modules.Workspace.WorkspaceContentPage"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
+    xmlns:core="clr-namespace:Helm.Core.Ui;assembly=Helm.Core.Windows"
+    xmlns:local="clr-namespace:Helm.Modules.Workspace"
+    Title="Workspace Controller">
+
+    <!-- The management screen (menu and Quick access): what is connected to this PC. VS Code windows today, Unity and
+         other apps later, each its own section. Steering happens on the phone; the options are on WorkspacePage. -->
+    <Page.Resources>
+        <DataTemplate x:Key="SessionTemplate" DataType="{x:Type local:SessionRow}">
+            <Border Style="{DynamicResource HelmExpanderRow}" Padding="80,8,16,8">
+                <core:CardHeader Title="{Binding Title}" Description="{Binding Detail}" />
+            </Border>
+        </DataTemplate>
+    </Page.Resources>
+
+    <StackPanel Margin="24,16,24,24">
+        <TextBlock Text="Workspace Controller" FontSize="28" FontWeight="SemiBold" Margin="0,0,0,16" />
+
+        <ui:InfoBar x:Name="OffBar" Title="Workspace Controller is turned off" Severity="Informational" IsClosable="False"
+                    Message="Turn it on in Home → Utilities so your phone can reach the VS Code windows on this PC." Margin="0,0,0,12" />
+        <ui:InfoBar Title="Something needs a look" Severity="Warning" IsClosable="False" IsOpen="True" Margin="0,0,0,12"
+                    Message="{Binding Module.StatusMessage}"
+                    Visibility="{Binding Module.StatusMessage, Converter={StaticResource NotEmptyToVisibility}}" />
+
+        <StackPanel x:Name="Body">
+            <!-- Host -->
+            <ui:CardControl Margin="0,0,0,4" Icon="{ui:SymbolIcon Desktop24}">
+                <ui:CardControl.Header>
+                    <core:CardHeader Title="This PC" Description="{Binding ListeningText}" />
+                </ui:CardControl.Header>
+            </ui:CardControl>
+
+            <!-- VS Code -->
+            <TextBlock Text="VS Code" Style="{DynamicResource HelmSectionHeader}" />
+            <ui:CardExpander Margin="0,0,0,4" IsExpanded="True" Icon="{ui:SymbolIcon WindowConsole20}">
+                <ui:CardExpander.Header>
+                    <core:CardHeader Title="Connected windows" Description="{Binding SessionsText}" />
+                </ui:CardExpander.Header>
+                <StackPanel>
+                    <TextBlock Text="No VS Code window is connected. Open VS Code: Helm Bridge connects each window by itself."
+                               Style="{DynamicResource HelmSecondaryText}" TextWrapping="Wrap" Margin="0,4"
+                               Visibility="{Binding HasVsCodeWindows, Converter={StaticResource InverseBoolToVisibility}}" />
+                    <ItemsControl ItemsSource="{Binding VsCodeWindows}">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate DataType="{x:Type local:HostWindowRow}">
+                                <StackPanel>
+                                    <Border Style="{DynamicResource HelmExpanderRow}">
+                                        <core:CardHeader Title="{Binding Name}" Description="{Binding Detail}" />
+                                    </Border>
+                                    <ItemsControl ItemsSource="{Binding Sessions}" ItemTemplate="{StaticResource SessionTemplate}" />
+                                </StackPanel>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </StackPanel>
+            </ui:CardExpander>
+
+            <!-- Outside VS Code -->
+            <StackPanel Visibility="{Binding HasOtherSessions, Converter={StaticResource BoolToVisibility}}">
+                <TextBlock Text="Elsewhere" Style="{DynamicResource HelmSectionHeader}" />
+                <ui:CardExpander Margin="0,0,0,4" IsExpanded="True" Icon="{ui:SymbolIcon Chat24}">
+                    <ui:CardExpander.Header>
+                        <core:CardHeader Title="Sessions outside VS Code" Description="Claude in a terminal or another editor: Helm sees them, the phone cannot type into them." />
+                    </ui:CardExpander.Header>
+                    <ItemsControl ItemsSource="{Binding OtherSessions}" ItemTemplate="{StaticResource SessionTemplate}" />
+                </ui:CardExpander>
+            </StackPanel>
+        </StackPanel>
+    </StackPanel>
+</Page>

@@ -7,50 +7,43 @@
     xmlns:local="clr-namespace:Helm.Modules.Workspace"
     Module="{Binding Module}">
 
-    <!-- The PC side manages what is connected (VS Code windows today, Unity and other apps later); the phone is
-         where you steer the sessions. -->
-    <core:ModulePageBase.Resources>
-        <DataTemplate x:Key="SessionTemplate" DataType="{x:Type local:SessionRow}">
-            <Border Style="{DynamicResource HelmExpanderRow}" Padding="80,8,16,8">
-                <core:CardHeader Title="{Binding Title}" Description="{Binding Detail}" />
-            </Border>
-        </DataTemplate>
-    </core:ModulePageBase.Resources>
-
+    <!-- Workspace Controller's settings (Home → Utilities). What is connected is on WorkspaceContentPage. -->
     <StackPanel>
-        <!-- Host -->
-        <TextBlock Text="Host" Style="{DynamicResource HelmSectionHeader}" />
-        <ui:CardControl Margin="0,0,0,4" Icon="{ui:SymbolIcon Desktop24}">
+        <ui:CardControl Margin="0,0,0,4">
+            <ui:CardControl.Icon>
+                <ui:ImageIcon Width="24" Height="24" Source="{x:Static local:WorkspaceLogo.Image}" />
+            </ui:CardControl.Icon>
             <ui:CardControl.Header>
-                <core:CardHeader Title="This PC" Description="{Binding ListeningText}" />
+                <core:CardHeader Title="Open Workspace Controller" Description="The VS Code windows connected to this PC and their Claude sessions. Also in the menu and on Home." />
             </ui:CardControl.Header>
+            <ui:Button Appearance="Primary" Content="Open Workspace Controller" Click="Open_Click" />
         </ui:CardControl>
+
+        <!-- Claude Code -->
+        <TextBlock Text="Claude Code" Style="{DynamicResource HelmSectionHeader}" />
+        <ui:CardExpander Margin="0,0,0,4" IsExpanded="True" Icon="{ui:SymbolIcon PlugConnected24}">
+            <ui:CardExpander.Header>
+                <core:RowLayout>
+                    <core:CardHeader Title="Claude Code hooks" Description="Claude Code tells Helm when a session starts, works, needs you or finishes. Off removes Helm's hooks." />
+                    <ui:ToggleSwitch Margin="0,0,16,0" IsChecked="{Binding ManageClaudeHooks}" AutomationProperties.Name="Manage Claude Code hooks" />
+                </core:RowLayout>
+            </ui:CardExpander.Header>
+            <StackPanel>
+                <Border Style="{DynamicResource HelmExpanderRow}" BorderThickness="0">
+                    <core:RowLayout>
+                        <core:CardHeader Title="Status" Description="{Binding HooksText}" />
+                        <ui:Button Content="Install again" Command="{Binding InstallHooksCommand}" IsEnabled="{Binding IsRunning}" />
+                    </core:RowLayout>
+                </Border>
+                <Border Style="{DynamicResource HelmExpanderRow}">
+                    <core:CardHeader Title="Listening" Description="{Binding ListeningText}" />
+                </Border>
+            </StackPanel>
+        </ui:CardExpander>
 
         <!-- VS Code -->
         <TextBlock Text="VS Code" Style="{DynamicResource HelmSectionHeader}" />
-        <ui:CardExpander Margin="0,0,0,4" IsExpanded="True" Icon="{ui:SymbolIcon WindowConsole20}" IsEnabled="{Binding IsRunning}">
-            <ui:CardExpander.Header>
-                <core:CardHeader Title="Connected windows" Description="{Binding SessionsText}" />
-            </ui:CardExpander.Header>
-            <StackPanel>
-                <TextBlock Text="No VS Code window is connected. Open VS Code: Helm Bridge connects each window by itself."
-                           Style="{DynamicResource HelmSecondaryText}" TextWrapping="Wrap" Margin="0,4"
-                           Visibility="{Binding HasVsCodeWindows, Converter={StaticResource InverseBoolToVisibility}}" />
-                <ItemsControl ItemsSource="{Binding VsCodeWindows}">
-                    <ItemsControl.ItemTemplate>
-                        <DataTemplate DataType="{x:Type local:HostWindowRow}">
-                            <StackPanel>
-                                <Border Style="{DynamicResource HelmExpanderRow}">
-                                    <core:CardHeader Title="{Binding Name}" Description="{Binding Detail}" />
-                                </Border>
-                                <ItemsControl ItemsSource="{Binding Sessions}" ItemTemplate="{StaticResource SessionTemplate}" />
-                            </StackPanel>
-                        </DataTemplate>
-                    </ItemsControl.ItemTemplate>
-                </ItemsControl>
-            </StackPanel>
-        </ui:CardExpander>
-        <ui:CardExpander Margin="0,0,0,4" Icon="{ui:SymbolIcon Window24}">
+        <ui:CardExpander Margin="0,0,0,4" IsExpanded="True" Icon="{ui:SymbolIcon Window24}">
             <ui:CardExpander.Header>
                 <core:RowLayout>
                     <core:CardHeader Title="Helm Bridge for VS Code" Description="A small extension that lets Helm open a Claude tab and type into it. Helm installs and updates it." />
@@ -63,30 +56,6 @@
                     <ui:Button Content="Install again" Command="{Binding InstallBridgeCommand}" />
                 </core:RowLayout>
             </Border>
-        </ui:CardExpander>
-
-        <!-- Claude Code -->
-        <TextBlock Text="Claude Code" Style="{DynamicResource HelmSectionHeader}" />
-        <ui:CardExpander Margin="0,0,0,4" Icon="{ui:SymbolIcon PlugConnected24}">
-            <ui:CardExpander.Header>
-                <core:RowLayout>
-                    <core:CardHeader Title="Claude Code hooks" Description="Claude Code tells Helm when a session starts, works, needs you or finishes. Off removes Helm's hooks." />
-                    <ui:ToggleSwitch Margin="0,0,16,0" IsChecked="{Binding ManageClaudeHooks}" AutomationProperties.Name="Manage Claude Code hooks" />
-                </core:RowLayout>
-            </ui:CardExpander.Header>
-            <Border Style="{DynamicResource HelmExpanderRow}" BorderThickness="0">
-                <core:RowLayout>
-                    <core:CardHeader Title="Status" Description="{Binding HooksText}" />
-                    <ui:Button Content="Install again" Command="{Binding InstallHooksCommand}" IsEnabled="{Binding IsRunning}" />
-                </core:RowLayout>
-            </Border>
-        </ui:CardExpander>
-        <ui:CardExpander Margin="0,0,0,4" Icon="{ui:SymbolIcon Chat24}"
-                         Visibility="{Binding HasOtherSessions, Converter={StaticResource BoolToVisibility}}">
-            <ui:CardExpander.Header>
-                <core:CardHeader Title="Sessions outside VS Code" Description="Claude sessions in a terminal or another editor: Helm sees them but cannot type into them." />
-            </ui:CardExpander.Header>
-            <ItemsControl ItemsSource="{Binding OtherSessions}" ItemTemplate="{StaticResource SessionTemplate}" />
         </ui:CardExpander>
     </StackPanel>
 </core:ModulePageBase>

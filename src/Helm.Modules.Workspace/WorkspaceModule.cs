@@ -8,11 +8,12 @@ using Wpf.Ui.Controls;
 namespace Helm.Modules.Workspace;
 
 /// <summary>
-/// Workspace Controller, PC side: a host only. It sees every Claude Code session in VS Code through Claude's hooks
+/// Workspace Controller, PC side: the host and its management screen (what is connected); the phone is the remote
+/// control. It sees every Claude Code session in VS Code through Claude's hooks
 /// and types prompts into them through Helm Bridge; you follow and steer them from the phone. While on, it listens on
 /// 127.0.0.1 and on a named pipe, and shows under General → Running in background.
 /// </summary>
-public sealed class WorkspaceModule : HelmModuleBase
+public sealed class WorkspaceModule : HelmModuleBase, IModuleContent
 {
     private readonly HelmPaths _paths;
     private readonly PromptSender _sender;
@@ -43,6 +44,7 @@ public sealed class WorkspaceModule : HelmModuleBase
     public override SymbolRegular Icon => SymbolRegular.WindowConsole20;
     public override System.Windows.Media.ImageSource IconImage => WorkspaceLogo.Image;
     public override Type SettingsPageType => typeof(WorkspacePage);
+    public Type ContentPageType => typeof(WorkspaceContentPage);
     public override IReadOnlyList<HotkeyDefinition> Hotkeys => [];
 
     public ISettingsStore<WorkspaceSettings> Settings { get; }
