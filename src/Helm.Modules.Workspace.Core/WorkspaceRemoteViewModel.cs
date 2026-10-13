@@ -121,8 +121,33 @@ public sealed partial class WorkspaceRemoteViewModel : ObservableObject
     public ObservableCollection<ProjectTab> Projects { get; } = [];
     public ObservableCollection<SessionTab> SessionTabs { get; } = [];
 
-    /// <summary>The open conversation, oldest first (the view keeps the end in sight, as VS Code does).</summary>
-    public ObservableCollection<TimelineRow> Timeline { get; } = [];
+    /// <summary>
+    /// The open conversation, oldest first (the view keeps the end in sight, as VS Code does): its last
+    /// <see cref="TimelinePage"/> steps, more with <see cref="ShowEarlierCommand"/>. A new list when another session
+    /// opens (one redraw), changed in place while the same one goes on.
+    /// </summary>
+    public ObservableCollection<TimelineRow> Timeline { get; private set; } = [];
+
+    /// <summary>Steps drawn at first; older ones come on request (a phone draws a long timeline slowly).</summary>
+    public const int TimelinePage = 30;
+
+    private int _timelineLimit = TimelinePage;
+    private string? _timelineFor;
+
+    /// <summary>Older steps not drawn yet.</summary>
+    public int HiddenSteps { get; private set; }
+    public bool HasHiddenSteps => HiddenSteps > 0;
+    public string HiddenStepsText => HiddenSteps == 1 ? "Show 1 earlier step" : $"Show {Math.Min(HiddenSteps, TimelinePage)} earlier steps";
+
+    [RelayCommand]
+    private void ShowEarlier()
+    {
+        _timelineLimit += TimelinePage;
+        FillTimeline();
+    }
+
+    /// <summary>Tabs closed from the phone: gone at once, back only if the PC could not close them.</summary>
+    private readonly HashSet<string> _closing = new(StringComparer.Ordinal);
 
     public ObservableCollection<SkillInfo> Suggestions { get; } = [];
 
@@ -403,8 +428,11 @@ public sealed partial class WorkspaceRemoteViewModel : ObservableObject
     private void CloseTab(SessionTab? tab)
     {
         if (tab is null || !HostOnline) return;
+        // Gone from the strip now; the neighbour opens. VS Code closes it a moment later.
+        _closing.Add(tab.SessionId);
         Write(new WorkspaceCommand { MachineId = _machineId!, Kind = WorkspaceCommandKind.CloseTab, SessionId = tab.SessionId, CreatedAt = _time.GetLocalNow() },
             "Closing the tab in VS Code…");
+        Refresh();
     }
 
     [RelayCommand] private void ShowChatView() => ShowReview = false;
@@ -678,6 +706,8 @@ public sealed partial class WorkspaceRemoteViewModel : ObservableObject
             IsSending = false;
             _pending = pending with { Done = true, Failed = SendFailed };
             if (SendFailed) RevertOverride(pending);
+            // VS Code kept the tab: it comes back.
+            if (SendFailed && pending.Kind == WorkspaceCommandKind.CloseTab && pending.SessionId is { } kept) _closing.Remove(kept);
             // A new session: open it once its tab shows up.
             if (pending.Kind == WorkspaceCommandKind.NewSession && result.Status == WorkspaceCommandStatus.Received && result.SessionId is { } sid)
                 _awaitSession = sid;
@@ -717,7 +747,10 @@ public sealed partial class WorkspaceRemoteViewModel : ObservableObject
                 _folder = windows.FirstOrDefault(w => records.Any(r => r.SessionId == _sessionId && SameFolder(r.WindowFolder, w.Folder)))?.Folder ?? windows.FirstOrDefault()?.Folder;
             }
             var window = windows.FirstOrDefault(w => SameFolder(w.Folder, _folder));
-            var inTabs = window is null ? [] : Ordered(records.Where(r => SameFolder(r.WindowFolder, window.Folder)).ToList(), window);
+            var inWindow = window is null ? [] : records.Where(r => SameFolder(r.WindowFolder, window.Folder)).ToList();
+            // A tab closed from the phone stays hidden until the PC stops listing it (then it is forgotten).
+            _closing.RemoveWhere(id => !records.Any(r => r.SessionId == id && (window is null || window.OpenSessions.Count == 0 || window.OpenSessions.Contains(id))));
+            var inTabs = window is null ? [] : Ordered(inWindow.Where(r => !_closing.Contains(r.SessionId)).ToList(), window);
             if (_awaitSession is not null && inTabs.Any(r => r.SessionId == _awaitSession))
             {
                 _sessionId = _awaitSession;
@@ -838,6 +871,41 @@ public sealed partial class WorkspaceRemoteViewModel : ObservableObject
         {
             rows.Add(TimelineRow.Sending(first, SendStatus ?? "", SendFailed));
         }
+        // Only the last steps are drawn; "Show earlier" draws more.
+        var openId = IsNewSession ? null : Session?.SessionId;
+        if (openId != _timelineFor) _timelineLimit = TimelinePage;
+        HiddenSteps = Math.Max(0, rows.Count - _timelineLimit);
+        if (HiddenSteps > 0) rows = rows.GetRange(HiddenSteps, rows.Count - HiddenSteps);
+
+        if (openId != _timelineFor)
+        {
+            // Another conversation: one new list, drawn once (not row by row).
+            _timelineFor = openId;
+            Timeline = new ObservableCollection<TimelineRow>(rows);
+            Notify(nameof(Timeline));
+        }
+        else Merge(rows);
+        Notify(nameof(ShowStatus), nameof(HiddenSteps), nameof(HasHiddenSteps), nameof(HiddenStepsText));
+    }
+
+    /// <summary>
+    /// Puts <paramref name="rows"/> into the timeline touching only what changed. The record keeps a sliding window
+    /// of steps, so old ones fall off the front while new ones come at the end: rows are matched by their step, not by
+    /// their place, and the ones in between stay as they are (no redraw).
+    /// </summary>
+    private void Merge(List<TimelineRow> rows)
+    {
+        // Steps gone from the front.
+        while (Timeline.Count > 0 && rows.FindIndex(r => r.Same(Timeline[0])) is var at && at != 0)
+        {
+            if (at < 0) Timeline.RemoveAt(0);
+            else
+            {
+                // Earlier steps shown again ("Show earlier"): inserted before.
+                for (var i = 0; i < at; i++) Timeline.Insert(i, rows[i]);
+                break;
+            }
+        }
         for (var i = 0; i < rows.Count; i++)
         {
             if (i < Timeline.Count)
@@ -847,7 +915,6 @@ public sealed partial class WorkspaceRemoteViewModel : ObservableObject
             else Timeline.Add(rows[i]);
         }
         while (Timeline.Count > rows.Count) Timeline.RemoveAt(Timeline.Count - 1);
-        Notify(nameof(ShowStatus));
     }
 
     /// <summary>The prompt shows in the transcript (it arrived, and Claude has it).</summary>

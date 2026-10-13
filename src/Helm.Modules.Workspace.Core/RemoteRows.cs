@@ -65,7 +65,6 @@ public sealed class TimelineRow
             TranscriptItemKind.Tool => TimelineKind.Tool,
             _ => TimelineKind.Answer,
         };
-        if (Kind == TimelineKind.Answer) Blocks = MarkdownBlocks.Parse(item.Text);
     }
 
     private TimelineRow(TimelineKind kind, string text)
@@ -104,7 +103,10 @@ public sealed class TimelineRow
     public bool ShowRunning => IsTool && Item.Running;
     public bool HasIo => HasInput || HasOutput || ShowRunning;
 
-    public IReadOnlyList<MarkdownBlock> Blocks { get; } = [];
+    private IReadOnlyList<MarkdownBlock>? _blocks;
+
+    /// <summary>The answer as Markdown blocks, parsed the first time the row is drawn.</summary>
+    public IReadOnlyList<MarkdownBlock> Blocks => _blocks ??= Kind == TimelineKind.Answer ? MarkdownBlocks.Parse(Item.Text) : [];
 
     /// <summary>Your prompt from the phone: "✓ Claude received it" and the like; null for one from the transcript.</summary>
     public string? Delivery { get; init; }

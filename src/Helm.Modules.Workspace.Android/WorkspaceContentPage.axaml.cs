@@ -27,6 +27,7 @@ public partial class WorkspaceContentPage : UserControl, IFullPage
     private readonly EdgeHints _sessionEdges;
     private TopLevel? _topLevel;
     private bool _stickToEnd = true;
+    private System.Collections.ObjectModel.ObservableCollection<TimelineRow> _timeline = [];
 
     /// <summary>For the XAML runtime loader and the designer; the shell resolves the page from DI.</summary>
     public WorkspaceContentPage()
@@ -67,7 +68,8 @@ public partial class WorkspaceContentPage : UserControl, IFullPage
             _viewModel.OpenSession(machine, session);
         }
         _viewModel.PropertyChanged += OnViewModelChanged;
-        _viewModel.Timeline.CollectionChanged += OnTimelineChanged;
+        _timeline = _viewModel.Timeline;
+        _timeline.CollectionChanged += OnTimelineChanged;
         _viewModel.Projects.CollectionChanged += OnTabsChanged;
         _viewModel.SessionTabs.CollectionChanged += OnTabsChanged;
         _topLevel = TopLevel.GetTopLevel(this);
@@ -85,7 +87,7 @@ public partial class WorkspaceContentPage : UserControl, IFullPage
         // Pages are transient: a new one is made each time the tool opens.
         _module.PropertyChanged -= OnModuleChanged;
         _viewModel.PropertyChanged -= OnViewModelChanged;
-        _viewModel.Timeline.CollectionChanged -= OnTimelineChanged;
+        _timeline.CollectionChanged -= OnTimelineChanged;
         _viewModel.Projects.CollectionChanged -= OnTabsChanged;
         _viewModel.SessionTabs.CollectionChanged -= OnTabsChanged;
         if (_topLevel?.InputPane is { } pane) pane.StateChanged -= OnKeyboardChanged;
@@ -95,6 +97,15 @@ public partial class WorkspaceContentPage : UserControl, IFullPage
 
     private void OnViewModelChanged(object? sender, PropertyChangedEventArgs e)
     {
+        if (e.PropertyName == nameof(WorkspaceRemoteViewModel.Timeline))
+        {
+            // A new list for another conversation: follow it.
+            _timeline.CollectionChanged -= OnTimelineChanged;
+            _timeline = _viewModel.Timeline;
+            _timeline.CollectionChanged += OnTimelineChanged;
+            _stickToEnd = true;
+            Dispatcher.UIThread.Post(ScrollToEnd, DispatcherPriority.Background);
+        }
         if (e.PropertyName == nameof(WorkspaceRemoteViewModel.OpenSessionId))
         {
             ClearNotification();

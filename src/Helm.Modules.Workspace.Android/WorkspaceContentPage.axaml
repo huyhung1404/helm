@@ -653,6 +653,10 @@
                         <ScaleTransform ScaleX="{Binding TextScale}" ScaleY="{Binding TextScale}" />
                     </LayoutTransformControl.LayoutTransform>
                 <StackPanel Margin="14,10,14,18" IsVisible="{Binding IsSessionOpen}">
+                    <Button Classes="flat" HorizontalAlignment="Center" Padding="12,6" Margin="0,0,0,6" IsVisible="{Binding HasHiddenSteps}"
+                            Command="{Binding ShowEarlierCommand}">
+                        <TextBlock Text="{Binding HiddenStepsText}" Foreground="{DynamicResource VsLink}" FontSize="13" />
+                    </Button>
                     <ItemsControl x:Name="TimelineList" ItemsSource="{Binding Timeline}">
                         <ItemsControl.ItemTemplate>
                             <DataTemplate x:DataType="vm:TimelineRow">
