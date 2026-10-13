@@ -174,6 +174,8 @@ public sealed class WorkspaceEngine : IAsyncDisposable
                 return new WorkspaceCommandResult(command.Id, WorkspaceCommandStatus.Failed, "That Claude session is not open on this PC.");
             if (session.State == SessionState.Ended)
                 return new WorkspaceCommandResult(command.Id, WorkspaceCommandStatus.Failed, "That Claude session has ended.");
+            if (!IsConnected(session))
+                return new WorkspaceCommandResult(command.Id, WorkspaceCommandStatus.Failed, "That session is disconnected from Helm on the PC.");
             sessionId = session.SessionId;
             folder = session.Folder;
             window = WindowFor(folder);
@@ -182,6 +184,8 @@ public sealed class WorkspaceEngine : IAsyncDisposable
         {
             folder = command.Folder;
             window = WindowFor(folder);
+            if (window is not null && _settings.Current.WindowLinks.TryGetValue(SessionRegistry.FolderKey(window.Info.Folders.First(f => IsUnder(folder, f))), out var linked) && !linked)
+                return new WorkspaceCommandResult(command.Id, WorkspaceCommandStatus.Failed, "That VS Code window is disconnected from Helm on the PC.");
         }
         if (window is null)
             return new WorkspaceCommandResult(command.Id, WorkspaceCommandStatus.Failed, "No VS Code window with Helm Bridge has that folder open.");
@@ -232,12 +236,38 @@ public sealed class WorkspaceEngine : IAsyncDisposable
     private static bool Contains(BridgeConnection window, string folder) => window.Info.Folders.Any(f => IsUnder(folder, f));
 
     /// <summary>True when <paramref name="path"/> is <paramref name="root"/> or inside it.</summary>
-    internal static bool IsUnder(string path, string root)
+    internal static bool IsUnder(string path, string root) => WorkspaceFolders.IsUnder(path, root);
+
+    /// <summary>Whether the phone may see and steer <paramref name="session"/> (your choice on the PC).</summary>
+    public bool IsConnected(AgentSession session) =>
+        _settings.Current.IsConnected(session.SessionId, session.Folder, (_bridge?.Windows ?? []).SelectMany(w => w.Info.Folders));
+
+    /// <summary>Connects or disconnects one session (null: back to its window's choice).</summary>
+    public void SetSessionLink(string sessionId, bool? connected)
     {
-        if (string.IsNullOrEmpty(path) || string.IsNullOrEmpty(root)) return false;
-        var p = SessionRegistry.FolderKey(path);
-        var r = SessionRegistry.FolderKey(root);
-        return p == r || p.StartsWith(r + "\\", StringComparison.Ordinal);
+        _settings.Update(s =>
+        {
+            if (connected is { } c) s.SessionLinks[sessionId] = c;
+            else s.SessionLinks.Remove(sessionId);
+            // Oldest choices go first: sessions are not reopened after days.
+            var known = Registry.Sessions.Select(x => x.SessionId).ToHashSet();
+            foreach (var stale in s.SessionLinks.Keys.Where(k => !known.Contains(k)).Take(Math.Max(0, s.SessionLinks.Count - WorkspaceSettings.MaxSessionLinks)).ToList())
+                s.SessionLinks.Remove(stale);
+        });
+        Changed?.Invoke(this, EventArgs.Empty);
+    }
+
+    /// <summary>Connects or disconnects a whole VS Code window (its folder): its sessions follow unless set one by one.</summary>
+    public void SetWindowLink(string folder, bool connected)
+    {
+        var sessions = Registry.Sessions.Where(x => IsUnder(x.Folder, folder)).Select(x => x.SessionId).ToList();
+        _settings.Update(s =>
+        {
+            s.WindowLinks[SessionRegistry.FolderKey(folder)] = connected;
+            // The window's switch is the newest choice for everything in it.
+            foreach (var id in sessions) s.SessionLinks.Remove(id);
+        });
+        Changed?.Invoke(this, EventArgs.Empty);
     }
 
     private void OnSessionChanged(object? sender, SessionChange change)

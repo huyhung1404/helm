@@ -28,8 +28,11 @@ public sealed record WorkspaceCommand
 
     public DateTimeOffset CreatedAt { get; init; }
 
-    /// <summary>A command older than this is not run (the phone may have been offline; typing it late would surprise).</summary>
-    public static readonly TimeSpan MaxAge = TimeSpan.FromMinutes(2);
+    /// <summary>
+    /// A command older than this is not run (the phone may have been offline; typing it late would surprise). Some
+    /// minutes, so a phone clock a little off from the PC's does not refuse everything.
+    /// </summary>
+    public static readonly TimeSpan MaxAge = TimeSpan.FromMinutes(5);
 }
 
 public enum WorkspaceCommandStatus

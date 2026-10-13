@@ -7,6 +7,7 @@ public static class WorkspaceServices
 {
     public static IServiceCollection AddWorkspaceModule(this IServiceCollection services) =>
         services
+            .AddWorkspaceSync()
             .AddSingleton<IPromptKeyboard, WindowsPromptKeyboard>()
             .AddSingleton<PromptSender>()
             .AddSingleton<BridgeInstaller>()

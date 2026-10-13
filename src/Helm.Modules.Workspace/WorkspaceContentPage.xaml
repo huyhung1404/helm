@@ -12,7 +12,12 @@
     <Page.Resources>
         <DataTemplate x:Key="SessionTemplate" DataType="{x:Type local:SessionRow}">
             <Border Style="{DynamicResource HelmExpanderRow}" Padding="80,8,16,8">
-                <core:CardHeader Title="{Binding Title}" Description="{Binding Detail}" />
+                <core:RowLayout>
+                    <core:CardHeader Title="{Binding Title}" Description="{Binding Detail}" />
+                    <ui:ToggleSwitch IsChecked="{Binding IsConnected}" ToolTip="Connected to Helm: your phone sees and steers this session."
+                                     AutomationProperties.Name="{Binding Title, StringFormat=Connect {0}}"
+                                     Visibility="{Binding CanConnect, Converter={StaticResource BoolToVisibility}}" />
+                </core:RowLayout>
             </Border>
         </DataTemplate>
     </Page.Resources>
@@ -49,7 +54,12 @@
                             <DataTemplate DataType="{x:Type local:HostWindowRow}">
                                 <StackPanel>
                                     <Border Style="{DynamicResource HelmExpanderRow}">
-                                        <core:CardHeader Title="{Binding Name}" Description="{Binding Detail}" />
+                                        <core:RowLayout>
+                                            <core:CardHeader Title="{Binding Name}" Description="{Binding Detail}" />
+                                            <ui:ToggleSwitch IsChecked="{Binding IsConnected}" Content="Connected"
+                                                             ToolTip="Connect or disconnect every Claude session in this window, also the ones you open later."
+                                                             AutomationProperties.Name="{Binding Name, StringFormat=Connect window {0}}" />
+                                        </core:RowLayout>
                                     </Border>
                                     <ItemsControl ItemsSource="{Binding Sessions}" ItemTemplate="{StaticResource SessionTemplate}" />
                                 </StackPanel>

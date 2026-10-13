@@ -2,6 +2,8 @@ using Helm.Core.Hotkeys;
 using Helm.Core.Modules;
 using Helm.Core.Services;
 using Helm.Core.Settings;
+using Helm.Core.Sync;
+using Helm.Shell.Services;
 using Microsoft.Extensions.Logging;
 using Wpf.Ui.Controls;
 
@@ -21,19 +23,32 @@ public sealed class WorkspaceModule : HelmModuleBase, IModuleContent
     private readonly IBackgroundActivities _activities;
     private readonly ILogger<WorkspaceModule> _logger;
     private readonly SemaphoreSlim _gate = new(1, 1);
+    private readonly ISyncedCollection<WorkspaceHostRecord> _hosts;
+    private readonly ISyncedCollection<WorkspaceSessionRecord> _sessions;
+    private readonly ISyncedCollection<WorkspaceCommand> _commands;
+    private readonly ISyncedCollection<WorkspaceResultRecord> _results;
+    private readonly IDeviceInfo? _device;
     private WorkspaceEngine? _engine;
+    private WorkspaceRelay? _relay;
     private BackgroundActivity? _activity;
     private string? _hooksProblem;
     private string? _bridgeProblem;
 
     public WorkspaceModule(ISettingsStoreFactory settings, HelmPaths paths, PromptSender sender, BridgeInstaller installer,
-        IBackgroundActivities activities, ILogger<WorkspaceModule> logger)
+        IBackgroundActivities activities, ISyncedCollection<WorkspaceHostRecord> hosts, ISyncedCollection<WorkspaceSessionRecord> sessions,
+        ISyncedCollection<WorkspaceCommand> commands, ISyncedCollection<WorkspaceResultRecord> results, ILogger<WorkspaceModule> logger,
+        IDeviceInfo? device = null)
     {
         Settings = settings.Get<WorkspaceSettings>(WorkspaceIds.ModuleId);
         _paths = paths;
         _sender = sender;
         _installer = installer;
         _activities = activities;
+        _hosts = hosts;
+        _sessions = sessions;
+        _commands = commands;
+        _results = results;
+        _device = device;
         _logger = logger;
     }
 
@@ -81,6 +96,8 @@ public sealed class WorkspaceModule : HelmModuleBase, IModuleContent
             }
             _engine.Changed += OnEngineChanged;
             if (Settings.Current.ManageClaudeHooks) _hooksProblem = _engine.InstallClaudeHooks(HooksFileOverride());
+            // The phone's link: this PC and its connected sessions out, the phone's commands in (Helm Sync).
+            _relay = new WorkspaceRelay(_engine, _hosts, _sessions, _commands, _results, _device?.DeviceName ?? Environment.MachineName, null, _logger);
             _activity = _activities.Start(Id, DisplayName, Detail(), StopFromGeneralAsync);
             UpdateStatus();
         }
@@ -99,6 +116,8 @@ public sealed class WorkspaceModule : HelmModuleBase, IModuleContent
         {
             _activity?.Dispose();
             _activity = null;
+            if (_relay is not null) await _relay.DisposeAsync().ConfigureAwait(false);
+            _relay = null;
             if (_engine is null) return;
             _engine.Changed -= OnEngineChanged;
             await _engine.DisposeAsync().ConfigureAwait(false);

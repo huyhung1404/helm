@@ -21,6 +21,12 @@
 
         <!-- Claude Code -->
         <TextBlock Text="Claude Code" Style="{DynamicResource HelmSectionHeader}" />
+        <ui:CardControl Margin="0,0,0,4" Icon="{ui:SymbolIcon LinkSquare24}">
+            <ui:CardControl.Header>
+                <core:CardHeader Title="Connect new sessions" Description="A new Claude session is shared with your phone right away. Off: you connect each one (or a whole window) on the Workspace Controller page." />
+            </ui:CardControl.Header>
+            <ui:ToggleSwitch IsChecked="{Binding ConnectNewSessions}" AutomationProperties.Name="Connect new sessions" />
+        </ui:CardControl>
         <ui:CardExpander Margin="0,0,0,4" IsExpanded="True" Icon="{ui:SymbolIcon PlugConnected24}">
             <ui:CardExpander.Header>
                 <core:RowLayout>

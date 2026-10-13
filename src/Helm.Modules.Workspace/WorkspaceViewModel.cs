@@ -7,10 +7,26 @@ using Helm.Shell.Services;
 
 namespace Helm.Modules.Workspace;
 
-/// <summary>One Claude session as this PC sees it (read-only: the phone steers it).</summary>
-public sealed class SessionRow(AgentSession session)
+/// <summary>One Claude session as this PC sees it. The phone steers it; here you only connect or disconnect it.</summary>
+public sealed class SessionRow(AgentSession session, bool connected = true, Action<bool>? setConnected = null)
 {
+    private bool _connected = connected;
+
     public AgentSession Session { get; } = session;
+
+    /// <summary>The phone sees and steers it. Hidden for sessions Helm cannot type into (outside VS Code).</summary>
+    public bool IsConnected
+    {
+        get => _connected;
+        set
+        {
+            if (_connected == value) return;
+            _connected = value;
+            setConnected?.Invoke(value);
+        }
+    }
+
+    public bool CanConnect => setConnected is not null;
 
     public string Title => Session.Title.Length > 0 ? Session.Title : "New conversation";
 
@@ -30,9 +46,23 @@ public sealed class SessionRow(AgentSession session)
 }
 
 /// <summary>An app window connected to this host (a VS Code window today; Unity and others later) with its sessions.</summary>
-public sealed class HostWindowRow(string name, string detail, IReadOnlyList<SessionRow> sessions)
+public sealed class HostWindowRow(string name, string detail, IReadOnlyList<SessionRow> sessions, bool connected = true, Action<bool>? setConnected = null)
 {
+    private bool _connected = connected;
+
     public string Name { get; } = name;
+
+    /// <summary>The whole window: all its sessions, also the ones opened later (unless one is set on its own).</summary>
+    public bool IsConnected
+    {
+        get => _connected;
+        set
+        {
+            if (_connected == value) return;
+            _connected = value;
+            setConnected?.Invoke(value);
+        }
+    }
 
     /// <summary>"c:\workpp · 2 Claude tabs".</summary>
     public string Detail { get; } = detail;
@@ -55,6 +85,7 @@ public sealed partial class WorkspaceViewModel : ObservableObject
 
     [ObservableProperty] private bool _manageClaudeHooks;
     [ObservableProperty] private bool _manageBridgeExtension;
+    [ObservableProperty] private bool _connectNewSessions;
     [ObservableProperty] private string _listeningText = "";
     [ObservableProperty] private string _hooksText = "";
     [ObservableProperty] private string _bridgeText = "";
@@ -70,6 +101,7 @@ public sealed partial class WorkspaceViewModel : ObservableObject
         _loading = true;
         ManageClaudeHooks = _store.Current.ManageClaudeHooks;
         ManageBridgeExtension = _store.Current.ManageBridgeExtension;
+        ConnectNewSessions = _store.Current.ConnectNewSessions;
         _loading = false;
         module.Changed += (_, _) => _ui.Post(Refresh);
         Refresh();
@@ -104,6 +136,13 @@ public sealed partial class WorkspaceViewModel : ObservableObject
         if (value) _ = Module.EnsureBridgeAsync();
     }
 
+    partial void OnConnectNewSessionsChanged(bool value)
+    {
+        if (_loading) return;
+        _store.Update(s => s.ConnectNewSessions = value);
+        Refresh();
+    }
+
     [RelayCommand]
     private void InstallHooks() => Module.InstallHooks();
 
@@ -123,8 +162,13 @@ public sealed partial class WorkspaceViewModel : ObservableObject
             var info = w.Connection.Info;
             var folders = info.Folders.Count == 0 ? "No folder open" : string.Join(", ", info.Folders);
             var tabs = info.ClaudeTabs == 1 ? "1 Claude tab" : $"{info.ClaudeTabs} Claude tabs";
-            VsCodeWindows.Add(new HostWindowRow(w.Name.Length > 0 ? w.Name : "Empty window", $"{folders} · {tabs}",
-                w.Sessions.OrderByDescending(s => s.UpdatedAt).Select(s => new SessionRow(s)).ToList()));
+            var folder = info.Folders.FirstOrDefault();
+            var windowConnected = folder is null || (_store.Current.WindowLinks.TryGetValue(SessionRegistry.FolderKey(folder), out var linked) ? linked : _store.Current.ConnectNewSessions);
+            var sessions = w.Sessions.OrderByDescending(s => s.UpdatedAt)
+                .Select(s => new SessionRow(s, engine!.IsConnected(s), on => { engine.SetSessionLink(s.SessionId, on); }))
+                .ToList();
+            VsCodeWindows.Add(new HostWindowRow(w.Name.Length > 0 ? w.Name : "Empty window", $"{folders} · {tabs}", sessions,
+                windowConnected, folder is null ? null : on => engine!.SetWindowLink(folder, on)));
         }
         foreach (var s in engine?.OtherSessions() ?? []) OtherSessions.Add(new SessionRow(s));
         OnPropertyChanged(nameof(HasVsCodeWindows));

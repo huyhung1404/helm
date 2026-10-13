@@ -28,4 +28,41 @@ public sealed class WorkspaceSettings : IVersionedSettings
 
     /// <summary>Helm installs and updates its small VS Code extension (Helm Bridge).</summary>
     public bool ManageBridgeExtension { get; set; } = true;
+
+    /// <summary>A session nobody chose for is connected (the phone sees and steers it). Off: you connect each one.</summary>
+    public bool ConnectNewSessions { get; set; } = true;
+
+    /// <summary>Your choice per VS Code window (by folder, see <see cref="SessionRegistry.FolderKey"/>): all its sessions.</summary>
+    public Dictionary<string, bool> WindowLinks { get; set; } = new(StringComparer.OrdinalIgnoreCase);
+
+    /// <summary>Your choice per session (by id); wins over the window's.</summary>
+    public Dictionary<string, bool> SessionLinks { get; set; } = new(StringComparer.Ordinal);
+
+    /// <summary>Choices kept at most; the oldest sessions' go first (sessions are not reopened after days).</summary>
+    public const int MaxSessionLinks = 400;
+
+    /// <summary>Whether the phone may see and steer this session: the session's choice, else its window's, else the default.</summary>
+    public bool IsConnected(string sessionId, string folder, IEnumerable<string> windowFolders)
+    {
+        if (SessionLinks.TryGetValue(sessionId, out var own)) return own;
+        foreach (var root in windowFolders.OrderByDescending(f => f.Length))
+        {
+            if (!WorkspaceFolders.IsUnder(folder, root)) continue;
+            if (WindowLinks.TryGetValue(SessionRegistry.FolderKey(root), out var window)) return window;
+            break;
+        }
+        return ConnectNewSessions;
+    }
+}
+
+public static class WorkspaceFolders
+{
+    /// <summary>True when <paramref name="path"/> is <paramref name="root"/> or inside it.</summary>
+    public static bool IsUnder(string path, string root)
+    {
+        if (string.IsNullOrEmpty(path) || string.IsNullOrEmpty(root)) return false;
+        var p = SessionRegistry.FolderKey(path);
+        var r = SessionRegistry.FolderKey(root);
+        return p == r || p.StartsWith(r + "\\", StringComparison.Ordinal);
+    }
 }
