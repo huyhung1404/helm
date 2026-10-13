@@ -3,6 +3,18 @@
 All notable changes to Helm. The top section is used as the GitHub release body and as the Velopack release notes.
 Format: [Keep a Changelog](https://keepachangelog.com), versions follow [SemVer](https://semver.org).
 
+## [Unreleased]
+
+### Added
+- **Workspace Controller (PC host, first part): Helm sees your Claude Code sessions in VS Code.** Turn it on and Helm
+  adds its own hooks to Claude Code's settings (next to your other hooks, which stay as they are; a backup of the file
+  is kept before Helm first changes it) and installs Helm Bridge, a small VS Code extension that lets Helm open a
+  Claude tab and type into it. The page lists the connected VS Code windows with their Claude sessions (working, needs
+  permission, asked a question, done) and also the sessions that were open before Helm started. The phone app that
+  follows and steers them comes next; every session is tied to its PC, so several PCs never mix.
+- **General → Running in background.** Every tool that keeps something running is listed with a Stop button that
+  turns it off.
+
 ## [0.41.0] - 2026-10-12
 
 ### Added

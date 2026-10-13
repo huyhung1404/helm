@@ -8,17 +8,16 @@ using Wpf.Ui.Controls;
 namespace Helm.Modules.Workspace;
 
 /// <summary>
-/// Workspace Controller (PC side): sees every Claude Code session in VS Code through Claude's hooks, and types prompts
-/// into them through Helm Bridge, so the phone (and this PC's page) can follow and steer them. While on, it listens on
+/// Workspace Controller, PC side: a host only. It sees every Claude Code session in VS Code through Claude's hooks
+/// and types prompts into them through Helm Bridge; you follow and steer them from the phone. While on, it listens on
 /// 127.0.0.1 and on a named pipe, and shows under General → Running in background.
 /// </summary>
-public sealed class WorkspaceModule : HelmModuleBase, IModuleContent
+public sealed class WorkspaceModule : HelmModuleBase
 {
     private readonly HelmPaths _paths;
     private readonly PromptSender _sender;
     private readonly BridgeInstaller _installer;
     private readonly IBackgroundActivities _activities;
-    private readonly IUserNotifications? _notifications;
     private readonly ILogger<WorkspaceModule> _logger;
     private readonly SemaphoreSlim _gate = new(1, 1);
     private WorkspaceEngine? _engine;
@@ -27,25 +26,23 @@ public sealed class WorkspaceModule : HelmModuleBase, IModuleContent
     private string? _bridgeProblem;
 
     public WorkspaceModule(ISettingsStoreFactory settings, HelmPaths paths, PromptSender sender, BridgeInstaller installer,
-        IBackgroundActivities activities, ILogger<WorkspaceModule> logger, IUserNotifications? notifications = null)
+        IBackgroundActivities activities, ILogger<WorkspaceModule> logger)
     {
         Settings = settings.Get<WorkspaceSettings>(WorkspaceIds.ModuleId);
         _paths = paths;
         _sender = sender;
         _installer = installer;
         _activities = activities;
-        _notifications = notifications;
         _logger = logger;
     }
 
     public override string Id => WorkspaceIds.ModuleId;
     public override string DisplayName => "Workspace Controller";
-    public override string Description => "Follow your Claude Code sessions in VS Code and give them their next task, from this page or your phone.";
+    public override string Description => "Lets your phone follow your Claude Code sessions in VS Code on this PC and give them their next task.";
     public override ModuleGroup Group => ModuleGroup.WindowsAndDesktop;
     public override SymbolRegular Icon => SymbolRegular.WindowConsole20;
     public override System.Windows.Media.ImageSource IconImage => WorkspaceLogo.Image;
     public override Type SettingsPageType => typeof(WorkspacePage);
-    public Type ContentPageType => typeof(WorkspaceContentPage);
     public override IReadOnlyList<HotkeyDefinition> Hotkeys => [];
 
     public ISettingsStore<WorkspaceSettings> Settings { get; }
@@ -71,7 +68,7 @@ public sealed class WorkspaceModule : HelmModuleBase, IModuleContent
             StatusMessage = null;
             try
             {
-                _engine = WorkspaceEngine.Start(Settings, _paths, _sender, _notifications, _logger,
+                _engine = WorkspaceEngine.Start(Settings, _paths, _sender, _logger,
                     bridgePipe: Environment.GetEnvironmentVariable("HELM_BRIDGE_PIPE"));
             }
             catch (Exception ex) when (ex is System.Net.Sockets.SocketException or IOException)

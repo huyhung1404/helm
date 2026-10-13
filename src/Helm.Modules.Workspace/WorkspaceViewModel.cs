@@ -7,56 +7,47 @@ using Helm.Shell.Services;
 
 namespace Helm.Modules.Workspace;
 
-/// <summary>One Claude session in the list.</summary>
-public sealed class SessionRow(AgentSession session, bool canSend)
+/// <summary>One Claude session as this PC sees it (read-only: the phone steers it).</summary>
+public sealed class SessionRow(AgentSession session)
 {
     public AgentSession Session { get; } = session;
-    public string SessionId => Session.SessionId;
-    public bool CanSend { get; } = canSend;
 
     public string Title => Session.Title.Length > 0 ? Session.Title : "New conversation";
 
-    public string Folder => Session.Folder;
+    /// <summary>"Working · 11:41".</summary>
+    public string Detail => $"{StateText} · {Session.UpdatedAt.ToLocalTime():HH:mm}";
 
     public string StateText => Session.State switch
     {
         SessionState.Idle => "Ready",
         SessionState.Working => "Working",
-        SessionState.NeedsPermission => "Needs your permission" + (Session.Waiting is { Length: > 0 } w ? $" · {w}" : ""),
-        SessionState.Question => "Asked you a question",
+        SessionState.NeedsPermission => "Needs permission",
+        SessionState.Question => "Asked a question",
         SessionState.Done => "Done",
         SessionState.Ended => "Ended",
         _ => "",
     };
-
-    public bool IsWorking => Session.State == SessionState.Working;
-    public bool NeedsYou => Session.NeedsYou;
-    public bool IsDone => Session.State == SessionState.Done;
-
-    public string LastPrompt => Session.LastPrompt ?? "";
-    public string LastReply => Session.LastReply ?? "";
-    public bool HasReply => !string.IsNullOrWhiteSpace(Session.LastReply);
-    public string Updated => Session.UpdatedAt.ToLocalTime().ToString("HH:mm");
 }
 
-/// <summary>A VS Code window with its sessions.</summary>
-public sealed class WindowRow(string name, string folders, IReadOnlyList<SessionRow> sessions, BridgeConnection? connection)
+/// <summary>An app window connected to this host (a VS Code window today; Unity and others later) with its sessions.</summary>
+public sealed class HostWindowRow(string name, string detail, IReadOnlyList<SessionRow> sessions)
 {
     public string Name { get; } = name;
-    public string Folders { get; } = folders;
-    public IReadOnlyList<SessionRow> Sessions { get; } = sessions;
-    public BridgeConnection? Connection { get; } = connection;
-    public bool HasSessions => Sessions.Count > 0;
 
-    /// <summary>The window's first folder: where a new session opens.</summary>
-    public string? Folder => Connection?.Info.Folders.FirstOrDefault();
+    /// <summary>"c:\workpp · 2 Claude tabs".</summary>
+    public string Detail { get; } = detail;
+
+    public IReadOnlyList<SessionRow> Sessions { get; } = sessions;
+
+    public bool HasSessions => Sessions.Count > 0;
 }
 
-/// <summary>Workspace Controller on the PC: the session list and composer (content page) and the options (settings page).</summary>
+/// <summary>
+/// Workspace Controller's settings page on the PC. The PC is only the host: this shows that it is listening, that
+/// Claude's hooks and Helm Bridge are in place, and which sessions it sees. Steering happens on the phone.
+/// </summary>
 public sealed partial class WorkspaceViewModel : ObservableObject
 {
-    public const string DefaultModel = "Default";
-
     private readonly ISettingsStore<WorkspaceSettings> _store;
     private readonly IUiDispatcher _ui;
     private readonly IDeviceInfo? _device;
@@ -64,28 +55,10 @@ public sealed partial class WorkspaceViewModel : ObservableObject
 
     [ObservableProperty] private bool _manageClaudeHooks;
     [ObservableProperty] private bool _manageBridgeExtension;
-    [ObservableProperty] private bool _notifyOnPc;
-
-    [ObservableProperty] private SessionRow? _selectedSession;
-    [ObservableProperty] private WindowRow? _newSessionWindow;
-    [ObservableProperty] private string _newSessionModel = DefaultModel;
-
-    [ObservableProperty]
-    [NotifyCanExecuteChangedFor(nameof(SendCommand))]
-    [NotifyCanExecuteChangedFor(nameof(StartSessionCommand))]
-    private string _prompt = "";
-
-    [ObservableProperty]
-    [NotifyCanExecuteChangedFor(nameof(SendCommand))]
-    [NotifyCanExecuteChangedFor(nameof(StartSessionCommand))]
-    private bool _isSending;
-
-    [ObservableProperty] private string? _sendStatus;
-    [ObservableProperty] private bool _sendFailed;
-
     [ObservableProperty] private string _listeningText = "";
     [ObservableProperty] private string _hooksText = "";
     [ObservableProperty] private string _bridgeText = "";
+    [ObservableProperty] private string _sessionsText = "";
     [ObservableProperty] private bool _isRunning;
 
     public WorkspaceViewModel(WorkspaceModule module, IUiDispatcher ui, IDeviceInfo? device = null)
@@ -97,7 +70,6 @@ public sealed partial class WorkspaceViewModel : ObservableObject
         _loading = true;
         ManageClaudeHooks = _store.Current.ManageClaudeHooks;
         ManageBridgeExtension = _store.Current.ManageBridgeExtension;
-        NotifyOnPc = _store.Current.NotifyOnPc;
         _loading = false;
         module.Changed += (_, _) => _ui.Post(Refresh);
         Refresh();
@@ -107,18 +79,15 @@ public sealed partial class WorkspaceViewModel : ObservableObject
 
     public string MachineName => _device?.DeviceName ?? Environment.MachineName;
 
-    public ObservableCollection<WindowRow> Windows { get; } = [];
+    /// <summary>The connected VS Code windows, each with its Claude sessions (newest first).</summary>
+    public ObservableCollection<HostWindowRow> VsCodeWindows { get; } = [];
 
-    /// <summary>Sessions outside a VS Code window with Helm Bridge (a terminal, another editor): shown, not steerable.</summary>
+    /// <summary>Sessions outside a connected VS Code window (a terminal, another editor): seen, not steerable.</summary>
     public ObservableCollection<SessionRow> OtherSessions { get; } = [];
 
+    public bool HasVsCodeWindows => VsCodeWindows.Count > 0;
+
     public bool HasOtherSessions => OtherSessions.Count > 0;
-
-    public bool HasWindows => Windows.Count > 0;
-
-    public bool HasSelection => SelectedSession is not null;
-
-    public IReadOnlyList<string> Models { get; } = [DefaultModel, "opus", "sonnet", "haiku"];
 
     partial void OnManageClaudeHooksChanged(bool value)
     {
@@ -135,89 +104,8 @@ public sealed partial class WorkspaceViewModel : ObservableObject
         if (value) _ = Module.EnsureBridgeAsync();
     }
 
-    partial void OnNotifyOnPcChanged(bool value)
-    {
-        if (!_loading) _store.Update(s => s.NotifyOnPc = value);
-    }
-
-    partial void OnSelectedSessionChanged(SessionRow? value)
-    {
-        OnPropertyChanged(nameof(HasSelection));
-        SendCommand.NotifyCanExecuteChanged();
-    }
-
-    private bool CanSend() => !IsSending && SelectedSession is { CanSend: true } && !string.IsNullOrWhiteSpace(Prompt) && Module.Engine is not null;
-
-    [RelayCommand(CanExecute = nameof(CanSend))]
-    private Task SendAsync() => RunAsync(new WorkspaceCommand
-    {
-        MachineId = Module.Engine!.MachineId,
-        Kind = WorkspaceCommandKind.Prompt,
-        SessionId = SelectedSession!.SessionId,
-        Folder = SelectedSession.Folder,
-        Text = Prompt,
-        CreatedAt = DateTimeOffset.Now,
-    });
-
-    private bool CanStartSession() => !IsSending && !string.IsNullOrWhiteSpace(Prompt) && Module.Engine is not null;
-
-    [RelayCommand(CanExecute = nameof(CanStartSession))]
-    private Task StartSessionAsync()
-    {
-        var window = NewSessionWindow ?? Windows.FirstOrDefault(w => w.Connection is not null);
-        if (window?.Folder is not { } folder)
-        {
-            SendFailed = true;
-            SendStatus = "Open a folder in VS Code (with Helm Bridge) first.";
-            return Task.CompletedTask;
-        }
-        return RunAsync(new WorkspaceCommand
-        {
-            MachineId = Module.Engine!.MachineId,
-            Kind = WorkspaceCommandKind.NewSession,
-            Folder = folder,
-            Text = Prompt,
-            Model = NewSessionModel == DefaultModel ? null : NewSessionModel,
-            CreatedAt = DateTimeOffset.Now,
-        });
-    }
-
-    private async Task RunAsync(WorkspaceCommand command)
-    {
-        if (Module.Engine is not { } engine) return;
-        IsSending = true;
-        SendFailed = false;
-        SendStatus = "Typing it into VS Code…";
-        try
-        {
-            var result = await engine.RunAsync(command, CancellationToken.None).ConfigureAwait(true);
-            SendFailed = result.Status == WorkspaceCommandStatus.Failed;
-            SendStatus = result.Status switch
-            {
-                WorkspaceCommandStatus.Received => "Claude received it.",
-                WorkspaceCommandStatus.Sent => result.Error,
-                _ => result.Error ?? "It could not be sent.",
-            };
-            if (!SendFailed) Prompt = "";
-        }
-        finally
-        {
-            IsSending = false;
-        }
-    }
-
     [RelayCommand]
     private void InstallHooks() => Module.InstallHooks();
-
-    [RelayCommand]
-    private void RemoveHooks()
-    {
-        Module.RemoveHooks();
-        _loading = true;
-        ManageClaudeHooks = false;
-        _loading = false;
-        _store.Update(s => s.ManageClaudeHooks = false);
-    }
 
     [RelayCommand]
     private Task InstallBridgeAsync() => Module.EnsureBridgeAsync();
@@ -226,38 +114,38 @@ public sealed partial class WorkspaceViewModel : ObservableObject
     {
         var engine = Module.Engine;
         IsRunning = engine is not null;
-        var selected = SelectedSession?.SessionId;
-        var newWindow = NewSessionWindow?.Name;
 
-        Windows.Clear();
+        VsCodeWindows.Clear();
         OtherSessions.Clear();
-        if (engine is not null)
+        var windows = engine?.Windows() ?? [];
+        foreach (var w in windows)
         {
-            foreach (var w in engine.Windows())
-            {
-                var rows = w.Sessions.Select(s => new SessionRow(s, canSend: s.State != SessionState.Ended)).ToList();
-                Windows.Add(new WindowRow(w.Name.Length > 0 ? w.Name : "(no folder)", string.Join(", ", w.Connection.Info.Folders), rows, w.Connection));
-            }
-            foreach (var s in engine.OtherSessions()) OtherSessions.Add(new SessionRow(s, canSend: false));
+            var info = w.Connection.Info;
+            var folders = info.Folders.Count == 0 ? "No folder open" : string.Join(", ", info.Folders);
+            var tabs = info.ClaudeTabs == 1 ? "1 Claude tab" : $"{info.ClaudeTabs} Claude tabs";
+            VsCodeWindows.Add(new HostWindowRow(w.Name.Length > 0 ? w.Name : "Empty window", $"{folders} · {tabs}",
+                w.Sessions.OrderByDescending(s => s.UpdatedAt).Select(s => new SessionRow(s)).ToList()));
         }
-        SelectedSession = Windows.SelectMany(w => w.Sessions).Concat(OtherSessions).FirstOrDefault(s => s.SessionId == selected);
-        NewSessionWindow = Windows.FirstOrDefault(w => w.Name == newWindow) ?? Windows.FirstOrDefault();
-        OnPropertyChanged(nameof(HasWindows));
+        foreach (var s in engine?.OtherSessions() ?? []) OtherSessions.Add(new SessionRow(s));
+        OnPropertyChanged(nameof(HasVsCodeWindows));
         OnPropertyChanged(nameof(HasOtherSessions));
+        var all = windows.SelectMany(w => w.Sessions).Concat(OtherSessions.Select(r => r.Session)).ToList();
 
         ListeningText = engine is null
-            ? "Off."
-            : $"Listening for Claude Code on 127.0.0.1:{engine.HookPort}. This PC: {MachineName}.";
+            ? "Off. Turn the tool on to let your phone reach this PC."
+            : $"This PC is “{MachineName}”. Helm listens for Claude Code on 127.0.0.1:{engine.HookPort}.";
         HooksText = !_store.Current.ManageClaudeHooks
-            ? "Helm does not manage its hooks. Without them Helm cannot see your Claude sessions."
-            : Module.HooksProblem ?? "Helm's hooks are in Claude Code's settings (your other hooks stay as they are).";
+            ? "Off: Helm does not add its hooks, so it cannot see your Claude sessions."
+            : Module.HooksProblem ?? "Helm's hooks are in Claude Code's settings. Your other hooks stay as they are.";
+        var connected = windows.Count;
         BridgeText = !_store.Current.ManageBridgeExtension
-            ? "Helm does not install Helm Bridge."
+            ? "Off: Helm does not install Helm Bridge."
             : Module.BridgeProblem ?? (BridgeInstaller.IsInstalled()
-                ? $"Helm Bridge {BridgeInstaller.Version} is installed. {Plural(Windows.Count(w => w.Connection is not null), "VS Code window")} connected."
+                ? $"Helm Bridge {BridgeInstaller.Version} is installed. {Plural(connected, "VS Code window")} connected."
                 : "Installing Helm Bridge into VS Code…");
-        SendCommand.NotifyCanExecuteChanged();
-        StartSessionCommand.NotifyCanExecuteChanged();
+        SessionsText = engine is null
+            ? "Turn the tool on to see the VS Code windows connected to this PC."
+            : $"{Plural(windows.Count, "window")} connected · {Plural(all.Count, "Claude session")}, {all.Count(s => s.State == SessionState.Working)} working.";
     }
 
     private static string Plural(int n, string what) => n == 1 ? $"1 {what}" : $"{n} {what}s";

@@ -23,12 +23,9 @@ public sealed class WorkspaceSettings : IVersionedSettings
     /// <summary>Bearer token in the hook's header, so no other page or program can post fake events.</summary>
     public string HookToken { get; set; } = "";
 
-    /// <summary>Helm adds its hooks to Claude Code's user settings (and removes them when the tool is turned off).</summary>
+    /// <summary>Helm keeps its hooks in Claude Code's user settings; turning this off takes them out.</summary>
     public bool ManageClaudeHooks { get; set; } = true;
 
     /// <summary>Helm installs and updates its small VS Code extension (Helm Bridge).</summary>
     public bool ManageBridgeExtension { get; set; } = true;
-
-    /// <summary>Show a Windows notification when a Claude session finishes or needs you while you are elsewhere.</summary>
-    public bool NotifyOnPc { get; set; }
 }

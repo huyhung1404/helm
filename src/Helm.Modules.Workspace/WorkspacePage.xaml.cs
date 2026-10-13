@@ -1,20 +1,13 @@
-using System.Windows;
-using Helm.Core.Services;
 using Helm.Core.Ui;
 
 namespace Helm.Modules.Workspace;
 
-/// <summary>Workspace Controller's settings (Home → Utilities). The sessions are on <see cref="WorkspaceContentPage"/>.</summary>
+/// <summary>Workspace Controller on the PC: the host's status and options. The phone steers the sessions.</summary>
 public partial class WorkspacePage : ModulePageBase
 {
-    private readonly IShellNavigation _navigation;
-
-    public WorkspacePage(WorkspaceViewModel viewModel, IShellNavigation navigation)
+    public WorkspacePage(WorkspaceViewModel viewModel)
     {
-        _navigation = navigation;
         DataContext = viewModel;
         InitializeComponent();
     }
-
-    private void Open_Click(object sender, RoutedEventArgs e) => _navigation.ShowPage(typeof(WorkspaceContentPage));
 }

@@ -10,6 +10,5 @@ public static class WorkspaceServices
             .AddSingleton<IPromptKeyboard, WindowsPromptKeyboard>()
             .AddSingleton<PromptSender>()
             .AddSingleton<BridgeInstaller>()
-            .AddHelmModule<WorkspaceModule, WorkspacePage, WorkspaceViewModel>()
-            .AddSingleton<WorkspaceContentPage>();
+            .AddHelmModule<WorkspaceModule, WorkspacePage, WorkspaceViewModel>();
 }

@@ -26,7 +26,8 @@ public sealed class WorkspaceEngine : IAsyncDisposable
 
     private readonly ISettingsStore<WorkspaceSettings> _settings;
     private readonly PromptSender _sender;
-    private readonly IUserNotifications? _notifications;
+    private readonly string? _projectsRoot;
+    private readonly ConcurrentDictionary<string, byte> _seeded = new(StringComparer.OrdinalIgnoreCase);
     private readonly ILogger _logger;
     private readonly TimeProvider _time;
     private readonly ConcurrentDictionary<string, TaskCompletionSource<string>> _receipts = new();
@@ -35,12 +36,12 @@ public sealed class WorkspaceEngine : IAsyncDisposable
     private BridgeHost? _bridge;
 
     private WorkspaceEngine(ISettingsStore<WorkspaceSettings> settings, SessionRegistry registry, PromptSender sender,
-        IUserNotifications? notifications, ILogger logger, TimeProvider time)
+        string? projectsRoot, ILogger logger, TimeProvider time)
     {
         _settings = settings;
         Registry = registry;
         _sender = sender;
-        _notifications = notifications;
+        _projectsRoot = projectsRoot;
         _logger = logger;
         _time = time;
         registry.Changed += OnSessionChanged;
@@ -63,11 +64,11 @@ public sealed class WorkspaceEngine : IAsyncDisposable
 
     /// <summary>Starts listening. A taken hook port is replaced by a free one (and Claude's settings follow).</summary>
     public static WorkspaceEngine Start(ISettingsStore<WorkspaceSettings> settings, HelmPaths paths, PromptSender sender,
-        IUserNotifications? notifications, ILogger logger, TimeProvider? time = null, string? bridgePipe = null)
+        ILogger logger, TimeProvider? time = null, string? bridgePipe = null, string? projectsRoot = null)
     {
         EnsureIdentity(settings);
         var s = settings.Current;
-        var engine = new WorkspaceEngine(settings, new SessionRegistry(s.InstallId, time), sender, notifications, logger, time ?? TimeProvider.System);
+        var engine = new WorkspaceEngine(settings, new SessionRegistry(s.InstallId, time), sender, projectsRoot, logger, time ?? TimeProvider.System);
         try
         {
             engine._hooks = HookListener.Start(s.HookPort, s.HookToken, engine.Registry.Apply, logger);
@@ -79,7 +80,11 @@ public sealed class WorkspaceEngine : IAsyncDisposable
         }
         if (engine._hooks.Port != s.HookPort) settings.Update(x => x.HookPort = engine._hooks.Port);
         engine._bridge = new BridgeHost(bridgePipe ?? WorkspaceEndpoint.PipeName(paths), logger);
-        engine._bridge.WindowsChanged += (_, _) => engine.Changed?.Invoke(engine, EventArgs.Empty);
+        engine._bridge.WindowsChanged += (_, _) =>
+        {
+            engine.SeedNewFolders();
+            engine.Changed?.Invoke(engine, EventArgs.Empty);
+        };
         return engine;
     }
 
@@ -186,7 +191,7 @@ public sealed class WorkspaceEngine : IAsyncDisposable
         Registry.ExpectPrompt(command.Id, sessionId, folder, command.Text, ReceiptTimeout + TimeSpan.FromSeconds(10));
         try
         {
-            await _sender.SendAsync(window, sessionId, command.Text, command.Kind == WorkspaceCommandKind.NewSession ? command.Model : null, ct).ConfigureAwait(false);
+            await _sender.SendAsync(window, sessionId, command.Text, command.Kind == WorkspaceCommandKind.NewSession ? command.Model : null, ct, receipt.Task).ConfigureAwait(false);
         }
         catch (PromptSendException ex)
         {
@@ -239,8 +244,61 @@ public sealed class WorkspaceEngine : IAsyncDisposable
     {
         var s = change.Session;
         if (s.TranscriptPath.Length > 0 && (s.Title.Length == 0 || change.StateChanged)) ReadTitleLater(s);
-        if (change.StateChanged && change.Previous is not null) Notify(s);
         Changed?.Invoke(this, EventArgs.Empty);
+    }
+
+    /// <summary>How far back sessions are listed when a VS Code window connects.</summary>
+    public static readonly TimeSpan SeedWindow = TimeSpan.FromHours(24);
+
+    /// <summary>At most this many earlier sessions per folder.</summary>
+    public const int SeedMax = 10;
+
+    /// <summary>Lists the recent sessions of each newly connected window's folders (once per folder).</summary>
+    private void SeedNewFolders()
+    {
+        var folders = (_bridge?.Windows ?? []).SelectMany(w => w.Info.Folders).Where(f => _seeded.TryAdd(SessionRegistry.FolderKey(f), 0)).ToList();
+        if (folders.Count == 0) return;
+        _ = Task.Run(() =>
+        {
+            try
+            {
+                foreach (var folder in folders) Seed(Registry, folder, _time.GetLocalNow() - SeedWindow, _projectsRoot);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Workspace: earlier sessions could not be read");
+            }
+        });
+    }
+
+    /// <summary>Adds the recent sessions Claude recorded for <paramref name="folder"/>, with their last prompt and answer.</summary>
+    internal static int Seed(SessionRegistry registry, string folder, DateTimeOffset since, string? projectsRoot = null)
+    {
+        var count = 0;
+        foreach (var (id, path, written) in ClaudeProjects.RecentSessions(folder, since, SeedMax, projectsRoot))
+        {
+            var tail = TranscriptReader.Read(path, maxTurns: 6);
+            if (tail.Turns.Count == 0) continue;
+            var lastUser = tail.Turns.LastOrDefault(t => t.FromUser);
+            var lastClaude = tail.Turns.LastOrDefault(t => !t.FromUser);
+            var answered = !tail.Turns[^1].FromUser;
+            var seeded = registry.Seed(new AgentSession
+            {
+                MachineId = registry.MachineId,
+                SessionId = id,
+                Folder = folder,
+                TranscriptPath = path,
+                Title = tail.Title,
+                // Finished with an answer: done. Ended on your prompt: it may still be working, or was stopped.
+                State = answered ? SessionState.Done : SessionState.Idle,
+                LastPrompt = lastUser?.Text,
+                LastReply = lastClaude?.Text,
+                StartedAt = written,
+                UpdatedAt = written.ToLocalTime(),
+            });
+            if (seeded) count++;
+        }
+        return count;
     }
 
     private void ReadTitleLater(AgentSession session)
@@ -264,27 +322,6 @@ public sealed class WorkspaceEngine : IAsyncDisposable
                 _titleReads.TryRemove(session.SessionId, out _);
             }
         });
-    }
-
-    private void Notify(AgentSession s)
-    {
-        if (!_settings.Current.NotifyOnPc || _notifications is null) return;
-        var name = s.Title.Length > 0 ? s.Title : Path.GetFileName(s.Folder.TrimEnd('\\', '/'));
-        var text = s.State switch
-        {
-            SessionState.Done => Shorten(s.LastReply) ?? "Claude finished.",
-            SessionState.NeedsPermission => "Claude needs your permission" + (s.Waiting is { } tool ? $" for {tool}." : "."),
-            SessionState.Question => "Claude asked you a question.",
-            _ => null,
-        };
-        if (text is not null) _notifications.Show(name, text);
-    }
-
-    private static string? Shorten(string? text)
-    {
-        if (string.IsNullOrWhiteSpace(text)) return null;
-        var t = text.ReplaceLineEndings(" ").Trim();
-        return t.Length <= 180 ? t : t[..177] + "…";
     }
 
     public async ValueTask DisposeAsync()

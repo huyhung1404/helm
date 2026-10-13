@@ -129,6 +129,22 @@ public sealed class SessionRegistry(string machineId, TimeProvider? time = null)
         if (receipt is not null) PromptReceived?.Invoke(this, receipt);
     }
 
+    /// <summary>
+    /// Lists a session found in Claude's records (one that ran before Helm started). A session Helm already knows
+    /// from its hooks is newer and wins, so this never overwrites one.
+    /// </summary>
+    public bool Seed(AgentSession session)
+    {
+        var seeded = session with { MachineId = MachineId };
+        lock (_gate)
+        {
+            if (_sessions.ContainsKey(session.SessionId)) return false;
+            _sessions[session.SessionId] = seeded;
+        }
+        Changed?.Invoke(this, new SessionChange(seeded, null));
+        return true;
+    }
+
     /// <summary>Sets the conversation title (read from the transcript), if it changed.</summary>
     public void SetTitle(string sessionId, string title)
     {

@@ -549,6 +549,16 @@ public class WorkspaceBridgeTests
         Assert.Contains($"Version=\"{BridgeInstaller.Version}\" Publisher=\"helm\"", manifest.ReadToEnd());
     }
 
+    internal static async Task<T> WaitLongAsync<T>(Func<T?> probe) where T : class
+    {
+        for (var i = 0; i < 120; i++)
+        {
+            if (probe() is { } value) return value;
+            await Task.Delay(500);
+        }
+        throw new TimeoutException();
+    }
+
     internal static async Task<T> WaitAsync<T>(Func<T?> probe) where T : class
     {
         for (var i = 0; i < 100; i++)
@@ -630,6 +640,23 @@ public class PromptSenderTests
 
         Assert.Equal(["type:/model sonnet", "submit:ctrl", "type:Hi", "submit:ctrl"], keys.Log);
         Assert.Equal("new", bridge.Requests[0].Op);
+        Assert.Equal("focusEditor", bridge.Requests[1].Op);
+    }
+
+    [Fact]
+    public async Task Presses_enter_again_until_claude_takes_the_prompt()
+    {
+        var (host, bridge, window) = await ConnectAsync();
+        await using var _ = host;
+        await using var __ = bridge;
+        var keys = new FakeKeyboard(target: 42, title: "alpha - Visual Studio Code", previous: 0);
+        var never = new TaskCompletionSource().Task;
+        await new PromptSender(keys, NullLogger<PromptSender>.Instance).SendAsync(window, "s1", "Go", null, CancellationToken.None, never);
+        Assert.Equal(["type:Go", "submit:enter", "wait", "submit:enter", "wait", "submit:enter"], keys.Log);
+
+        var confirmed = new FakeKeyboard(target: 42, title: "alpha - Visual Studio Code", previous: 0);
+        await new PromptSender(confirmed, NullLogger<PromptSender>.Instance).SendAsync(window, "s1", "Go", null, CancellationToken.None, Task.CompletedTask);
+        Assert.Equal(["type:Go", "submit:enter", "wait"], confirmed.Log);
     }
 
     [Fact]
@@ -718,11 +745,70 @@ public class PromptSenderTests
         public void NewLine() => Log.Add("newline");
         public void Submit(bool ctrl) => Log.Add(ctrl ? "submit:ctrl" : "submit:enter");
         public Task Pause(int milliseconds, CancellationToken ct) => Task.CompletedTask;
+
+        public Task<bool> WaitFor(Task task, int milliseconds, CancellationToken ct)
+        {
+            Log.Add("wait");
+            return Task.FromResult(task.IsCompleted);
+        }
     }
 }
 
 public class WorkspaceEngineTests
 {
+    [Theory]
+    [InlineData(@"c:\tmp\hws-spike\ws\alpha", "c--tmp-hws-spike-ws-alpha")]
+    [InlineData(@"C:\Project\Bee Smooth\", "C--Project-Bee-Smooth")]
+    [InlineData(@"c:\Project\huyhung1404\Packages", "c--Project-huyhung1404-Packages")]
+    public void Claude_names_a_project_folder_after_its_path(string folder, string key) =>
+        Assert.Equal(key, ClaudeProjects.ProjectKey(folder));
+
+    [Fact]
+    public void Sessions_from_before_helm_started_are_listed_with_their_last_answer()
+    {
+        var root = Directory.CreateTempSubdirectory("helm-projects-");
+        try
+        {
+            // Both spellings of the drive letter exist on real machines.
+            var upper = Directory.CreateDirectory(Path.Combine(root.FullName, "C--work-app"));
+            var lower = Directory.CreateDirectory(Path.Combine(root.FullName, "c--work-app"));
+            var other = Directory.CreateDirectory(Path.Combine(root.FullName, "c--work-apple"));
+            var done = Guid.NewGuid().ToString();
+            var asked = Guid.NewGuid().ToString();
+            var old = Guid.NewGuid().ToString();
+            File.WriteAllLines(Path.Combine(upper.FullName, done + ".jsonl"),
+            [
+                """{"type":"user","message":{"content":"Fix it"}}""",
+                """{"type":"assistant","message":{"content":[{"type":"text","text":"Fixed."}]}}""",
+                """{"type":"ai-title","aiTitle":"Fix"}""",
+            ]);
+            File.WriteAllLines(Path.Combine(lower.FullName, asked + ".jsonl"), ["""{"type":"user","message":{"content":"Still going?"}}"""]);
+            File.WriteAllLines(Path.Combine(lower.FullName, old + ".jsonl"), ["""{"type":"user","message":{"content":"Old"}}"""]);
+            File.SetLastWriteTimeUtc(Path.Combine(lower.FullName, old + ".jsonl"), DateTime.UtcNow.AddDays(-3));
+            File.WriteAllLines(Path.Combine(other.FullName, Guid.NewGuid() + ".jsonl"), ["""{"type":"user","message":{"content":"Not this folder"}}"""]);
+            File.WriteAllText(Path.Combine(lower.FullName, "not-a-session.jsonl"), "{}");
+
+            var registry = new SessionRegistry("pc-1");
+            Assert.Equal(2, WorkspaceEngine.Seed(registry, @"c:\work\app", DateTimeOffset.Now.AddDays(-1), root.FullName));
+            var fixedOne = registry.Find(done)!;
+            Assert.Equal(SessionState.Done, fixedOne.State);
+            Assert.Equal("Fix", fixedOne.Title);
+            Assert.Equal("Fixed.", fixedOne.LastReply);
+            Assert.Equal("pc-1", fixedOne.MachineId);
+            Assert.Equal(SessionState.Idle, registry.Find(asked)!.State);
+            Assert.Null(registry.Find(old));
+
+            // What the hooks said wins over an older record.
+            registry.Apply(new ClaudeHookEvent { Event = ClaudeHookEvent.UserPromptSubmit, SessionId = done, Cwd = @"c:\work\app", Prompt = "More" });
+            Assert.Equal(0, WorkspaceEngine.Seed(registry, @"c:\work\app", DateTimeOffset.Now.AddDays(-1), root.FullName));
+            Assert.Equal(SessionState.Working, registry.Find(done)!.State);
+        }
+        finally
+        {
+            root.Delete(true);
+        }
+    }
+
     [Theory]
     [InlineData(@"c:\work\app", @"C:\Work\App", true)]
     [InlineData(@"c:\work\app\src", @"c:\work\app\", true)]

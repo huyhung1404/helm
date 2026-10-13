@@ -11,6 +11,8 @@ const PROTOCOL = 1;
 const RETRY_MS = 5000;
 const CLAUDE_OPEN = 'claude-vscode.primaryEditor.open';
 const CLAUDE_FOCUS = 'claude-vscode.focus';
+// The tab `open` just showed is the active editor; focusing its group puts the keyboard in that Claude tab's input.
+const FOCUS_EDITOR = 'workbench.action.focusActiveEditorGroup';
 
 let socket = null;
 let timer = null;
@@ -68,6 +70,9 @@ async function handle(request) {
         return reply(true);
       case 'focus':
         await vscode.commands.executeCommand(CLAUDE_FOCUS);
+        return reply(true);
+      case 'focusEditor':
+        await vscode.commands.executeCommand(FOCUS_EDITOR);
         return reply(true);
       default:
         return reply(false, 'Unknown request: ' + request.op);

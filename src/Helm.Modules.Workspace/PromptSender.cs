@@ -16,6 +16,9 @@ public interface IPromptKeyboard
     void NewLine();
     void Submit(bool ctrl);
     Task Pause(int milliseconds, CancellationToken ct);
+
+    /// <summary>True when <paramref name="task"/> completes within <paramref name="milliseconds"/>.</summary>
+    Task<bool> WaitFor(Task task, int milliseconds, CancellationToken ct);
 }
 
 /// <summary>The real keyboard: SendInput into the foreground window.</summary>
@@ -40,6 +43,19 @@ public sealed class WindowsPromptKeyboard(IWindowService windows) : IPromptKeybo
     }
 
     public Task Pause(int milliseconds, CancellationToken ct) => Task.Delay(milliseconds, ct);
+
+    public async Task<bool> WaitFor(Task task, int milliseconds, CancellationToken ct)
+    {
+        try
+        {
+            await task.WaitAsync(TimeSpan.FromMilliseconds(milliseconds), ct).ConfigureAwait(false);
+            return true;
+        }
+        catch (TimeoutException)
+        {
+            return false;
+        }
+    }
 }
 
 /// <summary>Typing into a VS Code window failed; the message says why, in words for the phone.</summary>
@@ -56,10 +72,21 @@ public sealed class PromptSender(IPromptKeyboard keyboard, ILogger<PromptSender>
 {
     private readonly SemaphoreSlim _gate = new(1, 1);
 
+    /// <summary>How long one Enter may take to show up as Claude's UserPromptSubmit before Enter is pressed again.</summary>
+    public const int ConfirmMilliseconds = 4000;
+
+    /// <summary>Enter is pressed at most this many more times when Claude did not take the prompt.</summary>
+    public const int SubmitRetries = 2;
+
     /// <summary>Types <paramref name="text"/> into <paramref name="sessionId"/> (null: a new session) in that window.</summary>
     /// <param name="model">New session only: sent as <c>/model …</c> first.</param>
+    /// <param name="received">
+    /// Completes when Claude confirmed the prompt (its UserPromptSubmit hook). Until then Enter is pressed again a
+    /// couple of times: an Enter that landed while Claude's input was busy is lost, and Enter in an empty input (the
+    /// prompt went through after all) does nothing, so a retry never sends twice.
+    /// </param>
     /// <exception cref="PromptSendException">Nothing or only part was typed; the message says why.</exception>
-    public async Task SendAsync(BridgeConnection window, string? sessionId, string text, string? model, CancellationToken ct)
+    public async Task SendAsync(BridgeConnection window, string? sessionId, string text, string? model, CancellationToken ct, Task? received = null)
     {
         await _gate.WaitAsync(ct).ConfigureAwait(false);
         var previous = keyboard.Foreground();
@@ -73,12 +100,16 @@ public sealed class PromptSender(IPromptKeyboard keyboard, ILogger<PromptSender>
             target = VsCodeWindows.Find(keyboard.TopWindows(), window.Info.Name);
             if (target == 0) throw new PromptSendException($"The VS Code window “{window.Info.Name}” was not found (or two windows have that name).");
 
+            // A new tab is the active editor but not yet Claude's "current chat"; an open session (in an editor tab
+            // or in the side bar) was just revealed, and Claude's own focus command goes to it.
+            var focus = sessionId is null ? "focusEditor" : "focus";
             if (!string.IsNullOrWhiteSpace(model) && sessionId is null)
             {
-                await TypeAndSubmitAsync(window, target, "/model " + model.Trim(), ct).ConfigureAwait(false);
-                await keyboard.Pause(1500, ct).ConfigureAwait(false);
+                await TypeAndSubmitAsync(window, target, focus, "/model " + model.Trim(), ct).ConfigureAwait(false);
+                await keyboard.Pause(2500, ct).ConfigureAwait(false);
             }
-            await TypeAndSubmitAsync(window, target, text, ct).ConfigureAwait(false);
+            await TypeAndSubmitAsync(window, target, focus, text, ct).ConfigureAwait(false);
+            if (received is not null) await ConfirmAsync(window, target, focus, received, ct).ConfigureAwait(false);
         }
         finally
         {
@@ -87,10 +118,10 @@ public sealed class PromptSender(IPromptKeyboard keyboard, ILogger<PromptSender>
         }
     }
 
-    private async Task TypeAndSubmitAsync(BridgeConnection window, nint target, string text, CancellationToken ct)
+    private async Task TypeAndSubmitAsync(BridgeConnection window, nint target, string focus, string text, CancellationToken ct)
     {
         if (!keyboard.ForceActivate(target)) throw new PromptSendException("Windows did not let Helm bring VS Code to the front. Nothing was typed.");
-        await Bridge(window, "focus", null, ct).ConfigureAwait(false);
+        await Bridge(window, focus, null, ct).ConfigureAwait(false);
         await keyboard.Pause(300, ct).ConfigureAwait(false);
 
         var lines = SessionRegistry.Normalize(text).Split('\n');
@@ -100,10 +131,25 @@ public sealed class PromptSender(IPromptKeyboard keyboard, ILogger<PromptSender>
             if (i > 0) keyboard.NewLine();
             if (lines[i].Length > 0) keyboard.Type(lines[i]);
         }
-        await keyboard.Pause(150, ct).ConfigureAwait(false);
+        await keyboard.Pause(400, ct).ConfigureAwait(false);
         Guard(target, "The prompt was typed but not sent.");
         keyboard.Submit(window.Info.CtrlEnterSends);
         logger.LogInformation("Workspace: typed a prompt ({Length} chars) into VS Code window {Name}", text.Length, window.Info.Name);
+    }
+
+    private async Task ConfirmAsync(BridgeConnection window, nint target, string focus, Task received, CancellationToken ct)
+    {
+        for (var attempt = 0; attempt < SubmitRetries; attempt++)
+        {
+            if (await keyboard.WaitFor(received, ConfirmMilliseconds, ct).ConfigureAwait(false)) return;
+            // Back to the same tab and input, then Enter once more.
+            if (!keyboard.ForceActivate(target)) return;
+            await Bridge(window, focus, null, ct).ConfigureAwait(false);
+            await keyboard.Pause(300, ct).ConfigureAwait(false);
+            if (keyboard.Foreground() != target || keyboard.ModifierDown()) return;
+            keyboard.Submit(window.Info.CtrlEnterSends);
+            logger.LogInformation("Workspace: Claude had not taken the prompt in {Name}; pressed Enter again", window.Info.Name);
+        }
     }
 
     /// <summary>Stops before any key goes to another window, or turns into a shortcut because a modifier is held.</summary>
