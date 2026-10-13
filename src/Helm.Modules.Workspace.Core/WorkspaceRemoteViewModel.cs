@@ -135,6 +135,7 @@ public sealed partial class WorkspaceRemoteViewModel : ObservableObject
     public ObservableCollection<HostChoice> Hosts { get; } = [];
     public ObservableCollection<WindowTab> Tabs { get; } = [];
     public ObservableCollection<RemoteSessionRow> Sessions { get; } = [];
+    /// <summary>The open conversation, newest message first.</summary>
     public ObservableCollection<TurnRow> Turns { get; } = [];
     public ObservableCollection<SkillInfo> Suggestions { get; } = [];
     public ObservableCollection<string> Models { get; } = [DefaultModel];
@@ -183,12 +184,14 @@ public sealed partial class WorkspaceRemoteViewModel : ObservableObject
     partial void OnSelectedTabChanged(WindowTab? value)
     {
         if (_refreshing) return;
+        ClearStatus();
         SelectedSession = null;
         Refresh();
     }
 
     partial void OnSelectedSessionChanged(RemoteSessionRow? value)
     {
+        if (!_refreshing) ClearStatus();
         OnPropertyChanged(nameof(IsSessionOpen));
         OnPropertyChanged(nameof(IsListOpen));
         OnPropertyChanged(nameof(SessionStateText));
@@ -210,6 +213,14 @@ public sealed partial class WorkspaceRemoteViewModel : ObservableObject
                 Suggestions.Add(skill);
         }
         OnPropertyChanged(nameof(HasSuggestions));
+    }
+
+    /// <summary>The last command's line goes away when you move on (unless it is still on its way).</summary>
+    private void ClearStatus()
+    {
+        if (IsSending) return;
+        SendStatus = null;
+        SendFailed = false;
     }
 
     /// <summary>Back from the conversation to the list (Android back).</summary>
@@ -308,6 +319,8 @@ public sealed partial class WorkspaceRemoteViewModel : ObservableObject
 
     private void Refresh()
     {
+        // The open conversation's new answer is seen before anything is counted.
+        if (SelectedSession is { } open && _sessions.Get(open.SessionId) is { } current) MarkSeen(current);
         _refreshing = true;
         try
         {
@@ -347,8 +360,6 @@ public sealed partial class WorkspaceRemoteViewModel : ObservableObject
         {
             _refreshing = false;
         }
-        // An answer that arrives while the conversation is open is seen at once (the rows show it next time).
-        if (SelectedSession is { } open) MarkSeen(open.Record);
         FillTurns();
         OnPropertyChanged(nameof(HasHosts));
         OnPropertyChanged(nameof(HasTabs));
@@ -368,7 +379,8 @@ public sealed partial class WorkspaceRemoteViewModel : ObservableObject
             ? s.Record.Recent
             : new[] { s.Record.LastPrompt is { } p ? new TranscriptTurn(true, p, null) : null, s.Record.LastReply is { } r ? new TranscriptTurn(false, r, null) : null }
                 .OfType<TranscriptTurn>().ToList();
-        foreach (var t in turns) Turns.Add(new TurnRow(t));
+        // Newest first: on a phone the last answer is what you open the conversation for.
+        foreach (var t in turns.Reverse()) Turns.Add(new TurnRow(t));
     }
 
     private bool IsUnseen(WorkspaceSessionRecord r) =>

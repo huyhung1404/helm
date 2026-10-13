@@ -11,6 +11,7 @@ public static class WorkspaceServices
             .AddSingleton<IPromptKeyboard, WindowsPromptKeyboard>()
             .AddSingleton<PromptSender>()
             .AddSingleton<BridgeInstaller>()
+            .AddSingleton<ClaudeCatalog>()
             .AddHelmModule<WorkspaceModule, WorkspacePage, WorkspaceViewModel>()
             .AddSingleton<WorkspaceContentPage>();
 }

@@ -1,0 +1,244 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:ic="using:FluentIcons.Avalonia"
+             xmlns:vm="using:Helm.Modules.Workspace"
+             x:Class="Helm.Modules.Workspace.WorkspaceContentPage"
+             x:DataType="vm:WorkspaceRemoteViewModel">
+
+    <!-- The control screen (drawer and Quick access): a PC, a tab per VS Code window, its Claude sessions, the
+         conversation and the composer. Phone first: the composer sits right under the title and the newest message
+         comes first, so the last answer and the next task need no scrolling. -->
+    <UserControl.Styles>
+        <Style Selector="Border.tab">
+            <Setter Property="Background" Value="{DynamicResource HelmCardBackground}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource HelmCardStroke}" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="CornerRadius" Value="16" />
+            <Setter Property="Padding" Value="14,8" />
+        </Style>
+        <Style Selector="ListBoxItem:selected Border.tab">
+            <Setter Property="BorderBrush" Value="{DynamicResource SystemAccentColor}" />
+            <Setter Property="BorderThickness" Value="2" />
+        </Style>
+        <Style Selector="ListBox.tabs ListBoxItem">
+            <Setter Property="Padding" Value="0" />
+            <Setter Property="Margin" Value="0,0,8,0" />
+            <Setter Property="Background" Value="Transparent" />
+        </Style>
+        <Style Selector="ListBox.tabs ListBoxItem:selected /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="Transparent" />
+        </Style>
+        <Style Selector="ListBox.sessions ListBoxItem">
+            <Setter Property="Padding" Value="0" />
+            <Setter Property="Margin" Value="0,0,0,8" />
+        </Style>
+        <Style Selector="Border.count">
+            <Setter Property="Background" Value="{DynamicResource HelmDanger}" />
+            <Setter Property="CornerRadius" Value="9" />
+            <Setter Property="MinWidth" Value="18" />
+            <Setter Property="Height" Value="18" />
+            <Setter Property="Padding" Value="5,0" />
+            <Setter Property="Margin" Value="8,0,0,0" />
+        </Style>
+        <Style Selector="Border.count > TextBlock">
+            <Setter Property="Foreground" Value="White" />
+            <Setter Property="FontSize" Value="11" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="HorizontalAlignment" Value="Center" />
+            <Setter Property="VerticalAlignment" Value="Center" />
+        </Style>
+        <Style Selector="Ellipse.state">
+            <Setter Property="Width" Value="10" />
+            <Setter Property="Height" Value="10" />
+            <Setter Property="Margin" Value="0,0,8,0" />
+            <Setter Property="VerticalAlignment" Value="Center" />
+        </Style>
+        <Style Selector="Border.bubble">
+            <Setter Property="CornerRadius" Value="10" />
+            <Setter Property="Padding" Value="12,10" />
+            <Setter Property="Margin" Value="0,0,0,10" />
+            <Setter Property="Background" Value="{DynamicResource HelmCardBackground}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource HelmCardStroke}" />
+            <Setter Property="BorderThickness" Value="1" />
+        </Style>
+        <Style Selector="Border.bubble.mine">
+            <Setter Property="Background" Value="{DynamicResource HelmSubtleFill}" />
+            <Setter Property="Margin" Value="32,0,0,10" />
+        </Style>
+        <Style Selector="TextBlock.failed">
+            <Setter Property="Foreground" Value="{DynamicResource HelmDanger}" />
+        </Style>
+        <Style Selector="Button.chip">
+            <Setter Property="Margin" Value="0,0,8,8" />
+            <Setter Property="Padding" Value="12,6" />
+            <Setter Property="CornerRadius" Value="16" />
+        </Style>
+    </UserControl.Styles>
+
+    <StackPanel Spacing="12">
+        <Border x:Name="OffBar" Classes="infobar" IsVisible="False">
+            <TextBlock Text="Workspace Controller is turned off on this phone. Turn it on in Home → Utilities." TextWrapping="Wrap" />
+        </Border>
+
+        <!-- No PC yet -->
+        <Border Classes="card" IsVisible="{Binding !HasHosts}">
+            <StackPanel Spacing="6">
+                <TextBlock Text="No PC yet" Classes="title" />
+                <TextBlock Classes="secondary" TextWrapping="Wrap"
+                           Text="Turn on Workspace Controller in Helm on your PC, and sync this phone and that PC with the same account (General → Sync). The PC shows up here by itself." />
+            </StackPanel>
+        </Border>
+
+        <!-- The PC -->
+        <StackPanel Spacing="4" IsVisible="{Binding HasHosts}">
+            <ComboBox ItemsSource="{Binding Hosts}" SelectedItem="{Binding SelectedHost}" HorizontalAlignment="Stretch"
+                      AutomationProperties.Name="PC">
+                <ComboBox.ItemTemplate>
+                    <DataTemplate x:DataType="vm:HostChoice">
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                            <ic:SymbolIcon Symbol="Desktop" FontSize="18" VerticalAlignment="Center" />
+                            <TextBlock Text="{Binding Label}" VerticalAlignment="Center" FontWeight="SemiBold" />
+                        </StackPanel>
+                    </DataTemplate>
+                </ComboBox.ItemTemplate>
+            </ComboBox>
+            <TextBlock Text="{Binding HostStatus}" Classes="secondary" TextWrapping="Wrap" />
+        </StackPanel>
+
+        <!-- One tab per VS Code window -->
+        <ScrollViewer HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Disabled" IsVisible="{Binding HasTabs}">
+            <ListBox Classes="tabs" ItemsSource="{Binding Tabs}" SelectedItem="{Binding SelectedTab}" Background="Transparent">
+                <ListBox.ItemsPanel>
+                    <ItemsPanelTemplate>
+                        <StackPanel Orientation="Horizontal" />
+                    </ItemsPanelTemplate>
+                </ListBox.ItemsPanel>
+                <ListBox.ItemTemplate>
+                    <DataTemplate x:DataType="vm:WindowTab">
+                        <Border Classes="tab">
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Text="{Binding Name}" FontWeight="SemiBold" VerticalAlignment="Center" />
+                                <Border Classes="count" IsVisible="{Binding HasAttention}">
+                                    <TextBlock Text="{Binding Attention}" />
+                                </Border>
+                            </StackPanel>
+                        </Border>
+                    </DataTemplate>
+                </ListBox.ItemTemplate>
+            </ListBox>
+        </ScrollViewer>
+
+        <!-- The sessions of the window -->
+        <StackPanel Spacing="8" IsVisible="{Binding IsListOpen}">
+            <TextBlock Text="No Claude session in this window yet. Start one below." Classes="secondary" TextWrapping="Wrap"
+                       IsVisible="{Binding !HasSessions}" />
+            <ListBox Classes="sessions" ItemsSource="{Binding Sessions}" SelectedItem="{Binding SelectedSession}" Background="Transparent">
+                <ListBox.ItemTemplate>
+                    <DataTemplate x:DataType="vm:RemoteSessionRow">
+                        <Border Classes="card">
+                            <StackPanel Spacing="4">
+                                <DockPanel>
+                                    <TextBlock DockPanel.Dock="Right" Text="{Binding Time}" Classes="secondary" VerticalAlignment="Center" />
+                                    <Ellipse Classes="state" Fill="{DynamicResource SystemAccentColor}" IsVisible="{Binding IsWorking}" />
+                                    <Ellipse Classes="state" Fill="{DynamicResource HelmDanger}" IsVisible="{Binding NeedsYou}" />
+                                    <Ellipse Classes="state" Fill="{DynamicResource HelmSuccess}" IsVisible="{Binding Unseen}" />
+                                    <TextBlock Text="{Binding Title}" Classes="title" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
+                                </DockPanel>
+                                <TextBlock Text="{Binding StateText}" Classes="secondary" />
+                                <TextBlock Text="{Binding Preview}" TextWrapping="Wrap" MaxLines="3" TextTrimming="CharacterEllipsis" />
+                            </StackPanel>
+                        </Border>
+                    </DataTemplate>
+                </ListBox.ItemTemplate>
+            </ListBox>
+        </StackPanel>
+
+        <!-- The open conversation: title and state -->
+        <Border Classes="card" IsVisible="{Binding IsSessionOpen}">
+            <DockPanel>
+                <Button DockPanel.Dock="Left" Classes="icon" Margin="0,0,8,0" Click="Back_Click" AutomationProperties.Name="Back to the sessions"
+                        VerticalAlignment="Top">
+                    <ic:SymbolIcon Symbol="ArrowLeft" FontSize="20" />
+                </Button>
+                <StackPanel Spacing="2">
+                    <TextBlock Text="{Binding SelectedSession.Title, FallbackValue=''}" Classes="title" TextWrapping="Wrap" FontSize="17" />
+                    <TextBlock Text="{Binding SessionStateText}" Classes="secondary" TextWrapping="Wrap" />
+                </StackPanel>
+            </DockPanel>
+        </Border>
+
+        <!-- Composer: the next task, or a new session in this window -->
+        <Border Classes="card" IsVisible="{Binding HasTabs}">
+            <StackPanel Spacing="8">
+                <ItemsControl ItemsSource="{Binding Suggestions}" IsVisible="{Binding HasSuggestions}">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate x:DataType="vm:SkillInfo">
+                            <Button HorizontalAlignment="Stretch" HorizontalContentAlignment="Left" Margin="0,0,0,4"
+                                    Command="{Binding $parent[UserControl].((vm:WorkspaceRemoteViewModel)DataContext).PickSuggestionCommand}"
+                                    CommandParameter="{Binding}">
+                                <StackPanel>
+                                    <TextBlock Text="{Binding Name, StringFormat='/{0}'}" FontWeight="SemiBold" />
+                                    <TextBlock Text="{Binding Description}" Classes="secondary" TextWrapping="Wrap" MaxLines="2" />
+                                </StackPanel>
+                            </Button>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+                <TextBox Text="{Binding Prompt}" AcceptsReturn="True" TextWrapping="Wrap" MinHeight="80" MaxHeight="220" FontSize="16"
+                         PlaceholderText="The next task for Claude ( / for commands)" AutomationProperties.Name="Prompt" />
+                <ItemsControl ItemsSource="{Binding QuickReplies}" IsVisible="{Binding IsSessionOpen}">
+                    <ItemsControl.ItemsPanel>
+                        <ItemsPanelTemplate>
+                            <WrapPanel />
+                        </ItemsPanelTemplate>
+                    </ItemsControl.ItemsPanel>
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate x:DataType="x:String">
+                            <Button Classes="chip" Content="{Binding}"
+                                    Command="{Binding $parent[UserControl].((vm:WorkspaceRemoteViewModel)DataContext).QuickReplyCommand}"
+                                    CommandParameter="{Binding}" />
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+                <!-- In a conversation: send to it -->
+                <Button Classes="accent" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Command="{Binding SendCommand}"
+                        IsVisible="{Binding IsSessionOpen}" AutomationProperties.Name="Send">
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                        <ic:SymbolIcon Symbol="Send" FontSize="18" />
+                        <TextBlock Text="Send" VerticalAlignment="Center" />
+                    </StackPanel>
+                </Button>
+                <!-- In the list: a new session in this window -->
+                <Grid ColumnDefinitions="*,8,Auto" IsVisible="{Binding IsListOpen}">
+                    <ComboBox ItemsSource="{Binding Models}" SelectedItem="{Binding NewSessionModel}" HorizontalAlignment="Stretch"
+                              AutomationProperties.Name="Model" />
+                    <Button Grid.Column="2" Classes="accent" Command="{Binding StartSessionCommand}" AutomationProperties.Name="New session">
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                            <ic:SymbolIcon Symbol="Add" FontSize="18" />
+                            <TextBlock Text="New session" VerticalAlignment="Center" />
+                        </StackPanel>
+                    </Button>
+                </Grid>
+                <TextBlock Text="{Binding SendStatus}" TextWrapping="Wrap" Classes="secondary" Classes.failed="{Binding SendFailed}"
+                           IsVisible="{Binding SendStatus, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+            </StackPanel>
+        </Border>
+
+        <!-- The conversation, newest first -->
+        <ItemsControl ItemsSource="{Binding Turns}" IsVisible="{Binding IsSessionOpen}">
+            <ItemsControl.ItemTemplate>
+                <DataTemplate x:DataType="vm:TurnRow">
+                    <Border Classes="bubble" Classes.mine="{Binding FromUser}">
+                        <StackPanel Spacing="4">
+                            <DockPanel>
+                                <TextBlock DockPanel.Dock="Right" Text="{Binding Time}" Classes="secondary" />
+                                <TextBlock Text="{Binding Who}" FontWeight="SemiBold" />
+                            </DockPanel>
+                            <SelectableTextBlock Text="{Binding Text}" TextWrapping="Wrap" FontSize="15" />
+                        </StackPanel>
+                    </Border>
+                </DataTemplate>
+            </ItemsControl.ItemTemplate>
+        </ItemsControl>
+    </StackPanel>
+</UserControl>

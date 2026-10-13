@@ -1,0 +1,27 @@
+<ui:ModulePageBase xmlns="https://github.com/avaloniaui"
+                   xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                   xmlns:ui="using:Helm.Core.Ui"
+                   xmlns:vm="using:Helm.Modules.Workspace"
+                   x:Class="Helm.Modules.Workspace.WorkspacePage"
+                   x:DataType="vm:WorkspaceRemoteViewModel">
+
+    <!-- Workspace Controller's settings (Home → Utilities). The control screen is WorkspaceContentPage. -->
+    <StackPanel>
+        <Border Classes="card">
+            <StackPanel Spacing="8">
+                <TextBlock Text="Open Workspace Controller" Classes="title" />
+                <TextBlock Text="Your PCs, their VS Code windows and Claude sessions. Also in the menu and on Home." Classes="secondary" TextWrapping="Wrap" />
+                <Button Classes="accent" Content="Open Workspace Controller" Click="Open_Click" />
+            </StackPanel>
+        </Border>
+
+        <TextBlock Text="How it connects" Classes="section" />
+        <Border Classes="card">
+            <StackPanel Spacing="6">
+                <TextBlock Text="Through Helm Sync" Classes="title" />
+                <TextBlock Classes="secondary" TextWrapping="Wrap"
+                           Text="Turn on Workspace Controller in Helm on each PC, and sync this phone with the same account (General → Sync). Prompts and answers are end-to-end encrypted like the rest of your Helm data. On the PC you choose which sessions are connected." />
+            </StackPanel>
+        </Border>
+    </StackPanel>
+</ui:ModulePageBase>

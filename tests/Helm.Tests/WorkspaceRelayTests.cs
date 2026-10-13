@@ -88,7 +88,7 @@ public sealed class WorkspaceRelayTests : IAsyncDisposable
         Assert.Equal(1, phone.Tabs[0].Attention);
 
         phone.SelectedSession = row;
-        Assert.Equal("Build fixed.", phone.Turns.Last().Text);
+        Assert.Equal("Build fixed.", phone.Turns.First().Text);
         // Opening it counts as seen.
         Assert.False(Assert.Single(phone.Sessions).Unseen);
 
@@ -96,6 +96,13 @@ public sealed class WorkspaceRelayTests : IAsyncDisposable
         Assert.Equal(["commit", "compact"], phone.Suggestions.Select(s => s.Name));
         phone.PickSuggestionCommand.Execute(phone.Suggestions[0]);
         Assert.Equal("/commit ", phone.Prompt);
+
+        // A new answer arriving while the conversation is open counts as seen at once.
+        engine.Registry.Apply(Hook(ClaudeHookEvent.UserPromptSubmit, "s1", prompt: "And the docs"));
+        engine.Registry.Apply(Hook(ClaudeHookEvent.Stop, "s1", reply: "Docs done."));
+        await WorkspaceBridgeTests.WaitAsync(() => _sessions.Get("s1") is { LastReply: "Docs done." } r ? r : null);
+        Assert.Equal(0, phone.Tabs[0].Attention);
+        Assert.Equal("Docs done.", phone.Turns.First().Text);
 
         phone.Prompt = "Now run the tests";
         phone.SendCommand.Execute(null);
@@ -214,5 +221,18 @@ public sealed class WorkspaceRelayTests : IAsyncDisposable
             await Task.WhenAny(task, Task.Delay(50, ct));
             return task.IsCompleted;
         }
+    }
+}
+
+public class ClaudeCatalogTests
+{
+    [Fact]
+    public void Reads_the_commands_of_an_initialize_answer()
+    {
+        var line = """{"type":"control_response","response":{"subtype":"success","request_id":"helm-init","response":{"commands":[{"name":"commit","description":"Commit the changes","argumentHint":""},{"name":"/review","description":"Review"},{"description":"no name"}],"models":[]}}}""";
+        var skills = ClaudeCatalog.ParseInitialize(line)!;
+        Assert.Equal([new SkillInfo("commit", "Commit the changes"), new SkillInfo("review", "Review")], skills);
+        Assert.Null(ClaudeCatalog.ParseInitialize("""{"type":"system","subtype":"init"}"""));
+        Assert.Null(ClaudeCatalog.ParseInitialize("not json"));
     }
 }

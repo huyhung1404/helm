@@ -59,7 +59,10 @@ public sealed class WorkspaceRelay : IAsyncDisposable
     /// <summary>The model aliases the phone offers for a new session.</summary>
     public static IReadOnlyList<string> Models { get; } = ["opus", "sonnet", "haiku"];
 
-    private void OnEngineChanged(object? sender, EventArgs e) => _publishTimer.Change(PublishDelay, Timeout.InfiniteTimeSpan);
+    private void OnEngineChanged(object? sender, EventArgs e) => RequestPublish();
+
+    /// <summary>Publishes soon (changes close together become one write).</summary>
+    public void RequestPublish() => _publishTimer.Change(PublishDelay, Timeout.InfiniteTimeSpan);
 
     private void OnCommandsChanged(object? sender, SyncedChangedEventArgs e) => TakeCommands();
 

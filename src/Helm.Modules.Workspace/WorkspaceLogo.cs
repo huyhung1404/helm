@@ -16,18 +16,14 @@ public static class WorkspaceLogo
         var gradient = new LinearGradientBrush(Argb(WorkspaceIconShape.GradientStart), Argb(WorkspaceIconShape.GradientEnd),
             new Point(0, size), new Point(size, 0)) { MappingMode = BrushMappingMode.Absolute };
         var frame = new Pen(gradient, WorkspaceIconShape.Stroke) { LineJoin = PenLineJoin.Round };
-        var chevron = new Pen(gradient, WorkspaceIconShape.Stroke + 1)
-        {
-            LineJoin = PenLineJoin.Round,
-            StartLineCap = PenLineCap.Round,
-            EndLineCap = PenLineCap.Round,
-        };
+        var wave = new Pen(gradient, WorkspaceIconShape.Stroke) { StartLineCap = PenLineCap.Round, EndLineCap = PenLineCap.Round };
         var group = new DrawingGroup();
         // A transparent box keeps the icon's own margins at any size.
         group.Children.Add(new GeometryDrawing(Brushes.Transparent, null, new RectangleGeometry(new Rect(0, 0, size, size))));
-        group.Children.Add(new GeometryDrawing(null, frame, Geometry.Parse(WorkspaceIconShape.Frame)));
-        group.Children.Add(new GeometryDrawing(null, chevron, Geometry.Parse(WorkspaceIconShape.Chevron)));
-        group.Children.Add(new GeometryDrawing(gradient, null, Geometry.Parse(WorkspaceIconShape.Cursor)));
+        group.Children.Add(new GeometryDrawing(null, frame, Geometry.Parse(WorkspaceIconShape.Phone)));
+        group.Children.Add(new GeometryDrawing(gradient, null, Geometry.Parse(WorkspaceIconShape.HomeBar)));
+        group.Children.Add(new GeometryDrawing(null, wave, Geometry.Parse(WorkspaceIconShape.WaveNear)));
+        group.Children.Add(new GeometryDrawing(null, wave, Geometry.Parse(WorkspaceIconShape.WaveFar)));
         var image = new DrawingImage(group);
         image.Freeze();
         return image;
