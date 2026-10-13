@@ -82,6 +82,36 @@ internal sealed class InlineUi : IUiDispatcher
     }
 }
 
+/// <summary>
+/// Runs posted work right away but one at a time, like a UI thread: work posted from background threads (sync
+/// events) never runs beside work the test does through <see cref="Run"/>.
+/// </summary>
+internal sealed class SerialUi : IUiDispatcher
+{
+    private readonly object _gate = new();
+
+    public bool CheckAccess() => true;
+
+    public void Post(Action action)
+    {
+        lock (_gate) action();
+    }
+
+    public Task InvokeAsync(Action action)
+    {
+        Post(action);
+        return Task.CompletedTask;
+    }
+
+    /// <summary>Does what the user would do on the UI thread.</summary>
+    public void Run(Action action) => Post(action);
+
+    public T Run<T>(Func<T> read)
+    {
+        lock (_gate) return read();
+    }
+}
+
 internal sealed class AcceptDialogs : IDialogService
 {
     public Task<bool> ConfirmAsync(string title, string message, string confirmText) => Task.FromResult(true);

@@ -39,6 +39,8 @@ public sealed class WorkspaceRelayTests : IAsyncDisposable
     private readonly SettingsStoreFactory _phoneSettings;
     private readonly string _pipe = "Helm.Workspace.Test." + Guid.NewGuid().ToString("N");
     private readonly ClaudeKeyboard _keyboard = new();
+    // One "UI thread" for the phone: sync events from the PC side never change it beside what the test does.
+    private readonly SerialUi _ui = new();
     private WorkspaceEngine? _engine;
     private WorkspaceRelay? _relay;
     private FakeBridge? _bridge;
@@ -63,7 +65,7 @@ public sealed class WorkspaceRelayTests : IAsyncDisposable
     }
 
     private WorkspaceRemoteViewModel Phone() =>
-        new(_hosts, _sessions, _commands, _results, _phoneSettings, new InlineUi());
+        _ui.Run(() => new WorkspaceRemoteViewModel(_hosts, _sessions, _commands, _results, _phoneSettings, _ui));
 
     private static ClaudeHookEvent Hook(string name, string session, string? prompt = null, string? reply = null) => new()
     {
@@ -91,9 +93,9 @@ public sealed class WorkspaceRelayTests : IAsyncDisposable
         Assert.Equal("Build fixed.", phone.Timeline.Last().Text);
         Assert.Equal("Fix the build", phone.Timeline.First(r => r.IsUser).Text);
 
-        phone.Prompt = "/co";
+        _ui.Run(() => phone.Prompt = "/co");
         Assert.Equal(["commit", "compact"], phone.Suggestions.Select(s => s.Name));
-        phone.PickSuggestionCommand.Execute(phone.Suggestions[0]);
+        _ui.Run(() => phone.PickSuggestionCommand.Execute(phone.Suggestions[0]));
         Assert.Equal("/commit ", phone.Prompt);
 
         // A new answer arriving while the conversation is open counts as seen at once.
@@ -103,12 +105,15 @@ public sealed class WorkspaceRelayTests : IAsyncDisposable
         Assert.Equal(0, phone.Projects[0].Attention);
         Assert.Equal("Docs done.", phone.Timeline.Last().Text);
 
-        phone.Prompt = "Now run the tests";
-        phone.SendCommand.Execute(null);
-        Assert.True(phone.IsSending);
-        // The prompt shows at the end of the timeline while it is on its way.
-        Assert.Equal("Now run the tests", phone.Timeline.Last().Text);
-        Assert.True(phone.Timeline.Last().HasDelivery);
+        _ui.Run(() =>
+        {
+            phone.Prompt = "Now run the tests";
+            phone.SendCommand.Execute(null);
+            Assert.True(phone.IsSending);
+            // The prompt shows at the end of the timeline while it is on its way.
+            Assert.Equal("Now run the tests", phone.Timeline.Last().Text);
+            Assert.True(phone.Timeline.Last().HasDelivery);
+        });
         await WorkspaceBridgeTests.WaitAsync(() => phone.IsSending ? null : (object)true);
         Assert.Equal("✓ Claude received it", phone.SendStatus);
         Assert.False(phone.SendFailed);
@@ -125,23 +130,26 @@ public sealed class WorkspaceRelayTests : IAsyncDisposable
         var hook = engine.HandleHookAsync(PendingRequestTests.Permission("Bash", """{"command":"npm publish"}"""));
         await WorkspaceBridgeTests.WaitAsync(() => _sessions.Get("s1")?.Pending);
 
-        var phone = new WorkspaceRemoteViewModel(_hosts, _sessions, _commands, _results, _phoneSettings, new InlineUi(), dialogs: new Yes());
+        var phone = _ui.Run(() => new WorkspaceRemoteViewModel(_hosts, _sessions, _commands, _results, _phoneSettings, _ui, dialogs: new Yes()));
         Assert.Equal("s1", phone.OpenSessionId);
         Assert.True(phone.HasPermission);
         Assert.Equal("npm publish", phone.PendingDetail);
-        await phone.AllowCommand.ExecuteAsync(null);
+        await _ui.Run(() => phone.AllowCommand.ExecuteAsync(null));
         Assert.Contains("\"allow\"", await hook.WaitAsync(TimeSpan.FromSeconds(10)));
 
         var question = engine.HandleHookAsync(PendingRequestTests.Permission("AskUserQuestion",
             """{"questions":[{"question":"Which?","header":"Pick","multiSelect":false,"options":[{"label":"A","description":""},{"label":"B","description":""}]}]}"""));
         await WorkspaceBridgeTests.WaitAsync(() => _sessions.Get("s1")?.Pending?.Kind == PendingKind.Question ? (object)true : null);
         await WorkspaceBridgeTests.WaitAsync(() => phone.HasQuestion ? (object)true : null);
-        phone.SendAnswersCommand.Execute(null);
+        _ui.Run(() => phone.SendAnswersCommand.Execute(null));
         Assert.Contains("Which?", phone.SendStatus);
-        phone.Questions[0].Options[0].IsPicked = true;
-        phone.Questions[0].Options[1].IsPicked = true;
-        Assert.False(phone.Questions[0].Options[0].IsPicked);
-        phone.SendAnswersCommand.Execute(null);
+        _ui.Run(() =>
+        {
+            phone.Questions[0].Options[0].IsPicked = true;
+            phone.Questions[0].Options[1].IsPicked = true;
+            Assert.False(phone.Questions[0].Options[0].IsPicked);
+            phone.SendAnswersCommand.Execute(null);
+        });
         Assert.Contains("\"Which?\":\"B\"", await question.WaitAsync(TimeSpan.FromSeconds(10)));
     }
 
@@ -157,9 +165,12 @@ public sealed class WorkspaceRelayTests : IAsyncDisposable
         var phone = Phone();
         // A window without a session opens on "New session".
         Assert.True(phone.IsNewSession);
-        phone.DraftModel = "haiku";
-        phone.Prompt = "Plan the release";
-        phone.SendCommand.Execute(null);
+        _ui.Run(() =>
+        {
+            phone.DraftModel = "haiku";
+            phone.Prompt = "Plan the release";
+            phone.SendCommand.Execute(null);
+        });
         await WorkspaceBridgeTests.WaitAsync(() => phone.IsSending ? null : (object)true);
         Assert.Equal("✓ Claude received it", phone.SendStatus);
         Assert.Equal(["type:/model haiku", "submit", "type:Plan the release", "submit"], _keyboard.Log);
@@ -200,7 +211,7 @@ public sealed class WorkspaceRelayTests : IAsyncDisposable
         var phone = Phone();
         Assert.False(phone.HostOnline);
         Assert.Contains("Offline", phone.HostStatus);
-        phone.Prompt = "Hello";
+        _ui.Run(() => phone.Prompt = "Hello");
         Assert.False(phone.SendCommand.CanExecute(null));
     }
 
