@@ -82,6 +82,73 @@
                     <Color x:Key="VsRaiseClear">#00252526</Color>
                 </ResourceDictionary>
             </ResourceDictionary.ThemeDictionaries>
+                            <DataTemplate x:Key="TimelineRowTemplate" x:DataType="vm:TimelineRow">
+                                <Panel>
+                                    <!-- Your prompt -->
+                                    <StackPanel IsVisible="{Binding IsUser}" Margin="0,8,0,4">
+                                        <TextBlock Text="{Binding Time}" Classes="faint" FontSize="11" HorizontalAlignment="Right" Margin="0,0,0,4" IsVisible="{Binding HasTime}" />
+                                        <Border Background="{DynamicResource VsRaise}" BorderBrush="{DynamicResource VsLine2}" BorderThickness="1" CornerRadius="6" Padding="10,7">
+                                            <TextBlock Text="{Binding Text}" TextWrapping="Wrap" Foreground="{DynamicResource VsFgStrong}" FontSize="14" />
+                                        </Border>
+                                        <TextBlock Text="{Binding Delivery}" FontSize="12" Margin="2,4,0,0" IsVisible="{Binding HasDelivery}" TextWrapping="Wrap"
+                                                   Foreground="{DynamicResource VsMuted}" Classes.failed="{Binding DeliveryFailed}" />
+                                    </StackPanel>
+                                    <!-- A step of Claude's: the dot and the rail on the left -->
+                                    <Grid ColumnDefinitions="18,*" IsVisible="{Binding !IsUser}">
+                                        <Rectangle Width="1" Fill="{DynamicResource VsLine}" HorizontalAlignment="Left" Margin="4,0,0,0" />
+                                        <Panel Width="15" Height="15" HorizontalAlignment="Left" VerticalAlignment="Top" Margin="-3,10,0,0" Background="{DynamicResource VsBg}">
+                                            <Ellipse Width="9" Height="9" Fill="{DynamicResource VsFaint}" IsVisible="{Binding IsThought}" />
+                                            <Ellipse Width="9" Height="9" Fill="{DynamicResource VsAnswerDot}" IsVisible="{Binding IsAnswer}" />
+                                            <Ellipse Width="9" Height="9" Fill="{DynamicResource VsAccent}" Classes="pulse" IsVisible="{Binding IsWorking}" />
+                                            <Ellipse Width="9" Height="9" Fill="{DynamicResource VsAccent}" Classes="pulse" IsVisible="{Binding ShowRunning}" />
+                                            <Panel IsVisible="{Binding IsTool}">
+                                                <Ellipse Width="9" Height="9" Fill="{DynamicResource VsOk}" IsVisible="{Binding !Running}" />
+                                                <Ellipse Width="9" Height="9" Fill="{DynamicResource VsBad}" IsVisible="{Binding Failed}" />
+                                            </Panel>
+                                        </Panel>
+                                        <StackPanel Grid.Column="1" Margin="0,8,0,2">
+                                            <TextBlock Text="{Binding Time}" Classes="faint" FontSize="11" HorizontalAlignment="Right" IsVisible="{Binding IsAnswer}" Margin="0,0,0,2" />
+                                            <TextBlock Text="{Binding Text}" Classes="muted" IsVisible="{Binding IsThought}" />
+                                            <StackPanel Orientation="Horizontal" Spacing="6" IsVisible="{Binding IsWorking}">
+                                                <TextBlock Text="✻" Classes="spin" />
+                                                <TextBlock Text="{Binding Text}" Foreground="{DynamicResource VsAccent}" />
+                                            </StackPanel>
+                                            <StackPanel IsVisible="{Binding IsTool}">
+                                                <TextBlock TextWrapping="Wrap">
+                                                    <Run Text="{Binding ToolName}" Foreground="{DynamicResource VsFgStrong}" FontWeight="SemiBold" />
+                                                    <Run Text="  " />
+                                                    <Run Text="{Binding Text}" Foreground="{DynamicResource VsMuted}" />
+                                                </TextBlock>
+                                                <Border Classes="io" IsVisible="{Binding HasIo}">
+                                                    <StackPanel>
+                                                        <Grid ColumnDefinitions="34,*" IsVisible="{Binding HasInput}">
+                                                            <TextBlock Text="IN" Classes="lbl" />
+                                                            <ScrollViewer Grid.Column="1" HorizontalScrollBarVisibility="Hidden" VerticalScrollBarVisibility="Disabled">
+                                                                <TextBlock Text="{Binding Input}" Classes="mono" Foreground="{DynamicResource VsFg}" Margin="0,7,10,7" />
+                                                            </ScrollViewer>
+                                                        </Grid>
+                                                        <Grid ColumnDefinitions="34,*" Background="{DynamicResource VsCodeOut}" IsVisible="{Binding HasOutput}">
+                                                            <Border Grid.ColumnSpan="2" BorderBrush="{DynamicResource VsLine}" BorderThickness="0,1,0,0" IsVisible="{Binding HasInput}" />
+                                                            <TextBlock Text="OUT" Classes="lbl" />
+                                                            <ScrollViewer Grid.Column="1" HorizontalScrollBarVisibility="Hidden" VerticalScrollBarVisibility="Disabled">
+                                                                <TextBlock Text="{Binding Output}" Classes="mono" Foreground="{DynamicResource VsFg}" Margin="0,7,10,7" />
+                                                            </ScrollViewer>
+                                                        </Grid>
+                                                        <Grid ColumnDefinitions="34,*" Background="{DynamicResource VsCodeOut}" IsVisible="{Binding ShowRunning}">
+                                                            <TextBlock Text="OUT" Classes="lbl" />
+                                                            <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="6" Margin="0,7,10,7">
+                                                                <TextBlock Text="✻" Classes="spin" FontSize="12" />
+                                                                <TextBlock Text="Running…" Classes="mono" />
+                                                            </StackPanel>
+                                                        </Grid>
+                                                    </StackPanel>
+                                                </Border>
+                                            </StackPanel>
+                                            <local:MarkdownView Blocks="{Binding Blocks}" IsVisible="{Binding IsAnswer}" />
+                                        </StackPanel>
+                                    </Grid>
+                                </Panel>
+                            </DataTemplate>
         </ResourceDictionary>
     </UserControl.Resources>
 
@@ -594,10 +661,10 @@
             </Panel>
         </Border>
 
-        <!-- The session: title and state on two lines; Chat | Plan while a plan waits -->
-        <Border Grid.Row="3" BorderBrush="{DynamicResource VsLine}" BorderThickness="0,0,0,1" Padding="12,6" MinHeight="44" IsVisible="{Binding HasProjects}">
+        <!-- No title row (the subtab names the session and shows its state); only Chat | Plan while a plan waits -->
+        <Border Grid.Row="3" BorderBrush="{DynamicResource VsLine}" BorderThickness="0,0,0,1" Padding="10,4" IsVisible="{Binding HasReview}">
             <DockPanel>
-                <Border DockPanel.Dock="Right" Background="{DynamicResource VsRaise}" CornerRadius="5" Padding="2" IsVisible="{Binding HasReview}" VerticalAlignment="Center">
+                <Border DockPanel.Dock="Right" Background="{DynamicResource VsRaise}" CornerRadius="5" Padding="2" VerticalAlignment="Center">
                     <StackPanel Orientation="Horizontal" Spacing="2">
                         <Button Classes="seg" Classes.on="{Binding ShowChat}" Command="{Binding ShowChatViewCommand}">
                             <TextBlock Text="Chat" />
@@ -610,13 +677,9 @@
                         </Button>
                     </StackPanel>
                 </Border>
-                <StackPanel Spacing="1" VerticalAlignment="Center">
-                    <TextBlock Text="{Binding SessionTitle}" Classes="strong" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
-                    <StackPanel Orientation="Horizontal" Spacing="5">
-                        <TextBlock Text="✻" Classes="spin" FontSize="11" IsVisible="{Binding IsWorking}" VerticalAlignment="Center" />
-                        <Ellipse Width="6" Height="6" Fill="{DynamicResource VsBad}" IsVisible="{Binding NeedsYou}" VerticalAlignment="Center" />
-                        <TextBlock Text="{Binding SessionStateText}" Classes="muted" FontSize="11.5" TextTrimming="CharacterEllipsis" />
-                    </StackPanel>
+                <StackPanel Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
+                    <Ellipse Width="6" Height="6" Fill="{DynamicResource VsBad}" VerticalAlignment="Center" />
+                    <TextBlock Text="{Binding SessionStateText}" Classes="muted" FontSize="12" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
                 </StackPanel>
             </DockPanel>
         </Border>
@@ -657,77 +720,8 @@
                             Command="{Binding ShowEarlierCommand}">
                         <TextBlock Text="{Binding HiddenStepsText}" Foreground="{DynamicResource VsLink}" FontSize="13" />
                     </Button>
-                    <ItemsControl x:Name="TimelineList" ItemsSource="{Binding Timeline}">
-                        <ItemsControl.ItemTemplate>
-                            <DataTemplate x:DataType="vm:TimelineRow">
-                                <Panel>
-                                    <!-- Your prompt -->
-                                    <StackPanel IsVisible="{Binding IsUser}" Margin="0,8,0,4">
-                                        <TextBlock Text="{Binding Time}" Classes="faint" FontSize="11" HorizontalAlignment="Right" Margin="0,0,0,4" IsVisible="{Binding HasTime}" />
-                                        <Border Background="{DynamicResource VsRaise}" BorderBrush="{DynamicResource VsLine2}" BorderThickness="1" CornerRadius="6" Padding="10,7">
-                                            <TextBlock Text="{Binding Text}" TextWrapping="Wrap" Foreground="{DynamicResource VsFgStrong}" FontSize="14" />
-                                        </Border>
-                                        <TextBlock Text="{Binding Delivery}" FontSize="12" Margin="2,4,0,0" IsVisible="{Binding HasDelivery}" TextWrapping="Wrap"
-                                                   Foreground="{DynamicResource VsMuted}" Classes.failed="{Binding DeliveryFailed}" />
-                                    </StackPanel>
-                                    <!-- A step of Claude's: the dot and the rail on the left -->
-                                    <Grid ColumnDefinitions="18,*" IsVisible="{Binding !IsUser}">
-                                        <Rectangle Width="1" Fill="{DynamicResource VsLine}" HorizontalAlignment="Left" Margin="4,0,0,0" />
-                                        <Panel Width="15" Height="15" HorizontalAlignment="Left" VerticalAlignment="Top" Margin="-3,10,0,0" Background="{DynamicResource VsBg}">
-                                            <Ellipse Width="9" Height="9" Fill="{DynamicResource VsFaint}" IsVisible="{Binding IsThought}" />
-                                            <Ellipse Width="9" Height="9" Fill="{DynamicResource VsAnswerDot}" IsVisible="{Binding IsAnswer}" />
-                                            <Ellipse Width="9" Height="9" Fill="{DynamicResource VsAccent}" Classes="pulse" IsVisible="{Binding IsWorking}" />
-                                            <Ellipse Width="9" Height="9" Fill="{DynamicResource VsAccent}" Classes="pulse" IsVisible="{Binding ShowRunning}" />
-                                            <Panel IsVisible="{Binding IsTool}">
-                                                <Ellipse Width="9" Height="9" Fill="{DynamicResource VsOk}" IsVisible="{Binding !Running}" />
-                                                <Ellipse Width="9" Height="9" Fill="{DynamicResource VsBad}" IsVisible="{Binding Failed}" />
-                                            </Panel>
-                                        </Panel>
-                                        <StackPanel Grid.Column="1" Margin="0,8,0,2">
-                                            <TextBlock Text="{Binding Time}" Classes="faint" FontSize="11" HorizontalAlignment="Right" IsVisible="{Binding IsAnswer}" Margin="0,0,0,2" />
-                                            <TextBlock Text="{Binding Text}" Classes="muted" IsVisible="{Binding IsThought}" />
-                                            <StackPanel Orientation="Horizontal" Spacing="6" IsVisible="{Binding IsWorking}">
-                                                <TextBlock Text="✻" Classes="spin" />
-                                                <TextBlock Text="{Binding Text}" Foreground="{DynamicResource VsAccent}" />
-                                            </StackPanel>
-                                            <StackPanel IsVisible="{Binding IsTool}">
-                                                <TextBlock TextWrapping="Wrap">
-                                                    <Run Text="{Binding ToolName}" Foreground="{DynamicResource VsFgStrong}" FontWeight="SemiBold" />
-                                                    <Run Text="  " />
-                                                    <Run Text="{Binding Text}" Foreground="{DynamicResource VsMuted}" />
-                                                </TextBlock>
-                                                <Border Classes="io" IsVisible="{Binding HasIo}">
-                                                    <StackPanel>
-                                                        <Grid ColumnDefinitions="34,*" IsVisible="{Binding HasInput}">
-                                                            <TextBlock Text="IN" Classes="lbl" />
-                                                            <ScrollViewer Grid.Column="1" HorizontalScrollBarVisibility="Hidden" VerticalScrollBarVisibility="Disabled">
-                                                                <TextBlock Text="{Binding Input}" Classes="mono" Foreground="{DynamicResource VsFg}" Margin="0,7,10,7" />
-                                                            </ScrollViewer>
-                                                        </Grid>
-                                                        <Grid ColumnDefinitions="34,*" Background="{DynamicResource VsCodeOut}" IsVisible="{Binding HasOutput}">
-                                                            <Border Grid.ColumnSpan="2" BorderBrush="{DynamicResource VsLine}" BorderThickness="0,1,0,0" IsVisible="{Binding HasInput}" />
-                                                            <TextBlock Text="OUT" Classes="lbl" />
-                                                            <ScrollViewer Grid.Column="1" HorizontalScrollBarVisibility="Hidden" VerticalScrollBarVisibility="Disabled">
-                                                                <TextBlock Text="{Binding Output}" Classes="mono" Foreground="{DynamicResource VsFg}" Margin="0,7,10,7" />
-                                                            </ScrollViewer>
-                                                        </Grid>
-                                                        <Grid ColumnDefinitions="34,*" Background="{DynamicResource VsCodeOut}" IsVisible="{Binding ShowRunning}">
-                                                            <TextBlock Text="OUT" Classes="lbl" />
-                                                            <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="6" Margin="0,7,10,7">
-                                                                <TextBlock Text="✻" Classes="spin" FontSize="12" />
-                                                                <TextBlock Text="Running…" Classes="mono" />
-                                                            </StackPanel>
-                                                        </Grid>
-                                                    </StackPanel>
-                                                </Border>
-                                            </StackPanel>
-                                            <local:MarkdownView Blocks="{Binding Blocks}" IsVisible="{Binding IsAnswer}" />
-                                        </StackPanel>
-                                    </Grid>
-                                </Panel>
-                            </DataTemplate>
-                        </ItemsControl.ItemTemplate>
-                    </ItemsControl>
+                    <!-- One drawn list per open tab, made by the code-behind (switching back to a tab is instant) -->
+                    <Panel x:Name="TimelineHost" />
 
                     <!-- Claude waits: a tool to allow -->
                     <Border Classes="card" IsVisible="{Binding HasPermission}">

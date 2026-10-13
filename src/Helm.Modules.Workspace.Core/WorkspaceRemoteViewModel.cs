@@ -133,6 +133,17 @@ public sealed partial class WorkspaceRemoteViewModel : ObservableObject
 
     private int _timelineLimit = TimelinePage;
     private string? _timelineFor;
+    private readonly Dictionary<string, ObservableCollection<TimelineRow>> _timelines = new(StringComparer.Ordinal);
+    private bool _deferFill;
+
+    /// <summary>The timelines kept for the open tabs (the view keeps a drawn list for each: switching back costs nothing).</summary>
+    public IReadOnlyCollection<ObservableCollection<TimelineRow>> CachedTimelines => _timelines.Values;
+
+    /// <summary>
+    /// Set by the view: runs work after the next frame. A tab switch shows the new tab at once and fills its timeline
+    /// right after, instead of holding the screen while the rows are made.
+    /// </summary>
+    public Action<Action>? DeferTimeline { get; set; }
 
     /// <summary>Older steps not drawn yet.</summary>
     public int HiddenSteps { get; private set; }
@@ -391,6 +402,7 @@ public sealed partial class WorkspaceRemoteViewModel : ObservableObject
     private void SelectProject(ProjectTab? project)
     {
         if (project is null) return;
+        _deferFill = true;
         _folder = project.Folder;
         _sessionId = null;
         IsNewSession = false;
@@ -403,6 +415,7 @@ public sealed partial class WorkspaceRemoteViewModel : ObservableObject
     private void SelectSession(SessionTab? tab)
     {
         if (tab is null) return;
+        _deferFill = true;
         _sessionId = tab.SessionId;
         IsNewSession = false;
         ShowReview = false;
@@ -848,6 +861,40 @@ public sealed partial class WorkspaceRemoteViewModel : ObservableObject
     /// </summary>
     private void FillTimeline()
     {
+        SwitchTimeline();
+        if (_deferFill && DeferTimeline is { } defer)
+        {
+            _deferFill = false;
+            var forSession = _timelineFor;
+            defer(() =>
+            {
+                if (_timelineFor == forSession) FillTimelineCore();
+            });
+            return;
+        }
+        _deferFill = false;
+        FillTimelineCore();
+    }
+
+    /// <summary>
+    /// Another conversation opens with its own list: the one kept from before (already drawn), or a new one. Lists of
+    /// sessions that are no longer tabs are let go.
+    /// </summary>
+    private void SwitchTimeline()
+    {
+        var openId = IsNewSession ? null : Session?.SessionId;
+        if (openId == _timelineFor && _timelines.ContainsKey(openId ?? "")) return;
+        _timelineFor = openId;
+        _timelineLimit = TimelinePage;
+        var key = openId ?? "";
+        if (!_timelines.TryGetValue(key, out var list)) _timelines[key] = list = [];
+        foreach (var gone in _timelines.Keys.Where(k => k.Length > 0 && k != key && !SessionTabs.Any(t => t.SessionId == k)).ToList()) _timelines.Remove(gone);
+        Timeline = list;
+        Notify(nameof(Timeline), nameof(CachedTimelines));
+    }
+
+    private void FillTimelineCore()
+    {
         var rows = new List<TimelineRow>();
         if (Session is { } s)
         {
@@ -872,19 +919,9 @@ public sealed partial class WorkspaceRemoteViewModel : ObservableObject
             rows.Add(TimelineRow.Sending(first, SendStatus ?? "", SendFailed));
         }
         // Only the last steps are drawn; "Show earlier" draws more.
-        var openId = IsNewSession ? null : Session?.SessionId;
-        if (openId != _timelineFor) _timelineLimit = TimelinePage;
         HiddenSteps = Math.Max(0, rows.Count - _timelineLimit);
         if (HiddenSteps > 0) rows = rows.GetRange(HiddenSteps, rows.Count - HiddenSteps);
-
-        if (openId != _timelineFor)
-        {
-            // Another conversation: one new list, drawn once (not row by row).
-            _timelineFor = openId;
-            Timeline = new ObservableCollection<TimelineRow>(rows);
-            Notify(nameof(Timeline));
-        }
-        else Merge(rows);
+        Merge(rows);
         Notify(nameof(ShowStatus), nameof(HiddenSteps), nameof(HasHiddenSteps), nameof(HiddenStepsText));
     }
 

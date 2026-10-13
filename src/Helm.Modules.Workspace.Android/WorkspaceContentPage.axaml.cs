@@ -28,6 +28,7 @@ public partial class WorkspaceContentPage : UserControl, IFullPage
     private TopLevel? _topLevel;
     private bool _stickToEnd = true;
     private System.Collections.ObjectModel.ObservableCollection<TimelineRow> _timeline = [];
+    private readonly Dictionary<System.Collections.ObjectModel.ObservableCollection<TimelineRow>, (ItemsControl View, double Offset, bool AtEnd)> _views = new();
 
     /// <summary>For the XAML runtime loader and the designer; the shell resolves the page from DI.</summary>
     public WorkspaceContentPage()
@@ -46,6 +47,12 @@ public partial class WorkspaceContentPage : UserControl, IFullPage
         module.PropertyChanged += OnModuleChanged;
         ApplyEnabled();
         ChatScroller.ScrollChanged += OnChatScrolled;
+        // A tab switch draws the new tab first, then makes the rows (the tap answers at once).
+        viewModel.DeferTimeline = work =>
+        {
+            if (TopLevel.GetTopLevel(this) is { } top) top.RequestAnimationFrame(_ => Dispatcher.UIThread.Post(work, DispatcherPriority.Background));
+            else Dispatcher.UIThread.Post(work, DispatcherPriority.Background);
+        };
         Composer.SizeChanged += (_, e) => FitChips(e.NewSize.Width);
     }
 
@@ -70,6 +77,7 @@ public partial class WorkspaceContentPage : UserControl, IFullPage
         _viewModel.PropertyChanged += OnViewModelChanged;
         _timeline = _viewModel.Timeline;
         _timeline.CollectionChanged += OnTimelineChanged;
+        ShowTimeline(_timeline, null);
         _viewModel.Projects.CollectionChanged += OnTabsChanged;
         _viewModel.SessionTabs.CollectionChanged += OnTabsChanged;
         _topLevel = TopLevel.GetTopLevel(this);
@@ -99,12 +107,12 @@ public partial class WorkspaceContentPage : UserControl, IFullPage
     {
         if (e.PropertyName == nameof(WorkspaceRemoteViewModel.Timeline))
         {
-            // A new list for another conversation: follow it.
+            // Another conversation: its own drawn list (kept from before, or new), at its own place.
+            var previous = _timeline;
             _timeline.CollectionChanged -= OnTimelineChanged;
             _timeline = _viewModel.Timeline;
             _timeline.CollectionChanged += OnTimelineChanged;
-            _stickToEnd = true;
-            Dispatcher.UIThread.Post(ScrollToEnd, DispatcherPriority.Background);
+            ShowTimeline(_timeline, previous);
         }
         if (e.PropertyName == nameof(WorkspaceRemoteViewModel.OpenSessionId))
         {
@@ -146,6 +154,36 @@ public partial class WorkspaceContentPage : UserControl, IFullPage
     }
 
     private void ScrollToEnd() => ChatScroller.ScrollToEnd();
+
+    /// <summary>
+    /// Shows the drawn list of <paramref name="list"/> and hides the others: a tab seen before comes back as it was,
+    /// at the place you left it, with nothing to draw again. Lists of closed tabs are let go.
+    /// </summary>
+    private void ShowTimeline(System.Collections.ObjectModel.ObservableCollection<TimelineRow> list, System.Collections.ObjectModel.ObservableCollection<TimelineRow>? previous)
+    {
+        if (previous is not null && _views.TryGetValue(previous, out var old))
+            _views[previous] = (old.View, ChatScroller.Offset.Y, _stickToEnd);
+        foreach (var (key, entry) in _views.ToList())
+        {
+            if (key == list || _viewModel.CachedTimelines.Contains(key)) continue;
+            TimelineHost.Children.Remove(entry.View);
+            _views.Remove(key);
+        }
+        if (!_views.TryGetValue(list, out var shown))
+        {
+            var view = new ItemsControl { ItemTemplate = (Avalonia.Controls.Templates.IDataTemplate)this.FindResource("TimelineRowTemplate")!, ItemsSource = list };
+            TimelineHost.Children.Add(view);
+            _views[list] = shown = (view, 0, true);
+        }
+        foreach (var (key, entry) in _views) entry.View.IsVisible = key == list;
+        _stickToEnd = shown.AtEnd;
+        var offset = shown.Offset;
+        Dispatcher.UIThread.Post(() =>
+        {
+            if (_stickToEnd) ScrollToEnd();
+            else ChatScroller.Offset = new Vector(0, offset);
+        }, DispatcherPriority.Background);
+    }
 
     /// <summary>The keyboard covers the bottom of the screen: the composer moves up above it.</summary>
     private void OnKeyboardChanged(object? sender, Avalonia.Controls.Platform.InputPaneStateEventArgs e)
