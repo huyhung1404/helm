@@ -58,6 +58,9 @@ InvalidateRect
 UpdateWindow
 SetLayeredWindowAttributes
 AllowSetForegroundWindow
+AttachThreadInput
+BringWindowToTop
+GetCurrentThreadId
 GetDpiForWindow
 
 // DWM

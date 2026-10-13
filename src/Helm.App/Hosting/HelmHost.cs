@@ -88,6 +88,7 @@ internal static class HelmHost
         builder.Services.AddSingleton<HomePage>();
         builder.Services.AddSingleton<UpdatesViewModel>();
         builder.Services.AddSingleton<SyncViewModel>();
+        builder.Services.AddSingleton<BackgroundActivitiesViewModel>();
         builder.Services.AddSingleton<SyncIndicatorViewModel>();
         builder.Services.AddSingleton<GeneralViewModel>();
         builder.Services.AddSingleton<GeneralPage>();

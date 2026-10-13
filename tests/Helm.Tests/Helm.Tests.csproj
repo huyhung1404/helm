@@ -39,6 +39,8 @@
     <ProjectReference Include="..\..\src\Helm.Modules.Scratch\Helm.Modules.Scratch.csproj" />
     <ProjectReference Include="..\..\src\Helm.Modules.NovelReader\Helm.Modules.NovelReader.csproj" />
     <ProjectReference Include="..\..\src\Helm.Modules.ShortcutGuide\Helm.Modules.ShortcutGuide.csproj" />
+    <ProjectReference Include="..\..\src\Helm.Modules.Workspace\Helm.Modules.Workspace.csproj" />
+    <ProjectReference Include="..\..\src\Helm.Modules.Workspace.Core\Helm.Modules.Workspace.Core.csproj" />
   </ItemGroup>
 
 </Project>

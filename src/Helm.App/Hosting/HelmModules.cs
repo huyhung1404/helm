@@ -8,6 +8,7 @@ using Helm.Modules.Scratch;
 using Helm.Modules.Vault;
 using Helm.Modules.Tracker;
 using Helm.Modules.Wallet;
+using Helm.Modules.Workspace;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Helm.App.Hosting;
@@ -30,6 +31,7 @@ internal static class HelmModules
         services.AddSshModule();
         services.AddQuickCaptureModule();
         services.AddShortcutGuideModule();
+        services.AddWorkspaceModule();
 
         // Built but hidden; re-enable with (using Helm.Modules.AlwaysOnTop;):
         // services.AddAlwaysOnTopModule();

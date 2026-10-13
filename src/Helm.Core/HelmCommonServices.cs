@@ -1,3 +1,4 @@
+using Helm.Core.Services;
 using Helm.Core.Settings;
 using Helm.Core.Sync;
 using Microsoft.Extensions.DependencyInjection;
@@ -14,6 +15,7 @@ public static class HelmCommonServices
     public static IServiceCollection AddHelmCommon(this IServiceCollection services, HelmPaths paths)
     {
         services.AddSingleton(paths);
+        services.AddSingleton<IBackgroundActivities, BackgroundActivities>();
         services.AddSingleton<ISettingsStoreFactory>(sp => new SettingsStoreFactory(paths, sp.GetService<ILoggerFactory>()));
         services.AddHelmSync(paths);
         return services;

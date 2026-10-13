@@ -48,6 +48,13 @@ public static class InputSimulator
         PInvoke.SendInput(inputs, System.Runtime.InteropServices.Marshal.SizeOf<INPUT>());
     }
 
+    /// <summary>A key with a modifier held, e.g. Shift+Enter (VK_SHIFT = 0x10, VK_CONTROL = 0x11, VK_RETURN = 0x0D).</summary>
+    public static void PressChord(ushort modifier, ushort virtualKey)
+    {
+        Span<INPUT> inputs = [Key(modifier, up: false), Key(virtualKey, up: false), Key(virtualKey, up: true), Key(modifier, up: true)];
+        PInvoke.SendInput(inputs, System.Runtime.InteropServices.Marshal.SizeOf<INPUT>());
+    }
+
     /// <summary>True while Ctrl, Alt, Shift or a Win key is held (typing then would turn letters into shortcuts).</summary>
     public static bool AnyModifierDown() =>
         new[] { 0x10, 0x11, 0x12, 0x5B, 0x5C }.Any(vk => (PInvoke.GetAsyncKeyState(vk) & 0x8000) != 0);

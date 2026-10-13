@@ -41,6 +41,7 @@ internal sealed partial class GeneralViewModel : ObservableObject
         IAppLocation location,
         UpdatesViewModel updates,
         SyncViewModel sync,
+        BackgroundActivitiesViewModel background,
         IDialogService dialogs,
         ShellController shell,
         ILogger<GeneralViewModel> logger)
@@ -52,6 +53,7 @@ internal sealed partial class GeneralViewModel : ObservableObject
         _location = location;
         Updates = updates;
         Sync = sync;
+        Background = background;
         _dialogs = dialogs;
         _shell = shell;
         _logger = logger;
@@ -75,6 +77,9 @@ internal sealed partial class GeneralViewModel : ObservableObject
 
     /// <summary>General → Sync section.</summary>
     public SyncViewModel Sync { get; }
+
+    /// <summary>General → Running in background section.</summary>
+    public BackgroundActivitiesViewModel Background { get; }
 
     public string ElevationText => _launcher.IsElevated
         ? "Running as administrator — hooks and hotkeys also work on elevated windows."

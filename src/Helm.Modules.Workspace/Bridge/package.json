@@ -1,0 +1,13 @@
+{
+  "name": "helm-bridge",
+  "displayName": "Helm Bridge",
+  "description": "Lets Helm's Workspace Controller find this window and type into its Claude Code sessions. Installed and updated by Helm.",
+  "publisher": "helm",
+  "version": "1.0.0",
+  "license": "MIT",
+  "engines": { "vscode": "^1.90.0" },
+  "categories": ["Other"],
+  "main": "./extension.js",
+  "activationEvents": ["onStartupFinished"],
+  "extensionKind": ["ui"]
+}

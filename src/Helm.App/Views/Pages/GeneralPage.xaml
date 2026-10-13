@@ -134,6 +134,34 @@
             <ui:ToggleSwitch IsChecked="{Binding StartMinimized}" />
         </ui:CardControl>
 
+        <!-- Running in background: tools that keep something running, with a Stop button each -->
+        <TextBlock Text="Running in background" Style="{DynamicResource HelmSectionHeader}" />
+        <ui:CardExpander Margin="0,0,0,4" IsExpanded="True" Icon="{ui:SymbolIcon Pulse24}" DataContext="{Binding Background}">
+            <ui:CardExpander.Header>
+                <core:CardHeader Title="Running in background" Description="Tools that keep working while their page is closed. Stop turns the tool off." />
+            </ui:CardExpander.Header>
+            <StackPanel>
+                <TextBlock Text="Nothing is running in the background." Style="{DynamicResource HelmSecondaryText}" Margin="0,4"
+                           Visibility="{Binding HasItems, Converter={StaticResource InverseBoolToVisibility}}" />
+                <ItemsControl ItemsSource="{Binding Items}">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate>
+                            <Border Style="{DynamicResource HelmExpanderRow}">
+                                <core:RowLayout>
+                                    <core:CardHeader Title="{Binding Title}" Description="{Binding Detail}" />
+                                    <StackPanel Orientation="Horizontal">
+                                        <TextBlock Text="{Binding Since}" Style="{DynamicResource HelmSecondaryText}" VerticalAlignment="Center" Margin="0,0,12,0" />
+                                        <ui:Button Content="Stop" Icon="{ui:SymbolIcon Stop24}" Command="{Binding StopCommand}"
+                                                   IsEnabled="{Binding IsStopping, Converter={StaticResource InverseBool}}" />
+                                    </StackPanel>
+                                </core:RowLayout>
+                            </Border>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+            </StackPanel>
+        </ui:CardExpander>
+
         <!-- Sync -->
         <TextBlock Text="Sync" Style="{DynamicResource HelmSectionHeader}" />
         <ui:CardExpander Margin="0,0,0,4" IsExpanded="True" Icon="{ui:SymbolIcon ArrowSync24}" DataContext="{Binding Sync}">

@@ -1,0 +1,24 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- Workspace Controller (PC): Claude Code sessions in VS Code, seen through Claude's hooks and driven through the
+       Helm Bridge extension (Bridge/, shipped inside Helm and installed into VS Code as a .vsix). -->
+  <PropertyGroup>
+    <UseWPF>true</UseWPF>
+    <RootNamespace>Helm.Modules.Workspace</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Helm.Core.Windows\Helm.Core.Windows.csproj" />
+    <ProjectReference Include="..\Helm.Modules.Workspace.Core\Helm.Modules.Workspace.Core.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <EmbeddedResource Include="Bridge\package.json" LogicalName="Helm.Modules.Workspace.Bridge.package.json" />
+    <EmbeddedResource Include="Bridge\extension.js" LogicalName="Helm.Modules.Workspace.Bridge.extension.js" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="Helm.Tests" />
+  </ItemGroup>
+
+</Project>

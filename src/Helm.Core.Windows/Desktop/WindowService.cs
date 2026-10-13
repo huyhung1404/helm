@@ -1,6 +1,7 @@
 using System.Collections.Concurrent;
 using System.Runtime.InteropServices;
 using Helm.Core.Geometry;
+using Helm.Core.Hooks;
 using Helm.Core.Interop;
 using Microsoft.Extensions.Logging;
 using Windows.Win32;
@@ -59,6 +60,13 @@ public interface IWindowService
 
     /// <summary>Restores (if minimized) and brings a window to the foreground.</summary>
     bool Activate(nint hwnd);
+
+    /// <summary>
+    /// Brings the window to the foreground even when Windows' foreground lock would refuse a plain
+    /// <see cref="Activate"/> (Helm in the tray, another app in front). Returns true only when the window really is the
+    /// foreground window afterwards, so a caller can refuse to send keys anywhere else.
+    /// </summary>
+    bool ForceActivate(nint hwnd);
 
     bool IsTopmost(nint hwnd);
 
@@ -235,6 +243,52 @@ public sealed class WindowService(ILogger<WindowService> logger) : IWindowServic
         if (!PInvoke.IsWindow(h)) return false;
         if (PInvoke.IsIconic(h)) PInvoke.ShowWindow(h, SHOW_WINDOW_CMD.SW_RESTORE);
         return PInvoke.SetForegroundWindow(h);
+    }
+
+    public bool ForceActivate(nint hwnd)
+    {
+        var h = hwnd.ToHwnd();
+        if (!PInvoke.IsWindow(h)) return false;
+        if (PInvoke.IsIconic(h)) PInvoke.ShowWindow(h, SHOW_WINDOW_CMD.SW_RESTORE);
+        if (PInvoke.GetForegroundWindow() == h) return true;
+
+        // The process that sent the last input may take the foreground: a harmless key makes that Helm.
+        InputSimulator.SendDummyKey();
+        if (PInvoke.SetForegroundWindow(h) && WaitForeground(h)) return true;
+
+        // Share the foreground thread's input state for a moment, then ask again.
+        var foreground = PInvoke.GetForegroundWindow();
+        unsafe
+        {
+            var foregroundThread = PInvoke.GetWindowThreadProcessId(foreground, null);
+            var ownThread = PInvoke.GetCurrentThreadId();
+            var attached = foregroundThread != 0 && foregroundThread != ownThread && PInvoke.AttachThreadInput(ownThread, foregroundThread, true);
+            try
+            {
+                PInvoke.BringWindowToTop(h);
+                PInvoke.SetForegroundWindow(h);
+            }
+            finally
+            {
+                if (attached) PInvoke.AttachThreadInput(ownThread, foregroundThread, false);
+            }
+        }
+        if (WaitForeground(h)) return true;
+
+        // Last resort: minimise and restore, which activates the window.
+        PInvoke.ShowWindow(h, SHOW_WINDOW_CMD.SW_MINIMIZE);
+        PInvoke.ShowWindow(h, SHOW_WINDOW_CMD.SW_RESTORE);
+        return WaitForeground(h);
+    }
+
+    private static bool WaitForeground(HWND h)
+    {
+        for (var i = 0; i < 10; i++)
+        {
+            if (PInvoke.GetForegroundWindow() == h) return true;
+            Thread.Sleep(30);
+        }
+        return false;
     }
 
     public bool SetTopmost(nint hwnd, bool topmost)
