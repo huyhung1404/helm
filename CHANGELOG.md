@@ -3,7 +3,7 @@
 All notable changes to Helm. The top section is used as the GitHub release body and as the Velopack release notes.
 Format: [Keep a Changelog](https://keepachangelog.com), versions follow [SemVer](https://semver.org).
 
-## [Unreleased]
+## [0.42.0] - 2026-10-13
 
 ### Added
 - **Workspace Controller (PC and Android): steer the Claude Code sessions in VS Code from your phone.** On the PC,
