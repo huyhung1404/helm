@@ -73,7 +73,7 @@ public sealed class ClaudeCatalog(IChildProcessLauncher launcher, ILogger<Claude
     /// </summary>
     public async Task<IReadOnlyList<SkillInfo>> LoadAsync(string folder, CancellationToken ct)
     {
-        if (McpClientConfig.FindClaude() is not { } claude || !Directory.Exists(folder)) return [];
+        if ((ExtensionClaude() ?? McpClientConfig.FindClaude()) is not { } claude || !Directory.Exists(folder)) return [];
         // One file per run: folders are asked at the same time.
         var settings = Path.Combine(Path.GetTempPath(), $"helm-claude-catalog-{Guid.NewGuid():N}.json");
         // No hooks for this run: it is Helm asking, not a session of yours.
@@ -109,6 +109,29 @@ public sealed class ClaudeCatalog(IChildProcessLauncher launcher, ILogger<Claude
             catch (IOException)
             {
             }
+        }
+    }
+
+    /// <summary>
+    /// The Claude Code that VS Code's Claude extension runs (the newest one installed): the sessions the phone steers
+    /// are its, so its commands and model names are the ones to show. Null without the extension.
+    /// </summary>
+    internal static string? ExtensionClaude(string? extensionsDir = null)
+    {
+        var dir = extensionsDir ?? BridgeInstaller.TestExtensionsDir ?? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".vscode", "extensions");
+        try
+        {
+            if (!Directory.Exists(dir)) return null;
+            return Directory.EnumerateDirectories(dir, "anthropic.claude-code-*")
+                .Select(d => (Dir: d, Version: Version.TryParse(Path.GetFileName(d)["anthropic.claude-code-".Length..].Split('-')[0], out var v) ? v : null))
+                .Where(x => x.Version is not null)
+                .OrderByDescending(x => x.Version)
+                .Select(x => Path.Combine(x.Dir, "resources", "native-binary", "claude.exe"))
+                .FirstOrDefault(File.Exists);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            return null;
         }
     }
 

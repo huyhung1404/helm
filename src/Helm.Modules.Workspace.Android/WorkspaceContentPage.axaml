@@ -1,310 +1,1057 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-             xmlns:ic="using:FluentIcons.Avalonia"
              xmlns:vm="using:Helm.Modules.Workspace"
+             xmlns:local="using:Helm.Modules.Workspace"
              x:Class="Helm.Modules.Workspace.WorkspaceContentPage"
              x:DataType="vm:WorkspaceRemoteViewModel">
 
-    <!-- The control screen (drawer and Quick access): a PC, a tab per VS Code window, its Claude sessions, the
-         conversation and the composer. Phone first: the composer sits right under the title and the newest message
-         comes first, so the last answer and the next task need no scrolling. -->
+    <!-- The control screen, laid out like Claude's panel in VS Code (always its dark theme): the PC, a tab per VS Code
+         window, a subtab per Claude session open in it, the session's live timeline, and the composer with its chips.
+         Sheets slide up from the bottom for the PC, model and effort, mode, subagents, context and history. -->
     <UserControl.Styles>
-        <Style Selector="Border.tab">
-            <Setter Property="Background" Value="{DynamicResource HelmCardBackground}" />
-            <Setter Property="BorderBrush" Value="{DynamicResource HelmCardStroke}" />
-            <Setter Property="BorderThickness" Value="1" />
-            <Setter Property="CornerRadius" Value="16" />
-            <Setter Property="Padding" Value="14,8" />
+        <Style Selector="TextBlock">
+            <Setter Property="Foreground" Value="#cccccc" />
         </Style>
-        <Style Selector="ListBoxItem:selected Border.tab">
-            <Setter Property="BorderBrush" Value="{DynamicResource SystemAccentColor}" />
-            <Setter Property="BorderThickness" Value="2" />
+        <Style Selector="TextBlock.muted">
+            <Setter Property="Foreground" Value="#8b8b8b" />
         </Style>
-        <Style Selector="ListBox.tabs ListBoxItem">
-            <Setter Property="Padding" Value="0" />
-            <Setter Property="Margin" Value="0,0,8,0" />
+        <Style Selector="TextBlock.faint">
+            <Setter Property="Foreground" Value="#6a6a6a" />
+        </Style>
+        <Style Selector="TextBlock.failed">
+            <Setter Property="Foreground" Value="#f14c4c" />
+        </Style>
+        <Style Selector="TextBlock.strong">
+            <Setter Property="Foreground" Value="#e7e7e7" />
+        </Style>
+        <Style Selector="TextBlock.mono">
+            <Setter Property="FontFamily" Value="monospace" />
+            <Setter Property="FontSize" Value="12" />
+        </Style>
+        <Style Selector="Button.flat">
             <Setter Property="Background" Value="Transparent" />
-        </Style>
-        <Style Selector="ListBox.tabs ListBoxItem:selected /template/ ContentPresenter#PART_ContentPresenter">
-            <Setter Property="Background" Value="Transparent" />
-        </Style>
-        <Style Selector="ListBox.sessions ListBoxItem">
+            <Setter Property="BorderThickness" Value="0" />
             <Setter Property="Padding" Value="0" />
-            <Setter Property="Margin" Value="0,0,0,8" />
+            <Setter Property="CornerRadius" Value="4" />
+            <Setter Property="Foreground" Value="#cccccc" />
+            <Setter Property="HorizontalContentAlignment" Value="Stretch" />
         </Style>
-        <Style Selector="Border.count">
-            <Setter Property="Background" Value="{DynamicResource HelmDanger}" />
-            <Setter Property="CornerRadius" Value="9" />
-            <Setter Property="MinWidth" Value="18" />
-            <Setter Property="Height" Value="18" />
+        <Style Selector="Button.flat:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="#2d2d2d" />
+        </Style>
+        <Style Selector="Button.flat:pressed /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="#37373d" />
+        </Style>
+        <Style Selector="Path.icon">
+            <Setter Property="Stroke" Value="#cccccc" />
+            <Setter Property="StrokeThickness" Value="1.3" />
+            <Setter Property="Width" Value="16" />
+            <Setter Property="Height" Value="16" />
+            <Setter Property="StrokeLineCap" Value="Round" />
+            <Setter Property="StrokeJoin" Value="Round" />
+        </Style>
+        <Style Selector="TextBlock.spin">
+            <Setter Property="Foreground" Value="#d97757" />
+            <Setter Property="RenderTransformOrigin" Value="50%,50%" />
+            <Setter Property="RenderTransform">
+                <RotateTransform />
+            </Setter>
+            <Style.Animations>
+                <Animation Duration="0:0:1.6" IterationCount="Infinite">
+                    <KeyFrame Cue="0%">
+                        <Setter Property="RotateTransform.Angle" Value="0" />
+                    </KeyFrame>
+                    <KeyFrame Cue="100%">
+                        <Setter Property="RotateTransform.Angle" Value="360" />
+                    </KeyFrame>
+                </Animation>
+            </Style.Animations>
+        </Style>
+        <Style Selector="Ellipse.pulse">
+            <Style.Animations>
+                <Animation Duration="0:0:1" IterationCount="Infinite" PlaybackDirection="Alternate">
+                    <KeyFrame Cue="0%">
+                        <Setter Property="Opacity" Value="1" />
+                    </KeyFrame>
+                    <KeyFrame Cue="100%">
+                        <Setter Property="Opacity" Value="0.35" />
+                    </KeyFrame>
+                </Animation>
+            </Style.Animations>
+        </Style>
+
+        <!-- Tabs -->
+        <Style Selector="Button.tab">
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="BorderThickness" Value="0,0,1,0" />
+            <Setter Property="BorderBrush" Value="#333333" />
+            <Setter Property="CornerRadius" Value="0" />
+            <Setter Property="Padding" Value="12,0" />
+            <Setter Property="Height" Value="38" />
+            <Setter Property="Foreground" Value="#8b8b8b" />
+        </Style>
+        <Style Selector="Button.tab.on">
+            <Setter Property="Background" Value="#1f1f1f" />
+        </Style>
+        <Style Selector="Button.tab.on TextBlock.name">
+            <Setter Property="Foreground" Value="#e7e7e7" />
+        </Style>
+        <Style Selector="Button.stab">
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="BorderThickness" Value="0,0,0,2" />
+            <Setter Property="BorderBrush" Value="Transparent" />
+            <Setter Property="CornerRadius" Value="0" />
+            <Setter Property="Padding" Value="10,0" />
+            <Setter Property="Height" Value="34" />
+            <Setter Property="MaxWidth" Value="190" />
+        </Style>
+        <Style Selector="Button.stab.on">
+            <Setter Property="BorderBrush" Value="#d97757" />
+        </Style>
+        <Style Selector="Button.stab TextBlock.name">
+            <Setter Property="Foreground" Value="#8b8b8b" />
+            <Setter Property="FontSize" Value="12.5" />
+        </Style>
+        <Style Selector="Button.stab.on TextBlock.name">
+            <Setter Property="Foreground" Value="#e7e7e7" />
+        </Style>
+        <Style Selector="Button.tab.flash, Button.stab.flash">
+            <Setter Property="Background" Value="#55f14c4c" />
+        </Style>
+        <Style Selector="Border.badge">
+            <Setter Property="Background" Value="#f14c4c" />
+            <Setter Property="CornerRadius" Value="8" />
+            <Setter Property="MinWidth" Value="16" />
+            <Setter Property="Height" Value="16" />
             <Setter Property="Padding" Value="5,0" />
-            <Setter Property="Margin" Value="8,0,0,0" />
         </Style>
-        <Style Selector="Border.count > TextBlock">
+        <Style Selector="Border.badge > TextBlock">
             <Setter Property="Foreground" Value="White" />
             <Setter Property="FontSize" Value="11" />
             <Setter Property="FontWeight" Value="SemiBold" />
             <Setter Property="HorizontalAlignment" Value="Center" />
             <Setter Property="VerticalAlignment" Value="Center" />
         </Style>
-        <Style Selector="Ellipse.state">
-            <Setter Property="Width" Value="10" />
-            <Setter Property="Height" Value="10" />
-            <Setter Property="Margin" Value="0,0,8,0" />
+        <Style Selector="Button.edge">
+            <Setter Property="Width" Value="34" />
+            <Setter Property="Padding" Value="0" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="CornerRadius" Value="0" />
+            <Setter Property="VerticalAlignment" Value="Stretch" />
+            <Setter Property="IsVisible" Value="False" />
+        </Style>
+        <Style Selector="Button.edge.hot">
+            <Setter Property="Width" Value="48" />
+        </Style>
+        <Style Selector="Button.edge Border.pill">
+            <Setter Property="CornerRadius" Value="9" />
+            <Setter Property="Height" Value="18" />
+            <Setter Property="MinWidth" Value="18" />
+            <Setter Property="Padding" Value="3,0" />
+            <Setter Property="HorizontalAlignment" Value="Center" />
             <Setter Property="VerticalAlignment" Value="Center" />
         </Style>
-        <Style Selector="Border.bubble">
-            <Setter Property="CornerRadius" Value="10" />
-            <Setter Property="Padding" Value="12,10" />
-            <Setter Property="Margin" Value="0,0,0,10" />
-            <Setter Property="Background" Value="{DynamicResource HelmCardBackground}" />
-            <Setter Property="BorderBrush" Value="{DynamicResource HelmCardStroke}" />
+        <Style Selector="Button.edge.hot Border.pill">
+            <Setter Property="Background" Value="#f14c4c" />
+        </Style>
+        <Style Selector="Button.edge.hot Path.icon">
+            <Setter Property="Stroke" Value="White" />
+        </Style>
+
+        <!-- Timeline -->
+        <Style Selector="Border.io">
+            <Setter Property="BorderBrush" Value="#333333" />
             <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="CornerRadius" Value="5" />
+            <Setter Property="Background" Value="#181818" />
+            <Setter Property="ClipToBounds" Value="True" />
+            <Setter Property="Margin" Value="0,6,0,0" />
         </Style>
-        <Style Selector="Border.bubble.mine">
-            <Setter Property="Background" Value="{DynamicResource HelmSubtleFill}" />
-            <Setter Property="Margin" Value="32,0,0,10" />
-        </Style>
-        <Style Selector="TextBlock.failed">
-            <Setter Property="Foreground" Value="{DynamicResource HelmDanger}" />
-        </Style>
-        <Style Selector="Border.pending">
-            <Setter Property="BorderBrush" Value="{DynamicResource HelmDanger}" />
-            <Setter Property="BorderThickness" Value="2" />
-        </Style>
-        <Style Selector="SelectableTextBlock.code">
+        <Style Selector="TextBlock.lbl">
             <Setter Property="FontFamily" Value="monospace" />
-            <Setter Property="FontSize" Value="14" />
+            <Setter Property="FontSize" Value="10" />
+            <Setter Property="Foreground" Value="#6a6a6a" />
+            <Setter Property="Margin" Value="8,9,0,0" />
         </Style>
-        <Style Selector="ToggleButton.option">
+        <Style Selector="Border.card">
+            <Setter Property="BorderBrush" Value="#454545" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="CornerRadius" Value="6" />
+            <Setter Property="Background" Value="#252526" />
+            <Setter Property="ClipToBounds" Value="True" />
+            <Setter Property="Margin" Value="0,12,0,4" />
+        </Style>
+        <Style Selector="Button.opt">
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="BorderThickness" Value="0,1,0,0" />
+            <Setter Property="BorderBrush" Value="#333333" />
+            <Setter Property="CornerRadius" Value="0" />
+            <Setter Property="Padding" Value="12,10" />
             <Setter Property="HorizontalAlignment" Value="Stretch" />
-            <Setter Property="HorizontalContentAlignment" Value="Left" />
-            <Setter Property="Margin" Value="0,0,0,6" />
-            <Setter Property="Padding" Value="12,8" />
+            <Setter Property="HorizontalContentAlignment" Value="Stretch" />
         </Style>
+        <Style Selector="Button.opt:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="#04395e" />
+        </Style>
+        <Style Selector="Border.num">
+            <Setter Property="Width" Value="18" />
+            <Setter Property="Height" Value="18" />
+            <Setter Property="BorderBrush" Value="#454545" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="CornerRadius" Value="3" />
+            <Setter Property="Margin" Value="0,1,10,0" />
+            <Setter Property="VerticalAlignment" Value="Top" />
+        </Style>
+        <Style Selector="Border.num > TextBlock">
+            <Setter Property="FontSize" Value="11" />
+            <Setter Property="Foreground" Value="#8b8b8b" />
+            <Setter Property="HorizontalAlignment" Value="Center" />
+            <Setter Property="VerticalAlignment" Value="Center" />
+        </Style>
+        <Style Selector="ToggleButton.choice">
+            <Setter Property="HorizontalAlignment" Value="Stretch" />
+            <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="BorderThickness" Value="0,1,0,0" />
+            <Setter Property="BorderBrush" Value="#333333" />
+            <Setter Property="CornerRadius" Value="0" />
+            <Setter Property="Padding" Value="12,10" />
+        </Style>
+        <Style Selector="ToggleButton.choice:checked /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="#04395e" />
+        </Style>
+
+        <!-- Composer -->
         <Style Selector="Button.chip">
-            <Setter Property="Margin" Value="0,0,8,8" />
-            <Setter Property="Padding" Value="12,6" />
-            <Setter Property="CornerRadius" Value="16" />
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="Padding" Value="6,3" />
+            <Setter Property="CornerRadius" Value="4" />
+            <Setter Property="MinHeight" Value="28" />
+            <Setter Property="VerticalAlignment" Value="Center" />
+        </Style>
+        <Style Selector="Button.chip TextBlock">
+            <Setter Property="FontSize" Value="12" />
+            <Setter Property="Foreground" Value="#8b8b8b" />
+            <Setter Property="VerticalAlignment" Value="Center" />
+        </Style>
+        <Style Selector="Button.chip.model">
+            <Setter Property="Background" Value="#2d2d2d" />
+        </Style>
+        <Style Selector="Button.chip.model TextBlock.name">
+            <Setter Property="Foreground" Value="#cccccc" />
+        </Style>
+        <Style Selector="Button.send">
+            <Setter Property="Width" Value="32" />
+            <Setter Property="Height" Value="32" />
+            <Setter Property="CornerRadius" Value="5" />
+            <Setter Property="Padding" Value="0" />
+            <Setter Property="Background" Value="#d97757" />
+            <Setter Property="HorizontalContentAlignment" Value="Center" />
+            <Setter Property="VerticalContentAlignment" Value="Center" />
+        </Style>
+        <Style Selector="Button.send:disabled /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="#5a3a30" />
+        </Style>
+        <Style Selector="TextBox.prompt">
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="Foreground" Value="#e7e7e7" />
+            <Setter Property="FontSize" Value="15" />
+            <Setter Property="Padding" Value="10,8" />
+            <Setter Property="MinHeight" Value="40" />
+        </Style>
+        <Style Selector="TextBox.prompt:focus /template/ Border#PART_BorderElement">
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="BorderThickness" Value="0" />
+        </Style>
+        <Style Selector="TextBox.prompt:pointerover /template/ Border#PART_BorderElement">
+            <Setter Property="Background" Value="Transparent" />
+        </Style>
+
+        <!-- Sheets -->
+        <Style Selector="Button.pick">
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="CornerRadius" Value="0" />
+            <Setter Property="Padding" Value="16,9" />
+            <Setter Property="HorizontalAlignment" Value="Stretch" />
+            <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+        </Style>
+        <Style Selector="Button.pick.on">
+            <Setter Property="Background" Value="#37373d" />
+        </Style>
+        <Style Selector="Button.dot">
+            <Setter Property="Width" Value="24" />
+            <Setter Property="Height" Value="22" />
+            <Setter Property="Padding" Value="0" />
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="HorizontalContentAlignment" Value="Center" />
+            <Setter Property="VerticalContentAlignment" Value="Center" />
+        </Style>
+        <Style Selector="Button.dot Ellipse">
+            <Setter Property="Width" Value="5" />
+            <Setter Property="Height" Value="5" />
+            <Setter Property="Fill" Value="#6a6a6a" />
+        </Style>
+        <Style Selector="Button.dot.on Ellipse">
+            <Setter Property="Width" Value="13" />
+            <Setter Property="Height" Value="13" />
+            <Setter Property="Fill" Value="#d4d4d4" />
+        </Style>
+        <Style Selector="Button.dot:disabled">
+            <Setter Property="Opacity" Value="0.3" />
+        </Style>
+        <Style Selector="Border.switch">
+            <Setter Property="Width" Value="36" />
+            <Setter Property="Height" Value="20" />
+            <Setter Property="CornerRadius" Value="10" />
+            <Setter Property="Background" Value="#4a4a4a" />
+        </Style>
+        <Style Selector="Border.switch.on">
+            <Setter Property="Background" Value="#d97757" />
+        </Style>
+        <Style Selector="Border.switch > Ellipse">
+            <Setter Property="Width" Value="16" />
+            <Setter Property="Height" Value="16" />
+            <Setter Property="Fill" Value="#d4d4d4" />
+            <Setter Property="HorizontalAlignment" Value="Left" />
+            <Setter Property="Margin" Value="2,0" />
+        </Style>
+        <Style Selector="Border.switch.on > Ellipse">
+            <Setter Property="HorizontalAlignment" Value="Right" />
+        </Style>
+        <Style Selector="Button.seg">
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="Padding" Value="10,4" />
+            <Setter Property="CornerRadius" Value="4" />
+        </Style>
+        <Style Selector="Button.seg.on">
+            <Setter Property="Background" Value="#2d2d2d" />
+        </Style>
+        <Style Selector="Button.seg TextBlock">
+            <Setter Property="FontSize" Value="12" />
+            <Setter Property="Foreground" Value="#8b8b8b" />
+        </Style>
+        <Style Selector="Button.seg.on TextBlock">
+            <Setter Property="Foreground" Value="#e7e7e7" />
         </Style>
     </UserControl.Styles>
 
-    <StackPanel Spacing="12">
-        <Border x:Name="OffBar" Classes="infobar" IsVisible="False">
-            <TextBlock Text="Workspace Controller is turned off on this phone. Turn it on in Home → Utilities." TextWrapping="Wrap" />
-        </Border>
+    <ThemeVariantScope RequestedThemeVariant="Dark">
+    <Grid x:Name="Root" Background="#1f1f1f" RowDefinitions="Auto,Auto,Auto,Auto,*,Auto">
 
-        <!-- No PC yet -->
-        <Border Classes="card" IsVisible="{Binding !HasHosts}">
-            <StackPanel Spacing="6">
-                <TextBlock Text="No PC yet" Classes="title" />
-                <TextBlock Classes="secondary" TextWrapping="Wrap"
-                           Text="Turn on Workspace Controller in Helm on your PC, and sync this phone and that PC with the same account (General → Sync). The PC shows up here by itself." />
-            </StackPanel>
-        </Border>
-
-        <!-- The PC -->
-        <StackPanel Spacing="4" IsVisible="{Binding HasHosts}">
-            <ComboBox ItemsSource="{Binding Hosts}" SelectedItem="{Binding SelectedHost}" HorizontalAlignment="Stretch"
-                      AutomationProperties.Name="PC">
-                <ComboBox.ItemTemplate>
-                    <DataTemplate x:DataType="vm:HostChoice">
-                        <StackPanel Orientation="Horizontal" Spacing="8">
-                            <ic:SymbolIcon Symbol="Desktop" FontSize="18" VerticalAlignment="Center" />
-                            <TextBlock Text="{Binding Label}" VerticalAlignment="Center" FontWeight="SemiBold" />
-                        </StackPanel>
-                    </DataTemplate>
-                </ComboBox.ItemTemplate>
-            </ComboBox>
-            <TextBlock Text="{Binding HostStatus}" Classes="secondary" TextWrapping="Wrap" />
-        </StackPanel>
-
-        <!-- One tab per VS Code window -->
-        <ScrollViewer HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Disabled" IsVisible="{Binding HasTabs}">
-            <ListBox Classes="tabs" ItemsSource="{Binding Tabs}" SelectedItem="{Binding SelectedTab}" Background="Transparent">
-                <ListBox.ItemsPanel>
-                    <ItemsPanelTemplate>
-                        <StackPanel Orientation="Horizontal" />
-                    </ItemsPanelTemplate>
-                </ListBox.ItemsPanel>
-                <ListBox.ItemTemplate>
-                    <DataTemplate x:DataType="vm:WindowTab">
-                        <Border Classes="tab">
-                            <StackPanel Orientation="Horizontal">
-                                <TextBlock Text="{Binding Name}" FontWeight="SemiBold" VerticalAlignment="Center" />
-                                <Border Classes="count" IsVisible="{Binding HasAttention}">
-                                    <TextBlock Text="{Binding Attention}" />
-                                </Border>
-                            </StackPanel>
-                        </Border>
-                    </DataTemplate>
-                </ListBox.ItemTemplate>
-            </ListBox>
-        </ScrollViewer>
-
-        <!-- The sessions of the window -->
-        <StackPanel Spacing="8" IsVisible="{Binding IsListOpen}">
-            <TextBlock Text="No Claude session in this window yet. Start one below." Classes="secondary" TextWrapping="Wrap"
-                       IsVisible="{Binding !HasSessions}" />
-            <ListBox Classes="sessions" ItemsSource="{Binding Sessions}" SelectedItem="{Binding SelectedSession}" Background="Transparent">
-                <ListBox.ItemTemplate>
-                    <DataTemplate x:DataType="vm:RemoteSessionRow">
-                        <Border Classes="card">
-                            <StackPanel Spacing="4">
-                                <DockPanel>
-                                    <TextBlock DockPanel.Dock="Right" Text="{Binding Time}" Classes="secondary" VerticalAlignment="Center" />
-                                    <Ellipse Classes="state" Fill="{DynamicResource SystemAccentColor}" IsVisible="{Binding IsWorking}" />
-                                    <Ellipse Classes="state" Fill="{DynamicResource HelmDanger}" IsVisible="{Binding NeedsYou}" />
-                                    <Ellipse Classes="state" Fill="{DynamicResource HelmSuccess}" IsVisible="{Binding Unseen}" />
-                                    <TextBlock Text="{Binding Title}" Classes="title" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
-                                </DockPanel>
-                                <TextBlock Text="{Binding StateText}" Classes="secondary" />
-                                <TextBlock Text="{Binding Preview}" TextWrapping="Wrap" MaxLines="3" TextTrimming="CharacterEllipsis" />
-                            </StackPanel>
-                        </Border>
-                    </DataTemplate>
-                </ListBox.ItemTemplate>
-            </ListBox>
-        </StackPanel>
-
-        <!-- The open conversation: title and state -->
-        <Border Classes="card" IsVisible="{Binding IsSessionOpen}">
+        <!-- The PC, History, New session -->
+        <Border Grid.Row="0" Background="#181818" BorderBrush="#333333" BorderThickness="0,0,0,1" Padding="10,6">
             <DockPanel>
-                <Button DockPanel.Dock="Left" Classes="icon" Margin="0,0,8,0" Click="Back_Click" AutomationProperties.Name="Back to the sessions"
-                        VerticalAlignment="Top">
-                    <ic:SymbolIcon Symbol="ArrowLeft" FontSize="20" />
+                <Button DockPanel.Dock="Right" Classes="flat" Width="40" Height="36" Command="{Binding NewSessionCommand}"
+                        AutomationProperties.Name="New session" HorizontalContentAlignment="Center">
+                    <Path Classes="icon" Width="18" Height="18" Data="M3 2.5h7l3 3v8H3z M8 6v5M5.5 8.5h5" />
                 </Button>
-                <StackPanel Spacing="2">
-                    <TextBlock Text="{Binding SelectedSession.Title, FallbackValue=''}" Classes="title" TextWrapping="Wrap" FontSize="17" />
-                    <TextBlock Text="{Binding SessionStateText}" Classes="secondary" TextWrapping="Wrap" />
+                <Button DockPanel.Dock="Right" Classes="flat" Width="40" Height="36" Command="{Binding OpenSheetCommand}" CommandParameter="History"
+                        AutomationProperties.Name="History of this project" HorizontalContentAlignment="Center">
+                    <Path Classes="icon" Width="18" Height="18" Data="M14.2 8A6.2 6.2 0 1 1 1.8 8A6.2 6.2 0 1 1 14.2 8Z M8 4.5V8l2.5 1.6" />
+                </Button>
+                <StackPanel Orientation="Horizontal" Spacing="10">
+                    <Path Width="22" Height="22" Stretch="Uniform" StrokeThickness="2.2" StrokeLineCap="Round"
+                          Data="M16 4H42A12 12 0 0 1 54 16V84A12 12 0 0 1 42 96H16A12 12 0 0 1 4 84V16A12 12 0 0 1 16 4Z M68.7 35.3A20 20 0 0 1 68.7 64.7M80.9 23.1A38 38 0 0 1 80.9 76.9">
+                        <Path.Stroke>
+                            <LinearGradientBrush StartPoint="0%,100%" EndPoint="100%,0%">
+                                <GradientStop Offset="0" Color="#F97316" />
+                                <GradientStop Offset="1" Color="#DB2777" />
+                            </LinearGradientBrush>
+                        </Path.Stroke>
+                    </Path>
+                    <Button Classes="flat" Padding="8,4" Command="{Binding OpenSheetCommand}" CommandParameter="Pc" AutomationProperties.Name="Choose the PC">
+                        <StackPanel Orientation="Horizontal" Spacing="7">
+                            <Ellipse Width="8" Height="8" Fill="#89d185" IsVisible="{Binding HostOnline}" VerticalAlignment="Center" />
+                            <Ellipse Width="8" Height="8" Fill="#6a6a6a" IsVisible="{Binding !HostOnline}" VerticalAlignment="Center" />
+                            <TextBlock Text="{Binding HostName}" Classes="strong" FontWeight="SemiBold" VerticalAlignment="Center" />
+                            <Path Classes="icon" Width="12" Height="12" Stretch="Uniform" Data="M3 6l5 5 5-5" />
+                        </StackPanel>
+                    </Button>
                 </StackPanel>
             </DockPanel>
         </Border>
 
-        <!-- Claude waits for you: a tool to allow, held by the PC -->
-        <Border Classes="card pending" IsVisible="{Binding HasPermission}">
-            <StackPanel Spacing="8">
-                <TextBlock Text="{Binding PendingTitle}" Classes="title" TextWrapping="Wrap" />
-                <Border Background="{DynamicResource HelmSubtleFill}" CornerRadius="6" Padding="10,8">
-                    <SelectableTextBlock Classes="code" Text="{Binding PendingDetail}" TextWrapping="Wrap" />
-                </Border>
-                <TextBlock Text="{Binding PendingExpires}" Classes="secondary" TextWrapping="Wrap" />
-                <Grid ColumnDefinitions="*,8,*">
-                    <Button Classes="accent" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Content="Allow"
-                            Command="{Binding AllowCommand}" AutomationProperties.Name="Allow" />
-                    <Button Grid.Column="2" Classes="danger" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Content="Deny"
-                            Command="{Binding DenyCommand}" AutomationProperties.Name="Deny" />
-                </Grid>
-                <TextBlock Text="To deny with a reason Claude reads, type it in the box below first." Classes="secondary" TextWrapping="Wrap" />
-            </StackPanel>
-        </Border>
-
-        <!-- Claude waits for you: its question, held by the PC -->
-        <Border Classes="card pending" IsVisible="{Binding HasQuestion}">
-            <StackPanel Spacing="10">
-                <TextBlock Text="Claude asks you" Classes="title" />
-                <ItemsControl ItemsSource="{Binding Questions}">
+        <!-- One tab per VS Code window; scroll sideways; the edges tell what is hidden -->
+        <Panel Grid.Row="1" Background="#181818" IsVisible="{Binding HasProjects}">
+            <ScrollViewer x:Name="ProjectScroller" HorizontalScrollBarVisibility="Hidden" VerticalScrollBarVisibility="Disabled">
+                <ItemsControl x:Name="ProjectStrip" ItemsSource="{Binding Projects}">
+                    <ItemsControl.ItemsPanel>
+                        <ItemsPanelTemplate>
+                            <StackPanel Orientation="Horizontal" />
+                        </ItemsPanelTemplate>
+                    </ItemsControl.ItemsPanel>
                     <ItemsControl.ItemTemplate>
-                        <DataTemplate x:DataType="vm:QuestionChoice">
-                            <StackPanel Spacing="6" Margin="0,0,0,12">
-                                <TextBlock Text="{Binding Header}" Classes="secondary" />
-                                <TextBlock Text="{Binding Question}" TextWrapping="Wrap" FontSize="16" FontWeight="SemiBold" />
-                                <TextBlock Text="Pick one or more" Classes="secondary" IsVisible="{Binding MultiSelect}" />
-                                <ItemsControl ItemsSource="{Binding Options}">
-                                    <ItemsControl.ItemTemplate>
-                                        <DataTemplate x:DataType="vm:OptionChoice">
-                                            <ToggleButton Classes="option" IsChecked="{Binding IsPicked}">
-                                                <StackPanel>
-                                                    <TextBlock Text="{Binding Label}" FontWeight="SemiBold" TextWrapping="Wrap" />
-                                                    <TextBlock Text="{Binding Description}" Classes="secondary" TextWrapping="Wrap" IsVisible="{Binding HasDescription}" />
-                                                </StackPanel>
-                                            </ToggleButton>
-                                        </DataTemplate>
-                                    </ItemsControl.ItemTemplate>
-                                </ItemsControl>
-                                <TextBox Text="{Binding Other}" PlaceholderText="Or your own answer" TextWrapping="Wrap" AutomationProperties.Name="Your own answer" />
-                            </StackPanel>
-                        </DataTemplate>
-                    </ItemsControl.ItemTemplate>
-                </ItemsControl>
-                <TextBlock Text="{Binding PendingExpires}" Classes="secondary" TextWrapping="Wrap" />
-                <Button Classes="accent" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Content="Send answers"
-                        Command="{Binding SendAnswersCommand}" AutomationProperties.Name="Send answers" />
-            </StackPanel>
-        </Border>
-
-        <!-- Composer: the next task, or a new session in this window -->
-        <Border Classes="card" IsVisible="{Binding HasTabs}">
-            <StackPanel Spacing="8">
-                <ItemsControl ItemsSource="{Binding Suggestions}" IsVisible="{Binding HasSuggestions}">
-                    <ItemsControl.ItemTemplate>
-                        <DataTemplate x:DataType="vm:SkillInfo">
-                            <Button HorizontalAlignment="Stretch" HorizontalContentAlignment="Left" Margin="0,0,0,4"
-                                    Command="{Binding $parent[UserControl].((vm:WorkspaceRemoteViewModel)DataContext).PickSuggestionCommand}"
-                                    CommandParameter="{Binding}">
-                                <StackPanel>
-                                    <TextBlock Text="{Binding Name, StringFormat='/{0}'}" FontWeight="SemiBold" />
-                                    <TextBlock Text="{Binding Description}" Classes="secondary" TextWrapping="Wrap" MaxLines="2" />
+                        <DataTemplate x:DataType="vm:ProjectTab">
+                            <Button Classes="tab" Classes.on="{Binding IsSelected}"
+                                    Command="{Binding $parent[UserControl].((vm:WorkspaceRemoteViewModel)DataContext).SelectProjectCommand}" CommandParameter="{Binding}">
+                                <StackPanel Orientation="Horizontal" Spacing="7">
+                                    <TextBlock Text="✻" Classes="spin" FontSize="13" IsVisible="{Binding IsWorking}" VerticalAlignment="Center" />
+                                    <TextBlock Text="✻" Foreground="#d97757" FontSize="13" IsVisible="{Binding !IsWorking}" VerticalAlignment="Center" />
+                                    <TextBlock Text="{Binding Name}" Classes="name" FontSize="13.5" VerticalAlignment="Center" />
+                                    <Border Classes="badge" IsVisible="{Binding HasAttention}" VerticalAlignment="Center">
+                                        <TextBlock Text="{Binding Attention}" />
+                                    </Border>
                                 </StackPanel>
                             </Button>
                         </DataTemplate>
                     </ItemsControl.ItemTemplate>
                 </ItemsControl>
-                <TextBox Text="{Binding Prompt}" AcceptsReturn="True" TextWrapping="Wrap" MinHeight="80" MaxHeight="220" FontSize="16"
-                         PlaceholderText="The next task for Claude ( / for commands)" AutomationProperties.Name="Prompt" />
-                <ItemsControl ItemsSource="{Binding QuickReplies}" IsVisible="{Binding IsSessionOpen}">
-                    <ItemsControl.ItemsPanel>
-                        <ItemsPanelTemplate>
-                            <WrapPanel />
-                        </ItemsPanelTemplate>
-                    </ItemsControl.ItemsPanel>
-                    <ItemsControl.ItemTemplate>
-                        <DataTemplate x:DataType="x:String">
-                            <Button Classes="chip" Content="{Binding}"
-                                    Command="{Binding $parent[UserControl].((vm:WorkspaceRemoteViewModel)DataContext).QuickReplyCommand}"
-                                    CommandParameter="{Binding}" />
-                        </DataTemplate>
-                    </ItemsControl.ItemTemplate>
-                </ItemsControl>
-                <!-- In a conversation: send to it -->
-                <Button Classes="accent" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Command="{Binding SendCommand}"
-                        IsVisible="{Binding IsSessionOpen}" AutomationProperties.Name="Send">
-                    <StackPanel Orientation="Horizontal" Spacing="8">
-                        <ic:SymbolIcon Symbol="Send" FontSize="18" />
-                        <TextBlock Text="Send" VerticalAlignment="Center" />
+            </ScrollViewer>
+            <Button x:Name="ProjectLeft" Classes="edge" HorizontalAlignment="Left">
+                <Button.Background>
+                    <LinearGradientBrush StartPoint="0%,0%" EndPoint="100%,0%">
+                        <GradientStop Offset="0.45" Color="#181818" />
+                        <GradientStop Offset="1" Color="#00181818" />
+                    </LinearGradientBrush>
+                </Button.Background>
+                <Border Classes="pill">
+                    <StackPanel Orientation="Horizontal" Spacing="1">
+                        <Path Classes="icon" Width="12" Height="12" StrokeThickness="1.8" Stretch="Uniform" Data="M10 3L5 8l5 5" VerticalAlignment="Center" />
+                        <TextBlock FontSize="11" FontWeight="Bold" Foreground="White" VerticalAlignment="Center" IsVisible="False" />
                     </StackPanel>
-                </Button>
-                <!-- In the list: a new session in this window -->
-                <Grid ColumnDefinitions="*,8,Auto" IsVisible="{Binding IsListOpen}">
-                    <ComboBox ItemsSource="{Binding Models}" SelectedItem="{Binding NewSessionModel}" HorizontalAlignment="Stretch"
-                              AutomationProperties.Name="Model" />
-                    <Button Grid.Column="2" Classes="accent" Command="{Binding StartSessionCommand}" AutomationProperties.Name="New session">
-                        <StackPanel Orientation="Horizontal" Spacing="8">
-                            <ic:SymbolIcon Symbol="Add" FontSize="18" />
-                            <TextBlock Text="New session" VerticalAlignment="Center" />
+                </Border>
+            </Button>
+            <Button x:Name="ProjectRight" Classes="edge" HorizontalAlignment="Right">
+                <Button.Background>
+                    <LinearGradientBrush StartPoint="100%,0%" EndPoint="0%,0%">
+                        <GradientStop Offset="0.45" Color="#181818" />
+                        <GradientStop Offset="1" Color="#00181818" />
+                    </LinearGradientBrush>
+                </Button.Background>
+                <Border Classes="pill">
+                    <StackPanel Orientation="Horizontal" Spacing="1">
+                        <TextBlock FontSize="11" FontWeight="Bold" Foreground="White" VerticalAlignment="Center" IsVisible="False" />
+                        <Path Classes="icon" Width="12" Height="12" StrokeThickness="1.8" Stretch="Uniform" Data="M6 3l5 5-5 5" VerticalAlignment="Center" />
+                    </StackPanel>
+                </Border>
+            </Button>
+        </Panel>
+
+        <!-- One subtab per Claude session open in that window -->
+        <Border Grid.Row="2" BorderBrush="#333333" BorderThickness="0,0,0,1" IsVisible="{Binding HasProjects}">
+            <Panel>
+                <ScrollViewer x:Name="SessionScroller" HorizontalScrollBarVisibility="Hidden" VerticalScrollBarVisibility="Disabled">
+                    <StackPanel Orientation="Horizontal">
+                        <ItemsControl x:Name="SessionStrip" ItemsSource="{Binding SessionTabs}">
+                            <ItemsControl.ItemsPanel>
+                                <ItemsPanelTemplate>
+                                    <StackPanel Orientation="Horizontal" />
+                                </ItemsPanelTemplate>
+                            </ItemsControl.ItemsPanel>
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate x:DataType="vm:SessionTab">
+                                    <Button Classes="stab" Classes.on="{Binding IsSelected}"
+                                            Command="{Binding $parent[UserControl].((vm:WorkspaceRemoteViewModel)DataContext).SelectSessionCommand}" CommandParameter="{Binding}"
+                                            ToolTip.Tip="{Binding Title}">
+                                        <StackPanel Orientation="Horizontal" Spacing="6">
+                                            <TextBlock Text="✻" Classes="spin" FontSize="12" IsVisible="{Binding IsWorking}" VerticalAlignment="Center" />
+                                            <Ellipse Width="6" Height="6" Fill="#f14c4c" IsVisible="{Binding NeedsYou}" VerticalAlignment="Center" />
+                                            <Ellipse Width="6" Height="6" Fill="#4daafc" IsVisible="{Binding Unseen}" VerticalAlignment="Center" />
+                                            <TextBlock Text="{Binding Title}" Classes="name" TextTrimming="CharacterEllipsis" MaxWidth="150" VerticalAlignment="Center" />
+                                            <Button Classes="flat" Width="20" Height="20" IsVisible="{Binding CanClose}" HorizontalContentAlignment="Center"
+                                                    Command="{Binding $parent[UserControl].((vm:WorkspaceRemoteViewModel)DataContext).CloseTabCommand}" CommandParameter="{Binding}"
+                                                    AutomationProperties.Name="Close this tab">
+                                                <Path Classes="icon" Width="10" Height="10" Stretch="Uniform" Stroke="#6a6a6a" Data="M3 3l10 10M13 3L3 13" />
+                                            </Button>
+                                        </StackPanel>
+                                    </Button>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                        <Button Classes="stab on" IsVisible="{Binding IsNewSession}">
+                            <TextBlock Text="New session" Classes="name" VerticalAlignment="Center" />
+                        </Button>
+                        <Button Classes="stab" Command="{Binding NewSessionCommand}" AutomationProperties.Name="New session" Padding="12,0">
+                            <TextBlock Text="+" FontSize="17" Foreground="#8b8b8b" VerticalAlignment="Center" />
+                        </Button>
+                    </StackPanel>
+                </ScrollViewer>
+                <Button x:Name="SessionLeft" Classes="edge" HorizontalAlignment="Left">
+                    <Button.Background>
+                        <LinearGradientBrush StartPoint="0%,0%" EndPoint="100%,0%">
+                            <GradientStop Offset="0.45" Color="#1f1f1f" />
+                            <GradientStop Offset="1" Color="#001f1f1f" />
+                        </LinearGradientBrush>
+                    </Button.Background>
+                    <Border Classes="pill">
+                        <StackPanel Orientation="Horizontal" Spacing="1">
+                            <Path Classes="icon" Width="12" Height="12" StrokeThickness="1.8" Stretch="Uniform" Data="M10 3L5 8l5 5" VerticalAlignment="Center" />
+                            <TextBlock FontSize="11" FontWeight="Bold" Foreground="White" VerticalAlignment="Center" IsVisible="False" />
                         </StackPanel>
+                    </Border>
+                </Button>
+                <Button x:Name="SessionRight" Classes="edge" HorizontalAlignment="Right">
+                    <Button.Background>
+                        <LinearGradientBrush StartPoint="100%,0%" EndPoint="0%,0%">
+                            <GradientStop Offset="0.45" Color="#1f1f1f" />
+                            <GradientStop Offset="1" Color="#001f1f1f" />
+                        </LinearGradientBrush>
+                    </Button.Background>
+                    <Border Classes="pill">
+                        <StackPanel Orientation="Horizontal" Spacing="1">
+                            <TextBlock FontSize="11" FontWeight="Bold" Foreground="White" VerticalAlignment="Center" IsVisible="False" />
+                            <Path Classes="icon" Width="12" Height="12" StrokeThickness="1.8" Stretch="Uniform" Data="M6 3l5 5-5 5" VerticalAlignment="Center" />
+                        </StackPanel>
+                    </Border>
+                </Button>
+            </Panel>
+        </Border>
+
+        <!-- The session: title and state on two lines; Chat | Plan while a plan waits -->
+        <Border Grid.Row="3" BorderBrush="#333333" BorderThickness="0,0,0,1" Padding="12,6" MinHeight="44" IsVisible="{Binding HasProjects}">
+            <DockPanel>
+                <Border DockPanel.Dock="Right" Background="#252526" CornerRadius="5" Padding="2" IsVisible="{Binding HasReview}" VerticalAlignment="Center">
+                    <StackPanel Orientation="Horizontal" Spacing="2">
+                        <Button Classes="seg" Classes.on="{Binding ShowChat}" Command="{Binding ShowChatViewCommand}">
+                            <TextBlock Text="Chat" />
+                        </Button>
+                        <Button Classes="seg" Classes.on="{Binding ShowReview}" Command="{Binding ShowReviewViewCommand}">
+                            <StackPanel Orientation="Horizontal" Spacing="5">
+                                <TextBlock Text="{Binding ReviewLabel}" />
+                                <Ellipse Width="6" Height="6" Fill="#f14c4c" VerticalAlignment="Center" />
+                            </StackPanel>
+                        </Button>
+                    </StackPanel>
+                </Border>
+                <StackPanel Spacing="1" VerticalAlignment="Center">
+                    <TextBlock Text="{Binding SessionTitle}" Classes="strong" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+                    <StackPanel Orientation="Horizontal" Spacing="5">
+                        <TextBlock Text="✻" Classes="spin" FontSize="11" IsVisible="{Binding IsWorking}" VerticalAlignment="Center" />
+                        <Ellipse Width="6" Height="6" Fill="#f14c4c" IsVisible="{Binding NeedsYou}" VerticalAlignment="Center" />
+                        <TextBlock Text="{Binding SessionStateText}" Classes="muted" FontSize="11.5" TextTrimming="CharacterEllipsis" />
+                    </StackPanel>
+                </StackPanel>
+            </DockPanel>
+        </Border>
+
+        <!-- The main area -->
+        <Panel Grid.Row="4">
+            <!-- No PC yet -->
+            <StackPanel Spacing="8" Margin="24" VerticalAlignment="Center" IsVisible="{Binding !HasHosts}">
+                <TextBlock Text="No PC yet" Classes="strong" FontSize="17" FontWeight="SemiBold" HorizontalAlignment="Center" />
+                <TextBlock Classes="muted" TextWrapping="Wrap" TextAlignment="Center"
+                           Text="Turn on Workspace Controller in Helm on your PC, and sync this phone and that PC with the same account (General → Sync). The PC shows up here by itself." />
+            </StackPanel>
+
+            <!-- A new session -->
+            <StackPanel Spacing="8" Margin="28" VerticalAlignment="Center" IsVisible="{Binding IsNewSession}">
+                <Path Width="56" Height="56" Stretch="Uniform" StrokeThickness="4" StrokeLineCap="Round" HorizontalAlignment="Center"
+                      Data="M16 4H42A12 12 0 0 1 54 16V84A12 12 0 0 1 42 96H16A12 12 0 0 1 4 84V16A12 12 0 0 1 16 4Z M68.7 35.3A20 20 0 0 1 68.7 64.7M80.9 23.1A38 38 0 0 1 80.9 76.9">
+                    <Path.Stroke>
+                        <LinearGradientBrush StartPoint="0%,100%" EndPoint="100%,0%">
+                            <GradientStop Offset="0" Color="#F97316" />
+                            <GradientStop Offset="1" Color="#DB2777" />
+                        </LinearGradientBrush>
+                    </Path.Stroke>
+                </Path>
+                <TextBlock Text="{Binding SessionStateText}" Classes="strong" FontWeight="SemiBold" HorizontalAlignment="Center" TextWrapping="Wrap" TextAlignment="Center" />
+                <TextBlock Classes="muted" TextWrapping="Wrap" TextAlignment="Center"
+                           Text="Helm opens a Claude tab in this VS Code window on the PC, sets the model, effort and mode you chose below, then types your first task." />
+            </StackPanel>
+
+            <!-- The conversation -->
+            <ScrollViewer x:Name="ChatScroller" IsVisible="{Binding ShowChat}" HorizontalScrollBarVisibility="Disabled">
+                <StackPanel Margin="14,10,14,18" IsVisible="{Binding IsSessionOpen}">
+                    <ItemsControl x:Name="TimelineList" ItemsSource="{Binding Timeline}">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate x:DataType="vm:TimelineRow">
+                                <Panel>
+                                    <!-- Your prompt -->
+                                    <StackPanel IsVisible="{Binding IsUser}" Margin="0,8,0,4">
+                                        <TextBlock Text="{Binding Time}" Classes="faint" FontSize="11" HorizontalAlignment="Right" Margin="0,0,0,4" IsVisible="{Binding HasTime}" />
+                                        <Border Background="#252526" BorderBrush="#454545" BorderThickness="1" CornerRadius="6" Padding="10,7">
+                                            <TextBlock Text="{Binding Text}" TextWrapping="Wrap" Foreground="#e7e7e7" FontSize="14" />
+                                        </Border>
+                                        <TextBlock Text="{Binding Delivery}" FontSize="12" Margin="2,4,0,0" IsVisible="{Binding HasDelivery}" TextWrapping="Wrap"
+                                                   Foreground="#8b8b8b" Classes.failed="{Binding DeliveryFailed}" />
+                                    </StackPanel>
+                                    <!-- A step of Claude's: the dot and the rail on the left -->
+                                    <Grid ColumnDefinitions="18,*" IsVisible="{Binding !IsUser}">
+                                        <Rectangle Width="1" Fill="#333333" HorizontalAlignment="Left" Margin="4,0,0,0" />
+                                        <Panel Width="15" Height="15" HorizontalAlignment="Left" VerticalAlignment="Top" Margin="-3,10,0,0" Background="#1f1f1f">
+                                            <Ellipse Width="9" Height="9" Fill="#6a6a6a" IsVisible="{Binding IsThought}" />
+                                            <Ellipse Width="9" Height="9" Fill="#c5c5c5" IsVisible="{Binding IsAnswer}" />
+                                            <Ellipse Width="9" Height="9" Fill="#d97757" Classes="pulse" IsVisible="{Binding IsWorking}" />
+                                            <Ellipse Width="9" Height="9" Fill="#d97757" Classes="pulse" IsVisible="{Binding ShowRunning}" />
+                                            <Panel IsVisible="{Binding IsTool}">
+                                                <Ellipse Width="9" Height="9" Fill="#89d185" IsVisible="{Binding !Running}" />
+                                                <Ellipse Width="9" Height="9" Fill="#f14c4c" IsVisible="{Binding Failed}" />
+                                            </Panel>
+                                        </Panel>
+                                        <StackPanel Grid.Column="1" Margin="0,8,0,2">
+                                            <TextBlock Text="{Binding Time}" Classes="faint" FontSize="11" HorizontalAlignment="Right" IsVisible="{Binding IsAnswer}" Margin="0,0,0,2" />
+                                            <TextBlock Text="{Binding Text}" Classes="muted" IsVisible="{Binding IsThought}" />
+                                            <StackPanel Orientation="Horizontal" Spacing="6" IsVisible="{Binding IsWorking}">
+                                                <TextBlock Text="✻" Classes="spin" />
+                                                <TextBlock Text="{Binding Text}" Foreground="#d97757" />
+                                            </StackPanel>
+                                            <StackPanel IsVisible="{Binding IsTool}">
+                                                <TextBlock TextWrapping="Wrap">
+                                                    <Run Text="{Binding ToolName}" Foreground="#e7e7e7" FontWeight="SemiBold" />
+                                                    <Run Text="  " />
+                                                    <Run Text="{Binding Text}" Foreground="#8b8b8b" />
+                                                </TextBlock>
+                                                <Border Classes="io" IsVisible="{Binding HasIo}">
+                                                    <StackPanel>
+                                                        <Grid ColumnDefinitions="34,*" IsVisible="{Binding HasInput}">
+                                                            <TextBlock Text="IN" Classes="lbl" />
+                                                            <ScrollViewer Grid.Column="1" HorizontalScrollBarVisibility="Hidden" VerticalScrollBarVisibility="Disabled">
+                                                                <TextBlock Text="{Binding Input}" Classes="mono" Foreground="#cccccc" Margin="0,7,10,7" />
+                                                            </ScrollViewer>
+                                                        </Grid>
+                                                        <Grid ColumnDefinitions="34,*" Background="#1c1c1c" IsVisible="{Binding HasOutput}">
+                                                            <Border Grid.ColumnSpan="2" BorderBrush="#333333" BorderThickness="0,1,0,0" IsVisible="{Binding HasInput}" />
+                                                            <TextBlock Text="OUT" Classes="lbl" />
+                                                            <ScrollViewer Grid.Column="1" HorizontalScrollBarVisibility="Hidden" VerticalScrollBarVisibility="Disabled">
+                                                                <TextBlock Text="{Binding Output}" Classes="mono" Foreground="#cccccc" Margin="0,7,10,7" />
+                                                            </ScrollViewer>
+                                                        </Grid>
+                                                        <Grid ColumnDefinitions="34,*" Background="#1c1c1c" IsVisible="{Binding ShowRunning}">
+                                                            <TextBlock Text="OUT" Classes="lbl" />
+                                                            <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="6" Margin="0,7,10,7">
+                                                                <TextBlock Text="✻" Classes="spin" FontSize="12" />
+                                                                <TextBlock Text="Running…" Classes="mono" />
+                                                            </StackPanel>
+                                                        </Grid>
+                                                    </StackPanel>
+                                                </Border>
+                                            </StackPanel>
+                                            <local:MarkdownView Blocks="{Binding Blocks}" IsVisible="{Binding IsAnswer}" />
+                                        </StackPanel>
+                                    </Grid>
+                                </Panel>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+
+                    <!-- Claude waits: a tool to allow -->
+                    <Border Classes="card" IsVisible="{Binding HasPermission}">
+                        <StackPanel>
+                            <TextBlock Text="{Binding PendingTitle}" Classes="strong" FontWeight="SemiBold" Margin="12,10,12,6" />
+                            <Border Background="#181818" BorderBrush="#333333" BorderThickness="1" CornerRadius="4" Margin="12,0,12,10" Padding="10,8">
+                                <TextBlock Text="{Binding PendingDetail}" Classes="mono" Foreground="#cccccc" TextWrapping="Wrap" />
+                            </Border>
+                            <Button Classes="opt" Command="{Binding AllowCommand}">
+                                <DockPanel>
+                                    <Border Classes="num"><TextBlock Text="1" /></Border>
+                                    <TextBlock Text="Yes" Classes="strong" />
+                                </DockPanel>
+                            </Button>
+                            <Button Classes="opt" Command="{Binding DenyCommand}">
+                                <DockPanel>
+                                    <Border Classes="num"><TextBlock Text="2" /></Border>
+                                    <TextBlock Text="No" Classes="strong" />
+                                </DockPanel>
+                            </Button>
+                            <Button Classes="opt" Command="{Binding TellInsteadCommand}">
+                                <DockPanel>
+                                    <Border Classes="num"><TextBlock Text="3" /></Border>
+                                    <TextBlock Text="No, and tell Claude what to do instead" Classes="strong" TextWrapping="Wrap" />
+                                </DockPanel>
+                            </Button>
+                            <TextBlock Text="{Binding PendingExpires}" Classes="muted" FontSize="12" TextWrapping="Wrap" Margin="12,8,12,10" />
+                        </StackPanel>
+                    </Border>
+
+                    <!-- Claude waits: its questions -->
+                    <Border Classes="card" IsVisible="{Binding HasQuestion}">
+                        <StackPanel>
+                            <ItemsControl ItemsSource="{Binding Questions}">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate x:DataType="vm:QuestionChoice">
+                                        <StackPanel>
+                                            <TextBlock Text="{Binding Header}" Classes="muted" FontSize="12" Margin="12,10,12,2" />
+                                            <TextBlock Text="{Binding Question}" Classes="strong" FontWeight="SemiBold" TextWrapping="Wrap" Margin="12,0,12,8" />
+                                            <TextBlock Text="Pick one or more" Classes="muted" FontSize="12" Margin="12,0,12,6" IsVisible="{Binding MultiSelect}" />
+                                            <ItemsControl ItemsSource="{Binding Options}">
+                                                <ItemsControl.ItemTemplate>
+                                                    <DataTemplate x:DataType="vm:OptionChoice">
+                                                        <ToggleButton Classes="choice" IsChecked="{Binding IsPicked}">
+                                                            <StackPanel>
+                                                                <TextBlock Text="{Binding Label}" Classes="strong" TextWrapping="Wrap" />
+                                                                <TextBlock Text="{Binding Description}" Classes="muted" FontSize="12" TextWrapping="Wrap" IsVisible="{Binding HasDescription}" />
+                                                            </StackPanel>
+                                                        </ToggleButton>
+                                                    </DataTemplate>
+                                                </ItemsControl.ItemTemplate>
+                                            </ItemsControl>
+                                            <TextBox Text="{Binding Other}" PlaceholderText="Or type your own answer" Margin="12,8,12,4" AutomationProperties.Name="Your own answer" />
+                                        </StackPanel>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                            <Button Content="Answer" Background="#0e639c" Foreground="White" HorizontalAlignment="Right" Margin="12,6,12,10"
+                                    Command="{Binding SendAnswersCommand}" AutomationProperties.Name="Send answers" />
+                            <TextBlock Text="{Binding PendingExpires}" Classes="muted" FontSize="12" TextWrapping="Wrap" Margin="12,0,12,10" />
+                        </StackPanel>
+                    </Border>
+
+                    <!-- Claude waits: a plan -->
+                    <Border Classes="card" IsVisible="{Binding HasPlan}">
+                        <StackPanel>
+                            <TextBlock Text="Claude has a plan ready" Classes="strong" FontWeight="SemiBold" Margin="12,10,12,2" />
+                            <TextBlock Text="Plan mode · read it, then decide" Classes="muted" FontSize="12" Margin="12,0,12,8" />
+                            <Panel MaxHeight="150" ClipToBounds="True" Margin="12,0,12,8">
+                                <local:MarkdownView Blocks="{Binding PlanBlocks}" />
+                                <Border VerticalAlignment="Bottom" Height="50" IsHitTestVisible="False">
+                                    <Border.Background>
+                                        <LinearGradientBrush StartPoint="0%,0%" EndPoint="0%,100%">
+                                            <GradientStop Offset="0" Color="#00252526" />
+                                            <GradientStop Offset="1" Color="#252526" />
+                                        </LinearGradientBrush>
+                                    </Border.Background>
+                                </Border>
+                            </Panel>
+                            <Button Classes="opt" Command="{Binding ShowReviewViewCommand}">
+                                <DockPanel>
+                                    <Border Classes="num"><TextBlock Text="↗" /></Border>
+                                    <StackPanel>
+                                        <TextBlock Text="Open the plan" Classes="strong" />
+                                        <TextBlock Text="Read it in full and decide there" Classes="muted" FontSize="12" />
+                                    </StackPanel>
+                                </DockPanel>
+                            </Button>
+                            <TextBlock Text="{Binding PendingExpires}" Classes="muted" FontSize="12" TextWrapping="Wrap" Margin="12,8,12,10" />
+                        </StackPanel>
+                    </Border>
+                </StackPanel>
+            </ScrollViewer>
+
+            <!-- The plan, in full -->
+            <ScrollViewer IsVisible="{Binding ShowReview}" HorizontalScrollBarVisibility="Disabled">
+                <local:MarkdownView Blocks="{Binding PlanBlocks}" Margin="16,12,16,20" />
+            </ScrollViewer>
+        </Panel>
+
+        <!-- The plan's decision -->
+        <Border Grid.Row="5" Background="#252526" BorderBrush="#333333" BorderThickness="0,1,0,0" Padding="10,8,10,10" IsVisible="{Binding ShowReview}">
+            <StackPanel Spacing="6">
+                <TextBlock Text="Would you like to proceed?" Classes="strong" FontWeight="SemiBold" Margin="4,2,4,2" />
+                <Border BorderBrush="#454545" BorderThickness="1" CornerRadius="5" IsVisible="{Binding AutoModeAvailable}">
+                    <Button Classes="opt" BorderThickness="0" Command="{Binding ApprovePlanCommand}" CommandParameter="auto">
+                        <DockPanel>
+                            <Border Classes="num"><TextBlock Text="1" /></Border>
+                            <StackPanel>
+                                <TextBlock Text="Yes, and use auto mode" Classes="strong" />
+                                <TextBlock Text="Mode becomes Auto" Classes="muted" FontSize="12" />
+                            </StackPanel>
+                        </DockPanel>
                     </Button>
-                </Grid>
-                <TextBlock Text="{Binding SendStatus}" TextWrapping="Wrap" Classes="secondary" Classes.failed="{Binding SendFailed}"
-                           IsVisible="{Binding SendStatus, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+                </Border>
+                <Border BorderBrush="#454545" BorderThickness="1" CornerRadius="5">
+                    <Button Classes="opt" BorderThickness="0" Command="{Binding ApprovePlanCommand}" CommandParameter="acceptEdits">
+                        <DockPanel>
+                            <Border Classes="num"><TextBlock Text="•" /></Border>
+                            <StackPanel>
+                                <TextBlock Text="Yes, and auto-accept edits" Classes="strong" />
+                                <TextBlock Text="Mode becomes Edit automatically" Classes="muted" FontSize="12" />
+                            </StackPanel>
+                        </DockPanel>
+                    </Button>
+                </Border>
+                <Border BorderBrush="#454545" BorderThickness="1" CornerRadius="5">
+                    <Button Classes="opt" BorderThickness="0" Command="{Binding ApprovePlanCommand}" CommandParameter="default">
+                        <DockPanel>
+                            <Border Classes="num"><TextBlock Text="•" /></Border>
+                            <StackPanel>
+                                <TextBlock Text="Yes, and manually approve edits" Classes="strong" />
+                                <TextBlock Text="Mode becomes Manual: each edit asks your phone" Classes="muted" FontSize="12" TextWrapping="Wrap" />
+                            </StackPanel>
+                        </DockPanel>
+                    </Button>
+                </Border>
+                <Border BorderBrush="#454545" BorderThickness="1" CornerRadius="5">
+                    <Button Classes="opt" BorderThickness="0" Command="{Binding KeepPlanningCommand}">
+                        <DockPanel>
+                            <Border Classes="num"><TextBlock Text="•" /></Border>
+                            <StackPanel>
+                                <TextBlock Text="No, keep planning" Classes="strong" />
+                                <TextBlock Text="Back to the chat to tell Claude what to change" Classes="muted" FontSize="12" />
+                            </StackPanel>
+                        </DockPanel>
+                    </Button>
+                </Border>
             </StackPanel>
         </Border>
 
-        <!-- The conversation, newest first -->
-        <ItemsControl ItemsSource="{Binding Turns}" IsVisible="{Binding IsSessionOpen}">
-            <ItemsControl.ItemTemplate>
-                <DataTemplate x:DataType="vm:TurnRow">
-                    <Border Classes="bubble" Classes.mine="{Binding FromUser}">
-                        <StackPanel Spacing="4">
-                            <DockPanel>
-                                <TextBlock DockPanel.Dock="Right" Text="{Binding Time}" Classes="secondary" />
-                                <TextBlock Text="{Binding Who}" FontWeight="SemiBold" />
-                            </DockPanel>
-                            <SelectableTextBlock Text="{Binding Text}" TextWrapping="Wrap" FontSize="15" />
+        <!-- The composer -->
+        <Border Grid.Row="5" x:Name="Composer" BorderBrush="#333333" BorderThickness="0,1,0,0" Padding="10,8,10,10" Background="#1f1f1f"
+                IsVisible="{Binding ShowChat}">
+            <StackPanel Spacing="6">
+                <TextBlock Text="{Binding SendStatus}" FontSize="12" Classes="muted" TextWrapping="Wrap" Margin="4,0" IsVisible="{Binding ShowStatus}" />
+                <!-- "/" suggestions -->
+                <Border Background="#252526" BorderBrush="#454545" BorderThickness="1" CornerRadius="5" MaxHeight="220" IsVisible="{Binding HasSuggestions}">
+                    <ScrollViewer>
+                        <ItemsControl ItemsSource="{Binding Suggestions}">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate x:DataType="vm:SkillInfo">
+                                    <Button Classes="pick" Command="{Binding $parent[UserControl].((vm:WorkspaceRemoteViewModel)DataContext).PickSuggestionCommand}" CommandParameter="{Binding}">
+                                        <StackPanel>
+                                            <TextBlock Text="{Binding Name, StringFormat='/{0}'}" Classes="strong" FontWeight="SemiBold" />
+                                            <TextBlock Text="{Binding Description}" Classes="muted" FontSize="12" TextWrapping="Wrap" MaxLines="2" TextTrimming="CharacterEllipsis" />
+                                        </StackPanel>
+                                    </Button>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </ScrollViewer>
+                </Border>
+                <Border Background="#252526" BorderBrush="#454545" BorderThickness="1" CornerRadius="6">
+                    <StackPanel>
+                        <TextBox x:Name="PromptBox" Classes="prompt" Text="{Binding Prompt}" PlaceholderText="{Binding PromptHint}" AcceptsReturn="True"
+                                 TextWrapping="Wrap" MaxHeight="150" IsEnabled="{Binding CanType}" AutomationProperties.Name="Prompt" />
+                        <Grid ColumnDefinitions="Auto,Auto,Auto,Auto,Auto,*,Auto,Auto" Margin="4,0,4,4" ClipToBounds="True">
+                            <Button Grid.Column="0" Classes="chip" Click="Slash_Click" AutomationProperties.Name="Commands and skills">
+                                <TextBlock Text="/" FontSize="14" />
+                            </Button>
+                            <Button Grid.Column="1" Classes="chip" Command="{Binding OpenSheetCommand}" CommandParameter="Context" AutomationProperties.Name="Context used">
+                                <local:ContextRing Width="16" Height="16" Fraction="{Binding ContextFraction}" />
+                            </Button>
+                            <Button Grid.Column="2" Classes="chip" x:Name="AgeChip" IsHitTestVisible="False">
+                                <StackPanel Orientation="Horizontal" Spacing="4">
+                                    <Path Classes="icon" Width="12" Height="12" Stretch="Uniform" Stroke="#8b8b8b" Data="M14 8A6 6 0 1 1 2 8A6 6 0 1 1 14 8Z M8 4.8V8l2.2 1.4" />
+                                    <TextBlock Text="{Binding AgeText}" />
+                                </StackPanel>
+                            </Button>
+                            <Button Grid.Column="3" Classes="chip" Command="{Binding OpenSheetCommand}" CommandParameter="Agents" AutomationProperties.Name="Subagents">
+                                <StackPanel Orientation="Horizontal" Spacing="5">
+                                    <Ellipse Width="6" Height="6" Fill="#d97757" Classes="pulse" IsVisible="{Binding HasAgents}" VerticalAlignment="Center" />
+                                    <Ellipse Width="6" Height="6" Fill="#6a6a6a" IsVisible="{Binding !HasAgents}" VerticalAlignment="Center" />
+                                    <TextBlock Text="{Binding AgentsText}" />
+                                </StackPanel>
+                            </Button>
+                            <Button Grid.Column="4" Classes="chip model" Command="{Binding OpenSheetCommand}" CommandParameter="Model" AutomationProperties.Name="Model and effort">
+                                <StackPanel Orientation="Horizontal" Spacing="5">
+                                    <TextBlock Text="{Binding ModelLabel}" Classes="name" />
+                                    <TextBlock Text="{Binding EffortLabel}" IsVisible="{Binding HasEffort}" />
+                                </StackPanel>
+                            </Button>
+                            <Button Grid.Column="6" Classes="chip" Command="{Binding OpenSheetCommand}" CommandParameter="Mode" AutomationProperties.Name="Permission mode">
+                                <StackPanel Orientation="Horizontal" Spacing="5">
+                                    <Panel Width="14" Height="14">
+                                        <Path Classes="icon" Width="14" Height="14" Stretch="Uniform" Stroke="#8b8b8b" IsVisible="{Binding ModeIsManual}"
+                                              Data="M5 8V3.5a1 1 0 0 1 2 0V7M7 7V2.5a1 1 0 0 1 2 0V7M9 7V3.5a1 1 0 0 1 2 0V8M11 6.5a1 1 0 0 1 2 0V10c0 2.5-2 4.5-4.5 4.5S4 12.8 3.4 11L2.5 8.6a1 1 0 0 1 1.8-.8L5 9" />
+                                        <Path Classes="icon" Width="14" Height="14" Stretch="Uniform" Stroke="#8b8b8b" IsVisible="{Binding ModeIsEdits}" Data="M5 4L1.5 8 5 12M11 4l3.5 4L11 12" />
+                                        <Path Classes="icon" Width="14" Height="14" Stretch="Uniform" Stroke="#8b8b8b" IsVisible="{Binding ModeIsPlan}" Data="M3 2.5h10v11H3zM5.5 5.5h5M5.5 8h5M5.5 10.5h3" />
+                                        <Path Classes="icon" Width="14" Height="14" Stretch="Uniform" Stroke="#8b8b8b" IsVisible="{Binding ModeIsAuto}" Data="M9 1.5L3.5 9H8l-1 5.5L12.5 7H8z" />
+                                    </Panel>
+                                    <TextBlock Text="{Binding ModeName}" x:Name="ModeText" />
+                                </StackPanel>
+                            </Button>
+                            <Button Grid.Column="7" Classes="send" Command="{Binding SendCommand}" AutomationProperties.Name="Send" Margin="4,0,0,0">
+                                <Path Classes="icon" Stroke="White" StrokeThickness="1.8" Data="M8 13V3M4 7l4-4 4 4" />
+                            </Button>
+                        </Grid>
+                    </StackPanel>
+                </Border>
+            </StackPanel>
+        </Border>
+
+        <!-- Sheets -->
+        <Panel Grid.RowSpan="6" IsVisible="{Binding IsSheetOpen}">
+            <Border Background="#99000000" PointerPressed="Scrim_PointerPressed" />
+            <Border VerticalAlignment="Bottom" Background="#252526" BorderBrush="#454545" BorderThickness="0,1,0,0" CornerRadius="12,12,0,0"
+                    MaxHeight="{Binding #Root.Bounds.Height, Converter={x:Static local:SheetHeight.Instance}}">
+                <ScrollViewer HorizontalScrollBarVisibility="Disabled">
+                    <StackPanel Margin="0,6,0,14">
+                        <Border Width="36" Height="4" CornerRadius="2" Background="#454545" HorizontalAlignment="Center" Margin="0,2,0,6" />
+
+                        <!-- The PCs -->
+                        <StackPanel IsVisible="{Binding IsPcSheet}">
+                            <TextBlock Text="Your PCs" Classes="strong" FontWeight="SemiBold" Margin="16,6,16,6" />
+                            <ItemsControl ItemsSource="{Binding Hosts}">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate x:DataType="vm:HostChoice">
+                                        <Button Classes="pick" Command="{Binding $parent[UserControl].((vm:WorkspaceRemoteViewModel)DataContext).SelectHostCommand}" CommandParameter="{Binding}">
+                                            <DockPanel>
+                                                <Ellipse DockPanel.Dock="Left" Width="8" Height="8" Fill="#89d185" Margin="0,0,12,0" IsVisible="{Binding IsOnline}" VerticalAlignment="Center" />
+                                                <Ellipse DockPanel.Dock="Left" Width="8" Height="8" Fill="#6a6a6a" Margin="0,0,12,0" IsVisible="{Binding !IsOnline}" VerticalAlignment="Center" />
+                                                <StackPanel>
+                                                    <TextBlock Text="{Binding Host.MachineName}" Classes="strong" FontWeight="SemiBold" />
+                                                    <TextBlock Text="{Binding Detail}" Classes="muted" FontSize="12" />
+                                                </StackPanel>
+                                            </DockPanel>
+                                        </Button>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
                         </StackPanel>
-                    </Border>
-                </DataTemplate>
-            </ItemsControl.ItemTemplate>
-        </ItemsControl>
-    </StackPanel>
+
+                        <!-- Models -->
+                        <StackPanel IsVisible="{Binding IsModelSheet}">
+                            <TextBlock Text="Select a model" Classes="strong" FontWeight="SemiBold" Margin="16,6,16,6" />
+                            <ItemsControl ItemsSource="{Binding ModelOptions}">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate x:DataType="vm:ModelOption">
+                                        <Button Classes="pick" Classes.on="{Binding IsCurrent}"
+                                                Command="{Binding $parent[UserControl].((vm:WorkspaceRemoteViewModel)DataContext).SetModelCommand}" CommandParameter="{Binding}">
+                                            <DockPanel>
+                                                <Path DockPanel.Dock="Right" Classes="icon" Data="M3 8.5l3 3 7-7" IsVisible="{Binding IsCurrent}" VerticalAlignment="Center" />
+                                                <StackPanel>
+                                                    <TextBlock Text="{Binding Name}" Classes="strong" />
+                                                    <TextBlock Text="{Binding Description}" Classes="muted" FontSize="12" TextWrapping="Wrap" />
+                                                </StackPanel>
+                                            </DockPanel>
+                                        </Button>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </StackPanel>
+
+                        <!-- Modes -->
+                        <StackPanel IsVisible="{Binding IsModeSheet}">
+                            <DockPanel Margin="16,6,16,6">
+                                <TextBlock DockPanel.Dock="Right" Text="Shift + Tab on the PC" Classes="faint" FontSize="11" VerticalAlignment="Center" />
+                                <TextBlock Text="Modes" Classes="strong" FontWeight="SemiBold" />
+                            </DockPanel>
+                            <ItemsControl ItemsSource="{Binding ModeOptions}">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate x:DataType="vm:ModeOption">
+                                        <Button Classes="pick" Classes.on="{Binding IsCurrent}"
+                                                Command="{Binding $parent[UserControl].((vm:WorkspaceRemoteViewModel)DataContext).SetModeCommand}" CommandParameter="{Binding}">
+                                            <DockPanel>
+                                                <Panel DockPanel.Dock="Left" Width="16" Height="16" Margin="0,2,12,0" VerticalAlignment="Top">
+                                                    <Path Classes="icon" Stretch="Uniform" Stroke="#8b8b8b" IsVisible="{Binding IsManual}"
+                                                          Data="M5 8V3.5a1 1 0 0 1 2 0V7M7 7V2.5a1 1 0 0 1 2 0V7M9 7V3.5a1 1 0 0 1 2 0V8M11 6.5a1 1 0 0 1 2 0V10c0 2.5-2 4.5-4.5 4.5S4 12.8 3.4 11L2.5 8.6a1 1 0 0 1 1.8-.8L5 9" />
+                                                    <Path Classes="icon" Stretch="Uniform" Stroke="#8b8b8b" IsVisible="{Binding IsEdits}" Data="M5 4L1.5 8 5 12M11 4l3.5 4L11 12" />
+                                                    <Path Classes="icon" Stretch="Uniform" Stroke="#8b8b8b" IsVisible="{Binding IsPlan}" Data="M3 2.5h10v11H3zM5.5 5.5h5M5.5 8h5M5.5 10.5h3" />
+                                                    <Path Classes="icon" Stretch="Uniform" Stroke="#8b8b8b" IsVisible="{Binding IsAuto}" Data="M9 1.5L3.5 9H8l-1 5.5L12.5 7H8z" />
+                                                </Panel>
+                                                <Path DockPanel.Dock="Right" Classes="icon" Data="M3 8.5l3 3 7-7" IsVisible="{Binding IsCurrent}" VerticalAlignment="Center" />
+                                                <StackPanel>
+                                                    <TextBlock Text="{Binding Name}" Classes="strong" />
+                                                    <TextBlock Text="{Binding Description}" Classes="muted" FontSize="12" TextWrapping="Wrap" />
+                                                </StackPanel>
+                                            </DockPanel>
+                                        </Button>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </StackPanel>
+
+                        <!-- Effort and Ultracode (under models and modes, as in VS Code) -->
+                        <StackPanel IsVisible="{Binding ShowsEffort}">
+                            <Border BorderBrush="#333333" BorderThickness="0,1,0,0" Padding="16,10">
+                                <DockPanel>
+                                    <Border DockPanel.Dock="Right" Background="#1f1f1f" CornerRadius="12" Padding="4,2">
+                                        <ItemsControl ItemsSource="{Binding EffortDots}">
+                                            <ItemsControl.ItemsPanel>
+                                                <ItemsPanelTemplate>
+                                                    <StackPanel Orientation="Horizontal" Spacing="2" />
+                                                </ItemsPanelTemplate>
+                                            </ItemsControl.ItemsPanel>
+                                            <ItemsControl.ItemTemplate>
+                                                <DataTemplate x:DataType="vm:EffortDot">
+                                                    <Button Classes="dot" Classes.on="{Binding IsCurrent}" IsEnabled="{Binding IsAvailable}" ToolTip.Tip="{Binding Label}"
+                                                            AutomationProperties.Name="{Binding Label}"
+                                                            Command="{Binding $parent[UserControl].((vm:WorkspaceRemoteViewModel)DataContext).SetEffortCommand}" CommandParameter="{Binding}">
+                                                        <Ellipse />
+                                                    </Button>
+                                                </DataTemplate>
+                                            </ItemsControl.ItemTemplate>
+                                        </ItemsControl>
+                                    </Border>
+                                    <TextBlock Text="{Binding EffortHeading}" VerticalAlignment="Center" />
+                                </DockPanel>
+                            </Border>
+                            <Button Classes="pick" Command="{Binding ToggleUltracodeCommand}" BorderBrush="#333333" BorderThickness="0,1,0,0" Padding="16,10"
+                                    AutomationProperties.Name="Ultracode">
+                                <DockPanel>
+                                    <Border DockPanel.Dock="Right" Classes="switch" Classes.on="{Binding IsUltracode}">
+                                        <Ellipse />
+                                    </Border>
+                                    <TextBlock VerticalAlignment="Center" TextWrapping="Wrap">
+                                        <Run Text="Ultracode" />
+                                        <Run Text=" · plan, build and verify in parallel" Foreground="#8b8b8b" />
+                                    </TextBlock>
+                                </DockPanel>
+                            </Button>
+                        </StackPanel>
+
+                        <!-- Subagents -->
+                        <StackPanel IsVisible="{Binding IsAgentsSheet}">
+                            <DockPanel Margin="16,6,16,6">
+                                <TextBlock DockPanel.Dock="Right" Text="{Binding AgentsText}" Classes="faint" FontSize="11" VerticalAlignment="Center" />
+                                <TextBlock Text="Subagents" Classes="strong" FontWeight="SemiBold" />
+                            </DockPanel>
+                            <TextBlock Text="No subagent is running in this session." Classes="muted" Margin="16,8" IsVisible="{Binding !HasAgents}" />
+                            <ItemsControl ItemsSource="{Binding AgentRows}">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate x:DataType="vm:AgentRow">
+                                        <Border BorderBrush="#333333" BorderThickness="0,1,0,0" Padding="16,10">
+                                            <StackPanel Spacing="3">
+                                                <DockPanel>
+                                                    <TextBlock DockPanel.Dock="Right" Text="{Binding Elapsed}" Classes="faint" FontSize="12" />
+                                                    <StackPanel Orientation="Horizontal" Spacing="8">
+                                                        <TextBlock Text="✻" Classes="spin" />
+                                                        <TextBlock Text="{Binding Type}" Classes="strong" FontWeight="SemiBold" />
+                                                    </StackPanel>
+                                                </DockPanel>
+                                                <TextBlock Text="{Binding Task}" Classes="muted" FontSize="12" TextWrapping="Wrap" />
+                                                <TextBlock FontSize="12" TextWrapping="Wrap" IsVisible="{Binding HasDoing}">
+                                                    <Run Text="Now: " Foreground="#8b8b8b" />
+                                                    <Run Text="{Binding Doing}" FontFamily="monospace" Foreground="#d7ba7d" />
+                                                </TextBlock>
+                                            </StackPanel>
+                                        </Border>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </StackPanel>
+
+                        <!-- Context -->
+                        <StackPanel IsVisible="{Binding IsContextSheet}" Spacing="8">
+                            <TextBlock Text="Context" Classes="strong" FontWeight="SemiBold" Margin="16,6,16,0" />
+                            <TextBlock Text="{Binding ContextText}" Classes="muted" TextWrapping="Wrap" Margin="16,0,16,8" />
+                        </StackPanel>
+
+                        <!-- History -->
+                        <StackPanel IsVisible="{Binding IsHistorySheet}">
+                            <TextBlock Text="{Binding HistoryTitle}" Classes="strong" FontWeight="SemiBold" Margin="16,6,16,6" />
+                            <TextBox Text="{Binding HistoryQuery}" PlaceholderText="Search this project's sessions" Margin="16,2,16,8" AutomationProperties.Name="Search sessions" />
+                            <ItemsControl ItemsSource="{Binding HistoryRows}">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate x:DataType="vm:HistoryRow">
+                                        <Panel>
+                                            <TextBlock Text="{Binding Day}" Classes="faint" FontSize="11" FontWeight="SemiBold" Margin="16,10,16,4" IsVisible="{Binding IsDay}" />
+                                            <Button Classes="pick" IsVisible="{Binding IsSession}" Padding="16,10"
+                                                    Command="{Binding $parent[UserControl].((vm:WorkspaceRemoteViewModel)DataContext).OpenHistoryCommand}" CommandParameter="{Binding}">
+                                                <DockPanel>
+                                                    <Panel DockPanel.Dock="Left" Width="8" Margin="0,0,12,0" VerticalAlignment="Center">
+                                                        <Ellipse Width="8" Height="8" Fill="#f14c4c" IsVisible="{Binding NeedsYou}" />
+                                                        <Ellipse Width="8" Height="8" Fill="#d97757" IsVisible="{Binding IsWorking}" />
+                                                    </Panel>
+                                                    <Border DockPanel.Dock="Right" BorderBrush="#d97757" BorderThickness="1" CornerRadius="8" Padding="6,0" Margin="8,0,0,0"
+                                                            VerticalAlignment="Center" IsVisible="{Binding IsOpen}">
+                                                        <TextBlock Text="Open" FontSize="11" Foreground="#d97757" />
+                                                    </Border>
+                                                    <TextBlock DockPanel.Dock="Right" Text="{Binding When}" Classes="faint" FontSize="12" Margin="8,0,0,0" VerticalAlignment="Center" />
+                                                    <StackPanel>
+                                                        <TextBlock Text="{Binding Title}" Classes="strong" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+                                                        <TextBlock Text="{Binding Detail}" Classes="muted" FontSize="12" TextTrimming="CharacterEllipsis" />
+                                                    </StackPanel>
+                                                </DockPanel>
+                                            </Button>
+                                        </Panel>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                            <TextBlock Classes="faint" FontSize="11" TextWrapping="Wrap" Margin="16,10,16,0"
+                                       Text="From Claude Code's own history on the PC (~/.claude/projects). Tap an earlier session to reopen it as a tab." />
+                        </StackPanel>
+                    </StackPanel>
+                </ScrollViewer>
+            </Border>
+        </Panel>
+
+        <Border x:Name="OffBar" Grid.Row="4" VerticalAlignment="Top" Background="#5a1d1d" Padding="12,8" IsVisible="False">
+            <TextBlock Text="Workspace Controller is turned off on this phone. Turn it on in Home → Utilities." TextWrapping="Wrap" Foreground="#e7e7e7" />
+        </Border>
+    </Grid>
+    </ThemeVariantScope>
 </UserControl>

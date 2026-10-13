@@ -82,15 +82,14 @@ public sealed class WorkspaceRelayTests : IAsyncDisposable
         var host = Assert.Single(phone.Hosts);
         Assert.True(host.IsOnline);
         Assert.Equal("Desk PC", host.Label);
-        Assert.Equal("app", Assert.Single(phone.Tabs).Name);
-        var row = Assert.Single(phone.Sessions);
-        Assert.True(row.Unseen);
-        Assert.Equal(1, phone.Tabs[0].Attention);
-
-        phone.SelectedSession = row;
-        Assert.Equal("Build fixed.", phone.Turns.First().Text);
-        // Opening it counts as seen.
-        Assert.False(Assert.Single(phone.Sessions).Unseen);
+        Assert.Equal("app", Assert.Single(phone.Projects).Name);
+        // Like VS Code, the screen opens on the window's session: it is seen at once.
+        var tab = Assert.Single(phone.SessionTabs);
+        Assert.True(tab.IsSelected);
+        Assert.False(tab.Unseen);
+        Assert.Equal(0, phone.Projects[0].Attention);
+        Assert.Equal("Build fixed.", phone.Timeline.Last().Text);
+        Assert.Equal("Fix the build", phone.Timeline.First(r => r.IsUser).Text);
 
         phone.Prompt = "/co";
         Assert.Equal(["commit", "compact"], phone.Suggestions.Select(s => s.Name));
@@ -101,14 +100,17 @@ public sealed class WorkspaceRelayTests : IAsyncDisposable
         engine.Registry.Apply(Hook(ClaudeHookEvent.UserPromptSubmit, "s1", prompt: "And the docs"));
         engine.Registry.Apply(Hook(ClaudeHookEvent.Stop, "s1", reply: "Docs done."));
         await WorkspaceBridgeTests.WaitAsync(() => _sessions.Get("s1") is { LastReply: "Docs done." } r ? r : null);
-        Assert.Equal(0, phone.Tabs[0].Attention);
-        Assert.Equal("Docs done.", phone.Turns.First().Text);
+        Assert.Equal(0, phone.Projects[0].Attention);
+        Assert.Equal("Docs done.", phone.Timeline.Last().Text);
 
         phone.Prompt = "Now run the tests";
         phone.SendCommand.Execute(null);
         Assert.True(phone.IsSending);
+        // The prompt shows at the end of the timeline while it is on its way.
+        Assert.Equal("Now run the tests", phone.Timeline.Last().Text);
+        Assert.True(phone.Timeline.Last().HasDelivery);
         await WorkspaceBridgeTests.WaitAsync(() => phone.IsSending ? null : (object)true);
-        Assert.Equal("Claude received it.", phone.SendStatus);
+        Assert.Equal("✓ Claude received it", phone.SendStatus);
         Assert.False(phone.SendFailed);
         Assert.Contains("type:Now run the tests", _keyboard.Log);
     }
@@ -124,7 +126,7 @@ public sealed class WorkspaceRelayTests : IAsyncDisposable
         await WorkspaceBridgeTests.WaitAsync(() => _sessions.Get("s1")?.Pending);
 
         var phone = new WorkspaceRemoteViewModel(_hosts, _sessions, _commands, _results, _phoneSettings, new InlineUi(), dialogs: new Yes());
-        phone.SelectedSession = phone.Sessions.Single();
+        Assert.Equal("s1", phone.OpenSessionId);
         Assert.True(phone.HasPermission);
         Assert.Equal("npm publish", phone.PendingDetail);
         await phone.AllowCommand.ExecuteAsync(null);
@@ -153,11 +155,13 @@ public sealed class WorkspaceRelayTests : IAsyncDisposable
     {
         await StartPcAsync();
         var phone = Phone();
-        phone.NewSessionModel = "haiku";
+        // A window without a session opens on "New session".
+        Assert.True(phone.IsNewSession);
+        phone.DraftModel = "haiku";
         phone.Prompt = "Plan the release";
-        phone.StartSessionCommand.Execute(null);
+        phone.SendCommand.Execute(null);
         await WorkspaceBridgeTests.WaitAsync(() => phone.IsSending ? null : (object)true);
-        Assert.Equal("Claude received it.", phone.SendStatus);
+        Assert.Equal("✓ Claude received it", phone.SendStatus);
         Assert.Equal(["type:/model haiku", "submit", "type:Plan the release", "submit"], _keyboard.Log);
     }
 
@@ -170,7 +174,7 @@ public sealed class WorkspaceRelayTests : IAsyncDisposable
 
         engine.SetSessionLink("s1", false);
         await WorkspaceBridgeTests.WaitAsync(() => _sessions.Get("s1") is null ? (object)true : null);
-        Assert.Empty(Phone().Sessions);
+        Assert.Empty(Phone().SessionTabs);
 
         // A command written before the phone noticed is still refused by the PC.
         var result = await engine.RunAsync(new WorkspaceCommand { MachineId = engine.MachineId, SessionId = "s1", Text = "x", CreatedAt = DateTimeOffset.Now }, CancellationToken.None);
@@ -197,7 +201,7 @@ public sealed class WorkspaceRelayTests : IAsyncDisposable
         Assert.False(phone.HostOnline);
         Assert.Contains("Offline", phone.HostStatus);
         phone.Prompt = "Hello";
-        Assert.False(phone.StartSessionCommand.CanExecute(null));
+        Assert.False(phone.SendCommand.CanExecute(null));
     }
 
     [Fact]

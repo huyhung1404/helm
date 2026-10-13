@@ -11,7 +11,7 @@ namespace Helm.Modules.Workspace;
 /// Workspace Controller on Android: the remote control. Pick a PC, read what Claude answered in each VS Code window,
 /// give the next task, allow a tool or answer Claude's question, or start a new session. The PC (Helm with Workspace
 /// Controller on) does the typing; both talk through Helm Sync, so they must sync with the same account. While "Run in
-/// background" is on, <see cref="WorkspaceWatchService"/> keeps watching and notifies. Back closes the conversation
+/// background" is on, <see cref="WorkspaceWatchService"/> keeps watching and notifies. Back closes a sheet or the plan
 /// before the page.
 /// </summary>
 public sealed class WorkspaceModule : AndroidModuleBase, IModuleContent, IBackHandler
@@ -55,8 +55,8 @@ public sealed class WorkspaceModule : AndroidModuleBase, IModuleContent, IBackHa
         return Task.CompletedTask;
     }
 
-    /// <summary>Android back: the open conversation closes before the page does.</summary>
-    public bool HandleBack() => _viewModel.CloseSession();
+    /// <summary>Android back: an open sheet or the plan closes before the page does.</summary>
+    public bool HandleBack() => _viewModel.HandleBack();
 
     /// <summary>Runs the background watch exactly while the tool is on and "Run in background" is too.</summary>
     private void ApplyWatch()

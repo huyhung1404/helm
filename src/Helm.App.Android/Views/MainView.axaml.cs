@@ -24,7 +24,12 @@ public partial class MainView : UserControl
             (page, _) => (Control)App.Services.GetRequiredService(page.PageType)));
         PageHost.PropertyChanged += (_, e) =>
         {
-            if (e.Property == ContentControl.ContentProperty) PageScroller.Offset = default;
+            if (e.Property != ContentControl.ContentProperty) return;
+            PageScroller.Offset = default;
+            // A page that lays itself out (fixed bars, its own scrolling) gets the whole area.
+            var full = PageHost.Content is ModulePage page && typeof(Helm.Core.Ui.IFullPage).IsAssignableFrom(page.PageType);
+            PageScroller.VerticalScrollBarVisibility = full ? Avalonia.Controls.Primitives.ScrollBarVisibility.Disabled : Avalonia.Controls.Primitives.ScrollBarVisibility.Auto;
+            PageHost.Margin = full ? default : new Thickness(16, 16, 16, 24);
         };
     }
 

@@ -32,7 +32,7 @@ public sealed class BridgeInstaller(IChildProcessLauncher launcher, ILogger<Brid
     }
 
     /// <summary>Development and tests: a separate VS Code (its extensions and user data folders) instead of yours.</summary>
-    private static string? TestExtensionsDir => Environment.GetEnvironmentVariable("HELM_VSCODE_EXTENSIONS_DIR");
+    internal static string? TestExtensionsDir => Environment.GetEnvironmentVariable("HELM_VSCODE_EXTENSIONS_DIR");
     private static string? TestUserDataDir => Environment.GetEnvironmentVariable("HELM_VSCODE_USER_DATA_DIR");
 
     /// <summary>True when this bridge version sits in the user's VS Code extensions folder.</summary>
