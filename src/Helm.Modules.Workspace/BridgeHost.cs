@@ -32,7 +32,17 @@ public sealed record BridgeWindowInfo
     [JsonPropertyName("claudeTabs")] public int ClaudeTabs { get; init; }
     [JsonPropertyName("focused")] public bool Focused { get; init; }
 
+    /// <summary>The Claude tabs by name, in order (Bridge 1.1; null from an older bridge).</summary>
+    [JsonPropertyName("tabs")] public IReadOnlyList<BridgeTab>? Tabs { get; init; }
+
     public bool CtrlEnterSends => SendKey == "ctrl+enter";
+}
+
+/// <summary>One Claude tab of a window: Claude names it after the conversation, cut to 25 characters.</summary>
+public sealed record BridgeTab
+{
+    [JsonPropertyName("label")] public string Label { get; init; } = "";
+    [JsonPropertyName("active")] public bool Active { get; init; }
 }
 
 /// <summary>One VS Code window connected through Helm Bridge.</summary>
@@ -54,16 +64,17 @@ public sealed class BridgeConnection
 
     public BridgeWindowInfo Info { get; internal set; }
 
-    /// <summary>Asks the window to run one bridge request (open, new, focus, ping).</summary>
+    /// <summary>Asks the window to run one bridge request (open, new, focus, focusEditor, close, ping).</summary>
+    /// <param name="label">close: the name of the Claude tab to close.</param>
     /// <exception cref="BridgeException">The window refused, closed or did not answer.</exception>
-    public async Task RequestAsync(string op, string? session = null, string? prompt = null, CancellationToken ct = default)
+    public async Task RequestAsync(string op, string? session = null, string? prompt = null, CancellationToken ct = default, string? label = null)
     {
         var id = Guid.NewGuid().ToString("N");
         var answer = new TaskCompletionSource<string?>(TaskCreationOptions.RunContinuationsAsynchronously);
         _pending[id] = answer;
         try
         {
-            var line = JsonSerializer.Serialize(new { type = "request", id, op, session, prompt });
+            var line = JsonSerializer.Serialize(new { type = "request", id, op, session, prompt, label });
             await _write.WaitAsync(ct).ConfigureAwait(false);
             try
             {

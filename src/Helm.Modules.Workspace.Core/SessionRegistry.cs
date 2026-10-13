@@ -50,6 +50,12 @@ public sealed record AgentSession
 
     /// <summary>A permission or question the PC holds for the phone to answer; null when none.</summary>
     public PendingRequest? Pending { get; init; }
+
+    /// <summary>
+    /// Only known from Claude's records (listed when its window connected, or opened again from History); no hook of
+    /// it arrived since Helm started. Such a session shows on the phone only while it is open in a Claude tab.
+    /// </summary>
+    public bool FromHistory { get; init; }
 }
 
 /// <summary>A session changed (<paramref name="Previous"/> is null for a new one). Raised on the hook's thread.</summary>
@@ -121,6 +127,7 @@ public sealed class SessionRegistry(string machineId, TimeProvider? time = null)
                 Folder = e.Cwd.Length > 0 ? e.Cwd : current.Folder,
                 TranscriptPath = e.TranscriptPath.Length > 0 ? e.TranscriptPath : current.TranscriptPath,
                 PermissionMode = e.PermissionMode ?? current.PermissionMode,
+                FromHistory = false,
             };
             next = Transition(current, e, now);
             if (next is null) return;
@@ -163,6 +170,19 @@ public sealed class SessionRegistry(string machineId, TimeProvider? time = null)
                 Pending = pending,
                 State = pending?.Kind == PendingKind.Question ? SessionState.Question : pending is not null ? SessionState.NeedsPermission : previous.State,
             };
+            _sessions[sessionId] = next;
+        }
+        Changed?.Invoke(this, new SessionChange(next, previous));
+    }
+
+    /// <summary>The permission mode Helm just switched to (the next hook confirms or corrects it).</summary>
+    public void SetMode(string sessionId, string mode)
+    {
+        AgentSession? previous, next;
+        lock (_gate)
+        {
+            if (!_sessions.TryGetValue(sessionId, out previous) || previous.PermissionMode == mode) return;
+            next = previous with { PermissionMode = mode };
             _sessions[sessionId] = next;
         }
         Changed?.Invoke(this, new SessionChange(next, previous));
@@ -220,6 +240,7 @@ public sealed class SessionRegistry(string machineId, TimeProvider? time = null)
             ? s with { State = SessionState.Working, Waiting = null, WorkingSince = s.WorkingSince ?? now }
             : s,
         ClaudeHookEvent.PermissionRequest when e.ToolName == "AskUserQuestion" => s with { State = SessionState.Question, Waiting = "A question for you" },
+        ClaudeHookEvent.PermissionRequest when e.ToolName == "ExitPlanMode" => s with { State = SessionState.NeedsPermission, Waiting = "A plan for you to approve" },
         ClaudeHookEvent.PermissionRequest => s with { State = SessionState.NeedsPermission, Waiting = e.ToolName },
         // A question or a held request already says what Claude waits for; Claude Code's generic notice would blur it.
         ClaudeHookEvent.Notification when e.NotificationType == "permission_prompt" && s.State is not (SessionState.NeedsPermission or SessionState.Question) =>
@@ -234,6 +255,8 @@ public sealed class SessionRegistry(string machineId, TimeProvider? time = null)
             Waiting = null,
         },
         ClaudeHookEvent.SessionEnd => s with { State = SessionState.Ended, Waiting = null },
+        // A subagent started or finished: nothing changes here, but the phone's list of agents does.
+        ClaudeHookEvent.SubagentStart or ClaudeHookEvent.SubagentStop => s,
         _ => null,
     };
 

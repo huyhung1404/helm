@@ -9,10 +9,16 @@ using Microsoft.Extensions.Logging;
 
 namespace Helm.Modules.Workspace;
 
-/// <summary>A VS Code window and the Claude sessions whose folder is in it.</summary>
-public sealed record WorkspaceWindow(BridgeConnection Connection, IReadOnlyList<AgentSession> Sessions)
+/// <summary>
+/// A VS Code window and the Claude sessions whose folder is in it; <see cref="OpenSessions"/> are those open as Claude
+/// tabs, in tab order (null when the window's bridge is too old to tell).
+/// </summary>
+public sealed record WorkspaceWindow(BridgeConnection Connection, IReadOnlyList<AgentSession> Sessions, IReadOnlyList<string>? OpenSessions = null, string? ActiveSession = null)
 {
     public string Name => Connection.Info.Name;
+
+    /// <summary>Its first folder (where a new session opens; the phone's key for the window).</summary>
+    public string Folder => Connection.Info.Folders.FirstOrDefault() ?? "";
 }
 
 /// <summary>
@@ -48,6 +54,7 @@ public sealed class WorkspaceEngine : IAsyncDisposable
         Registry = registry;
         _sender = sender;
         _projectsRoot = projectsRoot;
+        History = new ClaudeHistory(projectsRoot);
         _logger = logger;
         _time = time;
         registry.Changed += OnSessionChanged;
@@ -58,6 +65,9 @@ public sealed class WorkspaceEngine : IAsyncDisposable
     }
 
     public SessionRegistry Registry { get; }
+
+    /// <summary>Claude's records of earlier sessions, per folder.</summary>
+    public ClaudeHistory History { get; }
 
     public string MachineId => Registry.MachineId;
 
@@ -94,6 +104,7 @@ public sealed class WorkspaceEngine : IAsyncDisposable
         engine._bridge.WindowsChanged += (_, _) =>
         {
             engine.SeedNewFolders();
+            engine.ResolveTabsLater();
             engine.Changed?.Invoke(engine, EventArgs.Empty);
         };
         return engine;
@@ -149,14 +160,91 @@ public sealed class WorkspaceEngine : IAsyncDisposable
         }
     }
 
-    /// <summary>The connected VS Code windows, each with its sessions (a session belongs to the window that has its folder).</summary>
+    /// <summary>
+    /// The connected VS Code windows, each with its sessions (a session belongs to the window that has its folder) and
+    /// the ones open as Claude tabs.
+    /// </summary>
     public IReadOnlyList<WorkspaceWindow> Windows()
     {
         var sessions = Registry.Sessions;
         return (_bridge?.Windows ?? [])
             .OrderBy(w => w.Info.Name, StringComparer.CurrentCultureIgnoreCase)
-            .Select(w => new WorkspaceWindow(w, sessions.Where(s => Contains(w, s.Folder)).ToList()))
+            .Select(w =>
+            {
+                var inWindow = sessions.Where(s => Contains(w, s.Folder)).ToList();
+                if (w.Info.Tabs is not { } tabs) return new WorkspaceWindow(w, inWindow);
+                var (open, active) = MatchTabs(tabs, inWindow);
+                return new WorkspaceWindow(w, inWindow, open.OfType<string>().ToList(), active);
+            })
             .ToList();
+    }
+
+    private static (IReadOnlyList<string?> Sessions, string? Active) MatchTabs(IReadOnlyList<BridgeTab> tabs, IReadOnlyList<AgentSession> sessions) =>
+        ClaudeTabMatch.Match(tabs.Select(t => (t.Label, t.Active)).ToList(),
+            sessions.Where(s => s.State != SessionState.Ended).Select(s => new ClaudeTabMatch.Candidate(s.SessionId, s.Title, s.LastPrompt, s.UpdatedAt)).ToList());
+
+    /// <summary>
+    /// Claude tabs whose session Helm does not know yet (opened before Helm started, days ago) are looked up in
+    /// Claude's records by their name and listed.
+    /// </summary>
+    private void ResolveTabsLater()
+    {
+        var windows = _bridge?.Windows ?? [];
+        var sessions = Registry.Sessions;
+        var missing = new List<(string Folder, string Label)>();
+        foreach (var w in windows)
+        {
+            if (w.Info.Tabs is not { } tabs) continue;
+            var inWindow = sessions.Where(s => Contains(w, s.Folder)).ToList();
+            var (open, _) = MatchTabs(tabs, inWindow);
+            for (var i = 0; i < tabs.Count; i++)
+                if (open[i] is null && tabs[i].Label != ClaudeTabMatch.Untitled) missing.AddRange(w.Info.Folders.Select(f => (f, tabs[i].Label)));
+        }
+        if (missing.Count == 0) return;
+        _ = Task.Run(() =>
+        {
+            try
+            {
+                var added = false;
+                foreach (var group in missing.GroupBy(m => SessionRegistry.FolderKey(m.Folder)))
+                {
+                    var folder = group.First().Folder;
+                    var labels = group.Select(m => m.Label).ToHashSet(StringComparer.Ordinal);
+                    foreach (var entry in History.For(folder).Where(h => labels.Contains(ClaudeTabMatch.Label(h.Title))))
+                    {
+                        labels.Remove(ClaudeTabMatch.Label(entry.Title));
+                        added |= SeedSession(folder, entry.SessionId);
+                    }
+                }
+                if (added) Changed?.Invoke(this, EventArgs.Empty);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Workspace: Claude tabs could not be matched to sessions");
+            }
+        });
+    }
+
+    /// <summary>Lists one session from Claude's records (it is open in a tab, or about to be). False when known already.</summary>
+    internal bool SeedSession(string folder, string sessionId)
+    {
+        if (Registry.Find(sessionId) is not null || History.TranscriptOf(folder, sessionId) is not { } path) return false;
+        var tail = TranscriptReader.Read(path, maxTurns: 6);
+        var written = new DateTimeOffset(File.GetLastWriteTimeUtc(path), TimeSpan.Zero);
+        return Registry.Seed(new AgentSession
+        {
+            MachineId = Registry.MachineId,
+            SessionId = sessionId,
+            Folder = folder,
+            TranscriptPath = path,
+            Title = tail.Title,
+            State = tail.Turns.Count > 0 && !tail.Turns[^1].FromUser ? SessionState.Done : SessionState.Idle,
+            LastPrompt = tail.Turns.LastOrDefault(t => t.FromUser)?.Text,
+            LastReply = tail.Turns.LastOrDefault(t => !t.FromUser)?.Text,
+            StartedAt = written,
+            UpdatedAt = written.ToLocalTime(),
+            FromHistory = true,
+        });
     }
 
     /// <summary>Sessions no connected VS Code window has (a terminal, another editor, a window without the bridge).</summary>
@@ -173,13 +261,21 @@ public sealed class WorkspaceEngine : IAsyncDisposable
             return new WorkspaceCommandResult(command.Id, WorkspaceCommandStatus.Failed, "This command is for another PC.");
         if (command.CreatedAt != default && _time.GetLocalNow() - command.CreatedAt > WorkspaceCommand.MaxAge)
             return new WorkspaceCommandResult(command.Id, WorkspaceCommandStatus.Failed, "The command is too old; it was not typed.");
-        if (command.Kind != WorkspaceCommandKind.Answer && string.IsNullOrWhiteSpace(command.Text))
+        if (command.NeedsText && string.IsNullOrWhiteSpace(command.Text))
             return new WorkspaceCommandResult(command.Id, WorkspaceCommandStatus.Failed, "The prompt is empty.");
 
         BridgeConnection? window;
         string? sessionId = null;
         string folder;
-        if (command.Kind == WorkspaceCommandKind.Answer) return Answer(command);
+        switch (command.Kind)
+        {
+            case WorkspaceCommandKind.Answer:
+                return Answer(command);
+            case WorkspaceCommandKind.SetModel or WorkspaceCommandKind.SetEffort or WorkspaceCommandKind.SetMode or WorkspaceCommandKind.CloseTab:
+                return await ChangeSessionAsync(command, ct).ConfigureAwait(false);
+            case WorkspaceCommandKind.Reopen:
+                return await ReopenAsync(command, ct).ConfigureAwait(false);
+        }
         if (command.Kind == WorkspaceCommandKind.Prompt)
         {
             if (command.SessionId is null || Registry.Find(command.SessionId) is not { } session)
@@ -207,7 +303,10 @@ public sealed class WorkspaceEngine : IAsyncDisposable
         Registry.ExpectPrompt(command.Id, sessionId, folder, command.Text, ReceiptTimeout + TimeSpan.FromSeconds(10));
         try
         {
-            await _sender.SendAsync(window, sessionId, command.Text, command.Kind == WorkspaceCommandKind.NewSession ? command.Model : null, ct, receipt.Task).ConfigureAwait(false);
+            var setup = command.Kind == WorkspaceCommandKind.NewSession
+                ? new NewSessionSetup(command.Model, command.Effort, command.Mode is { } m ? Math.Max(0, PermissionModes.Presses(PermissionModes.Manual, m, AutoModeAvailable)) : 0)
+                : null;
+            await _sender.SendAsync(window, sessionId, command.Text, setup, ct, receipt.Task).ConfigureAwait(false);
         }
         catch (PromptSendException ex)
         {
@@ -231,6 +330,79 @@ public sealed class WorkspaceEngine : IAsyncDisposable
                 "Typed and sent, but Claude did not confirm it yet (are Helm's hooks installed?).", sessionId);
         }
     }
+
+    /// <summary>Slash commands Claude takes without a reply hook: give them this long, then report them as sent.</summary>
+    private static readonly TimeSpan SlashSettle = TimeSpan.FromMilliseconds(1500);
+
+    /// <summary>Model, effort, mode or closing the tab of one open session.</summary>
+    private async Task<WorkspaceCommandResult> ChangeSessionAsync(WorkspaceCommand command, CancellationToken ct)
+    {
+        if (command.SessionId is null || Registry.Find(command.SessionId) is not { } session)
+            return new WorkspaceCommandResult(command.Id, WorkspaceCommandStatus.Failed, "That Claude session is not open on this PC.");
+        if (!IsConnected(session))
+            return new WorkspaceCommandResult(command.Id, WorkspaceCommandStatus.Failed, "That session is disconnected from Helm on the PC.", session.SessionId);
+        if (WindowFor(session.Folder) is not { } window)
+            return new WorkspaceCommandResult(command.Id, WorkspaceCommandStatus.Failed, "No VS Code window with Helm Bridge has that folder open.", session.SessionId);
+        try
+        {
+            switch (command.Kind)
+            {
+                case WorkspaceCommandKind.SetModel:
+                    await _sender.SendAsync(window, session.SessionId, "/model " + command.Text.Trim(), null, ct).ConfigureAwait(false);
+                    break;
+                case WorkspaceCommandKind.SetEffort:
+                    await _sender.SendAsync(window, session.SessionId, "/effort " + command.Text.Trim(), null, ct).ConfigureAwait(false);
+                    break;
+                case WorkspaceCommandKind.SetMode:
+                    var mode = PermissionModes.Normalize(command.Text.Trim());
+                    var presses = PermissionModes.Presses(session.PermissionMode, mode, AutoModeAvailable);
+                    if (presses < 0)
+                        return new WorkspaceCommandResult(command.Id, WorkspaceCommandStatus.Failed, $"Helm cannot switch from {PermissionModes.Label(session.PermissionMode)} to {PermissionModes.Label(mode)}; do it in VS Code.", session.SessionId);
+                    if (presses > 0) await _sender.CycleModeAsync(window, session.SessionId, presses, ct).ConfigureAwait(false);
+                    Registry.SetMode(session.SessionId, mode);
+                    return new WorkspaceCommandResult(command.Id, WorkspaceCommandStatus.Received, null, session.SessionId);
+                case WorkspaceCommandKind.CloseTab:
+                    if (session.State is SessionState.Working or SessionState.NeedsPermission or SessionState.Question)
+                        return new WorkspaceCommandResult(command.Id, WorkspaceCommandStatus.Failed, "Claude is still working in that tab; it was left open.", session.SessionId);
+                    await window.RequestAsync("close", null, null, ct, ClaudeTabMatch.Label(session.Title)).ConfigureAwait(false);
+                    return new WorkspaceCommandResult(command.Id, WorkspaceCommandStatus.Received, null, session.SessionId);
+            }
+        }
+        catch (PromptSendException ex)
+        {
+            return new WorkspaceCommandResult(command.Id, WorkspaceCommandStatus.Failed, ex.Message, session.SessionId);
+        }
+        catch (BridgeException ex)
+        {
+            return new WorkspaceCommandResult(command.Id, WorkspaceCommandStatus.Failed, ex.Message, session.SessionId);
+        }
+        await Task.Delay(SlashSettle, ct).ConfigureAwait(false);
+        return new WorkspaceCommandResult(command.Id, WorkspaceCommandStatus.Sent, null, session.SessionId);
+    }
+
+    /// <summary>Opens an earlier session of a window's folder as a Claude tab again.</summary>
+    private async Task<WorkspaceCommandResult> ReopenAsync(WorkspaceCommand command, CancellationToken ct)
+    {
+        if (command.SessionId is not { } id || WindowFor(command.Folder) is not { } window)
+            return new WorkspaceCommandResult(command.Id, WorkspaceCommandStatus.Failed, "No VS Code window with Helm Bridge has that folder open.", command.SessionId);
+        var folder = window.Info.Folders.Where(f => IsUnder(command.Folder, f)).OrderByDescending(f => f.Length).First();
+        if (Registry.Find(id) is null && History.TranscriptOf(folder, id) is null && History.TranscriptOf(command.Folder, id) is null)
+            return new WorkspaceCommandResult(command.Id, WorkspaceCommandStatus.Failed, "Claude has no record of that session on this PC.", id);
+        try
+        {
+            await window.RequestAsync("open", id, null, ct).ConfigureAwait(false);
+        }
+        catch (BridgeException ex)
+        {
+            return new WorkspaceCommandResult(command.Id, WorkspaceCommandStatus.Failed, ex.Message, id);
+        }
+        if (!SeedSession(command.Folder, id)) SeedSession(folder, id);
+        Changed?.Invoke(this, EventArgs.Empty);
+        return new WorkspaceCommandResult(command.Id, WorkspaceCommandStatus.Received, null, id);
+    }
+
+    /// <summary>Auto mode is one more stop of Shift+Tab when the account has it (told by the relay from Claude's own list).</summary>
+    public bool AutoModeAvailable { get; set; } = true;
 
     private void Forget(string commandId)
     {
@@ -337,6 +509,7 @@ public sealed class WorkspaceEngine : IAsyncDisposable
                 LastReply = lastClaude?.Text,
                 StartedAt = written,
                 UpdatedAt = written.ToLocalTime(),
+                FromHistory = true,
             });
             if (seeded) count++;
         }
@@ -411,13 +584,17 @@ public sealed class WorkspaceEngine : IAsyncDisposable
     {
         if (command.RequestId is not { } id || !_held.TryGetValue(id, out var held))
             return new WorkspaceCommandResult(command.Id, WorkspaceCommandStatus.Failed, "Claude is no longer waiting for that (answered in VS Code, or the time ran out).", command.SessionId);
-        var json = held.Request.Kind == PendingKind.Question
-            ? PendingRequest.Answer(held.ToolInput, command.Answers ?? new Dictionary<string, string>())
-            : PendingRequest.Decision(command.Allow, command.Text);
+        var json = held.Request.Kind switch
+        {
+            PendingKind.Question => PendingRequest.Answer(held.ToolInput, command.Answers ?? new Dictionary<string, string>()),
+            PendingKind.Plan => PendingRequest.PlanDecision(command.Allow ? command.PlanMode ?? PermissionModes.Manual : null, command.Text),
+            _ => PendingRequest.Decision(command.Allow, command.Text),
+        };
+        if (held.Request.Kind == PendingKind.Plan && command.Allow) Registry.SetMode(held.Request.SessionId, PermissionModes.Normalize(command.PlanMode));
         if (!held.Answer.TrySetResult(json))
             return new WorkspaceCommandResult(command.Id, WorkspaceCommandStatus.Failed, "That was answered already.", command.SessionId);
         _logger.LogInformation("Workspace: the phone answered {Tool} ({Answer})", held.Request.Tool,
-            held.Request.Kind == PendingKind.Question ? "question" : command.Allow ? "allow" : "deny");
+            held.Request.Kind == PendingKind.Question ? "question" : command.Allow ? "allow" + (command.PlanMode is { } m ? " → " + m : "") : "deny");
         return new WorkspaceCommandResult(command.Id, WorkspaceCommandStatus.Received, null, held.Request.SessionId);
     }
 

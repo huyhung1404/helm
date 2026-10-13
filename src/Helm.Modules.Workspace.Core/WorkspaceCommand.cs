@@ -6,8 +6,18 @@ public enum WorkspaceCommandKind
     Prompt,
     /// <summary>Open a new Claude tab in a VS Code window, optionally switch its model, then type the prompt.</summary>
     NewSession,
-    /// <summary>Answer what the PC holds for the phone: allow or deny a tool, or answer Claude's question.</summary>
+    /// <summary>Answer what the PC holds for the phone: allow or deny a tool, answer Claude's question, decide on a plan.</summary>
     Answer,
+    /// <summary>Switch an open session's model (<c>/model</c>, <see cref="WorkspaceCommand.Text"/> = alias or id).</summary>
+    SetModel,
+    /// <summary>Set an open session's effort (<c>/effort</c>, Text = low … max, "ultracode" or "ultracode off").</summary>
+    SetEffort,
+    /// <summary>Switch an open session's permission mode (Text = default, acceptEdits, plan, auto): Shift+Tab in its input.</summary>
+    SetMode,
+    /// <summary>Open an earlier session again as a Claude tab (<see cref="WorkspaceCommand.SessionId"/>, its folder).</summary>
+    Reopen,
+    /// <summary>Close a session's Claude tab (it stays in History).</summary>
+    CloseTab,
 }
 
 /// <summary>Something to do on one PC: always addressed to that PC (<see cref="MachineId"/>), never to "any".</summary>
@@ -23,8 +33,11 @@ public sealed record WorkspaceCommand
     /// <summary>The VS Code window's folder: where a new session opens, or where the session lives.</summary>
     public string Folder { get; init; } = "";
 
-    /// <summary>The prompt (Prompt, NewSession); for Answer, a message Claude reads when you deny.</summary>
-    public required string Text { get; init; }
+    /// <summary>
+    /// The prompt (Prompt, NewSession); for Answer, a message Claude reads when you deny; the model, effort or mode
+    /// for SetModel, SetEffort and SetMode; empty for Reopen and CloseTab.
+    /// </summary>
+    public string Text { get; init; } = "";
 
     /// <summary>Answer: the request (<see cref="PendingRequest.RequestId"/>).</summary>
     public string? RequestId { get; init; }
@@ -35,8 +48,21 @@ public sealed record WorkspaceCommand
     /// <summary>Answer to a question: question text → the chosen option(s) or your own words.</summary>
     public Dictionary<string, string>? Answers { get; init; }
 
+    /// <summary>Answer to a plan: the mode it continues in (acceptEdits, default, auto), or null to keep planning.</summary>
+    public string? PlanMode { get; init; }
+
     /// <summary>New session only: a model alias for <c>/model</c> (opus, sonnet, haiku …); null keeps the default.</summary>
     public string? Model { get; init; }
+
+    /// <summary>New session only: an effort for <c>/effort</c>; null keeps the default.</summary>
+    public string? Effort { get; init; }
+
+    /// <summary>New session only: the permission mode to start in; null keeps the default.</summary>
+    public string? Mode { get; init; }
+
+    /// <summary>True for the kinds that need <see cref="Text"/>.</summary>
+    public bool NeedsText => Kind is WorkspaceCommandKind.Prompt or WorkspaceCommandKind.NewSession or WorkspaceCommandKind.SetModel
+        or WorkspaceCommandKind.SetEffort or WorkspaceCommandKind.SetMode;
 
     public DateTimeOffset CreatedAt { get; init; }
 

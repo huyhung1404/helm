@@ -49,9 +49,8 @@ public static class ClaudeHookConfig
                 list = new JsonArray();
                 hooks[name] = list;
             }
+            // Every tool, before and after it runs: the phone follows Claude's steps live.
             var entry = new JsonObject();
-            // Only the question tool before it runs; every tool after it ran (that is how "back at work" is seen).
-            if (name == ClaudeHookEvent.PreToolUse) entry["matcher"] = "AskUserQuestion";
             entry["hooks"] = new JsonArray(new JsonObject
             {
                 ["type"] = "http",
@@ -88,8 +87,11 @@ public static class ClaudeHookConfig
         if (root["hooks"] is not JsonObject hooks) return false;
         foreach (var name in ClaudeHookEvent.Subscribed)
         {
-            var ours = (hooks[name] as JsonArray)?.OfType<JsonObject>().SelectMany(HelmHooksIn).ToList() ?? [];
+            var entries = (hooks[name] as JsonArray)?.OfType<JsonObject>().Where(e => HelmHooksIn(e).Any()).ToList() ?? [];
+            var ours = entries.SelectMany(HelmHooksIn).ToList();
             if (ours.Count != 1) return false;
+            // Helm 0.42 heard PreToolUse for the question tool only.
+            if (entries[0]["matcher"] is JsonValue m && m.GetValueKind() == JsonValueKind.String && m.GetValue<string>() is { Length: > 0 } matcher && matcher != "*") return false;
             var hook = ours[0];
             if (hook["url"]?.GetValue<string>() != HookUrl(port)) return false;
             if (hook["headers"]?["Authorization"]?.GetValue<string>() != "Bearer " + token) return false;

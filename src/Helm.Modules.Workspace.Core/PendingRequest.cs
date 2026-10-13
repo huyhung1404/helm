@@ -9,6 +9,8 @@ public enum PendingKind
     Permission,
     /// <summary>Claude asks you a question with choices (AskUserQuestion).</summary>
     Question,
+    /// <summary>Claude presents a plan and waits for you to approve it (ExitPlanMode in plan mode).</summary>
+    Plan,
 }
 
 public sealed record QuestionOption(string Label, string Description);
@@ -36,6 +38,10 @@ public sealed record PendingRequest
     public string Detail { get; init; } = "";
 
     public IReadOnlyList<QuestionInfo> Questions { get; init; } = [];
+
+    /// <summary>A plan: its Markdown.</summary>
+    public string? Plan { get; init; }
+
     public DateTimeOffset CreatedAt { get; init; }
 
     /// <summary>After this the PC stops waiting and VS Code shows its own dialog.</summary>
@@ -43,20 +49,25 @@ public sealed record PendingRequest
 
     public const int MaxDetail = 1500;
 
+    /// <summary>A plan longer than this is cut (it travels in the session record).</summary>
+    public const int MaxPlan = 14_000;
+
     /// <summary>The request for a PermissionRequest hook (AskUserQuestion becomes a question).</summary>
     public static PendingRequest From(ClaudeHookEvent e, string requestId, DateTimeOffset now, TimeSpan hold)
     {
         var tool = e.ToolName ?? "";
         var input = ParseObject(e.ToolInputJson);
         var questions = tool == "AskUserQuestion" ? ReadQuestions(input) : [];
+        var plan = tool == "ExitPlanMode" && input?["plan"] is JsonValue p && p.GetValueKind() == JsonValueKind.String ? p.GetValue<string>() : null;
         return new PendingRequest
         {
             RequestId = requestId,
             SessionId = e.SessionId,
-            Kind = questions.Count > 0 ? PendingKind.Question : PendingKind.Permission,
+            Kind = plan is not null ? PendingKind.Plan : questions.Count > 0 ? PendingKind.Question : PendingKind.Permission,
             Tool = tool,
-            Detail = Summarize(tool, input),
+            Detail = plan is not null ? "" : Summarize(tool, input),
             Questions = questions,
+            Plan = plan is null ? null : plan.Length <= MaxPlan ? plan : plan[..(MaxPlan - 1)] + "…",
             CreatedAt = now,
             ExpiresAt = now + hold,
         };
@@ -134,6 +145,31 @@ public sealed record PendingRequest
         foreach (var (question, answer) in answers) map[question] = answer;
         input["answers"] = map;
         return Wrap(new JsonObject { ["behavior"] = "allow", ["updatedInput"] = input });
+    }
+
+    /// <summary>
+    /// The answer to a plan: approved, and the session goes on in <paramref name="mode"/> (acceptEdits, default, auto),
+    /// as VS Code's own "Yes, …" choices do; or, with a null mode, not approved: Claude keeps planning and reads
+    /// <paramref name="feedback"/>.
+    /// </summary>
+    public static string PlanDecision(string? mode, string? feedback)
+    {
+        if (mode is null)
+            return Wrap(new JsonObject
+            {
+                ["behavior"] = "deny",
+                ["message"] = feedback is { Length: > 0 } f ? "Keep planning. " + f : "Keep planning: the plan was not approved yet.",
+            });
+        return Wrap(new JsonObject
+        {
+            ["behavior"] = "allow",
+            ["updatedPermissions"] = new JsonArray(new JsonObject
+            {
+                ["type"] = "setMode",
+                ["mode"] = PermissionModes.Normalize(mode),
+                ["destination"] = "session",
+            }),
+        });
     }
 
     private static string Wrap(JsonObject decision) => new JsonObject

@@ -204,10 +204,22 @@ public sealed class WorkspaceRelayTests : IAsyncDisposable
     public void Records_stay_small()
     {
         var huge = new string('x', 50_000);
+        var items = Enumerable.Range(0, 100).Select(i => new TranscriptItem
+        {
+            Kind = i % 3 == 0 ? TranscriptItemKind.Tool : TranscriptItemKind.Answer,
+            Text = huge,
+            Tool = "Bash",
+            Input = new string('i', TranscriptReader.MaxInput),
+            Output = new string('o', TranscriptReader.MaxOutput),
+        }).ToList();
         var record = WorkspaceSync.ToRecord(new AgentSession { MachineId = "m", SessionId = "s", Folder = "f", LastReply = huge, LastPrompt = huge },
-            "f", Enumerable.Range(0, 30).Select(i => new TranscriptTurn(i % 2 == 0, huge, null)).ToList());
+            "f", new TranscriptView { Items = items, Agents = [new SubagentInfo { Type = "Explore", Task = "Find it" }] });
         Assert.Equal(WorkspaceSync.MaxText, record.LastReply!.Length);
-        Assert.Equal(WorkspaceSync.MaxTurns, record.Recent.Count);
+        Assert.InRange(record.Items.Count, 1, WorkspaceSync.MaxItems);
+        // The newest steps are the ones kept.
+        Assert.Equal(items[^1].Kind, record.Items[^1].Kind);
+        Assert.Equal(items[^2].Kind, record.Items[^2].Kind);
+        Assert.Empty(record.Agents);
         Assert.True(System.Text.Json.JsonSerializer.Serialize(record).Length < 64 * 1024);
     }
 

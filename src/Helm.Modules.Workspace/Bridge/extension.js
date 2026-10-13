@@ -27,15 +27,23 @@ function pipeName() {
   return '\\\\.\\pipe\\Helm.Workspace.' + hash;
 }
 
-function claudeTabs() {
-  let count = 0;
+function isClaude(tab) {
+  const viewType = tab.input && tab.input.viewType;
+  return typeof viewType === 'string' && viewType.endsWith('claudeVSCodePanel');
+}
+
+function allClaudeTabs() {
+  const tabs = [];
   for (const group of vscode.window.tabGroups.all) {
-    for (const tab of group.tabs) {
-      const viewType = tab.input && tab.input.viewType;
-      if (typeof viewType === 'string' && viewType.endsWith('claudeVSCodePanel')) count++;
-    }
+    for (const tab of group.tabs) if (isClaude(tab)) tabs.push({ tab, group });
   }
-  return count;
+  return tabs;
+}
+
+// Claude names its tab after the conversation (cut to 25 characters); Helm matches the names to its sessions.
+function tabList() {
+  const active = vscode.window.tabGroups.activeTabGroup;
+  return allClaudeTabs().map(({ tab, group }) => ({ label: tab.label, active: tab.isActive && group === active }));
 }
 
 function state(type) {
@@ -46,7 +54,8 @@ function state(type) {
     name: vscode.workspace.name || '',
     folders: (vscode.workspace.workspaceFolders || []).map(f => f.uri.fsPath),
     sendKey: vscode.workspace.getConfiguration('claudeCode').get('useCtrlEnterToSend') ? 'ctrl+enter' : 'enter',
-    claudeTabs: claudeTabs(),
+    claudeTabs: allClaudeTabs().length,
+    tabs: tabList(),
     focused: vscode.window.state.focused,
   };
 }
@@ -74,6 +83,14 @@ async function handle(request) {
       case 'focusEditor':
         await vscode.commands.executeCommand(FOCUS_EDITOR);
         return reply(true);
+      case 'close': {
+        // Closes the one Claude tab with this name; two tabs with the same name are not guessed between.
+        const matches = allClaudeTabs().filter(t => t.tab.label === request.label);
+        if (matches.length === 0) return reply(false, 'That Claude tab is not open in VS Code.');
+        if (matches.length > 1) return reply(false, 'Two Claude tabs have that name; close it in VS Code.');
+        await vscode.window.tabGroups.close(matches[0].tab, true);
+        return reply(true);
+      }
       default:
         return reply(false, 'Unknown request: ' + request.op);
     }

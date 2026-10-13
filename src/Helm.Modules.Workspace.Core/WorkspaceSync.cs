@@ -1,3 +1,6 @@
+using System.Security.Cryptography;
+using System.Text;
+using System.Text.Json;
 using Helm.Core.Sync;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -11,10 +14,43 @@ public sealed record HostWindowInfo
     public string Name { get; init; } = "";
     public int ClaudeTabs { get; init; }
     public bool Connected { get; init; } = true;
+
+    /// <summary>The sessions open as Claude tabs in this window, in tab order (the phone's subtabs).</summary>
+    public IReadOnlyList<string> OpenSessions { get; init; } = [];
+
+    /// <summary>The Claude tab in front in this window, when it is one Helm knows.</summary>
+    public string? ActiveSession { get; init; }
+
+    public bool Equals(HostWindowInfo? other) =>
+        other is not null && Folder == other.Folder && Name == other.Name && ClaudeTabs == other.ClaudeTabs && Connected == other.Connected
+        && OpenSessions.SequenceEqual(other.OpenSessions) && ActiveSession == other.ActiveSession;
+
+    public override int GetHashCode() => HashCode.Combine(Folder, Name, ClaudeTabs, Connected, OpenSessions.Count, ActiveSession);
 }
 
 /// <summary>A slash command or skill Claude Code offers (for the "/" list on the phone).</summary>
 public sealed record SkillInfo(string Name, string Description);
+
+/// <summary>A model Claude Code offers (its own list, from the CLI's <c>initialize</c> answer).</summary>
+public sealed record ModelInfo
+{
+    /// <summary>What <c>/model</c> takes: an alias (opus, sonnet …) or a model id; "default" for the default.</summary>
+    public string Value { get; init; } = "";
+    public string DisplayName { get; init; } = "";
+    public string Description { get; init; } = "";
+
+    /// <summary>The model id it runs (claude-opus-5-5): matches a session's model.</summary>
+    public string ResolvedModel { get; init; } = "";
+
+    /// <summary>The effort levels it takes, lowest first; empty when it has no effort setting.</summary>
+    public IReadOnlyList<string> EffortLevels { get; init; } = [];
+
+    public bool Equals(ModelInfo? other) =>
+        other is not null && Value == other.Value && DisplayName == other.DisplayName && Description == other.Description
+        && ResolvedModel == other.ResolvedModel && EffortLevels.SequenceEqual(other.EffortLevels);
+
+    public override int GetHashCode() => HashCode.Combine(Value, DisplayName, ResolvedModel);
+}
 
 /// <summary>
 /// One PC running Workspace Controller (<c>workspace.hosts</c>, id = <see cref="MachineId"/>). The PC writes it when
@@ -31,8 +67,14 @@ public sealed record WorkspaceHostRecord
 
     public IReadOnlyList<HostWindowInfo> Windows { get; init; } = [];
 
-    /// <summary>Model aliases for a new session (<c>/model …</c>).</summary>
+    /// <summary>Model aliases for a new session (<c>/model …</c>); kept for phones of 0.42.</summary>
     public IReadOnlyList<string> Models { get; init; } = [];
+
+    /// <summary>Claude Code's own model list, in its order.</summary>
+    public IReadOnlyList<ModelInfo> ModelChoices { get; init; } = [];
+
+    /// <summary>Auto mode is offered on this PC's account (it is one more stop of Shift+Tab).</summary>
+    public bool AutoModeAvailable { get; init; }
 
     /// <summary>Slash commands and skills, for the "/" suggestions.</summary>
     public IReadOnlyList<SkillInfo> Skills { get; init; } = [];
@@ -45,7 +87,7 @@ public sealed record WorkspaceHostRecord
 
 /// <summary>
 /// One connected Claude session (<c>workspace.sessions</c>, id = session id), written by its PC. A disconnected or
-/// gone session is deleted. Kept small: the last messages only, each shortened.
+/// gone session is deleted. Kept small: the end of the timeline, each step shortened.
 /// </summary>
 public sealed record WorkspaceSessionRecord
 {
@@ -60,12 +102,59 @@ public sealed record WorkspaceSessionRecord
     public string? Waiting { get; init; }
     public string? LastPrompt { get; init; }
     public string? LastReply { get; init; }
+
+    /// <summary>Plain messages, as 0.42 sent them (no longer filled: <see cref="Items"/> replaces it).</summary>
     public IReadOnlyList<TranscriptTurn> Recent { get; init; } = [];
+
+    /// <summary>The end of the timeline: prompts, thoughts, tool calls with IN/OUT, answers.</summary>
+    public IReadOnlyList<TranscriptItem> Items { get; init; } = [];
+
     public DateTimeOffset UpdatedAt { get; init; }
     public DateTimeOffset? WorkingSince { get; init; }
+    public DateTimeOffset StartedAt { get; init; }
 
-    /// <summary>What the PC holds for the phone to answer (permission or question); null when nothing.</summary>
+    /// <summary>The model id of the latest answer (claude-opus-5-5).</summary>
+    public string? Model { get; init; }
+
+    /// <summary>The effort of the latest answer (low, medium, high, xhigh, max).</summary>
+    public string? Effort { get; init; }
+
+    /// <summary>default (Manual), acceptEdits, plan, auto, bypassPermissions.</summary>
+    public string? PermissionMode { get; init; }
+
+    /// <summary>Context the latest answer used, and how much the model has.</summary>
+    public long ContextTokens { get; init; }
+    public long ContextWindow { get; init; }
+
+    /// <summary>Subagents working for it now.</summary>
+    public IReadOnlyList<SubagentInfo> Agents { get; init; } = [];
+
+    /// <summary>What the PC holds for the phone to answer (permission, question, plan); null when nothing.</summary>
     public PendingRequest? Pending { get; init; }
+}
+
+/// <summary>One earlier session of a folder, as the history sheet lists it.</summary>
+public sealed record HistoryEntry
+{
+    public string SessionId { get; init; } = "";
+    public string Title { get; init; } = "";
+    public DateTimeOffset LastAt { get; init; }
+    public int Messages { get; init; }
+    public string? Model { get; init; }
+    public string FirstPrompt { get; init; } = "";
+    public string LastReply { get; init; } = "";
+}
+
+/// <summary>
+/// The sessions Claude Code kept for one folder of a PC (<c>workspace.history</c>, id = <see cref="WorkspaceSync.HistoryId"/>),
+/// newest first: what the phone's History sheet shows and can reopen as a tab.
+/// </summary>
+public sealed record WorkspaceHistoryRecord
+{
+    public string MachineId { get; init; } = "";
+    public string Folder { get; init; } = "";
+    public IReadOnlyList<HistoryEntry> Sessions { get; init; } = [];
+    public DateTimeOffset UpdatedAt { get; init; }
 }
 
 /// <summary>How far a command got (<c>workspace.results</c>, id = command id), written by the PC that ran it.</summary>
@@ -87,12 +176,20 @@ public static class WorkspaceSync
     public const string Sessions = "workspace.sessions";
     public const string Commands = "workspace.commands";
     public const string Results = "workspace.results";
+    public const string History = "workspace.history";
 
     /// <summary>Text longer than this is cut (records stay far below the server's 64 KB).</summary>
     public const int MaxText = 6000;
 
-    /// <summary>Messages kept per session record.</summary>
+    /// <summary>Messages kept per session record (0.42's plain list).</summary>
     public const int MaxTurns = 8;
+
+    /// <summary>Timeline steps kept per session record, and the most they may weigh together.</summary>
+    public const int MaxItems = 60;
+    public const int MaxItemsBytes = 40_000;
+
+    /// <summary>Earlier sessions listed per folder.</summary>
+    public const int MaxHistory = 30;
 
     /// <summary>Commands and results older than this are removed by the PC.</summary>
     public static readonly TimeSpan KeepCommands = TimeSpan.FromMinutes(30);
@@ -104,32 +201,70 @@ public static class WorkspaceSync
         services.AddSyncedCollection(new SyncedCollectionOptions<WorkspaceSessionRecord> { Name = Sessions });
         services.AddSyncedCollection(new SyncedCollectionOptions<WorkspaceCommand> { Name = Commands });
         services.AddSyncedCollection(new SyncedCollectionOptions<WorkspaceResultRecord> { Name = Results });
+        services.AddSyncedCollection(new SyncedCollectionOptions<WorkspaceHistoryRecord> { Name = History });
         services.AddSyncGroup(Prefix, "Workspace Controller");
         return services;
     }
 
+    /// <summary>The history record of one folder of one PC (the folder's path never shows in the id).</summary>
+    public static string HistoryId(string machineId, string folder) =>
+        machineId + "." + Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(SessionRegistry.FolderKey(folder))))[..16];
+
     /// <summary>A text cut to <see cref="MaxText"/> (the start kept; the phone shows "…").</summary>
-    public static string? Cut(string? text) => text is null || text.Length <= MaxText ? text : text[..(MaxText - 1)] + "…";
+    public static string? Cut(string? text) => Cut(text, MaxText);
+
+    public static string? Cut(string? text, int max) => text is null || text.Length <= max ? text : text[..(max - 1)] + "…";
+
+    /// <summary>
+    /// How much context a model has. Claude Code does not say it per session; the current large models have a million
+    /// tokens, older ones 200 000 (a session of a 1M model that is still small shows against 1M too).
+    /// </summary>
+    public static long ContextWindowOf(string? model, long used) =>
+        used > 200_000 || model is not null && (model.StartsWith("claude-opus-5", StringComparison.Ordinal) || model.StartsWith("claude-fable", StringComparison.Ordinal)
+            || model.StartsWith("claude-sonnet-5", StringComparison.Ordinal) || model.Contains("[1m]", StringComparison.Ordinal))
+            ? 1_000_000
+            : 200_000;
 
     /// <summary>The record the phone sees for a session.</summary>
-    public static WorkspaceSessionRecord ToRecord(AgentSession s, string windowFolder, IReadOnlyList<TranscriptTurn> recent) => new()
+    public static WorkspaceSessionRecord ToRecord(AgentSession s, string windowFolder, TranscriptView? view) => new()
     {
         MachineId = s.MachineId,
         SessionId = s.SessionId,
         WindowFolder = windowFolder,
         Folder = s.Folder,
-        Title = s.Title,
+        Title = s.Title.Length > 0 ? s.Title : view?.Title ?? "",
         State = s.State,
         Waiting = Cut(s.Waiting),
         LastPrompt = Cut(s.LastPrompt),
         LastReply = Cut(s.LastReply),
-        Recent = recent.TakeLast(MaxTurns).Select(t => t with { Text = Cut(t.Text) ?? "" }).ToList(),
+        Items = Fit(view?.Items ?? []),
         UpdatedAt = s.UpdatedAt,
         WorkingSince = s.WorkingSince,
+        StartedAt = s.StartedAt,
+        Model = view?.Model,
+        Effort = view?.Effort,
+        // The hooks tell the mode as it is now; the transcript only as of the last prompt.
+        PermissionMode = s.PermissionMode ?? view?.PermissionMode,
+        ContextTokens = view?.ContextTokens ?? 0,
+        ContextWindow = view is { ContextTokens: > 0 } v ? ContextWindowOf(v.Model, v.ContextTokens) : 0,
+        // Only a working session has subagents at work (a stopped turn leaves calls without results).
+        Agents = s.State is SessionState.Working or SessionState.NeedsPermission or SessionState.Question ? view?.Agents ?? [] : [],
         Pending = s.Pending,
     };
 
+    /// <summary>The newest steps that fit the record: answers cut, the oldest dropped first.</summary>
+    internal static IReadOnlyList<TranscriptItem> Fit(IReadOnlyList<TranscriptItem> items)
+    {
+        var kept = items.TakeLast(MaxItems).Select(i => i with { Text = Cut(i.Text) ?? "", CallId = null }).ToList();
+        var sizes = kept.Select(i => JsonSerializer.SerializeToUtf8Bytes(i).Length).ToList();
+        var total = sizes.Sum();
+        var drop = 0;
+        while (total > MaxItemsBytes && drop < kept.Count - 1) total -= sizes[drop++];
+        return drop == 0 ? kept : kept.GetRange(drop, kept.Count - drop);
+    }
+
     /// <summary>Same content (the time of a write alone is no reason to sync again).</summary>
     public static bool SameContent(WorkspaceSessionRecord a, WorkspaceSessionRecord b) =>
-        a with { UpdatedAt = default, Recent = [] } == b with { UpdatedAt = default, Recent = [] } && a.Recent.SequenceEqual(b.Recent);
+        a with { UpdatedAt = default, Recent = [], Items = [], Agents = [] } == b with { UpdatedAt = default, Recent = [], Items = [], Agents = [] }
+        && a.Items.SequenceEqual(b.Items) && a.Agents.SequenceEqual(b.Agents);
 }

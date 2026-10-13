@@ -149,7 +149,7 @@ public class SessionRegistryTests
         var registry = new SessionRegistry("pc-1", _time);
         var raised = 0;
         registry.Changed += (_, _) => raised++;
-        registry.Apply(Hook("SubagentStop"));
+        registry.Apply(Hook("Elicitation"));
         Assert.Empty(registry.Sessions);
         Assert.Equal(0, raised);
     }
@@ -244,7 +244,8 @@ public class ClaudeHookConfigTests
         Assert.Equal("http", ours["type"]!.GetValue<string>());
         Assert.Equal("http://127.0.0.1:47821/helm/workspace/hook", ours["url"]!.GetValue<string>());
         Assert.Equal("Bearer tok", ours["headers"]!["Authorization"]!.GetValue<string>());
-        Assert.Equal("AskUserQuestion", hooks["PreToolUse"]![1]!["matcher"]!.GetValue<string>());
+        // Every tool, before it runs (the phone follows Claude live).
+        Assert.Null(hooks["PreToolUse"]![1]!["matcher"]);
         Assert.True(ClaudeHookConfig.IsInstalled(json, 47821, "tok"));
     }
 
@@ -641,15 +642,15 @@ public class PromptSenderTests
     }
 
     [Fact]
-    public async Task A_new_session_switches_model_first_and_respects_ctrl_enter()
+    public async Task A_new_session_sets_model_effort_and_mode_first_and_respects_ctrl_enter()
     {
         var (host, bridge, window) = await ConnectAsync(sendKey: "ctrl+enter");
         await using var _ = host;
         await using var __ = bridge;
         var keys = new FakeKeyboard(target: 42, title: "alpha - Visual Studio Code", previous: 0);
-        await new PromptSender(keys, NullLogger<PromptSender>.Instance).SendAsync(window, null, "Hi", "sonnet", CancellationToken.None);
+        await new PromptSender(keys, NullLogger<PromptSender>.Instance).SendAsync(window, null, "Hi", new NewSessionSetup("sonnet", "high", 2), CancellationToken.None);
 
-        Assert.Equal(["type:/model sonnet", "submit:ctrl", "type:Hi", "submit:ctrl"], keys.Log);
+        Assert.Equal(["type:/model sonnet", "submit:ctrl", "type:/effort high", "submit:ctrl", "shift+tab", "shift+tab", "type:Hi", "submit:ctrl"], keys.Log);
         Assert.Equal("new", bridge.Requests[0].Op);
         Assert.Equal("focusEditor", bridge.Requests[1].Op);
     }
@@ -755,6 +756,7 @@ public class PromptSenderTests
 
         public void NewLine() => Log.Add("newline");
         public void Submit(bool ctrl) => Log.Add(ctrl ? "submit:ctrl" : "submit:enter");
+        public void NextMode() => Log.Add("shift+tab");
         public Task Pause(int milliseconds, CancellationToken ct) => Task.CompletedTask;
 
         public Task<bool> WaitFor(Task task, int milliseconds, CancellationToken ct)

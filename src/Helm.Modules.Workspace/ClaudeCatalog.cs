@@ -22,6 +22,13 @@ public sealed class ClaudeCatalog(IChildProcessLauncher launcher, ILogger<Claude
 
     private readonly ConcurrentDictionary<string, (DateTimeOffset At, IReadOnlyList<SkillInfo> Skills)> _byFolder = new(StringComparer.OrdinalIgnoreCase);
     private readonly ConcurrentDictionary<string, byte> _loading = new(StringComparer.OrdinalIgnoreCase);
+    private volatile IReadOnlyList<ModelInfo> _models = [];
+
+    /// <summary>Claude Code's model list (the same for every folder); empty until the first answer.</summary>
+    public IReadOnlyList<ModelInfo> Models => _models;
+
+    /// <summary>Auto mode is offered (the default model supports it): one more stop of Shift+Tab.</summary>
+    public bool AutoModeAvailable { get; private set; }
 
     /// <summary>A folder's list arrived.</summary>
     public event EventHandler? Updated;
@@ -60,7 +67,10 @@ public sealed class ClaudeCatalog(IChildProcessLauncher launcher, ILogger<Claude
         }
     }
 
-    /// <summary>One run of Claude Code in <paramref name="folder"/>; empty when Claude Code is missing or did not answer.</summary>
+    /// <summary>
+    /// One run of Claude Code in <paramref name="folder"/>: its commands (empty when Claude Code is missing or did not
+    /// answer). The model list of the same answer is kept in <see cref="Models"/>.
+    /// </summary>
     public async Task<IReadOnlyList<SkillInfo>> LoadAsync(string folder, CancellationToken ct)
     {
         if (McpClientConfig.FindClaude() is not { } claude || !Directory.Exists(folder)) return [];
@@ -75,7 +85,13 @@ public sealed class ClaudeCatalog(IChildProcessLauncher launcher, ILogger<Claude
         using var process = launcher.Start(new ChildProcessStartInfo(commandLine, folder));
         try
         {
-            return await AskAsync(process, ct).ConfigureAwait(false);
+            var (skills, models, auto) = await AskAsync(process, ct).ConfigureAwait(false);
+            if (models.Count > 0)
+            {
+                _models = models;
+                AutoModeAvailable = auto;
+            }
+            return skills;
         }
         finally
         {
@@ -96,7 +112,7 @@ public sealed class ClaudeCatalog(IChildProcessLauncher launcher, ILogger<Claude
         }
     }
 
-    private static async Task<IReadOnlyList<SkillInfo>> AskAsync(ChildProcess process, CancellationToken ct)
+    private static async Task<(IReadOnlyList<SkillInfo> Skills, IReadOnlyList<ModelInfo> Models, bool Auto)> AskAsync(ChildProcess process, CancellationToken ct)
     {
         using var timeout = CancellationTokenSource.CreateLinkedTokenSource(ct);
         timeout.CancelAfter(Timeout);
@@ -106,10 +122,53 @@ public sealed class ClaudeCatalog(IChildProcessLauncher launcher, ILogger<Claude
         using var reader = new StreamReader(process.StandardOutput, Encoding.UTF8);
         while (await reader.ReadLineAsync(timeout.Token).ConfigureAwait(false) is { } line)
         {
-            if (ParseInitialize(line) is { } skills) return skills;
+            if (ParseInitialize(line) is { } skills)
+            {
+                var (models, auto) = ParseModels(line);
+                return (skills, models, auto);
+            }
         }
-        return [];
+        return ([], [], false);
     }
+
+    /// <summary>The model list of an <c>initialize</c> answer (empty for any other line), and whether Auto mode is offered.</summary>
+    internal static (IReadOnlyList<ModelInfo> Models, bool AutoMode) ParseModels(string line)
+    {
+        if (line.Length == 0 || line[0] != '{') return ([], false);
+        try
+        {
+            using var doc = JsonDocument.Parse(line);
+            var response = doc.RootElement.TryGetProperty("response", out var r) ? r : default;
+            if (response.ValueKind == JsonValueKind.Object && response.TryGetProperty("response", out var inner)) response = inner;
+            if (response.ValueKind != JsonValueKind.Object || !response.TryGetProperty("models", out var models) || models.ValueKind != JsonValueKind.Array) return ([], false);
+            var list = new List<ModelInfo>();
+            var auto = false;
+            foreach (var m in models.EnumerateArray())
+            {
+                if (Str(m, "value") is not { Length: > 0 } value) continue;
+                var levels = m.TryGetProperty("supportedEffortLevels", out var e) && e.ValueKind == JsonValueKind.Array
+                    ? e.EnumerateArray().Where(x => x.ValueKind == JsonValueKind.String).Select(x => x.GetString()!).ToList()
+                    : m.TryGetProperty("supportsEffort", out var se) && se.ValueKind == JsonValueKind.True ? ["low", "medium", "high"] : [];
+                list.Add(new ModelInfo
+                {
+                    Value = value,
+                    DisplayName = Str(m, "displayName") ?? value,
+                    Description = Str(m, "description") ?? "",
+                    ResolvedModel = Str(m, "resolvedModel") ?? value,
+                    EffortLevels = levels,
+                });
+                if (value == "default" && m.TryGetProperty("supportsAutoMode", out var a) && a.ValueKind == JsonValueKind.True) auto = true;
+            }
+            return (list, auto);
+        }
+        catch (JsonException)
+        {
+            return ([], false);
+        }
+    }
+
+    private static string? Str(JsonElement e, string name) =>
+        e.ValueKind == JsonValueKind.Object && e.TryGetProperty(name, out var v) && v.ValueKind == JsonValueKind.String ? v.GetString() : null;
 
     /// <summary>The command list of an <c>initialize</c> answer; null for any other line.</summary>
     internal static IReadOnlyList<SkillInfo>? ParseInitialize(string line)

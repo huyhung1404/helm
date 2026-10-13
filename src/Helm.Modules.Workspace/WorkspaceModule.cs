@@ -28,6 +28,7 @@ public sealed class WorkspaceModule : HelmModuleBase, IModuleContent
     private readonly ISyncedCollection<WorkspaceSessionRecord> _sessions;
     private readonly ISyncedCollection<WorkspaceCommand> _commands;
     private readonly ISyncedCollection<WorkspaceResultRecord> _results;
+    private readonly ISyncedCollection<WorkspaceHistoryRecord>? _history;
     private readonly IDeviceInfo? _device;
     private readonly ClaudeCatalog _catalog;
     private readonly IUserActivity? _userActivity;
@@ -40,8 +41,9 @@ public sealed class WorkspaceModule : HelmModuleBase, IModuleContent
     public WorkspaceModule(ISettingsStoreFactory settings, HelmPaths paths, PromptSender sender, BridgeInstaller installer,
         IBackgroundActivities activities, ISyncedCollection<WorkspaceHostRecord> hosts, ISyncedCollection<WorkspaceSessionRecord> sessions,
         ISyncedCollection<WorkspaceCommand> commands, ISyncedCollection<WorkspaceResultRecord> results, ClaudeCatalog catalog,
-        ILogger<WorkspaceModule> logger, IDeviceInfo? device = null, IUserActivity? activity = null)
+        ILogger<WorkspaceModule> logger, IDeviceInfo? device = null, IUserActivity? activity = null, ISyncedCollection<WorkspaceHistoryRecord>? history = null)
     {
+        _history = history;
         Settings = settings.Get<WorkspaceSettings>(WorkspaceIds.ModuleId);
         _paths = paths;
         _sender = sender;
@@ -54,7 +56,11 @@ public sealed class WorkspaceModule : HelmModuleBase, IModuleContent
         _device = device;
         _catalog = catalog;
         _userActivity = activity;
-        catalog.Updated += (_, _) => _relay?.RequestPublish();
+        catalog.Updated += (_, _) =>
+        {
+            if (_engine is { } engine && catalog.Models.Count > 0) engine.AutoModeAvailable = catalog.AutoModeAvailable;
+            _relay?.RequestPublish();
+        };
         _logger = logger;
     }
 
@@ -104,7 +110,8 @@ public sealed class WorkspaceModule : HelmModuleBase, IModuleContent
             if (Settings.Current.ManageClaudeHooks) _hooksProblem = _engine.InstallClaudeHooks(HooksFileOverride());
             // The phone's link: this PC and its connected sessions out, the phone's commands in (Helm Sync).
             _relay = new WorkspaceRelay(_engine, _hosts, _sessions, _commands, _results, _device?.DeviceName ?? Environment.MachineName,
-                () => _catalog.Current, _logger);
+                () => _catalog.Current, _logger, models: () => (_catalog.Models, _catalog.AutoModeAvailable), history: _history);
+            if (_catalog.Models.Count > 0) _engine.AutoModeAvailable = _catalog.AutoModeAvailable;
             _engine.PhoneLinked = true;
             _activity = _activities.Start(Id, DisplayName, Detail(), StopFromGeneralAsync);
             UpdateStatus();

@@ -16,10 +16,12 @@ public sealed record ClaudeHookEvent
     public const string PreToolUse = "PreToolUse";
     public const string PostToolUse = "PostToolUse";
     public const string SessionEnd = "SessionEnd";
+    public const string SubagentStart = "SubagentStart";
+    public const string SubagentStop = "SubagentStop";
 
     /// <summary>The events Helm subscribes to, in the order they are written into Claude's settings.</summary>
     public static IReadOnlyList<string> Subscribed { get; } =
-        [SessionStart, UserPromptSubmit, Stop, Notification, PermissionRequest, PreToolUse, PostToolUse, SessionEnd];
+        [SessionStart, UserPromptSubmit, Stop, Notification, PermissionRequest, PreToolUse, PostToolUse, SubagentStart, SubagentStop, SessionEnd];
 
     public required string Event { get; init; }
     public required string SessionId { get; init; }
