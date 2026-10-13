@@ -15,8 +15,15 @@ Format: [Keep a Changelog](https://keepachangelog.com), versions follow [SemVer]
   conversation (newest first), send the next task, start a new session with a model, use "/" for Claude Code's own
   commands and skills, or one of the quick replies; the phone shows when Claude received it. Everything goes through
   Helm Sync, end-to-end encrypted, so the phone and the PCs must sync with the same account; several PCs never mix.
-- **General → Running in background.** Every tool that keeps something running is listed with a Stop button that
-  turns it off.
+- **Workspace Controller: approve from your phone, and notifications.** When Claude asks to use a tool or asks you a
+  question, the PC can hold the request for the phone (PC setting *Approve from your phone*: when you are away from
+  the PC, which is the default, always, or never). The phone shows exactly what would run (the command, the file),
+  Allow asks once more, Deny can carry a reason Claude reads, and a question shows its choices or takes your own
+  words. If the phone does not answer in time, or you come back to the PC, VS Code asks as usual. On the phone,
+  *Run in background and notify* keeps watching your PCs while Helm is closed and notifies when a session finishes
+  or waits for you, one group per VS Code window; tapping opens that conversation.
+- **General → Running in background (PC and Android).** Every tool that keeps something running is listed with a
+  Stop button.
 
 ## [0.41.0] - 2026-10-12
 

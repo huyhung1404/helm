@@ -15,6 +15,18 @@
             </StackPanel>
         </Border>
 
+        <TextBlock Text="Notifications" Classes="section" />
+        <Border Classes="card">
+            <DockPanel>
+                <ToggleSwitch DockPanel.Dock="Right" IsChecked="{Binding RunInBackground}" OnContent="" OffContent="" AutomationProperties.Name="Run in background" />
+                <StackPanel VerticalAlignment="Center" Spacing="2">
+                    <TextBlock Text="Run in background and notify" Classes="title" />
+                    <TextBlock Classes="secondary" TextWrapping="Wrap"
+                               Text="Keeps watching your PCs while Helm is closed, with a notification when a session finishes or waits for your permission or answer. Uses more battery; listed under General → Running in background." />
+                </StackPanel>
+            </DockPanel>
+        </Border>
+
         <TextBlock Text="How it connects" Classes="section" />
         <Border Classes="card">
             <StackPanel Spacing="6">

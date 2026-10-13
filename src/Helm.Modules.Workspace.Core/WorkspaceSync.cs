@@ -63,6 +63,9 @@ public sealed record WorkspaceSessionRecord
     public IReadOnlyList<TranscriptTurn> Recent { get; init; } = [];
     public DateTimeOffset UpdatedAt { get; init; }
     public DateTimeOffset? WorkingSince { get; init; }
+
+    /// <summary>What the PC holds for the phone to answer (permission or question); null when nothing.</summary>
+    public PendingRequest? Pending { get; init; }
 }
 
 /// <summary>How far a command got (<c>workspace.results</c>, id = command id), written by the PC that ran it.</summary>
@@ -123,6 +126,7 @@ public static class WorkspaceSync
         Recent = recent.TakeLast(MaxTurns).Select(t => t with { Text = Cut(t.Text) ?? "" }).ToList(),
         UpdatedAt = s.UpdatedAt,
         WorkingSince = s.WorkingSince,
+        Pending = s.Pending,
     };
 
     /// <summary>Same content (the time of a write alone is no reason to sync again).</summary>

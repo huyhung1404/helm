@@ -1,3 +1,4 @@
+using Helm.Core.Desktop;
 using Helm.Core.Hotkeys;
 using Helm.Core.Modules;
 using Helm.Core.Services;
@@ -29,6 +30,7 @@ public sealed class WorkspaceModule : HelmModuleBase, IModuleContent
     private readonly ISyncedCollection<WorkspaceResultRecord> _results;
     private readonly IDeviceInfo? _device;
     private readonly ClaudeCatalog _catalog;
+    private readonly IUserActivity? _userActivity;
     private WorkspaceEngine? _engine;
     private WorkspaceRelay? _relay;
     private BackgroundActivity? _activity;
@@ -38,7 +40,7 @@ public sealed class WorkspaceModule : HelmModuleBase, IModuleContent
     public WorkspaceModule(ISettingsStoreFactory settings, HelmPaths paths, PromptSender sender, BridgeInstaller installer,
         IBackgroundActivities activities, ISyncedCollection<WorkspaceHostRecord> hosts, ISyncedCollection<WorkspaceSessionRecord> sessions,
         ISyncedCollection<WorkspaceCommand> commands, ISyncedCollection<WorkspaceResultRecord> results, ClaudeCatalog catalog,
-        ILogger<WorkspaceModule> logger, IDeviceInfo? device = null)
+        ILogger<WorkspaceModule> logger, IDeviceInfo? device = null, IUserActivity? activity = null)
     {
         Settings = settings.Get<WorkspaceSettings>(WorkspaceIds.ModuleId);
         _paths = paths;
@@ -51,6 +53,7 @@ public sealed class WorkspaceModule : HelmModuleBase, IModuleContent
         _results = results;
         _device = device;
         _catalog = catalog;
+        _userActivity = activity;
         catalog.Updated += (_, _) => _relay?.RequestPublish();
         _logger = logger;
     }
@@ -88,7 +91,7 @@ public sealed class WorkspaceModule : HelmModuleBase, IModuleContent
             StatusMessage = null;
             try
             {
-                _engine = WorkspaceEngine.Start(Settings, _paths, _sender, _logger,
+                _engine = WorkspaceEngine.Start(Settings, _paths, _sender, _logger, activity: _userActivity,
                     bridgePipe: Environment.GetEnvironmentVariable("HELM_BRIDGE_PIPE"));
             }
             catch (Exception ex) when (ex is System.Net.Sockets.SocketException or IOException)
@@ -102,6 +105,7 @@ public sealed class WorkspaceModule : HelmModuleBase, IModuleContent
             // The phone's link: this PC and its connected sessions out, the phone's commands in (Helm Sync).
             _relay = new WorkspaceRelay(_engine, _hosts, _sessions, _commands, _results, _device?.DeviceName ?? Environment.MachineName,
                 () => _catalog.Current, _logger);
+            _engine.PhoneLinked = true;
             _activity = _activities.Start(Id, DisplayName, Detail(), StopFromGeneralAsync);
             UpdateStatus();
         }

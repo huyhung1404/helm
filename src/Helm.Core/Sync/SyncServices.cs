@@ -14,6 +14,7 @@ public static class SyncServices
     /// </summary>
     public static IServiceCollection AddHelmSync(this IServiceCollection services, HelmPaths paths)
     {
+        services.AddSingleton<LiveSyncDemand>();
         services.AddSingleton(sp => OpenDatabase(paths, sp.GetRequiredService<ISecretProtector>(), sp.GetService<ILoggerFactory>()?.CreateLogger("Sync.Database")));
         services.TryAddSingleton<ISyncCredentialStore>(sp => new ProtectedSyncCredentialStore(paths.SyncCredentialsFile, sp.GetRequiredService<ISecretProtector>()));
         services.TryAddSingleton(_ => new SyncApiClient());

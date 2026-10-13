@@ -24,6 +24,7 @@ public static class HelmCoreServices
         services.AddSingleton<LowLevelKeyboardHook>();
         services.AddSingleton<LowLevelMouseHook>();
         services.AddSingleton<IWindowService, WindowService>();
+        services.AddSingleton<IUserActivity, UserActivity>();
         services.AddSingleton<IMonitorService, MonitorService>();
         services.AddSingleton<IStartupTaskService, StartupTaskService>();
         services.AddSingleton<IProcessLauncher, ProcessLauncher>();

@@ -82,6 +82,8 @@ public sealed class MainActivity : AvaloniaMainActivity
     {
         try
         {
+            // A tool watching other devices (Workspace Controller) keeps the background as live as the foreground.
+            foreground |= App.Services.GetService<Helm.Core.Sync.LiveSyncDemand>()?.IsHeld == true;
             var engine = App.Services.GetRequiredService<Helm.Core.Sync.SyncEngine>();
             engine.SetPollInterval(foreground ? Helm.Core.Sync.SyncEngine.ForegroundPollInterval : Helm.Core.Sync.SyncEngine.PhoneBackgroundPollInterval);
             engine.SetLive(foreground);

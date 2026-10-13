@@ -71,6 +71,13 @@ public sealed class PromptSendException(string message) : Exception(message);
 public sealed class PromptSender(IPromptKeyboard keyboard, ILogger<PromptSender> logger)
 {
     private readonly SemaphoreSlim _gate = new(1, 1);
+    private long _typedUntil;
+
+    /// <summary>
+    /// Until when the keyboard and mouse input of this PC may be Helm's own typing (<see cref="Environment.TickCount64"/>
+    /// clock, a little after the last key Helm sent). Input after it is someone at the PC.
+    /// </summary>
+    public long TypedUntilTick => Interlocked.Read(ref _typedUntil);
 
     /// <summary>How long one Enter may take to show up as Claude's UserPromptSubmit before Enter is pressed again.</summary>
     public const int ConfirmMilliseconds = 4000;
@@ -114,6 +121,7 @@ public sealed class PromptSender(IPromptKeyboard keyboard, ILogger<PromptSender>
         finally
         {
             if (previous != 0 && previous != target) keyboard.Activate(previous);
+            Interlocked.Exchange(ref _typedUntil, Environment.TickCount64 + 1500);
             _gate.Release();
         }
     }
@@ -134,6 +142,7 @@ public sealed class PromptSender(IPromptKeyboard keyboard, ILogger<PromptSender>
         await keyboard.Pause(400, ct).ConfigureAwait(false);
         Guard(target, "The prompt was typed but not sent.");
         keyboard.Submit(window.Info.CtrlEnterSends);
+        Interlocked.Exchange(ref _typedUntil, Environment.TickCount64 + 1500);
         logger.LogInformation("Workspace: typed a prompt ({Length} chars) into VS Code window {Name}", text.Length, window.Info.Name);
     }
 

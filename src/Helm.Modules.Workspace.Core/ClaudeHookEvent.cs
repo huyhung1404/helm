@@ -35,6 +35,9 @@ public sealed record ClaudeHookEvent
     /// <summary>PreToolUse / PermissionRequest: the tool.</summary>
     public string? ToolName { get; init; }
 
+    /// <summary>PreToolUse / PermissionRequest: the tool's input as JSON (the command, the file, the questions).</summary>
+    public string? ToolInputJson { get; init; }
+
     /// <summary>Notification: the text Claude Code shows.</summary>
     public string? Message { get; init; }
 
@@ -68,6 +71,7 @@ public sealed record ClaudeHookEvent
                 Prompt = Text(root, "prompt"),
                 LastAssistantMessage = Text(root, "last_assistant_message"),
                 ToolName = Text(root, "tool_name"),
+                ToolInputJson = root.TryGetProperty("tool_input", out var toolInput) && toolInput.ValueKind == JsonValueKind.Object ? toolInput.GetRawText() : null,
                 Message = Text(root, "message"),
                 NotificationType = Text(root, "notification_type"),
                 Source = Text(root, "source") ?? Text(root, "reason"),

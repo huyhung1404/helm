@@ -6,6 +6,8 @@ public enum WorkspaceCommandKind
     Prompt,
     /// <summary>Open a new Claude tab in a VS Code window, optionally switch its model, then type the prompt.</summary>
     NewSession,
+    /// <summary>Answer what the PC holds for the phone: allow or deny a tool, or answer Claude's question.</summary>
+    Answer,
 }
 
 /// <summary>Something to do on one PC: always addressed to that PC (<see cref="MachineId"/>), never to "any".</summary>
@@ -21,7 +23,17 @@ public sealed record WorkspaceCommand
     /// <summary>The VS Code window's folder: where a new session opens, or where the session lives.</summary>
     public string Folder { get; init; } = "";
 
+    /// <summary>The prompt (Prompt, NewSession); for Answer, a message Claude reads when you deny.</summary>
     public required string Text { get; init; }
+
+    /// <summary>Answer: the request (<see cref="PendingRequest.RequestId"/>).</summary>
+    public string? RequestId { get; init; }
+
+    /// <summary>Answer to a permission: allow (true) or deny.</summary>
+    public bool Allow { get; init; }
+
+    /// <summary>Answer to a question: question text → the chosen option(s) or your own words.</summary>
+    public Dictionary<string, string>? Answers { get; init; }
 
     /// <summary>New session only: a model alias for <c>/model</c> (opus, sonnet, haiku …); null keeps the default.</summary>
     public string? Model { get; init; }

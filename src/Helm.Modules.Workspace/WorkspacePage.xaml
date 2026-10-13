@@ -27,6 +27,22 @@
             </ui:CardControl.Header>
             <ui:ToggleSwitch IsChecked="{Binding ConnectNewSessions}" AutomationProperties.Name="Connect new sessions" />
         </ui:CardControl>
+        <ui:CardExpander Margin="0,0,0,4" IsExpanded="True" Icon="{ui:SymbolIcon ShieldCheckmark24}">
+            <ui:CardExpander.Header>
+                <core:RowLayout>
+                    <core:CardHeader Title="Approve from your phone"
+                                     Description="When Claude asks to run a tool or asks you a question, the request waits for your phone instead of VS Code. If the phone does not answer in time, VS Code asks as usual." />
+                    <ComboBox Width="240" Margin="0,0,16,0" ItemsSource="{Binding ApprovalChoices}" SelectedItem="{Binding ApproveFromPhone}"
+                              AutomationProperties.Name="Approve from your phone" />
+                </core:RowLayout>
+            </ui:CardExpander.Header>
+            <Border Style="{DynamicResource HelmExpanderRow}" BorderThickness="0">
+                <core:RowLayout>
+                    <core:CardHeader Title="Away after" Description="Minutes without keyboard or mouse on this PC. Helm's own typing does not count; using the PC while a request waits hands it back to VS Code." />
+                    <ComboBox Width="120" ItemsSource="{Binding AwayChoices}" SelectedItem="{Binding AwayAfterMinutes}" AutomationProperties.Name="Away after minutes" />
+                </core:RowLayout>
+            </Border>
+        </ui:CardExpander>
         <ui:CardExpander Margin="0,0,0,4" IsExpanded="True" Icon="{ui:SymbolIcon PlugConnected24}">
             <ui:CardExpander.Header>
                 <core:RowLayout>

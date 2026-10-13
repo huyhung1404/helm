@@ -94,6 +94,32 @@
             </DockPanel>
         </Border>
 
+        <!-- Running in background: tools that keep something running, each with Stop -->
+        <TextBlock Text="Running in background" Classes="section" />
+        <Border Classes="card" DataContext="{Binding Background}" x:DataType="shell:BackgroundActivitiesViewModel">
+            <StackPanel Spacing="8">
+                <TextBlock Text="Tools that keep working while Helm is closed. Stop ends that." Classes="secondary" TextWrapping="Wrap" />
+                <TextBlock Text="Nothing is running in the background." IsVisible="{Binding !HasItems}" />
+                <ItemsControl ItemsSource="{Binding Items}">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate x:DataType="shell:BackgroundActivityRow">
+                            <Border Classes="row">
+                                <DockPanel>
+                                    <Button DockPanel.Dock="Right" Content="Stop" Command="{Binding StopCommand}" IsEnabled="{Binding !IsStopping}"
+                                            VerticalAlignment="Center" AutomationProperties.Name="Stop" />
+                                    <StackPanel Spacing="2" VerticalAlignment="Center" Margin="0,0,12,0">
+                                        <TextBlock Text="{Binding Title}" Classes="title" />
+                                        <TextBlock Text="{Binding Detail}" Classes="secondary" TextWrapping="Wrap" />
+                                        <TextBlock Text="{Binding Since}" Classes="secondary" />
+                                    </StackPanel>
+                                </DockPanel>
+                            </Border>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+            </StackPanel>
+        </Border>
+
         <!-- Sync -->
         <TextBlock Text="Sync" Classes="section" />
         <Border Classes="card" DataContext="{Binding Sync}" x:DataType="shell:SyncViewModel">

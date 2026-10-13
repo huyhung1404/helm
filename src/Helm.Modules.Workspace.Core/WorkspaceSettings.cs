@@ -29,6 +29,15 @@ public sealed class WorkspaceSettings : IVersionedSettings
     /// <summary>Helm installs and updates its small VS Code extension (Helm Bridge).</summary>
     public bool ManageBridgeExtension { get; set; } = true;
 
+    /// <summary>When Claude's permission requests and questions wait for your phone instead of VS Code.</summary>
+    public PhoneApprovals ApproveFromPhone { get; set; } = PhoneApprovals.WhenAway;
+
+    /// <summary>No keyboard or mouse on this PC for this long counts as away (Helm's own typing does not count).</summary>
+    public int AwayAfterMinutes { get; set; } = 2;
+
+    /// <summary>How long a request waits for the phone before VS Code shows its own dialog.</summary>
+    public int HoldMinutes { get; set; } = 10;
+
     /// <summary>A session nobody chose for is connected (the phone sees and steers it). Off: you connect each one.</summary>
     public bool ConnectNewSessions { get; set; } = true;
 

@@ -19,12 +19,12 @@ public sealed class HookListener : IAsyncDisposable
 
     private readonly TcpListener _listener;
     private readonly byte[] _token;
-    private readonly Action<ClaudeHookEvent> _onEvent;
+    private readonly Func<ClaudeHookEvent, Task<string?>> _onEvent;
     private readonly ILogger _logger;
     private readonly CancellationTokenSource _stop = new();
     private Task? _loop;
 
-    private HookListener(TcpListener listener, string token, Action<ClaudeHookEvent> onEvent, ILogger logger)
+    private HookListener(TcpListener listener, string token, Func<ClaudeHookEvent, Task<string?>> onEvent, ILogger logger)
     {
         _listener = listener;
         _token = Encoding.UTF8.GetBytes("Bearer " + token);
@@ -36,7 +36,9 @@ public sealed class HookListener : IAsyncDisposable
 
     /// <summary>Listens on <paramref name="port"/> (0 = any free one).</summary>
     /// <exception cref="SocketException">The port is taken.</exception>
-    public static HookListener Start(int port, string token, Action<ClaudeHookEvent> onEvent, ILogger logger)
+    /// <param name="onEvent">Handles a hook and returns the JSON Claude gets back (null: <c>{}</c>, nothing to say).
+    /// It may take long: a held PermissionRequest waits for the phone.</param>
+    public static HookListener Start(int port, string token, Func<ClaudeHookEvent, Task<string?>> onEvent, ILogger logger)
     {
         var listener = new TcpListener(IPAddress.Loopback, port);
         listener.Server.SetSocketOption(SocketOptionLevel.Socket, SocketOptionName.ExclusiveAddressUse, true);
@@ -75,12 +77,18 @@ public sealed class HookListener : IAsyncDisposable
         {
             try
             {
-                using var timeout = CancellationTokenSource.CreateLinkedTokenSource(ct);
-                timeout.CancelAfter(ReadTimeout);
                 var stream = client.GetStream();
-                var (status, hook) = await ReadAsync(stream, timeout.Token).ConfigureAwait(false);
-                await RespondAsync(stream, status, timeout.Token).ConfigureAwait(false);
-                if (hook is not null) _onEvent(hook);
+                int status;
+                ClaudeHookEvent? hook;
+                using (var timeout = CancellationTokenSource.CreateLinkedTokenSource(ct))
+                {
+                    timeout.CancelAfter(ReadTimeout);
+                    (status, hook) = await ReadAsync(stream, timeout.Token).ConfigureAwait(false);
+                }
+                var body = hook is null ? null : await _onEvent(hook).ConfigureAwait(false);
+                using var write = CancellationTokenSource.CreateLinkedTokenSource(ct);
+                write.CancelAfter(ReadTimeout);
+                await RespondAsync(stream, status, body, write.Token).ConfigureAwait(false);
             }
             catch (Exception ex) when (ex is IOException or OperationCanceledException or SocketException)
             {
@@ -131,12 +139,13 @@ public sealed class HookListener : IAsyncDisposable
         return hook is null ? (400, null) : (200, hook);
     }
 
-    private static async Task RespondAsync(Stream stream, int status, CancellationToken ct)
+    private static async Task RespondAsync(Stream stream, int status, string? answer, CancellationToken ct)
     {
-        var body = status == 200 ? "{}" : "";
+        var body = Encoding.UTF8.GetBytes(status == 200 ? answer ?? "{}" : "");
         var reason = status switch { 200 => "OK", 401 => "Unauthorized", 403 => "Forbidden", 404 => "Not Found", _ => "Bad Request" };
-        var text = $"HTTP/1.1 {status} {reason}\r\nContent-Type: application/json\r\nContent-Length: {body.Length}\r\nConnection: close\r\n\r\n{body}";
-        await stream.WriteAsync(Encoding.ASCII.GetBytes(text), ct).ConfigureAwait(false);
+        var head = $"HTTP/1.1 {status} {reason}\r\nContent-Type: application/json; charset=utf-8\r\nContent-Length: {body.Length}\r\nConnection: close\r\n\r\n";
+        await stream.WriteAsync(Encoding.ASCII.GetBytes(head), ct).ConfigureAwait(false);
+        await stream.WriteAsync(body, ct).ConfigureAwait(false);
         await stream.FlushAsync(ct).ConfigureAwait(false);
     }
 

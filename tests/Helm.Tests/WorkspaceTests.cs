@@ -122,6 +122,17 @@ public class SessionRegistryTests
     }
 
     [Fact]
+    public void A_question_stays_a_question_when_claude_code_also_notifies()
+    {
+        var registry = new SessionRegistry("pc-1", _time);
+        registry.Apply(Hook(ClaudeHookEvent.UserPromptSubmit, prompt: "Ask me"));
+        registry.Apply(Hook(ClaudeHookEvent.PermissionRequest, tool: "AskUserQuestion"));
+        registry.Apply(Hook(ClaudeHookEvent.Notification, notification: "permission_prompt"));
+        Assert.Equal(SessionState.Question, registry.Find("s1")!.State);
+        Assert.Equal("A question for you", registry.Find("s1")!.Waiting);
+    }
+
+    [Fact]
     public void Ended_sessions_leave_the_list_after_a_while()
     {
         var registry = new SessionRegistry("pc-1", _time);
@@ -330,7 +341,7 @@ public class HookListenerTests
     public async Task Accepts_a_hook_with_the_token_and_answers_at_once()
     {
         var received = new TaskCompletionSource<ClaudeHookEvent>();
-        await using var listener = HookListener.Start(0, Token, e => received.TrySetResult(e), NullLogger.Instance);
+        await using var listener = HookListener.Start(0, Token, e => { received.TrySetResult(e); return Task.FromResult<string?>(null); }, NullLogger.Instance);
         var (status, body) = await PostAsync(listener.Port, ClaudeHookConfig.UrlPath, "Bearer " + Token,
             """{"session_id":"s1","hook_event_name":"UserPromptSubmit","prompt":"Xin chào, thử tiếng Việt"}""");
         Assert.Equal(200, status);
@@ -347,7 +358,7 @@ public class HookListenerTests
     public async Task Refuses_what_is_not_claude(string? auth, string? origin, string path, int expected)
     {
         var count = 0;
-        await using var listener = HookListener.Start(0, Token, _ => Interlocked.Increment(ref count), NullLogger.Instance);
+        await using var listener = HookListener.Start(0, Token, _ => { Interlocked.Increment(ref count); return Task.FromResult<string?>(null); }, NullLogger.Instance);
         var (status, _) = await PostAsync(listener.Port, path, auth, """{"session_id":"s1","hook_event_name":"Stop"}""", origin);
         Assert.Equal(expected, status);
         Assert.Equal(0, count);
@@ -356,8 +367,8 @@ public class HookListenerTests
     [Fact]
     public async Task A_taken_port_is_reported()
     {
-        await using var first = HookListener.Start(0, Token, _ => { }, NullLogger.Instance);
-        Assert.Throws<SocketException>(() => HookListener.Start(first.Port, Token, _ => { }, NullLogger.Instance));
+        await using var first = HookListener.Start(0, Token, _ => Task.FromResult<string?>(null), NullLogger.Instance);
+        Assert.Throws<SocketException>(() => HookListener.Start(first.Port, Token, _ => Task.FromResult<string?>(null), NullLogger.Instance));
     }
 
     private static async Task<(int Status, string Body)> PostAsync(int port, string path, string? auth, string json, string? origin = null)

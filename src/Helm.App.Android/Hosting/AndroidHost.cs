@@ -63,6 +63,7 @@ internal static class AndroidHost
         // Shell view models (Updates and Sync are the Windows app's own, from Helm.Shell)
         services.AddSingleton<UpdatesViewModel>();
         services.AddSingleton<SyncViewModel>();
+        services.AddSingleton<BackgroundActivitiesViewModel>();
         services.AddSingleton<SyncIndicatorViewModel>();
         services.AddSingleton<HomeViewModel>();
         services.AddSingleton<GeneralViewModel>();

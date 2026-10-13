@@ -114,6 +114,41 @@ public sealed class WorkspaceRelayTests : IAsyncDisposable
     }
 
     [Fact]
+    public async Task The_phone_allows_a_held_tool_and_answers_a_question()
+    {
+        var engine = await StartPcAsync();
+        _pcSettings.Get<WorkspaceSettings>(WorkspaceIds.ModuleId).Update(s => s.ApproveFromPhone = PhoneApprovals.Always);
+        engine.PhoneLinked = true;
+        engine.Registry.Apply(Hook(ClaudeHookEvent.UserPromptSubmit, "s1", prompt: "Ship it"));
+        var hook = engine.HandleHookAsync(PendingRequestTests.Permission("Bash", """{"command":"npm publish"}"""));
+        await WorkspaceBridgeTests.WaitAsync(() => _sessions.Get("s1")?.Pending);
+
+        var phone = new WorkspaceRemoteViewModel(_hosts, _sessions, _commands, _results, _phoneSettings, new InlineUi(), dialogs: new Yes());
+        phone.SelectedSession = phone.Sessions.Single();
+        Assert.True(phone.HasPermission);
+        Assert.Equal("npm publish", phone.PendingDetail);
+        await phone.AllowCommand.ExecuteAsync(null);
+        Assert.Contains("\"allow\"", await hook.WaitAsync(TimeSpan.FromSeconds(10)));
+
+        var question = engine.HandleHookAsync(PendingRequestTests.Permission("AskUserQuestion",
+            """{"questions":[{"question":"Which?","header":"Pick","multiSelect":false,"options":[{"label":"A","description":""},{"label":"B","description":""}]}]}"""));
+        await WorkspaceBridgeTests.WaitAsync(() => _sessions.Get("s1")?.Pending?.Kind == PendingKind.Question ? (object)true : null);
+        await WorkspaceBridgeTests.WaitAsync(() => phone.HasQuestion ? (object)true : null);
+        phone.SendAnswersCommand.Execute(null);
+        Assert.Contains("Which?", phone.SendStatus);
+        phone.Questions[0].Options[0].IsPicked = true;
+        phone.Questions[0].Options[1].IsPicked = true;
+        Assert.False(phone.Questions[0].Options[0].IsPicked);
+        phone.SendAnswersCommand.Execute(null);
+        Assert.Contains("\"Which?\":\"B\"", await question.WaitAsync(TimeSpan.FromSeconds(10)));
+    }
+
+    private sealed class Yes : Helm.Shell.Services.IDialogService
+    {
+        public Task<bool> ConfirmAsync(string title, string message, string confirmText) => Task.FromResult(true);
+    }
+
+    [Fact]
     public async Task A_new_session_is_started_in_the_window_of_the_tab()
     {
         await StartPcAsync();

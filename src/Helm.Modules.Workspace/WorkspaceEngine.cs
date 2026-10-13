@@ -2,6 +2,7 @@ using System.Collections.Concurrent;
 using System.Net.Sockets;
 using System.Security.Cryptography;
 using System.Text.Json;
+using Helm.Core.Desktop;
 using Helm.Core.Services;
 using Helm.Core.Settings;
 using Microsoft.Extensions.Logging;
@@ -32,12 +33,17 @@ public sealed class WorkspaceEngine : IAsyncDisposable
     private readonly TimeProvider _time;
     private readonly ConcurrentDictionary<string, TaskCompletionSource<string>> _receipts = new();
     private readonly ConcurrentDictionary<string, byte> _titleReads = new();
+    private readonly ConcurrentDictionary<string, Held> _held = new();
+    private readonly IUserActivity? _activity;
+    private long _lastRealInput;
     private HookListener? _hooks;
     private BridgeHost? _bridge;
 
     private WorkspaceEngine(ISettingsStore<WorkspaceSettings> settings, SessionRegistry registry, PromptSender sender,
-        string? projectsRoot, ILogger logger, TimeProvider time)
+        string? projectsRoot, IUserActivity? activity, ILogger logger, TimeProvider time)
     {
+        _activity = activity;
+        _lastRealInput = activity?.LastInputTick ?? Environment.TickCount64;
         _settings = settings;
         Registry = registry;
         _sender = sender;
@@ -62,21 +68,26 @@ public sealed class WorkspaceEngine : IAsyncDisposable
     /// <summary>Sessions, windows or their state changed. Raised off the UI thread.</summary>
     public event EventHandler? Changed;
 
+    /// <summary>
+    /// The phone can answer (the relay runs). Without it a permission request is never held: VS Code asks at once.
+    /// </summary>
+    public bool PhoneLinked { get; set; }
+
     /// <summary>Starts listening. A taken hook port is replaced by a free one (and Claude's settings follow).</summary>
     public static WorkspaceEngine Start(ISettingsStore<WorkspaceSettings> settings, HelmPaths paths, PromptSender sender,
-        ILogger logger, TimeProvider? time = null, string? bridgePipe = null, string? projectsRoot = null)
+        ILogger logger, TimeProvider? time = null, string? bridgePipe = null, string? projectsRoot = null, IUserActivity? activity = null)
     {
         EnsureIdentity(settings);
         var s = settings.Current;
-        var engine = new WorkspaceEngine(settings, new SessionRegistry(s.InstallId, time), sender, projectsRoot, logger, time ?? TimeProvider.System);
+        var engine = new WorkspaceEngine(settings, new SessionRegistry(s.InstallId, time), sender, projectsRoot, activity, logger, time ?? TimeProvider.System);
         try
         {
-            engine._hooks = HookListener.Start(s.HookPort, s.HookToken, engine.Registry.Apply, logger);
+            engine._hooks = HookListener.Start(s.HookPort, s.HookToken, engine.HandleHookAsync, logger);
         }
         catch (SocketException ex) when (s.HookPort != 0)
         {
             logger.LogWarning(ex, "Workspace: hook port {Port} is taken, picking another", s.HookPort);
-            engine._hooks = HookListener.Start(0, s.HookToken, engine.Registry.Apply, logger);
+            engine._hooks = HookListener.Start(0, s.HookToken, engine.HandleHookAsync, logger);
         }
         if (engine._hooks.Port != s.HookPort) settings.Update(x => x.HookPort = engine._hooks.Port);
         engine._bridge = new BridgeHost(bridgePipe ?? WorkspaceEndpoint.PipeName(paths), logger);
@@ -162,12 +173,13 @@ public sealed class WorkspaceEngine : IAsyncDisposable
             return new WorkspaceCommandResult(command.Id, WorkspaceCommandStatus.Failed, "This command is for another PC.");
         if (command.CreatedAt != default && _time.GetLocalNow() - command.CreatedAt > WorkspaceCommand.MaxAge)
             return new WorkspaceCommandResult(command.Id, WorkspaceCommandStatus.Failed, "The command is too old; it was not typed.");
-        if (string.IsNullOrWhiteSpace(command.Text))
+        if (command.Kind != WorkspaceCommandKind.Answer && string.IsNullOrWhiteSpace(command.Text))
             return new WorkspaceCommandResult(command.Id, WorkspaceCommandStatus.Failed, "The prompt is empty.");
 
         BridgeConnection? window;
         string? sessionId = null;
         string folder;
+        if (command.Kind == WorkspaceCommandKind.Answer) return Answer(command);
         if (command.Kind == WorkspaceCommandKind.Prompt)
         {
             if (command.SessionId is null || Registry.Find(command.SessionId) is not { } session)
@@ -354,8 +366,92 @@ public sealed class WorkspaceEngine : IAsyncDisposable
         });
     }
 
+    /// <summary>How often a held request checks whether you came back to the PC or it ran out of time.</summary>
+    internal static readonly TimeSpan HoldCheck = TimeSpan.FromMilliseconds(500);
+
+    /// <summary>
+    /// One hook call. Most are only recorded. A PermissionRequest (a tool, or Claude's question) is held for the
+    /// phone when <see cref="WorkspaceSettings.ApproveFromPhone"/> says so: the session shows it as pending, and the
+    /// hook answers with the phone's decision. It gives up (no decision: VS Code shows its own dialog) when the time is
+    /// up or, in "when away" mode, as soon as someone uses this PC.
+    /// </summary>
+    internal async Task<string?> HandleHookAsync(ClaudeHookEvent e)
+    {
+        Registry.Apply(e);
+        if (e.Event != ClaudeHookEvent.PermissionRequest || !ShouldHold() || Registry.Find(e.SessionId) is not { } session || !IsConnected(session))
+            return null;
+
+        var hold = TimeSpan.FromMinutes(Math.Clamp(_settings.Current.HoldMinutes, 1, 25));
+        var request = PendingRequest.From(e, Guid.NewGuid().ToString("N"), _time.GetLocalNow(), hold);
+        var held = new Held(request, e.ToolInputJson);
+        _held[request.RequestId] = held;
+        Registry.SetPending(e.SessionId, request);
+        _logger.LogInformation("Workspace: holding {Tool} in session {Session} for the phone", request.Tool, e.SessionId);
+        var since = Environment.TickCount64;
+        try
+        {
+            while (true)
+            {
+                var answered = await Task.WhenAny(held.Answer.Task, Task.Delay(HoldCheck)).ConfigureAwait(false);
+                if (answered == held.Answer.Task) return await held.Answer.Task.ConfigureAwait(false);
+                if (_time.GetLocalNow() >= request.ExpiresAt) return null;
+                // Back at the PC: VS Code asks you there instead.
+                if (_settings.Current.ApproveFromPhone == PhoneApprovals.WhenAway && RealInputTick() > since) return null;
+            }
+        }
+        finally
+        {
+            _held.TryRemove(request.RequestId, out _);
+            if (Registry.Find(e.SessionId)?.Pending?.RequestId == request.RequestId) Registry.SetPending(e.SessionId, null);
+        }
+    }
+
+    /// <summary>The phone's answer to a held request.</summary>
+    private WorkspaceCommandResult Answer(WorkspaceCommand command)
+    {
+        if (command.RequestId is not { } id || !_held.TryGetValue(id, out var held))
+            return new WorkspaceCommandResult(command.Id, WorkspaceCommandStatus.Failed, "Claude is no longer waiting for that (answered in VS Code, or the time ran out).", command.SessionId);
+        var json = held.Request.Kind == PendingKind.Question
+            ? PendingRequest.Answer(held.ToolInput, command.Answers ?? new Dictionary<string, string>())
+            : PendingRequest.Decision(command.Allow, command.Text);
+        if (!held.Answer.TrySetResult(json))
+            return new WorkspaceCommandResult(command.Id, WorkspaceCommandStatus.Failed, "That was answered already.", command.SessionId);
+        _logger.LogInformation("Workspace: the phone answered {Tool} ({Answer})", held.Request.Tool,
+            held.Request.Kind == PendingKind.Question ? "question" : command.Allow ? "allow" : "deny");
+        return new WorkspaceCommandResult(command.Id, WorkspaceCommandStatus.Received, null, held.Request.SessionId);
+    }
+
+    private bool ShouldHold() => PhoneLinked && _settings.Current.ApproveFromPhone switch
+    {
+        PhoneApprovals.Always => true,
+        PhoneApprovals.WhenAway => Environment.TickCount64 - RealInputTick() >= TimeSpan.FromMinutes(Math.Max(1, _settings.Current.AwayAfterMinutes)).TotalMilliseconds,
+        _ => false,
+    };
+
+    /// <summary>
+    /// The last keyboard or mouse input that was not Helm typing into VS Code. Input during Helm's own typing is left
+    /// out, so a prompt from the phone does not make the PC look used.
+    /// </summary>
+    private long RealInputTick()
+    {
+        if (_activity is null) return Interlocked.Read(ref _lastRealInput);
+        var last = _activity.LastInputTick;
+        if (last > _sender.TypedUntilTick) Interlocked.Exchange(ref _lastRealInput, last);
+        return Interlocked.Read(ref _lastRealInput);
+    }
+
+    /// <summary>The pending requests held now (for the page and the tests).</summary>
+    internal IReadOnlyList<PendingRequest> HeldRequests => _held.Values.Select(h => h.Request).ToList();
+
+    private sealed record Held(PendingRequest Request, string? ToolInput)
+    {
+        public TaskCompletionSource<string?> Answer { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+    }
+
     public async ValueTask DisposeAsync()
     {
+        // Every held request goes back to VS Code's own dialog.
+        foreach (var held in _held.Values) held.Answer.TrySetResult(null);
         foreach (var waiting in _receipts.Values) waiting.TrySetCanceled();
         _receipts.Clear();
         if (_hooks is not null) await _hooks.DisposeAsync().ConfigureAwait(false);

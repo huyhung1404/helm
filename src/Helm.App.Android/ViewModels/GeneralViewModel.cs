@@ -31,6 +31,7 @@ public sealed partial class GeneralViewModel : ObservableObject
         AndroidLauncher launcher,
         UpdatesViewModel updates,
         SyncViewModel sync,
+        BackgroundActivitiesViewModel background,
         IDialogService dialogs,
         ILogger<GeneralViewModel> logger)
     {
@@ -42,6 +43,7 @@ public sealed partial class GeneralViewModel : ObservableObject
         _logger = logger;
         Updates = updates;
         Sync = sync;
+        Background = background;
 
         _loading = true;
         _theme = _general.Current.Theme;
@@ -51,6 +53,9 @@ public sealed partial class GeneralViewModel : ObservableObject
     public UpdatesViewModel Updates { get; }
 
     public SyncViewModel Sync { get; }
+
+    /// <summary>General → Running in background: tools that keep working while Helm is closed, with Stop.</summary>
+    public BackgroundActivitiesViewModel Background { get; }
 
     public IReadOnlyList<AppTheme> Themes { get; } = Enum.GetValues<AppTheme>();
 

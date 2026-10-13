@@ -47,6 +47,9 @@ public sealed record AgentSession
     public DateTimeOffset? WorkingSince { get; init; }
 
     public bool NeedsYou => State is SessionState.NeedsPermission or SessionState.Question;
+
+    /// <summary>A permission or question the PC holds for the phone to answer; null when none.</summary>
+    public PendingRequest? Pending { get; init; }
 }
 
 /// <summary>A session changed (<paramref name="Previous"/> is null for a new one). Raised on the hook's thread.</summary>
@@ -122,6 +125,9 @@ public sealed class SessionRegistry(string machineId, TimeProvider? time = null)
             next = Transition(current, e, now);
             if (next is null) return;
             next = next with { UpdatedAt = now };
+            // Claude moved on (the tool ran, the turn ended): nothing waits for the phone any more.
+            if (next.Pending is not null && e.Event is not ClaudeHookEvent.PermissionRequest and not ClaudeHookEvent.Notification)
+                next = next with { Pending = null };
             _sessions[e.SessionId] = next;
             if (e.Event == ClaudeHookEvent.UserPromptSubmit && e.Prompt is { } prompt) receipt = MatchExpected(next, prompt, now);
         }
@@ -143,6 +149,23 @@ public sealed class SessionRegistry(string machineId, TimeProvider? time = null)
         }
         Changed?.Invoke(this, new SessionChange(seeded, null));
         return true;
+    }
+
+    /// <summary>Shows (or clears, with null) what the PC holds for the phone in this session.</summary>
+    public void SetPending(string sessionId, PendingRequest? pending)
+    {
+        AgentSession? previous, next;
+        lock (_gate)
+        {
+            if (!_sessions.TryGetValue(sessionId, out previous) || previous.Pending == pending) return;
+            next = previous with
+            {
+                Pending = pending,
+                State = pending?.Kind == PendingKind.Question ? SessionState.Question : pending is not null ? SessionState.NeedsPermission : previous.State,
+            };
+            _sessions[sessionId] = next;
+        }
+        Changed?.Invoke(this, new SessionChange(next, previous));
     }
 
     /// <summary>Sets the conversation title (read from the transcript), if it changed.</summary>
@@ -196,8 +219,10 @@ public sealed class SessionRegistry(string machineId, TimeProvider? time = null)
         ClaudeHookEvent.PreToolUse or ClaudeHookEvent.PostToolUse => s.State is SessionState.NeedsPermission or SessionState.Question or SessionState.Idle or SessionState.Done
             ? s with { State = SessionState.Working, Waiting = null, WorkingSince = s.WorkingSince ?? now }
             : s,
+        ClaudeHookEvent.PermissionRequest when e.ToolName == "AskUserQuestion" => s with { State = SessionState.Question, Waiting = "A question for you" },
         ClaudeHookEvent.PermissionRequest => s with { State = SessionState.NeedsPermission, Waiting = e.ToolName },
-        ClaudeHookEvent.Notification when e.NotificationType == "permission_prompt" && s.State != SessionState.NeedsPermission =>
+        // A question or a held request already says what Claude waits for; Claude Code's generic notice would blur it.
+        ClaudeHookEvent.Notification when e.NotificationType == "permission_prompt" && s.State is not (SessionState.NeedsPermission or SessionState.Question) =>
             s with { State = SessionState.NeedsPermission, Waiting = e.Message },
         ClaudeHookEvent.Notification => s,
         // A Stop hook that made Claude continue: the turn goes on.

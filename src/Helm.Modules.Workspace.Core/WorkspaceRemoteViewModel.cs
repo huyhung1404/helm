@@ -4,6 +4,7 @@ using CommunityToolkit.Mvvm.Input;
 using Helm.Core.Services;
 using Helm.Core.Settings;
 using Helm.Core.Sync;
+using Helm.Shell.Services;
 
 namespace Helm.Modules.Workspace;
 
@@ -61,12 +62,54 @@ public sealed class TurnRow(TranscriptTurn turn)
     public string Time { get; } = turn.At?.ToLocalTime().ToString("HH:mm") ?? "";
 }
 
+/// <summary>One choice of a question; tap to pick it (several for a multi-select question).</summary>
+public sealed partial class OptionChoice(QuestionOption option) : ObservableObject
+{
+    [ObservableProperty] private bool _isPicked;
+
+    public string Label => option.Label;
+    public string Description => option.Description;
+    public bool HasDescription => option.Description.Length > 0;
+}
+
+/// <summary>One of Claude's questions, with its choices and room for your own words.</summary>
+public sealed partial class QuestionChoice : ObservableObject
+{
+    [ObservableProperty] private string _other = "";
+
+    public QuestionChoice(QuestionInfo question)
+    {
+        Info = question;
+        Options = question.Options.Select(o => new OptionChoice(o)).ToList();
+        foreach (var o in Options) o.PropertyChanged += (_, e) =>
+        {
+            if (e.PropertyName != nameof(OptionChoice.IsPicked) || !o.IsPicked || question.MultiSelect) return;
+            // One answer: picking one drops the other.
+            foreach (var other in Options.Where(x => x != o)) other.IsPicked = false;
+        };
+    }
+
+    public QuestionInfo Info { get; }
+    public string Question => Info.Question;
+    public string Header => Info.Header;
+    public bool MultiSelect => Info.MultiSelect;
+    public IReadOnlyList<OptionChoice> Options { get; }
+
+    /// <summary>Your own words win; else the picked labels (comma-separated when several); null when nothing yet.</summary>
+    public string? Answer => Other.Trim() is { Length: > 0 } own
+        ? own
+        : Options.Where(o => o.IsPicked).Select(o => o.Label).ToList() is { Count: > 0 } picked ? string.Join(", ", picked) : null;
+}
+
 /// <summary>Device-local state of the control screen (which PC, what you have seen).</summary>
 public sealed class WorkspaceRemoteSettings : IVersionedSettings
 {
     public static int CurrentVersion => 1;
     public int Version { get; set; }
     public string LastMachineId { get; set; } = "";
+
+    /// <summary>Keep watching the PCs while Helm is closed, and notify when a session finishes or waits for you.</summary>
+    public bool RunInBackground { get; set; } = true;
 
     /// <summary>Session id → the update you last saw (a newer answer is "unseen").</summary>
     public Dictionary<string, DateTimeOffset> Seen { get; set; } = new(StringComparer.Ordinal);
@@ -91,6 +134,8 @@ public sealed partial class WorkspaceRemoteViewModel : ObservableObject
     private readonly ISettingsStore<WorkspaceRemoteSettings> _settings;
     private readonly IUiDispatcher _ui;
     private readonly ISyncService? _sync;
+    private readonly IDialogService? _dialogs;
+    private string? _shownRequest;
     private readonly TimeProvider _time;
     private bool _refreshing;
     private string? _pendingCommand;
@@ -106,6 +151,7 @@ public sealed partial class WorkspaceRemoteViewModel : ObservableObject
     private string _prompt = "";
 
     [ObservableProperty] private string _newSessionModel = DefaultModel;
+    [ObservableProperty] private bool _runInBackground;
     [ObservableProperty] private string? _sendStatus;
     [ObservableProperty] private bool _sendFailed;
 
@@ -116,7 +162,7 @@ public sealed partial class WorkspaceRemoteViewModel : ObservableObject
 
     public WorkspaceRemoteViewModel(ISyncedCollection<WorkspaceHostRecord> hosts, ISyncedCollection<WorkspaceSessionRecord> sessions,
         ISyncedCollection<WorkspaceCommand> commands, ISyncedCollection<WorkspaceResultRecord> results, ISettingsStoreFactory settings,
-        IUiDispatcher ui, ISyncService? sync = null, TimeProvider? time = null)
+        IUiDispatcher ui, ISyncService? sync = null, TimeProvider? time = null, IDialogService? dialogs = null)
     {
         _hosts = hosts;
         _sessions = sessions;
@@ -125,10 +171,12 @@ public sealed partial class WorkspaceRemoteViewModel : ObservableObject
         _settings = settings.Get<WorkspaceRemoteSettings>(WorkspaceIds.ModuleId + "-remote");
         _ui = ui;
         _sync = sync;
+        _dialogs = dialogs;
         _time = time ?? TimeProvider.System;
         hosts.Changed += (_, _) => _ui.Post(Refresh);
         sessions.Changed += (_, _) => _ui.Post(Refresh);
         results.Changed += (_, _) => _ui.Post(ShowResult);
+        _runInBackground = _settings.Current.RunInBackground;
         Refresh();
     }
 
@@ -142,6 +190,17 @@ public sealed partial class WorkspaceRemoteViewModel : ObservableObject
 
     /// <summary>One tap answers for the common next steps.</summary>
     public IReadOnlyList<string> QuickReplies { get; } = ["Continue", "Run the tests", "Commit it"];
+
+    /// <summary>The questions of a held AskUserQuestion of the open session.</summary>
+    public ObservableCollection<QuestionChoice> Questions { get; } = [];
+
+    /// <summary>What the PC holds for you in the open session; null when nothing.</summary>
+    public PendingRequest? Pending => SelectedSession?.Record.Pending;
+    public bool HasPermission => Pending?.Kind == PendingKind.Permission;
+    public bool HasQuestion => Pending?.Kind == PendingKind.Question;
+    public string PendingTitle => Pending is { } p ? $"Claude wants to use {p.Tool}" : "";
+    public string PendingDetail => Pending?.Detail ?? "";
+    public string PendingExpires => Pending is { } p ? $"Waiting for you until {p.ExpiresAt.ToLocalTime():HH:mm}, then VS Code asks." : "";
 
     public bool HasHosts => Hosts.Count > 0;
     public bool HasTabs => Tabs.Count > 0;
@@ -171,6 +230,11 @@ public sealed partial class WorkspaceRemoteViewModel : ObservableObject
         SessionState.Ended => "Ended",
         _ => "",
     };
+
+    partial void OnRunInBackgroundChanged(bool value)
+    {
+        if (_settings.Current.RunInBackground != value) _settings.Update(s => s.RunInBackground = value);
+    }
 
     partial void OnSelectedHostChanged(HostChoice? value)
     {
@@ -223,6 +287,21 @@ public sealed partial class WorkspaceRemoteViewModel : ObservableObject
         SendFailed = false;
     }
 
+    /// <summary>The settings of this screen (the phone module reads RunInBackground).</summary>
+    public ISettingsStore<WorkspaceRemoteSettings> Settings => _settings;
+
+    /// <summary>The conversation open on screen now (no notification for it).</summary>
+    public string? OpenSessionId => SelectedSession?.SessionId;
+
+    /// <summary>Opens one session (from a notification): its PC, its window's tab, the conversation.</summary>
+    public void OpenSession(string machineId, string sessionId)
+    {
+        if (_sessions.Get(sessionId) is not { } record) return;
+        SelectedHost = Hosts.FirstOrDefault(h => h.MachineId == machineId) ?? SelectedHost;
+        SelectedTab = Tabs.FirstOrDefault(t => SameFolder(t.Folder, record.WindowFolder)) ?? SelectedTab;
+        SelectedSession = Sessions.FirstOrDefault(s => s.SessionId == sessionId);
+    }
+
     /// <summary>Back from the conversation to the list (Android back).</summary>
     public bool CloseSession()
     {
@@ -241,6 +320,53 @@ public sealed partial class WorkspaceRemoteViewModel : ObservableObject
     private void QuickReply(string? text)
     {
         if (!string.IsNullOrWhiteSpace(text)) Prompt = text;
+    }
+
+    private bool CanAnswer() => !IsSending && HostOnline && Pending is not null;
+
+    [RelayCommand(CanExecute = nameof(CanAnswer))]
+    private async Task AllowAsync()
+    {
+        if (Pending is not { } p) return;
+        // Allowing runs something on the PC: say exactly what, once more.
+        if (_dialogs is not null && !await _dialogs.ConfirmAsync($"Allow {p.Tool}?", p.Detail.Length > 0 ? p.Detail : "Claude will run it on the PC.", "Allow").ConfigureAwait(true)) return;
+        if (Pending?.RequestId != p.RequestId) return;
+        WriteAnswer(p, allow: true, answers: null);
+    }
+
+    [RelayCommand(CanExecute = nameof(CanAnswer))]
+    private void Deny()
+    {
+        if (Pending is { } p) WriteAnswer(p, allow: false, answers: null, message: Prompt.Trim());
+    }
+
+    [RelayCommand(CanExecute = nameof(CanAnswer))]
+    private void SendAnswers()
+    {
+        if (Pending is not { Kind: PendingKind.Question } p) return;
+        if (Questions.FirstOrDefault(q => q.Answer is null) is { } missing)
+        {
+            SendFailed = true;
+            SendStatus = $"Answer “{missing.Question}” first.";
+            return;
+        }
+        WriteAnswer(p, allow: true, Questions.ToDictionary(q => q.Question, q => q.Answer!));
+    }
+
+    private void WriteAnswer(PendingRequest p, bool allow, Dictionary<string, string>? answers, string message = "")
+    {
+        if (message.Length > 0) Prompt = "";
+        Write(new WorkspaceCommand
+        {
+            MachineId = SelectedHost!.MachineId,
+            Kind = WorkspaceCommandKind.Answer,
+            SessionId = p.SessionId,
+            RequestId = p.RequestId,
+            Allow = allow,
+            Answers = answers,
+            Text = message,
+            CreatedAt = _time.GetLocalNow(),
+        });
     }
 
     private bool CanSend() => !IsSending && HostOnline && SelectedSession is not null && !string.IsNullOrWhiteSpace(Prompt);
@@ -371,16 +497,42 @@ public sealed partial class WorkspaceRemoteViewModel : ObservableObject
         StartSessionCommand.NotifyCanExecuteChanged();
     }
 
+    /// <summary>The pending card follows the open session (new questions only rebuild when the request changed).</summary>
+    private void ShowPending()
+    {
+        var p = Pending;
+        if (p?.RequestId != _shownRequest)
+        {
+            _shownRequest = p?.RequestId;
+            Questions.Clear();
+            foreach (var q in p?.Questions ?? []) Questions.Add(new QuestionChoice(q));
+        }
+        OnPropertyChanged(nameof(Pending));
+        OnPropertyChanged(nameof(HasPermission));
+        OnPropertyChanged(nameof(HasQuestion));
+        OnPropertyChanged(nameof(PendingTitle));
+        OnPropertyChanged(nameof(PendingDetail));
+        OnPropertyChanged(nameof(PendingExpires));
+        AllowCommand.NotifyCanExecuteChanged();
+        DenyCommand.NotifyCanExecuteChanged();
+        SendAnswersCommand.NotifyCanExecuteChanged();
+    }
+
     private void FillTurns()
     {
+        ShowPending();
         Turns.Clear();
         if (SelectedSession is not { } s) return;
         var turns = s.Record.Recent.Count > 0
-            ? s.Record.Recent
+            ? s.Record.Recent.ToList()
             : new[] { s.Record.LastPrompt is { } p ? new TranscriptTurn(true, p, null) : null, s.Record.LastReply is { } r ? new TranscriptTurn(false, r, null) : null }
                 .OfType<TranscriptTurn>().ToList();
+        // The Stop hook brings the last answer a moment before the transcript has it: show it anyway.
+        if (s.Record.State == SessionState.Done && s.Record.LastReply is { Length: > 0 } last && turns.Count > 0
+            && (turns[^1].FromUser || turns[^1].Text != last))
+            turns.Add(new TranscriptTurn(false, last, s.Record.UpdatedAt));
         // Newest first: on a phone the last answer is what you open the conversation for.
-        foreach (var t in turns.Reverse()) Turns.Add(new TurnRow(t));
+        foreach (var t in Enumerable.Reverse(turns)) Turns.Add(new TurnRow(t));
     }
 
     private bool IsUnseen(WorkspaceSessionRecord r) =>

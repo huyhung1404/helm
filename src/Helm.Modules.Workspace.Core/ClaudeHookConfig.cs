@@ -17,6 +17,14 @@ public static class ClaudeHookConfig
     /// <summary>Seconds Claude waits for Helm per hook. Helm answers at once; a closed Helm refuses at once.</summary>
     public const int TimeoutSeconds = 3;
 
+    /// <summary>
+    /// The PermissionRequest hook may wait this long: Helm holds it while the phone decides (always less than this,
+    /// see <see cref="WorkspaceSettings.HoldMinutes"/>), and answers at once otherwise.
+    /// </summary>
+    public const int PermissionTimeoutSeconds = 1800;
+
+    public static int TimeoutFor(string hookEvent) => hookEvent == ClaudeHookEvent.PermissionRequest ? PermissionTimeoutSeconds : TimeoutSeconds;
+
     public static string HookUrl(int port) => $"http://127.0.0.1:{port}{UrlPath}";
 
     /// <summary>Claude Code's user settings file.</summary>
@@ -49,7 +57,7 @@ public static class ClaudeHookConfig
                 ["type"] = "http",
                 ["url"] = HookUrl(port),
                 ["headers"] = new JsonObject { ["Authorization"] = "Bearer " + token },
-                ["timeout"] = TimeoutSeconds,
+                ["timeout"] = TimeoutFor(name),
             });
             list.Add(entry);
         }
@@ -85,6 +93,7 @@ public static class ClaudeHookConfig
             var hook = ours[0];
             if (hook["url"]?.GetValue<string>() != HookUrl(port)) return false;
             if (hook["headers"]?["Authorization"]?.GetValue<string>() != "Bearer " + token) return false;
+            if (hook["timeout"] is not JsonValue t || t.GetValueKind() != JsonValueKind.Number || t.GetValue<int>() != TimeoutFor(name)) return false;
         }
         return true;
     }

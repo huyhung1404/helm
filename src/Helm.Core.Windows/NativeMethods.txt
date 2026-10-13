@@ -100,6 +100,7 @@ GetDpiForMonitor
 
 // Input
 GetCursorPos
+GetLastInputInfo
 GetAsyncKeyState
 SendInput
 MapVirtualKey

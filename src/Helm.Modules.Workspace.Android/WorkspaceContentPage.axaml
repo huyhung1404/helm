@@ -68,6 +68,20 @@
         <Style Selector="TextBlock.failed">
             <Setter Property="Foreground" Value="{DynamicResource HelmDanger}" />
         </Style>
+        <Style Selector="Border.pending">
+            <Setter Property="BorderBrush" Value="{DynamicResource HelmDanger}" />
+            <Setter Property="BorderThickness" Value="2" />
+        </Style>
+        <Style Selector="SelectableTextBlock.code">
+            <Setter Property="FontFamily" Value="monospace" />
+            <Setter Property="FontSize" Value="14" />
+        </Style>
+        <Style Selector="ToggleButton.option">
+            <Setter Property="HorizontalAlignment" Value="Stretch" />
+            <Setter Property="HorizontalContentAlignment" Value="Left" />
+            <Setter Property="Margin" Value="0,0,0,6" />
+            <Setter Property="Padding" Value="12,8" />
+        </Style>
         <Style Selector="Button.chip">
             <Setter Property="Margin" Value="0,0,8,8" />
             <Setter Property="Padding" Value="12,6" />
@@ -165,6 +179,58 @@
                     <TextBlock Text="{Binding SessionStateText}" Classes="secondary" TextWrapping="Wrap" />
                 </StackPanel>
             </DockPanel>
+        </Border>
+
+        <!-- Claude waits for you: a tool to allow, held by the PC -->
+        <Border Classes="card pending" IsVisible="{Binding HasPermission}">
+            <StackPanel Spacing="8">
+                <TextBlock Text="{Binding PendingTitle}" Classes="title" TextWrapping="Wrap" />
+                <Border Background="{DynamicResource HelmSubtleFill}" CornerRadius="6" Padding="10,8">
+                    <SelectableTextBlock Classes="code" Text="{Binding PendingDetail}" TextWrapping="Wrap" />
+                </Border>
+                <TextBlock Text="{Binding PendingExpires}" Classes="secondary" TextWrapping="Wrap" />
+                <Grid ColumnDefinitions="*,8,*">
+                    <Button Classes="accent" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Content="Allow"
+                            Command="{Binding AllowCommand}" AutomationProperties.Name="Allow" />
+                    <Button Grid.Column="2" Classes="danger" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Content="Deny"
+                            Command="{Binding DenyCommand}" AutomationProperties.Name="Deny" />
+                </Grid>
+                <TextBlock Text="To deny with a reason Claude reads, type it in the box below first." Classes="secondary" TextWrapping="Wrap" />
+            </StackPanel>
+        </Border>
+
+        <!-- Claude waits for you: its question, held by the PC -->
+        <Border Classes="card pending" IsVisible="{Binding HasQuestion}">
+            <StackPanel Spacing="10">
+                <TextBlock Text="Claude asks you" Classes="title" />
+                <ItemsControl ItemsSource="{Binding Questions}">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate x:DataType="vm:QuestionChoice">
+                            <StackPanel Spacing="6" Margin="0,0,0,12">
+                                <TextBlock Text="{Binding Header}" Classes="secondary" />
+                                <TextBlock Text="{Binding Question}" TextWrapping="Wrap" FontSize="16" FontWeight="SemiBold" />
+                                <TextBlock Text="Pick one or more" Classes="secondary" IsVisible="{Binding MultiSelect}" />
+                                <ItemsControl ItemsSource="{Binding Options}">
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate x:DataType="vm:OptionChoice">
+                                            <ToggleButton Classes="option" IsChecked="{Binding IsPicked}">
+                                                <StackPanel>
+                                                    <TextBlock Text="{Binding Label}" FontWeight="SemiBold" TextWrapping="Wrap" />
+                                                    <TextBlock Text="{Binding Description}" Classes="secondary" TextWrapping="Wrap" IsVisible="{Binding HasDescription}" />
+                                                </StackPanel>
+                                            </ToggleButton>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                                <TextBox Text="{Binding Other}" PlaceholderText="Or your own answer" TextWrapping="Wrap" AutomationProperties.Name="Your own answer" />
+                            </StackPanel>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+                <TextBlock Text="{Binding PendingExpires}" Classes="secondary" TextWrapping="Wrap" />
+                <Button Classes="accent" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Content="Send answers"
+                        Command="{Binding SendAnswersCommand}" AutomationProperties.Name="Send answers" />
+            </StackPanel>
         </Border>
 
         <!-- Composer: the next task, or a new session in this window -->

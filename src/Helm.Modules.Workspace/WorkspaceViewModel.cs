@@ -72,6 +72,12 @@ public sealed class HostWindowRow(string name, string detail, IReadOnlyList<Sess
     public bool HasSessions => Sessions.Count > 0;
 }
 
+/// <summary>One choice of "Approve from your phone".</summary>
+public sealed record ApprovalChoice(PhoneApprovals Value, string Label)
+{
+    public override string ToString() => Label;
+}
+
 /// <summary>
 /// Workspace Controller's settings page on the PC. The PC is only the host: this shows that it is listening, that
 /// Claude's hooks and Helm Bridge are in place, and which sessions it sees. Steering happens on the phone.
@@ -86,6 +92,8 @@ public sealed partial class WorkspaceViewModel : ObservableObject
     [ObservableProperty] private bool _manageClaudeHooks;
     [ObservableProperty] private bool _manageBridgeExtension;
     [ObservableProperty] private bool _connectNewSessions;
+    [ObservableProperty] private ApprovalChoice? _approveFromPhone;
+    [ObservableProperty] private int _awayAfterMinutes;
     [ObservableProperty] private string _listeningText = "";
     [ObservableProperty] private string _hooksText = "";
     [ObservableProperty] private string _bridgeText = "";
@@ -102,6 +110,8 @@ public sealed partial class WorkspaceViewModel : ObservableObject
         ManageClaudeHooks = _store.Current.ManageClaudeHooks;
         ManageBridgeExtension = _store.Current.ManageBridgeExtension;
         ConnectNewSessions = _store.Current.ConnectNewSessions;
+        ApproveFromPhone = ApprovalChoices.First(c => c.Value == _store.Current.ApproveFromPhone);
+        AwayAfterMinutes = _store.Current.AwayAfterMinutes;
         _loading = false;
         module.Changed += (_, _) => _ui.Post(Refresh);
         Refresh();
@@ -134,6 +144,26 @@ public sealed partial class WorkspaceViewModel : ObservableObject
         if (_loading) return;
         _store.Update(s => s.ManageBridgeExtension = value);
         if (value) _ = Module.EnsureBridgeAsync();
+    }
+
+    /// <summary>The choices of "Approve from your phone", with what each means.</summary>
+    public IReadOnlyList<ApprovalChoice> ApprovalChoices { get; } =
+    [
+        new(PhoneApprovals.WhenAway, "When I'm away from this PC"),
+        new(PhoneApprovals.Always, "Always"),
+        new(PhoneApprovals.Off, "Never"),
+    ];
+
+    public IReadOnlyList<int> AwayChoices { get; } = [1, 2, 5, 10, 15, 30];
+
+    partial void OnApproveFromPhoneChanged(ApprovalChoice? value)
+    {
+        if (!_loading && value is not null) _store.Update(s => s.ApproveFromPhone = value.Value);
+    }
+
+    partial void OnAwayAfterMinutesChanged(int value)
+    {
+        if (!_loading && value > 0) _store.Update(s => s.AwayAfterMinutes = value);
     }
 
     partial void OnConnectNewSessionsChanged(bool value)
