@@ -61,16 +61,27 @@ public static class SyncDefaults
 /// </summary>
 public sealed class SyncApiClient : IDisposable
 {
+    /// <summary>How long one file chunk (up to 4 MiB) may take: minutes on a weak phone connection, not the 60 s of a call.</summary>
+    public static readonly TimeSpan TransferTimeout = TimeSpan.FromMinutes(5);
+
     private readonly HttpClient _http;
+    private readonly HttpClient _transfer;
 
     public SyncApiClient(HttpMessageHandler? handler = null)
     {
         _http = handler is null ? new HttpClient() : new HttpClient(handler, disposeHandler: false);
         _http.Timeout = TimeSpan.FromSeconds(60);
         _http.DefaultRequestHeaders.UserAgent.ParseAdd("Helm-Sync/1");
+        _transfer = handler is null ? new HttpClient() : new HttpClient(handler, disposeHandler: false);
+        _transfer.Timeout = TransferTimeout;
+        _transfer.DefaultRequestHeaders.UserAgent.ParseAdd("Helm-Sync/1");
     }
 
-    public void Dispose() => _http.Dispose();
+    public void Dispose()
+    {
+        _http.Dispose();
+        _transfer.Dispose();
+    }
 
     public async Task<IReadOnlyList<PushOutcome>> PushAsync(SyncCredentials credentials, IReadOnlyList<PushItem> items, CancellationToken ct)
     {
@@ -205,7 +216,7 @@ public sealed class SyncApiClient : IDisposable
         var content = new ReadOnlyMemoryContent(data);
         content.Headers.ContentType = new MediaTypeHeaderValue("application/octet-stream");
         content.Headers.ContentLength = data.Length;
-        await SendAsync<JsonElement>(credentials, HttpMethod.Put, BlobPath(id) + $"/chunks/{index}", null, ct, content: content).ConfigureAwait(false);
+        await SendAsync<JsonElement>(credentials, HttpMethod.Put, BlobPath(id) + $"/chunks/{index}", null, ct, content: content, http: _transfer).ConfigureAwait(false);
     }
 
     public async Task<RemoteBlob> CommitBlobAsync(SyncCredentials credentials, string id, CancellationToken ct) =>
@@ -235,7 +246,7 @@ public sealed class SyncApiClient : IDisposable
     {
         using var request = new HttpRequestMessage(HttpMethod.Get, new Uri(credentials.Server, BlobPath(id) + $"/chunks/{index}"));
         request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", credentials.Token);
-        using var response = await _http.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, ct).ConfigureAwait(false);
+        using var response = await _transfer.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, ct).ConfigureAwait(false);
         if (response.StatusCode == HttpStatusCode.NotFound) return null;
         if (!response.IsSuccessStatusCode) await ThrowAsync(response, authenticate: true, ct).ConfigureAwait(false);
         return await response.Content.ReadAsByteArrayAsync(ct).ConfigureAwait(false);
@@ -274,14 +285,14 @@ public sealed class SyncApiClient : IDisposable
     {
         using var request = new HttpRequestMessage(HttpMethod.Put, url) { Content = new ReadOnlyMemoryContent(data) };
         request.Content.Headers.ContentLength = data.Length;
-        using var response = await _http.SendAsync(request, ct).ConfigureAwait(false);
+        using var response = await _transfer.SendAsync(request, ct).ConfigureAwait(false);
         if (!response.IsSuccessStatusCode) throw new HttpRequestException($"Storage refused the upload ({(int)response.StatusCode}).", null, response.StatusCode);
     }
 
     /// <returns>Null when storage has no such object.</returns>
     public async Task<byte[]?> GetFromUrlAsync(Uri url, CancellationToken ct)
     {
-        using var response = await _http.GetAsync(url, HttpCompletionOption.ResponseHeadersRead, ct).ConfigureAwait(false);
+        using var response = await _transfer.GetAsync(url, HttpCompletionOption.ResponseHeadersRead, ct).ConfigureAwait(false);
         if (response.StatusCode == HttpStatusCode.NotFound) return null;
         if (!response.IsSuccessStatusCode) throw new HttpRequestException($"Storage refused the download ({(int)response.StatusCode}).", null, response.StatusCode);
         return await response.Content.ReadAsByteArrayAsync(ct).ConfigureAwait(false);
@@ -294,14 +305,14 @@ public sealed class SyncApiClient : IDisposable
         DateTimeOffset.FromUnixTimeMilliseconds(b.CreatedAt), FromMs(b.DeletedAt), b.Chunks ?? []);
 
     private async Task<T> SendAsync<T>(SyncCredentials credentials, HttpMethod method, string path, object? body, CancellationToken ct,
-        bool authenticate = true, HttpContent? content = null)
+        bool authenticate = true, HttpContent? content = null, HttpClient? http = null)
     {
         using var request = new HttpRequestMessage(method, new Uri(credentials.Server, path));
         if (authenticate) request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", credentials.Token);
         if (body is not null) request.Content = JsonContent.Create(body, options: SyncJson.Wire);
         else if (content is not null) request.Content = content;
 
-        using var response = await _http.SendAsync(request, ct).ConfigureAwait(false);
+        using var response = await (http ?? _http).SendAsync(request, ct).ConfigureAwait(false);
         if (response.IsSuccessStatusCode)
         {
             return await response.Content.ReadFromJsonAsync<T>(SyncJson.Options, ct).ConfigureAwait(false)

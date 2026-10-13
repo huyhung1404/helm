@@ -24,5 +24,5 @@ public sealed class AndroidApp : AvaloniaAndroidApplication<App>
         base.OnCreate();
     }
 
-    protected override AppBuilder CustomizeAppBuilder(AppBuilder builder) => base.CustomizeAppBuilder(builder).WithInterFont();
+    protected override AppBuilder CustomizeAppBuilder(AppBuilder builder) => base.CustomizeAppBuilder(builder).WithInterFont().WithChineseFont();
 }

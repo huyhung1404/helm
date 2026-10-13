@@ -104,9 +104,13 @@ public sealed record NovelDictionary
 {
     public string Name { get; init; } = "";
 
+    /// <summary>Bytes of the file itself (the blob is smaller when <see cref="Compressed"/>).</summary>
     public long Size { get; init; }
 
     public BlobRef? Blob { get; init; }
+
+    /// <summary>The blob holds the file gzipped (about a third of VietPhrase's size to download); older records hold it as is.</summary>
+    public bool Compressed { get; init; }
 
     public DateTimeOffset UpdatedAt { get; init; }
 

@@ -306,17 +306,8 @@
                                     <ic:SymbolIcon Symbol="Stop" FontSize="20" />
                                 </Button>
                             </Grid>
-                            <!-- Loading, downloading, the sleep timer -->
+                            <!-- Loading, the sleep timer -->
                             <ProgressBar IsIndeterminate="True" Height="2" MinHeight="2" IsVisible="{Binding IsLoadingVoice}" />
-                            <DockPanel IsVisible="{Binding IsDownloadingAudio}">
-                                <Button DockPanel.Dock="Right" Classes="icon" Width="32" Height="32" Command="{Binding StopAudioDownloadCommand}" AutomationProperties.Name="Stop downloading">
-                                    <ic:SymbolIcon Symbol="Dismiss" FontSize="14" />
-                                </Button>
-                                <StackPanel VerticalAlignment="Center" Spacing="2">
-                                    <TextBlock Text="{Binding AudioDownloadText}" Classes="secondary" />
-                                    <ProgressBar Height="3" MinHeight="3" Minimum="0" Maximum="1" Value="{Binding AudioDownloadFraction}" />
-                                </StackPanel>
-                            </DockPanel>
                             <TextBlock Text="{Binding SleepTimerLabel}" Foreground="{DynamicResource AccentText}" FontSize="12" IsVisible="{Binding HasSleepTimer}" />
                         </StackPanel>
                     </Border>
@@ -435,7 +426,7 @@
                             <ListBox x:Name="ChapterList" ItemsSource="{Binding Chapters}" SelectionChanged="ChapterList_SelectionChanged" Background="Transparent">
                                 <ListBox.ItemTemplate>
                                     <DataTemplate DataType="vm:ChapterItem">
-                                        <TextBlock Text="{Binding DisplayTitle}" TextTrimming="CharacterEllipsis" />
+                                        <TextBlock Text="{Binding Title}" TextTrimming="CharacterEllipsis" />
                                     </DataTemplate>
                                 </ListBox.ItemTemplate>
                             </ListBox>
@@ -475,13 +466,6 @@
                                     <TextBlock Grid.Column="3" Width="44" TextAlignment="Center" VerticalAlignment="Center" Text="{Binding FontSize, StringFormat='{}{0:0}'}" />
                                     <Button Grid.Column="4" Classes="icon" Content="A+" FontSize="16" Command="{Binding ZoomInCommand}" AutomationProperties.Name="Larger text" />
                                 </Grid>
-                                <TextBlock Text="Download audio to listen offline" Classes="title" />
-                                <WrapPanel>
-                                    <Button Classes="chip" Content="This chapter" Command="{Binding DownloadThisChapterCommand}" />
-                                    <Button Classes="chip" Content="Next 10 chapters" Command="{Binding DownloadNextChaptersCommand}" />
-                                    <Button Classes="chip" Content="Whole novel" Command="{Binding DownloadWholeNovelCommand}" />
-                                    <Button Classes="chip" Content="Stop downloading" Command="{Binding StopAudioDownloadCommand}" IsVisible="{Binding IsDownloadingAudio}" />
-                                </WrapPanel>
                                 <TextBlock Text="{Binding ReadyLabel}" Classes="secondary" />
                                 <Button Content="More settings" Click="Settings_Click" />
                             </StackPanel>

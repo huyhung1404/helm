@@ -218,6 +218,30 @@ public sealed class BlobStoreTests : IDisposable
         Assert.Null(_server.Blobs[attachment.Blob.Id].DeletedAt);
     }
 
+    [Fact]
+    public async Task A_download_that_drops_is_asked_again_and_a_file_of_many_chunks_arrives_whole()
+    {
+        var transport = new FakeSyncServer.Transport(_server);
+        var a = NewStore("a", transport);
+        var data = RandomNumberGenerator.GetBytes(3 * BlobStore.ChunkSize + 999);
+        var blob = await a.ImportAsync(new MemoryStream(data));
+        Assert.True(await a.UploadPendingAsync(CancellationToken.None));
+        var b = NewStore("b", transport);
+        b.DownloadRetryWaits = [TimeSpan.Zero, TimeSpan.Zero];
+
+        transport.FailChunkDownloads = 2;
+        Assert.Equal(data, await b.ReadAllAsync(blob));
+
+        // A connection that stays down: the failure reaches the caller, nothing half-written is left as a chunk.
+        var c = NewStore("c", transport);
+        c.DownloadRetryWaits = [TimeSpan.Zero];
+        transport.FailChunkDownloads = 100;
+        await Assert.ThrowsAsync<HttpRequestException>(() => c.ReadAllAsync(blob));
+        Assert.False(c.IsCached(blob));
+        transport.FailChunkDownloads = 0;
+        Assert.Equal(data, await c.ReadAllAsync(blob));
+    }
+
     private BlobStore NewStore(string name, IBlobTransport transport)
     {
         var paths = new HelmPaths(Path.Combine(_dir, name));

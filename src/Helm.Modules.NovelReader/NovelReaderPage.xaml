@@ -294,15 +294,6 @@
                         </StackPanel>
                     </core:RowLayout>
                 </Border>
-                <Border Style="{DynamicResource HelmExpanderRow}">
-                    <core:RowLayout>
-                        <core:CardHeader Title="Downloaded audio" Description="{Binding AudioCacheSize, StringFormat=Sentences kept on this PC so they play at once and offline: {0}. A new voice or speed downloads again.}" />
-                        <StackPanel Orientation="Horizontal">
-                            <ui:Button Content="Open folder" Icon="{ui:SymbolIcon FolderOpen24}" Command="{Binding OpenAudioFolderCommand}" />
-                            <ui:Button Margin="8,0,0,0" Content="Clear" Icon="{ui:SymbolIcon Delete24}" Command="{Binding ClearAudioCommand}" />
-                        </StackPanel>
-                    </core:RowLayout>
-                </Border>
             </StackPanel>
         </ui:CardExpander>
 

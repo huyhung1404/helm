@@ -564,8 +564,11 @@ public sealed class NovelReaderTests : IDisposable
         await WaitFor(() => page.Engine.Spoken.Count > 2);
         page.ViewModel.StopReadingCommand.Execute(null);
         // What is read is the Vietnamese line's sentences, never the study rows above it.
-        Assert.Equal("Chương 1 sơn tự họa đoan", page.Engine.Spoken[0].Text);
-        Assert.All(page.Engine.Spoken, s => Assert.False(s.Text.Contains("lín", StringComparison.OrdinalIgnoreCase) || s.Text.Contains("sǎn"), s.Text));
+        // Downloading ahead may still be adding: look at a copy.
+        List<(string Text, SpeechOptions Options, string Voice)> spoken;
+        lock (page.Engine.Spoken) spoken = [.. page.Engine.Spoken];
+        Assert.Equal("Chương 1 sơn tự họa đoan", spoken[0].Text);
+        Assert.All(spoken, s => Assert.False(s.Text.Contains("lín", StringComparison.OrdinalIgnoreCase) || s.Text.Contains("sǎn"), s.Text));
     }
 
     [Fact]
@@ -682,6 +685,13 @@ public sealed class NovelReaderTests : IDisposable
 
         Assert.Equal(1, set.VietPhrase.Count);
         Assert.True(set.HanViet.ContainsKey("林"));
+        Assert.Equal(HanVietFile, File.ReadAllText(Path.Combine(b.Dictionaries.Folder, "ChinesePhienAmWords.txt")));
+        // Sent gzipped (VietPhrase is a third of its size to download).
+        Assert.All(a.Records.All(), r => Assert.True(r.Value.Compressed));
+
+        // A file an older Helm wrote straight from the gzipped blob (not the size the record says) is fetched again.
+        File.WriteAllText(Path.Combine(b.Dictionaries.Folder, "ChinesePhienAmWords.txt"), "\u001f\u008b garbage");
+        Assert.True(await b.Dictionaries.SyncFilesAsync());
         Assert.Equal(HanVietFile, File.ReadAllText(Path.Combine(b.Dictionaries.Folder, "ChinesePhienAmWords.txt")));
 
         // A file replaced on one device replaces it on the other.
@@ -887,48 +897,48 @@ public sealed class NovelReaderTests : IDisposable
     }
 
     [Fact]
-    public void Downloaded_sentences_are_kept_per_voice_speed_and_novel()
+    public void A_sentence_sounds_the_same_only_for_the_same_voice_speed_and_text()
     {
-        var cache = new AudioCache(Path.Combine(_dir, "audio"));
         var voice = new SpeechVoice("edge:hoaimy", "HoaiMy", "vi-VN", true);
-        var normal = AudioCache.Profile(voice, new SpeechOptions(1, 1, 1));
-        var faster = AudioCache.Profile(voice, new SpeechOptions(1.5, 1, 1));
-        var key = AudioCache.Key(normal, "Lâm Uyển gật đầu.");
+        var normal = SpeechKeys.Profile(voice, new SpeechOptions(1, 1, 1));
+        var faster = SpeechKeys.Profile(voice, new SpeechOptions(1.5, 1, 1));
 
-        cache.Put("book", key, new SpeechAudio([1, 2, 3], "audio/mpeg"));
-
-        Assert.True(cache.Contains("book", key));
-        Assert.False(cache.Contains("other", key));
-        Assert.NotEqual(key, AudioCache.Key(faster, "Lâm Uyển gật đầu."));
-        Assert.Equal([1, 2, 3], cache.TryGet("book", key)!.Data);
-        Assert.Equal(3, cache.SizeOf("book"));
-        Assert.Empty(Directory.GetFiles(Path.Combine(_dir, "audio", "book"), "*.part"));
-        cache.MarkChapter("book", 4, normal);
-        Assert.Equal([4], cache.DownloadedChapters("book", normal));
-        Assert.Empty(cache.DownloadedChapters("book", faster));
-
-        cache.Clear("book");
-        Assert.False(cache.Contains("book", key));
-        Assert.Equal(0, cache.SizeOf("book"));
+        Assert.Equal(SpeechKeys.Key(normal, "Lâm Uyển gật đầu."), SpeechKeys.Key(normal, "Lâm Uyển gật đầu."));
+        Assert.NotEqual(SpeechKeys.Key(normal, "Lâm Uyển gật đầu."), SpeechKeys.Key(faster, "Lâm Uyển gật đầu."));
+        Assert.NotEqual(SpeechKeys.Key(normal, "Lâm Uyển gật đầu."), SpeechKeys.Key(normal, "Lâm Uyển lắc đầu."));
     }
 
     [Fact]
-    public async Task Sound_downloaded_once_plays_again_without_the_voice()
+    public void The_sound_older_versions_kept_on_the_disk_is_deleted()
     {
-        var cache = new AudioCache(Path.Combine(_dir, "audio"));
+        var cache = Path.Combine(_dir, "cache");
+        var old = Path.Combine(cache, NovelReaderIds.ModuleId, "audio", "book");
+        Directory.CreateDirectory(old);
+        File.WriteAllBytes(Path.Combine(old, "0123.mp3"), [1, 2, 3]);
+
+        SpeechKeys.DeleteOldAudioFolder(cache);
+
+        Assert.False(Directory.Exists(Path.Combine(cache, NovelReaderIds.ModuleId, "audio")));
+        SpeechKeys.DeleteOldAudioFolder(cache);
+    }
+
+    [Fact]
+    public async Task Going_back_plays_from_memory_without_asking_the_voice_again()
+    {
         var engine = new FakeEngine();
-        var first = NewReader(engine, new FakeOutput(), new FakeHost([["a1. a2.", "b1."]]), cache);
-        first.Play(0);
-        await WaitFor(() => first.State == ReadAloudState.Stopped && engine.Spoken.Count == 3);
+        var output = new FakeOutput { Hold = true };
+        var reader = NewReader(engine, output, new FakeHost([["a1. a2.", "b1."]]));
 
-        // Another session (Helm restarted): everything plays from the disk.
-        var output = new FakeOutput();
-        var again = NewReader(engine, output, new FakeHost([["a1. a2.", "b1."]]), cache);
-        again.Play(0);
-        await WaitFor(() => again.State == ReadAloudState.Stopped && output.Played.Count == 3);
+        reader.Play(0);
+        await WaitFor(() => engine.Spoken.Count == 3 && output.Played.Count == 1);
+        output.Finish();
+        await WaitFor(() => output.Played.Count == 2);
+        reader.PreviousSentence();
+        await WaitFor(() => output.Played.Count == 3);
 
+        Assert.Equal(["a1.", "a2.", "a1."], output.Played);
         Assert.Equal(3, engine.Spoken.Count);
-        Assert.Equal(["a1.", "a2.", "b1."], output.Played);
+        reader.Stop();
     }
 
     [Fact]
@@ -937,17 +947,39 @@ public sealed class NovelReaderTests : IDisposable
         var engine = new FakeEngine();
         var output = new FakeOutput { Hold = true };
         var host = new FakeHost([["a1. a2.", "b1."], ["c1. c2. c3.", "d1. d2. d3."]]);
-        var cache = new AudioCache(Path.Combine(_dir, "audio"));
-        var reader = NewReader(engine, output, host, cache);
+        var reader = NewReader(engine, output, host);
 
         reader.Play(0);
 
         // Reading goes on by itself (the screen may be off): the open chapter, then all of the next one.
         await WaitFor(() => engine.Spoken.Count == 9);
         Assert.Equal(["a1.", "a2.", "b1.", "c1.", "c2.", "c3.", "d1.", "d2.", "d3."], engine.Spoken.Select(s => s.Text).Order());
-        await WaitFor(() => cache.DownloadedChapters("book", reader.Profile!).Contains(1));
         reader.RefreshReady();
         Assert.Equal(1, reader.ReadyThrough);
+        reader.Stop();
+    }
+
+    [Fact]
+    public async Task Downloading_ahead_waits_while_enough_sound_is_waiting_in_memory()
+    {
+        // Each sentence is 20 MB: memory holds what waits to be played up to AheadBytes (48 MB), then waits for reading.
+        var engine = new FakeEngine { PadTo = 20 * 1024 * 1024 };
+        var output = new FakeOutput { Hold = true };
+        var reader = NewReader(engine, output, new FakeHost([["a1. a2. a3. a4. a5. a6. a7."]]));
+
+        reader.Play(0);
+        await WaitFor(() => output.Played.Count == 1 && engine.Spoken.Count >= 4);
+        // a1 is playing; 48 MB or more waits behind it (one more per parallel request at most): then nothing until reading moves on.
+        await Task.Delay(1500);
+        var held = engine.Spoken.Count;
+        Assert.InRange(held, 4, 5);
+        await Task.Delay(1500);
+        Assert.Equal(held, engine.Spoken.Count);
+
+        output.Finish();
+        await WaitFor(() => output.Played.Count == 2);
+        await WaitFor(() => engine.Spoken.Count > held);
+        Assert.Equal(["a1.", "a2."], output.Played);
         reader.Stop();
     }
 
@@ -973,8 +1005,7 @@ public sealed class NovelReaderTests : IDisposable
         var engine = new FakeEngine();
         var output = new FakeOutput { Hold = true };
         var host = new FakeHost([["a1. a2."], ["b1. b2."], ["c1. c2."], ["d1. d2."], ["e1. e2."]]);
-        var cache = new AudioCache(Path.Combine(_dir, "audio"));
-        var reader = NewReader(engine, output, host, cache);
+        var reader = NewReader(engine, output, host);
         reader.PrefetchChapters = () => 2;
 
         reader.Play(0);
@@ -983,7 +1014,6 @@ public sealed class NovelReaderTests : IDisposable
         await WaitFor(() => engine.Spoken.Count == 6);
         await Task.Delay(100);
         Assert.Equal(["a1.", "a2.", "b1.", "b2.", "c1.", "c2."], engine.Spoken.Select(s => s.Text).Order());
-        await WaitFor(() => cache.DownloadedChapters("book", reader.Profile!).SetEquals([0, 1, 2]));
 
         // Reading moves into the next chapter: one more chapter is downloaded, and nothing twice.
         await WaitFor(() => output.Played.Count == 1);
@@ -1085,30 +1115,9 @@ public sealed class NovelReaderTests : IDisposable
         Assert.Equal(1.0, ReadAloudController.EstimateLength(new SpeechAudio(wav, "audio/wav")).TotalSeconds, 3);
     }
 
-    [Fact]
-    public async Task Chapters_download_for_listening_offline_and_only_what_is_missing()
+    private ReadAloudController NewReader(FakeEngine engine, FakeOutput output, FakeHost host)
     {
-        var cache = new AudioCache(Path.Combine(_dir, "audio"));
-        var engine = new FakeEngine();
-        var host = new FakeHost([["a1. a2."], ["b1. b2."], ["c1."]]);
-        var reader = NewReader(engine, new FakeOutput(), host, cache);
-        var seen = new List<AudioDownloadProgress>();
-        reader.DownloadChanged += (_, _) => { lock (seen) seen.Add(reader.Download); };
-
-        reader.DownloadChapters(0, 1);
-        await WaitFor(() => !reader.Download.Active && engine.Spoken.Count == 4);
-
-        lock (seen) Assert.Contains(seen, p => p is { Active: true, Chapter: 1, Done: 2, Total: 2 });
-        Assert.Equal([0, 1], cache.DownloadedChapters("book", reader.Profile!).Order());
-
-        reader.DownloadChapters(0, 2);
-        await WaitFor(() => !reader.Download.Active && engine.Spoken.Count == 5);
-        Assert.Equal("c1.", engine.Spoken[^1].Text);
-    }
-
-    private ReadAloudController NewReader(FakeEngine engine, FakeOutput output, FakeHost host, AudioCache? cache = null)
-    {
-        var reader = new ReadAloudController(new SpeechCatalog([engine]), output, _clock, disk: cache)
+        var reader = new ReadAloudController(new SpeechCatalog([engine]), output, _clock)
         {
             VoiceId = () => "test:hoaimy",
             ParagraphPause = () => 0,
@@ -1301,14 +1310,11 @@ public sealed class NovelReaderTests : IDisposable
     {
         var engine = new FakeDirectEngine();
         var output = new FakeOutput();
-        var cache = new AudioCache(Path.Combine(_dir, "audio"));
-        var reader = new ReadAloudController(new SpeechCatalog([engine]), output, _clock, disk: cache)
+        var reader = new ReadAloudController(new SpeechCatalog([engine]), output, _clock)
         {
             VoiceId = () => "edgeapp:hoaimy",
             ParagraphPause = () => 0,
         };
-        var notices = new List<string>();
-        reader.Notice += (_, text) => notices.Add(text);
         reader.Attach(new FakeHost([["a1. a2.", "b1."]]));
 
         var positions = new List<ReadingPosition>();
@@ -1331,9 +1337,6 @@ public sealed class NovelReaderTests : IDisposable
 
         Assert.Single(engine.Queued);
         Assert.Empty(output.Played);
-        Assert.Equal(0, cache.SizeOf(null));
-        reader.DownloadChapters(0, 0);
-        Assert.Contains(notices, n => n.Contains("cannot be downloaded", StringComparison.Ordinal));
     }
 
     /// <summary>Plays "by itself": each sentence ends when the test says so (or at once once <see cref="FinishAll"/> ran).</summary>
@@ -1417,7 +1420,7 @@ public sealed class NovelReaderTests : IDisposable
         var engine = new FakeEngine();
         var output = new FakeOutput();
         var viewModel = new NovelReaderViewModel(store, dictionaries, settings, new InlineUi(), new AcceptDialogs(), new Device(),
-            new SpeechCatalog([engine, .. moreEngines]), output, new AudioCache(Path.Combine(paths.Root, "audio")), new Launcher(), new MemoryClipboard(),
+            new SpeechCatalog([engine, .. moreEngines]), output, new Launcher(), new MemoryClipboard(),
             NullLogger<NovelReaderViewModel>.Instance, nameAgent: agent);
         return new Page(viewModel, store, progress, engine, output, dictionaries);
     }
@@ -1453,6 +1456,9 @@ public sealed class NovelReaderTests : IDisposable
 
         public bool Fail { get; set; }
 
+        /// <summary>Makes each sound at least this many bytes (zeros after the text), to fill memory.</summary>
+        public int PadTo { get; set; }
+
         public string Prefix => prefix;
 
         public IReadOnlyList<SpeechVoice> Voices { get; set; } = voices ?? [new SpeechVoice($"{prefix}:hoaimy", "HoaiMy", "vi-VN", online)];
@@ -1463,7 +1469,9 @@ public sealed class NovelReaderTests : IDisposable
         {
             if (Fail) return Task.FromException<SpeechAudio>(new SpeechUnavailableException("offline"));
             lock (Spoken) Spoken.Add((text, options, voice.Id));
-            return Task.FromResult(new SpeechAudio(Encoding.UTF8.GetBytes(text), "audio/mpeg"));
+            var data = Encoding.UTF8.GetBytes(text);
+            if (data.Length < PadTo) Array.Resize(ref data, PadTo);
+            return Task.FromResult(new SpeechAudio(data, "audio/mpeg"));
         }
     }
 
@@ -1484,7 +1492,7 @@ public sealed class NovelReaderTests : IDisposable
 
         public Task PlayAsync(SpeechAudio audio, CancellationToken ct)
         {
-            lock (Played) Played.Add(Encoding.UTF8.GetString(audio.Data));
+            lock (Played) Played.Add(Encoding.UTF8.GetString(audio.Data).TrimEnd('\0'));
             if (!Hold) return Task.CompletedTask;
             _playing = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
             ct.Register(() => _playing.TrySetCanceled());

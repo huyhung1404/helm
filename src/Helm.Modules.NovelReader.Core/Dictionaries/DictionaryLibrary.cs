@@ -1,3 +1,4 @@
+using System.IO.Compression;
 using System.Text.Json;
 using Helm.Core.Settings;
 using Helm.Core.Sync;
@@ -8,6 +9,9 @@ namespace Helm.Modules.NovelReader.Dictionaries;
 
 /// <summary>A dictionary file on this device.</summary>
 public sealed record DictionaryFile(string Name, DictionaryKind Kind, long Size);
+
+/// <summary>A synced dictionary being downloaded: which file, and how far all of them are (0 to 1).</summary>
+public sealed record DictionaryFetch(string File, double Fraction);
 
 /// <summary>
 /// The shared dictionaries, kept in settings/novel-reader/dictionaries and synced: each file is an encrypted blob
@@ -47,6 +51,11 @@ public sealed class DictionaryLibrary
         {
             if (e.Origin == SyncChangeOrigin.Remote) _ = OnRemoteChangeAsync();
         };
+        // A dictionary published here is on the server now: the file itself is in the folder, so its encrypted copy goes.
+        _blobs.Uploaded += (_, id) =>
+        {
+            if (_records.All().Any(r => r.Value.Blob?.Id == id)) _blobs.Evict(id);
+        };
     }
 
     /// <summary>Last writer wins: a dictionary replaced on one device replaces it everywhere.</summary>
@@ -66,6 +75,9 @@ public sealed class DictionaryLibrary
 
     /// <summary>Raised after a load, an import, a download, a synced change or an unload, on a background thread.</summary>
     public event EventHandler? Changed;
+
+    /// <summary>How far fetching the synced dictionaries is (over all files being fetched), on a background thread.</summary>
+    public event EventHandler<DictionaryFetch>? Fetching;
 
     public IReadOnlyList<DictionaryFile> Files()
     {
@@ -199,18 +211,46 @@ public sealed class DictionaryLibrary
             var manifest = ReadManifest();
             var changed = false;
             var records = _records.All().ToDictionary(r => r.Value.Name, r => r.Value, StringComparer.OrdinalIgnoreCase);
+            var missing = new List<(NovelDictionary Record, BlobRef Blob, string Path)>();
             foreach (var record in records.Values)
             {
                 if (record.Blob is not { } blob || DictionarySet.KindOf(record.Name) is null) continue;
                 var path = Path.Combine(Folder, Path.GetFileName(record.Name));
-                if (File.Exists(path) && manifest.TryGetValue(record.Name, out var have) && have == blob.Id) continue;
+                if (IsUpToDate(path, record, blob, manifest))
+                {
+                    // The file is here: the encrypted copy of it is not needed (the server keeps it).
+                    _blobs.Evict(blob.Id);
+                    continue;
+                }
+                missing.Add((record, blob, path));
+            }
+            long total = missing.Sum(m => m.Blob.Size), done = 0;
+            foreach (var (record, blob, path) in missing)
+            {
                 try
                 {
+                    var before = done;
+                    var progress = new Progress<double>(p => Fetching?.Invoke(this, new DictionaryFetch(record.Name, (before + p * blob.Size) / Math.Max(1, total))));
                     var part = path + ".part";
                     await using (var destination = File.Create(part))
-                        await _blobs.ReadAsync(blob, destination, null, ct).ConfigureAwait(false);
+                    {
+                        if (record.Compressed)
+                        {
+                            using var packed = new MemoryStream((int)Math.Min(blob.Size, int.MaxValue));
+                            await _blobs.ReadAsync(blob, packed, progress, ct).ConfigureAwait(false);
+                            packed.Position = 0;
+                            await using var unpacked = new GZipStream(packed, CompressionMode.Decompress);
+                            await unpacked.CopyToAsync(destination, ct).ConfigureAwait(false);
+                        }
+                        else
+                        {
+                            await _blobs.ReadAsync(blob, destination, progress, ct).ConfigureAwait(false);
+                        }
+                    }
                     File.Move(part, path, overwrite: true);
                     manifest[record.Name] = blob.Id;
+                    WriteManifest(manifest);
+                    _blobs.Evict(blob.Id);
                     changed = true;
                     _logger.LogInformation("Fetched synced dictionary {File}", record.Name);
                 }
@@ -219,6 +259,13 @@ public sealed class DictionaryLibrary
                     // Not uploaded yet, or sync is off: try again on the next change or load.
                     _logger.LogInformation("Synced dictionary {File} is not available yet: {Reason}", record.Name, ex.Message);
                 }
+                catch (Exception ex) when (!ct.IsCancellationRequested && ex is HttpRequestException or TaskCanceledException or InvalidDataException
+                    or SyncAuthException or SyncRequestException or System.Security.Cryptography.CryptographicException)
+                {
+                    // No connection, a timeout, a damaged file: the others still come; this one is tried again next time.
+                    _logger.LogWarning(ex, "Could not fetch the synced dictionary {File}", record.Name);
+                }
+                done += blob.Size;
             }
             WriteManifest(manifest);
             foreach (var path in Directory.GetFiles(Folder, "*.txt"))
@@ -248,13 +295,37 @@ public sealed class DictionaryLibrary
         }
     }
 
-    /// <summary>Encrypts one local file into a blob and points its record at it (the old blob is dropped).</summary>
+    /// <summary>
+    /// The local file is the one the record points at. The size check catches a file an older Helm wrote from a
+    /// compressed blob (it did not know to unpack it).
+    /// </summary>
+    private static bool IsUpToDate(string path, NovelDictionary record, BlobRef blob, Dictionary<string, string> manifest)
+    {
+        if (!manifest.TryGetValue(record.Name, out var have) || have != blob.Id) return false;
+        var file = new FileInfo(path);
+        return file.Exists && (record.Size <= 0 || file.Length == record.Size);
+    }
+
+    /// <summary>
+    /// Gzips one local file into a blob and points its record at it (the old blob is dropped). Once uploaded, the
+    /// encrypted copy leaves this device: the file itself is here.
+    /// </summary>
     private async Task PublishLockedAsync(string name, CancellationToken ct)
     {
         var path = Path.Combine(Folder, name);
         BlobRef blob;
-        await using (var content = File.OpenRead(path))
-            blob = await _blobs.ImportAsync(content, null, ct).ConfigureAwait(false);
+        long size;
+        using (var packed = new MemoryStream())
+        {
+            await using (var content = File.OpenRead(path))
+            {
+                size = content.Length;
+                await using var gzip = new GZipStream(packed, CompressionLevel.Optimal, leaveOpen: true);
+                await content.CopyToAsync(gzip, ct).ConfigureAwait(false);
+            }
+            packed.Position = 0;
+            blob = await _blobs.ImportAsync(packed, null, ct).ConfigureAwait(false);
+        }
         var id = name.ToLowerInvariant();
         var old = _records.Get(id);
         try
@@ -262,8 +333,9 @@ public sealed class DictionaryLibrary
             _records.Upsert(id, new NovelDictionary
             {
                 Name = name,
-                Size = blob.Size,
+                Size = size,
                 Blob = blob,
+                Compressed = true,
                 UpdatedAt = DateTimeOffset.UtcNow,
                 UpdatedFrom = _device.DeviceName,
             });
@@ -277,7 +349,7 @@ public sealed class DictionaryLibrary
         var manifest = ReadManifest();
         manifest[name] = blob.Id;
         WriteManifest(manifest);
-        _logger.LogInformation("Synced dictionary {File} ({Size} bytes)", name, blob.Size);
+        _logger.LogInformation("Synced dictionary {File} ({Size} bytes, {Packed} to upload)", name, size, blob.Size);
     }
 
     private async Task OnRemoteChangeAsync()
@@ -309,9 +381,9 @@ public sealed class DictionaryLibrary
             {
                 await SyncFilesAsync().ConfigureAwait(false);
             }
-            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException)
+            catch (Exception ex) when (ex is not OutOfMemoryException)
             {
-                // Loading what is on this device is still useful.
+                // No connection, sync not ready, a full disk: loading what is on this device is still useful.
                 _logger.LogWarning(ex, "Could not sync the dictionaries");
             }
             var started = Environment.TickCount64;

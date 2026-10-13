@@ -194,8 +194,10 @@ public sealed class NovelStore
         {
             return await _blobs.ReadAllAsync(cover, ct).ConfigureAwait(false);
         }
-        catch (Exception ex) when (ex is BlobUnavailableException or System.Security.Cryptography.CryptographicException or IOException)
+        catch (Exception ex) when (ex is BlobUnavailableException or System.Security.Cryptography.CryptographicException or IOException
+            or HttpRequestException or TaskCanceledException or SyncAuthException or SyncRequestException)
         {
+            // Offline or a timeout: no cover this time; it is fetched again with the next refresh.
             return null;
         }
     }

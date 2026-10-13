@@ -60,16 +60,7 @@ public sealed partial class ChapterItem(int index, string title) : ObservableObj
 {
     [ObservableProperty] private string _title = title;
 
-    /// <summary>Its sound is downloaded in full (for the voice and speed in use): marked ✓ in the picker.</summary>
-    [ObservableProperty] private bool _isDownloaded;
-
     public int Index { get; } = index;
-
-    public string DisplayTitle => IsDownloaded ? "✓ " + Title : Title;
-
-    partial void OnTitleChanged(string value) => OnPropertyChanged(nameof(DisplayTitle));
-
-    partial void OnIsDownloadedChanged(bool value) => OnPropertyChanged(nameof(DisplayTitle));
 }
 
 /// <summary>

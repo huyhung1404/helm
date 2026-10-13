@@ -114,7 +114,7 @@ public sealed class StudyText : WrapPanel
                 block.Inlines!.Add(run);
                 block.Inlines.Add(new LineBreak());
             }
-            // No font named: the system picks its own Chinese font, as for the 中文 view (a named one may be missing).
+            // No font named: Chinese characters use the phone's Chinese font everywhere (ChineseFont in the app).
             if (ShowChinese && reading.Chinese.Length > 0) Row(reading.Chinese, size * 1.2, null);
             if (ShowPinyin && reading.Pinyin.Length > 0) Row(reading.Pinyin, size * 0.64, pinyinBrush);
             if (ShowHanViet && reading.HanViet.Length > 0) Row(reading.HanViet, size * 0.64, hanVietBrush);

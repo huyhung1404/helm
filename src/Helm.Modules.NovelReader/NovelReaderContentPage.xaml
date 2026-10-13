@@ -241,7 +241,7 @@
                     <StackPanel Orientation="Horizontal" Style="{StaticResource BarItem}">
                         <ui:Button Style="{StaticResource IconAction}" Icon="{ui:SymbolIcon ChevronLeft24}" ToolTip="Previous chapter (←)"
                                    AutomationProperties.Name="Previous chapter" Command="{Binding PreviousChapterCommand}" IsEnabled="{Binding CanGoBack}" />
-                        <ComboBox x:Name="ChapterBox" Width="300" ItemsSource="{Binding Chapters}" DisplayMemberPath="DisplayTitle"
+                        <ComboBox x:Name="ChapterBox" Width="300" ItemsSource="{Binding Chapters}" DisplayMemberPath="Title"
                                   SelectionChanged="Chapter_SelectionChanged" AutomationProperties.Name="Chapter" />
                         <ui:Button Style="{StaticResource IconAction}" Margin="2,0,0,0" Icon="{ui:SymbolIcon ChevronRight24}" ToolTip="Next chapter (→)"
                                    AutomationProperties.Name="Next chapter" Command="{Binding NextChapterCommand}" IsEnabled="{Binding CanGoForward}" />
@@ -302,22 +302,9 @@
                                        AutomationProperties.Name="Next paragraph" Command="{Binding NextParagraphCommand}" />
                             <ui:Button Style="{StaticResource IconAction}" Icon="{ui:SymbolIcon Stop24}" ToolTip="Stop reading aloud" AutomationProperties.Name="Stop"
                                        Command="{Binding StopReadingCommand}" Visibility="{Binding IsSpeaking, Converter={StaticResource BoolToVisibility}}" />
-                            <!-- Download the sound for listening offline -->
-                            <ui:DropDownButton Margin="6,0,0,0" Padding="8,5" Icon="{ui:SymbolIcon ArrowDownload24}" ToolTip="Download the audio to listen offline"
-                                               AutomationProperties.Name="Download audio">
-                                <ui:DropDownButton.Flyout>
-                                    <ContextMenu>
-                                        <MenuItem Header="Download this chapter" Command="{Binding DownloadThisChapterCommand}" />
-                                        <MenuItem Header="Download the next 10 chapters" Command="{Binding DownloadNextChaptersCommand}" />
-                                        <MenuItem Header="Download the whole novel" Command="{Binding DownloadWholeNovelCommand}" />
-                                        <Separator />
-                                        <MenuItem Header="Stop downloading" Command="{Binding StopAudioDownloadCommand}" />
-                                    </ContextMenu>
-                                </ui:DropDownButton.Flyout>
-                            </ui:DropDownButton>
                         </StackPanel>
 
-                        <!-- Seek through the chapter by paragraph; the faint bar behind it is the audio already downloaded -->
+                        <!-- Seek through the chapter by paragraph; the faint bar behind it is the audio ready ahead -->
                         <ProgressBar Grid.Column="1" Margin="20,0" Height="4" VerticalAlignment="Center" Opacity="0.45" IsHitTestVisible="False"
                                      Minimum="0" Maximum="{Binding PlayerParagraphMax}" Value="{Binding PlayerReady}" />
                         <Slider x:Name="SeekBar" Grid.Column="1" Margin="12,0" VerticalAlignment="Center" Minimum="0" Maximum="{Binding PlayerParagraphMax}"
@@ -340,15 +327,7 @@
                             <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
                                 <ui:ProgressRing IsIndeterminate="True" Width="16" Height="16" Margin="0,0,8,0"
                                                  Visibility="{Binding IsLoadingVoice, Converter={StaticResource BoolToVisibility}}" />
-                                <StackPanel Orientation="Horizontal" Margin="0,0,12,0" VerticalAlignment="Center"
-                                            Visibility="{Binding IsDownloadingAudio, Converter={StaticResource BoolToVisibility}}">
-                                    <ProgressBar Width="80" Height="4" Minimum="0" Maximum="1" Value="{Binding AudioDownloadFraction}" VerticalAlignment="Center" />
-                                    <TextBlock Margin="8,0,4,0" Text="{Binding AudioDownloadText}" Style="{DynamicResource HelmSecondaryText}" VerticalAlignment="Center" />
-                                    <ui:Button Style="{StaticResource IconAction}" Icon="{ui:SymbolIcon Dismiss24}" ToolTip="Stop downloading"
-                                               AutomationProperties.Name="Stop downloading" Command="{Binding StopAudioDownloadCommand}" />
-                                </StackPanel>
-                                <TextBlock Text="{Binding ReadyLabel}" Style="{DynamicResource HelmSecondaryText}" Margin="0,0,12,0" VerticalAlignment="Center"
-                                           Visibility="{Binding IsDownloadingAudio, Converter={StaticResource InverseBoolToVisibility}}" />
+                                <TextBlock Text="{Binding ReadyLabel}" Style="{DynamicResource HelmSecondaryText}" Margin="0,0,12,0" VerticalAlignment="Center" />
                                 <TextBlock Text="{Binding SleepTimerLabel}" Foreground="{DynamicResource AccentTextFillColorPrimaryBrush}" Margin="0,0,12,0" VerticalAlignment="Center"
                                            Visibility="{Binding HasSleepTimer, Converter={StaticResource BoolToVisibility}}" />
                             </StackPanel>

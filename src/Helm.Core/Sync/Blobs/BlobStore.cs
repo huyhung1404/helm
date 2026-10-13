@@ -41,6 +41,10 @@ public sealed class BlobStore : IBlobSync
     /// <summary>Blobs no record uses are deleted only after this long, so another device's upload in progress is safe.</summary>
     public static readonly TimeSpan GarbageGrace = TimeSpan.FromDays(7);
     public const long DefaultMaxBlobBytes = 256L * 1024 * 1024;
+    /// <summary>Chunks downloaded at once while a file is read.</summary>
+    public const int ParallelDownloads = 3;
+    /// <summary>Waits before asking the server again for a chunk whose download failed (a weak connection, a busy server).</summary>
+    public IReadOnlyList<TimeSpan> DownloadRetryWaits { get; set; } = [TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(4)];
 
     private readonly SyncDatabase _db;
     private readonly IBlobTransport _transport;
@@ -118,7 +122,28 @@ public sealed class BlobStore : IBlobSync
     /// <exception cref="CryptographicException">A chunk was tampered with or belongs to another blob.</exception>
     public async Task ReadAsync(BlobRef blob, Stream destination, IProgress<double>? progress = null, CancellationToken ct = default)
     {
-        await DecryptAsync(blob, i => LoadChunkAsync(blob.Id, i, ct), destination, progress, ct).ConfigureAwait(false);
+        // Chunks missing here download a few at once, ahead of the one being decrypted.
+        using var stop = CancellationTokenSource.CreateLinkedTokenSource(ct);
+        var loads = new Task<byte[]>?[blob.ChunkCount];
+        var started = 0;
+        try
+        {
+            await DecryptAsync(blob, index =>
+            {
+                for (; started < blob.ChunkCount && started < index + ParallelDownloads; started++)
+                    loads[started] = LoadChunkAsync(blob.Id, started, stop.Token);
+                var load = loads[index]!;
+                loads[index] = null;
+                return load;
+            }, destination, progress, ct).ConfigureAwait(false);
+        }
+        finally
+        {
+            // A failure leaves the downloads ahead running: stop them, and see their failures so none goes unobserved.
+            stop.Cancel();
+            foreach (var load in loads)
+                _ = load?.ContinueWith(static t => _ = t.Exception, CancellationToken.None, TaskContinuationOptions.ExecuteSynchronously, TaskScheduler.Default);
+        }
         if (_db.GetBlob(blob.Id) is { } local) _db.UpsertBlob(local with { LastAccessMs = Now() });
     }
 
@@ -319,7 +344,7 @@ public sealed class BlobStore : IBlobSync
         var path = ChunkPath(id, index);
         if (File.Exists(path)) return await File.ReadAllBytesAsync(path, ct).ConfigureAwait(false);
         if (!_transport.IsConfigured) throw new BlobUnavailableException("This file is not on this device and sync is off.");
-        var data = await _transport.GetChunkAsync(id, index, ct).ConfigureAwait(false)
+        var data = await DownloadChunkAsync(id, index, ct).ConfigureAwait(false)
             ?? throw new BlobUnavailableException("This file is not on the server yet. Open it on the device it was added on, and let it sync.");
         Directory.CreateDirectory(Folder(id));
         await WriteAtomicAsync(path, data, ct).ConfigureAwait(false);
@@ -330,6 +355,31 @@ public sealed class BlobStore : IBlobSync
         }
         return data;
     }
+
+    /// <summary>One chunk from the server, asking again after a network failure or a timeout (never after a refusal).</summary>
+    private async Task<byte[]?> DownloadChunkAsync(string id, int index, CancellationToken ct)
+    {
+        for (var attempt = 0; ; attempt++)
+        {
+            try
+            {
+                return await _transport.GetChunkAsync(id, index, ct).ConfigureAwait(false);
+            }
+            catch (Exception ex) when (attempt < DownloadRetryWaits.Count && !ct.IsCancellationRequested && IsTransient(ex))
+            {
+                _logger.LogInformation("Chunk {Index} of blob {Id} failed ({Message}); trying again", index, id, ex.Message);
+                await Task.Delay(DownloadRetryWaits[attempt], _time, ct).ConfigureAwait(false);
+            }
+        }
+    }
+
+    /// <summary>The connection dropped, timed out, or the server was busy: worth asking again.</summary>
+    private static bool IsTransient(Exception ex) => ex switch
+    {
+        HttpRequestException h => h.StatusCode is null || (int)h.StatusCode >= 500 || h.StatusCode == System.Net.HttpStatusCode.TooManyRequests,
+        TaskCanceledException or TimeoutException or IOException => true,
+        _ => false,
+    };
 
     private async Task<long> MaxBlobBytesAsync(CancellationToken ct)
     {
@@ -395,7 +445,8 @@ public sealed class BlobStore : IBlobSync
 
     private static async Task WriteAtomicAsync(string path, byte[] data, CancellationToken ct)
     {
-        var temp = path + ".tmp";
+        // Two readers of the same file may fetch the same chunk at once: each writes its own temporary file.
+        var temp = path + "." + Guid.NewGuid().ToString("N")[..8] + ".tmp";
         await File.WriteAllBytesAsync(temp, data, ct).ConfigureAwait(false);
         File.Move(temp, path, overwrite: true);
     }

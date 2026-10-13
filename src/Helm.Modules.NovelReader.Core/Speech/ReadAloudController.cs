@@ -39,23 +39,15 @@ public interface IReadAloudHost
     (string Title, string Subtitle) NowPlaying { get; }
 }
 
-/// <summary>A download of sound for listening offline: which chapter, how far.</summary>
-public sealed record AudioDownloadProgress(bool Active, int Chapter, int FirstChapter, int LastChapter, int Done, int Total, string? Error = null)
-{
-    public static AudioDownloadProgress Idle { get; } = new(false, 0, 0, 0, 0, 0);
-
-    public double Fraction => Total == 0 ? 0 : (double)Done / Total;
-}
-
 /// <summary>
 /// Reading aloud like an audiobook player. It speaks a sentence at a time, with the voice's silence at both ends cut so
 /// sentences follow each other without a pause. While it reads, the sentences ahead (on into the next chapters, see
-/// <see cref="PrefetchChapters"/>) are synthesized and kept on the disk (<see cref="AudioCache"/>), so
-/// after the first sentence nothing waits for the network, going back or listening again plays at once, and it works
-/// offline. Whole chapters or the whole novel can be downloaded for listening offline. Pause stops in the middle of a
-/// sentence; it skips by sentence or paragraph, goes on with the next chapter, stops on a sleep timer (fading out), and
-/// falls back to an offline Vietnamese voice when the online one fails. Call it on the UI thread; it raises its events
-/// there too (downloads report through <see cref="DownloadChanged"/> on any thread).
+/// <see cref="PrefetchChapters"/>) are synthesized and held in memory only, so after the first sentence nothing waits
+/// for the network and going back plays at once. No sound is ever written to the disk: what was played is let go past
+/// <see cref="PlayedBytes"/>, and downloading ahead waits while <see cref="AheadBytes"/> is waiting to be played.
+/// Pause stops in the middle of a sentence; it skips by sentence or paragraph, goes on with the next chapter, stops on
+/// a sleep timer (fading out), and falls back to an offline Vietnamese voice when the online one fails. Call it on the
+/// UI thread; it raises its events there too.
 /// </summary>
 public sealed class ReadAloudController
 {
@@ -72,19 +64,21 @@ public sealed class ReadAloudController
     /// <summary>How long reading waits before asking an online voice that did not answer again (no offline voice to fall back on).</summary>
     public IReadOnlyList<TimeSpan> OnlineRetryWaits { get; init; } = [TimeSpan.FromSeconds(5), TimeSpan.FromSeconds(15), TimeSpan.FromSeconds(30)];
 
-    /// <summary>Sound kept in memory for going back instantly (the disk keeps everything else).</summary>
-    public const long MemoryBytes = 16L * 1024 * 1024;
+    /// <summary>Sound already played, held for going back at once.</summary>
+    public const long PlayedBytes = 16L * 1024 * 1024;
+
+    /// <summary>Sound downloaded ahead and not played yet: downloading ahead waits while this much is waiting.</summary>
+    public const long AheadBytes = 48L * 1024 * 1024;
 
     private readonly SpeechCatalog _catalog;
     private readonly IAudioOutput _output;
-    private readonly AudioCache? _disk;
     private readonly TimeProvider _time;
     private readonly ILogger<ReadAloudController> _logger;
     private readonly object _gate = new();
-    private readonly Dictionary<string, SpeechAudio> _memory = new(StringComparer.Ordinal);
-    private readonly LinkedList<string> _memoryOrder = new();
+    private readonly Dictionary<string, HeldAudio> _memory = new(StringComparer.Ordinal);
+    /// <summary>Played sentences, the one played longest ago first (the first to be let go).</summary>
+    private readonly LinkedList<string> _played = new();
     private readonly Dictionary<string, Task<SpeechAudio>> _inFlight = new(StringComparer.Ordinal);
-    private readonly HashSet<string> _onDisk = new(StringComparer.Ordinal);
     private IDirectSpeechEngine? _direct;
     private volatile bool _sleepReached;
     /// <summary>Background requests per engine (<see cref="ISpeechEngine.Parallel"/>); the sentence to play now does not wait for them.</summary>
@@ -92,18 +86,15 @@ public sealed class ReadAloudController
     private IReadAloudHost? _host;
     private CancellationTokenSource? _run;
     private PrefetchRun? _prefetch;
-    private CancellationTokenSource? _download;
     private TaskCompletionSource? _resumed;
     private SpeechVoice? _fallback;
     private ReadAloudState _state;
     private int _readyThrough = -1;
 
-    public ReadAloudController(SpeechCatalog catalog, IAudioOutput output, TimeProvider? time = null, ILogger<ReadAloudController>? logger = null,
-        AudioCache? disk = null)
+    public ReadAloudController(SpeechCatalog catalog, IAudioOutput output, TimeProvider? time = null, ILogger<ReadAloudController>? logger = null)
     {
         _catalog = catalog;
         _output = output;
-        _disk = disk;
         _time = time ?? TimeProvider.System;
         _logger = logger ?? Microsoft.Extensions.Logging.Abstractions.NullLogger<ReadAloudController>.Instance;
     }
@@ -147,10 +138,8 @@ public sealed class ReadAloudController
 
     public bool SleepAtChapterEnd { get; private set; }
 
-    public AudioDownloadProgress Download { get; private set; } = AudioDownloadProgress.Idle;
-
     /// <summary>The voice and settings sound is downloaded for now (null when no voice can speak).</summary>
-    public string? Profile => CurrentVoice() is { } voice ? AudioCache.Profile(voice, Options()) : null;
+    public string? Profile => CurrentVoice() is { } voice ? SpeechKeys.Profile(voice, Options()) : null;
 
     public event EventHandler? StateChanged;
 
@@ -158,9 +147,6 @@ public sealed class ReadAloudController
 
     /// <summary>More of the open chapter is ready to play (see <see cref="ReadyThrough"/>); may come on any thread.</summary>
     public event EventHandler? ReadyChanged;
-
-    /// <summary>A download for listening offline moved on (see <see cref="Download"/>); may come on any thread.</summary>
-    public event EventHandler? DownloadChanged;
 
     /// <summary>Something the reader should know: a fallback voice, an error, the sleep timer stopped reading; empty: it is over.</summary>
     public event EventHandler<string>? Notice;
@@ -292,7 +278,7 @@ public sealed class ReadAloudController
             _ = warming.WarmUpAsync(CancellationToken.None);
             return;
         }
-        if (_host?.BookId is not { } book || CurrentVoice() is not { IsOnline: true } voice || IsActive) return;
+        if (_host?.BookId is null || CurrentVoice() is not { IsOnline: true } voice || IsActive) return;
         var options = Options();
         var texts = new List<string>();
         var position = new ReadingPosition(_host.ChapterIndex, paragraph, sentence);
@@ -310,7 +296,7 @@ public sealed class ReadAloudController
             {
                 try
                 {
-                    await EnsureAsync(book, voice, options, text, background: true, CancellationToken.None).ConfigureAwait(false);
+                    await EnsureAsync(voice, options, text, background: true, CancellationToken.None).ConfigureAwait(false);
                 }
                 catch (Exception ex) when (ex is SpeechUnavailableException or OperationCanceledException)
                 {
@@ -318,93 +304,6 @@ public sealed class ReadAloudController
                 }
             }
         });
-    }
-
-    // ---- Downloading for listening offline -------------------------------------------------------------------------
-
-    /// <summary>
-    /// Downloads the sound of chapters <paramref name="first"/> to <paramref name="last"/> in the background (only what is
-    /// missing), with the voice and settings in use now. Replaces a download already running.
-    /// </summary>
-    public void DownloadChapters(int first, int last)
-    {
-        if (_host is null || _host.BookId is not { } book || CurrentVoice() is not { } voice) return;
-        if (_catalog.EngineOf(voice) is IDirectSpeechEngine)
-        {
-            Notice?.Invoke(this, $"{voice.Name} plays through Edge and cannot be downloaded. Pick a voice on this PC to listen offline.");
-            return;
-        }
-        StopDownload();
-        var cts = new CancellationTokenSource();
-        _download = cts;
-        var options = Options();
-        last = Math.Min(last, _host.ChapterCount - 1);
-        _ = Task.Run(() => DownloadAsync(book, voice, options, first, last, cts));
-    }
-
-    public void StopDownload()
-    {
-        var download = Interlocked.Exchange(ref _download, null);
-        try
-        {
-            download?.Cancel();
-        }
-        catch (ObjectDisposedException)
-        {
-        }
-    }
-
-    private async Task DownloadAsync(string book, SpeechVoice voice, SpeechOptions options, int first, int last, CancellationTokenSource cts)
-    {
-        var ct = cts.Token;
-        var profile = AudioCache.Profile(voice, options);
-        var failed = 0;
-        try
-        {
-            for (var chapter = first; chapter <= last && !ct.IsCancellationRequested; chapter++)
-            {
-                var paragraphs = await _host!.ChapterSentencesAsync(chapter, ct).ConfigureAwait(false);
-                var texts = paragraphs.SelectMany(p => p.Select(s => s.Text)).ToList();
-                var done = 0;
-                Report(new AudioDownloadProgress(true, chapter, first, last, 0, texts.Count));
-                var chapterFailed = 0;
-                await RunWorkersAsync(texts, WorkersFor(voice), async text =>
-                {
-                    try
-                    {
-                        await EnsureAsync(book, voice, options, text, background: true, ct).ConfigureAwait(false);
-                    }
-                    catch (SpeechUnavailableException)
-                    {
-                        Interlocked.Increment(ref chapterFailed);
-                        if (Interlocked.Increment(ref failed) >= 5) throw;
-                    }
-                    Report(new AudioDownloadProgress(true, chapter, first, last, Interlocked.Increment(ref done), texts.Count));
-                }, ct).ConfigureAwait(false);
-                if (chapterFailed == 0) _disk?.MarkChapter(book, chapter, profile);
-            }
-            Report(AudioDownloadProgress.Idle);
-        }
-        catch (OperationCanceledException)
-        {
-            Report(AudioDownloadProgress.Idle);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogWarning(ex, "Downloading audio stopped");
-            Report(AudioDownloadProgress.Idle with { Error = "Downloading audio stopped: " + ex.Message });
-        }
-        finally
-        {
-            Interlocked.CompareExchange(ref _download, null, cts);
-            cts.Dispose();
-        }
-
-        void Report(AudioDownloadProgress progress)
-        {
-            Download = progress;
-            DownloadChanged?.Invoke(this, EventArgs.Empty);
-        }
     }
 
     // ---- Reading ---------------------------------------------------------------------------------------------------
@@ -540,10 +439,9 @@ public sealed class ReadAloudController
             Notice?.Invoke(this, "There is no voice to read with. Pick one in Novel Reader's settings.");
             return null;
         }
-        var book = _host?.BookId ?? "";
         try
         {
-            return await EnsureAsync(book, voice, Options(), text, background: false, ct);
+            return await EnsureAsync(voice, Options(), text, background: false, ct);
         }
         catch (SpeechUnavailableException ex) when (voice.IsOnline)
         {
@@ -553,7 +451,7 @@ public sealed class ReadAloudController
                 _fallback = offline;
                 Notice?.Invoke(this, $"The online voice is not reachable, so {offline.Name} reads for now.");
                 StopPrefetch();
-                return await EnsureAsync(book, offline, Options(), text, background: false, ct);
+                return await EnsureAsync(offline, Options(), text, background: false, ct);
             }
             // No offline voice: wait and try again (a weak connection, a busy service) before giving up, so listening
             // with the screen off does not just stop.
@@ -563,7 +461,7 @@ public sealed class ReadAloudController
                 await Task.Delay(wait, ct);
                 try
                 {
-                    var audio = await EnsureAsync(book, voice, Options(), text, background: false, ct);
+                    var audio = await EnsureAsync(voice, Options(), text, background: false, ct);
                     Notice?.Invoke(this, "");
                     return audio;
                 }
@@ -586,26 +484,26 @@ public sealed class ReadAloudController
         _fallback ?? _catalog.Find(VoiceId()) ?? _catalog.Find(SpeechCatalog.DefaultVoiceId) ?? _catalog.Voices.FirstOrDefault();
 
     /// <summary>
-    /// The sound of one sentence: from memory, from the disk, from a request already running, or synthesized (and then
-    /// kept on the disk). Background requests share the engine's <see cref="ISpeechEngine.Parallel"/> slots; the
-    /// sentence to play does not wait.
+    /// The sound of one sentence: from memory, from a request already running, or synthesized now. Background requests
+    /// share the engine's <see cref="ISpeechEngine.Parallel"/> slots; the sentence to play does not wait. The sentence
+    /// to play (<paramref name="background"/> false) counts as played from here on.
     /// </summary>
-    private async Task<SpeechAudio> EnsureAsync(string book, SpeechVoice voice, SpeechOptions options, string text, bool background, CancellationToken ct)
+    private async Task<SpeechAudio> EnsureAsync(SpeechVoice voice, SpeechOptions options, string text, bool background, CancellationToken ct)
     {
-        var key = AudioCache.Key(AudioCache.Profile(voice, options), text);
+        var key = SpeechKeys.Key(SpeechKeys.Profile(voice, options), text);
+        var audio = await HeldOrSynthesizedAsync(key, voice, options, text, background, ct).ConfigureAwait(false);
+        if (!background) MarkPlayed(key);
+        return audio;
+    }
+
+    private async Task<SpeechAudio> HeldOrSynthesizedAsync(string key, SpeechVoice voice, SpeechOptions options, string text, bool background,
+        CancellationToken ct)
+    {
         Task<SpeechAudio>? running;
         lock (_gate)
         {
-            if (_memory.TryGetValue(key, out var kept)) return kept;
+            if (_memory.TryGetValue(key, out var held)) return held.Audio;
             _inFlight.TryGetValue(key, out running);
-        }
-        if (running is null && book.Length > 0 && _disk?.TryGet(book, key) is { } file)
-        {
-            // Kept before silence was cut (it changes nothing on sound cut already).
-            var stored = SpeechSilence.Trim(file);
-            lock (_gate) _onDisk.Add(book + "/" + key);
-            Remember(key, stored);
-            return stored;
         }
         if (running is null)
         {
@@ -613,10 +511,10 @@ public sealed class ReadAloudController
             lock (_gate)
             {
                 // Another request may have finished it since the first look.
-                if (_memory.TryGetValue(key, out var done)) return done;
+                if (_memory.TryGetValue(key, out var done)) return done.Audio;
                 if (!_inFlight.TryGetValue(key, out running))
                 {
-                    running = SynthesizeAsync(engine, book, voice, options, text, key, background);
+                    running = SynthesizeAsync(engine, voice, options, text, key, background);
                     // Whoever waited may have gone (a jump, a stop): the failure is still seen, not left unobserved.
                     _ = running.ContinueWith(static t => _ = t.Exception, CancellationToken.None,
                         TaskContinuationOptions.OnlyOnFaulted | TaskContinuationOptions.ExecuteSynchronously, TaskScheduler.Default);
@@ -629,7 +527,7 @@ public sealed class ReadAloudController
         return await running.WaitAsync(ct).ConfigureAwait(false);
     }
 
-    private async Task<SpeechAudio> SynthesizeAsync(ISpeechEngine engine, string book, SpeechVoice voice, SpeechOptions options, string text, string key,
+    private async Task<SpeechAudio> SynthesizeAsync(ISpeechEngine engine, SpeechVoice voice, SpeechOptions options, string text, string key,
         bool background)
     {
         var slots = background ? SlotsOf(engine) : null;
@@ -640,18 +538,6 @@ public sealed class ReadAloudController
             {
                 // Without the voice's padding at both ends, one sentence follows the last without a pause.
                 var audio = SpeechSilence.Trim(await engine.SynthesizeAsync(text, voice, options, CancellationToken.None).ConfigureAwait(false));
-                if (book.Length > 0)
-                {
-                    try
-                    {
-                        _disk?.Put(book, key, audio);
-                        lock (_gate) _onDisk.Add(book + "/" + key);
-                    }
-                    catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
-                    {
-                        _logger.LogWarning(ex, "Could not keep a sentence on the disk");
-                    }
-                }
                 Remember(key, audio);
                 return audio;
             }
@@ -678,23 +564,82 @@ public sealed class ReadAloudController
 
     private static int WorkersFor(ISpeechEngine engine) => Math.Clamp(engine.Parallel, 1, 16);
 
-    private int WorkersFor(SpeechVoice voice) => _catalog.EngineOf(voice) is { } engine ? WorkersFor(engine) : 1;
+    // ---- Sound in memory -------------------------------------------------------------------------------------------
 
-    /// <summary>Keeps recent sound in memory (for going back at once), up to <see cref="MemoryBytes"/>.</summary>
+    /// <summary>A sentence's sound, waiting to be played (for the download run that holds it) or played already.</summary>
+    private sealed class HeldAudio(SpeechAudio audio, PrefetchRun? run)
+    {
+        public SpeechAudio Audio { get; } = audio;
+
+        public PrefetchRun? Run { get; set; } = run;
+
+        public bool Played { get; set; }
+    }
+
+    /// <summary>Holds a new sentence as waiting to be played, for the download run going on now.</summary>
     private void Remember(string key, SpeechAudio audio)
     {
         lock (_gate)
         {
             if (_memory.ContainsKey(key)) return;
-            _memory[key] = audio;
-            _memoryOrder.AddLast(key);
-            var total = _memory.Values.Sum(a => (long)a.Data.Length);
-            while (total > MemoryBytes && _memoryOrder.First is { } oldest)
-            {
-                total -= _memory[oldest.Value].Data.Length;
-                _memory.Remove(oldest.Value);
-                _memoryOrder.RemoveFirst();
-            }
+            _memory[key] = new HeldAudio(audio, _prefetch);
+            Trim();
+        }
+    }
+
+    /// <summary>The sentence is being played: it may be let go once newer ones were played.</summary>
+    private void MarkPlayed(string key)
+    {
+        lock (_gate)
+        {
+            if (!_memory.TryGetValue(key, out var held)) return;
+            if (held.Played) _played.Remove(key);
+            held.Played = true;
+            _played.AddLast(key);
+            Trim();
+        }
+    }
+
+    /// <summary>
+    /// Whether a sentence is in memory; one waiting to be played becomes the run's (a new run over sound already
+    /// downloaded, after a jump). One played already stays among the played (going back plays it while it is held).
+    /// </summary>
+    private bool Claim(string key, PrefetchRun run)
+    {
+        lock (_gate)
+        {
+            if (!_memory.TryGetValue(key, out var held)) return false;
+            if (!held.Played) held.Run = run;
+            return true;
+        }
+    }
+
+    /// <summary>Bytes the run downloaded that were not played yet.</summary>
+    private long WaitingBytes(PrefetchRun run)
+    {
+        lock (_gate) return _memory.Values.Where(h => !h.Played && h.Run == run).Sum(h => (long)h.Audio.Data.Length);
+    }
+
+    /// <summary>
+    /// Lets go of what was played longest ago past <see cref="PlayedBytes"/>, then of sound no run waits for any more
+    /// (left by a jump or a stop) past <see cref="AheadBytes"/>. Sound the current run waits to play stays. Under the lock.
+    /// </summary>
+    private void Trim()
+    {
+        var played = _memory.Values.Where(h => h.Played).Sum(h => (long)h.Audio.Data.Length);
+        while (played > PlayedBytes && _played.First is { } oldest)
+        {
+            played -= _memory[oldest.Value].Audio.Data.Length;
+            _memory.Remove(oldest.Value);
+            _played.RemoveFirst();
+        }
+        var waiting = _memory.Values.Where(h => !h.Played).Sum(h => (long)h.Audio.Data.Length);
+        if (waiting <= AheadBytes) return;
+        foreach (var (key, held) in _memory.Where(e => !e.Value.Played && e.Value.Run != _prefetch).ToList())
+        {
+            _memory.Remove(key);
+            waiting -= held.Audio.Data.Length;
+            if (waiting <= AheadBytes) return;
         }
     }
 
@@ -841,16 +786,12 @@ public sealed class ReadAloudController
         }
     }
 
-    /// <summary>The sentences of one chapter in the queue; marked downloaded when the last of a whole chapter is done.</summary>
-    private sealed class PrefetchBatch(int chapter, IReadOnlyList<string> texts, bool whole)
+    /// <summary>The sentences of one chapter in the queue.</summary>
+    private sealed class PrefetchBatch(int chapter, IReadOnlyList<string> texts)
     {
         public int Chapter { get; } = chapter;
 
         public IReadOnlyList<string> Texts { get; } = texts;
-
-        public bool Whole { get; } = whole;
-
-        public int Remaining = texts.Count;
     }
 
     /// <summary>
@@ -878,10 +819,10 @@ public sealed class ReadAloudController
     private void StartPrefetch(ReadingPosition from)
     {
         StopPrefetch();
-        if (_host is not { BookId: { } book } host || CurrentVoice() is not { } voice || _catalog.EngineOf(voice) is not { } engine
+        if (_host is not { BookId: not null } host || CurrentVoice() is not { } voice || _catalog.EngineOf(voice) is not { } engine
             || engine is IDirectSpeechEngine) return;
         var options = Options();
-        var profile = AudioCache.Profile(voice, options);
+        var profile = SpeechKeys.Profile(voice, options);
         var current = new List<string>();
         for (var p = Math.Max(0, from.Paragraph); p < host.ParagraphCount; p++)
         {
@@ -891,11 +832,11 @@ public sealed class ReadAloudController
         var run = new PrefetchRun(profile, from.Chapter, from.Chapter, AheadChapters(), ContinueToNextChapter());
         _prefetch = run;
         var chapterCount = host.ChapterCount;
-        var first = new PrefetchBatch(from.Chapter, current, whole: from.Paragraph == 0 && from.Sentence == 0);
-        run.Running = Task.Run(() => PrefetchAsync(run, host, book, voice, options, WorkersFor(engine), first, chapterCount));
+        var first = new PrefetchBatch(from.Chapter, current);
+        run.Running = Task.Run(() => PrefetchAsync(run, host, voice, options, WorkersFor(engine), first, chapterCount));
     }
 
-    private async Task PrefetchAsync(PrefetchRun run, IReadAloudHost host, string book, SpeechVoice voice, SpeechOptions options, int workers,
+    private async Task PrefetchAsync(PrefetchRun run, IReadAloudHost host, SpeechVoice voice, SpeechOptions options, int workers,
         PrefetchBatch first, int chapterCount)
     {
         var ct = run.Cancel.Token;
@@ -920,7 +861,7 @@ public sealed class ReadAloudController
                     var paragraphs = await host.ChapterSentencesAsync(chapter, ct).ConfigureAwait(false);
                     var texts = paragraphs.SelectMany(p => p.Select(s => s.Text)).ToList();
                     // Reading stops at the chapter's end: only the start of the next, for opening it by hand.
-                    batch = run.Continuing ? new PrefetchBatch(chapter, texts, whole: true) : new PrefetchBatch(chapter, texts.Take(NextChapterLead).ToList(), whole: false);
+                    batch = new PrefetchBatch(chapter, run.Continuing ? texts : texts.Take(NextChapterLead).ToList());
                     index = 0;
                 }
                 return (batch, batch.Texts[index++]);
@@ -935,12 +876,15 @@ public sealed class ReadAloudController
         {
             while (await TakeAsync().ConfigureAwait(false) is { } item)
             {
-                var key = AudioCache.Key(run.Profile, item.Text);
-                if (!Kept(book, key))
+                var key = SpeechKeys.Key(run.Profile, item.Text);
+                if (!Claim(key, run))
                 {
+                    // Far enough ahead is held: wait for reading to catch up (memory is all the sound has).
+                    while (WaitingBytes(run) >= AheadBytes) await Task.Delay(TimeSpan.FromSeconds(1), _time, ct).ConfigureAwait(false);
                     try
                     {
-                        await EnsureAsync(book, voice, options, item.Text, background: true, ct).ConfigureAwait(false);
+                        await EnsureAsync(voice, options, item.Text, background: true, ct).ConfigureAwait(false);
+                        Claim(key, run);
                         Volatile.Write(ref failures, 0);
                         if (item.Batch.Chapter == run.Reading) ReadyChanged?.Invoke(this, EventArgs.Empty);
                     }
@@ -950,9 +894,6 @@ public sealed class ReadAloudController
                         if (Interlocked.Increment(ref failures) >= 3) throw new OperationCanceledException();
                     }
                 }
-                if (Interlocked.Decrement(ref item.Batch.Remaining) == 0 && item.Batch.Whole && item.Batch.Texts.Count > 0
-                    && AllKept(book, run.Profile, item.Batch.Texts))
-                    _disk?.MarkChapter(book, item.Batch.Chapter, run.Profile);
             }
         }
 
@@ -986,45 +927,22 @@ public sealed class ReadAloudController
         _prefetch = null;
     }
 
-    /// <summary>Workers taking the items in order.</summary>
-    private static async Task RunWorkersAsync<T>(IReadOnlyList<T> items, int workers, Func<T, Task> work, CancellationToken ct)
+    /// <summary>Whether every sentence of <paramref name="texts"/> is in memory for <paramref name="profile"/>.</summary>
+    private bool AllHeld(string profile, IEnumerable<string> texts)
     {
-        var next = -1;
-        async Task Worker()
-        {
-            while (!ct.IsCancellationRequested)
-            {
-                var i = Interlocked.Increment(ref next);
-                if (i >= items.Count) return;
-                await work(items[i]).ConfigureAwait(false);
-            }
-        }
-        await Task.WhenAll(Enumerable.Range(0, workers).Select(_ => Worker())).ConfigureAwait(false);
-        ct.ThrowIfCancellationRequested();
+        lock (_gate) return texts.All(text => _memory.ContainsKey(SpeechKeys.Key(profile, text)));
     }
-
-    /// <summary>Whether a sentence is in memory or on the disk already (without reading it).</summary>
-    private bool Kept(string book, string key)
-    {
-        lock (_gate)
-            if (_memory.ContainsKey(key) || _onDisk.Contains(book + "/" + key)) return true;
-        if (_disk?.Contains(book, key) != true) return false;
-        lock (_gate) _onDisk.Add(book + "/" + key);
-        return true;
-    }
-
-    private bool AllKept(string book, string profile, IEnumerable<string> texts) => texts.All(text => Kept(book, AudioCache.Key(profile, text)));
 
     /// <summary>How far, from the sentence being read, the sound of the open chapter is ready without a gap.</summary>
     private void UpdateReady(ReadingPosition from)
     {
-        if (_host is not { BookId: { } book } host || Profile is not { } profile) return;
+        if (_host is not { BookId: not null } host || Profile is not { } profile) return;
         var ready = from.Paragraph - 1;
         for (var p = from.Paragraph; p < host.ParagraphCount; p++)
         {
             var sentences = host.SentencesOf(p);
             var start = p == from.Paragraph ? from.Sentence : 0;
-            if (!AllKept(book, profile, sentences.Skip(start).Select(s => s.Text))) break;
+            if (!AllHeld(profile, sentences.Skip(start).Select(s => s.Text))) break;
             ready = p;
         }
         SetReadyThrough(ready);

@@ -164,6 +164,7 @@ public sealed class EdgeAnchor : IDisposable
             SetStatus("Starting Edge…");
             _logger.LogInformation("Starting the hidden Edge for HoaiMy");
             var port = FreePort();
+            TrimProfile();
             Directory.CreateDirectory(_profile);
             var start = new ProcessStartInfo(edge)
             {
@@ -174,6 +175,8 @@ public sealed class EdgeAnchor : IDisposable
             {
                 "--headless=new", $"--remote-debugging-port={port}", "--remote-debugging-address=127.0.0.1", $"--user-data-dir={_profile}",
                 "--no-first-run", "--no-default-browser-check", "--disable-extensions", "--disable-sync", "--autoplay-policy=no-user-gesture-required",
+                // Edge's components (shopping, wallet, provenance data…) are hundreds of megabytes HoaiMy never uses.
+                "--disable-component-update",
                 "about:blank",
             }) start.ArgumentList.Add(arg);
             _process = Process.Start(start) ?? throw new SpeechUnavailableException("Microsoft Edge did not start.");
@@ -262,6 +265,31 @@ public sealed class EdgeAnchor : IDisposable
     {
         _idle.Dispose();
         Stop();
+    }
+
+    /// <summary>Folders of the profile that only Edge's own features fill (they grew to about 450 MB before components were turned off).</summary>
+    private static readonly string[] HeavyFolders =
+    [
+        "component_crx_cache", "ProvenanceData", "Edge Wallet", "Edge Shopping", "Edge Entity Extraction", "Subresource Filter",
+        "EdgeLanguageDetectionModel", "Safe Browsing", "GrShaderCache", "ShaderCache",
+        Path.Combine("Default", "Cache"), Path.Combine("Default", "Code Cache"),
+    ];
+
+    /// <summary>Deletes what Edge downloaded or cached into the profile; Edge is not running. Best effort.</summary>
+    private void TrimProfile()
+    {
+        foreach (var name in HeavyFolders)
+        {
+            var folder = Path.Combine(_profile, name);
+            try
+            {
+                if (Directory.Exists(folder)) Directory.Delete(folder, recursive: true);
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+            {
+                _logger.LogDebug(ex, "Could not delete {Folder}", folder);
+            }
+        }
     }
 
     /// <summary>Where Edge is installed (App Paths in the registry, or the usual folders).</summary>

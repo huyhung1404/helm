@@ -50,7 +50,7 @@
                         </DataTemplate>
                     </ComboBox.ItemTemplate>
                 </ComboBox>
-                <TextBlock Text="The phone's own Vietnamese voices work offline and start at once. HoaiMy (online) needs the network; what it reads is kept on the phone." Classes="secondary" />
+                <TextBlock Text="The phone's own Vietnamese voices work offline and start at once. HoaiMy (online) needs the network; its sound is held in memory while you listen, never saved." Classes="secondary" />
                 <WrapPanel>
                     <Button Margin="0,0,8,8" Content="Listen" Click="Listen_Click" />
                     <Button Margin="0,0,8,8" Content="Get Vietnamese voices" Click="InstallVoices_Click" />
@@ -145,15 +145,6 @@
             </StackPanel>
         </Border>
 
-        <!-- Downloaded audio -->
-        <TextBlock Text="Downloaded audio" Classes="section" />
-        <Border Classes="card">
-            <StackPanel Spacing="8">
-                <TextBlock Text="Audio kept on this phone" Classes="title" />
-                <TextBlock Text="{Binding AudioCacheSize}" Classes="secondary" />
-                <Button Classes="danger" Content="Delete downloaded audio" Command="{Binding ClearAudioCommand}" />
-            </StackPanel>
-        </Border>
 
         <!-- The text -->
         <TextBlock Text="Text" Classes="section" />

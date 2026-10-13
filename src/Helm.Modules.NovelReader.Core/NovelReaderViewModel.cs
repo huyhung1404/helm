@@ -39,7 +39,6 @@ public sealed partial class NovelReaderViewModel : ObservableObject, IReadAloudH
     private readonly IDeviceInfo _device;
     private readonly SpeechCatalog _catalog;
     private readonly ReadAloudController _reader;
-    private readonly AudioCache _audio;
     private readonly ILocalVoiceServer? _localVoice;
     private readonly INameScanAgent? _nameAgent;
     private CancellationTokenSource? _scanCancel;
@@ -101,10 +100,6 @@ public sealed partial class NovelReaderViewModel : ObservableObject, IReadAloudH
     [ObservableProperty] private bool _fallbackToOfflineVoice;
     [ObservableProperty] private int _playerReady = -1;
     [ObservableProperty] private string _readyLabel = "";
-    [ObservableProperty] private bool _isDownloadingAudio;
-    [ObservableProperty] private string _audioDownloadText = "";
-    [ObservableProperty] private double _audioDownloadFraction;
-    [ObservableProperty] private string _audioCacheSize = "";
     [ObservableProperty] private string _localVoiceStatus = "";
     [ObservableProperty] private string _localVoiceFolder = "";
     [ObservableProperty] private int _localVoicePort;
@@ -143,22 +138,23 @@ public sealed partial class NovelReaderViewModel : ObservableObject, IReadAloudH
     private int _addChapterCount;
 
     public NovelReaderViewModel(NovelStore store, DictionaryLibrary dictionaries, ISettingsStoreFactory settings, IUiDispatcher ui,
-        IDialogService dialogs, IDeviceInfo device, SpeechCatalog catalog, IAudioOutput audio, AudioCache audioCache, IProcessLauncher launcher,
+        IDialogService dialogs, IDeviceInfo device, SpeechCatalog catalog, IAudioOutput audio, IProcessLauncher launcher,
         IClipboardService clipboard, ILogger<NovelReaderViewModel> logger, TimeProvider? time = null, ILocalVoiceServer? localVoice = null,
         INameScanAgent? nameAgent = null)
     {
         _store = store;
         _dictionaries = dictionaries;
         _settings = settings.Get<NovelReaderSettings>(NovelReaderIds.ModuleId);
+        // Sound is held in memory only now: the files older versions kept go.
+        _ = Task.Run(() => SpeechKeys.DeleteOldAudioFolder(Path.Combine(settings.Paths.Root, "cache")));
         _ui = ui;
         _dialogs = dialogs;
         _device = device;
         _catalog = catalog;
-        _audio = audioCache;
         _localVoice = localVoice;
         _nameAgent = nameAgent;
         if (localVoice is not null) localVoice.StatusChanged += (_, _) => _ui.Post(OnLocalVoiceChanged);
-        _reader = new ReadAloudController(catalog, audio, time, disk: audioCache)
+        _reader = new ReadAloudController(catalog, audio, time)
         {
             VoiceId = () => SelectedVoice?.Id,
             Options = () => new SpeechOptions(SpeechRate, SpeechPitch, SpeechVolume),
@@ -172,7 +168,6 @@ public sealed partial class NovelReaderViewModel : ObservableObject, IReadAloudH
         _reader.StateChanged += (_, _) => _ui.Post(OnReaderState);
         _reader.Notice += (_, text) => _ui.Post(() => Message = text.Length == 0 ? null : text);
         _reader.ReadyChanged += (_, _) => _ui.Post(OnReaderReady);
-        _reader.DownloadChanged += (_, _) => _ui.Post(OnDownloadChanged);
         audio.MediaButton += (_, button) => _ui.Post(() => OnMediaButton(button));
         _launcher = launcher;
         _logger = logger;
@@ -215,6 +210,12 @@ public sealed partial class NovelReaderViewModel : ObservableObject, IReadAloudH
 
         _store.Changed += (_, e) => _ui.Post(() => OnStoreChanged(e));
         _dictionaries.Changed += (_, _) => _ui.Post(OnDictionariesChanged);
+        _dictionaries.Fetching += (_, f) => _ui.Post(() =>
+        {
+            if (!IsBusy) return;
+            BusyText = $"Downloading the dictionaries ({f.File})…";
+            BusyProgress = f.Fraction;
+        });
         RefreshLibrary();
         RefreshDictionaryStatus();
     }
@@ -394,7 +395,6 @@ public sealed partial class NovelReaderViewModel : ObservableObject, IReadAloudH
         // phone's voices load after Helm starts), nor the empty choice while the list is filled again.
         if (!_loadingVoices && value is not null) Save(s => s.VoiceId = value.Id);
         OnPropertyChanged(nameof(SupportsPitch));
-        if (!_loading) RefreshChapterMarks();
     }
     partial void OnSpeechRateChanged(double value)
     {
@@ -421,7 +421,6 @@ public sealed partial class NovelReaderViewModel : ObservableObject, IReadAloudH
     public async Task ActivateAsync()
     {
         RefreshLibrary();
-        RefreshAudioSize();
         if (_dictionaries.HasFiles) _ = LoadDictionariesAsync();
         if (OpenBookId is not null) return;
         var id = _settings.Current.OpenBookId is { } saved && _store.GetBook(saved) is not null ? saved : _store.LastReadBookId();
@@ -472,6 +471,9 @@ public sealed partial class NovelReaderViewModel : ObservableObject, IReadAloudH
             var text = await _store.ReadBookTextAsync(id, progress);
             var chapters = await Task.Run(() => ChapterSplitter.Split(text));
             if (version != _openVersion) return;
+            // The dictionaries may still be downloading (a new phone): that shows here, not as the novel.
+            BusyText = "Opening…";
+            BusyProgress = 0;
             OpenBookId = id;
             BookTitle = book.Title;
             _chapters = chapters;
@@ -481,7 +483,6 @@ public sealed partial class NovelReaderViewModel : ObservableObject, IReadAloudH
             Chapters.Clear();
             for (var i = 0; i < chapters.Count; i++) Chapters.Add(new ChapterItem(i, chapters[i].Title));
             ConvertChapterTitles();
-            RefreshChapterMarks();
             var saved = _store.Progress(id);
             var chapter = Math.Clamp(saved?.Chapter ?? 0, 0, Math.Max(0, chapters.Count - 1));
             await LoadChapterAsync(chapter, saved?.Paragraph ?? 0, save: false, sentence: saved?.Sentence ?? 0, markResume: true);
@@ -502,7 +503,15 @@ public sealed partial class NovelReaderViewModel : ObservableObject, IReadAloudH
             _logger.LogWarning(ex, "Novel {Id} is damaged", id);
             Message = "This novel's file is damaged and cannot be opened. Add it again from the .txt file.";
         }
-        catch (Exception ex) when (ex is IOException or InvalidOperationException or UnauthorizedAccessException)
+        catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException or TimeoutException or SyncAuthException or SyncRequestException)
+        {
+            // No connection, a timeout, the server said no: say so (a command that throws would close Helm on a phone).
+            _logger.LogWarning(ex, "Could not download novel {Id}", id);
+            Message = ex is TaskCanceledException or TimeoutException
+                ? "Downloading the novel took too long. Check the connection and open it again."
+                : "Could not download the novel: " + ex.Message + " Check the connection and open it again.";
+        }
+        catch (Exception ex) when (ex is not OutOfMemoryException)
         {
             _logger.LogWarning(ex, "Could not open novel {Id}", id);
             Message = "Could not open the novel: " + ex.Message;
@@ -615,7 +624,6 @@ public sealed partial class NovelReaderViewModel : ObservableObject, IReadAloudH
         if (!ok) return;
         if (card.Id == OpenBookId) ShowLibrary();
         _store.DeleteBook(card.Id);
-        _audio.Clear(card.Id);
         RefreshLibrary();
     }
 
@@ -657,7 +665,10 @@ public sealed partial class NovelReaderViewModel : ObservableObject, IReadAloudH
             return;
         }
         var picture = await _store.ReadCoverAsync(card.Id);
-        if (card.CoverBlobId == blobId) card.Cover = picture;
+        if (card.CoverBlobId != blobId) return;
+        card.Cover = picture;
+        // Not fetched (offline, a timeout): forget it was asked for, so the next refresh tries again.
+        if (picture is null) card.CoverBlobId = null;
     }
 
     // ---- Chapters --------------------------------------------------------------------------------------------------
@@ -1048,49 +1059,6 @@ public sealed partial class NovelReaderViewModel : ObservableObject, IReadAloudH
         OnPropertyChanged(nameof(HasNoOfflineVietnameseVoice));
     }
 
-    // ---- Downloaded audio ------------------------------------------------------------------------------------------
-
-    [RelayCommand]
-    private void DownloadThisChapter()
-    {
-        if (ChapterIndex >= 0) _reader.DownloadChapters(ChapterIndex, ChapterIndex);
-    }
-
-    [RelayCommand]
-    private void DownloadNextChapters()
-    {
-        if (ChapterIndex >= 0) _reader.DownloadChapters(ChapterIndex, ChapterIndex + 9);
-    }
-
-    [RelayCommand]
-    private void DownloadWholeNovel()
-    {
-        if (ChapterIndex >= 0) _reader.DownloadChapters(0, _chapters.Count - 1);
-    }
-
-    [RelayCommand]
-    private void StopAudioDownload() => _reader.StopDownload();
-
-    [RelayCommand]
-    private async Task ClearAudio()
-    {
-        var ok = await _dialogs.ConfirmAsync("Delete the downloaded audio?",
-            $"The sound kept on this device ({NovelFormat.Size(_audio.SizeOf(null))}) is deleted. It downloads again when you listen.", "Delete");
-        if (!ok) return;
-        _reader.StopDownload();
-        _audio.Clear(null);
-        RefreshAudioSize();
-        RefreshChapterMarks();
-        QueueLibraryRefresh();
-    }
-
-    [RelayCommand]
-    private void OpenAudioFolder()
-    {
-        Directory.CreateDirectory(_audio.Root);
-        _launcher.OpenFolder(_audio.Root);
-    }
-
     // IReadAloudHost: the open novel and any of its chapters.
     string? IReadAloudHost.BookId => OpenBookId;
 
@@ -1118,39 +1086,7 @@ public sealed partial class NovelReaderViewModel : ObservableObject, IReadAloudH
         ReadyLabel = PlayerReady < 0 || count == 0 ? ""
             : PlayerReady >= count - 1 ? "Chapter audio ready"
             : $"Audio ready to paragraph {PlayerReady + 1} / {count}";
-        if (count > 0 && PlayerReady >= count - 1) RefreshChapterMarks();
     }
-
-    private void OnDownloadChanged()
-    {
-        var download = _reader.Download;
-        IsDownloadingAudio = download.Active;
-        AudioDownloadFraction = download.Fraction;
-        AudioDownloadText = download.Active
-            ? download.FirstChapter == download.LastChapter
-                ? $"Downloading audio · chapter {download.Chapter + 1} · {download.Fraction:P0}"
-                : $"Downloading audio · chapter {download.Chapter + 1} ({download.Chapter - download.FirstChapter + 1} / {download.LastChapter - download.FirstChapter + 1}) · {download.Fraction:P0}"
-            : "";
-        if (download.Error is { } error) Message = error;
-        if (!download.Active)
-        {
-            RefreshChapterMarks();
-            RefreshAudioSize();
-            QueueLibraryRefresh();
-        }
-        else if (download.Done == download.Total) RefreshChapterMarks();
-        if (IsBookOpen) OnReaderReady();
-    }
-
-    /// <summary>Marks the chapters whose sound is downloaded in full for the voice and speed in use.</summary>
-    private void RefreshChapterMarks()
-    {
-        if (OpenBookId is not { } book || _reader.Profile is not { } profile) return;
-        var downloaded = _audio.DownloadedChapters(book, profile);
-        foreach (var item in Chapters) item.IsDownloaded = downloaded.Contains(item.Index);
-    }
-
-    private void RefreshAudioSize() => AudioCacheSize = NovelFormat.Size(_audio.SizeOf(null));
 
     // ---- The voice on this PC (VieNeu-TTS) ----------------------------------------------------------------------
 
@@ -1708,12 +1644,7 @@ public sealed partial class NovelReaderViewModel : ObservableObject, IReadAloudH
                 : $"{book.ChapterCount} chapters · added {NovelFormat.Ago(book.AddedAt, now)}";
             card.Status = _store.IsUploading(book) ? "Waiting to upload" : _store.IsOnDevice(book) ? "" : "In the cloud";
             var names = _store.EntryCount(id);
-            var audioBytes = _audio.SizeOf(id);
-            card.Names = string.Join(" · ", new[]
-            {
-                names == 0 ? "" : names == 1 ? "1 saved name" : $"{names} saved names",
-                audioBytes > 0 ? "audio " + NovelFormat.Size(audioBytes) : "",
-            }.Where(s => s.Length > 0));
+            card.Names = names == 0 ? "" : names == 1 ? "1 saved name" : $"{names} saved names";
             card.IsOpen = id == OpenBookId;
             if (card.CoverBlobId != book.Cover?.Id) _ = LoadCoverAsync(card, book.Cover?.Id);
         }

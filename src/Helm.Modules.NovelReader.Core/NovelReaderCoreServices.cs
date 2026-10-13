@@ -32,9 +32,6 @@ public static class NovelReaderCoreServices
         // The online HoaiMy voice; platforms add their own engines (Windows voices) as ISpeechEngine too.
         services.AddSingleton<ISpeechEngine, EdgeSpeechEngine>();
         services.AddSingleton(sp => new SpeechCatalog(sp.GetServices<ISpeechEngine>()));
-        // Downloaded sentences, on this device only (cache/novel-reader/audio).
-        services.AddSingleton(sp => new AudioCache(Path.Combine(
-            sp.GetRequiredService<Helm.Core.Settings.ISettingsStoreFactory>().Paths.Root, "cache", NovelReaderIds.ModuleId, "audio")));
         // Windows registers it again through AddHelmModule; one instance either way.
         services.TryAddSingleton<NovelReaderViewModel>();
         return services;

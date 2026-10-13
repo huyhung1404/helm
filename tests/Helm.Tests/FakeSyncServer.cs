@@ -169,6 +169,9 @@ internal sealed class FakeSyncServer
 
         public int? FailChunkUploadsAfter { get; set; }
 
+        /// <summary>How many chunk downloads fail next, as a dropped connection would.</summary>
+        public int FailChunkDownloads { get; set; }
+
         public Task<SyncLimits> GetLimitsAsync(CancellationToken ct)
         {
             if (Offline) throw new HttpRequestException("offline");
@@ -213,6 +216,14 @@ internal sealed class FakeSyncServer
         public Task<byte[]?> GetChunkAsync(string id, int index, CancellationToken ct)
         {
             if (Offline) throw new HttpRequestException("offline");
+            lock (server._gate)
+            {
+                if (FailChunkDownloads > 0)
+                {
+                    FailChunkDownloads--;
+                    throw new HttpRequestException("connection reset");
+                }
+            }
             lock (server._gate)
             {
                 var blob = server._blobs.GetValueOrDefault(id);
