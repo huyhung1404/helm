@@ -19,6 +19,37 @@
             </StackPanel>
         </Border>
 
+        <!-- Novel Lens -->
+        <TextBlock Text="Novel Lens" Classes="section" />
+        <Border Classes="card">
+            <StackPanel Spacing="8">
+                <TextBlock Text="Read Fanqie's pages in study form" Classes="title" />
+                <TextBlock Text="While the Fanqie app (番茄小说) is open, a 译 button floats over it. Press it: Helm reads the page shown (recognised on the phone, offline) and covers the screen with it, each word with its Chinese, pinyin, Hán Việt and Vietnamese. Next turns Fanqie's page and reads the new one. Nothing of the pages is saved." Classes="secondary" />
+                <TextBlock x:Name="LensState" Classes="secondary" />
+                <Button x:Name="LensButton" Content="Accessibility settings" Click="LensSettings_Click" />
+                <Border Classes="row">
+                    <StackPanel Spacing="4">
+                        <TextBlock Text="Names from" />
+                        <ComboBox x:Name="LensBook" HorizontalAlignment="Stretch" SelectionChanged="LensBook_SelectionChanged" AutomationProperties.Name="Names from" />
+                        <TextBlock Text="The names you fixed for this novel are used on the lens's pages too, with the names for every novel. Tap a word on the lens to save a name or a meaning." Classes="secondary" />
+                        <TextBlock Text="A novel you read only in Fanqie: give it a novel here, by its title, to keep its names (it has no text in Novel Reader)." Classes="secondary" />
+                        <DockPanel>
+                            <Button DockPanel.Dock="Right" Margin="8,0,0,0" Content="Create" Click="LensCreate_Click" />
+                            <TextBox x:Name="LensNewTitle" PlaceholderText="The novel's title" AutomationProperties.Name="New novel for names" />
+                        </DockPanel>
+                    </StackPanel>
+                </Border>
+                <Border Classes="row">
+                    <StackPanel Spacing="4">
+                        <TextBlock x:Name="LensTapLabel" />
+                        <TextBlock Text="Where Next taps Fanqie to turn the page, from the left edge (Back taps the same distance from the right)." Classes="secondary" />
+                        <Slider x:Name="LensTap" Minimum="0.6" Maximum="0.98" SmallChange="0.02" TickFrequency="0.02" IsSnapToTickEnabled="True"
+                                ValueChanged="LensTap_ValueChanged" AutomationProperties.Name="Where Next taps" />
+                    </StackPanel>
+                </Border>
+            </StackPanel>
+        </Border>
+
         <!-- Dictionaries -->
         <TextBlock Text="Dictionaries" Classes="section" />
         <Border Classes="card">

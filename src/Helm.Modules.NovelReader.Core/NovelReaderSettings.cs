@@ -113,6 +113,17 @@ public sealed class NovelReaderSettings : IVersionedSettings
         DefaultSources.Where(s => Dictionaries.DictionarySet.KindOf(s.Key) == Dictionaries.DictionaryKind.Pinyin)
             .ToDictionary(s => s.Key, s => DictionarySources.TryGetValue(s.Key, out var url) ? url : s.Value, StringComparer.OrdinalIgnoreCase);
 
+    // ---- Novel Lens (phone) ----------------------------------------------------------------------------------------
+
+    /// <summary>The novel whose names Novel Lens uses for the reading app's pages; null: the novel open in the reader.</summary>
+    public string? LensBookId { get; set; }
+
+    /// <summary>Where Next taps the reading app, as a share of the screen's width (its next-page side; Back taps the mirror point).</summary>
+    public double LensNextTap { get; set; } = 0.9;
+
+    /// <summary>Text size of the lens's page (the reader's own size is set apart: the lens covers another app).</summary>
+    public double LensFontSize { get; set; } = 18;
+
     // ---- This device -----------------------------------------------------------------------------------------------
 
     /// <summary>The novel open on this device; null opens the one read most recently on any device.</summary>

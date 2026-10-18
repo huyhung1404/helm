@@ -434,6 +434,25 @@ public sealed class NovelReaderTests : IDisposable
     }
 
     [Fact]
+    public async Task A_novel_with_only_a_title_keeps_names_and_opens_empty()
+    {
+        // Novel Lens: a novel read in another app has no text here, only the names fixed for it.
+        var (store, _, _) = NewStore("a");
+
+        var id = store.AddNamesOnlyBook("  重生之后  ", "Phone");
+        store.SaveEntry(id, EntryKind.Name, "林宛", "Lâm Uyển");
+
+        var book = store.GetBook(id)!;
+        Assert.Equal("重生之后", book.Title);
+        Assert.Null(book.Blob);
+        Assert.True(store.IsOnDevice(book));
+        Assert.False(store.IsUploading(book));
+        Assert.NotNull(book.NamesScannedAt); // nothing to look for names in
+        Assert.Equal("", await store.ReadBookTextAsync(id));
+        Assert.Equal("Lâm Uyển", store.GetEntry(id, EntryKind.Name, "林宛")!.Vietnamese);
+    }
+
+    [Fact]
     public async Task Saved_names_are_one_record_each_and_their_ids_hide_the_chinese()
     {
         var (store, entries, _) = NewStore("a");

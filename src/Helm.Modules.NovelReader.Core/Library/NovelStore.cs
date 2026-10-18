@@ -127,6 +127,19 @@ public sealed class NovelStore
         }
     }
 
+    /// <summary>
+    /// Adds a novel that has only a title, to keep names and meanings for a novel read elsewhere (Novel Lens over the
+    /// Fanqie app): no text, so it opens empty; its names sync like any novel's.
+    /// </summary>
+    public string AddNamesOnlyBook(string title, string device) => _books.Add(new NovelBook
+    {
+        Title = CleanTitle(title, ""),
+        AddedAt = Now,
+        AddedFrom = device,
+        // Nothing to look for names in.
+        NamesScannedAt = Now,
+    });
+
     /// <exception cref="BlobUnavailableException">Not on this device yet and sync cannot fetch it.</exception>
     /// <exception cref="System.Security.Cryptography.CryptographicException">The stored text is damaged.</exception>
     public async Task<string> ReadBookTextAsync(string id, IProgress<double>? progress = null, CancellationToken ct = default)

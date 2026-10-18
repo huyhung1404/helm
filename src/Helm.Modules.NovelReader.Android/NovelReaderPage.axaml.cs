@@ -39,6 +39,87 @@ public partial class NovelReaderPage : ModulePageBase
         base.OnAttachedToVisualTree(e);
         _platform.StartPhoneVoices();
         ShowBatteryNote();
+        ShowLens();
+    }
+
+    // ---- Novel Lens ------------------------------------------------------------------------------------------------
+
+    private const string LensServiceName = "com.huyhung1404.helm/com.huyhung1404.helm.novel.LensService";
+
+    private Lens.LensTranslator? _lens;
+    private List<string?> _lensBookIds = [];
+    private bool _showingLens;
+
+    /// <summary>Whether Novel Lens is on, the novel its names come from, and where Next taps (read again on every visit).</summary>
+    private void ShowLens()
+    {
+        _lens ??= HelmAndroidServices.Current.GetService<Lens.LensTranslator>();
+        if (_lens is null) return;
+        _showingLens = true;
+        try
+        {
+            var context = global::Android.App.Application.Context;
+            if (!OperatingSystem.IsAndroidVersionAtLeast(30))
+            {
+                LensState.Text = "Novel Lens needs Android 11 or later.";
+                LensButton.IsVisible = false;
+            }
+            else
+            {
+                var enabled = global::Android.Provider.Settings.Secure.GetString(context.ContentResolver,
+                    global::Android.Provider.Settings.Secure.EnabledAccessibilityServices) ?? "";
+                var on = enabled.Split(':').Any(s => s.Equals(LensServiceName, StringComparison.OrdinalIgnoreCase));
+                LensState.Text = on
+                    ? "On. Open Fanqie and press the 译 button."
+                    : "Off. Turn on \"Helm Novel Lens\" in Accessibility settings (under Downloaded or Installed apps).";
+                LensButton.Content = on ? "Accessibility settings" : "Turn on Novel Lens";
+            }
+
+            var books = _lens.Books();
+            _lensBookIds = [null, .. books.Select(b => (string?)b.Id)];
+            LensBook.ItemsSource = new List<string> { "The novel open in Novel Reader" }.Concat(books.Select(b => b.Title)).ToList();
+            LensBook.SelectedIndex = Math.Max(0, _lensBookIds.IndexOf(_lens.Settings.LensBookId));
+            LensTap.Value = _lens.Settings.LensNextTap;
+            ShowLensTap();
+        }
+        finally
+        {
+            _showingLens = false;
+        }
+    }
+
+    private void ShowLensTap() => LensTapLabel.Text = $"Next taps at {LensTap.Value:P0} of the width";
+
+    private void LensSettings_Click(object? sender, RoutedEventArgs e)
+    {
+        var intent = new global::Android.Content.Intent(global::Android.Provider.Settings.ActionAccessibilitySettings);
+        intent.AddFlags(global::Android.Content.ActivityFlags.NewTask);
+        global::Android.App.Application.Context.StartActivity(intent);
+    }
+
+    /// <summary>A novel with just the typed title, chosen for the lens (the names fixed on the lens go to it).</summary>
+    private void LensCreate_Click(object? sender, RoutedEventArgs e)
+    {
+        if (_lens is null || LensNewTitle.Text is not { } title || title.Trim().Length == 0) return;
+        _lens.CreateBook(title);
+        LensNewTitle.Text = "";
+        ShowLens();
+    }
+
+    private void LensBook_SelectionChanged(object? sender, Avalonia.Controls.SelectionChangedEventArgs e)
+    {
+        if (_showingLens || _lens is null || LensBook.SelectedIndex < 0 || LensBook.SelectedIndex >= _lensBookIds.Count) return;
+        var id = _lensBookIds[LensBook.SelectedIndex];
+        _lens.Save(s => s.LensBookId = id);
+    }
+
+    private void LensTap_ValueChanged(object? sender, Avalonia.Controls.Primitives.RangeBaseValueChangedEventArgs e)
+    {
+        if (LensTapLabel is null) return;
+        ShowLensTap();
+        if (_showingLens || _lens is null) return;
+        var value = Math.Round(LensTap.Value, 2);
+        _lens.Save(s => s.LensNextTap = value);
     }
 
     private void OpenReader_Click(object? sender, RoutedEventArgs e) => _navigation?.ShowPage(typeof(NovelReaderContentPage));

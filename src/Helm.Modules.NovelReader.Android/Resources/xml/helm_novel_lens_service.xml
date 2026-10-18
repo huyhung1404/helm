@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Novel Lens: Helm's accessibility service. It only learns which app is in front (window changes, no content: the
+     reading app draws its text, which is read from a screenshot), takes screenshots of the page shown and taps the
+     screen to turn the page when Next is pressed. -->
+<accessibility-service xmlns:android="http://schemas.android.com/apk/res/android"
+    android:accessibilityEventTypes="typeWindowStateChanged"
+    android:accessibilityFeedbackType="feedbackGeneric"
+    android:notificationTimeout="100"
+    android:canRetrieveWindowContent="false"
+    android:canPerformGestures="true"
+    android:canTakeScreenshot="true"
+    android:description="@string/novel_lens_description" />

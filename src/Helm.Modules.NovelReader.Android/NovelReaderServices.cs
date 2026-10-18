@@ -18,6 +18,8 @@ public static class NovelReaderServices
             .AddSingleton<AndroidAudioOutput>()
             .AddSingleton<IAudioOutput>(sp => sp.GetRequiredService<AndroidAudioOutput>())
             .AddNovelReaderCore()
+            // Novel Lens (an accessibility service, Lens/LensService): the reading app's pages in study form.
+            .AddSingleton<Lens.LensTranslator>()
             .AddAndroidModule<NovelReaderModule, NovelReaderPage>()
             .AddTransient<NovelReaderContentPage>();
 }

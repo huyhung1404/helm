@@ -22,6 +22,10 @@
 
   <ItemGroup>
     <PackageReference Include="Avalonia" Version="12.1.3" />
+    <!-- Novel Lens hosts Avalonia content in its own overlay windows (AvaloniaView), outside the activity. -->
+    <PackageReference Include="Avalonia.Android" Version="12.1.3" />
+    <!-- Novel Lens: Chinese text recognition on the phone, offline (the model ships in the APK, no Play services). -->
+    <PackageReference Include="Xamarin.Google.MLKit.TextRecognition.Chinese" Version="116.0.1.9" />
     <PackageReference Include="FluentIcons.Avalonia" Version="2.1.343" />
     <PackageReference Include="SQLitePCLRaw.bundle_e_sqlite3" Version="2.1.13" />
   </ItemGroup>

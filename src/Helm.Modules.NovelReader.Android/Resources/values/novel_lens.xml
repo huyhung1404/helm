@@ -1,0 +1,4 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="novel_lens_description">Novel Lens reads the page open in your reading app (a screenshot, then Chinese text recognition on the phone) and shows it with pinyin, Hán Việt and Vietnamese. When you press Next, Helm taps the screen to turn the page. Helm does not read other apps\' content and keeps no text of the pages.</string>
+</resources>
