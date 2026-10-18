@@ -316,13 +316,15 @@ public sealed class ReadAloudController
 
     private void StartAt(ReadingPosition position)
     {
+        // Read before the old run is cancelled: cancelled, it goes on on another thread and can change the state.
+        var paused = _state == ReadAloudState.Paused;
         _run?.Cancel();
         StopDirect();
         _resumed?.TrySetResult();
         _resumed = null;
         // A skip while paused reads on: the output must play again too (the phone's player keeps a new sentence
         // silent while paused, and reading would hang on it looking like it plays).
-        if (_state == ReadAloudState.Paused) _output.Resume();
+        if (paused) _output.Resume();
         var run = new CancellationTokenSource();
         _run = run;
         StartPrefetch(position);
