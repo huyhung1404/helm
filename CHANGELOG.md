@@ -3,6 +3,24 @@
 All notable changes to Helm. The top section is used as the GitHub release body and as the Velopack release notes.
 Format: [Keep a Changelog](https://keepachangelog.com), versions follow [SemVer](https://semver.org).
 
+## [0.45.0] - 2026-10-18
+
+### Added – Novel Lens (Android)
+- **Read the Fanqie app's pages (番茄小说) in study form.** Turn on *Helm Novel Lens* once in Android's Accessibility
+  settings (Novel Reader settings → Novel Lens has the button). While Fanqie is open, a round 译 button floats over it
+  (drag it anywhere); press it and Helm reads the page shown, with Chinese text recognition on the phone (offline), and
+  covers the screen with it: each word with its Chinese, pinyin, Hán Việt and Vietnamese, the novel's names coloured.
+  Scroll to read the whole page; **Next** turns Fanqie's page and reads the new one, **Back** the page before, **Read
+  again** reads the page once more, A−/A+ change the text size, and ✕ or the phone's Back closes the lens.
+- Names come from a novel of your choice in Novel Reader (by default the one open there), with the names for every novel.
+- Nothing of the pages is saved or synced: the text lives in the lens only while its page is shown. Helm never reads
+  other apps' content; it only sees which app is in front. Android 11 or later.
+
+### Fixed
+- **Novel Reader: reading aloud on the phone no longer hangs silently.** Skipping while paused plays again, pausing
+  right at the end of a chapter stays paused, and a sentence the phone's player leaves stuck with the screen off is
+  started again once, then skipped.
+
 ## [0.44.0] - 2026-10-13
 
 ### Fixed
