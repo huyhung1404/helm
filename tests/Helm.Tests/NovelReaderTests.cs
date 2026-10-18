@@ -803,6 +803,25 @@ public sealed class NovelReaderTests : IDisposable
     }
 
     [Fact]
+    public async Task Skipping_while_paused_reads_on_with_the_output_playing()
+    {
+        // The phone's player keeps a new sentence silent while it is paused: reading must not look like it goes on
+        // while nothing is heard.
+        var output = new FakeOutput { Hold = true };
+        var reader = NewReader(new FakeEngine(), output, new FakeHost([["a1.", "b1."]]));
+        reader.Play(0);
+        await WaitFor(() => reader.State == ReadAloudState.Playing);
+        reader.Pause();
+        Assert.True(output.Paused);
+
+        reader.NextParagraph();
+        await WaitFor(() => output.Played.Count == 2);
+        Assert.Equal("b1.", output.Played[1]);
+        Assert.Equal(ReadAloudState.Playing, reader.State);
+        Assert.False(output.Paused);
+    }
+
+    [Fact]
     public async Task Reading_aloud_opens_the_next_chapter_and_skips_empty_paragraphs()
     {
         var output = new FakeOutput();

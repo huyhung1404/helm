@@ -320,6 +320,9 @@ public sealed class ReadAloudController
         StopDirect();
         _resumed?.TrySetResult();
         _resumed = null;
+        // A skip while paused reads on: the output must play again too (the phone's player keeps a new sentence
+        // silent while paused, and reading would hang on it looking like it plays).
+        if (_state == ReadAloudState.Paused) _output.Resume();
         var run = new CancellationTokenSource();
         _run = run;
         StartPrefetch(position);
@@ -346,7 +349,9 @@ public sealed class ReadAloudController
                         break;
                     }
                     if (!ContinueToNextChapter() || host.ChapterIndex + 1 >= host.ChapterCount) break;
-                    SetState(ReadAloudState.Loading);
+                    // Paused just as the chapter ended: it stays paused, or the next chapter's first sentence would
+                    // wait silently on a paused player.
+                    if (_state != ReadAloudState.Paused) SetState(ReadAloudState.Loading);
                     if (!await host.OpenChapterForReadingAsync(host.ChapterIndex + 1) || ct.IsCancellationRequested) break;
                     position = new ReadingPosition(host.ChapterIndex, 0, 0);
                     SetReadyThrough(-1);

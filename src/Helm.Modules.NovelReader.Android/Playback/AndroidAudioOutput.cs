@@ -89,8 +89,73 @@ public sealed class AndroidAudioOutput : IAudioOutput
             ReleasePlayer();
             return;
         }
+        _ = WatchAsync(player, done);
         using (ct.Register(() => StopIfCurrent(done)))
             await done.Task.ConfigureAwait(true);
+    }
+
+    /// <summary>How often a sentence being played is looked at, and how many looks with no progress make it stuck.</summary>
+    private static readonly TimeSpan WatchEvery = TimeSpan.FromSeconds(1);
+    private const int StuckLooks = 4;
+
+    /// <summary>
+    /// Some phones now and then leave a sentence without saying so with the screen off: it never prepares, or it stops
+    /// (or ends) and the player does not report it. Reading would then hang there, looking like it plays, until pause
+    /// and play. A sentence that has not moved on for a few seconds while it should play is started again once, then
+    /// taken as finished, so reading goes on with the next one.
+    /// </summary>
+    private async Task WatchAsync(MediaPlayer player, TaskCompletionSource done)
+    {
+        var last = -1;
+        var still = 0;
+        var restarted = false;
+        while (true)
+        {
+            await Task.Delay(WatchEvery).ConfigureAwait(true);
+            if (done.Task.IsCompleted || !ReferenceEquals(_player, player) || !ReferenceEquals(_playing, done)) return;
+            if (_paused)
+            {
+                still = 0;
+                continue;
+            }
+            int position, duration;
+            bool playing;
+            try
+            {
+                position = _prepared ? player.CurrentPosition : -1;
+                duration = _prepared ? player.Duration : -1;
+                playing = _prepared && player.IsPlaying;
+            }
+            catch (Java.Lang.IllegalStateException)
+            {
+                return;
+            }
+            if (position != last)
+            {
+                last = position;
+                still = 0;
+                continue;
+            }
+            if (++still < StuckLooks) continue;
+            still = 0;
+            if (_prepared && !playing && !restarted && (duration <= 0 || position < duration - 300))
+            {
+                _logger.LogWarning("A sentence stopped by itself at {Position}/{Duration} ms; playing it on", position, duration);
+                restarted = true;
+                try
+                {
+                    player.Start();
+                    continue;
+                }
+                catch (Java.Lang.IllegalStateException)
+                {
+                }
+            }
+            _logger.LogWarning("A sentence got stuck (prepared {Prepared}, playing {Playing}, at {Position}/{Duration} ms); going on with the next",
+                _prepared, playing, position, duration);
+            done.TrySetResult();
+            return;
+        }
     }
 
     public void Pause()
