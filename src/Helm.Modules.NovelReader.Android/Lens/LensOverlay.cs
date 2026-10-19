@@ -4,6 +4,7 @@ using Android.Graphics;
 using Android.Runtime;
 using Android.Views;
 using Avalonia.Android;
+using Helm.Modules.NovelReader.Speech;
 using Microsoft.Extensions.Logging;
 using Bitmap = Android.Graphics.Bitmap;
 
@@ -39,7 +40,7 @@ internal sealed class LensOverlay : IDisposable
     private bool _bubbleShown, _panelShown, _busy;
     private byte[]? _lastPage;
 
-    public LensOverlay(LensService service, LensTranslator? translator, ILogger logger)
+    public LensOverlay(LensService service, LensTranslator? translator, WordPronouncer? pronouncer, ILogger logger)
     {
         _service = service;
         _translator = translator;
@@ -63,6 +64,7 @@ internal sealed class LensOverlay : IDisposable
             SaveEntry = SaveEntryAsync,
             HasEntry = chinese => _translator?.HasEntry(chinese) == true,
             RemoveEntry = RemoveEntryAsync,
+            Pronounce = chinese => pronouncer?.SayAsync(chinese) ?? Task.FromResult<string?>("Helm's services are not ready: open Helm once, then try again."),
         };
         _panel = new PanelHost(service) { Back = Close };
         _panel.AddView(new AvaloniaView(service) { Content = _content });

@@ -387,7 +387,7 @@
                                                 </self:SegmentText>
                                                 <!-- Study mode: each word with its Chinese, pinyin and Hán Việt above the Vietnamese -->
                                                 <self:StudyText x:Name="Study" Visibility="Collapsed" Line="{Binding Line}" Readings="{Binding Readings}"
-                                                                WordClicked="Word_Clicked" ReadFromClicked="Paragraph_ReadFromClicked"
+                                                                WordClicked="Word_Clicked" ReadFromClicked="Paragraph_ReadFromClicked" WordHeld="Word_Held"
                                                                 Highlight="{Binding SpeakingSegments}" HighlightBrush="{StaticResource SentenceFill}"
                                                                 Sentences="{Binding Sentences}"
                                                                 TextSize="{Binding DataContext.FontSize, RelativeSource={RelativeSource AncestorType=Page}}"

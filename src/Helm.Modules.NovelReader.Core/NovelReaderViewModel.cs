@@ -41,6 +41,7 @@ public sealed partial class NovelReaderViewModel : ObservableObject, IReadAloudH
     private readonly ReadAloudController _reader;
     private readonly ILocalVoiceServer? _localVoice;
     private readonly INameScanAgent? _nameAgent;
+    private readonly WordPronouncer? _pronouncer;
     private CancellationTokenSource? _scanCancel;
     private bool _entriesQueued;
     private readonly IProcessLauncher _launcher;
@@ -140,7 +141,7 @@ public sealed partial class NovelReaderViewModel : ObservableObject, IReadAloudH
     public NovelReaderViewModel(NovelStore store, DictionaryLibrary dictionaries, ISettingsStoreFactory settings, IUiDispatcher ui,
         IDialogService dialogs, IDeviceInfo device, SpeechCatalog catalog, IAudioOutput audio, IProcessLauncher launcher,
         IClipboardService clipboard, ILogger<NovelReaderViewModel> logger, TimeProvider? time = null, ILocalVoiceServer? localVoice = null,
-        INameScanAgent? nameAgent = null)
+        INameScanAgent? nameAgent = null, WordPronouncer? pronouncer = null)
     {
         _store = store;
         _dictionaries = dictionaries;
@@ -153,6 +154,7 @@ public sealed partial class NovelReaderViewModel : ObservableObject, IReadAloudH
         _catalog = catalog;
         _localVoice = localVoice;
         _nameAgent = nameAgent;
+        _pronouncer = pronouncer;
         if (localVoice is not null) localVoice.StatusChanged += (_, _) => _ui.Post(OnLocalVoiceChanged);
         _reader = new ReadAloudController(catalog, audio, time)
         {
@@ -164,6 +166,17 @@ public sealed partial class NovelReaderViewModel : ObservableObject, IReadAloudH
             FallbackToOfflineVoice = () => FallbackToOfflineVoice,
         };
         _reader.Attach(this);
+        if (pronouncer is not null)
+            // A word said aloud pauses reading aloud (the two would talk over each other) and gives it back afterwards.
+            pronouncer.QuietReading = () =>
+            {
+                if (_reader.State is not (ReadAloudState.Playing or ReadAloudState.Loading)) return null;
+                _reader.Pause();
+                return () =>
+                {
+                    if (_reader.State == ReadAloudState.Paused) _reader.Resume();
+                };
+            };
         _reader.PositionChanged += (_, position) => _ui.Post(() => OnReaderPosition(position));
         _reader.StateChanged += (_, _) => _ui.Post(OnReaderState);
         _reader.Notice += (_, text) => _ui.Post(() => Message = text.Length == 0 ? null : text);
@@ -808,6 +821,13 @@ public sealed partial class NovelReaderViewModel : ObservableObject, IReadAloudH
 
     /// <summary>The reading-aloud engine; the page's player bar drives it through the commands below.</summary>
     public ReadAloudController Reader => _reader;
+
+    /// <summary>A long press on a word in study mode: says its Chinese in standard Mandarin, to learn how it sounds.</summary>
+    public async Task PronounceAsync(string chinese)
+    {
+        if (_pronouncer is null) return;
+        if (await _pronouncer.SayAsync(chinese) is { } problem) Message = problem;
+    }
 
     /// <summary>▶/⏸: plays from where reading stopped (or the top of the page), pauses, resumes.</summary>
     [RelayCommand]

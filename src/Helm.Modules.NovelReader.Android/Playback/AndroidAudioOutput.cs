@@ -355,7 +355,7 @@ public sealed class AndroidAudioOutput : IAudioOutput
     }
 
     /// <summary>A sentence's sound (MP3 or WAV) handed to the player from memory.</summary>
-    private sealed class MemoryMediaSource(byte[] data) : MediaDataSource
+    internal sealed class MemoryMediaSource(byte[] data) : MediaDataSource
     {
         public override long Size => data.Length;
 

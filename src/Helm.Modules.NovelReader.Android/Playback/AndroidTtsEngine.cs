@@ -15,7 +15,7 @@ namespace Helm.Modules.NovelReader.Playback;
 /// "android:vi-vn-x-gft-local". The engine starts when Novel Reader is opened (<see cref="EnsureStarted"/>), not with
 /// Helm; <see cref="VoicesChanged"/> says when its voices are known.
 /// </summary>
-public sealed class AndroidTtsEngine : ISpeechEngine
+public sealed class AndroidTtsEngine : ISpeechEngine, ILanguageVoices
 {
     public const string EnginePrefix = "android";
 
@@ -39,6 +39,9 @@ public sealed class AndroidTtsEngine : ISpeechEngine
     private TaskCompletionSource<bool> _ready = new(TaskCreationOptions.RunContinuationsAsynchronously);
     private Dictionary<string, Voice> _native = new(StringComparer.Ordinal);
     private IReadOnlyList<SpeechVoice> _voices = [];
+
+    /// <summary>The phone's Mandarin voice, kept out of <see cref="Voices"/>: it only says a word pressed in study mode offline.</summary>
+    private SpeechVoice? _chinese;
 
     public AndroidTtsEngine(ILogger<AndroidTtsEngine> logger)
     {
@@ -74,6 +77,21 @@ public sealed class AndroidTtsEngine : ISpeechEngine
         {
             if (_tts is not null && _ready.Task.IsCompletedSuccessfully && _ready.Task.Result) LoadVoices();
         }
+    }
+
+    public async Task<SpeechVoice?> VoiceForAsync(string language, CancellationToken ct)
+    {
+        if (language != "zh") return null;
+        EnsureStarted();
+        try
+        {
+            if (!await _ready.Task.WaitAsync(TimeSpan.FromSeconds(15), ct).ConfigureAwait(false)) return null;
+        }
+        catch (TimeoutException)
+        {
+            return null;
+        }
+        return _chinese;
     }
 
     public async Task<SpeechAudio> SynthesizeAsync(string text, SpeechVoice voice, SpeechOptions options, CancellationToken ct)
@@ -274,14 +292,15 @@ public sealed class AndroidTtsEngine : ISpeechEngine
     {
         if (_tts is not { } tts) return;
         var all = new List<Voice>();
+        var chinese = new List<Voice>();
         try
         {
             foreach (var voice in tts.Voices ?? [])
             {
-                if (voice.Locale?.Language != "vi") continue;
                 // Listed but its data is not on the phone yet.
                 if (voice.Features?.Contains(TextToSpeech.Engine.KeyFeatureNotInstalled) == true) continue;
-                all.Add(voice);
+                if (voice.Locale?.Language == "vi") all.Add(voice);
+                else if (voice.Locale?.Language is "zh" or "cmn") chinese.Add(voice);
             }
         }
         catch (Java.Lang.Exception ex)
@@ -318,6 +337,17 @@ public sealed class AndroidTtsEngine : ISpeechEngine
         _logger.LogInformation("The phone's text-to-speech is ready: {Count} Vietnamese voices ({Names}), default {Preferred}",
             ordered.Count, string.Join(", ", ordered.Select(v => v.Name)), preferred ?? "none");
         _native = ordered.ToDictionary(v => v.Name!, StringComparer.Ordinal);
+        // Mandarin of the mainland (zh-CN, cmn-CN) before Taiwan's, offline first; Hong Kong's speaks Cantonese.
+        var mandarin = chinese
+            .Where(v => v.Name is { } n && !n.EndsWith("-language", StringComparison.OrdinalIgnoreCase) && v.Locale?.Country != "HK")
+            .OrderByDescending(v => v.Locale?.Country == "CN")
+            .ThenByDescending(v => v.Locale?.Country == "TW")
+            .ThenBy(v => v.IsNetworkConnectionRequired)
+            .ThenBy(v => v.Name, StringComparer.Ordinal)
+            .FirstOrDefault();
+        if (mandarin is not null) _native[mandarin.Name!] = mandarin;
+        _chinese = mandarin is null ? null
+            : new SpeechVoice($"{EnginePrefix}:{mandarin.Name}", "Chinese", "zh-CN", mandarin.IsNetworkConnectionRequired);
         _voices = ordered.Select((v, i) => new SpeechVoice($"{EnginePrefix}:{v.Name}", $"Vietnamese {i + 1}", "vi-VN", v.IsNetworkConnectionRequired)
         {
             Description = (v.Name == preferred ? "The phone's default Vietnamese voice" : "A voice of the phone") + $" ({Code(v.Name!)})"

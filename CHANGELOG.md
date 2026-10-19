@@ -19,6 +19,14 @@ Format: [Keep a Changelog](https://keepachangelog.com), versions follow [SemVer]
 - **Scratch: Send to Notes.** Keeps a text for good: it becomes a new note with all its text (a .txt or other text
   file too) and the card goes to the trash. Right-click a card or press Ctrl+Shift+N on the PC (several selected texts
   become one note each); on the phone, tap the card, then **Send to Notes**.
+- **Novel Reader: hear how a word sounds in Mandarin.** In study mode, hold a word down (the mouse on the PC, a finger
+  on the phone, and on Novel Lens too): Helm says its Chinese in standard Mandarin with Microsoft's neural voice
+  Xiaoxiao (online), a little slower than speech so each tone is clear, and the word flashes. Letting go opens nothing;
+  a tap still opens the word and a double tap still reads aloud from there. Reading aloud pauses while the word is said
+  and goes on afterwards. A word pressed again plays at once. When the online voice cannot be reached, the device's own
+  Chinese voice says it, and goes on saying the words for ten minutes without waiting for the online one again: on the
+  phone its Mandarin voice (Android Settings → Text-to-speech → Google → Install voice data → Chinese (Mandarin)), on
+  the PC one added in Windows (Settings → Time & language → Speech → Add voices → Chinese (Simplified)).
 
 ## [0.45.0] - 2026-10-18
 

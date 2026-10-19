@@ -2,6 +2,7 @@ using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Controls.Documents;
 using Avalonia.Input;
+using Avalonia.Interactivity;
 using Avalonia.Media;
 using Avalonia.Styling;
 using Avalonia.Threading;
@@ -13,7 +14,8 @@ namespace Helm.Modules.NovelReader;
 /// A paragraph in study mode (the Avalonia counterpart of the Windows StudyText): one block per word, wrapping like text,
 /// with the word's Chinese, pinyin, Hán Việt and Vietnamese on four centred rows (each row can be hidden). Punctuation
 /// joins the Vietnamese of the word before it. A tap opens the word and a double tap reads aloud from there, through
-/// <see cref="SegmentText"/>'s events, and the sentence being read is highlighted. Each block is one text block.
+/// <see cref="SegmentText"/>'s events; a long press says the word's Chinese (<see cref="WordHeldEvent"/>), and opens
+/// nothing when the finger lifts. The sentence being read is highlighted. Each block is one text block.
 /// </summary>
 public sealed class StudyText : WrapPanel
 {
@@ -34,12 +36,30 @@ public sealed class StudyText : WrapPanel
     public static readonly StyledProperty<(int First, int Count)?> HighlightProperty =
         AvaloniaProperty.Register<StudyText, (int First, int Count)?>(nameof(Highlight));
 
+    /// <summary>A word was pressed long: say its Chinese.</summary>
+    public static readonly RoutedEvent<WordHeldEventArgs> WordHeldEvent =
+        RoutedEvent.Register<StudyText, WordHeldEventArgs>(nameof(WordHeld), RoutingStrategies.Bubble);
+
     private static readonly TimeSpan DoubleTapWait = TimeSpan.FromMilliseconds(230);
 
-    private readonly List<(TextBlock Block, int Index, Segment Segment)> _words = [];
+    /// <summary>A finger kept down this long on a word says it; moving further than <see cref="HoldSlop"/> is a scroll.</summary>
+    private static readonly TimeSpan HoldTime = TimeSpan.FromMilliseconds(450);
+
+    private const double HoldSlop = 10;
+
+    private readonly List<(TextBlock Block, int Index, Segment Segment, string Chinese)> _words = [];
     private IDisposable? _tapWait;
+    private IDisposable? _holdWait;
+    private Point _pressedAt;
+    private bool _held;
 
     public StudyText() => ActualThemeVariantChanged += (_, _) => Rebuild();
+
+    public event EventHandler<WordHeldEventArgs>? WordHeld
+    {
+        add => AddHandler(WordHeldEvent, value);
+        remove => RemoveHandler(WordHeldEvent, value);
+    }
 
     public ConvertedLine? Line { get => GetValue(LineProperty); set => SetValue(LineProperty, value); }
 
@@ -74,6 +94,7 @@ public sealed class StudyText : WrapPanel
 
     private void Rebuild()
     {
+        CancelHold();
         Children.Clear();
         _words.Clear();
         if (Line is not { IsSceneBreak: false } line || Readings is not { } readings) return;
@@ -126,7 +147,11 @@ public sealed class StudyText : WrapPanel
             block.Inlines.Add(vietnamese);
             block.Tapped += OnTapped;
             block.DoubleTapped += OnDoubleTapped;
-            _words.Add((block, i, segment));
+            block.PointerPressed += OnPressed;
+            block.PointerMoved += OnMoved;
+            block.PointerReleased += (_, _) => CancelHold();
+            block.PointerCaptureLost += (_, _) => CancelHold();
+            _words.Add((block, i, segment, reading.Chinese.Length > 0 ? reading.Chinese : line.SourceOf(segment)));
             Children.Add(block);
             lastVietnamese = vietnamese;
         }
@@ -141,18 +166,59 @@ public sealed class StudyText : WrapPanel
     {
         var range = Highlight;
         var fill = new SolidColorBrush(Accent("SystemAccentColor"), 0.38);
-        foreach (var (block, index, _) in _words)
+        foreach (var (block, index, _, _) in _words)
             // Never null: a transparent fill makes the whole block tappable, not only its letters.
             block.Background = range is { } r && index >= r.First && index < r.First + r.Count ? fill : Brushes.Transparent;
     }
 
-    private (TextBlock Block, int Index, Segment Segment)? WordOf(object? sender) =>
+    private (TextBlock Block, int Index, Segment Segment, string Chinese)? WordOf(object? sender) =>
         sender is TextBlock { Tag: int index } ? _words.FirstOrDefault(w => w.Index == index) : null;
+
+    /// <summary>A finger (or the mouse) down on a word: said if it stays there. Not handled, so scrolling still works.</summary>
+    private void OnPressed(object? sender, PointerPressedEventArgs e)
+    {
+        CancelHold();
+        _held = false;
+        if (WordOf(sender) is not { } word) return;
+        _pressedAt = e.GetPosition(this);
+        _holdWait = DispatcherTimer.RunOnce(() => OnHeld(word.Block, word.Chinese), HoldTime);
+    }
+
+    private void OnMoved(object? sender, PointerEventArgs e)
+    {
+        if (_holdWait is null) return;
+        var moved = e.GetPosition(this) - _pressedAt;
+        if (Math.Abs(moved.X) > HoldSlop || Math.Abs(moved.Y) > HoldSlop) CancelHold();
+    }
+
+    /// <summary>Says the word, and flashes it so the press is seen to have worked.</summary>
+    private void OnHeld(TextBlock block, string chinese)
+    {
+        _holdWait = null;
+        _held = true;
+        _tapWait?.Dispose();
+        _tapWait = null;
+        block.Background = new SolidColorBrush(Accent("SystemAccentColor"), 0.38);
+        DispatcherTimer.RunOnce(ApplyHighlight, TimeSpan.FromMilliseconds(500));
+        RaiseEvent(new WordHeldEventArgs(WordHeldEvent, chinese));
+    }
+
+    private void CancelHold()
+    {
+        _holdWait?.Dispose();
+        _holdWait = null;
+    }
 
     private void OnTapped(object? sender, TappedEventArgs e)
     {
         if (WordOf(sender) is not { } word) return;
         e.Handled = true;
+        if (_held)
+        {
+            // The word was said: lifting the finger opens nothing.
+            _held = false;
+            return;
+        }
         _tapWait?.Dispose();
         _tapWait = DispatcherTimer.RunOnce(() => RaiseEvent(new WordTappedEventArgs(SegmentText.WordTappedEvent, word.Segment, word.Index)), DoubleTapWait);
     }
@@ -163,6 +229,13 @@ public sealed class StudyText : WrapPanel
         _tapWait = null;
         if (WordOf(sender) is not { } word) return;
         e.Handled = true;
+        if (_held) return;
         RaiseEvent(new WordTappedEventArgs(SegmentText.WordDoubleTappedEvent, word.Segment, word.Index));
     }
+}
+
+/// <summary>A word pressed long in study mode, with the Chinese to say.</summary>
+public sealed class WordHeldEventArgs(RoutedEvent routedEvent, string chinese) : RoutedEventArgs(routedEvent)
+{
+    public string Chinese { get; } = chinese;
 }

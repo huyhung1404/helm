@@ -3,6 +3,7 @@ using System.Windows.Controls;
 using System.Windows.Documents;
 using System.Windows.Input;
 using System.Windows.Media;
+using System.Windows.Threading;
 using Helm.Modules.NovelReader.Conversion;
 using Helm.Modules.NovelReader.Grammar;
 using Helm.Modules.NovelReader.Speech;
@@ -12,7 +13,8 @@ namespace Helm.Modules.NovelReader;
 /// <summary>
 /// A paragraph in study mode: one block per word, wrapping like text, with the word's Chinese, pinyin, Hán Việt and
 /// Vietnamese on four centred rows (each row can be hidden). Punctuation joins the Vietnamese of the word before it. A
-/// click opens the word popup and a double click reads aloud from there, as on <see cref="SegmentText"/>; the sentence
+/// click opens the word popup and a double click reads aloud from there, as on <see cref="SegmentText"/>; holding the
+/// mouse down on a word says its Chinese (<see cref="WordHeldEvent"/>), with no popup when it is let go. The sentence
 /// being read is highlighted, and under the mouse the sentences and grammar are marked on the Vietnamese row. Each block
 /// is a single text block, so a long chapter stays light.
 /// </summary>
@@ -55,15 +57,36 @@ public sealed class StudyText : WrapPanel
     public static readonly DependencyProperty GrammarColorsProperty = DependencyProperty.Register(nameof(GrammarColors), typeof(bool),
         typeof(StudyText), new PropertyMetadata(false, (d, _) => ((StudyText)d).Apply()));
 
+    /// <summary>The mouse held down on a word this long says its Chinese.</summary>
+    public static readonly TimeSpan HoldTime = TimeSpan.FromMilliseconds(450);
+
+    /// <summary>A word was held: say its Chinese.</summary>
+    public static readonly RoutedEvent WordHeldEvent = EventManager.RegisterRoutedEvent(nameof(WordHeld), RoutingStrategy.Bubble,
+        typeof(EventHandler<WordHeldEventArgs>), typeof(StudyText));
+
     private readonly List<Word> _words = [];
+    private readonly DispatcherTimer _hold = new() { Interval = HoldTime };
     private IReadOnlyList<SegmentMark>? _marks;
     private bool _marksHaveRoles;
     private bool _doubleClicked;
+    private Word? _pressed;
+    private bool _held;
 
-    /// <summary>A block, the segment it shows, and its Vietnamese row (where marks and colours go).</summary>
-    private sealed record Word(TextBlock Block, int Index, Segment Segment, Run Vietnamese);
+    /// <summary>A block, the segment it shows, its Chinese and its Vietnamese row (where marks and colours go).</summary>
+    private sealed record Word(TextBlock Block, int Index, Segment Segment, string Chinese, Run Vietnamese);
 
-    public StudyText() => Loaded += (_, _) => Rebuild();
+    public StudyText()
+    {
+        Loaded += (_, _) => Rebuild();
+        Unloaded += (_, _) => CancelHold();
+        _hold.Tick += (_, _) => OnHeld();
+    }
+
+    public event EventHandler<WordHeldEventArgs> WordHeld
+    {
+        add => AddHandler(WordHeldEvent, value);
+        remove => RemoveHandler(WordHeldEvent, value);
+    }
 
     public ConvertedLine? Line { get => (ConvertedLine?)GetValue(LineProperty); set => SetValue(LineProperty, value); }
 
@@ -112,6 +135,7 @@ public sealed class StudyText : WrapPanel
 
     private void Rebuild()
     {
+        CancelHold();
         Children.Clear();
         _words.Clear();
         _marks = null;
@@ -153,7 +177,8 @@ public sealed class StudyText : WrapPanel
             block.Inlines.Add(vietnamese);
             block.MouseLeftButtonDown += OnMouseDown;
             block.MouseLeftButtonUp += OnMouseUp;
-            var word = new Word(block, i, segment, vietnamese);
+            block.MouseLeave += (_, _) => CancelHold();
+            var word = new Word(block, i, segment, reading.Chinese.Length > 0 ? reading.Chinese : line.SourceOf(segment), vietnamese);
             _words.Add(word);
             Children.Add(block);
             last = word;
@@ -227,14 +252,55 @@ public sealed class StudyText : WrapPanel
 
     private void OnMouseDown(object sender, MouseButtonEventArgs e)
     {
-        if (e.ClickCount != 2 || WordOf(sender) is not { } word) return;
+        if (WordOf(sender) is not { } word) return;
+        if (e.ClickCount == 1)
+        {
+            _held = false;
+            _pressed = word;
+            _hold.Stop();
+            _hold.Start();
+            return;
+        }
+        if (e.ClickCount != 2) return;
+        CancelHold();
         _doubleClicked = true;
         RaiseEvent(new WordClickedEventArgs(SegmentText.ReadFromClickedEvent, word.Segment, word.Index));
         e.Handled = true;
     }
 
+    /// <summary>The mouse stayed down on the word: say it, and flash the word so the press is seen to have worked.</summary>
+    private void OnHeld()
+    {
+        _hold.Stop();
+        if (_pressed is not { } word || Mouse.LeftButton != MouseButtonState.Pressed) return;
+        _held = true;
+        word.Block.Background = HighlightBrush ?? SystemColors.HighlightBrush;
+        var flash = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(500) };
+        flash.Tick += (_, _) =>
+        {
+            flash.Stop();
+            Apply();
+        };
+        flash.Start();
+        RaiseEvent(new WordHeldEventArgs(WordHeldEvent, word.Chinese));
+    }
+
+    private void CancelHold()
+    {
+        _hold.Stop();
+        _pressed = null;
+    }
+
     private void OnMouseUp(object sender, MouseButtonEventArgs e)
     {
+        CancelHold();
+        if (_held)
+        {
+            // The word was said: letting go opens nothing.
+            _held = false;
+            e.Handled = true;
+            return;
+        }
         if (_doubleClicked)
         {
             _doubleClicked = false;
@@ -245,4 +311,10 @@ public sealed class StudyText : WrapPanel
         RaiseEvent(new WordClickedEventArgs(SegmentText.WordClickedEvent, word.Segment, word.Index));
         e.Handled = true;
     }
+}
+
+/// <summary>A word held down in study mode, with the Chinese to say.</summary>
+public sealed class WordHeldEventArgs(RoutedEvent routedEvent, string chinese) : RoutedEventArgs(routedEvent)
+{
+    public string Chinese { get; } = chinese;
 }
