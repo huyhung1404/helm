@@ -39,22 +39,33 @@ public sealed class NovelPronounceTests
     }
 
     [Fact]
-    public async Task Without_the_online_voice_an_offline_Chinese_voice_says_it_and_online_is_tried_again_next_time()
+    public async Task Once_the_online_voice_failed_words_go_straight_to_an_offline_Chinese_voice_for_a_while()
     {
         var edge = new Engine(EdgeSpeechEngine.EnginePrefix) { Fails = true };
         var windows = new Engine("win",
             new SpeechVoice("win:an", "An", "vi-VN", IsOnline: false),
             new SpeechVoice("win:huihui", "Huihui", "zh-CN", IsOnline: false));
         var player = new Player();
-        var pronouncer = new WordPronouncer([edge, windows], player);
+        var clock = new Clock();
+        var pronouncer = new WordPronouncer([edge, windows], player, time: clock);
 
         Assert.Null(await pronouncer.SayAsync("你好"));
         Assert.Equal("win:huihui", Assert.Single(windows.Requests).Voice.Id);
 
+        // No wait for the online voice again, and the word said offline plays from memory.
         edge.Fails = false;
         Assert.Null(await pronouncer.SayAsync("你好"));
+        Assert.Null(await pronouncer.SayAsync("再见"));
+        Assert.Single(edge.Requests);
+        Assert.Equal(2, windows.Requests.Count);
+
+        // After a rest the online voice is asked again, and its sound is kept from then on.
+        clock.Now += TimeSpan.FromMinutes(11);
+        Assert.Null(await pronouncer.SayAsync("你好"));
+        Assert.Null(await pronouncer.SayAsync("你好"));
         Assert.Equal(2, edge.Requests.Count);
-        Assert.Equal(2, player.Played);
+        Assert.Equal(2, windows.Requests.Count);
+        Assert.Equal(5, player.Played);
     }
 
     [Fact]
@@ -68,7 +79,7 @@ public sealed class NovelPronounceTests
         Assert.Equal("android:cmn-cn-x-ccc-local", Assert.Single(phone.Requests).Voice.Id);
 
         var alone = new WordPronouncer([new Engine(EdgeSpeechEngine.EnginePrefix) { Fails = true }], new Player());
-        Assert.Contains("no offline Chinese voice", await alone.SayAsync("你好"));
+        Assert.Equal(WordPronouncer.NoVoice, await alone.SayAsync("你好"));
     }
 
     [Fact]
@@ -106,6 +117,13 @@ public sealed class NovelPronounceTests
         var options = new SpeechOptions(1, 1, 1);
         Assert.Contains("xml:lang='zh-CN'", EdgeSpeechEngine.Ssml("你好", "zh-CN-XiaoxiaoNeural", options));
         Assert.Contains("xml:lang='vi-VN'", EdgeSpeechEngine.Ssml("xin chào", "vi-VN-HoaiMyNeural", options));
+    }
+
+    private sealed class Clock : TimeProvider
+    {
+        public DateTimeOffset Now { get; set; } = new(2026, 10, 19, 9, 0, 0, TimeSpan.Zero);
+
+        public override DateTimeOffset GetUtcNow() => Now;
     }
 
     private class Engine(string prefix, params SpeechVoice[] voices) : ISpeechEngine
