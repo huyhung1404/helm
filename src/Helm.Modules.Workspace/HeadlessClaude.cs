@@ -118,8 +118,10 @@ public sealed class HeadlessClaude(IClaudeStarter starter, ILogger logger, TimeP
         {
             var run = _runs.GetOrAdd(sessionId, id => StartRun(id, folder));
             if (await run.WriteAsync(line, ct).ConfigureAwait(false)) return;
-            // That run was just closing: a new one takes the message.
             _runs.TryRemove(new KeyValuePair<string, Run>(sessionId, run));
+            // Stopped from the phone (or it crashed) while the message went in: it is not started again behind your back.
+            if (run.Killed) throw new PromptSendException("Claude was stopped on the PC before it took the message.");
+            // That run was just closing after its last answer: a new one takes the message.
         }
         throw new PromptSendException("Claude Code on the PC stopped before it took the message.");
     }
@@ -165,7 +167,7 @@ public sealed class HeadlessClaude(IClaudeStarter starter, ILogger logger, TimeP
         }
         finally
         {
-            run.Kill();
+            run.End();
             run.Dispose();
             _runs.TryRemove(new KeyValuePair<string, Run>(run.Info.SessionId, run));
             Changed?.Invoke(this, EventArgs.Empty);
@@ -203,7 +205,7 @@ public sealed class HeadlessClaude(IClaudeStarter starter, ILogger logger, TimeP
                 await _input.FlushAsync(ct).ConfigureAwait(false);
                 return true;
             }
-            catch (IOException)
+            catch (Exception ex) when (ex is IOException or ObjectDisposedException)
             {
                 _closed = true;
                 return false;
@@ -247,7 +249,7 @@ public sealed class HeadlessClaude(IClaudeStarter starter, ILogger logger, TimeP
                 await _input.WriteLineAsync(line).ConfigureAwait(false);
                 await _input.FlushAsync().ConfigureAwait(false);
             }
-            catch (IOException)
+            catch (Exception ex) when (ex is IOException or ObjectDisposedException)
             {
             }
             finally
@@ -273,7 +275,7 @@ public sealed class HeadlessClaude(IClaudeStarter starter, ILogger logger, TimeP
                 _closed = true;
                 _input.Dispose();
             }
-            catch (IOException)
+            catch (Exception ex) when (ex is IOException or ObjectDisposedException)
             {
             }
             finally
@@ -309,7 +311,18 @@ public sealed class HeadlessClaude(IClaudeStarter starter, ILogger logger, TimeP
             }
         }
 
+        /// <summary>Stopped (or its process ended) rather than closed after its last answer.</summary>
+        public bool Killed { get; private set; }
+
+        /// <summary>The phone's Stop.</summary>
         public void Kill()
+        {
+            Killed = true;
+            End();
+        }
+
+        /// <summary>Its output ended: make sure the process is gone too.</summary>
+        public void End()
         {
             _closed = true;
             process.Kill();
@@ -317,12 +330,19 @@ public sealed class HeadlessClaude(IClaudeStarter starter, ILogger logger, TimeP
 
         public void Dispose()
         {
+            // Not under a message being written: that write ends first (a dead process makes it fail at once).
+            var gate = _write.Wait(TimeSpan.FromSeconds(5));
             try
             {
+                _closed = true;
                 _input.Dispose();
             }
-            catch (IOException)
+            catch (Exception ex) when (ex is IOException or ObjectDisposedException)
             {
+            }
+            finally
+            {
+                if (gate) _write.Release();
             }
             process.Dispose();
         }

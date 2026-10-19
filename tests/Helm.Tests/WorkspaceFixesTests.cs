@@ -227,12 +227,30 @@ public sealed class WorkspaceEngineFixesTests : IAsyncDisposable
         Assert.Equal(WorkspaceCommandStatus.Received, set.Status);
         var run = engine.RunAsync(new WorkspaceCommand { MachineId = engine.MachineId, Kind = WorkspaceCommandKind.Prompt, SessionId = "s1", Text = "Hi" }, CancellationToken.None);
         await WorkspaceBridgeTests.WaitAsync(() => engine.HostedRuns.SingleOrDefault());
+        Assert.Contains("\"content\":\"Hi\"", await _claude.Last!.ReadInputAsync());
         Assert.Equal("haiku", _claude.Args![_claude.Args.ToList().IndexOf("--model") + 1]);
         var stop = await engine.RunAsync(new WorkspaceCommand { MachineId = engine.MachineId, Kind = WorkspaceCommandKind.Stop, SessionId = "s1" }, CancellationToken.None);
         Assert.Equal(WorkspaceCommandStatus.Received, stop.Status);
         Assert.True(_claude.Last!.Killed);
+        await WorkspaceBridgeTests.WaitAsync(() => engine.HostedRuns.Count == 0 ? (object)true : null);
         await engine.HandleHookAsync(Hook(ClaudeHookEvent.UserPromptSubmit, "s1", folder, transcript, prompt: "Hi"));
         await run.WaitAsync(TimeSpan.FromSeconds(10));
+    }
+
+    [Fact]
+    public async Task A_run_stopped_while_a_message_goes_in_is_not_started_again()
+    {
+        var claude = new FakeClaude();
+        var headless = new HeadlessClaude(claude, NullLogger.Instance);
+        var folder = Directory.CreateDirectory(Path.Combine(_dir.FullName, "cli")).FullName;
+        await headless.SendAsync("s1", folder, "One", CancellationToken.None);
+        var first = claude.Last!;
+        Assert.True(headless.Stop("s1"));
+        first.Dispose();
+        var second = await Record.ExceptionAsync(() => headless.SendAsync("s1", folder, "Two", CancellationToken.None));
+        // Either the stopped run is gone already (a new run takes "Two") or the write fails and says it was stopped: never a crash.
+        Assert.True(second is null or PromptSendException, second?.ToString());
+        await headless.DisposeAsync();
     }
 
     public async ValueTask DisposeAsync()
