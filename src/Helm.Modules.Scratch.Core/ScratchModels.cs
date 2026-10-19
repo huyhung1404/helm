@@ -77,6 +77,16 @@ public sealed record ScratchItem
     /// <summary>The name of the device it was added on.</summary>
     public string AddedFrom { get; init; } = "";
 
+    /// <summary>
+    /// When it was last opened, copied, sent, saved, moved or restored (on any device); unset: never since it was added.
+    /// A thing not used for <see cref="ScratchStore.IdleDays"/> days goes to the trash by itself.
+    /// </summary>
+    public DateTimeOffset? LastUsedAt { get; init; }
+
+    /// <summary>When it was last added or used.</summary>
+    [JsonIgnore]
+    public DateTimeOffset LastActive => LastUsedAt is { } used && used > AddedAt ? used : AddedAt;
+
     /// <summary>In the trash: hidden from the list, restorable, deleted only when the user deletes it from the trash.</summary>
     public bool Trashed { get; init; }
 
@@ -90,6 +100,14 @@ public sealed record ScratchItem
 
     [JsonIgnore]
     public bool IsMedia => IsImage || IsVideo;
+
+    /// <summary>A text, or a text file small enough to read into a note.</summary>
+    [JsonIgnore]
+    public bool CanBecomeNote => Kind == ScratchKind.Text
+        || (Kind == ScratchKind.File && Size <= MaxNoteFileBytes && ScratchFormat.IsPlainText(MediaType, Name));
+
+    /// <summary>The largest text file Send to Notes reads (a note holds 100,000 characters).</summary>
+    public const long MaxNoteFileBytes = 400 * 1024;
 
     /// <summary>The file name, or the first line of the text.</summary>
     [JsonIgnore]

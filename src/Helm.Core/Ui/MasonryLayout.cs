@@ -1,4 +1,4 @@
-namespace Helm.Modules.Scratch;
+namespace Helm.Core.Ui;
 
 /// <summary>The arithmetic of the card wall, shared by the WPF and Avalonia panels.</summary>
 public static class MasonryLayout

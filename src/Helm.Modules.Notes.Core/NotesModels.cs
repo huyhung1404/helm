@@ -85,6 +85,28 @@ public static class NoteText
         return Shorten(string.Join(' ', lines), max);
     }
 
+    /// <summary>
+    /// What a card shows under the title: the text without the line used as the title (when there is no title), its
+    /// line breaks kept (blank runs as one blank line), cut at <paramref name="max"/> characters.
+    /// </summary>
+    public static string CardText(string title, string body, int max = 1000)
+    {
+        var lines = Normalize(body).Split('\n').Select(l => l.TrimEnd()).ToList();
+        if (title.Trim().Length == 0)
+        {
+            var first = lines.FindIndex(l => l.Trim().Length > 0);
+            if (first >= 0) lines.RemoveRange(0, first + 1);
+        }
+        var kept = new List<string>(lines.Count);
+        foreach (var line in lines)
+        {
+            if (line.Trim().Length == 0 && (kept.Count == 0 || kept[^1].Length == 0)) continue;
+            kept.Add(line.Trim().Length == 0 ? "" : line);
+        }
+        while (kept.Count > 0 && kept[^1].Length == 0) kept.RemoveAt(kept.Count - 1);
+        return Shorten(string.Join('\n', kept), max);
+    }
+
     public static int Words(string text) =>
         text.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries).Length;
 

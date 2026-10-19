@@ -1,6 +1,7 @@
 using System.Collections.ObjectModel;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using Helm.Core.Capture;
 using Helm.Core.Services;
 using Helm.Core.Settings;
 using Helm.Core.Sync;
@@ -25,6 +26,7 @@ public sealed partial class ScratchRowViewModel : ObservableObject
     [ObservableProperty] private bool _isVideo;
     [ObservableProperty] private bool _isImage;
     [ObservableProperty] private bool _trashed;
+    [ObservableProperty] private bool _canBecomeNote;
 
     /// <summary>The card the keyboard acts on (PC: Ctrl+C, Delete, Enter).</summary>
     [ObservableProperty] private bool _isSelected;
@@ -70,24 +72,30 @@ public sealed partial class ScratchRowViewModel : ObservableObject
 
     internal void Update(ScratchItem item, DateTimeOffset now, string status)
     {
+        // Unused things go to the trash by themselves: the card says so in its last days, the tooltip always.
+        var idleUntil = ScratchStore.IdleUntil(item);
+        var trashIn = ScratchFormat.TrashIn(idleUntil, now);
         Name = item.DisplayName.Length > 0 ? item.DisplayName : "(empty)";
         KindName = ScratchFormat.KindName(item);
         var size = item.Kind == ScratchKind.Text
             ? item.Size == 1 ? "1 character" : $"{item.Size:N0} characters"
             : ScratchFormat.Size(item.Size);
         var when = item.Trashed && item.TrashedAt is { } at ? $"deleted {ScratchFormat.When(at, now)}" : ScratchFormat.When(item.AddedAt, now);
-        Meta = string.Join(" · ", new[] { KindName, size, item.AddedFrom.Length > 0 ? $"from {item.AddedFrom}" : "", when }.Where(p => p.Length > 0));
+        Meta = string.Join(" · ", new[] { KindName, size, item.AddedFrom.Length > 0 ? $"from {item.AddedFrom}" : "", when }.Where(p => p.Length > 0))
+            + (item.Trashed ? "" : $"\nGoes to the trash {trashIn} unless you use it (open, copy or send it).");
         Status = status;
         TextPreview = item.Kind == ScratchKind.Text ? Preview(item.Text ?? "") : "";
         // A card shows the whole text (very long ones are cut; Copy and the details have all of it).
         var text = item.Text ?? "";
         FullText = item.Kind != ScratchKind.Text ? "" : text.Length <= MaxCardText ? text : text[..MaxCardText].TrimEnd() + "…";
         Footer = item.Kind == ScratchKind.Text ? when : $"{size} · {when}";
+        if (!item.Trashed && idleUntil - now < TimeSpan.FromDays(ScratchViewModel.WarnDays)) Footer += $" · trash {trashIn}";
         if (!ReferenceEquals(Thumbnail, item.Thumbnail)) Thumbnail = item.Thumbnail;
         IsText = item.Kind == ScratchKind.Text;
         IsVideo = item.IsVideo;
         IsImage = item.IsImage;
         Trashed = item.Trashed;
+        CanBecomeNote = !item.Trashed && item.CanBecomeNote;
     }
 
     /// <summary>The lines after the first (the first is the row's name), for its row.</summary>
@@ -134,6 +142,8 @@ public sealed partial class ScratchViewModel : ObservableObject
     private readonly IDialogService _dialogs;
     private readonly IClipboardService _clipboard;
     private readonly ISyncService? _sync;
+    private readonly INoteWriter? _notes;
+    private readonly ISettingsStore<GeneralSettings> _general;
     private readonly ILogger<ScratchViewModel> _logger;
     private readonly Dictionary<string, ScratchRowViewModel> _rows = new(StringComparer.Ordinal);
     private readonly SemaphoreSlim _work = new(1, 1);
@@ -165,7 +175,8 @@ public sealed partial class ScratchViewModel : ObservableObject
         IDialogService dialogs,
         IClipboardService clipboard,
         ILogger<ScratchViewModel> logger,
-        ISyncService? sync = null)
+        ISyncService? sync = null,
+        INoteWriter? notes = null)
     {
         _store = store;
         _importer = importer;
@@ -176,6 +187,8 @@ public sealed partial class ScratchViewModel : ObservableObject
         _dialogs = dialogs;
         _clipboard = clipboard;
         _sync = sync;
+        _notes = notes;
+        _general = settings.Get<GeneralSettings>(GeneralSettings.StoreId);
         _logger = logger;
 
         FilterTabs =
@@ -199,6 +212,9 @@ public sealed partial class ScratchViewModel : ObservableObject
         if (_sync is not null) _sync.StatusChanged += (_, _) => ScheduleRefresh();
         Refresh();
     }
+
+    /// <summary>The cards say when they go to the trash this many days before.</summary>
+    public const int WarnDays = 2;
 
     /// <summary>The things shown: the filter, narrowed by the search.</summary>
     public ObservableCollection<ScratchRowViewModel> Rows { get; } = [];
@@ -226,7 +242,7 @@ public sealed partial class ScratchViewModel : ObservableObject
             if (Search.Trim().Length > 0) return $"Nothing here matches “{Search.Trim()}”.";
             return Filter switch
             {
-                ScratchFilter.Trash => "The trash is empty. Things you delete wait here until you delete them from the trash.",
+                ScratchFilter.Trash => $"The trash is empty. Things you delete, and things nobody used for {ScratchStore.IdleDays} days, wait here until you delete them from the trash.",
                 ScratchFilter.Media => "No photos or videos yet.",
                 ScratchFilter.Files => "No files yet.",
                 ScratchFilter.Text => "No text yet. Paste a link, an address or a code to have it on your other devices.",
@@ -238,7 +254,7 @@ public sealed partial class ScratchViewModel : ObservableObject
     /// <summary>For the settings page: how many things are in the trash.</summary>
     public string TrashSummary => _store.Counts()[ScratchFilter.Trash] switch
     {
-        0 => "Nothing in the trash. Things stay there until you delete them from it.",
+        0 => $"Nothing in the trash. Things nobody used for {ScratchStore.IdleDays} days go there by themselves, and stay until you delete them from it.",
         1 => "1 thing in the trash. Deleting it from the trash removes it from all your devices.",
         var n => $"{n} things in the trash. Deleting them from the trash removes them from all your devices.",
     };
@@ -436,6 +452,7 @@ public sealed partial class ScratchViewModel : ObservableObject
         if (items.All(x => x.Item!.Kind == ScratchKind.Text))
         {
             _clipboard.SetText(string.Join("\n\n", items.Select(x => x.Item!.Text ?? "")));
+            foreach (var (row, _) in items) Used(row.Id);
             Message = $"Copied {items.Count} texts as one.";
             return;
         }
@@ -448,6 +465,7 @@ public sealed partial class ScratchViewModel : ObservableObject
         try
         {
             await _platform.CopyToClipboardAsync(files, CancellationToken.None).ConfigureAwait(true);
+            foreach (var (row, _) in items.Where(x => x.Item!.Kind == ScratchKind.File)) Used(row.Id);
             var skipped = items.Count - files.Count;
             Message = $"Copied {files.Count} files." + (skipped > 0 ? $" {skipped} text{(skipped == 1 ? " was" : "s were")} left out: copy texts on their own." : "");
         }
@@ -526,12 +544,14 @@ public sealed partial class ScratchViewModel : ObservableObject
         if (item.Kind == ScratchKind.Text)
         {
             Select(row);
+            Used(row.Id);
             return;
         }
         if (await ExportAsync(row.Id, item).ConfigureAwait(true) is not { } file) return;
         try
         {
             await _platform.OpenAsync(file, CancellationToken.None).ConfigureAwait(true);
+            Used(row.Id);
         }
         catch (Exception ex)
         {
@@ -547,7 +567,10 @@ public sealed partial class ScratchViewModel : ObservableObject
         try
         {
             if (await _platform.SaveAsync(file, CancellationToken.None).ConfigureAwait(true) is { } where)
+            {
+                Used(row.Id);
                 Message = $"Saved “{item.Name}” to {where}.";
+            }
         }
         catch (Exception ex)
         {
@@ -563,6 +586,7 @@ public sealed partial class ScratchViewModel : ObservableObject
         if (item.Kind == ScratchKind.Text)
         {
             _clipboard.SetText(item.Text ?? "");
+            Used(row.Id);
             Message = "Text copied.";
             return;
         }
@@ -570,6 +594,7 @@ public sealed partial class ScratchViewModel : ObservableObject
         try
         {
             Message = await _platform.SendAsync([file], CancellationToken.None).ConfigureAwait(true);
+            Used(row.Id);
         }
         catch (Exception ex)
         {
@@ -587,6 +612,7 @@ public sealed partial class ScratchViewModel : ObservableObject
         {
             await _relay.CopyHereAsync(row.Id, item).ConfigureAwait(true);
             _relay.Send(row.Id);
+            Used(row.Id);
             Message = _sync?.Status.State is SyncState.NotConfigured
                 ? $"Copied “{row.Name}” here. Turn on sync to have your other devices copy it too."
                 : $"Copied “{row.Name}” here and on your other devices that are syncing.";
@@ -595,6 +621,101 @@ public sealed partial class ScratchViewModel : ObservableObject
         {
             Fail($"Could not send “{row.Name}” to the clipboard", ex);
         }
+    }
+
+    // ---- Send to Notes --------------------------------------------------------------------------------------------
+
+    /// <summary>Notes is part of the app and turned on (Send to Notes is offered).</summary>
+    public bool CanSendToNotes => _notes is not null
+        && (!_general.Current.EnabledModules.TryGetValue(_notes.ModuleId, out var on) || on);
+
+    /// <summary>
+    /// Keeps a text (or a text file) for good: it becomes a new note with all its text, and the card goes to the trash
+    /// (restorable, like anything deleted).
+    /// </summary>
+    [RelayCommand]
+    private async Task SendToNotesAsync(ScratchRowViewModel? row)
+    {
+        if (row is null) return;
+        if (await ToNoteAsync(row).ConfigureAwait(true) is { } title)
+        {
+            if (Selected == row) CloseDetail();
+            Message = $"Moved to Notes as “{title}”. The card is in the trash.";
+        }
+    }
+
+    /// <summary>The selected texts become notes, one each (PC: Ctrl+Shift+N); photos and other files stay.</summary>
+    public async Task SendSelectedToNotesAsync()
+    {
+        var rows = InWallOrder(_selection);
+        if (rows.Count <= 1)
+        {
+            if (rows.Count == 1) await SendToNotesCommand.ExecuteAsync(rows[0]).ConfigureAwait(true);
+            return;
+        }
+        var texts = rows.Where(r => r.CanBecomeNote).ToList();
+        var moved = 0;
+        foreach (var row in texts)
+        {
+            if (await ToNoteAsync(row).ConfigureAwait(true) is null) return;
+            moved++;
+        }
+        Select(null);
+        var skipped = rows.Count - texts.Count;
+        Message = (moved == 1 ? "Moved 1 text to Notes; its card is in the trash." : $"Moved {moved} texts to Notes; their cards are in the trash.")
+            + (skipped == 0 ? "" : skipped == 1 ? " 1 thing that is not text stays here." : $" {skipped} things that are not text stay here.");
+    }
+
+    /// <returns>The new note's title; null when it did not work (the message says why).</returns>
+    private async Task<string?> ToNoteAsync(ScratchRowViewModel row)
+    {
+        if (!CanSendToNotes)
+        {
+            Message = _notes is null ? "Notes is not part of this Helm." : "Notes is turned off. Turn it on in Home → Utilities to move texts there.";
+            return null;
+        }
+        if (_store.Get(row.Id) is not { Trashed: false } item) return null;
+        if (!item.CanBecomeNote)
+        {
+            Message = $"“{row.Name}” is not text: only texts and text files can become notes.";
+            return null;
+        }
+        string text;
+        if (item.Kind == ScratchKind.Text)
+        {
+            text = item.Text ?? "";
+        }
+        else
+        {
+            if (await ExportAsync(row.Id, item).ConfigureAwait(true) is not { } file) return null;
+            try
+            {
+                text = await File.ReadAllTextAsync(file.Path).ConfigureAwait(true);
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+            {
+                Fail($"Could not read “{item.Name}”", ex);
+                return null;
+            }
+        }
+        string title;
+        try
+        {
+            title = _notes!.Write(text).Title;
+        }
+        catch (ArgumentException ex)
+        {
+            Message = ex.Message;
+            return null;
+        }
+        catch (Exception ex)
+        {
+            Fail($"Could not move “{row.Name}” to Notes", ex);
+            return null;
+        }
+        // The note is safe: the card goes (to the trash, where it can still be restored).
+        Try(() => _store.MoveToTrash(row.Id));
+        return title;
     }
 
     partial void OnReceiveClipboardChanged(bool value)
@@ -620,6 +741,7 @@ public sealed partial class ScratchViewModel : ObservableObject
         if (item.Kind == ScratchKind.Text)
         {
             _clipboard.SetText(item.Text ?? "");
+            Used(row.Id);
             Message = "Text copied.";
             return;
         }
@@ -627,6 +749,7 @@ public sealed partial class ScratchViewModel : ObservableObject
         try
         {
             await _platform.CopyToClipboardAsync([file], CancellationToken.None).ConfigureAwait(true);
+            Used(row.Id);
             Message = $"Copied “{item.Name}”. Paste it into a folder, a chat or an email.";
         }
         catch (Exception ex)
@@ -640,6 +763,7 @@ public sealed partial class ScratchViewModel : ObservableObject
     {
         if (row is null || _store.Get(row.Id) is not { Kind: ScratchKind.Text } item) return;
         _clipboard.SetText(item.Text ?? "");
+        Used(row.Id);
         Message = "Text copied.";
     }
 
@@ -769,6 +893,7 @@ public sealed partial class ScratchViewModel : ObservableObject
     {
         try
         {
+            TrashIdle();
             RefreshList();
         }
         catch (Exception ex)
@@ -829,6 +954,23 @@ public sealed partial class ScratchViewModel : ObservableObject
         OnPropertyChanged(nameof(EmptyListText));
         OnPropertyChanged(nameof(HasTrash));
         OnPropertyChanged(nameof(TrashSummary));
+    }
+
+    /// <summary>
+    /// Unused things go to the trash. Only when this device knows the others' uses: sync is off, or it synced within
+    /// the hour (a PC back after two weeks away must not trash what the phone used yesterday).
+    /// </summary>
+    private void TrashIdle()
+    {
+        var status = _sync?.Status;
+        var current = status is null || status.State == SyncState.NotConfigured
+            || (status.LastSyncedAt is { } at && _store.Now - at < TimeSpan.FromHours(1));
+        if (!current) return;
+        var count = _store.TrashIdle();
+        if (count > 0)
+            Message = count == 1
+                ? $"1 thing nobody used for {ScratchStore.IdleDays} days went to the trash. Restore it there if you still need it."
+                : $"{count} things nobody used for {ScratchStore.IdleDays} days went to the trash. Restore them there if you still need them.";
     }
 
     private string StatusOf(ScratchItem item, SyncState state)
@@ -925,6 +1067,20 @@ public sealed partial class ScratchViewModel : ObservableObject
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
             // Open in another app: cleared when Scratch starts next time.
+        }
+    }
+
+    /// <summary>A thing was used: it stays out of the trash for another <see cref="ScratchStore.IdleDays"/> days.</summary>
+    private void Used(string id)
+    {
+        try
+        {
+            _store.Touch(id);
+        }
+        catch (Exception ex)
+        {
+            // Only a date: never worth failing the copy or the open over.
+            _logger.LogWarning(ex, "Could not mark a scratch thing as used");
         }
     }
 

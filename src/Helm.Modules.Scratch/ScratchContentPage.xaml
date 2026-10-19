@@ -75,7 +75,7 @@
         <DockPanel Margin="0,0,0,16">
             <!-- No buttons on PC: the keyboard does it (the phone has buttons) -->
             <TextBlock x:Name="Actions" DockPanel.Dock="Right" VerticalAlignment="Center" Style="{DynamicResource HelmSecondaryText}" TextAlignment="Right"
-                       Text="Ctrl+V or drop to add · Click a card (Shift+click for more): Ctrl+C copy, Del delete (Shift+Del for good), Enter open" />
+                       Text="Ctrl+V or drop to add · Click a card (Shift+click for more): Ctrl+C copy, Ctrl+Shift+N to Notes, Del delete (Shift+Del for good), Enter open" />
             <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
                 <Image Source="{x:Static self:ScratchLogo.Image}" Width="32" Height="32" Margin="0,0,12,0" />
                 <TextBlock Text="Scratch" FontSize="28" FontWeight="SemiBold" VerticalAlignment="Center" />
@@ -155,7 +155,7 @@
                 <ItemsControl x:Name="Wall" ItemsSource="{Binding Rows}" Focusable="True" FocusVisualStyle="{x:Null}" Margin="0,4,18,24" AutomationProperties.Name="Scratch" AllowDrop="True">
                     <ItemsControl.ItemsPanel>
                         <ItemsPanelTemplate>
-                            <self:MasonryPanel MinColumnWidth="230" Spacing="10" />
+                            <core:MasonryPanel MinColumnWidth="230" Spacing="10" />
                         </ItemsPanelTemplate>
                     </ItemsControl.ItemsPanel>
                     <ItemsControl.ItemTemplate>
@@ -174,6 +174,10 @@
                                                   CommandParameter="{Binding}" Visibility="{Binding IsLive, Converter={StaticResource BoolToVisibility}}" />
                                         <MenuItem Header="Save as…" Command="{Binding PlacementTarget.Tag.SaveCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
                                                   CommandParameter="{Binding}" Visibility="{Binding IsFile, Converter={StaticResource BoolToVisibility}}" />
+                                        <!-- Keep a text for good: it becomes a note, the card goes to the trash -->
+                                        <MenuItem Header="Send to Notes" InputGestureText="Ctrl+Shift+N"
+                                                  Command="{Binding PlacementTarget.Tag.SendToNotesCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
+                                                  CommandParameter="{Binding}" Visibility="{Binding CanBecomeNote, Converter={StaticResource BoolToVisibility}}" />
                                         <Separator />
                                         <MenuItem Header="Move to the trash" InputGestureText="Del" Command="{Binding PlacementTarget.Tag.TrashCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
                                                   CommandParameter="{Binding}" Visibility="{Binding IsLive, Converter={StaticResource BoolToVisibility}}" />

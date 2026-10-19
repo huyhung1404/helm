@@ -15,7 +15,7 @@ public sealed class NotesSettings : IVersionedSettings
 
     public int Version { get; set; }
 
-    /// <summary>The note the page opens on (Windows); null opens none.</summary>
+    /// <summary>The note open last; null when none is open (both apps start on the cards).</summary>
     public string? SelectedNoteId { get; set; }
 
     public NotesSortOrder SortOrder { get; set; } = NotesSortOrder.Edited;

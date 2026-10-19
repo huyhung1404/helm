@@ -13,6 +13,12 @@ public sealed class ScratchStore
 {
     public const string Collection = "scratch.items";
 
+    /// <summary>A thing nobody added or used for this many days goes to the trash by itself.</summary>
+    public const int IdleDays = 7;
+
+    /// <summary>A use is written at most this often per thing (copying ten times syncs one change, not ten).</summary>
+    public static readonly TimeSpan UseResolution = TimeSpan.FromHours(1);
+
     private readonly ISyncedCollection<ScratchItem> _items;
     private readonly BlobStore _blobs;
     private readonly TimeProvider _time;
@@ -173,7 +179,7 @@ public sealed class ScratchStore
                 (null, { } b) => b + 1000,
                 _ => 0,
             };
-            _items.Upsert(id, wall[from].Value with { SortKey = key });
+            _items.Upsert(id, wall[from].Value with { SortKey = key, LastUsedAt = Now });
             return true;
         }
     }
@@ -187,7 +193,31 @@ public sealed class ScratchStore
 
     public bool MoveToTrash(string id) => Change(id, i => i.Trashed ? i : i with { Trashed = true, TrashedAt = Now });
 
-    public bool Restore(string id) => Change(id, i => i.Trashed ? i with { Trashed = false, TrashedAt = null } : i);
+    /// <summary>Back out of the trash, as just used (so it is not trashed again for being idle).</summary>
+    public bool Restore(string id) => Change(id, i => i.Trashed ? i with { Trashed = false, TrashedAt = null, LastUsedAt = Now } : i);
+
+    /// <summary>
+    /// Marks a thing as used now (opened, copied, sent, saved), which keeps it out of the trash for another
+    /// <see cref="IdleDays"/> days. Written at most once per <see cref="UseResolution"/>.
+    /// </summary>
+    public bool Touch(string id) => Change(id, i => i.Trashed || Now - i.LastActive < UseResolution ? i : i with { LastUsedAt = Now });
+
+    /// <summary>When an unused thing goes to the trash by itself.</summary>
+    public static DateTimeOffset IdleUntil(ScratchItem item) => item.LastActive + TimeSpan.FromDays(IdleDays);
+
+    /// <summary>
+    /// Moves to the trash every thing that was not added or used for <see cref="IdleDays"/> days. The caller makes sure
+    /// this device knows the other devices' uses first (it has synced lately, or sync is off).
+    /// </summary>
+    /// <returns>How many things went to the trash.</returns>
+    public int TrashIdle()
+    {
+        var now = Now;
+        lock (_gate)
+        {
+            return Items(ScratchFilter.All).Where(i => IdleUntil(i.Value) <= now).Count(i => MoveToTrash(i.Id));
+        }
+    }
 
     /// <summary>
     /// Deletes a thing in the trash for good, on every device. Things outside the trash are never deleted. Its file

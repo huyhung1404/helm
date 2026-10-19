@@ -12,11 +12,15 @@ using Microsoft.Extensions.Logging;
 
 namespace Helm.Modules.Notes;
 
-/// <summary>One note in the list.</summary>
+/// <summary>One note on the wall of cards.</summary>
 public sealed partial class NoteRowViewModel : ObservableObject
 {
+    /// <summary>Characters of a note a card shows (the editor has all of it).</summary>
+    public const int MaxCardText = 1000;
+
     [ObservableProperty] private string _title = "";
     [ObservableProperty] private string _preview = "";
+    [ObservableProperty] private string _cardText = "";
     [ObservableProperty] private string _when = "";
     [ObservableProperty] private bool _pinned;
     [ObservableProperty] private bool _trashed;
@@ -26,13 +30,20 @@ public sealed partial class NoteRowViewModel : ObservableObject
     public string Id { get; }
 
     public bool HasPreview => Preview.Length > 0;
+    public bool HasCardText => CardText.Length > 0;
+    public bool IsLive => !Trashed;
 
     partial void OnPreviewChanged(string value) => OnPropertyChanged(nameof(HasPreview));
+
+    partial void OnCardTextChanged(string value) => OnPropertyChanged(nameof(HasCardText));
+
+    partial void OnTrashedChanged(bool value) => OnPropertyChanged(nameof(IsLive));
 
     internal void Update(NoteItem note, DateTimeOffset now)
     {
         Title = note.DisplayTitle;
         Preview = NoteText.Preview(note.Title, note.Body);
+        CardText = NoteText.CardText(note.Title, note.Body, MaxCardText);
         When = note.Trashed && note.TrashedAt is { } at ? $"Deleted {NotesFormat.When(at, now)}" : NotesFormat.When(note.EditedAt, now);
         Pinned = note.Pinned;
         Trashed = note.Trashed;
@@ -40,8 +51,8 @@ public sealed partial class NoteRowViewModel : ObservableObject
 }
 
 /// <summary>
-/// The Notes page, shared by the Windows and Android apps: the list (search, trash), the editor with autosave, and the
-/// settings. All members are used on the UI thread; store changes (local or synced) are coalesced into one refresh
+/// The Notes page, shared by the Windows and Android apps: the wall of cards (search, trash), the editor with
+/// autosave, and the settings. All members are used on the UI thread; store changes (local or synced) are coalesced into one refresh
 /// through <see cref="IUiDispatcher"/>.
 /// </summary>
 public sealed partial class NotesViewModel : ObservableObject, IDisposable
@@ -210,13 +221,6 @@ public sealed partial class NotesViewModel : ObservableObject, IDisposable
             _loading = false;
         }
         RefreshList();
-        Open(id);
-    }
-
-    /// <summary>Windows: opens the note that was open last time (the phone starts on the list).</summary>
-    public void OpenLastNote()
-    {
-        if (IsEditorOpen || _settings.Current.SelectedNoteId is not { } id || _store.Get(id) is not { Trashed: false }) return;
         Open(id);
     }
 
@@ -408,6 +412,54 @@ public sealed partial class NotesViewModel : ObservableObject, IDisposable
         var title = EditTitle.Trim();
         _clipboard.SetText(title.Length > 0 ? $"{title}\n\n{EditBody}" : EditBody);
         Message = "Note copied.";
+    }
+
+    // ---- A card's own actions (right-click on PC, the card's buttons on the phone) --------------------------------
+
+    [RelayCommand]
+    private void TogglePinRow(NoteRowViewModel? row)
+    {
+        if (row is null || row.Trashed) return;
+        Flush();
+        Try(() => _store.SetPinned(row.Id, !row.Pinned));
+    }
+
+    [RelayCommand]
+    private void CopyRow(NoteRowViewModel? row)
+    {
+        if (row is null) return;
+        Flush();
+        if (_store.Get(row.Id) is not { } note) return;
+        _clipboard.SetText(note.Title.Length > 0 ? $"{note.Title}\n\n{note.Body}" : note.Body);
+        Message = "Note copied.";
+    }
+
+    [RelayCommand]
+    private void TrashRow(NoteRowViewModel? row)
+    {
+        if (row is null) return;
+        Flush();
+        if (!Try(() => _store.MoveToTrash(row.Id))) return;
+        if (_editorId == row.Id) CloseEditorKeepingList();
+        Message = $"Moved “{row.Title}” to the trash.";
+    }
+
+    [RelayCommand]
+    private void RestoreRow(NoteRowViewModel? row)
+    {
+        if (row is null || !Try(() => _store.Restore(row.Id))) return;
+        Message = $"Restored “{row.Title}”.";
+    }
+
+    [RelayCommand]
+    private async Task DeleteForeverRowAsync(NoteRowViewModel? row)
+    {
+        if (row is null || _store.Get(row.Id) is not { Trashed: true } note) return;
+        var ok = await _dialogs.ConfirmAsync($"Delete “{note.DisplayTitle}” for good?",
+            "It is removed from all your devices and cannot be restored.", "Delete").ConfigureAwait(true);
+        if (!ok) return;
+        if (!Try(() => _store.DeleteForever(row.Id))) return;
+        if (_editorId == row.Id) CloseEditorKeepingList();
     }
 
     [RelayCommand]

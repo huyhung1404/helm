@@ -1,29 +1,29 @@
-using System.Windows;
-using System.Windows.Controls;
+using Avalonia;
+using Avalonia.Controls;
 
-namespace Helm.Modules.Scratch;
+namespace Helm.Core.Ui;
 
 /// <summary>
 /// Cards of different heights in equal columns, each card going into the shortest column so the gaps fill up (like a
-/// photo wall). As many columns as fit at <see cref="MinColumnWidth"/>; the columns share the width.
+/// photo wall). As many columns as fit at <see cref="MinColumnWidth"/> (two on a phone); the columns share the width.
 /// </summary>
 public sealed class MasonryPanel : Panel
 {
-    public static readonly DependencyProperty MinColumnWidthProperty = DependencyProperty.Register(nameof(MinColumnWidth), typeof(double),
-        typeof(MasonryPanel), new FrameworkPropertyMetadata(240.0, FrameworkPropertyMetadataOptions.AffectsMeasure));
+    public static readonly StyledProperty<double> MinColumnWidthProperty = AvaloniaProperty.Register<MasonryPanel, double>(nameof(MinColumnWidth), 150);
 
-    public static readonly DependencyProperty SpacingProperty = DependencyProperty.Register(nameof(Spacing), typeof(double),
-        typeof(MasonryPanel), new FrameworkPropertyMetadata(12.0, FrameworkPropertyMetadataOptions.AffectsMeasure));
+    public static readonly StyledProperty<double> SpacingProperty = AvaloniaProperty.Register<MasonryPanel, double>(nameof(Spacing), 8);
+
+    static MasonryPanel() => AffectsMeasure<MasonryPanel>(MinColumnWidthProperty, SpacingProperty);
 
     public double MinColumnWidth
     {
-        get => (double)GetValue(MinColumnWidthProperty);
+        get => GetValue(MinColumnWidthProperty);
         set => SetValue(MinColumnWidthProperty, value);
     }
 
     public double Spacing
     {
-        get => (double)GetValue(SpacingProperty);
+        get => GetValue(SpacingProperty);
         set => SetValue(SpacingProperty, value);
     }
 
@@ -44,10 +44,10 @@ public sealed class MasonryPanel : Panel
     {
         var (columns, columnWidth) = MasonryLayout.Columns(width, MinColumnWidth, Spacing);
         var heights = new double[columns];
-        foreach (UIElement child in InternalChildren)
+        foreach (var child in Children)
         {
             if (!arrange) child.Measure(new Size(columnWidth, double.PositiveInfinity));
-            if (child.Visibility == Visibility.Collapsed) continue;
+            if (!child.IsVisible) continue;
             var column = MasonryLayout.Shortest(heights);
             if (arrange) child.Arrange(new Rect(column * (columnWidth + Spacing), heights[column], columnWidth, child.DesiredSize.Height));
             heights[column] += child.DesiredSize.Height + Spacing;

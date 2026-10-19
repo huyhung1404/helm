@@ -104,6 +104,23 @@ public static class ScratchFormat
         _ => "application/octet-stream",
     };
 
+    /// <summary>A file of plain text (a .txt, .md, .csv, .log), which reads as a note as it is.</summary>
+    public static bool IsPlainText(string mediaType, string name) =>
+        mediaType.StartsWith("text/", StringComparison.OrdinalIgnoreCase)
+        || MediaTypeOf(name).StartsWith("text/", StringComparison.Ordinal);
+
+    /// <summary>"in 3 days", "in 1 day", "within a day": when an unused thing goes to the trash by itself (whole days, rounded down).</summary>
+    public static string TrashIn(DateTimeOffset due, DateTimeOffset now)
+    {
+        var days = (int)Math.Floor((due - now).TotalDays);
+        return days switch
+        {
+            <= 0 => "within a day",
+            1 => "in 1 day",
+            _ => $"in {days} days",
+        };
+    }
+
     /// <summary>The platform's media type unless it is missing or generic, then the one the name suggests.</summary>
     public static string PickMediaType(string? reported, string name) =>
         string.IsNullOrWhiteSpace(reported) || reported.Equals("application/octet-stream", StringComparison.OrdinalIgnoreCase)

@@ -1,7 +1,9 @@
 using System.Security.Cryptography;
 using System.Text;
+using Helm.Core.Capture;
 using Helm.Core.Settings;
 using Helm.Core.Sync;
+using Helm.Modules.Notes;
 using Helm.Modules.Scratch;
 using Helm.Shell.Services;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -532,6 +534,164 @@ public sealed class ScratchTests : IDisposable
         Assert.Single(device.Store.Items(ScratchFilter.All));
     }
 
+    // ---- Unused things go to the trash -------------------------------------------------------------------------------
+
+    [Fact]
+    public async Task A_thing_nobody_uses_for_seven_days_goes_to_the_trash_and_a_use_keeps_it()
+    {
+        var store = NewLocal("a").Store;
+        var idle = await store.AddTextAsync("forgotten", "PC");
+        var used = await store.AddTextAsync("in use", "PC");
+
+        _clock.Advance(TimeSpan.FromDays(5));
+        Assert.True(store.Touch(used));
+        _clock.Advance(TimeSpan.FromDays(2) - TimeSpan.FromMinutes(1));
+        Assert.Equal(0, store.TrashIdle());
+
+        _clock.Advance(TimeSpan.FromMinutes(1));
+        Assert.Equal(1, store.TrashIdle());
+        Assert.True(store.Get(idle)!.Trashed);
+        Assert.False(store.Get(used)!.Trashed);
+
+        // Restoring counts as a use: it does not go straight back.
+        store.Restore(idle);
+        Assert.Equal(0, store.TrashIdle());
+        _clock.Advance(TimeSpan.FromDays(ScratchStore.IdleDays));
+        Assert.Equal(2, store.TrashIdle());
+    }
+
+    [Fact]
+    public async Task A_use_is_written_at_most_once_an_hour_and_moving_a_card_is_a_use()
+    {
+        var store = NewLocal("a").Store;
+        var a = await store.AddTextAsync("a", "PC");
+        _clock.Advance(TimeSpan.FromSeconds(1));
+        var b = await store.AddTextAsync("b", "PC");
+
+        _clock.Advance(TimeSpan.FromMinutes(30));
+        store.Touch(a);
+        Assert.Null(store.Get(a)!.LastUsedAt);
+        _clock.Advance(TimeSpan.FromMinutes(31));
+        store.Touch(a);
+        Assert.Equal(_clock.GetUtcNow(), store.Get(a)!.LastUsedAt);
+
+        _clock.Advance(TimeSpan.FromDays(3));
+        store.Move(a, b);
+        Assert.Equal(_clock.GetUtcNow(), store.Get(a)!.LastUsedAt);
+    }
+
+    [Fact]
+    public async Task Copying_on_the_page_keeps_a_card_and_the_page_says_what_went_to_the_trash()
+    {
+        var device = NewLocal("a");
+        await device.Store.AddTextAsync("copied", "PC");
+        await device.Store.AddTextAsync("left alone", "PC");
+        var vm = NewViewModel(device.Store, new FakePlatform(Path.Combine(_dir, "open")), out var clipboard);
+
+        _clock.Advance(TimeSpan.FromDays(6));
+        await vm.CopyCommand.ExecuteAsync(vm.Rows.Single(r => r.Name == "copied"));
+        // In its last days a card says when it goes.
+        Assert.EndsWith("trash in 1 day", vm.Rows.Single(r => r.Name == "left alone").Footer);
+        Assert.DoesNotContain("trash", vm.Rows.Single(r => r.Name == "copied").Footer);
+
+        _clock.Advance(TimeSpan.FromDays(1));
+        await device.Store.AddTextAsync("new", "PC");
+
+        Assert.Equal(["new", "copied"], vm.Rows.Select(r => r.Name));
+        Assert.Contains("1 thing nobody used for 7 days went to the trash", vm.Message);
+    }
+
+    [Fact]
+    public async Task Nothing_goes_to_the_trash_for_being_unused_before_this_device_has_synced()
+    {
+        var device = NewLocal("a");
+        await device.Store.AddTextAsync("used on the phone, maybe", "PC");
+        _clock.Advance(TimeSpan.FromDays(14));
+        var sync = new FakeSync(new SyncStatus(SyncState.Offline, null, "offline"));
+
+        var vm = NewViewModel(device.Store, new FakePlatform(Path.Combine(_dir, "open")), out _, sync: sync);
+        Assert.Single(vm.Rows);
+
+        // Synced long ago (an old status): still not.
+        sync.Set(new SyncStatus(SyncState.Idle, _clock.GetUtcNow() - TimeSpan.FromHours(2), null));
+        Assert.Single(vm.Rows);
+
+        // Synced just now: the other devices' uses are known.
+        sync.Set(new SyncStatus(SyncState.Idle, _clock.GetUtcNow(), null));
+        Assert.Empty(vm.Rows);
+        Assert.Single(device.Store.Items(ScratchFilter.Trash));
+    }
+
+    // ---- Send to Notes ---------------------------------------------------------------------------------------------
+
+    [Fact]
+    public async Task Send_to_notes_keeps_the_whole_text_as_a_note_and_trashes_the_card()
+    {
+        var device = NewLocal("a");
+        var notes = new NotesStore(new MemorySynced<NoteItem>(), _clock);
+        var vm = NewViewModel(device.Store, new FakePlatform(Path.Combine(_dir, "open")), out _, notes: new NoteWriter(notes));
+        await vm.AddTextAsync("Shopping\n- milk\n- eggs");
+        await vm.AddSourcesAsync([new ScratchSource("photo.jpg", "image/jpeg", 2, () => new MemoryStream([0xFF, 0xD8]))]);
+        var text = vm.Rows.Single(r => r.IsText);
+        var photo = vm.Rows.Single(r => r.IsImage);
+        Assert.True(text.CanBecomeNote);
+        Assert.False(photo.CanBecomeNote);
+
+        await vm.SendToNotesCommand.ExecuteAsync(text);
+
+        var note = Assert.Single(notes.Notes()).Value;
+        Assert.Equal("", note.Title);
+        Assert.Equal("Shopping\n- milk\n- eggs", note.Body);
+        Assert.Equal("Shopping", note.DisplayTitle);
+        Assert.Equal(["photo.jpg"], vm.Rows.Select(r => r.Name));
+        Assert.Single(device.Store.Items(ScratchFilter.Trash));
+        Assert.Contains("Moved to Notes as “Shopping”", vm.Message);
+
+        // A photo cannot be a note: nothing changes.
+        await vm.SendToNotesCommand.ExecuteAsync(photo);
+        Assert.Single(notes.Notes());
+        Assert.Single(vm.Rows);
+    }
+
+    [Fact]
+    public async Task A_text_file_becomes_a_note_and_several_cards_go_at_once()
+    {
+        var device = NewLocal("a");
+        var notes = new NotesStore(new MemorySynced<NoteItem>(), _clock);
+        var vm = NewViewModel(device.Store, new FakePlatform(Path.Combine(_dir, "open")), out _, notes: new NoteWriter(notes));
+        var bytes = Encoding.UTF8.GetBytes("Ghi chú dài\ndòng hai");
+        await vm.AddSourcesAsync([new ScratchSource("log.txt", null, bytes.Length, () => new MemoryStream(bytes))]);
+        _clock.Advance(TimeSpan.FromSeconds(1));
+        await vm.AddTextAsync("one");
+        _clock.Advance(TimeSpan.FromSeconds(1));
+        await vm.AddSourcesAsync([new ScratchSource("a.pdf", null, 1, () => new MemoryStream([1]))]);
+
+        vm.SelectAll();
+        await vm.SendSelectedToNotesAsync();
+
+        Assert.Equal(["Ghi chú dài\ndòng hai", "one"], notes.Notes().Select(n => n.Value.Body).Order(StringComparer.Ordinal));
+        Assert.Equal(["a.pdf"], vm.Rows.Select(r => r.Name));
+        Assert.Contains("Moved 2 texts to Notes", vm.Message);
+        Assert.Contains("1 thing that is not text stays here", vm.Message);
+    }
+
+    [Fact]
+    public async Task Send_to_notes_waits_while_notes_is_turned_off()
+    {
+        var device = NewLocal("a");
+        var settings = Own(new SettingsStoreFactory(new HelmPaths(Path.Combine(_dir, "settings"))));
+        settings.Get<GeneralSettings>(GeneralSettings.StoreId).Update(s => s.EnabledModules[NotesIds.ModuleId] = false);
+        var notes = new NotesStore(new MemorySynced<NoteItem>(), _clock);
+        var vm = NewViewModel(device.Store, new FakePlatform(Path.Combine(_dir, "open")), out _, settings, notes: new NoteWriter(notes));
+        await vm.AddTextAsync("keep me");
+
+        await vm.SendToNotesCommand.ExecuteAsync(vm.Rows[0]);
+
+        Assert.Empty(notes.Notes());
+        Assert.Single(vm.Rows);
+        Assert.Contains("Notes is turned off", vm.Message);
+    }
+
     [Fact]
     public void The_trash_is_never_the_filter_the_page_opens_on()
     {
@@ -586,13 +746,31 @@ public sealed class ScratchTests : IDisposable
         return new Device(new ScratchStore(items, blobs, _clock), blobs, engine, signals);
     }
 
-    private ScratchViewModel NewViewModel(ScratchStore store, FakePlatform platform, out MemoryClipboard clipboard, SettingsStoreFactory? settings = null)
+    private ScratchViewModel NewViewModel(ScratchStore store, FakePlatform platform, out MemoryClipboard clipboard, SettingsStoreFactory? settings = null,
+        ISyncService? sync = null, INoteWriter? notes = null)
     {
         settings ??= Own(new SettingsStoreFactory(new HelmPaths(Path.Combine(_dir, "settings-" + Guid.NewGuid().ToString("N")[..6]))));
         clipboard = new MemoryClipboard();
         var relay = new ScratchClipboardRelay(new MemorySynced<ScratchClipboardSignal>(), store, platform, clipboard, settings, new FixedDevice(), new InlineUi());
         return new ScratchViewModel(store, new ScratchImporter(store, platform, new FixedDevice()), relay, platform, settings, new InlineUi(),
-            new AcceptDialogs(), clipboard, NullLogger<ScratchViewModel>.Instance);
+            new AcceptDialogs(), clipboard, NullLogger<ScratchViewModel>.Instance, sync, notes);
+    }
+
+    private sealed class FakeSync(SyncStatus status) : ISyncService
+    {
+        public SyncStatus Status { get; private set; } = status;
+        public event EventHandler<SyncStatus>? StatusChanged;
+
+        public void Set(SyncStatus status)
+        {
+            Status = status;
+            StatusChanged?.Invoke(this, status);
+        }
+
+        public Task<SyncRunResult> SyncNowAsync(CancellationToken ct = default) =>
+            Task.FromResult(new SyncRunResult(SyncRunOutcome.Completed, 0, 0, 0));
+
+        public void RequestSync() { }
     }
 
     private static async Task Sync(params Device[] devices)

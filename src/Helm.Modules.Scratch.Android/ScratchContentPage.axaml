@@ -2,6 +2,7 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:ic="using:FluentIcons.Avalonia"
              xmlns:vm="using:Helm.Modules.Scratch"
+             xmlns:core="using:Helm.Core.Ui"
              x:Class="Helm.Modules.Scratch.ScratchContentPage"
              x:DataType="vm:ScratchViewModel">
 
@@ -150,7 +151,7 @@
                 <ItemsControl x:Name="Wall" ItemsSource="{Binding Rows}" IsVisible="{Binding HasRows}">
                     <ItemsControl.ItemsPanel>
                         <ItemsPanelTemplate>
-                            <vm:MasonryPanel MinColumnWidth="150" Spacing="8" />
+                            <core:MasonryPanel MinColumnWidth="150" Spacing="8" />
                         </ItemsPanelTemplate>
                     </ItemsControl.ItemsPanel>
                     <ItemsControl.ItemTemplate>
@@ -264,6 +265,15 @@
                     <StackPanel Orientation="Horizontal" Spacing="6">
                         <ic:SymbolIcon Symbol="ClipboardArrowRight" FontSize="16" />
                         <TextBlock Text="Send to clipboard (all devices)" />
+                    </StackPanel>
+                </Button>
+
+                <!-- Keep a text for good: it becomes a note, the card goes to the trash -->
+                <Button Classes="action" Command="{Binding SendToNotesCommand}" CommandParameter="{Binding Selected}" AutomationProperties.Name="Send to Notes"
+                        IsVisible="{Binding Selected.CanBecomeNote, FallbackValue=False}">
+                    <StackPanel Orientation="Horizontal" Spacing="6">
+                        <ic:SymbolIcon Symbol="Notepad" FontSize="16" />
+                        <TextBlock Text="Send to Notes" />
                     </StackPanel>
                 </Button>
 

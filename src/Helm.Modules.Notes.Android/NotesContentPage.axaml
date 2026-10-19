@@ -6,7 +6,7 @@
              x:Class="Helm.Modules.Notes.NotesContentPage"
              x:DataType="vm:NotesViewModel">
 
-    <!-- Notes itself (drawer and Quick access): the list, or one note open in the editor (Back returns to the list).
+    <!-- Notes itself (drawer and Quick access): a wall of cards, or one note open in the editor (Back returns to the cards).
          Its options live on NotesPage (Home → Utilities). -->
     <UserControl.Styles>
         <!-- Square icon button in a toolbar (44 dp touch target) -->
@@ -19,6 +19,17 @@
         </Style>
         <Style Selector="Button.icon.on ic|SymbolIcon">
             <Setter Property="Foreground" Value="{DynamicResource SystemAccentColor}" />
+        </Style>
+        <!-- One note on the wall: a card as tall as its text (the same card as Scratch's) -->
+        <Style Selector="Button.tile">
+            <Setter Property="Background" Value="{DynamicResource CardBackgroundFillColorDefaultBrush}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource CardStrokeColorDefaultBrush}" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="CornerRadius" Value="8" />
+            <Setter Property="Padding" Value="10,8" />
+            <Setter Property="HorizontalAlignment" Value="Stretch" />
+            <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+            <Setter Property="VerticalContentAlignment" Value="Top" />
         </Style>
     </UserControl.Styles>
 
@@ -73,27 +84,32 @@
                     <TextBlock Text="{Binding ListHeader}" Classes="title" VerticalAlignment="Center" Margin="4,0,0,0" />
                 </DockPanel>
 
-                <Border Classes="card" Padding="4" IsVisible="{Binding HasNotes}">
-                    <ItemsControl ItemsSource="{Binding Notes}">
-                        <ItemsControl.ItemTemplate>
-                            <DataTemplate DataType="vm:NoteRowViewModel">
-                                <Button Classes="flat" Padding="12,10" AutomationProperties.Name="{Binding Title}"
-                                        Command="{Binding $parent[ItemsControl].((vm:NotesViewModel)DataContext).OpenRowCommand}" CommandParameter="{Binding}">
-                                    <StackPanel Spacing="2">
-                                        <Grid ColumnDefinitions="Auto,*,Auto">
-                                            <ic:SymbolIcon Symbol="Pin" IconVariant="Filled" FontSize="12" Margin="0,0,4,0" VerticalAlignment="Center"
-                                                           Foreground="{DynamicResource SystemAccentColor}" IsVisible="{Binding Pinned}" />
-                                            <TextBlock Grid.Column="1" Text="{Binding Title}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
-                                            <TextBlock Grid.Column="2" Text="{Binding When}" Classes="secondary" TextWrapping="NoWrap" Margin="8,0,0,0" />
-                                        </Grid>
-                                        <TextBlock Text="{Binding Preview}" Classes="secondary" TextWrapping="NoWrap" TextTrimming="CharacterEllipsis"
-                                                   IsVisible="{Binding HasPreview}" />
-                                    </StackPanel>
-                                </Button>
-                            </DataTemplate>
-                        </ItemsControl.ItemTemplate>
-                    </ItemsControl>
-                </Border>
+                <!-- The wall of cards (like Scratch): each shows its title and text and is as tall as that; a tap opens it -->
+                <ItemsControl ItemsSource="{Binding Notes}" IsVisible="{Binding HasNotes}">
+                    <ItemsControl.ItemsPanel>
+                        <ItemsPanelTemplate>
+                            <core:MasonryPanel MinColumnWidth="150" Spacing="8" />
+                        </ItemsPanelTemplate>
+                    </ItemsControl.ItemsPanel>
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate DataType="vm:NoteRowViewModel">
+                            <Button Classes="tile" AutomationProperties.Name="{Binding Title}"
+                                    Command="{Binding $parent[ItemsControl].((vm:NotesViewModel)DataContext).OpenRowCommand}" CommandParameter="{Binding}">
+                                <StackPanel Spacing="4">
+                                    <Grid ColumnDefinitions="*,Auto">
+                                        <TextBlock Text="{Binding Title}" FontWeight="SemiBold" TextWrapping="Wrap" MaxLines="3" TextTrimming="CharacterEllipsis" />
+                                        <ic:SymbolIcon Grid.Column="1" Symbol="Pin" IconVariant="Filled" FontSize="12" Margin="4,2,0,0" VerticalAlignment="Top"
+                                                       Foreground="{DynamicResource SystemAccentColor}" IsVisible="{Binding Pinned}" />
+                                    </Grid>
+                                    <!-- The text, with its lines; a long note is cut (the editor has all of it) -->
+                                    <TextBlock Text="{Binding CardText}" Classes="secondary" FontSize="13" TextWrapping="Wrap" MaxLines="14"
+                                               TextTrimming="CharacterEllipsis" IsVisible="{Binding HasCardText}" />
+                                    <TextBlock Text="{Binding When}" FontSize="11" Classes="secondary" TextTrimming="CharacterEllipsis" Margin="0,2,0,0" />
+                                </StackPanel>
+                            </Button>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
 
                 <TextBlock Text="{Binding EmptyListText}" Classes="secondary" Margin="4,8" IsVisible="{Binding IsListEmpty}" />
             </StackPanel>

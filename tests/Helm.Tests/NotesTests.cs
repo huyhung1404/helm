@@ -162,7 +162,49 @@ public sealed class NotesTests : IDisposable
         Assert.Equal(NoteText.Untitled, NoteText.FileName("..."));
     }
 
+    [Fact]
+    public void A_card_shows_the_text_with_its_lines_without_the_line_used_as_the_title()
+    {
+        Assert.Equal("- milk\n- eggs", NoteText.CardText("", "\nShopping\n- milk\n- eggs\n"));
+        Assert.Equal("Shopping\n- milk", NoteText.CardText("List", "Shopping\n- milk"));
+        // Blank runs shrink to one blank line, and the ends are tidy.
+        Assert.Equal("a\n\nb", NoteText.CardText("T", "\n\na\n\n\n  \nb\n\n"));
+        Assert.Equal("", NoteText.CardText("", "only a title line"));
+        Assert.Equal("abcd…", NoteText.CardText("T", "abcdefgh", 5));
+    }
+
     // ---- View model ----------------------------------------------------------------------------------------------
+
+    [Fact]
+    public async Task A_card_is_pinned_copied_trashed_restored_and_deleted_without_opening_it()
+    {
+        var clipboard = new MemoryClipboard();
+        var id = _store.Add("Plan", "step one");
+        using var vm = NewViewModel(clipboard);
+        var card = Assert.Single(vm.Notes);
+        Assert.Equal("step one", card.CardText);
+
+        vm.TogglePinRowCommand.Execute(card);
+        Assert.True(_store.Get(id)!.Pinned);
+        vm.CopyRowCommand.Execute(card);
+        Assert.Equal("Plan\n\nstep one", clipboard.Text);
+
+        vm.TrashRowCommand.Execute(card);
+        Assert.Empty(vm.Notes);
+        Assert.Equal(1, vm.TrashCount);
+
+        vm.ShowTrashCommand.Execute(null);
+        var trashed = Assert.Single(vm.Notes);
+        Assert.False(trashed.IsLive);
+        vm.RestoreRowCommand.Execute(trashed);
+        Assert.Empty(vm.Notes);
+        Assert.False(_store.Get(id)!.Trashed);
+
+        _store.MoveToTrash(id);
+        await vm.DeleteForeverRowCommand.ExecuteAsync(Assert.Single(vm.Notes));
+        Assert.Null(_store.Get(id));
+        Assert.False(vm.IsEditorOpen);
+    }
 
     private NotesViewModel NewViewModel(MemoryClipboard? clipboard = null) =>
         new(_store, _settings, new InlineUi(), new AcceptDialogs(), clipboard ?? new MemoryClipboard(), NullLogger<NotesViewModel>.Instance);

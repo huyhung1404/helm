@@ -3,6 +3,23 @@
 All notable changes to Helm. The top section is used as the GitHub release body and as the Velopack release notes.
 Format: [Keep a Changelog](https://keepachangelog.com), versions follow [SemVer](https://semver.org).
 
+## [Unreleased]
+
+### Changed
+- **Notes is a wall of cards, like Scratch.** Each note shows its title and its text with the lines kept, so you can
+  read your notes without opening them; pinned notes come first. Click a card (tap on the phone) to open it: on the PC
+  the note opens over the cards, and Esc, ✕ or a click beside it closes it (it saves as you type). Right-click a card
+  to pin, copy, move to the trash or restore it without opening it.
+- **Scratch tidies itself: a card nobody used for 7 days goes to the trash.** Opening, copying, sending, saving or
+  moving a card counts as using it, on any of your devices. A card says “trash in 1 day” in its last days, and the
+  trash keeps everything until you empty it, so nothing is lost. A device that has been away waits until it has synced,
+  so it never trashes what your phone used yesterday.
+
+### Added
+- **Scratch: Send to Notes.** Keeps a text for good: it becomes a new note with all its text (a .txt or other text
+  file too) and the card goes to the trash. Right-click a card or press Ctrl+Shift+N on the PC (several selected texts
+  become one note each); on the phone, tap the card, then **Send to Notes**.
+
 ## [0.45.0] - 2026-10-18
 
 ### Added – Novel Lens (Android)

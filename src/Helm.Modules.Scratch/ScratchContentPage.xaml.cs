@@ -124,6 +124,9 @@ public partial class ScratchContentPage : Page
             case Key.C when ctrl:
                 _ = _viewModel.CopySelectedAsync();
                 break;
+            case Key.N when ctrl && shift:
+                _ = _viewModel.SendSelectedToNotesAsync();
+                break;
             case Key.Delete when shift:
                 // Like Shift+Delete in Explorer: for good, without the trash (it asks first).
                 _ = _viewModel.DeleteSelectedForeverAsync();

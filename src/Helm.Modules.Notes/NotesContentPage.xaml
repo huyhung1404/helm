@@ -8,8 +8,9 @@
     xmlns:self="clr-namespace:Helm.Modules.Notes"
     Title="Notes" ScrollViewer.CanContentScroll="False">
 
-    <!-- Notes itself (menu and Quick access): the list on the left, the note on the right. The page scrolls its own
-         parts, so the editor fills the window. Options live on NotesPage (Home → Utilities). -->
+    <!-- Notes itself (menu and Quick access): every note as a card showing its text (like Scratch), the editor over the
+         cards when one opens. The page scrolls its own parts, so the editor fills the window. Options live on NotesPage
+         (Home → Utilities). -->
     <Page.InputBindings>
         <KeyBinding Key="N" Modifiers="Ctrl" Command="{Binding NewNoteCommand}" />
     </Page.InputBindings>
@@ -34,174 +35,231 @@
             </Style.Triggers>
         </Style>
 
-        <!-- A note row reads as its title to screen readers, not as the view model's type name -->
-        <Style x:Key="NoteRow" TargetType="ListBoxItem" BasedOn="{StaticResource HelmListItem}">
-            <Setter Property="AutomationProperties.Name" Value="{Binding Title}" />
+        <!-- The text on a card: the editor's font choice, so a card reads like the note -->
+        <Style x:Key="CardText" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="13" />
+            <Setter Property="LineHeight" Value="19" />
+            <Setter Property="Foreground" Value="{DynamicResource TextFillColorSecondaryBrush}" />
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding DataContext.Monospace, RelativeSource={RelativeSource AncestorType=ItemsControl}}" Value="True">
+                    <Setter Property="FontFamily" Value="Cascadia Mono, Consolas, Courier New" />
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+
+        <!-- One note: a card in the theme's card colours, as tall as its text; a click (or Enter) opens it -->
+        <Style x:Key="NoteCard" TargetType="Button">
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="Focusable" Value="True" />
+            <Setter Property="FocusVisualStyle" Value="{x:Null}" />
+            <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="Card" Background="{DynamicResource CardBackgroundFillColorDefaultBrush}" BorderBrush="{DynamicResource CardStrokeColorDefaultBrush}"
+                                BorderThickness="1" CornerRadius="8" Padding="12,10">
+                            <ContentPresenter />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Card" Property="Background" Value="{DynamicResource CardBackgroundFillColorSecondaryBrush}" />
+                            </Trigger>
+                            <Trigger Property="IsKeyboardFocused" Value="True">
+                                <Setter TargetName="Card" Property="BorderBrush" Value="{DynamicResource AccentFillColorDefaultBrush}" />
+                                <Setter TargetName="Card" Property="BorderThickness" Value="2" />
+                                <Setter TargetName="Card" Property="Padding" Value="11,9" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
         </Style>
     </Page.Resources>
 
-    <Grid Margin="24,16,24,16">
-        <Grid.RowDefinitions>
-            <RowDefinition Height="Auto" />
-            <RowDefinition Height="Auto" />
-            <RowDefinition Height="Auto" />
-            <RowDefinition Height="*" />
-        </Grid.RowDefinitions>
+    <Grid>
+        <Grid x:Name="Root" Margin="24,16,24,0">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="*" />
+            </Grid.RowDefinitions>
 
-        <DockPanel Margin="0,0,0,16">
-            <ui:Button DockPanel.Dock="Right" Appearance="Primary" Content="New note" Icon="{ui:SymbolIcon Add24}" VerticalAlignment="Center"
-                       ToolTip="New note (Ctrl+N)" Command="{Binding NewNoteCommand}" IsEnabled="{Binding IsEnabled, ElementName=Body}" />
-            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                <Image Source="{x:Static self:NotesLogo.Image}" Width="32" Height="32" Margin="0,0,12,0" />
-                <TextBlock Text="Notes" FontSize="28" FontWeight="SemiBold" VerticalAlignment="Center" />
-            </StackPanel>
-        </DockPanel>
+            <DockPanel Margin="0,0,0,16">
+                <ui:Button DockPanel.Dock="Right" Appearance="Primary" Content="New note" Icon="{ui:SymbolIcon Add24}" VerticalAlignment="Center"
+                           ToolTip="New note (Ctrl+N)" Command="{Binding NewNoteCommand}" IsEnabled="{Binding IsEnabled, ElementName=Body}" />
+                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                    <Image Source="{x:Static self:NotesLogo.Image}" Width="32" Height="32" Margin="0,0,12,0" />
+                    <TextBlock Text="Notes" FontSize="28" FontWeight="SemiBold" VerticalAlignment="Center" />
+                </StackPanel>
+            </DockPanel>
 
-        <!-- Shown while the tool is turned off -->
-        <ui:InfoBar x:Name="OffBar" Grid.Row="1" Severity="Informational" IsClosable="False" IsOpen="False" Visibility="Collapsed" Margin="0,0,0,12"
-                    Title="Notes is turned off" Message="Your notes are kept. Turn Notes on in its settings to write." />
+            <!-- Shown while the tool is turned off -->
+            <ui:InfoBar x:Name="OffBar" Grid.Row="1" Severity="Informational" IsClosable="False" IsOpen="False" Visibility="Collapsed" Margin="0,0,0,12"
+                        Title="Notes is turned off" Message="Your notes are kept. Turn Notes on in its settings to write." />
 
-        <!-- What happened: a conflict copy, a note moved to the trash, a problem -->
-        <Border Grid.Row="2" Style="{DynamicResource HelmSurface}" Margin="0,0,0,12" Padding="12,8"
-                Visibility="{Binding HasMessage, Converter={StaticResource BoolToVisibility}}">
-            <core:RowLayout>
-                <TextBlock Text="{Binding Message}" TextWrapping="Wrap" VerticalAlignment="Center" />
-                <ui:Button Style="{StaticResource ToolbarAction}" Icon="{ui:SymbolIcon Dismiss24}" ToolTip="Dismiss" AutomationProperties.Name="Dismiss"
-                           Command="{Binding DismissMessageCommand}" />
-            </core:RowLayout>
-        </Border>
+            <!-- What happened: a conflict copy, a note moved to the trash, a problem -->
+            <Border Grid.Row="2" Style="{DynamicResource HelmSurface}" Margin="0,0,0,12" Padding="12,8"
+                    Visibility="{Binding HasMessage, Converter={StaticResource BoolToVisibility}}">
+                <core:RowLayout>
+                    <TextBlock Text="{Binding Message}" TextWrapping="Wrap" VerticalAlignment="Center" />
+                    <ui:Button Style="{StaticResource ToolbarAction}" Icon="{ui:SymbolIcon Dismiss24}" ToolTip="Dismiss" AutomationProperties.Name="Dismiss"
+                               Command="{Binding DismissMessageCommand}" />
+                </core:RowLayout>
+            </Border>
 
-        <Grid x:Name="Body" Grid.Row="3">
-            <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="300" />
-                <ColumnDefinition Width="12" />
-                <ColumnDefinition Width="*" />
-            </Grid.ColumnDefinitions>
+            <!-- Notes or the trash, and the search -->
+            <Grid Grid.Row="3" Margin="0,0,0,10">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                    <TextBlock Text="{Binding ListHeader}" FontSize="16" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,0,8,0" />
+                    <ui:Button Style="{StaticResource ToolbarAction}" Content="{Binding TrashButtonText}" Icon="{ui:SymbolIcon Delete24}"
+                               ToolTip="Notes you deleted, kept for 30 days" AutomationProperties.Name="Show the trash" Command="{Binding ShowTrashCommand}"
+                               Visibility="{Binding ShowingTrash, Converter={StaticResource InverseBoolToVisibility}}" />
+                    <ui:Button Style="{StaticResource ToolbarAction}" Content="Back to notes" Icon="{ui:SymbolIcon ArrowLeft24}"
+                               AutomationProperties.Name="Back to notes" Command="{Binding ShowNotesCommand}"
+                               Visibility="{Binding ShowingTrash, Converter={StaticResource BoolToVisibility}}" />
+                    <ui:Button Style="{StaticResource ToolbarAction}" Icon="{ui:SymbolIcon Delete24}" Content="Empty trash"
+                               ToolTip="Delete every note in the trash for good" AutomationProperties.Name="Empty the trash" Command="{Binding EmptyTrashCommand}"
+                               Visibility="{Binding ShowingTrash, Converter={StaticResource BoolToVisibility}}" IsEnabled="{Binding HasTrash}" />
+                </StackPanel>
+                <ui:TextBox x:Name="SearchBox" Grid.Column="1" Width="260" PlaceholderText="Search notes (Ctrl+F)" Icon="{ui:SymbolIcon Search24}"
+                            AutomationProperties.Name="Search notes" Text="{Binding Search, UpdateSourceTrigger=PropertyChanged}" />
+            </Grid>
 
-            <!-- The list -->
-            <Border Style="{DynamicResource HelmSurface}" Padding="0">
+            <Grid x:Name="Body" Grid.Row="4">
+                <TextBlock Margin="4,8,4,16" Text="{Binding EmptyListText}" Style="{DynamicResource HelmSecondaryText}" TextWrapping="Wrap"
+                           Visibility="{Binding IsListEmpty, Converter={StaticResource BoolToVisibility}}" />
+
+                <!-- The wall of cards: each shows its title and text and is as tall as that; the cards fill the columns -->
+                <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" PanningMode="VerticalOnly" Focusable="False"
+                              Visibility="{Binding HasNotes, Converter={StaticResource BoolToVisibility}}">
+                    <!-- The right margin leaves room for the scroll bar, which WPF-UI draws over the content -->
+                    <ItemsControl x:Name="Wall" ItemsSource="{Binding Notes}" Focusable="False" Margin="0,4,18,24" AutomationProperties.Name="Notes">
+                        <ItemsControl.ItemsPanel>
+                            <ItemsPanelTemplate>
+                                <core:MasonryPanel MinColumnWidth="240" Spacing="10" />
+                            </ItemsPanelTemplate>
+                        </ItemsControl.ItemsPanel>
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate DataType="{x:Type local:NoteRowViewModel}">
+                                <Button Style="{StaticResource NoteCard}" AutomationProperties.Name="{Binding Title}"
+                                        Command="{Binding DataContext.OpenRowCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}" CommandParameter="{Binding}"
+                                        Tag="{Binding DataContext, RelativeSource={RelativeSource AncestorType=ItemsControl}}">
+                                    <!-- Right-click: what can be done without opening it -->
+                                    <Button.ContextMenu>
+                                        <ContextMenu>
+                                            <MenuItem Header="Open" InputGestureText="Enter" Command="{Binding PlacementTarget.Tag.OpenRowCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
+                                                      CommandParameter="{Binding}" />
+                                            <MenuItem Command="{Binding PlacementTarget.Tag.TogglePinRowCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
+                                                      CommandParameter="{Binding}">
+                                                <MenuItem.Style>
+                                                    <Style TargetType="MenuItem" BasedOn="{StaticResource {x:Type MenuItem}}">
+                                                        <Setter Property="Header" Value="Pin to the top" />
+                                                        <Setter Property="Visibility" Value="{Binding IsLive, Converter={StaticResource BoolToVisibility}}" />
+                                                        <Style.Triggers>
+                                                            <DataTrigger Binding="{Binding Pinned}" Value="True">
+                                                                <Setter Property="Header" Value="Unpin" />
+                                                            </DataTrigger>
+                                                        </Style.Triggers>
+                                                    </Style>
+                                                </MenuItem.Style>
+                                            </MenuItem>
+                                            <MenuItem Header="Copy" Command="{Binding PlacementTarget.Tag.CopyRowCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
+                                                      CommandParameter="{Binding}" />
+                                            <Separator />
+                                            <MenuItem Header="Move to the trash" Command="{Binding PlacementTarget.Tag.TrashRowCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
+                                                      CommandParameter="{Binding}" Visibility="{Binding IsLive, Converter={StaticResource BoolToVisibility}}" />
+                                            <MenuItem Header="Restore" Command="{Binding PlacementTarget.Tag.RestoreRowCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
+                                                      CommandParameter="{Binding}" Visibility="{Binding Trashed, Converter={StaticResource BoolToVisibility}}" />
+                                            <MenuItem Header="Delete for good" Command="{Binding PlacementTarget.Tag.DeleteForeverRowCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
+                                                      CommandParameter="{Binding}" Visibility="{Binding Trashed, Converter={StaticResource BoolToVisibility}}" />
+                                        </ContextMenu>
+                                    </Button.ContextMenu>
+                                    <StackPanel>
+                                        <DockPanel>
+                                            <ui:SymbolIcon DockPanel.Dock="Right" Symbol="Pin24" Filled="True" FontSize="14" Margin="8,2,0,0" VerticalAlignment="Top"
+                                                           Foreground="{DynamicResource AccentTextFillColorPrimaryBrush}" ToolTip="Pinned"
+                                                           Visibility="{Binding Pinned, Converter={StaticResource BoolToVisibility}}" />
+                                            <TextBlock Text="{Binding Title}" FontSize="15" FontWeight="SemiBold" TextWrapping="Wrap"
+                                                       Foreground="{DynamicResource TextFillColorPrimaryBrush}" />
+                                        </DockPanel>
+                                        <!-- The text, with its lines; a long note is cut (the editor has all of it) -->
+                                        <TextBlock Margin="0,6,0,0" Text="{Binding CardText}" Style="{StaticResource CardText}" TextWrapping="Wrap"
+                                                   MaxHeight="342" TextTrimming="CharacterEllipsis"
+                                                   Visibility="{Binding HasCardText, Converter={StaticResource BoolToVisibility}}" />
+                                        <TextBlock Margin="0,8,0,0" Text="{Binding When}" FontSize="12" Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                                   TextTrimming="CharacterEllipsis" />
+                                    </StackPanel>
+                                </Button>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </ScrollViewer>
+            </Grid>
+        </Grid>
+
+        <!-- The open note, over the cards: Esc, the close button or a click beside it closes it (it saves as you type) -->
+        <Grid x:Name="EditorLayer" Visibility="{Binding IsEditorOpen, Converter={StaticResource BoolToVisibility}}">
+            <Border x:Name="Backdrop" Background="#66000000" MouseLeftButtonDown="Backdrop_MouseLeftButtonDown" />
+            <Border MaxWidth="860" Margin="32,24,32,24" CornerRadius="8" BorderThickness="1"
+                    Background="{DynamicResource SolidBackgroundFillColorBaseBrush}" BorderBrush="{DynamicResource CardStrokeColorDefaultBrush}">
                 <Grid>
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto" />
                         <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
                         <RowDefinition Height="*" />
                     </Grid.RowDefinitions>
-                    <ui:TextBox x:Name="SearchBox" Margin="12,12,12,8" PlaceholderText="Search notes (Ctrl+F)" Icon="{ui:SymbolIcon Search24}"
-                                AutomationProperties.Name="Search notes" Text="{Binding Search, UpdateSourceTrigger=PropertyChanged}" />
-                    <DockPanel Grid.Row="1" Margin="16,0,8,4">
-                        <ui:Button DockPanel.Dock="Right" Style="{StaticResource ToolbarAction}" Icon="{ui:SymbolIcon Delete24}" Content="Empty"
-                                   ToolTip="Delete every note in the trash for good" AutomationProperties.Name="Empty the trash" Command="{Binding EmptyTrashCommand}"
-                                   Visibility="{Binding ShowingTrash, Converter={StaticResource BoolToVisibility}}" IsEnabled="{Binding HasTrash}" />
-                        <ui:Button DockPanel.Dock="Right" Style="{StaticResource ToolbarAction}" Content="{Binding TrashButtonText}" Icon="{ui:SymbolIcon Delete24}"
-                                   ToolTip="Notes you deleted, kept for 30 days" AutomationProperties.Name="Show the trash" Command="{Binding ShowTrashCommand}"
-                                   Visibility="{Binding ShowingTrash, Converter={StaticResource InverseBoolToVisibility}}" />
-                        <ui:Button DockPanel.Dock="Right" Style="{StaticResource ToolbarAction}" Content="Back to notes" Icon="{ui:SymbolIcon ArrowLeft24}"
-                                   AutomationProperties.Name="Back to notes" Command="{Binding ShowNotesCommand}"
-                                   Visibility="{Binding ShowingTrash, Converter={StaticResource BoolToVisibility}}" />
-                        <TextBlock Text="{Binding ListHeader}" FontWeight="SemiBold" VerticalAlignment="Center" />
+
+                    <DockPanel Margin="16,8,8,0">
+                        <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
+                            <ui:Button AutomationProperties.Name="Pin"
+                                       Command="{Binding TogglePinCommand}" Visibility="{Binding CanEditPin, Converter={StaticResource BoolToVisibility}}">
+                                <ui:Button.Style>
+                                    <Style TargetType="ui:Button" BasedOn="{StaticResource ToolbarAction}">
+                                        <Setter Property="Icon" Value="{ui:SymbolIcon Pin24}" />
+                                        <Setter Property="ToolTip" Value="Pin to the top" />
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding EditPinned}" Value="True">
+                                                <Setter Property="Icon" Value="{ui:SymbolIcon Pin24, Filled=True}" />
+                                                <Setter Property="ToolTip" Value="Unpin" />
+                                                <Setter Property="Foreground" Value="{DynamicResource AccentTextFillColorPrimaryBrush}" />
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </ui:Button.Style>
+                            </ui:Button>
+                            <ui:Button Style="{StaticResource ToolbarAction}" Icon="{ui:SymbolIcon Link24}" ToolTip="Link to a task, a person in the debt book or a mission"
+                                       AutomationProperties.Name="Link to a task, person or mission" Command="{Binding EditorLinks.StartPickingCommand}"
+                                       Visibility="{Binding EditorLinks, Converter={StaticResource NotEmptyToVisibility}}" />
+                            <ui:Button Style="{StaticResource ToolbarAction}" Icon="{ui:SymbolIcon Copy24}" ToolTip="Copy the note" AutomationProperties.Name="Copy the note"
+                                       Command="{Binding CopyNoteCommand}" />
+                            <ui:Button Style="{StaticResource ToolbarAction}" Icon="{ui:SymbolIcon Delete24}" ToolTip="Move to the trash" AutomationProperties.Name="Move to the trash" Margin="16,0,0,0"
+                                       Command="{Binding TrashCommand}" Visibility="{Binding EditTrashed, Converter={StaticResource InverseBoolToVisibility}}" />
+                            <ui:Button Style="{StaticResource ToolbarAction}" Icon="{ui:SymbolIcon ArrowUndo24}" Content="Restore" AutomationProperties.Name="Restore"
+                                       Command="{Binding RestoreCommand}" Visibility="{Binding EditTrashed, Converter={StaticResource BoolToVisibility}}" />
+                            <ui:Button Style="{StaticResource ToolbarAction}" Icon="{ui:SymbolIcon Delete24}" Content="Delete for good" AutomationProperties.Name="Delete for good" Margin="16,0,0,0"
+                                       Command="{Binding DeleteForeverCommand}" Visibility="{Binding EditTrashed, Converter={StaticResource BoolToVisibility}}" />
+                            <ui:Button Style="{StaticResource ToolbarAction}" Icon="{ui:SymbolIcon Dismiss24}" ToolTip="Close (Esc)" AutomationProperties.Name="Close the note" Margin="16,0,0,0"
+                                       Command="{Binding CloseEditorCommand}" />
+                        </StackPanel>
+                        <TextBlock Text="{Binding EditorInfo}" Style="{DynamicResource HelmSecondaryText}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" TextWrapping="NoWrap" />
                     </DockPanel>
 
-                    <ListBox x:Name="List" Grid.Row="2" Margin="4,0,4,4" ItemsSource="{Binding Notes}" SelectedItem="{Binding SelectedNote}"
-                             AutomationProperties.Name="Notes" ScrollViewer.HorizontalScrollBarVisibility="Disabled"
-                             Background="Transparent" BorderThickness="0" ItemContainerStyle="{StaticResource NoteRow}"
-                             Visibility="{Binding HasNotes, Converter={StaticResource BoolToVisibility}}">
-                        <ListBox.ItemTemplate>
-                            <DataTemplate DataType="{x:Type local:NoteRowViewModel}">
-                                <Grid Margin="0,2" AutomationProperties.Name="{Binding Title}">
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="*" />
-                                        <ColumnDefinition Width="Auto" />
-                                    </Grid.ColumnDefinitions>
-                                    <Grid.RowDefinitions>
-                                        <RowDefinition Height="Auto" />
-                                        <RowDefinition Height="Auto" />
-                                    </Grid.RowDefinitions>
-                                    <StackPanel Orientation="Horizontal">
-                                        <ui:SymbolIcon Symbol="Pin24" Filled="True" FontSize="12" Margin="0,0,4,0" VerticalAlignment="Center"
-                                                       Foreground="{DynamicResource AccentTextFillColorPrimaryBrush}" ToolTip="Pinned"
-                                                       Visibility="{Binding Pinned, Converter={StaticResource BoolToVisibility}}" />
-                                        <TextBlock Text="{Binding Title}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
-                                    </StackPanel>
-                                    <TextBlock Grid.Column="1" Text="{Binding When}" Style="{DynamicResource HelmSecondaryText}" TextWrapping="NoWrap"
-                                               Margin="8,0,0,0" VerticalAlignment="Center" />
-                                    <TextBlock Grid.Row="1" Grid.ColumnSpan="2" Text="{Binding Preview}" Style="{DynamicResource HelmSecondaryText}"
-                                               TextWrapping="NoWrap" TextTrimming="CharacterEllipsis" Margin="0,2,0,0"
-                                               Visibility="{Binding HasPreview, Converter={StaticResource BoolToVisibility}}" />
-                                </Grid>
-                            </DataTemplate>
-                        </ListBox.ItemTemplate>
-                    </ListBox>
-
-                    <TextBlock Grid.Row="2" Margin="16,8,16,16" Text="{Binding EmptyListText}" Style="{DynamicResource HelmSecondaryText}"
-                               Visibility="{Binding IsListEmpty, Converter={StaticResource BoolToVisibility}}" />
-                </Grid>
-            </Border>
-
-            <!-- The note -->
-            <Border Grid.Column="2" Style="{DynamicResource HelmSurface}" Padding="0">
-                <Grid>
-                    <!-- Nothing open -->
-                    <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center" Margin="24"
-                                Visibility="{Binding IsEditorClosed, Converter={StaticResource BoolToVisibility}}">
-                        <Image Source="{x:Static self:NotesLogo.Image}" Width="56" Height="56" Opacity="0.8" />
-                        <TextBlock Margin="0,16,0,4" HorizontalAlignment="Center" FontSize="16" FontWeight="SemiBold" Text="Pick a note, or start a new one" />
-                        <TextBlock HorizontalAlignment="Center" TextAlignment="Center" Style="{DynamicResource HelmSecondaryText}" MaxWidth="360"
-                                   Text="Notes save as you type and sync to your other devices. Win+Alt+N captures a note from anywhere." />
-                        <ui:Button Margin="0,16,0,0" HorizontalAlignment="Center" Appearance="Secondary" Content="New note" Icon="{ui:SymbolIcon Add24}"
-                                   Command="{Binding NewNoteCommand}" />
-                    </StackPanel>
-
-                    <Grid Visibility="{Binding IsEditorOpen, Converter={StaticResource BoolToVisibility}}">
-                        <Grid.RowDefinitions>
-                            <RowDefinition Height="Auto" />
-                            <RowDefinition Height="Auto" />
-                            <RowDefinition Height="Auto" />
-                            <RowDefinition Height="*" />
-                        </Grid.RowDefinitions>
-
-                        <DockPanel Margin="16,8,8,0">
-                            <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
-                                <ui:Button AutomationProperties.Name="Pin"
-                                           Command="{Binding TogglePinCommand}" Visibility="{Binding CanEditPin, Converter={StaticResource BoolToVisibility}}">
-                                    <ui:Button.Style>
-                                        <Style TargetType="ui:Button" BasedOn="{StaticResource ToolbarAction}">
-                                            <Setter Property="Icon" Value="{ui:SymbolIcon Pin24}" />
-                                            <Setter Property="ToolTip" Value="Pin to the top of the list" />
-                                            <Style.Triggers>
-                                                <DataTrigger Binding="{Binding EditPinned}" Value="True">
-                                                    <Setter Property="Icon" Value="{ui:SymbolIcon Pin24, Filled=True}" />
-                                                    <Setter Property="ToolTip" Value="Unpin" />
-                                                    <Setter Property="Foreground" Value="{DynamicResource AccentTextFillColorPrimaryBrush}" />
-                                                </DataTrigger>
-                                            </Style.Triggers>
-                                        </Style>
-                                    </ui:Button.Style>
-                                </ui:Button>
-                                <ui:Button Style="{StaticResource ToolbarAction}" Icon="{ui:SymbolIcon Link24}" ToolTip="Link to a task, a person in the debt book or a mission"
-                                           AutomationProperties.Name="Link to a task, person or mission" Command="{Binding EditorLinks.StartPickingCommand}"
-                                           Visibility="{Binding EditorLinks, Converter={StaticResource NotEmptyToVisibility}}" />
-                                <ui:Button Style="{StaticResource ToolbarAction}" Icon="{ui:SymbolIcon Copy24}" ToolTip="Copy the note" AutomationProperties.Name="Copy the note"
-                                           Command="{Binding CopyNoteCommand}" />
-                                <ui:Button Style="{StaticResource ToolbarAction}" Icon="{ui:SymbolIcon Delete24}" ToolTip="Move to the trash" AutomationProperties.Name="Move to the trash" Margin="16,0,0,0"
-                                           Command="{Binding TrashCommand}" Visibility="{Binding EditTrashed, Converter={StaticResource InverseBoolToVisibility}}" />
-                                <ui:Button Style="{StaticResource ToolbarAction}" Icon="{ui:SymbolIcon ArrowUndo24}" Content="Restore" AutomationProperties.Name="Restore"
-                                           Command="{Binding RestoreCommand}" Visibility="{Binding EditTrashed, Converter={StaticResource BoolToVisibility}}" />
-                                <ui:Button Style="{StaticResource ToolbarAction}" Icon="{ui:SymbolIcon Delete24}" Content="Delete for good" AutomationProperties.Name="Delete for good" Margin="16,0,0,0"
-                                           Command="{Binding DeleteForeverCommand}" Visibility="{Binding EditTrashed, Converter={StaticResource BoolToVisibility}}" />
-                            </StackPanel>
-                            <TextBlock Text="{Binding EditorInfo}" Style="{DynamicResource HelmSecondaryText}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" TextWrapping="NoWrap" />
-                        </DockPanel>
-
-                        <ui:TextBox x:Name="TitleBox" Grid.Row="1" Margin="12,8,12,4" PlaceholderText="Title" FontSize="20" FontWeight="SemiBold"
-                                    ClearButtonEnabled="False" AutomationProperties.Name="Title" MaxLength="500"
-                                    IsReadOnly="{Binding EditTrashed}" Text="{Binding EditTitle, UpdateSourceTrigger=PropertyChanged}" />
-                        <!-- What the note is linked to: click a task, person or mission to open it -->
-                        <core:LinksPanel Grid.Row="2" Margin="16,0,12,4" DataContext="{Binding EditorLinks}" />
-                        <ui:TextBox x:Name="BodyBox" Grid.Row="3" Margin="12,4,12,12" PlaceholderText="Write something…" Style="{StaticResource EditorText}"
-                                    ClearButtonEnabled="False" AutomationProperties.Name="Note text" AcceptsReturn="True" AcceptsTab="True"
-                                    TextWrapping="Wrap" VerticalContentAlignment="Top" VerticalScrollBarVisibility="Auto" SpellCheck.IsEnabled="False"
-                                    IsReadOnly="{Binding EditTrashed}" Text="{Binding EditBody, UpdateSourceTrigger=PropertyChanged}" />
-                    </Grid>
+                    <ui:TextBox x:Name="TitleBox" Grid.Row="1" Margin="12,8,12,4" PlaceholderText="Title" FontSize="20" FontWeight="SemiBold"
+                                ClearButtonEnabled="False" AutomationProperties.Name="Title" MaxLength="500"
+                                IsReadOnly="{Binding EditTrashed}" Text="{Binding EditTitle, UpdateSourceTrigger=PropertyChanged}" />
+                    <!-- What the note is linked to: click a task, person or mission to open it -->
+                    <core:LinksPanel Grid.Row="2" Margin="16,0,12,4" DataContext="{Binding EditorLinks}" />
+                    <ui:TextBox x:Name="BodyBox" Grid.Row="3" Margin="12,4,12,12" PlaceholderText="Write something…" Style="{StaticResource EditorText}"
+                                ClearButtonEnabled="False" AutomationProperties.Name="Note text" AcceptsReturn="True" AcceptsTab="True"
+                                TextWrapping="Wrap" VerticalContentAlignment="Top" VerticalScrollBarVisibility="Auto" SpellCheck.IsEnabled="False"
+                                IsReadOnly="{Binding EditTrashed}" Text="{Binding EditBody, UpdateSourceTrigger=PropertyChanged}" />
                 </Grid>
             </Border>
         </Grid>
