@@ -56,6 +56,9 @@ public sealed record AgentSession
     /// it arrived since Helm started. Such a session shows on the phone only while it is open in a Claude tab.
     /// </summary>
     public bool FromHistory { get; init; }
+
+    /// <summary>Helm runs this session itself, in the background for the phone (it was outside VS Code).</summary>
+    public bool Hosted { get; init; }
 }
 
 /// <summary>A session changed (<paramref name="Previous"/> is null for a new one). Raised on the hook's thread.</summary>
@@ -189,13 +192,27 @@ public sealed class SessionRegistry(string machineId, TimeProvider? time = null)
     }
 
     /// <summary>Sets the conversation title (read from the transcript), if it changed.</summary>
-    public void SetTitle(string sessionId, string title)
+    public void SetTitle(string sessionId, string title) => Change(sessionId, s => s.Title == title ? s : s with { Title = title });
+
+    /// <summary>The session's project folder turned out to be another one (a VS Code window with it connected).</summary>
+    public void SetFolder(string sessionId, string folder) =>
+        Change(sessionId, s => FolderKey(s.Folder) == FolderKey(folder) ? s : s with { Folder = folder });
+
+    /// <summary>Helm started (or stopped) running this session in the background.</summary>
+    public void SetHosted(string sessionId, bool hosted) => Change(sessionId, s => s.Hosted == hosted ? s : s with { Hosted = hosted });
+
+    /// <summary>An ended session was opened again (its tab came back): it is listed as finished, not ended.</summary>
+    public void Revive(string sessionId) =>
+        Change(sessionId, s => s.State != SessionState.Ended ? s : s with { State = s.LastReply is not null ? SessionState.Done : SessionState.Idle, UpdatedAt = _time.GetLocalNow() });
+
+    private void Change(string sessionId, Func<AgentSession, AgentSession> change)
     {
         AgentSession? previous, next;
         lock (_gate)
         {
-            if (!_sessions.TryGetValue(sessionId, out previous) || previous.Title == title) return;
-            next = previous with { Title = title };
+            if (!_sessions.TryGetValue(sessionId, out previous)) return;
+            next = change(previous);
+            if (ReferenceEquals(next, previous)) return;
             _sessions[sessionId] = next;
         }
         Changed?.Invoke(this, new SessionChange(next, previous));
@@ -219,7 +236,7 @@ public sealed class SessionRegistry(string machineId, TimeProvider? time = null)
 
     /// <summary>Folder paths as one key: Claude and VS Code differ in drive-letter case and trailing separators.</summary>
     public static string FolderKey(string path) =>
-        path.Replace('/', '\\').TrimEnd('\\').ToLowerInvariant();
+        WorkspaceFolders.Native(path).TrimEnd('\\').ToLowerInvariant();
 
     /// <summary>Prompt text as compared: line endings and outer whitespace do not count.</summary>
     public static string Normalize(string text) => text.Replace("\r\n", "\n").Replace('\r', '\n').Trim();

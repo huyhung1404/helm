@@ -66,6 +66,18 @@ public sealed class WorkspaceSettings : IVersionedSettings
 
 public static class WorkspaceFolders
 {
+    /// <summary>
+    /// A path as Windows spells it: Git Bash and MSYS tools report <c>C:\Project</c> as <c>/c/Project</c>, and Claude's
+    /// hooks pass on whatever the shell used last.
+    /// </summary>
+    public static string Native(string path)
+    {
+        var p = path.Replace('/', '\\');
+        if (p.Length >= 2 && p[0] == '\\' && char.IsAsciiLetter(p[1]) && (p.Length == 2 || p[2] == '\\'))
+            p = char.ToUpperInvariant(p[1]) + ":" + (p.Length == 2 ? "\\" : p[2..]);
+        return p;
+    }
+
     /// <summary>True when <paramref name="path"/> is <paramref name="root"/> or inside it.</summary>
     public static bool IsUnder(string path, string root)
     {

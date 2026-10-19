@@ -14,7 +14,7 @@ public sealed class SessionRow(AgentSession session, bool connected = true, Acti
 
     public AgentSession Session { get; } = session;
 
-    /// <summary>The phone sees and steers it. Hidden for sessions Helm cannot type into (outside VS Code).</summary>
+    /// <summary>The phone sees and steers it (outside VS Code, Helm runs it in the background for the phone).</summary>
     public bool IsConnected
     {
         get => _connected;
@@ -31,7 +31,7 @@ public sealed class SessionRow(AgentSession session, bool connected = true, Acti
     public string Title => Session.Title.Length > 0 ? Session.Title : "New conversation";
 
     /// <summary>"Working · 11:41".</summary>
-    public string Detail => $"{StateText} · {Session.UpdatedAt.ToLocalTime():HH:mm}";
+    public string Detail => $"{StateText}{(Session.Hosted ? " · Helm runs it for the phone" : "")} · {Session.UpdatedAt.ToLocalTime():HH:mm}";
 
     public string StateText => Session.State switch
     {
@@ -124,7 +124,7 @@ public sealed partial class WorkspaceViewModel : ObservableObject
     /// <summary>The connected VS Code windows, each with its Claude sessions (newest first).</summary>
     public ObservableCollection<HostWindowRow> VsCodeWindows { get; } = [];
 
-    /// <summary>Sessions outside a connected VS Code window (a terminal, another editor): seen, not steerable.</summary>
+    /// <summary>Sessions outside a connected VS Code window (a terminal, another editor): the phone continues them through Helm.</summary>
     public ObservableCollection<SessionRow> OtherSessions { get; } = [];
 
     public bool HasVsCodeWindows => VsCodeWindows.Count > 0;
@@ -200,7 +200,7 @@ public sealed partial class WorkspaceViewModel : ObservableObject
             VsCodeWindows.Add(new HostWindowRow(w.Name.Length > 0 ? w.Name : "Empty window", $"{folders} · {tabs}", sessions,
                 windowConnected, folder is null ? null : on => engine!.SetWindowLink(folder, on)));
         }
-        foreach (var s in engine?.OtherSessions() ?? []) OtherSessions.Add(new SessionRow(s));
+        foreach (var s in engine?.OtherSessions() ?? []) OtherSessions.Add(new SessionRow(s, engine!.IsConnected(s), on => { engine.SetSessionLink(s.SessionId, on); }));
         OnPropertyChanged(nameof(HasVsCodeWindows));
         OnPropertyChanged(nameof(HasOtherSessions));
         var all = windows.SelectMany(w => w.Sessions).Concat(OtherSessions.Select(r => r.Session)).ToList();

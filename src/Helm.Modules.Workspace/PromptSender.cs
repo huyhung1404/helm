@@ -102,13 +102,18 @@ public sealed class PromptSender(IPromptKeyboard keyboard, ILogger<PromptSender>
     /// prompt went through after all) does nothing, so a retry never sends twice.
     /// </param>
     /// <exception cref="PromptSendException">Nothing or only part was typed; the message says why.</exception>
-    public async Task SendAsync(BridgeConnection window, string? sessionId, string text, NewSessionSetup? setup, CancellationToken ct, Task? received = null)
+    /// <param name="step">Told each step as it starts, in words for the phone ("Typing your prompt").</param>
+    public async Task SendAsync(BridgeConnection window, string? sessionId, string text, NewSessionSetup? setup, CancellationToken ct, Task? received = null,
+        Action<string>? step = null)
     {
+        step ??= _ => { };
+        if (_gate.CurrentCount == 0) step("Waiting for the prompt before it on this PC");
         await _gate.WaitAsync(ct).ConfigureAwait(false);
         var previous = keyboard.Foreground();
         nint target = 0;
         try
         {
+            step(sessionId is null ? $"Opening a new Claude tab in {window.Info.Name}" : $"Switching to the tab in {window.Info.Name}");
             if (sessionId is null) await Bridge(window, "new", null, ct).ConfigureAwait(false);
             else await Bridge(window, "open", sessionId, ct).ConfigureAwait(false);
             await keyboard.Pause(400, ct).ConfigureAwait(false);
@@ -123,16 +128,19 @@ public sealed class PromptSender(IPromptKeyboard keyboard, ILogger<PromptSender>
             {
                 if (!string.IsNullOrWhiteSpace(setup.Model))
                 {
+                    step($"Setting the model to {setup.Model.Trim()}");
                     await TypeAndSubmitAsync(window, target, focus, "/model " + setup.Model.Trim(), ct).ConfigureAwait(false);
                     await keyboard.Pause(2500, ct).ConfigureAwait(false);
                 }
                 if (!string.IsNullOrWhiteSpace(setup.Effort))
                 {
+                    step($"Setting the effort to {setup.Effort.Trim()}");
                     await TypeAndSubmitAsync(window, target, focus, "/effort " + setup.Effort.Trim(), ct).ConfigureAwait(false);
                     await keyboard.Pause(1500, ct).ConfigureAwait(false);
                 }
                 if (setup.ModePresses > 0)
                 {
+                    step("Setting the permission mode");
                     if (!keyboard.ForceActivate(target)) throw new PromptSendException("Windows did not let Helm bring VS Code to the front. Nothing was typed.");
                     await ConfirmFocusAsync(window, "Nothing was typed.", ct).ConfigureAwait(false);
                     await Bridge(window, focus, null, ct).ConfigureAwait(false);
@@ -145,7 +153,9 @@ public sealed class PromptSender(IPromptKeyboard keyboard, ILogger<PromptSender>
                     }
                 }
             }
+            step("Typing your prompt into VS Code");
             await TypeAndSubmitAsync(window, target, focus, text, ct).ConfigureAwait(false);
+            step("Waiting for Claude to take it");
             if (received is not null) await ConfirmAsync(window, target, focus, received, ct).ConfigureAwait(false);
         }
         finally

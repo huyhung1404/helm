@@ -44,10 +44,13 @@ public sealed class WorkspaceEngine : IAsyncDisposable
     private long _lastRealInput;
     private HookListener? _hooks;
     private BridgeHost? _bridge;
+    private readonly HeadlessClaude? _headless;
 
     private WorkspaceEngine(ISettingsStore<WorkspaceSettings> settings, SessionRegistry registry, PromptSender sender,
-        string? projectsRoot, IUserActivity? activity, ILogger logger, TimeProvider time)
+        string? projectsRoot, IUserActivity? activity, ILogger logger, TimeProvider time, HeadlessClaude? headless)
     {
+        _headless = headless;
+        if (headless is not null) headless.Changed += (_, _) => OnRunsChanged();
         _activity = activity;
         _lastRealInput = activity?.LastInputTick ?? Environment.TickCount64;
         _settings = settings;
@@ -85,11 +88,12 @@ public sealed class WorkspaceEngine : IAsyncDisposable
 
     /// <summary>Starts listening. A taken hook port is replaced by a free one (and Claude's settings follow).</summary>
     public static WorkspaceEngine Start(ISettingsStore<WorkspaceSettings> settings, HelmPaths paths, PromptSender sender,
-        ILogger logger, TimeProvider? time = null, string? bridgePipe = null, string? projectsRoot = null, IUserActivity? activity = null)
+        ILogger logger, TimeProvider? time = null, string? bridgePipe = null, string? projectsRoot = null, IUserActivity? activity = null,
+        HeadlessClaude? headless = null)
     {
         EnsureIdentity(settings);
         var s = settings.Current;
-        var engine = new WorkspaceEngine(settings, new SessionRegistry(s.InstallId, time), sender, projectsRoot, activity, logger, time ?? TimeProvider.System);
+        var engine = new WorkspaceEngine(settings, new SessionRegistry(s.InstallId, time), sender, projectsRoot, activity, logger, time ?? TimeProvider.System, headless);
         try
         {
             engine._hooks = HookListener.Start(s.HookPort, s.HookToken, engine.HandleHookAsync, logger);
@@ -103,6 +107,8 @@ public sealed class WorkspaceEngine : IAsyncDisposable
         engine._bridge = new BridgeHost(bridgePipe ?? WorkspaceEndpoint.PipeName(paths), logger);
         engine._bridge.WindowsChanged += (_, _) =>
         {
+            engine.RehomeSessions();
+            engine.ReviveOpenTabs();
             engine.SeedNewFolders();
             engine.ResolveTabsLater();
             engine.Changed?.Invoke(engine, EventArgs.Empty);
@@ -179,9 +185,23 @@ public sealed class WorkspaceEngine : IAsyncDisposable
             .ToList();
     }
 
-    private static (IReadOnlyList<string?> Sessions, string? Active) MatchTabs(IReadOnlyList<BridgeTab> tabs, IReadOnlyList<AgentSession> sessions) =>
+    private (IReadOnlyList<string?> Sessions, string? Active) MatchTabs(IReadOnlyList<BridgeTab> tabs, IReadOnlyList<AgentSession> sessions) =>
         ClaudeTabMatch.Match(tabs.Select(t => (t.Label, t.Active)).ToList(),
-            sessions.Where(s => s.State != SessionState.Ended).Select(s => new ClaudeTabMatch.Candidate(s.SessionId, s.Title, s.LastPrompt, s.UpdatedAt)).ToList());
+            sessions.Select(s => new ClaudeTabMatch.Candidate(s.SessionId, s.Title, s.LastPrompt, s.UpdatedAt)).ToList(),
+            RecentlyOpened());
+
+    /// <summary>Tabs Helm opened lately (reopened from History, new from the phone), newest first.</summary>
+    private readonly ConcurrentDictionary<string, DateTimeOffset> _opened = new(StringComparer.Ordinal);
+
+    /// <summary>How long a tab Helm opened is matched to its session even when its name does not fit.</summary>
+    internal static readonly TimeSpan OpenedFor = TimeSpan.FromMinutes(10);
+
+    private IReadOnlyList<string> RecentlyOpened()
+    {
+        var since = _time.GetLocalNow() - OpenedFor;
+        foreach (var old in _opened.Where(p => p.Value < since).Select(p => p.Key).ToList()) _opened.TryRemove(old, out _);
+        return _opened.OrderByDescending(p => p.Value).Select(p => p.Key).ToList();
+    }
 
     /// <summary>
     /// Claude tabs whose session Helm does not know yet (opened before Helm started, days ago) are looked up in
@@ -247,15 +267,149 @@ public sealed class WorkspaceEngine : IAsyncDisposable
         });
     }
 
+    /// <summary>
+    /// The folder a hook's session belongs to. Claude reports where its shell is now, which wanders (a worktree in
+    /// C:\tmp, a subfolder, "/c/Project"): a session started in a VS Code window would then look like it is outside it.
+    /// The folder it was filed under stays: a connected window that has it, else the one found once and kept.
+    /// </summary>
+    private string HomeOf(ClaudeHookEvent e)
+    {
+        var cwd = e.Cwd.Length > 0 ? WorkspaceFolders.Native(e.Cwd) : "";
+        var key = ClaudeProjects.KeyOf(e.TranscriptPath);
+        if (key.Length == 0) return Registry.Find(e.SessionId)?.Folder is { Length: > 0 } known ? known : cwd;
+        if ((_bridge?.Windows ?? []).SelectMany(w => w.Info.Folders).FirstOrDefault(f => ClaudeProjects.IsProjectOf(f, key)) is { } window) return window;
+        if (_homes.TryGetValue(e.SessionId, out var home)) return home;
+        home = ClaudeProjects.HomeOf(e.TranscriptPath, cwd) ?? (Registry.Find(e.SessionId)?.Folder is { Length: > 0 } f ? f : cwd);
+        if (home.Length > 0) _homes[e.SessionId] = home;
+        return home;
+    }
+
+    private readonly ConcurrentDictionary<string, string> _homes = new(StringComparer.Ordinal);
+
+    /// <summary>A window connected: the sessions filed under its folder are its, wherever their shell went.</summary>
+    private void RehomeSessions()
+    {
+        var folders = (_bridge?.Windows ?? []).SelectMany(w => w.Info.Folders).ToList();
+        if (folders.Count == 0) return;
+        foreach (var s in Registry.Sessions)
+        {
+            if (folders.Any(f => IsUnder(s.Folder, f))) continue;
+            var key = ClaudeProjects.KeyOf(s.TranscriptPath);
+            if (folders.FirstOrDefault(f => ClaudeProjects.IsProjectOf(f, key)) is { } folder) Registry.SetFolder(s.SessionId, folder);
+        }
+    }
+
+    /// <summary>
+    /// A Claude tab shows a session Helm saw end (VS Code was reloaded, or the tab closed and opened again): it is open,
+    /// so it is listed again.
+    /// </summary>
+    private void ReviveOpenTabs()
+    {
+        foreach (var w in Windows())
+            foreach (var id in w.OpenSessions ?? [])
+                if (w.Sessions.FirstOrDefault(s => s.SessionId == id) is { State: SessionState.Ended }) Registry.Revive(id);
+    }
+
     /// <summary>Sessions no connected VS Code window has (a terminal, another editor, a window without the bridge).</summary>
     public IReadOnlyList<AgentSession> OtherSessions()
     {
         var windows = _bridge?.Windows ?? [];
-        return Registry.Sessions.Where(s => !windows.Any(w => Contains(w, s.Folder))).ToList();
+        return Registry.Sessions.Where(s => !windows.Any(w => Contains(w, s.Folder)) && !_dismissed.ContainsKey(s.SessionId)).ToList();
     }
 
+    /// <summary>Sessions outside VS Code taken off the phone's list (its close button); a new prompt brings one back.</summary>
+    private readonly ConcurrentDictionary<string, byte> _dismissed = new(StringComparer.Ordinal);
+
+    /// <summary>How long a session Helm runs may take to show the prompt (Claude Code starts first).</summary>
+    public static readonly TimeSpan HostedReceiptTimeout = TimeSpan.FromSeconds(60);
+
+    /// <summary>
+    /// A prompt for a session outside VS Code: Helm runs that session in the background (<see cref="HeadlessClaude"/>),
+    /// or hands the prompt to the run it has going. Not while Claude works on it elsewhere (its terminal).
+    /// </summary>
+    private async Task<WorkspaceCommandResult> RunOutsideAsync(WorkspaceCommand command, AgentSession session, CancellationToken ct, Action<string>? step)
+    {
+        if (_headless is null)
+            return new WorkspaceCommandResult(command.Id, WorkspaceCommandStatus.Failed, "No VS Code window with Helm Bridge has that session's folder open.", session.SessionId);
+        var running = _headless.IsRunning(session.SessionId);
+        if (!running && session.State is SessionState.Working or SessionState.NeedsPermission or SessionState.Question)
+            return new WorkspaceCommandResult(command.Id, WorkspaceCommandStatus.Failed,
+                "Claude is still working on that session where it runs (a terminal?). Send it when that turn is over.", session.SessionId);
+        _dismissed.TryRemove(session.SessionId, out _);
+        var receipt = new TaskCompletionSource<string>(TaskCreationOptions.RunContinuationsAsynchronously);
+        _receipts[command.Id] = receipt;
+        Registry.ExpectPrompt(command.Id, session.SessionId, session.Folder, command.Text, HostedReceiptTimeout + TimeSpan.FromSeconds(10));
+        try
+        {
+            step?.Invoke(running ? "Adding your message to Claude's run on the PC" : "Starting Claude in the background on the PC");
+            var folder = ClaudeProjects.HomeOf(session.TranscriptPath, session.Folder) ?? session.Folder;
+            await _headless.SendAsync(session.SessionId, folder, command.Text, ct).ConfigureAwait(false);
+            Registry.SetHosted(session.SessionId, true);
+            step?.Invoke("Waiting for Claude to take it");
+            var arrived = await receipt.Task.WaitAsync(HostedReceiptTimeout, ct).ConfigureAwait(false);
+            return new WorkspaceCommandResult(command.Id, WorkspaceCommandStatus.Received, null, arrived);
+        }
+        catch (PromptSendException ex)
+        {
+            Forget(command.Id);
+            return new WorkspaceCommandResult(command.Id, WorkspaceCommandStatus.Failed, ex.Message, session.SessionId);
+        }
+        catch (Exception ex) when (ex is TimeoutException or OperationCanceledException)
+        {
+            Forget(command.Id);
+            return new WorkspaceCommandResult(command.Id, WorkspaceCommandStatus.Sent,
+                "Claude was started on the PC but did not confirm the message yet (are Helm's hooks installed?).", session.SessionId);
+        }
+    }
+
+    /// <summary>Model, effort, mode of a session outside VS Code: kept for Helm's next run of it. Closing its tab hides it.</summary>
+    private WorkspaceCommandResult ChangeOutside(WorkspaceCommand command, AgentSession session)
+    {
+        if (command.Kind == WorkspaceCommandKind.CloseTab)
+        {
+            if (_headless?.IsRunning(session.SessionId) == true)
+                return new WorkspaceCommandResult(command.Id, WorkspaceCommandStatus.Failed, "Helm is still running that session; stop it first.", session.SessionId);
+            _dismissed[session.SessionId] = 0;
+            Changed?.Invoke(this, EventArgs.Empty);
+            return new WorkspaceCommandResult(command.Id, WorkspaceCommandStatus.Received, null, session.SessionId);
+        }
+        if (_headless is null)
+            return new WorkspaceCommandResult(command.Id, WorkspaceCommandStatus.Failed, "No VS Code window with Helm Bridge has that folder open.", session.SessionId);
+        var value = command.Text.Trim();
+        switch (command.Kind)
+        {
+            case WorkspaceCommandKind.SetModel:
+                _headless.SetOptions(session.SessionId, o => o with { Model = value == "default" ? null : value });
+                break;
+            case WorkspaceCommandKind.SetEffort:
+                if (value.StartsWith("ultracode", StringComparison.Ordinal))
+                    return new WorkspaceCommandResult(command.Id, WorkspaceCommandStatus.Failed, "Ultracode is only for sessions in VS Code.", session.SessionId);
+                _headless.SetOptions(session.SessionId, o => o with { Effort = value });
+                break;
+            case WorkspaceCommandKind.SetMode:
+                var mode = PermissionModes.Normalize(value);
+                _headless.SetOptions(session.SessionId, o => o with { PermissionMode = mode });
+                Registry.SetMode(session.SessionId, mode);
+                break;
+        }
+        return new WorkspaceCommandResult(command.Id, WorkspaceCommandStatus.Received,
+            _headless.IsRunning(session.SessionId) ? "Takes effect from Helm's next run of this session." : null, session.SessionId);
+    }
+
+    /// <summary>Background runs started or ended: the sessions say whether Helm runs them.</summary>
+    private void OnRunsChanged()
+    {
+        var running = (_headless?.Runs ?? []).Select(r => r.SessionId).ToHashSet(StringComparer.Ordinal);
+        foreach (var s in Registry.Sessions.Where(s => s.Hosted != running.Contains(s.SessionId))) Registry.SetHosted(s.SessionId, running.Contains(s.SessionId));
+        Changed?.Invoke(this, EventArgs.Empty);
+    }
+
+    /// <summary>The sessions Helm runs in the background now.</summary>
+    public IReadOnlyList<HostedRun> HostedRuns => _headless?.Runs ?? [];
+
     /// <summary>Runs one command and reports how far it got. Never throws.</summary>
-    public async Task<WorkspaceCommandResult> RunAsync(WorkspaceCommand command, CancellationToken ct)
+    /// <param name="step">Told each step as it starts, in words for the phone.</param>
+    public async Task<WorkspaceCommandResult> RunAsync(WorkspaceCommand command, CancellationToken ct, Action<string>? step = null)
     {
         if (command.MachineId != MachineId)
             return new WorkspaceCommandResult(command.Id, WorkspaceCommandStatus.Failed, "This command is for another PC.");
@@ -275,18 +429,26 @@ public sealed class WorkspaceEngine : IAsyncDisposable
                 return await ChangeSessionAsync(command, ct).ConfigureAwait(false);
             case WorkspaceCommandKind.Reopen:
                 return await ReopenAsync(command, ct).ConfigureAwait(false);
+            case WorkspaceCommandKind.Ping:
+                return new WorkspaceCommandResult(command.Id, WorkspaceCommandStatus.Received);
+            case WorkspaceCommandKind.Stop:
+                return command.SessionId is { } stop && _headless?.Stop(stop) == true
+                    ? new WorkspaceCommandResult(command.Id, WorkspaceCommandStatus.Received, null, stop)
+                    : new WorkspaceCommandResult(command.Id, WorkspaceCommandStatus.Failed, "Helm is not running that session; stop it where it runs.", command.SessionId);
         }
         if (command.Kind == WorkspaceCommandKind.Prompt)
         {
             if (command.SessionId is null || Registry.Find(command.SessionId) is not { } session)
                 return new WorkspaceCommandResult(command.Id, WorkspaceCommandStatus.Failed, "That Claude session is not open on this PC.");
-            if (session.State == SessionState.Ended)
-                return new WorkspaceCommandResult(command.Id, WorkspaceCommandStatus.Failed, "That Claude session has ended.");
             if (!IsConnected(session))
                 return new WorkspaceCommandResult(command.Id, WorkspaceCommandStatus.Failed, "That session is disconnected from Helm on the PC.");
             sessionId = session.SessionId;
             folder = session.Folder;
             window = WindowFor(folder);
+            // Outside VS Code Helm runs it itself, ended (its terminal closed) or not.
+            if (window is null) return await RunOutsideAsync(command, session, ct, step).ConfigureAwait(false);
+            if (session.State == SessionState.Ended)
+                return new WorkspaceCommandResult(command.Id, WorkspaceCommandStatus.Failed, "That Claude session has ended; open it again from History.");
         }
         else
         {
@@ -306,7 +468,7 @@ public sealed class WorkspaceEngine : IAsyncDisposable
             var setup = command.Kind == WorkspaceCommandKind.NewSession
                 ? new NewSessionSetup(command.Model, command.Effort, command.Mode is { } m ? Math.Max(0, PermissionModes.Presses(PermissionModes.Manual, m, AutoModeAvailable)) : 0)
                 : null;
-            await _sender.SendAsync(window, sessionId, command.Text, setup, ct, receipt.Task).ConfigureAwait(false);
+            await _sender.SendAsync(window, sessionId, command.Text, setup, ct, receipt.Task, step).ConfigureAwait(false);
         }
         catch (PromptSendException ex)
         {
@@ -321,6 +483,11 @@ public sealed class WorkspaceEngine : IAsyncDisposable
         try
         {
             var arrived = await receipt.Task.WaitAsync(ReceiptTimeout, ct).ConfigureAwait(false);
+            if (command.Kind == WorkspaceCommandKind.NewSession)
+            {
+                _opened[arrived] = _time.GetLocalNow();
+                Changed?.Invoke(this, EventArgs.Empty);
+            }
             return new WorkspaceCommandResult(command.Id, WorkspaceCommandStatus.Received, null, arrived);
         }
         catch (Exception ex) when (ex is TimeoutException or OperationCanceledException)
@@ -341,8 +508,7 @@ public sealed class WorkspaceEngine : IAsyncDisposable
             return new WorkspaceCommandResult(command.Id, WorkspaceCommandStatus.Failed, "That Claude session is not open on this PC.");
         if (!IsConnected(session))
             return new WorkspaceCommandResult(command.Id, WorkspaceCommandStatus.Failed, "That session is disconnected from Helm on the PC.", session.SessionId);
-        if (WindowFor(session.Folder) is not { } window)
-            return new WorkspaceCommandResult(command.Id, WorkspaceCommandStatus.Failed, "No VS Code window with Helm Bridge has that folder open.", session.SessionId);
+        if (WindowFor(session.Folder) is not { } window) return ChangeOutside(command, session);
         try
         {
             switch (command.Kind)
@@ -396,7 +562,13 @@ public sealed class WorkspaceEngine : IAsyncDisposable
         {
             return new WorkspaceCommandResult(command.Id, WorkspaceCommandStatus.Failed, ex.Message, id);
         }
-        if (!SeedSession(command.Folder, id)) SeedSession(folder, id);
+        _opened[id] = _time.GetLocalNow();
+        if (!SeedSession(command.Folder, id) && !SeedSession(folder, id) && Registry.Find(id) is { } known)
+        {
+            // Known already: its tab was closed (SessionEnd) or its shell wandered off. Open again, in this window.
+            if (!IsUnder(known.Folder, folder)) Registry.SetFolder(id, folder);
+            Registry.Revive(id);
+        }
         Changed?.Invoke(this, EventArgs.Empty);
         return new WorkspaceCommandResult(command.Id, WorkspaceCommandStatus.Received, null, id);
     }
@@ -550,8 +722,12 @@ public sealed class WorkspaceEngine : IAsyncDisposable
     /// </summary>
     internal async Task<string?> HandleHookAsync(ClaudeHookEvent e)
     {
+        e = e with { Cwd = HomeOf(e) };
+        if (e.Event is ClaudeHookEvent.UserPromptSubmit or ClaudeHookEvent.SessionStart) _dismissed.TryRemove(e.SessionId, out _);
         Registry.Apply(e);
-        if (e.Event != ClaudeHookEvent.PermissionRequest || !ShouldHold() || Registry.Find(e.SessionId) is not { } session || !IsConnected(session))
+        // A session Helm runs in the background has no VS Code to ask in: the phone always decides.
+        var hosted = _headless?.IsRunning(e.SessionId) == true;
+        if (e.Event != ClaudeHookEvent.PermissionRequest || !hosted && !ShouldHold() || Registry.Find(e.SessionId) is not { } session || !IsConnected(session))
             return null;
 
         var hold = TimeSpan.FromMinutes(Math.Clamp(_settings.Current.HoldMinutes, 1, 25));
@@ -569,7 +745,7 @@ public sealed class WorkspaceEngine : IAsyncDisposable
                 if (answered == held.Answer.Task) return await held.Answer.Task.ConfigureAwait(false);
                 if (_time.GetLocalNow() >= request.ExpiresAt) return null;
                 // Back at the PC: VS Code asks you there instead.
-                if (_settings.Current.ApproveFromPhone == PhoneApprovals.WhenAway && RealInputTick() > since) return null;
+                if (!hosted && _settings.Current.ApproveFromPhone == PhoneApprovals.WhenAway && RealInputTick() > since) return null;
             }
         }
         finally
@@ -629,6 +805,7 @@ public sealed class WorkspaceEngine : IAsyncDisposable
     {
         // Every held request goes back to VS Code's own dialog.
         foreach (var held in _held.Values) held.Answer.TrySetResult(null);
+        if (_headless is not null) await _headless.DisposeAsync().ConfigureAwait(false);
         foreach (var waiting in _receipts.Values) waiting.TrySetCanceled();
         _receipts.Clear();
         if (_hooks is not null) await _hooks.DisposeAsync().ConfigureAwait(false);

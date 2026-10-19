@@ -12,6 +12,7 @@ public static class WorkspaceServices
             .AddSingleton<PromptSender>()
             .AddSingleton<BridgeInstaller>()
             .AddSingleton<ClaudeCatalog>()
+            .AddSingleton<IClaudeStarter, ClaudeStarter>()
             .AddHelmModule<WorkspaceModule, WorkspacePage, WorkspaceViewModel>()
             .AddSingleton<WorkspaceContentPage>();
 }
