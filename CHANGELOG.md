@@ -3,7 +3,7 @@
 All notable changes to Helm. The top section is used as the GitHub release body and as the Velopack release notes.
 Format: [Keep a Changelog](https://keepachangelog.com), versions follow [SemVer](https://semver.org).
 
-## [Unreleased]
+## [0.47.0] - 2026-10-19
 
 ### Fixed
 - **Novel Reader on the PC: a word held down in study mode is said even where Microsoft refuses Helm's direct
@@ -12,6 +12,29 @@ Format: [Keep a Changelog](https://keepachangelog.com), versions follow [SemVer]
 - **Novel Reader on the PC: reading aloud with HoaiMy no longer stalls after the first sentence when Edge has an update
   waiting.** Helm took the hidden Edge for gone and started another, which the first one blocked. It now also closes
   a hidden Edge an earlier Helm left running (killed, or ended by an update), which kept HoaiMy from starting at all.
+- **Workspace Controller: the phone shows every Claude tab of a VS Code window.** A session whose shell went into a
+  worktree, a subfolder or a Git Bash path (`/c/…`) counted as "outside VS Code", so the phone showed one tab where VS
+  Code had three. A session now belongs to the folder Claude filed it under, wherever its shell goes. Tabs still open
+  after VS Code reloaded come back too.
+- **Workspace Controller: opening a session from History works.** A session whose tab you had closed stayed "ended", so
+  reopening it from the phone opened it in VS Code but never on the phone. It shows up now, and the phone says so if
+  it does not within 20 seconds.
+- **Workspace Controller: commands reach the PC within a second or two.** Every hop waited 2 seconds for more changes,
+  and while Claude worked the PC's updates kept pushing that wait back, so a new session could take long enough to
+  look frozen. Commands and their progress now go out at once, and a stream of updates no longer holds sync back.
+
+### Added
+- **Workspace Controller: a progress card for each message, new session or reopened session.** It shows each step as
+  it happens (sent, picked up by the PC, opening the tab, setting the model, typing, Claude has it) with a clock, and
+  says what may hold it up when it is slow.
+- **Workspace Controller: is what you see up to date?** A chip beside the PC's name says Live, how long ago the PC was
+  heard from, or Offline. Tap it for the sync connection, when the PC last wrote, what it is doing in the background
+  for the phone, and **Check now**. "Working…" counts the time and says when Claude's last step was.
+- **Workspace Controller: go on with sessions outside VS Code from the phone.** Claude sessions in a terminal or another
+  editor have their own tab. Send one a message and Helm runs it on the PC in the background (`claude -p --resume`,
+  same conversation): its steps, permissions and questions come to the phone like a VS Code tab, model, effort and mode
+  apply from its next run, and **Stop** ends it. The phone asks once first, because a terminal that still has the
+  session open does not see these turns.
 
 ## [0.46.0] - 2026-10-19
 

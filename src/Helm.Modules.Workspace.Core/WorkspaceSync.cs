@@ -79,6 +79,12 @@ public sealed record WorkspaceHostRecord
     /// <summary>Slash commands and skills, for the "/" suggestions.</summary>
     public IReadOnlyList<SkillInfo> Skills { get; init; } = [];
 
+    /// <summary>What the PC is busy with for the phone right now ("Typing a prompt into VS Code"), newest last.</summary>
+    public IReadOnlyList<string> Activities { get; init; } = [];
+
+    /// <summary>How often the PC writes this record when nothing changes (the phone's "last heard from").</summary>
+    public static readonly TimeSpan HeartbeatEvery = TimeSpan.FromSeconds(30);
+
     /// <summary>The PC wrote within this long and its tool is on: it is reachable.</summary>
     public static readonly TimeSpan OnlineWithin = TimeSpan.FromMinutes(3);
 
@@ -131,6 +137,12 @@ public sealed record WorkspaceSessionRecord
 
     /// <summary>What the PC holds for the phone to answer (permission, question, plan); null when nothing.</summary>
     public PendingRequest? Pending { get; init; }
+
+    /// <summary>Outside VS Code, Helm on the PC runs it in the background for the phone (and can stop it).</summary>
+    public bool Hosted { get; init; }
+
+    /// <summary>Not in a connected VS Code window (a terminal, another editor): the phone's "Outside VS Code" tab.</summary>
+    [System.Text.Json.Serialization.JsonIgnore] public bool IsOutside => WindowFolder.Length == 0;
 }
 
 /// <summary>One earlier session of a folder, as the history sheet lists it.</summary>
@@ -166,6 +178,9 @@ public sealed record WorkspaceResultRecord
     public string? Error { get; init; }
     public string? SessionId { get; init; }
     public DateTimeOffset UpdatedAt { get; init; }
+
+    /// <summary>While <see cref="Status"/> is Sending: the step the PC is at ("Opening a new Claude tab in Helm").</summary>
+    public string? Step { get; init; }
 }
 
 /// <summary>The synced collections of Workspace Controller (all end-to-end encrypted like the rest of Helm Sync).</summary>
@@ -199,8 +214,9 @@ public static class WorkspaceSync
     {
         services.AddSyncedCollection(new SyncedCollectionOptions<WorkspaceHostRecord> { Name = Hosts });
         services.AddSyncedCollection(new SyncedCollectionOptions<WorkspaceSessionRecord> { Name = Sessions });
-        services.AddSyncedCollection(new SyncedCollectionOptions<WorkspaceCommand> { Name = Commands });
-        services.AddSyncedCollection(new SyncedCollectionOptions<WorkspaceResultRecord> { Name = Results });
+        // Someone holds the phone and waits: a command and the PC's progress go out at once.
+        services.AddSyncedCollection(new SyncedCollectionOptions<WorkspaceCommand> { Name = Commands, Urgent = true });
+        services.AddSyncedCollection(new SyncedCollectionOptions<WorkspaceResultRecord> { Name = Results, Urgent = true });
         services.AddSyncedCollection(new SyncedCollectionOptions<WorkspaceHistoryRecord> { Name = History });
         services.AddSyncGroup(Prefix, "Workspace Controller");
         return services;
@@ -250,6 +266,7 @@ public static class WorkspaceSync
         // Only a working session has subagents at work (a stopped turn leaves calls without results).
         Agents = s.State is SessionState.Working or SessionState.NeedsPermission or SessionState.Question ? view?.Agents ?? [] : [],
         Pending = s.Pending,
+        Hosted = s.Hosted,
     };
 
     /// <summary>The newest steps that fit the record: answers cut, the oldest dropped first.</summary>

@@ -615,6 +615,14 @@ internal sealed class FakeBridge(string pipe) : IAsyncDisposable
         });
     }
 
+    /// <summary>Reports the window's Claude tabs by name, as Bridge 1.1 does.</summary>
+    public Task TabsAsync(string name, string[] folders, params (string Label, bool Active)[] tabs) =>
+        _writer!.WriteLineAsync(JsonSerializer.Serialize(new
+        {
+            type = "state", protocol = 1, pid = 1, name, folders, sendKey = "enter", claudeTabs = tabs.Length, focused = true,
+            tabs = tabs.Select(t => new { label = t.Label, active = t.Active }),
+        }));
+
     public async ValueTask DisposeAsync()
     {
         await _stream.DisposeAsync();

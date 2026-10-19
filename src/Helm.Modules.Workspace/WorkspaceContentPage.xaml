@@ -74,7 +74,7 @@
                 <TextBlock Text="Elsewhere" Style="{DynamicResource HelmSectionHeader}" />
                 <ui:CardExpander Margin="0,0,0,4" IsExpanded="True" Icon="{ui:SymbolIcon Chat24}">
                     <ui:CardExpander.Header>
-                        <core:CardHeader Title="Sessions outside VS Code" Description="Claude in a terminal or another editor: Helm sees them, the phone cannot type into them." />
+                        <core:CardHeader Title="Sessions outside VS Code" Description="Claude in a terminal or another editor. The phone can go on with them: Helm runs them here in the background, with the same conversation (a terminal that still has one open will not see those turns)." />
                     </ui:CardExpander.Header>
                     <ItemsControl ItemsSource="{Binding OtherSessions}" ItemTemplate="{StaticResource SessionTemplate}" />
                 </ui:CardExpander>

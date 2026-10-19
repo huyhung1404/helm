@@ -71,6 +71,12 @@ public interface ISyncService
 
     /// <summary>Schedules a debounced <see cref="SyncNowAsync"/> (a no-op while sync is not configured).</summary>
     void RequestSync();
+
+    /// <summary>Syncs within a moment (a command another device waits for), instead of after the usual pause.</summary>
+    void RequestSyncSoon() => RequestSync();
+
+    /// <summary>True while the live channel is connected: other devices' changes arrive within seconds.</summary>
+    bool IsLive => false;
 }
 
 /// <summary>
@@ -251,7 +257,8 @@ public sealed class SyncEngine : ISyncService, IDisposable
         if (_ownSeqs.ContainsKey(seq)) return;
         InterlockedMax(ref _liveSeq, seq);
         if (_run.CurrentCount == 0) return;
-        if (seq > _db.GetCursor(MainCursor)) RequestSync();
+        // Another device just wrote: fetch it now (the pause only gathers this device's own edits).
+        if (seq > _db.GetCursor(MainCursor)) RequestSyncSoon();
     }
 
     private static void InterlockedMax(ref long target, long value)
@@ -310,11 +317,32 @@ public sealed class SyncEngine : ISyncService, IDisposable
         _pollInterval = every;
     }
 
-    public void RequestSync()
+    /// <summary>How soon <see cref="RequestSyncSoon"/> syncs.</summary>
+    internal static readonly TimeSpan SoonDelay = TimeSpan.FromMilliseconds(150);
+
+    private readonly object _scheduleGate = new();
+    private long _dueTicks;
+
+    /// <summary>
+    /// Syncs after a short pause, so changes close together go in one run. A run already due sooner stays due: a steady
+    /// stream of changes (a session publishing every second) never pushes the run back for ever.
+    /// </summary>
+    public void RequestSync() => Schedule(_debounce);
+
+    public void RequestSyncSoon() => Schedule(_debounce < SoonDelay ? _debounce : SoonDelay);
+
+    private void Schedule(TimeSpan delay)
     {
         if (_disposed || !_transport.IsConfigured) return;
-        try { _timer.Change(_debounce, Timeout.InfiniteTimeSpan); }
-        catch (ObjectDisposedException) { }
+        lock (_scheduleGate)
+        {
+            var now = Environment.TickCount64;
+            var due = now + (long)delay.TotalMilliseconds;
+            if (_dueTicks > now && _dueTicks <= due) return;
+            _dueTicks = due;
+            try { _timer.Change(delay, Timeout.InfiniteTimeSpan); }
+            catch (ObjectDisposedException) { }
+        }
     }
 
     /// <summary>Forgets the cached key, e.g. after sync was set up or reset on this device.</summary>
@@ -416,7 +444,7 @@ public sealed class SyncEngine : ISyncService, IDisposable
             RaiseChanges(run);
             // Something another device announced during the run that the run did not fetch (it came after the pull):
             // go again. Only after a complete run: a held, offline or refused run would otherwise loop.
-            if (completed && Interlocked.Read(ref _liveSeq) > _db.GetCursor(MainCursor)) RequestSync();
+            if (completed && Interlocked.Read(ref _liveSeq) > _db.GetCursor(MainCursor)) RequestSyncSoon();
         }
     }
 
@@ -1007,6 +1035,7 @@ public sealed class SyncEngine : ISyncService, IDisposable
     private async Task RunScheduledAsync()
     {
         if (_disposed) return;
+        lock (_scheduleGate) _dueTicks = 0;
         try
         {
             await SyncNowAsync().ConfigureAwait(false);

@@ -80,6 +80,12 @@ public sealed class SyncedCollectionOptions<T> where T : class
     /// <summary>The blob ids a record uses (see <see cref="SyncCollectionDescriptor.BlobReferences"/>).</summary>
     public Func<T, IEnumerable<string>>? BlobReferences { get; init; }
 
+    /// <summary>
+    /// Another device waits for these records (a command, its result): a local write syncs within a moment instead of
+    /// after the usual pause.
+    /// </summary>
+    public bool Urgent { get; init; }
+
     internal SyncCollectionDescriptor ToDescriptor()
     {
         Func<string, string>? copy = null;
@@ -210,7 +216,8 @@ public sealed class SyncedCollection<T> : ISyncedCollection<T>, IDisposable wher
     private void OnLocalWrite(string id)
     {
         Changed?.Invoke(this, new SyncedChangedEventArgs([id], SyncChangeOrigin.Local));
-        _engine.RequestSync();
+        if (_options.Urgent) _engine.RequestSyncSoon();
+        else _engine.RequestSync();
     }
 
     private void OnRecordsChanged(object? sender, SyncRecordsChangedEventArgs e)

@@ -27,6 +27,7 @@
                     <SolidColorBrush x:Key="VsLink" Color="#005fb8" />
                     <SolidColorBrush x:Key="VsBad" Color="#e51400" />
                     <SolidColorBrush x:Key="VsOk" Color="#388a34" />
+                    <SolidColorBrush x:Key="VsWarn" Color="#bf8803" />
                     <SolidColorBrush x:Key="VsCodeBg" Color="#f8f8f8" />
                     <SolidColorBrush x:Key="VsCodeOut" Color="#f3f3f3" />
                     <SolidColorBrush x:Key="VsAnswerDot" Color="#8b8b8b" />
@@ -62,6 +63,7 @@
                     <SolidColorBrush x:Key="VsLink" Color="#4daafc" />
                     <SolidColorBrush x:Key="VsBad" Color="#f14c4c" />
                     <SolidColorBrush x:Key="VsOk" Color="#89d185" />
+                    <SolidColorBrush x:Key="VsWarn" Color="#cca700" />
                     <SolidColorBrush x:Key="VsCodeBg" Color="#181818" />
                     <SolidColorBrush x:Key="VsCodeOut" Color="#1c1c1c" />
                     <SolidColorBrush x:Key="VsAnswerDot" Color="#c5c5c5" />
@@ -397,6 +399,33 @@
         <Style Selector="Button.send:disabled /template/ ContentPresenter#PART_ContentPresenter">
             <Setter Property="Background" Value="{DynamicResource VsSendDisabled}" />
         </Style>
+        <Style Selector="Button.stop">
+            <Setter Property="Width" Value="32" />
+            <Setter Property="Height" Value="32" />
+            <Setter Property="CornerRadius" Value="5" />
+            <Setter Property="Padding" Value="0" />
+            <Setter Property="Background" Value="{DynamicResource VsBad}" />
+            <Setter Property="HorizontalContentAlignment" Value="Center" />
+            <Setter Property="VerticalContentAlignment" Value="Center" />
+        </Style>
+        <Style Selector="Button.fresh">
+            <Setter Property="Background" Value="{DynamicResource VsRaise}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource VsLine2}" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="CornerRadius" Value="11" />
+            <Setter Property="Padding" Value="8,2" />
+            <Setter Property="MinHeight" Value="24" />
+            <Setter Property="Margin" Value="2,0,0,0" />
+        </Style>
+        <Style Selector="Border.progress">
+            <Setter Property="BorderBrush" Value="{DynamicResource VsAccent}" />
+            <Setter Property="BorderThickness" Value="1.5" />
+            <Setter Property="CornerRadius" Value="10" />
+            <Setter Property="Background" Value="{DynamicResource VsRaise}" />
+            <Setter Property="Padding" Value="16,14" />
+            <Setter Property="Margin" Value="12,12,12,14" />
+            <Setter Property="BoxShadow" Value="0 4 18 0 #40000000" />
+        </Style>
         <Style Selector="TextBox.prompt">
             <Setter Property="Background" Value="Transparent" />
             <Setter Property="BorderThickness" Value="0" />
@@ -507,7 +536,7 @@
         <!-- The PC, History, New session -->
         <Border Grid.Row="0" Background="{DynamicResource VsBar}" BorderBrush="{DynamicResource VsLine}" BorderThickness="0,0,0,1" Padding="4,4,10,4">
             <DockPanel>
-                <Button DockPanel.Dock="Right" Classes="flat" Width="40" Height="36" Command="{Binding NewSessionCommand}"
+                <Button DockPanel.Dock="Right" Classes="flat" Width="40" Height="36" Command="{Binding NewSessionCommand}" IsVisible="{Binding CanStartNew}"
                         AutomationProperties.Name="New session" HorizontalContentAlignment="Center">
                     <Path Classes="icon" Width="18" Height="18" Data="M3 2.5h7l3 3v8H3z M8 6v5M5.5 8.5h5" />
                 </Button>
@@ -515,7 +544,7 @@
                         AutomationProperties.Name="Text size" HorizontalContentAlignment="Center">
                     <TextBlock Text="Aa" FontSize="15" FontWeight="SemiBold" Foreground="{DynamicResource VsFg}" VerticalAlignment="Center" />
                 </Button>
-                <Button DockPanel.Dock="Right" Classes="flat" Width="40" Height="36" Command="{Binding OpenSheetCommand}" CommandParameter="History"
+                <Button DockPanel.Dock="Right" Classes="flat" Width="40" Height="36" Command="{Binding OpenSheetCommand}" CommandParameter="History" IsVisible="{Binding CanStartNew}"
                         AutomationProperties.Name="History of this project" HorizontalContentAlignment="Center">
                     <Path Classes="icon" Width="18" Height="18" Data="M14.2 8A6.2 6.2 0 1 1 1.8 8A6.2 6.2 0 1 1 14.2 8Z M8 4.5V8l2.5 1.6" />
                 </Button>
@@ -529,6 +558,19 @@
                             <Ellipse Width="8" Height="8" Fill="{DynamicResource VsFaint}" IsVisible="{Binding !HostOnline}" VerticalAlignment="Center" />
                             <TextBlock Text="{Binding HostName}" Classes="strong" FontWeight="SemiBold" VerticalAlignment="Center" />
                             <Path Classes="icon" Width="12" Height="12" Stretch="Uniform" Data="M3 6l5 5 5-5" />
+                        </StackPanel>
+                    </Button>
+                    <!-- How fresh the screen is: Live, "40 s ago", Offline; tap for what runs and a check now -->
+                    <Button Classes="fresh" Command="{Binding OpenSheetCommand}" CommandParameter="Status" IsVisible="{Binding HasHosts}" VerticalAlignment="Center"
+                            AutomationProperties.Name="{Binding FreshnessText, StringFormat='Up to date? {0}'}">
+                        <StackPanel Orientation="Horizontal" Spacing="5">
+                            <Panel Width="8" Height="8" VerticalAlignment="Center">
+                                <Ellipse Width="8" Height="8" Fill="{DynamicResource VsOk}" Classes="pulse" IsVisible="{Binding FreshLive}" />
+                                <Ellipse Width="8" Height="8" Fill="{DynamicResource VsWarn}" IsVisible="{Binding FreshDelayed}" />
+                                <Ellipse Width="8" Height="8" Fill="{DynamicResource VsFaint}" IsVisible="{Binding FreshOffline}" />
+                            </Panel>
+                            <TextBlock Text="{Binding FreshnessText}" FontSize="12" VerticalAlignment="Center" />
+                            <TextBlock Text="⟳" Classes="spin" FontSize="12" IsVisible="{Binding IsSyncing}" VerticalAlignment="Center" />
                         </StackPanel>
                     </Button>
                 </StackPanel>
@@ -625,7 +667,7 @@
                         <Button Classes="stab on" IsVisible="{Binding IsNewSession}">
                             <TextBlock Text="New session" Classes="name" VerticalAlignment="Center" />
                         </Button>
-                        <Button Classes="stab" Command="{Binding NewSessionCommand}" AutomationProperties.Name="New session" Padding="12,0">
+                        <Button Classes="stab" Command="{Binding NewSessionCommand}" AutomationProperties.Name="New session" Padding="12,0" IsVisible="{Binding CanStartNew}">
                             <TextBlock Text="+" FontSize="17" Foreground="{DynamicResource VsMuted}" VerticalAlignment="Center" />
                         </Button>
                     </StackPanel>
@@ -705,7 +747,7 @@
                     </Path.Stroke>
                 </Path>
                 <TextBlock Text="{Binding SessionStateText}" Classes="strong" FontWeight="SemiBold" HorizontalAlignment="Center" TextWrapping="Wrap" TextAlignment="Center" />
-                <TextBlock Classes="muted" TextWrapping="Wrap" TextAlignment="Center"
+                <TextBlock Classes="muted" TextWrapping="Wrap" TextAlignment="Center" IsVisible="{Binding !ShowProgress}"
                            Text="Helm opens a Claude tab in this VS Code window on the PC, sets the model, effort and mode you chose below, then types your first task." />
             </StackPanel>
 
@@ -826,6 +868,42 @@
                     <local:MarkdownView Blocks="{Binding PlanBlocks}" Margin="16,12,16,20" />
                 </LayoutTransformControl>
             </ScrollViewer>
+
+            <!-- A command on its way: big and step by step, so a slow PC never looks like a frozen phone -->
+            <Border Classes="progress" VerticalAlignment="Bottom" IsVisible="{Binding ShowProgress}">
+                <StackPanel Spacing="10">
+                    <DockPanel>
+                        <TextBlock DockPanel.Dock="Right" Text="{Binding ProgressElapsed}" Classes="muted" FontSize="13" VerticalAlignment="Center" Margin="8,0,0,0" />
+                        <StackPanel Orientation="Horizontal" Spacing="10">
+                            <TextBlock Text="✻" Classes="spin" FontSize="22" IsVisible="{Binding ProgressRunning}" VerticalAlignment="Center" />
+                            <Border Width="22" Height="22" CornerRadius="11" Background="{DynamicResource VsBad}" IsVisible="{Binding ProgressFailed}" VerticalAlignment="Center">
+                                <TextBlock Text="!" Foreground="White" FontWeight="Bold" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                            </Border>
+                            <TextBlock Text="{Binding ProgressTitle}" Classes="strong" FontSize="16" FontWeight="SemiBold" TextWrapping="Wrap" VerticalAlignment="Center" MaxWidth="260" />
+                        </StackPanel>
+                    </DockPanel>
+                    <ProgressBar IsIndeterminate="True" IsVisible="{Binding ProgressRunning}" Height="3" MinHeight="3" Foreground="{DynamicResource VsAccent}" Background="{DynamicResource VsLine}" />
+                    <ItemsControl ItemsSource="{Binding ProgressSteps}">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate x:DataType="vm:ProgressStep">
+                                <DockPanel Margin="0,3">
+                                    <Panel DockPanel.Dock="Left" Width="20" Margin="0,0,8,0" VerticalAlignment="Top">
+                                        <TextBlock Text="✓" Foreground="{DynamicResource VsOk}" FontWeight="Bold" FontSize="15" IsVisible="{Binding IsDone}" HorizontalAlignment="Center" />
+                                        <TextBlock Text="✻" Classes="spin" FontSize="15" IsVisible="{Binding IsActive}" HorizontalAlignment="Center" />
+                                        <TextBlock Text="✕" Foreground="{DynamicResource VsBad}" FontWeight="Bold" FontSize="15" IsVisible="{Binding IsFailed}" HorizontalAlignment="Center" />
+                                    </Panel>
+                                    <TextBlock Text="{Binding Text}" TextWrapping="Wrap" FontSize="14" Classes.strong="{Binding IsActive}" Classes.failed="{Binding IsFailed}" />
+                                </DockPanel>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                    <TextBlock Text="{Binding ProgressHint}" Classes="muted" FontSize="13" TextWrapping="Wrap" IsVisible="{Binding HasProgressHint}" />
+                    <Button Classes="decide" HorizontalAlignment="Right" Padding="16,6" Command="{Binding DismissProgressCommand}" IsVisible="{Binding ProgressFailed}"
+                            AutomationProperties.Name="Close this message">
+                        <TextBlock Text="OK" />
+                    </Button>
+                </StackPanel>
+            </Border>
         </Panel>
 
         <!-- The plan's decision: small, so the plan above keeps the screen -->
@@ -926,7 +1004,10 @@
                                     <TextBlock Text="{Binding ModeName}" x:Name="ModeText" />
                                 </StackPanel>
                             </Button>
-                            <Button Grid.Column="7" Classes="send" Command="{Binding SendCommand}" AutomationProperties.Name="Send" Margin="4,0,0,0">
+                            <Button Grid.Column="7" Classes="stop" Command="{Binding StopCommand}" IsVisible="{Binding CanStop}" AutomationProperties.Name="Stop Claude on the PC" Margin="4,0,0,0">
+                                <Rectangle Width="10" Height="10" Fill="White" RadiusX="1.5" RadiusY="1.5" />
+                            </Button>
+                            <Button Grid.Column="7" Classes="send" Command="{Binding SendCommand}" IsVisible="{Binding !CanStop}" AutomationProperties.Name="Send" Margin="4,0,0,0">
                                 <Path Classes="icon" Stroke="White" StrokeThickness="1.8" Data="M8 13V3M4 7l4-4 4 4" />
                             </Button>
                         </Grid>
@@ -1109,6 +1190,48 @@
                         <StackPanel IsVisible="{Binding IsContextSheet}" Spacing="8">
                             <TextBlock Text="Context" Classes="strong" FontWeight="SemiBold" Margin="16,6,16,0" />
                             <TextBlock Text="{Binding ContextText}" Classes="muted" TextWrapping="Wrap" Margin="16,0,16,8" />
+                        </StackPanel>
+
+                        <!-- Is this up to date? What runs in the background? -->
+                        <StackPanel IsVisible="{Binding IsStatusSheet}" Spacing="10">
+                            <DockPanel Margin="16,6,16,0">
+                                <Button DockPanel.Dock="Right" Classes="decide" Padding="14,6" Command="{Binding RefreshNowCommand}" AutomationProperties.Name="Check now">
+                                    <StackPanel Orientation="Horizontal" Spacing="6">
+                                        <TextBlock Text="⟳" Classes="spin" IsVisible="{Binding IsSyncing}" />
+                                        <TextBlock Text="Check now" />
+                                    </StackPanel>
+                                </Button>
+                                <StackPanel Orientation="Horizontal" Spacing="7" VerticalAlignment="Center">
+                                    <Panel Width="10" Height="10" VerticalAlignment="Center">
+                                        <Ellipse Width="10" Height="10" Fill="{DynamicResource VsOk}" IsVisible="{Binding FreshLive}" />
+                                        <Ellipse Width="10" Height="10" Fill="{DynamicResource VsWarn}" IsVisible="{Binding FreshDelayed}" />
+                                        <Ellipse Width="10" Height="10" Fill="{DynamicResource VsFaint}" IsVisible="{Binding FreshOffline}" />
+                                    </Panel>
+                                    <TextBlock Text="{Binding FreshnessText, StringFormat='Up to date? {0}'}" Classes="strong" FontWeight="SemiBold" />
+                                </StackPanel>
+                            </DockPanel>
+                            <StackPanel Margin="16,0" Spacing="8">
+                                <TextBlock Text="Sync" Classes="faint" FontSize="11" FontWeight="SemiBold" />
+                                <TextBlock Text="{Binding StatusSync}" TextWrapping="Wrap" FontSize="13" />
+                                <TextBlock Text="PC" Classes="faint" FontSize="11" FontWeight="SemiBold" />
+                                <TextBlock Text="{Binding StatusPc}" TextWrapping="Wrap" FontSize="13" />
+                                <TextBlock Text="This session" Classes="faint" FontSize="11" FontWeight="SemiBold" />
+                                <TextBlock Text="{Binding StatusSession}" TextWrapping="Wrap" FontSize="13" />
+                                <TextBlock Text="From this phone" Classes="faint" FontSize="11" FontWeight="SemiBold" />
+                                <TextBlock Text="{Binding StatusCommand}" TextWrapping="Wrap" FontSize="13" />
+                                <TextBlock Text="Running in the background on the PC" Classes="faint" FontSize="11" FontWeight="SemiBold" />
+                                <ItemsControl ItemsSource="{Binding PcActivities}" IsVisible="{Binding HasPcActivities}">
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate x:DataType="x:String">
+                                            <StackPanel Orientation="Horizontal" Spacing="8" Margin="0,2">
+                                                <TextBlock Text="✻" Classes="spin" FontSize="12" VerticalAlignment="Top" />
+                                                <TextBlock Text="{Binding}" TextWrapping="Wrap" FontSize="13" MaxWidth="300" />
+                                            </StackPanel>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                                <TextBlock Text="Nothing for the phone right now." Classes="muted" FontSize="13" IsVisible="{Binding !HasPcActivities}" />
+                            </StackPanel>
                         </StackPanel>
 
                         <!-- History -->

@@ -16,8 +16,12 @@ public enum WorkspaceCommandKind
     SetMode,
     /// <summary>Open an earlier session again as a Claude tab (<see cref="WorkspaceCommand.SessionId"/>, its folder).</summary>
     Reopen,
-    /// <summary>Close a session's Claude tab (it stays in History).</summary>
+    /// <summary>Close a session's Claude tab (it stays in History); outside VS Code, take it off the phone's list.</summary>
     CloseTab,
+    /// <summary>Stop the session Helm runs in the background (outside VS Code) where it is.</summary>
+    Stop,
+    /// <summary>Nothing to do: the PC answers at once and writes its host record, so the phone knows it is there now.</summary>
+    Ping,
 }
 
 /// <summary>Something to do on one PC: always addressed to that PC (<see cref="MachineId"/>), never to "any".</summary>

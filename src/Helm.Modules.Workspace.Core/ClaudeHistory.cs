@@ -91,8 +91,26 @@ public static class ClaudeTabMatch
     /// <summary>
     /// The session of each tab, in tab order (null where none matches), and the active tab's session. A name that
     /// fits several sessions goes to the newest not taken yet; an untitled tab to the newest session without a title.
+    /// A tab still without a session goes to one Helm just opened (<paramref name="opened"/>, newest first): VS Code
+    /// may name a reopened conversation differently from its records.
     /// </summary>
-    public static (IReadOnlyList<string?> Sessions, string? Active) Match(IReadOnlyList<(string Label, bool Active)> tabs, IReadOnlyList<Candidate> candidates)
+    public static (IReadOnlyList<string?> Sessions, string? Active) Match(IReadOnlyList<(string Label, bool Active)> tabs, IReadOnlyList<Candidate> candidates,
+        IReadOnlyList<string>? opened = null)
+    {
+        var (sessions, active) = MatchByName(tabs, candidates);
+        if (opened is not { Count: > 0 } || !sessions.Contains(null)) return (sessions, active);
+        var result = sessions.ToList();
+        var left = new Queue<string>(opened.Where(id => !result.Contains(id) && candidates.Any(c => c.SessionId == id)));
+        for (var i = 0; i < result.Count && left.Count > 0; i++)
+        {
+            if (result[i] is not null) continue;
+            result[i] = left.Dequeue();
+            if (tabs[i].Active) active = result[i];
+        }
+        return (result, active);
+    }
+
+    private static (IReadOnlyList<string?> Sessions, string? Active) MatchByName(IReadOnlyList<(string Label, bool Active)> tabs, IReadOnlyList<Candidate> candidates)
     {
         var taken = new HashSet<string>(StringComparer.Ordinal);
         var newest = candidates.OrderByDescending(c => c.Updated).ToList();

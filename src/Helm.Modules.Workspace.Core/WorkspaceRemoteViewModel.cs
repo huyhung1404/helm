@@ -26,7 +26,7 @@ public sealed class WorkspaceRemoteSettings : IVersionedSettings
 }
 
 /// <summary>The bottom sheets of the control screen.</summary>
-public enum WorkspaceSheet { None, Pc, Model, Mode, Agents, History, Context, TextSize }
+public enum WorkspaceSheet { None, Pc, Model, Mode, Agents, History, Context, TextSize, Status }
 
 /// <summary>
 /// The phone's control screen for Workspace Controller, laid out like Claude's panel in VS Code: a tab per VS Code
@@ -61,6 +61,22 @@ public sealed partial class WorkspaceRemoteViewModel : ObservableObject
     private string? _awaitSession;
     private SentCommand? _pending;
     private bool _denyNext;
+
+    // The progress card of the command on its way: the steps the PC reported, and when its answer came.
+    private readonly List<string> _pcSteps = [];
+    private DateTimeOffset? _answeredAt;
+    private string? _progressTitle;
+    private bool _awaitGaveUp;
+
+    /// <summary>Sessions outside VS Code you agreed to go on with from the phone (asked once each).</summary>
+    private readonly HashSet<string> _takenOver = new(StringComparer.Ordinal);
+
+    // "Refresh now": when the PC last answered a ping, and the ping on its way.
+    private string? _pingId;
+    private DateTimeOffset _pingAt;
+    private DateTimeOffset? _pcAnsweredAt;
+    private TimeSpan? _pcRoundTrip;
+    private readonly ITimer _ticker;
 
     [ObservableProperty]
     [NotifyCanExecuteChangedFor(nameof(SendCommand))]
@@ -112,6 +128,9 @@ public sealed partial class WorkspaceRemoteViewModel : ObservableObject
         sessions.Changed += (_, _) => _ui.Post(Refresh);
         results.Changed += (_, _) => _ui.Post(ShowResult);
         if (history is not null) history.Changed += (_, _) => _ui.Post(FillHistory);
+        if (sync is not null) sync.StatusChanged += (_, _) => _ui.Post(() => { RebuildProgress(); NotifyFreshness(); });
+        // Once a second while the screen is shown: how long things take, and how fresh what you see is.
+        _ticker = _time.CreateTimer(_ => _ui.Post(Tick), null, Timeout.InfiniteTimeSpan, Timeout.InfiniteTimeSpan);
         _runInBackground = _settings.Current.RunInBackground;
         _machineId = _settings.Current.LastMachineId is { Length: > 0 } last ? last : null;
         Refresh();
@@ -171,6 +190,12 @@ public sealed partial class WorkspaceRemoteViewModel : ObservableObject
     public ObservableCollection<AgentRow> AgentRows { get; } = [];
     public ObservableCollection<HistoryRow> HistoryRows { get; } = [];
 
+    /// <summary>The steps of the command on its way, for the progress card.</summary>
+    public ObservableCollection<ProgressStep> ProgressSteps { get; } = [];
+
+    /// <summary>What the PC is busy with for the phone (the status sheet).</summary>
+    public ObservableCollection<string> PcActivities { get; } = [];
+
     // ---- The PC
 
     public HostChoice? SelectedHost => Hosts.FirstOrDefault(h => h.MachineId == _machineId);
@@ -199,7 +224,19 @@ public sealed partial class WorkspaceRemoteViewModel : ObservableObject
     // ---- The session header
 
     public string SessionTitle => IsNewSession ? "New session" : SelectedTab?.Title ?? "";
-    public string SessionStateText => Session is { } r ? Describe(r) : IsNewSession && SelectedProject is { } p ? $"Opens a Claude tab in {p.Name}" : "";
+    public string SessionStateText => Session is { } r ? Describe(r) + (r.Hosted ? " · Helm runs it on the PC" : "") : IsNewSession && SelectedProject is { } p ? $"Opens a Claude tab in {p.Name}" : "";
+
+    // ---- Outside VS Code
+
+    /// <summary>The open tab lists sessions outside VS Code: no new session or History there.</summary>
+    public bool IsOutsideProject => SelectedProject?.IsOutside == true;
+    public bool CanStartNew => SelectedProject is { IsOutside: false };
+
+    /// <summary>The open session is outside VS Code (Helm runs it on the PC when you send it something).</summary>
+    public bool IsOutsideSession => Session?.IsOutside == true;
+
+    /// <summary>Helm runs the open session in the background and it is at work: it can be stopped from here.</summary>
+    public bool CanStop => HostOnline && Session is { Hosted: true, State: SessionState.Working or SessionState.NeedsPermission or SessionState.Question };
     public bool IsWorking => Session?.State == SessionState.Working;
     public bool NeedsYou => Session?.State is SessionState.NeedsPermission or SessionState.Question;
 
@@ -295,7 +332,7 @@ public sealed partial class WorkspaceRemoteViewModel : ObservableObject
     public bool HasAgents => AgentCount > 0;
 
     /// <summary>The last command's line shows above the composer when the timeline does not show it (a model switch, a tab closed).</summary>
-    public bool ShowStatus => SendStatus is { Length: > 0 } && Timeline.LastOrDefault()?.HasDelivery != true;
+    public bool ShowStatus => SendStatus is { Length: > 0 } && !ShowProgress && Timeline.LastOrDefault()?.HasDelivery != true;
 
     /// <summary>The PC's account offers Auto mode (a plan can be approved into it).</summary>
     public bool AutoModeAvailable => Host?.AutoModeAvailable == true;
@@ -310,6 +347,7 @@ public sealed partial class WorkspaceRemoteViewModel : ObservableObject
         : PlanFeedback ? "Tell Claude what to change in the plan…"
         : _denyNext ? "Tell Claude what to do instead…"
         : IsWorking ? "Queue another message…"
+        : IsOutsideSession && Session?.Hosted != true ? "Go on with this session from the phone…"
         : "Ask Claude to edit…";
 
     // ---- Sheets
@@ -322,6 +360,7 @@ public sealed partial class WorkspaceRemoteViewModel : ObservableObject
     public bool IsHistorySheet => Sheet == WorkspaceSheet.History;
     public bool IsContextSheet => Sheet == WorkspaceSheet.Context;
     public bool IsTextSizeSheet => Sheet == WorkspaceSheet.TextSize;
+    public bool IsStatusSheet => Sheet == WorkspaceSheet.Status;
 
     // ---- Text size
 
@@ -351,8 +390,9 @@ public sealed partial class WorkspaceRemoteViewModel : ObservableObject
         if (value == WorkspaceSheet.History) FillHistory();
         if (value is WorkspaceSheet.Model or WorkspaceSheet.Mode) FillChoices();
         if (value == WorkspaceSheet.Agents) FillAgents();
+        if (value == WorkspaceSheet.Status) NotifyFreshness();
         Notify(nameof(IsSheetOpen), nameof(IsPcSheet), nameof(IsModelSheet), nameof(IsModeSheet), nameof(IsAgentsSheet), nameof(IsHistorySheet),
-            nameof(IsContextSheet), nameof(IsTextSizeSheet), nameof(ShowsEffort));
+            nameof(IsContextSheet), nameof(IsTextSizeSheet), nameof(IsStatusSheet), nameof(ShowsEffort));
     }
 
     partial void OnHistoryQueryChanged(string value) => FillHistory();
@@ -428,7 +468,7 @@ public sealed partial class WorkspaceRemoteViewModel : ObservableObject
     [RelayCommand]
     private void NewSession()
     {
-        if (SelectedProject is null) return;
+        if (SelectedProject is not { IsOutside: false }) return;
         IsNewSession = true;
         ShowReview = false;
         PlanFeedback = false;
@@ -547,10 +587,19 @@ public sealed partial class WorkspaceRemoteViewModel : ObservableObject
             SelectSession(SessionTabs.FirstOrDefault(t => t.SessionId == row.SessionId));
             return;
         }
-        if (!HostOnline || SelectedProject is not { } project) return;
+        if (!HostOnline || SelectedProject is not { IsOutside: false } project) return;
         _awaitSession = row.SessionId;
+        _progressTitle = $"Opening “{row.Title}”";
         Write(new WorkspaceCommand { MachineId = _machineId!, Kind = WorkspaceCommandKind.Reopen, SessionId = row.SessionId, Folder = project.Folder, CreatedAt = _time.GetLocalNow() },
             "Opening it in VS Code…");
+    }
+
+    /// <summary>Stops the session Helm runs on the PC (outside VS Code) where it is.</summary>
+    [RelayCommand]
+    private void Stop()
+    {
+        if (!CanStop || Session is not { } s) return;
+        Write(new WorkspaceCommand { MachineId = _machineId!, Kind = WorkspaceCommandKind.Stop, SessionId = s.SessionId, CreatedAt = _time.GetLocalNow() }, "Stopping Claude on the PC…");
     }
 
     // ---- Answers
@@ -637,9 +686,18 @@ public sealed partial class WorkspaceRemoteViewModel : ObservableObject
     private bool CanSend() => !IsSending && CanType && !string.IsNullOrWhiteSpace(Prompt);
 
     [RelayCommand(CanExecute = nameof(CanSend))]
-    private void Send()
+    private async Task SendAsync()
     {
         var text = Prompt.Trim();
+        // Outside VS Code Helm runs the session itself: say what that means, once per session.
+        if (!IsNewSession && Session is { IsOutside: true, Hosted: false } outside && outside.State != SessionState.Ended && !_takenOver.Contains(outside.SessionId))
+        {
+            if (_dialogs is not null && !await _dialogs.ConfirmAsync("Go on with it from the phone?",
+                    "Helm runs this session on the PC in the background, with the same conversation. If it is still open in a terminal, that terminal will not see these messages; close it there first.",
+                    "Go on").ConfigureAwait(true)) return;
+            _takenOver.Add(outside.SessionId);
+            if (Session?.SessionId != outside.SessionId) return;
+        }
         if (PlanFeedback && Pending is { Kind: PendingKind.Plan } plan)
         {
             WriteAnswer(plan, allow: false, answers: null, message: text);
@@ -652,6 +710,7 @@ public sealed partial class WorkspaceRemoteViewModel : ObservableObject
         }
         if (IsNewSession)
         {
+            _progressTitle = $"Starting a new session in {SelectedProject!.Name}";
             Write(new WorkspaceCommand
             {
                 MachineId = _machineId!,
@@ -665,6 +724,7 @@ public sealed partial class WorkspaceRemoteViewModel : ObservableObject
             }, sending: text);
             return;
         }
+        _progressTitle = Session!.IsOutside ? "Sending it to Claude on the PC" : "Sending your message";
         Write(new WorkspaceCommand
         {
             MachineId = _machineId!,
@@ -679,13 +739,18 @@ public sealed partial class WorkspaceRemoteViewModel : ObservableObject
     private void Write(WorkspaceCommand command, string status = "Sending to the PC…", string? sending = null)
     {
         _commands.Upsert(command.Id, command);
-        _sync?.RequestSync();
+        _sync?.RequestSyncSoon();
         _pending = new SentCommand(command.Id, command.Kind, command.SessionId, sending, _time.GetLocalNow());
+        _pcSteps.Clear();
+        _answeredAt = null;
+        _awaitGaveUp = false;
+        if (command.Kind is not (WorkspaceCommandKind.Prompt or WorkspaceCommandKind.NewSession or WorkspaceCommandKind.Reopen)) _progressTitle = null;
         IsSending = true;
         SendFailed = false;
         SendStatus = status;
         if (sending is not null || command.Kind == WorkspaceCommandKind.Answer) Prompt = "";
         _ = WatchTimeoutAsync(command.Id);
+        RebuildProgress();
         FillTimeline();
     }
 
@@ -695,17 +760,26 @@ public sealed partial class WorkspaceRemoteViewModel : ObservableObject
         _ui.Post(() =>
         {
             if (_pending?.CommandId != id || _results.Get(id) is not null) return;
-            _pending = _pending with { Done = true };
+            _pending = _pending with { Done = true, Failed = true };
             IsSending = false;
             SendFailed = true;
             SendStatus = "The PC did not answer. Is Helm running there, with Workspace Controller on?";
+            RebuildProgress();
             FillTimeline();
         });
     }
 
     private void ShowResult()
     {
+        if (_pingId is { } ping && _results.Get(ping) is { Status: not WorkspaceCommandStatus.Sending })
+        {
+            _pingId = null;
+            _pcAnsweredAt = _time.GetLocalNow();
+            _pcRoundTrip = _pcAnsweredAt - _pingAt;
+            NotifyFreshness();
+        }
         if (_pending is not { Done: false } pending || _results.Get(pending.CommandId) is not { } result) return;
+        if (result.Status == WorkspaceCommandStatus.Sending && result.Step is { Length: > 0 } step && (_pcSteps.Count == 0 || _pcSteps[^1] != step)) _pcSteps.Add(step);
         SendFailed = result.Status == WorkspaceCommandStatus.Failed;
         SendStatus = result.Status switch
         {
@@ -724,8 +798,11 @@ public sealed partial class WorkspaceRemoteViewModel : ObservableObject
             // A new session: open it once its tab shows up.
             if (pending.Kind == WorkspaceCommandKind.NewSession && result.Status == WorkspaceCommandStatus.Received && result.SessionId is { } sid)
                 _awaitSession = sid;
+            if (SendFailed && pending.Kind == WorkspaceCommandKind.Reopen) _awaitSession = null;
+            _answeredAt = _time.GetLocalNow();
         }
         Refresh();
+        RebuildProgress();
     }
 
     private void ClearStatus()
@@ -734,7 +811,194 @@ public sealed partial class WorkspaceRemoteViewModel : ObservableObject
         SendStatus = null;
         SendFailed = false;
         _pending = null;
+        RebuildProgress();
     }
+
+    // ---- The progress card
+
+    /// <summary>A prompt, a new session or a session opened from History is on its way (or just failed): the card shows each step.</summary>
+    public bool ShowProgress => _pending is { Kind: WorkspaceCommandKind.Prompt or WorkspaceCommandKind.NewSession or WorkspaceCommandKind.Reopen } p
+        && (!p.Done || p.Failed || AwaitingTab);
+
+    /// <summary>The PC is done; the new or reopened tab has not shown up on the phone yet.</summary>
+    private bool AwaitingTab => _awaitSession is not null && _pending is { Done: true, Failed: false, Kind: WorkspaceCommandKind.NewSession or WorkspaceCommandKind.Reopen } && !_awaitGaveUp;
+
+    public bool ProgressFailed => _pending is { Failed: true } || _awaitGaveUp;
+    public bool ProgressRunning => ShowProgress && !ProgressFailed;
+    public string ProgressTitle => _progressTitle ?? "Sending to the PC";
+
+    /// <summary>"12 s": how long it has been on its way.</summary>
+    public string ProgressElapsed => _pending is { } p ? Seconds(_time.GetLocalNow() - p.At) : "";
+
+    /// <summary>Said when it takes longer than it should, with what may hold it up.</summary>
+    public string ProgressHint
+    {
+        get
+        {
+            if (_pending is not { Done: false } p) return "";
+            var waited = _time.GetLocalNow() - p.At;
+            if (_results.Get(p.CommandId) is null)
+                return waited > TimeSpan.FromSeconds(12) ? $"{HostName} has not picked it up yet. Is the PC awake, with Helm running? It keeps trying." : "";
+            return waited > TimeSpan.FromSeconds(25) ? "Slower than usual: VS Code or Claude may be busy on the PC. It keeps going." : "";
+        }
+    }
+
+    public bool HasProgressHint => ProgressHint.Length > 0;
+
+    [RelayCommand]
+    private void DismissProgress()
+    {
+        if (IsSending) return;
+        _awaitSession = null;
+        ClearStatus();
+        FillTimeline();
+    }
+
+    /// <summary>The card's steps: sent from the phone, picked up by the PC, each step there, then Claude has it (and the tab opens here).</summary>
+    private void RebuildProgress()
+    {
+        var steps = new List<ProgressStep>();
+        if (_pending is { } p && ShowProgress)
+        {
+            var result = _results.Get(p.CommandId);
+            var pushed = result is not null || _sync is null || _sync.Status.LastSyncedAt is { } synced && synced >= p.At;
+            steps.Add(new ProgressStep(pushed ? "Sent from this phone" : "Sending from this phone…", pushed ? ProgressState.Done : p.Failed ? ProgressState.Failed : ProgressState.Active));
+            if (pushed)
+            {
+                steps.Add(result is not null
+                    ? new ProgressStep($"{HostName} picked it up", ProgressState.Done)
+                    : new ProgressStep(p.Failed ? $"{HostName} did not answer" : $"Waiting for {HostName}…", p.Failed ? ProgressState.Failed : ProgressState.Active));
+                for (var i = 0; i < _pcSteps.Count; i++)
+                {
+                    var last = i == _pcSteps.Count - 1;
+                    steps.Add(new ProgressStep(_pcSteps[i], last && !p.Done ? ProgressState.Active : last && p.Failed && result?.Status == WorkspaceCommandStatus.Failed ? ProgressState.Failed : ProgressState.Done));
+                }
+                switch (result?.Status)
+                {
+                    case WorkspaceCommandStatus.Received:
+                        steps.Add(new ProgressStep(p.Kind == WorkspaceCommandKind.Reopen ? "Open in VS Code" : "Claude received it", ProgressState.Done));
+                        if (_awaitGaveUp) steps.Add(new ProgressStep("It did not show up here yet. Pull the tabs again with ⟳, or look on the PC.", ProgressState.Failed));
+                        else if (AwaitingTab) steps.Add(new ProgressStep("Opening it here…", ProgressState.Active));
+                        break;
+                    case WorkspaceCommandStatus.Sent:
+                        steps.Add(new ProgressStep(result.Error ?? "Typed into VS Code; Claude has not confirmed it yet", ProgressState.Done));
+                        break;
+                    case WorkspaceCommandStatus.Failed:
+                        steps.Add(new ProgressStep(result.Error ?? "It could not be sent.", ProgressState.Failed));
+                        break;
+                }
+            }
+        }
+        if (!steps.SequenceEqual(ProgressSteps)) Sync(ProgressSteps, steps, (a, b) => a == b);
+        Notify(nameof(ShowProgress), nameof(ProgressFailed), nameof(ProgressRunning), nameof(ProgressTitle), nameof(ProgressElapsed), nameof(ProgressHint),
+            nameof(HasProgressHint), nameof(ShowStatus));
+    }
+
+    private static string Seconds(TimeSpan t) => t.TotalSeconds < 60 ? $"{Math.Max(0, (int)t.TotalSeconds)} s" : $"{(int)t.TotalMinutes} min {t.Seconds:00} s";
+
+    // ---- How fresh is what you see
+
+    /// <summary>Live: changes arrive within seconds and the PC was heard from lately. Delayed: polling, or the PC quiet a while.</summary>
+    public bool FreshLive => HostOnline && _sync?.IsLive != false && PcQuiet < TimeSpan.FromSeconds(75);
+    public bool FreshDelayed => HostOnline && !FreshLive;
+    public bool FreshOffline => !HostOnline;
+    public bool IsSyncing => _sync?.Status.State == SyncState.Syncing;
+
+    /// <summary>The chip: "Live", "40 s ago", "Offline".</summary>
+    public string FreshnessText => FreshOffline ? "Offline" : FreshLive ? "Live" : Ago(PcQuiet);
+
+    /// <summary>How long since the PC last wrote (its heartbeat, every 30 seconds while on).</summary>
+    private TimeSpan PcQuiet => Host is { } h ? _time.GetLocalNow() - (_pcAnsweredAt is { } a && a > h.LastSeen ? a : h.LastSeen) : TimeSpan.MaxValue;
+
+    public string StatusSync => _sync is null ? "Helm Sync is not set up on this phone."
+        : (_sync.IsLive ? "Live connection to Helm Sync: changes from the PC arrive within a second or two." : "No live connection to Helm Sync right now: the phone checks every 30 seconds.")
+          + (_sync.Status.LastSyncedAt is { } at ? $" Last synced {Ago(_time.GetLocalNow() - at)} ({at.ToLocalTime():HH:mm:ss})." : "")
+          + (_sync.Status.LastError is { Length: > 0 } e && _sync.Status.State is SyncState.Offline or SyncState.Error ? $" Problem: {e}" : "");
+
+    public string StatusPc => Host is not { } h ? "No PC chosen."
+        : !HostOnline ? $"{h.MachineName} is offline (last heard {h.LastSeen.ToLocalTime():dd/MM HH:mm}). Turn on Workspace Controller in Helm there."
+        : $"{h.MachineName} last wrote {Ago(_time.GetLocalNow() - h.LastSeen)}; it writes at least every 30 seconds while on."
+          + (_pcAnsweredAt is { } a ? $" It answered your check {Ago(_time.GetLocalNow() - a)}" + (_pcRoundTrip is { } rt ? $", in {rt.TotalSeconds:0.0} s." : ".") : "");
+
+    public string StatusSession => Session is { } s
+        ? $"This session last changed at {s.UpdatedAt.ToLocalTime():HH:mm:ss} ({Describe(s)})." + (s.Items.LastOrDefault()?.At is { } step ? $" Its latest step is from {step.ToLocalTime():HH:mm:ss}." : "")
+        : "No session open.";
+
+    public string StatusCommand => _pending is { Done: false } p ? $"Your {Describe(p.Kind)} is on its way ({ProgressElapsed})." + (_pcSteps.LastOrDefault() is { } last ? $" The PC: {last}." : "")
+        : _pingId is not null ? "Checking the PC…" : "Nothing of yours is on its way.";
+
+    public bool HasPcActivities => PcActivities.Count > 0;
+
+    private static string Describe(WorkspaceCommandKind kind) => kind switch
+    {
+        WorkspaceCommandKind.NewSession => "new session",
+        WorkspaceCommandKind.Reopen => "session from History",
+        WorkspaceCommandKind.Answer => "answer",
+        WorkspaceCommandKind.Prompt => "message",
+        _ => "change",
+    };
+
+    private static string Ago(TimeSpan t) =>
+        t == TimeSpan.MaxValue ? "never" : t < TimeSpan.FromSeconds(5) ? "just now" : t.TotalSeconds < 60 ? $"{(int)t.TotalSeconds} s ago"
+        : t.TotalMinutes < 60 ? $"{(int)t.TotalMinutes} min ago" : $"{(int)t.TotalHours} h ago";
+
+    /// <summary>Checks now: syncs at once and asks the PC to answer (so "last heard" is fresh).</summary>
+    [RelayCommand]
+    private void RefreshNow()
+    {
+        _sync?.RequestSyncSoon();
+        if (_machineId is null || !HostOnline || _pingId is not null) return;
+        var ping = new WorkspaceCommand { MachineId = _machineId, Kind = WorkspaceCommandKind.Ping, CreatedAt = _time.GetLocalNow() };
+        _pingId = ping.Id;
+        _pingAt = ping.CreatedAt;
+        _commands.Upsert(ping.Id, ping);
+        NotifyFreshness();
+    }
+
+    private void NotifyFreshness()
+    {
+        var activities = Host?.Activities ?? [];
+        if (!activities.SequenceEqual(PcActivities)) Sync(PcActivities, activities, (a, b) => a == b);
+        Notify(nameof(FreshLive), nameof(FreshDelayed), nameof(FreshOffline), nameof(FreshnessText), nameof(IsSyncing), nameof(StatusSync),
+            nameof(StatusPc), nameof(StatusSession), nameof(StatusCommand), nameof(HasPcActivities));
+    }
+
+    /// <summary>Once a second: the progress card's clock, the "Working…" line, and how fresh the screen is.</summary>
+    private void Tick()
+    {
+        if (AwaitingTab && _answeredAt is { } answered && _time.GetLocalNow() - answered > AwaitTabFor)
+        {
+            _awaitGaveUp = true;
+            _awaitSession = null;
+        }
+        if (_pingId is not null && _time.GetLocalNow() - _pingAt > AnswerTimeout) _pingId = null;
+        if (ShowProgress || ProgressSteps.Count > 0) RebuildProgress();
+        if (IsWorking && !_deferFill && _timelineFor == Session?.SessionId) FillTimelineCore();
+        NotifyFreshness();
+        Notify(nameof(AgeText));
+    }
+
+    /// <summary>
+    /// The screen is in front (set by the page): only then do the clocks tick, so a phone with Helm in the background
+    /// is not woken every second.
+    /// </summary>
+    public bool IsOnScreen
+    {
+        get => _onScreen;
+        set
+        {
+            if (_onScreen == value) return;
+            _onScreen = value;
+            var every = value ? TimeSpan.FromSeconds(1) : Timeout.InfiniteTimeSpan;
+            _ticker.Change(every, every);
+            if (value) Tick();
+        }
+    }
+
+    private bool _onScreen;
+
+    /// <summary>A new or reopened tab should show up within this long after the PC opened it.</summary>
+    public static readonly TimeSpan AwaitTabFor = TimeSpan.FromSeconds(20);
 
     // ---- Refresh
 
@@ -753,7 +1017,9 @@ public sealed partial class WorkspaceRemoteViewModel : ObservableObject
             // The open conversation's new answer is seen before anything is counted.
             if (!IsNewSession && _sessionId is not null && records.FirstOrDefault(r => r.SessionId == _sessionId) is { } open) MarkSeen(open);
 
-            var windows = Host?.Windows ?? [];
+            IReadOnlyList<HostWindowInfo> windows = Host?.Windows ?? [];
+            // Sessions outside VS Code get a tab of their own, after the windows.
+            if (records.Any(r => r.IsOutside)) windows = [.. windows, ProjectTab.OutsideWindow];
             if (!windows.Any(w => SameFolder(w.Folder, _folder)))
             {
                 // A notification may name a session of a window by its folder; else the first window.
@@ -776,7 +1042,7 @@ public sealed partial class WorkspaceRemoteViewModel : ObservableObject
                 var pick = inTabs.FirstOrDefault(r => r.State is SessionState.NeedsPermission or SessionState.Question)
                     ?? inTabs.FirstOrDefault(r => r.SessionId == window?.ActiveSession) ?? inTabs.FirstOrDefault();
                 _sessionId = pick?.SessionId;
-                if (pick is null && window is not null && _awaitSession is null) IsNewSession = true;
+                if (pick is null && window is not null && window.Folder.Length > 0 && _awaitSession is null) IsNewSession = true;
                 if (pick is not null) MarkSeen(pick);
             }
             Sync(SessionTabs, inTabs.Select(r => new SessionTab(r, IsUnseen(r), !IsNewSession && r.SessionId == _sessionId)).ToList(),
@@ -803,13 +1069,16 @@ public sealed partial class WorkspaceRemoteViewModel : ObservableObject
         if (Sheet == WorkspaceSheet.Agents) FillAgents();
         if (Sheet == WorkspaceSheet.History) FillHistory();
         Notify(nameof(SelectedHost), nameof(HasHosts), nameof(HostOnline), nameof(HostName), nameof(HostStatus), nameof(HasProjects), nameof(SelectedProject),
-            nameof(AutoModeAvailable));
+            nameof(AutoModeAvailable), nameof(IsOutsideProject), nameof(CanStartNew));
         NotifySession();
+        RebuildProgress();
+        NotifyFreshness();
     }
 
     /// <summary>The window's sessions in the order of its Claude tabs; others (in the side bar, at work) after them.</summary>
     private static List<WorkspaceSessionRecord> Ordered(List<WorkspaceSessionRecord> records, HostWindowInfo window)
     {
+        if (window.Folder.Length == 0) return records.OrderByDescending(r => r.UpdatedAt).ToList();
         var order = window.OpenSessions.Select((id, i) => (id, i)).ToDictionary(x => x.id, x => x.i, StringComparer.Ordinal);
         return records.OrderBy(r => order.TryGetValue(r.SessionId, out var i) ? i : int.MaxValue).ThenBy(r => r.StartedAt).ToList();
     }
@@ -817,7 +1086,8 @@ public sealed partial class WorkspaceRemoteViewModel : ObservableObject
     private void NotifySession()
     {
         Notify(nameof(SelectedTab), nameof(Session), nameof(IsSessionOpen), nameof(OpenSessionId), nameof(SessionTitle), nameof(SessionStateText),
-            nameof(IsWorking), nameof(NeedsYou), nameof(HasReview), nameof(ReviewLabel), nameof(CanType), nameof(PromptHint), nameof(HistoryTitle));
+            nameof(IsWorking), nameof(NeedsYou), nameof(HasReview), nameof(ReviewLabel), nameof(CanType), nameof(PromptHint), nameof(HistoryTitle),
+            nameof(IsOutsideSession), nameof(CanStop));
         NotifyChips();
         SendCommand.NotifyCanExecuteChanged();
     }
@@ -910,13 +1180,13 @@ public sealed partial class WorkspaceRemoteViewModel : ObservableObject
                 && !rows.Any(r => r.IsAnswer && r.Text.Trim() == last.Trim()))
                 rows.Add(new TimelineRow(new TranscriptItem { Kind = TranscriptItemKind.Answer, Text = last, At = s.UpdatedAt }));
             if (_pending is { Text: { } text } pending && pending.SessionId == s.SessionId && !Arrived(s, text, pending.At))
-                rows.Add(TimelineRow.Sending(text, SendStatus ?? "", SendFailed));
+                rows.Add(TimelineRow.Sending(text, ShowProgress ? "" : SendStatus ?? "", SendFailed, pending.At));
             else if (s.State == SessionState.Working && (rows.Count == 0 || !rows[^1].Running))
-                rows.Add(TimelineRow.Working(s.Agents.Count > 0 ? $"Working… {AgentsText} at work" : "Working…"));
+                rows.Add(TimelineRow.Working(WorkingText(s)));
         }
-        else if (IsNewSession && _pending is { Kind: WorkspaceCommandKind.NewSession, Text: { } first })
+        else if (IsNewSession && _pending is { Kind: WorkspaceCommandKind.NewSession, Text: { } first } sent)
         {
-            rows.Add(TimelineRow.Sending(first, SendStatus ?? "", SendFailed));
+            rows.Add(TimelineRow.Sending(first, ShowProgress ? "" : SendStatus ?? "", SendFailed, sent.At));
         }
         // Only the last steps are drawn; "Show earlier" draws more.
         HiddenSteps = Math.Max(0, rows.Count - _timelineLimit);
@@ -952,6 +1222,18 @@ public sealed partial class WorkspaceRemoteViewModel : ObservableObject
             else Timeline.Add(rows[i]);
         }
         while (Timeline.Count > rows.Count) Timeline.RemoveAt(Timeline.Count - 1);
+    }
+
+    /// <summary>"Working… 2m 05s · last step 40 s ago": Claude is at it, and you can tell it has not stalled.</summary>
+    private string WorkingText(WorkspaceSessionRecord s)
+    {
+        var now = _time.GetLocalNow();
+        var text = "Working…";
+        if (s.WorkingSince is { } since) text += " " + AgentRow.Format(now - since);
+        if (s.Agents.Count > 0) text += $" · {AgentsText} at work";
+        var last = s.Items.LastOrDefault()?.At ?? s.UpdatedAt;
+        if (now - last > TimeSpan.FromSeconds(30)) text += $" · last step {Ago(now - last)}";
+        return text;
     }
 
     /// <summary>The prompt shows in the transcript (it arrived, and Claude has it).</summary>

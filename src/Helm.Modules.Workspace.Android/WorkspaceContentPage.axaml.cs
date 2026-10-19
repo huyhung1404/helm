@@ -75,6 +75,9 @@ public partial class WorkspaceContentPage : UserControl, IFullPage
             _viewModel.OpenSession(machine, session);
         }
         _viewModel.PropertyChanged += OnViewModelChanged;
+        Helm.Core.Platform.ActivityHost.Paused += OnAppPaused;
+        Helm.Core.Platform.ActivityHost.Resumed += OnAppResumed;
+        _viewModel.IsOnScreen = Helm.Core.Platform.ActivityHost.Current is not null;
         _timeline = _viewModel.Timeline;
         _timeline.CollectionChanged += OnTimelineChanged;
         ShowTimeline(_timeline, null);
@@ -95,12 +98,25 @@ public partial class WorkspaceContentPage : UserControl, IFullPage
         // Pages are transient: a new one is made each time the tool opens.
         _module.PropertyChanged -= OnModuleChanged;
         _viewModel.PropertyChanged -= OnViewModelChanged;
+        Helm.Core.Platform.ActivityHost.Paused -= OnAppPaused;
+        Helm.Core.Platform.ActivityHost.Resumed -= OnAppResumed;
+        _viewModel.IsOnScreen = false;
         _timeline.CollectionChanged -= OnTimelineChanged;
         _viewModel.Projects.CollectionChanged -= OnTabsChanged;
         _viewModel.SessionTabs.CollectionChanged -= OnTabsChanged;
         if (_topLevel?.InputPane is { } pane) pane.StateChanged -= OnKeyboardChanged;
         _topLevel = null;
         base.OnDetachedFromVisualTree(e);
+    }
+
+    // The page stays attached while Helm is in the background: its clocks stop there.
+    private void OnAppPaused(object? sender, EventArgs e) => _viewModel.IsOnScreen = false;
+
+    private void OnAppResumed(object? sender, EventArgs e)
+    {
+        _viewModel.IsOnScreen = true;
+        // Back in front: fetch what changed meanwhile at once.
+        _viewModel.RefreshNowCommand.Execute(null);
     }
 
     private void OnViewModelChanged(object? sender, PropertyChangedEventArgs e)

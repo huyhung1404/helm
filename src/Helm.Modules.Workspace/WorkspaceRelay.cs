@@ -16,7 +16,7 @@ namespace Helm.Modules.Workspace;
 public sealed class WorkspaceRelay : IAsyncDisposable
 {
     private static readonly TimeSpan PublishDelay = TimeSpan.FromMilliseconds(700);
-    private static readonly TimeSpan Heartbeat = TimeSpan.FromMinutes(1);
+    private static readonly TimeSpan Heartbeat = WorkspaceHostRecord.HeartbeatEvery;
     private static readonly TimeSpan LiveCheck = TimeSpan.FromSeconds(1);
 
     /// <summary>A working session with subagents is read again this often, as their own transcripts grow.</summary>
@@ -115,11 +115,13 @@ public sealed class WorkspaceRelay : IAsyncDisposable
                 ModelChoices = models,
                 AutoModeAvailable = autoMode,
                 Skills = _skills(),
+                Activities = Activities(),
             };
             // LastSeen alone changes every time: write it only as the heartbeat, or with a real change.
-            if (_hosts.Get(_engine.MachineId) is not { } before || !before.Running || now - before.LastSeen > Heartbeat - TimeSpan.FromSeconds(10) ||
+            if (Interlocked.Exchange(ref _hostDue, 0) == 1 || _hosts.Get(_engine.MachineId) is not { } before || !before.Running || now - before.LastSeen > Heartbeat - TimeSpan.FromSeconds(5) ||
                 !before.Windows.SequenceEqual(host.Windows) || !before.Skills.SequenceEqual(host.Skills) || before.MachineName != host.MachineName ||
-                !before.ModelChoices.SequenceEqual(host.ModelChoices) || before.AutoModeAvailable != host.AutoModeAvailable)
+                !before.ModelChoices.SequenceEqual(host.ModelChoices) || before.AutoModeAvailable != host.AutoModeAvailable ||
+                !before.Activities.SequenceEqual(host.Activities))
                 _hosts.Upsert(_engine.MachineId, host);
 
             var keep = new HashSet<string>(StringComparer.Ordinal);
@@ -249,6 +251,28 @@ public sealed class WorkspaceRelay : IAsyncDisposable
 
     private sealed record CachedView(long Length, SessionState State, DateTimeOffset At, TranscriptView View);
 
+    /// <summary>1: write the host record at the next publish even if nothing changed (the phone asked whether this PC is there).</summary>
+    private int _hostDue;
+
+    /// <summary>The step of the command being run now, as the phone reads it.</summary>
+    private volatile string? _doing;
+
+    /// <summary>What this PC is busy with for the phone: the command at hand, requests it holds, sessions it runs.</summary>
+    private IReadOnlyList<string> Activities()
+    {
+        var list = new List<string>();
+        if (_doing is { } doing) list.Add(doing);
+        var waiting = _queue.Reader.Count;
+        if (waiting > 0) list.Add(waiting == 1 ? "1 more command from the phone waits its turn" : $"{waiting} more commands from the phone wait their turn");
+        foreach (var held in _engine.HeldRequests) list.Add($"Holding Claude's request ({held.Tool}) for your answer");
+        foreach (var run in _engine.HostedRuns)
+        {
+            var title = _engine.Registry.Find(run.SessionId)?.Title is { Length: > 0 } t ? t : Path.GetFileName(run.Folder);
+            list.Add($"Running Claude in the background: {title}");
+        }
+        return list;
+    }
+
     /// <summary>Queues the commands addressed to this PC that have no result yet.</summary>
     private void TakeCommands()
     {
@@ -258,7 +282,11 @@ public sealed class WorkspaceRelay : IAsyncDisposable
             {
                 var c = item.Value;
                 if (c.MachineId != _engine.MachineId || _results.Get(c.Id) is not null || !_taken.TryAdd(c.Id, 0)) continue;
+                // The phone learns at once that this PC has it, even while another command is being typed.
+                Report(new WorkspaceCommandResult(c.Id, WorkspaceCommandStatus.Sending, null, c.SessionId), c,
+                    _doing is null ? "Helm on the PC got it" : "Helm on the PC got it; it waits for the command before it");
                 _queue.Writer.TryWrite(c);
+                RequestPublish();
             }
         }
         catch (Exception ex)
@@ -275,9 +303,35 @@ public sealed class WorkspaceRelay : IAsyncDisposable
             {
                 try
                 {
-                    Report(new WorkspaceCommandResult(command.Id, WorkspaceCommandStatus.Sending, null, command.SessionId), command);
-                    var result = await _engine.RunAsync(command, ct).ConfigureAwait(false);
+                    void Step(string text)
+                    {
+                        _doing = text;
+                        Report(new WorkspaceCommandResult(command.Id, WorkspaceCommandStatus.Sending, null, command.SessionId), command, text);
+                        RequestPublish();
+                    }
+                    Step(command.Kind switch
+                    {
+                        WorkspaceCommandKind.NewSession => "Starting a new session",
+                        WorkspaceCommandKind.Reopen => "Opening the session in VS Code",
+                        WorkspaceCommandKind.Prompt => "Delivering your prompt",
+                        _ => "Working on it",
+                    });
+                    WorkspaceCommandResult result;
+                    try
+                    {
+                        result = await _engine.RunAsync(command, ct, Step).ConfigureAwait(false);
+                    }
+                    finally
+                    {
+                        _doing = null;
+                        RequestPublish();
+                    }
                     Report(result, command);
+                    if (command.Kind == WorkspaceCommandKind.Ping)
+                    {
+                        Interlocked.Exchange(ref _hostDue, 1);
+                        RequestPublish();
+                    }
                     _logger.LogInformation("Workspace relay: command {Id} ({Kind}) from the phone → {Status}", command.Id, command.Kind, result.Status);
                     if (command.Kind is WorkspaceCommandKind.Reopen or WorkspaceCommandKind.CloseTab) RefreshHistory();
                 }
@@ -297,7 +351,7 @@ public sealed class WorkspaceRelay : IAsyncDisposable
         }
     }
 
-    private void Report(WorkspaceCommandResult result, WorkspaceCommand command) =>
+    private void Report(WorkspaceCommandResult result, WorkspaceCommand command, string? step = null) =>
         _results.Upsert(command.Id, new WorkspaceResultRecord
         {
             CommandId = command.Id,
@@ -306,6 +360,7 @@ public sealed class WorkspaceRelay : IAsyncDisposable
             Error = result.Error,
             SessionId = result.SessionId ?? command.SessionId,
             UpdatedAt = _time.GetLocalNow(),
+            Step = step,
         });
 
     /// <summary>Removes this PC's old commands and results.</summary>

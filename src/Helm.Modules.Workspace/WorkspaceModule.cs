@@ -32,6 +32,7 @@ public sealed class WorkspaceModule : HelmModuleBase, IModuleContent
     private readonly IDeviceInfo? _device;
     private readonly ClaudeCatalog _catalog;
     private readonly IUserActivity? _userActivity;
+    private readonly IClaudeStarter? _starter;
     private WorkspaceEngine? _engine;
     private WorkspaceRelay? _relay;
     private BackgroundActivity? _activity;
@@ -41,8 +42,10 @@ public sealed class WorkspaceModule : HelmModuleBase, IModuleContent
     public WorkspaceModule(ISettingsStoreFactory settings, HelmPaths paths, PromptSender sender, BridgeInstaller installer,
         IBackgroundActivities activities, ISyncedCollection<WorkspaceHostRecord> hosts, ISyncedCollection<WorkspaceSessionRecord> sessions,
         ISyncedCollection<WorkspaceCommand> commands, ISyncedCollection<WorkspaceResultRecord> results, ClaudeCatalog catalog,
-        ILogger<WorkspaceModule> logger, IDeviceInfo? device = null, IUserActivity? activity = null, ISyncedCollection<WorkspaceHistoryRecord>? history = null)
+        ILogger<WorkspaceModule> logger, IDeviceInfo? device = null, IUserActivity? activity = null, ISyncedCollection<WorkspaceHistoryRecord>? history = null,
+        IClaudeStarter? starter = null)
     {
+        _starter = starter;
         _history = history;
         Settings = settings.Get<WorkspaceSettings>(WorkspaceIds.ModuleId);
         _paths = paths;
@@ -97,8 +100,10 @@ public sealed class WorkspaceModule : HelmModuleBase, IModuleContent
             StatusMessage = null;
             try
             {
+                // Sessions outside VS Code: Helm runs them itself when the phone sends them something.
+                var headless = _starter is null ? null : new HeadlessClaude(_starter, _logger);
                 _engine = WorkspaceEngine.Start(Settings, _paths, _sender, _logger, activity: _userActivity,
-                    bridgePipe: Environment.GetEnvironmentVariable("HELM_BRIDGE_PIPE"));
+                    bridgePipe: Environment.GetEnvironmentVariable("HELM_BRIDGE_PIPE"), headless: headless);
             }
             catch (Exception ex) when (ex is System.Net.Sockets.SocketException or IOException)
             {
@@ -202,7 +207,9 @@ public sealed class WorkspaceModule : HelmModuleBase, IModuleContent
         var windows = _engine.Windows().Count;
         var working = _engine.Registry.Sessions.Count(s => s.State == SessionState.Working);
         var text = windows == 1 ? "1 VS Code window" : $"{windows} VS Code windows";
-        return working > 0 ? $"{text} · Claude working in {working}" : text;
+        if (working > 0) text += $" · Claude working in {working}";
+        var hosted = _engine.HostedRuns.Count;
+        return hosted > 0 ? text + $" · {hosted} run{(hosted == 1 ? "" : "s")} for the phone" : text;
     }
 
     private void UpdateStatus() => StatusMessage = _hooksProblem ?? _bridgeProblem;

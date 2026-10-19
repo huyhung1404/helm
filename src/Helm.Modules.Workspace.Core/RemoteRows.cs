@@ -25,6 +25,12 @@ public sealed class ProjectTab(HostWindowInfo window, int attention, bool workin
     public string Name => Window.Name.Length > 0 ? Window.Name : "Window";
     public string Folder => Window.Folder;
 
+    /// <summary>The tab of sessions outside VS Code (a terminal, another editor): Helm runs them for the phone.</summary>
+    public bool IsOutside => Window.Folder.Length == 0;
+
+    /// <summary>The tab that lists the sessions outside VS Code.</summary>
+    public static HostWindowInfo OutsideWindow { get; } = new() { Folder = "", Name = "Outside VS Code" };
+
     /// <summary>Sessions that finished (unseen) or wait for you.</summary>
     public int Attention { get; } = attention;
     public bool HasAttention => Attention > 0;
@@ -44,8 +50,8 @@ public sealed class SessionTab(WorkspaceSessionRecord record, bool unseen, bool 
     public bool Unseen { get; } = unseen;
     public bool IsSelected { get; } = selected;
 
-    /// <summary>A finished tab can be closed from the phone (it stays in History).</summary>
-    public bool CanClose => IsSelected && Record.State is SessionState.Done or SessionState.Idle;
+    /// <summary>A finished tab can be closed from the phone (it stays in History); one outside VS Code leaves the phone's list.</summary>
+    public bool CanClose => IsSelected && (Record.State is SessionState.Done or SessionState.Idle || Record.IsOutside && Record.State == SessionState.Ended && !Record.Hosted);
 
     public int AttentionCount => NeedsYou || Unseen && !IsSelected ? 1 : 0;
 }
@@ -77,8 +83,8 @@ public sealed class TimelineRow
     public static TimelineRow Working(string text) => new(TimelineKind.Working, text);
 
     /// <summary>Your prompt on its way (not in the transcript yet), with how far it got.</summary>
-    public static TimelineRow Sending(string text, string status, bool failed) =>
-        new(new TranscriptItem { Kind = TranscriptItemKind.User, Text = text, At = DateTimeOffset.Now }) { Delivery = status, DeliveryFailed = failed };
+    public static TimelineRow Sending(string text, string status, bool failed, DateTimeOffset at) =>
+        new(new TranscriptItem { Kind = TranscriptItemKind.User, Text = text, At = at }) { Delivery = status.Length > 0 ? status : null, DeliveryFailed = failed };
 
     public TranscriptItem Item { get; }
     public TimelineKind Kind { get; }
@@ -114,6 +120,16 @@ public sealed class TimelineRow
     public bool HasDelivery => Delivery is not null;
 
     public bool Same(TimelineRow other) => Kind == other.Kind && Item == other.Item && Delivery == other.Delivery && DeliveryFailed == other.DeliveryFailed;
+}
+
+public enum ProgressState { Done, Active, Failed }
+
+/// <summary>One step of a command on its way (the progress card): sent, picked up by the PC, each step there, Claude has it.</summary>
+public sealed record ProgressStep(string Text, ProgressState State)
+{
+    public bool IsDone => State == ProgressState.Done;
+    public bool IsActive => State == ProgressState.Active;
+    public bool IsFailed => State == ProgressState.Failed;
 }
 
 /// <summary>A model in the model sheet.</summary>
