@@ -170,7 +170,20 @@ public sealed partial class NovelReaderViewModel : ObservableObject, IReadAloudH
             // A word said aloud pauses reading aloud (the two would talk over each other) and gives it back afterwards.
             pronouncer.QuietReading = () =>
             {
-                if (_reader.State is not (ReadAloudState.Playing or ReadAloudState.Loading)) return null;
+                var playing = _reader.State is ReadAloudState.Playing or ReadAloudState.Loading;
+                if (SelectedVoice?.IsThroughEdge == true && _reader.State != ReadAloudState.Stopped)
+                {
+                    // The hidden Edge has one queue: a word would wait behind a paused sentence. Reading stops (where it
+                    // was is kept) and, if it was playing, starts that sentence again after the word.
+                    var at = _reader.Position;
+                    _reader.Stop();
+                    if (!playing) return null;
+                    return () =>
+                    {
+                        if (_reader.State == ReadAloudState.Stopped && _reader.Position == at) _reader.Play(at.Paragraph, at.Sentence);
+                    };
+                }
+                if (!playing) return null;
                 _reader.Pause();
                 return () =>
                 {

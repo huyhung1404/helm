@@ -18,15 +18,29 @@ public interface ILanguageVoices
 }
 
 /// <summary>
+/// A voice that says a word by itself instead of handing back sound: Xiaoxiao through the hidden Edge on the PC, which
+/// reaches Microsoft's voices where a direct request is refused.
+/// </summary>
+public interface IWordSpeaker
+{
+    bool IsAvailable { get; }
+
+    /// <summary>Says <paramref name="chinese"/>; completes when said, cancelling stops it.</summary>
+    /// <exception cref="SpeechUnavailableException">The voice cannot speak now.</exception>
+    Task SayAsync(string chinese, SpeechOptions options, CancellationToken ct);
+}
+
+/// <summary>
 /// Says a Chinese word in standard Mandarin (a long press on a word in study mode and on Novel Lens), to learn its
-/// pronunciation: Microsoft's neural voice Xiaoxiao through Edge's read-aloud service, a little slower than speech, or an
-/// offline Chinese voice of this device when that is not reachable. Once the online voice failed, words go straight to
-/// the offline one for a while (<see cref="OnlineRest"/>), so a press never waits for it again and again. Words said are
+/// pronunciation: Microsoft's neural voice Xiaoxiao, a little slower than speech — through the hidden Edge where there is
+/// one (<see cref="IWordSpeaker"/>, the PC), else through Edge's read-aloud service — or an offline Chinese voice of this
+/// device when neither is reachable. A voice that failed is passed over for a while (<see cref="OnlineRest"/>), so a press
+/// never waits for it again and again. Words said are
 /// kept in memory, so a word pressed again plays at once. Reading aloud pauses while a word is said and goes on
 /// afterwards (<see cref="QuietReading"/>).
 /// </summary>
 public sealed class WordPronouncer(IEnumerable<ISpeechEngine> engines, IClipPlayer player, ILogger<WordPronouncer>? logger = null,
-    TimeProvider? time = null)
+    TimeProvider? time = null, IWordSpeaker? speaker = null)
 {
     public static readonly SpeechVoice OnlineVoice = new($"{EdgeSpeechEngine.EnginePrefix}:zh-CN-XiaoxiaoNeural", "Xiaoxiao", "zh-CN", IsOnline: true)
     {
@@ -54,6 +68,7 @@ public sealed class WordPronouncer(IEnumerable<ISpeechEngine> engines, IClipPlay
     private readonly Dictionary<string, SpeechAudio> _kept = new(StringComparer.Ordinal);
     private readonly Queue<string> _order = new();
     private DateTimeOffset _onlineRestsUntil = DateTimeOffset.MinValue;
+    private DateTimeOffset _speakerRestsUntil = DateTimeOffset.MinValue;
     private CancellationTokenSource? _current;
     private Action? _resume;
 
@@ -77,6 +92,7 @@ public sealed class WordPronouncer(IEnumerable<ISpeechEngine> engines, IClipPlay
         _resume ??= QuietReading?.Invoke();
         try
         {
+            if (await SpeakerSaidAsync(chinese, mine.Token)) return null;
             var audio = await AudioOfAsync(chinese, mine.Token);
             if (audio is null) return NoVoice;
             await player.PlayAsync(audio, mine.Token);
@@ -101,6 +117,23 @@ public sealed class WordPronouncer(IEnumerable<ISpeechEngine> engines, IClipPlay
                 _resume = null;
                 resume?.Invoke();
             }
+        }
+    }
+
+    /// <summary>Whether the word was said by the voice that speaks by itself (the hidden Edge).</summary>
+    private async Task<bool> SpeakerSaidAsync(string chinese, CancellationToken ct)
+    {
+        if (speaker is not { IsAvailable: true } || _time.GetUtcNow() < _speakerRestsUntil) return false;
+        try
+        {
+            await speaker.SayAsync(chinese, Options, ct);
+            return true;
+        }
+        catch (SpeechUnavailableException ex)
+        {
+            logger?.LogInformation("The hidden Edge could not say a word ({Reason}); other voices say words for a while", ex.Message);
+            _speakerRestsUntil = _time.GetUtcNow() + OnlineRest;
+            return false;
         }
     }
 

@@ -27,6 +27,8 @@ public static class NovelReaderServices
             .AddSingleton<IAudioOutput>(sp => sp.GetRequiredService<WindowsAudioOutput>())
             // A long press on a word in study mode says it in Mandarin, through a player of its own.
             .AddSingleton<IClipPlayer, WindowsClipPlayer>()
+            // Xiaoxiao through the hidden Edge: reaches Microsoft's voices where a direct request is refused.
+            .AddSingleton<IWordSpeaker>(sp => new EdgeWordSpeaker(sp.GetRequiredService<EdgeAnchor>()))
             .AddSingleton<WordPronouncer>()
             // Word classes for colouring subjects, verbs and objects under the mouse (jieba's list, built into this module).
             .AddSingleton(_ => new Grammar.WordClassDictionary(OpenWordClasses))

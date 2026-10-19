@@ -13,8 +13,8 @@ using Microsoft.Win32;
 namespace Helm.Modules.NovelReader;
 
 /// <summary>
-/// A hidden Microsoft Edge (headless, its own empty profile) that reads with Edge's own online voice HoaiMy: Edge
-/// streams it and starts speaking in about 0.4 s, as on the web. Helm drives it through the DevTools protocol on a
+/// A hidden Microsoft Edge (headless, its own empty profile) that reads with Edge's own online voice HoaiMy (and says a
+/// word pressed in study mode with its Xiaoxiao): Edge streams it and starts speaking in about 0.4 s, as on the web. Helm drives it through the DevTools protocol on a
 /// random port bound to 127.0.0.1 and hears back through a page binding (start, end, error of each sentence). Started
 /// on first use, stopped after 10 minutes without reading and when Helm exits (the whole process tree).
 /// </summary>
@@ -32,11 +32,19 @@ public sealed class EdgeAnchor : IDisposable
           ready() {
             return new Promise(done => { let n = 0; const tick = () => { if (this.pick() || ++n > 75) done(!!this.voice); else setTimeout(tick, 200); }; tick(); });
           },
-          speak(id, text, rate, pitch, volume) {
-            if (!this.voice) this.pick();
-            const u = new SpeechSynthesisUtterance(text);
-            u.voice = this.voice; u.lang = 'vi-VN'; u.rate = rate; u.pitch = pitch; u.volume = volume;
+          voiceFor(lang) {
+            if (lang === 'vi-VN') { if (!this.voice) this.pick(); return this.voice; }
+            const voices = speechSynthesis.getVoices().filter(v => v.lang === lang);
+            return voices.find(v => v.name.includes('Xiaoxiao') && !v.localService) || voices.find(v => !v.localService) || voices[0] || null;
+          },
+          speak(id, text, rate, pitch, volume, lang = 'vi-VN') {
             const report = (type, error) => { if (type !== 'start') this.live.delete(id); helmEvent(JSON.stringify({ type, id, error })); };
+            const voice = this.voiceFor(lang);
+            if (!voice && lang !== 'vi-VN') { report('error', 'no-voice'); return; }
+            // A word said while reading aloud was paused would wait behind it: reading is stopped first, so nothing is queued.
+            if (lang !== 'vi-VN' && speechSynthesis.paused) speechSynthesis.resume();
+            const u = new SpeechSynthesisUtterance(text);
+            u.voice = voice; u.lang = lang; u.rate = rate; u.pitch = pitch; u.volume = volume;
             u.onstart = () => report('start');
             u.onend = () => report('end');
             u.onboundary = e => helmEvent(JSON.stringify({ type: 'boundary', id, at: e.charIndex }));
@@ -62,6 +70,9 @@ public sealed class EdgeAnchor : IDisposable
     private readonly Timer _idle;
     private Process? _process;
     private ClientWebSocket? _socket;
+
+    /// <summary>Edge's own DevTools address (not the page's): where it is asked to quit.</summary>
+    private string? _browserUrl;
     private int _nextCall;
     private DateTime _lastUse = DateTime.UtcNow;
     private string _status = "Stopped";
@@ -77,7 +88,11 @@ public sealed class EdgeAnchor : IDisposable
     /// <summary>Edge is installed and the user did not turn this voice off.</summary>
     public bool IsAvailable => _settings.Current.UseEdgeVoice && EdgePath() is not null;
 
-    public bool IsRunning => _socket?.State == WebSocketState.Open && _process is { HasExited: false };
+    /// <summary>
+    /// Edge answers. Its DevTools connection tells, not the process started: with an update waiting (new_msedge.exe), the
+    /// msedge.exe started hands over to the new version and exits while Edge goes on.
+    /// </summary>
+    public bool IsRunning => _socket?.State == WebSocketState.Open;
 
     public string Status => _status;
 
@@ -85,23 +100,26 @@ public sealed class EdgeAnchor : IDisposable
 
     /// <summary>
     /// Speaks after what is queued; completes when spoken. Cancelling stops it and everything queued. If Edge does not
-    /// answer, it is started again once before the voice is reported unavailable.
+    /// answer, it is started again once before the voice is reported unavailable. <paramref name="language"/> picks the
+    /// voice: HoaiMy for "vi-VN", Edge's online Xiaoxiao for "zh-CN".
     /// </summary>
-    public async Task SpeakAsync(string text, double rate, double pitch, double volume, CancellationToken ct, Action<int>? progress = null)
+    public async Task SpeakAsync(string text, double rate, double pitch, double volume, CancellationToken ct, Action<int>? progress = null,
+        string language = "vi-VN")
     {
         try
         {
-            await SpeakOnceAsync(text, rate, pitch, volume, ct, progress).ConfigureAwait(false);
+            await SpeakOnceAsync(text, rate, pitch, volume, ct, progress, language).ConfigureAwait(false);
         }
         catch (SpeechUnavailableException ex) when (!ct.IsCancellationRequested)
         {
             _logger.LogWarning("Hidden Edge failed ({Reason}); starting it again", ex.Message);
             Stop();
-            await SpeakOnceAsync(text, rate, pitch, volume, ct, progress).ConfigureAwait(false);
+            await SpeakOnceAsync(text, rate, pitch, volume, ct, progress, language).ConfigureAwait(false);
         }
     }
 
-    private async Task SpeakOnceAsync(string text, double rate, double pitch, double volume, CancellationToken ct, Action<int>? progress)
+    private async Task SpeakOnceAsync(string text, double rate, double pitch, double volume, CancellationToken ct, Action<int>? progress,
+        string language)
     {
         await EnsureStartedAsync(ct).ConfigureAwait(false);
         _lastUse = DateTime.UtcNow;
@@ -116,7 +134,7 @@ public sealed class EdgeAnchor : IDisposable
             Cancel();
             done.TrySetCanceled(ct);
         });
-        var call = $"__helm.speak({Js(id)}, {Js(text)}, {Num(Math.Clamp(rate, 0.5, 3))}, {Num(Math.Clamp(pitch, 0, 2))}, {Num(Math.Clamp(volume, 0, 1))})";
+        var call = $"__helm.speak({Js(id)}, {Js(text)}, {Num(Math.Clamp(rate, 0.5, 3))}, {Num(Math.Clamp(pitch, 0, 2))}, {Num(Math.Clamp(volume, 0, 1))}, {Js(language)})";
         try
         {
             await EvaluateAsync(call, awaitPromise: false, ct).ConfigureAwait(false);
@@ -161,6 +179,7 @@ public sealed class EdgeAnchor : IDisposable
             if (IsRunning) return;
             Stop();
             var edge = EdgePath() ?? throw new SpeechUnavailableException("Microsoft Edge is not installed.");
+            await CloseLeftOverAsync(ct).ConfigureAwait(false);
             SetStatus("Starting Edge…");
             _logger.LogInformation("Starting the hidden Edge for HoaiMy");
             var port = FreePort();
@@ -200,6 +219,9 @@ public sealed class EdgeAnchor : IDisposable
                 if (pageSocket is null) await Task.Delay(150, ct).ConfigureAwait(false);
             }
             if (pageSocket is null) throw new SpeechUnavailableException("Microsoft Edge did not answer.");
+            _browserUrl = await BrowserUrlAsync(port, ct).ConfigureAwait(false);
+            // Read on the next start, should Helm end without closing this Edge (killed, or updated).
+            TryWrite(PortFile, port.ToString(System.Globalization.CultureInfo.InvariantCulture));
 
             var socket = new ClientWebSocket();
             await socket.ConnectAsync(new Uri(pageSocket), ct).ConfigureAwait(false);
@@ -244,6 +266,7 @@ public sealed class EdgeAnchor : IDisposable
     public void Stop()
     {
         var socket = Interlocked.Exchange(ref _socket, null);
+        if (socket is not null) Close(socket);
         socket?.Abort();
         socket?.Dispose();
         var process = Interlocked.Exchange(ref _process, null);
@@ -265,6 +288,123 @@ public sealed class EdgeAnchor : IDisposable
     {
         _idle.Dispose();
         Stop();
+    }
+
+    private string PortFile => Path.Combine(_profile, "helm-devtools-port");
+
+    /// <summary>
+    /// Asks Edge itself to quit and waits a moment until it has: the process started may be gone already (see
+    /// <see cref="IsRunning"/>), and an Edge left running holds the profile, so the next one could not start. Best effort.
+    /// </summary>
+    private void Close(ClientWebSocket page)
+    {
+        var browser = Interlocked.Exchange(ref _browserUrl, null);
+        if (page.State != WebSocketState.Open || browser is null) return;
+        try
+        {
+            if (!QuitAsync(browser, CancellationToken.None).Wait(TimeSpan.FromSeconds(2))) return;
+            // The page's connection drops when Edge has quit.
+            var waited = Stopwatch.StartNew();
+            while (page.State == WebSocketState.Open && waited.Elapsed < TimeSpan.FromSeconds(3)) Thread.Sleep(50);
+            TryDelete(PortFile);
+        }
+        catch (AggregateException ex)
+        {
+            _logger.LogDebug(ex, "Could not ask the hidden Edge to quit");
+        }
+    }
+
+    /// <summary>
+    /// An Edge of an earlier Helm that ended without closing it (killed, or updated) still holds the profile: a new Edge
+    /// would only hand over to it and exit. Asked to quit through the port it was started with, then given time to go.
+    /// </summary>
+    private async Task CloseLeftOverAsync(CancellationToken ct)
+    {
+        if (!int.TryParse(TryRead(PortFile), System.Globalization.NumberStyles.None, System.Globalization.CultureInfo.InvariantCulture, out var port))
+            return;
+        TryDelete(PortFile);
+        try
+        {
+            if (await BrowserUrlAsync(port, ct).ConfigureAwait(false) is not { } browser) return;
+            _logger.LogInformation("Closing a hidden Edge left running by an earlier Helm (port {Port})", port);
+            await QuitAsync(browser, ct).ConfigureAwait(false);
+            // It lets go of the profile when it has quit.
+            for (var i = 0; i < 20 && await BrowserUrlAsync(port, ct).ConfigureAwait(false) is not null; i++)
+                await Task.Delay(250, ct).ConfigureAwait(false);
+        }
+        catch (Exception ex) when (ex is WebSocketException or HttpRequestException or TaskCanceledException or IOException)
+        {
+            _logger.LogDebug(ex, "Could not close the hidden Edge left running");
+        }
+    }
+
+    /// <summary>Edge's own DevTools address on <paramref name="port"/>, or null when no Edge answers there.</summary>
+    private static async Task<string?> BrowserUrlAsync(int port, CancellationToken ct)
+    {
+        try
+        {
+            using var http = new HttpClient { Timeout = TimeSpan.FromSeconds(1) };
+            using var version = JsonDocument.Parse(await http.GetStringAsync($"http://127.0.0.1:{port}/json/version", ct).ConfigureAwait(false));
+            var root = version.RootElement;
+            return root.TryGetProperty("Browser", out var name) && name.GetString()?.Contains("Edg", StringComparison.Ordinal) == true
+                   && root.TryGetProperty("webSocketDebuggerUrl", out var url) ? url.GetString() : null;
+        }
+        catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException or JsonException)
+        {
+            return null;
+        }
+    }
+
+    /// <summary>Sends Browser.close to Edge itself.</summary>
+    private static async Task QuitAsync(string browserUrl, CancellationToken ct)
+    {
+        using var socket = new ClientWebSocket();
+        using var timeout = CancellationTokenSource.CreateLinkedTokenSource(ct);
+        timeout.CancelAfter(TimeSpan.FromSeconds(2));
+        await socket.ConnectAsync(new Uri(browserUrl), timeout.Token).ConfigureAwait(false);
+        await socket.SendAsync("{\"id\":1,\"method\":\"Browser.close\"}"u8.ToArray(), WebSocketMessageType.Text, true, timeout.Token).ConfigureAwait(false);
+        // Its answer (or the connection closing as it quits): the request was taken, not lost to an abrupt close.
+        try
+        {
+            await socket.ReceiveAsync(new byte[4096], timeout.Token).ConfigureAwait(false);
+        }
+        catch (WebSocketException)
+        {
+        }
+    }
+
+    private static string? TryRead(string path)
+    {
+        try
+        {
+            return File.Exists(path) ? File.ReadAllText(path).Trim() : null;
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            return null;
+        }
+    }
+
+    private static void TryWrite(string path, string text)
+    {
+        try
+        {
+            File.WriteAllText(path, text);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+        }
+    }
+
+    private static void TryDelete(string path)
+    {
+        try
+        {
+            File.Delete(path);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+        }
     }
 
     /// <summary>Folders of the profile that only Edge's own features fill (they grew to about 450 MB before components were turned off).</summary>
@@ -487,6 +627,15 @@ public sealed class EdgeAnchor : IDisposable
     private static string Js(string text) => JsonSerializer.Serialize(text);
 
     private static string Num(double value) => value.ToString("0.###", System.Globalization.CultureInfo.InvariantCulture);
+}
+
+/// <summary>A word in Mandarin through the hidden Edge: its online Xiaoxiao (a long press in study mode).</summary>
+public sealed class EdgeWordSpeaker(EdgeAnchor anchor) : IWordSpeaker
+{
+    public bool IsAvailable => anchor.IsAvailable;
+
+    public Task SayAsync(string chinese, SpeechOptions options, CancellationToken ct) =>
+        anchor.SpeakAsync(chinese, options.Rate, options.Pitch, options.Volume, ct, language: "zh-CN");
 }
 
 /// <summary>HoaiMy through the hidden Edge, as a voice of Novel Reader.</summary>

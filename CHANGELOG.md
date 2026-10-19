@@ -3,6 +3,16 @@
 All notable changes to Helm. The top section is used as the GitHub release body and as the Velopack release notes.
 Format: [Keep a Changelog](https://keepachangelog.com), versions follow [SemVer](https://semver.org).
 
+## [Unreleased]
+
+### Fixed
+- **Novel Reader on the PC: a word held down in study mode is said even where Microsoft refuses Helm's direct
+  request.** The PC now says it with Xiaoxiao through the hidden Edge that reads HoaiMy, with nothing to install. While
+  HoaiMy reads aloud, reading stops for the word and starts that sentence again afterwards.
+- **Novel Reader on the PC: reading aloud with HoaiMy no longer stalls after the first sentence when Edge has an update
+  waiting.** Helm took the hidden Edge for gone and started another, which the first one blocked. It now also closes
+  a hidden Edge an earlier Helm left running (killed, or ended by an update), which kept HoaiMy from starting at all.
+
 ## [0.46.0] - 2026-10-19
 
 ### Changed
