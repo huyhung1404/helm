@@ -165,6 +165,9 @@ public partial class NovelReaderContentPage : Page
         if (sender is FrameworkElement { DataContext: ParagraphViewModel paragraph }) _viewModel.OpenWord(paragraph, e.Segment);
     }
 
+    /// <summary>The mouse held down on a word in study mode says its Chinese.</summary>
+    private async void Word_Held(object? sender, WordHeldEventArgs e) => await _viewModel.PronounceAsync(e.Chinese);
+
     /// <summary>A double-click on a sentence reads aloud from it.</summary>
     private void Paragraph_ReadFromClicked(object? sender, WordClickedEventArgs e)
     {

@@ -9,8 +9,9 @@ namespace Helm.Modules.NovelReader.Lens;
 
 /// <summary>
 /// The lens's page over the reading app: each paragraph in study form (Chinese, pinyin, Hán Việt, Vietnamese) to scroll
-/// through, a status line on top and the buttons at the bottom (back, read again, text size, Next, close). Colours come
-/// from Helm's theme, as on its own pages.
+/// through, a status line on top and the buttons at the bottom (back, read again, text size, Next, close). A tap on a
+/// word fixes it as a name or a meaning, a long press says it in Mandarin. Colours come from Helm's theme, as on its own
+/// pages.
 /// </summary>
 internal sealed class LensPanel : UserControl
 {
@@ -43,6 +44,9 @@ internal sealed class LensPanel : UserControl
     public Func<string, bool>? HasEntry { get; init; }
 
     public Func<string, Task>? RemoveEntry { get; init; }
+
+    /// <summary>Says a word's Chinese (a long press on it); gives back why it could not, or null.</summary>
+    public Func<string, Task<string?>>? Pronounce { get; init; }
 
     private Button? _remove;
 
@@ -262,6 +266,10 @@ internal sealed class LensPanel : UserControl
             };
             var line = row.Line;
             study.AddHandler(SegmentText.WordTappedEvent, (_, e) => OpenEditor(line, e.Segment));
+            study.AddHandler(StudyText.WordHeldEvent, async (_, e) =>
+            {
+                if (Pronounce is not null && await Pronounce(e.Chinese) is { } problem) SetStatus(problem);
+            });
             _rows.Children.Add(study);
         }
         if (_continues.On && _shown.Count > 0) _rows.Children.Add(Note("goes on on the next page …"));

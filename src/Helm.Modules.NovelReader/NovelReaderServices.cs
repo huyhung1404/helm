@@ -25,6 +25,9 @@ public static class NovelReaderServices
             .AddSingleton<Helm.Modules.NovelReader.Names.INameScanAgent, ClaudeCodeNameAgent>()
             .AddSingleton<WindowsAudioOutput>()
             .AddSingleton<IAudioOutput>(sp => sp.GetRequiredService<WindowsAudioOutput>())
+            // A long press on a word in study mode says it in Mandarin, through a player of its own.
+            .AddSingleton<IClipPlayer, WindowsClipPlayer>()
+            .AddSingleton<WordPronouncer>()
             // Word classes for colouring subjects, verbs and objects under the mouse (jieba's list, built into this module).
             .AddSingleton(_ => new Grammar.WordClassDictionary(OpenWordClasses))
             .AddNovelReaderCore()

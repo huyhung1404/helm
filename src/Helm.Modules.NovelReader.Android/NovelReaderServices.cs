@@ -17,6 +17,9 @@ public static class NovelReaderServices
             // The player, with the background service, its notification and the lock-screen controls.
             .AddSingleton<AndroidAudioOutput>()
             .AddSingleton<IAudioOutput>(sp => sp.GetRequiredService<AndroidAudioOutput>())
+            // A long press on a word in study mode (and on Novel Lens) says it in Mandarin, through a player of its own.
+            .AddSingleton<IClipPlayer, AndroidClipPlayer>()
+            .AddSingleton<WordPronouncer>()
             .AddNovelReaderCore()
             // Novel Lens (an accessibility service, Lens/LensService): the reading app's pages in study form.
             .AddSingleton<Lens.LensTranslator>()

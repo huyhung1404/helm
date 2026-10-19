@@ -227,14 +227,19 @@ public sealed class EdgeSpeechEngine(ILogger<EdgeSpeechEngine> logger) : ISpeech
         return Convert.ToHexString(SHA256.HashData(Encoding.ASCII.GetBytes(ticks.ToString(CultureInfo.InvariantCulture) + TrustedClientToken)));
     }
 
-    /// <summary>The request: the voice, speed, pitch and volume as SSML prosody, the text escaped.</summary>
+    /// <summary>
+    /// The request: the voice, speed, pitch and volume as SSML prosody, the text escaped, in the voice's language
+    /// ("zh-CN-XiaoxiaoNeural" speaks zh-CN).
+    /// </summary>
     internal static string Ssml(string text, string voice, SpeechOptions options)
     {
         var rate = (int)Math.Round((Math.Clamp(options.Rate, 0.5, 3) - 1) * 100);
         var pitch = (int)Math.Round((Math.Clamp(options.Pitch, 0, 2) - 1) * 50);
         var volume = (int)Math.Round((Math.Clamp(options.Volume, 0, 1) - 1) * 100);
         var clean = new string(text.Where(c => c is '\t' or '\n' or '\r' || (c >= ' ' && !char.IsSurrogate(c))).ToArray());
-        return "<speak version='1.0' xmlns='http://www.w3.org/2001/10/synthesis' xml:lang='vi-VN'>" +
+        var parts = voice.Split('-');
+        var language = parts.Length >= 3 ? $"{parts[0]}-{parts[1]}" : "vi-VN";
+        return $"<speak version='1.0' xmlns='http://www.w3.org/2001/10/synthesis' xml:lang='{SecurityElement.Escape(language)}'>" +
                $"<voice name='{voice}'><prosody pitch='{pitch:+0;-0}Hz' rate='{rate:+0;-0}%' volume='{volume:+0;-0}%'>" +
                SecurityElement.Escape(clean) + "</prosody></voice></speak>";
     }

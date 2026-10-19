@@ -3,6 +3,17 @@
 All notable changes to Helm. The top section is used as the GitHub release body and as the Velopack release notes.
 Format: [Keep a Changelog](https://keepachangelog.com), versions follow [SemVer](https://semver.org).
 
+## [Unreleased]
+
+### Added
+- **Novel Reader: hear how a word sounds in Mandarin.** In study mode, hold a word down (the mouse on the PC, a finger
+  on the phone, and on Novel Lens too): Helm says its Chinese in standard Mandarin with Microsoft's neural voice
+  Xiaoxiao (online), a little slower than speech so each tone is clear, and the word flashes. Letting go opens nothing;
+  a tap still opens the word and a double tap still reads aloud from there. Reading aloud pauses while the word is said
+  and goes on afterwards. A word pressed again plays at once. Without the internet, an offline Chinese voice of the
+  device says it: on the PC one added in Windows (Settings → Time & language → Speech → Chinese), on the phone its own
+  Mandarin voice (Google's, when installed).
+
 ## [0.45.0] - 2026-10-18
 
 ### Added – Novel Lens (Android)

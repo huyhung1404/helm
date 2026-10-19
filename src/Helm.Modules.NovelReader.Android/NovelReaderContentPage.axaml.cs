@@ -65,6 +65,7 @@ public partial class NovelReaderContentPage : UserControl
         InitializeComponent();
         ParagraphList.AddHandler(SegmentText.WordTappedEvent, OnWordTapped);
         ParagraphList.AddHandler(SegmentText.WordDoubleTappedEvent, OnWordDoubleTapped);
+        ParagraphList.AddHandler(StudyText.WordHeldEvent, OnWordHeld);
         // Two fingers apart or together: larger or smaller text, from the size the pinch started at.
         Scroller.GestureRecognizers.Add(new PinchGestureRecognizer());
         Scroller.AddHandler(InputElement.PinchEvent, (_, e) =>
@@ -261,6 +262,9 @@ public partial class NovelReaderContentPage : UserControl
         _viewModel.Editor.CloseCommand.Execute(null);
         _viewModel.ReadFromSegment(paragraph, e.Index);
     }
+
+    /// <summary>A long press on a word in study mode says its Chinese.</summary>
+    private async void OnWordHeld(object? sender, WordHeldEventArgs e) => await _viewModel.PronounceAsync(e.Chinese);
 
     private void EndTouch()
     {

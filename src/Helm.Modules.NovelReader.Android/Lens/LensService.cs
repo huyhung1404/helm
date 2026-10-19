@@ -41,13 +41,15 @@ public sealed class LensService : AccessibilityService
         try
         {
             LensTranslator? translator = null;
+            Speech.WordPronouncer? pronouncer = null;
             if (HelmAndroidServices.IsConfigured)
             {
                 var services = HelmAndroidServices.Current;
                 _logger = (ILogger?)services.GetService<ILoggerFactory>()?.CreateLogger<LensService>() ?? NullLogger.Instance;
                 translator = services.GetService<LensTranslator>();
+                pronouncer = services.GetService<Speech.WordPronouncer>();
             }
-            _overlay = new LensOverlay(this, translator, _logger);
+            _overlay = new LensOverlay(this, translator, pronouncer, _logger);
             _logger.LogInformation("Novel Lens connected");
         }
         catch (Exception ex)
