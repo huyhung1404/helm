@@ -90,7 +90,25 @@
                                     <StackPanel IsVisible="{Binding IsUser}" Margin="0,8,0,4">
                                         <TextBlock Text="{Binding Time}" Classes="faint" FontSize="11" HorizontalAlignment="Right" Margin="0,0,0,4" IsVisible="{Binding HasTime}" />
                                         <Border Background="{DynamicResource VsRaise}" BorderBrush="{DynamicResource VsLine2}" BorderThickness="1" CornerRadius="6" Padding="10,7">
-                                            <TextBlock Text="{Binding Text}" TextWrapping="Wrap" Foreground="{DynamicResource VsFgStrong}" FontSize="14" />
+                                            <StackPanel Spacing="6">
+                                                <ItemsControl ItemsSource="{Binding Images}" IsVisible="{Binding HasImages}">
+                                                    <ItemsControl.ItemsPanel>
+                                                        <ItemsPanelTemplate>
+                                                            <WrapPanel />
+                                                        </ItemsPanelTemplate>
+                                                    </ItemsControl.ItemsPanel>
+                                                    <ItemsControl.ItemTemplate>
+                                                        <DataTemplate x:DataType="vm:WorkspaceImage">
+                                                            <Button Classes="thumb" Command="{Binding $parent[UserControl].((vm:WorkspaceRemoteViewModel)DataContext).ViewImageCommand}"
+                                                                    CommandParameter="{Binding}" AutomationProperties.Name="Picture">
+                                                                <local:WorkspaceImageView Image="{Binding}" Width="96" Height="96" CornerRadius="4" DecodeWidth="240"
+                                                                                          Background="{DynamicResource VsRaise2}" />
+                                                            </Button>
+                                                        </DataTemplate>
+                                                    </ItemsControl.ItemTemplate>
+                                                </ItemsControl>
+                                                <TextBlock Text="{Binding Text}" TextWrapping="Wrap" Foreground="{DynamicResource VsFgStrong}" FontSize="14" IsVisible="{Binding HasText}" />
+                                            </StackPanel>
                                         </Border>
                                         <TextBlock Text="{Binding Delivery}" FontSize="12" Margin="2,4,0,0" IsVisible="{Binding HasDelivery}" TextWrapping="Wrap"
                                                    Foreground="{DynamicResource VsMuted}" Classes.failed="{Binding DeliveryFailed}" />
@@ -365,6 +383,25 @@
         </Style>
         <Style Selector="ToggleButton.choice:checked /template/ ContentPresenter#PART_ContentPresenter">
             <Setter Property="Background" Value="{DynamicResource VsOptHover}" />
+        </Style>
+
+        <!-- Pictures -->
+        <Style Selector="Button.thumb">
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="Padding" Value="0" />
+            <Setter Property="Margin" Value="0,0,6,6" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="CornerRadius" Value="4" />
+        </Style>
+        <Style Selector="Button.unattach">
+            <Setter Property="Width" Value="22" />
+            <Setter Property="Height" Value="22" />
+            <Setter Property="Padding" Value="0" />
+            <Setter Property="Margin" Value="0,2,2,0" />
+            <Setter Property="CornerRadius" Value="11" />
+            <Setter Property="Background" Value="#B0000000" />
+            <Setter Property="HorizontalContentAlignment" Value="Center" />
+            <Setter Property="VerticalContentAlignment" Value="Center" />
         </Style>
 
         <!-- Composer -->
@@ -964,35 +1001,62 @@
                 </Border>
                 <Border Background="{DynamicResource VsRaise}" BorderBrush="{DynamicResource VsLine2}" BorderThickness="1" CornerRadius="6">
                     <StackPanel>
+                        <!-- Pictures that go with the next message -->
+                        <ScrollViewer HorizontalScrollBarVisibility="Hidden" VerticalScrollBarVisibility="Disabled" IsVisible="{Binding HasAttachments}" Margin="8,8,8,0">
+                            <ItemsControl ItemsSource="{Binding Attachments}">
+                                <ItemsControl.ItemsPanel>
+                                    <ItemsPanelTemplate>
+                                        <StackPanel Orientation="Horizontal" Spacing="6" />
+                                    </ItemsPanelTemplate>
+                                </ItemsControl.ItemsPanel>
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate x:DataType="vm:DraftImage">
+                                        <Panel Width="64" Height="64">
+                                            <local:WorkspaceImageView Image="{Binding Image}" CornerRadius="4" DecodeWidth="160" Background="{DynamicResource VsRaise2}"
+                                                                      BorderBrush="{DynamicResource VsLine2}" BorderThickness="1" />
+                                            <Button Classes="unattach" HorizontalAlignment="Right" VerticalAlignment="Top" AutomationProperties.Name="Remove the picture"
+                                                    Command="{Binding $parent[UserControl].((vm:WorkspaceRemoteViewModel)DataContext).RemoveAttachmentCommand}" CommandParameter="{Binding}">
+                                                <Path Classes="icon" Width="9" Height="9" Stretch="Uniform" Stroke="White" StrokeThickness="1.8" Data="M2 2l8 8M10 2l-8 8" />
+                                            </Button>
+                                        </Panel>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </ScrollViewer>
                         <TextBox x:Name="PromptBox" Classes="prompt" Text="{Binding Prompt}" PlaceholderText="{Binding PromptHint}" AcceptsReturn="True"
                                  TextWrapping="Wrap" MaxHeight="150" IsEnabled="{Binding CanType}" AutomationProperties.Name="Prompt" />
-                        <Grid ColumnDefinitions="Auto,Auto,Auto,Auto,Auto,*,Auto,Auto" Margin="4,0,4,4" ClipToBounds="True">
+                        <Grid ColumnDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,*,Auto,Auto" Margin="4,0,4,4" ClipToBounds="True">
                             <Button Grid.Column="0" Classes="chip" Click="Slash_Click" AutomationProperties.Name="Commands and skills">
                                 <TextBlock Text="/" FontSize="14" />
                             </Button>
-                            <Button Grid.Column="1" Classes="chip" Command="{Binding OpenSheetCommand}" CommandParameter="Context" AutomationProperties.Name="Context used">
+                            <Button Grid.Column="1" Classes="chip" x:Name="AttachChip" Command="{Binding OpenSheetCommand}" CommandParameter="Attach" IsVisible="{Binding ImagesSupported}"
+                                    IsEnabled="{Binding CanAttach}" AutomationProperties.Name="Add a picture">
+                                <Path Classes="icon" Width="14" Height="14" Stretch="Uniform" Stroke="{DynamicResource VsMuted}"
+                                      Data="M10.5 4.5L5.3 9.7a1.5 1.5 0 0 0 2.1 2.1l5.4-5.4a3 3 0 0 0-4.2-4.2L3.2 7.6a4.5 4.5 0 0 0 6.4 6.4l4.4-4.4" />
+                            </Button>
+                            <Button Grid.Column="2" Classes="chip" Command="{Binding OpenSheetCommand}" CommandParameter="Context" AutomationProperties.Name="Context used">
                                 <local:ContextRing Width="16" Height="16" Fraction="{Binding ContextFraction}" />
                             </Button>
-                            <Button Grid.Column="2" Classes="chip" x:Name="AgeChip" IsHitTestVisible="False">
+                            <Button Grid.Column="3" Classes="chip" x:Name="AgeChip" IsHitTestVisible="False">
                                 <StackPanel Orientation="Horizontal" Spacing="4">
                                     <Path Classes="icon" Width="12" Height="12" Stretch="Uniform" Stroke="{DynamicResource VsMuted}" Data="M14 8A6 6 0 1 1 2 8A6 6 0 1 1 14 8Z M8 4.8V8l2.2 1.4" />
                                     <TextBlock Text="{Binding AgeText}" />
                                 </StackPanel>
                             </Button>
-                            <Button Grid.Column="3" Classes="chip" Command="{Binding OpenSheetCommand}" CommandParameter="Agents" AutomationProperties.Name="Subagents">
+                            <Button Grid.Column="4" Classes="chip" Command="{Binding OpenSheetCommand}" CommandParameter="Agents" AutomationProperties.Name="Subagents">
                                 <StackPanel Orientation="Horizontal" Spacing="5">
                                     <Ellipse Width="6" Height="6" Fill="{DynamicResource VsAccent}" Classes="pulse" IsVisible="{Binding HasAgents}" VerticalAlignment="Center" />
                                     <Ellipse Width="6" Height="6" Fill="{DynamicResource VsFaint}" IsVisible="{Binding !HasAgents}" VerticalAlignment="Center" />
                                     <TextBlock Text="{Binding AgentsText}" />
                                 </StackPanel>
                             </Button>
-                            <Button Grid.Column="4" Classes="chip model" Command="{Binding OpenSheetCommand}" CommandParameter="Model" AutomationProperties.Name="Model and effort">
+                            <Button Grid.Column="5" Classes="chip model" Command="{Binding OpenSheetCommand}" CommandParameter="Model" AutomationProperties.Name="Model and effort">
                                 <StackPanel Orientation="Horizontal" Spacing="5">
                                     <TextBlock Text="{Binding ModelLabel}" Classes="name" />
                                     <TextBlock Text="{Binding EffortLabel}" IsVisible="{Binding HasEffort}" />
                                 </StackPanel>
                             </Button>
-                            <Button Grid.Column="6" Classes="chip" Command="{Binding OpenSheetCommand}" CommandParameter="Mode" AutomationProperties.Name="Permission mode">
+                            <Button Grid.Column="7" Classes="chip" Command="{Binding OpenSheetCommand}" CommandParameter="Mode" AutomationProperties.Name="Permission mode">
                                 <StackPanel Orientation="Horizontal" Spacing="5">
                                     <Panel Width="14" Height="14">
                                         <Path Classes="icon" Width="14" Height="14" Stretch="Uniform" Stroke="{DynamicResource VsMuted}" IsVisible="{Binding ModeIsManual}"
@@ -1004,10 +1068,10 @@
                                     <TextBlock Text="{Binding ModeName}" x:Name="ModeText" />
                                 </StackPanel>
                             </Button>
-                            <Button Grid.Column="7" Classes="stop" Command="{Binding StopCommand}" IsVisible="{Binding CanStop}" AutomationProperties.Name="Stop Claude on the PC" Margin="4,0,0,0">
+                            <Button Grid.Column="8" Classes="stop" Command="{Binding StopCommand}" IsVisible="{Binding CanStop}" AutomationProperties.Name="Stop Claude on the PC" Margin="4,0,0,0">
                                 <Rectangle Width="10" Height="10" Fill="White" RadiusX="1.5" RadiusY="1.5" />
                             </Button>
-                            <Button Grid.Column="7" Classes="send" Command="{Binding SendCommand}" IsVisible="{Binding !CanStop}" AutomationProperties.Name="Send" Margin="4,0,0,0">
+                            <Button Grid.Column="8" Classes="send" Command="{Binding SendCommand}" IsVisible="{Binding !CanStop}" AutomationProperties.Name="Send" Margin="4,0,0,0">
                                 <Path Classes="icon" Stroke="White" StrokeThickness="1.8" Data="M8 13V3M4 7l4-4 4 4" />
                             </Button>
                         </Grid>
@@ -1024,6 +1088,27 @@
                 <ScrollViewer HorizontalScrollBarVisibility="Disabled">
                     <StackPanel Margin="0,6,0,14">
                         <Border Width="36" Height="4" CornerRadius="2" Background="{DynamicResource VsLine2}" HorizontalAlignment="Center" Margin="0,2,0,6" />
+
+                        <!-- Add a picture -->
+                        <StackPanel IsVisible="{Binding IsAttachSheet}">
+                            <TextBlock Text="Add a picture" Classes="strong" FontWeight="SemiBold" Margin="16,6,16,6" />
+                            <Button Classes="pick" Command="{Binding TakePhotoCommand}">
+                                <DockPanel>
+                                    <Path DockPanel.Dock="Left" Classes="icon" Width="18" Height="18" Stretch="Uniform" Stroke="{DynamicResource VsMuted}" Margin="0,0,12,0"
+                                          Data="M2 5.5h3l1.5-2h5l1.5 2h3v9H2z M9 7.5a2.8 2.8 0 1 0 0 5.6a2.8 2.8 0 1 0 0-5.6z" VerticalAlignment="Center" />
+                                    <TextBlock Text="Take a photo" Classes="strong" VerticalAlignment="Center" />
+                                </DockPanel>
+                            </Button>
+                            <Button Classes="pick" Command="{Binding PickImagesCommand}">
+                                <DockPanel>
+                                    <Path DockPanel.Dock="Left" Classes="icon" Width="18" Height="18" Stretch="Uniform" Stroke="{DynamicResource VsMuted}" Margin="0,0,12,0"
+                                          Data="M2 3h14v12H2z M2 12l4-4 3 3 2-2 5 5 M11.5 6a1 1 0 1 0 0 2a1 1 0 1 0 0-2z" VerticalAlignment="Center" />
+                                    <TextBlock Text="Choose from the gallery" Classes="strong" VerticalAlignment="Center" />
+                                </DockPanel>
+                            </Button>
+                            <TextBlock Text="Up to 5 pictures a message. They are made smaller on the phone and travel encrypted through Helm Sync."
+                                       Classes="faint" FontSize="11" TextWrapping="Wrap" Margin="16,6,16,6" />
+                        </StackPanel>
 
                         <!-- The PCs -->
                         <StackPanel IsVisible="{Binding IsPcSheet}">
@@ -1276,5 +1361,14 @@
         <Border x:Name="OffBar" Grid.Row="4" VerticalAlignment="Top" Background="{DynamicResource VsOffBar}" Padding="12,8" IsVisible="False">
             <TextBlock Text="Workspace Controller is turned off on this phone. Turn it on in Home → Utilities." TextWrapping="Wrap" Foreground="{DynamicResource VsFgStrong}" />
         </Border>
+
+        <!-- A picture full screen (Back or ✕ closes it) -->
+        <Panel Grid.RowSpan="6" Background="Black" IsVisible="{Binding IsViewingImage}">
+            <local:WorkspaceImageView Image="{Binding ViewedImage}" Stretch="Uniform" DecodeWidth="1600" Margin="0,48,0,16" />
+            <Button Classes="unattach" Width="40" Height="40" CornerRadius="20" Margin="0,8,8,0" HorizontalAlignment="Right" VerticalAlignment="Top"
+                    Command="{Binding CloseImageCommand}" AutomationProperties.Name="Close the picture">
+                <Path Classes="icon" Width="14" Height="14" Stretch="Uniform" Stroke="White" StrokeThickness="2" Data="M2 2l10 10M12 2L2 12" />
+            </Button>
+        </Panel>
     </Grid>
 </UserControl>

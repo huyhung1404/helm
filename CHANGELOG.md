@@ -3,6 +3,25 @@
 All notable changes to Helm. The top section is used as the GitHub release body and as the Velopack release notes.
 Format: [Keep a Changelog](https://keepachangelog.com), versions follow [SemVer](https://semver.org).
 
+## [Unreleased]
+
+### Added
+- **Workspace Controller: send pictures to Claude from the phone.** The 📎 chip in the composer takes a photo with
+  the camera or picks up to 5 from the gallery; they show above the text, ✕ takes one out, and a picture alone can be
+  sent. The phone turns each one upright, brings it down to 1568 px and sends it encrypted through Helm Sync (the PC
+  gets the message only once its pictures are on the server). A session Helm runs outside VS Code gets the pictures
+  inside the message itself. A VS Code tab gets a line naming the picture's file on the PC, and Claude may open that
+  file without asking (only files Helm saved for a prompt; anything else is asked as usual). No camera or storage
+  permission is asked. A PC on an older Helm does not offer it.
+- **Workspace Controller: pictures show in the timeline.** Your prompts show their pictures (yours and ones pasted
+  into Claude on the PC, which the PC uploads once); tap one to see it full screen. The phone shows its own photos at
+  once, before the PC has its copy.
+
+### Fixed
+- **Workspace Controller: large pictures in a conversation no longer hide the steps before them on the phone.** The
+  PC read only the last 512 KB of a transcript, which two pasted screenshots can fill; it now reads further back when
+  that leaves too few steps.
+
 ## [0.47.0] - 2026-10-19
 
 ### Fixed

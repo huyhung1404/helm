@@ -8,6 +8,7 @@ public static class WorkspaceServices
     public static IServiceCollection AddWorkspaceModule(this IServiceCollection services) =>
         services
             .AddWorkspaceSync()
+            .AddSingleton<IWorkspaceImagePicker, AndroidWorkspaceImagePicker>()
             .AddSingleton<WorkspaceRemoteViewModel>()
             .AddAndroidModule<WorkspaceModule, WorkspacePage>()
             .AddTransient<WorkspaceContentPage>();

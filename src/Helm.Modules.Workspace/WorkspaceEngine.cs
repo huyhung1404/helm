@@ -5,6 +5,7 @@ using System.Text.Json;
 using Helm.Core.Desktop;
 using Helm.Core.Services;
 using Helm.Core.Settings;
+using Helm.Core.Sync;
 using Microsoft.Extensions.Logging;
 
 namespace Helm.Modules.Workspace;
@@ -45,11 +46,13 @@ public sealed class WorkspaceEngine : IAsyncDisposable
     private HookListener? _hooks;
     private BridgeHost? _bridge;
     private readonly HeadlessClaude? _headless;
+    private readonly WorkspaceImageStore? _images;
 
     private WorkspaceEngine(ISettingsStore<WorkspaceSettings> settings, SessionRegistry registry, PromptSender sender,
-        string? projectsRoot, IUserActivity? activity, ILogger logger, TimeProvider time, HeadlessClaude? headless)
+        string? projectsRoot, IUserActivity? activity, ILogger logger, TimeProvider time, HeadlessClaude? headless, WorkspaceImageStore? images)
     {
         _headless = headless;
+        _images = images;
         if (headless is not null) headless.Changed += (_, _) => OnRunsChanged();
         _activity = activity;
         _lastRealInput = activity?.LastInputTick ?? Environment.TickCount64;
@@ -74,6 +77,9 @@ public sealed class WorkspaceEngine : IAsyncDisposable
 
     public string MachineId => Registry.MachineId;
 
+    /// <summary>Pictures from the phone reach Claude on this PC (sync is set up here).</summary>
+    public bool TakesImages => _images?.CanSend == true;
+
     public int HookPort => _hooks?.Port ?? 0;
 
     public string? BridgePipe => _bridge?.PipeName;
@@ -89,11 +95,11 @@ public sealed class WorkspaceEngine : IAsyncDisposable
     /// <summary>Starts listening. A taken hook port is replaced by a free one (and Claude's settings follow).</summary>
     public static WorkspaceEngine Start(ISettingsStore<WorkspaceSettings> settings, HelmPaths paths, PromptSender sender,
         ILogger logger, TimeProvider? time = null, string? bridgePipe = null, string? projectsRoot = null, IUserActivity? activity = null,
-        HeadlessClaude? headless = null)
+        HeadlessClaude? headless = null, WorkspaceImageStore? images = null)
     {
         EnsureIdentity(settings);
         var s = settings.Current;
-        var engine = new WorkspaceEngine(settings, new SessionRegistry(s.InstallId, time), sender, projectsRoot, activity, logger, time ?? TimeProvider.System, headless);
+        var engine = new WorkspaceEngine(settings, new SessionRegistry(s.InstallId, time), sender, projectsRoot, activity, logger, time ?? TimeProvider.System, headless, images);
         try
         {
             engine._hooks = HookListener.Start(s.HookPort, s.HookToken, engine.HandleHookAsync, logger);
@@ -336,6 +342,15 @@ public sealed class WorkspaceEngine : IAsyncDisposable
             return new WorkspaceCommandResult(command.Id, WorkspaceCommandStatus.Failed,
                 "Claude is still working on that session where it runs (a terminal?). Send it when that turn is over.", session.SessionId);
         _dismissed.TryRemove(session.SessionId, out _);
+        List<(WorkspaceImage Image, byte[] Bytes)> images;
+        try
+        {
+            images = await FetchImagesAsync(command, ct, step).ConfigureAwait(false);
+        }
+        catch (PromptSendException ex)
+        {
+            return new WorkspaceCommandResult(command.Id, WorkspaceCommandStatus.Failed, ex.Message, session.SessionId);
+        }
         var receipt = new TaskCompletionSource<string>(TaskCreationOptions.RunContinuationsAsynchronously);
         _receipts[command.Id] = receipt;
         Registry.ExpectPrompt(command.Id, session.SessionId, session.Folder, command.Text, HostedReceiptTimeout + TimeSpan.FromSeconds(10));
@@ -343,7 +358,9 @@ public sealed class WorkspaceEngine : IAsyncDisposable
         {
             step?.Invoke(running ? "Adding your message to Claude's run on the PC" : "Starting Claude in the background on the PC");
             var folder = ClaudeProjects.HomeOf(session.TranscriptPath, session.Folder) ?? session.Folder;
-            await _headless.SendAsync(session.SessionId, folder, command.Text, ct).ConfigureAwait(false);
+            // Claude takes the pictures themselves in the message, as its own panel sends them.
+            await _headless.SendAsync(session.SessionId, folder, command.Text, ct,
+                images.Select(i => (i.Image.MediaType, Convert.ToBase64String(i.Bytes))).ToList()).ConfigureAwait(false);
             Registry.SetHosted(session.SessionId, true);
             step?.Invoke("Waiting for Claude to take it");
             var arrived = await receipt.Task.WaitAsync(HostedReceiptTimeout, ct).ConfigureAwait(false);
@@ -415,7 +432,7 @@ public sealed class WorkspaceEngine : IAsyncDisposable
             return new WorkspaceCommandResult(command.Id, WorkspaceCommandStatus.Failed, "This command is for another PC.");
         if (command.CreatedAt != default && _time.GetLocalNow() - command.CreatedAt > WorkspaceCommand.MaxAge)
             return new WorkspaceCommandResult(command.Id, WorkspaceCommandStatus.Failed, "The command is too old; it was not typed.");
-        if (command.NeedsText && string.IsNullOrWhiteSpace(command.Text))
+        if (command.NeedsText && string.IsNullOrWhiteSpace(command.Text) && !(command.Kind is WorkspaceCommandKind.Prompt or WorkspaceCommandKind.NewSession && command.Images.Count > 0))
             return new WorkspaceCommandResult(command.Id, WorkspaceCommandStatus.Failed, "The prompt is empty.");
 
         BridgeConnection? window;
@@ -460,15 +477,25 @@ public sealed class WorkspaceEngine : IAsyncDisposable
         if (window is null)
             return new WorkspaceCommandResult(command.Id, WorkspaceCommandStatus.Failed, "No VS Code window with Helm Bridge has that folder open.");
 
+        // Pictures go in as files Claude opens (VS Code's panel takes no pictures typed in).
+        string text;
+        try
+        {
+            text = WithImageFiles(command.Text, await FetchImagesAsync(command, ct, step).ConfigureAwait(false));
+        }
+        catch (PromptSendException ex)
+        {
+            return new WorkspaceCommandResult(command.Id, WorkspaceCommandStatus.Failed, ex.Message, sessionId);
+        }
         var receipt = new TaskCompletionSource<string>(TaskCreationOptions.RunContinuationsAsynchronously);
         _receipts[command.Id] = receipt;
-        Registry.ExpectPrompt(command.Id, sessionId, folder, command.Text, ReceiptTimeout + TimeSpan.FromSeconds(10));
+        Registry.ExpectPrompt(command.Id, sessionId, folder, text, ReceiptTimeout + TimeSpan.FromSeconds(10));
         try
         {
             var setup = command.Kind == WorkspaceCommandKind.NewSession
                 ? new NewSessionSetup(command.Model, command.Effort, command.Mode is { } m ? Math.Max(0, PermissionModes.Presses(PermissionModes.Manual, m, AutoModeAvailable)) : 0)
                 : null;
-            await _sender.SendAsync(window, sessionId, command.Text, setup, ct, receipt.Task, step).ConfigureAwait(false);
+            await _sender.SendAsync(window, sessionId, text, setup, ct, receipt.Task, step).ConfigureAwait(false);
         }
         catch (PromptSendException ex)
         {
@@ -495,6 +522,62 @@ public sealed class WorkspaceEngine : IAsyncDisposable
             Forget(command.Id);
             return new WorkspaceCommandResult(command.Id, WorkspaceCommandStatus.Sent,
                 "Typed and sent, but Claude did not confirm it yet (are Helm's hooks installed?).", sessionId);
+        }
+    }
+
+    /// <summary>The pictures of a command, fetched from the sync server (none when it has none).</summary>
+    /// <exception cref="PromptSendException">One could not be fetched, or this PC cannot take pictures.</exception>
+    private async Task<List<(WorkspaceImage Image, byte[] Bytes)>> FetchImagesAsync(WorkspaceCommand command, CancellationToken ct, Action<string>? step)
+    {
+        var list = new List<(WorkspaceImage, byte[])>();
+        if (command.Images.Count == 0) return list;
+        if (_images is null) throw new PromptSendException("This PC cannot take pictures: Helm Sync is not set up here.");
+        var images = command.Images.Take(WorkspaceImages.MaxPerMessage).ToList();
+        step?.Invoke(images.Count == 1 ? "Fetching your picture" : $"Fetching your {images.Count} pictures");
+        foreach (var image in images)
+        {
+            try
+            {
+                list.Add((image, await _images.ReadAsync(image, ct).ConfigureAwait(false)));
+            }
+            catch (Exception ex) when (ex is BlobUnavailableException or InvalidOperationException or IOException or HttpRequestException
+                or System.Security.Cryptography.CryptographicException or SyncRequestException)
+            {
+                _logger.LogWarning(ex, "Workspace: a picture from the phone could not be fetched");
+                throw new PromptSendException("A picture could not be fetched from the sync server: " + ex.Message);
+            }
+        }
+        return list;
+    }
+
+    /// <summary>The prompt with a line per picture naming its file on this PC, for Claude to open.</summary>
+    private string WithImageFiles(string text, List<(WorkspaceImage Image, byte[] Bytes)> images)
+    {
+        if (images.Count == 0) return text;
+        List<string> lines;
+        try
+        {
+            lines = images.Select(i => WorkspaceImages.Marker(_images!.SaveFile(i.Image, i.Bytes))).ToList();
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            throw new PromptSendException("The picture could not be saved on the PC: " + ex.Message);
+        }
+        return text.Trim().Length == 0 ? string.Join("\n", lines) : text.TrimEnd() + "\n\n" + string.Join("\n", lines);
+    }
+
+    /// <summary>A Read of a picture file Helm saved for a prompt from the phone: Claude may open it without asking.</summary>
+    private bool ReadsOwnPicture(ClaudeHookEvent e)
+    {
+        if (_images is null || e.Event != ClaudeHookEvent.PermissionRequest || e.ToolName != "Read" || e.ToolInputJson is not { } json) return false;
+        try
+        {
+            using var doc = JsonDocument.Parse(json);
+            return doc.RootElement.TryGetProperty("file_path", out var path) && path.ValueKind == JsonValueKind.String && _images.IsOwnFile(path.GetString());
+        }
+        catch (JsonException)
+        {
+            return false;
         }
     }
 
@@ -723,6 +806,12 @@ public sealed class WorkspaceEngine : IAsyncDisposable
     internal async Task<string?> HandleHookAsync(ClaudeHookEvent e)
     {
         e = e with { Cwd = HomeOf(e) };
+        // Opening a picture the phone sent is what that prompt asked for: allowed at once, the session never waits on it.
+        if (ReadsOwnPicture(e))
+        {
+            _logger.LogInformation("Workspace: Claude opens a picture sent from the phone; allowed");
+            return PendingRequest.Decision(true);
+        }
         if (e.Event is ClaudeHookEvent.UserPromptSubmit or ClaudeHookEvent.SessionStart) _dismissed.TryRemove(e.SessionId, out _);
         Registry.Apply(e);
         // A session Helm runs in the background has no VS Code to ask in: the phone always decides.

@@ -33,8 +33,11 @@ public sealed class WorkspaceModule : HelmModuleBase, IModuleContent
     private readonly ClaudeCatalog _catalog;
     private readonly IUserActivity? _userActivity;
     private readonly IClaudeStarter? _starter;
+    private readonly BlobStore? _blobs;
+    private readonly ISyncService? _sync;
     private WorkspaceEngine? _engine;
     private WorkspaceRelay? _relay;
+    private WorkspaceImageStore? _images;
     private BackgroundActivity? _activity;
     private string? _hooksProblem;
     private string? _bridgeProblem;
@@ -43,9 +46,11 @@ public sealed class WorkspaceModule : HelmModuleBase, IModuleContent
         IBackgroundActivities activities, ISyncedCollection<WorkspaceHostRecord> hosts, ISyncedCollection<WorkspaceSessionRecord> sessions,
         ISyncedCollection<WorkspaceCommand> commands, ISyncedCollection<WorkspaceResultRecord> results, ClaudeCatalog catalog,
         ILogger<WorkspaceModule> logger, IDeviceInfo? device = null, IUserActivity? activity = null, ISyncedCollection<WorkspaceHistoryRecord>? history = null,
-        IClaudeStarter? starter = null)
+        IClaudeStarter? starter = null, BlobStore? blobs = null, ISyncService? sync = null)
     {
         _starter = starter;
+        _blobs = blobs;
+        _sync = sync;
         _history = history;
         Settings = settings.Get<WorkspaceSettings>(WorkspaceIds.ModuleId);
         _paths = paths;
@@ -102,8 +107,12 @@ public sealed class WorkspaceModule : HelmModuleBase, IModuleContent
             {
                 // Sessions outside VS Code: Helm runs them itself when the phone sends them something.
                 var headless = _starter is null ? null : new HeadlessClaude(_starter, _logger);
+                // Pictures from the phone come as blobs of Helm Sync; without sync there are none.
+                var sync = _sync;
+                _images = _blobs is null ? null
+                    : new WorkspaceImageStore(_blobs, Path.Combine(_paths.ModuleDataDirectory(Id), "images"), _logger, sync is null ? null : () => sync.RequestSync());
                 _engine = WorkspaceEngine.Start(Settings, _paths, _sender, _logger, activity: _userActivity,
-                    bridgePipe: Environment.GetEnvironmentVariable("HELM_BRIDGE_PIPE"), headless: headless);
+                    bridgePipe: Environment.GetEnvironmentVariable("HELM_BRIDGE_PIPE"), headless: headless, images: _images);
             }
             catch (Exception ex) when (ex is System.Net.Sockets.SocketException or IOException)
             {
@@ -115,7 +124,7 @@ public sealed class WorkspaceModule : HelmModuleBase, IModuleContent
             if (Settings.Current.ManageClaudeHooks) _hooksProblem = _engine.InstallClaudeHooks(HooksFileOverride());
             // The phone's link: this PC and its connected sessions out, the phone's commands in (Helm Sync).
             _relay = new WorkspaceRelay(_engine, _hosts, _sessions, _commands, _results, _device?.DeviceName ?? Environment.MachineName,
-                () => _catalog.Current, _logger, models: () => (_catalog.Models, _catalog.AutoModeAvailable), history: _history);
+                () => _catalog.Current, _logger, models: () => (_catalog.Models, _catalog.AutoModeAvailable), history: _history, images: _images);
             if (_catalog.Models.Count > 0) _engine.AutoModeAvailable = _catalog.AutoModeAvailable;
             _engine.PhoneLinked = true;
             _activity = _activities.Start(Id, DisplayName, Detail(), StopFromGeneralAsync);
@@ -138,6 +147,8 @@ public sealed class WorkspaceModule : HelmModuleBase, IModuleContent
             _activity = null;
             if (_relay is not null) await _relay.DisposeAsync().ConfigureAwait(false);
             _relay = null;
+            _images?.Dispose();
+            _images = null;
             if (_engine is null) return;
             _engine.Changed -= OnEngineChanged;
             await _engine.DisposeAsync().ConfigureAwait(false);

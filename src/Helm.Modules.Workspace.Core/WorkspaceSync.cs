@@ -79,6 +79,9 @@ public sealed record WorkspaceHostRecord
     /// <summary>Slash commands and skills, for the "/" suggestions.</summary>
     public IReadOnlyList<SkillInfo> Skills { get; init; } = [];
 
+    /// <summary>This PC takes pictures with a prompt (older ones would type the words alone).</summary>
+    public bool TakesImages { get; init; }
+
     /// <summary>What the PC is busy with for the phone right now ("Typing a prompt into VS Code"), newest last.</summary>
     public IReadOnlyList<string> Activities { get; init; } = [];
 
@@ -213,14 +216,23 @@ public static class WorkspaceSync
     public static IServiceCollection AddWorkspaceSync(this IServiceCollection services)
     {
         services.AddSyncedCollection(new SyncedCollectionOptions<WorkspaceHostRecord> { Name = Hosts });
-        services.AddSyncedCollection(new SyncedCollectionOptions<WorkspaceSessionRecord> { Name = Sessions });
+        services.AddSyncedCollection(new SyncedCollectionOptions<WorkspaceSessionRecord> { Name = Sessions, BlobReferences = ImagesOf });
         // Someone holds the phone and waits: a command and the PC's progress go out at once.
-        services.AddSyncedCollection(new SyncedCollectionOptions<WorkspaceCommand> { Name = Commands, Urgent = true });
+        services.AddSyncedCollection(new SyncedCollectionOptions<WorkspaceCommand>
+        {
+            Name = Commands,
+            Urgent = true,
+            BlobReferences = c => c.Images.Select(i => i.Blob?.Id).OfType<string>(),
+        });
         services.AddSyncedCollection(new SyncedCollectionOptions<WorkspaceResultRecord> { Name = Results, Urgent = true });
         services.AddSyncedCollection(new SyncedCollectionOptions<WorkspaceHistoryRecord> { Name = History });
         services.AddSyncGroup(Prefix, "Workspace Controller");
         return services;
     }
+
+    /// <summary>The pictures a session record shows (kept on the server while it does).</summary>
+    public static IEnumerable<string> ImagesOf(WorkspaceSessionRecord record) =>
+        record.Items.SelectMany(i => i.Images).Select(i => i.Blob?.Id).OfType<string>();
 
     /// <summary>The history record of one folder of one PC (the folder's path never shows in the id).</summary>
     public static string HistoryId(string machineId, string folder) =>

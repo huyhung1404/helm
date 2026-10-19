@@ -64,7 +64,10 @@ public sealed record WorkspaceCommand
     /// <summary>New session only: the permission mode to start in; null keeps the default.</summary>
     public string? Mode { get; init; }
 
-    /// <summary>True for the kinds that need <see cref="Text"/>.</summary>
+    /// <summary>Prompt, NewSession: pictures sent with it (their blobs reach the server before this record does).</summary>
+    public IReadOnlyList<WorkspaceImage> Images { get; init; } = [];
+
+    /// <summary>True for the kinds that need <see cref="Text"/> (or, for a prompt, a picture).</summary>
     public bool NeedsText => Kind is WorkspaceCommandKind.Prompt or WorkspaceCommandKind.NewSession or WorkspaceCommandKind.SetModel
         or WorkspaceCommandKind.SetEffort or WorkspaceCommandKind.SetMode;
 

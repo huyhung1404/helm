@@ -44,6 +44,16 @@ public sealed record TranscriptItem
 
     /// <summary>Tool: Claude's id for the call (pairs it with its result; not shown).</summary>
     public string? CallId { get; init; }
+
+    /// <summary>Your prompt: the pictures that came with it.</summary>
+    public IReadOnlyList<WorkspaceImage> Images { get; init; } = [];
+
+    // The pictures are a list: two steps are the same when their pictures are, whichever list holds them.
+    public bool Equals(TranscriptItem? other) =>
+        other is not null && Kind == other.Kind && Text == other.Text && Tool == other.Tool && Input == other.Input && Output == other.Output
+        && Running == other.Running && Failed == other.Failed && At == other.At && CallId == other.CallId && Images.SequenceEqual(other.Images);
+
+    public override int GetHashCode() => HashCode.Combine(Kind, Text, Tool, Input, Output, Running, At, CallId);
 }
 
 /// <summary>A subagent working for the session now (an Agent / Task call without a result yet).</summary>
@@ -80,6 +90,12 @@ public sealed record TranscriptView
     public long ContextTokens { get; init; }
 
     public IReadOnlyList<SubagentInfo> Agents { get; init; } = [];
+
+    /// <summary>
+    /// The pictures of <see cref="Items"/> that Claude keeps in the transcript itself, by key: their base64 text, for
+    /// the PC to upload once. Empty in a view that is kept (it is only needed right after the read).
+    /// </summary>
+    public IReadOnlyDictionary<string, string> ImageData { get; init; } = new Dictionary<string, string>();
 }
 
 /// <summary>
@@ -98,6 +114,10 @@ public static class TranscriptReader
     public const int MaxOutput = 1200;
     public const int MaxOutputLines = 14;
     public const int MaxInput = 600;
+
+    /// <summary>Fewer steps than this in the tail (pictures took its room): the tail is read again, larger, up to <see cref="MaxTailBytes"/>.</summary>
+    public const int MinItems = 12;
+    public const int MaxTailBytes = 8 * 1024 * 1024;
 
     public static TranscriptTail Read(string path, int maxTurns = 20)
     {
@@ -119,9 +139,18 @@ public static class TranscriptReader
     /// <summary>The timeline (its last <paramref name="maxItems"/> steps) and the session's details.</summary>
     public static TranscriptView ReadView(string path, int maxItems = 80, bool withAgents = true)
     {
-        var lines = ReadTailLines(path, TailBytes, out var partial);
-        var state = new ParseState();
-        foreach (var line in lines) Parse(line, state);
+        var bytes = TailBytes;
+        ParseState state;
+        bool partial;
+        while (true)
+        {
+            var lines = ReadTailLines(path, bytes, out partial);
+            state = new ParseState();
+            foreach (var line in lines) Parse(line, state);
+            // A picture is one long line: a few of them fill the tail, and the steps before them fall out. Read further back then.
+            if (!partial || state.Items.Count >= Math.Min(maxItems, MinItems) || bytes >= MaxTailBytes) break;
+            bytes = Math.Min(MaxTailBytes, bytes * 4);
+        }
         // Titles are written again and again, so the tail nearly always has one; scan the whole file only if not.
         if (state.Title.Length == 0 && partial)
         {
@@ -131,10 +160,15 @@ public static class TranscriptReader
         }
         var items = state.Items;
         var agents = withAgents ? RunningAgents(path, items) : [];
+        var kept = items.Count > maxItems ? items.GetRange(items.Count - maxItems, maxItems) : items;
+        var data = new Dictionary<string, string>(StringComparer.Ordinal);
+        foreach (var image in kept.SelectMany(i => i.Images))
+            if (state.ImageData.TryGetValue(image.Key, out var base64)) data[image.Key] = base64;
         return new TranscriptView
         {
             Title = state.Title,
-            Items = items.Count > maxItems ? items.GetRange(items.Count - maxItems, maxItems) : items,
+            Items = kept,
+            ImageData = data,
             Model = state.Model,
             Effort = state.Effort,
             PermissionMode = state.Mode,
@@ -148,6 +182,7 @@ public static class TranscriptReader
         public string Title = "";
         public readonly List<TranscriptItem> Items = [];
         public readonly Dictionary<string, int> Calls = new(StringComparer.Ordinal);
+        public readonly Dictionary<string, string> ImageData = new(StringComparer.Ordinal);
         public string? Model, Effort, Mode;
         public long Context, ThoughtMs;
     }
@@ -243,11 +278,12 @@ public static class TranscriptReader
         if (!message.TryGetProperty("content", out var content)) return;
         if (content.ValueKind == JsonValueKind.String)
         {
-            AddPrompt(root, content.GetString() ?? "", at, s);
+            AddPrompt(root, content.GetString() ?? "", [], at, s);
             return;
         }
         if (content.ValueKind != JsonValueKind.Array) return;
         var texts = new List<string>();
+        var images = new List<WorkspaceImage>();
         foreach (var part in content.EnumerateArray())
         {
             switch (Text(part, "type"))
@@ -264,20 +300,29 @@ public static class TranscriptReader
                 case "text" when Text(part, "text") is { } text:
                     texts.Add(text);
                     break;
+                case "image" when part.TryGetProperty("source", out var source) && Text(source, "type") == "base64" && Text(source, "data") is { Length: > 0 } data:
+                    var key = WorkspaceImages.KeyOf(data);
+                    s.ImageData[key] = data;
+                    images.Add(new WorkspaceImage { Key = key, MediaType = Text(source, "media_type") ?? "image/png" });
+                    break;
                 case "image":
                     texts.Add("[Image]");
                     break;
             }
         }
-        if (texts.Count > 0) AddPrompt(root, string.Join("\n\n", texts), at, s);
+        if (texts.Count > 0 || images.Count > 0) AddPrompt(root, string.Join("\n\n", texts), images, at, s);
     }
 
-    private static void AddPrompt(JsonElement root, string text, DateTimeOffset? at, ParseState s)
+    private static void AddPrompt(JsonElement root, string text, List<WorkspaceImage> images, DateTimeOffset? at, ParseState s)
     {
         // Background-task notices and the like come as "user" records too; only what a person typed is a prompt.
         if (root.TryGetProperty("origin", out var origin) && origin.ValueKind == JsonValueKind.Object && Text(origin, "kind") is { } kind && kind != "human") return;
         var clean = Clean(text);
-        if (clean.Length > 0) s.Items.Add(new TranscriptItem { Kind = TranscriptItemKind.User, Text = clean, At = at });
+        if (text.Trim().Length > 0 && clean.Length == 0) return;
+        // A picture sent from the phone into VS Code is a line naming its file: shown as the picture again.
+        var (shown, keys) = WorkspaceImages.SplitMarkers(clean);
+        images.AddRange(keys.Where(k => images.All(i => i.Key != k)).Select(k => new WorkspaceImage { Key = k }));
+        if (shown.Length > 0 || images.Count > 0) s.Items.Add(new TranscriptItem { Kind = TranscriptItemKind.User, Text = shown, Images = images, At = at });
     }
 
     /// <summary>Commands the CLI echoes into the transcript (/model, local command output) are not conversation.</summary>

@@ -28,6 +28,7 @@ public sealed class WorkspaceRelay : IAsyncDisposable
     private readonly ISyncedCollection<WorkspaceCommand> _commands;
     private readonly ISyncedCollection<WorkspaceResultRecord> _results;
     private readonly ISyncedCollection<WorkspaceHistoryRecord>? _history;
+    private readonly WorkspaceImageStore? _images;
     private readonly string _machineName;
     private readonly Func<IReadOnlyList<SkillInfo>> _skills;
     private readonly Func<(IReadOnlyList<ModelInfo> Models, bool AutoMode)> _models;
@@ -48,8 +49,10 @@ public sealed class WorkspaceRelay : IAsyncDisposable
     public WorkspaceRelay(WorkspaceEngine engine, ISyncedCollection<WorkspaceHostRecord> hosts, ISyncedCollection<WorkspaceSessionRecord> sessions,
         ISyncedCollection<WorkspaceCommand> commands, ISyncedCollection<WorkspaceResultRecord> results, string machineName,
         Func<IReadOnlyList<SkillInfo>>? skills, ILogger logger, TimeProvider? time = null,
-        Func<(IReadOnlyList<ModelInfo>, bool)>? models = null, ISyncedCollection<WorkspaceHistoryRecord>? history = null)
+        Func<(IReadOnlyList<ModelInfo>, bool)>? models = null, ISyncedCollection<WorkspaceHistoryRecord>? history = null,
+        WorkspaceImageStore? images = null)
     {
+        _images = images;
         _engine = engine;
         _hosts = hosts;
         _sessions = sessions;
@@ -66,6 +69,13 @@ public sealed class WorkspaceRelay : IAsyncDisposable
         _live = _time.CreateTimer(_ => CheckLive(), null, LiveCheck, LiveCheck);
         _engine.Changed += OnEngineChanged;
         _commands.Changed += OnCommandsChanged;
+        if (images is not null)
+        {
+            // The pictures this PC published before are on the server already: never uploaded again.
+            foreach (var item in _sessions.All().Where(i => i.Value.MachineId == engine.MachineId))
+                foreach (var image in item.Value.Items.SelectMany(i => i.Images)) images.Remember(image);
+            images.Changed += OnImagesChanged;
+        }
         _worker = Task.Run(() => RunCommandsAsync(_stop.Token));
         SafePublish();
         TakeCommands();
@@ -75,6 +85,8 @@ public sealed class WorkspaceRelay : IAsyncDisposable
     public static IReadOnlyList<string> Models { get; } = ["opus", "sonnet", "haiku"];
 
     private void OnEngineChanged(object? sender, EventArgs e) => RequestPublish();
+
+    private void OnImagesChanged(object? sender, EventArgs e) => RequestPublish();
 
     /// <summary>
     /// Publishes soon. Changes close together become one write, and a steady stream of them (Claude calling tool after
@@ -114,13 +126,14 @@ public sealed class WorkspaceRelay : IAsyncDisposable
                 Models = Models,
                 ModelChoices = models,
                 AutoModeAvailable = autoMode,
+                TakesImages = _engine.TakesImages,
                 Skills = _skills(),
                 Activities = Activities(),
             };
             // LastSeen alone changes every time: write it only as the heartbeat, or with a real change.
             if (Interlocked.Exchange(ref _hostDue, 0) == 1 || _hosts.Get(_engine.MachineId) is not { } before || !before.Running || now - before.LastSeen > Heartbeat - TimeSpan.FromSeconds(5) ||
                 !before.Windows.SequenceEqual(host.Windows) || !before.Skills.SequenceEqual(host.Skills) || before.MachineName != host.MachineName ||
-                !before.ModelChoices.SequenceEqual(host.ModelChoices) || before.AutoModeAvailable != host.AutoModeAvailable ||
+                !before.ModelChoices.SequenceEqual(host.ModelChoices) || before.AutoModeAvailable != host.AutoModeAvailable || before.TakesImages != host.TakesImages ||
                 !before.Activities.SequenceEqual(host.Activities))
                 _hosts.Upsert(_engine.MachineId, host);
 
@@ -159,7 +172,10 @@ public sealed class WorkspaceRelay : IAsyncDisposable
 
     private void Write(AgentSession s, string windowFolder)
     {
-        var record = WorkspaceSync.ToRecord(s, windowFolder, View(s));
+        var view = View(s);
+        // Pictures show on the phone once their blobs are on the server.
+        if (view is not null && _images is not null) view = view with { Items = _images.Resolve(view.Items) };
+        var record = WorkspaceSync.ToRecord(s, windowFolder, view);
         if (_sessions.Get(s.SessionId) is { } old && WorkspaceSync.SameContent(old, record)) return;
         _sessions.Upsert(s.SessionId, record);
     }
@@ -205,6 +221,9 @@ public sealed class WorkspaceRelay : IAsyncDisposable
             (cached.View.Agents.Count == 0 || now - cached.At < AgentsRefresh))
             return cached.View;
         var view = TranscriptReader.ReadView(s.TranscriptPath, WorkspaceSync.MaxItems);
+        // Pictures pasted on the PC are uploaded once for the phone; their base64 text is not kept.
+        _images?.Take(view);
+        view = view with { ImageData = new Dictionary<string, string>() };
         _views[s.SessionId] = new CachedView(length, s.State, now, view);
         return view;
     }
@@ -405,6 +424,7 @@ public sealed class WorkspaceRelay : IAsyncDisposable
     {
         _engine.Changed -= OnEngineChanged;
         _commands.Changed -= OnCommandsChanged;
+        if (_images is not null) _images.Changed -= OnImagesChanged;
         await _publishTimer.DisposeAsync().ConfigureAwait(false);
         await _heartbeat.DisposeAsync().ConfigureAwait(false);
         await _live.DisposeAsync().ConfigureAwait(false);

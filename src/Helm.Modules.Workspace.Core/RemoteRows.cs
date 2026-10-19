@@ -83,8 +83,12 @@ public sealed class TimelineRow
     public static TimelineRow Working(string text) => new(TimelineKind.Working, text);
 
     /// <summary>Your prompt on its way (not in the transcript yet), with how far it got.</summary>
-    public static TimelineRow Sending(string text, string status, bool failed, DateTimeOffset at) =>
-        new(new TranscriptItem { Kind = TranscriptItemKind.User, Text = text, At = at }) { Delivery = status.Length > 0 ? status : null, DeliveryFailed = failed };
+    public static TimelineRow Sending(string text, string status, bool failed, DateTimeOffset at, IReadOnlyList<WorkspaceImage>? images = null) =>
+        new(new TranscriptItem { Kind = TranscriptItemKind.User, Text = text, At = at, Images = images ?? [] })
+        {
+            Delivery = status.Length > 0 ? status : null,
+            DeliveryFailed = failed,
+        };
 
     public TranscriptItem Item { get; }
     public TimelineKind Kind { get; }
@@ -95,6 +99,12 @@ public sealed class TimelineRow
     public bool IsWorking => Kind == TimelineKind.Working;
 
     public string Text => Item.Text;
+    public bool HasText => Item.Text.Length > 0;
+
+    /// <summary>Your prompt: its pictures (one without a blob yet shows as a placeholder).</summary>
+    public IReadOnlyList<WorkspaceImage> Images => Item.Images;
+    public bool HasImages => Item.Images.Count > 0;
+
     public string Time => Item.At?.ToLocalTime().ToString("HH:mm") ?? "";
     public bool HasTime => Item.At is not null && (IsUser || IsAnswer);
 

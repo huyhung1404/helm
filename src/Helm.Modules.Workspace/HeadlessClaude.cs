@@ -110,10 +110,12 @@ public sealed class HeadlessClaude(IClaudeStarter starter, ILogger logger, TimeP
     /// Hands <paramref name="text"/> to the session: to its run when one is going, else to a new run started in
     /// <paramref name="folder"/>. Returns once the message is written (Claude's UserPromptSubmit hook confirms it).
     /// </summary>
+    /// <param name="images">Pictures sent with it (media type, base64), before the words, as Claude's own panel sends them.</param>
     /// <exception cref="PromptSendException">Claude Code is missing or could not be started.</exception>
-    public async Task SendAsync(string sessionId, string folder, string text, CancellationToken ct)
+    public async Task SendAsync(string sessionId, string folder, string text, CancellationToken ct,
+        IReadOnlyList<(string MediaType, string Base64)>? images = null)
     {
-        var line = JsonSerializer.Serialize(new { type = "user", message = new { role = "user", content = text } });
+        var line = Message(text, images ?? []);
         for (var attempt = 0; attempt < 2; attempt++)
         {
             var run = _runs.GetOrAdd(sessionId, id => StartRun(id, folder));
@@ -124,6 +126,17 @@ public sealed class HeadlessClaude(IClaudeStarter starter, ILogger logger, TimeP
             // That run was just closing after its last answer: a new one takes the message.
         }
         throw new PromptSendException("Claude Code on the PC stopped before it took the message.");
+    }
+
+    /// <summary>The stream-json line of a message: plain text, or picture blocks then the text (public for the tests).</summary>
+    public static string Message(string text, IReadOnlyList<(string MediaType, string Base64)> images)
+    {
+        if (images.Count == 0) return JsonSerializer.Serialize(new { type = "user", message = new { role = "user", content = text } });
+        var content = new List<object>();
+        foreach (var (mediaType, base64) in images)
+            content.Add(new { type = "image", source = new { type = "base64", media_type = mediaType, data = base64 } });
+        if (text.Length > 0) content.Add(new { type = "text", text });
+        return JsonSerializer.Serialize(new { type = "user", message = new { role = "user", content } });
     }
 
     /// <summary>Stops the session's run (the phone's Stop). False when none runs.</summary>

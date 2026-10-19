@@ -26,7 +26,7 @@ public sealed class WorkspaceRemoteSettings : IVersionedSettings
 }
 
 /// <summary>The bottom sheets of the control screen.</summary>
-public enum WorkspaceSheet { None, Pc, Model, Mode, Agents, History, Context, TextSize, Status }
+public enum WorkspaceSheet { None, Pc, Model, Mode, Agents, History, Context, TextSize, Status, Attach }
 
 /// <summary>
 /// The phone's control screen for Workspace Controller, laid out like Claude's panel in VS Code: a tab per VS Code
@@ -112,8 +112,10 @@ public sealed partial class WorkspaceRemoteViewModel : ObservableObject
     public WorkspaceRemoteViewModel(ISyncedCollection<WorkspaceHostRecord> hosts, ISyncedCollection<WorkspaceSessionRecord> sessions,
         ISyncedCollection<WorkspaceCommand> commands, ISyncedCollection<WorkspaceResultRecord> results, ISettingsStoreFactory settings,
         IUiDispatcher ui, ISyncService? sync = null, TimeProvider? time = null, IDialogService? dialogs = null,
-        ISyncedCollection<WorkspaceHistoryRecord>? history = null)
+        ISyncedCollection<WorkspaceHistoryRecord>? history = null, BlobStore? blobs = null, IWorkspaceImagePicker? picker = null)
     {
+        _blobs = blobs;
+        _picker = picker;
         _hosts = hosts;
         _sessions = sessions;
         _commands = commands;
@@ -392,7 +394,7 @@ public sealed partial class WorkspaceRemoteViewModel : ObservableObject
         if (value == WorkspaceSheet.Agents) FillAgents();
         if (value == WorkspaceSheet.Status) NotifyFreshness();
         Notify(nameof(IsSheetOpen), nameof(IsPcSheet), nameof(IsModelSheet), nameof(IsModeSheet), nameof(IsAgentsSheet), nameof(IsHistorySheet),
-            nameof(IsContextSheet), nameof(IsTextSizeSheet), nameof(IsStatusSheet), nameof(ShowsEffort));
+            nameof(IsContextSheet), nameof(IsTextSizeSheet), nameof(IsStatusSheet), nameof(IsAttachSheet), nameof(ShowsEffort));
     }
 
     partial void OnHistoryQueryChanged(string value) => FillHistory();
@@ -513,6 +515,7 @@ public sealed partial class WorkspaceRemoteViewModel : ObservableObject
     /// <summary>Android back: closes a sheet or the review first. False when there is nothing to go back from.</summary>
     public bool HandleBack()
     {
+        if (ViewedImage is not null) { ViewedImage = null; return true; }
         if (Sheet != WorkspaceSheet.None) { Sheet = WorkspaceSheet.None; return true; }
         if (ShowReview) { ShowReview = false; return true; }
         return false;
@@ -683,7 +686,7 @@ public sealed partial class WorkspaceRemoteViewModel : ObservableObject
 
     // ---- Sending
 
-    private bool CanSend() => !IsSending && CanType && !string.IsNullOrWhiteSpace(Prompt);
+    private bool CanSend() => !IsSending && CanType && (!string.IsNullOrWhiteSpace(Prompt) || Attachments.Count > 0 && ImagesSupported && !PlanFeedback && !_denyNext);
 
     [RelayCommand(CanExecute = nameof(CanSend))]
     private async Task SendAsync()
@@ -720,6 +723,7 @@ public sealed partial class WorkspaceRemoteViewModel : ObservableObject
                 Model = DraftModel == DefaultModel ? null : DraftModel,
                 Effort = DraftUltracode ? "ultracode" : DraftEffort,
                 Mode = DraftMode == PermissionModes.Manual ? null : DraftMode,
+                Images = ImagesSupported ? TakeAttachments() : [],
                 CreatedAt = _time.GetLocalNow(),
             }, sending: text);
             return;
@@ -732,6 +736,7 @@ public sealed partial class WorkspaceRemoteViewModel : ObservableObject
             SessionId = Session!.SessionId,
             Folder = Session.Folder,
             Text = text,
+            Images = ImagesSupported ? TakeAttachments() : [],
             CreatedAt = _time.GetLocalNow(),
         }, sending: text);
     }
@@ -740,7 +745,7 @@ public sealed partial class WorkspaceRemoteViewModel : ObservableObject
     {
         _commands.Upsert(command.Id, command);
         _sync?.RequestSyncSoon();
-        _pending = new SentCommand(command.Id, command.Kind, command.SessionId, sending, _time.GetLocalNow());
+        _pending = new SentCommand(command.Id, command.Kind, command.SessionId, sending, _time.GetLocalNow()) { Images = command.Images };
         _pcSteps.Clear();
         _answeredAt = null;
         _awaitGaveUp = false;
@@ -1087,7 +1092,7 @@ public sealed partial class WorkspaceRemoteViewModel : ObservableObject
     {
         Notify(nameof(SelectedTab), nameof(Session), nameof(IsSessionOpen), nameof(OpenSessionId), nameof(SessionTitle), nameof(SessionStateText),
             nameof(IsWorking), nameof(NeedsYou), nameof(HasReview), nameof(ReviewLabel), nameof(CanType), nameof(PromptHint), nameof(HistoryTitle),
-            nameof(IsOutsideSession), nameof(CanStop));
+            nameof(IsOutsideSession), nameof(CanStop), nameof(CanAttach), nameof(ImagesSupported));
         NotifyChips();
         SendCommand.NotifyCanExecuteChanged();
     }
@@ -1168,7 +1173,7 @@ public sealed partial class WorkspaceRemoteViewModel : ObservableObject
         var rows = new List<TimelineRow>();
         if (Session is { } s)
         {
-            rows.AddRange(s.Items.Select(i => new TimelineRow(i)));
+            rows.AddRange(s.Items.Select(i => new TimelineRow(WithLocalImages(i))));
             if (rows.Count == 0 && (s.LastPrompt is not null || s.LastReply is not null))
             {
                 // A session of an older PC (or one not read yet): its last prompt and answer.
@@ -1179,14 +1184,14 @@ public sealed partial class WorkspaceRemoteViewModel : ObservableObject
             if (s.State == SessionState.Done && s.LastReply is { Length: > 0 } last && rows.Count > 0 && !rows[^1].IsAnswer && !rows[^1].Running
                 && !rows.Any(r => r.IsAnswer && r.Text.Trim() == last.Trim()))
                 rows.Add(new TimelineRow(new TranscriptItem { Kind = TranscriptItemKind.Answer, Text = last, At = s.UpdatedAt }));
-            if (_pending is { Text: { } text } pending && pending.SessionId == s.SessionId && !Arrived(s, text, pending.At))
-                rows.Add(TimelineRow.Sending(text, ShowProgress ? "" : SendStatus ?? "", SendFailed, pending.At));
+            if (_pending is { Text: { } text } pending && pending.SessionId == s.SessionId && !Arrived(s, text, pending.Images, pending.At))
+                rows.Add(TimelineRow.Sending(text, ShowProgress ? "" : SendStatus ?? "", SendFailed, pending.At, pending.Images));
             else if (s.State == SessionState.Working && (rows.Count == 0 || !rows[^1].Running))
                 rows.Add(TimelineRow.Working(WorkingText(s)));
         }
         else if (IsNewSession && _pending is { Kind: WorkspaceCommandKind.NewSession, Text: { } first } sent)
         {
-            rows.Add(TimelineRow.Sending(first, ShowProgress ? "" : SendStatus ?? "", SendFailed, sent.At));
+            rows.Add(TimelineRow.Sending(first, ShowProgress ? "" : SendStatus ?? "", SendFailed, sent.At, sent.Images));
         }
         // Only the last steps are drawn; "Show earlier" draws more.
         HiddenSteps = Math.Max(0, rows.Count - _timelineLimit);
@@ -1237,8 +1242,9 @@ public sealed partial class WorkspaceRemoteViewModel : ObservableObject
     }
 
     /// <summary>The prompt shows in the transcript (it arrived, and Claude has it).</summary>
-    private static bool Arrived(WorkspaceSessionRecord s, string text, DateTimeOffset since) =>
-        s.Items.Any(i => i.Kind == TranscriptItemKind.User && SessionRegistry.Normalize(i.Text) == SessionRegistry.Normalize(text) && (i.At is null || i.At >= since.AddMinutes(-2)));
+    private static bool Arrived(WorkspaceSessionRecord s, string text, IReadOnlyList<WorkspaceImage> images, DateTimeOffset since) =>
+        s.Items.Any(i => i.Kind == TranscriptItemKind.User && SessionRegistry.Normalize(i.Text) == SessionRegistry.Normalize(text) && (i.At is null || i.At >= since.AddMinutes(-2))
+            && (images.Count == 0 || SameImages(i.Images, images)));
 
     private void FillChoices()
     {
@@ -1346,7 +1352,10 @@ public sealed partial class WorkspaceRemoteViewModel : ObservableObject
         NotifyChips();
     }
 
-    private sealed record SentCommand(string CommandId, WorkspaceCommandKind Kind, string? SessionId, string? Text, DateTimeOffset At, bool Done = false, bool Failed = false);
+    private sealed record SentCommand(string CommandId, WorkspaceCommandKind Kind, string? SessionId, string? Text, DateTimeOffset At, bool Done = false, bool Failed = false)
+    {
+        public IReadOnlyList<WorkspaceImage> Images { get; init; } = [];
+    }
 
     // ---- Seen
 

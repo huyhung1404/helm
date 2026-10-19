@@ -59,8 +59,10 @@ public partial class WorkspaceContentPage : UserControl, IFullPage
     /// <summary>A narrow phone keeps the composer's row in one line: the session time goes first, then the mode's name (its icon stays).</summary>
     private void FitChips(double width)
     {
-        AgeChip.IsVisible = width >= 420;
-        ModeText.IsVisible = width >= 380;
+        // The 📎 chip takes room too when the PC takes pictures.
+        var extra = _viewModel.ImagesSupported ? 40 : 0;
+        AgeChip.IsVisible = width >= 420 + extra;
+        ModeText.IsVisible = width >= 380 + extra;
     }
 
     protected override void OnAttachedToVisualTree(VisualTreeAttachmentEventArgs e)
@@ -130,6 +132,7 @@ public partial class WorkspaceContentPage : UserControl, IFullPage
             _timeline.CollectionChanged += OnTimelineChanged;
             ShowTimeline(_timeline, previous);
         }
+        if (e.PropertyName == nameof(WorkspaceRemoteViewModel.ImagesSupported)) FitChips(Composer.Bounds.Width);
         if (e.PropertyName == nameof(WorkspaceRemoteViewModel.OpenSessionId))
         {
             ClearNotification();
