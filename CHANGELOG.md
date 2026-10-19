@@ -3,7 +3,7 @@
 All notable changes to Helm. The top section is used as the GitHub release body and as the Velopack release notes.
 Format: [Keep a Changelog](https://keepachangelog.com), versions follow [SemVer](https://semver.org).
 
-## [Unreleased]
+## [0.48.0] - 2026-10-19
 
 ### Added
 - **Workspace Controller: send pictures to Claude from the phone.** The 📎 chip in the composer takes a photo with
