@@ -14,7 +14,23 @@ using Wpf.Ui.Controls;
 namespace Helm.App.Services;
 
 /// <summary>What a page looks like on its tab: its title and a fresh icon (an icon element can sit in one place only).</summary>
-internal sealed record TabLook(string Title, Func<IconElement> Icon);
+internal sealed record TabLook(string Title, Func<IconElement> Icon)
+{
+    /// <summary>
+    /// The icon at tab size. A glyph (Home, General, AI &amp; MCP) takes the theme's text colour: left to inherit, it came
+    /// out dim and sank into the strip beside the tools' coloured pictures.
+    /// </summary>
+    public IconElement CreateIcon()
+    {
+        var icon = Icon();
+        if (icon is SymbolIcon symbol)
+        {
+            symbol.FontSize = 16;
+            symbol.SetResourceReference(IconElement.ForegroundProperty, "TextFillColorPrimaryBrush");
+        }
+        return icon;
+    }
+}
 
 /// <summary>
 /// The tabs of every Helm window, like a browser's: each page (Home, General, a tool's content or settings page) opens

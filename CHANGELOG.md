@@ -3,6 +3,12 @@
 All notable changes to Helm. The top section is used as the GitHub release body and as the Velopack release notes.
 Format: [Keep a Changelog](https://keepachangelog.com), versions follow [SemVer](https://semver.org).
 
+## [Unreleased]
+
+### Fixed
+- **Tabs on the PC: the Home, General and AI & MCP tabs no longer fade into the strip.** Their icons now take the
+  theme's text colour, as clear as the tools' coloured icons beside them (also in the "+" menu).
+
 ## [0.49.0] - 2026-10-20
 
 ### Added
