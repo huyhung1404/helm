@@ -280,8 +280,7 @@ internal sealed class TabHost : UserControl
         var menu = new ContextMenu();
         foreach (var (look, pageType) in Manager.Launchable())
         {
-            var icon = look.Icon();
-            if (icon is SymbolIcon symbol) symbol.FontSize = 16;
+            var icon = look.CreateIcon();
             var item = new MenuItem { Header = look.Title, Icon = icon };
             item.Click += (_, _) => Manager.Open(pageType, this);
             menu.Items.Add(item);

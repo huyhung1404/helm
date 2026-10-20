@@ -10,6 +10,8 @@ Format: [Keep a Changelog](https://keepachangelog.com), versions follow [SemVer]
   Android draws from a fallback font, so it circled around a point beside itself, and the chip grew and shrank each
   time a sync started and ended, moving the whole button. It is now a ring drawn round the status dot; the chip keeps
   its size. "Check now" in the status sheet gets the same ring.
+- **Tabs on the PC: the Home, General and AI & MCP tabs no longer fade into the strip.** Their icons now take the
+  theme's text colour, as clear as the tools' coloured icons beside them (also in the "+" menu).
 
 ## [0.49.0] - 2026-10-20
 

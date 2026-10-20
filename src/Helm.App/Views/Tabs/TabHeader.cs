@@ -36,10 +36,9 @@ internal sealed class TabHeader : Border
         ToolTip = tab.Look.Title;
         AutomationProperties.SetName(this, tab.Look.Title);
 
-        var icon = tab.Look.Icon();
+        var icon = tab.Look.CreateIcon();
         icon.VerticalAlignment = VerticalAlignment.Center;
         icon.Margin = new Thickness(0, 0, 8, 0);
-        if (icon is SymbolIcon symbol) symbol.FontSize = 16;
 
         _title = new TextBlock
         {
