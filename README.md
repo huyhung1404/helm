@@ -61,7 +61,7 @@ Settings live separately in `%LOCALAPPDATA%\Helm`, so they survive an uninstall 
 
 Requires Android 8.0 or newer.
 
-Download **`Helm-android.apk`** from the same release and open it; Android asks you to allow installs from your browser or file manager once. Helm then updates itself from GitHub (General → Updates), asking before each install.
+Download **`Helm-android.apk`** from the same release and open it (`Helm-android-x64.apk` is for x86_64 emulators such as LDPlayer); Android asks you to allow installs from your browser or file manager once. Helm then updates itself from GitHub (General → Updates), asking before each install.
 
 ## Updates
 

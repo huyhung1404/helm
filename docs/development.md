@@ -123,7 +123,7 @@ Helm checks GitHub Releases 30 seconds after it starts and then every 6 hours, d
    git push origin HEAD --follow-tags
    ```
 
-3. The tag push runs [.github/workflows/release.yml](../.github/workflows/release.yml). Its `android` job builds `Helm-android.apk` with the same version, signed with the release keystore from the `ANDROID_KEYSTORE_BASE64` / `ANDROID_KEYSTORE_PASSWORD` secrets ([android.md](android.md#release-signing)). The `release` job then tests, publishes `win-x64`, packs with `vpk` (packId `HelmApp`, title "Helm", channel from the tag), uploads to a draft GitHub Release, attaches `Helm-win-Setup.exe`, `Helm-android.apk` and the Vault restore tool, and only then publishes it (pre-release for suffixed tags). No one sees a release with files missing.
+3. The tag push runs [.github/workflows/release.yml](../.github/workflows/release.yml). Its `android` job builds `Helm-android.apk` (arm64, phones) and `Helm-android-x64.apk` (x86_64, emulators) with the same version, signed with the release keystore from the `ANDROID_KEYSTORE_BASE64` / `ANDROID_KEYSTORE_PASSWORD` secrets ([android.md](android.md#release-signing)). The `release` job then tests, publishes `win-x64`, packs with `vpk` (packId `HelmApp`, title "Helm", channel from the tag), uploads to a draft GitHub Release, attaches `Helm-win-Setup.exe`, both APKs and the Vault restore tool, and only then publishes it (pre-release for suffixed tags). No one sees a release with files missing.
 
 4. The `android` job runs in the `release` environment and waits for the owner's approval: open the run under
    **Actions** → **Review deployments** → **Approve and deploy**. Nothing is published until then (the `release` job

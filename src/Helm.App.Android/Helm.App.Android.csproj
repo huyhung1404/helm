@@ -13,8 +13,11 @@
     <ApplicationTitle>Helm</ApplicationTitle>
     <AndroidPackageFormat>apk</AndroidPackageFormat>
     <AndroidEnableProfiledAot>false</AndroidEnableProfiledAot>
-    <!-- Real phones are arm64; LDPlayer and the emulator are x86_64. One APK carries both. -->
+    <!-- Real phones are arm64; LDPlayer and the emulator are x86_64. A local build carries both; a release builds one APK
+         per CPU with -p:HelmAndroidRid=android-arm64 (or android-x64). Not -p:RuntimeIdentifiers: a global property
+         reaches the referenced libraries too, which then fail to build. -->
     <RuntimeIdentifiers>android-arm64;android-x64</RuntimeIdentifiers>
+    <RuntimeIdentifiers Condition="'$(HelmAndroidRid)' != ''">$(HelmAndroidRid)</RuntimeIdentifiers>
     <!-- Settings and sync records use reflection-based System.Text.Json. -->
     <JsonSerializerIsReflectionEnabledByDefault>true</JsonSerializerIsReflectionEnabledByDefault>
     <AvaloniaUseCompiledBindingsByDefault>true</AvaloniaUseCompiledBindingsByDefault>
