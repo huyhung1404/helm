@@ -52,6 +52,8 @@ public partial class MainView : UserControl
         tab.View ??= PageViews.Build(tab);
         if (ReferenceEquals(PageArea.Child, tab.View)) return;
         PageArea.Child = null;
+        // A view outlives its window when Android makes the activity again (the tabs are the app's, not the window's).
+        if (tab.View.Parent is Decorator old) old.Child = null;
         PageArea.Child = tab.View;
         // A page that lays itself out (fixed bars, its own scrolling) gets the whole area, without the app bar.
         AppBar.IsVisible = !PageViews.IsFull(tab);

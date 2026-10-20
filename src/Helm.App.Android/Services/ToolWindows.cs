@@ -47,8 +47,9 @@ public sealed class ToolWindows
     public static void ShowMain()
     {
         var context = global::Android.App.Application.Context;
-        if (context.PackageManager?.GetLaunchIntentForPackage(context.PackageName!) is not { } intent) return;
-        intent.AddFlags(ActivityFlags.NewTask | ActivityFlags.ResetTaskIfNeeded);
+        // The running main window comes up as it is (a new one only when Android ended it).
+        var intent = new Intent(context, typeof(MainActivity));
+        intent.AddFlags(ActivityFlags.NewTask | ActivityFlags.ClearTop | ActivityFlags.SingleTop);
         context.StartActivity(intent);
     }
 }

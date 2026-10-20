@@ -42,8 +42,6 @@ public sealed class ToolWindowActivity : AvaloniaActivity
     {
         _key = Intent?.GetStringExtra(ExtraKey);
         var tab = _key is null ? null : App.Services.GetRequiredService<ShellNavigator>().Describe(_key);
-        // The view must be there before Avalonia's view is created (in base.OnCreate).
-        if (tab is not null) Content = new ToolWindowView(tab, MoveToMain, FinishAndRemoveTask);
         base.OnCreate(savedInstanceState);
         ActivityHost.OnCreated(this);
         if (tab is null)
@@ -52,6 +50,8 @@ public sealed class ToolWindowActivity : AvaloniaActivity
             FinishAndRemoveTask();
             return;
         }
+        // Only content set after base.OnCreate (which makes Avalonia's view) puts that view in the activity.
+        Content = new ToolWindowView(tab, MoveToMain, FinishAndRemoveTask);
         App.Services.GetRequiredService<ToolWindows>().Opened(tab.Key);
         SetTaskDescription(new ActivityManager.TaskDescription($"{tab.Title} - Helm"));
     }
