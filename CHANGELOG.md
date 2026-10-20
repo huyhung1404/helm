@@ -3,6 +3,14 @@
 All notable changes to Helm. The top section is used as the GitHub release body and as the Velopack release notes.
 Format: [Keep a Changelog](https://keepachangelog.com), versions follow [SemVer](https://semver.org).
 
+## [Unreleased]
+
+### Fixed
+- **Workspace Controller on the phone: the sync sign beside "Live" turns on the spot.** It was a text character that
+  Android draws from a fallback font, so it circled around a point beside itself, and the chip grew and shrank each
+  time a sync started and ended, moving the whole button. It is now a ring drawn round the status dot; the chip keeps
+  its size. "Check now" in the status sheet gets the same ring.
+
 ## [0.49.0] - 2026-10-20
 
 ### Added
