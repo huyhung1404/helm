@@ -229,6 +229,14 @@
             <Setter Property="StrokeLineCap" Value="Round" />
             <Setter Property="StrokeJoin" Value="Round" />
         </Style>
+        <Style Selector="Path.bar">
+            <Setter Property="Width" Value="24" />
+            <Setter Property="Height" Value="24" />
+            <Setter Property="Stretch" Value="None" />
+            <Setter Property="StrokeThickness" Value="1.6" />
+            <Setter Property="HorizontalAlignment" Value="Center" />
+            <Setter Property="VerticalAlignment" Value="Center" />
+        </Style>
         <Style Selector="TextBlock.spin">
             <Setter Property="Foreground" Value="{DynamicResource VsAccent}" />
             <Setter Property="RenderTransformOrigin" Value="50%,50%" />
@@ -604,22 +612,23 @@
         <Border Grid.Row="0" Background="{DynamicResource VsBar}" BorderBrush="{DynamicResource VsLine}" BorderThickness="0,0,0,1" Padding="4,4,10,4">
             <DockPanel>
                 <Button DockPanel.Dock="Right" Classes="flat" Width="40" Height="36" Command="{Binding NewSessionCommand}" IsVisible="{Binding CanStartNew}"
-                        AutomationProperties.Name="New session" HorizontalContentAlignment="Center">
-                    <Path Classes="icon" Width="18" Height="18" Data="M3 2.5h7l3 3v8H3z M8 6v5M5.5 8.5h5" />
+                        AutomationProperties.Name="New session" HorizontalContentAlignment="Center" VerticalContentAlignment="Center">
+                    <Path Classes="icon bar" Data="M6.5 4.5h7l4 4v11h-11z M13.5 4.5v4h4 M12 10.5v6M9 13.5h6" />
                 </Button>
                 <Button DockPanel.Dock="Right" Classes="flat" Width="40" Height="36" Command="{Binding OpenSheetCommand}" CommandParameter="TextSize"
-                        AutomationProperties.Name="Text size" HorizontalContentAlignment="Center">
-                    <TextBlock Text="Aa" FontSize="15" FontWeight="SemiBold" Foreground="{DynamicResource VsFg}" VerticalAlignment="Center" />
+                        AutomationProperties.Name="Text size" HorizontalContentAlignment="Center" VerticalContentAlignment="Center">
+                    <Path Classes="icon bar" Data="M4 6.5h9M8.5 6.5v11 M13.5 11.5h6.5M16.75 11.5v6" />
                 </Button>
                 <Button DockPanel.Dock="Right" Classes="flat" Width="40" Height="36" Command="{Binding OpenSheetCommand}" CommandParameter="History" IsVisible="{Binding CanStartNew}"
-                        AutomationProperties.Name="History of this project" HorizontalContentAlignment="Center">
-                    <Path Classes="icon" Width="18" Height="18" Data="M14.2 8A6.2 6.2 0 1 1 1.8 8A6.2 6.2 0 1 1 14.2 8Z M8 4.5V8l2.5 1.6" />
+                        AutomationProperties.Name="History of this project" HorizontalContentAlignment="Center" VerticalContentAlignment="Center">
+                    <Path Classes="icon bar" Data="M19.5 12A7.5 7.5 0 1 1 4.5 12A7.5 7.5 0 1 1 19.5 12Z M12 8v4l2.8 1.8" />
                 </Button>
-                <StackPanel Orientation="Horizontal" Spacing="4">
-                    <Button Classes="flat" Width="40" Height="36" Click="Menu_Click" HorizontalContentAlignment="Center" AutomationProperties.Name="Open navigation">
-                        <Path Classes="icon" Width="18" Height="18" Data="M2 4h12M2 8h12M2 12h12" />
+                <StackPanel Orientation="Horizontal" Spacing="4" VerticalAlignment="Center">
+                    <Button Classes="flat" Width="40" Height="36" Click="Menu_Click" HorizontalContentAlignment="Center" VerticalContentAlignment="Center"
+                            AutomationProperties.Name="Open navigation">
+                        <Path Classes="icon bar" Data="M4.5 7h15M4.5 12h15M4.5 17h15" />
                     </Button>
-                    <Button Classes="flat" Padding="8,4" Command="{Binding OpenSheetCommand}" CommandParameter="Pc" AutomationProperties.Name="Choose the PC">
+                    <Button Classes="flat" Height="36" Padding="8,0" VerticalAlignment="Center" VerticalContentAlignment="Center" Command="{Binding OpenSheetCommand}" CommandParameter="Pc" AutomationProperties.Name="Choose the PC">
                         <StackPanel Orientation="Horizontal" Spacing="7">
                             <Ellipse Width="8" Height="8" Fill="{DynamicResource VsOk}" IsVisible="{Binding HostOnline}" VerticalAlignment="Center" />
                             <Ellipse Width="8" Height="8" Fill="{DynamicResource VsFaint}" IsVisible="{Binding !HostOnline}" VerticalAlignment="Center" />

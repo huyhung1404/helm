@@ -3,6 +3,14 @@
 All notable changes to Helm. The top section is used as the GitHub release body and as the Velopack release notes.
 Format: [Keep a Changelog](https://keepachangelog.com), versions follow [SemVer](https://semver.org).
 
+## [Unreleased]
+
+### Fixed
+- **Workspace Controller on the phone: the top bar's buttons line up.** The menu, History and New session icons sat a
+  pixel above the middle and were each a different size, and "Aa" was text that sat lower and looked larger. They are
+  now one set of icons drawn round the middle of their buttons with the same size and stroke; text size has its own
+  icon (a large and a small T), and every button in the bar is the same height.
+
 ## [0.50.0] - 2026-10-20
 
 ### Changed
