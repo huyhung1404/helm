@@ -41,6 +41,7 @@ public sealed class WorkspaceModule : HelmModuleBase, IModuleContent
     private BackgroundActivity? _activity;
     private string? _hooksProblem;
     private string? _bridgeProblem;
+    private ClaudeHooksGuard? _hooksGuard;
 
     public WorkspaceModule(ISettingsStoreFactory settings, HelmPaths paths, PromptSender sender, BridgeInstaller installer,
         IBackgroundActivities activities, ISyncedCollection<WorkspaceHostRecord> hosts, ISyncedCollection<WorkspaceSessionRecord> sessions,
@@ -121,7 +122,7 @@ public sealed class WorkspaceModule : HelmModuleBase, IModuleContent
                 throw;
             }
             _engine.Changed += OnEngineChanged;
-            if (Settings.Current.ManageClaudeHooks) _hooksProblem = _engine.InstallClaudeHooks(HooksFileOverride());
+            StartHooks(_engine);
             // The phone's link: this PC and its connected sessions out, the phone's commands in (Helm Sync).
             _relay = new WorkspaceRelay(_engine, _hosts, _sessions, _commands, _results, _device?.DeviceName ?? Environment.MachineName,
                 () => _catalog.Current, _logger, models: () => (_catalog.Models, _catalog.AutoModeAvailable), history: _history, images: _images);
@@ -149,6 +150,8 @@ public sealed class WorkspaceModule : HelmModuleBase, IModuleContent
             _relay = null;
             _images?.Dispose();
             _images = null;
+            _hooksGuard?.Dispose();
+            _hooksGuard = null;
             if (_engine is null) return;
             _engine.Changed -= OnEngineChanged;
             await _engine.DisposeAsync().ConfigureAwait(false);
@@ -165,7 +168,7 @@ public sealed class WorkspaceModule : HelmModuleBase, IModuleContent
     public void InstallHooks()
     {
         if (_engine is null) return;
-        _hooksProblem = _engine.InstallClaudeHooks(HooksFileOverride());
+        _hooksProblem = HooksFile() is { } file ? _engine.InstallClaudeHooks(file) : TestCopyHooks;
         UpdateStatus();
         Changed?.Invoke(this, EventArgs.Empty);
     }
@@ -173,7 +176,8 @@ public sealed class WorkspaceModule : HelmModuleBase, IModuleContent
     /// <summary>Takes Helm's hooks out of Claude Code's settings (Settings page button, or managing turned off).</summary>
     public void RemoveHooks()
     {
-        _hooksProblem = WorkspaceEngine.RemoveClaudeHooks(_logger, HooksFileOverride());
+        if (HooksFile() is not { } file) return;
+        _hooksProblem = WorkspaceEngine.RemoveClaudeHooks(_logger, file);
         UpdateStatus();
         Changed?.Invoke(this, EventArgs.Empty);
     }
@@ -194,8 +198,34 @@ public sealed class WorkspaceModule : HelmModuleBase, IModuleContent
         Changed?.Invoke(this, EventArgs.Empty);
     }
 
-    /// <summary>Development and tests: hooks go into this file instead of the user's Claude settings.</summary>
-    private static string? HooksFileOverride() => Environment.GetEnvironmentVariable("HELM_CLAUDE_SETTINGS");
+    /// <summary>
+    /// The Claude settings file Helm's hooks go into: HELM_CLAUDE_SETTINGS (development, tests), else the user's own,
+    /// except for a copy on a test data folder, which would take the installed Helm's place there (null).
+    /// </summary>
+    private string? HooksFile() => Environment.GetEnvironmentVariable("HELM_CLAUDE_SETTINGS") is { Length: > 0 } file ? file
+        : _paths.IsDefault ? ClaudeHookConfig.UserSettingsPath() : null;
+
+    private const string TestCopyHooks = "This copy of Helm runs on a test data folder (--data-dir), so it leaves Claude Code's settings alone. Set HELM_CLAUDE_SETTINGS to a file to try the hooks.";
+
+    /// <summary>Writes the hooks, then keeps them there while the tool runs (another program may take them out).</summary>
+    private void StartHooks(WorkspaceEngine engine)
+    {
+        if (HooksFile() is not { } file)
+        {
+            _hooksProblem = TestCopyHooks;
+            return;
+        }
+        if (Settings.Current.ManageClaudeHooks) _hooksProblem = engine.InstallClaudeHooks(file);
+        _hooksGuard = new ClaudeHooksGuard(file,
+            json => !Settings.Current.ManageClaudeHooks || ClaudeHookConfig.IsInstalled(json, engine.HookPort, Settings.Current.HookToken),
+            () => engine.InstallClaudeHooks(file), _logger);
+        _hooksGuard.Restored += problem =>
+        {
+            _hooksProblem = problem;
+            UpdateStatus();
+            Changed?.Invoke(this, EventArgs.Empty);
+        };
+    }
 
     private Task StopFromGeneralAsync()
     {
