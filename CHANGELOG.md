@@ -5,6 +5,13 @@ Format: [Keep a Changelog](https://keepachangelog.com), versions follow [SemVer]
 
 ## [Unreleased]
 
+### Changed
+- **Android updates download half as much.** A release now has one APK per kind of device: phones get
+  `Helm-android.apk` with only what a phone runs (about half the size it was; it also carried the code emulators
+  need), emulators such as LDPlayer get `Helm-android-x64.apk`. Helm picks the right one.
+- **An Android update that stops halfway goes on from there** the next time, instead of starting again from 0%, and
+  Helm's log notes how long each download took.
+
 ### Fixed
 - **Workspace Controller on the phone: the sync sign beside "Live" turns on the spot.** It was a text character that
   Android draws from a fallback font, so it circled around a point beside itself, and the chip grew and shrank each

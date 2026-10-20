@@ -7,7 +7,7 @@ Helm has two apps built from one repository:
 | Project | `src/Helm.App` (WPF, WPF-UI) | `src/Helm.App.Android` (Avalonia 12, Fluent theme) |
 | Home, General | Same content: What's new, Updates tile, Quick access, Utilities; Updates, theme, Sync, logs, reset | Same, without the Windows-only rows (administrator mode, run at startup, tray, shortcuts) |
 | Tools | `src/Helm.App/Hosting/HelmModules.cs` | `src/Helm.App.Android/Hosting/AndroidModules.cs` |
-| Distribution | `Helm-win-Setup.exe` + Velopack updates | `Helm-android.apk` + the in-app updater |
+| Distribution | `Helm-win-Setup.exe` + Velopack updates | `Helm-android.apk` (arm64 phones) / `Helm-android-x64.apk` (emulators) + the in-app updater |
 | Minimum OS | Windows 10 19041 | Android 8.0 (API 26) |
 
 Every release tag builds both and attaches both files to the same GitHub release, with the same version number.
@@ -114,7 +114,8 @@ Notes:
 - **`EmbedAssembliesIntoApk=true`** is needed when you install the Debug APK with `adb install`. Without it, Debug
   uses Fast Deployment and the app aborts at start ("No assemblies found … Assuming this is part of Fast
   Deployment"). `dotnet build -t:Install` deploys the assemblies itself.
-- **LDPlayer / emulators** are x86_64; the APK carries `android-arm64` and `android-x64`. LDPlayer's adb is
+- **LDPlayer / emulators** are x86_64. A local build carries `android-arm64` and `android-x64`; a release has one
+  APK per CPU (`Helm-android.apk` for arm64 phones, `Helm-android-x64.apk`), and the updater picks the device's. LDPlayer's adb is
   `C:\LDPlayer\LDPlayer9\adb.exe` (device `emulator-5554`).
 - **Screenshots**: `adb exec-out screencap -p > shot.png` captures the emulator only, never the desktop.
 - **Taps from adb**: Android 9's `input tap` sends touches with tool type UNKNOWN, which Avalonia drops;

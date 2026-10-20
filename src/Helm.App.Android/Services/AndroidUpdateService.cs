@@ -13,14 +13,26 @@ using AndroidUri = Android.Net.Uri;
 namespace Helm.App.Android.Services;
 
 /// <summary>
-/// Updates for the Android app from GitHub Releases: the newest release on the chosen channel that carries
-/// <see cref="AssetName"/>. The APK is downloaded to the cache, checked against GitHub's SHA-256 digest and handed to
-/// the system installer, which asks the user to confirm (Android never installs silently). Same states and settings
-/// as the Windows updater, so General → Updates and the Home tile are shared.
+/// Updates for the Android app from GitHub Releases: the newest release on the chosen channel that carries this
+/// device's APK (<see cref="AssetName"/>). The APK is downloaded to the cache, checked against GitHub's SHA-256 digest
+/// and handed to the system installer, which asks the user to confirm (Android never installs silently). An
+/// interrupted download goes on from where it stopped. Same states and settings as the Windows updater, so
+/// General → Updates and the Home tile are shared.
 /// </summary>
 internal sealed class AndroidUpdateService : IUpdateService, IDisposable
 {
-    public const string AssetName = "Helm-android.apk";
+    /// <summary>The phones' APK (arm64). Every Helm since 0.8 looks for this name.</summary>
+    public const string PhoneAssetName = "Helm-android.apk";
+
+    /// <summary>The APK for x86_64 devices: emulators such as LDPlayer.</summary>
+    public const string X64AssetName = "Helm-android-x64.apk";
+
+    /// <summary>
+    /// The APK built for this device's CPU. Each release has one per CPU, so a phone does not download the emulators'
+    /// half (one APK with both was twice the size).
+    /// </summary>
+    public static string AssetName { get; } =
+        global::Android.OS.Build.SupportedAbis?.FirstOrDefault() == "x86_64" ? X64AssetName : PhoneAssetName;
     private const string ApkMimeType = "application/vnd.android.package-archive";
     private static readonly TimeSpan StartupDelay = TimeSpan.FromSeconds(30);
 
@@ -174,14 +186,22 @@ internal sealed class AndroidUpdateService : IUpdateService, IDisposable
             _machine.TryFire(UpdateTrigger.DownloadStarted);
             Directory.CreateDirectory(_downloadDirectory);
 
-            using var response = await _http.GetAsync(candidate.Asset.DownloadUrl, HttpCompletionOption.ResponseHeadersRead, ct).ConfigureAwait(false);
+            // What an interrupted download already has is kept: only the rest is asked for.
+            var resumeFrom = File.Exists(partial) ? new FileInfo(partial).Length : 0;
+            if (candidate.Asset.Size > 0 && resumeFrom >= candidate.Asset.Size) resumeFrom = 0;
+            using var request = new HttpRequestMessage(HttpMethod.Get, candidate.Asset.DownloadUrl);
+            if (resumeFrom > 0) request.Headers.Range = new RangeHeaderValue(resumeFrom, null);
+            var started = System.Diagnostics.Stopwatch.StartNew();
+            using var response = await _http.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, ct).ConfigureAwait(false);
             response.EnsureSuccessStatusCode();
-            var total = response.Content.Headers.ContentLength ?? candidate.Asset.Size;
+            // A server that ignores the range sends the whole file again: start over.
+            if (resumeFrom > 0 && response.StatusCode != System.Net.HttpStatusCode.PartialContent) resumeFrom = 0;
+            var total = resumeFrom + (response.Content.Headers.ContentLength ?? candidate.Asset.Size - resumeFrom);
+            long done = resumeFrom;
             await using (var source = await response.Content.ReadAsStreamAsync(ct).ConfigureAwait(false))
-            await using (var target = File.Create(partial))
+            await using (var target = new FileStream(partial, resumeFrom > 0 ? FileMode.Append : FileMode.Create, FileAccess.Write))
             {
                 var buffer = new byte[81920];
-                long done = 0;
                 int read;
                 while ((read = await source.ReadAsync(buffer, ct).ConfigureAwait(false)) > 0)
                 {
@@ -196,9 +216,18 @@ internal sealed class AndroidUpdateService : IUpdateService, IDisposable
                     }
                 }
             }
+            started.Stop();
+            var fetched = done - resumeFrom;
+            // How long the download took, to tell a slow route to GitHub from a slow phone.
+            _logger.LogInformation("Update {Version}: {Fetched:F1} MB in {Seconds:F1} s ({Speed:F2} MB/s){Resumed} from {Host}",
+                candidate.Version, fetched / 1e6, started.Elapsed.TotalSeconds, fetched / 1e6 / Math.Max(0.001, started.Elapsed.TotalSeconds),
+                resumeFrom > 0 ? $", resumed at {resumeFrom / 1e6:F1} MB" : string.Empty, response.RequestMessage?.RequestUri?.Host);
 
             if (!await IsValidDownloadAsync(partial, candidate, ct).ConfigureAwait(false))
+            {
+                TryDelete(partial);
                 throw new InvalidDataException("The downloaded update does not match the release (size or SHA-256). It was deleted; try again.");
+            }
             File.Move(partial, file, overwrite: true);
             _downloadedFile = file;
             DownloadProgress = 100;
@@ -207,10 +236,10 @@ internal sealed class AndroidUpdateService : IUpdateService, IDisposable
         }
         catch (Exception ex)
         {
+            // The part already downloaded stays for the next try (a dropped connection costs only what was missing).
             _logger.LogWarning(ex, "Update download failed");
             ErrorMessage = ex is OperationCanceledException ? "The download was cancelled." : Describe(ex);
             _machine.TryFire(UpdateTrigger.Failed);
-            TryDelete(partial);
         }
         finally
         {
@@ -301,7 +330,9 @@ internal sealed class AndroidUpdateService : IUpdateService, IDisposable
             if (!Directory.Exists(_downloadDirectory)) return;
             foreach (var file in Directory.EnumerateFiles(_downloadDirectory))
             {
+                // Helm-<version>.apk, or Helm-<version>.apk.part (an interrupted download, kept while it is newer).
                 var name = Path.GetFileName(file);
+                if (name.EndsWith(".part", StringComparison.Ordinal)) name = name[..^5];
                 var version = name.StartsWith("Helm-", StringComparison.Ordinal) && name.EndsWith(".apk", StringComparison.Ordinal) ? name[5..^4] : null;
                 if (version is null || UpdatePolicy.VersionFromTag(version) is null || !UpdatePolicy.IsNewer(version, CurrentVersion)) TryDelete(file);
             }

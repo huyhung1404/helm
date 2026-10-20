@@ -59,34 +59,41 @@ jobs:
           fi
           echo "$KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/helm-release.keystore"
 
-      - name: Build signed APK
+      - name: Build signed APKs
         env:
           HELM_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
           # SHA-256 of the Helm release certificate (public). A different key would break updates on every phone.
           RELEASE_CERT_SHA256: e97a927caec382d0cd42c52806dda29202008227acbe5b32c85c791375bef223
         run: |
           version="${TAG#v}"
-          dotnet build src/Helm.App.Android --configuration Release -p:Version="$version" \
-            -p:AndroidSdkDirectory="$ANDROID_SDK_ROOT" -p:HelmKeystore="$RUNNER_TEMP/helm-release.keystore"
-          rm -f "$RUNNER_TEMP/helm-release.keystore"
-          cp src/Helm.App.Android/bin/Release/net10.0-android/com.huyhung1404.helm-Signed.apk Helm-android.apk
           apksigner="$(ls -d "$ANDROID_SDK_ROOT"/build-tools/*/ | sort -V | tail -1)apksigner"
-          echo "Verifying with $apksigner"
-          if ! certs=$("$apksigner" verify --print-certs Helm-android.apk 2>&1); then
+          # One APK per CPU: phones are arm64 (Helm-android.apk, the name every installed Helm looks for); emulators
+          # such as LDPlayer are x86_64 (Helm-android-x64.apk). One APK with both was twice the download for a phone.
+          for pair in android-arm64:Helm-android.apk android-x64:Helm-android-x64.apk; do
+            rid="${pair%%:*}"; apk="${pair#*:}"
+            dotnet build src/Helm.App.Android --configuration Release -p:Version="$version" -p:HelmAndroidRid="$rid"               -p:AndroidSdkDirectory="$ANDROID_SDK_ROOT" -p:HelmKeystore="$RUNNER_TEMP/helm-release.keystore"
+            cp src/Helm.App.Android/bin/Release/net10.0-android/com.huyhung1404.helm-Signed.apk "$apk"
+            echo "Verifying $apk with $apksigner"
+            if ! certs=$("$apksigner" verify --print-certs "$apk" 2>&1); then
+              echo "$certs"
+              echo "::error::apksigner could not verify $apk"
+              exit 1
+            fi
             echo "$certs"
-            echo "::error::apksigner could not verify Helm-android.apk"
-            exit 1
-          fi
-          echo "$certs"
-          if ! echo "$certs" | grep -qi "certificate SHA-256 digest: $RELEASE_CERT_SHA256"; then
-            echo "::error::Helm-android.apk is not signed with the Helm release key ($RELEASE_CERT_SHA256)"
-            exit 1
-          fi
+            if ! echo "$certs" | grep -qi "certificate SHA-256 digest: $RELEASE_CERT_SHA256"; then
+              echo "::error::$apk is not signed with the Helm release key ($RELEASE_CERT_SHA256)"
+              exit 1
+            fi
+            ls -l "$apk"
+          done
+          rm -f "$RUNNER_TEMP/helm-release.keystore"
 
       - uses: actions/upload-artifact@v4
         with:
           name: helm-android
-          path: Helm-android.apk
+          path: |
+            Helm-android.apk
+            Helm-android-x64.apk
           if-no-files-found: error
 
   release:
@@ -176,7 +183,7 @@ jobs:
           $channel = '${{ steps.meta.outputs.channel }}'
           Copy-Item "releases/HelmApp-$channel-Setup.exe" 'releases/Helm-win-Setup.exe'
           Copy-Item 'artifacts/vault-restore/helm-vault-restore.exe' 'releases/helm-vault-restore-win-x64.exe'
-          gh release upload $env:TAG 'releases/Helm-win-Setup.exe' 'releases/Helm-android.apk' 'releases/helm-vault-restore-win-x64.exe' --clobber
+          gh release upload $env:TAG 'releases/Helm-win-Setup.exe' 'releases/Helm-android.apk' 'releases/Helm-android-x64.apk' 'releases/helm-vault-restore-win-x64.exe' --clobber
           if ($LASTEXITCODE -ne 0) { throw 'gh release upload failed' }
           $notes = 'artifacts/notes-${{ steps.meta.outputs.version }}.md'
           $flags = @('--notes-file', $notes, '--draft=false')
