@@ -308,7 +308,7 @@ public sealed class WorkspaceImageTests : IAsyncDisposable
             phone.Prompt = "Like this";
             phone.SendCommand.Execute(null);
             Assert.Empty(phone.Attachments);
-            var sending = phone.Timeline.Last();
+            var sending = phone.Timeline.Last(r => r.IsUser);
             Assert.Equal("Like this", sending.Text);
             Assert.Equal(photo.Key, Assert.Single(sending.Images).Key);
         });

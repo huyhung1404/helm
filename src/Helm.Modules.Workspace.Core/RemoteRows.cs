@@ -56,7 +56,7 @@ public sealed class SessionTab(WorkspaceSessionRecord record, bool unseen, bool 
     public int AttentionCount => NeedsYou || Unseen && !IsSelected ? 1 : 0;
 }
 
-public enum TimelineKind { User, Thought, Tool, Answer, Working }
+public enum TimelineKind { User, Thought, Tool, Answer, Working, Step }
 
 /// <summary>One line of the open conversation's timeline.</summary>
 public sealed class TimelineRow
@@ -82,6 +82,17 @@ public sealed class TimelineRow
     /// <summary>"✻ Working…" under the timeline while Claude thinks between steps.</summary>
     public static TimelineRow Working(string text) => new(TimelineKind.Working, text);
 
+    /// <summary>
+    /// A step of your message on its way, on the timeline's rail like Claude's own steps: "Sent from this phone · 0.6 s",
+    /// "✻ Typing it into VS Code… 3 s", then "Claude received it · in 4.2 s".
+    /// </summary>
+    public static TimelineRow Step(ProgressStep step, string? hint = null) => new(TimelineKind.Step, step.Text)
+    {
+        StepState = step.State,
+        Took = step.Took,
+        Hint = hint is { Length: > 0 } ? hint : null,
+    };
+
     /// <summary>Your prompt on its way (not in the transcript yet), with how far it got.</summary>
     public static TimelineRow Sending(string text, string status, bool failed, DateTimeOffset at, IReadOnlyList<WorkspaceImage>? images = null) =>
         new(new TranscriptItem { Kind = TranscriptItemKind.User, Text = text, At = at, Images = images ?? [] })
@@ -97,6 +108,20 @@ public sealed class TimelineRow
     public bool IsTool => Kind == TimelineKind.Tool;
     public bool IsAnswer => Kind == TimelineKind.Answer;
     public bool IsWorking => Kind == TimelineKind.Working;
+    public bool IsStep => Kind == TimelineKind.Step;
+
+    public ProgressState StepState { get; private init; }
+    public bool StepDone => IsStep && StepState == ProgressState.Done;
+    public bool StepActive => IsStep && StepState == ProgressState.Active;
+    public bool StepFailed => IsStep && StepState == ProgressState.Failed;
+
+    /// <summary>How long the step took ("0.6 s"), or has taken so far while it runs.</summary>
+    public string Took { get; private init; } = "";
+    public bool HasTook => Took.Length > 0;
+
+    /// <summary>Said under a step that takes longer than it should, with what may hold it up.</summary>
+    public string? Hint { get; private init; }
+    public bool HasHint => Hint is not null;
 
     public string Text => Item.Text;
     public bool HasText => Item.Text.Length > 0;
@@ -129,13 +154,14 @@ public sealed class TimelineRow
     public bool DeliveryFailed { get; init; }
     public bool HasDelivery => Delivery is not null;
 
-    public bool Same(TimelineRow other) => Kind == other.Kind && Item == other.Item && Delivery == other.Delivery && DeliveryFailed == other.DeliveryFailed;
+    public bool Same(TimelineRow other) => Kind == other.Kind && Item == other.Item && Delivery == other.Delivery && DeliveryFailed == other.DeliveryFailed
+        && StepState == other.StepState && Took == other.Took && Hint == other.Hint;
 }
 
 public enum ProgressState { Done, Active, Failed }
 
 /// <summary>One step of a command on its way (the progress card): sent, picked up by the PC, each step there, Claude has it.</summary>
-public sealed record ProgressStep(string Text, ProgressState State)
+public sealed record ProgressStep(string Text, ProgressState State, string Took = "")
 {
     public bool IsDone => State == ProgressState.Done;
     public bool IsActive => State == ProgressState.Active;
