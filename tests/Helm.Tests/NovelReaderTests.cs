@@ -709,8 +709,10 @@ public sealed class NovelReaderTests : IDisposable
         Assert.All(a.Records.All(), r => Assert.True(r.Value.Compressed));
 
         // A file an older Helm wrote straight from the gzipped blob (not the size the record says) is fetched again.
+        // The pull above also runs a fetch of its own half a second later; on a slow machine that one may repair the file
+        // first, so only the file is checked, not which of the two fetched it.
         File.WriteAllText(Path.Combine(b.Dictionaries.Folder, "ChinesePhienAmWords.txt"), "\u001f\u008b garbage");
-        Assert.True(await b.Dictionaries.SyncFilesAsync());
+        await b.Dictionaries.SyncFilesAsync();
         Assert.Equal(HanVietFile, File.ReadAllText(Path.Combine(b.Dictionaries.Folder, "ChinesePhienAmWords.txt")));
 
         // A file replaced on one device replaces it on the other.
