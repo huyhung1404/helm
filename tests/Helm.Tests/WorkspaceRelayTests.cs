@@ -111,7 +111,7 @@ public sealed class WorkspaceRelayTests : IAsyncDisposable
             phone.SendCommand.Execute(null);
             Assert.True(phone.IsSending);
             // The prompt shows at the end of the timeline while it is on its way, and the card says how far it got.
-            Assert.Equal("Now run the tests", phone.Timeline.Last().Text);
+            Assert.Equal("Now run the tests", phone.Timeline.Last(r => r.IsUser).Text);
             Assert.True(phone.ShowProgress);
             Assert.Equal("Sending your message", phone.ProgressTitle);
             Assert.True(phone.ProgressSteps[0].IsDone);

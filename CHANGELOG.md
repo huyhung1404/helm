@@ -3,6 +3,22 @@
 All notable changes to Helm. The top section is used as the GitHub release body and as the Velopack release notes.
 Format: [Keep a Changelog](https://keepachangelog.com), versions follow [SemVer](https://semver.org).
 
+## [Unreleased]
+
+### Fixed
+- **Workspace Controller: a message on its way shows its steps in its own session's timeline.** The big "Sending your
+  message" card used to cover the chat, follow you to every tab and hold up Send everywhere until the PC answered. Now
+  each step sits on the timeline's rail under your message, small and quiet like VS Code's notes ("Sent from this
+  phone · 0.6 s", "✻ Typing it into VS Code… 3 s"), and once Claude has it one line says how long it took ("Claude
+  received it · in 4.2 s"). Other tabs stay free: you can switch and send to another session meanwhile. A message that
+  fails while you are in another tab waits for you in its tab; a new session started from the phone no longer pulls you
+  over to it if you moved on.
+- **Workspace Controller: Helm keeps hearing from Claude when something else rewrites Claude Code's settings.** If
+  another program, or a second copy of Helm, put other hooks in `~/.claude/settings.json`, Helm stopped hearing from
+  Claude without a word: the phone said "Claude did not confirm it yet" for messages Claude had, and sessions stayed
+  on Working after Claude finished. Helm now watches that file while the tool runs and puts its hooks back within a
+  second. A copy of Helm started on a test data folder (`--data-dir`) no longer touches Claude Code's settings at all.
+
 ## [0.48.0] - 2026-10-19
 
 ### Added

@@ -452,6 +452,155 @@ public sealed class WorkspacePhoneFixesTests : IDisposable
         Assert.Equal(["Running Claude in the background: term"], phone.PcActivities);
     }
 
+    [Fact]
+    public async Task A_message_on_its_way_stays_with_its_session_and_holds_up_no_other()
+    {
+        Pc(new HostWindowInfo { Folder = @"c:\app", Name = "app", OpenSessions = ["a", "b"] });
+        Session("a", @"c:\app");
+        Session("b", @"c:\app");
+        var phone = Phone();
+        Assert.Equal("a", phone.OpenSessionId);
+        _ui.Run(() => phone.Prompt = "Fix the build");
+        await _ui.Run(() => phone.SendCommand.ExecuteAsync(null));
+        var first = Assert.Single(_commands.All()).Id;
+        Assert.True(phone.ShowProgress);
+        Assert.True(phone.IsSending);
+
+        // Another tab: no card over its chat, its composer is free, the message does not show in its timeline.
+        _ui.Run(() => phone.SelectSessionCommand.Execute(phone.SessionTabs[1]));
+        Assert.Equal("b", phone.OpenSessionId);
+        Assert.False(phone.ShowProgress);
+        Assert.False(phone.IsSending);
+        Assert.Null(phone.SendStatus);
+        Assert.DoesNotContain(phone.Timeline, r => r.Text == "Fix the build");
+        _ui.Run(() => phone.Prompt = "Write the docs");
+        Assert.True(phone.SendCommand.CanExecute(null));
+        await _ui.Run(() => phone.SendCommand.ExecuteAsync(null));
+        Assert.Equal(2, _commands.All().Count());
+        Assert.True(phone.ShowProgress);
+        Assert.Equal("Write the docs", phone.Timeline.Last(r => r.IsUser).Text);
+
+        // Back in the first tab: its own card, still on its way.
+        _ui.Run(() => phone.SelectSessionCommand.Execute(phone.SessionTabs[0]));
+        Assert.True(phone.ShowProgress);
+        Assert.True(phone.IsSending);
+        Assert.Equal("Fix the build", phone.Timeline.Last(r => r.IsUser).Text);
+
+        // Claude has the second one while you look at the first: nothing changes here.
+        var second = _commands.All().Single(c => c.Id != first).Id;
+        Result(second, WorkspaceCommandStatus.Received);
+        Assert.True(phone.ShowProgress);
+        Result(first, WorkspaceCommandStatus.Received);
+        Assert.False(phone.ShowProgress);
+        Assert.False(phone.IsSending);
+        Assert.Equal("✓ Claude received it", phone.SendStatus);
+
+        _ui.Run(() => phone.SelectSessionCommand.Execute(phone.SessionTabs[1]));
+        Assert.False(phone.ShowProgress);
+        Assert.False(phone.IsSending);
+    }
+
+    [Fact]
+    public async Task The_steps_of_a_message_on_its_way_are_on_the_timeline_with_their_times()
+    {
+        Pc(new HostWindowInfo { Folder = @"c:\app", Name = "app", OpenSessions = ["a"] });
+        Session("a", @"c:\app");
+        var phone = Phone();
+        _ui.Run(() => phone.Prompt = "Fix the build");
+        await _ui.Run(() => phone.SendCommand.ExecuteAsync(null));
+        var id = Assert.Single(_commands.All()).Id;
+        Assert.Equal(["Fix the build", "Sent from this phone", "Waiting for Desk…"], phone.Timeline.TakeLast(3).Select(r => r.Text));
+        Assert.True(phone.Timeline[^1].StepActive);
+
+        _time.Advance(TimeSpan.FromSeconds(1.5));
+        Result(id, WorkspaceCommandStatus.Sending, step: "Typing it into VS Code");
+        var steps = phone.Timeline.Where(r => r.IsStep).ToList();
+        Assert.Equal(["Sent from this phone", "Desk picked it up", "Typing it into VS Code"], steps.Select(r => r.Text));
+        Assert.Equal("1.5 s", steps[1].Took);
+        Assert.True(steps[2].StepActive);
+
+        _time.Advance(TimeSpan.FromSeconds(2));
+        Result(id, WorkspaceCommandStatus.Received);
+        Assert.Equal("Claude received it", phone.Timeline[^1].Text);
+        Assert.Equal("in 3.5 s", phone.Timeline[^1].Took);
+        Assert.False(phone.ShowStatus);
+
+        // The transcript has it: one quiet line under it says how long it took, Claude's steps go on below.
+        _sessions.Upsert("a", _sessions.Get("a")! with
+        {
+            Items = [new TranscriptItem { Kind = TranscriptItemKind.User, Text = "Fix the build", At = _time.GetLocalNow() }],
+            State = SessionState.Working,
+        });
+        var mine = phone.Timeline.ToList().FindIndex(r => r.IsUser && r.Text == "Fix the build");
+        Assert.Equal("Claude received it", phone.Timeline[mine + 1].Text);
+        Assert.Single(phone.Timeline, r => r.IsStep);
+        Assert.True(phone.Timeline[^1].IsWorking);
+    }
+
+    [Fact]
+    public async Task A_new_sessions_first_prompt_shows_its_steps_in_place_of_the_page()
+    {
+        Pc(new HostWindowInfo { Folder = @"c:\app", Name = "app" });
+        var phone = Phone();
+        Assert.True(phone.ShowNewIntro);
+        Assert.False(phone.ShowTimeline);
+        _ui.Run(() => phone.Prompt = "Build a game");
+        await _ui.Run(() => phone.SendCommand.ExecuteAsync(null));
+        Assert.False(phone.ShowNewIntro);
+        Assert.True(phone.ShowTimeline);
+        Assert.Equal(["Build a game", "Sent from this phone", "Waiting for Desk…"], phone.Timeline.Select(r => r.Text));
+    }
+
+    [Fact]
+    public async Task A_message_that_failed_while_you_were_in_another_tab_waits_for_you_there()
+    {
+        Pc(new HostWindowInfo { Folder = @"c:\app", Name = "app", OpenSessions = ["a", "b"] });
+        Session("a", @"c:\app");
+        Session("b", @"c:\app");
+        var phone = Phone();
+        _ui.Run(() => phone.Prompt = "Fix the build");
+        await _ui.Run(() => phone.SendCommand.ExecuteAsync(null));
+        var id = Assert.Single(_commands.All()).Id;
+
+        _ui.Run(() => phone.SelectSessionCommand.Execute(phone.SessionTabs[1]));
+        Result(id, WorkspaceCommandStatus.Failed);
+        Assert.False(phone.ShowProgress);
+        Assert.False(phone.SendFailed);
+
+        _ui.Run(() => phone.SelectSessionCommand.Execute(phone.SessionTabs[0]));
+        Assert.True(phone.ShowProgress);
+        Assert.True(phone.ProgressFailed);
+        Assert.True(phone.SendFailed);
+
+        // Seen: leaving the tab puts it away.
+        _ui.Run(() => phone.SelectSessionCommand.Execute(phone.SessionTabs[1]));
+        _ui.Run(() => phone.SelectSessionCommand.Execute(phone.SessionTabs[0]));
+        Assert.False(phone.ShowProgress);
+        Assert.False(phone.SendFailed);
+    }
+
+    [Fact]
+    public async Task A_new_session_opened_while_you_were_in_another_tab_does_not_pull_you_over()
+    {
+        Pc(new HostWindowInfo { Folder = @"c:\app", Name = "app", OpenSessions = ["a"] });
+        Session("a", @"c:\app");
+        var phone = Phone();
+        _ui.Run(() => phone.NewSessionCommand.Execute(null));
+        _ui.Run(() => phone.Prompt = "Build a game");
+        await _ui.Run(() => phone.SendCommand.ExecuteAsync(null));
+        var id = Assert.Single(_commands.All()).Id;
+        Assert.True(phone.ShowProgress);
+
+        _ui.Run(() => phone.SelectSessionCommand.Execute(phone.SessionTabs[0]));
+        Assert.False(phone.ShowProgress);
+        Result(id, WorkspaceCommandStatus.Received, session: "new");
+        Pc(new HostWindowInfo { Folder = @"c:\app", Name = "app", OpenSessions = ["a", "new"] });
+        Session("new", @"c:\app", SessionState.Working);
+        Assert.Equal("a", phone.OpenSessionId);
+        Assert.False(phone.ShowProgress);
+        Assert.Equal(["a", "new"], phone.SessionTabs.Select(t => t.SessionId));
+    }
+
     private void Result(string id, WorkspaceCommandStatus status, string? step = null, string? session = null) =>
         _results.Upsert(id, new WorkspaceResultRecord { CommandId = id, MachineId = "pc", Status = status, Step = step, SessionId = session, UpdatedAt = _time.GetLocalNow() });
 

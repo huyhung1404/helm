@@ -58,15 +58,16 @@ public sealed partial class WorkspaceRemoteViewModel : ObservableObject
     private string? _machineId;
     private string? _folder;
     private string? _sessionId;
-    private string? _awaitSession;
-    private SentCommand? _pending;
     private bool _denyNext;
 
-    // The progress card of the command on its way: the steps the PC reported, and when its answer came.
-    private readonly List<string> _pcSteps = [];
-    private DateTimeOffset? _answeredAt;
-    private string? _progressTitle;
-    private bool _awaitGaveUp;
+    /// <summary>
+    /// The commands on their way, each with the place it belongs to (its session, or its project for a new session,
+    /// a reopened one or a closed tab): a place shows only its own card and status, and the others stay free to use.
+    /// </summary>
+    private readonly List<Delivery> _deliveries = [];
+
+    /// <summary>The place on screen (project, session or new-session page) whose deliveries are shown.</summary>
+    private string? _viewKey;
 
     /// <summary>Sessions outside VS Code you agreed to go on with from the phone (asked once each).</summary>
     private readonly HashSet<string> _takenOver = new(StringComparer.Ordinal);
@@ -86,9 +87,8 @@ public sealed partial class WorkspaceRemoteViewModel : ObservableObject
     [ObservableProperty] private string? _sendStatus;
     [ObservableProperty] private bool _sendFailed;
 
-    [ObservableProperty]
-    [NotifyCanExecuteChangedFor(nameof(SendCommand))]
-    private bool _isSending;
+    /// <summary>Something of the open session (or new-session page) is on its way to the PC; other tabs are not held up.</summary>
+    public bool IsSending => _deliveries.Any(d => !d.Sent.Done && d.Sent.Kind is not (WorkspaceCommandKind.Reopen or WorkspaceCommandKind.CloseTab) && Shows(d));
 
     [ObservableProperty]
     [NotifyCanExecuteChangedFor(nameof(SendCommand))]
@@ -130,7 +130,13 @@ public sealed partial class WorkspaceRemoteViewModel : ObservableObject
         sessions.Changed += (_, _) => _ui.Post(Refresh);
         results.Changed += (_, _) => _ui.Post(ShowResult);
         if (history is not null) history.Changed += (_, _) => _ui.Post(FillHistory);
-        if (sync is not null) sync.StatusChanged += (_, _) => _ui.Post(() => { RebuildProgress(); NotifyFreshness(); });
+        if (sync is not null) sync.StatusChanged += (_, _) => _ui.Post(() =>
+        {
+            foreach (var d in _deliveries) StepsOf(d);
+            RebuildProgress();
+            if (_deliveries.Any(Shows)) FillTimeline();
+            NotifyFreshness();
+        });
         // Once a second while the screen is shown: how long things take, and how fresh what you see is.
         _ticker = _time.CreateTimer(_ => _ui.Post(Tick), null, Timeout.InfiniteTimeSpan, Timeout.InfiniteTimeSpan);
         _runInBackground = _settings.Current.RunInBackground;
@@ -334,7 +340,7 @@ public sealed partial class WorkspaceRemoteViewModel : ObservableObject
     public bool HasAgents => AgentCount > 0;
 
     /// <summary>The last command's line shows above the composer when the timeline does not show it (a model switch, a tab closed).</summary>
-    public bool ShowStatus => SendStatus is { Length: > 0 } && !ShowProgress && Timeline.LastOrDefault()?.HasDelivery != true;
+    public bool ShowStatus => SendStatus is { Length: > 0 } && !ShowProgress && Timeline.LastOrDefault()?.HasDelivery != true && !Timeline.Any(r => r.IsStep);
 
     /// <summary>The PC's account offers Auto mode (a plan can be approved into it).</summary>
     public bool AutoModeAvailable => Host?.AutoModeAvailable == true;
@@ -449,7 +455,6 @@ public sealed partial class WorkspaceRemoteViewModel : ObservableObject
         _sessionId = null;
         IsNewSession = false;
         ShowReview = false;
-        ClearStatus();
         Refresh();
     }
 
@@ -463,7 +468,6 @@ public sealed partial class WorkspaceRemoteViewModel : ObservableObject
         ShowReview = false;
         PlanFeedback = false;
         _denyNext = false;
-        ClearStatus();
         Refresh();
     }
 
@@ -475,7 +479,6 @@ public sealed partial class WorkspaceRemoteViewModel : ObservableObject
         ShowReview = false;
         PlanFeedback = false;
         Sheet = WorkspaceSheet.None;
-        ClearStatus();
         Refresh();
     }
 
@@ -591,10 +594,8 @@ public sealed partial class WorkspaceRemoteViewModel : ObservableObject
             return;
         }
         if (!HostOnline || SelectedProject is not { IsOutside: false } project) return;
-        _awaitSession = row.SessionId;
-        _progressTitle = $"Opening “{row.Title}”";
         Write(new WorkspaceCommand { MachineId = _machineId!, Kind = WorkspaceCommandKind.Reopen, SessionId = row.SessionId, Folder = project.Folder, CreatedAt = _time.GetLocalNow() },
-            "Opening it in VS Code…");
+            "Opening it in VS Code…", title: $"Opening “{row.Title}”", awaitSession: row.SessionId);
     }
 
     /// <summary>Stops the session Helm runs on the PC (outside VS Code) where it is.</summary>
@@ -713,7 +714,6 @@ public sealed partial class WorkspaceRemoteViewModel : ObservableObject
         }
         if (IsNewSession)
         {
-            _progressTitle = $"Starting a new session in {SelectedProject!.Name}";
             Write(new WorkspaceCommand
             {
                 MachineId = _machineId!,
@@ -725,10 +725,9 @@ public sealed partial class WorkspaceRemoteViewModel : ObservableObject
                 Mode = DraftMode == PermissionModes.Manual ? null : DraftMode,
                 Images = ImagesSupported ? TakeAttachments() : [],
                 CreatedAt = _time.GetLocalNow(),
-            }, sending: text);
+            }, sending: text, title: $"Starting a new session in {SelectedProject!.Name}");
             return;
         }
-        _progressTitle = Session!.IsOutside ? "Sending it to Claude on the PC" : "Sending your message";
         Write(new WorkspaceCommand
         {
             MachineId = _machineId!,
@@ -738,23 +737,23 @@ public sealed partial class WorkspaceRemoteViewModel : ObservableObject
             Text = text,
             Images = ImagesSupported ? TakeAttachments() : [],
             CreatedAt = _time.GetLocalNow(),
-        }, sending: text);
+        }, sending: text, title: Session!.IsOutside ? "Sending it to Claude on the PC" : "Sending your message");
     }
 
-    private void Write(WorkspaceCommand command, string status = "Sending to the PC…", string? sending = null)
+    private void Write(WorkspaceCommand command, string status = "Sending to the PC…", string? sending = null, string? title = null, string? awaitSession = null)
     {
         _commands.Upsert(command.Id, command);
         _sync?.RequestSyncSoon();
-        _pending = new SentCommand(command.Id, command.Kind, command.SessionId, sending, _time.GetLocalNow()) { Images = command.Images };
-        _pcSteps.Clear();
-        _answeredAt = null;
-        _awaitGaveUp = false;
-        if (command.Kind is not (WorkspaceCommandKind.Prompt or WorkspaceCommandKind.NewSession or WorkspaceCommandKind.Reopen)) _progressTitle = null;
-        IsSending = true;
+        var delivery = new Delivery(new SentCommand(command.Id, command.Kind, command.SessionId, sending, _time.GetLocalNow()) { Images = command.Images },
+            _folder, title, awaitSession) { Status = status };
+        // What finished here before makes room for it (other tabs keep theirs).
+        _deliveries.RemoveAll(d => d.Sent.Done && d.AwaitSession is null && Shows(d));
+        _deliveries.Add(delivery);
         SendFailed = false;
         SendStatus = status;
         if (sending is not null || command.Kind == WorkspaceCommandKind.Answer) Prompt = "";
         _ = WatchTimeoutAsync(command.Id);
+        NotifySending();
         RebuildProgress();
         FillTimeline();
     }
@@ -764,11 +763,9 @@ public sealed partial class WorkspaceRemoteViewModel : ObservableObject
         await Task.Delay(AnswerTimeout).ConfigureAwait(false);
         _ui.Post(() =>
         {
-            if (_pending?.CommandId != id || _results.Get(id) is not null) return;
-            _pending = _pending with { Done = true, Failed = true };
-            IsSending = false;
-            SendFailed = true;
-            SendStatus = "The PC did not answer. Is Helm running there, with Workspace Controller on?";
+            if (_deliveries.Find(d => d.Sent.CommandId == id) is not { Sent.Done: false } d || _results.Get(id) is not null) return;
+            Finish(d, failed: true, "The PC did not answer. Is Helm running there, with Workspace Controller on?");
+            NotifySending();
             RebuildProgress();
             FillTimeline();
         });
@@ -783,121 +780,222 @@ public sealed partial class WorkspaceRemoteViewModel : ObservableObject
             _pcRoundTrip = _pcAnsweredAt - _pingAt;
             NotifyFreshness();
         }
-        if (_pending is not { Done: false } pending || _results.Get(pending.CommandId) is not { } result) return;
-        if (result.Status == WorkspaceCommandStatus.Sending && result.Step is { Length: > 0 } step && (_pcSteps.Count == 0 || _pcSteps[^1] != step)) _pcSteps.Add(step);
-        SendFailed = result.Status == WorkspaceCommandStatus.Failed;
-        SendStatus = result.Status switch
+        var changed = false;
+        foreach (var d in _deliveries.Where(d => !d.Sent.Done).ToList())
         {
-            WorkspaceCommandStatus.Sending => pending.Text is null ? SendStatus : "The PC is typing it into VS Code…",
-            WorkspaceCommandStatus.Sent => result.Error ?? (pending.Text is null ? "Done on the PC." : "Typed into VS Code."),
-            WorkspaceCommandStatus.Received => pending.Text is null ? "Done." : "✓ Claude received it",
-            _ => result.Error ?? "It could not be sent.",
-        };
-        if (result.Status != WorkspaceCommandStatus.Sending)
-        {
-            IsSending = false;
-            _pending = pending with { Done = true, Failed = SendFailed };
-            if (SendFailed) RevertOverride(pending);
-            // VS Code kept the tab: it comes back.
-            if (SendFailed && pending.Kind == WorkspaceCommandKind.CloseTab && pending.SessionId is { } kept) _closing.Remove(kept);
+            if (_results.Get(d.Sent.CommandId) is not { } result) continue;
+            changed = true;
+            var sent = d.Sent;
+            if (result.Status == WorkspaceCommandStatus.Sending && result.Step is { Length: > 0 } step && (d.PcSteps.Count == 0 || d.PcSteps[^1] != step)) d.PcSteps.Add(step);
+            StepsOf(d);
+            var failed = result.Status == WorkspaceCommandStatus.Failed;
+            var status = result.Status switch
+            {
+                WorkspaceCommandStatus.Sending => sent.Text is null ? d.Status : "The PC is typing it into VS Code…",
+                WorkspaceCommandStatus.Sent => result.Error ?? (sent.Text is null ? "Done on the PC." : "Typed into VS Code."),
+                WorkspaceCommandStatus.Received => sent.Text is null ? "Done." : "✓ Claude received it",
+                _ => result.Error ?? "It could not be sent.",
+            };
+            if (result.Status == WorkspaceCommandStatus.Sending)
+            {
+                d.Status = status;
+                if (d == Latest) { SendStatus = status; SendFailed = false; }
+                continue;
+            }
             // A new session: open it once its tab shows up.
-            if (pending.Kind == WorkspaceCommandKind.NewSession && result.Status == WorkspaceCommandStatus.Received && result.SessionId is { } sid)
-                _awaitSession = sid;
-            if (SendFailed && pending.Kind == WorkspaceCommandKind.Reopen) _awaitSession = null;
-            _answeredAt = _time.GetLocalNow();
+            if (sent.Kind == WorkspaceCommandKind.NewSession && result.Status == WorkspaceCommandStatus.Received && result.SessionId is { } sid) d.AwaitSession = sid;
+            Finish(d, failed, status);
+            StepsOf(d);
+            if (failed) RevertOverride(sent);
+            // VS Code kept the tab: it comes back.
+            if (failed && sent.Kind == WorkspaceCommandKind.CloseTab && sent.SessionId is { } kept) _closing.Remove(kept);
         }
+        if (!changed) return;
+        NotifySending();
         Refresh();
         RebuildProgress();
     }
 
-    private void ClearStatus()
+    /// <summary>
+    /// The PC answered (or never did). Shown where it belongs; one that went well while you were in another tab is
+    /// put away, one that failed waits for you there.
+    /// </summary>
+    private void Finish(Delivery d, bool failed, string? status)
     {
-        if (IsSending) return;
-        SendStatus = null;
-        SendFailed = false;
-        _pending = null;
-        RebuildProgress();
+        d.Sent = d.Sent with { Done = true, Failed = failed };
+        d.Status = status;
+        d.Failed = failed;
+        d.AnsweredAt = _time.GetLocalNow();
+        d.SeenDone = Shows(d);
+        if (failed && d.Sent.Kind == WorkspaceCommandKind.Reopen) d.AwaitSession = null;
+        if (d == Latest)
+        {
+            SendFailed = failed;
+            SendStatus = status;
+        }
+        else if (!failed && d.AwaitSession is null && !Shows(d)) _deliveries.Remove(d);
+    }
+
+    private void NotifySending()
+    {
+        Notify(nameof(IsSending));
+        SendCommand.NotifyCanExecuteChanged();
+        AllowCommand.NotifyCanExecuteChanged();
+        DenyCommand.NotifyCanExecuteChanged();
+        TellInsteadCommand.NotifyCanExecuteChanged();
+        SendAnswersCommand.NotifyCanExecuteChanged();
+        ApprovePlanCommand.NotifyCanExecuteChanged();
+        KeepPlanningCommand.NotifyCanExecuteChanged();
+    }
+
+    // ---- Where a delivery shows
+
+    /// <summary>The place on screen now: the new-session page of a project, or one of its sessions.</summary>
+    private string ViewKey => (IsNewSession ? "new:" : "session:" + Session?.SessionId + ":") + _folder;
+
+    /// <summary>
+    /// Whether <paramref name="d"/> belongs to what is on screen: a new session to its project's new-session page,
+    /// a reopened session or a closed tab to its project, anything else to its session.
+    /// </summary>
+    private bool Shows(Delivery d) => d.Sent.Kind switch
+    {
+        WorkspaceCommandKind.NewSession => IsNewSession && SameFolder(d.Folder, _folder),
+        WorkspaceCommandKind.Reopen or WorkspaceCommandKind.CloseTab => SameFolder(d.Folder, _folder),
+        _ => !IsNewSession && d.Sent.SessionId is { } id && id == Session?.SessionId,
+    };
+
+    /// <summary>The latest delivery of the place on screen: its line above the composer.</summary>
+    private Delivery? Latest => _deliveries.LastOrDefault(Shows);
+
+    /// <summary>The prompt, new session or reopened session of the place on screen: its progress card.</summary>
+    private Delivery? Card => _deliveries.LastOrDefault(d => d.Sent.Kind is WorkspaceCommandKind.Prompt or WorkspaceCommandKind.NewSession or WorkspaceCommandKind.Reopen && Shows(d));
+
+    /// <summary>
+    /// Another place opened: what you saw finish where you were is put away, then the new place shows its own
+    /// (a message still on its way there, or one that failed while you were elsewhere).
+    /// </summary>
+    private void FollowView()
+    {
+        var key = ViewKey;
+        if (key == _viewKey) return;
+        _viewKey = key;
+        _deliveries.RemoveAll(d => d.Sent.Done && d.AwaitSession is null && d.SeenDone && !Shows(d));
+        foreach (var d in _deliveries.Where(d => d.Sent.Done && Shows(d))) d.SeenDone = true;
+        var latest = Latest;
+        SendStatus = latest?.Status;
+        SendFailed = latest?.Failed ?? false;
+        NotifySending();
     }
 
     // ---- The progress card
 
     /// <summary>A prompt, a new session or a session opened from History is on its way (or just failed): the card shows each step.</summary>
-    public bool ShowProgress => _pending is { Kind: WorkspaceCommandKind.Prompt or WorkspaceCommandKind.NewSession or WorkspaceCommandKind.Reopen } p
-        && (!p.Done || p.Failed || AwaitingTab);
+    public bool ShowProgress => Card is { } d && (!d.Sent.Done || d.Sent.Failed || AwaitingTab(d));
 
     /// <summary>The PC is done; the new or reopened tab has not shown up on the phone yet.</summary>
-    private bool AwaitingTab => _awaitSession is not null && _pending is { Done: true, Failed: false, Kind: WorkspaceCommandKind.NewSession or WorkspaceCommandKind.Reopen } && !_awaitGaveUp;
+    private static bool AwaitingTab(Delivery d) => d.AwaitSession is not null && d.Sent is { Done: true, Failed: false, Kind: WorkspaceCommandKind.NewSession or WorkspaceCommandKind.Reopen } && !d.AwaitGaveUp;
 
-    public bool ProgressFailed => _pending is { Failed: true } || _awaitGaveUp;
+    public bool ProgressFailed => Card is { Sent.Failed: true } or { AwaitGaveUp: true };
     public bool ProgressRunning => ShowProgress && !ProgressFailed;
-    public string ProgressTitle => _progressTitle ?? "Sending to the PC";
+    public string ProgressTitle => Card?.Title ?? "Sending to the PC";
 
     /// <summary>"12 s": how long it has been on its way.</summary>
-    public string ProgressElapsed => _pending is { } p ? Seconds(_time.GetLocalNow() - p.At) : "";
+    public string ProgressElapsed => Card is { } d ? Seconds(_time.GetLocalNow() - d.Sent.At) : "";
 
     /// <summary>Said when it takes longer than it should, with what may hold it up.</summary>
-    public string ProgressHint
-    {
-        get
-        {
-            if (_pending is not { Done: false } p) return "";
-            var waited = _time.GetLocalNow() - p.At;
-            if (_results.Get(p.CommandId) is null)
-                return waited > TimeSpan.FromSeconds(12) ? $"{HostName} has not picked it up yet. Is the PC awake, with Helm running? It keeps trying." : "";
-            return waited > TimeSpan.FromSeconds(25) ? "Slower than usual: VS Code or Claude may be busy on the PC. It keeps going." : "";
-        }
-    }
+    public string ProgressHint => Card is { } d ? HintOf(d) : "";
 
     public bool HasProgressHint => ProgressHint.Length > 0;
 
-    [RelayCommand]
-    private void DismissProgress()
-    {
-        if (IsSending) return;
-        _awaitSession = null;
-        ClearStatus();
-        FillTimeline();
-    }
-
-    /// <summary>The card's steps: sent from the phone, picked up by the PC, each step there, then Claude has it (and the tab opens here).</summary>
+    /// <summary>The card's steps (the timeline shows them on its rail): sent from the phone, picked up by the PC, each step there, then Claude has it.</summary>
     private void RebuildProgress()
     {
-        var steps = new List<ProgressStep>();
-        if (_pending is { } p && ShowProgress)
-        {
-            var result = _results.Get(p.CommandId);
-            var pushed = result is not null || _sync is null || _sync.Status.LastSyncedAt is { } synced && synced >= p.At;
-            steps.Add(new ProgressStep(pushed ? "Sent from this phone" : "Sending from this phone…", pushed ? ProgressState.Done : p.Failed ? ProgressState.Failed : ProgressState.Active));
-            if (pushed)
-            {
-                steps.Add(result is not null
-                    ? new ProgressStep($"{HostName} picked it up", ProgressState.Done)
-                    : new ProgressStep(p.Failed ? $"{HostName} did not answer" : $"Waiting for {HostName}…", p.Failed ? ProgressState.Failed : ProgressState.Active));
-                for (var i = 0; i < _pcSteps.Count; i++)
-                {
-                    var last = i == _pcSteps.Count - 1;
-                    steps.Add(new ProgressStep(_pcSteps[i], last && !p.Done ? ProgressState.Active : last && p.Failed && result?.Status == WorkspaceCommandStatus.Failed ? ProgressState.Failed : ProgressState.Done));
-                }
-                switch (result?.Status)
-                {
-                    case WorkspaceCommandStatus.Received:
-                        steps.Add(new ProgressStep(p.Kind == WorkspaceCommandKind.Reopen ? "Open in VS Code" : "Claude received it", ProgressState.Done));
-                        if (_awaitGaveUp) steps.Add(new ProgressStep("It did not show up here yet. Pull the tabs again with ⟳, or look on the PC.", ProgressState.Failed));
-                        else if (AwaitingTab) steps.Add(new ProgressStep("Opening it here…", ProgressState.Active));
-                        break;
-                    case WorkspaceCommandStatus.Sent:
-                        steps.Add(new ProgressStep(result.Error ?? "Typed into VS Code; Claude has not confirmed it yet", ProgressState.Done));
-                        break;
-                    case WorkspaceCommandStatus.Failed:
-                        steps.Add(new ProgressStep(result.Error ?? "It could not be sent.", ProgressState.Failed));
-                        break;
-                }
-            }
-        }
+        var steps = Card is { } d && ShowProgress ? StepsOf(d) : [];
         if (!steps.SequenceEqual(ProgressSteps)) Sync(ProgressSteps, steps, (a, b) => a == b);
         Notify(nameof(ShowProgress), nameof(ProgressFailed), nameof(ProgressRunning), nameof(ProgressTitle), nameof(ProgressElapsed), nameof(ProgressHint),
-            nameof(HasProgressHint), nameof(ShowStatus));
+            nameof(HasProgressHint), nameof(ShowStatus), nameof(ShowTimeline), nameof(ShowNewIntro));
     }
+
+    /// <summary>
+    /// The steps of <paramref name="d"/> so far, each with how long it took (or has taken while it runs). A step's time
+    /// is from when the phone first saw it to when it saw the next one, so it is noted for every delivery, on screen or not.
+    /// </summary>
+    private List<ProgressStep> StepsOf(Delivery d)
+    {
+        var p = d.Sent;
+        var steps = new List<(string Text, ProgressState State)>();
+        if (p.Kind == WorkspaceCommandKind.Reopen && d.Title is { } title) steps.Add((title, p.Done ? p.Failed ? ProgressState.Failed : ProgressState.Done : ProgressState.Active));
+        var result = _results.Get(p.CommandId);
+        var pushed = result is not null || _sync is null || _sync.Status.LastSyncedAt is { } synced && synced >= p.At;
+        steps.Add((pushed ? "Sent from this phone" : "Sending from this phone…", pushed ? ProgressState.Done : p.Failed ? ProgressState.Failed : ProgressState.Active));
+        if (pushed)
+        {
+            steps.Add(result is not null
+                ? ($"{HostName} picked it up", ProgressState.Done)
+                : (p.Failed ? $"{HostName} did not answer" : $"Waiting for {HostName}…", p.Failed ? ProgressState.Failed : ProgressState.Active));
+            for (var i = 0; i < d.PcSteps.Count; i++)
+            {
+                var last = i == d.PcSteps.Count - 1;
+                steps.Add((d.PcSteps[i], last && !p.Done ? ProgressState.Active : last && p.Failed && result?.Status == WorkspaceCommandStatus.Failed ? ProgressState.Failed : ProgressState.Done));
+            }
+            switch (result?.Status)
+            {
+                case WorkspaceCommandStatus.Received:
+                    steps.Add((p.Kind == WorkspaceCommandKind.Reopen ? "Open in VS Code" : "Claude received it", ProgressState.Done));
+                    if (d.AwaitGaveUp) steps.Add(("It did not show up here yet. Pull the tabs again with ⟳, or look on the PC.", ProgressState.Failed));
+                    else if (AwaitingTab(d)) steps.Add(("Opening it here…", ProgressState.Active));
+                    break;
+                case WorkspaceCommandStatus.Sent:
+                    steps.Add((result.Error ?? "Typed into VS Code; Claude has not confirmed it yet", ProgressState.Done));
+                    break;
+                case WorkspaceCommandStatus.Failed:
+                    steps.Add((result.Error ?? "It could not be sent.", ProgressState.Failed));
+                    break;
+            }
+        }
+        var now = _time.GetLocalNow();
+        // When each step was first seen (by its place in the list: a step's words change as it ends, its place does not).
+        for (var i = d.StepAt.Count; i < steps.Count; i++) d.StepAt.Add(now);
+        var list = new List<ProgressStep>(steps.Count);
+        for (var i = 0; i < steps.Count; i++)
+        {
+            var start = i == 0 ? p.At : d.StepAt[i];
+            var (text, state) = steps[i];
+            var took = i + 1 < steps.Count ? Took(d.StepAt[i + 1] - start)
+                : state == ProgressState.Active ? Took(now - start)
+                // The last word: how long it all took.
+                : steps.Count > 1 ? "in " + Took(d.StepAt[i] - p.At) : "";
+            list.Add(new ProgressStep(text, state, took));
+        }
+        return list;
+    }
+
+    /// <summary>"0.6 s", "12 s", "1 min 05 s".</summary>
+    private static string Took(TimeSpan t) => t.TotalSeconds < 10 ? $"{Math.Max(0, t.TotalSeconds):0.0} s" : Seconds(t);
+
+    /// <summary>Said under the running step of <paramref name="d"/> when it takes longer than it should.</summary>
+    private string HintOf(Delivery d)
+    {
+        if (d.Sent is not { Done: false } p) return "";
+        var waited = _time.GetLocalNow() - p.At;
+        if (_results.Get(p.CommandId) is null)
+            return waited > TimeSpan.FromSeconds(12) ? $"{HostName} has not picked it up yet. Is the PC awake, with Helm running? It keeps trying." : "";
+        return waited > TimeSpan.FromSeconds(25) ? "Slower than usual: VS Code or Claude may be busy on the PC. It keeps going." : "";
+    }
+
+    /// <summary>The steps of <paramref name="d"/> as timeline rows; the running one says what holds it up when it is slow.</summary>
+    private IEnumerable<TimelineRow> StepRows(Delivery d)
+    {
+        var steps = StepsOf(d);
+        var hint = HintOf(d);
+        return steps.Select((step, i) => TimelineRow.Step(step, i == steps.Count - 1 && step.IsActive ? hint : null));
+    }
+
+    /// <summary>The conversation area shows: a session is open, or a new session or reopened one is on its way.</summary>
+    public bool ShowTimeline => IsSessionOpen || Card is not null && ShowProgress;
+
+    /// <summary>The new-session page's words, until its first prompt is sent (then its steps show instead).</summary>
+    public bool ShowNewIntro => IsNewSession && !ShowTimeline;
 
     private static string Seconds(TimeSpan t) => t.TotalSeconds < 60 ? $"{Math.Max(0, (int)t.TotalSeconds)} s" : $"{(int)t.TotalMinutes} min {t.Seconds:00} s";
 
@@ -929,8 +1027,16 @@ public sealed partial class WorkspaceRemoteViewModel : ObservableObject
         ? $"This session last changed at {s.UpdatedAt.ToLocalTime():HH:mm:ss} ({Describe(s)})." + (s.Items.LastOrDefault()?.At is { } step ? $" Its latest step is from {step.ToLocalTime():HH:mm:ss}." : "")
         : "No session open.";
 
-    public string StatusCommand => _pending is { Done: false } p ? $"Your {Describe(p.Kind)} is on its way ({ProgressElapsed})." + (_pcSteps.LastOrDefault() is { } last ? $" The PC: {last}." : "")
-        : _pingId is not null ? "Checking the PC…" : "Nothing of yours is on its way.";
+    public string StatusCommand
+    {
+        get
+        {
+            var elsewhere = _deliveries.Count(d => !d.Sent.Done && !Shows(d));
+            var others = elsewhere == 0 ? "" : elsewhere == 1 ? " 1 more is on its way in another tab." : $" {elsewhere} more are on their way in other tabs.";
+            return (Latest is { Sent.Done: false } d ? $"Your {Describe(d.Sent.Kind)} is on its way ({Seconds(_time.GetLocalNow() - d.Sent.At)})." + (d.PcSteps.LastOrDefault() is { } last ? $" The PC: {last}." : "")
+                : _pingId is not null ? "Checking the PC…" : elsewhere > 0 ? "Nothing of yours is on its way here." : "Nothing of yours is on its way.") + others;
+        }
+    }
 
     public bool HasPcActivities => PcActivities.Count > 0;
 
@@ -971,14 +1077,15 @@ public sealed partial class WorkspaceRemoteViewModel : ObservableObject
     /// <summary>Once a second: the progress card's clock, the "Working…" line, and how fresh the screen is.</summary>
     private void Tick()
     {
-        if (AwaitingTab && _answeredAt is { } answered && _time.GetLocalNow() - answered > AwaitTabFor)
+        foreach (var d in _deliveries.Where(d => AwaitingTab(d) && d.AnsweredAt is { } answered && _time.GetLocalNow() - answered > AwaitTabFor))
         {
-            _awaitGaveUp = true;
-            _awaitSession = null;
+            d.AwaitGaveUp = true;
+            d.AwaitSession = null;
         }
         if (_pingId is not null && _time.GetLocalNow() - _pingAt > AnswerTimeout) _pingId = null;
         if (ShowProgress || ProgressSteps.Count > 0) RebuildProgress();
-        if (IsWorking && !_deferFill && _timelineFor == Session?.SessionId) FillTimelineCore();
+        var stepping = _deliveries.Any(d => Shows(d) && (!d.Sent.Done || AwaitingTab(d)));
+        if ((IsWorking || stepping) && !_deferFill && _timelineFor == (IsNewSession ? null : Session?.SessionId)) FillTimelineCore();
         NotifyFreshness();
         Notify(nameof(AgeText));
     }
@@ -1035,11 +1142,16 @@ public sealed partial class WorkspaceRemoteViewModel : ObservableObject
             // A tab closed from the phone stays hidden until the PC stops listing it (then it is forgotten).
             _closing.RemoveWhere(id => !records.Any(r => r.SessionId == id && (window is null || window.OpenSessions.Count == 0 || window.OpenSessions.Contains(id))));
             var inTabs = window is null ? [] : Ordered(inWindow.Where(r => !_closing.Contains(r.SessionId)).ToList(), window);
-            if (_awaitSession is not null && inTabs.Any(r => r.SessionId == _awaitSession))
+            foreach (var d in _deliveries.Where(d => d.AwaitSession is not null).ToList())
             {
-                _sessionId = _awaitSession;
-                _awaitSession = null;
-                IsNewSession = false;
+                // The new or reopened tab is here: it opens if you still look at its project, else it simply waits there.
+                if (SameFolder(d.Folder, _folder) && inTabs.Any(r => r.SessionId == d.AwaitSession) && (d.Sent.Kind == WorkspaceCommandKind.Reopen || IsNewSession))
+                {
+                    _sessionId = d.AwaitSession;
+                    d.AwaitSession = null;
+                    IsNewSession = false;
+                }
+                else if (records.Any(r => r.SessionId == d.AwaitSession && SameFolder(r.WindowFolder, d.Folder)) && !Shows(d)) _deliveries.Remove(d);
             }
             if (!IsNewSession && !inTabs.Any(r => r.SessionId == _sessionId))
             {
@@ -1047,7 +1159,7 @@ public sealed partial class WorkspaceRemoteViewModel : ObservableObject
                 var pick = inTabs.FirstOrDefault(r => r.State is SessionState.NeedsPermission or SessionState.Question)
                     ?? inTabs.FirstOrDefault(r => r.SessionId == window?.ActiveSession) ?? inTabs.FirstOrDefault();
                 _sessionId = pick?.SessionId;
-                if (pick is null && window is not null && window.Folder.Length > 0 && _awaitSession is null) IsNewSession = true;
+                if (pick is null && window is not null && window.Folder.Length > 0 && !_deliveries.Any(d => d.AwaitSession is not null && SameFolder(d.Folder, window.Folder))) IsNewSession = true;
                 if (pick is not null) MarkSeen(pick);
             }
             Sync(SessionTabs, inTabs.Select(r => new SessionTab(r, IsUnseen(r), !IsNewSession && r.SessionId == _sessionId)).ToList(),
@@ -1068,6 +1180,7 @@ public sealed partial class WorkspaceRemoteViewModel : ObservableObject
         {
             _refreshing = false;
         }
+        FollowView();
         FillTimeline();
         ShowPending();
         if (Sheet is WorkspaceSheet.Model or WorkspaceSheet.Mode) FillChoices();
@@ -1184,14 +1297,33 @@ public sealed partial class WorkspaceRemoteViewModel : ObservableObject
             if (s.State == SessionState.Done && s.LastReply is { Length: > 0 } last && rows.Count > 0 && !rows[^1].IsAnswer && !rows[^1].Running
                 && !rows.Any(r => r.IsAnswer && r.Text.Trim() == last.Trim()))
                 rows.Add(new TimelineRow(new TranscriptItem { Kind = TranscriptItemKind.Answer, Text = last, At = s.UpdatedAt }));
-            if (_pending is { Text: { } text } pending && pending.SessionId == s.SessionId && !Arrived(s, text, pending.Images, pending.At))
-                rows.Add(TimelineRow.Sending(text, ShowProgress ? "" : SendStatus ?? "", SendFailed, pending.At, pending.Images));
-            else if (s.State == SessionState.Working && (rows.Count == 0 || !rows[^1].Running))
-                rows.Add(TimelineRow.Working(WorkingText(s)));
+            var mine = _deliveries.LastOrDefault(d => d.Sent.Text is not null && d.Sent.SessionId == s.SessionId);
+            if (mine is { Sent: { Text: { } text } pending } && !Arrived(s, text, pending.Images, pending.At))
+            {
+                // Your message, then each step of its way on the rail.
+                rows.Add(TimelineRow.Sending(text, "", mine.Failed, pending.At, pending.Images));
+                rows.AddRange(StepRows(mine));
+            }
+            else
+            {
+                // Claude has it: one line under your message says how long that took.
+                if (mine is { Sent: { Text: { } said, Done: true, Failed: false } }
+                    && rows.FindLastIndex(r => r.IsUser && SessionRegistry.Normalize(r.Text) == SessionRegistry.Normalize(said)) is var at and >= 0
+                    && StepsOf(mine) is { Count: > 0 } done)
+                    rows.Insert(at + 1, TimelineRow.Step(done[^1]));
+                if (s.State == SessionState.Working && (rows.Count == 0 || !rows[^1].Running))
+                    rows.Add(TimelineRow.Working(WorkingText(s)));
+            }
+            if (Card is { Sent.Kind: WorkspaceCommandKind.Reopen } reopen && ShowProgress) rows.AddRange(StepRows(reopen));
         }
-        else if (IsNewSession && _pending is { Kind: WorkspaceCommandKind.NewSession, Text: { } first } sent)
+        else if (IsNewSession && Card is { Sent: { Kind: WorkspaceCommandKind.NewSession, Text: { } first } sent } started)
         {
-            rows.Add(TimelineRow.Sending(first, ShowProgress ? "" : SendStatus ?? "", SendFailed, sent.At, sent.Images));
+            rows.Add(TimelineRow.Sending(first, "", started.Failed, sent.At, sent.Images));
+            rows.AddRange(StepRows(started));
+        }
+        else if (Card is { Sent.Kind: WorkspaceCommandKind.Reopen } opening && ShowProgress)
+        {
+            rows.AddRange(StepRows(opening));
         }
         // Only the last steps are drawn; "Show earlier" draws more.
         HiddenSteps = Math.Max(0, rows.Count - _timelineLimit);
@@ -1355,6 +1487,33 @@ public sealed partial class WorkspaceRemoteViewModel : ObservableObject
     private sealed record SentCommand(string CommandId, WorkspaceCommandKind Kind, string? SessionId, string? Text, DateTimeOffset At, bool Done = false, bool Failed = false)
     {
         public IReadOnlyList<WorkspaceImage> Images { get; init; } = [];
+    }
+
+    /// <summary>One command on its way and what its card shows: the steps the PC reported, its status line, when it answered.</summary>
+    private sealed class Delivery(SentCommand sent, string? folder, string? title, string? awaitSession)
+    {
+        public SentCommand Sent { get; set; } = sent;
+
+        /// <summary>The project (VS Code window folder) it was sent from.</summary>
+        public string? Folder { get; } = folder;
+
+        public string? Title { get; } = title;
+
+        /// <summary>The new or reopened session whose tab should open here.</summary>
+        public string? AwaitSession { get; set; } = awaitSession;
+
+        public bool AwaitGaveUp { get; set; }
+        public List<string> PcSteps { get; } = [];
+
+        /// <summary>When the phone first saw each step (by its place in the list).</summary>
+        public List<DateTimeOffset> StepAt { get; } = [];
+
+        public DateTimeOffset? AnsweredAt { get; set; }
+        public string? Status { get; set; }
+        public bool Failed { get; set; }
+
+        /// <summary>You saw how it ended: it is put away when you leave its place.</summary>
+        public bool SeenDone { get; set; }
     }
 
     // ---- Seen

@@ -121,6 +121,9 @@
                                             <Ellipse Width="9" Height="9" Fill="{DynamicResource VsAnswerDot}" IsVisible="{Binding IsAnswer}" />
                                             <Ellipse Width="9" Height="9" Fill="{DynamicResource VsAccent}" Classes="pulse" IsVisible="{Binding IsWorking}" />
                                             <Ellipse Width="9" Height="9" Fill="{DynamicResource VsAccent}" Classes="pulse" IsVisible="{Binding ShowRunning}" />
+                                            <Ellipse Width="7" Height="7" Fill="{DynamicResource VsFaint}" IsVisible="{Binding StepDone}" />
+                                            <Ellipse Width="9" Height="9" Fill="{DynamicResource VsAccent}" Classes="pulse" IsVisible="{Binding StepActive}" />
+                                            <Ellipse Width="9" Height="9" Fill="{DynamicResource VsBad}" IsVisible="{Binding StepFailed}" />
                                             <Panel IsVisible="{Binding IsTool}">
                                                 <Ellipse Width="9" Height="9" Fill="{DynamicResource VsOk}" IsVisible="{Binding !Running}" />
                                                 <Ellipse Width="9" Height="9" Fill="{DynamicResource VsBad}" IsVisible="{Binding Failed}" />
@@ -132,6 +135,18 @@
                                             <StackPanel Orientation="Horizontal" Spacing="6" IsVisible="{Binding IsWorking}">
                                                 <TextBlock Text="✻" Classes="spin" />
                                                 <TextBlock Text="{Binding Text}" Foreground="{DynamicResource VsAccent}" />
+                                            </StackPanel>
+                                            <!-- A step of your message on its way: small and quiet, like VS Code's notes on the rail -->
+                                            <StackPanel IsVisible="{Binding IsStep}" Spacing="2">
+                                                <DockPanel>
+                                                    <TextBlock DockPanel.Dock="Left" Text="✻" Classes="spin" FontSize="12" Margin="0,0,6,0" IsVisible="{Binding StepActive}" VerticalAlignment="Center" />
+                                                    <TextBlock TextWrapping="Wrap" FontSize="12.5" FontStyle="Italic" VerticalAlignment="Center" Classes="muted" Classes.failed="{Binding StepFailed}">
+                                                        <Run Text="{Binding Text}" />
+                                                        <Run Text="  " />
+                                                        <Run Text="{Binding Took}" Foreground="{DynamicResource VsFaint}" />
+                                                    </TextBlock>
+                                                </DockPanel>
+                                                <TextBlock Text="{Binding Hint}" FontSize="12" TextWrapping="Wrap" Foreground="{DynamicResource VsFaint}" IsVisible="{Binding HasHint}" />
                                             </StackPanel>
                                             <StackPanel IsVisible="{Binding IsTool}">
                                                 <TextBlock TextWrapping="Wrap">
@@ -454,15 +469,6 @@
             <Setter Property="MinHeight" Value="24" />
             <Setter Property="Margin" Value="2,0,0,0" />
         </Style>
-        <Style Selector="Border.progress">
-            <Setter Property="BorderBrush" Value="{DynamicResource VsAccent}" />
-            <Setter Property="BorderThickness" Value="1.5" />
-            <Setter Property="CornerRadius" Value="10" />
-            <Setter Property="Background" Value="{DynamicResource VsRaise}" />
-            <Setter Property="Padding" Value="16,14" />
-            <Setter Property="Margin" Value="12,12,12,14" />
-            <Setter Property="BoxShadow" Value="0 4 18 0 #40000000" />
-        </Style>
         <Style Selector="TextBox.prompt">
             <Setter Property="Background" Value="Transparent" />
             <Setter Property="BorderThickness" Value="0" />
@@ -773,7 +779,7 @@
             </StackPanel>
 
             <!-- A new session -->
-            <StackPanel Spacing="8" Margin="28" VerticalAlignment="Center" IsVisible="{Binding IsNewSession}">
+            <StackPanel Spacing="8" Margin="28" VerticalAlignment="Center" IsVisible="{Binding ShowNewIntro}">
                 <Path Width="56" Height="56" Stretch="Uniform" StrokeThickness="4" StrokeLineCap="Round" HorizontalAlignment="Center"
                       Data="M16 4H42A12 12 0 0 1 54 16V84A12 12 0 0 1 42 96H16A12 12 0 0 1 4 84V16A12 12 0 0 1 16 4Z M68.7 35.3A20 20 0 0 1 68.7 64.7M80.9 23.1A38 38 0 0 1 80.9 76.9">
                     <Path.Stroke>
@@ -784,7 +790,7 @@
                     </Path.Stroke>
                 </Path>
                 <TextBlock Text="{Binding SessionStateText}" Classes="strong" FontWeight="SemiBold" HorizontalAlignment="Center" TextWrapping="Wrap" TextAlignment="Center" />
-                <TextBlock Classes="muted" TextWrapping="Wrap" TextAlignment="Center" IsVisible="{Binding !ShowProgress}"
+                <TextBlock Classes="muted" TextWrapping="Wrap" TextAlignment="Center"
                            Text="Helm opens a Claude tab in this VS Code window on the PC, sets the model, effort and mode you chose below, then types your first task." />
             </StackPanel>
 
@@ -794,7 +800,7 @@
                     <LayoutTransformControl.LayoutTransform>
                         <ScaleTransform ScaleX="{Binding TextScale}" ScaleY="{Binding TextScale}" />
                     </LayoutTransformControl.LayoutTransform>
-                <StackPanel Margin="14,10,14,18" IsVisible="{Binding IsSessionOpen}">
+                <StackPanel Margin="14,10,14,18" IsVisible="{Binding ShowTimeline}">
                     <Button Classes="flat" HorizontalAlignment="Center" Padding="12,6" Margin="0,0,0,6" IsVisible="{Binding HasHiddenSteps}"
                             Command="{Binding ShowEarlierCommand}">
                         <TextBlock Text="{Binding HiddenStepsText}" Foreground="{DynamicResource VsLink}" FontSize="13" />
@@ -905,42 +911,6 @@
                     <local:MarkdownView Blocks="{Binding PlanBlocks}" Margin="16,12,16,20" />
                 </LayoutTransformControl>
             </ScrollViewer>
-
-            <!-- A command on its way: big and step by step, so a slow PC never looks like a frozen phone -->
-            <Border Classes="progress" VerticalAlignment="Bottom" IsVisible="{Binding ShowProgress}">
-                <StackPanel Spacing="10">
-                    <DockPanel>
-                        <TextBlock DockPanel.Dock="Right" Text="{Binding ProgressElapsed}" Classes="muted" FontSize="13" VerticalAlignment="Center" Margin="8,0,0,0" />
-                        <StackPanel Orientation="Horizontal" Spacing="10">
-                            <TextBlock Text="✻" Classes="spin" FontSize="22" IsVisible="{Binding ProgressRunning}" VerticalAlignment="Center" />
-                            <Border Width="22" Height="22" CornerRadius="11" Background="{DynamicResource VsBad}" IsVisible="{Binding ProgressFailed}" VerticalAlignment="Center">
-                                <TextBlock Text="!" Foreground="White" FontWeight="Bold" HorizontalAlignment="Center" VerticalAlignment="Center" />
-                            </Border>
-                            <TextBlock Text="{Binding ProgressTitle}" Classes="strong" FontSize="16" FontWeight="SemiBold" TextWrapping="Wrap" VerticalAlignment="Center" MaxWidth="260" />
-                        </StackPanel>
-                    </DockPanel>
-                    <ProgressBar IsIndeterminate="True" IsVisible="{Binding ProgressRunning}" Height="3" MinHeight="3" Foreground="{DynamicResource VsAccent}" Background="{DynamicResource VsLine}" />
-                    <ItemsControl ItemsSource="{Binding ProgressSteps}">
-                        <ItemsControl.ItemTemplate>
-                            <DataTemplate x:DataType="vm:ProgressStep">
-                                <DockPanel Margin="0,3">
-                                    <Panel DockPanel.Dock="Left" Width="20" Margin="0,0,8,0" VerticalAlignment="Top">
-                                        <TextBlock Text="✓" Foreground="{DynamicResource VsOk}" FontWeight="Bold" FontSize="15" IsVisible="{Binding IsDone}" HorizontalAlignment="Center" />
-                                        <TextBlock Text="✻" Classes="spin" FontSize="15" IsVisible="{Binding IsActive}" HorizontalAlignment="Center" />
-                                        <TextBlock Text="✕" Foreground="{DynamicResource VsBad}" FontWeight="Bold" FontSize="15" IsVisible="{Binding IsFailed}" HorizontalAlignment="Center" />
-                                    </Panel>
-                                    <TextBlock Text="{Binding Text}" TextWrapping="Wrap" FontSize="14" Classes.strong="{Binding IsActive}" Classes.failed="{Binding IsFailed}" />
-                                </DockPanel>
-                            </DataTemplate>
-                        </ItemsControl.ItemTemplate>
-                    </ItemsControl>
-                    <TextBlock Text="{Binding ProgressHint}" Classes="muted" FontSize="13" TextWrapping="Wrap" IsVisible="{Binding HasProgressHint}" />
-                    <Button Classes="decide" HorizontalAlignment="Right" Padding="16,6" Command="{Binding DismissProgressCommand}" IsVisible="{Binding ProgressFailed}"
-                            AutomationProperties.Name="Close this message">
-                        <TextBlock Text="OK" />
-                    </Button>
-                </StackPanel>
-            </Border>
         </Panel>
 
         <!-- The plan's decision: small, so the plan above keeps the screen -->
