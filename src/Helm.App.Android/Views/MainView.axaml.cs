@@ -14,28 +14,47 @@ public partial class MainView : UserControl
     private IInsetsManager? _insets;
     private TopLevel? _topLevel;
 
+    private ShellNavigator? _navigator;
+
     public MainView()
     {
         InitializeComponent();
-        // A tool's page is whatever control its module names (created fresh from DI each time it is shown). The match
-        // leaves out null: Avalonia 12 offers a typed template empty content too, which a list does while it recycles
-        // an item (scrolling Novel Reader's chapter list crashed here).
-        DataTemplates.Add(new FuncDataTemplate<ModulePage>(page => page is not null,
-            (page, _) => (Control)App.Services.GetRequiredService(page.PageType)));
-        PageHost.PropertyChanged += (_, e) =>
+        TabsScrim.PointerPressed += (_, _) =>
         {
-            if (e.Property != ContentControl.ContentProperty) return;
-            PageScroller.Offset = default;
-            // A page that lays itself out (fixed bars, its own scrolling) gets the whole area.
-            var full = PageHost.Content is ModulePage page && typeof(Helm.Core.Ui.IFullPage).IsAssignableFrom(page.PageType);
-            PageScroller.VerticalScrollBarVisibility = full ? Avalonia.Controls.Primitives.ScrollBarVisibility.Disabled : Avalonia.Controls.Primitives.ScrollBarVisibility.Auto;
-            PageHost.Margin = full ? default : new Thickness(16, 16, 16, 24);
-            AppBar.IsVisible = !full;
+            if (DataContext is MainViewModel vm) vm.IsTabsOpen = false;
         };
-        Helm.Core.Ui.ShellChrome.OpenNavigation = () =>
+        DataContextChanged += (_, _) =>
         {
-            if (DataContext is MainViewModel vm) vm.IsPaneOpen = true;
+            if (_navigator is not null) _navigator.PropertyChanged -= OnNavigatorChanged;
+            _navigator = (DataContext as MainViewModel)?.Navigator;
+            if (_navigator is not null) _navigator.PropertyChanged += OnNavigatorChanged;
+            ShowActiveTab();
         };
+    }
+
+    private void OnNavigatorChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName == nameof(ShellNavigator.ActiveTab)) ShowActiveTab();
+    }
+
+    /// <summary>
+    /// Shows the active tab's view, built the first time and kept while the tab is open, so a page keeps its state
+    /// (scroll position, an open item) while other tabs are shown. Only the shown page is in the visual tree: a hidden
+    /// tab's timers and live updates pause as they did when a page was left.
+    /// </summary>
+    private void ShowActiveTab()
+    {
+        if (_navigator?.ActiveTab is not { } tab)
+        {
+            PageArea.Child = null;
+            return;
+        }
+        tab.View ??= PageViews.Build(tab);
+        if (ReferenceEquals(PageArea.Child, tab.View)) return;
+        PageArea.Child = null;
+        PageArea.Child = tab.View;
+        // A page that lays itself out (fixed bars, its own scrolling) gets the whole area, without the app bar.
+        AppBar.IsVisible = !PageViews.IsFull(tab);
     }
 
     protected override void OnAttachedToVisualTree(VisualTreeAttachmentEventArgs e)
@@ -51,6 +70,11 @@ public partial class MainView : UserControl
             _insets.DisplayEdgeToEdgePreference = true;
             UpdateSystemBarColor();
         }
+        // A full page's own menu button opens the drawer (which also lists the open tabs).
+        Helm.Core.Ui.ShellChrome.SetNavigation(_topLevel, _ =>
+        {
+            if (DataContext is MainViewModel vm) vm.IsPaneOpen = true;
+        });
         ContentInsets.Changed += OnContentInsetsChanged;
         UpdatePadding();
         ActualThemeVariantChanged += OnThemeChanged;

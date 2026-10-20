@@ -38,6 +38,7 @@ internal static class HelmHost
         // Shell services
         builder.Services.AddSingleton<Core.Services.IUiDispatcher, UiDispatcher>();
         builder.Services.AddSingleton<ThemeService>();
+        builder.Services.AddSingleton<TabManager>();
         builder.Services.AddSingleton<ShellNavigator>();
         builder.Services.AddSingleton<IShellNavigator>(sp => sp.GetRequiredService<ShellNavigator>());
         builder.Services.AddSingleton<IShellNavigation>(sp => sp.GetRequiredService<ShellNavigator>());
@@ -84,6 +85,7 @@ internal static class HelmHost
         // Shell views and view models
         builder.Services.AddSingleton<MainWindowViewModel>();
         builder.Services.AddSingleton<MainWindow>();
+        builder.Services.AddSingleton<TabsPage>();
         builder.Services.AddSingleton<HomeViewModel>();
         builder.Services.AddSingleton<HomePage>();
         builder.Services.AddSingleton<UpdatesViewModel>();

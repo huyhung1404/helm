@@ -8,38 +8,28 @@ namespace Helm.App.Services;
 
 internal interface IShellNavigator
 {
-    /// <summary>Shows the main window and navigates to <paramref name="pageType"/>; optionally scrolls to a settings card.</summary>
+    /// <summary>Shows <paramref name="pageType"/>'s tab (opening it if needed) and its window; optionally scrolls to a settings card.</summary>
     void Navigate(Type pageType, FrameworkElement? focus = null);
 
     /// <summary>Navigates to <paramref name="pageType"/> and reveals the card whose header title is <paramref name="cardTitle"/>.</summary>
     void NavigateToCard(Type pageType, string cardTitle);
 }
 
-/// <summary>Bridges view models to the MainWindow's NavigationView without them touching the view.</summary>
-internal sealed class ShellNavigator(SearchService search) : IShellNavigator, IShellNavigation
+/// <summary>Bridges view models and modules to the windows' tabs without them touching the views.</summary>
+internal sealed class ShellNavigator(SearchService search, TabManager tabs) : IShellNavigator, IShellNavigation
 {
-    private NavigationView? _navigation;
-    private Action? _showWindow;
-
-    public void Attach(NavigationView navigation, Action showWindow)
-    {
-        _navigation = navigation;
-        _showWindow = showWindow;
-    }
-
     public void ShowPage(Type pageType) => Navigate(pageType);
 
     public void NavigateToCard(Type pageType, string cardTitle) => Navigate(pageType, search.FindCard(pageType, cardTitle));
 
     public void Navigate(Type pageType, FrameworkElement? focus = null)
     {
-        if (_navigation is null) return;
-        _showWindow?.Invoke();
-        _navigation.Navigate(pageType);
+        if (!tabs.IsAttached) return;
+        tabs.Open(pageType);
         if (focus is null) return;
 
         // Let the page load and lay out before scrolling to the card.
-        _navigation.Dispatcher.BeginInvoke(DispatcherPriority.Loaded, () => Reveal(focus));
+        focus.Dispatcher.BeginInvoke(DispatcherPriority.Loaded, () => Reveal(focus));
     }
 
     private static void Reveal(FrameworkElement target)

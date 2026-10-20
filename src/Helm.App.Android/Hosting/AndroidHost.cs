@@ -58,6 +58,7 @@ internal static class AndroidHost
         services.AddSingleton<AndroidUpdateService>();
         services.AddSingleton<IUpdateService>(sp => sp.GetRequiredService<AndroidUpdateService>());
         services.AddSingleton<ShellNavigator>();
+        services.AddSingleton<ToolWindows>();
         services.AddSingleton<IShellNavigation>(sp => sp.GetRequiredService<ShellNavigator>());
 
         // Shell view models (Updates and Sync are the Windows app's own, from Helm.Shell)

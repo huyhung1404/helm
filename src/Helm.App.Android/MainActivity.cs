@@ -20,29 +20,11 @@ namespace Helm.App.Android;
     ConfigurationChanges = ConfigChanges.Orientation | ConfigChanges.ScreenSize | ConfigChanges.UiMode | ConfigChanges.ScreenLayout | ConfigChanges.SmallestScreenSize)]
 public sealed class MainActivity : AvaloniaMainActivity
 {
-    /// <summary>
-    /// Avalonia ignores touches whose tool type is UNKNOWN (it only turns FINGER into touch input). Injected events
-    /// report UNKNOWN on older Android (adb "input tap" on Android 9, some automation and accessibility tools), so
-    /// such touchscreen events are passed on as a finger.
-    /// </summary>
+    /// <summary>Touches from tools that report no finger are passed on as a finger (see <see cref="ActivityInput"/>).</summary>
     public override bool DispatchTouchEvent(MotionEvent? e)
     {
-        if (e is null || !e.IsFromSource(InputSourceType.Touchscreen) || !HasUnknownTool(e)) return base.DispatchTouchEvent(e);
-
-        var count = e.PointerCount;
-        var properties = new MotionEvent.PointerProperties[count];
-        var coords = new MotionEvent.PointerCoords[count];
-        for (var i = 0; i < count; i++)
-        {
-            properties[i] = new MotionEvent.PointerProperties();
-            e.GetPointerProperties(i, properties[i]);
-            if (properties[i].ToolType == MotionEventToolType.Unknown) properties[i].ToolType = MotionEventToolType.Finger;
-            coords[i] = new MotionEvent.PointerCoords();
-            e.GetPointerCoords(i, coords[i]);
-        }
-        using var finger = MotionEvent.Obtain(e.DownTime, e.EventTime, e.Action, count, properties, coords, e.MetaState,
-            e.ButtonState, e.XPrecision, e.YPrecision, e.DeviceId, e.EdgeFlags, e.Source, e.Flags)!;
-        return base.DispatchTouchEvent(finger);
+        using var finger = ActivityInput.AsFinger(e);
+        return base.DispatchTouchEvent(finger ?? e);
     }
 
     /// <summary>
@@ -50,11 +32,7 @@ public sealed class MainActivity : AvaloniaMainActivity
     /// keys while it has the focus, so typing, Enter and Backspace reach it; Back stays with Helm's navigation, and
     /// Avalonia's own text boxes are untouched.
     /// </summary>
-    public override bool DispatchKeyEvent(KeyEvent? e)
-    {
-        if (e is not null && e.KeyCode != Keycode.Back && CurrentFocus is global::Android.Webkit.WebView web && web.DispatchKeyEvent(e)) return true;
-        return base.DispatchKeyEvent(e);
-    }
+    public override bool DispatchKeyEvent(KeyEvent? e) => ActivityInput.ToWebView(this, e) || base.DispatchKeyEvent(e);
 
     private View? _avaloniaView;
     private ContentInsetsListener? _layoutListener;
@@ -70,6 +48,7 @@ public sealed class MainActivity : AvaloniaMainActivity
     {
         ActivityHost.OnPaused(this);
         SetSyncPolling(foreground: false);
+        SaveTabs();
         base.OnPause();
     }
 
@@ -91,6 +70,19 @@ public sealed class MainActivity : AvaloniaMainActivity
         catch (Exception ex)
         {
             Serilog.Log.Warning(ex, "Could not change the sync interval");
+        }
+    }
+
+    /// <summary>The open tabs come back after Android ends the process in the background.</summary>
+    private static void SaveTabs()
+    {
+        try
+        {
+            App.Services.GetRequiredService<ShellNavigator>().Save();
+        }
+        catch (Exception ex)
+        {
+            Serilog.Log.Warning(ex, "Could not remember the open tabs");
         }
     }
 
@@ -212,12 +204,5 @@ public sealed class MainActivity : AvaloniaMainActivity
     private sealed class ContentInsetsListener(MainActivity activity) : Java.Lang.Object, ViewTreeObserver.IOnGlobalLayoutListener
     {
         public void OnGlobalLayout() => activity.MeasureContentInsets();
-    }
-
-    private static bool HasUnknownTool(MotionEvent e)
-    {
-        for (var i = 0; i < e.PointerCount; i++)
-            if (e.GetToolType(i) == MotionEventToolType.Unknown) return true;
-        return false;
     }
 }

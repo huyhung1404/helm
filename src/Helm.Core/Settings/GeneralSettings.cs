@@ -29,6 +29,12 @@ public sealed class WindowPlacementSettings
 
     /// <summary>Expanded navigation pane width in DIPs (drag its right edge to change).</summary>
     public double NavWidth { get; set; } = 300;
+
+    /// <summary>The main window's tabs, left to right (page type names); null before tabs were ever saved.</summary>
+    public List<string>? Tabs { get; set; }
+
+    /// <summary>The main window's shown tab (a page type name).</summary>
+    public string? ActiveTab { get; set; }
 }
 
 /// <summary>general.json: shell-wide preferences plus the enabled state of every module.</summary>

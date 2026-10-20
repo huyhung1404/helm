@@ -8,17 +8,13 @@
              x:DataType="vm:MainViewModel"
              Background="{DynamicResource HelmBarBackground}">
 
-    <UserControl.DataTemplates>
-        <DataTemplate DataType="vm:HomeViewModel">
-            <views:HomeView />
-        </DataTemplate>
-        <DataTemplate DataType="vm:GeneralViewModel">
-            <views:GeneralView />
-        </DataTemplate>
-        <views:ModulePageTemplate />
-    </UserControl.DataTemplates>
-
     <UserControl.Styles>
+        <Style Selector="Border.tabrow.active">
+            <Setter Property="Background" Value="{DynamicResource HelmSubtleFill}" />
+        </Style>
+        <Style Selector="Border.tabrow.active TextBlock.tabtitle">
+            <Setter Property="FontWeight" Value="SemiBold" />
+        </Style>
         <Style Selector="ic|SymbolIcon.syncglyph.muted">
             <Setter Property="Opacity" Value="0.45" />
         </Style>
@@ -46,15 +42,33 @@
     <Grid>
         <DockPanel>
             <!-- App bar: drawer button + page title (the Windows title bar + nav pane toggle) -->
-            <Grid x:Name="AppBar" DockPanel.Dock="Top" ColumnDefinitions="Auto,*,Auto" Height="56" Background="{DynamicResource HelmBarBackground}">
+            <Grid x:Name="AppBar" DockPanel.Dock="Top" ColumnDefinitions="Auto,*,Auto,Auto" Height="56" Background="{DynamicResource HelmBarBackground}">
                 <Button Classes="flat" Width="48" Height="48" Margin="4,0,0,0" Padding="0" HorizontalContentAlignment="Center"
                         Command="{Binding TogglePaneCommand}" ToolTip.Tip="Navigation" AutomationProperties.Name="Open navigation">
                     <ic:SymbolIcon Symbol="Navigation" FontSize="22" />
                 </Button>
-                <TextBlock Grid.Column="1" Text="{Binding Navigator.Title}" FontSize="20" FontWeight="SemiBold" VerticalAlignment="Center" Margin="8,0,16,0" />
+                <TextBlock Grid.Column="1" Text="{Binding Navigator.Title}" FontSize="20" FontWeight="SemiBold" VerticalAlignment="Center" Margin="8,0,8,0"
+                           TextTrimming="CharacterEllipsis" />
+                <!-- Tabs: no strip (a phone has no room for one), only the number of open tabs, as in a phone browser; tap for
+                     the list. -->
+                <Button Grid.Column="2" Width="48" Height="48" Padding="0" Background="Transparent" Command="{Binding ShowTabsCommand}"
+                        ToolTip.Tip="Open tabs" AutomationProperties.Name="Open tabs">
+                    <Button.Template>
+                        <ControlTemplate>
+                            <Panel Background="{TemplateBinding Background}">
+                                <ContentPresenter Name="PART_ContentPresenter" Content="{TemplateBinding Content}"
+                                                  HorizontalAlignment="Center" VerticalAlignment="Center" />
+                            </Panel>
+                        </ControlTemplate>
+                    </Button.Template>
+                    <Border Width="22" Height="22" BorderThickness="2" CornerRadius="5" BorderBrush="{Binding #TabCountText.Foreground}">
+                        <TextBlock x:Name="TabCountText" Text="{Binding Navigator.TabCount}" FontSize="12" FontWeight="Bold"
+                                   HorizontalAlignment="Center" VerticalAlignment="Center" />
+                    </Border>
+                </Button>
                 <!-- Sync: its state on every page; tap to sync now (or to set it up). Just the icon, without a button look (no
                      press fill), over a 48 dp touch target. -->
-                <Button Grid.Column="2" Width="48" Height="48" Margin="0,0,4,0" Padding="0" Background="Transparent"
+                <Button Grid.Column="3" Width="48" Height="48" Margin="0,0,4,0" Padding="0" Background="Transparent"
                         DataContext="{Binding Sync}" Command="{Binding SyncNowCommand}" ToolTip.Tip="{Binding ToolTip}" AutomationProperties.Name="Sync now">
                     <Button.Template>
                         <ControlTemplate>
@@ -80,6 +94,14 @@
             <SplitView IsPaneOpen="{Binding IsPaneOpen}" DisplayMode="Overlay" OpenPaneLength="296" PaneBackground="{DynamicResource HelmBarBackground}">
                 <SplitView.Pane>
                     <DockPanel Margin="8">
+                        <!-- The open tabs, also for a full page (no app bar, so no tab button): its menu button opens this drawer. -->
+                        <Button DockPanel.Dock="Top" Classes="flat" Command="{Binding ShowTabsCommand}" Margin="0,0,0,4">
+                            <Grid ColumnDefinitions="Auto,*,Auto">
+                                <ic:SymbolIcon Symbol="TabDesktopMultiple" FontSize="20" />
+                                <TextBlock Grid.Column="1" Text="Open tabs" VerticalAlignment="Center" Margin="16,0,0,0" />
+                                <TextBlock Grid.Column="2" Text="{Binding Navigator.TabCount}" Classes="secondary" VerticalAlignment="Center" />
+                            </Grid>
+                        </Button>
                         <Button DockPanel.Dock="Bottom" Classes="flat" Command="{Binding OpenCommand}" CommandParameter="{Binding GeneralEntry}">
                             <StackPanel Orientation="Horizontal" Spacing="16">
                                 <ic:SymbolIcon Symbol="Settings" FontSize="20" />
@@ -107,13 +129,58 @@
                     </DockPanel>
                 </SplitView.Pane>
 
-                <Border Background="{DynamicResource HelmPageBackground}" CornerRadius="8,8,0,0">
-                    <ScrollViewer x:Name="PageScroller" HorizontalScrollBarVisibility="Disabled">
-                        <ContentControl x:Name="PageHost" Content="{Binding Navigator.CurrentPage}" Margin="16,16,16,24" />
-                    </ScrollViewer>
-                </Border>
+                <!-- The shown tab's page; MainView keeps every open tab's view (PageViews), so a page keeps its state. -->
+                <Border x:Name="PageArea" Background="{DynamicResource HelmPageBackground}" CornerRadius="8,8,0,0" ClipToBounds="True" />
             </SplitView>
         </DockPanel>
+
+        <!-- Open tabs: tap one to show it; each tool's tab can move to a window of its own (split screen) or close. -->
+        <Panel IsVisible="{Binding IsTabsOpen}">
+            <Border x:Name="TabsScrim" Background="{DynamicResource HelmScrim}" />
+            <Border Classes="card" VerticalAlignment="Top" Margin="12,8,12,24" Padding="8,8,8,12" BoxShadow="0 8 32 0 #40000000">
+                <DockPanel>
+                    <Grid DockPanel.Dock="Top" ColumnDefinitions="*,Auto,Auto" Margin="8,0,0,4">
+                        <TextBlock Text="Open tabs" FontSize="18" Classes="title" VerticalAlignment="Center" />
+                        <Button Grid.Column="1" Classes="flat" Content="Close others" HorizontalAlignment="Right" Command="{Binding CloseOtherTabsCommand}" />
+                        <Button Grid.Column="2" Classes="flat" Width="44" Height="44" Padding="0" HorizontalContentAlignment="Center"
+                                Command="{Binding HideTabsCommand}" ToolTip.Tip="Close the list" AutomationProperties.Name="Close the list">
+                            <ic:SymbolIcon Symbol="ChevronUp" FontSize="20" />
+                        </Button>
+                    </Grid>
+                    <ScrollViewer MaxHeight="520">
+                        <ItemsControl ItemsSource="{Binding Navigator.Tabs}">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate DataType="vm:ShellTab">
+                                    <Border Classes="tabrow" Classes.active="{Binding IsActive}" CornerRadius="8" Margin="0,2">
+                                        <Grid ColumnDefinitions="*,Auto,Auto">
+                                            <Button Classes="flat" CommandParameter="{Binding}"
+                                                    Command="{Binding $parent[ItemsControl].((vm:MainViewModel)DataContext).SelectTabCommand}">
+                                                <StackPanel Orientation="Horizontal" Spacing="16">
+                                                    <ui:ModuleIcon Symbol="{Binding Icon}" Image="{Binding Image}" Size="20" />
+                                                    <TextBlock Classes="tabtitle" Text="{Binding Title}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
+                                                </StackPanel>
+                                            </Button>
+                                            <Button Grid.Column="1" Classes="flat" Width="44" Height="44" Padding="0" HorizontalContentAlignment="Center"
+                                                    IsVisible="{Binding CanOpenInWindow}" CommandParameter="{Binding}"
+                                                    Command="{Binding $parent[ItemsControl].((vm:MainViewModel)DataContext).OpenInWindowCommand}"
+                                                    ToolTip.Tip="Open in new window" AutomationProperties.Name="Open in new window">
+                                                <ic:SymbolIcon Symbol="WindowNew" FontSize="20" />
+                                            </Button>
+                                            <Button Grid.Column="2" Classes="flat" Width="44" Height="44" Padding="0" HorizontalContentAlignment="Center"
+                                                    CommandParameter="{Binding}"
+                                                    Command="{Binding $parent[ItemsControl].((vm:MainViewModel)DataContext).CloseTabCommand}"
+                                                    ToolTip.Tip="Close tab" AutomationProperties.Name="Close tab">
+                                                <ic:SymbolIcon Symbol="Dismiss" FontSize="20" />
+                                            </Button>
+                                        </Grid>
+                                    </Border>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </ScrollViewer>
+                </DockPanel>
+            </Border>
+        </Panel>
 
         <!-- Confirmation dialog (IDialogService) -->
         <Border Background="{DynamicResource HelmScrim}" IsVisible="{Binding Dialogs.IsOpen}">

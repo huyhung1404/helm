@@ -3,6 +3,7 @@ using System.Windows;
 using Helm.App.Services;
 using Helm.App.ViewModels;
 using Helm.App.Views.Pages;
+using Helm.App.Views.Tabs;
 using Helm.Core.Modules;
 using Helm.Core.Settings;
 using Helm.Core.Ui;
@@ -17,10 +18,12 @@ internal partial class MainWindow : FluentWindow
     private readonly IServiceProvider _services;
     private readonly ISettingsStore<GeneralSettings> _general;
     private readonly NavPaneController _navPane;
+    private readonly TabManager _tabs;
 
-    public MainWindow(MainWindowViewModel viewModel, IServiceProvider services, ShellNavigator navigator, ISettingsStoreFactory settings)
+    public MainWindow(MainWindowViewModel viewModel, IServiceProvider services, ShellNavigator navigator, TabManager tabs, ISettingsStoreFactory settings)
     {
         _viewModel = viewModel;
+        _tabs = tabs;
         _services = services;
         _general = settings.Get<GeneralSettings>(GeneralSettings.StoreId);
         DataContext = viewModel;
@@ -30,7 +33,12 @@ internal partial class MainWindow : FluentWindow
         _navPane = new NavPaneController(Navigation, RootGrid, _general, TitleIcon);
         Navigation.SetServiceProvider(services);
         BuildNavigation();
-        navigator.Attach(Navigation, () => _services.GetRequiredService<ShellController>().ShowMainWindow());
+
+        // The window's content is its tabs: the menu, search and Quick access open pages as tabs (one per page).
+        tabs.AttachMain(services.GetRequiredService<TabsPage>().Host);
+        tabs.MainActivePageChanged += (_, page) => HighlightMenu(page);
+        tabs.RestoreMain(StartupPage());
+        TabKeys.Attach(this, () => tabs.Main);
 
         // The sync button, and quicker pulls while the window is shown so other devices' changes show up within seconds.
         var sync = services.GetRequiredService<Helm.Shell.ViewModels.SyncIndicatorViewModel>();
@@ -43,14 +51,10 @@ internal partial class MainWindow : FluentWindow
         SearchBox.QuerySubmitted += (_, e) => NavigateTo(_viewModel.Search(e.QueryText).FirstOrDefault());
         SearchBox.SuggestionChosen += (_, e) => NavigateTo(e.SelectedItem as SearchResult);
 
-        Loaded += (_, _) => Navigation.Navigate(StartupPage());
+        Loaded += (_, _) => Navigation.Navigate(typeof(TabsPage));
         // The search box gives way on a narrow window, so the sync button never slides under the window buttons.
         SizeChanged += (_, _) => FitSearchBox();
-        Navigation.Navigated += (_, e) =>
-        {
-            UseThemeForeground(e.Page);
-            Dispatcher.BeginInvoke(System.Windows.Threading.DispatcherPriority.Loaded, ConstrainPageWidth);
-        };
+        Navigation.Navigated += (_, _) => Dispatcher.BeginInvoke(System.Windows.Threading.DispatcherPriority.Loaded, ConstrainPageWidth);
     }
 
     /// <summary>
@@ -64,25 +68,12 @@ internal partial class MainWindow : FluentWindow
     }
 
     /// <summary>
-    /// A page's text inherits its colour from WPF-UI's scroll viewer around the page. A page that opts out of it
-    /// (ScrollViewer.CanContentScroll="False", e.g. Vault, which scrolls its own list) inherits nothing and falls back
-    /// to WPF's default black, unreadable in the dark theme. Every page therefore gets the theme's text colour unless it
-    /// sets its own.
-    /// </summary>
-    private static void UseThemeForeground(object? page)
-    {
-        if (page is System.Windows.Controls.Page p && p.ReadLocalValue(ForegroundProperty) == DependencyProperty.UnsetValue)
-            p.SetResourceReference(ForegroundProperty, "TextFillColorPrimaryBrush");
-    }
-
-    /// <summary>
-    /// WPF-UI hosts pages in a scroll viewer that also scrolls horizontally, so a page is measured with infinite
-    /// width and one long line (e.g. an update tile) makes the whole page wider than the window — cards then get
-    /// clipped on the right. Disabling horizontal scrolling on the host makes every page fit the viewport.
+    /// WPF-UI hosts pages in a scroll viewer that also scrolls horizontally, so the tabs page would be measured with
+    /// infinite width and the tab strip would never fit the window. Disabling horizontal scrolling on the host makes
+    /// it fit the viewport (each tab does the same for its own page).
     /// </summary>
     private void ConstrainPageWidth()
     {
-        if (Navigation.SelectedItem is null) return;
         foreach (var viewer in FindDescendants<System.Windows.Controls.ScrollViewer>(Navigation))
         {
             // Only the hosts between the NavigationView and the page, not scroll viewers inside page content.
@@ -110,12 +101,12 @@ internal partial class MainWindow : FluentWindow
         return null;
     }
 
-    /// <summary>"--page Diagnostics" (dev/testing) opens that page instead of Home.</summary>
-    private Type StartupPage()
+    /// <summary>"--page Diagnostics" (dev/testing) opens that page's tab in front; without it the last session's tabs come back.</summary>
+    private Type? StartupPage()
     {
         var args = Environment.GetCommandLineArgs();
         var index = Array.FindIndex(args, a => a.Equals("--page", StringComparison.OrdinalIgnoreCase));
-        if (index < 0 || index + 1 >= args.Length) return typeof(HomePage);
+        if (index < 0 || index + 1 >= args.Length) return null;
         var name = args[index + 1];
         var candidates = new[] { typeof(HomePage), typeof(GeneralPage), typeof(McpPage), typeof(DiagnosticsPage), typeof(WelcomePage), typeof(WhatsNewPage) }
             .Concat(_viewModel.Groups.SelectMany(g => g.Modules).Select(m => m.SettingsPageType))
@@ -128,6 +119,7 @@ internal partial class MainWindow : FluentWindow
     {
         // Before the window has ever been shown WPF reports Left/Top as NaN (CenterScreen) and RestoreBounds as
         // Rect.Empty (infinite); only persist real, finite placements.
+        _tabs.SaveMain();
         if (!IsLoaded) return;
         var bounds = WindowState == WindowState.Normal ? new Rect(Left, Top, Width, Height) : RestoreBounds;
         if (bounds.IsEmpty || !double.IsFinite(bounds.Left) || !double.IsFinite(bounds.Top)
@@ -221,14 +213,27 @@ internal partial class MainWindow : FluentWindow
         Navigation.FooterMenuItems.Add(feedback);
     }
 
-    private static NavigationViewItem NavItem(string title, SymbolRegular icon, Type pageType) => NavItem(title, new SymbolIcon(icon), pageType);
+    private NavigationViewItem NavItem(string title, SymbolRegular icon, Type pageType) => NavItem(title, new SymbolIcon(icon), pageType);
 
-    private static NavigationViewItem NavItem(string title, IconElement icon, Type pageType) => new()
+    /// <summary>A menu entry that opens its page as a tab (or goes to its tab); no TargetPageType, so the NavigationView never navigates.</summary>
+    private NavigationViewItem NavItem(string title, IconElement icon, Type pageType)
     {
-        Content = title,
-        Icon = icon,
-        TargetPageType = pageType,
-    };
+        var item = new NavigationViewItem { Content = title, Icon = icon, Tag = pageType };
+        item.Click += (_, _) => _tabs.Open(pageType, _tabs.Main);
+        return item;
+    }
+
+    /// <summary>The menu marks the page of the main window's shown tab.</summary>
+    private void HighlightMenu(Type? page)
+    {
+        foreach (var item in Navigation.MenuItems.OfType<NavigationViewItem>().Concat(Navigation.FooterMenuItems.OfType<NavigationViewItem>()))
+        {
+            var children = item.MenuItems.OfType<NavigationViewItem>().ToList();
+            foreach (var child in children) child.IsActive = Equals(child.Tag, page);
+            // A group shows as one icon while the menu is collapsed: it lights up for its tools.
+            item.IsActive = Equals(item.Tag, page) || children.Any(c => c.IsActive);
+        }
+    }
 
     private void OnSearchTextChanged(AutoSuggestBox sender, AutoSuggestBoxTextChangedEventArgs args)
     {

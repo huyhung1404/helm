@@ -3,6 +3,18 @@
 All notable changes to Helm. The top section is used as the GitHub release body and as the Velopack release notes.
 Format: [Keep a Changelog](https://keepachangelog.com), versions follow [SemVer](https://semver.org).
 
+## [Unreleased]
+
+### Added
+- **Tabs, like a browser, on the PC and the phone.** A page no longer replaces the one you were on: the menu, Quick
+  access and search open each page in a tab of its own (or go to its tab when it is already open), and every tab keeps
+  its page as you left it. On the PC the tabs sit above the page: drag one along the strip to reorder it, drag it off
+  the strip to give it a window of its own, and drop that window on another window's strip to put the tab back
+  (the tab's menu also has "Move to new window" and "Move to main window"). Ctrl+Tab and Ctrl+Shift+Tab switch,
+  Ctrl+W and a middle click close, "+" opens any tool; the main window's tabs come back after a restart. The phone has
+  no strip (no room for one): the app bar shows the number of open tabs, and tapping it (or "Open tabs" in the menu)
+  lists them to switch, close, or open a tool in a window of its own, which Android shows beside Helm in split screen.
+
 ## [0.48.0] - 2026-10-19
 
 ### Added

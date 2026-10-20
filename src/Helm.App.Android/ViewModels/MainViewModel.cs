@@ -14,11 +14,15 @@ public sealed record NavEntry(string Title, Symbol Icon, bool IsHeader, Action? 
     public bool IsPage => !IsHeader;
 }
 
-/// <summary>The shell: app bar, navigation drawer (Home, tools by group, General) and the confirmation overlay.</summary>
+/// <summary>The shell: app bar, navigation drawer (Home, tools by group, General), the tab list and the confirmation overlay.</summary>
 public sealed partial class MainViewModel : ObservableObject
 {
     [ObservableProperty]
     private bool _isPaneOpen;
+
+    /// <summary>The list of open tabs (from the app bar's tab button or the drawer), over the page.</summary>
+    [ObservableProperty]
+    private bool _isTabsOpen;
 
     /// <summary>The sync button in the app bar.</summary>
     public Helm.Shell.ViewModels.SyncIndicatorViewModel Sync { get; }
@@ -39,7 +43,7 @@ public sealed partial class MainViewModel : ObservableObject
         }
         GeneralEntry = new NavEntry("General", Symbol.Settings, false, navigator.GoGeneral);
 
-        if (navigator.CurrentPage is null) navigator.GoHome();
+        navigator.Restore();
     }
 
     public ShellNavigator Navigator { get; }
@@ -61,7 +65,47 @@ public sealed partial class MainViewModel : ObservableObject
         IsPaneOpen = false;
     }
 
-    /// <summary>Android back: close the dialog, then the drawer, then return to Home; false lets Android leave the app.</summary>
+    [RelayCommand]
+    private void ShowTabs()
+    {
+        IsPaneOpen = false;
+        IsTabsOpen = true;
+    }
+
+    [RelayCommand]
+    private void HideTabs() => IsTabsOpen = false;
+
+    [RelayCommand]
+    private void SelectTab(ShellTab? tab)
+    {
+        if (tab is not null) Navigator.Activate(tab);
+        IsTabsOpen = false;
+    }
+
+    [RelayCommand]
+    private void CloseTab(ShellTab? tab)
+    {
+        if (tab is not null) Navigator.Close(tab);
+    }
+
+    [RelayCommand]
+    private void CloseOtherTabs()
+    {
+        if (Navigator.ActiveTab is { } active) Navigator.CloseOthers(active);
+    }
+
+    [RelayCommand]
+    private void OpenInWindow(ShellTab? tab)
+    {
+        if (tab is null) return;
+        IsTabsOpen = false;
+        Navigator.OpenInWindow(tab);
+    }
+
+    /// <summary>
+    /// Android back: close the dialog, the drawer or the tab list, then go back inside the tool, then to the Home tab
+    /// (the tool's tab stays open); false lets Android leave the app.
+    /// </summary>
     public bool HandleBack()
     {
         if (Dialogs.IsOpen)
@@ -74,13 +118,19 @@ public sealed partial class MainViewModel : ObservableObject
             IsPaneOpen = false;
             return true;
         }
+        if (IsTabsOpen)
+        {
+            IsTabsOpen = false;
+            return true;
+        }
         if (Navigator.CurrentPage is ModulePage page)
         {
             var content = (page.Module as IModuleContent)?.ContentPageType;
-            // A tool's settings page goes back to its content page, where the menu and Quick access lead.
-            if (content is not null && page.PageType != content)
+            // A tool's settings tab gives way to its content page, where the menu and Quick access lead.
+            if (content is not null && page.PageType != content && Navigator.ActiveTab is { } settings)
             {
                 Navigator.GoModuleContent(page.Module);
+                Navigator.Close(settings);
                 return true;
             }
             // A tool with its own back stack (an open item) goes back first; only on the page that shows that stack.
