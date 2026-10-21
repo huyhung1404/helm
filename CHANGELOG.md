@@ -5,6 +5,18 @@ Format: [Keep a Changelog](https://keepachangelog.com), versions follow [SemVer]
 
 ## [Unreleased]
 
+### Added
+- **Window Zones (PC): zones on your screens that keep their windows.** Draw zones on one monitor or several (the
+  editor opens from the tool's page or with Win+Shift+`), then hold Shift while you drag a window by its title bar:
+  the zones of that monitor show, and the window fits the one you drop it in. A zone holds every window you drop in
+  it, like a drawer: Ctrl+Alt+its number brings its windows back when it is closed, brings it to the front when
+  another app is in front, and minimizes them all when it is in front. Win+PgDn and Win+PgUp switch between the
+  windows of the zone in front (the keys go to the app as usual anywhere else), with the zone's windows shown as tabs
+  for a moment. Drag a window out of its zone and it gets its own size back. The tool's page lists each zone with its
+  windows: open or close it, show where it is, name it, choose its number, take a window out. Zones remember their
+  windows when Helm restarts, and a zone moved or resized in the editor takes its windows with it. The keys, the key
+  held while dragging and the look of the zones can be changed in the settings.
+
 ### Fixed
 - **Workspace Controller on the phone: the top bar's buttons line up.** The menu, History and New session icons sat a
   pixel above the middle and were each a different size, and "Aa" was text that sat lower and looked larger. They are

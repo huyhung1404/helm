@@ -207,7 +207,7 @@ The page is a `core:ModulePageBase`. It already renders the title, the icon + de
 - Card spacing is always `Margin="0,0,0,4"`. Sections are separated by `HelmSectionHeader`. The page provides the outer 24 px inset, so don't add another one.
 - Texts are English, in sentence case, and short. A description is one sentence that explains the effect.
 - Typical section order: *Activation / Shortcut* → *Behavior* → *Appearance* → *Excluded apps* → tool-specific lists.
-- Full-screen overlays or editors (like the old Zones editor) use one window per monitor, are placed in physical pixels, close on Esc, and put buttons in a `WrapPanel` so they never overlap.
+- Full-screen overlays or editors (like the Window Zones editor) use one window per monitor, are placed in physical pixels, close on Esc, and put buttons in a `WrapPanel` so they never overlap.
 
 #### Android pages
 

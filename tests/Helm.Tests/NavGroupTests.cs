@@ -22,6 +22,7 @@ public class NavGroupTests
         ["always-on-top"] = ModuleGroup.WindowsAndDesktop,
         ["shortcut-guide"] = ModuleGroup.WindowsAndDesktop,
         ["workspace-controller"] = ModuleGroup.WindowsAndDesktop,
+        ["window-zones"] = ModuleGroup.WindowsAndDesktop,
     };
 
     /// <summary>Tools on their way out; they only need some group.</summary>

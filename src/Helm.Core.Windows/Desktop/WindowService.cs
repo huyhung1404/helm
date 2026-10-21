@@ -30,6 +30,9 @@ public interface IWindowService
 
     string GetProcessName(nint hwnd);
 
+    /// <summary>Full path of the window's program (for its icon); empty when Windows does not say.</summary>
+    string GetProcessPath(nint hwnd);
+
     string GetTitle(nint hwnd);
 
     /// <summary>Visible frame bounds (excludes the invisible resize border). Falls back to GetWindowRect.</summary>
@@ -60,6 +63,12 @@ public interface IWindowService
 
     /// <summary>Restores (if minimized) and brings a window to the foreground.</summary>
     bool Activate(nint hwnd);
+
+    /// <summary>Minimizes a window to the taskbar; Windows activates the next window in line.</summary>
+    bool Minimize(nint hwnd);
+
+    /// <summary>Restores a minimized window to where it was, without taking the focus from the window in front.</summary>
+    bool RestoreWithoutActivating(nint hwnd);
 
     /// <summary>
     /// Brings the window to the foreground even when Windows' foreground lock would refuse a plain
@@ -168,7 +177,7 @@ public sealed class WindowService(ILogger<WindowService> logger) : IWindowServic
         var now = Environment.TickCount64;
         if (_processNames.TryGetValue(pid, out var cached) && now - cached.Ticks < 30_000) return cached.Name;
 
-        var name = QueryProcessName(pid);
+        var name = Path.GetFileName(QueryProcessPath(pid));
         _processNames[pid] = (name, now);
         if (_processNames.Count > 512)
         {
@@ -243,6 +252,22 @@ public sealed class WindowService(ILogger<WindowService> logger) : IWindowServic
         if (!PInvoke.IsWindow(h)) return false;
         if (PInvoke.IsIconic(h)) PInvoke.ShowWindow(h, SHOW_WINDOW_CMD.SW_RESTORE);
         return PInvoke.SetForegroundWindow(h);
+    }
+
+    public bool Minimize(nint hwnd)
+    {
+        var h = hwnd.ToHwnd();
+        if (!PInvoke.IsWindow(h)) return false;
+        if (!PInvoke.IsIconic(h)) PInvoke.ShowWindow(h, SHOW_WINDOW_CMD.SW_MINIMIZE);
+        return true;
+    }
+
+    public bool RestoreWithoutActivating(nint hwnd)
+    {
+        var h = hwnd.ToHwnd();
+        if (!PInvoke.IsWindow(h)) return false;
+        if (PInvoke.IsIconic(h)) PInvoke.ShowWindow(h, SHOW_WINDOW_CMD.SW_SHOWNOACTIVATE);
+        return true;
     }
 
     public bool ForceActivate(nint hwnd)
@@ -375,7 +400,13 @@ public sealed class WindowService(ILogger<WindowService> logger) : IWindowServic
         }
     }
 
-    private static string QueryProcessName(int pid)
+    public string GetProcessPath(nint hwnd)
+    {
+        var pid = GetProcessId(hwnd);
+        return pid == 0 ? string.Empty : QueryProcessPath(pid);
+    }
+
+    private static string QueryProcessPath(int pid)
     {
         var handle = PInvoke.OpenProcess(PROCESS_ACCESS_RIGHTS.PROCESS_QUERY_LIMITED_INFORMATION, false, (uint)pid);
         if (handle.IsNull) return string.Empty;
@@ -384,7 +415,7 @@ public sealed class WindowService(ILogger<WindowService> logger) : IWindowServic
             Span<char> buffer = stackalloc char[1024];
             var size = (uint)buffer.Length;
             if (!PInvoke.QueryFullProcessImageName(handle, PROCESS_NAME_FORMAT.PROCESS_NAME_WIN32, buffer, ref size)) return string.Empty;
-            return Path.GetFileName(new string(buffer[..(int)size]));
+            return new string(buffer[..(int)size]);
         }
         finally
         {

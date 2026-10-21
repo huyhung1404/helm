@@ -1,0 +1,55 @@
+<Window
+    x:Class="Helm.Modules.WindowZones.Editor.EditorWindow"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
+    Title="Window Zones editor"
+    AllowsTransparency="True"
+    WindowStyle="None"
+    ResizeMode="NoResize"
+    ShowInTaskbar="False"
+    Topmost="True"
+    Foreground="{DynamicResource TextFillColorPrimaryBrush}"
+    WindowStartupLocation="Manual"
+    Left="0" Top="0" Width="800" Height="600">
+
+    <!-- The zones of one monitor; the toolbar sits on the monitor the editor was opened on. The see-through dark
+         background is set in code (EditorWindow.xaml.cs) so no colour is hard-coded here. -->
+    <Grid>
+        <ContentPresenter x:Name="CanvasHost" />
+
+        <!-- Other monitors: a small caption so it is clear the editor is open there too -->
+        <Border HorizontalAlignment="Center" VerticalAlignment="Top" Margin="24" CornerRadius="8" Padding="12,6"
+                Background="{DynamicResource ApplicationBackgroundBrush}" IsHitTestVisible="False"
+                Visibility="{Binding IsHome, Converter={StaticResource InverseBoolToVisibility}}">
+            <TextBlock Text="{Binding MonitorCaption}" FontSize="12" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+        </Border>
+
+        <!-- Toolbar (home monitor) -->
+        <Border HorizontalAlignment="Center" VerticalAlignment="Top" Margin="24" MaxWidth="860" CornerRadius="10" Padding="14,10" BorderThickness="1"
+                Background="{DynamicResource ApplicationBackgroundBrush}" BorderBrush="{DynamicResource SurfaceStrokeColorDefaultBrush}"
+                Visibility="{Binding IsHome, Converter={StaticResource BoolToVisibility}}">
+            <StackPanel>
+                <DockPanel Margin="4,0,4,6">
+                    <TextBlock DockPanel.Dock="Right" Text="{Binding Session.Summary}" VerticalAlignment="Center" Margin="12,0,0,0"
+                               FontSize="12" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+                    <TextBlock Text="Window Zones" FontSize="16" FontWeight="SemiBold" />
+                </DockPanel>
+                <WrapPanel>
+                    <ui:Button Content="Split ↔" Icon="{ui:SymbolIcon SplitVertical24}" Command="{Binding Session.SplitVerticalCommand}" Margin="4"
+                               IsEnabled="{Binding Session.CanEditZone}" ToolTip="Split the selected zone into left and right halves" />
+                    <ui:Button Content="Split ↕" Icon="{ui:SymbolIcon SplitHorizontal24}" Command="{Binding Session.SplitHorizontalCommand}" Margin="4"
+                               IsEnabled="{Binding Session.CanEditZone}" ToolTip="Split the selected zone into top and bottom halves" />
+                    <ui:Button Content="Delete zone" Icon="{ui:SymbolIcon Delete24}" Command="{Binding Session.DeleteZoneCommand}" Margin="4"
+                               IsEnabled="{Binding Session.CanEditZone}" ToolTip="Delete the selected zone (Del)" />
+                    <ui:Button Content="Delete all" Icon="{ui:SymbolIcon DeleteDismiss24}" Command="{Binding Session.DeleteAllCommand}" Margin="4"
+                               ToolTip="Remove every zone and start again" />
+                    <ui:Button Content="Save" Appearance="Primary" Icon="{ui:SymbolIcon Save24}" Command="{Binding Session.SaveCommand}" Margin="4"
+                               ToolTip="Save the zones (Ctrl+Enter). Windows in a zone follow it." />
+                    <ui:Button Content="Cancel" Command="{Binding Session.CloseCommand}" Margin="4" ToolTip="Close without saving (Esc)" />
+                </WrapPanel>
+                <TextBlock Text="{Binding Session.Hint}" FontSize="12" Margin="4,6,4,0" TextWrapping="Wrap" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+            </StackPanel>
+        </Border>
+    </Grid>
+</Window>

@@ -6,6 +6,7 @@ using Helm.Modules.ShortcutGuide;
 using Helm.Modules.Ssh;
 using Helm.Modules.Scratch;
 using Helm.Modules.Vault;
+using Helm.Modules.WindowZones;
 using Helm.Modules.Tracker;
 using Helm.Modules.Wallet;
 using Helm.Modules.Workspace;
@@ -31,6 +32,7 @@ internal static class HelmModules
         services.AddSshModule();
         services.AddQuickCaptureModule();
         services.AddShortcutGuideModule();
+        services.AddWindowZonesModule();
         services.AddWorkspaceModule();
 
         // Built but hidden; re-enable with (using Helm.Modules.AlwaysOnTop;):

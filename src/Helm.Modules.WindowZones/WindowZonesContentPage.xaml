@@ -1,0 +1,98 @@
+<Page
+    x:Class="Helm.Modules.WindowZones.WindowZonesContentPage"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
+    xmlns:core="clr-namespace:Helm.Core.Ui;assembly=Helm.Core.Windows"
+    xmlns:local="clr-namespace:Helm.Modules.WindowZones"
+    Title="Window Zones">
+
+    <!-- The zones and their windows (menu and Quick access). Its options live on WindowZonesPage (Home → Utilities). -->
+    <Page.Resources>
+        <!-- Small icon-only action button in a list row -->
+        <Style x:Key="RowAction" TargetType="ui:Button" BasedOn="{StaticResource {x:Type ui:Button}}">
+            <Setter Property="Appearance" Value="Transparent" />
+            <Setter Property="Padding" Value="6" />
+            <Setter Property="Margin" Value="4,0,0,0" />
+            <Setter Property="MinWidth" Value="0" />
+            <Setter Property="VerticalAlignment" Value="Center" />
+        </Style>
+
+        <DataTemplate x:Key="WindowRow" DataType="{x:Type local:ZoneWindowRowViewModel}">
+            <Border BorderThickness="0,1,0,0" BorderBrush="{DynamicResource CardStrokeColorDefaultBrush}" Padding="0,6">
+                <DockPanel>
+                    <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
+                        <ui:Button Style="{StaticResource RowAction}" Icon="{ui:SymbolIcon Open24}" ToolTip="Bring this window to the front, in its zone"
+                                   AutomationProperties.Name="Show window" Command="{Binding ShowCommand}" />
+                        <ui:Button Style="{StaticResource RowAction}" Icon="{ui:SymbolIcon Dismiss24}" ToolTip="Take it out of the zone (the window stays where it is)"
+                                   AutomationProperties.Name="Take out of the zone" Command="{Binding ReleaseCommand}" />
+                    </StackPanel>
+                    <Image DockPanel.Dock="Left" Width="20" Height="20" Margin="0,0,12,0" VerticalAlignment="Center" Source="{Binding Icon}"
+                           RenderOptions.BitmapScalingMode="HighQuality" />
+                    <StackPanel VerticalAlignment="Center">
+                        <TextBlock Text="{Binding Title}" TextTrimming="CharacterEllipsis" />
+                        <TextBlock Text="{Binding Detail}" FontSize="12" Style="{DynamicResource HelmSecondaryText}" TextTrimming="CharacterEllipsis" />
+                    </StackPanel>
+                </DockPanel>
+            </Border>
+        </DataTemplate>
+
+        <DataTemplate x:Key="ZoneCard" DataType="{x:Type local:ZoneCardViewModel}">
+            <Border Margin="0,0,0,4" Padding="16,12" CornerRadius="8" BorderThickness="1"
+                    Background="{DynamicResource CardBackgroundFillColorDefaultBrush}" BorderBrush="{DynamicResource CardStrokeColorDefaultBrush}">
+                <StackPanel>
+                    <core:RowLayout>
+                        <StackPanel>
+                            <WrapPanel>
+                                <core:Keycaps Keys="{Binding ShortcutCaps}" Margin="0,0,12,4" VerticalAlignment="Center" />
+                                <ui:TextBox Width="220" Margin="0,0,0,4" Text="{Binding Name, UpdateSourceTrigger=LostFocus}" PlaceholderText="{Binding Label}"
+                                            AutomationProperties.Name="Zone name" ToolTip="A name for the zone, shown with its number" />
+                            </WrapPanel>
+                            <TextBlock Text="{Binding StateText}" TextWrapping="Wrap" />
+                            <TextBlock Text="{Binding MonitorName}" FontSize="12" Style="{DynamicResource HelmSecondaryText}" />
+                        </StackPanel>
+                        <WrapPanel HorizontalAlignment="Right" VerticalAlignment="Center">
+                            <ComboBox Width="140" Margin="4" ItemsSource="{Binding NumberOptions}" SelectedIndex="{Binding NumberIndex}"
+                                      AutomationProperties.Name="Zone shortcut" ToolTip="The shortcut that opens and closes this zone" />
+                            <ui:Button Margin="4" Icon="{ui:SymbolIcon Eye24}" Content="Where" Command="{Binding ShowWhereCommand}"
+                                       IsEnabled="{Binding IsConnected}" ToolTip="Light up the zone on its screen for a moment" />
+                            <ui:Button Margin="4" Icon="{ui:SymbolIcon ArrowMaximize24}" Content="Open" Command="{Binding OpenCommand}"
+                                       IsEnabled="{Binding CanOpen}" Visibility="{Binding IsClosed, Converter={StaticResource BoolToVisibility}}"
+                                       ToolTip="Bring its windows back" />
+                            <ui:Button Margin="4" Icon="{ui:SymbolIcon ArrowMinimize24}" Content="Close" Command="{Binding CloseCommand}"
+                                       IsEnabled="{Binding CanOpen}" Visibility="{Binding IsClosed, Converter={StaticResource InverseBoolToVisibility}}"
+                                       ToolTip="Minimize its windows" />
+                        </WrapPanel>
+                    </core:RowLayout>
+                    <ItemsControl Margin="0,8,0,0" ItemsSource="{Binding Windows}" ItemTemplate="{StaticResource WindowRow}" Focusable="False"
+                                  Visibility="{Binding HasWindows, Converter={StaticResource BoolToVisibility}}" />
+                </StackPanel>
+            </Border>
+        </DataTemplate>
+    </Page.Resources>
+
+    <StackPanel Margin="24,16,24,24">
+        <TextBlock Text="Window Zones" FontSize="28" FontWeight="SemiBold" Margin="0,0,0,20" />
+
+        <!-- Shown while the tool is turned off -->
+        <ui:InfoBar x:Name="OffBar" Severity="Informational" IsClosable="False" IsOpen="False" Visibility="Collapsed" Margin="0,0,0,8"
+                    Title="Window Zones is turned off" Message="Your zones are kept, and closed zones keep their windows minimized. Turn Window Zones on in its settings to use them." />
+
+        <StackPanel x:Name="Body">
+            <!-- The zones themselves: draw and change them in the editor -->
+            <ui:CardControl Margin="0,0,0,4">
+                <ui:CardControl.Icon>
+                    <ui:ImageIcon Width="24" Height="24" Source="{x:Static local:WindowZonesLogo.Image}" />
+                </ui:CardControl.Icon>
+                <ui:CardControl.Header>
+                    <core:CardHeader Title="Zones" Description="{Binding Summary}" />
+                </ui:CardControl.Header>
+                <ui:Button Appearance="Primary" Icon="{ui:SymbolIcon Edit24}" Content="Edit zones" Command="{Binding OpenEditorCommand}"
+                           ToolTip="Draw, move and resize zones on every monitor" />
+            </ui:CardControl>
+
+            <TextBlock Text="Your zones" Style="{DynamicResource HelmSectionHeader}" Visibility="{Binding HasZones, Converter={StaticResource BoolToVisibility}}" />
+            <ItemsControl ItemsSource="{Binding Zones}" ItemTemplate="{StaticResource ZoneCard}" Focusable="False" />
+        </StackPanel>
+    </StackPanel>
+</Page>
