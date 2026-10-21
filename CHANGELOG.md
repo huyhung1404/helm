@@ -3,7 +3,7 @@
 All notable changes to Helm. The top section is used as the GitHub release body and as the Velopack release notes.
 Format: [Keep a Changelog](https://keepachangelog.com), versions follow [SemVer](https://semver.org).
 
-## [Unreleased]
+## [0.51.0] - 2026-10-21
 
 ### Added
 - **Window Zones (PC): zones on your screens that keep their windows.** Draw zones on one monitor or several (the
