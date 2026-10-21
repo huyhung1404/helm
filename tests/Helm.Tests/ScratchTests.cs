@@ -706,6 +706,48 @@ public sealed class ScratchTests : IDisposable
         Assert.Equal(ScratchFilter.Text, second.Filter);
     }
 
+    // ---- Quick Capture -------------------------------------------------------------------------------------------
+
+    [Fact]
+    public async Task Quick_Capture_saves_text_into_Scratch_and_long_text_as_a_file()
+    {
+        var store = NewLocal("a").Store;
+        var target = new ScratchCaptureTarget(new ScratchImporter(store, new FakePlatform(Path.Combine(_dir, "open")), new FixedDevice()));
+
+        Assert.False(target.Preview("  \n ").CanSave);
+        var preview = target.Preview("https://example.com\nsecond line");
+        Assert.True(preview.CanSave);
+        Assert.Contains("https://example.com", preview.Text);
+
+        var result = target.Capture("https://example.com\r\nsecond line");
+        Assert.True(result.Saved);
+        var text = Assert.Single(store.Items(ScratchFilter.Text)).Value;
+        Assert.Equal("https://example.com\nsecond line", text.Text);
+        Assert.Equal("Test PC", text.AddedFrom);
+
+        var longText = new string('x', ScratchItem.MaxTextLength + 1);
+        Assert.Contains(".txt", target.Preview(longText).Text);
+        Assert.True(target.Capture(longText).Saved);
+        var file = Assert.Single(store.Items(ScratchFilter.Files)).Value;
+        using var read = new MemoryStream();
+        await store.ReadAsync(file, read);
+        Assert.Equal(longText, Encoding.UTF8.GetString(read.ToArray()));
+
+        Assert.False(target.Capture("   ").Saved);
+    }
+
+    [Fact]
+    public void Quick_Capture_routes_the_c_prefix_to_Scratch()
+    {
+        var store = NewLocal("a").Store;
+        var scratch = new ScratchCaptureTarget(new ScratchImporter(store, new FakePlatform(Path.Combine(_dir, "open")), new FixedDevice()));
+
+        var (target, text) = CaptureRouter.Resolve([scratch], null, "/c 482913");
+
+        Assert.Same(scratch, target);
+        Assert.Equal("482913", text);
+    }
+
     // ---- Helpers -------------------------------------------------------------------------------------------------
 
     private sealed record Device(ScratchStore Store, BlobStore Blobs, SyncEngine? Engine, SyncedCollection<ScratchClipboardSignal>? Signals = null);

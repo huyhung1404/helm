@@ -263,7 +263,7 @@ The page is a `core:ModulePageBase`. It already renders the title, the icon + de
   search open the settings page (§4).
 - **Quick Capture** (optional, both platforms): a tool whose data can be written from one line of text registers an
   `ICaptureTarget` (`Helm.Core.Capture`) in its `.Core` services, e.g. `services.AddSingleton<ICaptureTarget, MyTarget>()`.
-  Give it a one-letter `Prefix` that is not taken (`n` Notes, `t` task, `d` debt, `m` mission, `s` spending), a `Preview` that says what Enter
+  Give it a one-letter `Prefix` that is not taken (`n` Notes, `t` task, `d` debt, `m` mission, `s` spending, `c` Scratch), a `Preview` that says what Enter
   will do, and never throw. See `NoteCaptureTarget`, `TaskCaptureTarget`.
 - Quick Capture does not reference a tool: it finds targets in DI and offers only those of tools that are on.
 

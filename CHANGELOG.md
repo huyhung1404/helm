@@ -3,6 +3,13 @@
 All notable changes to Helm. The top section is used as the GitHub release body and as the Velopack release notes.
 Format: [Keep a Changelog](https://keepachangelog.com), versions follow [SemVer](https://semver.org).
 
+## [Unreleased]
+
+### Added
+- **Quick Capture sends to Scratch.** The capture box (and its Android version) has a Scratch button: a link, an
+  address or a code typed there goes into Scratch as text and reaches your other devices on the next sync. Type `/c`
+  at the start to pick it, e.g. `/c https://…`. Scratch can also be chosen as where Quick Capture saves first.
+
 ## [0.51.0] - 2026-10-21
 
 ### Added

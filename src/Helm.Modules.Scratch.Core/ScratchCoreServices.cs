@@ -17,6 +17,8 @@ public static class ScratchCoreServices
         services.AddSyncGroup("scratch.", ScratchIds.DisplayName);
         services.AddSingleton(sp => new ScratchStore(sp.GetRequiredService<ISyncedCollection<ScratchItem>>(), sp.GetRequiredService<BlobStore>()));
         services.AddSingleton<ScratchImporter>();
+        // Quick Capture: "/c https://…".
+        services.AddSingleton<Helm.Core.Capture.ICaptureTarget, ScratchCaptureTarget>();
         services.AddSyncedCollection(ScratchClipboardRelay.Options);
         services.AddSingleton<ScratchClipboardRelay>();
         // Windows registers it again through AddHelmModule; one instance either way.
