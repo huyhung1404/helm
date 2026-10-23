@@ -131,7 +131,8 @@ GetStockObject
 DrawText
 SetBkMode
 SetTextColor
-CreateFont
+CreateFontIndirect
+GetPixel
 CreateCompatibleDC
 CreateCompatibleBitmap
 DeleteDC

@@ -185,7 +185,7 @@ internal sealed class AlwaysOnTopEngine : IAsyncDisposable
                 {
                     var o = _options;
                     canvas.Frame(new PixelRect(0, 0, canvas.Width, canvas.Height), o.Color, o.Thickness);
-                }, title: "Helm pinned border");
+                }, title: "Helm pinned border", logger: _logger);
             }
             catch (Exception ex)
             {

@@ -635,7 +635,7 @@ internal sealed class WindowZonesEngine : IAsyncDisposable
         {
             try
             {
-                _overlay = OverlayWindow.Create(Paint, _options.OverlayAlpha, "Helm window zones");
+                _overlay = OverlayWindow.Create(Paint, _options.OverlayAlpha, "Helm window zones", _logger);
             }
             catch (Exception ex)
             {

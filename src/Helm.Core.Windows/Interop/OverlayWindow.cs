@@ -1,5 +1,6 @@
 using System.Collections.Concurrent;
 using Helm.Core.Geometry;
+using Microsoft.Extensions.Logging;
 using Windows.Win32;
 using Windows.Win32.Foundation;
 using Windows.Win32.Graphics.Gdi;
@@ -37,15 +38,17 @@ public sealed class OverlayWindow : IDisposable
     private static bool s_classRegistered;
 
     private readonly Action<IOverlayCanvas> _paint;
+    private readonly ILogger? _logger;
     private readonly int _threadId = Environment.CurrentManagedThreadId;
     private HWND _hwnd;
     private byte _alpha;
     private PixelRect _bounds;
 
-    private OverlayWindow(Action<IOverlayCanvas> paint, byte alpha)
+    private OverlayWindow(Action<IOverlayCanvas> paint, byte alpha, ILogger? logger)
     {
         _paint = paint;
         _alpha = alpha;
+        _logger = logger;
     }
 
     public nint Handle => _hwnd;
@@ -64,10 +67,14 @@ public sealed class OverlayWindow : IDisposable
         }
     }
 
-    public static OverlayWindow Create(Action<IOverlayCanvas> paint, byte alpha = 255, string title = "Helm overlay")
+    /// <summary>
+    /// Creates the (hidden) overlay. A paint callback that throws is logged to <paramref name="logger"/>: an exception
+    /// must never leave the window procedure, where it would end the whole app.
+    /// </summary>
+    public static OverlayWindow Create(Action<IOverlayCanvas> paint, byte alpha = 255, string title = "Helm overlay", ILogger? logger = null)
     {
         EnsureClassRegistered();
-        var window = new OverlayWindow(paint, alpha);
+        var window = new OverlayWindow(paint, alpha, logger);
         var ex = WINDOW_EX_STYLE.WS_EX_LAYERED | WINDOW_EX_STYLE.WS_EX_TRANSPARENT | WINDOW_EX_STYLE.WS_EX_TOOLWINDOW
                  | WINDOW_EX_STYLE.WS_EX_NOACTIVATE | WINDOW_EX_STYLE.WS_EX_TOPMOST;
         unsafe
@@ -171,9 +178,45 @@ public sealed class OverlayWindow : IDisposable
                 PInvoke.DeleteDC(memDc);
             }
         }
+        catch (Exception ex)
+        {
+            // Inside the window procedure: an exception here would end the app. Log it and draw nothing.
+            _logger?.LogError(ex, "An overlay could not be drawn");
+        }
         finally
         {
             PInvoke.EndPaint(_hwnd, ps);
+        }
+    }
+
+    /// <summary>
+    /// Draws <paramref name="paint"/> on an off-screen bitmap and counts the pixels it painted (anything but
+    /// <see cref="TransparentKey"/>). Exercises the real GDI calls without a window (tests).
+    /// </summary>
+    internal static int DrawOffScreen(int width, int height, Action<IOverlayCanvas> paint)
+    {
+        var screen = PInvoke.GetDC(default);
+        var memDc = PInvoke.CreateCompatibleDC(screen);
+        var bitmap = PInvoke.CreateCompatibleBitmap(screen, width, height);
+        var old = PInvoke.SelectObject(memDc, bitmap);
+        try
+        {
+            var canvas = new GdiCanvas(memDc, width, height);
+            canvas.Fill(new PixelRect(0, 0, width, height), TransparentKey);
+            paint(canvas);
+            var key = TransparentKey.ToColorRef();
+            var painted = 0;
+            for (var y = 0; y < height; y++)
+                for (var x = 0; x < width; x++)
+                    if (PInvoke.GetPixel(memDc, x, y) != key) painted++;
+            return painted;
+        }
+        finally
+        {
+            PInvoke.SelectObject(memDc, old);
+            PInvoke.DeleteObject(bitmap);
+            PInvoke.DeleteDC(memDc);
+            PInvoke.ReleaseDC(default, screen);
         }
     }
 
@@ -219,6 +262,25 @@ public sealed class OverlayWindow : IDisposable
         public int Width { get; } = width;
         public int Height { get; } = height;
 
+        /// <summary>
+        /// Segoe UI at <paramref name="pixelHeight"/>. CreateFontIndirect, not CreateFont: the generated CreateFont
+        /// cannot marshal its one-byte charset argument and throws (that took the app down on the first label).
+        /// </summary>
+        private static unsafe HFONT CreateFont(int pixelHeight, bool bold)
+        {
+            var font = new LOGFONTW
+            {
+                lfHeight = -pixelHeight,
+                lfWeight = bold ? 600 : 400,
+                lfCharSet = FONT_CHARSET.DEFAULT_CHARSET,
+                lfOutPrecision = FONT_OUTPUT_PRECISION.OUT_DEFAULT_PRECIS,
+                lfClipPrecision = FONT_CLIP_PRECISION.CLIP_DEFAULT_PRECIS,
+                lfQuality = FONT_QUALITY.CLEARTYPE_QUALITY,
+            };
+            "Segoe UI".AsSpan().CopyTo(font.lfFaceName.AsSpan());
+            return PInvoke.CreateFontIndirect(&font);
+        }
+
         public void Fill(PixelRect rect, RgbColor color)
         {
             if (rect.IsEmpty) return;
@@ -240,9 +302,8 @@ public sealed class OverlayWindow : IDisposable
         public void Text(PixelRect rect, string text, RgbColor color, int pixelHeight, bool bold = true)
         {
             if (rect.IsEmpty || string.IsNullOrEmpty(text)) return;
-            var font = PInvoke.CreateFont(-pixelHeight, 0, 0, 0, bold ? 600 : 400, 0, 0, 0,
-                FONT_CHARSET.DEFAULT_CHARSET, FONT_OUTPUT_PRECISION.OUT_DEFAULT_PRECIS, FONT_CLIP_PRECISION.CLIP_DEFAULT_PRECIS,
-                FONT_QUALITY.CLEARTYPE_QUALITY, 0, "Segoe UI");
+            var font = CreateFont(pixelHeight, bold);
+            if (font.IsNull) return;
             var old = PInvoke.SelectObject(hdc, font);
             try
             {

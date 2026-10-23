@@ -10,6 +10,12 @@ Format: [Keep a Changelog](https://keepachangelog.com), versions follow [SemVer]
   address or a code typed there goes into Scratch as text and reaches your other devices on the next sync. Type `/c`
   at the start to pick it, e.g. `/c https://…`. Scratch can also be chosen as where Quick Capture saves first.
 
+### Fixed
+- **Window Zones: a zone's shortcut no longer freezes the mouse and closes Helm.** Pressing Ctrl+Alt+number for an
+  empty zone (or showing zone numbers while dragging) drew text in a way Windows' font call could not take; the error
+  ended Helm, and while it was closing the mouse and keyboard hooks it still held made the whole PC stutter. The text
+  is now drawn the right way, and a drawing error in any of Helm's overlays is logged instead of closing the app.
+
 ## [0.51.0] - 2026-10-21
 
 ### Added
