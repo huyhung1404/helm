@@ -3,7 +3,7 @@
 All notable changes to Helm. The top section is used as the GitHub release body and as the Velopack release notes.
 Format: [Keep a Changelog](https://keepachangelog.com), versions follow [SemVer](https://semver.org).
 
-## [Unreleased]
+## [0.52.0] - 2026-10-23
 
 ### Added
 - **Quick Capture sends to Scratch.** The capture box (and its Android version) has a Scratch button: a link, an
