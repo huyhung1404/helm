@@ -197,6 +197,11 @@
                                             <TextBlock Text="{Binding Subtitle}" Classes="secondary" />
                                             <TextBlock Text="{Binding Names}" Classes="secondary" IsVisible="{Binding HasNames}" />
                                             <TextBlock Text="{Binding Status}" Foreground="{DynamicResource AccentText}" FontSize="12" IsVisible="{Binding HasStatus}" />
+                                            <!-- A web novel: new chapters found, and asking the PC to download them (the phone has no browser for it) -->
+                                            <TextBlock Text="{Binding SourceStatus}" Classes="secondary" TextWrapping="Wrap" IsVisible="{Binding HasSource}" />
+                                            <Button Classes="chip" Margin="0,4,0,0" Content="Get new chapters (on the PC)" IsVisible="{Binding HasSource}"
+                                                    IsEnabled="{Binding !IsUpdateRequested}"
+                                                    Command="{Binding $parent[ItemsControl].((vm:NovelReaderViewModel)DataContext).RequestUpdateCommand}" CommandParameter="{Binding}" />
                                             <StackPanel Orientation="Horizontal" Margin="0,6,0,0" IsVisible="{Binding IsNotRenaming}">
                                                 <Button Classes="accent" Content="Read"
                                                         Command="{Binding $parent[ItemsControl].((vm:NovelReaderViewModel)DataContext).OpenBookCommand}" CommandParameter="{Binding}" />

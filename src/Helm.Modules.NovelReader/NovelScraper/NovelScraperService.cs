@@ -126,7 +126,11 @@ public sealed partial class NovelScraperService
         _logger.LogInformation("Scraper started for {Url} ({Mode})", start, existingPort is not null ? "open browser" : quiet ? "quiet" : "own Edge");
         var list = await ReadChapterListAsync(browser, start, quiet, progress, ct);
         var cover = await DownloadCoverAsync(browser.Tab, list, ct);
-        var result = await ReadChaptersAsync(browser, list, have, progress, early, ct);
+        // A Traditional Chinese novel comes out in Simplified (NovelReaderSettings.ConvertTraditional).
+        var simplify = _settings.Current.ConvertTraditional;
+        Action<ScrapeResult>? first = early is null ? null : r => early(simplify ? ScrapedBook.Simplified(r) : r);
+        var result = await ReadChaptersAsync(browser, list, have, progress, first, ct);
+        if (simplify) result = ScrapedBook.Simplified(result);
         return result with { Cover = cover };
     }
 

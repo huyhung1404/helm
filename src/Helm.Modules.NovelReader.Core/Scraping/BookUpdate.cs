@@ -1,5 +1,6 @@
 using System.Text;
 using Helm.Modules.NovelReader.Books;
+using Helm.Modules.NovelReader.Text;
 
 namespace Helm.Modules.NovelReader.Scraping;
 
@@ -87,9 +88,9 @@ public static class BookUpdate
 
     /// <summary>
     /// How a title is matched: as written into the text (<see cref="ScrapedBook.Heading"/>: cut, maybe in 【】), letters
-    /// and digits only, so a list's "蓝念到底是谁？" is the novel's "【蓝念到底是谁？】".
+    /// and digits only, in Simplified, so a list's "藍念到底是誰？" is the novel's "【蓝念到底是谁？】".
     /// </summary>
-    private static string MatchKey(string title) => Key(ScrapedBook.Heading(title));
+    private static string MatchKey(string title) => Key(TraditionalChinese.ToSimplified(ScrapedBook.Heading(title)));
 
     private static List<Chapter> Own(IReadOnlyList<Chapter> existing) => existing.Where(c => !IsEmpty(c, existing.Count)).ToList();
 

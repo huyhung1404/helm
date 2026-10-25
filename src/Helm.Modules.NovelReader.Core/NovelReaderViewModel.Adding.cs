@@ -74,6 +74,9 @@ public sealed partial class NovelReaderViewModel
         try
         {
             var text = await Task.Run(() => TextFiles.ReadAllText(path));
+            // A Traditional Chinese file is kept in Simplified, which the dictionaries read far better.
+            var convert = ConvertTraditional;
+            text = await Task.Run(() => convert && TraditionalChinese.Looks(text) ? TraditionalChinese.ToSimplified(text) : text);
             var chapters = await Task.Run(() => ChapterSplitter.Split(text));
             ResetAdd();
             _addPath = path;

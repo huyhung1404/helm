@@ -252,6 +252,25 @@ public sealed class NovelScraperTests
     }
 
     [Fact]
+    public void A_traditional_novel_is_stored_in_simplified_and_its_chapters_still_match_the_traditional_list()
+    {
+        const string traditional = "田鑫源抓了抓頭發，有些懊惱為什麽會被唐緒煜拐騙過來啊？就因為他說我在這劇裏能找到對象？";
+        Assert.True(Helm.Modules.NovelReader.Text.TraditionalChinese.Looks(traditional));
+        Assert.False(Helm.Modules.NovelReader.Text.TraditionalChinese.Looks("林宛撑着一柄素色油纸伞，沿着蜿蜒的山路缓步而行。"));
+        Assert.Equal("田鑫源抓了抓头发，有些懊恼为什么会被唐绪煜拐骗过来啊？就因为他说我在这剧里能找到对象？",
+            Helm.Modules.NovelReader.Text.TraditionalChinese.ToSimplified(traditional));
+
+        var result = ScrapedBook.Simplified(new ScrapeResult("黎闕閣牽", "https://x.com/",
+            [new ScrapeItem(L("第 1 章 藍念到底是誰？", "u1"), ScrapeOutcome.Got, new ScrapedChapter("第 1 章 藍念到底是誰？", [traditional]))]));
+        Assert.Equal("黎阙阁牵", result.Title);
+        Assert.Equal("第 1 章 蓝念到底是谁？", result.Items[0].Chapter!.Title);
+
+        // Continuing: the site still lists Traditional titles; the stored chapter is Simplified.
+        Chapter[] have = [new("第 1 章 蓝念到底是谁？", ["正文。"])];
+        Assert.Empty(BookUpdate.Missing(have, [L("第 1 章 藍念到底是誰？", "u1")]));
+    }
+
+    [Fact]
     public void An_empty_novel_takes_every_chapter_that_came()
     {
         var empty = ChapterSplitter.Split("");

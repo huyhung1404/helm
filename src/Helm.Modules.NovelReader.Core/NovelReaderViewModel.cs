@@ -114,6 +114,7 @@ public sealed partial class NovelReaderViewModel : ObservableObject, IReadAloudH
     [ObservableProperty] private bool _continueToNextChapter;
     [ObservableProperty] private int _prefetchChapters;
     [ObservableProperty] private int _scrapeTabs;
+    [ObservableProperty] private bool _convertTraditional;
 
     // Adding a novel
     [ObservableProperty] private bool _isAdding;
@@ -220,6 +221,7 @@ public sealed partial class NovelReaderViewModel : ObservableObject, IReadAloudH
         ContinueToNextChapter = s.ContinueToNextChapter;
         PrefetchChapters = Math.Clamp(s.PrefetchChapters, 1, ReadAloudController.MaxPrefetchChapters);
         ScrapeTabs = Math.Clamp(s.ScrapeTabs, 1, 5);
+        ConvertTraditional = s.ConvertTraditional;
         FallbackToOfflineVoice = s.FallbackToOfflineVoice;
         LocalVoiceFolder = s.LocalVoiceFolder ?? "";
         LocalVoicePort = s.LocalVoicePort;
@@ -431,6 +433,7 @@ public sealed partial class NovelReaderViewModel : ObservableObject, IReadAloudH
     partial void OnContinueToNextChapterChanged(bool value) => Save(s => s.ContinueToNextChapter = value);
     partial void OnPrefetchChaptersChanged(int value) => Save(s => s.PrefetchChapters = value);
     partial void OnScrapeTabsChanged(int value) => Save(s => s.ScrapeTabs = value);
+    partial void OnConvertTraditionalChanged(bool value) => Save(s => s.ConvertTraditional = value);
     partial void OnFallbackToOfflineVoiceChanged(bool value) => Save(s => s.FallbackToOfflineVoice = value);
     partial void OnIsSpeakingChanged(bool value) => OnPropertyChanged(nameof(ShowBackToReading));
     partial void OnIsFollowingChanged(bool value) => OnPropertyChanged(nameof(ShowBackToReading));

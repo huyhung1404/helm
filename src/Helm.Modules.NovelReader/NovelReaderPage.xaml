@@ -309,6 +309,13 @@
             </StackPanel>
         </ui:CardControl>
 
+        <ui:CardControl Margin="0,0,0,4" Icon="{ui:SymbolIcon Translate24}">
+            <ui:CardControl.Header>
+                <core:CardHeader Title="Store Traditional Chinese as Simplified" Description="A novel written in Traditional characters (added or scraped) is kept in Simplified: the dictionaries are written in Simplified and read it far better." />
+            </ui:CardControl.Header>
+            <ui:ToggleSwitch AutomationProperties.Name="Store Traditional Chinese as Simplified" IsChecked="{Binding ConvertTraditional}" />
+        </ui:CardControl>
+
         <!-- Names -->
         <TextBlock Text="Your names" Style="{DynamicResource HelmSectionHeader}" />
         <ui:CardControl Margin="0,0,0,4" Icon="{ui:SymbolIcon People24}">

@@ -1,5 +1,6 @@
 using System.Text.RegularExpressions;
 using Helm.Modules.NovelReader.Books;
+using Helm.Modules.NovelReader.Text;
 
 namespace Helm.Modules.NovelReader.Scraping;
 
@@ -52,6 +53,27 @@ public static partial class ScrapedBook
             changed = title != before;
         }
         return title;
+    }
+
+    /// <summary>
+    /// The scrape in Simplified Chinese when it is Traditional (its title and first chapters tell), so the dictionaries
+    /// read it well; else as it is.
+    /// </summary>
+    public static ScrapeResult Simplified(ScrapeResult result)
+    {
+        var sample = string.Join("\n", result.Items.Where(i => i.Chapter is not null).Take(3)
+            .SelectMany(i => i.Chapter!.Paragraphs.Take(60).Prepend(i.Chapter.Title)).Prepend(result.Title));
+        if (!TraditionalChinese.Looks(sample)) return result;
+        static string S(string text) => TraditionalChinese.ToSimplified(text);
+        return result with
+        {
+            Title = S(result.Title),
+            Items = [.. result.Items.Select(i => i with
+            {
+                Link = i.Link with { Text = S(i.Link.Text) },
+                Chapter = i.Chapter is { } c ? new ScrapedChapter(S(c.Title), [.. c.Paragraphs.Select(S)]) : null,
+            })],
+        };
     }
 
     /// <summary>Chapters per stored part: a few new chapters re-upload one part of about 300 KB, not the whole novel.</summary>

@@ -88,6 +88,9 @@ public sealed class NovelReaderSettings : IVersionedSettings
     /// <summary>Chapter pages scraped at once (tabs of the browser), 1 to 5: more is faster, and more likely refused by a site.</summary>
     public int ScrapeTabs { get; set; } = 3;
 
+    /// <summary>A novel in Traditional Chinese (added or scraped) is stored in Simplified, which the dictionaries read far better.</summary>
+    public bool ConvertTraditional { get; set; } = true;
+
     // ---- Finding names ---------------------------------------------------------------------------------------------
 
     /// <summary>Opening a novel for the first time looks for its character names and adds the sure ones.</summary>

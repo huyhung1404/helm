@@ -21,4 +21,10 @@
     <InternalsVisibleTo Include="Helm.Tests" />
   </ItemGroup>
 
+  <ItemGroup>
+    <!-- OpenCC's Traditional-to-Simplified tables (Apache-2.0, see Resources/opencc-ts.LICENSE.txt), for Traditional Chinese novels -->
+    <EmbeddedResource Include="Resources\opencc-ts.txt.gz" LogicalName="Helm.Modules.NovelReader.opencc-ts.txt.gz" />
+    <None Include="Resources\opencc-ts.LICENSE.txt" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
 </Project>
