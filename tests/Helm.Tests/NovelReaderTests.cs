@@ -304,6 +304,9 @@ public sealed class NovelReaderTests : IDisposable
         var all = new ScrapeResult("山寺", "https://x.com/book/123/", [.. Enumerable.Range(1, 4).Select(n => WebChapter(n, ScrapeOutcome.Got))]);
         Assert.Equal(2, await page.ViewModel.SaveNewChaptersAsync(id!, all));
         Assert.Equal(4, page.ViewModel.Chapters.Count);
+        Assert.Equal("1 / 4", page.ViewModel.ChapterPosition);
+        Assert.True(page.ViewModel.CanGoForward);
+        Assert.EndsWith("Chapter 1 / 4", page.ViewModel.PlayerPosition);
         Assert.Equal(4, page.Store.GetBook(id!)!.ChapterCount);
         Assert.False(page.ViewModel.IsAdding);
         Assert.Equal(0, await page.ViewModel.SaveNewChaptersAsync(id!, all));

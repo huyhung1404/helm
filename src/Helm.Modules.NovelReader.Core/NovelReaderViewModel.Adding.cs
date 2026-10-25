@@ -266,6 +266,10 @@ public sealed partial class NovelReaderViewModel
                     _chapters = chapters;
                     for (var i = from; i < chapters.Count; i++) Chapters.Add(new ChapterItem(i, chapters[i].Title));
                     ConvertChapterTitles();
+                    // "1 / 20" becomes "1 / 78", and the last chapter read is no longer the last.
+                    OnPropertyChanged(nameof(CanGoForward));
+                    OnPropertyChanged(nameof(ChapterPosition));
+                    UpdatePlayerPosition();
                 }
             }
             else
