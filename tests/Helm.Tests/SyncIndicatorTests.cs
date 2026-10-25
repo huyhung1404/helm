@@ -58,7 +58,8 @@ public sealed class SyncIndicatorTests
         sync.Set(new SyncStatus(SyncState.Idle, DateTimeOffset.Now, null));
         Assert.True(vm.JustSynced);
 
-        await Task.Delay(400);
+        // The green goes after 50 ms; a busy CI machine can take far longer to run the timer.
+        for (var waited = 0; vm.JustSynced && waited < 5000; waited += 50) await Task.Delay(50);
         Assert.False(vm.JustSynced);
 
         sync.Set(new SyncStatus(SyncState.Syncing, null, null));
