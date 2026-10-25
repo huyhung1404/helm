@@ -64,9 +64,18 @@ public sealed partial class BookCardViewModel(string id) : ObservableObject
     /// <summary>"Continue download" is running for this novel (its button shows that and waits).</summary>
     [ObservableProperty] private bool _isContinuing;
 
+    [ObservableProperty] private bool _autoSave;
+
+    /// <summary>A request for new chapters waits for the PC (shown on the phone, which cannot download them itself).</summary>
+    [ObservableProperty] private bool _isUpdateRequested;
+
     public string AutoCheckText => AutoCheck ? "Stop checking for new chapters" : "Check for new chapters by itself";
 
+    public string AutoSaveText => AutoSave ? "Show new chapters before saving them" : "Save new chapters by itself (no preview)";
+
     partial void OnAutoCheckChanged(bool value) => OnPropertyChanged(nameof(AutoCheckText));
+
+    partial void OnAutoSaveChanged(bool value) => OnPropertyChanged(nameof(AutoSaveText));
 }
 
 /// <summary>A chapter in the preview of a novel about to be added (or of the new chapters about to be put in one).</summary>

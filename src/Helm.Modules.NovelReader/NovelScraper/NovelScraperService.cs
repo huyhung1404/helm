@@ -15,7 +15,7 @@ namespace Helm.Modules.NovelReader;
 /// read once it has finished loading and stopped changing. Chapters are kept on disk as they come, so a cancelled or
 /// failed run picks up where it stopped. One run at a time: Helm's own look for new chapters waits its turn.
 /// </summary>
-public sealed class NovelScraperService
+public sealed partial class NovelScraperService
 {
     private static readonly int[] ProbePorts = [9222, 9223, 9224, 9225, 9229, 9230];
     private static readonly TimeSpan PageLimit = TimeSpan.FromSeconds(20);
@@ -35,9 +35,11 @@ public sealed class NovelScraperService
     private readonly string _cache;
     private readonly string _windowSites;
     private readonly SemaphoreSlim _busy = new(1, 1);
+    private readonly ISettingsStore<NovelReaderSettings> _settings;
 
     public NovelScraperService(ISettingsStoreFactory settings, ILogger<NovelScraperService> logger)
     {
+        _settings = settings.Get<NovelReaderSettings>(NovelReaderIds.ModuleId);
         _logger = logger;
         var root = Path.Combine(settings.Paths.Root, "cache", NovelReaderIds.ModuleId);
         _profile = Path.Combine(root, "scraper-profile");
@@ -73,29 +75,59 @@ public sealed class NovelScraperService
     /// download) only the chapters it lacks are fetched; the others come back as <see cref="ScrapeOutcome.Skipped"/>.
     /// </summary>
     public async Task<ScrapeResult> ScrapeAsync(string url, int? existingPort, IReadOnlyList<Chapter>? have,
-        IProgress<(string Status, int Done, int Total)> progress, CancellationToken ct)
+        IProgress<(string Status, int Done, int Total)> progress, CancellationToken ct, Action<ScrapeResult>? early = null)
     {
         var start = Start(url);
         if (!_busy.Wait(0))
         {
-            progress.Report(("Waiting for Helm's own look for new chapters to finish…", 0, 0));
+            progress.Report(("Waiting for Helm's other Edge to finish (a look for new chapters, or a login window still open)…", 0, 0));
             await _busy.WaitAsync(ct);
         }
         try
         {
-            TrimCache();
-            progress.Report(("Opening the browser…", 0, 0));
-            await using var browser = existingPort is { } port
-                ? await ScraperBrowser.AttachAsync(port, ct)
-                : await ScraperBrowser.LaunchAsync(BrowserPath(), _profile, visible: OpensInWindow(start.Host), ct);
-            _logger.LogInformation("Scraper started for {Url} ({Mode})", url, existingPort is null ? "own Edge" : "open browser");
-            var list = await ReadChapterListAsync(browser, start, quiet: false, progress, ct);
-            return await ReadChaptersAsync(browser, list, have, progress, ct);
+            return await RunAsync(start, existingPort, have, progress, early, quiet: false, ct);
         }
         finally
         {
             _busy.Release();
         }
+    }
+
+    /// <summary>
+    /// A scrape Helm starts by itself (new chapters to save, a phone's request): in a hidden Edge, nothing shown. Null when
+    /// it cannot run now (another scrape or a login window is open) or the site asks for a check; tried again later.
+    /// </summary>
+    public async Task<ScrapeResult?> ScrapeQuietlyAsync(string url, IReadOnlyList<Chapter> have, CancellationToken ct)
+    {
+        if (!await _busy.WaitAsync(0, ct)) return null;
+        try
+        {
+            return await RunAsync(Start(url), null, have, new Progress<(string, int, int)>(), null, quiet: true, ct);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException || !ct.IsCancellationRequested)
+        {
+            _logger.LogInformation("Could not download new chapters at {Url}: {Reason}", url, ex.Message);
+            return null;
+        }
+        finally
+        {
+            _busy.Release();
+        }
+    }
+
+    private async Task<ScrapeResult> RunAsync(Uri start, int? existingPort, IReadOnlyList<Chapter>? have,
+        IProgress<(string Status, int Done, int Total)> progress, Action<ScrapeResult>? early, bool quiet, CancellationToken ct)
+    {
+        TrimCache();
+        progress.Report(("Opening the browser…", 0, 0));
+        await using var browser = existingPort is { } port
+            ? await ScraperBrowser.AttachAsync(port, ct)
+            : await ScraperBrowser.LaunchAsync(BrowserPath(), _profile, visible: !quiet && OpensInWindow(start.Host), ct, quiet);
+        _logger.LogInformation("Scraper started for {Url} ({Mode})", start, existingPort is not null ? "open browser" : quiet ? "quiet" : "own Edge");
+        var list = await ReadChapterListAsync(browser, start, quiet, progress, ct);
+        var cover = await DownloadCoverAsync(browser.Tab, list, ct);
+        var result = await ReadChaptersAsync(browser, list, have, progress, early, ct);
+        return result with { Cover = cover };
     }
 
     /// <summary>
@@ -124,6 +156,88 @@ public sealed class NovelScraperService
         }
     }
 
+    /// <summary>
+    /// Opens <paramref name="url"/> in a normal Edge window on Helm's own scraping profile, for the user to log in to the
+    /// site (paid chapters, Fanqie after chapter 10): the login stays in that profile, so every later scrape, hidden or
+    /// not, is logged in. Scraping waits until the window is closed (one Edge per profile). Returns once it is closed.
+    /// </summary>
+    public async Task LogInAsync(string url, IProgress<(string Status, int Done, int Total)> progress, CancellationToken ct)
+    {
+        var start = Uri.TryCreate(url.Trim(), UriKind.Absolute, out var uri) && uri.Scheme is "http" or "https" ? uri
+            : throw new InvalidOperationException("Paste the web address of the site to log in to (https://…).");
+        if (!_busy.Wait(0))
+        {
+            progress.Report(("Waiting for the scrape that is running to finish…", 0, 0));
+            await _busy.WaitAsync(ct);
+        }
+        try
+        {
+            Directory.CreateDirectory(_profile);
+            var info = new System.Diagnostics.ProcessStartInfo(BrowserPath()) { UseShellExecute = false };
+            foreach (var arg in new[] { $"--user-data-dir={_profile}", "--no-first-run", "--no-default-browser-check", "--new-window", start.AbsoluteUri })
+                info.ArgumentList.Add(arg);
+            using var edge = System.Diagnostics.Process.Start(info) ?? throw new InvalidOperationException("Edge did not start.");
+            progress.Report(("Log in to the site in the Edge window, then close the window. Scraping waits until it is closed.", 0, 0));
+            _logger.LogInformation("Login window opened for {Host}", start.Host);
+            await edge.WaitForExitAsync(ct);
+            // Edge hands the window to a process already on the profile and the one started exits at once: wait for that one too.
+            while (File.Exists(Path.Combine(_profile, "lockfile")) && IsLocked(Path.Combine(_profile, "lockfile")))
+                await Task.Delay(1000, ct);
+            _logger.LogInformation("Login window closed for {Host}", start.Host);
+        }
+        finally
+        {
+            _busy.Release();
+        }
+    }
+
+    private static bool IsLocked(string file)
+    {
+        try
+        {
+            using var _ = File.Open(file, FileMode.Open, FileAccess.ReadWrite, FileShare.None);
+            return false;
+        }
+        catch (IOException)
+        {
+            return true;
+        }
+        catch (UnauthorizedAccessException)
+        {
+            return true;
+        }
+    }
+
+    /// <summary>
+    /// The cover picture the chapter list shows, as the site sends it (made small later, on the UI thread), or null. Asked
+    /// for like the page does (its address as the referrer, the browser's user agent), as image servers often want.
+    /// </summary>
+    private async Task<byte[]?> DownloadCoverAsync(CdpSession tab, ChapterList list, CancellationToken ct)
+    {
+        if (list.CoverUrl is not { } url || !Uri.TryCreate(url, UriKind.Absolute, out var uri) || uri.Scheme is not ("http" or "https")) return null;
+        try
+        {
+            var agent = (await tab.EvaluateStringAsync("navigator.userAgent", ct)).Replace("HeadlessChrome", "Chrome", StringComparison.Ordinal);
+            using var http = new HttpClient { Timeout = TimeSpan.FromSeconds(15) };
+            using var request = new HttpRequestMessage(HttpMethod.Get, uri);
+            request.Headers.Referrer = new Uri(list.TocUrl);
+            request.Headers.TryAddWithoutValidation("User-Agent", agent);
+            using var response = await http.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, ct);
+            if (!response.IsSuccessStatusCode || response.Content.Headers.ContentType?.MediaType?.StartsWith("image/", StringComparison.Ordinal) != true
+                || response.Content.Headers.ContentLength > MaxCoverBytes)
+                return null;
+            var bytes = await response.Content.ReadAsByteArrayAsync(ct);
+            return bytes.Length is > 0 and <= MaxCoverBytes ? bytes : null;
+        }
+        catch (Exception ex) when (ex is HttpRequestException or InvalidOperationException || (ex is TaskCanceledException && !ct.IsCancellationRequested))
+        {
+            _logger.LogInformation("No cover from {Url}: {Reason}", url, ex.Message);
+            return null;
+        }
+    }
+
+    private const int MaxCoverBytes = 5 * 1024 * 1024;
+
     private static Uri Start(string url)
     {
         if (!Uri.TryCreate(url.Trim(), UriKind.Absolute, out var start) || start.Scheme is not ("http" or "https"))
@@ -133,14 +247,14 @@ public sealed class NovelScraperService
         return start;
     }
 
-    private sealed record ChapterList(string TocUrl, string Book, string? Site, IReadOnlyList<WebLink> Chapters);
+    private sealed record ChapterList(string TocUrl, string Book, string? Site, IReadOnlyList<WebLink> Chapters, string? CoverUrl);
 
     /// <summary>The chapter list, with every further page of it.</summary>
     private async Task<ChapterList> ReadChapterListAsync(ScraperBrowser browser, Uri start, bool quiet,
         IProgress<(string Status, int Done, int Total)> progress, CancellationToken ct)
     {
         progress.Report(("Reading the chapter list…", 0, 0));
-        var first = await LoadAsync(browser, start.AbsoluteUri, quiet, progress, ct);
+        var first = await LoadAsync(browser, browser.Tab, start.AbsoluteUri, quiet, progress, ct);
         var list = await ReadListAsync(browser.Tab, ct);
         var tocUrl = first.Href;
         var links = new List<WebLink>(list.Links);
@@ -152,7 +266,7 @@ public sealed class NovelScraperService
             progress.Report(($"Reading the chapter list, page {visited.Count - 1}…", 0, 0));
             try
             {
-                var state = await LoadAsync(browser, page, quiet, progress, ct);
+                var state = await LoadAsync(browser, browser.Tab, page, quiet, progress, ct);
                 var more = await ReadListAsync(browser.Tab, ct);
                 links.AddRange(more.Links);
                 foreach (var next in ChapterLinks.ListPages(state.Href, more.Links)) pending.Enqueue(next);
@@ -168,110 +282,203 @@ public sealed class NovelScraperService
             throw new InvalidOperationException("No chapters on this page. Open the novel's chapter list (目录) and paste that address.");
         var book = ScrapedBook.Title(list.BookName, list.Heading, list.Title);
         _logger.LogInformation("Scraper found {Count} chapters of {Book} at {Url}", chapters.Count, book, tocUrl);
-        return new ChapterList(tocUrl, book, ScrapedBook.SiteName(list.Title), chapters);
+        return new ChapterList(tocUrl, book, ScrapedBook.SiteName(list.Title), chapters, string.IsNullOrEmpty(list.Cover) ? null : list.Cover);
     }
 
-    /// <summary>Every chapter of the list in order: fetched (or kept from an earlier run), or skipped when the novel has it.</summary>
+    /// <summary>
+    /// Every chapter of the list in order: fetched (or kept from an earlier run), or skipped when the novel has it.
+    /// Chapters are read in several tabs at once (<see cref="NovelReaderSettings.ScrapeTabs"/>), in list order; the
+    /// first tab alone deals with a Cloudflare check, so when another tab meets one, or the site says it is too busy,
+    /// the extra tabs stop and the first goes on with their chapters. Once the first <see cref="EarlyChapters"/> wanted
+    /// chapters are in, <paramref name="early"/> gets them, so reading can start while the rest download.
+    /// </summary>
     private async Task<ScrapeResult> ReadChaptersAsync(ScraperBrowser browser, ChapterList list, IReadOnlyList<Chapter>? have,
-        IProgress<(string Status, int Done, int Total)> progress, CancellationToken ct)
+        IProgress<(string Status, int Done, int Total)> progress, Action<ScrapeResult>? early, CancellationToken ct)
     {
         var chapters = list.Chapters;
         var wanted = have is null ? null : BookUpdate.Missing(have, chapters).Select(l => l.Url).ToHashSet(StringComparer.Ordinal);
-        var total = wanted?.Count ?? chapters.Count;
         var cache = Path.Combine(_cache, Hash(list.TocUrl));
         Directory.CreateDirectory(cache);
         Directory.SetLastWriteTimeUtc(cache, DateTime.UtcNow);
         var chapterUrls = chapters.Select(c => c.Url).ToHashSet(StringComparer.Ordinal);
-        var items = new List<ScrapeItem>(chapters.Count);
-        int done = 0, lockedRun = 0, saved = 0;
+        var slots = new ScrapeItem?[chapters.Count];
+        var todo = new List<int>();
+        int done = 0, saved = 0, lockedRun = 0;
 
         for (var i = 0; i < chapters.Count; i++)
         {
             var link = chapters[i];
-            if (wanted is not null && !wanted.Contains(link.Url))
+            if (wanted is not null && !wanted.Contains(link.Url)) slots[i] = new ScrapeItem(link, ScrapeOutcome.Skipped, null);
+            else if (ReadSaved(Path.Combine(cache, Hash(link.Url) + ".txt")) is { } kept)
             {
-                items.Add(new ScrapeItem(link, ScrapeOutcome.Skipped, null));
-                continue;
-            }
-            var file = Path.Combine(cache, Hash(link.Url) + ".txt");
-            if (ReadSaved(file) is { } kept)
-            {
-                items.Add(new ScrapeItem(link, ScrapeOutcome.Got, kept));
+                slots[i] = new ScrapeItem(link, ScrapeOutcome.Got, kept);
                 saved++;
                 done++;
-                continue;
             }
-            if (lockedRun >= LockedRun)
-            {
-                items.Add(new ScrapeItem(link with { Text = Name(link, null, i) }, ScrapeOutcome.Locked, null));
-                done++;
-                continue;
-            }
+            else todo.Add(i);
+        }
+        var total = done + todo.Count;
+        var resumed = saved > 0 ? $" ({saved} kept from the last run)" : "";
 
-            var resumed = saved > 0 ? $" ({saved} kept from the last run)" : "";
-            progress.Report(($"Chapter {done + 1}/{total}: {Name(link, null, i)}{resumed}", done, total));
-            ChapterPage? read = null;
-            for (var attempt = 1; attempt <= Attempts && read is null; attempt++)
+        // Wanted chapters, in list order: the first ones decide when reading can start.
+        var order = Enumerable.Range(0, chapters.Count).Where(i => slots[i]?.Outcome != ScrapeOutcome.Skipped).ToList();
+        var earlySent = early is null || order.Count <= EarlyChapters;
+        void MaybeEarly()
+        {
+            if (earlySent) return;
+            var first = order.Take(EarlyChapters).ToList();
+            if (first.Any(i => slots[i] is null)) return;
+            earlySent = true;
+            early!(new ScrapeResult(list.Book, list.TocUrl, [.. first.Select(i => slots[i]!)]));
+        }
+        MaybeEarly();
+
+        var queue = new Queue<int>(todo);
+        var alone = new List<int>();
+        var gate = new object();
+        var extraStopped = false;
+
+        async Task WorkAsync(CdpSession tab, bool main)
+        {
+            while (true)
             {
+                int i;
+                lock (gate)
+                {
+                    if (!main && extraStopped) return;
+                    if (!queue.TryDequeue(out i)) return;
+                }
+                var link = chapters[i];
+                if (Volatile.Read(ref lockedRun) >= LockedRun)
+                {
+                    lock (gate)
+                    {
+                        slots[i] = new ScrapeItem(link with { Text = Name(link, null, i) }, ScrapeOutcome.Locked, null);
+                        done++;
+                    }
+                    continue;
+                }
+                progress.Report(($"{Volatile.Read(ref done)}/{total} chapters · now {Name(link, null, i)}{resumed}", Volatile.Read(ref done), total));
+                ScrapeItem item;
                 try
                 {
-                    read = await ReadChapterAsync(browser, link, i, list.Book, list.Site, chapterUrls, progress, ct);
+                    item = await FetchAsync(browser, tab, main, link, i, list, chapterUrls, cache, progress, ct);
                 }
-                catch (Exception ex) when (ex is not OperationCanceledException || !ct.IsCancellationRequested)
+                catch (TabStoppedException)
                 {
-                    _logger.LogWarning(ex, "Scraper attempt {Attempt} failed for {Title} at {Url}", attempt, link.Text, link.Url);
-                    if (!browser.Tab.IsOpen)
-                        throw new InvalidOperationException("The browser window was closed. Scrape again to pick up where it stopped.", ex);
-                    if (attempt < Attempts) await Task.Delay(TimeSpan.FromSeconds(1.5 * attempt), ct);
+                    // Left for the first tab: a check to pass, a busy site, or this tab closed with the window.
+                    lock (gate)
+                    {
+                        extraStopped = true;
+                        alone.Add(i);
+                    }
+                    return;
+                }
+                lock (gate)
+                {
+                    slots[i] = item;
+                    done++;
+                    lockedRun = item.Outcome == ScrapeOutcome.Locked ? lockedRun + 1 : 0;
+                    MaybeEarly();
                 }
             }
-            done++;
-
-            var named = link with { Text = read?.Chapter.Title ?? Name(link, null, i) };
-            if (read is { Locked: true })
-            {
-                lockedRun++;
-                items.Add(new ScrapeItem(named, ScrapeOutcome.Locked, null));
-                continue;
-            }
-            lockedRun = 0;
-            if (read is null || read.Chapter.Paragraphs.Count == 0)
-            {
-                _logger.LogWarning("Scraper got no text from {Title} at {Url}", link.Text, link.Url);
-                items.Add(new ScrapeItem(named, ScrapeOutcome.Failed, null));
-                continue;
-            }
-            items.Add(new ScrapeItem(named, ScrapeOutcome.Got, read.Chapter));
-            await File.WriteAllLinesAsync(file, read.Chapter.Paragraphs.Prepend(read.Chapter.Title), ct);
         }
 
+        var tabs = Math.Clamp(_settings.Current.ScrapeTabs, 1, 5);
+        var workers = new List<Task> { WorkAsync(browser.Tab, main: true) };
+        for (var t = 1; t < Math.Min(tabs, todo.Count); t++)
+            if (await browser.OpenTabAsync(ct) is { } extra) workers.Add(WorkAsync(extra, main: false));
+        await Task.WhenAll(workers);
+        // What the extra tabs left goes through the first one, in order.
+        foreach (var i in alone.Order())
+        {
+            lock (gate) queue.Enqueue(i);
+        }
+        if (alone.Count > 0)
+        {
+            _logger.LogInformation("Scraper goes on with one tab for {Count} chapters", alone.Count);
+            await WorkAsync(browser.Tab, main: true);
+        }
+
+        var items = slots.Select((s, i) => s ?? new ScrapeItem(chapters[i], ScrapeOutcome.Failed, null)).ToList();
         var result = new ScrapeResult(list.Book, list.TocUrl, items);
         var got = result.Count(ScrapeOutcome.Got);
         var locked = result.Count(ScrapeOutcome.Locked);
         if (got == 0 && have is null)
             throw new InvalidOperationException(locked > 0
-                ? "Every chapter is locked: the site wants you to log in or pay. Log in in your browser, open it with remote debugging and try again."
+                ? "Every chapter is locked: the site wants you to log in or pay. Log in to the site (the web menu on a novel, or your own browser) and try again."
                 : "No chapter text came. The site may need a login, or show its text in a way Helm cannot read.");
 
-        _logger.LogInformation("Scraper finished {Book}: {Got}/{Total} chapters, {Locked} locked, {Skipped} already there",
-            list.Book, got, total, locked, result.Count(ScrapeOutcome.Skipped));
+        _logger.LogInformation("Scraper finished {Book}: {Got}/{Total} chapters, {Locked} locked, {Skipped} already there, {Tabs} tabs",
+            list.Book, got, total, locked, result.Count(ScrapeOutcome.Skipped), workers.Count);
         return result;
+    }
+
+    /// <summary>Wanted chapters that must be in before reading can start while the rest download.</summary>
+    public const int EarlyChapters = 20;
+
+    /// <summary>An extra tab gives its chapter back to the first tab (a check, a busy site, a closed window).</summary>
+    private sealed class TabStoppedException() : Exception("The tab stopped");
+
+    /// <summary>A site's answer when asked too often.</summary>
+    private sealed class TooBusyException() : Exception("The site is busy");
+
+    /// <summary>One chapter, tried a few times; kept on disk when it came.</summary>
+    private async Task<ScrapeItem> FetchAsync(ScraperBrowser browser, CdpSession tab, bool main, WebLink link, int index, ChapterList list,
+        IReadOnlySet<string> chapterUrls, string cache, IProgress<(string, int, int)> progress, CancellationToken ct)
+    {
+        ChapterPage? read = null;
+        for (var attempt = 1; attempt <= Attempts && read is null; attempt++)
+        {
+            try
+            {
+                read = await ReadChapterAsync(browser, tab, main, link, index, list.Book, list.Site, chapterUrls, progress, ct);
+            }
+            catch (CheckNeededException) when (main && browser.Quiet)
+            {
+                // No one to pass the check: the quiet run ends here and is tried again later.
+                throw;
+            }
+            catch (Exception ex) when (!main && (ex is CheckNeededException or TooBusyException || !tab.IsOpen))
+            {
+                throw new TabStoppedException();
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException || !ct.IsCancellationRequested)
+            {
+                _logger.LogWarning(ex, "Scraper attempt {Attempt} failed for {Title} at {Url}", attempt, link.Text, link.Url);
+                if (!(main ? browser.Tab : tab).IsOpen)
+                    throw new InvalidOperationException("The browser window was closed. Scrape again to pick up where it stopped.", ex);
+                if (attempt < Attempts) await Task.Delay(TimeSpan.FromSeconds((ex is TooBusyException ? 5 : 1.5) * attempt), ct);
+            }
+        }
+
+        var named = link with { Text = read?.Chapter.Title ?? Name(link, null, index) };
+        if (read is { Locked: true }) return new ScrapeItem(named, ScrapeOutcome.Locked, null);
+        if (read is null || read.Chapter.Paragraphs.Count == 0)
+        {
+            _logger.LogWarning("Scraper got no text from {Title} at {Url}", link.Text, link.Url);
+            return new ScrapeItem(named, ScrapeOutcome.Failed, null);
+        }
+        await File.WriteAllLinesAsync(Path.Combine(cache, Hash(link.Url) + ".txt"), read.Chapter.Paragraphs.Prepend(read.Chapter.Title), ct);
+        return new ScrapeItem(named, ScrapeOutcome.Got, read.Chapter);
     }
 
     private sealed record ChapterPage(ScrapedChapter Chapter, bool Locked);
 
     /// <summary>One chapter, joined from all its pages (123.html, 123_2.html…).</summary>
-    private async Task<ChapterPage> ReadChapterAsync(ScraperBrowser browser, WebLink link, int index, string book, string? site,
+    private async Task<ChapterPage> ReadChapterAsync(ScraperBrowser browser, CdpSession tab, bool main, WebLink link, int index, string book, string? site,
         IReadOnlySet<string> chapterUrls, IProgress<(string, int, int)> progress, CancellationToken ct)
     {
         var parts = new List<string>();
+        // The first tab is replaced when Edge starts again as a window for a check.
+        CdpSession Current() => main ? browser.Tab : tab;
         var seen = new HashSet<string>(StringComparer.Ordinal) { link.Url };
         string? heading = null, pageText = "";
         var pageUrl = link.Url;
         for (var page = 0; page < MaxChapterPages; page++)
         {
-            var state = await LoadAsync(browser, pageUrl, quiet: false, progress, ct);
-            var read = await browser.Tab.EvaluateAsync<ChapterJson>(ChapterJs, ct) ?? new ChapterJson();
+            var state = await LoadAsync(browser, Current(), pageUrl, quiet: false, progress, ct);
+            var read = await Current().EvaluateAsync<ChapterJson>(ChapterJs, ct) ?? new ChapterJson();
             heading ??= string.IsNullOrWhiteSpace(read.Heading) ? null : read.Heading.Trim();
             parts.Add(read.Text ?? "");
             pageText = read.Page ?? "";
@@ -295,22 +502,27 @@ public sealed class NovelScraperService
         return list.Links is null ? list with { Links = [] } : list;
     }
 
+    [System.Text.RegularExpressions.GeneratedRegex(@"429|Too Many Requests|503 Service|Service Unavailable|请求过于频繁|訪問過於頻繁|访问过于频繁|访问频率")]
+    private static partial System.Text.RegularExpressions.Regex BusyPattern();
+
     /// <summary>
-    /// Opens <paramref name="url"/> and waits until it has loaded and stopped changing. A Cloudflare check brings up a
-    /// window for the user to pass it; a page that cannot be reached throws with the browser's reason.
+    /// Opens <paramref name="url"/> in <paramref name="tab"/> and waits until it has loaded and stopped changing. A
+    /// Cloudflare check in the first tab brings up a window for the user to pass it (another tab gives up); a page that
+    /// cannot be reached throws with the browser's reason, and a site that says it is busy throws so the caller waits.
     /// </summary>
-    private async Task<PageState> LoadAsync(ScraperBrowser browser, string url, bool quiet, IProgress<(string, int, int)> progress, CancellationToken ct)
+    private async Task<PageState> LoadAsync(ScraperBrowser browser, CdpSession tab, string url, bool quiet, IProgress<(string, int, int)> progress, CancellationToken ct)
     {
-        await browser.Tab.NavigateAsync(url, ct);
-        var state = await WaitAsync(browser, ct);
-        if (state.Challenge && quiet) throw new CheckNeededException();
+        await tab.NavigateAsync(url, ct);
+        var state = await WaitAsync(browser, tab, ct);
+        if (state.Challenge && (quiet || browser.Quiet || tab != browser.Tab)) throw new CheckNeededException();
         if (state.Challenge) state = await PassCheckAsync(browser, url, progress, ct);
         if (state.Href.StartsWith("chrome-error:", StringComparison.Ordinal))
             throw new InvalidOperationException("The page could not be opened: " + FirstLine(state.Body));
+        if (state.Text < 400 && BusyPattern().IsMatch(state.Title + " " + state.Body)) throw new TooBusyException();
         return state;
     }
 
-    private static async Task<PageState> WaitAsync(ScraperBrowser browser, CancellationToken ct)
+    private static async Task<PageState> WaitAsync(ScraperBrowser browser, CdpSession tab, CancellationToken ct)
     {
         var started = DateTime.UtcNow;
         // Cloudflare lets a real window through by itself after a few seconds; a hidden one never.
@@ -319,7 +531,7 @@ public sealed class NovelScraperService
         while (true)
         {
             await Task.Delay(previous is null ? 250 : 400, ct);
-            var state = await browser.Tab.EvaluateAsync<PageState>(StateJs, ct) ?? new PageState();
+            var state = await tab.EvaluateAsync<PageState>(StateJs, ct) ?? new PageState();
             var waited = DateTime.UtcNow - started;
             if (state.Href.StartsWith("chrome-error:", StringComparison.Ordinal)) return state;
             if (state.Challenge && waited < challengeWait)
@@ -346,7 +558,7 @@ public sealed class NovelScraperService
         var until = DateTime.UtcNow + CheckLimit;
         while (DateTime.UtcNow < until)
         {
-            var state = await WaitAsync(browser, ct);
+            var state = await WaitAsync(browser, browser.Tab, ct);
             if (!state.Challenge)
             {
                 _logger.LogInformation("Scraper passed the check at {Host}", host);
@@ -450,6 +662,7 @@ public sealed class NovelScraperService
         public int Links { get; init; }
         public int Text { get; init; }
         public bool Challenge { get; init; }
+        public string Title { get; init; } = "";
         public string Body { get; init; } = "";
     }
 
@@ -458,6 +671,7 @@ public sealed class NovelScraperService
         public string? BookName { get; init; }
         public string? Heading { get; init; }
         public string? Title { get; init; }
+        public string? Cover { get; init; }
         public List<WebLink> Links { get; init; } = [];
     }
 
@@ -475,7 +689,7 @@ public sealed class NovelScraperService
           var challenge = /Just a moment|Checking your browser|Attention Required|请稍候|請稍候|安全验证/i.test(t)
             || !!document.querySelector('#challenge-form,#challenge-stage,#cf-challenge-running,.cf-turnstile,[name="cf-turnstile-response"]');
           var body = document.body ? document.body.innerText || '' : '';
-          return JSON.stringify({ ready: document.readyState, href: location.href, links: document.links.length,
+          return JSON.stringify({ ready: document.readyState, href: location.href, title: t, links: document.links.length,
             text: body.length, challenge: challenge, body: body.slice(0, 300) });
         })()
         """;
@@ -491,8 +705,15 @@ public sealed class NovelScraperService
             if (/^(https?:)?\/|\.html?$|\?/.test(v)) { try { links.push({ text: (o.textContent || '').trim(), url: new URL(v, location.href).href }); } catch (e) {} }
           }
           var h1 = document.querySelector('h1');
+          // The cover: the page's picture tag, else a picture in a cover box (biquge's #fmimg), else one named like a cover.
+          var cover = meta('og:image');
+          if (!cover) {
+            var img = document.querySelector('#fmimg img,.book-img img,.bookimg img,.book-cover img,.cover img,[class*="cover"] img,img[class*="cover"],img[src*="cover"]');
+            if (img) cover = img.currentSrc || img.src;
+          }
+          try { cover = cover ? new URL(cover, location.href).href : ''; } catch (e) { cover = ''; }
           return JSON.stringify({ bookName: meta('og:novel:book_name') || meta('og:novel:title'), heading: h1 ? h1.innerText.trim() : '',
-            title: document.title, links: links });
+            title: document.title, cover: cover, links: links });
         })()
         """;
 

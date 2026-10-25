@@ -13,7 +13,7 @@ namespace Helm.Modules.NovelReader;
 /// </summary>
 internal sealed class ScraperBrowser : IAsyncDisposable
 {
-    private readonly int _port;
+    private int _port;
     private readonly string? _tabId;
     private readonly string? _path;
     private readonly string? _profile;
@@ -38,27 +38,22 @@ internal sealed class ScraperBrowser : IAsyncDisposable
     /// <summary>The pages are in a window the user can see (or bring back).</summary>
     public bool Visible { get; private set; }
 
+    /// <summary>Helm runs it by itself, with no one to show a window to: a check ends the run instead.</summary>
+    public bool Quiet { get; private init; }
+
     /// <summary>Opens a new tab in the browser listening on <paramref name="port"/>.</summary>
     public static async Task<ScraperBrowser> AttachAsync(int port, CancellationToken ct)
     {
-        using var http = new HttpClient { Timeout = TimeSpan.FromSeconds(5) };
-        var address = $"http://127.0.0.1:{port}/json/new?about:blank";
-        // Chromium 111+ wants PUT here; older ones only answer GET.
-        using var put = await http.PutAsync(address, null, ct);
-        var json = put.IsSuccessStatusCode ? await put.Content.ReadAsStringAsync(ct) : await http.GetStringAsync(address, ct);
-        using var target = JsonDocument.Parse(json);
-        var id = target.RootElement.GetProperty("id").GetString();
-        var socket = target.RootElement.GetProperty("webSocketDebuggerUrl").GetString()
-            ?? throw new InvalidOperationException("The browser did not open a tab for Helm.");
+        var (id, socket) = await NewTargetAsync(port, ct);
         var tab = await CdpSession.ConnectAsync(socket, ct);
         return new ScraperBrowser(port, tab, id, null, null, null, visible: true);
     }
 
     /// <summary>Starts Helm's own Edge (or Chrome) on <paramref name="profile"/>, hidden unless <paramref name="visible"/>.</summary>
-    public static async Task<ScraperBrowser> LaunchAsync(string path, string profile, bool visible, CancellationToken ct)
+    public static async Task<ScraperBrowser> LaunchAsync(string path, string profile, bool visible, CancellationToken ct, bool quiet = false)
     {
         var (process, port, tab) = await StartAsync(path, profile, visible, ct);
-        var browser = new ScraperBrowser(port, tab, null, process, path, profile, visible);
+        var browser = new ScraperBrowser(port, tab, null, process, path, profile, visible) { Quiet = quiet };
         if (visible) await browser.MinimizeAsync(ct);
         return browser;
     }
@@ -73,7 +68,8 @@ internal sealed class ScraperBrowser : IAsyncDisposable
         {
             Tab.Dispose();
             Stop();
-            var (process, _, tab) = await StartAsync(_path, _profile, visible: true, ct);
+            var (process, port, tab) = await StartAsync(_path, _profile, visible: true, ct);
+            _port = port;
             _process = process;
             Tab = tab;
             Visible = true;
@@ -134,12 +130,7 @@ internal sealed class ScraperBrowser : IAsyncDisposable
         try
         {
             var tab = await CdpSession.ConnectAsync(await PageSocketAsync(port, process, ct), ct);
-            if (!visible)
-            {
-                // A hidden Edge says "HeadlessChrome" in its user agent, which some sites refuse.
-                var agent = await tab.EvaluateStringAsync("navigator.userAgent", ct);
-                await tab.CallAsync("Network.setUserAgentOverride", new { userAgent = agent.Replace("HeadlessChrome", "Chrome", StringComparison.Ordinal) }, ct);
-            }
+            if (!visible) await HideHeadlessAsync(tab, ct);
             return (process, port, tab);
         }
         catch
@@ -202,21 +193,73 @@ internal sealed class ScraperBrowser : IAsyncDisposable
         return port;
     }
 
+    /// <summary>
+    /// Another tab of the same browser (same cookies, so a check passed in the first tab holds), for reading chapters at
+    /// the same time; null when the browser will not open one.
+    /// </summary>
+    public async Task<CdpSession?> OpenTabAsync(CancellationToken ct)
+    {
+        try
+        {
+            var (id, socket) = await NewTargetAsync(_port, ct);
+            var tab = await CdpSession.ConnectAsync(socket, ct);
+            if (!Visible && !Attached) await HideHeadlessAsync(tab, ct);
+            lock (_extra) _extra.Add((id, tab));
+            return tab;
+        }
+        catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException or JsonException or InvalidOperationException
+            or System.Net.WebSockets.WebSocketException or KeyNotFoundException)
+        {
+            return null;
+        }
+    }
+
     public async ValueTask DisposeAsync()
     {
         Tab.Dispose();
-        if (_tabId is not null)
-        {
-            try
-            {
-                using var http = new HttpClient { Timeout = TimeSpan.FromSeconds(2) };
-                await http.GetStringAsync($"http://127.0.0.1:{_port}/json/close/{_tabId}");
-            }
-            catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException)
-            {
-            }
-        }
+        List<(string Id, CdpSession Tab)> extra;
+        lock (_extra) extra = [.. _extra];
+        foreach (var (_, tab) in extra) tab.Dispose();
+        // Helm's own Edge goes with its process; tabs opened in the user's browser are closed one by one.
+        if (Attached)
+            foreach (var id in extra.Select(e => e.Id).Prepend(_tabId).OfType<string>()) await CloseTargetAsync(_port, id);
         Stop();
+    }
+
+    private readonly List<(string Id, CdpSession Tab)> _extra = [];
+
+    /// <summary>A new blank tab of the browser on <paramref name="port"/>: its id and DevTools address.</summary>
+    private static async Task<(string Id, string Socket)> NewTargetAsync(int port, CancellationToken ct)
+    {
+        using var http = new HttpClient { Timeout = TimeSpan.FromSeconds(5) };
+        var address = $"http://127.0.0.1:{port}/json/new?about:blank";
+        // Chromium 111+ wants PUT here; older ones only answer GET.
+        using var put = await http.PutAsync(address, null, ct);
+        var json = put.IsSuccessStatusCode ? await put.Content.ReadAsStringAsync(ct) : await http.GetStringAsync(address, ct);
+        using var target = JsonDocument.Parse(json);
+        var id = target.RootElement.GetProperty("id").GetString() ?? "";
+        var socket = target.RootElement.GetProperty("webSocketDebuggerUrl").GetString()
+            ?? throw new InvalidOperationException("The browser did not open a tab for Helm.");
+        return (id, socket);
+    }
+
+    private static async Task CloseTargetAsync(int port, string id)
+    {
+        try
+        {
+            using var http = new HttpClient { Timeout = TimeSpan.FromSeconds(2) };
+            await http.GetStringAsync($"http://127.0.0.1:{port}/json/close/{id}");
+        }
+        catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException)
+        {
+        }
+    }
+
+    /// <summary>A hidden Edge says "HeadlessChrome" in its user agent, which some sites refuse.</summary>
+    private static async Task HideHeadlessAsync(CdpSession tab, CancellationToken ct)
+    {
+        var agent = await tab.EvaluateStringAsync("navigator.userAgent", ct);
+        await tab.CallAsync("Network.setUserAgentOverride", new { userAgent = agent.Replace("HeadlessChrome", "Chrome", StringComparison.Ordinal) }, ct);
     }
 }
 

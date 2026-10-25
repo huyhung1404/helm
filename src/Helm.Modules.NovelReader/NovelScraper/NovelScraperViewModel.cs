@@ -39,6 +39,7 @@ public sealed partial class NovelScraperViewModel : ObservableObject
         AutoCommand.NotifyCanExecuteChanged();
         ContinueCommand.NotifyCanExecuteChanged();
         RetryFailedCommand.NotifyCanExecuteChanged();
+        LogInCommand.NotifyCanExecuteChanged();
         CancelCommand.NotifyCanExecuteChanged();
         OnPropertyChanged(nameof(IsIndeterminate));
     }
@@ -86,6 +87,76 @@ public sealed partial class NovelScraperViewModel : ObservableObject
 
     private bool CanStart() => !IsRunning;
 
+    /// <summary>The first chapters of the novel being scraped, ready to read (<see cref="NovelScraperService.EarlyChapters"/>).</summary>
+    private ScrapeResult? _early;
+
+    /// <summary>The novel "Read now" added: the rest of the chapters go into it when the scrape ends.</summary>
+    private string? _readingBookId;
+
+    [ObservableProperty] private bool _canReadNow;
+
+    /// <summary>
+    /// Adds the novel with the chapters that came so far and opens it; the scrape goes on, and the rest of the chapters go
+    /// into it when it ends (no preview).
+    /// </summary>
+    [RelayCommand]
+    private async Task ReadNow()
+    {
+        if (_early is not { } first || _readingBookId is not null) return;
+        CanReadNow = false;
+        _readingBookId = await _novels.AddFromWebNowAsync(first);
+        if (_readingBookId is not null && IsRunning)
+            StatusText = "Reading the first chapters; the rest go into the novel when they are downloaded.";
+    }
+
+    /// <summary>The chapters that did not come, said after a run whose result was saved without a preview.</summary>
+    private static string Failures(ScrapeResult result)
+    {
+        var failed = result.Count(ScrapeOutcome.Failed);
+        var locked = result.Count(ScrapeOutcome.Locked);
+        return (failed > 0 ? $" {failed} failed: press Continue on the novel to try them again." : "")
+            + (locked > 0 ? $" {locked} are locked (the site wants a login or payment)." : "");
+    }
+
+    /// <summary>
+    /// Opens the site in an Edge window on the scraper's own profile to log in (a novel's web source, or the address in
+    /// the box): later scrapes are logged in, for paid chapters and sites that show only the first ones otherwise.
+    /// </summary>
+    [RelayCommand(CanExecute = nameof(CanStart))]
+    private async Task LogIn(BookCardViewModel? card)
+    {
+        var url = card is null ? Url.Trim() : _novels.SourceUrlOf(card.Id) ?? "";
+        if (url.Length == 0)
+        {
+            StatusText = "Paste the address of the site (or of the novel) first, then press Log in.";
+            return;
+        }
+        _cts = new CancellationTokenSource();
+        IsRunning = true;
+        ChapterTotal = 0;
+        try
+        {
+            var prog = new Progress<(string Status, int Done, int Total)>(p => StatusText = p.Status);
+            await Task.Run(() => _service.LogInAsync(url, prog, _cts.Token));
+            StatusText = "The login is kept: scrape (or Continue) now gets what your account can read.";
+        }
+        catch (OperationCanceledException)
+        {
+            StatusText = "Stopped waiting for the login window.";
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Could not open the login window for {Url}", url);
+            StatusText = "Could not open the login window: " + ex.Message;
+        }
+        finally
+        {
+            IsRunning = false;
+            _cts?.Dispose();
+            _cts = null;
+        }
+    }
+
     private async Task RunAsync(string url, string? bookId)
     {
         _cts = new CancellationTokenSource();
@@ -99,6 +170,17 @@ public sealed partial class NovelScraperViewModel : ObservableObject
         StatusText = "Looking for an open browser…";
         BrowserStatus = "";
         var title = _novels.IsAdding && !_novels.IsUpdating ? _novels.AddTitle : null;
+        _early = null;
+        _readingBookId = null;
+        CanReadNow = false;
+        // The first chapters of a new novel are in: it can be read while the rest download.
+        var earlyProgress = new Progress<ScrapeResult>(r =>
+        {
+            if (!IsRunning || _readingBookId is not null) return;
+            _early = r;
+            CanReadNow = true;
+        });
+        Action<ScrapeResult>? early = bookId is null ? r => ((IProgress<ScrapeResult>)earlyProgress).Report(r) : null;
 
         try
         {
@@ -117,10 +199,18 @@ public sealed partial class NovelScraperViewModel : ObservableObject
                 Progress = p.Total > 0 ? (double)p.Done / p.Total : 0;
             });
 
-            var result = await Task.Run(() => _service.ScrapeAsync(url, port, have, prog, ct), ct);
+            var result = await Task.Run(() => _service.ScrapeAsync(url, port, have, prog, ct, early), ct);
+            result = result with { Cover = SmallCover(result.Cover) };
             IsRunning = false;
+            CanReadNow = false;
             StatusText = Summary(result, bookId is not null);
-            if (bookId is null)
+            if (_readingBookId is { } reading)
+            {
+                // "Read now" stored the first chapters: the rest go into that novel, no preview.
+                var added = await _novels.SaveNewChaptersAsync(reading, result);
+                StatusText = $"All chapters are in: {added} more went into the novel you are reading." + Failures(result);
+            }
+            else if (bookId is null)
             {
                 await _novels.PrepareAddFromWebAsync(result);
                 // "Retry failed" keeps a title the user already changed.
@@ -145,6 +235,22 @@ public sealed partial class NovelScraperViewModel : ObservableObject
             IsRunning = false;
             _cts?.Dispose();
             _cts = null;
+        }
+    }
+
+    /// <summary>The site's cover made small like a picked one (on the UI thread: it draws with WPF), or null.</summary>
+    private byte[]? SmallCover(byte[]? picture)
+    {
+        if (picture is null) return null;
+        try
+        {
+            return CoverPicture.Shrink(picture);
+        }
+        catch (Exception ex) when (ex is NotSupportedException or ArgumentException or InvalidOperationException or System.IO.IOException
+            or System.Runtime.InteropServices.COMException or FileFormatException)
+        {
+            _logger.LogInformation(ex, "The site's cover is not a picture Windows can read");
+            return null;
         }
     }
 

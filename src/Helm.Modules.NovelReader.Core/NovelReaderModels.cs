@@ -14,8 +14,8 @@ public static class NovelReaderIds
 }
 
 /// <summary>
-/// A novel in the library, synced: its text is an encrypted blob uploaded before the record, so another device never
-/// sees a novel it cannot open. Read-only: the text never changes after it was added.
+/// A novel in the library, synced: its text is an encrypted blob (or several) uploaded before the record, so another
+/// device never sees a novel it cannot open. Its text changes only when chapters are added from its web source.
 /// </summary>
 public sealed record NovelBook
 {
@@ -26,8 +26,15 @@ public sealed record NovelBook
     /// <summary>The name of the file it came from.</summary>
     public string FileName { get; init; } = "";
 
-    /// <summary>The text as UTF-8, whatever the file was encoded in.</summary>
+    /// <summary>The text as UTF-8, whatever the file was encoded in (a novel added from a file).</summary>
     public BlobRef? Blob { get; init; }
+
+    /// <summary>
+    /// The text in parts of about a hundred chapters (a novel from the web), read one after another; used instead of
+    /// <see cref="Blob"/>. Adding chapters stores and syncs only the parts that changed. Versions before 0.54 do not
+    /// know it and show such a novel empty.
+    /// </summary>
+    public IReadOnlyList<BookPart> Parts { get; init; } = [];
 
     public long Size { get; init; }
 
@@ -53,11 +60,23 @@ public sealed record NovelBook
     /// <summary>Helm looks at <see cref="SourceUrl"/> for new chapters by itself (on the PC, a few times a day).</summary>
     public bool AutoCheck { get; init; }
 
+    /// <summary>New chapters Helm finds by itself are downloaded and saved at once, without a preview.</summary>
+    public bool AutoSave { get; init; }
+
+    /// <summary>
+    /// A device without a browser (the phone) asked for the new chapters at this time: the PC downloads and saves them
+    /// when it sees the request, then sets <see cref="SourceCheckedAt"/> past it.
+    /// </summary>
+    public DateTimeOffset? UpdateRequestedAt { get; init; }
+
     /// <summary>When the source was last looked at, and how many chapters it had that this novel does not.</summary>
     public DateTimeOffset? SourceCheckedAt { get; init; }
 
     public int SourceNewChapters { get; init; }
 }
+
+/// <summary>One part of a novel's text: the blob, a hash of its text (an unchanged part is kept), and its chapters.</summary>
+public sealed record BookPart(BlobRef Blob, string Hash, int Chapters);
 
 public enum EntryKind
 {

@@ -28,7 +28,13 @@ public sealed partial class NovelReaderViewModel
     private string? _addPath;
     private string? _addText;
     private int _addChapterCount;
+
+    /// <summary>A novel from the web is stored in parts (see <see cref="NovelBook.Parts"/>), a file as one text.</summary>
+    private IReadOnlyList<TextPart>? _addParts;
     private string? _addSourceUrl;
+
+    /// <summary>The cover the site shows (already made small), set on the novel when it has none.</summary>
+    private byte[]? _addCover;
     private string? _updateBookId;
     private IReadOnlyList<int>? _updateMap;
     private Converter? _previewConverter;
@@ -98,14 +104,14 @@ public sealed partial class NovelReaderViewModel
         try
         {
             var got = result.Items.Where(i => i.Chapter is not null).Select(i => i.Chapter!).ToList();
-            var text = ScrapedBook.Text(got);
-            var count = await Task.Run(() => ChapterSplitter.Split(text).Count);
+            var parts = await Task.Run(() => ScrapedBook.Parts(got));
             ResetAdd();
             // Only the name of this file is kept: a title with / or : in it must not lose its start.
             _addPath = string.Concat(result.Title.Select(c => Path.GetInvalidFileNameChars().Contains(c) ? '_' : c)) + ".txt";
-            _addText = text;
-            _addChapterCount = count;
+            _addParts = parts;
+            _addChapterCount = got.Count;
             _addSourceUrl = result.SourceUrl;
+            _addCover = result.Cover;
             AddTitle = result.Title;
             AddSummary = Summary(result, got.Count, $"{got.Count} of {result.Items.Count} chapters");
             await FillPreviewAsync(result.Items.Select(i => new PreviewChapterItem(i.Title, i.Outcome, ToChapter(i.Chapter), isNew: false)).ToList());
@@ -147,15 +153,15 @@ public sealed partial class NovelReaderViewModel
                     : $"No chapter came for “{book.Title}”: {notGot} could not be downloaded (failed or locked). Try again later.";
                 return;
             }
-            var text = ScrapedBook.Text(merged.Chapters.Select(c => new ScrapedChapter(c.Title, c.Paragraphs)));
-            var count = await Task.Run(() => ChapterSplitter.Split(text).Count);
+            var parts = await Task.Run(() => ScrapedBook.Parts([.. merged.Chapters.Select(c => new ScrapedChapter(c.Title, c.Paragraphs))]));
             ResetAdd();
             _updateBookId = bookId;
             _updateMap = merged.NewIndexOfOld;
             _addPath = book.FileName;
-            _addText = text;
-            _addChapterCount = count;
+            _addParts = parts;
+            _addChapterCount = merged.Chapters.Count;
             _addSourceUrl = result.SourceUrl;
+            _addCover = result.Cover;
             AddTitle = book.Title;
             AddSummary = Summary(result, merged.Added.Count, $"{merged.Added.Count} new chapters for a novel of {existing.Count}");
             IsUpdating = true;
@@ -176,6 +182,99 @@ public sealed partial class NovelReaderViewModel
     /// <summary>The web page a library novel's chapters are listed on, or null.</summary>
     public string? SourceUrlOf(string bookId) => _store.GetBook(bookId)?.SourceUrl;
 
+    /// <summary>
+    /// Adds a novel from the web at once, without a preview, and opens it: the first chapters of a novel still
+    /// downloading ("Read now"); the rest go in with <see cref="SaveNewChaptersAsync"/> when they are in. Returns its id.
+    /// </summary>
+    public async Task<string?> AddFromWebNowAsync(ScrapeResult result)
+    {
+        Message = null;
+        IsBusy = true;
+        BusyText = "Adding the novel…";
+        try
+        {
+            var got = result.Items.Where(i => i.Chapter is not null).Select(i => i.Chapter!).ToList();
+            var parts = await Task.Run(() => ScrapedBook.Parts(got));
+            var fileName = string.Concat(result.Title.Select(c => Path.GetInvalidFileNameChars().Contains(c) ? '_' : c)) + ".txt";
+            var id = await _store.AddBookAsync(result.Title, fileName, parts, _device.DeviceName, new Progress<double>(p => BusyProgress = p),
+                sourceUrl: result.SourceUrl);
+            if (result.Cover is { } cover) await _store.SetCoverAsync(id, cover);
+            RefreshLibrary();
+            IsBusy = false;
+            await OpenBookAsync(id);
+            return id;
+        }
+        catch (Exception ex) when (ex is IOException or InvalidOperationException or BlobTooLargeException)
+        {
+            _logger.LogWarning(ex, "Could not add the first chapters of a novel");
+            Message = "Could not add the novel: " + ex.Message;
+            return null;
+        }
+        finally
+        {
+            IsBusy = false;
+        }
+    }
+
+    /// <summary>
+    /// Puts the chapters that came into a library novel at once, without a preview (new chapters Helm found by itself,
+    /// a phone's request, the rest of a novel being read while it downloads): its text is stored again (only the parts
+    /// that changed), the reading place follows its chapter, and the site's cover is kept when the novel has none. The
+    /// novel open in the reader gets its new chapters at the end of its list (reading aloud goes on); chapters put in
+    /// before show the next time it is opened. Returns how many chapters were added.
+    /// </summary>
+    public async Task<int> SaveNewChaptersAsync(string bookId, ScrapeResult result)
+    {
+        if (_store.GetBook(bookId) is not { } book) return 0;
+        var existing = await ReadChaptersAsync(bookId);
+        var merged = await Task.Run(() => BookUpdate.Merge(existing, result.Items));
+        if (merged.Added.Count == 0)
+        {
+            _store.MarkSourceChecked(bookId, 0);
+            RefreshLibrary();
+            return 0;
+        }
+        if (OpenBookId == bookId) FlushProgress();
+        var parts = await Task.Run(() => ScrapedBook.Parts([.. merged.Chapters.Select(c => new ScrapedChapter(c.Title, c.Paragraphs))]));
+        await _store.ReplaceBookTextAsync(bookId, parts);
+        if (_store.Progress(bookId) is { } place && place.Chapter >= 0 && place.Chapter < merged.NewIndexOfOld.Count)
+            _store.MoveProgressChapter(bookId, merged.NewIndexOfOld[place.Chapter]);
+        if (result.Cover is { } cover && book.Cover is null)
+        {
+            try
+            {
+                await _store.SetCoverAsync(bookId, cover);
+            }
+            catch (Exception ex) when (ex is IOException or InvalidOperationException)
+            {
+                _logger.LogInformation(ex, "Could not keep the cover of {Id}", bookId);
+            }
+        }
+        if (OpenBookId == bookId)
+        {
+            var appended = merged.Added.All(i => i >= existing.Count);
+            if (appended)
+            {
+                var text = string.Join("\n\n", parts.Select(p => p.Text));
+                var chapters = await Task.Run(() => ChapterSplitter.Split(text));
+                if (OpenBookId == bookId && chapters.Count > _chapters.Count)
+                {
+                    var from = _chapters.Count;
+                    _chapters = chapters;
+                    for (var i = from; i < chapters.Count; i++) Chapters.Add(new ChapterItem(i, chapters[i].Title));
+                    ConvertChapterTitles();
+                }
+            }
+            else
+            {
+                Message = $"{merged.Added.Count} chapters were put into this novel; open it again to see them in their place.";
+            }
+        }
+        RefreshLibrary();
+        _logger.LogInformation("Saved {Count} new chapters into {Title}", merged.Added.Count, book.Title);
+        return merged.Added.Count;
+    }
+
     /// <summary>A novel's chapters as the reader splits them (downloading its text when it is not on this device).</summary>
     public async Task<IReadOnlyList<Chapter>> ReadChaptersAsync(string bookId)
     {
@@ -187,7 +286,7 @@ public sealed partial class NovelReaderViewModel
     [RelayCommand]
     private async Task ConfirmAdd()
     {
-        if (_addPath is null || _addText is null) return;
+        if (_addPath is null || (_addText is null && _addParts is null)) return;
         IsBusy = true;
         BusyText = IsUpdating ? "Saving the new chapters…" : "Adding the novel…";
         try
@@ -199,16 +298,31 @@ public sealed partial class NovelReaderViewModel
             {
                 id = bookId;
                 FlushProgress();
-                await _store.ReplaceBookTextAsync(id, _addText, _addChapterCount, progress);
+                await _store.ReplaceBookTextAsync(id, _addParts ?? [new TextPart(_addText ?? "", _addChapterCount)], progress);
                 // Chapters put in before the reading place push it on, so it stays on the same chapter.
                 if (_store.Progress(id) is { } place && _updateMap is { } map && place.Chapter >= 0 && place.Chapter < map.Count)
                     _store.MoveProgressChapter(id, map[place.Chapter]);
                 if (_store.GetBook(id) is { } book && book.Title != AddTitle.Trim()) _store.RenameBook(id, AddTitle);
             }
+            else if (_addParts is { } parts)
+            {
+                id = await _store.AddBookAsync(AddTitle, Path.GetFileName(_addPath), parts, _device.DeviceName, progress, sourceUrl: _addSourceUrl);
+            }
             else
             {
-                id = await _store.AddBookAsync(AddTitle, Path.GetFileName(_addPath), _addText, _addChapterCount, _device.DeviceName,
+                id = await _store.AddBookAsync(AddTitle, Path.GetFileName(_addPath), _addText ?? "", _addChapterCount, _device.DeviceName,
                     progress, sourceUrl: _addSourceUrl);
+            }
+            if (_addCover is { } cover && _store.GetBook(id) is { Cover: null })
+            {
+                try
+                {
+                    await _store.SetCoverAsync(id, cover);
+                }
+                catch (Exception ex) when (ex is IOException or InvalidOperationException)
+                {
+                    _logger.LogInformation(ex, "Could not keep the cover of {Id}", id);
+                }
             }
             if (source is not null) WebNovelSaved?.Invoke(this, source);
             CancelAdd();
@@ -244,7 +358,9 @@ public sealed partial class NovelReaderViewModel
     {
         _addPath = null;
         _addText = null;
+        _addParts = null;
         _addSourceUrl = null;
+        _addCover = null;
         _updateBookId = null;
         _updateMap = null;
         _previewConverter = null;
@@ -370,12 +486,32 @@ public sealed partial class NovelReaderViewModel
         RefreshLibrary();
     }
 
+    /// <summary>New chapters Helm finds by itself are saved at once, or shown first (the default).</summary>
+    [RelayCommand]
+    private void ToggleAutoSave(BookCardViewModel? card)
+    {
+        if (card is null || _store.GetBook(card.Id) is not { SourceUrl: not null } book) return;
+        _store.SetAutoSave(card.Id, !book.AutoSave);
+        RefreshLibrary();
+    }
+
+    /// <summary>On the phone (no browser): asks the PC, through sync, to download and save the novel's new chapters.</summary>
+    [RelayCommand]
+    private void RequestUpdate(BookCardViewModel? card)
+    {
+        if (card is null) return;
+        _store.RequestUpdate(card.Id);
+        RefreshLibrary();
+    }
+
     /// <summary>The card's line about the web source: new chapters found, when it was looked at, whether Helm looks by itself.</summary>
     private static string SourceStatus(NovelBook book, DateTimeOffset now)
     {
         if (book.SourceUrl is null) return "";
+        if (NovelStore.IsUpdateRequested(book)) return "Waiting for the PC to download the new chapters (Helm must be open there)";
         var checkedAt = book.SourceCheckedAt is { } at ? $"checked {NovelFormat.Ago(at, now)}" : "not checked yet";
         var found = book.SourceNewChapters > 0 ? $"{book.SourceNewChapters} new chapters on the web · " : "";
-        return $"{found}{checkedAt}{(book.AutoCheck ? " · checks by itself" : "")}";
+        var self = book.AutoCheck ? book.AutoSave ? " · checks and saves by itself" : " · checks by itself" : "";
+        return $"{found}{checkedAt}{self}";
     }
 }

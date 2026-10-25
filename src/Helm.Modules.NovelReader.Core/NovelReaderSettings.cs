@@ -83,6 +83,11 @@ public sealed class NovelReaderSettings : IVersionedSettings
     /// </summary>
     public int PrefetchChapters { get; set; } = 2;
 
+    // ---- Scrape from web --------------------------------------------------------------------------------------------
+
+    /// <summary>Chapter pages scraped at once (tabs of the browser), 1 to 5: more is faster, and more likely refused by a site.</summary>
+    public int ScrapeTabs { get; set; } = 3;
+
     // ---- Finding names ---------------------------------------------------------------------------------------------
 
     /// <summary>Opening a novel for the first time looks for its character names and adds the sure ones.</summary>

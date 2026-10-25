@@ -288,6 +288,79 @@ public sealed class NovelReaderTests : IDisposable
     }
 
     [Fact]
+    public async Task Read_now_opens_the_first_chapters_and_the_rest_go_into_the_open_novel_without_a_preview()
+    {
+        var page = NewPage("a");
+        page.ViewModel.AutoScanNames = false;
+        var first = new ScrapeResult("山寺", "https://x.com/book/123/", [.. Enumerable.Range(1, 2).Select(n => WebChapter(n, ScrapeOutcome.Got))]);
+
+        var id = await page.ViewModel.AddFromWebNowAsync(first);
+        Assert.NotNull(id);
+        Assert.Equal(id, page.ViewModel.OpenBookId);
+        Assert.Equal(2, page.ViewModel.Chapters.Count);
+        Assert.Equal("https://x.com/book/123/", page.Store.GetBook(id!)!.SourceUrl);
+
+        // The whole list came: the two already there are matched by title, the others go in at the end.
+        var all = new ScrapeResult("山寺", "https://x.com/book/123/", [.. Enumerable.Range(1, 4).Select(n => WebChapter(n, ScrapeOutcome.Got))]);
+        Assert.Equal(2, await page.ViewModel.SaveNewChaptersAsync(id!, all));
+        Assert.Equal(4, page.ViewModel.Chapters.Count);
+        Assert.Equal(4, page.Store.GetBook(id!)!.ChapterCount);
+        Assert.False(page.ViewModel.IsAdding);
+        Assert.Equal(0, await page.ViewModel.SaveNewChaptersAsync(id!, all));
+
+        // A phone asks the PC for new chapters through the record; the PC's look answers it.
+        Assert.False(NovelStore.IsUpdateRequested(page.Store.GetBook(id!)!));
+        _clock.Advance(TimeSpan.FromMinutes(1));
+        page.ViewModel.RequestUpdateCommand.Execute(page.ViewModel.Books.Single());
+        Assert.True(NovelStore.IsUpdateRequested(page.Store.GetBook(id!)!));
+        Assert.True(page.ViewModel.Books.Single().IsUpdateRequested);
+        Assert.StartsWith("Waiting for the PC", page.ViewModel.Books.Single().SourceStatus);
+        _clock.Advance(TimeSpan.FromMinutes(1));
+        await page.ViewModel.SaveNewChaptersAsync(id!, all);
+        Assert.False(NovelStore.IsUpdateRequested(page.Store.GetBook(id!)!));
+
+        page.ViewModel.ToggleAutoSaveCommand.Execute(page.ViewModel.Books.Single());
+        Assert.True(page.Store.GetBook(id!)!.AutoSave);
+    }
+
+    [Fact]
+    public async Task A_web_novel_is_stored_in_parts_and_new_chapters_upload_only_the_part_that_changed()
+    {
+        var (store, _, blobs) = NewStore("a");
+        ScrapedChapter Chapter(int n) => new($"第{n}章 第{n}回", [$"第{n}回的第一段。", "林宛撑着一柄素色油纸伞。"]);
+        var chapters = Enumerable.Range(1, 250).Select(Chapter).ToList();
+
+        var id = await store.AddBookAsync("山寺", "山寺.txt", ScrapedBook.Parts(chapters), "PC", sourceUrl: "https://x.com/book/1/");
+        var book = store.GetBook(id)!;
+        Assert.Null(book.Blob);
+        Assert.Equal([100, 100, 50], book.Parts.Select(p => p.Chapters));
+        Assert.Equal(250, book.ChapterCount);
+        Assert.True(store.IsUploading(book));
+        var split = ChapterSplitter.Split(await store.ReadBookTextAsync(id));
+        Assert.Equal(chapters.Select(c => c.Title), split.Select(c => c.Title));
+        Assert.Equal(chapters.Select(c => c.Paragraphs), split.Select(c => c.Paragraphs));
+
+        await store.ReplaceBookTextAsync(id, ScrapedBook.Parts([.. chapters, Chapter(251)]));
+        var after = store.GetBook(id)!;
+        Assert.Equal(251, after.ChapterCount);
+        Assert.Equal(book.Parts[0].Blob.Id, after.Parts[0].Blob.Id);
+        Assert.Equal(book.Parts[1].Blob.Id, after.Parts[1].Blob.Id);
+        Assert.NotEqual(book.Parts[2].Blob.Id, after.Parts[2].Blob.Id);
+        Assert.Equal(251, ChapterSplitter.Split(await store.ReadBookTextAsync(id)).Count);
+
+        // A novel from a file (one blob) becomes parts the first time chapters are added.
+        var file = await store.AddBookAsync("Novel", "n.txt", Novel, 3, "PC");
+        var old = store.GetBook(file)!.Blob!;
+        await store.ReplaceBookTextAsync(file, ScrapedBook.Parts([.. ChapterSplitter.Split(Novel).Select(c => new ScrapedChapter(c.Title, c.Paragraphs)), Chapter(4)]));
+        Assert.Null(store.GetBook(file)!.Blob);
+        Assert.Equal(4, ChapterSplitter.Split(await store.ReadBookTextAsync(file)).Count);
+        Assert.False(blobs.IsPending(old.Id));
+
+        store.DeleteBook(id);
+        Assert.All(after.Parts, p => Assert.False(blobs.IsPending(p.Blob.Id)));
+    }
+
+    [Fact]
     public async Task A_novel_gets_a_web_source_checks_it_by_itself_when_asked_and_its_card_tells_what_was_found()
     {
         var page = NewPage("a");

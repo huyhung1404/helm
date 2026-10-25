@@ -1,7 +1,11 @@
+using System.Security.Cryptography;
 using Helm.Core.Sync;
 using Helm.Modules.NovelReader.Text;
 
 namespace Helm.Modules.NovelReader.Library;
+
+/// <summary>A part of a novel's text to store: the text of some chapters, and how many.</summary>
+public sealed record TextPart(string Text, int Chapters);
 
 /// <summary>Which part of the library changed.</summary>
 public enum NovelArea
@@ -62,7 +66,7 @@ public sealed class NovelStore
         Name = BooksCollection,
         ConflictPolicy = SyncConflictPolicy.LastWriterWins,
         GuardDeletions = true,
-        BlobReferences = book => new[] { book.Blob?.Id, book.Cover?.Id }.OfType<string>(),
+        BlobReferences = book => new[] { book.Blob?.Id, book.Cover?.Id }.Concat(book.Parts.Select(p => p.Blob.Id)).OfType<string>(),
     };
 
     /// <summary>Not guarded: deleting a novel deletes its names too, which would otherwise hold every other device.</summary>
@@ -142,23 +146,105 @@ public sealed class NovelStore
     });
 
     /// <summary>
-    /// Gives a novel a new text (chapters added from its web source): a new blob, and the old one dropped once the record
-    /// points at the new one, so other devices download the new text.
+    /// Adds a novel from the web, its text in parts (<see cref="NovelBook.Parts"/>): each part is encrypted into its own
+    /// blob, and the record follows them to the other devices after the next sync.
     /// </summary>
-    /// <exception cref="BlobTooLargeException">Larger than the sync server accepts.</exception>
-    public async Task ReplaceBookTextAsync(string id, string text, int chapterCount, IProgress<double>? progress = null, CancellationToken ct = default)
+    /// <exception cref="BlobTooLargeException">A part is larger than the sync server accepts.</exception>
+    public async Task<string> AddBookAsync(string title, string fileName, IReadOnlyList<TextPart> parts, string device,
+        IProgress<double>? progress = null, CancellationToken ct = default, string? sourceUrl = null)
     {
-        using var content = new MemoryStream(TextFiles.Utf8.GetBytes(text));
-        var blob = await _blobs.ImportAsync(content, progress, ct).ConfigureAwait(false);
+        title = CleanTitle(title, fileName);
+        var stored = await StorePartsAsync(parts, [], progress, ct).ConfigureAwait(false);
+        try
+        {
+            return _books.Add(new NovelBook
+            {
+                Title = title,
+                FileName = Path.GetFileName(fileName),
+                Parts = stored,
+                Size = stored.Sum(p => p.Blob.Size),
+                ChapterCount = parts.Sum(p => p.Chapters),
+                AddedAt = Now,
+                AddedFrom = device,
+                SourceUrl = sourceUrl,
+            });
+        }
+        catch
+        {
+            foreach (var part in stored) _blobs.Discard(part.Blob.Id);
+            throw;
+        }
+    }
+
+    /// <summary>
+    /// Gives a novel a new text in parts (chapters added from its web source). A part whose text did not change keeps its
+    /// blob, so only the changed parts are uploaded and downloaded again; the novel's old blobs that are no longer used
+    /// are dropped once the record points at the new ones.
+    /// </summary>
+    /// <exception cref="BlobTooLargeException">A part is larger than the sync server accepts.</exception>
+    public async Task ReplaceBookTextAsync(string id, IReadOnlyList<TextPart> parts, IProgress<double>? progress = null, CancellationToken ct = default)
+    {
+        var before = _books.Get(id) ?? throw new InvalidOperationException("This novel is no longer in the library.");
+        var stored = await StorePartsAsync(parts, before.Parts, progress, ct).ConfigureAwait(false);
+        var kept = before.Parts.Select(p => p.Blob.Id).ToHashSet(StringComparer.Ordinal);
         // Read again: the record may have changed (a rename, a check) while the text was stored.
         if (_books.Get(id) is not { } book)
         {
-            _blobs.Discard(blob.Id);
+            foreach (var part in stored.Where(p => !kept.Contains(p.Blob.Id))) _blobs.Discard(part.Blob.Id);
             throw new InvalidOperationException("This novel is no longer in the library.");
         }
-        _books.Upsert(id, book with { Blob = blob, Size = blob.Size, ChapterCount = chapterCount, SourceNewChapters = 0, SourceCheckedAt = Now });
+        _books.Upsert(id, book with
+        {
+            Blob = null,
+            Parts = stored,
+            Size = stored.Sum(p => p.Blob.Size),
+            ChapterCount = parts.Sum(p => p.Chapters),
+            SourceNewChapters = 0,
+            SourceCheckedAt = Now,
+        });
+        var used = stored.Select(p => p.Blob.Id).ToHashSet(StringComparer.Ordinal);
         if (book.Blob is { } old) _blobs.Discard(old.Id);
+        foreach (var part in book.Parts.Where(p => !used.Contains(p.Blob.Id))) _blobs.Discard(part.Blob.Id);
     }
+
+    /// <summary>Encrypts each part into a blob, reusing <paramref name="existing"/> parts with the same text.</summary>
+    private async Task<List<BookPart>> StorePartsAsync(IReadOnlyList<TextPart> parts, IReadOnlyList<BookPart> existing, IProgress<double>? progress, CancellationToken ct)
+    {
+        var stored = new List<BookPart>(parts.Count);
+        var total = Math.Max(1, parts.Sum(p => (long)p.Text.Length));
+        long done = 0;
+        try
+        {
+            foreach (var part in parts)
+            {
+                var bytes = TextFiles.Utf8.GetBytes(part.Text);
+                var hash = Convert.ToHexString(SHA256.HashData(bytes))[..32];
+                if (existing.FirstOrDefault(p => p.Hash == hash) is { } same)
+                {
+                    stored.Add(same with { Chapters = part.Chapters });
+                }
+                else
+                {
+                    var start = done;
+                    var share = part.Text.Length;
+                    using var content = new MemoryStream(bytes);
+                    var blob = await _blobs.ImportAsync(content, progress is null ? null : new Progress<double>(f => progress.Report((start + f * share) / total)), ct)
+                        .ConfigureAwait(false);
+                    stored.Add(new BookPart(blob, hash, part.Chapters));
+                }
+                done += part.Text.Length;
+                progress?.Report((double)done / total);
+            }
+            return stored;
+        }
+        catch
+        {
+            var keep = existing.Select(p => p.Blob.Id).ToHashSet(StringComparer.Ordinal);
+            foreach (var part in stored.Where(p => !keep.Contains(p.Blob.Id))) _blobs.Discard(part.Blob.Id);
+            throw;
+        }
+    }
+
 
     /// <summary>Sets (or clears, with null) the web page a novel's chapters are listed on, and whether Helm looks there by itself.</summary>
     public void SetSource(string id, string? url, bool autoCheck)
@@ -176,6 +262,23 @@ public sealed class NovelStore
     }
 
     /// <summary>Records a look at the novel's web source: <paramref name="newChapters"/> it has that the novel does not.</summary>
+    public void SetAutoSave(string id, bool autoSave)
+    {
+        if (_books.Get(id) is not { } book || book.AutoSave == autoSave) return;
+        _books.Upsert(id, book with { AutoSave = autoSave && book.SourceUrl is not null });
+    }
+
+    /// <summary>Asks the PC (through sync) to download and save the novel's new chapters: for a device without a browser.</summary>
+    public void RequestUpdate(string id)
+    {
+        if (_books.Get(id) is not { SourceUrl: not null } book) return;
+        _books.Upsert(id, book with { UpdateRequestedAt = Now });
+    }
+
+    /// <summary>A request for new chapters the PC has not answered yet.</summary>
+    public static bool IsUpdateRequested(NovelBook book) =>
+        book.UpdateRequestedAt is { } asked && (book.SourceCheckedAt is not { } checkedAt || checkedAt < asked);
+
     public void MarkSourceChecked(string id, int newChapters)
     {
         if (_books.Get(id) is not { } book) return;
@@ -192,22 +295,38 @@ public sealed class NovelStore
         _progress.Upsert(bookId, progress with { Chapter = chapter });
     }
 
+
     /// <exception cref="BlobUnavailableException">Not on this device yet and sync cannot fetch it.</exception>
     /// <exception cref="System.Security.Cryptography.CryptographicException">The stored text is damaged.</exception>
     public async Task<string> ReadBookTextAsync(string id, IProgress<double>? progress = null, CancellationToken ct = default)
     {
         var book = _books.Get(id) ?? throw new InvalidOperationException("This novel is no longer in the library.");
-        if (book.Blob is not { } blob) return "";
-        using var buffer = new MemoryStream((int)Math.Min(blob.Size, int.MaxValue));
-        await _blobs.ReadAsync(blob, buffer, progress, ct).ConfigureAwait(false);
-        return TextFiles.Decode(buffer.GetBuffer().AsSpan(0, (int)buffer.Length));
+        var blobs = Blobs(book).ToList();
+        if (blobs.Count == 0) return "";
+        var total = Math.Max(1, blobs.Sum(b => b.Size));
+        long done = 0;
+        var texts = new List<string>(blobs.Count);
+        foreach (var blob in blobs)
+        {
+            var start = done;
+            using var buffer = new MemoryStream((int)Math.Min(blob.Size, int.MaxValue));
+            await _blobs.ReadAsync(blob, buffer, progress is null ? null : new Progress<double>(f => progress.Report((start + f * blob.Size) / total)), ct)
+                .ConfigureAwait(false);
+            texts.Add(TextFiles.Decode(buffer.GetBuffer().AsSpan(0, (int)buffer.Length)));
+            done += blob.Size;
+        }
+        // Each part ends its last paragraph with a line break: one more blank line between parts, as between chapters.
+        return string.Join("\n\n", texts);
     }
 
+    /// <summary>The blobs that hold a novel's text: its one blob, or its parts in order.</summary>
+    private static IEnumerable<BlobRef> Blobs(NovelBook book) => book.Blob is { } blob ? [blob, .. book.Parts.Select(p => p.Blob)] : book.Parts.Select(p => p.Blob);
+
     /// <summary>Added on this device and not uploaded yet.</summary>
-    public bool IsUploading(NovelBook book) => book.Blob is { } blob && _blobs.IsPending(blob.Id);
+    public bool IsUploading(NovelBook book) => Blobs(book).Any(b => _blobs.IsPending(b.Id));
 
     /// <summary>The text is on this device (opening it needs no download).</summary>
-    public bool IsOnDevice(NovelBook book) => book.Blob is not { } blob || _blobs.IsCached(blob);
+    public bool IsOnDevice(NovelBook book) => Blobs(book).All(_blobs.IsCached);
 
     public void RenameBook(string id, string title)
     {
@@ -222,7 +341,8 @@ public sealed class NovelStore
         foreach (var entryId in EntryIdsOf(id)) _entries.Delete(entryId);
         _progress.Delete(id);
         _books.Delete(id);
-        if (book?.Blob is { } blob) _blobs.Discard(blob.Id);
+        if (book is not null)
+            foreach (var blob in Blobs(book)) _blobs.Discard(blob.Id);
         if (book?.Cover is { } cover) _blobs.Discard(cover.Id);
     }
 

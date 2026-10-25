@@ -113,6 +113,7 @@ public sealed partial class NovelReaderViewModel : ObservableObject, IReadAloudH
     [ObservableProperty] private double _paragraphPause;
     [ObservableProperty] private bool _continueToNextChapter;
     [ObservableProperty] private int _prefetchChapters;
+    [ObservableProperty] private int _scrapeTabs;
 
     // Adding a novel
     [ObservableProperty] private bool _isAdding;
@@ -218,6 +219,7 @@ public sealed partial class NovelReaderViewModel : ObservableObject, IReadAloudH
         ParagraphPause = Math.Clamp(s.ParagraphPause, 0, 2);
         ContinueToNextChapter = s.ContinueToNextChapter;
         PrefetchChapters = Math.Clamp(s.PrefetchChapters, 1, ReadAloudController.MaxPrefetchChapters);
+        ScrapeTabs = Math.Clamp(s.ScrapeTabs, 1, 5);
         FallbackToOfflineVoice = s.FallbackToOfflineVoice;
         LocalVoiceFolder = s.LocalVoiceFolder ?? "";
         LocalVoicePort = s.LocalVoicePort;
@@ -428,6 +430,7 @@ public sealed partial class NovelReaderViewModel : ObservableObject, IReadAloudH
     partial void OnParagraphPauseChanged(double value) => Save(s => s.ParagraphPause = value);
     partial void OnContinueToNextChapterChanged(bool value) => Save(s => s.ContinueToNextChapter = value);
     partial void OnPrefetchChaptersChanged(int value) => Save(s => s.PrefetchChapters = value);
+    partial void OnScrapeTabsChanged(int value) => Save(s => s.ScrapeTabs = value);
     partial void OnFallbackToOfflineVoiceChanged(bool value) => Save(s => s.FallbackToOfflineVoice = value);
     partial void OnIsSpeakingChanged(bool value) => OnPropertyChanged(nameof(ShowBackToReading));
     partial void OnIsFollowingChanged(bool value) => OnPropertyChanged(nameof(ShowBackToReading));
@@ -1608,6 +1611,8 @@ public sealed partial class NovelReaderViewModel : ObservableObject, IReadAloudH
             card.IsOpen = id == OpenBookId;
             card.HasSource = book.SourceUrl is not null;
             card.AutoCheck = book.AutoCheck;
+            card.AutoSave = book.AutoSave;
+            card.IsUpdateRequested = NovelStore.IsUpdateRequested(book);
             card.SourceStatus = SourceStatus(book, now);
             if (card.CoverBlobId != book.Cover?.Id) _ = LoadCoverAsync(card, book.Cover?.Id);
         }

@@ -54,6 +54,16 @@ public static partial class ScrapedBook
         return title;
     }
 
+    /// <summary>Chapters per stored part: a few new chapters re-upload one part of about 300 KB, not the whole novel.</summary>
+    public const int ChaptersPerPart = 100;
+
+    /// <summary>
+    /// The text in parts of <see cref="ChaptersPerPart"/> chapters, each written like <see cref="Text"/>; read back one
+    /// after another (a blank line between them) they are the same text.
+    /// </summary>
+    public static IReadOnlyList<Library.TextPart> Parts(IReadOnlyList<ScrapedChapter> chapters) =>
+        chapters.Chunk(ChaptersPerPart).Select(c => new Library.TextPart(Text(c), c.Length)).ToList();
+
     /// <summary>
     /// The text: each chapter's title, then its paragraphs one blank line apart, chapters two blank lines apart (the
     /// layout the splitter knows, so a title without "第N章" still starts a chapter).

@@ -297,6 +297,18 @@
             </StackPanel>
         </ui:CardExpander>
 
+        <!-- Scrape from web -->
+        <ui:CardControl Margin="0,0,0,4" Icon="{ui:SymbolIcon Globe24}">
+            <ui:CardControl.Header>
+                <core:CardHeader Title="Chapters downloaded at once" Description="Scrape from web reads this many chapter pages at the same time. More is faster; a site may refuse too many, and then Helm goes on one at a time." />
+            </ui:CardControl.Header>
+            <StackPanel Orientation="Horizontal">
+                <Slider Width="160" Minimum="1" Maximum="5" TickFrequency="1" IsSnapToTickEnabled="True" Value="{Binding ScrapeTabs}"
+                        VerticalAlignment="Center" AutomationProperties.Name="Chapters downloaded at once" />
+                <TextBlock Width="40" Margin="8,0,0,0" VerticalAlignment="Center" Text="{Binding ScrapeTabs}" />
+            </StackPanel>
+        </ui:CardControl>
+
         <!-- Names -->
         <TextBlock Text="Your names" Style="{DynamicResource HelmSectionHeader}" />
         <ui:CardControl Margin="0,0,0,4" Icon="{ui:SymbolIcon People24}">

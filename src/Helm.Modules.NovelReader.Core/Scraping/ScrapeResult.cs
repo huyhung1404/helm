@@ -23,8 +23,11 @@ public sealed record ScrapeItem(WebLink Link, ScrapeOutcome Outcome, ScrapedChap
     public string Title => Chapter?.Title ?? Link.Text;
 }
 
-/// <summary>Everything one scrape gives: the book's name, where its list is, and every chapter of the list in order.</summary>
-public sealed record ScrapeResult(string Title, string SourceUrl, IReadOnlyList<ScrapeItem> Items)
+/// <summary>
+/// Everything one scrape gives: the book's name, where its list is, every chapter of the list in order, and the cover
+/// picture the site shows (a small JPEG once the platform has shrunk it), or null.
+/// </summary>
+public sealed record ScrapeResult(string Title, string SourceUrl, IReadOnlyList<ScrapeItem> Items, byte[]? Cover = null)
 {
     public int Count(ScrapeOutcome outcome) => Items.Count(i => i.Outcome == outcome);
 }

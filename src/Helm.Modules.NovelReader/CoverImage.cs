@@ -54,6 +54,20 @@ public static class CoverPicture
     public static byte[] Shrink(string path)
     {
         using var stream = File.OpenRead(path);
+        return Shrink(stream);
+    }
+
+    /// <summary>A picture downloaded from the web (a novel's cover on its site), made small the same way.</summary>
+    /// <exception cref="NotSupportedException">Not a picture Windows can read.</exception>
+    public static byte[] Shrink(byte[] picture)
+    {
+        using var stream = new MemoryStream(picture);
+        return Shrink(stream);
+    }
+
+    /// <remarks>Draws with WPF: call it on the UI thread.</remarks>
+    private static byte[] Shrink(Stream stream)
+    {
         var decoder = BitmapDecoder.Create(stream, BitmapCreateOptions.IgnoreColorProfile, BitmapCacheOption.OnLoad);
         BitmapSource frame = decoder.Frames[0];
         var scale = Math.Min(1.0, (double)MaxSide / Math.Max(frame.PixelWidth, frame.PixelHeight));
