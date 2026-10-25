@@ -3,6 +3,28 @@
 All notable changes to Helm. The top section is used as the GitHub release body and as the Velopack release notes.
 Format: [Keep a Changelog](https://keepachangelog.com), versions follow [SemVer](https://semver.org).
 
+## [0.53.0] - 2026-10-25
+
+### Added
+- **Novel Reader: scrape a novel from the web, look at it first, and continue its download (PC).** Paste the address
+  of a novel's chapter list under "Scrape from web": Helm reads it in Edge (a new tab of a browser you opened with a
+  DevTools port, or its own hidden Edge), waits for each page to finish loading, picks the chapters out of the list
+  in reading order (not the "latest chapters" block, not other books), and cleans each chapter of the site's buttons,
+  notices and slogans. A chapter split over several pages is joined; a failed chapter is tried three times. When a
+  site asks for a Cloudflare check, an Edge window opens for you to confirm it, and the site is remembered.
+  What came is shown before anything is saved: the chapter list (failed and locked chapters marked) and each chapter
+  in your reading language, with "Retry failed" for the ones that did not come. A novel added from a .txt file is
+  shown the same way. A web novel keeps its address: **Continue** on its card fetches only the chapters it lacks
+  (new ones, and ones that failed before), shows them, and puts them in their place; the chapter you were reading
+  stays the one you are on. Turn on "Check for new chapters by itself" in the card's web menu and Helm looks a few
+  times a day, quietly, and the card says how many chapters are new. Chapters already downloaded are kept until the
+  novel is saved, so a cancelled run picks up where it stopped. Tested on biquge.tw, piaotia, ixdzs8, xbanxia and
+  Qidian's free chapters; Fanqie scrambles its text on the web and is not supported (Novel Lens reads it on the phone).
+
+### Fixed
+- **Novel Reader: HoaiMy reads again.** Edge's online voice service now refuses the old request token (403); Helm
+  sends the new one, so the HoaiMy voice works again on the PC and the phone.
+
 ## [0.52.0] - 2026-10-23
 
 ### Added
