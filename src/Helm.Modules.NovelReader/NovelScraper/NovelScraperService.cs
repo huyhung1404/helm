@@ -358,8 +358,6 @@ public sealed partial class NovelScraperService
     {
         if (!Uri.TryCreate(url.Trim(), UriKind.Absolute, out var start) || start.Scheme is not ("http" or "https"))
             throw new InvalidOperationException("Paste the web address of the novel's chapter list (https://…).");
-        if (start.Host.EndsWith("fanqienovel.com", StringComparison.OrdinalIgnoreCase))
-            throw new InvalidOperationException("Fanqie scrambles its text on the web, so it cannot be scraped. Read it with Novel Lens on the phone.");
         return start;
     }
 
@@ -604,8 +602,16 @@ public sealed partial class NovelScraperService
         {
             var state = await LoadAsync(browser, Current(), pageUrl, quiet: false, progress, ct);
             var read = await Current().EvaluateAsync<ChapterJson>(ChapterJs, ct) ?? new ChapterJson();
-            heading ??= string.IsNullOrWhiteSpace(read.Heading) ? null : read.Heading.Trim();
-            parts.Add(read.Text ?? "");
+            var text = read.Text ?? "";
+            if (FanqieText.IsScrambled(text))
+            {
+                // Fanqie's own characters: decoded with the table made for its font, never with another one.
+                if (!FanqieText.KnowsFont(read.Fonts ?? ""))
+                    throw new InvalidOperationException("Fanqie changed the font it scrambles its text with; Helm cannot read it until it is updated.");
+                text = FanqieText.Decode(text);
+            }
+            heading ??= string.IsNullOrWhiteSpace(read.Heading) ? null : FanqieText.Decode(read.Heading.Trim());
+            parts.Add(text);
             pageText = read.Page ?? "";
             var next = ChapterLinks.Continuation(state.Href, link.Url, read.Next ?? [], chapterUrls, seen);
             if (next is null) break;
@@ -806,6 +812,7 @@ public sealed partial class NovelScraperService
         public string? Text { get; init; }
         public string? Page { get; init; }
         public List<WebLink>? Next { get; init; }
+        public string? Fonts { get; init; }
     }
 
     private const string StateJs = """
@@ -875,8 +882,10 @@ public sealed partial class NovelScraperService
           }
           var h1 = document.querySelector('h1');
           var page = document.body ? document.body.innerText || '' : '';
+          // The fonts the page names (Fanqie draws its common characters with one of its own).
+          var fonts = Array.from(document.querySelectorAll('style')).map(function(s) { return (s.textContent || '').match(/[^\s'"()]+\.(woff2?|otf|ttf)/g) || []; }).flat().join(' ');
           return JSON.stringify({ heading: h1 ? h1.innerText.trim() : '', text: best ? best.innerText || '' : '',
-            page: page.slice(0, 2000), next: next });
+            page: page.slice(0, 2000), next: next, fonts: fonts });
         })()
         """;
 

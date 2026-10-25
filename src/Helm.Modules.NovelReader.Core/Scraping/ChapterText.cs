@@ -29,7 +29,7 @@ public static partial class ChapterText
     [GeneratedRegex(@"[　 ]{2,}| {4,}")]
     private static partial Regex RunTogether();
 
-    [GeneratedRegex(@"订阅本章|購買本章|购买本章|VIP章节|VIP章節|本章为VIP|本章為VIP|登录后|登錄後|登入後|付费章节|付費章節|解锁本章|解鎖本章|立即订阅|需要订阅|订阅后|訂閱後")]
+    [GeneratedRegex(@"订阅本章|購買本章|购买本章|VIP章节|VIP章節|本章为VIP|本章為VIP|登录后|登錄後|登入後|付费章节|付費章節|解锁本章|解鎖本章|立即订阅|需要订阅|订阅后|訂閱後|畅读全文|暢讀全文|SVIP|下载APP免费读|扫码下载")]
     private static partial Regex LockNotice();
 
     /// <summary>

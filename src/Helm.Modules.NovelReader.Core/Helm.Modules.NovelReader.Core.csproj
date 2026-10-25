@@ -25,6 +25,8 @@
     <!-- OpenCC's Traditional-to-Simplified tables (Apache-2.0, see Resources/opencc-ts.LICENSE.txt), for Traditional Chinese novels -->
     <EmbeddedResource Include="Resources\opencc-ts.txt.gz" LogicalName="Helm.Modules.NovelReader.opencc-ts.txt.gz" />
     <None Include="Resources\opencc-ts.LICENSE.txt" CopyToOutputDirectory="PreserveNewest" />
+    <!-- Fanqie's web font table in Scraping/FanqieText.cs (MIT) -->
+    <None Include="Resources\fanqie-chars.LICENSE.txt" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
 </Project>

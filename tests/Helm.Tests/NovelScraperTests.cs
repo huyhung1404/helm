@@ -305,6 +305,23 @@ public sealed class NovelScraperTests
     }
 
     [Fact]
+    public void Fanqies_own_characters_are_turned_back_with_the_corrected_table_and_its_paywall_is_a_locked_chapter()
+    {
+        Assert.Equal(372, FanqieText.Length);
+        Assert.Equal(10, FanqieText.Gaps);
+        // 根本 / 点头 / 给 / 一名 / 自己 / 事情 / 意思, the entries the source table had wrong.
+        Assert.Equal("根本点头给一名自己事情意思", FanqieText.Decode("根头一自事思"));
+        Assert.Equal("第1章 空屋", FanqieText.Decode("第1章 空屋"));
+        Assert.True(FanqieText.IsScrambled(""));
+        Assert.True(FanqieText.KnowsFont("https://lf6-awef.bytetos.com/obj/awesome-font/c/dc027189e0ba4cd.woff2"));
+        Assert.False(FanqieText.KnowsFont("https://lf6-awef.bytetos.com/obj/awesome-font/c/0123456789abcde.woff2"));
+
+        const string chapter11 = "齐夏座坐，既站寻找线索。\n怪怪。\n扫码下载APP免费读，SVIP网页畅读\n会员登录后，可在网页畅读全文";
+        var paragraphs = ChapterText.Clean(chapter11, "十日终焉", "番茄小说官网", "第11章 继续吧");
+        Assert.True(ChapterText.LooksLocked(paragraphs, chapter11));
+    }
+
+    [Fact]
     public void An_empty_novel_takes_every_chapter_that_came()
     {
         var empty = ChapterSplitter.Split("");
