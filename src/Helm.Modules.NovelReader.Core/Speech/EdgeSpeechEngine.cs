@@ -128,7 +128,7 @@ public sealed class EdgeSpeechEngine(ILogger<EdgeSpeechEngine> logger) : ISpeech
         socket.Options.SetRequestHeader("Cache-Control", "no-cache");
         socket.Options.SetRequestHeader("Cookie", $"muid={Convert.ToHexString(RandomNumberGenerator.GetBytes(16))};");
         var url = $"{Endpoint}?TrustedClientToken={TrustedClientToken}&Sec-MS-GEC={SecMsGec(DateTimeOffset.UtcNow + _clockSkew)}" +
-                  $"&Sec-MS-GEC-Version=1-{ChromiumVersion}&ConnectionId={requestId}";
+                  $"&Sec-MS-GEC-Version=2-{ChromiumVersion}&ConnectionId={requestId}";
         try
         {
             await socket.ConnectAsync(new Uri(url), token).ConfigureAwait(false);
@@ -216,16 +216,8 @@ public sealed class EdgeSpeechEngine(ILogger<EdgeSpeechEngine> logger) : ISpeech
         }
     }
 
-    /// <summary>
-    /// The Sec-MS-GEC token: SHA-256 of the Windows file time rounded down to 5 minutes and the client token, upper-case
-    /// hex (as Edge computes it).
-    /// </summary>
-    internal static string SecMsGec(DateTimeOffset now)
-    {
-        var ticks = now.UtcDateTime.ToFileTimeUtc();
-        ticks -= ticks % 3_000_000_000L;
-        return Convert.ToHexString(SHA256.HashData(Encoding.ASCII.GetBytes(ticks.ToString(CultureInfo.InvariantCulture) + TrustedClientToken)));
-    }
+    /// <summary>The Sec-MS-GEC token (version 2: <see cref="EdgeToken"/>), the same for 5 minutes.</summary>
+    internal static string SecMsGec(DateTimeOffset now) => EdgeToken.Generate(now, TrustedClientToken);
 
     /// <summary>
     /// The request: the voice, speed, pitch and volume as SSML prosody, the text escaped, in the voice's language

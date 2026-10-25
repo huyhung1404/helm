@@ -758,7 +758,10 @@ public sealed class NovelReaderTests : IDisposable
         var at = new DateTimeOffset(2026, 10, 10, 12, 3, 0, TimeSpan.Zero);
         Assert.Equal(EdgeSpeechEngine.SecMsGec(at), EdgeSpeechEngine.SecMsGec(at.AddMinutes(1)));
         Assert.NotEqual(EdgeSpeechEngine.SecMsGec(at), EdgeSpeechEngine.SecMsGec(at.AddMinutes(3)));
-        Assert.Matches("^[0-9A-F]{64}$", EdgeSpeechEngine.SecMsGec(at));
+        // Version 2, as edge-tts 7.3.1 computes it.
+        Assert.Equal("C8BAEC3DB76BC168-FA5FF5B8F51F0ADFF0BE025FE441D06FB85086AA5C371DD25EB4F57F6B11C9D0", EdgeSpeechEngine.SecMsGec(at));
+        Assert.Equal("2CD23A2CA0B2595A-F3C846C370E05F9CC83ACC5F995C5F5D87A4D0F14CE8936A0F902E64099E38A2",
+            EdgeSpeechEngine.SecMsGec(DateTimeOffset.FromUnixTimeSeconds(1700000000)));
 
         var ssml = EdgeSpeechEngine.Ssml("Lâm <Uyển> & “bạn”", "vi-VN-HoaiMyNeural", new SpeechOptions(1.5, 1, 0.8));
         Assert.Contains("<voice name='vi-VN-HoaiMyNeural'>", ssml);
