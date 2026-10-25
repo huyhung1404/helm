@@ -3,6 +3,34 @@
 All notable changes to Helm. The top section is used as the GitHub release body and as the Velopack release notes.
 Format: [Keep a Changelog](https://keepachangelog.com), versions follow [SemVer](https://semver.org).
 
+## [0.54.0] - 2026-10-25
+
+### Added
+- **Novel Reader: find a novel by name.** Type its name instead of an address under "Scrape from web": Helm looks
+  on ixdzs8, Qidian, piaotia, xbanxia and biquge.tw at once (a site that asks for a Cloudflare check is left out) and
+  lists what it found; pick one to scrape it. A book's information page leads to its chapter list by itself.
+- **Novel Reader: Fanqie.** Fanqie's web reader scrambles its most common characters with a font of its own; Helm
+  turns them back. Without an account that has SVIP, Fanqie shows only the first ten chapters in full on the web: the
+  others come back as locked chapters. If Fanqie changes its font, Helm says so instead of saving wrong text.
+- **Novel Reader: read while the rest downloads.** Once the first 20 chapters of a new novel are in, "Read now" adds
+  it and opens it; the other chapters go into it when they are downloaded.
+- **Novel Reader: faster scraping.** Chapters download in several tabs at once (three by default, 1 to 5 in the
+  settings): 78 chapters took 24 seconds instead of 80. A site that refuses so many goes on one at a time.
+- **Novel Reader: covers and logins.** The cover the site shows becomes the novel's when it has none. "Log in…"
+  (next to Auto, and in a novel's web menu) opens the site in Helm's own Edge to log in; later scrapes, hidden ones
+  too, keep the login, for paid chapters.
+- **Novel Reader: new chapters by themselves.** A novel's web menu can also "Save new chapters by itself": Helm then
+  downloads and saves them when it finds them, with no preview. A Windows notification tells what was found or saved.
+- **Novel Reader on the phone: "Get new chapters (on the PC)".** The phone cannot run the browser scraping needs: the
+  button asks the PC through sync, and the PC (with Helm open) downloads and saves the new chapters, which sync back.
+- **Novel Reader: Traditional Chinese read as Simplified.** A novel in Traditional characters (added from a file or
+  scraped, xbanxia for one) is stored in Simplified, which the dictionaries are written in: on xbanxia 74% of the
+  characters are then read as phrases instead of 57%. Turn it off under "Store Traditional Chinese as Simplified".
+
+### Changed
+- **Novel Reader: a web novel is stored in parts of 100 chapters**, so new chapters upload and download only the
+  part that changed, not the whole novel. Older versions of Helm show such a novel empty: update the PC and the phone.
+
 ## [0.53.0] - 2026-10-25
 
 ### Added
