@@ -168,7 +168,7 @@
                             <core:RowLayout>
                                 <StackPanel VerticalAlignment="Center">
                                     <TextBlock Text="Scrape from web" FontWeight="SemiBold" />
-                                    <TextBlock Text="Paste a chapter-list URL. Helm connects to your open browser (or opens one quietly), downloads every chapter and shows them before anything is saved."
+                                    <TextBlock Text="Paste a chapter-list address, or type a novel's name to look for it. Helm connects to your open browser (or opens one quietly), downloads every chapter and shows them before anything is saved."
                                                Style="{DynamicResource HelmSecondaryText}" TextWrapping="Wrap" />
                                 </StackPanel>
                             </core:RowLayout>
@@ -181,7 +181,7 @@
                                 </Grid.ColumnDefinitions>
                                 <ui:TextBox Grid.Column="0"
                                             Text="{Binding Scraper.Url, ElementName=Root, UpdateSourceTrigger=PropertyChanged}"
-                                            PlaceholderText="https://..." Margin="0,0,8,0"
+                                            PlaceholderText="https://… or a novel's name" Margin="0,0,8,0"
                                             AutomationProperties.Name="Chapter list URL" />
                                 <ui:Button Grid.Column="1" Appearance="Primary" Content="Auto"
                                            Icon="{ui:SymbolIcon Globe24}"
@@ -194,6 +194,21 @@
                                            Command="{Binding Scraper.CancelCommand, ElementName=Root}"
                                            Visibility="{Binding Scraper.IsRunning, ElementName=Root, Converter={StaticResource BoolToVisibility}}" />
                             </Grid>
+                            <!-- Novels found by name: pick one to scrape it -->
+                            <ItemsControl Margin="0,8,0,0" ItemsSource="{Binding Scraper.Results, ElementName=Root}"
+                                          Visibility="{Binding Scraper.HasResults, ElementName=Root, Converter={StaticResource BoolToVisibility}}">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate>
+                                        <DockPanel Margin="0,0,0,4">
+                                            <ui:Button DockPanel.Dock="Right" Margin="8,0,0,0" Padding="9,4" Content="Scrape" Icon="{ui:SymbolIcon ArrowDownload24}"
+                                                       Command="{Binding Scraper.PickCommand, RelativeSource={RelativeSource AncestorType=Page}}" CommandParameter="{Binding}"
+                                                       AutomationProperties.Name="{Binding Title, StringFormat=Scrape {0}}" />
+                                            <TextBlock DockPanel.Dock="Right" Text="{Binding Site}" Style="{DynamicResource HelmSecondaryText}" VerticalAlignment="Center" />
+                                            <TextBlock Text="{Binding Title}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" ToolTip="{Binding Url}" />
+                                        </DockPanel>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
                             <!-- The first chapters are in: read them while the rest download -->
                             <ui:Button Margin="0,8,0,0" Appearance="Primary" Icon="{ui:SymbolIcon BookOpen24}" Content="Read now"
                                        ToolTip="Add the novel with the chapters downloaded so far and open it; the rest go into it when they are in"

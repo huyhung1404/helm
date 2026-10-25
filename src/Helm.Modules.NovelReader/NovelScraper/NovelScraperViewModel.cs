@@ -40,6 +40,8 @@ public sealed partial class NovelScraperViewModel : ObservableObject
         ContinueCommand.NotifyCanExecuteChanged();
         RetryFailedCommand.NotifyCanExecuteChanged();
         LogInCommand.NotifyCanExecuteChanged();
+        SearchCommand.NotifyCanExecuteChanged();
+        PickCommand.NotifyCanExecuteChanged();
         CancelCommand.NotifyCanExecuteChanged();
         OnPropertyChanged(nameof(IsIndeterminate));
     }
@@ -53,12 +55,80 @@ public sealed partial class NovelScraperViewModel : ObservableObject
         _novels.WebNovelSaved += (_, source) => _service.ForgetChapters(source);
     }
 
-    /// <summary>Scrapes the novel whose chapter list is at <see cref="Url"/> and shows it for a look before it is added.</summary>
+    /// <summary>
+    /// Scrapes the novel whose chapter list is at <see cref="Url"/> and shows it for a look before it is added; a name
+    /// rather than an address is looked for on the sites Helm knows.
+    /// </summary>
     [RelayCommand(CanExecute = nameof(CanStart))]
     private Task Auto()
     {
         var url = Url.Trim();
-        return url.Length == 0 ? Task.CompletedTask : RunAsync(url, null);
+        if (url.Length == 0) return Task.CompletedTask;
+        return Uri.TryCreate(url, UriKind.Absolute, out var uri) && uri.Scheme is "http" or "https" ? RunAsync(url, null) : Search();
+    }
+
+    /// <summary>Novels found by name; picking one scrapes it.</summary>
+    public System.Collections.ObjectModel.ObservableCollection<SearchHit> Results { get; } = [];
+
+    [ObservableProperty] private bool _hasResults;
+
+    /// <summary>Looks for the name in the box on the sites Helm knows (ixdzs8, Qidian, piaotia, xbanxia, biquge.tw).</summary>
+    [RelayCommand(CanExecute = nameof(CanStart))]
+    private async Task Search()
+    {
+        var query = Url.Trim();
+        if (query.Length == 0)
+        {
+            StatusText = "Type the novel's name (or paste its address), then search.";
+            return;
+        }
+        _cts = new CancellationTokenSource();
+        IsRunning = true;
+        ChapterTotal = 0;
+        Results.Clear();
+        HasResults = false;
+        try
+        {
+            var prog = new Progress<(string Status, int Done, int Total)>(p =>
+            {
+                StatusText = p.Status;
+                ChapterDone = p.Done;
+                ChapterTotal = p.Total;
+                Progress = p.Total > 0 ? (double)p.Done / p.Total : 0;
+            });
+            var hits = await Task.Run(() => _service.SearchAsync(query, prog, _cts.Token));
+            foreach (var hit in hits) Results.Add(hit);
+            HasResults = hits.Count > 0;
+            StatusText = hits.Count == 0
+                ? $"Nothing named “{query}” on ixdzs8, Qidian, piaotia or xbanxia (biquge.tw is left out when it asks for a check). Paste the novel's address instead."
+                : $"{hits.Count} found: pick one to scrape it.";
+        }
+        catch (OperationCanceledException)
+        {
+            StatusText = "Search cancelled.";
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Searching for {Query} failed", query);
+            StatusText = "Could not search: " + ex.Message;
+        }
+        finally
+        {
+            IsRunning = false;
+            _cts?.Dispose();
+            _cts = null;
+        }
+    }
+
+    /// <summary>Scrapes a novel picked from the search results.</summary>
+    [RelayCommand(CanExecute = nameof(CanStart))]
+    private Task Pick(SearchHit? hit)
+    {
+        if (hit is null) return Task.CompletedTask;
+        Url = hit.Url;
+        Results.Clear();
+        HasResults = false;
+        return RunAsync(hit.Url, null);
     }
 
     /// <summary>Fetches the chapters a library novel lacks from its web source: new ones, and ones that failed before.</summary>

@@ -271,6 +271,40 @@ public sealed class NovelScraperTests
     }
 
     [Fact]
+    public void A_search_page_gives_the_novels_named_like_the_search_the_exact_one_first()
+    {
+        var hits = NovelSearch.Hits("斗破苍穹", "https://www.qidian.com/so/斗破苍穹.html",
+        [
+            L("斗破苍穹之雷霆震碎", "https://www.qidian.com/book/1042192006/"),
+            L("斗破苍穹", "https://www.qidian.com/book/1209977/"),
+            L("最新更新 《斗破苍穹：斗帝之路》手游", "https://www.qidian.com/chapter/1209977/427202307/"),
+            L("斗破苍穹", "https://www.qidian.com/book/1209977/"),
+            L("斗破苍穹搜索结果", "https://www.qidian.com/so/斗破苍穹.html"),
+            L("天蚕土豆", "https://www.qidian.com/author/4362/"),
+            L("斗破苍穹 同人", "https://other.com/book/1/"),
+        ], "Qidian");
+
+        Assert.Equal(["斗破苍穹", "斗破苍穹之雷霆震碎"], hits.Select(h => h.Title));
+        Assert.All(hits, h => Assert.Equal("Qidian", h.Site));
+        // Traditional titles answer a Simplified search.
+        Assert.Single(NovelSearch.Hits("龙傲天", "https://www.xbanxia.cc/modules/article/search_t.php",
+            [L("龍傲天也拒絕不了嬌妻腦", "http://www.xbanxia.cc/books/428334.html")], "xbanxia"));
+        Assert.False(NovelSearch.IsBookPage("https://www.qidian.com/so/死亡作业.html"));
+    }
+
+    [Fact]
+    public void A_books_information_page_leads_to_its_chapter_list()
+    {
+        Assert.Equal("https://www.piaotia.com/html/15/15400/", ChapterLinks.CatalogLink("https://www.piaotia.com/bookinfo/15/15400.html",
+        [
+            L("首页", "https://www.piaotia.com/"),
+            L("目录", "https://www.piaotia.com/top/allvisit.html"),
+            L("点击阅读", "https://www.piaotia.com/html/15/15400/"),
+        ]));
+        Assert.Null(ChapterLinks.CatalogLink("https://www.piaotia.com/bookinfo/15/15400.html", [L("目录", "https://www.piaotia.com/top/allvisit.html")]));
+    }
+
+    [Fact]
     public void An_empty_novel_takes_every_chapter_that_came()
     {
         var empty = ChapterSplitter.Split("");

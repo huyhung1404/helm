@@ -121,6 +121,26 @@ public static partial class ChapterLinks
         return null;
     }
 
+    [GeneratedRegex(@"^\s*(查看|进入|進入|返回)?\s*(全部章节|全部章節|章节目录|章節目錄|章节列表|章節列表|目录|目錄|点击阅读|點擊閱讀|开始阅读|開始閱讀|立即阅读|立即閱讀|免费阅读|免費閱讀|全文阅读|全文閱讀|在线阅读|在線閱讀)\s*(>>|»|→)?\s*$")]
+    private static partial Regex CatalogText();
+
+    /// <summary>
+    /// The book's chapter list linked from its information page (piaotia's bookinfo/15/15400.html → html/15/15400/):
+    /// "目录", "点击阅读", "开始阅读"… to an address carrying the book's id; null when the page has none.
+    /// </summary>
+    public static string? CatalogLink(string pageUrl, IEnumerable<WebLink> links)
+    {
+        if (!Uri.TryCreate(pageUrl, UriKind.Absolute, out var page)) return null;
+        var ids = IdPattern().Matches(page.PathAndQuery).Select(m => m.Value).ToList();
+        if (ids.Count == 0) return null;
+        foreach (var link in links)
+        {
+            if (!CatalogText().IsMatch(link.Text) || !TryNormalize(link.Url, out var uri) || !SameSite(uri, page) || Same(uri, page)) continue;
+            if (ids.Any(id => uri.PathAndQuery.Contains(id, StringComparison.Ordinal))) return uri.AbsoluteUri;
+        }
+        return null;
+    }
+
     /// <summary>A chapter's link text without the site's address some sites slip into it ("第 53 章.com", ".com現實，千露？").</summary>
     public static string CleanText(string text) => string.Join(' ', Domain().Replace(text, " ").Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries));
 

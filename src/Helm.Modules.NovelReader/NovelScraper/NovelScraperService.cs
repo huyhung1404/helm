@@ -160,6 +160,118 @@ public sealed partial class NovelScraperService
         }
     }
 
+    /// <summary>A site searched by name: its address, and its search page with {0} for the name, or null to fill its search box.</summary>
+    private sealed record SearchSite(string Name, string Home, string? Search);
+
+    private static readonly SearchSite[] SearchSites =
+    [
+        new("ixdzs8", "https://ixdzs8.com/", "https://ixdzs8.com/bsearch?q={0}"),
+        new("Qidian", "https://www.qidian.com/", "https://www.qidian.com/so/{0}.html"),
+        new("piaotia", "https://www.piaotia.com/", null),
+        new("xbanxia", "https://www.xbanxia.cc/", null),
+        new("biquge.tw", "https://www.biquge.tw/", null),
+    ];
+
+    /// <summary>
+    /// Looks for a novel by name on the sites Helm knows, all at once in a hidden Edge (a site that asks for a check or
+    /// does not answer is left out). A site that opens the novel itself for an exact name gives that page.
+    /// </summary>
+    public async Task<IReadOnlyList<SearchHit>> SearchAsync(string query, IProgress<(string Status, int Done, int Total)> progress, CancellationToken ct)
+    {
+        query = query.Trim();
+        if (query.Length == 0) return [];
+        if (!_busy.Wait(0))
+        {
+            progress.Report(("Waiting for Helm's other Edge to finish…", 0, 0));
+            await _busy.WaitAsync(ct);
+        }
+        try
+        {
+            progress.Report(($"Looking for “{query}” on {SearchSites.Length} sites…", 0, SearchSites.Length));
+            await using var browser = await ScraperBrowser.LaunchAsync(BrowserPath(), _profile, visible: false, ct, quiet: true);
+            var tabs = new List<CdpSession> { browser.Tab };
+            for (var i = 1; i < SearchSites.Length; i++)
+                if (await browser.OpenTabAsync(ct) is { } tab) tabs.Add(tab);
+            var done = 0;
+            // More sites than tabs (a tab would not open): a tab takes its sites one after another.
+            var turns = tabs.Select(_ => new SemaphoreSlim(1, 1)).ToList();
+            var found = await Task.WhenAll(SearchSites.Select(async (site, i) =>
+            {
+                var slot = i % tabs.Count;
+                await turns[slot].WaitAsync(ct);
+                try
+                {
+                    var hits = await SearchSiteAsync(browser, tabs[slot], site, query, ct);
+                    progress.Report(($"Looking for “{query}”…", Interlocked.Increment(ref done), SearchSites.Length));
+                    return hits;
+                }
+                finally
+                {
+                    turns[slot].Release();
+                }
+            }));
+            return [.. found.SelectMany(h => h)];
+        }
+        finally
+        {
+            _busy.Release();
+        }
+    }
+
+    private async Task<IReadOnlyList<SearchHit>> SearchSiteAsync(ScraperBrowser browser, CdpSession tab, SearchSite site, string query, CancellationToken ct)
+    {
+        try
+        {
+            using var timeout = CancellationTokenSource.CreateLinkedTokenSource(ct);
+            timeout.CancelAfter(TimeSpan.FromSeconds(45));
+            var token = timeout.Token;
+            if (site.Search is { } search)
+            {
+                await LoadAsync(browser, tab, string.Format(System.Globalization.CultureInfo.InvariantCulture, search, Uri.EscapeDataString(query)), quiet: true,
+                    new Progress<(string, int, int)>(), token);
+            }
+            else
+            {
+                await LoadAsync(browser, tab, site.Home, quiet: true, new Progress<(string, int, int)>(), token);
+                var answer = await tab.EvaluateStringAsync(SearchFormJs + "(" + JsonSerializer.Serialize(query) + ")", token);
+                if (answer != "submitted") return [];
+                await Task.Delay(1500, token);
+                await WaitAsync(browser, tab, token);
+            }
+            var state = await tab.EvaluateAsync<PageState>(StateJs, token) ?? new PageState();
+            var list = await ReadListAsync(tab, token);
+            var hits = NovelSearch.Hits(query, state.Href, list.Links, site.Name).ToList();
+            // An exact name opens the novel itself on some sites (piaotia): that page is the result.
+            if (hits.Count == 0 && NovelSearch.IsBookPage(state.Href)
+                && ScrapedBook.Title(list.BookName, list.Heading, list.Title) is { } title
+                && BookUpdate.Key(Helm.Modules.NovelReader.Text.TraditionalChinese.ToSimplified(title))
+                    .Contains(BookUpdate.Key(Helm.Modules.NovelReader.Text.TraditionalChinese.ToSimplified(query)), StringComparison.Ordinal))
+                hits.Add(new SearchHit(title, state.Href, site.Name));
+            _logger.LogInformation("Search for {Query} on {Site}: {Count} found", query, site.Name, hits.Count);
+            return hits;
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException || !ct.IsCancellationRequested)
+        {
+            _logger.LogInformation("Search on {Site} gave nothing: {Reason}", site.Name, ex.Message);
+            return [];
+        }
+    }
+
+    /// <summary>Fills a site's own search box and submits it in the same tab (the browser encodes the name as the site wants, GBK too).</summary>
+    private const string SearchFormJs = """
+        (function(q) {
+          var box = document.querySelector('input[name="searchkey"],input[name="keyword"],input[name="q"],input[name="wd"],input[name="s"],input[type="search"],input[name*="key"]');
+          if (!box || !box.form) return 'no box';
+          box.value = q;
+          box.dispatchEvent(new Event('input', { bubbles: true }));
+          var form = box.form;
+          form.target = '_self';
+          var button = form.querySelector('[type="submit"],button');
+          if (button) button.click(); else form.submit();
+          return 'submitted';
+        })
+        """;
+
     /// <summary>
     /// Opens <paramref name="url"/> in a normal Edge window on Helm's own scraping profile, for the user to log in to the
     /// site (paid chapters, Fanqie after chapter 10): the login stays in that profile, so every later scrape, hidden or
@@ -260,6 +372,15 @@ public sealed partial class NovelScraperService
         progress.Report(("Reading the chapter list…", 0, 0));
         var first = await LoadAsync(browser, browser.Tab, start.AbsoluteUri, quiet, progress, ct);
         var list = await ReadListAsync(browser.Tab, ct);
+        // A book's information page (a search result) shows its latest chapters only: its chapter list is a link away.
+        if (ChapterLinks.Pick(first.Href, list.Links).Count < 30 && ChapterLinks.CatalogLink(first.Href, list.Links) is { } catalog)
+        {
+            _logger.LogInformation("Scraper follows the chapter list link {Url}", catalog);
+            var cover = list.Cover;
+            first = await LoadAsync(browser, browser.Tab, catalog, quiet, progress, ct);
+            list = await ReadListAsync(browser.Tab, ct);
+            if (string.IsNullOrEmpty(list.Cover)) list = list with { Cover = cover };
+        }
         var tocUrl = first.Href;
         var links = new List<WebLink>(list.Links);
         var visited = new HashSet<string>(StringComparer.Ordinal) { start.AbsoluteUri, tocUrl };
