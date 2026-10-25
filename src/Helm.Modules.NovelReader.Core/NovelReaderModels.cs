@@ -46,6 +46,17 @@ public sealed record NovelBook
 
     /// <summary>Names the scan found that the user deleted: a later scan does not add them again.</summary>
     public IReadOnlyList<string> IgnoredNames { get; init; } = [];
+
+    /// <summary>The web page listing its chapters (scraped from there, or set by the user): "Continue download" reads it again.</summary>
+    public string? SourceUrl { get; init; }
+
+    /// <summary>Helm looks at <see cref="SourceUrl"/> for new chapters by itself (on the PC, a few times a day).</summary>
+    public bool AutoCheck { get; init; }
+
+    /// <summary>When the source was last looked at, and how many chapters it had that this novel does not.</summary>
+    public DateTimeOffset? SourceCheckedAt { get; init; }
+
+    public int SourceNewChapters { get; init; }
 }
 
 public enum EntryKind

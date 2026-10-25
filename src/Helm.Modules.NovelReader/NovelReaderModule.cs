@@ -7,11 +7,13 @@ using Wpf.Ui.Controls;
 namespace Helm.Modules.NovelReader;
 
 /// <summary>
-/// Novel Reader on Windows. Nothing runs in the background: the dictionaries load when a novel is opened and are freed
-/// when the tool is turned off. The menu and Quick access open <see cref="NovelReaderContentPage"/>; Home → Utilities
+/// Novel Reader on Windows. The dictionaries load when a novel is opened and are freed when the tool is turned off; in
+/// the background only <see cref="NovelSourceWatcher"/> runs, looking for new chapters of the web novels that ask for it.
+/// The menu and Quick access open <see cref="NovelReaderContentPage"/>; Home → Utilities
 /// opens the settings (<see cref="NovelReaderPage"/>).
 /// </summary>
-public sealed class NovelReaderModule(NovelReaderViewModel viewModel, IUiDispatcher ui, VieNeuServer localVoice, EdgeAnchor edge) : HelmModuleBase, IModuleContent
+public sealed class NovelReaderModule(NovelReaderViewModel viewModel, IUiDispatcher ui, VieNeuServer localVoice, EdgeAnchor edge,
+    NovelSourceWatcher watcher) : HelmModuleBase, IModuleContent
 {
     public override string Id => NovelReaderIds.ModuleId;
     public override string DisplayName => NovelReaderIds.DisplayName;
@@ -26,12 +28,14 @@ public sealed class NovelReaderModule(NovelReaderViewModel viewModel, IUiDispatc
     public override Task EnableAsync(CancellationToken ct)
     {
         StatusMessage = null;
+        watcher.Start();
         return Task.CompletedTask;
     }
 
-    /// <summary>Also runs when Helm exits or updates: reading aloud stops, the place reading stopped is saved, and the local voice server and the hidden Edge stop.</summary>
+    /// <summary>Also runs when Helm exits or updates: reading aloud stops, the place reading stopped is saved, and the local voice server, the hidden Edge and the look for new chapters stop.</summary>
     public override async Task DisableAsync()
     {
+        watcher.Stop();
         await ui.InvokeAsync(viewModel.Release).ConfigureAwait(false);
         localVoice.Stop();
         edge.Stop();

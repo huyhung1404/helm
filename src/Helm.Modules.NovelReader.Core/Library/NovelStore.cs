@@ -102,7 +102,7 @@ public sealed class NovelStore
     /// </summary>
     /// <exception cref="BlobTooLargeException">Larger than the sync server accepts.</exception>
     public async Task<string> AddBookAsync(string title, string fileName, string text, int chapterCount, string device,
-        IProgress<double>? progress = null, CancellationToken ct = default)
+        IProgress<double>? progress = null, CancellationToken ct = default, string? sourceUrl = null)
     {
         title = CleanTitle(title, fileName);
         using var content = new MemoryStream(TextFiles.Utf8.GetBytes(text));
@@ -118,6 +118,7 @@ public sealed class NovelStore
                 ChapterCount = chapterCount,
                 AddedAt = Now,
                 AddedFrom = device,
+                SourceUrl = sourceUrl,
             });
         }
         catch
@@ -139,6 +140,57 @@ public sealed class NovelStore
         // Nothing to look for names in.
         NamesScannedAt = Now,
     });
+
+    /// <summary>
+    /// Gives a novel a new text (chapters added from its web source): a new blob, and the old one dropped once the record
+    /// points at the new one, so other devices download the new text.
+    /// </summary>
+    /// <exception cref="BlobTooLargeException">Larger than the sync server accepts.</exception>
+    public async Task ReplaceBookTextAsync(string id, string text, int chapterCount, IProgress<double>? progress = null, CancellationToken ct = default)
+    {
+        using var content = new MemoryStream(TextFiles.Utf8.GetBytes(text));
+        var blob = await _blobs.ImportAsync(content, progress, ct).ConfigureAwait(false);
+        // Read again: the record may have changed (a rename, a check) while the text was stored.
+        if (_books.Get(id) is not { } book)
+        {
+            _blobs.Discard(blob.Id);
+            throw new InvalidOperationException("This novel is no longer in the library.");
+        }
+        _books.Upsert(id, book with { Blob = blob, Size = blob.Size, ChapterCount = chapterCount, SourceNewChapters = 0, SourceCheckedAt = Now });
+        if (book.Blob is { } old) _blobs.Discard(old.Id);
+    }
+
+    /// <summary>Sets (or clears, with null) the web page a novel's chapters are listed on, and whether Helm looks there by itself.</summary>
+    public void SetSource(string id, string? url, bool autoCheck)
+    {
+        if (_books.Get(id) is not { } book) return;
+        url = string.IsNullOrWhiteSpace(url) ? null : url.Trim();
+        if (book.SourceUrl == url && book.AutoCheck == autoCheck) return;
+        _books.Upsert(id, book with
+        {
+            SourceUrl = url,
+            AutoCheck = url is not null && autoCheck,
+            SourceNewChapters = url == book.SourceUrl ? book.SourceNewChapters : 0,
+            SourceCheckedAt = url == book.SourceUrl ? book.SourceCheckedAt : null,
+        });
+    }
+
+    /// <summary>Records a look at the novel's web source: <paramref name="newChapters"/> it has that the novel does not.</summary>
+    public void MarkSourceChecked(string id, int newChapters)
+    {
+        if (_books.Get(id) is not { } book) return;
+        _books.Upsert(id, book with { SourceCheckedAt = Now, SourceNewChapters = newChapters });
+    }
+
+    /// <summary>
+    /// Moves the reading place to another chapter number after chapters were put in before it; when and where it was
+    /// read stay as they were.
+    /// </summary>
+    public void MoveProgressChapter(string bookId, int chapter)
+    {
+        if (_progress.Get(bookId) is not { } progress || progress.Chapter == chapter) return;
+        _progress.Upsert(bookId, progress with { Chapter = chapter });
+    }
 
     /// <exception cref="BlobUnavailableException">Not on this device yet and sync cannot fetch it.</exception>
     /// <exception cref="System.Security.Cryptography.CryptographicException">The stored text is damaged.</exception>

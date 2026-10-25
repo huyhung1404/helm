@@ -9,6 +9,7 @@ using Helm.Modules.NovelReader.Conversion;
 using Helm.Modules.NovelReader.Dictionaries;
 using Helm.Modules.NovelReader.Library;
 using Helm.Modules.NovelReader.Names;
+using Helm.Modules.NovelReader.Scraping;
 using Helm.Modules.NovelReader.Speech;
 using Helm.Modules.NovelReader.Text;
 using Helm.Shell.Services;
@@ -230,6 +231,91 @@ public sealed class NovelReaderTests : IDisposable
         // A house is only suggested.
         Assert.DoesNotContain("林府", sure);
         Assert.Contains(result.Maybe, f => f.Chinese == "林府");
+    }
+
+    private static ScrapeItem WebChapter(int n, ScrapeOutcome outcome) => new(
+        new WebLink($"第{n}章 第{n}回", $"https://x.com/book/123/{n}.html"), outcome,
+        outcome == ScrapeOutcome.Got ? new ScrapedChapter($"第{n}章 第{n}回", ["林宛撑着一柄素色油纸伞。", "青竹紧随其后。"]) : null);
+
+    [Fact]
+    public async Task A_web_novel_is_previewed_before_it_is_added_and_continuing_it_keeps_the_reading_place_on_its_chapter()
+    {
+        var page = NewPage("a");
+        page.ViewModel.AutoScanNames = false;
+
+        // Chapter 2 failed: shown in the preview, not saved.
+        await page.ViewModel.PrepareAddFromWebAsync(new ScrapeResult("山寺", "https://x.com/book/123/",
+            [WebChapter(1, ScrapeOutcome.Got), WebChapter(2, ScrapeOutcome.Failed), WebChapter(3, ScrapeOutcome.Got)]));
+
+        Assert.True(page.ViewModel.IsAdding);
+        Assert.Equal(3, page.ViewModel.PreviewChapters.Count);
+        Assert.Equal(1, page.ViewModel.PreviewFailedCount);
+        Assert.Equal("第1章 第1回", page.ViewModel.SelectedPreviewChapter!.Title);
+        Assert.Equal(3, page.ViewModel.PreviewLines.Count);
+        Assert.True(page.ViewModel.PreviewLines[0].IsHeading);
+        Assert.Empty(page.Store.Books());
+
+        await page.ViewModel.ConfirmAddCommand.ExecuteAsync(null);
+        var (id, book, _) = page.Store.Books().Single();
+        Assert.Equal("https://x.com/book/123/", book.SourceUrl);
+        Assert.Equal(2, book.ChapterCount);
+
+        // Reading chapter 3; continuing brings chapter 2 (failed before) and the new chapter 4.
+        page.Store.SaveProgress(id, 1, 1, "PC");
+        var have = await page.ViewModel.ReadChaptersAsync(id);
+        Assert.Equal(["https://x.com/book/123/2.html", "https://x.com/book/123/4.html"],
+            BookUpdate.Missing(have, [.. Enumerable.Range(1, 4).Select(n => WebChapter(n, ScrapeOutcome.Got).Link)]).Select(l => l.Url));
+        await page.ViewModel.PrepareUpdateAsync(id, new ScrapeResult("山寺", "https://x.com/book/123/",
+            [WebChapter(1, ScrapeOutcome.Skipped), WebChapter(2, ScrapeOutcome.Got), WebChapter(3, ScrapeOutcome.Skipped), WebChapter(4, ScrapeOutcome.Got)]));
+
+        Assert.True(page.ViewModel.IsUpdating);
+        Assert.Equal(["第2章 第2回", "第4章 第4回"], page.ViewModel.PreviewChapters.Select(c => c.Title));
+        Assert.All(page.ViewModel.PreviewChapters, c => Assert.True(c.IsNew));
+
+        await page.ViewModel.ConfirmAddCommand.ExecuteAsync(null);
+        var text = await page.Store.ReadBookTextAsync(id);
+        Assert.Equal(["第1章 第1回", "第2章 第2回", "第3章 第3回", "第4章 第4回"], ChapterSplitter.Split(text).Select(c => c.Title));
+        Assert.Equal(4, page.Store.GetBook(id)!.ChapterCount);
+        Assert.Equal(2, page.Store.Progress(id)!.Chapter);
+        Assert.Equal(1, page.Store.Progress(id)!.Paragraph);
+        Assert.Single(page.Store.Books());
+
+        // Nothing new: said so, nothing to save.
+        await page.ViewModel.PrepareUpdateAsync(id, new ScrapeResult("山寺", "https://x.com/book/123/",
+            [.. Enumerable.Range(1, 4).Select(n => WebChapter(n, ScrapeOutcome.Skipped))]));
+        Assert.False(page.ViewModel.IsAdding);
+        Assert.Contains("every chapter", page.ViewModel.Message);
+    }
+
+    [Fact]
+    public async Task A_novel_gets_a_web_source_checks_it_by_itself_when_asked_and_its_card_tells_what_was_found()
+    {
+        var page = NewPage("a");
+        var id = await page.Store.AddBookAsync("Novel", "n.txt", Novel, 3, "PC");
+        var card = page.ViewModel.Books.Single();
+        Assert.False(card.HasSource);
+
+        page.ViewModel.StartEditSourceCommand.Execute(card);
+        card.SourceDraft = "not a web address";
+        page.ViewModel.SaveSourceCommand.Execute(card);
+        Assert.Null(page.Store.GetBook(id)!.SourceUrl);
+        card.SourceDraft = " https://www.biquge.tw/book/7848572/ ";
+        page.ViewModel.SaveSourceCommand.Execute(card);
+        Assert.Equal("https://www.biquge.tw/book/7848572/", page.Store.GetBook(id)!.SourceUrl);
+        Assert.True(card.HasSource);
+        Assert.False(card.IsEditingSource);
+
+        page.ViewModel.ToggleAutoCheckCommand.Execute(card);
+        Assert.True(page.Store.GetBook(id)!.AutoCheck);
+        page.Store.MarkSourceChecked(id, 12);
+        page.ViewModel.ShowLibraryCommand.Execute(null);
+        Assert.StartsWith("12 new chapters on the web · checked", card.SourceStatus);
+        Assert.EndsWith("checks by itself", card.SourceStatus);
+
+        // Another address: what was found at the old one no longer counts.
+        page.Store.SetSource(id, "https://www.piaotia.com/html/15/15400/", autoCheck: true);
+        Assert.Equal(0, page.Store.GetBook(id)!.SourceNewChapters);
+        Assert.Null(page.Store.GetBook(id)!.SourceCheckedAt);
     }
 
     [Fact]

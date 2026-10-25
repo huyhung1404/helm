@@ -134,10 +134,6 @@ public sealed partial class NovelReaderViewModel : ObservableObject, IReadAloudH
     [ObservableProperty] private string _downloadStatus = "";
     [ObservableProperty] private string _dictionarySourcesText = "";
 
-    private string? _addPath;
-    private string? _addText;
-    private int _addChapterCount;
-
     public NovelReaderViewModel(NovelStore store, DictionaryLibrary dictionaries, ISettingsStoreFactory settings, IUiDispatcher ui,
         IDialogService dialogs, IDeviceInfo device, SpeechCatalog catalog, IAudioOutput audio, IProcessLauncher launcher,
         IClipboardService clipboard, ILogger<NovelReaderViewModel> logger, TimeProvider? time = null, ILocalVoiceServer? localVoice = null,
@@ -546,75 +542,6 @@ public sealed partial class NovelReaderViewModel : ObservableObject, IReadAloudH
         {
             if (version == _openVersion) IsBusy = false;
         }
-    }
-
-    /// <summary>Step 1 of adding a novel: read the file and show what was found, with a title to edit.</summary>
-    public async Task PrepareAddAsync(string path)
-    {
-        Message = null;
-        IsBusy = true;
-        BusyText = "Reading the file…";
-        try
-        {
-            var text = await Task.Run(() => TextFiles.ReadAllText(path));
-            var chapters = await Task.Run(() => ChapterSplitter.Split(text));
-            _addPath = path;
-            _addText = text;
-            _addChapterCount = chapters.Count;
-            AddTitle = Path.GetFileNameWithoutExtension(path);
-            var first = chapters.Count > 0 ? chapters[0].Title : "";
-            AddSummary = string.Create(System.Globalization.CultureInfo.InvariantCulture, $"{chapters.Count} chapters, {text.Length:N0} characters. First chapter: {first}");
-            IsAdding = true;
-        }
-        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
-        {
-            Message = "Could not read the file: " + ex.Message;
-        }
-        finally
-        {
-            IsBusy = false;
-        }
-    }
-
-    /// <summary>Step 2: store the novel (encrypted, synced) and open it.</summary>
-    [RelayCommand]
-    private async Task ConfirmAdd()
-    {
-        if (_addPath is null || _addText is null) return;
-        IsBusy = true;
-        BusyText = "Adding the novel…";
-        try
-        {
-            var id = await _store.AddBookAsync(AddTitle, Path.GetFileName(_addPath), _addText, _addChapterCount, _device.DeviceName,
-                new Progress<double>(p => BusyProgress = p));
-            CancelAdd();
-            RefreshLibrary();
-            IsBusy = false;
-            await OpenBookAsync(id);
-        }
-        catch (BlobTooLargeException ex)
-        {
-            Message = ex.Message;
-        }
-        catch (Exception ex) when (ex is IOException or InvalidOperationException)
-        {
-            _logger.LogWarning(ex, "Could not add a novel");
-            Message = "Could not add the novel: " + ex.Message;
-        }
-        finally
-        {
-            IsBusy = false;
-        }
-    }
-
-    [RelayCommand]
-    private void CancelAdd()
-    {
-        IsAdding = false;
-        _addPath = null;
-        _addText = null;
-        AddTitle = "";
-        AddSummary = "";
     }
 
     [RelayCommand]
@@ -1679,6 +1606,9 @@ public sealed partial class NovelReaderViewModel : ObservableObject, IReadAloudH
             var names = _store.EntryCount(id);
             card.Names = names == 0 ? "" : names == 1 ? "1 saved name" : $"{names} saved names";
             card.IsOpen = id == OpenBookId;
+            card.HasSource = book.SourceUrl is not null;
+            card.AutoCheck = book.AutoCheck;
+            card.SourceStatus = SourceStatus(book, now);
             if (card.CoverBlobId != book.Cover?.Id) _ = LoadCoverAsync(card, book.Cover?.Id);
         }
         OnPropertyChanged(nameof(HasBooks));

@@ -60,6 +60,12 @@ public static partial class ChapterSplitter
     /// <summary>"第12章 …" or "番外 …": a heading even when its title ends like a sentence ("你…很难受吗？").</summary>
     public static bool LooksLikeHeading(string line) => line.Length <= MaxHeadingLength && HeadingPattern().IsMatch(line);
 
+    /// <summary>
+    /// A line read back as a heading when it stands alone the way downloaders write headings: "第12章 …"/"番外 …", or
+    /// short and not ending like a sentence ("萧炎云韵篇", not "蓝念到底是谁？").
+    /// </summary>
+    public static bool CanBeHeading(string line) => LooksLikeHeading(line) || (line.Length is > 0 and <= MaxHeadingLength && !EndsLikeSentence(line));
+
     private static bool IsHeading(string line, int index, bool[] blank, bool useLayout)
     {
         if (LooksLikeHeading(line)) return true;

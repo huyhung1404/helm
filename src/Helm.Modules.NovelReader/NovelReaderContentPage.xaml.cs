@@ -35,13 +35,16 @@ public partial class NovelReaderContentPage : Page
     private double _scrollTo;
     private DateTime _scrollStarted;
 
+    public NovelScraperViewModel Scraper { get; }
+
     public NovelReaderContentPage(NovelReaderModule module, NovelReaderViewModel viewModel, IClipboardService clipboard,
-        Grammar.WordClassDictionary wordClasses)
+        Grammar.WordClassDictionary wordClasses, NovelScraperViewModel scraper)
     {
         _module = module;
         _viewModel = viewModel;
         _clipboard = clipboard;
         _wordClasses = wordClasses;
+        Scraper = scraper;
         SegmentText.WordClasses = wordClasses;
         DataContext = viewModel;
         InitializeComponent();
@@ -448,6 +451,8 @@ public partial class NovelReaderContentPage : Page
             ChapterBox.SelectedIndex = _viewModel.ChapterIndex;
             _choosingChapter = false;
         }
+        // Another chapter in the preview starts at its top.
+        if (e.PropertyName == nameof(NovelReaderViewModel.SelectedPreviewChapter)) PreviewScroll.ScrollToTop();
     }
 
     private void OnModuleChanged(object? sender, PropertyChangedEventArgs e)

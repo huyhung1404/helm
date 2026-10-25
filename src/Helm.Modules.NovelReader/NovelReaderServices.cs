@@ -32,6 +32,10 @@ public static class NovelReaderServices
             .AddSingleton<WordPronouncer>()
             // Word classes for colouring subjects, verbs and objects under the mouse (jieba's list, built into this module).
             .AddSingleton(_ => new Grammar.WordClassDictionary(OpenWordClasses))
+            // Scrape from web (Edge through DevTools), and Helm's own look for new chapters of web novels.
+            .AddSingleton<NovelScraperService>()
+            .AddSingleton<NovelScraperViewModel>()
+            .AddSingleton<NovelSourceWatcher>()
             .AddNovelReaderCore()
             .AddHelmModule<NovelReaderModule, NovelReaderPage, NovelReaderViewModel>()
             .AddSingleton<NovelReaderContentPage>();

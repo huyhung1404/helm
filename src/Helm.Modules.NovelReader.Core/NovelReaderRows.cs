@@ -53,6 +53,49 @@ public sealed partial class BookCardViewModel(string id) : ObservableObject
     partial void OnNamesChanged(string value) => OnPropertyChanged(nameof(HasNames));
 
     partial void OnIsRenamingChanged(bool value) => OnPropertyChanged(nameof(IsNotRenaming));
+
+    // The web page the novel's chapters are listed on.
+    [ObservableProperty] private bool _hasSource;
+    [ObservableProperty] private bool _autoCheck;
+    [ObservableProperty] private string _sourceStatus = "";
+    [ObservableProperty] private bool _isEditingSource;
+    [ObservableProperty] private string _sourceDraft = "";
+
+    /// <summary>"Continue download" is running for this novel (its button shows that and waits).</summary>
+    [ObservableProperty] private bool _isContinuing;
+
+    public string AutoCheckText => AutoCheck ? "Stop checking for new chapters" : "Check for new chapters by itself";
+
+    partial void OnAutoCheckChanged(bool value) => OnPropertyChanged(nameof(AutoCheckText));
+}
+
+/// <summary>A chapter in the preview of a novel about to be added (or of the new chapters about to be put in one).</summary>
+public sealed partial class PreviewChapterItem(string title, Scraping.ScrapeOutcome outcome, Books.Chapter? chapter, bool isNew) : ObservableObject
+{
+    /// <summary>The title in the reading language (the Chinese one until it is converted).</summary>
+    [ObservableProperty] private string _displayTitle = title;
+
+    public string Title { get; } = title;
+
+    public Scraping.ScrapeOutcome Outcome { get; } = outcome;
+
+    /// <summary>Its text; null for a chapter that failed or is locked (shown, not saved).</summary>
+    public Books.Chapter? Chapter { get; } = chapter;
+
+    public bool IsNew { get; } = isNew;
+
+    public bool IsFailed => Outcome == Scraping.ScrapeOutcome.Failed;
+
+    public bool IsLocked => Outcome == Scraping.ScrapeOutcome.Locked;
+
+    /// <summary>A word after the title: "failed", "locked" or "new".</summary>
+    public string Badge => IsFailed ? "failed" : IsLocked ? "locked" : IsNew ? "new" : "";
+}
+
+/// <summary>One paragraph of the preview: the converted text, and the Chinese under it when that is shown.</summary>
+public sealed record PreviewLine(string Text, string Chinese, bool IsHeading)
+{
+    public bool HasChinese => Chinese.Length > 0;
 }
 
 /// <summary>A chapter in the chapter picker.</summary>
