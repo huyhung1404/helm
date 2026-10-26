@@ -32,6 +32,13 @@ the real ones, marked as found; it never replaces a name the user saved. Novel R
 without a window with only these tools allowed (`claude -p --allowedTools mcp__helm__novel_…`), so it needs Claude
 Code installed and Helm added to it.
 
+`novel_translation_reports` (read only) gives the sentences the user reported as translated wrong in Novel Reader: the
+Chinese, what Helm showed, the right translation and the user's note, the dictionary pieces Helm cut the sentence
+into, and what Helm shows for it now (`helm_now`, `right_now`), so an agent improving the converter can work from them
+and check its changes. `novel_suggest_translations` writes an agent's suggested translation of reports, with a note
+and the kind of error; the user's own translation is never replaced. Novel Reader's **Ask Claude Code** runs Claude
+Code without a window with only `novel_translation_reports`, `novel_names` and `novel_suggest_translations` allowed.
+
 ## Connect a client
 
 Helm has to be running when an agent uses its tools. Each client starts `Helm.exe --mcp`, which passes the agent's messages

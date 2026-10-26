@@ -21,8 +21,10 @@ public static class NovelReaderServices
             .AddSingleton<ISpeechEngine>(sp => new LocalSpeechEngine(sp.GetRequiredService<ILocalVoiceServer>(),
                 Path.Combine(sp.GetRequiredService<ISettingsStoreFactory>().Paths.ModuleDataDirectory(NovelReaderIds.ModuleId), "local-voices.json"),
                 sp.GetRequiredService<ILogger<LocalSpeechEngine>>()))
-            // The AI name scan: Claude Code on this PC, through Helm's MCP tools.
+            // The AI name scan and suggested translations: Claude Code on this PC, through Helm's MCP tools.
+            .AddSingleton<ClaudeCodeRunner>()
             .AddSingleton<Helm.Modules.NovelReader.Names.INameScanAgent, ClaudeCodeNameAgent>()
+            .AddSingleton<Helm.Modules.NovelReader.Reports.ITranslationAgent, ClaudeCodeTranslationAgent>()
             .AddSingleton<WindowsAudioOutput>()
             .AddSingleton<IAudioOutput>(sp => sp.GetRequiredService<WindowsAudioOutput>())
             // A long press on a word in study mode says it in Mandarin, through a player of its own.

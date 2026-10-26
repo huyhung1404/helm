@@ -71,7 +71,7 @@ public sealed class NovelReaderMcpTools(NovelStore store, DictionaryLibrary dict
 
     private async Task<object?> CandidatesAsync(JsonElement args, CancellationToken ct)
     {
-        var (id, book) = Find(McpArgs.RequiredString(args, "novel"));
+        var (id, book) = FindBook(store, McpArgs.RequiredString(args, "novel"));
         var offset = Math.Max(0, McpArgs.Int(args, "offset") ?? 0);
         var limit = Math.Clamp(McpArgs.Int(args, "limit") ?? DefaultPage, 1, MaxPage);
         IReadOnlyList<Candidate>? items;
@@ -130,7 +130,7 @@ public sealed class NovelReaderMcpTools(NovelStore store, DictionaryLibrary dict
 
     private object Names(string novel)
     {
-        var (id, book) = Find(novel);
+        var (id, book) = FindBook(store, novel);
         return new
         {
             novel = book.Title,
@@ -141,7 +141,7 @@ public sealed class NovelReaderMcpTools(NovelStore store, DictionaryLibrary dict
 
     private object AddNames(JsonElement args)
     {
-        var (id, book) = Find(McpArgs.RequiredString(args, "novel"));
+        var (id, book) = FindBook(store, McpArgs.RequiredString(args, "novel"));
         if (!args.TryGetProperty("names", out var list) || list.ValueKind != JsonValueKind.Array)
             throw new McpToolException("names must be a list of { word, vietnamese }.");
         var ignored = new HashSet<string>(book.IgnoredNames, StringComparer.Ordinal);
@@ -168,14 +168,16 @@ public sealed class NovelReaderMcpTools(NovelStore store, DictionaryLibrary dict
 
     private object IgnoreNames(JsonElement args)
     {
-        var (id, book) = Find(McpArgs.RequiredString(args, "novel"));
+        var (id, book) = FindBook(store, McpArgs.RequiredString(args, "novel"));
         var words = McpArgs.Strings(args, "words");
         foreach (var word in words) store.IgnoreName(id, word);
         return new { novel = book.Title, set_aside = words.Count };
     }
 
     /// <summary>A novel by id, exact title, or the one title that contains the text.</summary>
-    private (string Id, NovelBook Book) Find(string novel)
+    /// <summary>A novel by its id, its title, or a part of its title that only one novel has.</summary>
+    /// <exception cref="McpToolException">No novel, or several.</exception>
+    internal static (string Id, NovelBook Book) FindBook(NovelStore store, string novel)
     {
         var books = store.Books();
         var match = books.FirstOrDefault(b => b.Id == novel)

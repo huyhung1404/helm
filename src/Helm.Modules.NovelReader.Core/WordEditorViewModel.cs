@@ -133,6 +133,19 @@ public sealed partial class WordEditorViewModel : ObservableObject
         ReadFrom(Paragraph, segment);
     }
 
+    /// <summary>Starts a report of a wrong translation at a stretch of a paragraph (set by the page view model).</summary>
+    public Action<ConvertedLine, int, int>? Report { get; init; }
+
+    public bool CanReport => Report is not null;
+
+    /// <summary>Reports the sentence this word is in as translated wrong.</summary>
+    [RelayCommand]
+    private void ReportSentence()
+    {
+        IsOpen = false;
+        if (Paragraph?.Line is { } line) Report?.Invoke(line, _start, _length);
+    }
+
     [RelayCommand]
     private void CopyChinese() => _clipboard.SetText(Chinese);
 

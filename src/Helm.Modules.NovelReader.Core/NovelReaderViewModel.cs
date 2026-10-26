@@ -10,6 +10,7 @@ using Helm.Modules.NovelReader.Conversion;
 using Helm.Modules.NovelReader.Dictionaries;
 using Helm.Modules.NovelReader.Library;
 using Helm.Modules.NovelReader.Names;
+using Helm.Modules.NovelReader.Reports;
 using Helm.Modules.NovelReader.Speech;
 using Helm.Modules.NovelReader.Text;
 using Helm.Shell.Services;
@@ -139,7 +140,8 @@ public sealed partial class NovelReaderViewModel : ObservableObject, IReadAloudH
     public NovelReaderViewModel(NovelStore store, DictionaryLibrary dictionaries, ISettingsStoreFactory settings, IUiDispatcher ui,
         IDialogService dialogs, IDeviceInfo device, SpeechCatalog catalog, IAudioOutput audio, IProcessLauncher launcher,
         IClipboardService clipboard, ILogger<NovelReaderViewModel> logger, TimeProvider? time = null, ILocalVoiceServer? localVoice = null,
-        INameScanAgent? nameAgent = null, WordPronouncer? pronouncer = null)
+        INameScanAgent? nameAgent = null, WordPronouncer? pronouncer = null, TranslationReportStore? reports = null,
+        ITranslationAgent? translator = null)
     {
         _store = store;
         _dictionaries = dictionaries;
@@ -195,10 +197,16 @@ public sealed partial class NovelReaderViewModel : ObservableObject, IReadAloudH
         audio.MediaButton += (_, button) => _ui.Post(() => OnMediaButton(button));
         _launcher = launcher;
         _logger = logger;
+        if (reports is not null)
+        {
+            Reports = new TranslationReportsViewModel(reports, ui, clipboard, device, ReportContextNow, translator);
+            Reports.PanelOpened += (_, _) => ShowNamesPanel = false;
+        }
         Editor = new WordEditorViewModel(store, clipboard, () => _converter, () => OpenBookId)
         {
             ReadFrom = ReadFromSegment,
             PinyinOf = chinese => _dictionaries.Current.Pinyin.Of(chinese),
+            Report = Reports is null ? null : Reports.Start,
         };
 
         _loading = true;
@@ -247,6 +255,9 @@ public sealed partial class NovelReaderViewModel : ObservableObject, IReadAloudH
     }
 
     public WordEditorViewModel Editor { get; }
+
+    /// <summary>Reports of wrong translations (null when the host has no report store, as in some tests).</summary>
+    public TranslationReportsViewModel? Reports { get; }
 
     public ObservableCollection<BookCardViewModel> Books { get; } = [];
 
@@ -306,6 +317,7 @@ public sealed partial class NovelReaderViewModel : ObservableObject, IReadAloudH
         OnPropertyChanged(nameof(IsBookOpen));
         OnPropertyChanged(nameof(IsLibraryShown));
         foreach (var card in Books) card.IsOpen = card.Id == value;
+        if (Reports is { IsPanelOpen: true }) Reports.Refresh();
     }
 
     partial void OnChapterIndexChanged(int value)
@@ -413,6 +425,8 @@ public sealed partial class NovelReaderViewModel : ObservableObject, IReadAloudH
     {
         Save(s => s.ShowNamesPanel = value);
         if (value) RefreshEntries();
+        // One side panel at a time.
+        if (value && Reports is not null) Reports.IsPanelOpen = false;
     }
 
     partial void OnSelectedVoiceChanged(SpeechVoice? value)
@@ -904,6 +918,11 @@ public sealed partial class NovelReaderViewModel : ObservableObject, IReadAloudH
 
     (string Title, string Subtitle) IReadAloudHost.NowPlaying =>
         (BookTitle, ChapterIndex >= 0 && ChapterIndex < Chapters.Count ? Chapters[ChapterIndex].Title : "");
+
+    /// <summary>Where the reader is, for a report of a wrong translation; null while no novel is open and converted.</summary>
+    private ReportContext? ReportContextNow() => OpenBookId is { } id && _converter is { } converter
+        ? new ReportContext(id, BookTitle, ChapterIndex, ((IReadAloudHost)this).NowPlaying.Subtitle, converter)
+        : null;
 
     private void OnReaderPosition(ReadingPosition position)
     {

@@ -60,6 +60,12 @@ public partial class NovelReaderContentPage : Page
             if (e.PropertyName == nameof(WordEditorViewModel.IsOpen) && viewModel.Editor.IsOpen)
                 Dispatcher.BeginInvoke(DispatcherPriority.Input, () => { DraftBox.Focus(); DraftBox.SelectAll(); });
         };
+        if (viewModel.Reports is { } reports)
+            reports.Editor.PropertyChanged += (_, e) =>
+            {
+                if (e.PropertyName == nameof(Reports.ReportEditorViewModel.IsOpen) && reports.Editor.IsOpen)
+                    Dispatcher.BeginInvoke(DispatcherPriority.Input, () => { CorrectBox.Focus(); CorrectBox.SelectAll(); });
+            };
         Loaded += async (_, _) =>
         {
             LoadWordClasses();
@@ -205,6 +211,42 @@ public partial class NovelReaderContentPage : Page
 
     private static ParagraphViewModel? ParagraphOf(object sender) => (sender as FrameworkElement)?.DataContext as ParagraphViewModel;
 
+    // ---- Reports of wrong translations -----------------------------------------------------------------------------
+
+    /// <summary>A report from the paragraph's menu starts on its first sentence; the form widens it.</summary>
+    private void ReportParagraph_Click(object sender, RoutedEventArgs e)
+    {
+        if (ParagraphOf(sender)?.Line is { } line) _viewModel.Reports?.Start(line, 0, 0);
+    }
+
+    private void ExportReports_Click(object sender, RoutedEventArgs e)
+    {
+        if (_viewModel.Reports is not { } reports) return;
+        var dialog = new SaveFileDialog
+        {
+            Title = "Save the reports of wrong translations",
+            FileName = $"Translation reports {DateTime.Now:yyyy-MM-dd}.md",
+            Filter = "Markdown (*.md)|*.md",
+        };
+        if (dialog.ShowDialog(Window.GetWindow(this)) == true) reports.ExportTo(dialog.FileName);
+    }
+
+    /// <summary>Ctrl+Enter saves the report, Esc closes the form.</summary>
+    private void ReportForm_KeyDown(object sender, KeyEventArgs e)
+    {
+        if (_viewModel.Reports?.Editor is not { } editor) return;
+        if (e.Key == Key.Escape)
+        {
+            editor.CloseCommand.Execute(null);
+            e.Handled = true;
+        }
+        else if (e.Key == Key.Enter && Keyboard.Modifiers.HasFlag(ModifierKeys.Control))
+        {
+            editor.SaveCommand.Execute(null);
+            e.Handled = true;
+        }
+    }
+
     private void ExportBookNames_Click(object sender, RoutedEventArgs e)
     {
         if (_viewModel.OpenBookId is not { } id) return;
@@ -234,7 +276,8 @@ public partial class NovelReaderContentPage : Page
     /// </summary>
     private void OnPreviewKeyDown(object sender, KeyEventArgs e)
     {
-        if (!_viewModel.IsBookOpen || Keyboard.FocusedElement is TextBox or ComboBox or ComboBoxItem || _viewModel.Editor.IsOpen) return;
+        if (!_viewModel.IsBookOpen || Keyboard.FocusedElement is TextBox or ComboBox or ComboBoxItem || _viewModel.Editor.IsOpen
+            || _viewModel.Reports?.Editor.IsOpen == true) return;
         var alt = e.Key == Key.System;
         switch (alt ? e.SystemKey : e.Key)
         {

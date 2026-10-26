@@ -3,6 +3,24 @@
 All notable changes to Helm. The top section is used as the GitHub release body and as the Velopack release notes.
 Format: [Keep a Changelog](https://keepachangelog.com), versions follow [SemVer](https://semver.org).
 
+## [Unreleased]
+
+### Added
+- **Novel Reader: report a sentence translated wrong.** Click (or tap) a word, then **Report sentence**: Helm shows the
+  sentence, what it made of it and a box for the right translation, with a note on what is wrong. ◀ ▶ add the
+  sentence before or after. On the PC a paragraph's menu has it too. Reports sync between your devices.
+- **Novel Reader: the reports as a document.** **Reports** (next to Names; the flag on the phone) lists this novel's
+  reports, or all of them, and marks the ones Helm now gets right. **Copy as document** puts them on the clipboard as
+  Markdown, and on the PC **Save…** writes a .md file: each report with the Chinese, Helm's text, the right one, the
+  note and the dictionary pieces Helm cut the sentence into. An AI on the PC reads them through the
+  `novel_translation_reports` MCP tool, to improve the translation from them.
+- **Novel Reader: Claude Code suggests the right translation (PC).** **Ask Claude Code** in the report form, or
+  **for the rest** in the Reports list, runs Claude Code on this PC without a window (your Claude plan, no API key),
+  allowed only Novel Reader's report and name tools. It reads the sentence, the paragraph and the novel's names, and
+  writes back a translation, a short note on what Helm got wrong and the kind of error (word order, location, meaning,
+  segmentation, pronoun, name). The suggestion shows beside your own translation and never replaces it: **Use it**
+  takes it. Suggestions sync, so the phone shows them too. Needs Claude Code with Helm added (AI & MCP page).
+
 ## [0.54.0] - 2026-10-25
 
 ### Added

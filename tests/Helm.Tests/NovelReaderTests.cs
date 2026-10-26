@@ -9,6 +9,7 @@ using Helm.Modules.NovelReader.Conversion;
 using Helm.Modules.NovelReader.Dictionaries;
 using Helm.Modules.NovelReader.Library;
 using Helm.Modules.NovelReader.Names;
+using Helm.Modules.NovelReader.Reports;
 using Helm.Modules.NovelReader.Scraping;
 using Helm.Modules.NovelReader.Speech;
 using Helm.Modules.NovelReader.Text;
@@ -479,12 +480,25 @@ public sealed class NovelReaderTests : IDisposable
             """{"type":"result","subtype":"success","is_error":false,"result":"Added 42 names, set aside 17 words."}""");
         var steps = new List<string>();
 
-        var (result, failed, calls) = await ClaudeCodeNameAgent.ReadEventsAsync(new MemoryStream(Encoding.UTF8.GetBytes(lines)), new InlineProgress(steps.Add));
+        var (result, failed, calls) = await ClaudeCodeRunner.ReadEventsAsync(new MemoryStream(Encoding.UTF8.GetBytes(lines)), new InlineProgress(steps.Add),
+            ClaudeCodeNameAgent.Describe);
 
         Assert.Equal(("Added 42 names, set aside 17 words.", false, 2), (result, failed, calls));
         Assert.Equal("Claude Code is adding names… (2 steps)", steps[^1]);
         Assert.All(ClaudeCodeNameAgent.AllowedTools, t => Assert.StartsWith("mcp__helm__novel_", t, StringComparison.Ordinal));
         Assert.Contains("novel_add_names", ClaudeCodeNameAgent.Instructions("b1", "Novel"), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Claude_code_suggests_translations_with_only_the_report_tools()
+    {
+        Assert.Equal(["mcp__helm__novel_translation_reports", "mcp__helm__novel_names", "mcp__helm__novel_suggest_translations"],
+            ClaudeCodeTranslationAgent.AllowedTools);
+        var instructions = ClaudeCodeTranslationAgent.Instructions("b1", "Novel", ["r1", "r2"]);
+        Assert.Contains("ids \"r1\", \"r2\"", instructions, StringComparison.Ordinal);
+        Assert.Contains("novel_suggest_translations", instructions, StringComparison.Ordinal);
+        Assert.All(ErrorKinds.All, kind => Assert.Contains(kind, instructions, StringComparison.Ordinal));
+        Assert.Equal("Claude Code is writing its suggestions… (3 steps)", ClaudeCodeTranslationAgent.Describe("novel_suggest_translations", 3));
     }
 
     private sealed class InlineProgress(Action<string> report) : IProgress<string>
@@ -841,6 +855,76 @@ public sealed class NovelReaderTests : IDisposable
         Assert.False(page.ViewModel.Editor.IsOpen);
         Assert.Equal("Lâm Uyển", page.Store.GetEntry(id, EntryKind.Name, "林宛")!.Vietnamese);
         await WaitFor(() => paragraph.Text.StartsWith("Lâm Uyển", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task A_sentence_reported_from_the_word_popup_is_listed_and_read_by_an_ai_through_mcp()
+    {
+        var reports = new TranslationReportStore(new MemorySynced<TranslationReport>(), _clock);
+        var page = NewPage("a", reports: reports);
+        var id = await page.Store.AddBookAsync("Novel", "n.txt", Novel, 3, "PC");
+        await page.ViewModel.OpenBookAsync(id);
+        var paragraph = page.ViewModel.Paragraphs[2];
+        page.ViewModel.OpenWord(paragraph, paragraph.Line!.Segments.First(s => s.IsWord));
+
+        Assert.True(page.ViewModel.Editor.CanReport);
+        page.ViewModel.Editor.ReportSentenceCommand.Execute(null);
+        var form = page.ViewModel.Reports!.Editor;
+        Assert.False(page.ViewModel.Editor.IsOpen);
+        Assert.True(form.IsOpen);
+        Assert.Equal("林宛撑着一柄素色油纸伞.", form.Chinese);
+        Assert.Equal(paragraph.Text, form.Helm);
+        form.Correct = "Lâm Uyển che một chiếc ô giấy dầu màu trơn.";
+        form.SaveCommand.Execute(null);
+        Assert.False(form.IsOpen);
+        var saved = Assert.Single(reports.Reports(id)).Value;
+        Assert.Equal("Novel", saved.BookTitle);
+        Assert.Equal("林", saved.Word);
+        Assert.Contains(new ReportPiece("林", "Lâm", "han-viet"), saved.Pieces);
+
+        // The list is the open novel's; opening it closes the names panel, and the other way round.
+        page.ViewModel.ShowNamesPanel = true;
+        page.ViewModel.Reports.IsPanelOpen = true;
+        Assert.False(page.ViewModel.ShowNamesPanel);
+        var row = Assert.Single(page.ViewModel.Reports.Rows);
+        Assert.False(row.IsRightNow);
+        Assert.Equal("1 report for this novel · 1 in all", page.ViewModel.Reports.Summary);
+        page.ViewModel.ShowNamesPanel = true;
+        Assert.False(page.ViewModel.Reports.IsPanelOpen);
+
+        // An AI reads it, with what Helm shows now: right once 林宛 and the rest are known.
+        var tools = new TranslationReportMcpTools(reports, page.Store, page.Dictionaries).Tools.ToDictionary(t => t.Name);
+        Assert.True(tools["novel_translation_reports"].ReadOnly);
+        Assert.False(tools["novel_suggest_translations"].ReadOnly);
+        async Task<JsonElement> Run(string tool, string args)
+        {
+            using var json = JsonDocument.Parse(args);
+            return JsonDocument.Parse(JsonSerializer.Serialize(await tools[tool].Run(json.RootElement.Clone(), CancellationToken.None))).RootElement;
+        }
+        Task<JsonElement> Call(string args) => Run("novel_translation_reports", args);
+        var listed = await Call("""{"novel":"Novel"}""");
+        Assert.Equal(1, listed.GetProperty("total").GetInt32());
+        var item = listed.GetProperty("reports")[0];
+        Assert.Equal("林宛撑着一柄素色油纸伞.", item.GetProperty("chinese").GetString());
+        Assert.Equal(saved.Helm, item.GetProperty("helm_now").GetString());
+        Assert.False(item.GetProperty("right_now").GetBoolean());
+        page.Store.SaveEntry(id, EntryKind.Phrase, "林宛撑着一柄素色油纸伞", "Lâm Uyển che một chiếc ô giấy dầu màu trơn");
+        Assert.True((await Call("{}")).GetProperty("reports")[0].GetProperty("right_now").GetBoolean());
+
+        // It suggests a translation: kept beside the reader's own, which stays; an unknown kind is "other".
+        var reportId = item.GetProperty("id").GetString()!;
+        var suggested = await Run("novel_suggest_translations", $$"""
+            {"suggestions":[{"id":"{{reportId}}","translation":"Lâm Uyển cầm một chiếc ô giấy dầu.","note":"撑 là cầm ô","kind":"guess"},
+                            {"id":"nope","translation":"x","note":"","kind":"meaning"}]}
+            """);
+        Assert.Equal(1, suggested.GetProperty("saved").GetInt32());
+        Assert.Equal("no such report", suggested.GetProperty("skipped")[0].GetProperty("reason").GetString());
+        var report = reports.Get(reportId)!;
+        Assert.Equal(("Lâm Uyển cầm một chiếc ô giấy dầu.", "撑 là cầm ô", "other"), (report.Suggestion, report.SuggestionNote, report.ErrorKind));
+        Assert.Equal("Lâm Uyển che một chiếc ô giấy dầu màu trơn.", report.Correct);
+        var only = await Call($$"""{"ids":["{{reportId}}"]}""");
+        Assert.Equal("Lâm Uyển cầm một chiếc ô giấy dầu.", only.GetProperty("reports")[0].GetProperty("suggestion").GetString());
+        Assert.Equal(0, (await Call("""{"ids":["nope"]}""")).GetProperty("total").GetInt32());
     }
 
     // ---- Synced dictionaries ---------------------------------------------------------------------------------------
@@ -1278,7 +1362,7 @@ public sealed class NovelReaderTests : IDisposable
     {
         // The phone's text-to-speech starts after Helm: its voices are missing at first.
         var phone = new FakeEngine("android", online: false, voices: []);
-        var page = NewPage("a", "android:vi-vn-x-gft-local", null, phone);
+        var page = NewPage("a", "android:vi-vn-x-gft-local", null, null, phone);
         Assert.Equal("test:hoaimy", page.ViewModel.SelectedVoice?.Id);
         // Filling the list again meanwhile does not make the stand-in the saved choice.
         page.ViewModel.RefreshVoicesCommand.Execute(null);
@@ -1610,7 +1694,8 @@ public sealed class NovelReaderTests : IDisposable
     private sealed record Page(NovelReaderViewModel ViewModel, NovelStore Store, MemorySynced<NovelProgress> Progress, FakeEngine Engine, FakeOutput Output,
         DictionaryLibrary Dictionaries);
 
-    private Page NewPage(string name, string voiceId = "test:hoaimy", INameScanAgent? agent = null, params ISpeechEngine[] moreEngines)
+    private Page NewPage(string name, string voiceId = "test:hoaimy", INameScanAgent? agent = null, TranslationReportStore? reports = null,
+        params ISpeechEngine[] moreEngines)
     {
         var paths = new HelmPaths(Path.Combine(_dir, name));
         var db = Own(new SyncDatabase(paths.SyncDatabaseFile, TestKeys.Local));
@@ -1626,7 +1711,7 @@ public sealed class NovelReaderTests : IDisposable
         var output = new FakeOutput();
         var viewModel = new NovelReaderViewModel(store, dictionaries, settings, new InlineUi(), new AcceptDialogs(), new Device(),
             new SpeechCatalog([engine, .. moreEngines]), output, new Launcher(), new MemoryClipboard(),
-            NullLogger<NovelReaderViewModel>.Instance, nameAgent: agent);
+            NullLogger<NovelReaderViewModel>.Instance, nameAgent: agent, reports: reports);
         return new Page(viewModel, store, progress, engine, output, dictionaries);
     }
 

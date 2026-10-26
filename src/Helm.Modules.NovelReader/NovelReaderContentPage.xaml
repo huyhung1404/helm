@@ -445,6 +445,13 @@
                             <TextBlock Margin="6,0,0,0" Text="Names" />
                         </StackPanel>
                     </ToggleButton>
+                    <ToggleButton Margin="0,0,8,8" VerticalAlignment="Center" IsChecked="{Binding Reports.IsPanelOpen}" Padding="10,5"
+                                  ToolTip="Sentences you marked as translated wrong, as a document" AutomationProperties.Name="Wrong translations">
+                        <StackPanel Orientation="Horizontal">
+                            <ui:SymbolIcon Symbol="Flag24" />
+                            <TextBlock Margin="6,0,0,0" Text="Reports" />
+                        </StackPanel>
+                    </ToggleButton>
                     <!-- Text size: also Ctrl + mouse wheel, Ctrl + = / Ctrl + − and Ctrl + 0 -->
                     <StackPanel Orientation="Horizontal" Margin="0,0,8,8" VerticalAlignment="Center">
                         <ui:Button Style="{StaticResource IconAction}" Command="{Binding ZoomOutCommand}"
@@ -555,6 +562,7 @@
                                                     <MenuItem Header="Read aloud from here" Click="ReadFromHere_Click" />
                                                     <MenuItem Header="Copy the translation" Click="CopyText_Click" />
                                                     <MenuItem Header="Copy the Chinese" Click="CopyChinese_Click" />
+                                                    <MenuItem Header="Report a wrong translation…" Click="ReportParagraph_Click" />
                                                 </ContextMenu>
                                             </Border.ContextMenu>
                                             <StackPanel>
@@ -720,6 +728,148 @@
                             </TabItem>
                         </TabControl>
                     </Border>
+
+                    <!-- Reports panel: sentences marked as translated wrong, copied or saved as one document -->
+                    <Border Grid.Column="1" Width="380" Margin="8,0,0,24" Style="{DynamicResource HelmSurface}" Padding="12"
+                            DataContext="{Binding Reports}" Visibility="{Binding IsPanelOpen, Converter={StaticResource BoolToVisibility}, FallbackValue=Collapsed}">
+                        <DockPanel>
+                            <StackPanel DockPanel.Dock="Top" Margin="0,0,0,8">
+                                <TextBlock Text="Wrong translations" FontSize="16" FontWeight="SemiBold" />
+                                <TextBlock Text="{Binding Summary}" Style="{DynamicResource HelmSecondaryText}" Margin="0,2,0,8" />
+                                <CheckBox Content="All my novels" IsChecked="{Binding ShowAllNovels}" Margin="0,0,0,8" />
+                                <WrapPanel>
+                                    <ui:Button Margin="0,0,8,8" Content="Copy as document" Icon="{ui:SymbolIcon Copy24}" Command="{Binding CopyAllCommand}"
+                                               IsEnabled="{Binding HasRows}" ToolTip="The listed reports as Markdown, to paste where the translation is improved" />
+                                    <ui:Button Margin="0,0,8,8" Content="Save…" Icon="{ui:SymbolIcon Save24}" Click="ExportReports_Click" IsEnabled="{Binding HasRows}"
+                                               ToolTip="Save the listed reports as a Markdown file" />
+                                    <!-- Claude Code on this PC suggests the right translation of each report -->
+                                    <ui:Button Margin="0,0,8,8" Icon="{ui:SymbolIcon Sparkle24}" Command="{Binding AskForRestCommand}"
+                                               Visibility="{Binding CanAsk, Converter={StaticResource BoolToVisibility}}"
+                                               IsEnabled="{Binding IsAsking, Converter={StaticResource InverseBool}}"
+                                               ToolTip="Claude Code suggests the right translation of every listed report that has none yet (through Helm's MCP tools, on your Claude plan)">
+                                        <TextBlock Text="{Binding AskLabel, StringFormat={}{0} for the rest}" />
+                                    </ui:Button>
+                                    <ui:Button Margin="0,0,8,8" Content="Stop" Icon="{ui:SymbolIcon Stop24}" Command="{Binding StopAskingCommand}"
+                                               Visibility="{Binding IsAsking, Converter={StaticResource BoolToVisibility}}" />
+                                </WrapPanel>
+                                <TextBlock Text="{Binding AskStatus}" Style="{DynamicResource HelmSecondaryText}" TextWrapping="Wrap" Margin="0,0,0,4"
+                                           Visibility="{Binding HasAskStatus, Converter={StaticResource BoolToVisibility}}" />
+                                <TextBlock Text="{Binding Status}" Style="{DynamicResource HelmSecondaryText}" TextWrapping="Wrap"
+                                           Visibility="{Binding HasStatus, Converter={StaticResource BoolToVisibility}}" />
+                            </StackPanel>
+                            <TextBlock DockPanel.Dock="Top" TextWrapping="Wrap" Style="{DynamicResource HelmSecondaryText}"
+                                       Text="Click a word Helm translates wrong, then Report sentence. Each report keeps the Chinese, Helm's text and the right one."
+                                       Visibility="{Binding HasRows, Converter={StaticResource InverseBoolToVisibility}}" />
+                            <ScrollViewer VerticalScrollBarVisibility="Auto">
+                                <ItemsControl ItemsSource="{Binding Rows}">
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate>
+                                            <Border Padding="4,8" BorderThickness="0,0,0,1" BorderBrush="{DynamicResource CardStrokeColorDefaultBrush}">
+                                                <DockPanel>
+                                                    <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Top">
+                                                        <ui:Button Style="{StaticResource IconAction}" Icon="{ui:SymbolIcon Edit24}" ToolTip="Edit" AutomationProperties.Name="Edit"
+                                                                   Command="{Binding DataContext.EditCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}" CommandParameter="{Binding}" />
+                                                        <ui:Button Style="{StaticResource IconAction}" Icon="{ui:SymbolIcon Delete24}" ToolTip="Delete" AutomationProperties.Name="Delete"
+                                                                   Command="{Binding DataContext.DeleteCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}" CommandParameter="{Binding}" />
+                                                    </StackPanel>
+                                                    <StackPanel>
+                                                        <TextBlock Text="{Binding Where}" Style="{DynamicResource HelmSecondaryText}" FontSize="12" TextTrimming="CharacterEllipsis" />
+                                                        <TextBlock Text="{Binding Chinese}" FontWeight="SemiBold" TextWrapping="Wrap" Margin="0,2,0,0" />
+                                                        <TextBlock Text="{Binding Helm}" Style="{DynamicResource HelmSecondaryText}" TextWrapping="Wrap" TextDecorations="Strikethrough"
+                                                                   Visibility="{Binding HasCorrect, Converter={StaticResource BoolToVisibility}}" />
+                                                        <TextBlock Text="{Binding Helm}" Style="{DynamicResource HelmSecondaryText}" TextWrapping="Wrap"
+                                                                   Visibility="{Binding HasCorrect, Converter={StaticResource InverseBoolToVisibility}}" />
+                                                        <TextBlock Text="{Binding Correct}" Foreground="{DynamicResource AccentTextFillColorPrimaryBrush}" TextWrapping="Wrap"
+                                                                   Visibility="{Binding HasCorrect, Converter={StaticResource BoolToVisibility}}" />
+                                                        <TextBlock Text="{Binding Note}" FontStyle="Italic" TextWrapping="Wrap" Margin="0,2,0,0"
+                                                                   Visibility="{Binding HasNote, Converter={StaticResource BoolToVisibility}}" />
+                                                        <TextBlock Text="✓ Helm gets it right now" Foreground="{DynamicResource SystemFillColorSuccessBrush}" FontSize="12" Margin="0,2,0,0"
+                                                                   Visibility="{Binding IsRightNow, Converter={StaticResource BoolToVisibility}}" />
+                                                        <!-- The AI's suggestion, taken as the right translation with Use -->
+                                                        <DockPanel Margin="0,4,0,0" Visibility="{Binding HasSuggestion, Converter={StaticResource BoolToVisibility}}">
+                                                            <ui:Button DockPanel.Dock="Right" Content="Use" Padding="8,2" VerticalAlignment="Top" Margin="6,0,0,0"
+                                                                       Visibility="{Binding CanUseSuggestion, Converter={StaticResource BoolToVisibility}}"
+                                                                       ToolTip="Take the suggestion as the right translation"
+                                                                       Command="{Binding DataContext.UseSuggestionCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}" CommandParameter="{Binding}" />
+                                                            <StackPanel>
+                                                                <TextBlock TextWrapping="Wrap">
+                                                                    <Run Text="✦ " Foreground="{DynamicResource AccentTextFillColorPrimaryBrush}" /><Run Text="{Binding Suggestion, Mode=OneWay}" />
+                                                                </TextBlock>
+                                                                <TextBlock Text="{Binding SuggestionNote}" Style="{DynamicResource HelmSecondaryText}" FontSize="12" TextWrapping="Wrap" />
+                                                            </StackPanel>
+                                                        </DockPanel>
+                                                    </StackPanel>
+                                                </DockPanel>
+                                            </Border>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                            </ScrollViewer>
+                        </DockPanel>
+                    </Border>
+
+                    <!-- Report a wrong translation: the sentence, Helm's text, the right one and a note (Ctrl+Enter saves, Esc closes) -->
+                    <Grid Grid.ColumnSpan="2" Margin="0,0,0,24" Background="{DynamicResource SmokeFillColorDefaultBrush}" DataContext="{Binding Reports.Editor}"
+                          Visibility="{Binding IsOpen, Converter={StaticResource BoolToVisibility}, FallbackValue=Collapsed}" PreviewKeyDown="ReportForm_KeyDown">
+                        <Border Width="520" VerticalAlignment="Center" HorizontalAlignment="Center" Padding="16" CornerRadius="8" BorderThickness="1"
+                                Background="{DynamicResource ApplicationBackgroundBrush}" BorderBrush="{DynamicResource SurfaceStrokeColorDefaultBrush}">
+                            <StackPanel>
+                                <DockPanel Margin="0,0,0,10">
+                                    <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Top">
+                                        <ui:Button Style="{StaticResource IconAction}" Content="◀" ToolTip="Add the sentence before" AutomationProperties.Name="Add the sentence before"
+                                                   Command="{Binding AddBeforeCommand}" IsEnabled="{Binding CanAddBefore}" />
+                                        <ui:Button Style="{StaticResource IconAction}" Content="▶" ToolTip="Add the sentence after" AutomationProperties.Name="Add the sentence after"
+                                                   Command="{Binding AddAfterCommand}" IsEnabled="{Binding CanAddAfter}" />
+                                        <ui:Button Style="{StaticResource IconAction}" Content="−" ToolTip="One sentence less" AutomationProperties.Name="One sentence less"
+                                                   Command="{Binding DropCommand}" IsEnabled="{Binding CanDrop}" />
+                                    </StackPanel>
+                                    <TextBlock Text="{Binding Title}" FontSize="18" FontWeight="SemiBold" VerticalAlignment="Center" />
+                                </DockPanel>
+                                <TextBox Text="{Binding Chinese, Mode=OneWay}" IsReadOnly="True" FontSize="18" TextWrapping="Wrap" BorderThickness="0" Background="Transparent"
+                                         AutomationProperties.Name="Chinese" />
+                                <TextBlock Text="Helm shows" Style="{DynamicResource HelmSecondaryText}" Margin="0,10,0,2" />
+                                <TextBox Text="{Binding Helm, Mode=OneWay}" IsReadOnly="True" TextWrapping="Wrap" BorderThickness="0" Background="Transparent"
+                                         AutomationProperties.Name="Helm's translation" />
+                                <TextBlock Text="The right translation" Style="{DynamicResource HelmSecondaryText}" Margin="0,10,0,2" />
+                                <ui:TextBox x:Name="CorrectBox" Text="{Binding Correct, UpdateSourceTrigger=PropertyChanged}" TextWrapping="Wrap" MinHeight="56"
+                                            AutomationProperties.Name="The right translation" />
+                                <TextBlock Text="Note (optional): what is wrong" Style="{DynamicResource HelmSecondaryText}" Margin="0,10,0,2" />
+                                <ui:TextBox Text="{Binding Note, UpdateSourceTrigger=PropertyChanged}" TextWrapping="Wrap" PlaceholderText="道 means nói here · the 的 phrase is reversed…"
+                                            AutomationProperties.Name="Note" />
+                                <!-- Claude Code's suggestion: shown when it arrives, put in the box with Use it -->
+                                <Border Margin="0,10,0,0" Padding="10,8" CornerRadius="6" Background="{DynamicResource ControlFillColorSecondaryBrush}"
+                                        Visibility="{Binding HasSuggestion, Converter={StaticResource BoolToVisibility}}">
+                                    <DockPanel>
+                                        <ui:Button DockPanel.Dock="Right" VerticalAlignment="Top" Content="Use it" Margin="8,0,0,0" Command="{Binding UseSuggestionCommand}"
+                                                   ToolTip="Put the suggestion in the box for the right translation" />
+                                        <StackPanel>
+                                            <TextBlock Text="✦ Claude Code suggests" Foreground="{DynamicResource AccentTextFillColorPrimaryBrush}" FontSize="12" />
+                                            <TextBox Text="{Binding Suggestion, Mode=OneWay}" IsReadOnly="True" TextWrapping="Wrap" BorderThickness="0" Background="Transparent"
+                                                     AutomationProperties.Name="Suggested translation" />
+                                            <TextBlock Style="{DynamicResource HelmSecondaryText}" FontSize="12" TextWrapping="Wrap">
+                                                <Run Text="{Binding SuggestionNote, Mode=OneWay}" /><Run Text=" · " /><Run Text="{Binding ErrorKind, Mode=OneWay}" />
+                                            </TextBlock>
+                                        </StackPanel>
+                                    </DockPanel>
+                                </Border>
+                                <TextBlock Text="{Binding AskStatus}" Style="{DynamicResource HelmSecondaryText}" TextWrapping="Wrap" Margin="0,8,0,0"
+                                           Visibility="{Binding HasAskStatus, Converter={StaticResource BoolToVisibility}}" />
+                                <TextBlock Text="{Binding Error}" Foreground="{DynamicResource SystemFillColorCriticalBrush}" TextWrapping="Wrap" Margin="0,8,0,0"
+                                           Visibility="{Binding HasError, Converter={StaticResource BoolToVisibility}}" />
+                                <DockPanel Margin="0,14,0,0">
+                                    <ui:Button DockPanel.Dock="Left" Content="Ask Claude Code" Icon="{ui:SymbolIcon Sparkle24}" Command="{Binding AskAiCommand}"
+                                               Visibility="{Binding CanAsk, Converter={StaticResource BoolToVisibility}}"
+                                               IsEnabled="{Binding IsAsking, Converter={StaticResource InverseBool}}"
+                                               ToolTip="Saves the report and has Claude Code suggest the right translation, with what Helm got wrong" />
+                                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                                        <ui:Button Appearance="Primary" Content="Save report" Icon="{ui:SymbolIcon Flag24}" Command="{Binding SaveCommand}"
+                                                   ToolTip="Save the report (Ctrl+Enter)" />
+                                        <ui:Button Margin="8,0,0,0" Content="Cancel" Command="{Binding CloseCommand}" ToolTip="Close without saving (Esc)" />
+                                    </StackPanel>
+                                </DockPanel>
+                            </StackPanel>
+                        </Border>
+                    </Grid>
                 </Grid>
             </DockPanel>
         </Grid>
@@ -776,6 +926,9 @@
                                    ToolTip="Read aloud from the sentence this word is in" />
                         <ui:Button Content="Remove" Icon="{ui:SymbolIcon Delete24}" Margin="0,0,6,6" Command="{Binding RemoveCommand}"
                                    Visibility="{Binding HasSaved, Converter={StaticResource BoolToVisibility}}" />
+                        <ui:Button Content="Report sentence" Icon="{ui:SymbolIcon Flag24}" Margin="0,0,6,6" Command="{Binding ReportSentenceCommand}"
+                                   Visibility="{Binding CanReport, Converter={StaticResource BoolToVisibility}}"
+                                   ToolTip="Mark the sentence this word is in as translated wrong, with the right translation" />
                     </WrapPanel>
                 </StackPanel>
             </Border>

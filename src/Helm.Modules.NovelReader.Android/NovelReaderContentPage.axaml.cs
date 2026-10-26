@@ -8,6 +8,7 @@ using Avalonia.VisualTree;
 using Helm.Core;
 using Helm.Core.Modules;
 using Helm.Core.Services;
+using Helm.Modules.NovelReader.Reports;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Helm.Modules.NovelReader;
@@ -33,6 +34,8 @@ public partial class NovelReaderContentPage : UserControl
         Chapters,
         Options,
         Names,
+        Reports,
+        Report,
     }
 
     private readonly NovelReaderModule _module;
@@ -47,6 +50,9 @@ public partial class NovelReaderContentPage : UserControl
     private DateTime _autoScrollUntil = DateTime.MinValue;
     private DispatcherTimer? _animation;
     private bool _pickingChapter;
+
+    /// <summary>The sheet the report form came from (the list, to edit a report), shown again when the form closes.</summary>
+    private Sheet _beforeReport;
 
     /// <summary>For the XAML runtime loader and the designer; the shell resolves the page from DI.</summary>
     public NovelReaderContentPage()
@@ -93,6 +99,7 @@ public partial class NovelReaderContentPage : UserControl
         _module.PageBack = HandleBack;
         _viewModel.PropertyChanged += OnViewModelChanged;
         _viewModel.Editor.PropertyChanged += OnEditorChanged;
+        if (_viewModel.Reports is { } reports) reports.Editor.PropertyChanged += OnReportEditorChanged;
         _viewModel.ScrollRequested += OnScrollRequested;
         _viewModel.FollowRequested += OnFollowRequested;
         _pageScroller = this.FindAncestorOfType<ScrollViewer>();
@@ -113,6 +120,7 @@ public partial class NovelReaderContentPage : UserControl
         if (_module.PageBack == HandleBack) _module.PageBack = null;
         _viewModel.PropertyChanged -= OnViewModelChanged;
         _viewModel.Editor.PropertyChanged -= OnEditorChanged;
+        if (_viewModel.Reports is { } reports) reports.Editor.PropertyChanged -= OnReportEditorChanged;
         _viewModel.ScrollRequested -= OnScrollRequested;
         _viewModel.FollowRequested -= OnFollowRequested;
         if (_pageScroller is not null) _pageScroller.PropertyChanged -= OnPageScrollerChanged;
@@ -201,6 +209,21 @@ public partial class NovelReaderContentPage : UserControl
         if (e.PropertyName != nameof(WordEditorViewModel.IsOpen)) return;
         if (_viewModel.Editor.IsOpen) ShowSheet(Sheet.Word);
         else if (_sheet == Sheet.Word) ShowSheet(Sheet.None);
+    }
+
+    private void OnReportEditorChanged(object? sender, PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName != nameof(ReportEditorViewModel.IsOpen) || _viewModel.Reports is not { } reports) return;
+        if (reports.Editor.IsOpen)
+        {
+            // From the word sheet the form replaces it; from the list it comes back to the list.
+            _beforeReport = _sheet == Sheet.Reports ? Sheet.Reports : Sheet.None;
+            ShowSheet(Sheet.Report);
+        }
+        else if (_sheet == Sheet.Report)
+        {
+            ShowSheet(_beforeReport);
+        }
     }
 
     private void UpdateChapterTitle()
@@ -370,11 +393,14 @@ public partial class NovelReaderContentPage : UserControl
         ChapterSheet.IsVisible = sheet == Sheet.Chapters;
         OptionsSheet.IsVisible = sheet == Sheet.Options;
         NamesSheet.IsVisible = sheet == Sheet.Names;
+        ReportsSheet.IsVisible = sheet == Sheet.Reports;
+        ReportSheet.IsVisible = sheet == Sheet.Report;
+        if (_viewModel.Reports is { } reports) reports.IsPanelOpen = sheet == Sheet.Reports;
         SheetLayer.IsVisible = sheet != Sheet.None;
         if (sheet == Sheet.None) return;
         SheetBox.MaxHeight = Math.Max(240, Bounds.Height * 0.85);
         // Lists fill the sheet; the others are as tall as what they show.
-        SheetBox.Height = sheet is Sheet.Chapters or Sheet.Names ? SheetBox.MaxHeight : double.NaN;
+        SheetBox.Height = sheet is Sheet.Chapters or Sheet.Names or Sheet.Reports ? SheetBox.MaxHeight : double.NaN;
         if (sheet == Sheet.Chapters)
         {
             _pickingChapter = true;
@@ -387,6 +413,12 @@ public partial class NovelReaderContentPage : UserControl
     private void CloseSheet()
     {
         if (_sheet == Sheet.Word) _viewModel.Editor.CloseCommand.Execute(null);
+        if (_sheet == Sheet.Report)
+        {
+            // Back (or a tap outside) leaves the form without saving, like Cancel.
+            _viewModel.Reports?.Editor.CloseCommand.Execute(null);
+            return;
+        }
         ShowSheet(Sheet.None);
     }
 
@@ -395,6 +427,8 @@ public partial class NovelReaderContentPage : UserControl
     private void Chapters_Click(object? sender, RoutedEventArgs e) => ShowSheet(Sheet.Chapters);
 
     private void Options_Click(object? sender, RoutedEventArgs e) => ShowSheet(Sheet.Options);
+
+    private void Reports_Click(object? sender, RoutedEventArgs e) => ShowSheet(Sheet.Reports);
 
     private void Names_Click(object? sender, RoutedEventArgs e)
     {

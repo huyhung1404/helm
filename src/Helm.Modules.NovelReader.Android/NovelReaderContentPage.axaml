@@ -3,6 +3,7 @@
              xmlns:ic="using:FluentIcons.Avalonia"
              xmlns:vm="using:Helm.Modules.NovelReader"
              xmlns:speech="using:Helm.Modules.NovelReader.Speech"
+             xmlns:rep="using:Helm.Modules.NovelReader.Reports"
              x:Class="Helm.Modules.NovelReader.NovelReaderContentPage"
              x:DataType="vm:NovelReaderViewModel">
 
@@ -225,7 +226,7 @@
                 <!-- ================================ Reader ================================ -->
                 <DockPanel IsVisible="{Binding IsBookOpen}">
                     <!-- The novel, the chapter, the sheets -->
-                    <Grid DockPanel.Dock="Top" ColumnDefinitions="Auto,Auto,*,Auto,Auto" Margin="0,0,0,4">
+                    <Grid DockPanel.Dock="Top" ColumnDefinitions="Auto,Auto,*,Auto,Auto,Auto" Margin="0,0,0,4">
                         <Button Classes="icon" Command="{Binding ShowLibraryCommand}" AutomationProperties.Name="Library">
                             <ic:SymbolIcon Symbol="ArrowLeft" FontSize="20" />
                         </Button>
@@ -242,7 +243,10 @@
                         <Button Grid.Column="3" Classes="icon" Click="Names_Click" AutomationProperties.Name="Names">
                             <ic:SymbolIcon Symbol="People" FontSize="20" />
                         </Button>
-                        <Button Grid.Column="4" Classes="icon" Click="Options_Click" AutomationProperties.Name="Reading options">
+                        <Button Grid.Column="4" Classes="icon" Click="Reports_Click" AutomationProperties.Name="Wrong translations">
+                            <ic:SymbolIcon Symbol="Flag" FontSize="20" />
+                        </Button>
+                        <Button Grid.Column="5" Classes="icon" Click="Options_Click" AutomationProperties.Name="Reading options">
                             <ic:SymbolIcon Symbol="TextFont" FontSize="20" />
                         </Button>
                     </Grid>
@@ -422,6 +426,12 @@
                                     </Button>
                                     <Button Grid.Row="2" Grid.Column="2" Classes="action danger" Content="Remove" Command="{Binding RemoveCommand}" IsVisible="{Binding HasSaved}" />
                                 </Grid>
+                                <Button Classes="action" Command="{Binding ReportSentenceCommand}" IsVisible="{Binding CanReport}" AutomationProperties.Name="Report sentence">
+                                    <StackPanel Orientation="Horizontal" Spacing="6">
+                                        <ic:SymbolIcon Symbol="Flag" FontSize="16" />
+                                        <TextBlock Text="Report sentence as translated wrong" />
+                                    </StackPanel>
+                                </Button>
                             </StackPanel>
                         </ScrollViewer>
 
@@ -568,6 +578,105 @@
                                 </DockPanel>
                             </Panel>
                         </DockPanel>
+
+                        <!-- Sentences marked as translated wrong; they sync to the PC, where they become a document -->
+                        <DockPanel x:Name="ReportsSheet" DataContext="{Binding Reports}" x:DataType="rep:TranslationReportsViewModel">
+                            <StackPanel DockPanel.Dock="Top" Spacing="6" Margin="0,0,0,8">
+                                <TextBlock Text="Wrong translations" Classes="title" />
+                                <TextBlock Text="{Binding Summary}" Classes="secondary" />
+                                <CheckBox Content="All my novels" IsChecked="{Binding ShowAllNovels}" />
+                                <Button Command="{Binding CopyAllCommand}" IsEnabled="{Binding HasRows}" AutomationProperties.Name="Copy as document">
+                                    <StackPanel Orientation="Horizontal" Spacing="6">
+                                        <ic:SymbolIcon Symbol="Copy" FontSize="16" />
+                                        <TextBlock Text="Copy as document" />
+                                    </StackPanel>
+                                </Button>
+                                <TextBlock Text="{Binding Status}" Classes="secondary" TextWrapping="Wrap" IsVisible="{Binding HasStatus}" />
+                                <TextBlock Classes="secondary" TextWrapping="Wrap" IsVisible="{Binding !HasRows}"
+                                           Text="Tap a word Helm translates wrong, then Report sentence. Each report keeps the Chinese, Helm's text and the right one." />
+                            </StackPanel>
+                            <ScrollViewer>
+                                <ItemsControl ItemsSource="{Binding Rows}">
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate DataType="rep:ReportRowViewModel">
+                                            <Border Classes="row" Margin="0,0,0,8" Padding="0,8,0,0">
+                                                <DockPanel>
+                                                    <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Top">
+                                                        <Button Classes="icon" AutomationProperties.Name="Edit"
+                                                                Command="{Binding $parent[ItemsControl].((rep:TranslationReportsViewModel)DataContext).EditCommand}" CommandParameter="{Binding}">
+                                                            <ic:SymbolIcon Symbol="Edit" FontSize="16" />
+                                                        </Button>
+                                                        <Button Classes="icon" AutomationProperties.Name="Delete"
+                                                                Command="{Binding $parent[ItemsControl].((rep:TranslationReportsViewModel)DataContext).DeleteCommand}" CommandParameter="{Binding}">
+                                                            <ic:SymbolIcon Symbol="Delete" FontSize="16" />
+                                                        </Button>
+                                                    </StackPanel>
+                                                    <StackPanel Spacing="2">
+                                                        <TextBlock Text="{Binding Where}" Classes="secondary" FontSize="12" TextTrimming="CharacterEllipsis" />
+                                                        <TextBlock Text="{Binding Chinese}" FontWeight="SemiBold" TextWrapping="Wrap" />
+                                                        <TextBlock Text="{Binding Helm}" Classes="secondary" TextWrapping="Wrap" TextDecorations="Strikethrough" IsVisible="{Binding HasCorrect}" />
+                                                        <TextBlock Text="{Binding Helm}" Classes="secondary" TextWrapping="Wrap" IsVisible="{Binding !HasCorrect}" />
+                                                        <TextBlock Text="{Binding Correct}" Foreground="{DynamicResource AccentText}" TextWrapping="Wrap" IsVisible="{Binding HasCorrect}" />
+                                                        <TextBlock Text="{Binding Note}" FontStyle="Italic" TextWrapping="Wrap" IsVisible="{Binding HasNote}" />
+                                                        <TextBlock Text="✓ Helm gets it right now" Foreground="{DynamicResource AccentText}" FontSize="12" IsVisible="{Binding IsRightNow}" />
+                                                        <!-- A suggestion Claude Code made on the PC, synced here -->
+                                                        <DockPanel IsVisible="{Binding HasSuggestion}" Margin="0,4,0,0">
+                                                            <Button DockPanel.Dock="Right" Content="Use" VerticalAlignment="Top" Margin="6,0,0,0" IsVisible="{Binding CanUseSuggestion}"
+                                                                    AutomationProperties.Name="Use the suggestion"
+                                                                    Command="{Binding $parent[ItemsControl].((rep:TranslationReportsViewModel)DataContext).UseSuggestionCommand}" CommandParameter="{Binding}" />
+                                                            <StackPanel Spacing="2">
+                                                                <TextBlock Text="{Binding Suggestion, StringFormat='✦ {0}'}" TextWrapping="Wrap" />
+                                                                <TextBlock Text="{Binding SuggestionNote}" Classes="secondary" FontSize="12" TextWrapping="Wrap" />
+                                                            </StackPanel>
+                                                        </DockPanel>
+                                                    </StackPanel>
+                                                </DockPanel>
+                                            </Border>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                            </ScrollViewer>
+                        </DockPanel>
+
+                        <!-- Report a wrong translation: the sentence, Helm's text, the right one and a note -->
+                        <ScrollViewer x:Name="ReportSheet" DataContext="{Binding Reports.Editor}" x:DataType="rep:ReportEditorViewModel">
+                            <StackPanel Spacing="6">
+                                <DockPanel>
+                                    <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Top">
+                                        <Button Classes="icon" Width="36" Content="◀" Command="{Binding AddBeforeCommand}" IsEnabled="{Binding CanAddBefore}"
+                                                AutomationProperties.Name="Add the sentence before" />
+                                        <Button Classes="icon" Width="36" Content="▶" Command="{Binding AddAfterCommand}" IsEnabled="{Binding CanAddAfter}"
+                                                AutomationProperties.Name="Add the sentence after" />
+                                        <Button Classes="icon" Width="36" Content="−" Command="{Binding DropCommand}" IsEnabled="{Binding CanDrop}"
+                                                AutomationProperties.Name="One sentence less" />
+                                    </StackPanel>
+                                    <TextBlock Text="{Binding Title}" Classes="title" VerticalAlignment="Center" />
+                                </DockPanel>
+                                <SelectableTextBlock Text="{Binding Chinese}" FontSize="18" TextWrapping="Wrap" />
+                                <TextBlock Text="Helm shows" Classes="secondary" />
+                                <SelectableTextBlock Text="{Binding Helm}" TextWrapping="Wrap" />
+                                <TextBlock Text="The right translation" Classes="secondary" />
+                                <TextBox Text="{Binding Correct}" TextWrapping="Wrap" AcceptsReturn="False" AutomationProperties.Name="The right translation" />
+                                <TextBlock Text="Note (optional): what is wrong" Classes="secondary" />
+                                <TextBox Text="{Binding Note}" TextWrapping="Wrap" PlaceholderText="道 means nói here · the 的 phrase is reversed…" AutomationProperties.Name="Note" />
+                                <!-- Claude Code's suggestion, made on the PC -->
+                                <Border Classes="row" Padding="0,8,0,0" IsVisible="{Binding HasSuggestion}">
+                                    <DockPanel>
+                                        <Button DockPanel.Dock="Right" Content="Use it" VerticalAlignment="Top" Margin="6,0,0,0" Command="{Binding UseSuggestionCommand}" />
+                                        <StackPanel Spacing="2">
+                                            <TextBlock Text="✦ Claude Code suggests" Foreground="{DynamicResource AccentText}" FontSize="12" />
+                                            <SelectableTextBlock Text="{Binding Suggestion}" TextWrapping="Wrap" />
+                                            <TextBlock Text="{Binding SuggestionNote}" Classes="secondary" FontSize="12" TextWrapping="Wrap" />
+                                        </StackPanel>
+                                    </DockPanel>
+                                </Border>
+                                <TextBlock Text="{Binding Error}" Foreground="{DynamicResource HelmDanger}" TextWrapping="Wrap" IsVisible="{Binding HasError}" />
+                                <Grid ColumnDefinitions="*,8,*">
+                                    <Button Classes="accent action" Content="Save report" Command="{Binding SaveCommand}" />
+                                    <Button Grid.Column="2" Classes="action" Content="Cancel" Command="{Binding CloseCommand}" />
+                                </Grid>
+                            </StackPanel>
+                        </ScrollViewer>
                     </Panel>
                 </DockPanel>
             </Border>
