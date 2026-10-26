@@ -415,6 +415,25 @@ public class VsCodeWindowsTests
         Assert.Equal(3, VsCodeWindows.Find(windows, "y"));
         Assert.Equal(0, VsCodeWindows.Find(windows, "z"));
     }
+
+    [Fact]
+    public void Windows_of_one_workspace_are_told_apart_by_the_tab_in_front()
+    {
+        // An editor moved into a new window: both titles carry the workspace name.
+        (nint, string)[] windows =
+        [
+            (1, "Manager - Game (Workspace) - Visual Studio Code"),
+            (2, "● Bản soát UX Studio deskt… - Game (Workspace) - Visual Studio Code"),
+            (3, "Bản soát UX Studio deskt… - Other - Visual Studio Code"),
+        ];
+        Assert.Equal(2, VsCodeWindows.Find(windows, "Game", "Bản soát UX Studio deskt…"));
+        Assert.Equal(1, VsCodeWindows.Find(windows, "Game", "Manager"));
+        Assert.Equal(0, VsCodeWindows.Find(windows, "Game"));
+        Assert.Equal(0, VsCodeWindows.Find(windows, "Game", "Man"));
+        Assert.Equal(0, VsCodeWindows.Find([(1, "x - Game - Visual Studio Code"), (2, "x - Game - Visual Studio Code")], "Game", "x"));
+        // One window needs no tab name, even when the name is stale.
+        Assert.Equal(3, VsCodeWindows.Find(windows, "Other", "Manager"));
+    }
 }
 
 public class TranscriptReaderTests
@@ -522,8 +541,10 @@ public class WorkspaceBridgeTests
         Assert.Equal("alpha", window.Info.Name);
         Assert.Equal(@"c:\work\alpha", Assert.Single(window.Info.Folders));
 
-        await window.RequestAsync("open", "s1");
+        Assert.Null(await window.RequestAsync("open", "s1"));
         Assert.Equal(("open", "s1"), Assert.Single(client.Requests));
+        client.Editor = "Fix the build";
+        Assert.Equal("Fix the build", await window.RequestAsync("open", "s1"));
 
         client.FailNext = "Claude Code is not installed";
         var ex = await Assert.ThrowsAsync<BridgeException>(() => window.RequestAsync("focus"));
@@ -593,6 +614,9 @@ internal sealed class FakeBridge(string pipe) : IAsyncDisposable
 
     public string? FailNext { get; set; }
 
+    /// <summary>The tab in front, sent with every reply as Bridge 1.2 does; null plays an older bridge.</summary>
+    public string? Editor { get; set; }
+
     public async Task ConnectAsync(string name, string[] folders, string sendKey = "enter", bool focused = true)
     {
         await _stream.ConnectAsync(5000);
@@ -610,7 +634,7 @@ internal sealed class FakeBridge(string pipe) : IAsyncDisposable
                 lock (Requests) Requests.Add((op, session));
                 var fail = FailNext;
                 FailNext = null;
-                await _writer.WriteLineAsync(JsonSerializer.Serialize(new { type = "reply", id = r.GetProperty("id").GetString(), ok = fail is null, error = fail }));
+                await _writer.WriteLineAsync(JsonSerializer.Serialize(new { type = "reply", id = r.GetProperty("id").GetString(), ok = fail is null, error = fail, editor = Editor }));
             }
         });
     }
@@ -723,6 +747,41 @@ public class PromptSenderTests
     }
 
     [Fact]
+    public async Task Types_into_the_window_of_the_workspace_that_shows_the_claude_tab()
+    {
+        var (host, bridge, window) = await ConnectAsync();
+        await using var _ = host;
+        await using var __ = bridge;
+        bridge.Editor = "Fix build";
+        var keys = new FakeKeyboard(target: 42, title: "Fix build - alpha - Visual Studio Code", previous: 0)
+        {
+            Others = [(43, "Manager - alpha - Visual Studio Code")],
+        };
+        await new PromptSender(keys, NullLogger<PromptSender>.Instance).SendAsync(window, "s1", "Go", null, CancellationToken.None);
+        Assert.Equal(["type:Go", "submit:enter"], keys.Log);
+        Assert.Equal([42], keys.Raised.Distinct());
+    }
+
+    [Fact]
+    public async Task Nothing_is_typed_when_windows_of_one_workspace_cannot_be_told_apart()
+    {
+        // An older bridge does not say which tab is in front.
+        var (host, bridge, window) = await ConnectAsync();
+        await using var _ = host;
+        await using var __ = bridge;
+        var keys = new FakeKeyboard(target: 42, title: "Fix build - alpha - Visual Studio Code", previous: 0)
+        {
+            Others = [(43, "Manager - alpha - Visual Studio Code")],
+        };
+        var sender = new PromptSender(keys, NullLogger<PromptSender>.Instance);
+        var ex = await Assert.ThrowsAsync<PromptSendException>(() => sender.SendAsync(window, "s1", "Go", null, CancellationToken.None));
+        Assert.Contains("Several VS Code windows show “alpha”", ex.Message);
+        await Assert.ThrowsAsync<PromptSendException>(() => sender.CycleModeAsync(window, "s1", 1, CancellationToken.None));
+        Assert.Empty(keys.Log);
+        Assert.Empty(keys.Raised);
+    }
+
+    [Fact]
     public async Task Nothing_is_pressed_in_a_window_whose_bridge_does_not_say_it_has_the_keyboard()
     {
         // Another VS Code window with the same title is in front: Windows says yes, the bridge of "alpha" says no.
@@ -759,13 +818,16 @@ public class PromptSenderTests
         public bool Modifier { get; init; }
         public int StealFocusAfterTypes { get; init; } = int.MaxValue;
         public nint ActivatedAfter { get; private set; }
+        public (nint Handle, string Title)[] Others { get; init; } = [];
+        public List<nint> Raised { get; } = [];
 
-        public IReadOnlyList<(nint Handle, string Title)> TopWindows() => [(target, title), (99, "notes - Notepad")];
+        public IReadOnlyList<(nint Handle, string Title)> TopWindows() => [(target, title), .. Others, (99, "notes - Notepad")];
         public nint Foreground() => _foreground;
 
         public bool ForceActivate(nint hwnd)
         {
             if (RefuseActivate) return false;
+            Raised.Add(hwnd);
             _foreground = hwnd;
             return true;
         }

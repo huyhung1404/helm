@@ -114,12 +114,12 @@ public sealed class PromptSender(IPromptKeyboard keyboard, ILogger<PromptSender>
         try
         {
             step(sessionId is null ? $"Opening a new Claude tab in {window.Info.Name}" : $"Switching to the tab in {window.Info.Name}");
-            if (sessionId is null) await Bridge(window, "new", null, ct).ConfigureAwait(false);
-            else await Bridge(window, "open", sessionId, ct).ConfigureAwait(false);
+            var editor = sessionId is null
+                ? await Bridge(window, "new", null, ct).ConfigureAwait(false)
+                : await Bridge(window, "open", sessionId, ct).ConfigureAwait(false);
             await keyboard.Pause(400, ct).ConfigureAwait(false);
 
-            target = VsCodeWindows.Find(keyboard.TopWindows(), window.Info.Name);
-            if (target == 0) throw new PromptSendException($"The VS Code window “{window.Info.Name}” was not found (or two windows have that name).");
+            target = FindWindow(window, editor, "Nothing was typed.");
 
             // A new tab is the active editor but not yet Claude's "current chat"; an open session (in an editor tab
             // or in the side bar) was just revealed, and Claude's own focus command goes to it.
@@ -178,10 +178,9 @@ public sealed class PromptSender(IPromptKeyboard keyboard, ILogger<PromptSender>
         nint target = 0;
         try
         {
-            await Bridge(window, "open", sessionId, ct).ConfigureAwait(false);
+            var editor = await Bridge(window, "open", sessionId, ct).ConfigureAwait(false);
             await keyboard.Pause(400, ct).ConfigureAwait(false);
-            target = VsCodeWindows.Find(keyboard.TopWindows(), window.Info.Name);
-            if (target == 0) throw new PromptSendException($"The VS Code window “{window.Info.Name}” was not found (or two windows have that name).");
+            target = FindWindow(window, editor, "The mode did not change.");
             if (!keyboard.ForceActivate(target)) throw new PromptSendException("Windows did not let Helm bring VS Code to the front. The mode did not change.");
             await ConfirmFocusAsync(window, "The mode did not change.", ct).ConfigureAwait(false);
             await Bridge(window, "focus", null, ct).ConfigureAwait(false);
@@ -267,11 +266,23 @@ public sealed class PromptSender(IPromptKeyboard keyboard, ILogger<PromptSender>
         }
     }
 
-    private static async Task Bridge(BridgeConnection window, string op, string? session, CancellationToken ct)
+    /// <summary>The top-level window showing <paramref name="editor"/> in <paramref name="window"/>'s workspace.</summary>
+    private nint FindWindow(BridgeConnection window, string? editor, string state)
+    {
+        var windows = keyboard.TopWindows();
+        var target = VsCodeWindows.Find(windows, window.Info.Name, editor);
+        if (target != 0) return target;
+        throw new PromptSendException(windows.Any(w => VsCodeWindows.Matches(w.Title, window.Info.Name))
+            ? $"Several VS Code windows show “{window.Info.Name}” and Helm could not tell which one holds the Claude tab. {state}"
+            : $"The VS Code window “{window.Info.Name}” was not found. {state}");
+    }
+
+    /// <returns>The tab in front after the request (null from an older bridge).</returns>
+    private static async Task<string?> Bridge(BridgeConnection window, string op, string? session, CancellationToken ct)
     {
         try
         {
-            await window.RequestAsync(op, session, null, ct).ConfigureAwait(false);
+            return await window.RequestAsync(op, session, null, ct).ConfigureAwait(false);
         }
         catch (BridgeException ex)
         {

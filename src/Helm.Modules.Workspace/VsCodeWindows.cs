@@ -25,10 +25,16 @@ public static class VsCodeWindows
         return false;
     }
 
-    /// <summary>The one window of <paramref name="name"/>; null when there is none or more than one (ambiguous).</summary>
-    public static nint Find(IEnumerable<(nint Handle, string Title)> windows, string name)
+    /// <summary>
+    /// The one window of <paramref name="name"/>; 0 when there is none, or more than one and they cannot be told apart.
+    /// One workspace can have several windows (an editor moved into a new window carries the workspace name too); then
+    /// the one whose title starts with <paramref name="editor"/>, the tab VS Code just showed, is it.
+    /// </summary>
+    public static nint Find(IEnumerable<(nint Handle, string Title)> windows, string name, string? editor = null)
     {
-        var found = windows.Where(w => Matches(w.Title, name)).Select(w => w.Handle).Distinct().Take(2).ToList();
-        return found.Count == 1 ? found[0] : 0;
+        var found = windows.Where(w => Matches(w.Title, name)).DistinctBy(w => w.Handle).ToList();
+        if (found.Count > 1 && !string.IsNullOrEmpty(editor))
+            found = found.Where(w => w.Title.TrimStart('●', ' ').StartsWith(editor + " - ", StringComparison.Ordinal)).ToList();
+        return found.Count == 1 ? found[0].Handle : 0;
     }
 }

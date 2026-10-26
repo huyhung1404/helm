@@ -46,6 +46,13 @@ function tabList() {
   return allClaudeTabs().map(({ tab, group }) => ({ label: tab.label, active: tab.isActive && group === active }));
 }
 
+// The tab in front of the active group: VS Code puts its name at the start of the title of the window showing it, so
+// Helm can tell this workspace's windows apart (an editor moved into a new window has the workspace name too).
+function activeEditor() {
+  const group = vscode.window.tabGroups.activeTabGroup;
+  return group && group.activeTab ? group.activeTab.label : null;
+}
+
 function state(type) {
   return {
     type,
@@ -65,7 +72,7 @@ function send(message) {
 }
 
 async function handle(request) {
-  const reply = (ok, error) => send({ type: 'reply', id: request.id, ok, error: error || null });
+  const reply = (ok, error) => send({ type: 'reply', id: request.id, ok, error: error || null, editor: activeEditor() });
   try {
     switch (request.op) {
       case 'ping':

@@ -51,7 +51,7 @@ public sealed class BridgeConnection
     private static readonly TimeSpan RequestTimeout = TimeSpan.FromSeconds(10);
     private readonly StreamWriter _writer;
     private readonly SemaphoreSlim _write = new(1, 1);
-    private readonly ConcurrentDictionary<string, TaskCompletionSource<string?>> _pending = new();
+    private readonly ConcurrentDictionary<string, TaskCompletionSource<(string? Error, string? Editor)>> _pending = new();
 
     internal BridgeConnection(Guid id, StreamWriter writer, BridgeWindowInfo info)
     {
@@ -66,11 +66,12 @@ public sealed class BridgeConnection
 
     /// <summary>Asks the window to run one bridge request (open, new, focus, focusEditor, close, ping).</summary>
     /// <param name="label">close: the name of the Claude tab to close.</param>
+    /// <returns>The name of the tab in front of the window's active group once the request ran (Bridge 1.2; null from an older bridge).</returns>
     /// <exception cref="BridgeException">The window refused, closed or did not answer.</exception>
-    public async Task RequestAsync(string op, string? session = null, string? prompt = null, CancellationToken ct = default, string? label = null)
+    public async Task<string?> RequestAsync(string op, string? session = null, string? prompt = null, CancellationToken ct = default, string? label = null)
     {
         var id = Guid.NewGuid().ToString("N");
-        var answer = new TaskCompletionSource<string?>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var answer = new TaskCompletionSource<(string? Error, string? Editor)>(TaskCreationOptions.RunContinuationsAsynchronously);
         _pending[id] = answer;
         try
         {
@@ -91,16 +92,17 @@ public sealed class BridgeConnection
             }
             using var timeout = CancellationTokenSource.CreateLinkedTokenSource(ct);
             timeout.CancelAfter(RequestTimeout);
-            string? error;
+            (string? Error, string? Editor) reply;
             try
             {
-                error = await answer.Task.WaitAsync(timeout.Token).ConfigureAwait(false);
+                reply = await answer.Task.WaitAsync(timeout.Token).ConfigureAwait(false);
             }
             catch (OperationCanceledException) when (!ct.IsCancellationRequested)
             {
                 throw new BridgeException("VS Code did not answer.");
             }
-            if (error is not null) throw new BridgeException(error);
+            if (reply.Error is not null) throw new BridgeException(reply.Error);
+            return reply.Editor;
         }
         finally
         {
@@ -108,9 +110,9 @@ public sealed class BridgeConnection
         }
     }
 
-    internal void Answer(string id, bool ok, string? error)
+    internal void Answer(string id, bool ok, string? error, string? editor)
     {
-        if (_pending.TryGetValue(id, out var answer)) answer.TrySetResult(ok ? null : error ?? "VS Code refused.");
+        if (_pending.TryGetValue(id, out var answer)) answer.TrySetResult((ok ? null : error ?? "VS Code refused.", editor));
     }
 
     internal void Closed()
@@ -270,7 +272,8 @@ public sealed class BridgeHost : IAsyncDisposable
                 var id = root.TryGetProperty("id", out var i) ? i.GetString() : null;
                 var ok = root.TryGetProperty("ok", out var o) && o.ValueKind == JsonValueKind.True;
                 var error = root.TryGetProperty("error", out var e) && e.ValueKind == JsonValueKind.String ? e.GetString() : null;
-                if (id is not null) connection.Answer(id, ok, error);
+                var editor = root.TryGetProperty("editor", out var a) && a.ValueKind == JsonValueKind.String ? a.GetString() : null;
+                if (id is not null) connection.Answer(id, ok, error, editor);
                 return false;
             default:
                 return false;
