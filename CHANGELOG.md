@@ -3,6 +3,14 @@
 All notable changes to Helm. The top section is used as the GitHub release body and as the Velopack release notes.
 Format: [Keep a Changelog](https://keepachangelog.com), versions follow [SemVer](https://semver.org).
 
+## [Unreleased]
+
+### Fixed
+- **Workspace: sending to a workspace that has two VS Code windows.** An editor moved into a new window carries the
+  workspace name too, and the phone said the window "was not found (or two windows have that name)". Helm now types
+  into the window showing the Claude tab, and still types nothing when it cannot tell them apart. Needs Helm Bridge
+  1.2: Helm installs it, then reload each VS Code window once.
+
 ## [0.55.0] - 2026-10-26
 
 ### Added
