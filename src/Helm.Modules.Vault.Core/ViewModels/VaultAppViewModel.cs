@@ -122,7 +122,7 @@ public sealed partial class VaultAppViewModel : ObservableObject
     };
 
     /// <summary>Another device deleted many items; sync of the vault waits for a decision.</summary>
-    public string? HeldWarning => _engine.Hold is { Collection: VaultStore.Collection } hold
+    public string? HeldWarning => _engine.Holds.FirstOrDefault(h => h.Collection == VaultStore.Collection) is { } hold
         ? $"Another device deleted {hold.Records.Count} of your {hold.LiveRecords} vault items without using the trash. Nothing was deleted here yet."
         : null;
 
@@ -239,11 +239,11 @@ public sealed partial class VaultAppViewModel : ObservableObject
     private Task ApplyHeldAsync() => RunAsync(async () =>
     {
         if (!await _platform.ConfirmAsync("Apply the deletions", "Delete these items on this device too? They stay in your backups.", "Delete").ConfigureAwait(true)) return;
-        await _engine.ApproveHeldAsync().ConfigureAwait(true);
+        await _engine.ApproveHeldAsync(VaultStore.Collection).ConfigureAwait(true);
     });
 
     [RelayCommand]
-    private Task KeepHeldAsync() => RunAsync(() => _engine.RejectHeldAsync());
+    private Task KeepHeldAsync() => RunAsync(() => _engine.RejectHeldAsync(VaultStore.Collection));
 
     /// <summary>Shows the Emergency Kit for a recovery key just created (by setup or the settings page).</summary>
     public void ShowKit(string recoveryKey)

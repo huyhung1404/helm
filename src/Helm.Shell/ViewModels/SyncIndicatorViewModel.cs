@@ -19,7 +19,7 @@ public static class SyncStatusText
             SyncState.Unauthorized => "This device's token was revoked or has expired. Turn off sync and connect again.",
             SyncState.QuotaExceeded => "Storage is full — new changes stay on this device. " + status.LastError,
             SyncState.KeyChanged => "The account key was changed on another device. Unlock with your passphrase to continue.",
-            SyncState.Held => "Sync is paused: another device deleted many records. Delete them here too or keep them in General → Sync.",
+            SyncState.Held => "Another device deleted many records: they wait for you in General → Sync. Everything else syncs" + last,
             SyncState.Error => "Sync problem: " + status.LastError,
             _ => "Not set up",
         };

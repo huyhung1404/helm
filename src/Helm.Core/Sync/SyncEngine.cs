@@ -1,5 +1,6 @@
 using System.Collections.Concurrent;
 using System.Security.Cryptography;
+using System.Text.Json;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 
@@ -20,8 +21,8 @@ public enum SyncState
     /// <summary>The account key was rotated on another device: unlock again with the passphrase.</summary>
     KeyChanged,
     /// <summary>
-    /// A pull would delete many records of a guarded collection (see <see cref="SyncChangeGuard"/>). Nothing more is
-    /// pulled until the user decides (<see cref="SyncEngine.Hold"/>); local edits are still pushed.
+    /// Another device deleted many records of a guarded collection (see <see cref="SyncChangeGuard"/>): those deletions
+    /// wait until the user decides (<see cref="SyncEngine.Holds"/>). Everything else goes on syncing both ways.
     /// </summary>
     Held,
     Error,
@@ -41,14 +42,10 @@ public enum SyncRunOutcome
     Failed,
 }
 
-/// <summary>A pull that was not applied because it deletes <see cref="Records"/> of a guarded collection.</summary>
-/// <param name="Records">The records the server has deleted, with the server version of each deletion.</param>
+/// <summary>Deletions of a guarded collection that were set aside instead of applied: they wait for the user.</summary>
+/// <param name="Records">The records the server has deleted, with the server version of each deletion (0: the server
+/// no longer has the record at all).</param>
 public sealed record SyncHold(string Collection, int LiveRecords, IReadOnlyList<(string Id, long Version)> Records);
-
-internal sealed class SyncHeldException(SyncHold hold) : Exception($"Sync would delete {hold.Records.Count} {hold.Collection} records.")
-{
-    public SyncHold Hold { get; } = hold;
-}
 
 public sealed record SyncRunResult(SyncRunOutcome Outcome, int Pushed, int Pulled, int Conflicts);
 
@@ -94,6 +91,8 @@ public sealed class SyncEngine : ISyncService, IDisposable
     private const int MaxPushRounds = 1000;
     // Pages (of PullPageSize) held in memory at most while judging guarded deletions together.
     private const int MaxHeldPages = 20;
+    // Deletions set aside for the user, one meta row per collection (survives a restart).
+    private const string HeldMeta = "held_deletions:";
     private const string BlobGcMeta = "blob_gc_at";
     private static readonly TimeSpan BlobGcInterval = TimeSpan.FromDays(1);
     // Selective sync (device-local): prefixes this device does not sync, and re-enabled ones still to download again.
@@ -121,7 +120,8 @@ public sealed class SyncEngine : ISyncService, IDisposable
     private readonly object _keyGate = new();
     private SyncKeyring? _keyring;
     private volatile bool _disposed;
-    private volatile bool _applyHold;
+    // Held deletions by collection; changed only during a run (or approve/reject, which hold the run lock).
+    private readonly ConcurrentDictionary<string, HeldSet> _holds = new(StringComparer.Ordinal);
     private readonly IBlobSync? _blobs;
     private readonly object _selectionGate = new();
     private string[] _excluded = [];
@@ -154,7 +154,8 @@ public sealed class SyncEngine : ISyncService, IDisposable
         _debounce = debounce ?? TimeSpan.FromSeconds(2);
         foreach (var descriptor in descriptors) Register(descriptor);
         _excluded = ParseList(db.GetMetaValue(ExcludeMeta));
-        _timer = new Timer(_ => _ = RunScheduledAsync(requested: true), null, Timeout.Infinite, Timeout.Infinite);
+        LoadHolds();
+        _timer = new Timer(_ => _ = RunScheduledAsync(), null, Timeout.Infinite, Timeout.Infinite);
         Status = new SyncStatus(transport.IsConfigured ? SyncState.Idle : SyncState.NotConfigured, null, null);
     }
 
@@ -171,8 +172,11 @@ public sealed class SyncEngine : ISyncService, IDisposable
     /// <summary>Raised after a run for every collection whose records changed (remote edits, conflict copies).</summary>
     internal event EventHandler<SyncRecordsChangedEventArgs>? RecordsChanged;
 
-    /// <summary>The deletions waiting for the user while <see cref="Status"/> is <see cref="SyncState.Held"/>; else null.</summary>
-    public SyncHold? Hold { get; private set; }
+    /// <summary>Deletions from other devices waiting for the user, one per guarded collection (empty when none).</summary>
+    public IReadOnlyList<SyncHold> Holds => _holds.Values.OrderBy(h => h.Collection, StringComparer.Ordinal).Select(h => h.ToHold()).ToList();
+
+    /// <summary>The first of <see cref="Holds"/>, or null.</summary>
+    public SyncHold? Hold => Holds.FirstOrDefault();
 
     internal SyncDatabase Database => _db;
 
@@ -283,7 +287,7 @@ public sealed class SyncEngine : ISyncService, IDisposable
             if (!_transport.IsConfigured || PollGate?.Invoke() == false) return;
             // Live: changes are announced, so polling is only a safety net.
             if (IsLive && Environment.TickCount64 - Interlocked.Read(ref _lastRunTicks) < BackgroundPollInterval.TotalMilliseconds) return;
-            _ = RunScheduledAsync(requested: false);
+            _ = RunScheduledAsync();
         }, null, TimeSpan.FromSeconds(3), every);
     }
 
@@ -379,17 +383,21 @@ public sealed class SyncEngine : ISyncService, IDisposable
             await CatchUpAsync(keyring, run, ct).ConfigureAwait(false);
             // Conflicts found while pulling may have kept local edits (rebased or copied): send them now.
             if (run.PendingPush) await PushAsync(keyring, run, ct).ConfigureAwait(false);
-            _applyHold = false;
-            Hold = null;
+            ReleaseHolds(run);
             await CollectBlobGarbageAsync(ct).ConfigureAwait(false);
             CollectLocalTombstones();
+            completed = true;
             if (!blobsFit)
             {
                 SetStatus(new SyncStatus(SyncState.QuotaExceeded, _time.GetUtcNow(), "Some files could not be uploaded: storage is full."));
                 return run.Result(SyncRunOutcome.QuotaExceeded);
             }
+            if (Hold is { } hold)
+            {
+                SetStatus(new SyncStatus(SyncState.Held, _time.GetUtcNow(), $"Another device deleted {hold.Records.Count} {hold.Collection} records; they wait for you."));
+                return run.Result(SyncRunOutcome.Held);
+            }
             SetStatus(new SyncStatus(SyncState.Idle, _time.GetUtcNow(), null));
-            completed = true;
             return run.Result(SyncRunOutcome.Completed);
         }
         catch (OperationCanceledException) when (ct.IsCancellationRequested)
@@ -404,18 +412,6 @@ public sealed class SyncEngine : ISyncService, IDisposable
             try { KeyEpochChanged?.Invoke(this, EventArgs.Empty); }
             catch (Exception handlerEx) { _logger.LogError(handlerEx, "A key-change handler failed"); }
             return run.Result(SyncRunOutcome.KeyChanged);
-        }
-        catch (SyncHeldException ex)
-        {
-            // Every periodic run meets the same hold until the user decides: log it once.
-            if (Hold is not { } previous || previous.Collection != ex.Hold.Collection || previous.Records.Count != ex.Hold.Records.Count)
-            {
-                _logger.LogWarning("Sync held: the server deletes {Count} of {Live} {Collection} records", ex.Hold.Records.Count,
-                    ex.Hold.LiveRecords, ex.Hold.Collection);
-            }
-            Hold = ex.Hold;
-            SetStatus(Status with { State = SyncState.Held, LastError = ex.Message });
-            return run.Result(SyncRunOutcome.Held);
         }
         catch (SyncQuotaException ex)
         {
@@ -447,74 +443,55 @@ public sealed class SyncEngine : ISyncService, IDisposable
             _run.Release();
             RaiseChanges(run);
             // Something another device announced during the run that the run did not fetch (it came after the pull):
-            // go again. Only after a complete run: a held, offline or refused run would otherwise loop.
+            // go again. Only after a complete run (held deletions aside): an offline or refused run would otherwise loop.
             if (completed && Interlocked.Read(ref _liveSeq) > _db.GetCursor(MainCursor)) RequestSyncSoon();
         }
     }
 
-    /// <summary>
-    /// A run asked for by a local edit or by another device's announcement. While a hold waits for the user, the pull
-    /// would stop at the same deletions again (and announcements keep coming, since the cursor cannot move), so only
-    /// this device's edits go out. The periodic sync and Sync now still try the whole run: the hold may be gone, e.g.
-    /// when the records were restored on another device.
-    /// </summary>
-    internal Task<SyncRunResult> SyncRequestedAsync(CancellationToken ct = default) =>
-        Hold is null ? SyncNowAsync(ct) : PushWhileHeldAsync(ct);
-
-    private async Task<SyncRunResult> PushWhileHeldAsync(CancellationToken ct)
+    /// <summary>The user accepts the held deletions of <paramref name="collection"/> (null: every hold): they are applied here.</summary>
+    public async Task<SyncRunResult> ApproveHeldAsync(string? collection = null, CancellationToken ct = default)
     {
-        if (!_transport.IsConfigured) return NotConfigured();
-        var keyring = GetKeyring();
-        if (keyring is null) return NotConfigured();
-
-        await _run.WaitAsync(ct).ConfigureAwait(false);
         var run = new RunState();
-        try
-        {
-            // The status stays Held: nothing turns while only pushing.
-            if (_blobs is not null) await _blobs.UploadPendingAsync(ct).ConfigureAwait(false);
-            await PushAsync(keyring, run, ct).ConfigureAwait(false);
-        }
-        catch (Exception ex) when (ex is not OperationCanceledException || !ct.IsCancellationRequested)
-        {
-            // The next whole run (periodic or Sync now) finds out what is wrong and says so.
-            _logger.LogInformation(ex, "Push while sync is held failed; it is tried again");
-        }
-        finally
-        {
-            // _lastRunTicks is left alone: pushes must not put off the periodic run that checks the hold again.
-            _run.Release();
-            RaiseChanges(run);
-        }
-        return run.Result(SyncRunOutcome.Held);
-    }
-
-    /// <summary>The user accepts the held deletions: the next run applies them.</summary>
-    public Task<SyncRunResult> ApproveHeldAsync(CancellationToken ct = default)
-    {
-        if (Hold is { } hold) ResetRecentDeletions(hold.Collection);
-        _applyHold = true;
-        return SyncNowAsync(ct);
-    }
-
-    /// <summary>
-    /// The user keeps this device's records: each held deletion is overridden by uploading the local record again on
-    /// top of the server's deletion, which restores it on every device.
-    /// </summary>
-    public async Task<SyncRunResult> RejectHeldAsync(CancellationToken ct = default)
-    {
         await _run.WaitAsync(ct).ConfigureAwait(false);
         try
         {
-            if (Hold is { } hold)
+            foreach (var held in Chosen(collection))
             {
                 _db.InTransaction(() =>
                 {
-                    foreach (var (id, version) in hold.Records) _db.KeepLocal(hold.Collection, id, version);
+                    ApplyHeld(held, run);
+                    ForgetHold(held.Collection);
                 });
-                _logger.LogWarning("Kept {Count} {Collection} records that the server had deleted", hold.Records.Count, hold.Collection);
-                ResetRecentDeletions(hold.Collection);
-                Hold = null;
+                ResetRecentDeletions(held.Collection);
+                _logger.LogInformation("Applied {Count} held {Collection} deletions", held.Records.Count, held.Collection);
+            }
+        }
+        finally
+        {
+            _run.Release();
+            RaiseChanges(run);
+        }
+        return await SyncNowAsync(ct).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// The user keeps this device's records of <paramref name="collection"/> (null: every hold): each held deletion is
+    /// overridden by uploading the local record again on top of the server's deletion, which restores it on every device.
+    /// </summary>
+    public async Task<SyncRunResult> RejectHeldAsync(string? collection = null, CancellationToken ct = default)
+    {
+        await _run.WaitAsync(ct).ConfigureAwait(false);
+        try
+        {
+            foreach (var held in Chosen(collection))
+            {
+                _db.InTransaction(() =>
+                {
+                    foreach (var d in held.Records) _db.KeepLocal(held.Collection, d.Id, d.Version);
+                    ForgetHold(held.Collection);
+                });
+                _logger.LogWarning("Kept {Count} {Collection} records that the server had deleted", held.Records.Count, held.Collection);
+                ResetRecentDeletions(held.Collection);
             }
         }
         finally
@@ -523,6 +500,9 @@ public sealed class SyncEngine : ISyncService, IDisposable
         }
         return await SyncNowAsync(ct).ConfigureAwait(false);
     }
+
+    private List<HeldSet> Chosen(string? collection) =>
+        _holds.Values.Where(h => collection is null || h.Collection == collection).ToList();
 
     public void Dispose()
     {
@@ -683,7 +663,7 @@ public sealed class SyncEngine : ISyncService, IDisposable
 
     /// <summary>
     /// After a complete resync: a local row with a server version that the server did not return was deleted and
-    /// cleaned up there. A clean row goes (guarded collections may hold the run, as for any mass deletion); a local
+    /// cleaned up there. A clean row goes (a guarded collection's may be held, as for any mass deletion); a local
     /// edit of it is kept and uploaded again as a new record, since an edit beats a deletion.
     /// </summary>
     private void DropMissing(SyncPullFilter filter, HashSet<(string, string)> seen, RunState run)
@@ -694,6 +674,7 @@ public sealed class SyncEngine : ISyncService, IDisposable
         if (missing.Count == 0) return;
 
         var removed = new List<(string Collection, string Id)>();
+        var guarded = new List<(string Collection, string Id)>();
         foreach (var (collection, id, _, deleted, dirty) in missing)
         {
             if (dirty && !deleted)
@@ -709,16 +690,24 @@ public sealed class SyncEngine : ISyncService, IDisposable
                 {
                     if (!run.GuardedDeletions.TryGetValue(collection, out var deletions)) run.GuardedDeletions[collection] = deletions = [];
                     deletions.Add((id, 0));
+                    guarded.Add((collection, id));
                 }
             }
             removed.Add((collection, id));
         }
-        if (!_applyHold) CheckChangeGuards(run);
+        var held = HeldCollections(run);
+        var aside = guarded.Where(g => held.Contains(g.Collection)).ToHashSet();
+        removed.RemoveAll(aside.Contains);
         _db.InTransaction(() =>
         {
             foreach (var (collection, id) in removed) _db.Remove(collection, id);
+            foreach (var (collection, id) in aside)
+                if (_db.Get(collection, id) is { } local)
+                    SetAside(collection, new HeldDeletion(id, 0, _time.GetUtcNow().ToUnixTimeMilliseconds(), "", local.SchemaVersion));
+            SaveHolds(aside.Select(a => a.Collection));
         });
-        foreach (var (collection, deletions) in run.GuardedDeletions) AddRecentDeletions(collection, deletions.Count);
+        foreach (var (collection, deletions) in run.GuardedDeletions)
+            if (!held.Contains(collection)) AddRecentDeletions(collection, deletions.Count);
         run.GuardedDeletions.Clear();
         foreach (var (collection, id) in removed) run.Changed(collection, id);
         _logger.LogInformation("Resync dropped {Count} records the server no longer has", removed.Count);
@@ -738,40 +727,50 @@ public sealed class SyncEngine : ISyncService, IDisposable
             var page = await _transport.PullAsync(since, PullPageSize, filter, ct).ConfigureAwait(false);
             var next = Math.Max(since, page.NextSeq);
             var last = !page.HasMore || next == since;
-            if (_applyHold)
+            pending.Add((page, next));
+            CollectGuardedDeletions(page.Records.Where(r => filter.Matches(r.Collection) && !IsExcluded(r.Collection)).ToList(), run);
+            // Once a guarded deletion was seen, keep collecting to the end of the pull (or the memory cap).
+            if (run.GuardedDeletions.Count == 0 || last || pending.Count >= MaxHeldPages)
             {
-                Apply(keyring, page, next, run, filter, cursor, seen);
-            }
-            else
-            {
-                pending.Add((page, next));
-                CollectGuardedDeletions(page.Records.Where(r => filter.Matches(r.Collection) && !IsExcluded(r.Collection)).ToList(), run);
-                // Once a guarded deletion was seen, keep collecting to the end of the pull (or the memory cap).
-                if (run.GuardedDeletions.Count == 0 || last || pending.Count >= MaxHeldPages)
-                {
-                    // Throws before anything pending is applied; the cursor stays, so the same pages come back next run.
-                    CheckChangeGuards(run);
-                    foreach (var (held, heldNext) in pending) Apply(keyring, held, heldNext, run, filter, cursor, seen);
-                    foreach (var (collection, deletions) in run.GuardedDeletions) AddRecentDeletions(collection, deletions.Count);
-                    pending.Clear();
-                    run.GuardedDeletions.Clear();
-                }
+                // Deletions over the threshold are set aside for the user; the rest of the pages (every other
+                // collection, and the other changes of this one) is applied and the cursor moves on.
+                var held = HeldCollections(run);
+                foreach (var (pulled, pulledNext) in pending) Apply(keyring, pulled, pulledNext, run, filter, cursor, seen, held);
+                foreach (var (collection, deletions) in run.GuardedDeletions)
+                    if (!held.Contains(collection)) AddRecentDeletions(collection, deletions.Count);
+                pending.Clear();
+                run.GuardedDeletions.Clear();
             }
             if (last) return next;
             since = next;
         }
     }
 
+    /// <param name="held">Collections whose guarded deletions in <see cref="RunState.GuardedDeletions"/> are set aside.</param>
     private void Apply(SyncKeyring keyring, PullPage page, long next, RunState run, SyncPullFilter filter, string? cursor,
-        HashSet<(string, string)>? seen) => _db.InTransaction(() =>
+        HashSet<(string, string)>? seen, IReadOnlySet<string> held) => _db.InTransaction(() =>
     {
+        var touched = new HashSet<string>(StringComparer.Ordinal);
         foreach (var record in page.Records)
         {
             // An older server ignores the filter: leave out what this device does not sync here.
             if (!filter.Matches(record.Collection) || IsExcluded(record.Collection)) continue;
             seen?.Add((record.Collection, record.Id));
+            if (held.Contains(record.Collection) && record.Deleted && run.GuardedDeletions.TryGetValue(record.Collection, out var guarded) &&
+                guarded.Contains((record.Id, record.Version)))
+            {
+                if (TryOpen(keyring, record, out var content))
+                {
+                    SetAside(record.Collection, new HeldDeletion(record.Id, record.Version, content.UpdatedAtMs, content.DeviceId, content.SchemaVersion));
+                    touched.Add(record.Collection);
+                }
+                continue;
+            }
+            // Written again on another device after its deletion was held: the deletion is over.
+            if (!record.Deleted && _holds.TryGetValue(record.Collection, out var set) && set.Remove(record.Id)) touched.Add(record.Collection);
             ApplyPulled(keyring, record, run);
         }
+        SaveHolds(touched);
         if (cursor is not null) _db.SetCursor(cursor, next);
     });
 
@@ -899,18 +898,136 @@ public sealed class SyncEngine : ISyncService, IDisposable
     }
 
     /// <summary>
-    /// Deletions already applied in the last <see cref="GuardWindow"/> count too, so a hostile or buggy source cannot
-    /// empty a collection a few records per run, or by padding one run with thousands of other records.
+    /// The collections whose guarded deletions in this pull are set aside: too many of them, or a hold of that collection
+    /// already waits (new deletions join it, to be judged together). Deletions already applied in the last
+    /// <see cref="GuardWindow"/> count too, so a hostile or buggy source cannot empty a collection a few records per run,
+    /// or by padding one run with thousands of other records.
     /// </summary>
-    private void CheckChangeGuards(RunState run)
+    private HashSet<string> HeldCollections(RunState run)
     {
+        var held = new HashSet<string>(StringComparer.Ordinal);
         foreach (var (collection, deletions) in run.GuardedDeletions)
         {
-            var live = _db.List(collection).Count;
-            var recent = RecentDeletions(collection);
-            if (recent + deletions.Count >= SyncChangeGuard.Threshold(live + recent))
-                throw new SyncHeldException(new SyncHold(collection, live, deletions.ToList()));
+            if (!_holds.ContainsKey(collection) && !TooMany(collection, deletions.Count)) continue;
+            held.Add(collection);
+            _logger.LogWarning("Sync holds {Count} {Collection} deletions from another device for the user; everything else syncs",
+                deletions.Count, collection);
         }
+        return held;
+    }
+
+    private bool TooMany(string collection, int deletions)
+    {
+        var recent = RecentDeletions(collection);
+        return recent + deletions >= SyncChangeGuard.Threshold(_db.List(collection).Count + recent);
+    }
+
+    /// <summary>
+    /// After a run: a hold that would no longer be held (the deletions counted in the last <see cref="GuardWindow"/>
+    /// went out of it) is applied, as it would have been had it come now.
+    /// </summary>
+    private void ReleaseHolds(RunState run)
+    {
+        foreach (var held in _holds.Values.ToList())
+        {
+            if (held.Records.Count > 0 && TooMany(held.Collection, held.Records.Count)) continue;
+            _db.InTransaction(() =>
+            {
+                ApplyHeld(held, run);
+                ForgetHold(held.Collection);
+            });
+            AddRecentDeletions(held.Collection, held.Records.Count);
+            if (held.Records.Count > 0)
+                _logger.LogInformation("Applied {Count} held {Collection} deletions: the guard lets them through now", held.Records.Count, held.Collection);
+        }
+    }
+
+    /// <summary>Applies held deletions to the local rows; a local edit made since is kept (an edit beats a deletion).</summary>
+    private void ApplyHeld(HeldSet held, RunState run)
+    {
+        foreach (var d in held.Records)
+        {
+            var local = _db.Get(held.Collection, d.Id);
+            if (local is null || local.Deleted || local.Dirty || d.Version != 0 && local.Version >= d.Version) continue;
+            if (d.Version == 0) _db.Remove(held.Collection, d.Id);
+            else _db.ApplyRemote(held.Collection, d.Id, d.Version, new SealedContent(d.SchemaVersion, d.UpdatedAtMs, d.DeviceId, null), deleted: true);
+            run.Changed(held.Collection, d.Id);
+        }
+    }
+
+    private void SetAside(string collection, HeldDeletion deletion)
+    {
+        var set = _holds.GetOrAdd(collection, c => new HeldSet(c));
+        set.Add(deletion);
+        set.LiveRecords = _db.List(collection).Count;
+    }
+
+    private void ForgetHold(string collection)
+    {
+        _holds.TryRemove(collection, out _);
+        _db.SetMetaValue(HeldMeta + collection, null);
+    }
+
+    private void SaveHolds(IEnumerable<string> collections)
+    {
+        foreach (var collection in collections.Distinct(StringComparer.Ordinal))
+        {
+            if (!_holds.TryGetValue(collection, out var set) || set.Records.Count == 0) ForgetHold(collection);
+            else _db.SetMetaValue(HeldMeta + collection, JsonSerializer.Serialize(new HeldMetaValue(set.LiveRecords, set.Records.ToList())));
+        }
+    }
+
+    private void LoadHolds()
+    {
+        foreach (var collection in _db.ListCollections())
+        {
+            if (_db.GetMetaValue(HeldMeta + collection) is not { } json) continue;
+            try
+            {
+                if (JsonSerializer.Deserialize<HeldMetaValue>(json) is not { } value) continue;
+                var set = new HeldSet(collection) { LiveRecords = value.Live };
+                foreach (var d in value.Records) set.Add(d);
+                if (set.Records.Count > 0) _holds[collection] = set;
+            }
+            catch (JsonException ex)
+            {
+                _logger.LogWarning(ex, "Held {Collection} deletions could not be read", collection);
+            }
+        }
+    }
+
+    private sealed record HeldDeletion(string Id, long Version, long UpdatedAtMs, string DeviceId, int SchemaVersion);
+
+    private sealed record HeldMetaValue(int Live, List<HeldDeletion> Records);
+
+    /// <summary>The deletions of one collection set aside for the user, the newest per record. Read by the UI meanwhile.</summary>
+    private sealed class HeldSet(string collection)
+    {
+        private readonly Dictionary<string, HeldDeletion> _records = new(StringComparer.Ordinal);
+
+        public string Collection { get; } = collection;
+
+        public int LiveRecords { get; set; }
+
+        /// <summary>A copy.</summary>
+        public IReadOnlyList<HeldDeletion> Records
+        {
+            get { lock (_records) return _records.Values.ToList(); }
+        }
+
+        public void Add(HeldDeletion deletion)
+        {
+            lock (_records)
+                if (!_records.TryGetValue(deletion.Id, out var old) || old.Version < deletion.Version) _records[deletion.Id] = deletion;
+        }
+
+        public bool Remove(string id)
+        {
+            lock (_records) return _records.Remove(id);
+        }
+
+        public SyncHold ToHold() =>
+            new(Collection, LiveRecords, Records.OrderBy(r => r.Id, StringComparer.Ordinal).Select(r => (r.Id, r.Version)).ToList());
     }
 
     private static readonly TimeSpan GuardWindow = TimeSpan.FromHours(24);
@@ -1073,14 +1190,13 @@ public sealed class SyncEngine : ISyncService, IDisposable
     }
 
     /// <summary>Timer callbacks run on the thread pool, where an unhandled exception terminates Helm.</summary>
-    /// <param name="requested">Asked for by an edit or an announcement (see <see cref="SyncRequestedAsync"/>), not the poll.</param>
-    private async Task RunScheduledAsync(bool requested)
+    private async Task RunScheduledAsync()
     {
         if (_disposed) return;
         lock (_scheduleGate) _dueTicks = 0;
         try
         {
-            await (requested ? SyncRequestedAsync() : SyncNowAsync()).ConfigureAwait(false);
+            await SyncNowAsync().ConfigureAwait(false);
         }
         catch (Exception ex)
         {

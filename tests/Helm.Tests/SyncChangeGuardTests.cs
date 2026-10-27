@@ -38,7 +38,7 @@ public sealed class SyncChangeGuardTests : IDisposable
     }
 
     [Fact]
-    public async Task Bulk_deletions_are_held_and_nothing_of_the_pull_is_applied()
+    public async Task Bulk_deletions_are_held_and_the_rest_of_the_pull_is_applied()
     {
         var (a, b, ids) = await TwoDevicesWith(20);
         foreach (var id in ids.Take(4)) a.Items.Delete(id);
@@ -54,10 +54,80 @@ public sealed class SyncChangeGuardTests : IDisposable
         Assert.Equal(20, hold.LiveRecords);
         Assert.Equal(ids.Take(4).Order(), hold.Records.Select(r => r.Id).Order());
         Assert.Equal(20, b.Items.All().Count);
-        Assert.Equal("item 10", b.Items.Get(ids[10])!.Title);
+        Assert.Equal("edited", b.Items.Get(ids[10])!.Title);
 
-        // Held again on the next run: the cursor did not move.
+        // Still waiting for the user on the next run, with nothing new to pull.
+        var again = await b.Engine.SyncNowAsync();
+        Assert.Equal(SyncRunOutcome.Held, again.Outcome);
+        Assert.Equal(0, again.Pulled);
+        Assert.Equal(4, b.Engine.Hold!.Records.Count);
+    }
+
+    [Fact]
+    public async Task Other_collections_keep_syncing_while_deletions_are_held()
+    {
+        var (a, b, ids) = await TwoDevicesWith(20);
+        foreach (var id in ids.Take(5)) a.Items.Delete(id);
+        await Sync(a);
         Assert.Equal(SyncRunOutcome.Held, (await b.Engine.SyncNowAsync()).Outcome);
+
+        // A command another device waits for (Workspace) goes through both ways while the hold waits.
+        a.Live.Upsert("command", new Item("from a", false));
+        await Sync(a);
+        Assert.Equal(SyncRunOutcome.Held, (await b.Engine.SyncNowAsync()).Outcome);
+        Assert.Equal("from a", b.Live.Get("command")!.Title);
+        b.Live.Upsert("result", new Item("from b", false));
+        Assert.Equal(SyncRunOutcome.Held, (await b.Engine.SyncNowAsync()).Outcome);
+        await Sync(a);
+        Assert.Equal("from b", a.Live.Get("result")!.Title);
+        Assert.Equal(20, b.Items.All().Count);
+    }
+
+    [Fact]
+    public async Task Later_deletions_join_the_hold()
+    {
+        var (a, b, ids) = await TwoDevicesWith(20);
+        foreach (var id in ids.Take(4)) a.Items.Delete(id);
+        await Sync(a);
+        Assert.Equal(SyncRunOutcome.Held, (await b.Engine.SyncNowAsync()).Outcome);
+        a.Items.Delete(ids[4]);
+        await Sync(a);
+
+        Assert.Equal(SyncRunOutcome.Held, (await b.Engine.SyncNowAsync()).Outcome);
+        Assert.Equal(5, b.Engine.Hold!.Records.Count);
+        Assert.Equal(20, b.Items.All().Count);
+    }
+
+    [Fact]
+    public async Task Held_deletions_survive_a_restart()
+    {
+        var (a, b, ids) = await TwoDevicesWith(20);
+        foreach (var id in ids.Take(6)) a.Items.Delete(id);
+        await Sync(a);
+        Assert.Equal(SyncRunOutcome.Held, (await b.Engine.SyncNowAsync()).Outcome);
+
+        var again = NewDevice("b");
+        Assert.Equal(6, again.Engine.Hold!.Records.Count);
+        Assert.Equal(SyncRunOutcome.Completed, (await again.Engine.ApproveHeldAsync()).Outcome);
+        Assert.Equal(14, again.Items.All().Count);
+    }
+
+    [Fact]
+    public async Task A_hold_the_guard_would_let_through_now_is_applied()
+    {
+        // Twenty live records: three deletions go through, the fourth within a day is held (the count is 4 then).
+        var (a, b, ids) = await TwoDevicesWith(20);
+        foreach (var id in ids.Take(3)) a.Items.Delete(id);
+        await Sync(a, b);
+        a.Items.Delete(ids[3]);
+        await Sync(a);
+        Assert.Equal(SyncRunOutcome.Held, (await b.Engine.SyncNowAsync()).Outcome);
+        Assert.Equal(17, b.Items.All().Count);
+
+        _time.Advance(TimeSpan.FromHours(25));
+        Assert.Equal(SyncRunOutcome.Completed, (await b.Engine.SyncNowAsync()).Outcome);
+        Assert.Equal(16, b.Items.All().Count);
+        Assert.Null(b.Engine.Hold);
     }
 
     [Fact]
@@ -69,26 +139,6 @@ public sealed class SyncChangeGuardTests : IDisposable
         b.Items.Upsert(ids[15], new Item("from b", Trashed: false));
 
         Assert.Equal(SyncRunOutcome.Held, (await b.Engine.SyncNowAsync()).Outcome);
-        await Sync(a);
-        Assert.Equal("from b", a.Items.Get(ids[15])!.Title);
-    }
-
-    [Fact]
-    public async Task While_held_a_requested_run_only_pushes()
-    {
-        var (a, b, ids) = await TwoDevicesWith(20);
-        foreach (var id in ids.Take(5)) a.Items.Delete(id);
-        await Sync(a);
-        Assert.Equal(SyncRunOutcome.Held, (await b.Engine.SyncNowAsync()).Outcome);
-        b.Items.Upsert(ids[15], new Item("from b", Trashed: false));
-        var pulls = _server.PullFilters.Count;
-
-        // A local edit or another device's announcement: the pull would stop at the same deletions again.
-        Assert.Equal(SyncRunOutcome.Held, (await b.Engine.SyncRequestedAsync()).Outcome);
-
-        Assert.Equal(pulls, _server.PullFilters.Count);
-        Assert.Equal(SyncState.Held, b.Engine.Status.State);
-        Assert.NotNull(b.Engine.Hold);
         await Sync(a);
         Assert.Equal("from b", a.Items.Get(ids[15])!.Title);
     }
@@ -184,12 +234,12 @@ public sealed class SyncChangeGuardTests : IDisposable
         Assert.Equal(SyncRunOutcome.Held, (await b.Engine.SyncNowAsync()).Outcome);
         Assert.Equal(10, b.Engine.Hold!.Records.Count);
         Assert.Equal(600, b.Items.All().Count);
-        Assert.Equal("item 20", b.Items.Get(ids[20])!.Title);
+        Assert.Equal("edited", b.Items.Get(ids[20])!.Title);
     }
 
     private sealed record Item(string Title, bool Trashed);
 
-    private sealed record Device(SyncEngine Engine, SyncedCollection<Item> Items);
+    private sealed record Device(SyncEngine Engine, SyncedCollection<Item> Items, SyncedCollection<Item> Live);
 
     private async Task<(Device A, Device B, List<string> Ids)> TwoDevicesWith(int count)
     {
@@ -213,7 +263,8 @@ public sealed class SyncChangeGuardTests : IDisposable
             GuardDeletions = guard,
             IsExpendable = item => item.Trashed,
         }));
-        return new Device(engine, items);
+        var live = Own(new SyncedCollection<Item>(engine, new SyncedCollectionOptions<Item> { Name = "live", ConflictPolicy = SyncConflictPolicy.LastWriterWins }));
+        return new Device(engine, items, live);
     }
 
     private static async Task Sync(params Device[] devices)

@@ -122,7 +122,7 @@ public sealed partial class SyncViewModel : ObservableObject
 
     [ObservableProperty] private bool _isBusy;
 
-    /// <summary>Deletions from another device wait for the user (<see cref="SyncState.Held"/>), for any tool.</summary>
+    /// <summary>Deletions from another device wait for the user (<see cref="SyncState.Held"/>), for any tool; the first of them.</summary>
     [ObservableProperty] private bool _hasHold;
     [ObservableProperty] private string _holdTitle = "";
     [ObservableProperty] private string _holdText = "";
@@ -258,12 +258,18 @@ public sealed partial class SyncViewModel : ObservableObject
             $"The {hold.Records.Count} {ToolName(hold.Collection)} records deleted on another device are deleted on this device too.",
             "Delete").ConfigureAwait(true);
         if (!confirmed) return;
-        await RunAsync(() => _engine.ApproveHeldAsync()).ConfigureAwait(true);
+        await RunAsync(() => _engine.ApproveHeldAsync(hold.Collection)).ConfigureAwait(true);
+        UpdateStatusText();
     }
 
     /// <summary>The held deletions are undone: this device uploads its records again, which restores them everywhere.</summary>
     [RelayCommand]
-    private Task KeepHeldAsync() => RunAsync(() => _engine.RejectHeldAsync());
+    private async Task KeepHeldAsync()
+    {
+        if (_engine.Hold is not { } hold) return;
+        await RunAsync(() => _engine.RejectHeldAsync(hold.Collection)).ConfigureAwait(true);
+        UpdateStatusText();
+    }
 
     [RelayCommand]
     private Task AddDeviceAsync() => RunAsync(async () =>
@@ -432,10 +438,10 @@ public sealed partial class SyncViewModel : ObservableObject
         var hold = _engine.Hold;
         HasHold = hold is not null;
         if (hold is null) return;
-        HoldTitle = $"Sync is paused: {ToolName(hold.Collection)} records were deleted on another device";
+        HoldTitle = $"{ToolName(hold.Collection)} records were deleted on another device";
         HoldText = $"{hold.Records.Count} deletions wait for you ({hold.Collection}, {hold.LiveRecords} records on this device). " +
-            "Helm stops when many records go within a day, in case it was a mistake or a lost device. Until you choose, " +
-            "this device still sends its changes but gets nothing new from your other devices.";
+            "Helm holds them when many records go within a day, in case it was a mistake or a lost device. Everything " +
+            "else keeps syncing both ways meanwhile; until you choose, those records stay here.";
     }
 
     /// <summary>The tool a collection belongs to, as "What syncs on this device" names it.</summary>
