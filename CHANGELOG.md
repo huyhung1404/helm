@@ -11,6 +11,21 @@ Format: [Keep a Changelog](https://keepachangelog.com), versions follow [SemVer]
   asking until it disconnects, also as root (menu items likewise). Destructive commands and menu items marked
   dangerous are still asked each time. Revoke it on the AI & MCP page.
 
+### Fixed
+- **Sync: deletions waiting for you no longer stop everything else.** When another device deletes many records of a
+  guarded tool at once (Wallet, Notes, Scratch, Novel Reader, Vault), only those deletions wait now; everything else
+  keeps syncing both ways. Before, the whole sync stopped for up to a day, and with it the Workspace Controller: the
+  phone's prompts and new sessions never reached the PC. **General → Sync** now shows the waiting deletions of any
+  tool, with **Delete them here too** and **Keep and restore them**, and the sync button opens it.
+- **Workspace: the phone shows exactly the Claude sessions each VS Code window has.** Helm reads the claude
+  process each Claude tab runs, and Claude Code's own record of it, instead of guessing from the tab's name (cut to 25
+  characters, shared by conversations with the same title): a session open in a window is listed under it even when its
+  shell went to another folder, or the window has no folder, and prompts go to the window that runs it.
+- **Workspace: a session no longer stays "working" (or idle) when a hook was lost.** Claude Code's own busy or idle
+  corrects the state when it is newer than what the hooks said.
+- **Workspace (phone): reopening a conversation shows its end.** The chat follows the end while its rows are measured
+  and pictures come in, so the latest answer is no longer hidden below.
+
 ## [0.56.0] - 2026-10-27
 
 ### Added
