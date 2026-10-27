@@ -122,6 +122,26 @@ public sealed class McpConsentPolicyTests
     }
 
     [Fact]
+    public async Task An_elevated_call_the_tool_allows_for_the_session_is_covered_but_high_ones_are_still_asked()
+    {
+        var policy = Policy();
+        var root = Request(McpRisk.Remote, "web", elevated: true, tool: "ssh_exec") with { SessionWhenElevated = true, SessionTitle = "Shell commands on web" };
+        _prompt.Answers.Enqueue(McpConsentAnswer.AllowForSession);
+        Assert.Equal(McpConsentAnswer.AllowForSession, await policy.AskAsync(root, Claude, default));
+        Assert.True(_prompt.Asked[^1].OfferSession);
+        Assert.Equal("Shell commands on web", Assert.Single(policy.Allowances).Title);
+
+        // Another command on the same server: no question.
+        Assert.Equal(McpConsentAnswer.AllowForSession, await policy.AskAsync(root with { Title = "Run “df -h” on web" }, Claude, default));
+        Assert.Single(_prompt.Asked);
+
+        // A destructive one (High) is asked although the session is allowed.
+        _prompt.Answers.Enqueue(McpConsentAnswer.Deny);
+        Assert.Equal(McpConsentAnswer.Deny, await policy.AskAsync(root with { Danger = McpDanger.High }, Claude, default));
+        Assert.False(_prompt.Asked[^1].OfferSession);
+    }
+
+    [Fact]
     public async Task A_scoped_session_allowance_covers_only_that_scope()
     {
         var policy = Policy();

@@ -26,6 +26,9 @@ internal partial class McpConsentDialog : FluentWindow
 
         var warnings = new List<string>();
         if (request.Danger == McpDanger.High) warnings.Add("This one can do real harm if it is wrong: read the details before you allow it.");
+        if (prompt.OfferSession && request is { Risk: McpRisk.Remote, Elevated: true })
+            warnings.Add($"“Allow for this session” lets {client.Name}'s next ones run with full rights without asking until it disconnects " +
+                         "(dangerous ones are still asked).");
         if (prompt.CallerNotElevated)
             warnings.Add($"{client.Name} does not run as Administrator, but Helm does: allowing lets it act with Helm's rights.");
         Warning.Visibility = warnings.Count > 0 ? Visibility.Visible : Visibility.Collapsed;

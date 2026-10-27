@@ -44,8 +44,9 @@ may connect** (Claude Code normally runs without elevation; refusing them would 
 - Helm's own tools never touch the system (no registry, services or files outside Helm's data), so the elevation adds
   nothing to a `Change`: it may be "allowed for this session" (same connection, same tool), or an agent editing five
   notes would mean five dialogs;
-- a command run as root (or as Administrator) on another machine is never "allowed for this session": each one is
-  asked.
+- a command run as root (or as Administrator) on another machine is "allowed for this session" only where the tool
+  says so (`McpConsentRequest.SessionWhenElevated`, the SSH tools): the dialog then warns that the next ones run with
+  full rights without asking until the agent disconnects, and High calls are still asked each time.
 
 ### Prompt injection through tool output
 
@@ -54,8 +55,9 @@ The agent may follow them. Helm does not try to detect this; instead nothing tha
 
 - every `Remote` call is asked, with the exact command line in the dialog (unless the user set the server to run
   without asking: then only the destructive ones are, see *Shell commands*);
-- `McpDanger.High` (a menu item marked `high`, or root on the server) shows the details in a highlighted monospace box
-  and never offers "Allow for this session";
+- `McpDanger.High` (a menu item marked `high`, or a destructive shell command, see *Shell commands*) shows the
+  details in a highlighted monospace box, never offers "Allow for this session" and is asked even when the session
+  is allowed;
 - a session allowance covers one connection, one tool and one target only, so an injected call to another server or
   another tool is still asked;
 - the server marks `Remote` tools `destructiveHint`/`openWorldHint`, so the client may ask too;
@@ -68,11 +70,12 @@ A shell is far more than a menu: one injected command can delete or leak anythin
 - it is a second switch per server, **AI agents may run shell commands**, off by default and shown only once the
   menu switch is on; turning the menu off turns it off too. An agent never connects: the server must be connected in
   Helm by the user;
-- every command is asked with its exact text, highlighted. "Allow for this session" is offered as **Allow this exact
-  command for this session** (`McpConsentRequest.Scope`): the allowance covers that command line on that server only,
-  never the shell as a whole;
-- as root, every command is High: asked each time, never allowed for the session, never run as a status command
-  without asking (only the server's own **Run AI agents' commands without asking**, below, skips the question);
+- every command is asked with its exact text, highlighted. **Allow for this session** covers every further shell
+  command on that server for that connection (listed as "Shell commands on …", revocable), also as root, except the
+  commands `SshShellCommands.AlwaysAsked` names (below): those are High, asked each time with the reason. A menu
+  item's session allowance likewise covers that server's menu, except items marked `high`;
+- as root, a command is never run as a status command without asking (only the session allowance or the server's
+  own **Run AI agents' commands without asking**, below, skips the question);
 - it runs on Helm's own channel with no TTY and nothing on standard input (a password prompt fails or times out), is
   stopped after its timeout (2 min by default, 15 min at most) and its output is capped at 64 KB;
 - **Status commands without asking** (on by default with the shell switch, can be turned off per server): a command
@@ -109,7 +112,7 @@ A question asked too often stops meaning anything. So:
 - every question says in plain words **what will happen**, **why Helm asks** and the exact details, so it can be
   answered in two seconds;
 - "Allow for this session" stops repeats of the same tool on the same target (any change of Helm's data; a command
-  on a server unless it is High danger or runs as root);
+  on a server, also as root, unless it is High danger);
 - questions come one at a time; more than **10 asked calls in a minute** are refused without asking, with a message
   the agent reads ("Helm did not ask the user: …"), so a runaway loop cannot flood the user with dialogs.
 

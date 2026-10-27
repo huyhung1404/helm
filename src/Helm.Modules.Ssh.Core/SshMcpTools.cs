@@ -15,7 +15,8 @@ namespace Helm.Modules.Ssh;
 /// <see cref="SshHost.AllowMcpShell"/>. Helm never connects for AI agents. Items marked <c>agents: false</c> are left
 /// out. Every run is asked first with the exact command line (except status commands that only read, where the user
 /// allows that, and never as root; and except on a server the user set to run AI agents' commands without asking, where
-/// only dangerous menu items and <see cref="SshShellCommands.AlwaysAsked"/> commands are asked), runs on Helm's own channel (never typed into the terminal, no TTY) with a timeout,
+/// only dangerous menu items and <see cref="SshShellCommands.AlwaysAsked"/> commands are asked). "Allow for this
+/// session" covers every shell command (or menu item) on that server, also as root, except those dangerous ones. Runs on Helm's own channel (never typed into the terminal, no TTY) with a timeout,
 /// and its output is capped. What the server prints is data for the agent, never instructions. Windows only (MCP is not
 /// on Android).
 /// </summary>
@@ -279,11 +280,14 @@ public sealed class SshMcpTools : IMcpToolProvider
         var root = await IsRootAsync(channel, ct).ConfigureAwait(false);
         var name = SafeName(host);
         var status = !root && host.AllowMcpStatusWithoutAsking && SshShellCommands.IsStatusCommand(command);
-        var stillAsked = host.AllowMcpWithoutAsking ? SshShellCommands.AlwaysAsked(command) : null;
+        var stillAsked = SshShellCommands.AlwaysAsked(command);
         var why = root
             ? $"It runs as root on {name}: it can change or delete anything on that server."
             : $"A shell command can change or delete anything the server's user may touch on {name}. Read it before you allow it.";
-        if (stillAsked is not null) why += $" Asked although {name} runs AI agents' commands without asking: it {stillAsked}.";
+        if (stillAsked is not null)
+            why += host.AllowMcpWithoutAsking
+                ? $" Asked although {name} runs AI agents' commands without asking: it {stillAsked}."
+                : $" Asked every time, even after “Allow for this session”: it {stillAsked}.";
         var request = new McpConsentRequest(
             "ssh_exec",
             McpRisk.Remote,
@@ -294,10 +298,12 @@ public sealed class SshMcpTools : IMcpToolProvider
             command,
             host.DisplayName,
             root,
-            root || stillAsked is not null ? McpDanger.High : McpDanger.Normal)
+            stillAsked is not null ? McpDanger.High : McpDanger.Normal)
         {
-            // "Allow for this session" covers this exact command, never the shell as a whole.
-            Scope = command,
+            // "Allow for this session" covers every shell command on this server for this connection, also as root,
+            // except the destructive ones: those are High, asked each time.
+            SessionWhenElevated = true,
+            SessionTitle = $"Shell commands on {name}",
             AllowWithoutAsking = status ? "a status command that only reads" : null,
             UserAllowsWithoutAsking = host.AllowMcpWithoutAsking && stillAsked is null ? RunsWithoutAsking(name) : null,
         };
@@ -353,8 +359,11 @@ public sealed class SshMcpTools : IMcpToolProvider
             command,
             host.DisplayName,
             root,
-            item.Danger == MenuDanger.High || root ? McpDanger.High : McpDanger.Normal)
+            item.Danger == MenuDanger.High ? McpDanger.High : McpDanger.Normal)
         {
+            // "Allow for this session" covers the menu's items on this server, also as root, except dangerous ones.
+            SessionWhenElevated = true,
+            SessionTitle = $"Menu items on {name}",
             // An item the server's menu marks dangerous is asked even where everything else runs without asking.
             UserAllowsWithoutAsking = host.AllowMcpWithoutAsking && item.Danger != MenuDanger.High ? RunsWithoutAsking(name) : null,
         };

@@ -3,6 +3,14 @@
 All notable changes to Helm. The top section is used as the GitHub release body and as the Velopack release notes.
 Format: [Keep a Changelog](https://keepachangelog.com), versions follow [SemVer](https://semver.org).
 
+## [Unreleased]
+
+### Changed
+- **SSH: "Allow for this session" covers the whole server.** It allowed only that exact command, and a server whose
+  user is root never offered it. Now one click lets the AI agent's next shell commands on that server run without
+  asking until it disconnects, also as root (menu items likewise). Destructive commands and menu items marked
+  dangerous are still asked each time. Revoke it on the AI & MCP page.
+
 ## [0.56.0] - 2026-10-27
 
 ### Added

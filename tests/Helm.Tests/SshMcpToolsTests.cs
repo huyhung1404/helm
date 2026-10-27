@@ -160,7 +160,7 @@ public sealed class SshMcpToolsTests
     }
 
     [Fact]
-    public async Task Root_is_elevated_and_high_and_checked_once_per_session()
+    public async Task Root_is_elevated_may_be_allowed_for_the_session_and_checked_once_per_session()
     {
         _channel.Output["id -u"] = "0\n";
         var server = Server();
@@ -170,7 +170,9 @@ public sealed class SshMcpToolsTests
         Assert.All(_consent.Asked, r =>
         {
             Assert.True(r.Elevated);
-            Assert.Equal(McpDanger.High, r.Danger);
+            Assert.Equal(McpDanger.Normal, r.Danger);
+            Assert.True(r.SessionWhenElevated);
+            Assert.Equal("Menu items on web", r.SessionTitle);
             Assert.Contains("root", r.WhyAsk);
         });
         Assert.Single(_channel.Commands, c => c == "id -u");
@@ -266,7 +268,7 @@ public sealed class SshMcpToolsTests
     }
 
     [Fact]
-    public async Task A_shell_command_is_asked_with_its_exact_text_and_scoped_to_it()
+    public async Task A_shell_command_is_asked_with_its_exact_text_and_the_session_covers_the_servers_shell()
     {
         AllowShell();
         _channel.Output["cd ~/main && npm run build"] = "built\n";
@@ -277,7 +279,9 @@ public sealed class SshMcpToolsTests
         Assert.Equal("ssh_exec", request.Tool);
         Assert.Equal(McpRisk.Remote, request.Risk);
         Assert.Equal("cd ~/main && npm run build", request.Details);
-        Assert.Equal("cd ~/main && npm run build", request.Scope);
+        Assert.Null(request.Scope);
+        Assert.True(request.SessionWhenElevated);
+        Assert.Equal("Shell commands on web", request.SessionTitle);
         Assert.Null(request.AllowWithoutAsking);
         Assert.Equal("Run “cd ~/main && npm run build” on web", request.Title);
         Assert.Equal(McpDanger.Normal, request.Danger);
@@ -310,15 +314,26 @@ public sealed class SshMcpToolsTests
     }
 
     [Fact]
-    public async Task As_root_every_shell_command_is_high_and_none_skips_the_question()
+    public async Task As_root_a_shell_command_is_elevated_may_be_allowed_for_the_session_and_never_runs_as_status()
     {
         AllowShell();
         _channel.Output["id -u"] = "0\n";
         await Call(Server(), "ssh_exec", new { server = "web", command = "uptime" });
         var request = Assert.Single(_consent.Asked);
         Assert.True(request.Elevated);
-        Assert.Equal(McpDanger.High, request.Danger);
+        Assert.Equal(McpDanger.Normal, request.Danger);
+        Assert.True(request.SessionWhenElevated);
         Assert.Null(request.AllowWithoutAsking);
+    }
+
+    [Fact]
+    public async Task Destructive_commands_are_high_so_a_session_allowance_never_covers_them()
+    {
+        AllowShell();
+        await Call(Server(), "ssh_exec", new { server = "web", command = "rm -rf ~" });
+        var request = Assert.Single(_consent.Asked);
+        Assert.Equal(McpDanger.High, request.Danger);
+        Assert.Contains("Asked every time, even after “Allow for this session”: it deletes a whole folder", request.WhyAsk);
     }
 
     [Fact]
