@@ -3,7 +3,7 @@
 All notable changes to Helm. The top section is used as the GitHub release body and as the Velopack release notes.
 Format: [Keep a Changelog](https://keepachangelog.com), versions follow [SemVer](https://semver.org).
 
-## [Unreleased]
+## [0.57.0] - 2026-10-27
 
 ### Changed
 - **SSH: "Allow for this session" covers the whole server.** It allowed only that exact command, and a server whose
