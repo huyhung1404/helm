@@ -1,0 +1,31 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- Vietnamese text to phonemes for the VieNeu voices: a C# port of sea-g2p 0.10.0 (Apache-2.0,
+       https://github.com/pnnbao97/sea-g2p, see LICENSE.sea-g2p.txt), the Vietnamese normalizer and G2P only. The
+       dictionary (sea_g2p.bin) is not shipped: it is downloaded with the voice. No platform APIs, so Windows and
+       Android share it. -->
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <SupportedOSPlatformVersion></SupportedOSPlatformVersion>
+    <PlatformTarget>AnyCPU</PlatformTarget>
+    <RootNamespace>Helm.Speech.Vietnamese</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="Helm.Tests" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="LICENSE.sea-g2p.txt" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
+  <!-- sea-g2p's compiled-in word lists (top English words, frequent toneless syllables, two-syllable compounds), one
+       entry per line, gzip'd. The dictionary is read through a memory map, which needs unsafe code. -->
+  <PropertyGroup>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+  </PropertyGroup>
+  <ItemGroup>
+    <EmbeddedResource Include="Data\*.txt.gz" LogicalName="Helm.Speech.Vietnamese.Data.%(Filename)%(Extension)" />
+  </ItemGroup>
+
+</Project>
