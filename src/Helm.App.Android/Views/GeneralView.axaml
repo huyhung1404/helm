@@ -224,6 +224,20 @@
                             <Button Content="Sync now" Command="{Binding SyncNowCommand}" Margin="0,4,0,0" />
                         </StackPanel>
                     </Border>
+                    <Border Classes="row" IsVisible="{Binding HasHold}">
+                        <StackPanel Spacing="8">
+                            <Border Classes="infobar warning" Margin="0">
+                                <StackPanel>
+                                    <TextBlock Text="{Binding HoldTitle}" Classes="title" TextWrapping="Wrap" />
+                                    <TextBlock Text="{Binding HoldText}" TextWrapping="Wrap" />
+                                </StackPanel>
+                            </Border>
+                            <WrapPanel>
+                                <Button Content="Delete them here too" Classes="accent" Command="{Binding ApplyHeldCommand}" Margin="0,0,8,8" />
+                                <Button Content="Keep and restore them" Command="{Binding KeepHeldCommand}" Margin="0,0,0,8" />
+                            </WrapPanel>
+                        </StackPanel>
+                    </Border>
                     <Border Classes="row" IsVisible="{Binding NeedsProtectionUpgrade}">
                         <StackPanel Spacing="8">
                             <TextBlock Text="Strengthen passphrase protection" Classes="title" />

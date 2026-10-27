@@ -122,6 +122,11 @@ public sealed partial class SyncViewModel : ObservableObject
 
     [ObservableProperty] private bool _isBusy;
 
+    /// <summary>Deletions from another device wait for the user (<see cref="SyncState.Held"/>), for any tool.</summary>
+    [ObservableProperty] private bool _hasHold;
+    [ObservableProperty] private string _holdTitle = "";
+    [ObservableProperty] private string _holdText = "";
+
     [ObservableProperty, NotifyPropertyChangedFor(nameof(HasError))]
     private string? _errorMessage;
 
@@ -244,6 +249,21 @@ public sealed partial class SyncViewModel : ObservableObject
         await _engine.SyncNowAsync().ConfigureAwait(true);
         await LoadAccountAsync().ConfigureAwait(true);
     });
+
+    [RelayCommand]
+    private async Task ApplyHeldAsync()
+    {
+        if (_engine.Hold is not { } hold) return;
+        var confirmed = await _dialogs.ConfirmAsync("Delete them here too?",
+            $"The {hold.Records.Count} {ToolName(hold.Collection)} records deleted on another device are deleted on this device too.",
+            "Delete").ConfigureAwait(true);
+        if (!confirmed) return;
+        await RunAsync(() => _engine.ApproveHeldAsync()).ConfigureAwait(true);
+    }
+
+    /// <summary>The held deletions are undone: this device uploads its records again, which restores them everywhere.</summary>
+    [RelayCommand]
+    private Task KeepHeldAsync() => RunAsync(() => _engine.RejectHeldAsync());
 
     [RelayCommand]
     private Task AddDeviceAsync() => RunAsync(async () =>
@@ -406,8 +426,21 @@ public sealed partial class SyncViewModel : ObservableObject
             Devices.Add(new SyncDeviceItem(d, d.Id == _thisTokenId));
     }
 
-    private void UpdateStatusText() =>
+    private void UpdateStatusText()
+    {
         StatusText = SyncStatusText.Describe(_engine.Status) + (_engine.IsLive ? " · live: other devices' changes arrive at once" : "");
+        var hold = _engine.Hold;
+        HasHold = hold is not null;
+        if (hold is null) return;
+        HoldTitle = $"Sync is paused: {ToolName(hold.Collection)} records were deleted on another device";
+        HoldText = $"{hold.Records.Count} deletions wait for you ({hold.Collection}, {hold.LiveRecords} records on this device). " +
+            "Helm stops when many records go within a day, in case it was a mistake or a lost device. Until you choose, " +
+            "this device still sends its changes but gets nothing new from your other devices.";
+    }
+
+    /// <summary>The tool a collection belongs to, as "What syncs on this device" names it.</summary>
+    private string ToolName(string collection) =>
+        Groups.FirstOrDefault(g => collection.StartsWith(g.Group.Prefix, StringComparison.Ordinal))?.Name ?? collection;
 
     private async Task RunAsync(Func<Task> work)
     {

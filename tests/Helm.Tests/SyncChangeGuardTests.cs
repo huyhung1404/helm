@@ -74,6 +74,45 @@ public sealed class SyncChangeGuardTests : IDisposable
     }
 
     [Fact]
+    public async Task While_held_a_requested_run_only_pushes()
+    {
+        var (a, b, ids) = await TwoDevicesWith(20);
+        foreach (var id in ids.Take(5)) a.Items.Delete(id);
+        await Sync(a);
+        Assert.Equal(SyncRunOutcome.Held, (await b.Engine.SyncNowAsync()).Outcome);
+        b.Items.Upsert(ids[15], new Item("from b", Trashed: false));
+        var pulls = _server.PullFilters.Count;
+
+        // A local edit or another device's announcement: the pull would stop at the same deletions again.
+        Assert.Equal(SyncRunOutcome.Held, (await b.Engine.SyncRequestedAsync()).Outcome);
+
+        Assert.Equal(pulls, _server.PullFilters.Count);
+        Assert.Equal(SyncState.Held, b.Engine.Status.State);
+        Assert.NotNull(b.Engine.Hold);
+        await Sync(a);
+        Assert.Equal("from b", a.Items.Get(ids[15])!.Title);
+    }
+
+    [Fact]
+    public async Task Deletions_a_few_at_a_time_are_held_once_the_day_adds_up()
+    {
+        // 116 live records: threshold 10. Nine deletions go through, the tenth within the day is held.
+        var (a, b, ids) = await TwoDevicesWith(116);
+        foreach (var id in ids.Take(9)) a.Items.Delete(id);
+        await Sync(a, b);
+        Assert.Equal(107, b.Items.All().Count);
+
+        a.Items.Delete(ids[9]);
+        await Sync(a);
+        Assert.Equal(SyncRunOutcome.Held, (await b.Engine.SyncNowAsync()).Outcome);
+
+        // A day later the earlier deletions no longer count.
+        _time.Advance(TimeSpan.FromHours(25));
+        Assert.Equal(SyncRunOutcome.Completed, (await b.Engine.SyncNowAsync()).Outcome);
+        Assert.Equal(106, b.Items.All().Count);
+    }
+
+    [Fact]
     public async Task Approving_applies_the_held_deletions()
     {
         var (a, b, ids) = await TwoDevicesWith(20);

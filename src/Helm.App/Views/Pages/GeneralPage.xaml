@@ -267,6 +267,15 @@
                             <ui:Button HorizontalAlignment="Right" Content="Sync now" Icon="{ui:SymbolIcon ArrowSync24}" Command="{Binding SyncNowCommand}" />
                         </core:RowLayout>
                     </Border>
+                    <Border Style="{DynamicResource HelmExpanderRow}" Visibility="{Binding HasHold, Converter={StaticResource BoolToVisibility}}">
+                        <StackPanel>
+                            <ui:InfoBar Title="{Binding HoldTitle}" Message="{Binding HoldText}" Severity="Warning" IsClosable="False" IsOpen="True" Margin="0,0,0,8" />
+                            <StackPanel Orientation="Horizontal">
+                                <ui:Button Content="Delete them here too" Appearance="Primary" Icon="{ui:SymbolIcon Delete24}" Command="{Binding ApplyHeldCommand}" Margin="0,0,8,0" />
+                                <ui:Button Content="Keep and restore them" Icon="{ui:SymbolIcon ArrowUndo24}" Command="{Binding KeepHeldCommand}" />
+                            </StackPanel>
+                        </StackPanel>
+                    </Border>
                     <Border Style="{DynamicResource HelmExpanderRow}" Visibility="{Binding NeedsProtectionUpgrade, Converter={StaticResource BoolToVisibility}}">
                         <StackPanel>
                             <TextBlock Text="Strengthen passphrase protection" FontWeight="SemiBold" />

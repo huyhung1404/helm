@@ -154,7 +154,7 @@ public sealed class SyncEngine : ISyncService, IDisposable
         _debounce = debounce ?? TimeSpan.FromSeconds(2);
         foreach (var descriptor in descriptors) Register(descriptor);
         _excluded = ParseList(db.GetMetaValue(ExcludeMeta));
-        _timer = new Timer(_ => _ = RunScheduledAsync(), null, Timeout.Infinite, Timeout.Infinite);
+        _timer = new Timer(_ => _ = RunScheduledAsync(requested: true), null, Timeout.Infinite, Timeout.Infinite);
         Status = new SyncStatus(transport.IsConfigured ? SyncState.Idle : SyncState.NotConfigured, null, null);
     }
 
@@ -283,7 +283,7 @@ public sealed class SyncEngine : ISyncService, IDisposable
             if (!_transport.IsConfigured || PollGate?.Invoke() == false) return;
             // Live: changes are announced, so polling is only a safety net.
             if (IsLive && Environment.TickCount64 - Interlocked.Read(ref _lastRunTicks) < BackgroundPollInterval.TotalMilliseconds) return;
-            _ = RunScheduledAsync();
+            _ = RunScheduledAsync(requested: false);
         }, null, TimeSpan.FromSeconds(3), every);
     }
 
@@ -407,8 +407,12 @@ public sealed class SyncEngine : ISyncService, IDisposable
         }
         catch (SyncHeldException ex)
         {
-            _logger.LogWarning("Sync held: the server deletes {Count} of {Live} {Collection} records", ex.Hold.Records.Count,
-                ex.Hold.LiveRecords, ex.Hold.Collection);
+            // Every periodic run meets the same hold until the user decides: log it once.
+            if (Hold is not { } previous || previous.Collection != ex.Hold.Collection || previous.Records.Count != ex.Hold.Records.Count)
+            {
+                _logger.LogWarning("Sync held: the server deletes {Count} of {Live} {Collection} records", ex.Hold.Records.Count,
+                    ex.Hold.LiveRecords, ex.Hold.Collection);
+            }
             Hold = ex.Hold;
             SetStatus(Status with { State = SyncState.Held, LastError = ex.Message });
             return run.Result(SyncRunOutcome.Held);
@@ -446,6 +450,43 @@ public sealed class SyncEngine : ISyncService, IDisposable
             // go again. Only after a complete run: a held, offline or refused run would otherwise loop.
             if (completed && Interlocked.Read(ref _liveSeq) > _db.GetCursor(MainCursor)) RequestSyncSoon();
         }
+    }
+
+    /// <summary>
+    /// A run asked for by a local edit or by another device's announcement. While a hold waits for the user, the pull
+    /// would stop at the same deletions again (and announcements keep coming, since the cursor cannot move), so only
+    /// this device's edits go out. The periodic sync and Sync now still try the whole run: the hold may be gone, e.g.
+    /// when the records were restored on another device.
+    /// </summary>
+    internal Task<SyncRunResult> SyncRequestedAsync(CancellationToken ct = default) =>
+        Hold is null ? SyncNowAsync(ct) : PushWhileHeldAsync(ct);
+
+    private async Task<SyncRunResult> PushWhileHeldAsync(CancellationToken ct)
+    {
+        if (!_transport.IsConfigured) return NotConfigured();
+        var keyring = GetKeyring();
+        if (keyring is null) return NotConfigured();
+
+        await _run.WaitAsync(ct).ConfigureAwait(false);
+        var run = new RunState();
+        try
+        {
+            // The status stays Held: nothing turns while only pushing.
+            if (_blobs is not null) await _blobs.UploadPendingAsync(ct).ConfigureAwait(false);
+            await PushAsync(keyring, run, ct).ConfigureAwait(false);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException || !ct.IsCancellationRequested)
+        {
+            // The next whole run (periodic or Sync now) finds out what is wrong and says so.
+            _logger.LogInformation(ex, "Push while sync is held failed; it is tried again");
+        }
+        finally
+        {
+            // _lastRunTicks is left alone: pushes must not put off the periodic run that checks the hold again.
+            _run.Release();
+            RaiseChanges(run);
+        }
+        return run.Result(SyncRunOutcome.Held);
     }
 
     /// <summary>The user accepts the held deletions: the next run applies them.</summary>
@@ -1032,13 +1073,14 @@ public sealed class SyncEngine : ISyncService, IDisposable
     }
 
     /// <summary>Timer callbacks run on the thread pool, where an unhandled exception terminates Helm.</summary>
-    private async Task RunScheduledAsync()
+    /// <param name="requested">Asked for by an edit or an announcement (see <see cref="SyncRequestedAsync"/>), not the poll.</param>
+    private async Task RunScheduledAsync(bool requested)
     {
         if (_disposed) return;
         lock (_scheduleGate) _dueTicks = 0;
         try
         {
-            await SyncNowAsync().ConfigureAwait(false);
+            await (requested ? SyncRequestedAsync() : SyncNowAsync()).ConfigureAwait(false);
         }
         catch (Exception ex)
         {

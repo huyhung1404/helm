@@ -37,6 +37,13 @@ public sealed class SyncIndicatorTests
         Assert.Equal(2, sync.Runs); // a revoked token: the settings say what to do
         Assert.Equal(2, opened);
 
+        sync.Set(new SyncStatus(SyncState.Held, null, null));
+        Assert.True(vm.HasProblem);
+        Assert.Contains("General → Sync", vm.ToolTip);
+        await vm.SyncNowCommand.ExecuteAsync(null);
+        Assert.Equal(2, sync.Runs); // held deletions: the settings ask what to do with them
+        Assert.Equal(3, opened);
+
         sync.Set(new SyncStatus(SyncState.Syncing, null, null));
         Assert.True(vm.IsSyncing);
         Assert.False(vm.IsSynced);

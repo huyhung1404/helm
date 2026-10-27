@@ -19,7 +19,7 @@ public static class SyncStatusText
             SyncState.Unauthorized => "This device's token was revoked or has expired. Turn off sync and connect again.",
             SyncState.QuotaExceeded => "Storage is full — new changes stay on this device. " + status.LastError,
             SyncState.KeyChanged => "The account key was changed on another device. Unlock with your passphrase to continue.",
-            SyncState.Held => "Sync is paused: another device deleted many records. Review the change in the tool that owns them.",
+            SyncState.Held => "Sync is paused: another device deleted many records. Delete them here too or keep them in General → Sync.",
             SyncState.Error => "Sync problem: " + status.LastError,
             _ => "Not set up",
         };
@@ -71,6 +71,9 @@ public sealed partial class SyncIndicatorViewModel : ObservableObject
     /// <summary>Anything that needs the user (token, quota, key, held deletions, errors).</summary>
     public bool HasProblem => State is SyncState.Unauthorized or SyncState.QuotaExceeded or SyncState.KeyChanged or SyncState.Held or SyncState.Error;
 
+    /// <summary>Nothing a retry can fix: a click opens the sync settings, which say what to do.</summary>
+    private bool NeedsUser => State is SyncState.NotConfigured or SyncState.Unauthorized or SyncState.KeyChanged or SyncState.Held;
+
     partial void OnStateChanged(SyncState oldValue, SyncState newValue)
     {
         if (oldValue == SyncState.Syncing && newValue == SyncState.Idle)
@@ -103,20 +106,14 @@ public sealed partial class SyncIndicatorViewModel : ObservableObject
         State = status.State;
         ToolTip = status.State == SyncState.NotConfigured
             ? "Sync is not set up: your data stays on this device. Click to set it up."
-            : SyncStatusText.Describe(status) + (status.State == SyncState.Syncing ? "" : " — click to sync now");
+            : SyncStatusText.Describe(status) + (status.State == SyncState.Syncing ? "" : NeedsUser ? " — click to open the sync settings" : " — click to sync now");
     }
 
     [RelayCommand]
     private async Task SyncNowAsync()
     {
-        if (State == SyncState.NotConfigured)
+        if (NeedsUser)
         {
-            OpenSettings?.Invoke();
-            return;
-        }
-        if (HasProblem && State is SyncState.Unauthorized or SyncState.KeyChanged)
-        {
-            // Nothing a retry can fix: the settings say what to do.
             OpenSettings?.Invoke();
             return;
         }
