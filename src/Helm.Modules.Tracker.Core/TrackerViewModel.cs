@@ -5,6 +5,7 @@ using CommunityToolkit.Mvvm.Input;
 using Helm.Core.Links;
 using Helm.Core.Services;
 using Helm.Core.Settings;
+using Helm.Core.Ui;
 using Helm.Modules.Wallet;
 using Helm.Shell.Services;
 using Microsoft.Extensions.Logging;
@@ -62,6 +63,7 @@ public sealed partial class TrackerViewModel : ObservableObject
 
     // Lists, totals, report
     [ObservableProperty] private bool _showCompleted;
+    [ObservableProperty] private int _itemsShownIndex;
     [ObservableProperty] private string _openSummary = "";
     [ObservableProperty] private int _reportRangeIndex;
     [ObservableProperty] private bool _reportAllWorkspaces;
@@ -109,6 +111,10 @@ public sealed partial class TrackerViewModel : ObservableObject
 
         _loading = true;
         var s = _settings.Current;
+        OpenPager = new ListPager(RefreshItems, s.ItemsShown);
+        CompletedPager = new ListPager(RefreshItems, s.ItemsShown);
+        HistoryPager = new ListPager(RefreshHistory, s.ItemsShown);
+        ItemsShownIndex = ListPager.IndexOf(s.ItemsShown);
         ShowCompleted = s.ShowCompleted;
         ReportRangeIndex = (int)s.ReportRange;
         ReportAllWorkspaces = s.ReportAllWorkspaces;
@@ -141,7 +147,27 @@ public sealed partial class TrackerViewModel : ObservableObject
     public void ShowItem(string workspaceId, string itemId)
     {
         ShowWorkspace(workspaceId);
+        if (!_rows.ContainsKey(itemId)) ListItem(itemId);
         if (_rows.TryGetValue(itemId, out var row)) row.IsExpanded = true;
+    }
+
+    /// <summary>A task further down than its list's page shows: the page grows to it.</summary>
+    private void ListItem(string itemId)
+    {
+        if (SelectedWorkspace is not { } ws) return;
+        var items = _store.Items(ws.Id);
+        static int IndexOf(IReadOnlyList<Helm.Core.Sync.SyncedItem<TrackerItem>> list, string id)
+        {
+            for (var i = 0; i < list.Count; i++)
+                if (list[i].Id == id) return i;
+            return -1;
+        }
+        var open = IndexOf(TrackerOrdering.Open(items), itemId);
+        var done = IndexOf(TrackerOrdering.Completed(items).Take(CompletedLimit).ToList(), itemId);
+        if (open >= 0) OpenPager.ShowAtLeast(open + 1);
+        else if (done >= 0) CompletedPager.ShowAtLeast(done + 1);
+        else return;
+        RefreshItems();
     }
 
     /// <summary>Shows a person of Wallet's debt book (a debt due on the calendar).</summary>
@@ -169,6 +195,11 @@ public sealed partial class TrackerViewModel : ObservableObject
 
     public bool HasReportRepeats => ReportRepeats.Count > 0;
     public ObservableCollection<HistoryRow> History { get; } = [];
+
+    // The lists a page at a time (TrackerSettings.ItemsShown).
+    public ListPager OpenPager { get; }
+    public ListPager CompletedPager { get; }
+    public ListPager HistoryPager { get; }
 
     public IReadOnlyList<string> PriorityNames { get; } = Enum.GetValues<TrackerPriority>().Select(TrackerFormat.Priority).ToList();
 
@@ -417,6 +448,16 @@ public sealed partial class TrackerViewModel : ObservableObject
         _settings.Update(s => s.ShowCompleted = value);
     }
 
+    partial void OnItemsShownIndexChanged(int value)
+    {
+        if (_loading || value < 0) return;
+        var size = ListPager.SizeAt(value);
+        _settings.Update(s => s.ItemsShown = size);
+        OpenPager.PageSize = CompletedPager.PageSize = HistoryPager.PageSize = size;
+        RefreshItems();
+        RefreshHistory();
+    }
+
     partial void OnMessageChanged(string? value) => OnPropertyChanged(nameof(HasMessage));
 
     [RelayCommand]
@@ -593,12 +634,14 @@ public sealed partial class TrackerViewModel : ObservableObject
             var today = DateOnly.FromDateTime(TimeZoneInfo.ConvertTime(_store.Now, TimeZoneInfo.Local).DateTime);
             var items = _store.Items(SelectedWorkspace.Id);
             var open = TrackerOrdering.Open(items);
-            var done = TrackerOrdering.Completed(items).Take(CompletedLimit).ToList();
+            // Rows (and their subtasks) only for a page of each list.
+            var shownOpen = OpenPager.Take(open, SelectedWorkspace.Id);
+            var done = CompletedPager.Take(TrackerOrdering.Completed(items).Take(CompletedLimit).ToList(), SelectedWorkspace.Id);
 
             var live = new HashSet<string>(items.Select(i => i.Id), StringComparer.Ordinal);
             foreach (var stale in _rows.Keys.Where(k => !live.Contains(k)).ToList()) _rows.Remove(stale);
 
-            var openRows = open.Select(i => Row(i.Id, i.Value, ws, today)).ToList();
+            var openRows = shownOpen.Select(i => Row(i.Id, i.Value, ws, today)).ToList();
             foreach (var row in openRows)
                 row.SetSubtasks(_store.Subtasks(row.Id).Select(sub => Row(sub.Id, sub.Value, ws, today)).ToList());
             for (var i = 0; i < openRows.Count; i++)
@@ -680,10 +723,12 @@ public sealed partial class TrackerViewModel : ObservableObject
     private void RefreshHistory()
     {
         var names = WorkspaceMap();
-        var rows = _store.History()
+        var events = _store.History()
             .Where(e => e.WorkspaceKind == WorkspaceKind.Tasks)
             .Reverse()
             .Take(HistoryLimit)
+            .ToList();
+        var rows = HistoryPager.Take(events)
             .Select(e => new HistoryRow(
                 TrackerFormat.When(e.At),
                 Describe(e),

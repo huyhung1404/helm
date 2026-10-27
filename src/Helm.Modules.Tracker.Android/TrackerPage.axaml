@@ -66,6 +66,15 @@
                 </StackPanel>
             </DockPanel>
         </Border>
+        <Border Classes="card">
+            <StackPanel Spacing="8">
+                <TextBlock Text="Items shown" Classes="title" />
+                <TextBlock Text="To do, Completed and History list this many at first; Show more adds as many again. Fewer keeps Tracker smooth to scroll."
+                           Classes="secondary" TextWrapping="Wrap" />
+                <ComboBox HorizontalAlignment="Stretch" ItemsSource="{x:Static ui:ListPager.SizeNames}" SelectedIndex="{Binding ItemsShownIndex}"
+                          AutomationProperties.Name="Items shown" />
+            </StackPanel>
+        </Border>
 
         <!-- Reminders -->
         <TextBlock Text="Reminders" Classes="section" />

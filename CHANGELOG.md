@@ -18,9 +18,11 @@ Format: [Keep a Changelog](https://keepachangelog.com), versions follow [SemVer]
   workspace name too, and the phone said the window "was not found (or two windows have that name)". Helm now types
   into the window showing the Claude tab, and still types nothing when it cannot tell them apart. Needs Helm Bridge
   1.2: Helm installs it, then reload each VS Code window once.
-- **Wallet on the phone: smooth to scroll again.** The page drew every transaction of the month at once. It now lists
-  the newest 5, and **Show more** adds as many again; each day still shows what was spent on the whole day. Choose 5,
-  10, 20 or 50 in Wallet's settings (**Transactions list**).
+- **Wallet, Tracker, Notes and Scratch on the phone: smooth to scroll again.** Their pages drew every row at once. They
+  now list 5 at first, and **Show more** adds as many again: Wallet's transactions (each day still shows what was spent
+  on the whole day), Tracker's To do, Completed and History, the notes and the Scratch cards. A task opened from a note
+  is listed even when it is further down. Choose 5, 10, 20 or 50 in each tool's settings. The PC still lists
+  everything.
 
 ## [0.55.0] - 2026-10-26
 

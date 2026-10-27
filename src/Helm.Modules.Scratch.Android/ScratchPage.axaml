@@ -30,6 +30,17 @@
             </DockPanel>
         </Border>
 
+        <!-- Display -->
+        <TextBlock Text="Display" Classes="section" />
+        <Border Classes="card">
+            <StackPanel Spacing="8">
+                <TextBlock Text="Cards shown" Classes="title" />
+                <TextBlock Text="Scratch shows this many cards at first; Show more adds as many again. Fewer keeps it smooth to scroll." Classes="secondary" TextWrapping="Wrap" />
+                <ComboBox HorizontalAlignment="Stretch" ItemsSource="{x:Static ui:ListPager.SizeNames}" SelectedIndex="{Binding ItemsShownIndex}"
+                          AutomationProperties.Name="Cards shown" />
+            </StackPanel>
+        </Border>
+
         <!-- Storage -->
         <TextBlock Text="Storage" Classes="section" />
         <Border Classes="card">

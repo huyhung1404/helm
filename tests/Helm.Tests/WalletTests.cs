@@ -1,5 +1,6 @@
 using System.Globalization;
 using Helm.Core.Settings;
+using Helm.Core.Ui;
 using Helm.Modules.Wallet;
 using Microsoft.Extensions.Logging.Abstractions;
 
@@ -682,14 +683,14 @@ public sealed class WalletTests : IDisposable
         // One page (5 by default), newest first; the day's total still counts all twelve.
         Assert.Equal(["item 0", "item 1", "item 2", "item 3", "item 4"], Titles(vm));
         Assert.Contains(WalletFormat.Money(120_000), vm.Days[0].TotalText);
-        Assert.True(vm.HasMoreTransactions);
-        Assert.Equal("Show more (8 left)", vm.MoreTransactionsText);
+        Assert.True(vm.TransactionPager.HasMore);
+        Assert.Equal("Show more (8 left)", vm.TransactionPager.MoreText);
 
-        vm.ShowMoreTransactionsCommand.Execute(null);
-        vm.ShowMoreTransactionsCommand.Execute(null);
+        vm.TransactionPager.ShowMoreCommand.Execute(null);
+        vm.TransactionPager.ShowMoreCommand.Execute(null);
         Assert.Equal(13, Titles(vm).Count);
         Assert.Equal("yesterday", vm.Days[1].Rows.Single().Title);
-        Assert.False(vm.HasMoreTransactions);
+        Assert.False(vm.TransactionPager.HasMore);
 
         // Saving keeps what is shown; another search starts over at one page.
         _store.AddManual(-5_000, "item new", T0.AddMinutes(1), WalletCategories.Food);
@@ -699,15 +700,15 @@ public sealed class WalletTests : IDisposable
         Assert.Equal(5, Titles(vm).Count);
 
         // The page size is a setting, kept on this device.
-        vm.TransactionPageIndex = WalletViewModel.TransactionPageSizes.ToList().IndexOf(10);
+        vm.TransactionPageIndex = ListPager.IndexOf(10);
         Assert.Equal(10, Titles(vm).Count);
         Assert.Equal(10, _settings.Get<WalletSettings>(WalletIds.ModuleId).Current.TransactionsShown);
         Assert.Equal(10, ViewModel().Days.SelectMany(d => d.Rows).Count());
 
         // Opening the page again starts over too.
-        vm.ShowMoreTransactionsCommand.Execute(null);
+        vm.TransactionPager.ShowMoreCommand.Execute(null);
         Assert.Equal(13, Titles(vm).Count);
-        vm.ShowFirstTransactions();
+        vm.TransactionPager.Reset();
         vm.Refresh();
         Assert.Equal(10, Titles(vm).Count);
     }

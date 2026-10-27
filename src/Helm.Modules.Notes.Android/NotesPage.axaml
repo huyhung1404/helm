@@ -28,6 +28,14 @@
                           AutomationProperties.Name="Sort notes by" />
                 <Border Classes="row">
                     <StackPanel Spacing="8">
+                        <TextBlock Text="Notes shown" Classes="title" />
+                        <TextBlock Text="The list shows this many at first; Show more adds as many again. Fewer keeps Notes smooth to scroll." Classes="secondary" TextWrapping="Wrap" />
+                        <ComboBox HorizontalAlignment="Stretch" ItemsSource="{x:Static ui:ListPager.SizeNames}" SelectedIndex="{Binding ItemsShownIndex}"
+                                  AutomationProperties.Name="Notes shown" />
+                    </StackPanel>
+                </Border>
+                <Border Classes="row">
+                    <StackPanel Spacing="8">
                         <TextBlock Text="Text size" Classes="title" />
                         <TextBlock Text="For the note's text; the title stays larger." Classes="secondary" />
                         <ComboBox HorizontalAlignment="Stretch" ItemsSource="{Binding FontSizes}" SelectedItem="{Binding EditorFontSize}"

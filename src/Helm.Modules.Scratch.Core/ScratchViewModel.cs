@@ -6,6 +6,7 @@ using Helm.Core.Services;
 using Helm.Core.Settings;
 using Helm.Core.Sync;
 using Helm.Core.Text;
+using Helm.Core.Ui;
 using Helm.Shell.Services;
 using Microsoft.Extensions.Logging;
 
@@ -164,6 +165,7 @@ public sealed partial class ScratchViewModel : ObservableObject
     [ObservableProperty] private string? _syncNote;
     [ObservableProperty] private string _storageSummary = "";
     [ObservableProperty] private bool _receiveClipboard;
+    [ObservableProperty] private int _itemsShownIndex;
 
     public ScratchViewModel(
         ScratchStore store,
@@ -199,7 +201,9 @@ public sealed partial class ScratchViewModel : ObservableObject
             new ScratchFilterTab(ScratchFilter.Text, "Text"),
             new ScratchFilterTab(ScratchFilter.Trash, "Trash"),
         ];
+        Pager = new ListPager(RefreshList, _settings.Current.ItemsShown);
         _loading = true;
+        ItemsShownIndex = ListPager.IndexOf(_settings.Current.ItemsShown);
         var wanted = _settings.Current.Filter;
         Filter = Enum.IsDefined(wanted) && wanted != ScratchFilter.Trash ? wanted : ScratchFilter.All;
         _loading = false;
@@ -218,6 +222,9 @@ public sealed partial class ScratchViewModel : ObservableObject
 
     /// <summary>The things shown: the filter, narrowed by the search.</summary>
     public ObservableCollection<ScratchRowViewModel> Rows { get; } = [];
+
+    /// <summary>The cards a page at a time (<see cref="ScratchSettings.ItemsShown"/>).</summary>
+    public ListPager Pager { get; }
 
     public IReadOnlyList<ScratchFilterTab> FilterTabs { get; }
 
@@ -723,6 +730,15 @@ public sealed partial class ScratchViewModel : ObservableObject
         if (!_loading) _settings.Update(s => s.ReceiveClipboard = value);
     }
 
+    partial void OnItemsShownIndexChanged(int value)
+    {
+        if (_loading || value < 0) return;
+        var size = ListPager.SizeAt(value);
+        _settings.Update(s => s.ItemsShown = size);
+        Pager.PageSize = size;
+        RefreshList();
+    }
+
     /// <summary>Cards can be dragged to reorder them, except in the trash and while searching (the order would be unclear).</summary>
     public bool CanReorder => !ShowingTrash && Search.Trim().Length == 0;
 
@@ -909,7 +925,8 @@ public sealed partial class ScratchViewModel : ObservableObject
         var state = _sync?.Status.State ?? SyncState.NotConfigured;
         var terms = TextSearch.Terms(Search);
         var source = _store.Items(Filter);
-        var shown = terms.Count == 0 ? source : source.Where(i => TextSearch.Score(terms, i.Value.DisplayName, i.Value.Text) > 0).ToList();
+        var found = terms.Count == 0 ? source : source.Where(i => TextSearch.Score(terms, i.Value.DisplayName, i.Value.Text) > 0).ToList();
+        var shown = Pager.Take(found, (Filter, Search.Trim()));
 
         var live = new HashSet<string>(StringComparer.Ordinal);
         var wanted = new List<ScratchRowViewModel>(shown.Count);

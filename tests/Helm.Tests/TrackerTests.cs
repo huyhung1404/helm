@@ -2,6 +2,7 @@ using System.Globalization;
 using Helm.Core.Services;
 using Helm.Core.Settings;
 using Helm.Core.Sync;
+using Helm.Core.Ui;
 using Helm.Modules.Tracker;
 using Helm.Modules.Wallet;
 using Helm.Shell.Services;
@@ -491,6 +492,42 @@ public sealed class TrackerTests
         var repeat = Assert.Single(report.Repeats);
         Assert.Equal("Read", repeat.Title);
         Assert.Equal(2, repeat.Count);
+    }
+
+    [Fact]
+    public void The_lists_show_a_page_and_a_task_opened_from_a_link_further_down_is_listed()
+    {
+        var dir = Path.Combine(Path.GetTempPath(), "helm-tests", Guid.NewGuid().ToString("N"));
+        try
+        {
+            using var settings = new SettingsStoreFactory(new HelmPaths(dir));
+            settings.Get<TrackerSettings>(TrackerIds.ModuleId).Update(s => s.ItemsShown = 5); // the phone's default
+            var ws = _store.AddWorkspace("To-do");
+            for (var i = 0; i < 12; i++) _store.AddItem(ws, new TrackerItemDraft($"task {i}"));
+            var vm = new TrackerViewModel(_store, settings, new InlineDispatcher(),
+                new YesDialogs(), new NullClipboard(), new TrackerReminderService(_store, settings, _time), NullLogger<TrackerViewModel>.Instance);
+
+            var order = _store.OpenItems(ws).Select(i => i.Value.Title).ToList();
+            Assert.Equal(order.Take(5), vm.OpenItems.Select(r => r.Title));
+            Assert.Equal("12 open", vm.OpenSummary); // the summary counts them all
+            Assert.Equal("Show more (7 left)", vm.OpenPager.MoreText);
+            Assert.True(vm.OpenItems[^1].CanMoveDown); // the next one is only further down the list
+
+            var far = _store.OpenItems(ws)[8];
+            vm.ShowItem(ws, far.Id);
+            Assert.Equal(10, vm.OpenItems.Count);
+            Assert.True(vm.OpenItems.Single(r => r.Id == far.Id).IsExpanded);
+
+            vm.ItemsShownIndex = ListPager.IndexOf(20);
+            Assert.Equal(12, vm.OpenItems.Count);
+            Assert.False(vm.OpenPager.HasMore);
+            Assert.Equal(20, settings.Get<TrackerSettings>(TrackerIds.ModuleId).Current.ItemsShown);
+        }
+        finally
+        {
+            try { if (Directory.Exists(dir)) Directory.Delete(dir, recursive: true); }
+            catch (IOException) { }
+        }
     }
 
     [Fact]

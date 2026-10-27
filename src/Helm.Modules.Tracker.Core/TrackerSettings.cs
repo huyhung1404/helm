@@ -1,4 +1,5 @@
 using Helm.Core.Settings;
+using Helm.Core.Ui;
 
 namespace Helm.Modules.Tracker;
 
@@ -16,6 +17,12 @@ public sealed class TrackerSettings : IVersionedSettings
     public string? SelectedWorkspaceId { get; set; }
 
     public bool ShowCompleted { get; set; } = true;
+
+    /// <summary>
+    /// Items listed at first in the open and completed lists and the history; "Show more" adds as many again. A page on
+    /// the phone (a long list was slow to scroll), everything on the PC (0).
+    /// </summary>
+    public int ItemsShown { get; set; } = ListPager.DefaultSize;
 
     public ReportRange ReportRange { get; set; } = ReportRange.Last7Days;
 

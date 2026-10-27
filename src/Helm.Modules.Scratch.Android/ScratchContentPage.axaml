@@ -218,6 +218,10 @@
                         </DataTemplate>
                     </ItemsControl.ItemTemplate>
                 </ItemsControl>
+                <!-- A page at a time: the phone draws every card it is given -->
+                <Button HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Margin="0,8,0,0"
+                        Content="{Binding Pager.MoreText}" Command="{Binding Pager.ShowMoreCommand}" IsVisible="{Binding Pager.HasMore}"
+                        AutomationProperties.Name="Show more cards" />
 
                 <TextBlock Text="{Binding EmptyListText}" Classes="secondary" TextWrapping="Wrap" Margin="4,8" IsVisible="{Binding IsListEmpty}" />
                 <TextBlock Text="Tip: in Gallery or any app, tap Share → Helm Scratch to put photos, videos and files here."

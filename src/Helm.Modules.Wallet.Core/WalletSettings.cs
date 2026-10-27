@@ -31,8 +31,9 @@ public sealed class WalletSettings : IVersionedSettings
     public bool AutoCategorize { get; set; } = true;
 
     /// <summary>
-    /// The month's transactions listed at first; "Show more" adds as many again (see
-    /// <see cref="WalletViewModel.TransactionPageSizes"/>). A long list made the phone's page slow to scroll.
+    /// The month's transactions listed at first; "Show more" adds as many again (one of
+    /// <see cref="Helm.Core.Ui.ListPager.Sizes"/>). A long list made the phone's page slow to scroll. Only the phone
+    /// lists them, so it is a page there too.
     /// </summary>
     public int TransactionsShown { get; set; } = 5;
 

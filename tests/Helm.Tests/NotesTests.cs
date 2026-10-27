@@ -1,4 +1,5 @@
 using Helm.Core.Settings;
+using Helm.Core.Ui;
 using Helm.Modules.Notes;
 using Microsoft.Extensions.Logging.Abstractions;
 
@@ -204,6 +205,26 @@ public sealed class NotesTests : IDisposable
         await vm.DeleteForeverRowCommand.ExecuteAsync(Assert.Single(vm.Notes));
         Assert.Null(_store.Get(id));
         Assert.False(vm.IsEditorOpen);
+    }
+
+    [Fact]
+    public void The_list_shows_a_page_and_a_search_starts_over()
+    {
+        _settings.Get<NotesSettings>(NotesIds.ModuleId).Update(s => s.ItemsShown = 5); // the phone's default
+        for (var i = 0; i < 12; i++) _store.Add($"note {i}", i % 2 == 0 ? "even" : "odd");
+        using var vm = NewViewModel();
+        Assert.Equal(5, vm.Notes.Count);
+        Assert.Equal("Show more (7 left)", vm.Pager.MoreText);
+
+        vm.Pager.ShowMoreCommand.Execute(null);
+        Assert.Equal(10, vm.Notes.Count);
+        vm.Search = "even";
+        Assert.Equal(5, vm.Notes.Count);
+        Assert.Equal("Show more (1 left)", vm.Pager.MoreText);
+
+        vm.ItemsShownIndex = ListPager.IndexOf(10);
+        Assert.Equal(6, vm.Notes.Count);
+        Assert.False(vm.Pager.HasMore);
     }
 
     private NotesViewModel NewViewModel(MemoryClipboard? clipboard = null) =>

@@ -7,6 +7,7 @@ using Helm.Core.Services;
 using Helm.Core.Settings;
 using Helm.Core.Sync;
 using Helm.Core.Text;
+using Helm.Core.Ui;
 using Helm.Shell.Services;
 using Microsoft.Extensions.Logging;
 
@@ -89,6 +90,7 @@ public sealed partial class NotesViewModel : ObservableObject, IDisposable
     [ObservableProperty] private string _editorInfo = "";
     [ObservableProperty] private int _trashCount;
     [ObservableProperty] private int _sortOrderIndex;
+    [ObservableProperty] private int _itemsShownIndex;
     [ObservableProperty] private int _editorFontSize;
     [ObservableProperty] private bool _monospace;
 
@@ -118,6 +120,8 @@ public sealed partial class NotesViewModel : ObservableObject, IDisposable
 
         _loading = true;
         var s = _settings.Current;
+        Pager = new ListPager(RefreshList, s.ItemsShown);
+        ItemsShownIndex = ListPager.IndexOf(s.ItemsShown);
         SortOrderIndex = Math.Clamp((int)s.SortOrder, 0, SortOrderNames.Count - 1);
         EditorFontSize = Math.Clamp(s.EditorFontSize, NotesSettings.MinFontSize, NotesSettings.MaxFontSize);
         Monospace = s.Monospace;
@@ -140,6 +144,9 @@ public sealed partial class NotesViewModel : ObservableObject, IDisposable
 
     /// <summary>The notes shown: search results, or the trash.</summary>
     public ObservableCollection<NoteRowViewModel> Notes { get; } = [];
+
+    /// <summary>The notes a page at a time (<see cref="NotesSettings.ItemsShown"/>).</summary>
+    public ListPager Pager { get; }
 
     public IReadOnlyList<string> SortOrderNames { get; } = ["Last edited", "Date created", "Title"];
 
@@ -491,6 +498,15 @@ public sealed partial class NotesViewModel : ObservableObject, IDisposable
         RefreshList();
     }
 
+    partial void OnItemsShownIndexChanged(int value)
+    {
+        if (_loading || value < 0) return;
+        var size = ListPager.SizeAt(value);
+        _settings.Update(s => s.ItemsShown = size);
+        Pager.PageSize = size;
+        RefreshList();
+    }
+
     partial void OnEditorFontSizeChanged(int value)
     {
         if (!_loading && value > 0) _settings.Update(s => s.EditorFontSize = Math.Clamp(value, NotesSettings.MinFontSize, NotesSettings.MaxFontSize));
@@ -571,7 +587,8 @@ public sealed partial class NotesViewModel : ObservableObject, IDisposable
         var now = _store.Now;
         var source = ShowingTrash ? _store.Trash() : _store.Notes((NotesSortOrder)Math.Clamp(SortOrderIndex, 0, SortOrderNames.Count - 1));
         var terms = TextSearch.Terms(Search);
-        var shown = terms.Count == 0 ? source : source.Where(n => TextSearch.Score(terms, n.Value.DisplayTitle, n.Value.Body) > 0).ToList();
+        var found = terms.Count == 0 ? source : source.Where(n => TextSearch.Score(terms, n.Value.DisplayTitle, n.Value.Body) > 0).ToList();
+        var shown = Pager.Take(found, (ShowingTrash, Search.Trim(), SortOrderIndex));
 
         var live = new HashSet<string>(StringComparer.Ordinal);
         var wanted = new List<NoteRowViewModel>(shown.Count);

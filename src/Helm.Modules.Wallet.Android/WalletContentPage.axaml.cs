@@ -68,7 +68,7 @@ public partial class WalletContentPage : UserControl
         ActivityHost.Resumed += OnResumed;
         ApplyEnabled();
         // Transactions saved from notifications while the page was away, and "today" after midnight.
-        _viewModel.ShowFirstTransactions();
+        _viewModel.TransactionPager.Reset();
         _viewModel.Refresh();
         _module.PageShown();
     }

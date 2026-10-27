@@ -433,6 +433,10 @@
                 <StackPanel>
                     <TextBlock Margin="0,12" Text="Nothing to do. Add a task above." Classes="secondary" IsVisible="{Binding HasNoOpen}" />
                     <ItemsControl ItemsSource="{Binding OpenItems}" Margin="0,-1,0,0" />
+                    <!-- A page at a time: the phone draws every row it is given -->
+                    <Button Classes="flat" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Margin="0,0,0,8"
+                            Content="{Binding OpenPager.MoreText}" Command="{Binding OpenPager.ShowMoreCommand}" IsVisible="{Binding OpenPager.HasMore}"
+                            AutomationProperties.Name="Show more to do" />
                 </StackPanel>
             </Border>
 
@@ -443,6 +447,9 @@
                     <TextBlock Margin="0,12" Text="Nothing finished yet. Tick an item and it moves here, with its times recorded."
                                Classes="secondary" IsVisible="{Binding !HasCompleted}" />
                     <ItemsControl ItemsSource="{Binding CompletedItems}" Margin="0,-1,0,0" />
+                    <Button Classes="flat" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Margin="0,0,0,8"
+                            Content="{Binding CompletedPager.MoreText}" Command="{Binding CompletedPager.ShowMoreCommand}" IsVisible="{Binding CompletedPager.HasMore}"
+                            AutomationProperties.Name="Show more completed" />
                 </StackPanel>
             </Border>
             </StackPanel>
@@ -571,6 +578,9 @@
                                 </DataTemplate>
                             </ItemsControl.ItemTemplate>
                         </ItemsControl>
+                        <Button Classes="flat" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center"
+                                Content="{Binding HistoryPager.MoreText}" Command="{Binding HistoryPager.ShowMoreCommand}" IsVisible="{Binding HistoryPager.HasMore}"
+                                AutomationProperties.Name="Show more history" />
                     </StackPanel>
                 </Expander>
             </Border>

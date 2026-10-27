@@ -2,6 +2,7 @@ using System.Security.Cryptography;
 using System.Text;
 using Helm.Core.Capture;
 using Helm.Core.Settings;
+using Helm.Core.Ui;
 using Helm.Core.Sync;
 using Helm.Modules.Notes;
 using Helm.Modules.Scratch;
@@ -378,6 +379,31 @@ public sealed class ScratchTests : IDisposable
     }
 
     // ---- View model ----------------------------------------------------------------------------------------------
+
+    [Fact]
+    public async Task The_wall_shows_a_page_and_another_filter_starts_over()
+    {
+        var device = NewLocal("a");
+        for (var i = 0; i < 12; i++)
+        {
+            await device.Store.AddTextAsync($"text {i}", "PC");
+            _clock.Advance(TimeSpan.FromSeconds(1));
+        }
+        var settings = Own(new SettingsStoreFactory(new HelmPaths(Path.Combine(_dir, "paged"))));
+        settings.Get<ScratchSettings>(ScratchIds.ModuleId).Update(s => s.ItemsShown = 5); // the phone's default
+        var vm = NewViewModel(device.Store, new FakePlatform(Path.Combine(_dir, "open")), out _, settings);
+
+        Assert.Equal(["text 11", "text 10", "text 9", "text 8", "text 7"], vm.Rows.Select(r => r.FullText));
+        Assert.Equal("Show more (7 left)", vm.Pager.MoreText);
+        vm.Pager.ShowMoreCommand.Execute(null);
+        Assert.Equal(10, vm.Rows.Count);
+
+        vm.Filter = ScratchFilter.Text;
+        Assert.Equal(5, vm.Rows.Count);
+        vm.Search = "text 1";
+        Assert.Equal(["text 11", "text 10", "text 1"], vm.Rows.Select(r => r.FullText));
+        Assert.False(vm.Pager.HasMore);
+    }
 
     [Fact]
     public async Task The_page_adds_picked_files_with_thumbnails_and_reports_failures()

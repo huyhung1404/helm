@@ -204,7 +204,7 @@
                 <TextBlock Text="Transactions shown" Classes="title" />
                 <TextBlock Text="The month's newest transactions listed at first; Show more adds as many again. Fewer keeps Wallet smooth to scroll."
                            Classes="secondary" TextWrapping="Wrap" />
-                <ComboBox HorizontalAlignment="Stretch" ItemsSource="{x:Static vm:WalletViewModel.TransactionPageNames}" SelectedIndex="{Binding TransactionPageIndex}"
+                <ComboBox HorizontalAlignment="Stretch" ItemsSource="{x:Static ui:ListPager.SizeNames}" SelectedIndex="{Binding TransactionPageIndex}"
                           AutomationProperties.Name="Transactions shown" />
             </StackPanel>
         </Border>
