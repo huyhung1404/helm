@@ -80,6 +80,13 @@ public sealed record SshHost
     /// </summary>
     public bool AllowMcpStatusWithoutAsking { get; init; } = true;
 
+    /// <summary>
+    /// With <see cref="AllowMcp"/>: AI agents' menu items and shell commands run without asking, also as root, except
+    /// menu items marked dangerous and commands <see cref="SshShellCommands.AlwaysAsked"/> names. Logged and notified like
+    /// every allowed run. Off unless turned on for this server (Helm confirms it once).
+    /// </summary>
+    public bool AllowMcpWithoutAsking { get; init; }
+
     /// <summary>user@host, with :port when it is not 22.</summary>
     [JsonIgnore]
     public string Target => SshAddress.Format(User, Address, Port);

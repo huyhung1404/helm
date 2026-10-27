@@ -168,6 +168,22 @@ public sealed class McpConsentPolicyTests
     }
 
     [Fact]
+    public async Task The_users_own_setting_runs_remote_calls_without_asking_even_as_root_and_notifies()
+    {
+        var policy = Policy();
+        var request = Request(McpRisk.Remote, "web", elevated: true, danger: McpDanger.High) with { UserAllowsWithoutAsking = "web runs AI agents' commands without asking" };
+        Assert.Equal(McpConsentAnswer.AllowOnce, await policy.AskAsync(request, Claude, default));
+        Assert.Empty(_prompt.Asked);
+        policy.Completed(request, Claude, McpConsentAnswer.AllowOnce, ok: true);
+
+        var entry = Assert.Single(_log.Entries);
+        Assert.Equal("Allowed by your setting: web runs AI agents' commands without asking", entry.Answer);
+        Assert.Equal("ok", entry.Result);
+        Assert.Single(_notified);
+        Assert.Empty(policy.Allowances);
+    }
+
+    [Fact]
     public async Task A_session_allowance_covers_one_connection_tool_and_target_until_revoked_or_disconnected()
     {
         var policy = Policy();

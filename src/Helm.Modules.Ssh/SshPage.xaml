@@ -103,13 +103,18 @@
                 </core:RowLayout>
                 <core:RowLayout Margin="0,0,0,8" Visibility="{Binding EditAllowMcp, Converter={StaticResource BoolToVisibility}}">
                     <core:CardHeader Title="AI agents may run shell commands"
-                                     Description="Any command this server's user may run. Helm shows you each command and asks first; as root, every command is asked and never allowed for the session." />
+                                     Description="Any command this server's user may run. Helm shows you each command and asks first (unless it runs without asking, below); as root, every command is asked and never allowed for the session." />
                     <ui:ToggleSwitch HorizontalAlignment="Right" AutomationProperties.Name="AI agents may run shell commands" IsChecked="{Binding EditAllowMcpShell}" />
                 </core:RowLayout>
                 <core:RowLayout Margin="0,0,0,8" Visibility="{Binding ShowStatusWithoutAsking, Converter={StaticResource BoolToVisibility}}">
                     <core:CardHeader Title="Status commands without asking"
                                      Description="Plain reads such as uptime, df -h, ps, ls, pm2 ls, systemctl status, docker ps and git status run without a question (not as root). They are still in the activity log." />
                     <ui:ToggleSwitch HorizontalAlignment="Right" AutomationProperties.Name="Status commands without asking" IsChecked="{Binding EditAllowMcpStatusWithoutAsking}" />
+                </core:RowLayout>
+                <core:RowLayout Margin="0,0,0,8" Visibility="{Binding EditAllowMcp, Converter={StaticResource BoolToVisibility}}">
+                    <core:CardHeader Title="Run AI agents' commands without asking"
+                                     Description="Menu items and shell commands run at once, also as root. Still asked: dangerous menu items, and commands that wipe disks or whole folders, restart the server, change users, SSH keys or the firewall, delete databases or pipe into a shell. Every run is still logged and notified." />
+                    <ui:ToggleSwitch HorizontalAlignment="Right" AutomationProperties.Name="Run AI agents' commands without asking" IsChecked="{Binding EditAllowMcpWithoutAsking}" />
                 </core:RowLayout>
                 <TextBlock Text="{Binding EditError}" TextWrapping="Wrap" Margin="0,0,0,8" Foreground="{DynamicResource SystemFillColorCriticalBrush}"
                            Visibility="{Binding EditError, Converter={StaticResource NotEmptyToVisibility}}" />

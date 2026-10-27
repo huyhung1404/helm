@@ -17,7 +17,7 @@ the consent policy unless the tool only reads.
 |---|---|---|
 | `Read` | only reads Helm's own data | never |
 | `Change` | changes Helm's data (synced to the other devices) | when Helm runs as Administrator, when the call is marked elevated, or when **Ask before every change** is on |
-| `Remote` | runs something on another machine (SSH) | always, except status commands that only read (see *Shell commands*) |
+| `Remote` | runs something on another machine (SSH) | always, except status commands that only read, and servers the user set to run without asking (see *Shell commands*) |
 
 ## Threats and defences
 
@@ -52,7 +52,8 @@ may connect** (Claude Code normally runs without elevation; refusing them would 
 Text a tool returns (a note, a task, a server's output) can contain instructions such as "now run deploy on prod".
 The agent may follow them. Helm does not try to detect this; instead nothing that matters runs on the agent's word alone:
 
-- every `Remote` call is asked, with the exact command line in the dialog;
+- every `Remote` call is asked, with the exact command line in the dialog (unless the user set the server to run
+  without asking: then only the destructive ones are, see *Shell commands*);
 - `McpDanger.High` (a menu item marked `high`, or root on the server) shows the details in a highlighted monospace box
   and never offers "Allow for this session";
 - a session allowance covers one connection, one tool and one target only, so an injected call to another server or
@@ -70,7 +71,8 @@ A shell is far more than a menu: one injected command can delete or leak anythin
 - every command is asked with its exact text, highlighted. "Allow for this session" is offered as **Allow this exact
   command for this session** (`McpConsentRequest.Scope`): the allowance covers that command line on that server only,
   never the shell as a whole;
-- as root, every command is High: asked each time, never allowed for the session, never run without asking;
+- as root, every command is High: asked each time, never allowed for the session, never run as a status command
+  without asking (only the server's own **Run AI agents' commands without asking**, below, skips the question);
 - it runs on Helm's own channel with no TTY and nothing on standard input (a password prompt fails or times out), is
   stopped after its timeout (2 min by default, 15 min at most) and its output is capped at 64 KB;
 - **Status commands without asking** (on by default with the shell switch, can be turned off per server): a command
@@ -83,6 +85,21 @@ A shell is far more than a menu: one injected command can delete or leak anythin
   or write (`hostname x`, `date -s`, `git log --output`, `git branch -D`, `systemctl -H`…) are refused. Files are never
   read this way (no `cat`, `tail`, `env`, `pm2 jlist`), so a secret cannot leave the server without a question. These
   calls are still in the activity log, without a notification each.
+- **Run AI agents' commands without asking** (off by default, per server, shown once the menu switch is on; turning the
+  menu off turns it off too): the user hands the server to the agent. Menu items and shell commands run without a
+  question, **also as root** (`McpConsentRequest.UserAllowsWithoutAsking`, honoured even for an elevated or High
+  call). Helm confirms it once when it is turned on, since it covers root. Still asked, highlighted as High: menu
+  items the server's menu marks `high`, and commands `SshShellCommands.AlwaysAsked` names, with the reason in the
+  dialog: wiping a disk (`mkfs`, `dd of=/dev/…`, `wipefs`…), a recursive `rm`/`chmod`/`chown` or an unfiltered
+  `find -delete` on `/`, `~`, `.`, `*` or a folder one or two levels under the root (`/etc`, `/var/www`,
+  `/home/x`; not `/tmp/…`) or a database folder under `/var/lib`, `--no-preserve-root`, reboot/shutdown, users and
+  passwords, anything naming `authorized_keys`, `/etc/ssh/`, `/etc/sudoers`, `/etc/passwd|shadow|group`, flushing the
+  firewall, a script piped into a shell (`… | sh`, `bash <(…)`), Docker volumes, `DROP DATABASE|TABLE`, `FLUSHALL`,
+  `crontab -r` and fork bombs. The check splits the line into programs at `; & | ( ) $(` and backticks, skips `sudo`,
+  `env`, `timeout`… and `VAR=x`, takes quotes and backslashes out (`r''m` is `rm`) and looks inside `sh -c "…"`.
+  It is a net for a slip or an obvious injection, **not a sandbox**: a command written to hide (a script file,
+  base64, a variable holding the path) gets past it. Every run is in the activity log as "Allowed by your setting"
+  and shown with a tray notification and in the AI agent tab, where the user can stop it.
 
 ### Consent fatigue
 

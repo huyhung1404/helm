@@ -124,8 +124,15 @@ public sealed partial class SshViewModel : ObservableObject, IDisposable
 
     [ObservableProperty] private bool _editAllowMcpStatusWithoutAsking = true;
 
-    /// <summary>The "status commands without asking" switch only means something once shell commands are allowed.</summary>
-    public bool ShowStatusWithoutAsking => EditAllowMcp && EditAllowMcpShell;
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(ShowStatusWithoutAsking))]
+    private bool _editAllowMcpWithoutAsking;
+
+    /// <summary>
+    /// The "status commands without asking" switch only means something once shell commands are allowed, and nothing
+    /// once everything runs without asking.
+    /// </summary>
+    public bool ShowStatusWithoutAsking => EditAllowMcp && EditAllowMcpShell && !EditAllowMcpWithoutAsking;
 
     [ObservableProperty] private VaultSecretRef? _editVaultRef;
     [ObservableProperty] private bool _canOpenVault;
@@ -733,6 +740,7 @@ public sealed partial class SshViewModel : ObservableObject, IDisposable
         EditAllowMcp = false;
         EditAllowMcpShell = false;
         EditAllowMcpStatusWithoutAsking = true;
+        EditAllowMcpWithoutAsking = false;
         EditError = null;
         IsEditing = true;
     }
@@ -750,6 +758,7 @@ public sealed partial class SshViewModel : ObservableObject, IDisposable
         EditAllowMcp = row.Host.AllowMcp;
         EditAllowMcpShell = row.Host.AllowMcpShell;
         EditAllowMcpStatusWithoutAsking = row.Host.AllowMcpStatusWithoutAsking;
+        EditAllowMcpWithoutAsking = row.Host.AllowMcpWithoutAsking;
         EditVaultRef = row.Host is { VaultItemUid: { } uid, VaultField: { } field } ? new VaultSecretRef(uid, row.Host.VaultItemTitle ?? "", field) : null;
         if (row.Host.Auth == SshAuthKind.Vault) RefreshVaultFields();
         EditError = null;
@@ -764,7 +773,7 @@ public sealed partial class SshViewModel : ObservableObject, IDisposable
     }
 
     [RelayCommand]
-    private void SaveEdit()
+    private async Task SaveEditAsync()
     {
         if (!SshAddress.TryParse(EditAddress, out var user, out var address, out var port))
         {
@@ -791,6 +800,17 @@ public sealed partial class SshViewModel : ObservableObject, IDisposable
         }
         var vaultRef = auth == SshAuthKind.Vault ? EditVaultRef : null;
         var existing = EditingId is null ? null : _settings.Current.Hosts.FirstOrDefault(h => h.Id == EditingId);
+        var withoutAsking = EditAllowMcp && EditAllowMcpWithoutAsking;
+        // Turned on here: confirmed once, since it also covers root.
+        if (withoutAsking && existing?.AllowMcpWithoutAsking != true
+            && !await AskAsync("Run AI agents' commands without asking?",
+                    "Menu items and shell commands that AI agents send to this server then run at once, also as root. Still asked: menu " +
+                    "items marked dangerous, and commands that wipe a disk or a whole folder such as / or ~, restart the server, change " +
+                    "its users, SSH keys or firewall, delete Docker volumes or a database, or pipe a script into a shell. Each run is in " +
+                    "the activity log and the AI agent tab, where you can stop it. Turn it on only for a server you would let the agent " +
+                    "use on its own.",
+                    "Run without asking").ConfigureAwait(true))
+            return;
         var host = (existing ?? new SshHost()) with
         {
             Name = EditName.Trim(), User = user, Address = address, Port = port, Auth = auth,
@@ -801,6 +821,7 @@ public sealed partial class SshViewModel : ObservableObject, IDisposable
             // Shell commands only ever go with the menu: turning the menu off turns them off too.
             AllowMcpShell = EditAllowMcp && EditAllowMcpShell,
             AllowMcpStatusWithoutAsking = EditAllowMcpStatusWithoutAsking,
+            AllowMcpWithoutAsking = withoutAsking,
         };
         _passphraseNeeded.Remove(host.Id);
         SaveHost(host);

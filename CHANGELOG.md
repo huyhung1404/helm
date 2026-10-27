@@ -5,6 +5,14 @@ Format: [Keep a Changelog](https://keepachangelog.com), versions follow [SemVer]
 
 ## [Unreleased]
 
+### Added
+- **SSH: run AI agents' commands without asking.** A new switch per server (SSH settings, under the AI agent
+  switches): menu items and shell commands that Claude Code sends then run at once, also as root. Helm confirms it
+  once when you turn it on. Still asked: menu items the server marks dangerous, and commands that wipe a disk or a
+  whole folder such as `/` or `~`, restart the server, change users, SSH keys or the firewall, delete Docker volumes
+  or a database, or pipe a script into a shell. Each run stays in the activity log, the AI agent tab (where you can
+  stop it) and a tray notification.
+
 ### Fixed
 - **Workspace: sending to a workspace that has two VS Code windows.** An editor moved into a new window carries the
   workspace name too, and the phone said the window "was not found (or two windows have that name)". Helm now types

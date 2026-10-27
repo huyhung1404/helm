@@ -57,6 +57,14 @@ public sealed record McpConsentRequest(
     /// is still logged.
     /// </summary>
     public string? AllowWithoutAsking { get; init; }
+
+    /// <summary>
+    /// Why the user's own setting lets this call run without asking (e.g. a server set to run AI agents' commands without
+    /// asking), or null. Honoured for a <see cref="McpRisk.Remote"/> call even when elevated (root on the server) or
+    /// <see cref="McpDanger.High"/>: the tool leaves it out for what must still be asked. Logged and notified like an
+    /// allowed call.
+    /// </summary>
+    public string? UserAllowsWithoutAsking { get; init; }
 }
 
 /// <summary>Who is calling: one MCP connection, named by the client's <c>initialize</c>.</summary>
@@ -118,7 +126,8 @@ public sealed record McpSessionAllowance(Guid ConnectionId, string ClientName, s
 /// <item><see cref="McpRisk.Change"/>: asked when Helm runs as Administrator, the call is elevated, or the user turned on
 /// "Ask before every change"; otherwise it runs (and is logged).</item>
 /// <item><see cref="McpRisk.Remote"/>: always asked, except a call the tool marks <see cref="McpConsentRequest.AllowWithoutAsking"/>
-/// that is neither elevated nor High (logged, without a notification).</item>
+/// that is neither elevated nor High (logged, without a notification), and a call the user's own setting allows
+/// (<see cref="McpConsentRequest.UserAllowsWithoutAsking"/>: logged and notified).</item>
 /// </list>
 /// One question at a time; no answer within <see cref="Timeout"/> is a Deny; more than <see cref="MaxAskedPerMinute"/>
 /// asked calls in a minute are refused without asking. Every call it sees goes to the <see cref="McpActivityLog"/>.
@@ -130,6 +139,7 @@ public sealed class McpConsentPolicy : IMcpConsent, IMcpCallObserver
     private const string AllowedWithoutAsking = "Allowed without asking";
     private const string AllowedForSession = "Allowed for this session";
     private const string AllowedAsStatus = "Allowed without asking: ";
+    private const string AllowedBySetting = "Allowed by your setting: ";
     private readonly IMcpConsentPrompt _prompt;
     private readonly McpActivityLog _log;
     private readonly Func<bool> _askBeforeChanges;
@@ -195,6 +205,8 @@ public sealed class McpConsentPolicy : IMcpConsent, IMcpCallObserver
         var helmElevated = _helmElevated();
         if (request is { Risk: McpRisk.Remote, AllowWithoutAsking: { Length: > 0 } because, Elevated: false, Danger: McpDanger.Normal })
             return Allowed(request, McpConsentAnswer.AllowOnce, AllowedAsStatus + because);
+        if (request is { Risk: McpRisk.Remote, UserAllowsWithoutAsking: { Length: > 0 } setting })
+            return Allowed(request, McpConsentAnswer.AllowOnce, AllowedBySetting + setting);
         var mustAsk = request.Risk == McpRisk.Remote || helmElevated || request.Elevated || _askBeforeChanges();
         if (!mustAsk) return Allowed(request, McpConsentAnswer.AllowOnce, AllowedWithoutAsking);
 

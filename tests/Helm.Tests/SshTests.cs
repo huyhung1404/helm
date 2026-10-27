@@ -418,14 +418,55 @@ public sealed class SshTests : IDisposable
         Assert.False(vm.ShowTerminal);
     }
 
+    [Fact]
+    public async Task Running_without_asking_is_confirmed_once_and_goes_with_the_menu_switch()
+    {
+        var dialogs = new WatchingDialogs { Answer = false };
+        var asked = 0;
+        dialogs.During = () => asked++;
+        var key = new SshDeviceKey(Path.Combine(_dir.Path, "k.bin"), new PlainSecretProtector(), "pc");
+        using var vm = new SshViewModel(_settings, key, new InlineUi(), dialogs, new MemoryClipboard(), NullLogger<SshViewModel>.Instance);
+        vm.NewHostCommand.Execute(null);
+        vm.EditAddress = "root@example.com";
+        vm.EditAllowMcp = true;
+        vm.EditAllowMcpShell = true;
+        Assert.True(vm.ShowStatusWithoutAsking);
+        vm.EditAllowMcpWithoutAsking = true;
+        Assert.False(vm.ShowStatusWithoutAsking);
+
+        // Declined: nothing saved, the editor stays open.
+        await vm.SaveEditCommand.ExecuteAsync(null);
+        Assert.Equal(1, asked);
+        Assert.True(vm.IsEditing);
+        Assert.Empty(vm.Hosts);
+
+        dialogs.Answer = true;
+        await vm.SaveEditCommand.ExecuteAsync(null);
+        Assert.Equal(2, asked);
+        Assert.True(Assert.Single(vm.Hosts).Host.AllowMcpWithoutAsking);
+
+        // Already on: saving again asks nothing; the menu switch off turns it off too.
+        vm.EditHostCommand.Execute(vm.Hosts[0]);
+        Assert.True(vm.EditAllowMcpWithoutAsking);
+        await vm.SaveEditCommand.ExecuteAsync(null);
+        Assert.Equal(2, asked);
+        vm.EditHostCommand.Execute(vm.Hosts[0]);
+        vm.EditAllowMcp = false;
+        await vm.SaveEditCommand.ExecuteAsync(null);
+        Assert.False(vm.Hosts[0].Host.AllowMcpWithoutAsking);
+        Assert.Equal(2, asked);
+    }
+
     private sealed class WatchingDialogs : IDialogService
     {
         public Action? During { get; set; }
 
+        public bool Answer { get; set; } = true;
+
         public Task<bool> ConfirmAsync(string title, string message, string confirmText)
         {
             During?.Invoke();
-            return Task.FromResult(true);
+            return Task.FromResult(Answer);
         }
     }
 
