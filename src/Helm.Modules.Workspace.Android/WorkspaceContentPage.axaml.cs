@@ -167,8 +167,13 @@ public partial class WorkspaceContentPage : UserControl, IFullPage
 
     private void OnChatScrolled(object? sender, ScrollChangedEventArgs e)
     {
-        // Only your own scrolling decides; the content growing under you does not.
-        if (e.ExtentDelta.Y != 0 && e.OffsetDelta.Y == 0) return;
+        // Only your own scrolling decides; the content growing under you does not. Rows are measured (and pictures come
+        // in) after the jump to the end when a conversation opens: at the end, the end is followed as it moves.
+        if ((e.ExtentDelta.Y != 0 || e.ViewportDelta.Y != 0) && e.OffsetDelta.Y == 0)
+        {
+            if (_stickToEnd) Dispatcher.UIThread.Post(ScrollToEnd, DispatcherPriority.Background);
+            return;
+        }
         _stickToEnd = ChatScroller.Offset.Y + ChatScroller.Viewport.Height >= ChatScroller.Extent.Height - 48;
     }
 

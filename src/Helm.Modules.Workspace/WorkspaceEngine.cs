@@ -45,6 +45,7 @@ public sealed class WorkspaceEngine : IAsyncDisposable
     private long _lastRealInput;
     private HookListener? _hooks;
     private BridgeHost? _bridge;
+    private RunningSessions? _running;
     private readonly HeadlessClaude? _headless;
     private readonly WorkspaceImageStore? _images;
 
@@ -95,7 +96,7 @@ public sealed class WorkspaceEngine : IAsyncDisposable
     /// <summary>Starts listening. A taken hook port is replaced by a free one (and Claude's settings follow).</summary>
     public static WorkspaceEngine Start(ISettingsStore<WorkspaceSettings> settings, HelmPaths paths, PromptSender sender,
         ILogger logger, TimeProvider? time = null, string? bridgePipe = null, string? projectsRoot = null, IUserActivity? activity = null,
-        HeadlessClaude? headless = null, WorkspaceImageStore? images = null)
+        HeadlessClaude? headless = null, WorkspaceImageStore? images = null, ClaudeProcesses? processes = null)
     {
         EnsureIdentity(settings);
         var s = settings.Current;
@@ -111,8 +112,12 @@ public sealed class WorkspaceEngine : IAsyncDisposable
         }
         if (engine._hooks.Port != s.HookPort) settings.Update(x => x.HookPort = engine._hooks.Port);
         engine._bridge = new BridgeHost(bridgePipe ?? WorkspaceEndpoint.PipeName(paths), logger);
+        engine._running = new RunningSessions(processes ?? new ClaudeProcesses(),
+            () => (engine._bridge?.Windows ?? []).Select(w => w.Info.Pid).ToList(), engine._time);
+        engine._running.Changed += (_, _) => engine.OnRunningChanged();
         engine._bridge.WindowsChanged += (_, _) =>
         {
+            engine._running?.Refresh();
             engine.RehomeSessions();
             engine.ReviveOpenTabs();
             engine.SeedNewFolders();
@@ -173,8 +178,9 @@ public sealed class WorkspaceEngine : IAsyncDisposable
     }
 
     /// <summary>
-    /// The connected VS Code windows, each with its sessions (a session belongs to the window that has its folder) and
-    /// the ones open as Claude tabs.
+    /// The connected VS Code windows, each with its sessions and the ones open in it. A session a window runs (its claude
+    /// process is that window's) is that window's, open, wherever its folder is; the others belong to the window that
+    /// has their folder, and are open when a Claude tab has their name (a tab VS Code restored is not started yet).
     /// </summary>
     public IReadOnlyList<WorkspaceWindow> Windows()
     {
@@ -183,18 +189,73 @@ public sealed class WorkspaceEngine : IAsyncDisposable
             .OrderBy(w => w.Info.Name, StringComparer.CurrentCultureIgnoreCase)
             .Select(w =>
             {
-                var inWindow = sessions.Where(s => Contains(w, s.Folder)).ToList();
+                var running = _running?.Of(w.Info.Pid) ?? [];
+                var inWindow = InWindow(w, sessions, running);
                 if (w.Info.Tabs is not { } tabs) return new WorkspaceWindow(w, inWindow);
-                var (open, active) = MatchTabs(tabs, inWindow);
-                return new WorkspaceWindow(w, inWindow, open.OfType<string>().ToList(), active);
+                var (open, active) = MatchTabs(tabs, inWindow, running);
+                var list = open.OfType<string>().ToList();
+                list.AddRange(inWindow.Where(s => running.Contains(s.SessionId) && !list.Contains(s.SessionId)).Select(s => s.SessionId));
+                return new WorkspaceWindow(w, inWindow, list, active);
             })
             .ToList();
     }
 
-    private (IReadOnlyList<string?> Sessions, string? Active) MatchTabs(IReadOnlyList<BridgeTab> tabs, IReadOnlyList<AgentSession> sessions) =>
-        ClaudeTabMatch.Match(tabs.Select(t => (t.Label, t.Active)).ToList(),
-            sessions.Select(s => new ClaudeTabMatch.Candidate(s.SessionId, s.Title, s.LastPrompt, s.UpdatedAt)).ToList(),
-            RecentlyOpened());
+    /// <summary>The sessions of a window: those it runs, and those of its folders that no other window runs.</summary>
+    private List<AgentSession> InWindow(BridgeConnection w, IReadOnlyList<AgentSession> sessions, HashSet<string> running) =>
+        sessions.Where(s => running.Contains(s.SessionId) || Contains(w, s.Folder) && _running?.HostOf(s.SessionId) is null).ToList();
+
+    /// <summary>
+    /// The session of each Claude tab, by name: first among the sessions the window runs (exact), then the rest of the
+    /// tabs among its other sessions.
+    /// </summary>
+    private (IReadOnlyList<string?> Sessions, string? Active) MatchTabs(IReadOnlyList<BridgeTab> tabs, IReadOnlyList<AgentSession> sessions,
+        HashSet<string> running)
+    {
+        var opened = RecentlyOpened();
+        var (first, active) = Match(tabs, sessions.Where(s => running.Contains(s.SessionId)));
+        var left = Enumerable.Range(0, tabs.Count).Where(i => first[i] is null).ToList();
+        if (left.Count == 0) return (first, active);
+        var (second, secondActive) = Match(left.Select(i => tabs[i]).ToList(), sessions.Where(s => !running.Contains(s.SessionId)));
+        var result = first.ToList();
+        for (var k = 0; k < left.Count; k++) result[left[k]] = second[k];
+        return (result, active ?? secondActive);
+
+        (IReadOnlyList<string?> Sessions, string? Active) Match(IReadOnlyList<BridgeTab> some, IEnumerable<AgentSession> candidates) =>
+            ClaudeTabMatch.Match(some.Select(t => (t.Label, t.Active)).ToList(),
+                candidates.Select(s => new ClaudeTabMatch.Candidate(s.SessionId, s.Title, s.LastPrompt, s.UpdatedAt)).ToList(), opened);
+    }
+
+    /// <summary>
+    /// The windows' claude processes changed: a session one runs that Helm does not know yet (opened before Helm started,
+    /// or its hooks lost) is listed from Claude's records, and Claude Code's busy or idle corrects a state a lost hook left.
+    /// </summary>
+    private void OnRunningChanged()
+    {
+        try
+        {
+            var windows = _bridge?.Windows ?? [];
+            foreach (var p in _running?.Current ?? [])
+            {
+                var window = windows.FirstOrDefault(w => w.Info.Pid == p.HostPid);
+                if (Registry.Find(p.SessionId) is null)
+                {
+                    var folders = (window?.Info.Folders ?? []).Where(f => p.Cwd.Length == 0 || IsUnder(p.Cwd, f)).Append(p.Cwd).Where(f => f.Length > 0);
+                    foreach (var folder in folders)
+                        if (SeedSession(folder, p.SessionId)) break;
+                }
+                if (Registry.Find(p.SessionId) is not { } session) continue;
+                if (session.State == SessionState.Ended) Registry.Revive(p.SessionId);
+                if (window is not null && window.Info.Folders.Count > 0 && !Contains(window, session.Folder))
+                    Registry.SetFolder(p.SessionId, window.Info.Folders.FirstOrDefault(f => IsUnder(p.Cwd, f)) ?? window.Info.Folders[0]);
+                if (p is { Busy: { } busy, StatusAt: { } at }) Registry.Settle(p.SessionId, busy, at);
+            }
+            Changed?.Invoke(this, EventArgs.Empty);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Workspace: the windows' Claude sessions could not be read");
+        }
+    }
 
     /// <summary>Tabs Helm opened lately (reopened from History, new from the phone), newest first.</summary>
     private readonly ConcurrentDictionary<string, DateTimeOffset> _opened = new(StringComparer.Ordinal);
@@ -221,8 +282,8 @@ public sealed class WorkspaceEngine : IAsyncDisposable
         foreach (var w in windows)
         {
             if (w.Info.Tabs is not { } tabs) continue;
-            var inWindow = sessions.Where(s => Contains(w, s.Folder)).ToList();
-            var (open, _) = MatchTabs(tabs, inWindow);
+            var running = _running?.Of(w.Info.Pid) ?? [];
+            var (open, _) = MatchTabs(tabs, InWindow(w, sessions, running), running);
             for (var i = 0; i < tabs.Count; i++)
                 if (open[i] is null && tabs[i].Label != ClaudeTabMatch.Untitled) missing.AddRange(w.Info.Folders.Select(f => (f, tabs[i].Label)));
         }
@@ -320,7 +381,8 @@ public sealed class WorkspaceEngine : IAsyncDisposable
     public IReadOnlyList<AgentSession> OtherSessions()
     {
         var windows = _bridge?.Windows ?? [];
-        return Registry.Sessions.Where(s => !windows.Any(w => Contains(w, s.Folder)) && !_dismissed.ContainsKey(s.SessionId)).ToList();
+        return Registry.Sessions.Where(s => _running?.HostOf(s.SessionId) is null && !windows.Any(w => Contains(w, s.Folder)) &&
+            !_dismissed.ContainsKey(s.SessionId)).ToList();
     }
 
     /// <summary>Sessions outside VS Code taken off the phone's list (its close button); a new prompt brings one back.</summary>
@@ -461,7 +523,7 @@ public sealed class WorkspaceEngine : IAsyncDisposable
                 return new WorkspaceCommandResult(command.Id, WorkspaceCommandStatus.Failed, "That session is disconnected from Helm on the PC.");
             sessionId = session.SessionId;
             folder = session.Folder;
-            window = WindowFor(folder);
+            window = WindowOf(session);
             // Outside VS Code Helm runs it itself, ended (its terminal closed) or not.
             if (window is null) return await RunOutsideAsync(command, session, ct, step).ConfigureAwait(false);
             if (session.State == SessionState.Ended)
@@ -591,7 +653,7 @@ public sealed class WorkspaceEngine : IAsyncDisposable
             return new WorkspaceCommandResult(command.Id, WorkspaceCommandStatus.Failed, "That Claude session is not open on this PC.");
         if (!IsConnected(session))
             return new WorkspaceCommandResult(command.Id, WorkspaceCommandStatus.Failed, "That session is disconnected from Helm on the PC.", session.SessionId);
-        if (WindowFor(session.Folder) is not { } window) return ChangeOutside(command, session);
+        if (WindowOf(session) is not { } window) return ChangeOutside(command, session);
         try
         {
             switch (command.Kind)
@@ -664,6 +726,12 @@ public sealed class WorkspaceEngine : IAsyncDisposable
         _receipts.TryRemove(commandId, out _);
         Registry.Forget(commandId);
     }
+
+    /// <summary>The window running <paramref name="session"/>, else the one that has its folder.</summary>
+    private BridgeConnection? WindowOf(AgentSession session) =>
+        _running?.HostOf(session.SessionId) is { } host && (_bridge?.Windows ?? []).FirstOrDefault(w => w.Info.Pid == host) is { } running
+            ? running
+            : WindowFor(session.Folder);
 
     private BridgeConnection? WindowFor(string folder)
     {
@@ -898,6 +966,8 @@ public sealed class WorkspaceEngine : IAsyncDisposable
         foreach (var waiting in _receipts.Values) waiting.TrySetCanceled();
         _receipts.Clear();
         if (_hooks is not null) await _hooks.DisposeAsync().ConfigureAwait(false);
+        _running?.Dispose();
+        _running = null;
         if (_bridge is not null) await _bridge.DisposeAsync().ConfigureAwait(false);
         _hooks = null;
         _bridge = null;

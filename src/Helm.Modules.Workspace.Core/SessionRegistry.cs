@@ -205,6 +205,24 @@ public sealed class SessionRegistry(string machineId, TimeProvider? time = null)
     public void Revive(string sessionId) =>
         Change(sessionId, s => s.State != SessionState.Ended ? s : s with { State = s.LastReply is not null ? SessionState.Done : SessionState.Idle, UpdatedAt = _time.GetLocalNow() });
 
+    /// <summary>
+    /// Claude Code's own word on a running session (busy or idle, written at <paramref name="at"/>) corrects the state
+    /// when it is newer than the last hook: a hook lost (Helm restarted mid-turn, its port changed) no longer leaves a
+    /// session working for ever, or idle while it works. Waiting for you is left to the hooks.
+    /// </summary>
+    public void Settle(string sessionId, bool busy, DateTimeOffset at) => Change(sessionId, s =>
+    {
+        if (at <= s.UpdatedAt + SettleMargin) return s;
+        if (busy && s.State is SessionState.Idle or SessionState.Done or SessionState.Ended)
+            return s with { State = SessionState.Working, WorkingSince = at, UpdatedAt = _time.GetLocalNow() };
+        if (!busy && s.State == SessionState.Working)
+            return s with { State = s.LastReply is not null ? SessionState.Done : SessionState.Idle, UpdatedAt = _time.GetLocalNow() };
+        return s;
+    });
+
+    /// <summary>A hook and Claude Code's status file written this close together are the same news.</summary>
+    internal static readonly TimeSpan SettleMargin = TimeSpan.FromSeconds(2);
+
     private void Change(string sessionId, Func<AgentSession, AgentSession> change)
     {
         AgentSession? previous, next;
