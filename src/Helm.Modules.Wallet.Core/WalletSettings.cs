@@ -30,6 +30,12 @@ public sealed class WalletSettings : IVersionedSettings
     /// <summary>A transaction with the same description as earlier ones that all went in one category goes there too.</summary>
     public bool AutoCategorize { get; set; } = true;
 
+    /// <summary>
+    /// The month's transactions listed at first; "Show more" adds as many again (see
+    /// <see cref="WalletViewModel.TransactionPageSizes"/>). A long list made the phone's page slow to scroll.
+    /// </summary>
+    public int TransactionsShown { get; set; } = 5;
+
     /// <summary>Bank notifications Helm could not read (newest first, at most <see cref="WalletCapture.MaxUnread"/>).</summary>
     public List<UnreadNotification> Unread { get; set; } = [];
 

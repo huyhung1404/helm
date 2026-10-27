@@ -39,6 +39,10 @@ public sealed partial class WalletViewModel : ObservableObject
     private IReadOnlyList<string> _similarIds = [];
     private string? _similarCategory;
 
+    /// <summary>The month's transactions listed now (0: one page); one page again for another month, filter or search.</summary>
+    private int _transactionsShown;
+    private (DateOnly Month, int Filter, string Search) _transactionsShownFor;
+
     /// <summary>The debt book is shown instead of the month.</summary>
     [ObservableProperty] private bool _isDebtsView;
 
@@ -74,6 +78,7 @@ public sealed partial class WalletViewModel : ObservableObject
     [ObservableProperty] private int _filterIndex;
     [ObservableProperty] private string _searchText = "";
     [ObservableProperty] private string _emptyText = "";
+    [ObservableProperty] private string _moreTransactionsText = "";
 
     // Adding a transaction by hand
     [ObservableProperty] private bool _isAddOpen;
@@ -98,6 +103,7 @@ public sealed partial class WalletViewModel : ObservableObject
     [ObservableProperty] private bool _askForCategory;
     [ObservableProperty] private bool _autoCategorize;
     [ObservableProperty] private bool _askForMissing;
+    [ObservableProperty] private int _transactionPageIndex;
     [ObservableProperty] private int _widgetChartIndex;
     [ObservableProperty] private int _widgetBackgroundIndex;
     [ObservableProperty] private int _widgetOpacity = 100;
@@ -168,6 +174,13 @@ public sealed partial class WalletViewModel : ObservableObject
     public static IReadOnlyList<string> KindNames { get; } = ["Spending", "Money in", "Between my accounts"];
 
     public static IReadOnlyList<string> TestBankNames { get; } = BankSources.All.Select(b => b.Name).ToList();
+
+    /// <summary>The choices for how many transactions are listed at first, and added by each "Show more".</summary>
+    public static IReadOnlyList<int> TransactionPageSizes { get; } = [5, 10, 20, 50];
+
+    public static IReadOnlyList<string> TransactionPageNames { get; } = TransactionPageSizes.Select(n => n.ToString(CultureInfo.CurrentCulture)).ToList();
+
+    private int TransactionPageSize => TransactionPageSizes[Math.Clamp(TransactionPageIndex, 0, TransactionPageSizes.Count - 1)];
 
     public static IReadOnlyList<string> WidgetChartNames => WalletWidgetModel.ChartNames;
 
@@ -240,6 +253,8 @@ public sealed partial class WalletViewModel : ObservableObject
 
     public bool HasDays => Days.Count > 0;
 
+    public bool HasMoreTransactions => MoreTransactionsText.Length > 0;
+
     public bool HasUnread => Unread.Count > 0;
 
     public bool HasSpentToday => SpentTodayText.Length > 0;
@@ -266,6 +281,8 @@ public sealed partial class WalletViewModel : ObservableObject
     partial void OnSimilarTextChanged(string value) => OnPropertyChanged(nameof(HasSimilar));
 
     partial void OnMoreToCategorizeTextChanged(string value) => OnPropertyChanged(nameof(HasMoreToCategorize));
+
+    partial void OnMoreTransactionsTextChanged(string value) => OnPropertyChanged(nameof(HasMoreTransactions));
 
     partial void OnSpentTodayTextChanged(string value) => OnPropertyChanged(nameof(HasSpentToday));
 
@@ -347,6 +364,16 @@ public sealed partial class WalletViewModel : ObservableObject
     partial void OnFilterIndexChanged(int value) => RefreshDays(Categories());
 
     partial void OnSearchTextChanged(string value) => RefreshDays(Categories());
+
+    [RelayCommand]
+    private void ShowMoreTransactions()
+    {
+        _transactionsShown += TransactionPageSize;
+        RefreshDays(Categories());
+    }
+
+    /// <summary>Back to one page of transactions (the page opens again: a long list is slow to scroll).</summary>
+    public void ShowFirstTransactions() => _transactionsShown = 0;
 
     [RelayCommand]
     private void DismissMessage() => Message = null;
@@ -716,13 +743,29 @@ public sealed partial class WalletViewModel : ObservableObject
             return WalletText.Fold(t.Value.Description + " " + t.Value.Note + " " + t.Value.Bank + " " + category).Contains(search, StringComparison.Ordinal);
         }).ToList();
 
+        // Only the newest ones get rows (newest first, as the store lists them): the phone draws every row it is given.
+        var shownFor = (_month, FilterIndex, search);
+        if (_transactionsShown <= 0 || shownFor != _transactionsShownFor)
+        {
+            _transactionsShown = TransactionPageSize;
+            _transactionsShownFor = shownFor;
+        }
+        var left = inMonth.Count - _transactionsShown;
+        MoreTransactionsText = left > 0 ? $"Show more ({left} left)" : "";
+
+        // A day cut short still shows what was spent on the whole day.
+        var spentOn = inMonth
+            .Where(t => t.Value.Amount < 0)
+            .GroupBy(t => WalletFormat.LocalDay(t.Value.OccurredAt, _zone))
+            .ToDictionary(g => g.Key, g => -g.Sum(t => t.Value.Amount));
         var today = WalletFormat.LocalDay(_store.Now, _zone);
         var groups = inMonth
+            .Take(_transactionsShown)
             .GroupBy(t => WalletFormat.LocalDay(t.Value.OccurredAt, _zone))
             .OrderByDescending(g => g.Key)
             .Select(g =>
             {
-                var spent = -g.Where(t => t.Value.Amount < 0).Sum(t => t.Value.Amount);
+                var spent = spentOn.GetValueOrDefault(g.Key);
                 var rows = g.Select(t => RowFor(t.Id, t.Value, categories)).ToList();
                 return new DayGroup(WalletFormat.Day(g.Key, today), spent > 0 ? $"−{WalletFormat.Money(spent)}" : "", rows);
             })
@@ -778,6 +821,7 @@ public sealed partial class WalletViewModel : ObservableObject
         AskForCategory = s.AskForCategory;
         AutoCategorize = s.AutoCategorize;
         AskForMissing = s.AskForMissing;
+        TransactionPageIndex = Math.Max(0, TransactionPageSizes.ToList().IndexOf(s.TransactionsShown));
         WidgetChartIndex = (int)s.WidgetChart;
         WidgetBackgroundIndex = (int)s.WidgetBackground;
         WidgetOpacity = Math.Clamp(s.WidgetOpacity, 0, 100);
@@ -832,6 +876,14 @@ public sealed partial class WalletViewModel : ObservableObject
     partial void OnAskForMissingChanged(bool value)
     {
         if (!_loading) _settings.Update(s => s.AskForMissing = value);
+    }
+
+    partial void OnTransactionPageIndexChanged(int value)
+    {
+        if (value < 0) return;
+        if (!_loading) _settings.Update(s => s.TransactionsShown = TransactionPageSize);
+        _transactionsShown = 0;
+        RefreshDays(Categories());
     }
 
     partial void OnWidgetChartIndexChanged(int value)

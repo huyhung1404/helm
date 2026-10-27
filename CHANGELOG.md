@@ -10,6 +10,9 @@ Format: [Keep a Changelog](https://keepachangelog.com), versions follow [SemVer]
   workspace name too, and the phone said the window "was not found (or two windows have that name)". Helm now types
   into the window showing the Claude tab, and still types nothing when it cannot tell them apart. Needs Helm Bridge
   1.2: Helm installs it, then reload each VS Code window once.
+- **Wallet on the phone: smooth to scroll again.** The page drew every transaction of the month at once. It now lists
+  the newest 5, and **Show more** adds as many again; each day still shows what was spent on the whole day. Choose 5,
+  10, 20 or 50 in Wallet's settings (**Transactions list**).
 
 ## [0.55.0] - 2026-10-26
 

@@ -613,6 +613,9 @@
             </Grid>
             <TextBlock Text="{Binding EmptyText}" Classes="secondary" Margin="4,12,4,8" TextWrapping="Wrap" IsVisible="{Binding !HasDays}" />
             <ItemsControl ItemsSource="{Binding Days}" />
+            <!-- Only the newest few are drawn: the whole month made the page slow to scroll -->
+            <Button Classes="wide" Content="{Binding MoreTransactionsText}" Command="{Binding ShowMoreTransactionsCommand}" Margin="0,0,0,8"
+                    IsVisible="{Binding HasMoreTransactions}" AutomationProperties.Name="Show more transactions" />
             </StackPanel>
         </StackPanel>
     </StackPanel>

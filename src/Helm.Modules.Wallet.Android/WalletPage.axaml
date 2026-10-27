@@ -197,6 +197,18 @@
             </StackPanel>
         </Border>
 
+        <!-- The month's transactions on Wallet's page -->
+        <TextBlock Text="Transactions list" Classes="section" />
+        <Border Classes="card">
+            <StackPanel Spacing="8">
+                <TextBlock Text="Transactions shown" Classes="title" />
+                <TextBlock Text="The month's newest transactions listed at first; Show more adds as many again. Fewer keeps Wallet smooth to scroll."
+                           Classes="secondary" TextWrapping="Wrap" />
+                <ComboBox HorizontalAlignment="Stretch" ItemsSource="{x:Static vm:WalletViewModel.TransactionPageNames}" SelectedIndex="{Binding TransactionPageIndex}"
+                          AutomationProperties.Name="Transactions shown" />
+            </StackPanel>
+        </Border>
+
         <!-- Home-screen widget -->
         <TextBlock Text="Home screen" Classes="section" />
         <Border Classes="card">
