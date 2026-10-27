@@ -12,6 +12,7 @@ using Helm.Modules.NovelReader.Library;
 using Helm.Modules.NovelReader.Names;
 using Helm.Modules.NovelReader.Reports;
 using Helm.Modules.NovelReader.Speech;
+using Helm.Modules.NovelReader.Speech.VieNeu;
 using Helm.Modules.NovelReader.Text;
 using Helm.Shell.Services;
 using Microsoft.Extensions.Logging;
@@ -40,7 +41,6 @@ public sealed partial class NovelReaderViewModel : ObservableObject, IReadAloudH
     private readonly IDeviceInfo _device;
     private readonly SpeechCatalog _catalog;
     private readonly ReadAloudController _reader;
-    private readonly ILocalVoiceServer? _localVoice;
     private readonly INameScanAgent? _nameAgent;
     private readonly WordPronouncer? _pronouncer;
     private CancellationTokenSource? _scanCancel;
@@ -102,11 +102,6 @@ public sealed partial class NovelReaderViewModel : ObservableObject, IReadAloudH
     [ObservableProperty] private bool _fallbackToOfflineVoice;
     [ObservableProperty] private int _playerReady = -1;
     [ObservableProperty] private string _readyLabel = "";
-    [ObservableProperty] private string _localVoiceStatus = "";
-    [ObservableProperty] private string _localVoiceFolder = "";
-    [ObservableProperty] private int _localVoicePort;
-    [ObservableProperty] private bool _stopLocalVoiceWhenIdle;
-    [ObservableProperty] private bool _useEdgeVoice;
     [ObservableProperty] private SpeechVoice? _selectedVoice;
     [ObservableProperty] private double _speechRate;
     [ObservableProperty] private double _speechPitch;
@@ -139,7 +134,7 @@ public sealed partial class NovelReaderViewModel : ObservableObject, IReadAloudH
 
     public NovelReaderViewModel(NovelStore store, DictionaryLibrary dictionaries, ISettingsStoreFactory settings, IUiDispatcher ui,
         IDialogService dialogs, IDeviceInfo device, SpeechCatalog catalog, IAudioOutput audio, IProcessLauncher launcher,
-        IClipboardService clipboard, ILogger<NovelReaderViewModel> logger, TimeProvider? time = null, ILocalVoiceServer? localVoice = null,
+        IClipboardService clipboard, ILogger<NovelReaderViewModel> logger, TimeProvider? time = null, VieNeuInstaller? vieneu = null,
         INameScanAgent? nameAgent = null, WordPronouncer? pronouncer = null, TranslationReportStore? reports = null,
         ITranslationAgent? translator = null)
     {
@@ -152,10 +147,18 @@ public sealed partial class NovelReaderViewModel : ObservableObject, IReadAloudH
         _dialogs = dialogs;
         _device = device;
         _catalog = catalog;
-        _localVoice = localVoice;
         _nameAgent = nameAgent;
         _pronouncer = pronouncer;
-        if (localVoice is not null) localVoice.StatusChanged += (_, _) => _ui.Post(OnLocalVoiceChanged);
+        if (vieneu is not null)
+        {
+            VieNeu = new VieNeuVoiceViewModel(vieneu, ui, dialogs);
+            // Downloaded: its voices show and the saved one (Ngọc Huyền by default) is picked again.
+            VieNeu.InstalledChanged += (_, _) =>
+            {
+                _catalog.Refresh();
+                LoadVoices();
+            };
+        }
         _reader = new ReadAloudController(catalog, audio, time)
         {
             VoiceId = () => SelectedVoice?.Id,
@@ -171,18 +174,6 @@ public sealed partial class NovelReaderViewModel : ObservableObject, IReadAloudH
             pronouncer.QuietReading = () =>
             {
                 var playing = _reader.State is ReadAloudState.Playing or ReadAloudState.Loading;
-                if (SelectedVoice?.IsThroughEdge == true && _reader.State != ReadAloudState.Stopped)
-                {
-                    // The hidden Edge has one queue: a word would wait behind a paused sentence. Reading stops (where it
-                    // was is kept) and, if it was playing, starts that sentence again after the word.
-                    var at = _reader.Position;
-                    _reader.Stop();
-                    if (!playing) return null;
-                    return () =>
-                    {
-                        if (_reader.State == ReadAloudState.Stopped && _reader.Position == at) _reader.Play(at.Paragraph, at.Sentence);
-                    };
-                }
                 if (!playing) return null;
                 _reader.Pause();
                 return () =>
@@ -231,15 +222,10 @@ public sealed partial class NovelReaderViewModel : ObservableObject, IReadAloudH
         ScrapeTabs = Math.Clamp(s.ScrapeTabs, 1, 5);
         ConvertTraditional = s.ConvertTraditional;
         FallbackToOfflineVoice = s.FallbackToOfflineVoice;
-        LocalVoiceFolder = s.LocalVoiceFolder ?? "";
-        LocalVoicePort = s.LocalVoicePort;
-        StopLocalVoiceWhenIdle = s.StopLocalVoiceWhenIdle;
-        UseEdgeVoice = s.UseEdgeVoice;
         AutoScanNames = s.AutoScanNames;
         NameScanModeIndex = (int)s.NameScanMode;
         DictionarySourcesText = FormatSources(s.DictionarySources);
         LoadVoices();
-        OnLocalVoiceChanged();
         _loading = false;
 
         _store.Changed += (_, e) => _ui.Post(() => OnStoreChanged(e));
@@ -1073,67 +1059,13 @@ public sealed partial class NovelReaderViewModel : ObservableObject, IReadAloudH
             : $"Audio ready to paragraph {PlayerReady + 1} / {count}";
     }
 
-    // ---- The voice on this PC (VieNeu-TTS) ----------------------------------------------------------------------
+    // ---- The VieNeu voice ------------------------------------------------------------------------------------------
 
-    /// <summary>The local voice server is set up on this PC.</summary>
-    public bool HasLocalVoice => _localVoice?.IsInstalled == true;
+    /// <summary>The VieNeu voice's download and status in the settings (null where the app has no VieNeu).</summary>
+    public VieNeuVoiceViewModel? VieNeu { get; }
 
-    public bool IsLocalVoiceRunning => _localVoice?.IsRunning == true;
-
-    /// <summary>Pitch is not supported by the voices on this PC.</summary>
+    /// <summary>Pitch is not supported by VieNeu's voices.</summary>
     public bool SupportsPitch => SelectedVoice?.SupportsPitch ?? true;
-
-    [RelayCommand]
-    private async Task StartLocalVoice()
-    {
-        if (_localVoice is null) return;
-        if (await _localVoice.EnsureRunningAsync(CancellationToken.None))
-        {
-            // The server now lists its voices (with who is a woman); show them.
-            _catalog.Refresh();
-            await Task.Delay(800);
-            LoadVoices();
-        }
-        OnLocalVoiceChanged();
-    }
-
-    [RelayCommand]
-    private void StopLocalVoice()
-    {
-        _localVoice?.Stop();
-        OnLocalVoiceChanged();
-    }
-
-    /// <summary>The VieNeu-TTS folder the user picked (it holds .venv and apps\openai_speech.py).</summary>
-    public void SetLocalVoiceFolder(string folder)
-    {
-        _localVoice?.Stop();
-        LocalVoiceFolder = folder;
-        Save(s => s.LocalVoiceFolder = folder);
-        LoadVoices();
-        OnLocalVoiceChanged();
-    }
-
-    partial void OnLocalVoicePortChanged(int value)
-    {
-        if (value is < 1024 or > 65535) return;
-        Save(s => s.LocalVoicePort = value);
-    }
-
-    partial void OnStopLocalVoiceWhenIdleChanged(bool value) => Save(s => s.StopLocalVoiceWhenIdle = value);
-
-    partial void OnUseEdgeVoiceChanged(bool value)
-    {
-        Save(s => s.UseEdgeVoice = value);
-        if (!_loading) LoadVoices();
-    }
-
-    private void OnLocalVoiceChanged()
-    {
-        LocalVoiceStatus = _localVoice is null ? "" : _localVoice.Status;
-        OnPropertyChanged(nameof(HasLocalVoice));
-        OnPropertyChanged(nameof(IsLocalVoiceRunning));
-    }
 
     // ---- Names panel and suggestions -------------------------------------------------------------------------------
 

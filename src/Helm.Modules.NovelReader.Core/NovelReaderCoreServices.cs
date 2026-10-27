@@ -3,8 +3,10 @@ using Helm.Modules.NovelReader.Dictionaries;
 using Helm.Modules.NovelReader.Library;
 using Helm.Modules.NovelReader.Reports;
 using Helm.Modules.NovelReader.Speech;
+using Helm.Modules.NovelReader.Speech.VieNeu;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using Microsoft.Extensions.Logging;
 
 namespace Helm.Modules.NovelReader;
 
@@ -33,7 +35,14 @@ public static class NovelReaderCoreServices
         // Tools for an AI on this PC (MCP, Windows only: other platforms never ask for them).
         services.AddSingleton<Helm.Core.Mcp.IMcpToolProvider, NovelReaderMcpTools>();
         services.AddSingleton<Helm.Core.Mcp.IMcpToolProvider, TranslationReportMcpTools>();
-        // The online HoaiMy voice; platforms add their own engines (Windows voices) as ISpeechEngine too.
+        // The VieNeu voices, running in Helm (downloaded once, on the user's word); platforms add their own engines
+        // (Windows voices, the phone's) as ISpeechEngine too.
+        services.AddSingleton(sp => new VieNeuInstaller(
+            new VieNeuFiles(Path.Combine(sp.GetRequiredService<Helm.Core.Settings.ISettingsStoreFactory>().Paths.Root, "models", "vieneu-v3-turbo")),
+            sp.GetRequiredService<ILogger<VieNeuInstaller>>()));
+        services.AddSingleton<VieNeuSpeechEngine>();
+        services.AddSingleton<ISpeechEngine>(sp => sp.GetRequiredService<VieNeuSpeechEngine>());
+        // Edge's read-aloud service, only for Xiaoxiao saying a Chinese word pressed in study mode (no reading voices).
         services.AddSingleton<ISpeechEngine, EdgeSpeechEngine>();
         services.AddSingleton(sp => new SpeechCatalog(sp.GetServices<ISpeechEngine>()));
         // Windows registers it again through AddHelmModule; one instance either way.

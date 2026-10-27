@@ -15,6 +15,8 @@
     <ProjectReference Include="..\Helm.Core\Helm.Core.csproj" />
     <!-- IDialogService / IClipboardService: the portable seams both apps already implement. -->
     <ProjectReference Include="..\Helm.Shell\Helm.Shell.csproj" />
+    <!-- Vietnamese text to phonemes for the VieNeu voices that run in Helm. -->
+    <ProjectReference Include="..\Helm.Speech.Vietnamese\Helm.Speech.Vietnamese.csproj" />
   </ItemGroup>
 
   <ItemGroup>
@@ -27,6 +29,15 @@
     <None Include="Resources\opencc-ts.LICENSE.txt" CopyToOutputDirectory="PreserveNewest" />
     <!-- Fanqie's web font table in Scraping/FanqieText.cs (MIT) -->
     <None Include="Resources\fanqie-chars.LICENSE.txt" CopyToOutputDirectory="PreserveNewest" />
+    <!-- VieNeu-TTS v3 Turbo's women's preset voices (Apache-2.0, see Resources/vieneu.LICENSE.txt); the model is downloaded -->
+    <EmbeddedResource Include="Resources\vieneu-voices.json" LogicalName="Helm.Modules.NovelReader.vieneu-voices.json" />
+    <None Include="Resources\vieneu.LICENSE.txt" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- The VieNeu voice runs in ONNX Runtime. Only the managed API here: each app adds the native runtime for its platform
+         (Microsoft.ML.OnnxRuntime). -->
+    <PackageReference Include="Microsoft.ML.OnnxRuntime.Managed" Version="1.30.0" />
   </ItemGroup>
 
 </Project>

@@ -771,8 +771,30 @@ public sealed partial class NovelScraperService
 
     private static string FirstLine(string text) => text.Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).FirstOrDefault() ?? "no answer";
 
-    private static string BrowserPath() => EdgeAnchor.EdgePath() ?? ChromePath()
+    private static string BrowserPath() => EdgePath() ?? ChromePath()
         ?? throw new InvalidOperationException("Microsoft Edge or Chrome is needed to scrape. Install one and try again.");
+
+    /// <summary>Where Edge is installed (App Paths in the registry, or the usual folders).</summary>
+    private static string? EdgePath()
+    {
+        foreach (var root in new[] { Microsoft.Win32.Registry.CurrentUser, Microsoft.Win32.Registry.LocalMachine })
+        {
+            try
+            {
+                using var key = root.OpenSubKey(@"SOFTWARE\Microsoft\Windows\CurrentVersion\App Paths\msedge.exe");
+                if (key?.GetValue(null) is string path && File.Exists(path)) return path;
+            }
+            catch (Exception ex) when (ex is System.Security.SecurityException or UnauthorizedAccessException)
+            {
+            }
+        }
+        foreach (var folder in new[] { Environment.SpecialFolder.ProgramFilesX86, Environment.SpecialFolder.ProgramFiles })
+        {
+            var path = Path.Combine(Environment.GetFolderPath(folder), "Microsoft", "Edge", "Application", "msedge.exe");
+            if (File.Exists(path)) return path;
+        }
+        return null;
+    }
 
     private static string? ChromePath()
     {

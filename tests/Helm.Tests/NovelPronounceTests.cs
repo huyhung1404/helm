@@ -112,39 +112,11 @@ public sealed class NovelPronounceTests
     }
 
     [Fact]
-    public async Task On_the_PC_the_hidden_Edge_says_the_word_and_when_it_fails_the_other_voices_do_for_a_while()
-    {
-        var edge = new Engine(EdgeSpeechEngine.EnginePrefix);
-        var speaker = new Speaker();
-        var player = new Player();
-        var clock = new Clock();
-        var pronouncer = new WordPronouncer([edge], player, time: clock, speaker: speaker);
-
-        Assert.Null(await pronouncer.SayAsync("你好"));
-        Assert.Equal("你好", Assert.Single(speaker.Said));
-        Assert.True(speaker.Options!.Rate < 1);
-        Assert.Empty(edge.Requests);
-        Assert.Equal(0, player.Played);
-
-        speaker.Fails = true;
-        Assert.Null(await pronouncer.SayAsync("再见"));
-        Assert.Null(await pronouncer.SayAsync("谢谢"));
-        Assert.Equal(2, speaker.Said.Count);
-        Assert.Equal(2, edge.Requests.Count);
-        Assert.Equal(2, player.Played);
-
-        speaker.Fails = false;
-        clock.Now += TimeSpan.FromMinutes(11);
-        Assert.Null(await pronouncer.SayAsync("谢谢"));
-        Assert.Equal(3, speaker.Said.Count);
-    }
-
-    [Fact]
     public void The_online_request_speaks_the_language_of_its_voice()
     {
         var options = new SpeechOptions(1, 1, 1);
         Assert.Contains("xml:lang='zh-CN'", EdgeSpeechEngine.Ssml("你好", "zh-CN-XiaoxiaoNeural", options));
-        Assert.Contains("xml:lang='vi-VN'", EdgeSpeechEngine.Ssml("xin chào", "vi-VN-HoaiMyNeural", options));
+        Assert.Contains("xml:lang='zh-TW'", EdgeSpeechEngine.Ssml("你好", "zh-TW-HsiaoChenNeural", options));
     }
 
     private sealed class Clock : TimeProvider
@@ -179,24 +151,6 @@ public sealed class NovelPronounceTests
     {
         public Task<SpeechVoice?> VoiceForAsync(string language, CancellationToken ct) =>
             Task.FromResult(language == "zh" ? new SpeechVoice("android:cmn-cn-x-ccc-local", "Chinese", "zh-CN", IsOnline: false) : null);
-    }
-
-    private sealed class Speaker : IWordSpeaker
-    {
-        public bool Fails { get; set; }
-
-        public List<string> Said { get; } = [];
-
-        public SpeechOptions? Options { get; private set; }
-
-        public bool IsAvailable => true;
-
-        public Task SayAsync(string chinese, SpeechOptions options, CancellationToken ct)
-        {
-            Said.Add(chinese);
-            Options = options;
-            return Fails ? Task.FromException(new SpeechUnavailableException("no Edge")) : Task.CompletedTask;
-        }
     }
 
     private sealed class Player : IClipPlayer

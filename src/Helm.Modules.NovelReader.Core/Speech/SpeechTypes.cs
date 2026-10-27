@@ -1,6 +1,6 @@
 namespace Helm.Modules.NovelReader.Speech;
 
-/// <summary>A voice of one engine. <see cref="Id"/> is "engine:voice", e.g. "edge:vi-VN-HoaiMyNeural".</summary>
+/// <summary>A voice of one engine. <see cref="Id"/> is "engine:voice", e.g. "vieneu:ngoc_huyen".</summary>
 public sealed record SpeechVoice(string Id, string Name, string Language, bool IsOnline)
 {
     public bool IsVietnamese => Language.StartsWith("vi", StringComparison.OrdinalIgnoreCase);
@@ -10,19 +10,16 @@ public sealed record SpeechVoice(string Id, string Name, string Language, bool I
 
     public string Description { get; init; } = "";
 
-    /// <summary>Runs on this PC through a local server (VieNeu), not the Windows voices.</summary>
-    public bool IsLocal => Engine == "local";
+    /// <summary>One of VieNeu's voices, running in Helm itself (downloaded once).</summary>
+    public bool IsVieNeu => Engine == "vieneu";
 
-    /// <summary>Speed can be set; pitch only on the online and Windows voices.</summary>
-    public bool SupportsPitch => !IsLocal;
-
-    /// <summary>Plays through a hidden Microsoft Edge (HoaiMy as Edge reads it).</summary>
-    public bool IsThroughEdge => Engine == "edgeapp";
+    /// <summary>Speed can be set; pitch only on the system's voices (VieNeu speaks at its own pitch).</summary>
+    public bool SupportsPitch => !IsVieNeu;
 
     /// <summary>One of the phone's own voices (Android text-to-speech, e.g. Google's Vietnamese voices).</summary>
     public bool IsOnPhone => Engine == "android";
 
-    public string Label => IsLocal ? $"{Name} (on this PC)" : IsThroughEdge ? $"{Name} (online, via Edge)" : IsOnPhone ? $"{Name} (on this phone)"
+    public string Label => IsVieNeu ? (Description.Length > 0 ? $"{Name} ({Description})" : Name) : IsOnPhone ? $"{Name} (on this phone)"
         : IsOnline ? $"{Name} (online)" : $"{Name} ({Language})";
 
     /// <summary>The engine's own name of the voice (after "engine:").</summary>
@@ -37,10 +34,10 @@ public sealed record SpeechOptions(double Rate, double Pitch, double Volume);
 /// <summary>Synthesized speech: an MP3 or WAV file in memory.</summary>
 public sealed record SpeechAudio(byte[] Data, string ContentType);
 
-/// <summary>Text to speech: an online service or the system's voices.</summary>
+/// <summary>Text to speech: VieNeu in Helm, the system's voices, or an online service (Xiaoxiao, for words).</summary>
 public interface ISpeechEngine
 {
-    /// <summary>The prefix of this engine's voice ids ("edge", "win").</summary>
+    /// <summary>The prefix of this engine's voice ids ("vieneu", "win", "android").</summary>
     string Prefix { get; }
 
     IReadOnlyList<SpeechVoice> Voices { get; }
@@ -53,6 +50,9 @@ public interface ISpeechEngine
     /// sentence to play now never waits for these.
     /// </summary>
     int Parallel => 2;
+
+    /// <summary>Gets ready for the first sentence (a voice in Helm loads its model); nothing for most engines.</summary>
+    void WarmUp() { }
 
     /// <exception cref="SpeechUnavailableException">The engine cannot speak now (offline, service changed).</exception>
     Task<SpeechAudio> SynthesizeAsync(string text, SpeechVoice voice, SpeechOptions options, CancellationToken ct);
@@ -99,21 +99,23 @@ public interface IAudioOutput
 /// <summary>All voices of all engines, by id.</summary>
 public sealed class SpeechCatalog(IEnumerable<ISpeechEngine> engines)
 {
-    /// <summary>HoaiMy as a hidden Edge reads it; where there is no Edge the first Vietnamese voice is used.</summary>
-    public const string DefaultVoiceId = "edgeapp:vi-VN-HoaiMy";
+    /// <summary>VieNeu's Ngọc Huyền; until VieNeu is downloaded the first Vietnamese voice is used.</summary>
+    public const string DefaultVoiceId = "vieneu:" + VieNeu.VieNeuVoices.DefaultId;
 
     private readonly IReadOnlyList<ISpeechEngine> _engines = engines.ToList();
 
     /// <summary>
-    /// Vietnamese voices first: the ones on this PC (VieNeu), HoaiMy through Edge, the phone's own voices, then online,
-    /// then the Windows voices; women first. Where the saved voice is missing (a phone has no Edge), the first one is used.
+    /// Vietnamese voices first: VieNeu's, the phone's own voices, then online, then the Windows voices; women first.
+    /// Where the saved voice is missing (VieNeu not downloaded yet), the first one is used.
     /// </summary>
     public IReadOnlyList<SpeechVoice> Voices =>
         _engines.SelectMany(e => e.Voices)
-            .OrderByDescending(v => v.IsVietnamese).ThenBy(Rank).ThenByDescending(v => v.IsFemale).ThenBy(v => v.Name, StringComparer.Ordinal)
+            .OrderByDescending(v => v.IsVietnamese).ThenBy(Rank).ThenByDescending(v => v.IsFemale)
+            // VieNeu's keep their own order (the editors' picks first); the sort is stable.
+            .ThenBy(v => v.IsVieNeu ? "" : v.Name, StringComparer.Ordinal)
             .ToList();
 
-    private static int Rank(SpeechVoice voice) => voice.IsLocal ? 0 : voice.IsThroughEdge ? 1 : voice.IsOnPhone ? 2 : voice.IsOnline ? 3 : 4;
+    private static int Rank(SpeechVoice voice) => voice.IsVieNeu ? 0 : voice.IsOnPhone ? 1 : voice.IsOnline ? 2 : 3;
 
     public void Refresh()
     {

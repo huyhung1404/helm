@@ -4,6 +4,7 @@ using Helm.Core.Modules;
 using Helm.Core.Platform;
 using Helm.Core.Services;
 using Helm.Modules.NovelReader.Playback;
+using Helm.Modules.NovelReader.Speech.VieNeu;
 
 namespace Helm.Modules.NovelReader;
 
@@ -18,11 +19,14 @@ public sealed class NovelReaderModule : AndroidModuleBase, IModuleContent, IBack
 {
     private readonly NovelReaderViewModel _viewModel;
     private readonly IUiDispatcher _ui;
+    private readonly VieNeuSpeechEngine _vieneu;
 
-    public NovelReaderModule(NovelReaderViewModel viewModel, IUiDispatcher ui, AndroidAudioOutput output, AndroidTtsEngine voices)
+    public NovelReaderModule(NovelReaderViewModel viewModel, IUiDispatcher ui, AndroidAudioOutput output, AndroidTtsEngine voices,
+        VieNeuSpeechEngine vieneu)
     {
         _viewModel = viewModel;
         _ui = ui;
+        _vieneu = vieneu;
         // The cover on the media notification and the lock screen.
         output.Artwork = () => viewModel.OpenBookCard?.Cover;
         // The phone's voices load after Helm starts: pick the saved one once they are there.
@@ -52,11 +56,12 @@ public sealed class NovelReaderModule : AndroidModuleBase, IModuleContent, IBack
         return Task.CompletedTask;
     }
 
-    /// <summary>Also runs when Helm exits or updates: reading aloud stops and the place reading stopped is saved.</summary>
+    /// <summary>Also runs when Helm exits or updates: reading aloud stops, the place reading stopped is saved and the VieNeu voice lets its model go.</summary>
     public override async Task DisableAsync()
     {
         ActivityHost.Paused -= OnAppPaused;
         await _ui.InvokeAsync(_viewModel.Release).ConfigureAwait(false);
+        _vieneu.Release();
     }
 
     public bool HandleBack() => PageBack?.Invoke() ?? false;

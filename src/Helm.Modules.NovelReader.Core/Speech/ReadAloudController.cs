@@ -79,8 +79,6 @@ public sealed class ReadAloudController
     /// <summary>Played sentences, the one played longest ago first (the first to be let go).</summary>
     private readonly LinkedList<string> _played = new();
     private readonly Dictionary<string, Task<SpeechAudio>> _inFlight = new(StringComparer.Ordinal);
-    private IDirectSpeechEngine? _direct;
-    private volatile bool _sleepReached;
     /// <summary>Background requests per engine (<see cref="ISpeechEngine.Parallel"/>); the sentence to play now does not wait for them.</summary>
     private readonly Dictionary<string, SemaphoreSlim> _slots = new(StringComparer.Ordinal);
     private IReadAloudHost? _host;
@@ -186,7 +184,6 @@ public sealed class ReadAloudController
         if (_state is not (ReadAloudState.Playing or ReadAloudState.Loading)) return;
         _resumed = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         _output.Pause();
-        _direct?.Pause();
         SetState(ReadAloudState.Paused);
     }
 
@@ -194,7 +191,6 @@ public sealed class ReadAloudController
     {
         if (_state != ReadAloudState.Paused) return;
         _output.Resume();
-        _direct?.Resume();
         SetState(ReadAloudState.Playing);
         _resumed?.TrySetResult();
         _resumed = null;
@@ -205,7 +201,6 @@ public sealed class ReadAloudController
     {
         _run?.Cancel();
         _run = null;
-        StopDirect();
         StopPrefetch();
         _resumed?.TrySetResult();
         _resumed = null;
@@ -268,16 +263,12 @@ public sealed class ReadAloudController
     }
 
     /// <summary>
-    /// Downloads the first sentences from a place in the open chapter in the background, so pressing play there starts
-    /// at once (used when a chapter is opened with an online voice).
+    /// Gets the voice ready when a chapter is opened, so pressing play starts at once: a voice in Helm loads its model;
+    /// with an online voice the first sentences from that place are downloaded in the background.
     /// </summary>
     public void Warm(int paragraph, int sentence, int count = 3)
     {
-        if (CurrentVoice() is { } directVoice && _catalog.EngineOf(directVoice) is IDirectSpeechEngine warming)
-        {
-            _ = warming.WarmUpAsync(CancellationToken.None);
-            return;
-        }
+        if (CurrentVoice() is { } current && _catalog.EngineOf(current) is { } engine) engine.WarmUp();
         if (_host?.BookId is null || CurrentVoice() is not { IsOnline: true } voice || IsActive) return;
         var options = Options();
         var texts = new List<string>();
@@ -319,7 +310,6 @@ public sealed class ReadAloudController
         // Read before the old run is cancelled: cancelled, it goes on on another thread and can change the state.
         var paused = _state == ReadAloudState.Paused;
         _run?.Cancel();
-        StopDirect();
         _resumed?.TrySetResult();
         _resumed = null;
         // A skip while paused reads on: the output must play again too (the phone's player keeps a new sentence
@@ -379,22 +369,6 @@ public sealed class ReadAloudController
                 KeepPrefetching(position);
                 UpdateReady(position);
 
-                if (CurrentVoice() is { } speaking && _catalog.EngineOf(speaking) is IDirectSpeechEngine direct)
-                {
-                    var after = await SpeakChunkAsync(direct, speaking, position, ct);
-                    if (after is not { } next) break;
-                    if (_sleepReached)
-                    {
-                        _sleepReached = false;
-                        SleepAt = null;
-                        Notice?.Invoke(this, "Sleep timer: reading stopped.");
-                        break;
-                    }
-                    position = next;
-                    lastParagraph = -1;
-                    continue;
-                }
-
                 if (_state != ReadAloudState.Paused) SetState(ReadAloudState.Loading);
                 var audio = await AudioAsync(sentence.Text, ct);
                 if (audio is null) break;
@@ -428,7 +402,6 @@ public sealed class ReadAloudController
             {
                 _run = null;
                 StopPrefetch();
-                StopDirect();
                 _output.ClearNowPlaying();
                 SetState(ReadAloudState.Stopped);
                 PositionChanged?.Invoke(this, Position);
@@ -650,100 +623,6 @@ public sealed class ReadAloudController
         }
     }
 
-    // ---- Voices that play by themselves (HoaiMy through Edge) ----------------------------------------------------
-
-    /// <summary>Characters handed to a voice that plays by itself at once: about 45 s of speech, one short pause each.</summary>
-    public const int DirectChunk = 700;
-
-    /// <summary>
-    /// Speaks whole sentences from <paramref name="start"/> (across paragraphs, up to <see cref="DirectChunk"/>
-    /// characters, never past the chapter) as one text, following the words the voice reports to move the highlight and
-    /// the saved place sentence by sentence. Returns where to go on, or null when reading must stop.
-    /// </summary>
-    private async Task<ReadingPosition?> SpeakChunkAsync(IDirectSpeechEngine direct, SpeechVoice voice, ReadingPosition start, CancellationToken ct)
-    {
-        var host = _host!;
-        var parts = new List<(ReadingPosition Position, int Offset, string Text)>();
-        var text = new System.Text.StringBuilder();
-        var position = start;
-        while (position.Paragraph < host.ParagraphCount)
-        {
-            var sentences = host.SentencesOf(position.Paragraph);
-            if (position.Sentence < sentences.Count)
-            {
-                var sentence = sentences[position.Sentence].Text;
-                if (parts.Count > 0 && text.Length + sentence.Length > DirectChunk) break;
-                if (text.Length > 0) text.Append(position.Sentence == 0 ? "\n" : " ");
-                parts.Add((position, text.Length, sentence));
-                text.Append(sentence);
-            }
-            var next = NextOf(position, sentenceStep: true);
-            if (next == position) break;
-            position = next;
-        }
-        if (parts.Count == 0) return position;
-
-        _direct = direct;
-        await WhileResumedAsync(ct);
-        if (_state != ReadAloudState.Paused) SetState(ReadAloudState.Loading);
-        var current = 0;
-        void Follow(int at)
-        {
-            var index = current;
-            while (index + 1 < parts.Count && parts[index + 1].Offset <= at) index++;
-            if (index == current) return;
-            current = index;
-            Position = parts[index].Position;
-            CurrentText = parts[index].Text;
-            PositionChanged?.Invoke(this, Position);
-            if (SleepAt is { } due && _time.GetUtcNow() >= due)
-            {
-                // The sleep timer stops at a sentence, not in the middle of one.
-                _sleepReached = true;
-                Position = parts[index].Position;
-                direct.Cancel();
-            }
-        }
-        try
-        {
-            var speaking = direct.SpeakAsync(text.ToString(), voice, Options(), ct, Follow);
-            if (_state != ReadAloudState.Paused) SetState(ReadAloudState.Playing);
-            await speaking;
-            return position;
-        }
-        catch (OperationCanceledException) when (_sleepReached && !ct.IsCancellationRequested)
-        {
-            return Position;
-        }
-        catch (OperationCanceledException) when (!ct.IsCancellationRequested)
-        {
-            // Not the reader stopping: the voice gave up. Say so instead of stopping silently.
-            StopDirect();
-            Notice?.Invoke(this, $"{voice.Name} stopped answering. Press play to try again, or pick another voice.");
-            return null;
-        }
-        catch (SpeechUnavailableException ex)
-        {
-            StopDirect();
-            _logger.LogWarning(ex, "Voice through Edge unavailable");
-            if (FallbackToOfflineVoice() && _catalog.OfflineVietnamese is { } offline)
-            {
-                _fallback = offline;
-                Notice?.Invoke(this, $"{voice.Name} is not reachable, so {offline.Name} reads for now.");
-                // Go on from the sentence being read, with the offline voice.
-                return Position;
-            }
-            Notice?.Invoke(this, ex.Message);
-            return null;
-        }
-    }
-
-    private void StopDirect()
-    {
-        _direct?.Cancel();
-        _direct = null;
-    }
-
     // ---- Downloading ahead -----------------------------------------------------------------------------------------
 
     /// <summary>
@@ -826,8 +705,7 @@ public sealed class ReadAloudController
     private void StartPrefetch(ReadingPosition from)
     {
         StopPrefetch();
-        if (_host is not { BookId: not null } host || CurrentVoice() is not { } voice || _catalog.EngineOf(voice) is not { } engine
-            || engine is IDirectSpeechEngine) return;
+        if (_host is not { BookId: not null } host || CurrentVoice() is not { } voice || _catalog.EngineOf(voice) is not { } engine) return;
         var options = Options();
         var profile = SpeechKeys.Profile(voice, options);
         var current = new List<string>();

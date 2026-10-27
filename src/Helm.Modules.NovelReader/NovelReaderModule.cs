@@ -2,6 +2,7 @@ using System.Windows.Media;
 using Helm.Core.Hotkeys;
 using Helm.Core.Modules;
 using Helm.Core.Services;
+using Helm.Modules.NovelReader.Speech.VieNeu;
 using Wpf.Ui.Controls;
 
 namespace Helm.Modules.NovelReader;
@@ -12,7 +13,7 @@ namespace Helm.Modules.NovelReader;
 /// The menu and Quick access open <see cref="NovelReaderContentPage"/>; Home → Utilities
 /// opens the settings (<see cref="NovelReaderPage"/>).
 /// </summary>
-public sealed class NovelReaderModule(NovelReaderViewModel viewModel, IUiDispatcher ui, VieNeuServer localVoice, EdgeAnchor edge,
+public sealed class NovelReaderModule(NovelReaderViewModel viewModel, IUiDispatcher ui, VieNeuSpeechEngine voice,
     NovelSourceWatcher watcher) : HelmModuleBase, IModuleContent
 {
     public override string Id => NovelReaderIds.ModuleId;
@@ -32,12 +33,11 @@ public sealed class NovelReaderModule(NovelReaderViewModel viewModel, IUiDispatc
         return Task.CompletedTask;
     }
 
-    /// <summary>Also runs when Helm exits or updates: reading aloud stops, the place reading stopped is saved, and the local voice server, the hidden Edge and the look for new chapters stop.</summary>
+    /// <summary>Also runs when Helm exits or updates: reading aloud stops, the place reading stopped is saved, the VieNeu voice lets its model go and the look for new chapters stops.</summary>
     public override async Task DisableAsync()
     {
         watcher.Stop();
         await ui.InvokeAsync(viewModel.Release).ConfigureAwait(false);
-        localVoice.Stop();
-        edge.Stop();
+        voice.Release();
     }
 }

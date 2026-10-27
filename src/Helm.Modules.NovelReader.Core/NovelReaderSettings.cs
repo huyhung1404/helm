@@ -9,9 +9,20 @@ namespace Helm.Modules.NovelReader;
 /// </summary>
 public sealed class NovelReaderSettings : IVersionedSettings
 {
-    public static int CurrentVersion => 1;
+    public static int CurrentVersion => 2;
 
     public int Version { get; set; }
+
+    /// <summary>
+    /// Version 2: HoaiMy (online and through a hidden Edge) and the VieNeu server on this PC are gone; a saved voice of
+    /// theirs becomes VieNeu's Ngọc Huyền in Helm.
+    /// </summary>
+    public void Migrate(int fromVersion)
+    {
+        if (fromVersion < 2 && VoiceId is { } voice && (voice.StartsWith("edge:", StringComparison.Ordinal)
+                || voice.StartsWith("edgeapp:", StringComparison.Ordinal) || voice.StartsWith("local:", StringComparison.Ordinal)))
+            VoiceId = Speech.SpeechCatalog.DefaultVoiceId;
+    }
 
     public ConvertMode Mode { get; set; } = ConvertMode.VietPhrase;
 
@@ -44,10 +55,10 @@ public sealed class NovelReaderSettings : IVersionedSettings
 
     // ---- Reading aloud ---------------------------------------------------------------------------------------------
 
-    /// <summary>"engine:voice"; the online HoaiMy voice by default.</summary>
+    /// <summary>"engine:voice"; VieNeu's Ngọc Huyền by default (once VieNeu is downloaded).</summary>
     public string? VoiceId { get; set; } = Speech.SpeechCatalog.DefaultVoiceId;
 
-    /// <summary>When the online voice cannot be reached, read with a Vietnamese Windows voice if one is installed.</summary>
+    /// <summary>When the voice cannot speak (an online one unreachable), read with another Vietnamese voice of this device.</summary>
     public bool FallbackToOfflineVoice { get; set; } = true;
 
     /// <summary>0.5 to 3 (1 is the voice's normal speed).</summary>
@@ -61,18 +72,6 @@ public sealed class NovelReaderSettings : IVersionedSettings
 
     /// <summary>Silence between paragraphs, in seconds (0 to 2).</summary>
     public double ParagraphPause { get; set; } = 0.15;
-
-    /// <summary>Offer HoaiMy through a hidden Microsoft Edge (fast, online; it cannot be downloaded).</summary>
-    public bool UseEdgeVoice { get; set; } = true;
-
-    /// <summary>The VieNeu-TTS folder (with its .venv) for the voices on this PC; null: not set up.</summary>
-    public string? LocalVoiceFolder { get; set; }
-
-    /// <summary>The port the local voice server listens on (127.0.0.1 only).</summary>
-    public int LocalVoicePort { get; set; } = 8765;
-
-    /// <summary>Stop the local voice server after 10 minutes without reading, to free the GPU memory.</summary>
-    public bool StopLocalVoiceWhenIdle { get; set; } = true;
 
     /// <summary>At the end of a chapter, reading aloud goes on with the next one.</summary>
     public bool ContinueToNextChapter { get; set; } = true;

@@ -137,7 +137,7 @@ public partial class NovelReaderPage : ModulePageBase
         }
     }
 
-    /// <summary>A sentence with the chosen voice: the phone's voices at once; HoaiMy needs a novel open to read from.</summary>
+    /// <summary>A sentence with the chosen voice: the phone's voices at once; VieNeu's need a novel open to read from.</summary>
     private void Listen_Click(object? sender, RoutedEventArgs e)
     {
         if (_viewModel.SelectedVoice is { IsOnPhone: true } voice)

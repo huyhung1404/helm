@@ -3,6 +3,7 @@
                    xmlns:ui="using:Helm.Core.Ui"
                    xmlns:vm="using:Helm.Modules.NovelReader"
                    xmlns:speech="using:Helm.Modules.NovelReader.Speech"
+                   xmlns:vieneu="using:Helm.Modules.NovelReader.Speech.VieNeu"
                    x:Class="Helm.Modules.NovelReader.NovelReaderPage"
                    x:DataType="vm:NovelReaderViewModel">
 
@@ -70,6 +71,19 @@
         <TextBlock Text="Reading aloud" Classes="section" />
         <Border Classes="card">
             <StackPanel Spacing="8">
+                <!-- VieNeu: natural Vietnamese voices that run in Helm, downloaded once -->
+                <StackPanel Spacing="4" DataContext="{Binding VieNeu}" x:DataType="vieneu:VieNeuVoiceViewModel">
+                    <TextBlock Text="VieNeu voices (Vietnamese)" Classes="title" />
+                    <TextBlock Text="{Binding Status}" Classes="secondary" TextWrapping="Wrap" />
+                    <ProgressBar Minimum="0" Maximum="1" Value="{Binding Progress}" IsVisible="{Binding IsDownloading}" />
+                    <WrapPanel>
+                        <Button Margin="0,0,8,8" Content="{Binding Size, StringFormat='Download ({0})'}" Command="{Binding DownloadCommand}" IsVisible="{Binding CanDownload}" />
+                        <Button Margin="0,0,8,8" Content="Stop" Command="{Binding CancelCommand}" IsVisible="{Binding IsDownloading}" />
+                        <Button Margin="0,0,8,8" Content="Remove" Command="{Binding RemoveCommand}" IsVisible="{Binding IsInstalled}" />
+                    </WrapPanel>
+                    <TextBlock Text="Eleven women's voices of VieNeu-TTS v3 Turbo (Ngọc Huyền first). They run in Helm, offline; the text never leaves the phone. Download on Wi-Fi." Classes="secondary" TextWrapping="Wrap" />
+                </StackPanel>
+
                 <TextBlock Text="Voice" Classes="title" />
                 <ComboBox HorizontalAlignment="Stretch" ItemsSource="{Binding Voices}" SelectedItem="{Binding SelectedVoice}" AutomationProperties.Name="Voice">
                     <ComboBox.ItemTemplate>
@@ -81,7 +95,7 @@
                         </DataTemplate>
                     </ComboBox.ItemTemplate>
                 </ComboBox>
-                <TextBlock Text="The phone's own Vietnamese voices work offline and start at once. HoaiMy (online) needs the network; its sound is held in memory while you listen, never saved." Classes="secondary" />
+                <TextBlock Text="VieNeu's voices once they are downloaded, and the phone's own Vietnamese voices. Sound is held in memory while you listen, never saved." Classes="secondary" />
                 <WrapPanel>
                     <Button Margin="0,0,8,8" Content="Listen" Click="Listen_Click" />
                     <Button Margin="0,0,8,8" Content="Get Vietnamese voices" Click="InstallVoices_Click" />
@@ -141,7 +155,7 @@
                         <ToggleSwitch DockPanel.Dock="Right" IsChecked="{Binding FallbackToOfflineVoice}" OnContent="" OffContent="" AutomationProperties.Name="Use an offline voice when offline" />
                         <StackPanel VerticalAlignment="Center" Spacing="2">
                             <TextBlock Text="Use an offline voice when offline" />
-                            <TextBlock Text="When HoaiMy cannot be reached, the phone's Vietnamese voice reads on." Classes="secondary" />
+                            <TextBlock Text="When an online voice cannot be reached, an offline Vietnamese voice reads on." Classes="secondary" />
                         </StackPanel>
                     </DockPanel>
                 </Border>

@@ -730,7 +730,7 @@ public sealed class NovelReaderTests : IDisposable
         Assert.Contains(page.Engine.Spoken, s => s.Text == "Chương 181 nhĩ...");
         Assert.DoesNotContain(page.Engine.Spoken, s => s.Text.Contains('*'));
         Assert.All(page.Engine.Spoken, s => Assert.Equal(1.5, s.Options.Rate));
-        Assert.All(page.Engine.Spoken, s => Assert.Equal("test:hoaimy", s.Voice));
+        Assert.All(page.Engine.Spoken, s => Assert.Equal("test:mai", s.Voice));
         var progress = page.Store.Progress(id)!;
         Assert.Equal((2, 1, 1, 2), (progress.Chapter, progress.Paragraph, progress.Sentence, progress.ParagraphCount));
     }
@@ -1009,12 +1009,12 @@ public sealed class NovelReaderTests : IDisposable
         Assert.Equal("2CD23A2CA0B2595A-F3C846C370E05F9CC83ACC5F995C5F5D87A4D0F14CE8936A0F902E64099E38A2",
             EdgeSpeechEngine.SecMsGec(DateTimeOffset.FromUnixTimeSeconds(1700000000)));
 
-        var ssml = EdgeSpeechEngine.Ssml("Lâm <Uyển> & “bạn”", "vi-VN-HoaiMyNeural", new SpeechOptions(1.5, 1, 0.8));
-        Assert.Contains("<voice name='vi-VN-HoaiMyNeural'>", ssml);
+        var ssml = EdgeSpeechEngine.Ssml("林 <婉儿> & “说”", "zh-CN-XiaoxiaoNeural", new SpeechOptions(1.5, 1, 0.8));
+        Assert.Contains("<voice name='zh-CN-XiaoxiaoNeural'>", ssml);
         Assert.Contains("rate='+50%'", ssml);
         Assert.Contains("pitch='+0Hz'", ssml);
         Assert.Contains("volume='-20%'", ssml);
-        Assert.Contains("Lâm &lt;Uyển&gt; &amp; “bạn”", ssml);
+        Assert.Contains("林 &lt;婉儿&gt; &amp; “说”", ssml);
     }
 
     [Fact]
@@ -1133,7 +1133,7 @@ public sealed class NovelReaderTests : IDisposable
         var output = new FakeOutput();
         var reader = new ReadAloudController(new SpeechCatalog([online, offline]), output, _clock)
         {
-            VoiceId = () => "edge:hoaimy",
+            VoiceId = () => "edge:mai",
             ParagraphPause = () => 0,
         };
         var notices = new List<string>();
@@ -1144,7 +1144,7 @@ public sealed class NovelReaderTests : IDisposable
         await WaitFor(() => reader.State == ReadAloudState.Stopped && output.Played.Count == 2);
 
         Assert.Equal(["a1.", "a2."], offline.Spoken.Select(s => s.Text));
-        Assert.Contains(notices, n => n.Contains("HoaiMy reads for now", StringComparison.Ordinal));
+        Assert.Contains(notices, n => n.Contains("Mai reads for now", StringComparison.Ordinal));
     }
 
     [Fact]
@@ -1154,7 +1154,7 @@ public sealed class NovelReaderTests : IDisposable
         var output = new FakeOutput();
         var reader = new ReadAloudController(new SpeechCatalog([online]), output, _clock)
         {
-            VoiceId = () => "edge:hoaimy",
+            VoiceId = () => "edge:mai",
             ParagraphPause = () => 0,
             OnlineRetryWaits = [TimeSpan.FromMilliseconds(50), TimeSpan.FromMilliseconds(400), TimeSpan.FromSeconds(30)],
         };
@@ -1165,7 +1165,7 @@ public sealed class NovelReaderTests : IDisposable
         reader.Play(0);
         // Asked again after the first wait, still no answer: a second wait.
         await WaitFor(() => { lock (notices) return notices.Count == 2; });
-        Assert.All(notices, n => Assert.Contains("HoaiMy is not answering. Trying again", n, StringComparison.Ordinal));
+        Assert.All(notices, n => Assert.Contains("Mai is not answering. Trying again", n, StringComparison.Ordinal));
         Assert.True(reader.IsActive);
 
         // The connection is back.
@@ -1188,7 +1188,7 @@ public sealed class NovelReaderTests : IDisposable
     [Fact]
     public void A_sentence_sounds_the_same_only_for_the_same_voice_speed_and_text()
     {
-        var voice = new SpeechVoice("edge:hoaimy", "HoaiMy", "vi-VN", true);
+        var voice = new SpeechVoice("edge:mai", "Mai", "vi-VN", true);
         var normal = SpeechKeys.Profile(voice, new SpeechOptions(1, 1, 1));
         var faster = SpeechKeys.Profile(voice, new SpeechOptions(1.5, 1, 1));
 
@@ -1353,7 +1353,7 @@ public sealed class NovelReaderTests : IDisposable
 
         var voices = new SpeechCatalog([online, phone]).Voices;
 
-        Assert.Equal(["android:vi-vn-x-gft-local", "android:vi-vn-x-vid-local", "edge:hoaimy", "android:en-us-x-iol-local"], voices.Select(v => v.Id));
+        Assert.Equal(["android:vi-vn-x-gft-local", "android:vi-vn-x-vid-local", "edge:mai", "android:en-us-x-iol-local"], voices.Select(v => v.Id));
         Assert.Equal("Vietnamese 1 (on this phone)", voices[0].Label);
     }
 
@@ -1363,7 +1363,7 @@ public sealed class NovelReaderTests : IDisposable
         // The phone's text-to-speech starts after Helm: its voices are missing at first.
         var phone = new FakeEngine("android", online: false, voices: []);
         var page = NewPage("a", "android:vi-vn-x-gft-local", null, null, phone);
-        Assert.Equal("test:hoaimy", page.ViewModel.SelectedVoice?.Id);
+        Assert.Equal("test:mai", page.ViewModel.SelectedVoice?.Id);
         // Filling the list again meanwhile does not make the stand-in the saved choice.
         page.ViewModel.RefreshVoicesCommand.Execute(null);
 
@@ -1408,7 +1408,7 @@ public sealed class NovelReaderTests : IDisposable
     {
         var reader = new ReadAloudController(new SpeechCatalog([engine]), output, _clock)
         {
-            VoiceId = () => "test:hoaimy",
+            VoiceId = () => "test:mai",
             ParagraphPause = () => 0,
         };
         reader.Attach(host);
@@ -1443,7 +1443,7 @@ public sealed class NovelReaderTests : IDisposable
         public (string Title, string Subtitle) NowPlaying => ("Novel", $"Chapter {ChapterIndex + 1}");
     }
 
-    // ---- Voices on this PC and covers --------------------------------------------------------------------------
+    // ---- Sound and covers ------------------------------------------------------------------------------------
 
     [Theory]
     [InlineData(1.5)]
@@ -1468,7 +1468,7 @@ public sealed class NovelReaderTests : IDisposable
     }
 
     [Fact]
-    public void Local_voice_sound_becomes_a_complete_wav_file()
+    public void A_voices_sound_becomes_a_complete_wav_file()
     {
         var wav = TimeStretch.Wav([1, -1, 300], 24000);
 
@@ -1479,45 +1479,6 @@ public sealed class NovelReaderTests : IDisposable
         Assert.Equal(6, BitConverter.ToInt32(wav, 40));
         Assert.Equal(300, BitConverter.ToInt16(wav, 48));
         Assert.Equal([50, -50], TimeStretch.Scale([100, -100], 0.5));
-    }
-
-    [Fact]
-    public async Task The_local_voice_starts_its_server_and_asks_for_raw_sound()
-    {
-        var server = new FakeLocalServer();
-        var http = new FakeHttp(request => request.RequestUri!.AbsolutePath switch
-        {
-            "/v1/voices" => Json("{\"object\":\"list\",\"data\":[{\"id\":\"Hải Đăng\",\"name\":\"Hải Đăng\",\"gender\":\"male\"},{\"id\":\"Ngọc Huyền\",\"name\":\"Ngọc Huyền\",\"gender\":\"female\",\"description\":\"Bắc\"}]}"),
-            "/v1/audio/speech" => Pcm(4800),
-            _ => new HttpResponseMessage(System.Net.HttpStatusCode.NotFound),
-        });
-        var engine = new LocalSpeechEngine(server, Path.Combine(_dir, "local-voices.json"), NullLogger<LocalSpeechEngine>.Instance, http);
-
-        await engine.RefreshVoicesAsync(CancellationToken.None);
-        var voice = engine.Voices[0];
-        var audio = await engine.SynthesizeAsync("Lâm Uyển gật đầu.", voice, new SpeechOptions(2, 1, 1), CancellationToken.None);
-
-        Assert.Equal(("local:Ngọc Huyền", true), (voice.Id, voice.IsFemale));
-        Assert.False(voice.SupportsPitch);
-        Assert.Equal(1, server.Started);
-        Assert.Equal("audio/wav", audio.ContentType);
-        // 4800 samples at twice the speed: about 2400 samples after the 44-byte header.
-        Assert.InRange((audio.Data.Length - 44) / 2, 2390, 2410);
-        var sent = JsonDocument.Parse(http.Bodies.Last()).RootElement;
-        Assert.Equal(("Ngọc Huyền", "pcm", 24000), (sent.GetProperty("voice").GetString(), sent.GetProperty("response_format").GetString(), sent.GetProperty("sample_rate").GetInt32()));
-        // The list is kept for the next start of Helm, before the server runs.
-        var again = new LocalSpeechEngine(server, Path.Combine(_dir, "local-voices.json"), NullLogger<LocalSpeechEngine>.Instance, http);
-        Assert.Equal("Ngọc Huyền", again.Voices[0].Name);
-    }
-
-    [Fact]
-    public async Task A_local_voice_that_cannot_start_is_unavailable()
-    {
-        var server = new FakeLocalServer { CanStart = false };
-        var engine = new LocalSpeechEngine(server, Path.Combine(_dir, "v.json"), NullLogger<LocalSpeechEngine>.Instance, new FakeHttp(_ => Pcm(10)));
-
-        await Assert.ThrowsAsync<SpeechUnavailableException>(() =>
-            engine.SynthesizeAsync("a", engine.Voices[0], new SpeechOptions(1, 1, 1), CancellationToken.None));
     }
 
     [Fact]
@@ -1550,126 +1511,6 @@ public sealed class NovelReaderTests : IDisposable
         Assert.Equal("?", CoverArt.Initials("  "));
     }
 
-    private static HttpResponseMessage Json(string body) =>
-        new(System.Net.HttpStatusCode.OK) { Content = new StringContent(body, Encoding.UTF8, "application/json") };
-
-    private static HttpResponseMessage Pcm(int samples)
-    {
-        var bytes = new byte[samples * 2];
-        for (var i = 0; i < samples; i++) BitConverter.TryWriteBytes(bytes.AsSpan(2 * i), (short)(4000 * Math.Sin(i / 10.0)));
-        var response = new HttpResponseMessage(System.Net.HttpStatusCode.OK) { Content = new ByteArrayContent(bytes) };
-        response.Headers.Add("X-Sample-Rate", "24000");
-        return response;
-    }
-
-    private sealed class FakeLocalServer : ILocalVoiceServer
-    {
-        public bool CanStart { get; init; } = true;
-        public int Started { get; private set; }
-        public Uri BaseAddress { get; } = new("http://127.0.0.1:8765/");
-        public bool IsInstalled => true;
-        public bool IsRunning => Started > 0;
-        public string Status => IsRunning ? "Running" : "Stopped";
-        public event EventHandler? StatusChanged { add { } remove { } }
-
-        public Task<bool> EnsureRunningAsync(CancellationToken ct)
-        {
-            if (CanStart && Started == 0) Started++;
-            return Task.FromResult(CanStart);
-        }
-
-        public void Touch() { }
-
-        public void Stop() { }
-    }
-
-    private sealed class FakeHttp(Func<HttpRequestMessage, HttpResponseMessage> answer) : HttpMessageHandler
-    {
-        public List<string> Bodies { get; } = [];
-
-        protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken ct)
-        {
-            if (request.Content is not null) Bodies.Add(await request.Content.ReadAsStringAsync(ct));
-            return answer(request);
-        }
-    }
-
-    [Fact]
-    public async Task A_voice_that_plays_by_itself_reads_in_chunks_and_follows_the_spoken_words()
-    {
-        var engine = new FakeDirectEngine();
-        var output = new FakeOutput();
-        var reader = new ReadAloudController(new SpeechCatalog([engine]), output, _clock)
-        {
-            VoiceId = () => "edgeapp:hoaimy",
-            ParagraphPause = () => 0,
-        };
-        reader.Attach(new FakeHost([["a1. a2.", "b1."]]));
-
-        var positions = new List<ReadingPosition>();
-        reader.PositionChanged += (_, p) => { lock (positions) positions.Add(p); };
-
-        reader.Play(0);
-        await WaitFor(() => engine.Queued.Count == 1);
-        // The whole chapter fits one chunk: one text, paragraphs on their own lines.
-        Assert.Equal("a1. a2.\nb1.", engine.Queued[0]);
-        engine.Report(4);   // "a2."
-        engine.Report(8);   // "b1."
-        lock (positions) Assert.Equal([new ReadingPosition(0, 0, 0), new ReadingPosition(0, 0, 1), new ReadingPosition(0, 1, 0)], positions.Take(3));
-        Assert.Equal("b1.", reader.CurrentText);
-        reader.Pause();
-        Assert.Equal(1, engine.Paused);
-        reader.Resume();
-        Assert.Equal(1, engine.Resumed);
-        engine.FinishAll();
-        await WaitFor(() => reader.State == ReadAloudState.Stopped);
-
-        Assert.Single(engine.Queued);
-        Assert.Empty(output.Played);
-    }
-
-    /// <summary>Plays "by itself": each sentence ends when the test says so (or at once once <see cref="FinishAll"/> ran).</summary>
-    private sealed class FakeDirectEngine : ISpeechEngine, IDirectSpeechEngine
-    {
-        private readonly List<TaskCompletionSource> _playing = [];
-        private bool _finishAll;
-        private Action<int>? _progress;
-
-        public List<string> Queued { get; } = [];
-        public int Paused { get; private set; }
-        public int Resumed { get; private set; }
-        public string Prefix => "edgeapp";
-        public IReadOnlyList<SpeechVoice> Voices { get; } = [new SpeechVoice("edgeapp:hoaimy", "HoaiMy", "vi-VN", true)];
-        public void RefreshVoices() { }
-
-        public Task<SpeechAudio> SynthesizeAsync(string text, SpeechVoice voice, SpeechOptions options, CancellationToken ct) =>
-            throw new SpeechUnavailableException("plays by itself");
-
-        public Task SpeakAsync(string text, SpeechVoice voice, SpeechOptions options, CancellationToken ct, Action<int>? progress = null)
-        {
-            _progress = progress;
-            lock (Queued) Queued.Add(text);
-            if (_finishAll) return Task.CompletedTask;
-            var done = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-            ct.Register(() => done.TrySetCanceled());
-            lock (_playing) _playing.Add(done);
-            return done.Task;
-        }
-
-        public void Report(int at) => _progress?.Invoke(at);
-
-        public void FinishAll()
-        {
-            _finishAll = true;
-            lock (_playing) foreach (var p in _playing) p.TrySetResult();
-        }
-
-        public void Pause() => Paused++;
-        public void Resume() => Resumed++;
-        public void Cancel() { }
-        public Task WarmUpAsync(CancellationToken ct) => Task.CompletedTask;
-    }
-
     // ---- Helpers ---------------------------------------------------------------------------------------------------
 
     private static DictionarySet Dictionaries(string vietPhrase = "", string names = "", string luatNhan = "") =>
@@ -1694,7 +1535,7 @@ public sealed class NovelReaderTests : IDisposable
     private sealed record Page(NovelReaderViewModel ViewModel, NovelStore Store, MemorySynced<NovelProgress> Progress, FakeEngine Engine, FakeOutput Output,
         DictionaryLibrary Dictionaries);
 
-    private Page NewPage(string name, string voiceId = "test:hoaimy", INameScanAgent? agent = null, TranslationReportStore? reports = null,
+    private Page NewPage(string name, string voiceId = "test:mai", INameScanAgent? agent = null, TranslationReportStore? reports = null,
         params ISpeechEngine[] moreEngines)
     {
         var paths = new HelmPaths(Path.Combine(_dir, name));
@@ -1751,7 +1592,7 @@ public sealed class NovelReaderTests : IDisposable
 
         public string Prefix => prefix;
 
-        public IReadOnlyList<SpeechVoice> Voices { get; set; } = voices ?? [new SpeechVoice($"{prefix}:hoaimy", "HoaiMy", "vi-VN", online)];
+        public IReadOnlyList<SpeechVoice> Voices { get; set; } = voices ?? [new SpeechVoice($"{prefix}:mai", "Mai", "vi-VN", online)];
 
         public void RefreshVoices() { }
 

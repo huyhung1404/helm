@@ -11,7 +11,7 @@ public static class NovelReaderServices
     public static IServiceCollection AddNovelReaderModule(this IServiceCollection services) =>
         services
             .AddSingleton<INovelPlatform, AndroidNovelPlatform>()
-            // The phone's own voices (Google's Vietnamese ones, offline); the shared core adds HoaiMy online.
+            // The phone's own voices (Google's Vietnamese ones, offline); the shared core adds VieNeu's.
             .AddSingleton<AndroidTtsEngine>()
             .AddSingleton<ISpeechEngine>(sp => sp.GetRequiredService<AndroidTtsEngine>())
             // The player, with the background service, its notification and the lock-screen controls.

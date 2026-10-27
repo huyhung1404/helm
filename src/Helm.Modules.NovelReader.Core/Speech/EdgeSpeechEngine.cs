@@ -8,9 +8,10 @@ using Microsoft.Extensions.Logging;
 namespace Helm.Modules.NovelReader.Speech;
 
 /// <summary>
-/// Microsoft's neural voice HoaiMy (Vietnamese, female) through the read-aloud service of Microsoft Edge: free and
-/// without an account, but not an official API (the same one the open-source edge-tts uses), so the version below may
-/// need a bump when Microsoft changes it. One WebSocket per sentence; the text of the sentence is sent to Microsoft.
+/// Microsoft's neural voice Xiaoxiao (Mandarin) through the read-aloud service of Microsoft Edge, to say a Chinese word
+/// pressed in study mode (<see cref="WordPronouncer"/>); it offers no voice for reading aloud. Free and without an
+/// account, but not an official API (the same one the open-source edge-tts uses), so the version below may need a bump
+/// when Microsoft changes it. One WebSocket per word; the word is sent to Microsoft.
 /// </summary>
 public sealed class EdgeSpeechEngine(ILogger<EdgeSpeechEngine> logger) : ISpeechEngine
 {
@@ -28,7 +29,8 @@ public sealed class EdgeSpeechEngine(ILogger<EdgeSpeechEngine> logger) : ISpeech
 
     public string Prefix => EnginePrefix;
 
-    public IReadOnlyList<SpeechVoice> Voices { get; } = [new($"{EnginePrefix}:vi-VN-HoaiMyNeural", "HoaiMy", "vi-VN", IsOnline: true)];
+    /// <summary>None for reading aloud: <see cref="WordPronouncer.OnlineVoice"/> is asked for by itself.</summary>
+    public IReadOnlyList<SpeechVoice> Voices { get; } = [];
 
     public void RefreshVoices() { }
 
@@ -36,8 +38,7 @@ public sealed class EdgeSpeechEngine(ILogger<EdgeSpeechEngine> logger) : ISpeech
     /// The service now and then turns a request away (it closes the connection before any sound) or answers slowly. So
     /// when a request has no answer after <see cref="HedgeAfter"/>, a second one starts and the first to answer wins; a
     /// refused request is tried again at once, up to <see cref="Attempts"/> rounds. Each round waits longer for the first
-    /// sound (<see cref="FirstSoundTimeouts"/>): when the service is slow, a sentence comes late instead of not at all.
-    /// Reading aloud downloads ahead, so this only shows on the very first sentence.
+    /// sound (<see cref="FirstSoundTimeouts"/>): when the service is slow, a word comes late instead of not at all.
     /// </summary>
     public async Task<SpeechAudio> SynthesizeAsync(string text, SpeechVoice voice, SpeechOptions options, CancellationToken ct)
     {
@@ -85,7 +86,7 @@ public sealed class EdgeSpeechEngine(ILogger<EdgeSpeechEngine> logger) : ISpeech
         _ => "the service did not answer.",
     };
 
-    /// <summary>Rounds of requests per sentence before giving up (and falling back to an offline voice).</summary>
+    /// <summary>Rounds of requests per word before giving up (and falling back to an offline voice).</summary>
     internal const int Attempts = 4;
 
     /// <summary>How long a request may take before a second one races it.</summary>
@@ -230,7 +231,7 @@ public sealed class EdgeSpeechEngine(ILogger<EdgeSpeechEngine> logger) : ISpeech
         var volume = (int)Math.Round((Math.Clamp(options.Volume, 0, 1) - 1) * 100);
         var clean = new string(text.Where(c => c is '\t' or '\n' or '\r' || (c >= ' ' && !char.IsSurrogate(c))).ToArray());
         var parts = voice.Split('-');
-        var language = parts.Length >= 3 ? $"{parts[0]}-{parts[1]}" : "vi-VN";
+        var language = parts.Length >= 3 ? $"{parts[0]}-{parts[1]}" : "zh-CN";
         return $"<speak version='1.0' xmlns='http://www.w3.org/2001/10/synthesis' xml:lang='{SecurityElement.Escape(language)}'>" +
                $"<voice name='{voice}'><prosody pitch='{pitch:+0;-0}Hz' rate='{rate:+0;-0}%' volume='{volume:+0;-0}%'>" +
                SecurityElement.Escape(clean) + "</prosody></voice></speak>";

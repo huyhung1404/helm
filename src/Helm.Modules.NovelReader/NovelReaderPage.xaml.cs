@@ -37,13 +37,6 @@ public partial class NovelReaderPage : ModulePageBase
         if (dialog.ShowDialog(Window.GetWindow(this)) == true) await _viewModel.ImportDictionariesAsync(dialog.FileNames);
     }
 
-    /// <summary>View glue: the folder dialog is Windows UI.</summary>
-    private void ChooseLocalVoiceFolder_Click(object sender, RoutedEventArgs e)
-    {
-        var dialog = new OpenFolderDialog { Title = "The VieNeu-TTS folder (with .venv inside)" };
-        if (dialog.ShowDialog(Window.GetWindow(this)) == true) _viewModel.SetLocalVoiceFolder(dialog.FolderName);
-    }
-
     private void Sources_LostFocus(object sender, RoutedEventArgs e) => _viewModel.ApplyDictionarySources(SourcesBox.Text);
 
     private void NameAgent_Expanded(object sender, RoutedEventArgs e) => _viewModel.RefreshNameAgentStatusCommand.Execute(null);

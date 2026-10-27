@@ -28,6 +28,8 @@
     <PackageReference Include="Xamarin.Google.MLKit.TextRecognition.Chinese" Version="116.0.1.9" />
     <PackageReference Include="FluentIcons.Avalonia" Version="2.1.343" />
     <PackageReference Include="SQLitePCLRaw.bundle_e_sqlite3" Version="2.1.13" />
+    <!-- ONNX Runtime's native library for the VieNeu voice (the managed API comes with Helm.Modules.NovelReader.Core). -->
+    <PackageReference Include="Microsoft.ML.OnnxRuntime" Version="1.30.0" />
   </ItemGroup>
 
   <ItemGroup>

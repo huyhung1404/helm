@@ -13,6 +13,16 @@ Format: [Keep a Changelog](https://keepachangelog.com), versions follow [SemVer]
   or a database, or pipe a script into a shell. Each run stays in the activity log, the AI agent tab (where you can
   stop it) and a tray notification.
 
+### Changed
+- **Novel Reader: VieNeu reads in Helm itself, on the PC and the phone; HoaiMy is gone.** Eleven women's voices of
+  VieNeu-TTS v3 Turbo (Ngọc Huyền first) now run inside Helm, on the processor: no other app, no Python, no server,
+  offline, and the text never leaves the device. Download the voice once in Novel Reader's settings (**VieNeu voices**,
+  about 270 MB; a download that stops goes on from where it stopped). Sentences are made ahead while you listen, so
+  reading no longer stops between chunks as HoaiMy did. HoaiMy (online and through a hidden Edge), the hidden Edge
+  itself and the VieNeu-TTS folder setting are removed; a saved HoaiMy or VieNeu-folder voice becomes Ngọc Huyền. The
+  phone's own voices and the Windows voices stay. A Chinese word pressed in study mode is still said by Xiaoxiao
+  (Edge's read-aloud service, or the device's Chinese voice).
+
 ### Fixed
 - **Workspace: sending to a workspace that has two VS Code windows.** An editor moved into a new window carries the
   workspace name too, and the phone said the window "was not found (or two windows have that name)". Helm now types
