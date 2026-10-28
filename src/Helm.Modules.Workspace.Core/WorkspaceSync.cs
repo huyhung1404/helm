@@ -184,6 +184,18 @@ public sealed record WorkspaceResultRecord
 
     /// <summary>While <see cref="Status"/> is Sending: the step the PC is at ("Opening a new Claude tab in Helm").</summary>
     public string? Step { get; init; }
+
+    /// <summary>
+    /// Which start of Helm on the PC wrote it (null from PCs before 0.58). A Sending result of an earlier start was
+    /// left behind when Helm stopped: the next start reports it failed instead of leaving it on its way for ever.
+    /// </summary>
+    public string? Run { get; init; }
+
+    /// <summary>While a command is Sending (or waits its turn), its PC writes the result again this often: a lease.</summary>
+    public static readonly TimeSpan RenewEvery = TimeSpan.FromSeconds(15);
+
+    /// <summary>A Sending result not written again for this long (on a phone that is up to date) lost its PC.</summary>
+    public static readonly TimeSpan LostAfter = TimeSpan.FromSeconds(60);
 }
 
 /// <summary>The synced collections of Workspace Controller (all end-to-end encrypted like the rest of Helm Sync).</summary>

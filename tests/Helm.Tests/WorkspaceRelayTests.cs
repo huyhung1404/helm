@@ -51,7 +51,7 @@ public sealed class WorkspaceRelayTests : IAsyncDisposable
         _phoneSettings = new SettingsStoreFactory(new HelmPaths(Path.Combine(_dir.FullName, "phone")));
     }
 
-    private async Task<WorkspaceEngine> StartPcAsync()
+    private async Task<WorkspaceEngine> StartPcAsync(Action<WorkspaceEngine>? beforeRelay = null)
     {
         var settings = _pcSettings.Get<WorkspaceSettings>(WorkspaceIds.ModuleId);
         _engine = WorkspaceEngine.Start(settings, new HelmPaths(_dir.FullName), new PromptSender(_keyboard, NullLogger<PromptSender>.Instance),
@@ -60,6 +60,7 @@ public sealed class WorkspaceRelayTests : IAsyncDisposable
         _bridge = new FakeBridge(_pipe);
         await _bridge.ConnectAsync("app", [@"c:\work\app"]);
         await WorkspaceBridgeTests.WaitAsync(() => _engine.Windows().SingleOrDefault());
+        beforeRelay?.Invoke(_engine);
         _relay = new WorkspaceRelay(_engine, _hosts, _sessions, _commands, _results, "Desk PC", () => [new SkillInfo("commit", "Commit the changes"), new SkillInfo("compact", "Compact")], NullLogger.Instance);
         return _engine;
     }
@@ -219,6 +220,59 @@ public sealed class WorkspaceRelayTests : IAsyncDisposable
     }
 
     [Fact]
+    public async Task A_command_an_earlier_start_left_on_its_way_is_failed_not_typed_again()
+    {
+        // Helm stopped while it typed c1: its result still says Sending. c2 is another PC's.
+        await StartPcAsync(beforeRelay: e =>
+        {
+            _commands.SetRemote("c1", new WorkspaceCommand { Id = "c1", MachineId = e.MachineId, SessionId = "s1", Text = "Half typed", CreatedAt = DateTimeOffset.Now });
+            _results.SetRemote("c1", new WorkspaceResultRecord
+            {
+                CommandId = "c1", MachineId = e.MachineId, Status = WorkspaceCommandStatus.Sending, Step = "Delivering your prompt", Run = "earlier", UpdatedAt = DateTimeOffset.Now,
+            });
+            _results.SetRemote("c2", new WorkspaceResultRecord { CommandId = "c2", MachineId = "another-pc", Status = WorkspaceCommandStatus.Sending, UpdatedAt = DateTimeOffset.Now });
+        });
+
+        var left = _results.Get("c1")!;
+        Assert.Equal(WorkspaceCommandStatus.Failed, left.Status);
+        Assert.Equal(WorkspaceRelay.StoppedText, left.Error);
+        Assert.Null(left.Step);
+        Assert.NotEqual("earlier", left.Run);
+        await Task.Delay(300);
+        Assert.Empty(_keyboard.Log);
+        Assert.Equal(WorkspaceCommandStatus.Sending, _results.Get("c2")!.Status);
+    }
+
+    [Fact]
+    public async Task Helm_closing_while_it_types_tells_the_phone_at_once()
+    {
+        var engine = await StartPcAsync();
+        engine.Registry.Apply(Hook(ClaudeHookEvent.UserPromptSubmit, "s1", prompt: "Start"));
+        await WorkspaceBridgeTests.WaitAsync(() => _sessions.Get("s1"));
+        _keyboard.Hang = true;
+        var phone = Phone();
+        _ui.Run(() =>
+        {
+            phone.Prompt = "Run the tests";
+            phone.SendCommand.Execute(null);
+        });
+        await _keyboard.Hung.Task.WaitAsync(TimeSpan.FromSeconds(10));
+        var id = Assert.Single(_commands.All()).Id;
+        var sending = _results.Get(id)!;
+        Assert.Equal(WorkspaceCommandStatus.Sending, sending.Status);
+        Assert.NotNull(sending.Run);
+
+        await _relay!.DisposeAsync();
+        _relay = null;
+        var stopped = _results.Get(id)!;
+        Assert.Equal(WorkspaceCommandStatus.Failed, stopped.Status);
+        Assert.Equal(WorkspaceRelay.StoppedText, stopped.Error);
+        await WorkspaceBridgeTests.WaitAsync(() => phone.IsSending ? null : (object)true);
+        Assert.True(phone.SendFailed);
+        Assert.Equal(WorkspaceRelay.StoppedText, phone.SendStatus);
+    }
+
+    [Fact]
     public void Records_stay_small()
     {
         var huge = new string('x', 50_000);
@@ -279,7 +333,16 @@ public sealed class WorkspaceRelayTests : IAsyncDisposable
             Registry.Apply(new ClaudeHookEvent { Event = ClaudeHookEvent.UserPromptSubmit, SessionId = session, Cwd = @"c:\work\app", Prompt = text });
         }
 
-        public Task Pause(int milliseconds, CancellationToken ct) => Task.CompletedTask;
+        /// <summary>Typing stops at the next pause until the PC's work is cancelled (Helm closing in the middle).</summary>
+        public bool Hang { get; set; }
+        public TaskCompletionSource Hung { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        public Task Pause(int milliseconds, CancellationToken ct)
+        {
+            if (!Hang) return Task.CompletedTask;
+            Hung.TrySetResult();
+            return Task.Delay(Timeout.Infinite, ct);
+        }
 
         public async Task<bool> WaitFor(Task task, int milliseconds, CancellationToken ct)
         {

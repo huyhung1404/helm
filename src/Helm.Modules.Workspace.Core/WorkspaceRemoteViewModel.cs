@@ -783,9 +783,16 @@ public sealed partial class WorkspaceRemoteViewModel : ObservableObject
             NotifyFreshness();
         }
         var changed = false;
-        foreach (var d in _deliveries.Where(d => !d.Sent.Done).ToList())
+        foreach (var d in _deliveries.Where(d => !d.Sent.Done || d.Lost).ToList())
         {
             if (_results.Get(d.Sent.CommandId) is not { } result) continue;
+            _progress.Observe(d, result);
+            // A card given up on comes back once its PC answers after all.
+            if (d.Lost)
+            {
+                if (result.Status == WorkspaceCommandStatus.Sending) continue;
+                d.Lost = false;
+            }
             changed = true;
             var sent = d.Sent;
             if (result.Status == WorkspaceCommandStatus.Sending && result.Step is { Length: > 0 } step && (d.PcSteps.Count == 0 || d.PcSteps[^1] != step)) d.PcSteps.Add(step);
@@ -1015,6 +1022,18 @@ public sealed partial class WorkspaceRemoteViewModel : ObservableObject
             d.AwaitSession = null;
         }
         if (_pingId is not null && _time.GetLocalNow() - _pingAt > AnswerTimeout) _pingId = null;
+        var lost = _deliveries.Where(_progress.IsLost).ToList();
+        foreach (var d in lost)
+        {
+            Finish(d, failed: true, DeliveryProgress.LostText);
+            d.Lost = true;
+            RevertOverride(d.Sent);
+        }
+        if (lost.Count > 0)
+        {
+            NotifySending();
+            FillTimeline();
+        }
         if (ShowProgress || ProgressSteps.Count > 0) RebuildProgress();
         var stepping = _deliveries.Any(d => Shows(d) && (!d.Sent.Done || AwaitingTab(d)));
         if ((IsWorking || stepping) && !_deferFill && _timelineFor == (IsNewSession ? null : Session?.SessionId)) FillTimelineCore();

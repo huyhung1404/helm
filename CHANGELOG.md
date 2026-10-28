@@ -3,6 +3,15 @@
 All notable changes to Helm. The top section is used as the GitHub release body and as the Velopack release notes.
 Format: [Keep a Changelog](https://keepachangelog.com), versions follow [SemVer](https://semver.org).
 
+## [Unreleased]
+
+### Fixed
+- **Workspace: a message no longer stays "on its way" for ever when Helm on the PC stops.** If Helm closed, crashed
+  or the tool was turned off while it typed a prompt (or with prompts waiting their turn), the phone kept saying "It
+  keeps going". Now Helm reports them as stopped when it closes, and again when it starts; while it works on a
+  command it renews it every 15 seconds, and a phone that hears nothing for a minute says so, so you can look at the
+  session and send it again. If the PC answers after all, the card follows.
+
 ## [0.57.0] - 2026-10-27
 
 ### Changed

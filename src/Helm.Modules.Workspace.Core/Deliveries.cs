@@ -33,6 +33,13 @@ internal sealed class Delivery(SentCommand sent, string? folder, string? title, 
 
     /// <summary>You saw how it ended: it is put away when you leave its place.</summary>
     public bool SeenDone { get; set; }
+
+    /// <summary>The PC's result as last seen (its time of writing), and when this phone saw it change: the lease.</summary>
+    public DateTimeOffset? LeaseStamp { get; set; }
+    public DateTimeOffset? LeaseSeenAt { get; set; }
+
+    /// <summary>Given up on (its PC stopped renewing the lease); it comes back if the PC answers after all.</summary>
+    public bool Lost { get; set; }
 }
 
 /// <summary>
@@ -77,6 +84,9 @@ internal sealed class DeliveryProgress(ISyncedCollection<WorkspaceResultRecord> 
                 case WorkspaceCommandStatus.Failed:
                     steps.Add((result.Error ?? "It could not be sent.", ProgressState.Failed));
                     break;
+                case WorkspaceCommandStatus.Sending when d.Lost:
+                    steps.Add((LostText, ProgressState.Failed));
+                    break;
             }
         }
         var now = time.GetLocalNow();
@@ -112,6 +122,30 @@ internal sealed class DeliveryProgress(ISyncedCollection<WorkspaceResultRecord> 
         var steps = StepsOf(d);
         var hint = HintOf(d);
         return steps.Select((step, i) => TimelineRow.Step(step, i == steps.Count - 1 && step.IsActive ? hint : null));
+    }
+
+    /// <summary>Said on a card given up on because its PC stopped answering in the middle.</summary>
+    public const string LostText = "Helm on the PC stopped answering while it was sending this. It may not have reached Claude: look at the session, then send it again if needed.";
+
+    /// <summary>Notes the PC's result of <paramref name="d"/>: a new write renews the lease, timed by this phone's clock (the PC's may be off).</summary>
+    public void Observe(Delivery d, WorkspaceResultRecord result)
+    {
+        if (d.LeaseSeenAt is not null && d.LeaseStamp == result.UpdatedAt) return;
+        d.LeaseStamp = result.UpdatedAt;
+        d.LeaseSeenAt = time.GetLocalNow();
+    }
+
+    /// <summary>
+    /// The PC took <paramref name="d"/> and then went quiet: still Sending, not written again for
+    /// <see cref="WorkspaceResultRecord.LostAfter"/> while this phone was up to date (a live link, or a pull since).
+    /// Only PCs that renew the lease (0.58 on) are judged; an older one may be slow without saying so.
+    /// </summary>
+    public bool IsLost(Delivery d)
+    {
+        if (d.Sent.Done || d.LeaseSeenAt is not { } seen) return false;
+        if (results.Get(d.Sent.CommandId) is not { Status: WorkspaceCommandStatus.Sending, Run: not null }) return false;
+        if (time.GetLocalNow() - seen <= WorkspaceResultRecord.LostAfter) return false;
+        return sync is null || sync.IsLive || sync.Status.LastSyncedAt is { } at && at - seen > WorkspaceResultRecord.LostAfter;
     }
 
     /// <summary>The PC is done; the new or reopened tab has not shown up on the phone yet.</summary>

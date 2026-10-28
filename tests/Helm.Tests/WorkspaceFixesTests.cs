@@ -601,8 +601,66 @@ public sealed class WorkspacePhoneFixesTests : IDisposable
         Assert.Equal(["a", "new"], phone.SessionTabs.Select(t => t.SessionId));
     }
 
-    private void Result(string id, WorkspaceCommandStatus status, string? step = null, string? session = null) =>
-        _results.Upsert(id, new WorkspaceResultRecord { CommandId = id, MachineId = "pc", Status = status, Step = step, SessionId = session, UpdatedAt = _time.GetLocalNow() });
+    [Fact]
+    public async Task A_message_whose_pc_went_quiet_is_given_up_and_comes_back_if_the_pc_answers()
+    {
+        Pc(new HostWindowInfo { Folder = @"c:\app", Name = "app", OpenSessions = ["a"] });
+        Session("a", @"c:\app");
+        var phone = Phone();
+        _ui.Run(() => phone.Prompt = "Fix the build");
+        await _ui.Run(() => phone.SendCommand.ExecuteAsync(null));
+        var id = Assert.Single(_commands.All()).Id;
+        Result(id, WorkspaceCommandStatus.Sending, step: "Typing it into VS Code", run: "r1");
+
+        // The PC renews its lease: on its way, however long it takes.
+        for (var i = 0; i < 6; i++)
+        {
+            _time.Advance(WorkspaceResultRecord.RenewEvery);
+            Result(id, WorkspaceCommandStatus.Sending, step: "Typing it into VS Code", run: "r1");
+            Tick(phone);
+        }
+        Assert.True(phone.IsSending);
+        Assert.False(phone.SendFailed);
+
+        // Then it goes quiet: given up, said why, the composer is free again.
+        _time.Advance(WorkspaceResultRecord.LostAfter + TimeSpan.FromSeconds(1));
+        Tick(phone);
+        Assert.False(phone.IsSending);
+        Assert.True(phone.SendFailed);
+        Assert.Equal(DeliveryProgress.LostText, phone.SendStatus);
+        Assert.True(phone.ProgressFailed);
+        Assert.Equal(DeliveryProgress.LostText, phone.ProgressSteps[^1].Text);
+
+        // It answers after all: the card says so.
+        Result(id, WorkspaceCommandStatus.Received, run: "r1");
+        Assert.False(phone.SendFailed);
+        Assert.Equal("✓ Claude received it", phone.SendStatus);
+    }
+
+    [Fact]
+    public async Task A_pc_from_before_the_lease_is_never_given_up_on()
+    {
+        Pc(new HostWindowInfo { Folder = @"c:\app", Name = "app", OpenSessions = ["a"] });
+        Session("a", @"c:\app");
+        var phone = Phone();
+        _ui.Run(() => phone.Prompt = "Fix the build");
+        await _ui.Run(() => phone.SendCommand.ExecuteAsync(null));
+        Result(Assert.Single(_commands.All()).Id, WorkspaceCommandStatus.Sending, step: "Typing it into VS Code");
+        _time.Advance(TimeSpan.FromMinutes(5));
+        Tick(phone);
+        Assert.True(phone.IsSending);
+        Assert.False(phone.SendFailed);
+    }
+
+    /// <summary>One tick of the screen's clock (it ticks only while the screen is shown).</summary>
+    private void Tick(WorkspaceRemoteViewModel phone) => _ui.Run(() =>
+    {
+        phone.IsOnScreen = true;
+        phone.IsOnScreen = false;
+    });
+
+    private void Result(string id, WorkspaceCommandStatus status, string? step = null, string? session = null, string? run = null) =>
+        _results.Upsert(id, new WorkspaceResultRecord { CommandId = id, MachineId = "pc", Status = status, Step = step, SessionId = session, UpdatedAt = _time.GetLocalNow(), Run = run });
 
     private sealed class Answer(bool yes) : Helm.Shell.Services.IDialogService
     {

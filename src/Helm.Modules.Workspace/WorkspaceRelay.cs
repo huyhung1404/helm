@@ -36,6 +36,12 @@ public sealed class WorkspaceRelay : IAsyncDisposable
     private readonly TimeProvider _time;
     private readonly object _gate = new();
     private readonly ConcurrentDictionary<string, byte> _taken = new();
+
+    /// <summary>This start of Helm (<see cref="WorkspaceResultRecord.Run"/>).</summary>
+    private readonly string _run = Guid.NewGuid().ToString("N")[..12];
+
+    /// <summary>The commands taken and not finished (one running, the others waiting their turn), with their step now.</summary>
+    private readonly ConcurrentDictionary<string, OpenCommand> _open = new(StringComparer.Ordinal);
     private readonly Dictionary<string, CachedView> _views = new();
     private readonly Channel<WorkspaceCommand> _queue = Channel.CreateUnbounded<WorkspaceCommand>();
     private readonly CancellationTokenSource _stop = new();
@@ -78,7 +84,32 @@ public sealed class WorkspaceRelay : IAsyncDisposable
         }
         _worker = Task.Run(() => RunCommandsAsync(_stop.Token));
         SafePublish();
+        FailLeftOver();
         TakeCommands();
+    }
+
+    /// <summary>Said of a command Helm stopped before it finished (it closed, crashed, or the tool was turned off).</summary>
+    public const string StoppedText = "Helm on the PC stopped before it finished this. It may not have reached Claude: look at the session, then send it again if needed.";
+
+    /// <summary>
+    /// The commands an earlier start of Helm left on their way (it stopped while typing one, or with some waiting):
+    /// reported failed, so the phone is not told "it keeps going" for ever and can send them again.
+    /// </summary>
+    private void FailLeftOver()
+    {
+        try
+        {
+            var now = _time.GetLocalNow();
+            foreach (var item in _results.All().Where(i => i.Value.MachineId == _engine.MachineId && i.Value.Status == WorkspaceCommandStatus.Sending && i.Value.Run != _run).ToList())
+            {
+                _taken.TryAdd(item.Id, 0);
+                _results.Upsert(item.Id, item.Value with { Status = WorkspaceCommandStatus.Failed, Error = StoppedText, Step = null, Run = _run, UpdatedAt = now });
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Workspace relay: commands left by an earlier start could not be closed");
+        }
     }
 
     /// <summary>The model aliases phones of 0.42 offer for a new session.</summary>
@@ -302,8 +333,9 @@ public sealed class WorkspaceRelay : IAsyncDisposable
                 var c = item.Value;
                 if (c.MachineId != _engine.MachineId || _results.Get(c.Id) is not null || !_taken.TryAdd(c.Id, 0)) continue;
                 // The phone learns at once that this PC has it, even while another command is being typed.
-                Report(new WorkspaceCommandResult(c.Id, WorkspaceCommandStatus.Sending, null, c.SessionId), c,
-                    _doing is null ? "Helm on the PC got it" : "Helm on the PC got it; it waits for the command before it");
+                var step = _doing is null ? "Helm on the PC got it" : "Helm on the PC got it; it waits for the command before it";
+                _open[c.Id] = new OpenCommand(c, step);
+                Report(new WorkspaceCommandResult(c.Id, WorkspaceCommandStatus.Sending, null, c.SessionId), c, step);
                 _queue.Writer.TryWrite(c);
                 RequestPublish();
             }
@@ -325,6 +357,7 @@ public sealed class WorkspaceRelay : IAsyncDisposable
                     void Step(string text)
                     {
                         _doing = text;
+                        if (_open.TryGetValue(command.Id, out var open)) open.Step = text;
                         Report(new WorkspaceCommandResult(command.Id, WorkspaceCommandStatus.Sending, null, command.SessionId), command, text);
                         RequestPublish();
                     }
@@ -338,13 +371,21 @@ public sealed class WorkspaceRelay : IAsyncDisposable
                     WorkspaceCommandResult result;
                     try
                     {
-                        result = await _engine.RunAsync(command, ct, Step).ConfigureAwait(false);
+                        var run = _engine.RunAsync(command, ct, Step);
+                        // While it runs, every command still open is written again: the phone sees this PC is at it.
+                        while (await Task.WhenAny(run, Task.Delay(WorkspaceResultRecord.RenewEvery, _time, ct)).ConfigureAwait(false) != run)
+                        {
+                            ct.ThrowIfCancellationRequested();
+                            Renew();
+                        }
+                        result = await run.ConfigureAwait(false);
                     }
                     finally
                     {
                         _doing = null;
                         RequestPublish();
                     }
+                    _open.TryRemove(command.Id, out _);
                     Report(result, command);
                     if (command.Kind == WorkspaceCommandKind.Ping)
                     {
@@ -361,6 +402,7 @@ public sealed class WorkspaceRelay : IAsyncDisposable
                 catch (Exception ex)
                 {
                     _logger.LogWarning(ex, "Workspace relay: command {Id} failed", command.Id);
+                    _open.TryRemove(command.Id, out _);
                     Report(new WorkspaceCommandResult(command.Id, WorkspaceCommandStatus.Failed, "Helm on the PC hit an error: " + ex.Message), command);
                 }
             }
@@ -380,7 +422,28 @@ public sealed class WorkspaceRelay : IAsyncDisposable
             SessionId = result.SessionId ?? command.SessionId,
             UpdatedAt = _time.GetLocalNow(),
             Step = step,
+            Run = _run,
         });
+
+    /// <summary>Writes every open command again, as it stands: the lease the phone watches.</summary>
+    private void Renew()
+    {
+        try
+        {
+            foreach (var open in _open.Values)
+                Report(new WorkspaceCommandResult(open.Command.Id, WorkspaceCommandStatus.Sending, null, open.Command.SessionId), open.Command, open.Step);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogDebug(ex, "Workspace relay: the lease of the open commands could not be renewed");
+        }
+    }
+
+    private sealed class OpenCommand(WorkspaceCommand command, string step)
+    {
+        public WorkspaceCommand Command { get; } = command;
+        public volatile string Step = step;
+    }
 
     /// <summary>Removes this PC's old commands and results.</summary>
     internal void Cleanup()
@@ -437,6 +500,19 @@ public sealed class WorkspaceRelay : IAsyncDisposable
         catch (OperationCanceledException)
         {
         }
+        // What was being typed or waited its turn will not be: the phone hears it now (and the next start would say so too).
+        foreach (var open in _open.Values)
+        {
+            try
+            {
+                Report(new WorkspaceCommandResult(open.Command.Id, WorkspaceCommandStatus.Failed, StoppedText), open.Command);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Workspace relay: could not report command {Id} as stopped", open.Command.Id);
+            }
+        }
+        _open.Clear();
         try
         {
             lock (_gate)
