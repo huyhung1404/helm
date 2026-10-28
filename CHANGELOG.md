@@ -5,6 +5,12 @@ Format: [Keep a Changelog](https://keepachangelog.com), versions follow [SemVer]
 
 ## [Unreleased]
 
+### Changed
+- **Workspace (phone): scroll back through the last 200 steps of a conversation, not 60.** The PC now sends a
+  session's timeline in pages of 20 steps, each step with its own id from Claude's transcript. While Claude works only
+  the last page is written again, instead of the whole timeline every second, and the phone keeps the earlier pages.
+  Phones before this version still see the newest steps; PCs before it work as before.
+
 ### Fixed
 - **Workspace: a message no longer stays "on its way" for ever when Helm on the PC stops.** If Helm closed, crashed
   or the tool was turned off while it typed a prompt (or with prompts waiting their turn), the phone kept saying "It

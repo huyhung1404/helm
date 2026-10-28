@@ -29,6 +29,7 @@ public sealed class WorkspaceRelay : IAsyncDisposable
     private readonly ISyncedCollection<WorkspaceResultRecord> _results;
     private readonly ISyncedCollection<WorkspaceHistoryRecord>? _history;
     private readonly WorkspaceImageStore? _images;
+    private readonly TimelinePublisher? _timeline;
     private readonly string _machineName;
     private readonly Func<IReadOnlyList<SkillInfo>> _skills;
     private readonly Func<(IReadOnlyList<ModelInfo> Models, bool AutoMode)> _models;
@@ -56,7 +57,7 @@ public sealed class WorkspaceRelay : IAsyncDisposable
         ISyncedCollection<WorkspaceCommand> commands, ISyncedCollection<WorkspaceResultRecord> results, string machineName,
         Func<IReadOnlyList<SkillInfo>>? skills, ILogger logger, TimeProvider? time = null,
         Func<(IReadOnlyList<ModelInfo>, bool)>? models = null, ISyncedCollection<WorkspaceHistoryRecord>? history = null,
-        WorkspaceImageStore? images = null)
+        WorkspaceImageStore? images = null, ISyncedCollection<WorkspaceTimelinePage>? timeline = null)
     {
         _images = images;
         _engine = engine;
@@ -70,6 +71,7 @@ public sealed class WorkspaceRelay : IAsyncDisposable
         _models = models ?? (() => ([], false));
         _logger = logger;
         _time = time ?? TimeProvider.System;
+        _timeline = timeline is null ? null : new TimelinePublisher(timeline, engine.MachineId, _time);
         _publishTimer = _time.CreateTimer(_ => SafePublish(), null, Timeout.InfiniteTimeSpan, Timeout.InfiniteTimeSpan);
         _heartbeat = _time.CreateTimer(_ => { SafePublish(); SafeCleanup(); }, null, Heartbeat, Heartbeat);
         _live = _time.CreateTimer(_ => CheckLive(), null, LiveCheck, LiveCheck);
@@ -80,6 +82,8 @@ public sealed class WorkspaceRelay : IAsyncDisposable
             // The pictures this PC published before are on the server already: never uploaded again.
             foreach (var item in _sessions.All().Where(i => i.Value.MachineId == engine.MachineId))
                 foreach (var image in item.Value.Items.SelectMany(i => i.Images)) images.Remember(image);
+            foreach (var page in timeline?.All().Where(i => i.Value.MachineId == engine.MachineId) ?? [])
+                foreach (var image in page.Value.Items.SelectMany(i => i.Images)) images.Remember(image);
             images.Changed += OnImagesChanged;
         }
         _worker = Task.Run(() => RunCommandsAsync(_stop.Token));
@@ -187,6 +191,7 @@ public sealed class WorkspaceRelay : IAsyncDisposable
                 _sessions.Delete(item.Id);
                 _views.Remove(item.Id);
             }
+            _timeline?.KeepOnly(keep);
             PublishHistory(windows, now);
         }
     }
@@ -207,6 +212,8 @@ public sealed class WorkspaceRelay : IAsyncDisposable
         // Pictures show on the phone once their blobs are on the server.
         if (view is not null && _images is not null) view = view with { Items = _images.Resolve(view.Items) };
         var record = WorkspaceSync.ToRecord(s, windowFolder, view);
+        // The timeline goes in pages: a live session rewrites its last page, not all of its steps.
+        if (_timeline is not null) record = _timeline.Publish(record, view?.Items ?? []);
         if (_sessions.Get(s.SessionId) is { } old && WorkspaceSync.SameContent(old, record)) return;
         _sessions.Upsert(s.SessionId, record);
     }
@@ -251,7 +258,8 @@ public sealed class WorkspaceRelay : IAsyncDisposable
         if (_views.TryGetValue(s.SessionId, out var cached) && cached.Length == length && cached.State == s.State &&
             (cached.View.Agents.Count == 0 || now - cached.At < AgentsRefresh))
             return cached.View;
-        var view = TranscriptReader.ReadView(s.TranscriptPath, WorkspaceSync.MaxItems);
+        // With pages the phone can scroll back further than one record holds.
+        var view = TranscriptReader.ReadView(s.TranscriptPath, _timeline is null ? WorkspaceSync.MaxItems : WorkspaceSync.MaxTimelineItems);
         // Pictures pasted on the PC are uploaded once for the phone; their base64 text is not kept.
         _images?.Take(view);
         view = view with { ImageData = new Dictionary<string, string>() };

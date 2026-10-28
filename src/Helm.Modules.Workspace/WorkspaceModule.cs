@@ -38,6 +38,7 @@ public sealed class WorkspaceModule : HelmModuleBase, IModuleContent
     private WorkspaceEngine? _engine;
     private WorkspaceRelay? _relay;
     private WorkspaceImageStore? _images;
+    private readonly ISyncedCollection<WorkspaceTimelinePage>? _timeline;
     private BackgroundActivity? _activity;
     private string? _hooksProblem;
     private string? _bridgeProblem;
@@ -47,8 +48,9 @@ public sealed class WorkspaceModule : HelmModuleBase, IModuleContent
         IBackgroundActivities activities, ISyncedCollection<WorkspaceHostRecord> hosts, ISyncedCollection<WorkspaceSessionRecord> sessions,
         ISyncedCollection<WorkspaceCommand> commands, ISyncedCollection<WorkspaceResultRecord> results, ClaudeCatalog catalog,
         ILogger<WorkspaceModule> logger, IDeviceInfo? device = null, IUserActivity? activity = null, ISyncedCollection<WorkspaceHistoryRecord>? history = null,
-        IClaudeStarter? starter = null, BlobStore? blobs = null, ISyncService? sync = null)
+        IClaudeStarter? starter = null, BlobStore? blobs = null, ISyncService? sync = null, ISyncedCollection<WorkspaceTimelinePage>? timeline = null)
     {
+        _timeline = timeline;
         _starter = starter;
         _blobs = blobs;
         _sync = sync;
@@ -125,7 +127,7 @@ public sealed class WorkspaceModule : HelmModuleBase, IModuleContent
             StartHooks(_engine);
             // The phone's link: this PC and its connected sessions out, the phone's commands in (Helm Sync).
             _relay = new WorkspaceRelay(_engine, _hosts, _sessions, _commands, _results, _device?.DeviceName ?? Environment.MachineName,
-                () => _catalog.Current, _logger, models: () => (_catalog.Models, _catalog.AutoModeAvailable), history: _history, images: _images);
+                () => _catalog.Current, _logger, models: () => (_catalog.Models, _catalog.AutoModeAvailable), history: _history, images: _images, timeline: _timeline);
             if (_catalog.Models.Count > 0) _engine.AutoModeAvailable = _catalog.AutoModeAvailable;
             _engine.PhoneLinked = true;
             _activity = _activities.Start(Id, DisplayName, Detail(), StopFromGeneralAsync);

@@ -144,8 +144,34 @@ public sealed record WorkspaceSessionRecord
     /// <summary>Outside VS Code, Helm on the PC runs it in the background for the phone (and can stop it).</summary>
     public bool Hosted { get; init; }
 
+    /// <summary>
+    /// Set when the timeline is in pages (<see cref="WorkspaceTimelinePage"/>): which writing of them, and the pages it
+    /// has (oldest dropped). <see cref="Items"/> then keeps only the newest few, for phones before 0.58. Null: the
+    /// timeline is <see cref="Items"/> alone, as before (an older PC, or a transcript without step ids).
+    /// </summary>
+    public string? TimelineEpoch { get; init; }
+    public int TimelineFirstPage { get; init; }
+    public int TimelineLastPage { get; init; }
+
     /// <summary>Not in a connected VS Code window (a terminal, another editor): the phone's "Outside VS Code" tab.</summary>
     [System.Text.Json.Serialization.JsonIgnore] public bool IsOutside => WindowFolder.Length == 0;
+}
+
+/// <summary>
+/// A stretch of a session's timeline (<c>workspace.timeline</c>, id = <see cref="WorkspaceSync.PageId"/>), written by
+/// its PC: <see cref="WorkspaceSync.TimelinePageSize"/> steps, in order. A full page is written again only when one of
+/// its steps changed (rare), so a live session rewrites only its last page while the phone keeps the earlier ones.
+/// </summary>
+public sealed record WorkspaceTimelinePage
+{
+    public string MachineId { get; init; } = "";
+    public string SessionId { get; init; } = "";
+
+    /// <summary>The writing it belongs to (<see cref="WorkspaceSessionRecord.TimelineEpoch"/>): a page of another one is not shown.</summary>
+    public string Epoch { get; init; } = "";
+    public int Page { get; init; }
+    public IReadOnlyList<TranscriptItem> Items { get; init; } = [];
+    public DateTimeOffset UpdatedAt { get; init; }
 }
 
 /// <summary>One earlier session of a folder, as the history sheet lists it.</summary>
@@ -207,9 +233,19 @@ public static class WorkspaceSync
     public const string Commands = "workspace.commands";
     public const string Results = "workspace.results";
     public const string History = "workspace.history";
+    public const string Timeline = "workspace.timeline";
 
     /// <summary>Text longer than this is cut (records stay far below the server's 64 KB).</summary>
     public const int MaxText = 6000;
+
+    /// <summary>Steps per timeline page, the pages kept per session (the oldest dropped), and the most a page may weigh.</summary>
+    public const int TimelinePageSize = 20;
+    public const int TimelinePages = 10;
+    public const int MaxTimelineItems = TimelinePageSize * TimelinePages;
+    public const int MaxPageBytes = 40_000;
+
+    /// <summary>With pages, the session record still carries its newest steps, for phones before 0.58.</summary>
+    public const int LegacyItems = 8;
 
     /// <summary>Messages kept per session record (0.42's plain list).</summary>
     public const int MaxTurns = 8;
@@ -238,13 +274,19 @@ public static class WorkspaceSync
         });
         services.AddSyncedCollection(new SyncedCollectionOptions<WorkspaceResultRecord> { Name = Results, Urgent = true });
         services.AddSyncedCollection(new SyncedCollectionOptions<WorkspaceHistoryRecord> { Name = History });
+        services.AddSyncedCollection(new SyncedCollectionOptions<WorkspaceTimelinePage> { Name = Timeline, BlobReferences = p => ImagesOf(p.Items) });
         services.AddSyncGroup(Prefix, "Workspace Controller");
         return services;
     }
 
     /// <summary>The pictures a session record shows (kept on the server while it does).</summary>
-    public static IEnumerable<string> ImagesOf(WorkspaceSessionRecord record) =>
-        record.Items.SelectMany(i => i.Images).Select(i => i.Blob?.Id).OfType<string>();
+    public static IEnumerable<string> ImagesOf(WorkspaceSessionRecord record) => ImagesOf(record.Items);
+
+    public static IEnumerable<string> ImagesOf(IEnumerable<TranscriptItem> items) =>
+        items.SelectMany(i => i.Images).Select(i => i.Blob?.Id).OfType<string>();
+
+    /// <summary>The record id of a session's timeline page.</summary>
+    public static string PageId(string sessionId, int page) => sessionId + "." + page.ToString("D5", System.Globalization.CultureInfo.InvariantCulture);
 
     /// <summary>The history record of one folder of one PC (the folder's path never shows in the id).</summary>
     public static string HistoryId(string machineId, string folder) =>

@@ -67,6 +67,9 @@ public sealed partial class WorkspaceRemoteViewModel : ObservableObject
     private readonly List<Delivery> _deliveries = [];
     private readonly DeliveryProgress _progress;
 
+    /// <summary>The steps of a session: its timeline pages, or its record's own.</summary>
+    private readonly SessionTimeline _steps;
+
     /// <summary>The place on screen (project, session or new-session page) whose deliveries are shown.</summary>
     private string? _viewKey;
 
@@ -113,8 +116,10 @@ public sealed partial class WorkspaceRemoteViewModel : ObservableObject
     public WorkspaceRemoteViewModel(ISyncedCollection<WorkspaceHostRecord> hosts, ISyncedCollection<WorkspaceSessionRecord> sessions,
         ISyncedCollection<WorkspaceCommand> commands, ISyncedCollection<WorkspaceResultRecord> results, ISettingsStoreFactory settings,
         IUiDispatcher ui, ISyncService? sync = null, TimeProvider? time = null, IDialogService? dialogs = null,
-        ISyncedCollection<WorkspaceHistoryRecord>? history = null, BlobStore? blobs = null, IWorkspaceImagePicker? picker = null)
+        ISyncedCollection<WorkspaceHistoryRecord>? history = null, BlobStore? blobs = null, IWorkspaceImagePicker? picker = null,
+        ISyncedCollection<WorkspaceTimelinePage>? timeline = null)
     {
+        _steps = new SessionTimeline(timeline);
         _blobs = blobs;
         _picker = picker;
         _hosts = hosts;
@@ -132,6 +137,11 @@ public sealed partial class WorkspaceRemoteViewModel : ObservableObject
         sessions.Changed += (_, _) => _ui.Post(Refresh);
         results.Changed += (_, _) => _ui.Post(ShowResult);
         if (history is not null) history.Changed += (_, _) => _ui.Post(FillHistory);
+        // A page of the open conversation came in (earlier steps, or the last one growing).
+        if (timeline is not null) timeline.Changed += (_, e) => _ui.Post(() =>
+        {
+            if (Session is { } s && SessionTimeline.Touches(e.Ids, s.SessionId)) FillTimeline();
+        });
         if (sync is not null) sync.StatusChanged += (_, _) => _ui.Post(() =>
         {
             foreach (var d in _deliveries) StepsOf(d);
@@ -963,7 +973,7 @@ public sealed partial class WorkspaceRemoteViewModel : ObservableObject
           + (_pcAnsweredAt is { } a ? $" It answered your check {Ago(_time.GetLocalNow() - a)}" + (_pcRoundTrip is { } rt ? $", in {rt.TotalSeconds:0.0} s." : ".") : "");
 
     public string StatusSession => Session is { } s
-        ? $"This session last changed at {s.UpdatedAt.ToLocalTime():HH:mm:ss} ({Describe(s)})." + (s.Items.LastOrDefault()?.At is { } step ? $" Its latest step is from {step.ToLocalTime():HH:mm:ss}." : "")
+        ? $"This session last changed at {s.UpdatedAt.ToLocalTime():HH:mm:ss} ({Describe(s)})." + (_steps.ItemsOf(s).LastOrDefault()?.At is { } step ? $" Its latest step is from {step.ToLocalTime():HH:mm:ss}." : "")
         : "No session open.";
 
     public string StatusCommand
@@ -1237,7 +1247,8 @@ public sealed partial class WorkspaceRemoteViewModel : ObservableObject
         var rows = new List<TimelineRow>();
         if (Session is { } s)
         {
-            rows.AddRange(s.Items.Select(i => new TimelineRow(WithLocalImages(i))));
+            var steps = _steps.ItemsOf(s);
+            rows.AddRange(steps.Select(i => new TimelineRow(WithLocalImages(i))));
             if (rows.Count == 0 && (s.LastPrompt is not null || s.LastReply is not null))
             {
                 // A session of an older PC (or one not read yet): its last prompt and answer.
@@ -1249,7 +1260,7 @@ public sealed partial class WorkspaceRemoteViewModel : ObservableObject
                 && !rows.Any(r => r.IsAnswer && r.Text.Trim() == last.Trim()))
                 rows.Add(new TimelineRow(new TranscriptItem { Kind = TranscriptItemKind.Answer, Text = last, At = s.UpdatedAt }));
             var mine = _deliveries.LastOrDefault(d => d.Sent.Text is not null && d.Sent.SessionId == s.SessionId);
-            if (mine is { Sent: { Text: { } text } pending } && !Arrived(s, text, pending.Images, pending.At))
+            if (mine is { Sent: { Text: { } text } pending } && !Arrived(steps, text, pending.Images, pending.At))
             {
                 // Your message, then each step of its way on the rail.
                 rows.Add(TimelineRow.Sending(text, "", mine.Failed, pending.At, pending.Images));
@@ -1263,7 +1274,7 @@ public sealed partial class WorkspaceRemoteViewModel : ObservableObject
                     && StepsOf(mine) is { Count: > 0 } done)
                     rows.Insert(at + 1, TimelineRow.Step(done[^1]));
                 if (s.State == SessionState.Working && (rows.Count == 0 || !rows[^1].Running))
-                    rows.Add(TimelineRow.Working(WorkingText(s)));
+                    rows.Add(TimelineRow.Working(WorkingText(s, steps)));
             }
             if (Card is { Sent.Kind: WorkspaceCommandKind.Reopen } reopen && ShowProgress) rows.AddRange(StepRows(reopen));
         }
@@ -1313,20 +1324,20 @@ public sealed partial class WorkspaceRemoteViewModel : ObservableObject
     }
 
     /// <summary>"Working… 2m 05s · last step 40 s ago": Claude is at it, and you can tell it has not stalled.</summary>
-    private string WorkingText(WorkspaceSessionRecord s)
+    private string WorkingText(WorkspaceSessionRecord s, IReadOnlyList<TranscriptItem> steps)
     {
         var now = _time.GetLocalNow();
         var text = "Working…";
         if (s.WorkingSince is { } since) text += " " + AgentRow.Format(now - since);
         if (s.Agents.Count > 0) text += $" · {AgentsText} at work";
-        var last = s.Items.LastOrDefault()?.At ?? s.UpdatedAt;
+        var last = steps.LastOrDefault()?.At ?? s.UpdatedAt;
         if (now - last > TimeSpan.FromSeconds(30)) text += $" · last step {Ago(now - last)}";
         return text;
     }
 
     /// <summary>The prompt shows in the transcript (it arrived, and Claude has it).</summary>
-    private static bool Arrived(WorkspaceSessionRecord s, string text, IReadOnlyList<WorkspaceImage> images, DateTimeOffset since) =>
-        s.Items.Any(i => i.Kind == TranscriptItemKind.User && SessionRegistry.Normalize(i.Text) == SessionRegistry.Normalize(text) && (i.At is null || i.At >= since.AddMinutes(-2))
+    private static bool Arrived(IReadOnlyList<TranscriptItem> steps, string text, IReadOnlyList<WorkspaceImage> images, DateTimeOffset since) =>
+        steps.Any(i => i.Kind == TranscriptItemKind.User && SessionRegistry.Normalize(i.Text) == SessionRegistry.Normalize(text) && (i.At is null || i.At >= since.AddMinutes(-2))
             && (images.Count == 0 || SameImages(i.Images, images)));
 
     private void FillChoices()

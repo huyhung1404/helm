@@ -45,13 +45,19 @@ public sealed record TranscriptItem
     /// <summary>Tool: Claude's id for the call (pairs it with its result; not shown).</summary>
     public string? CallId { get; init; }
 
+    /// <summary>
+    /// The step's own id, the same in every read of the transcript (from Claude's record ids, or the call's id); null
+    /// when the transcript has none. Steps grow (an answer's next block, a tool's result) but keep it.
+    /// </summary>
+    public string? Id { get; init; }
+
     /// <summary>Your prompt: the pictures that came with it.</summary>
     public IReadOnlyList<WorkspaceImage> Images { get; init; } = [];
 
     // The pictures are a list: two steps are the same when their pictures are, whichever list holds them.
     public bool Equals(TranscriptItem? other) =>
         other is not null && Kind == other.Kind && Text == other.Text && Tool == other.Tool && Input == other.Input && Output == other.Output
-        && Running == other.Running && Failed == other.Failed && At == other.At && CallId == other.CallId && Images.SequenceEqual(other.Images);
+        && Running == other.Running && Failed == other.Failed && At == other.At && CallId == other.CallId && Id == other.Id && Images.SequenceEqual(other.Images);
 
     public override int GetHashCode() => HashCode.Combine(Kind, Text, Tool, Input, Output, Running, At, CallId);
 }
@@ -211,8 +217,9 @@ public static class TranscriptReader
             if (Flag(root, "isSidechain") || Flag(root, "isMeta") || Flag(root, "isCompactSummary") || Flag(root, "isVisibleInTranscriptOnly")) return;
             if (!root.TryGetProperty("message", out var message) || message.ValueKind != JsonValueKind.Object) return;
             DateTimeOffset? at = DateTimeOffset.TryParse(Text(root, "timestamp"), out var t) ? t.ToLocalTime() : null;
-            if (type == "assistant") ParseAssistant(root, message, at, s);
-            else ParseUser(root, message, at, s);
+            var uuid = Text(root, "uuid");
+            if (type == "assistant") ParseAssistant(root, message, at, uuid, s);
+            else ParseUser(root, message, at, uuid, s);
         }
         catch (JsonException)
         {
@@ -220,7 +227,7 @@ public static class TranscriptReader
         }
     }
 
-    private static void ParseAssistant(JsonElement root, JsonElement message, DateTimeOffset? at, ParseState s)
+    private static void ParseAssistant(JsonElement root, JsonElement message, DateTimeOffset? at, string? uuid, ParseState s)
     {
         if (Text(message, "model") is { Length: > 0 } model && model != "<synthetic>") s.Model = model;
         if (Text(root, "effort") is { Length: > 0 } effort) s.Effort = effort;
@@ -236,13 +243,15 @@ public static class TranscriptReader
             else
             {
                 s.ThoughtMs = thought;
-                s.Items.Add(new TranscriptItem { Kind = TranscriptItemKind.Thought, At = at });
+                s.Items.Add(new TranscriptItem { Kind = TranscriptItemKind.Thought, At = at, Id = uuid is null ? null : "t:" + uuid });
             }
             s.Items[^1] = s.Items[^1] with { Text = $"Thought for {Math.Max(1, (int)Math.Round(s.ThoughtMs / 1000.0))}s" };
         }
         if (!message.TryGetProperty("content", out var content) || content.ValueKind != JsonValueKind.Array) return;
+        var index = -1;
         foreach (var part in content.EnumerateArray())
         {
+            index++;
             switch (Text(part, "type"))
             {
                 case "text" when Text(part, "text") is { } text && text.Trim().Length > 0:
@@ -250,7 +259,7 @@ public static class TranscriptReader
                     if (s.Items.Count > 0 && s.Items[^1].Kind == TranscriptItemKind.Answer)
                         s.Items[^1] = s.Items[^1] with { Text = s.Items[^1].Text + "\n\n" + text.Trim(), At = at ?? s.Items[^1].At };
                     else
-                        s.Items.Add(new TranscriptItem { Kind = TranscriptItemKind.Answer, Text = text.Trim(), At = at });
+                        s.Items.Add(new TranscriptItem { Kind = TranscriptItemKind.Answer, Text = text.Trim(), At = at, Id = uuid is null ? null : $"{uuid}#{index}" });
                     break;
                 case "tool_use":
                     var name = Text(part, "name") ?? "Tool";
@@ -266,19 +275,20 @@ public static class TranscriptReader
                         Running = true,
                         At = at,
                         CallId = Text(part, "id"),
+                        Id = Text(part, "id"),
                     });
                     break;
             }
         }
     }
 
-    private static void ParseUser(JsonElement root, JsonElement message, DateTimeOffset? at, ParseState s)
+    private static void ParseUser(JsonElement root, JsonElement message, DateTimeOffset? at, string? uuid, ParseState s)
     {
         if (Text(root, "permissionMode") is { Length: > 0 } mode) s.Mode = mode;
         if (!message.TryGetProperty("content", out var content)) return;
         if (content.ValueKind == JsonValueKind.String)
         {
-            AddPrompt(root, content.GetString() ?? "", [], at, s);
+            AddPrompt(root, content.GetString() ?? "", [], at, uuid, s);
             return;
         }
         if (content.ValueKind != JsonValueKind.Array) return;
@@ -310,10 +320,10 @@ public static class TranscriptReader
                     break;
             }
         }
-        if (texts.Count > 0 || images.Count > 0) AddPrompt(root, string.Join("\n\n", texts), images, at, s);
+        if (texts.Count > 0 || images.Count > 0) AddPrompt(root, string.Join("\n\n", texts), images, at, uuid, s);
     }
 
-    private static void AddPrompt(JsonElement root, string text, List<WorkspaceImage> images, DateTimeOffset? at, ParseState s)
+    private static void AddPrompt(JsonElement root, string text, List<WorkspaceImage> images, DateTimeOffset? at, string? uuid, ParseState s)
     {
         // Background-task notices and the like come as "user" records too; only what a person typed is a prompt.
         if (root.TryGetProperty("origin", out var origin) && origin.ValueKind == JsonValueKind.Object && Text(origin, "kind") is { } kind && kind != "human") return;
@@ -322,7 +332,7 @@ public static class TranscriptReader
         // A picture sent from the phone into VS Code is a line naming its file: shown as the picture again.
         var (shown, keys) = WorkspaceImages.SplitMarkers(clean);
         images.AddRange(keys.Where(k => images.All(i => i.Key != k)).Select(k => new WorkspaceImage { Key = k }));
-        if (shown.Length > 0 || images.Count > 0) s.Items.Add(new TranscriptItem { Kind = TranscriptItemKind.User, Text = shown, Images = images, At = at });
+        if (shown.Length > 0 || images.Count > 0) s.Items.Add(new TranscriptItem { Kind = TranscriptItemKind.User, Text = shown, Images = images, At = at, Id = uuid });
     }
 
     /// <summary>Commands the CLI echoes into the transcript (/model, local command output) are not conversation.</summary>
