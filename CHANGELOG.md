@@ -3,7 +3,7 @@
 All notable changes to Helm. The top section is used as the GitHub release body and as the Velopack release notes.
 Format: [Keep a Changelog](https://keepachangelog.com), versions follow [SemVer](https://semver.org).
 
-## [Unreleased]
+## [0.58.0] - 2026-10-28
 
 ### Changed
 - **Workspace (phone): scroll back through the last 200 steps of a conversation, not 60.** The PC now sends a
