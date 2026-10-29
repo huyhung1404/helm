@@ -154,6 +154,28 @@ public sealed class WorkspaceEngineFixesTests : IAsyncDisposable
     }
 
     [Fact]
+    public async Task A_session_whose_tab_closed_is_no_longer_listed()
+    {
+        var engine = Start();
+        var app = Directory.CreateDirectory(Path.Combine(_dir.FullName, "app")).FullName;
+        var transcript = Transcript(app, "s1", app);
+        await ConnectAsync(app);
+        foreach (var (id, title) in new[] { ("s1", "Fix the build"), ("s2", "Write the docs") })
+        {
+            await engine.HandleHookAsync(Hook(ClaudeHookEvent.UserPromptSubmit, id, app, transcript, prompt: "Go"));
+            await engine.HandleHookAsync(Hook(ClaudeHookEvent.Stop, id, app, transcript, reply: "Done"));
+            engine.Registry.SetTitle(id, title);
+        }
+        await engine.HandleHookAsync(Hook(ClaudeHookEvent.SessionEnd, "s2", app, transcript));
+
+        await _bridge!.TabsAsync("app", [app], ("Fix the build", true));
+        await WorkspaceBridgeTests.WaitAsync(() => engine.Windows().Single().OpenSessions is { Count: > 0 } open ? open : null);
+        var window = engine.Windows().Single();
+        Assert.Equal(2, window.Sessions.Count);
+        Assert.Equal(["s1"], window.Shown.Select(s => s.SessionId));
+    }
+
+    [Fact]
     public async Task A_session_outside_vs_code_goes_on_in_the_background_for_the_phone()
     {
         var engine = Start();

@@ -194,16 +194,17 @@ public sealed partial class WorkspaceViewModel : ObservableObject
             var tabs = info.ClaudeTabs == 1 ? "1 Claude tab" : $"{info.ClaudeTabs} Claude tabs";
             var folder = info.Folders.FirstOrDefault();
             var windowConnected = folder is null || (_store.Current.WindowLinks.TryGetValue(SessionRegistry.FolderKey(folder), out var linked) ? linked : _store.Current.ConnectNewSessions);
-            var sessions = w.Sessions.OrderByDescending(s => s.UpdatedAt)
+            // Only what the window has open now: a session whose tab closed is not listed (History still has it).
+            var sessions = w.Shown.OrderByDescending(s => s.UpdatedAt)
                 .Select(s => new SessionRow(s, engine!.IsConnected(s), on => { engine.SetSessionLink(s.SessionId, on); }))
                 .ToList();
             VsCodeWindows.Add(new HostWindowRow(w.Name.Length > 0 ? w.Name : "Empty window", $"{folders} · {tabs}", sessions,
                 windowConnected, folder is null ? null : on => engine!.SetWindowLink(folder, on)));
         }
-        foreach (var s in engine?.OtherSessions() ?? []) OtherSessions.Add(new SessionRow(s, engine!.IsConnected(s), on => { engine.SetSessionLink(s.SessionId, on); }));
+        foreach (var s in (engine?.OtherSessions() ?? []).Where(s => !s.FromHistory)) OtherSessions.Add(new SessionRow(s, engine!.IsConnected(s), on => { engine.SetSessionLink(s.SessionId, on); }));
         OnPropertyChanged(nameof(HasVsCodeWindows));
         OnPropertyChanged(nameof(HasOtherSessions));
-        var all = windows.SelectMany(w => w.Sessions).Concat(OtherSessions.Select(r => r.Session)).ToList();
+        var all = windows.SelectMany(w => w.Shown).Concat(OtherSessions.Select(r => r.Session)).ToList();
 
         ListeningText = engine is null
             ? "Off. Turn the tool on to let your phone reach this PC."

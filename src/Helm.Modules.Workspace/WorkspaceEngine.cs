@@ -20,6 +20,17 @@ public sealed record WorkspaceWindow(BridgeConnection Connection, IReadOnlyList<
 
     /// <summary>Its first folder (where a new session opens; the phone's key for the window).</summary>
     public string Folder => Connection.Info.Folders.FirstOrDefault() ?? "";
+
+    /// <summary>
+    /// The sessions the window has now, as the PC page and the phone list them: those open as Claude tabs, plus any that
+    /// work or wait for you outside a tab (the side bar). A session only known from Claude's records shows only while a
+    /// tab has it; one whose tab closed is gone. A window whose bridge is too old to name its tabs shows everything it has.
+    /// </summary>
+    public IReadOnlyList<AgentSession> Shown => OpenSessions is null ? Sessions : Sessions.Where(Shows).ToList();
+
+    public bool Shows(AgentSession s) =>
+        OpenSessions is not { } open
+        || open.Contains(s.SessionId) || !s.FromHistory && s.State is SessionState.Working or SessionState.NeedsPermission or SessionState.Question;
 }
 
 /// <summary>

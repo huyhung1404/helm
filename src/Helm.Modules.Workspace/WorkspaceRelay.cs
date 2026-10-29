@@ -175,7 +175,7 @@ public sealed class WorkspaceRelay : IAsyncDisposable
             var keep = new HashSet<string>(StringComparer.Ordinal);
             foreach (var w in windows)
             {
-                foreach (var s in w.Sessions.Where(s => Shown(s, w) && _engine.IsConnected(s)))
+                foreach (var s in w.Shown.Where(_engine.IsConnected))
                 {
                     keep.Add(s.SessionId);
                     Write(s, w.Folder);
@@ -195,16 +195,6 @@ public sealed class WorkspaceRelay : IAsyncDisposable
             PublishHistory(windows, now);
         }
     }
-
-    /// <summary>
-    /// The phone shows a window's sessions open as Claude tabs, plus any that work or wait for you outside a tab (the
-    /// side bar). A session only known from Claude's records shows only while a tab has it. A window whose bridge is
-    /// too old to name its tabs shows everything it has.
-    /// </summary>
-    private static bool Shown(AgentSession s, WorkspaceWindow w) =>
-        w.OpenSessions is not { } open
-            ? true
-            : open.Contains(s.SessionId) || !s.FromHistory && s.State is SessionState.Working or SessionState.NeedsPermission or SessionState.Question;
 
     private void Write(AgentSession s, string windowFolder)
     {
