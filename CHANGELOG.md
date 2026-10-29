@@ -3,6 +3,13 @@
 All notable changes to Helm. The top section is used as the GitHub release body and as the Velopack release notes.
 Format: [Keep a Changelog](https://keepachangelog.com), versions follow [SemVer](https://semver.org).
 
+## [Unreleased]
+
+### Fixed
+- **Workspace (PC): the settings page shows what your VS Code windows have open now.** A conversation whose Claude
+  tab you closed stayed on the list (as Ended, Done or Ready) until Helm restarted. Now the page lists, like the
+  phone, the conversations open in a Claude tab and any that work or wait for you; closed ones are in History.
+
 ## [0.58.0] - 2026-10-28
 
 ### Changed
