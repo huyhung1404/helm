@@ -61,6 +61,12 @@ public interface IWindowService
     /// </summary>
     bool MakePassiveOverlay(nint hwnd);
 
+    /// <summary>
+    /// Turns one of Helm's own windows into a card you can click without it taking the keyboard focus from the app you
+    /// are in, kept out of Alt+Tab. For small cards that pop up now and then.
+    /// </summary>
+    bool MakeNonActivating(nint hwnd) => false;
+
     /// <summary>Restores (if minimized) and brings a window to the foreground.</summary>
     bool Activate(nint hwnd);
 
@@ -95,6 +101,12 @@ public interface IWindowService
 
     /// <summary>True while a full-screen Direct3D app (game) or presentation is running.</summary>
     bool IsFullScreenGameRunning();
+
+    /// <summary>
+    /// True while anything full-screen is in front (a game, a presentation, a video, an app in F11) or nobody can see the
+    /// screen (locked, screen saver): a time not to pop anything up.
+    /// </summary>
+    bool IsBusyFullScreen() => IsFullScreenGameRunning();
 }
 
 public sealed class WindowService(ILogger<WindowService> logger) : IWindowService
@@ -335,6 +347,16 @@ public sealed class WindowService(ILogger<WindowService> logger) : IWindowServic
         return true;
     }
 
+    public bool MakeNonActivating(nint hwnd)
+    {
+        var h = hwnd.ToHwnd();
+        if (!PInvoke.IsWindow(h)) return false;
+        var ex = (WINDOW_EX_STYLE)(uint)PInvoke.GetWindowLongPtr(h, WINDOW_LONG_PTR_INDEX.GWL_EXSTYLE);
+        ex |= WINDOW_EX_STYLE.WS_EX_NOACTIVATE | WINDOW_EX_STYLE.WS_EX_TOOLWINDOW;
+        PInvoke.SetWindowLongPtr(h, WINDOW_LONG_PTR_INDEX.GWL_EXSTYLE, (nint)(uint)ex);
+        return true;
+    }
+
     public bool IsTopmost(nint hwnd)
     {
         var ex = (WINDOW_EX_STYLE)(uint)PInvoke.GetWindowLongPtr(hwnd.ToHwnd(), WINDOW_LONG_PTR_INDEX.GWL_EXSTYLE);
@@ -368,6 +390,13 @@ public sealed class WindowService(ILogger<WindowService> logger) : IWindowServic
     {
         if (PInvoke.SHQueryUserNotificationState(out var state).Failed) return false;
         return state is QUERY_USER_NOTIFICATION_STATE.QUNS_RUNNING_D3D_FULL_SCREEN or QUERY_USER_NOTIFICATION_STATE.QUNS_PRESENTATION_MODE;
+    }
+
+    public bool IsBusyFullScreen()
+    {
+        if (PInvoke.SHQueryUserNotificationState(out var state).Failed) return false;
+        return state is QUERY_USER_NOTIFICATION_STATE.QUNS_RUNNING_D3D_FULL_SCREEN or QUERY_USER_NOTIFICATION_STATE.QUNS_PRESENTATION_MODE
+            or QUERY_USER_NOTIFICATION_STATE.QUNS_BUSY or QUERY_USER_NOTIFICATION_STATE.QUNS_NOT_PRESENT;
     }
 
     public bool IsAppWindow(nint hwnd)

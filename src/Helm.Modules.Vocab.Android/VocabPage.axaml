@@ -1,0 +1,82 @@
+<ui:ModulePageBase xmlns="https://github.com/avaloniaui"
+                   xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                   xmlns:ui="using:Helm.Core.Ui"
+                   xmlns:vm="using:Helm.Modules.Vocab"
+                   x:Class="Helm.Modules.Vocab.VocabPage"
+                   x:DataType="vm:VocabViewModel">
+
+    <!-- Vocabulary's settings (Home → Utilities). The words themselves are on VocabContentPage. -->
+    <StackPanel>
+        <Border Classes="infobar" IsVisible="{Binding HasMessage}">
+            <TextBlock Text="{Binding Message}" TextWrapping="Wrap" />
+        </Border>
+        <Border Classes="card">
+            <StackPanel Spacing="8">
+                <TextBlock Text="Open Vocabulary" Classes="title" />
+                <TextBlock Text="Your words and their parts. Also in the menu and on Home." Classes="secondary" TextWrapping="Wrap" />
+                <Button Classes="accent" Content="Open Vocabulary" Click="OpenVocabulary_Click" />
+            </StackPanel>
+        </Border>
+
+        <!-- Lock screen -->
+        <TextBlock Text="Lock screen" Classes="section" />
+        <Border Classes="card">
+            <Grid ColumnDefinitions="*,Auto">
+                <StackPanel Spacing="4">
+                    <TextBlock Text="A word on the lock screen" Classes="title" />
+                    <TextBlock Classes="secondary" TextWrapping="Wrap"
+                               Text="Each time the screen turns on, a silent notification shows one of your words. Tap Show meaning, then Forgot or Remembered, without unlocking." />
+                </StackPanel>
+                <ToggleSwitch Grid.Column="1" IsChecked="{Binding LockScreenWord}" OnContent="" OffContent="" AutomationProperties.Name="A word on the lock screen" />
+            </Grid>
+        </Border>
+
+        <!-- Widget -->
+        <TextBlock Text="Home-screen widget" Classes="section" />
+        <Border Classes="card">
+            <StackPanel Spacing="8">
+                <TextBlock Text="A word to guess on your home screen" Classes="title" />
+                <TextBlock Classes="secondary" TextWrapping="Wrap"
+                           Text="Tap the word to see its meaning, then say whether you remembered. Each unlock brings a new word (while Helm runs), and words you forget come back more often." />
+                <Button x:Name="AddWidgetButton" Content="Add the widget" Click="AddWidget_Click" />
+            </StackPanel>
+        </Border>
+
+        <!-- Display -->
+        <TextBlock Text="Display" Classes="section" />
+        <Border Classes="card">
+            <StackPanel Spacing="12">
+                <Grid ColumnDefinitions="*,Auto">
+                    <StackPanel>
+                        <TextBlock Text="Show traditional characters" />
+                        <TextBlock Text="Next to a Chinese word or part when it differs (补救 (補救))." Classes="secondary" TextWrapping="Wrap" />
+                    </StackPanel>
+                    <ToggleSwitch Grid.Column="1" IsChecked="{Binding ShowTraditional}" OnContent="" OffContent="" AutomationProperties.Name="Show traditional characters" />
+                </Grid>
+                <Grid ColumnDefinitions="*,Auto">
+                    <StackPanel>
+                        <TextBlock Text="YouGlish button" />
+                        <TextBlock Text="Next to the word: hear real people say it in YouTube videos (opens youglish.com)." Classes="secondary" TextWrapping="Wrap" />
+                    </StackPanel>
+                    <ToggleSwitch Grid.Column="1" IsChecked="{Binding ShowYouGlish}" OnContent="" OffContent="" AutomationProperties.Name="YouGlish button" />
+                </Grid>
+                <StackPanel Spacing="4">
+                    <TextBlock Text="Words shown at first" />
+                    <ComboBox HorizontalAlignment="Stretch" ItemsSource="{Binding ItemsShownNames}" SelectedIndex="{Binding ItemsShownIndex}"
+                              AutomationProperties.Name="Words shown at first" />
+                </StackPanel>
+            </StackPanel>
+        </Border>
+
+        <!-- Analysis -->
+        <TextBlock Text="Analysis" Classes="section" />
+        <Border Classes="card">
+            <StackPanel Spacing="8">
+                <TextBlock Text="Breaking words down" Classes="title" />
+                <TextBlock Classes="secondary" TextWrapping="Wrap"
+                           Text="Words you add wait until an AI agent breaks them down: ask Claude Code on your PC (Helm's tools must be allowed there). The analysis syncs here." />
+                <Button Content="Copy request" Command="{Binding CopyPromptCommand}" />
+            </StackPanel>
+        </Border>
+    </StackPanel>
+</ui:ModulePageBase>

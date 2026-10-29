@@ -1,0 +1,441 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:ic="using:FluentIcons.Avalonia"
+             xmlns:vm="using:Helm.Modules.Vocab"
+             x:Class="Helm.Modules.Vocab.VocabContentPage"
+             x:DataType="vm:VocabViewModel">
+
+    <!-- Vocabulary itself (drawer and Quick access): Learn (only the card) and Words (adding, the list, a word's tree).
+         Its options live on VocabPage (Home → Utilities). -->
+    <UserControl.Styles>
+        <!-- One box of the tree, small enough that most words fit the phone's width; the word's own box is filled,
+             the tapped one outlined -->
+        <Style Selector="Button.node">
+            <Setter Property="Background" Value="{DynamicResource HelmSubtleFill}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource HelmCardStroke}" />
+            <Setter Property="BorderThickness" Value="1.5" />
+            <Setter Property="CornerRadius" Value="8" />
+            <Setter Property="Padding" Value="8,4" />
+            <Setter Property="MinWidth" Value="48" />
+            <Setter Property="HorizontalAlignment" Value="Center" />
+            <Setter Property="HorizontalContentAlignment" Value="Center" />
+        </Style>
+        <Style Selector="Button.node.root">
+            <Setter Property="Background" Value="{DynamicResource SystemAccentColor}" />
+            <Setter Property="Foreground" Value="{DynamicResource HelmPageBackground}" />
+        </Style>
+        <Style Selector="Button.node.selected">
+            <Setter Property="BorderBrush" Value="{DynamicResource SystemAccentColor}" />
+            <Setter Property="BorderThickness" Value="2.5" />
+        </Style>
+        <Style Selector="Border.line">
+            <Setter Property="Background" Value="{DynamicResource HelmSecondaryText}" />
+            <Setter Property="Opacity" Value="0.5" />
+        </Style>
+        <Style Selector="Border.bar">
+            <Setter Property="BorderBrush" Value="{DynamicResource HelmSecondaryText}" />
+            <Setter Property="BorderThickness" Value="0,1.5,0,0" />
+            <Setter Property="Opacity" Value="0.5" />
+        </Style>
+        <Style Selector="TextBlock.role">
+            <Setter Property="FontSize" Value="9" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="HorizontalAlignment" Value="Center" />
+            <Setter Property="Foreground" Value="{DynamicResource HelmSuccess}" />
+        </Style>
+        <Style Selector="TextBlock.role.sound">
+            <Setter Property="Foreground" Value="#E5A50A" />
+        </Style>
+        <Style Selector="TextBlock.accent">
+            <Setter Property="Foreground" Value="{DynamicResource SystemAccentColor}" />
+        </Style>
+        <Style Selector="Border.badge">
+            <Setter Property="Background" Value="{DynamicResource HelmSubtleFill}" />
+            <Setter Property="CornerRadius" Value="4" />
+            <Setter Property="Padding" Value="6,0" />
+        </Style>
+        <Style Selector="Button.icon">
+            <Setter Property="Width" Value="44" />
+            <Setter Property="Height" Value="44" />
+            <Setter Property="Padding" Value="0" />
+            <Setter Property="HorizontalContentAlignment" Value="Center" />
+            <Setter Property="VerticalContentAlignment" Value="Center" />
+        </Style>
+        <!-- The two tabs: the one in front is filled -->
+        <Style Selector="Button.tab">
+            <Setter Property="HorizontalAlignment" Value="Stretch" />
+            <Setter Property="HorizontalContentAlignment" Value="Center" />
+            <Setter Property="Padding" Value="8,10" />
+        </Style>
+    </UserControl.Styles>
+
+    <UserControl.DataTemplates>
+        <!-- The tree, top-down: a line up to the parent, the box, a line down, then the children side by side.
+             Siblings' half lines (LineFromLeft / LineToRight) meet into one bar under their parent. -->
+        <DataTemplate DataType="vm:VocabNodeViewModel">
+            <StackPanel>
+                <Grid ColumnDefinitions="*,*" Height="12" IsVisible="{Binding HasParent}">
+                    <Border Classes="bar" IsVisible="{Binding LineFromLeft}" />
+                    <Border Grid.Column="1" Classes="bar" IsVisible="{Binding LineToRight}" />
+                    <Border Grid.ColumnSpan="2" Classes="line" Width="1.5" HorizontalAlignment="Center" />
+                </Grid>
+                <Button Classes="node" Classes.root="{Binding IsRoot}" Classes.selected="{Binding IsSelected}" Margin="3,0"
+                        Command="{Binding SelectCommand}" AutomationProperties.Name="{Binding Form}">
+                    <StackPanel>
+                        <TextBlock Classes="role" Classes.sound="{Binding IsSound}" Text="{Binding RoleText}" IsVisible="{Binding HasRole}" />
+                        <TextBlock Text="{Binding Form}" FontSize="18" FontWeight="SemiBold" HorizontalAlignment="Center" />
+                        <TextBlock Text="{Binding Caption}" FontSize="10" Opacity="0.8" HorizontalAlignment="Center" IsVisible="{Binding HasCaption}" />
+                        <TextBlock Text="{Binding ShortMeaning}" FontSize="10" Opacity="0.8" HorizontalAlignment="Center" IsVisible="{Binding HasShortMeaning}" />
+                    </StackPanel>
+                </Button>
+                <Border Classes="line" Width="1.5" Height="12" HorizontalAlignment="Center" IsVisible="{Binding HasChildren}" />
+                <ItemsControl ItemsSource="{Binding Children}" HorizontalAlignment="Center">
+                    <ItemsControl.ItemsPanel>
+                        <ItemsPanelTemplate>
+                            <StackPanel Orientation="Horizontal" />
+                        </ItemsPanelTemplate>
+                    </ItemsControl.ItemsPanel>
+                </ItemsControl>
+            </StackPanel>
+        </DataTemplate>
+    </UserControl.DataTemplates>
+
+    <UserControl.Resources>
+        <!-- How a word is built: its tree (scrolls sideways when wide), then the tapped part. On the Learn card and the Words tab. -->
+        <DataTemplate x:Key="PartsView" x:DataType="vm:VocabWordDetailViewModel">
+            <StackPanel Spacing="6">
+                <ScrollViewer HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Disabled">
+                    <ContentControl Content="{Binding Root}" HorizontalAlignment="Center" />
+                </ScrollViewer>
+                <TextBlock Classes="secondary" HorizontalAlignment="Center" TextWrapping="Wrap" TextAlignment="Center" FontSize="12"
+                           Text="Tap a part to see what it means and which of your words share it." IsVisible="{Binding IsWordSelected}" />
+                <Border BorderThickness="0,1,0,0" BorderBrush="{DynamicResource HelmCardStroke}" Padding="0,8,0,0" IsVisible="{Binding IsPartSelected}">
+                    <StackPanel Spacing="2">
+                        <Grid ColumnDefinitions="*,Auto">
+                            <WrapPanel>
+                                <TextBlock Text="{Binding CardTitle}" FontSize="22" FontWeight="SemiBold" Margin="0,0,10,0" />
+                                <TextBlock Text="{Binding CardKind}" Classes="secondary" VerticalAlignment="Center" />
+                            </WrapPanel>
+                            <StackPanel Grid.Column="1" Orientation="Horizontal">
+                                <Button Classes="icon flat" Command="{Binding SayPartCommand}" IsVisible="{Binding CanSayPart}" AutomationProperties.Name="Say this part">
+                                    <ic:SymbolIcon Symbol="Speaker2" FontSize="18" />
+                                </Button>
+                                <Button Classes="icon flat" Command="{Binding BeginEditPartCommand}" AutomationProperties.Name="Edit this part">
+                                    <ic:SymbolIcon Symbol="Edit" FontSize="18" />
+                                </Button>
+                            </StackPanel>
+                        </Grid>
+                        <TextBlock Text="{Binding CardPhonetic}" Classes="secondary" IsVisible="{Binding HasCardPhonetic}" />
+                        <TextBlock Text="{Binding CardHanViet}" Classes="secondary" IsVisible="{Binding HasCardHanViet}" />
+                        <TextBlock Text="{Binding CardMeaning}" FontSize="16" TextWrapping="Wrap" />
+                        <TextBlock Text="{Binding CardOrigin}" Classes="secondary" TextWrapping="Wrap" IsVisible="{Binding HasCardOrigin}" />
+                        <StackPanel IsVisible="{Binding HasAlsoIn}" Margin="0,6,0,0" Spacing="4">
+                            <TextBlock Text="Also in your words" FontWeight="SemiBold" />
+                            <ItemsControl ItemsSource="{Binding AlsoIn}">
+                                <ItemsControl.ItemsPanel>
+                                    <ItemsPanelTemplate>
+                                        <WrapPanel />
+                                    </ItemsPanelTemplate>
+                                </ItemsControl.ItemsPanel>
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate DataType="vm:VocabWordLink">
+                                        <Button Margin="0,0,6,6" Content="{Binding Text}" Command="{Binding Open}" />
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </StackPanel>
+                        <!-- Edit the tapped part by hand (every word with it shows the change) -->
+                        <StackPanel Spacing="4" IsVisible="{Binding IsEditingPart}" Margin="0,8,0,0">
+                            <TextBlock Text="Meaning" Classes="secondary" />
+                            <TextBox Text="{Binding EditPartMeaning}" AutomationProperties.Name="Meaning" TextWrapping="Wrap" AcceptsReturn="True" />
+                            <TextBlock Text="Origin" Classes="secondary" />
+                            <TextBox Text="{Binding EditPartOrigin}" AutomationProperties.Name="Origin" TextWrapping="Wrap" AcceptsReturn="True" />
+                            <TextBlock Text="Phonetic" Classes="secondary" />
+                            <TextBox Text="{Binding EditPartPhonetic}" AutomationProperties.Name="Phonetic" />
+                            <TextBlock Text="Hán Việt" Classes="secondary" />
+                            <TextBox Text="{Binding EditPartHanViet}" AutomationProperties.Name="Hán Việt" />
+                            <Grid ColumnDefinitions="*,8,*" Margin="0,8,0,0">
+                                <Button Classes="accent" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Content="Save" Command="{Binding SavePartCommand}" />
+                                <Button Grid.Column="2" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Content="Cancel" Command="{Binding CancelEditPartCommand}" />
+                            </Grid>
+                        </StackPanel>
+                    </StackPanel>
+                </Border>
+            </StackPanel>
+        </DataTemplate>
+        <!-- One word in a list: the word, its reading, meaning (or "Waiting") and how well it is known -->
+        <DataTemplate x:Key="WordRow" x:DataType="vm:VocabWordRow">
+            <Button Classes="flat" HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch" Padding="10,8" Command="{Binding Open}"
+                    AutomationProperties.Name="{Binding Text}">
+                <StackPanel>
+                    <Grid ColumnDefinitions="*,Auto">
+                        <WrapPanel>
+                            <TextBlock Text="{Binding Text}" FontSize="16" FontWeight="SemiBold" Margin="0,0,8,0" />
+                            <TextBlock Text="{Binding Phonetic}" Classes="secondary" VerticalAlignment="Center" IsVisible="{Binding HasPhonetic}" />
+                        </WrapPanel>
+                        <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+                            <Border Classes="badge" IsVisible="{Binding IsPending}" VerticalAlignment="Center">
+                                <TextBlock Text="Waiting" FontSize="11" FontWeight="SemiBold" Foreground="#E5A50A" />
+                            </Border>
+                            <Button Classes="icon flat" Command="{Binding Remove}" IsVisible="{Binding CanRemove}" AutomationProperties.Name="Remove">
+                                <ic:SymbolIcon Symbol="Dismiss" FontSize="14" />
+                            </Button>
+                        </StackPanel>
+                    </Grid>
+                    <TextBlock Text="{Binding Meaning}" Classes="secondary" TextTrimming="CharacterEllipsis" />
+                    <TextBlock Text="{Binding LevelText}" Classes="secondary" FontSize="11"
+                               IsVisible="{Binding LevelText, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+                </StackPanel>
+            </Button>
+        </DataTemplate>
+    </UserControl.Resources>
+
+    <StackPanel>
+        <!-- Shown while the tool is turned off -->
+        <Border x:Name="OffBar" Classes="infobar" IsVisible="False">
+            <StackPanel>
+                <TextBlock Text="Vocabulary is turned off" Classes="title" />
+                <TextBlock Text="Your words are kept. Turn Vocabulary on in its settings to use them." TextWrapping="Wrap" />
+            </StackPanel>
+        </Border>
+
+        <StackPanel x:Name="Body">
+            <!-- Learn or Words -->
+            <Grid ColumnDefinitions="*,6,*,6,*" Margin="0,0,0,12">
+                <Button Classes="tab" Classes.accent="{Binding IsLearning}" Command="{Binding ShowLearnCommand}" AutomationProperties.Name="Learn">
+                    <StackPanel Orientation="Horizontal" Spacing="6">
+                        <ic:SymbolIcon Symbol="HatGraduation" FontSize="18" />
+                        <TextBlock Text="Learn" VerticalAlignment="Center" />
+                    </StackPanel>
+                </Button>
+                <Button Grid.Column="2" Classes="tab" Classes.accent="{Binding IsAdding}" Command="{Binding ShowAddCommand}" AutomationProperties.Name="Add words">
+                    <StackPanel Orientation="Horizontal" Spacing="6">
+                        <ic:SymbolIcon Symbol="Add" FontSize="18" />
+                        <TextBlock Text="Add" VerticalAlignment="Center" />
+                    </StackPanel>
+                </Button>
+                <Button Grid.Column="4" Classes="tab" Classes.accent="{Binding IsWordsTab}" Command="{Binding ShowWordsCommand}" AutomationProperties.Name="Words">
+                    <StackPanel Orientation="Horizontal" Spacing="6">
+                        <ic:SymbolIcon Symbol="BookLetter" FontSize="18" />
+                        <TextBlock Text="{Binding WordsTabText}" VerticalAlignment="Center" />
+                    </StackPanel>
+                </Button>
+            </Grid>
+
+            <Border Classes="infobar" IsVisible="{Binding HasMessage}" Margin="0,0,0,8">
+                <Grid ColumnDefinitions="*,Auto">
+                    <TextBlock Text="{Binding Message}" TextWrapping="Wrap" VerticalAlignment="Center" />
+                    <Button Grid.Column="1" Classes="icon flat" Command="{Binding DismissMessageCommand}" AutomationProperties.Name="Dismiss">
+                        <ic:SymbolIcon Symbol="Dismiss" FontSize="16" />
+                    </Button>
+                </Grid>
+            </Border>
+
+            <!-- ===== Learn: one word at a time, nothing else ===== -->
+            <StackPanel IsVisible="{Binding IsLearning}">
+                <TextBlock Text="{Binding LearnSummary}" Classes="secondary" HorizontalAlignment="Center" Margin="0,0,0,8" FontSize="12" />
+                <Border Classes="card" DataContext="{Binding Card}" x:DataType="vm:VocabCardViewModel">
+                    <StackPanel>
+                        <!-- Nothing to learn yet -->
+                        <StackPanel IsVisible="{Binding !HasWord}" Spacing="8" Margin="0,16">
+                            <TextBlock Text="No word to learn yet" FontSize="18" FontWeight="SemiBold" HorizontalAlignment="Center" />
+                            <TextBlock Classes="secondary" TextWrapping="Wrap" TextAlignment="Center"
+                                       Text="Add the words you meet on the Add tab. Once an AI agent breaks them down, they come here one at a time." />
+                        </StackPanel>
+
+                        <StackPanel IsVisible="{Binding HasWord}" Spacing="4">
+                            <Grid ColumnDefinitions="*,Auto">
+                                <TextBlock Text="{Binding LevelText}" Classes="secondary" FontSize="12" VerticalAlignment="Center" TextWrapping="Wrap" />
+                                <Button Grid.Column="1" Classes="flat" Command="{Binding SkipCommand}" AutomationProperties.Name="Skip">
+                                    <StackPanel Orientation="Horizontal" Spacing="4">
+                                        <TextBlock Text="Skip" VerticalAlignment="Center" />
+                                        <ic:SymbolIcon Symbol="ArrowNext" FontSize="16" />
+                                    </StackPanel>
+                                </Button>
+                            </Grid>
+
+                            <!-- The word: a tap shows the meaning -->
+                            <Button Classes="flat" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Padding="8,32" Command="{Binding RevealCommand}"
+                                    AutomationProperties.Name="Show the meaning">
+                                <StackPanel Spacing="6">
+                                    <TextBlock Text="{Binding Text}" FontSize="42" FontWeight="SemiBold" HorizontalAlignment="Center" TextWrapping="Wrap" TextAlignment="Center" />
+                                    <TextBlock Text="Say the meaning in your head, then tap to check" Classes="secondary" HorizontalAlignment="Center"
+                                               TextWrapping="Wrap" TextAlignment="Center" IsVisible="{Binding !IsRevealed}" />
+                                </StackPanel>
+                            </Button>
+
+                            <!-- Hear it: a neural voice, or real speakers on YouGlish -->
+                            <WrapPanel HorizontalAlignment="Center">
+                                <Button Classes="flat" Command="{Binding SayCommand}" IsVisible="{Binding CanSay}" AutomationProperties.Name="Listen">
+                                    <StackPanel Orientation="Horizontal" Spacing="6">
+                                        <ic:SymbolIcon Symbol="Speaker2" FontSize="18" />
+                                        <TextBlock Text="Listen" VerticalAlignment="Center" />
+                                    </StackPanel>
+                                </Button>
+                                <Button Classes="flat" Command="{Binding YouGlishCommand}" IsVisible="{Binding ShowYouGlish}" AutomationProperties.Name="YouGlish">
+                                    <StackPanel Orientation="Horizontal" Spacing="6">
+                                        <ic:SymbolIcon Symbol="Video" FontSize="18" />
+                                        <TextBlock Text="YouGlish" VerticalAlignment="Center" />
+                                    </StackPanel>
+                                </Button>
+                            </WrapPanel>
+
+                            <!-- The answer, how the word is built, then the user's own verdict -->
+                            <StackPanel IsVisible="{Binding IsRevealed}" Spacing="4">
+                                <WrapPanel HorizontalAlignment="Center">
+                                    <TextBlock Text="{Binding Phonetic}" Classes="secondary" FontSize="15" Margin="0,0,8,0" />
+                                    <TextBlock Text="{Binding HanViet}" Classes="secondary" FontSize="15" FontWeight="SemiBold" Margin="0,0,8,0" />
+                                    <TextBlock Text="{Binding Traditional}" Classes="secondary" FontSize="15" />
+                                </WrapPanel>
+                                <TextBlock Text="{Binding Meaning}" FontSize="20" TextWrapping="Wrap" TextAlignment="Center" HorizontalAlignment="Center" />
+                                <TextBlock Text="{Binding Explanation}" Classes="secondary" TextWrapping="Wrap" TextAlignment="Center" HorizontalAlignment="Center" />
+
+                                <StackPanel IsVisible="{Binding HasExplanationTree}" Margin="0,12,0,0" Spacing="6">
+                                    <TextBlock Text="How it's built" FontWeight="SemiBold" />
+                                    <ContentControl Content="{Binding ExplanationTree}" ContentTemplate="{StaticResource PartsView}" />
+                                </StackPanel>
+
+                                <Grid ColumnDefinitions="*,10,*" Margin="0,16,0,0">
+                                    <Button HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Padding="8,12" Content="Forgot" Command="{Binding ForgotCommand}" />
+                                    <Button Grid.Column="2" Classes="accent" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Padding="8,12" Content="Remembered"
+                                            Command="{Binding RememberedCommand}" />
+                                </Grid>
+                            </StackPanel>
+                        </StackPanel>
+                    </StackPanel>
+                </Border>
+            </StackPanel>
+
+            <!-- ===== Add: new words, and what waits for the agent ===== -->
+            <StackPanel IsVisible="{Binding IsAdding}">
+                    <Border Classes="card">
+                        <StackPanel Spacing="8">
+                            <TextBlock Text="Add a word" Classes="title" />
+                            <TextBox PlaceholderText="relative, 补救…" Text="{Binding NewWord}" FontSize="16" AutomationProperties.Name="New word">
+                                <TextBox.KeyBindings>
+                                    <KeyBinding Gesture="Enter" Command="{Binding AddCommand}" />
+                                </TextBox.KeyBindings>
+                            </TextBox>
+                            <TextBox PlaceholderText="Where you met it (optional)" Text="{Binding NewNote}" AutomationProperties.Name="Note" />
+                            <Button Classes="accent" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Content="Add" Command="{Binding AddCommand}" />
+                        </StackPanel>
+                    </Border>
+
+                    <Border Classes="infobar" IsVisible="{Binding HasPending}" Margin="0,4,0,0">
+                        <StackPanel Spacing="6">
+                            <TextBlock Text="{Binding PendingText}" TextWrapping="Wrap" />
+                            <TextBlock Text="Ask Claude Code on your PC to analyze them; the result syncs here." Classes="secondary" TextWrapping="Wrap" />
+                        </StackPanel>
+                    </Border>
+
+                <TextBlock Text="Recently added" Classes="section" IsVisible="{Binding HasRecentWords}" />
+                <Border Classes="card" Padding="4" IsVisible="{Binding HasRecentWords}">
+                    <ItemsControl ItemsSource="{Binding RecentWords}" ItemTemplate="{StaticResource WordRow}" />
+                </Border>
+            </StackPanel>
+
+            <!-- ===== Words: the list, a word's tree ===== -->
+            <StackPanel IsVisible="{Binding IsWordsTab}">
+                <!-- A word opened: back, its fields, how it is built -->
+                <StackPanel IsVisible="{Binding HasDetail}">
+                    <Grid ColumnDefinitions="Auto,*,Auto">
+                        <Button Classes="flat" Command="{Binding CloseDetailCommand}" AutomationProperties.Name="Back to the words">
+                            <StackPanel Orientation="Horizontal" Spacing="6">
+                                <ic:SymbolIcon Symbol="ArrowLeft" FontSize="18" />
+                                <TextBlock Text="All words" VerticalAlignment="Center" />
+                            </StackPanel>
+                        </Button>
+                        <StackPanel Grid.Column="2" Orientation="Horizontal">
+                            <Button Classes="icon flat" Command="{Binding Detail.SayWordCommand}" IsVisible="{Binding Detail.CanSay}" AutomationProperties.Name="Say the word">
+                                <ic:SymbolIcon Symbol="Speaker2" FontSize="18" />
+                            </Button>
+                            <Button Classes="icon flat" Command="{Binding Detail.YouGlishCommand}" IsVisible="{Binding Detail.ShowYouGlish}" AutomationProperties.Name="YouGlish">
+                                <ic:SymbolIcon Symbol="Video" FontSize="18" />
+                            </Button>
+                            <Button Classes="icon flat" Command="{Binding Detail.BeginEditWordCommand}" AutomationProperties.Name="Edit the word">
+                                <ic:SymbolIcon Symbol="Edit" FontSize="18" />
+                            </Button>
+                            <Button Classes="icon flat" Command="{Binding DeleteWordCommand}" AutomationProperties.Name="Delete the word">
+                                <ic:SymbolIcon Symbol="Delete" FontSize="18" />
+                            </Button>
+                        </StackPanel>
+                    </Grid>
+
+                    <StackPanel DataContext="{Binding Detail}" x:DataType="vm:VocabWordDetailViewModel">
+                        <Border Classes="card">
+                            <StackPanel Spacing="4">
+                                <WrapPanel>
+                                    <TextBlock Text="{Binding Word.Text}" FontSize="30" FontWeight="SemiBold" Margin="0,0,8,0" />
+                                    <TextBlock Text="{Binding Word.Traditional}" FontSize="22" Classes="secondary" VerticalAlignment="Bottom" IsVisible="{Binding ShowTraditional}" />
+                                </WrapPanel>
+                                <WrapPanel>
+                                    <TextBlock Text="{Binding Word.Phonetic}" Classes="secondary" FontSize="15" Margin="0,0,8,0" />
+                                    <TextBlock Text="{Binding Word.HanViet}" Classes="secondary" FontSize="15" FontWeight="SemiBold" IsVisible="{Binding HasHanViet}" />
+                                </WrapPanel>
+                                <TextBlock Text="{Binding Word.Meaning}" FontSize="17" TextWrapping="Wrap" />
+                                <TextBlock Text="{Binding Word.Explanation}" Classes="secondary" TextWrapping="Wrap" IsVisible="{Binding HasExplanation}" />
+                                <TextBlock Text="{Binding Word.Note, StringFormat='Your note: {0}'}" Classes="secondary" FontStyle="Italic" TextWrapping="Wrap" IsVisible="{Binding HasNote}" />
+                                <TextBlock Text="{Binding LevelText}" Classes="secondary" FontSize="12" />
+                                <Border Classes="infobar" IsVisible="{Binding IsPending}" Margin="0,6,0,0">
+                                    <TextBlock Text="{Binding PendingText}" TextWrapping="Wrap" />
+                                </Border>
+                                <Button Classes="flat" Content="Ask for a new analysis" Command="{Binding BeginRedoCommand}" Margin="0,4,0,0" />
+                                <!-- Edit by hand: make the meaning easier to read -->
+                                <StackPanel Spacing="4" IsVisible="{Binding IsEditingWord}" Margin="0,8,0,0">
+                                    <TextBlock Text="Phonetic" Classes="secondary" />
+                                    <TextBox Text="{Binding EditPhonetic}" AutomationProperties.Name="Phonetic" />
+                                    <TextBlock Text="Meaning" Classes="secondary" />
+                                    <TextBox Text="{Binding EditMeaning}" AutomationProperties.Name="Meaning" TextWrapping="Wrap" AcceptsReturn="True" />
+                                    <TextBlock Text="Hán Việt" Classes="secondary" />
+                                    <TextBox Text="{Binding EditHanViet}" AutomationProperties.Name="Hán Việt" />
+                                    <TextBlock Text="Traditional" Classes="secondary" />
+                                    <TextBox Text="{Binding EditTraditional}" AutomationProperties.Name="Traditional" />
+                                    <TextBlock Text="Explanation" Classes="secondary" />
+                                    <TextBox Text="{Binding EditExplanation}" AutomationProperties.Name="Explanation" TextWrapping="Wrap" AcceptsReturn="True" />
+                                    <TextBlock Text="Your note" Classes="secondary" />
+                                    <TextBox Text="{Binding EditNote}" AutomationProperties.Name="Your note" TextWrapping="Wrap" AcceptsReturn="True" />
+                                    <Grid ColumnDefinitions="*,8,*" Margin="0,8,0,0">
+                                        <Button Classes="accent" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Content="Save" Command="{Binding SaveWordCommand}" />
+                                        <Button Grid.Column="2" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Content="Cancel" Command="{Binding CancelEditWordCommand}" />
+                                    </Grid>
+                                </StackPanel>
+                                <StackPanel Spacing="8" IsVisible="{Binding IsAskingRedo}">
+                                    <TextBox PlaceholderText="What should change? e.g. tách lat thành ferre" Text="{Binding RedoNote}" TextWrapping="Wrap"
+                                             AutomationProperties.Name="What should change" />
+                                    <Button Classes="accent" Content="Send back" Command="{Binding SendRedoCommand}" />
+                                </StackPanel>
+                            </StackPanel>
+                        </Border>
+                        <Border Classes="card" IsVisible="{Binding HasTree}" Padding="8,12">
+                            <ContentControl Content="{Binding}" ContentTemplate="{StaticResource PartsView}" />
+                        </Border>
+                    </StackPanel>
+                </StackPanel>
+
+                <!-- The list -->
+                <StackPanel IsVisible="{Binding !HasDetail}">
+                    <!-- One language at a time, alphabetical (Chinese by pinyin) -->
+                    <Grid ColumnDefinitions="*,6,*" Margin="0,0,0,8">
+                        <Button Classes="tab" Classes.accent="{Binding IsEnglishList}" Content="{Binding EnglishTabText}" Command="{Binding ShowEnglishCommand}"
+                                AutomationProperties.Name="English words" />
+                        <Button Grid.Column="2" Classes="tab" Classes.accent="{Binding IsChineseList}" Content="{Binding ChineseTabText}" Command="{Binding ShowChineseCommand}"
+                                AutomationProperties.Name="Chinese words" />
+                    </Grid>
+                    <TextBox PlaceholderText="Search words and meanings" Text="{Binding SearchText}" Margin="0,0,0,8" IsVisible="{Binding HasWords}"
+                             AutomationProperties.Name="Search words" />
+                    <Border Classes="card" Padding="4">
+                        <StackPanel>
+                            <TextBlock Margin="12" TextWrapping="Wrap" Classes="secondary" IsVisible="{Binding HasNoWords}"
+                                       Text="Words show up here once an AI agent has broken them down. Add the words you meet on the Add tab, one at a time: learning them as they come is what makes them stick." />
+                            <ItemsControl ItemsSource="{Binding Words}" ItemTemplate="{StaticResource WordRow}" />
+                            <!-- A page at a time: the phone draws every row it is given -->
+                            <Button Classes="flat" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Margin="0,0,0,8"
+                                    Content="{Binding Pager.MoreText}" Command="{Binding Pager.ShowMoreCommand}" IsVisible="{Binding Pager.HasMore}"
+                                    AutomationProperties.Name="Show more words" />
+                        </StackPanel>
+                    </Border>
+                </StackPanel>
+            </StackPanel>
+        </StackPanel>
+    </StackPanel>
+</UserControl>

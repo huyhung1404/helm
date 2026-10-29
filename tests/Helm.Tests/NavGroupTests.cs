@@ -23,6 +23,7 @@ public class NavGroupTests
         ["shortcut-guide"] = ModuleGroup.WindowsAndDesktop,
         ["workspace-controller"] = ModuleGroup.WindowsAndDesktop,
         ["window-zones"] = ModuleGroup.WindowsAndDesktop,
+        ["vocab"] = ModuleGroup.Learning,
     };
 
     /// <summary>Tools on their way out; they only need some group.</summary>
@@ -68,7 +69,7 @@ public class NavGroupTests
             var name = group.DisplayName();
             Assert.DoesNotContain(name, Generic, StringComparer.OrdinalIgnoreCase);
         }
-        Assert.Equal(["Planning", "Money & Media", "Security & Servers", "Windows & Desktop"],
+        Assert.Equal(["Planning", "Money & Media", "Security & Servers", "Windows & Desktop", "Learning"],
             Enum.GetValues<ModuleGroup>().Select(g => g.DisplayName()));
     }
 

@@ -119,6 +119,26 @@ public sealed class NovelPronounceTests
         Assert.Contains("xml:lang='zh-TW'", EdgeSpeechEngine.Ssml("你好", "zh-TW-HsiaoChenNeural", options));
     }
 
+    [Fact]
+    public async Task An_English_word_is_said_by_the_British_voice_or_an_offline_English_one()
+    {
+        var edge = new Engine(EdgeSpeechEngine.EnginePrefix);
+        var windows = new Engine("win", new SpeechVoice("win:huihui", "Huihui", "zh-CN", IsOnline: false), new SpeechVoice("win:hazel", "Hazel", "en-GB", IsOnline: false));
+        var pronouncer = new WordPronouncer([edge, windows], new Player());
+
+        Assert.Null(await pronouncer.SayAsync(" relative ", "en"));
+        var (text, voice, _) = Assert.Single(edge.Requests);
+        Assert.Equal("relative", text);
+        Assert.Equal("en-GB", voice.Language);
+
+        edge.Fails = true;
+        Assert.Null(await pronouncer.SayAsync("translate", "en"));
+        Assert.Equal("win:hazel", Assert.Single(windows.Requests).Voice.Id);
+
+        var none = new WordPronouncer([new Engine(EdgeSpeechEngine.EnginePrefix) { Fails = true }], new Player());
+        Assert.Equal(WordPronouncer.NoEnglishVoice, await none.SayAsync("relative", "en"));
+    }
+
     private sealed class Clock : TimeProvider
     {
         public DateTimeOffset Now { get; set; } = new(2026, 10, 19, 9, 0, 0, TimeSpan.Zero);

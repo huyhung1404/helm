@@ -7,6 +7,7 @@ using Helm.Modules.Ssh;
 using Helm.Modules.Scratch;
 using Helm.Modules.Tracker;
 using Helm.Modules.Vault;
+using Helm.Modules.Vocab;
 using Helm.Modules.Wallet;
 using Helm.Modules.Workspace;
 using Microsoft.Extensions.DependencyInjection;
@@ -33,5 +34,6 @@ internal static class AndroidModules
         services.AddSshModule();
         services.AddNovelReaderModule();
         services.AddWorkspaceModule();
+        services.AddVocabModule();
     }
 }

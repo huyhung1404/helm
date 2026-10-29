@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The Vocabulary home-screen widget (VocabWidgetProvider). A new word with each unlock (while Helm runs) and with
+     the half-hourly update, unless one is waiting for its answer. -->
+<appwidget-provider xmlns:android="http://schemas.android.com/apk/res/android"
+    android:minWidth="250dp"
+    android:minHeight="110dp"
+    android:minResizeWidth="180dp"
+    android:minResizeHeight="100dp"
+    android:targetCellWidth="4"
+    android:targetCellHeight="2"
+    android:resizeMode="horizontal|vertical"
+    android:widgetCategory="home_screen"
+    android:updatePeriodMillis="1800000"
+    android:initialLayout="@layout/vocab_widget"
+    android:previewLayout="@layout/vocab_widget"
+    android:description="@string/vocab_widget_description" />

@@ -23,8 +23,16 @@ The **Tools AI agents can reach** card lists every tool offered right now, in th
 | **Change** | Changes Helm's data: add or edit notes and tasks, tick tasks, add debts, create, re-plan and advance missions. Changes sync to your other devices. Nothing is deleted for good: notes go to a 30-day trash. |
 | **Remote** | Runs something on another machine (an item of a server's SSH menu). Only on servers you allowed, and Helm always asks you first. |
 
-Only the tools of Helm tools that are turned on (Notes, Tracker, Wallet, Missions, SSH, Novel Reader) are offered. The **Vault is never reachable**: no tool reads or writes
+Only the tools of Helm tools that are turned on (Notes, Tracker, Wallet, Missions, SSH, Novel Reader, Vocabulary) are offered. The **Vault is never reachable**: no tool reads or writes
 it, whatever the settings.
+
+Vocabulary's tools let an agent break down the words the user adds: `vocab_pending` lists the words waiting (with the
+user's note, and what they found wrong in an analysis they sent back), `vocab_find_parts` finds pieces Helm already
+has so a root keeps one meaning across words, and `vocab_save_analysis` / `vocab_save_analyses` (many words in one
+call) save a word's phonetic, Vietnamese meaning, Hán Việt and tree of parts. Helm checks each analysis before saving
+anything (a Chinese word splits into its characters in order, characters need pinyin and Hán Việt, no strokes, no
+loops) and answers what to fix. `vocab_edit` rewords words and parts without touching their trees; `vocab_words`,
+`vocab_get` and `vocab_add_words` read and add words. Nothing is deleted through them.
 
 Novel Reader's tools (`novel_list`, `novel_name_candidates`, `novel_names`, `novel_add_names`, `novel_ignore_names`)
 let an agent find a novel's character names: it reads the possible names with sentences where they appear and adds

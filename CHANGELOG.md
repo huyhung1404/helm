@@ -5,6 +5,22 @@ Format: [Keep a Changelog](https://keepachangelog.com), versions follow [SemVer]
 
 ## [Unreleased]
 
+### Added
+- **Vocabulary (PC and Android): learn English and Chinese words by their parts.** Add the words you meet, one at a
+  time; an AI agent (ask Claude Code, through Helm's tools) breaks each one into meaningful pieces, as many levels as
+  carry meaning: relative → relate + -ive → re- + lat ("mang", the same root as fer in transfer); 补救 → 补 + 救, and
+  救 → 求 (gives the sound) + 攵 (gives the meaning), each with its pinyin, Hán Việt and where it comes from. Tap any
+  piece for its meaning and the other words of yours that share it. Three tabs: **Learn** shows one word at a time;
+  tap it to see the meaning and how it is built, then say whether you remembered (words you forget come back more
+  often). **Add** takes new words and shows the ones waiting for the agent. **Words** lists the finished ones, English
+  and 中文 apart, in alphabetical order (Chinese by pinyin). Listen to a word (a neural voice, British English or
+  Mandarin) or hear real people say it on YouGlish; edit any meaning by hand. The phone also has a home-screen widget
+  and a word on the lock screen each time the screen turns on (answer it without unlocking); the PC shows a word in a
+  corner now and then, without taking the focus, as often as you choose (down to a range in seconds).
+- **Helm's tools for AI agents: Vocabulary.** `vocab_pending`, `vocab_find_parts`, `vocab_save_analysis` and
+  `vocab_save_analyses` (many words at once; Helm checks each before saving and says what to fix), `vocab_edit`,
+  `vocab_words`, `vocab_get` and `vocab_add_words`.
+
 ### Fixed
 - **Workspace (PC): the settings page shows what your VS Code windows have open now.** A conversation whose Claude
   tab you closed stayed on the list (as Ended, Done or Ready) until Helm restarted. Now the page lists, like the

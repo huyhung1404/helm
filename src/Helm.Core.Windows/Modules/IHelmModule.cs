@@ -14,6 +14,7 @@ public static class ModuleGroupIcons
         ModuleGroup.MoneyAndMedia => SymbolRegular.Money24,
         ModuleGroup.SecurityAndServers => SymbolRegular.ShieldLock24,
         ModuleGroup.WindowsAndDesktop => SymbolRegular.WindowMultiple20,
+        ModuleGroup.Learning => SymbolRegular.HatGraduation24,
         _ => SymbolRegular.Apps24,
     };
 }

@@ -273,19 +273,8 @@ public sealed class VaultViewsTests : IDisposable
         resources.Add(new ResourceDictionary { Source = new Uri("pack://application:,,,/Helm.Core.Windows;component/Ui/HelmStyles.xaml") });
     }
 
-    private static void RunSta(Action body)
-    {
-        Exception? error = null;
-        var thread = new Thread(() =>
-        {
-            try { body(); }
-            catch (Exception ex) { error = ex; }
-        });
-        thread.SetApartmentState(ApartmentState.STA);
-        thread.Start();
-        thread.Join();
-        if (error is not null) throw new Xunit.Sdk.XunitException(error.ToString());
-    }
+    // Every view test shares one WPF Application (a process may have only one).
+    private static void RunSta(Action body) => WpfHost.Run(body);
 
     /// <summary>Like the app's UiDispatcher: work is posted to the WPF dispatcher of the test thread.</summary>
     private sealed class Dispatcher : IUiDispatcher

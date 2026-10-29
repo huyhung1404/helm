@@ -1,0 +1,24 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- Vocabulary logic shared by the Windows and Android apps: words and their parts (on Helm Sync), the analysis an
+       AI agent writes over MCP, the quiz and the page view models. No WPF, Avalonia or platform APIs here. -->
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <SupportedOSPlatformVersion></SupportedOSPlatformVersion>
+    <PlatformTarget>AnyCPU</PlatformTarget>
+    <RootNamespace>Helm.Modules.Vocab</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Helm.Core\Helm.Core.csproj" />
+    <!-- IDialogService / IClipboardService: the portable seams both apps already implement. -->
+    <ProjectReference Include="..\Helm.Shell\Helm.Shell.csproj" />
+    <!-- Words are said by Novel Reader's word pronouncer (neural voices, offline fallback, both apps). -->
+    <ProjectReference Include="..\Helm.Modules.NovelReader.Core\Helm.Modules.NovelReader.Core.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="Helm.Tests" />
+  </ItemGroup>
+
+</Project>

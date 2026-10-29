@@ -12,6 +12,7 @@ public enum ModuleGroup
     MoneyAndMedia,
     SecurityAndServers,
     WindowsAndDesktop,
+    Learning,
 }
 
 public static class ModuleGroups
@@ -22,6 +23,7 @@ public static class ModuleGroups
         ModuleGroup.MoneyAndMedia => "Money & Media",
         ModuleGroup.SecurityAndServers => "Security & Servers",
         ModuleGroup.WindowsAndDesktop => "Windows & Desktop",
+        ModuleGroup.Learning => "Learning",
         _ => group.ToString(),
     };
 }

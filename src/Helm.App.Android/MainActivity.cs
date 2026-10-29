@@ -182,6 +182,11 @@ public sealed class MainActivity : AvaloniaMainActivity
     {
         if (Intent?.GetStringExtra(ShellIntents.ExtraModule) is not { Length: > 0 } id) return;
         Intent!.RemoveExtra(ShellIntents.ExtraModule);
+        if (Intent.GetStringExtra(ShellIntents.ExtraItem) is { Length: > 0 } item)
+        {
+            Intent.RemoveExtra(ShellIntents.ExtraItem);
+            ShellIntents.OfferItem(id, item);
+        }
         try
         {
             var services = App.Services;

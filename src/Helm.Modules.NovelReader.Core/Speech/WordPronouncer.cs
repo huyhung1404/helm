@@ -33,6 +33,12 @@ public sealed class WordPronouncer(IEnumerable<ISpeechEngine> engines, IClipPlay
         IsFemale = true,
     };
 
+    /// <summary>English words (Vocabulary): Microsoft's British neural voice Sonia, the accent of the Aptis exam.</summary>
+    public static readonly SpeechVoice OnlineEnglishVoice = new($"{EdgeSpeechEngine.EnginePrefix}:en-GB-SoniaNeural", "Sonia", "en-GB", IsOnline: true)
+    {
+        IsFemale = true,
+    };
+
     /// <summary>Slower than speech, so each tone is clear.</summary>
     public static readonly SpeechOptions Options = new(0.85, 1, 1);
 
@@ -40,6 +46,11 @@ public sealed class WordPronouncer(IEnumerable<ISpeechEngine> engines, IClipPlay
     public const string NoVoice = "Could not say the word: the online Chinese voice is not reachable and there is no Chinese voice on this " +
         "device. On the phone: Android Settings → Text-to-speech → Google → Install voice data → Chinese (Mandarin). On the PC: " +
         "Windows Settings → Time & language → Speech → Add voices → Chinese (Simplified).";
+
+    /// <summary>What to do when no voice can say an English word.</summary>
+    public const string NoEnglishVoice = "Could not say the word: the online English voice is not reachable and there is no English voice on " +
+        "this device. On the phone: Android Settings → Text-to-speech → Google → Install voice data → English. On the PC: Windows " +
+        "Settings → Time & language → Speech → Add voices → English.";
 
     /// <summary>The longest wait for the online voice before an offline one says the word.</summary>
     internal TimeSpan OnlineTimeout { get; init; } = TimeSpan.FromSeconds(6);
@@ -67,18 +78,26 @@ public sealed class WordPronouncer(IEnumerable<ISpeechEngine> engines, IClipPlay
     /// Says the Chinese of <paramref name="text"/> (other characters are left out); a word pressed while another is said
     /// cuts it. Called on the UI thread. Returns why it could not be said, or null.
     /// </summary>
-    public async Task<string?> SayAsync(string text)
+    public Task<string?> SayAsync(string text) => SayAsync(text, "zh");
+
+    /// <summary>
+    /// Says a word in <paramref name="language"/>: "zh" (only its Chinese characters are said) or "en". Returns why it could
+    /// not be said, or null.
+    /// </summary>
+    public async Task<string?> SayAsync(string text, string language)
     {
-        var chinese = new string(text.Where(ChineseText.IsHan).ToArray());
+        var english = language == "en";
+        var chinese = english ? text.Trim() : new string(text.Where(ChineseText.IsHan).ToArray());
         if (chinese.Length == 0) return null;
+        var online = english ? OnlineEnglishVoice : OnlineVoice;
         _current?.Cancel();
         using var mine = new CancellationTokenSource();
         _current = mine;
         _resume ??= QuietReading?.Invoke();
         try
         {
-            var audio = await AudioOfAsync(chinese, mine.Token);
-            if (audio is null) return NoVoice;
+            var audio = await AudioOfAsync(chinese, online, mine.Token);
+            if (audio is null) return english ? NoEnglishVoice : NoVoice;
             await player.PlayAsync(audio, mine.Token);
             return null;
         }
@@ -105,15 +124,15 @@ public sealed class WordPronouncer(IEnumerable<ISpeechEngine> engines, IClipPlay
     }
 
     /// <summary>The online voice's sound whenever there is one, else the offline voice's.</summary>
-    private async Task<SpeechAudio?> AudioOfAsync(string chinese, CancellationToken ct)
+    private async Task<SpeechAudio?> AudioOfAsync(string chinese, SpeechVoice onlineVoice, CancellationToken ct)
     {
-        if (_kept.TryGetValue(Key(OnlineVoice, chinese), out var kept)) return kept;
-        if (_time.GetUtcNow() >= _onlineRestsUntil && await OnlineAsync(chinese, ct) is { } online)
+        if (_kept.TryGetValue(Key(onlineVoice, chinese), out var kept)) return kept;
+        if (_time.GetUtcNow() >= _onlineRestsUntil && await OnlineAsync(chinese, onlineVoice, ct) is { } online)
         {
-            Keep(Key(OnlineVoice, chinese), online);
+            Keep(Key(onlineVoice, chinese), online);
             return online;
         }
-        if (await OfflineVoiceAsync(ct) is not { } voice || _engines.FirstOrDefault(e => e.Prefix == voice.Engine) is not { } engine) return null;
+        if (await OfflineVoiceAsync(onlineVoice.Language[..2], ct) is not { } voice || _engines.FirstOrDefault(e => e.Prefix == voice.Engine) is not { } engine) return null;
         if (_kept.TryGetValue(Key(voice, chinese), out kept)) return kept;
         try
         {
@@ -128,14 +147,14 @@ public sealed class WordPronouncer(IEnumerable<ISpeechEngine> engines, IClipPlay
         }
     }
 
-    private async Task<SpeechAudio?> OnlineAsync(string chinese, CancellationToken ct)
+    private async Task<SpeechAudio?> OnlineAsync(string chinese, SpeechVoice onlineVoice, CancellationToken ct)
     {
-        if (_engines.FirstOrDefault(e => e.Prefix == OnlineVoice.Engine) is not { } edge) return null;
+        if (_engines.FirstOrDefault(e => e.Prefix == onlineVoice.Engine) is not { } edge) return null;
         using var timeout = CancellationTokenSource.CreateLinkedTokenSource(ct);
         timeout.CancelAfter(OnlineTimeout);
         try
         {
-            var audio = await edge.SynthesizeAsync(chinese, OnlineVoice, Options, timeout.Token);
+            var audio = await edge.SynthesizeAsync(chinese, onlineVoice, Options, timeout.Token);
             _onlineRestsUntil = DateTimeOffset.MinValue;
             return audio;
         }
@@ -147,20 +166,17 @@ public sealed class WordPronouncer(IEnumerable<ISpeechEngine> engines, IClipPlay
         }
     }
 
-    /// <summary>An offline Chinese voice: one of the listed voices (Windows), else one an engine keeps aside (the phone's).</summary>
-    private async Task<SpeechVoice?> OfflineVoiceAsync(CancellationToken ct)
+    /// <summary>An offline voice of the language ("zh", "en"): one of the listed voices (Windows), else one an engine keeps aside (the phone's).</summary>
+    private async Task<SpeechVoice?> OfflineVoiceAsync(string language, CancellationToken ct)
     {
-        var voice = _engines.SelectMany(e => e.Voices).FirstOrDefault(IsOfflineChinese);
+        var voice = _engines.SelectMany(e => e.Voices).FirstOrDefault(v => !v.IsOnline && v.Language.StartsWith(language, StringComparison.OrdinalIgnoreCase));
         foreach (var other in _engines.OfType<ILanguageVoices>())
         {
             if (voice is not null) break;
-            voice = await other.VoiceForAsync("zh", ct);
+            voice = await other.VoiceForAsync(language, ct);
         }
         return voice;
     }
-
-    private static bool IsOfflineChinese(SpeechVoice voice) =>
-        !voice.IsOnline && voice.Language.StartsWith("zh", StringComparison.OrdinalIgnoreCase);
 
     private static string Key(SpeechVoice voice, string chinese) => voice.Id + "|" + chinese;
 

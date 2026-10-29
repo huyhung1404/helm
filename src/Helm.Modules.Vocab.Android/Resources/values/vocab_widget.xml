@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Vocabulary widget colours, light theme: the same surfaces as the app (HelmCardBackground, HelmSecondaryText, ...). -->
+<resources>
+    <color name="vocab_widget_background">#FBFBFB</color>
+    <color name="vocab_widget_stroke">#E5E5E5</color>
+    <color name="vocab_widget_text">#1A1A1A</color>
+    <color name="vocab_widget_secondary">#5F5F5F</color>
+    <color name="vocab_widget_accent">#0067C0</color>
+    <color name="vocab_widget_on_accent">#FFFFFF</color>
+    <color name="vocab_widget_button">#0A000000</color>
+    <string name="vocab_widget_description">One of your words to guess. Tap it to see the meaning, then say whether you remembered.</string>
+</resources>

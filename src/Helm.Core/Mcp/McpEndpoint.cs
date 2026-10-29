@@ -16,7 +16,8 @@ public static class McpEndpoint
     /// <summary>What an AI agent is told about Helm when it connects.</summary>
     public const string Instructions =
         "Helm is the user's own toolkit. These tools read and change the user's notes, their Tracker (to-do lists), " +
-        "their Wallet's debt book (who owes whom) and their Missions (goals reached through ordered steps). Changes sync to " +
+        "their Wallet's debt book (who owes whom), their Missions (goals reached through ordered steps) and the words they learn in " +
+        "Vocabulary (an agent breaks each new word into its meaningful parts). Changes sync to " +
         "the user's other devices. Dates and times are the user's " +
         "local ones. Nothing here deletes for good: notes go to a 30-day trash. Ask before changing many things at once. " +
         "The ssh_ tools reach the user's servers through each server's own menu, and run shell commands (ssh_exec) only where " +
