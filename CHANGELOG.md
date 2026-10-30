@@ -3,7 +3,7 @@
 All notable changes to Helm. The top section is used as the GitHub release body and as the Velopack release notes.
 Format: [Keep a Changelog](https://keepachangelog.com), versions follow [SemVer](https://semver.org).
 
-## [Unreleased]
+## [0.65.0] - 2026-10-30
 
 ### Changed
 - **Vocabulary: the Words and Roots lists show one page at a time** (20 by default; 10, 50 or 100 in the settings,
