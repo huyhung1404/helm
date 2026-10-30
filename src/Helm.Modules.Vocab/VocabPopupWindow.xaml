@@ -10,7 +10,8 @@
     UseLayoutRounding="True">
 
     <!-- One word to guess; a click on it shows the meaning, then the user says whether they remembered it. -->
-    <Border Margin="16" Padding="16,12,16,16" CornerRadius="12" BorderThickness="1"
+    <Border Margin="16" Padding="16,12,16,16" CornerRadius="12" BorderThickness="1" MouseLeftButtonDown="Card_MouseLeftButtonDown"
+            ToolTip="Drag to move it; double-click to put it back in the corner" ToolTipService.InitialShowDelay="1500"
             Background="{DynamicResource ApplicationBackgroundBrush}" BorderBrush="{DynamicResource CardStrokeColorDefaultBrush}"
             TextElement.Foreground="{DynamicResource TextFillColorPrimaryBrush}">
         <Border.Effect>

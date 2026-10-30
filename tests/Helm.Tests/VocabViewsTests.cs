@@ -86,6 +86,14 @@ public sealed class VocabViewsTests : IDisposable
         Layout(page, new Size(1100, 760), "8-roots");
         latRow.Select.Execute(null);
         Assert.True(viewModel.Roots.HasSelected);
+        // An open family takes the tab and walks the list.
+        Assert.False(viewModel.Roots.ShowsList);
+        Assert.Equal($"1 / {viewModel.Roots.Roots.Count}", viewModel.Roots.RootPosition);
+        Assert.True(viewModel.Roots.HasNextRoot);
+        viewModel.Roots.NextFamilyCommand.Execute(null);
+        Assert.NotEqual("lat", viewModel.Roots.Selected!.Form);
+        viewModel.Roots.PreviousFamilyCommand.Execute(null);
+        Assert.Equal("lat", viewModel.Roots.Selected!.Form);
         Layout(page, new Size(1100, 760), "8b-root-family");
 
         viewModel.Open(store.FindWord("补救")!.Id);
@@ -100,6 +108,9 @@ public sealed class VocabViewsTests : IDisposable
         var lat = viewModel.Detail!.Root.Children[0].Children[1];
         lat.SelectCommand.Execute(null);
         Assert.Equal(["translate"], viewModel.Detail.AlsoIn.Select(w => w.Text));
+        // Opened from another language's list, it still walks its own: relative → translate.
+        Assert.True(viewModel.HasNextWord);
+        Assert.Equal("1 / 2", viewModel.WordPosition);
         Layout(page, new Size(1100, 900), "4-english-word");
 
         // A change arriving (an answer from another device) refreshes the open word but leaves the Learn tab in front.

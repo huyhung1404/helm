@@ -255,16 +255,16 @@
                 </Border>
             </StackPanel>
 
-            <!-- ===== Words: the list, a word's page ===== -->
+            <!-- ===== Words: the list; an opened word takes the whole page (Back or Esc returns, Previous / Next walk the list) ===== -->
             <Grid Visibility="{Binding IsWordsTab, Converter={StaticResource BoolToVisibility}}">
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="340" />
-                    <ColumnDefinition Width="16" />
-                    <ColumnDefinition Width="*" />
-                </Grid.ColumnDefinitions>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                </Grid.RowDefinitions>
 
                 <!-- The list: one language, searched, filtered, sorted, in groups -->
-                <StackPanel DataContext="{Binding List}">
+                <StackPanel Grid.Row="1" DataContext="{Binding List}"
+                            Visibility="{Binding DataContext.HasDetail, RelativeSource={RelativeSource AncestorType=Page}, Converter={StaticResource InverseBoolToVisibility}}">
                     <Grid Margin="0,0,0,8">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="*" />
@@ -302,15 +302,32 @@
                 </StackPanel>
 
                 <!-- No word picked yet -->
-                <Border Grid.Column="2" Style="{DynamicResource HelmSurface}" VerticalAlignment="Top"
+                <Border Style="{DynamicResource HelmSurface}" Margin="0,0,0,12" VerticalAlignment="Top"
                         Visibility="{Binding HasDetail, Converter={StaticResource InverseBoolToVisibility}}">
                     <TextBlock Margin="4,8" TextWrapping="Wrap" Style="{DynamicResource HelmSecondaryText}"
-                               Text="Pick a word on the left to see its parts. Tap any part to see what it means and which of your other words share it." />
+                               Text="Open a word below to see its parts. Tap any part to see what it means and which of your other words share it; right-click a character or a word inside to make it one of your words." />
                 </Border>
 
                 <!-- The opened word: its fields, what helps to use it, then how it is built -->
-                <StackPanel Grid.Column="2" DataContext="{Binding Detail}"
+                <StackPanel x:Name="DetailPanel" Margin="0,0,0,16" DataContext="{Binding Detail}" Focusable="True" FocusVisualStyle="{x:Null}"
                             Visibility="{Binding DataContext.HasDetail, RelativeSource={RelativeSource AncestorType=Page}, Converter={StaticResource BoolToVisibility}}">
+                    <!-- Back to the list, and the words before and after this one -->
+                    <DockPanel Margin="0,0,0,8">
+                        <ui:Button DockPanel.Dock="Left" Appearance="Transparent" Content="All words" Icon="{ui:SymbolIcon ArrowLeft24}" ToolTip="Back to the list (Esc)"
+                                   AutomationProperties.Name="Back to the words"
+                                   Command="{Binding DataContext.CloseDetailCommand, RelativeSource={RelativeSource AncestorType=Page}}" />
+                        <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
+                            <TextBlock Text="{Binding DataContext.WordPosition, RelativeSource={RelativeSource AncestorType=Page}}" VerticalAlignment="Center" Margin="0,0,10,0"
+                                       Style="{DynamicResource HelmSecondaryText}" />
+                            <ui:Button Appearance="Transparent" Content="Previous" Icon="{ui:SymbolIcon ChevronLeft24}" ToolTip="The word before this one in the list (←)"
+                                       Command="{Binding DataContext.PreviousWordCommand, RelativeSource={RelativeSource AncestorType=Page}}"
+                                       IsEnabled="{Binding DataContext.HasPreviousWord, RelativeSource={RelativeSource AncestorType=Page}}" />
+                            <ui:Button Margin="6,0,0,0" Appearance="Transparent" Content="Next" Icon="{ui:SymbolIcon ChevronRight24}" ToolTip="The word after this one in the list (→)"
+                                       Command="{Binding DataContext.NextWordCommand, RelativeSource={RelativeSource AncestorType=Page}}"
+                                       IsEnabled="{Binding DataContext.HasNextWord, RelativeSource={RelativeSource AncestorType=Page}}" />
+                        </StackPanel>
+                        <Border />
+                    </DockPanel>
                     <Border Style="{DynamicResource HelmSurface}" Margin="0,0,0,8">
                         <StackPanel>
                             <DockPanel>
@@ -338,9 +355,6 @@
                                     <ui:Button Appearance="Transparent" Padding="6" MinWidth="0" Icon="{ui:SymbolIcon Delete24}" ToolTip="Delete the word"
                                                AutomationProperties.Name="Delete the word"
                                                Command="{Binding DataContext.DeleteWordCommand, RelativeSource={RelativeSource AncestorType=Page}}" />
-                                    <ui:Button Appearance="Transparent" Padding="6" MinWidth="0" Icon="{ui:SymbolIcon Dismiss24}" ToolTip="Close"
-                                               AutomationProperties.Name="Close the word"
-                                               Command="{Binding DataContext.CloseDetailCommand, RelativeSource={RelativeSource AncestorType=Page}}" />
                                 </StackPanel>
                                 <TextBlock TextWrapping="Wrap">
                                     <Run Text="{Binding Word.Text, Mode=OneWay}" FontSize="32" FontWeight="SemiBold" />
@@ -475,8 +489,9 @@
             </Grid>
 
             <!-- ===== Roots: families of words that share a part ===== -->
-            <StackPanel MaxWidth="900" DataContext="{Binding Roots}" Visibility="{Binding DataContext.IsRootsTab, RelativeSource={RelativeSource AncestorType=Page}, Converter={StaticResource BoolToVisibility}}">
-                <DockPanel Margin="0,0,0,8">
+            <StackPanel x:Name="RootsPanel" MaxWidth="900" DataContext="{Binding Roots}" Focusable="True" FocusVisualStyle="{x:Null}"
+                        Visibility="{Binding DataContext.IsRootsTab, RelativeSource={RelativeSource AncestorType=Page}, Converter={StaticResource BoolToVisibility}}">
+                <DockPanel Margin="0,0,0,8" Visibility="{Binding ShowsList, Converter={StaticResource BoolToVisibility}}">
                     <ui:Button DockPanel.Dock="Right" Content="Practise roots" Icon="{ui:SymbolIcon HatGraduation24}" Command="{Binding NextRootCommand}"
                                ToolTip="A root alone: say its meaning, then see its family" />
                     <StackPanel Orientation="Horizontal">
@@ -485,7 +500,8 @@
                     </StackPanel>
                 </DockPanel>
 
-                <!-- Practising a root -->
+                <!-- Practising a root (hidden while a family is open) -->
+                <Grid Visibility="{Binding ShowsList, Converter={StaticResource BoolToVisibility}}">
                 <Border Style="{DynamicResource HelmSurface}" Margin="0,0,0,8" Padding="20,12,20,16" Visibility="{Binding HasPractice, Converter={StaticResource BoolToVisibility}}">
                     <StackPanel>
                         <DockPanel>
@@ -512,7 +528,12 @@
                                 </ItemsControl.ItemsPanel>
                                 <ItemsControl.ItemTemplate>
                                     <DataTemplate DataType="{x:Type local:VocabWordLink}">
-                                        <ui:Button Margin="0,0,6,6" Content="{Binding Text}" ToolTip="{Binding Meaning}" Command="{Binding Open}" />
+                                        <ui:Button Margin="0,0,6,6" ToolTip="{Binding Meaning}" Command="{Binding Open}" AutomationProperties.Name="{Binding Text}">
+                                            <TextBlock>
+                                                <Run Text="{Binding Split.Before, Mode=OneWay}" /><Run Text="{Binding Split.Match, Mode=OneWay}" FontWeight="Bold" TextDecorations="Underline"
+                                                    Foreground="{DynamicResource AccentTextFillColorPrimaryBrush}" /><Run Text="{Binding Split.After, Mode=OneWay}" />
+                                            </TextBlock>
+                                        </ui:Button>
                                     </DataTemplate>
                                 </ItemsControl.ItemTemplate>
                             </ItemsControl>
@@ -520,8 +541,23 @@
                         <ui:Button Margin="0,10,0,0" HorizontalAlignment="Center" Appearance="Primary" Content="Next root" Icon="{ui:SymbolIcon ArrowNext24}" Command="{Binding NextRootCommand}" />
                     </StackPanel>
                 </Border>
+                </Grid>
 
-                <!-- The chosen family, and more of it from the agent -->
+                <!-- The chosen family takes the tab: back to the list, the families before and after it -->
+                <DockPanel Margin="0,0,0,8" Visibility="{Binding HasSelected, Converter={StaticResource BoolToVisibility}}">
+                    <ui:Button DockPanel.Dock="Left" Appearance="Transparent" Content="All roots" Icon="{ui:SymbolIcon ArrowLeft24}" ToolTip="Back to the list (Esc)"
+                               AutomationProperties.Name="Back to the roots" Command="{Binding CloseSelectedCommand}" />
+                    <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
+                        <TextBlock Text="{Binding RootPosition}" VerticalAlignment="Center" Margin="0,0,10,0" Style="{DynamicResource HelmSecondaryText}" />
+                        <ui:Button Appearance="Transparent" Content="Previous" Icon="{ui:SymbolIcon ChevronLeft24}" ToolTip="The family before this one (←)"
+                                   Command="{Binding PreviousFamilyCommand}" IsEnabled="{Binding HasPreviousRoot}" />
+                        <ui:Button Margin="6,0,0,0" Appearance="Transparent" Content="Next" Icon="{ui:SymbolIcon ChevronRight24}" ToolTip="The family after this one (→)"
+                                   Command="{Binding NextFamilyCommand}" IsEnabled="{Binding HasNextRoot}" />
+                    </StackPanel>
+                    <Border />
+                </DockPanel>
+
+                <!-- The chosen family, its words, and more of it from the agent -->
                 <Border Style="{DynamicResource HelmSurface}" Margin="0,0,0,8" Visibility="{Binding HasSelected, Converter={StaticResource BoolToVisibility}}">
                     <StackPanel>
                         <DockPanel>
@@ -529,8 +565,6 @@
                                 <ui:Button Appearance="Primary" Content="Suggest 3 more words" Icon="{ui:SymbolIcon Sparkle24}" Command="{Binding SuggestCommand}"
                                            ToolTip="Claude Code adds and breaks down a few useful words of this family"
                                            Visibility="{Binding Agent.CanRun, Converter={StaticResource BoolToVisibility}}" />
-                                <ui:Button Margin="6,0,0,0" Appearance="Transparent" Padding="6" MinWidth="0" Icon="{ui:SymbolIcon Dismiss24}" Command="{Binding CloseSelectedCommand}"
-                                           AutomationProperties.Name="Close the family" />
                             </StackPanel>
                             <TextBlock TextWrapping="Wrap">
                                 <Run Text="{Binding Selected.Form, Mode=OneWay}" FontSize="26" FontWeight="SemiBold" />
@@ -539,13 +573,30 @@
                         </DockPanel>
                         <TextBlock Text="{Binding Selected.Meaning}" FontSize="16" TextWrapping="Wrap" />
                         <TextBlock Margin="0,4,0,0" Text="{Binding Selected.Origin}" TextWrapping="Wrap" Style="{DynamicResource HelmSecondaryText}" />
+                        <TextBlock Margin="0,14,0,4" FontWeight="SemiBold">
+                            <Run Text="Your words with it" /> <Run Text="{Binding Selected.CountText, Mode=OneWay, StringFormat=({0})}" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+                        </TextBlock>
+                        <ItemsControl ItemsSource="{Binding Selected.Words}" Focusable="False">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate DataType="{x:Type local:VocabWordLink}">
+                                    <Button Style="{StaticResource FlatButton}" Padding="10,6" Command="{Binding Open}" AutomationProperties.Name="{Binding Text}"
+                                            ToolTip="Open the word">
+                                        <TextBlock TextWrapping="Wrap">
+                                            <Run Text="{Binding Split.Before, Mode=OneWay}" FontSize="16" FontWeight="SemiBold" /><Run Text="{Binding Split.Match, Mode=OneWay}" FontSize="16" FontWeight="Bold"
+                                                TextDecorations="Underline" Foreground="{DynamicResource AccentTextFillColorPrimaryBrush}" /><Run Text="{Binding Split.After, Mode=OneWay}" FontSize="16" FontWeight="SemiBold" />
+                                            <Run Text="  " /><Run Text="{Binding Meaning, Mode=OneWay}" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+                                        </TextBlock>
+                                    </Button>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
                         <TextBlock Margin="0,8,0,0" Text="{Binding Agent.Status}" TextWrapping="Wrap" Style="{DynamicResource HelmSecondaryText}"
                                    Visibility="{Binding Agent.HasStatus, Converter={StaticResource BoolToVisibility}}" />
                     </StackPanel>
                 </Border>
 
                 <!-- Every part, the biggest families first -->
-                <Border Style="{DynamicResource HelmSurface}" Padding="4">
+                <Border Style="{DynamicResource HelmSurface}" Padding="4" Visibility="{Binding ShowsList, Converter={StaticResource BoolToVisibility}}">
                     <StackPanel>
                         <TextBlock Margin="12" TextWrapping="Wrap" Style="{DynamicResource HelmSecondaryText}" Visibility="{Binding HasNoRoots, Converter={StaticResource BoolToVisibility}}"
                                    Text="The parts of your words show up here once they are broken down; a part shared by several words makes a family." />
@@ -570,7 +621,10 @@
                                                         </ItemsControl.ItemsPanel>
                                                         <ItemsControl.ItemTemplate>
                                                             <DataTemplate DataType="{x:Type local:VocabWordLink}">
-                                                                <TextBlock Margin="0,0,10,0" Text="{Binding Text}" Foreground="{DynamicResource AccentTextFillColorPrimaryBrush}" />
+                                                                <TextBlock Margin="0,0,10,0" Foreground="{DynamicResource AccentTextFillColorPrimaryBrush}">
+                                                                    <Run Text="{Binding Split.Before, Mode=OneWay}" /><Run Text="{Binding Split.Match, Mode=OneWay}" FontWeight="Bold"
+                                                                        TextDecorations="Underline" /><Run Text="{Binding Split.After, Mode=OneWay}" />
+                                                                </TextBlock>
                                                             </DataTemplate>
                                                         </ItemsControl.ItemTemplate>
                                                     </ItemsControl>

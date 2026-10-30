@@ -4,7 +4,11 @@ using CommunityToolkit.Mvvm.Input;
 namespace Helm.Modules.Vocab;
 
 /// <summary>Another of the user's words that has the selected part (a tap opens it).</summary>
-public sealed record VocabWordLink(string Id, string Text, string Meaning, IRelayCommand Open);
+/// <summary>A word to open, cut around the part it is listed for (re<b>lat</b>ive) when there is one.</summary>
+public sealed record VocabWordLink(string Id, string Text, string Meaning, IRelayCommand Open)
+{
+    public VocabWordSplit Split { get; init; } = VocabWordSplit.None(Text);
+}
 
 /// <summary>
 /// One word opened on the page: its fields, the tree, and the card of the box tapped in the tree (the word's own box
@@ -15,6 +19,7 @@ public sealed partial class VocabWordDetailViewModel : ObservableObject
     private readonly VocabStore _store;
     private readonly Action<string> _open;
     private readonly VocabVoice? _voice;
+    private readonly Action<string>? _notify;
 
     [ObservableProperty] private VocabNodeViewModel? _selectedNode;
     [ObservableProperty] private string _redoNote = "";
@@ -28,17 +33,19 @@ public sealed partial class VocabWordDetailViewModel : ObservableObject
     [ObservableProperty] private string _editPartOrigin = "";
 
     public VocabWordDetailViewModel(VocabStore store, string id, VocabWord word, VocabWordStats stats, bool showTraditional, Action<string> open, string? selectPartId = null,
-        VocabVoice? voice = null, bool showYouGlish = true)
+        VocabVoice? voice = null, bool showYouGlish = true, Action<string>? notify = null)
     {
         _store = store;
         _open = open;
         _voice = voice;
+        _notify = notify;
         ShowYouGlish = showYouGlish;
         Id = id;
         Word = word;
         LevelText = VocabFormat.Level(stats, store.Now);
         IsHard = !word.Hidden && VocabQuiz.IsHard(word, stats);
-        Root = new VocabNodeViewModel(VocabTree.Build(store, word), showTraditional, n => SelectedNode = n);
+        Root = new VocabNodeViewModel(VocabTree.Build(store, word), showTraditional, n => SelectedNode = n,
+            addAsWord: AddPartAsWord, isWord: form => store.FindWord(form) is not null);
         Tree = [Root];
         SelectedNode = (selectPartId is null ? null : Root.SelfAndDescendants().FirstOrDefault(n => n.Node.PartId == selectPartId)) ?? Root;
         ShowTraditional = showTraditional && word.Traditional.Length > 0;
@@ -145,6 +152,37 @@ public sealed partial class VocabWordDetailViewModel : ObservableObject
 
     public bool IsWordSelected => !IsPartSelected;
 
+    /// <summary>The tapped part is a word by itself: the part's card offers to add it (or open it).</summary>
+    public bool CanAddSelectedAsWord => SelectedNode?.CanAddAsWord == true;
+
+    public string SelectedAddText => SelectedNode?.AddAsWordText ?? "";
+
+    [RelayCommand]
+    private void AddSelectedAsWord()
+    {
+        if (SelectedNode is { CanAddAsWord: true } node) AddPartAsWord(node);
+    }
+
+    /// <summary>Makes a part (挽 of 挽昼) one of the user's words, waiting for an analysis; one they have already opens.</summary>
+    private void AddPartAsWord(VocabNodeViewModel node)
+    {
+        var form = node.Node.Form;
+        if (_store.FindWord(form) is { } existing)
+        {
+            _open(existing.Id);
+            return;
+        }
+        try
+        {
+            _store.AddWord(form, $"Trong {Word.Text}");
+            _notify?.Invoke($"“{form}” is one of your words now; it waits for an AI agent to break it down (Add tab).");
+        }
+        catch (ArgumentException ex)
+        {
+            _notify?.Invoke(ex.Message);
+        }
+    }
+
     partial void OnSelectedNodeChanged(VocabNodeViewModel? oldValue, VocabNodeViewModel? newValue)
     {
         IsEditingPart = false;
@@ -152,11 +190,14 @@ public sealed partial class VocabWordDetailViewModel : ObservableObject
         if (newValue is not null) newValue.IsSelected = true;
         AlsoIn = newValue?.Node.PartId is { } partId
             ? _store.WordsUsing(partId).Where(w => w.Id != Id)
-                .Select(w => new VocabWordLink(w.Id, w.Value.Text, w.Value.Meaning, new RelayCommand(() => _open(w.Id)))).ToList()
+                .Select(w => new VocabWordLink(w.Id, w.Value.Text, w.Value.Meaning, new RelayCommand(() => _open(w.Id)))
+                {
+                    Split = VocabHighlight.Find(_store, w.Value, partId),
+                }).ToList()
             : [];
         foreach (var name in new[] { nameof(CardTitle), nameof(CardKind), nameof(CardPhonetic), nameof(CardHanViet), nameof(CardMeaning), nameof(CardOrigin),
                      nameof(HasCardPhonetic), nameof(HasCardHanViet), nameof(HasCardOrigin), nameof(AlsoIn), nameof(HasAlsoIn),
-                     nameof(IsPartSelected), nameof(IsWordSelected), nameof(CanSayPart) })
+                     nameof(IsPartSelected), nameof(IsWordSelected), nameof(CanSayPart), nameof(CanAddSelectedAsWord), nameof(SelectedAddText) })
             OnPropertyChanged(name);
     }
 

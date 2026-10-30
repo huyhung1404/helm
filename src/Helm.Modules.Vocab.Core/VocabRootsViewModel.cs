@@ -22,13 +22,15 @@ public sealed record VocabRootRow(string PartId, string Form, string Kind, strin
 /// <summary>
 /// The Roots tab: every part of the user's words with the words that share it, the biggest families first; a card to
 /// practise roots alone (the root, then its meaning and family); and, on the PC, "Suggest words" to add more of a
-/// family. UI thread only.
+/// family. A family opened takes the whole tab, with Previous and Next through the list. UI thread only.
 /// </summary>
 public sealed partial class VocabRootsViewModel : ObservableObject
 {
     private readonly VocabStore _store;
     private readonly Action<string> _open;
     private readonly Random _random;
+    // Every row of the list (all pages), in its order: an opened family's Previous and Next.
+    private List<VocabRootRow> _all = [];
 
     [ObservableProperty] private VocabLanguage _language = VocabLanguage.English;
     [ObservableProperty] private VocabRootRow? _selected;
@@ -62,6 +64,29 @@ public sealed partial class VocabRootsViewModel : ObservableObject
 
     public bool HasSelected => Selected is not null;
 
+    /// <summary>The list and its tools show while no family is open.</summary>
+    public bool ShowsList => Selected is null;
+
+    public bool HasNextRoot => Neighbour(1) is not null;
+
+    public bool HasPreviousRoot => Neighbour(-1) is not null;
+
+    /// <summary>"3 / 25" beside Previous and Next.</summary>
+    public string RootPosition => Selected is { } s && _all.FindIndex(r => r.PartId == s.PartId) is var at and >= 0 ? $"{at + 1} / {_all.Count}" : "";
+
+    private VocabRootRow? Neighbour(int step)
+    {
+        if (Selected is not { } s) return null;
+        var at = _all.FindIndex(r => r.PartId == s.PartId);
+        return at < 0 || at + step < 0 || at + step >= _all.Count ? null : _all[at + step];
+    }
+
+    [RelayCommand]
+    private void NextFamily() => Selected = Neighbour(1) ?? Selected;
+
+    [RelayCommand]
+    private void PreviousFamily() => Selected = Neighbour(-1) ?? Selected;
+
     public bool HasPractice => Practice is not null;
 
     partial void OnLanguageChanged(VocabLanguage value)
@@ -73,7 +98,19 @@ public sealed partial class VocabRootsViewModel : ObservableObject
         Refresh();
     }
 
-    partial void OnSelectedChanged(VocabRootRow? value) => OnPropertyChanged(nameof(HasSelected));
+    partial void OnSelectedChanged(VocabRootRow? value)
+    {
+        OnPropertyChanged(nameof(HasSelected));
+        OnPropertyChanged(nameof(ShowsList));
+        OnNeighboursChanged();
+    }
+
+    private void OnNeighboursChanged()
+    {
+        OnPropertyChanged(nameof(HasNextRoot));
+        OnPropertyChanged(nameof(HasPreviousRoot));
+        OnPropertyChanged(nameof(RootPosition));
+    }
 
     partial void OnPracticeChanged(VocabRootRow? value)
     {
@@ -120,6 +157,7 @@ public sealed partial class VocabRootsViewModel : ObservableObject
     public void Refresh()
     {
         var all = Families(_store, Language, _open, row => Selected = row);
+        _all = all;
         Roots.Clear();
         var last = "";
         foreach (var row in Pager.Take(all, Language))
@@ -129,6 +167,7 @@ public sealed partial class VocabRootsViewModel : ObservableObject
             last = group;
         }
         if (Selected is { } chosen) Selected = all.FirstOrDefault(r => r.PartId == chosen.PartId);
+        OnNeighboursChanged();
         OnPropertyChanged(nameof(HasRoots));
         OnPropertyChanged(nameof(HasNoRoots));
     }
@@ -162,7 +201,10 @@ public sealed partial class VocabRootsViewModel : ObservableObject
         {
             if (store.GetPart(partId) is not { } part) continue;
             var links = family.OrderBy(f => f.Word.Text, StringComparer.CurrentCulture)
-                .Select(f => new VocabWordLink(f.Id, f.Word.Text, f.Word.Meaning, new RelayCommand(() => open(f.Id)))).ToList();
+                .Select(f => new VocabWordLink(f.Id, f.Word.Text, f.Word.Meaning, new RelayCommand(() => open(f.Id)))
+                {
+                    Split = VocabHighlight.Find(store, f.Word, partId),
+                }).ToList();
             VocabRootRow? row = null;
             row = new VocabRootRow(partId, part.Form, KindText(part.Kind), part.Meaning, part.Origin, links,
                 new RelayCommand(() => select?.Invoke(row!)));

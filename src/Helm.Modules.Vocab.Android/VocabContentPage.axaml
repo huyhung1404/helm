@@ -138,7 +138,7 @@
                     <ContentControl Content="{Binding Root}" HorizontalAlignment="Center" />
                 </ScrollViewer>
                 <TextBlock Classes="secondary" HorizontalAlignment="Center" TextWrapping="Wrap" TextAlignment="Center" FontSize="12"
-                           Text="Tap a part to see what it means and which of your words share it." IsVisible="{Binding IsWordSelected}" />
+                           Text="Tap a part to see what it means and which of your words share it; hold a character to make it one of your words." IsVisible="{Binding IsWordSelected}" />
                 <Border BorderThickness="0,1,0,0" BorderBrush="{DynamicResource HelmCardStroke}" Padding="0,8,0,0" IsVisible="{Binding IsPartSelected}">
                     <StackPanel Spacing="2">
                         <Grid ColumnDefinitions="*,Auto">
@@ -159,6 +159,13 @@
                         <TextBlock Text="{Binding CardHanViet}" Classes="secondary" IsVisible="{Binding HasCardHanViet}" />
                         <TextBlock Text="{Binding CardMeaning}" FontSize="16" TextWrapping="Wrap" />
                         <TextBlock Text="{Binding CardOrigin}" Classes="secondary" TextWrapping="Wrap" IsVisible="{Binding HasCardOrigin}" />
+                        <Button Classes="flat" HorizontalAlignment="Left" Command="{Binding AddSelectedAsWordCommand}" IsVisible="{Binding CanAddSelectedAsWord}"
+                                AutomationProperties.Name="{Binding SelectedAddText}">
+                            <StackPanel Orientation="Horizontal" Spacing="6">
+                                <ic:SymbolIcon Symbol="AddCircle" FontSize="18" />
+                                <TextBlock Text="{Binding SelectedAddText}" VerticalAlignment="Center" />
+                            </StackPanel>
+                        </Button>
                         <StackPanel IsVisible="{Binding HasAlsoIn}" Margin="0,6,0,0" Spacing="4">
                             <TextBlock Text="Also in your words" FontWeight="SemiBold" />
                             <ItemsControl ItemsSource="{Binding AlsoIn}">
@@ -169,7 +176,9 @@
                                 </ItemsControl.ItemsPanel>
                                 <ItemsControl.ItemTemplate>
                                     <DataTemplate DataType="vm:VocabWordLink">
-                                        <Button Margin="0,0,6,6" Content="{Binding Text}" Command="{Binding Open}" />
+                                        <Button Margin="0,0,6,6" Command="{Binding Open}" AutomationProperties.Name="{Binding Text}">
+                                            <TextBlock><Run Text="{Binding Split.Before}" /><Run Text="{Binding Split.Match}" FontWeight="Bold" TextDecorations="Underline" Foreground="{DynamicResource SystemAccentColor}" /><Run Text="{Binding Split.After}" /></TextBlock>
+                                        </Button>
                                     </DataTemplate>
                                 </ItemsControl.ItemTemplate>
                             </ItemsControl>
@@ -539,6 +548,25 @@
                         </StackPanel>
                     </Grid>
 
+                    <!-- The words before and after this one in the list -->
+                    <Grid ColumnDefinitions="*,Auto,*" Margin="0,0,0,6">
+                        <Button Classes="flat" HorizontalAlignment="Left" Command="{Binding PreviousWordCommand}" IsEnabled="{Binding HasPreviousWord}"
+                                AutomationProperties.Name="Previous word">
+                            <StackPanel Orientation="Horizontal" Spacing="4">
+                                <ic:SymbolIcon Symbol="ChevronLeft" FontSize="16" />
+                                <TextBlock Text="Previous" VerticalAlignment="Center" />
+                            </StackPanel>
+                        </Button>
+                        <TextBlock Grid.Column="1" Text="{Binding WordPosition}" Classes="secondary" VerticalAlignment="Center" />
+                        <Button Grid.Column="2" Classes="flat" HorizontalAlignment="Right" Command="{Binding NextWordCommand}" IsEnabled="{Binding HasNextWord}"
+                                AutomationProperties.Name="Next word">
+                            <StackPanel Orientation="Horizontal" Spacing="4">
+                                <TextBlock Text="Next" VerticalAlignment="Center" />
+                                <ic:SymbolIcon Symbol="ChevronRight" FontSize="16" />
+                            </StackPanel>
+                        </Button>
+                    </Grid>
+
                     <StackPanel DataContext="{Binding Detail}" x:DataType="vm:VocabWordDetailViewModel">
                         <Border Classes="card">
                             <StackPanel Spacing="4">
@@ -657,18 +685,20 @@
             <!-- ===== Roots: families of words that share a part ===== -->
             <Panel IsVisible="{Binding IsRootsTab}">
             <StackPanel DataContext="{Binding Roots}" x:DataType="vm:VocabRootsViewModel" Spacing="8">
-                <Grid ColumnDefinitions="*,6,*">
+                <Grid ColumnDefinitions="*,6,*" IsVisible="{Binding ShowsList}">
                     <Button Classes="tab" Classes.accent="{Binding IsEnglish}" Content="English" Command="{Binding ShowEnglishCommand}" />
                     <Button Grid.Column="2" Classes="tab" Classes.accent="{Binding IsChinese}" Content="中文" Command="{Binding ShowChineseCommand}" />
                 </Grid>
-                <Button HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Command="{Binding NextRootCommand}" AutomationProperties.Name="Practise roots">
+                <Button HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Command="{Binding NextRootCommand}" AutomationProperties.Name="Practise roots"
+                        IsVisible="{Binding ShowsList}">
                     <StackPanel Orientation="Horizontal" Spacing="6">
                         <ic:SymbolIcon Symbol="HatGraduation" FontSize="18" />
                         <TextBlock Text="Practise roots" VerticalAlignment="Center" />
                     </StackPanel>
                 </Button>
 
-                <!-- Practising a root -->
+                <!-- Practising a root (hidden while a family is open) -->
+                <Panel IsVisible="{Binding ShowsList}">
                 <Border Classes="card" IsVisible="{Binding HasPractice}">
                     <StackPanel Spacing="6">
                         <Grid ColumnDefinitions="*,Auto">
@@ -696,7 +726,9 @@
                                 </ItemsControl.ItemsPanel>
                                 <ItemsControl.ItemTemplate>
                                     <DataTemplate DataType="vm:VocabWordLink">
-                                        <Button Margin="0,0,6,6" Content="{Binding Text}" Command="{Binding Open}" />
+                                        <Button Margin="0,0,6,6" Command="{Binding Open}" AutomationProperties.Name="{Binding Text}">
+                                            <TextBlock><Run Text="{Binding Split.Before}" /><Run Text="{Binding Split.Match}" FontWeight="Bold" TextDecorations="Underline" Foreground="{DynamicResource SystemAccentColor}" /><Run Text="{Binding Split.After}" /></TextBlock>
+                                        </Button>
                                     </DataTemplate>
                                 </ItemsControl.ItemTemplate>
                             </ItemsControl>
@@ -704,6 +736,34 @@
                         <Button Classes="accent" HorizontalAlignment="Center" Content="Next root" Command="{Binding NextRootCommand}" />
                     </StackPanel>
                 </Border>
+                </Panel>
+
+                <!-- A family opened takes the tab: back, and the families before and after it -->
+                <StackPanel IsVisible="{Binding HasSelected}" Spacing="2">
+                    <Button Classes="flat" HorizontalAlignment="Left" Command="{Binding CloseSelectedCommand}" AutomationProperties.Name="Back to the roots">
+                        <StackPanel Orientation="Horizontal" Spacing="6">
+                            <ic:SymbolIcon Symbol="ArrowLeft" FontSize="18" />
+                            <TextBlock Text="All roots" VerticalAlignment="Center" />
+                        </StackPanel>
+                    </Button>
+                    <Grid ColumnDefinitions="*,Auto,*">
+                        <Button Classes="flat" HorizontalAlignment="Left" Command="{Binding PreviousFamilyCommand}" IsEnabled="{Binding HasPreviousRoot}"
+                                AutomationProperties.Name="Previous root">
+                            <StackPanel Orientation="Horizontal" Spacing="4">
+                                <ic:SymbolIcon Symbol="ChevronLeft" FontSize="16" />
+                                <TextBlock Text="Previous" VerticalAlignment="Center" />
+                            </StackPanel>
+                        </Button>
+                        <TextBlock Grid.Column="1" Text="{Binding RootPosition}" Classes="secondary" VerticalAlignment="Center" />
+                        <Button Grid.Column="2" Classes="flat" HorizontalAlignment="Right" Command="{Binding NextFamilyCommand}" IsEnabled="{Binding HasNextRoot}"
+                                AutomationProperties.Name="Next root">
+                            <StackPanel Orientation="Horizontal" Spacing="4">
+                                <TextBlock Text="Next" VerticalAlignment="Center" />
+                                <ic:SymbolIcon Symbol="ChevronRight" FontSize="16" />
+                            </StackPanel>
+                        </Button>
+                    </Grid>
+                </StackPanel>
 
                 <!-- The chosen family -->
                 <Border Classes="card" IsVisible="{Binding HasSelected}">
@@ -713,19 +773,30 @@
                                 <TextBlock Text="{Binding Selected.Form}" FontSize="24" FontWeight="SemiBold" Margin="0,0,8,0" />
                                 <TextBlock Text="{Binding Selected.Kind}" Classes="secondary" VerticalAlignment="Center" />
                             </WrapPanel>
-                            <Button Grid.Column="1" Classes="icon flat" Command="{Binding CloseSelectedCommand}" AutomationProperties.Name="Close the family">
-                                <ic:SymbolIcon Symbol="Dismiss" FontSize="16" />
-                            </Button>
                         </Grid>
                         <TextBlock Text="{Binding Selected.Meaning}" FontSize="16" TextWrapping="Wrap" />
                         <TextBlock Text="{Binding Selected.Origin}" Classes="secondary" TextWrapping="Wrap" />
+                        <TextBlock Text="{Binding Selected.CountText, StringFormat='Your words with it ({0})'}" FontWeight="SemiBold" Margin="0,10,0,2" />
+                        <ItemsControl ItemsSource="{Binding Selected.Words}">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate DataType="vm:VocabWordLink">
+                                    <Button Classes="flat" HorizontalAlignment="Stretch" HorizontalContentAlignment="Left" Padding="8,6" Command="{Binding Open}"
+                                            AutomationProperties.Name="{Binding Text}">
+                                        <StackPanel>
+                                            <TextBlock FontSize="16" FontWeight="SemiBold"><Run Text="{Binding Split.Before}" /><Run Text="{Binding Split.Match}" FontWeight="Bold" TextDecorations="Underline" Foreground="{DynamicResource SystemAccentColor}" /><Run Text="{Binding Split.After}" /></TextBlock>
+                                            <TextBlock Text="{Binding Meaning}" Classes="secondary" TextWrapping="Wrap" />
+                                        </StackPanel>
+                                    </Button>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
                         <TextBlock Classes="secondary" FontSize="12" TextWrapping="Wrap"
                                    Text="More words of this family: on the PC, Helm's Roots tab has Suggest 3 more words (Claude Code)." />
                     </StackPanel>
                 </Border>
 
                 <!-- Every part, the biggest families first -->
-                <Border Classes="card" Padding="4">
+                <Border Classes="card" Padding="4" IsVisible="{Binding ShowsList}">
                     <StackPanel>
                         <TextBlock Margin="12" TextWrapping="Wrap" Classes="secondary" IsVisible="{Binding HasNoRoots}"
                                    Text="The parts of your words show up here once they are broken down; a part shared by several words makes a family." />
@@ -752,7 +823,7 @@
                                                     </ItemsControl.ItemsPanel>
                                                     <ItemsControl.ItemTemplate>
                                                         <DataTemplate DataType="vm:VocabWordLink">
-                                                            <TextBlock Margin="0,0,10,0" Text="{Binding Text}" Classes="accent" />
+                                                            <TextBlock Margin="0,0,10,0" Classes="accent"><Run Text="{Binding Split.Before}" /><Run Text="{Binding Split.Match}" FontWeight="Bold" TextDecorations="Underline" /><Run Text="{Binding Split.After}" /></TextBlock>
                                                         </DataTemplate>
                                                     </ItemsControl.ItemTemplate>
                                                 </ItemsControl>

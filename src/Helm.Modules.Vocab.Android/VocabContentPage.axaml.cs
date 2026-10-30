@@ -29,6 +29,8 @@ public partial class VocabContentPage : UserControl
         _viewModel = viewModel;
         DataContext = viewModel;
         InitializeComponent();
+        // Holding a box of a tree offers to make that part one of the words.
+        TreeNodeHold.Attach(this);
     }
 
     // Pages are transient and the module is a singleton: listen only while shown.

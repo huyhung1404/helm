@@ -139,7 +139,14 @@ public sealed class VocabPopup : IDisposable
             if (_window is { IsVisible: true }) return;
             var card = new VocabCardViewModel(_store, _quiz, voice: _voice) { ShowYouGlish = _settings.Current.ShowYouGlish };
             if (!card.ShowNext()) return;
-            _window = new VocabPopupWindow(card, _windows, OpenWord);
+            var s = _settings.Current;
+            _window = new VocabPopupWindow(card, _windows, OpenWord,
+                s.PopupLeft is { } left && s.PopupBottom is { } bottom ? new System.Windows.Point(left, bottom) : null,
+                at => _settings.Update(v =>
+                {
+                    v.PopupLeft = at?.X;
+                    v.PopupBottom = at?.Y;
+                }));
             _window.Closed += (_, _) => _window = null;
             _window.ShowCard();
         }

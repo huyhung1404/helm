@@ -48,6 +48,14 @@ public sealed class VocabSettings : IVersionedSettings
     /// <summary>The user typed the range (Custom) rather than picking one of the choices.</summary>
     public bool PopupCustom { get; set; }
 
+    /// <summary>
+    /// PC: where the user dragged the pop-up, as its bottom-left corner in screen units (it grows upwards when the meaning
+    /// shows); null keeps it in the bottom-right corner.
+    /// </summary>
+    public double? PopupLeft { get; set; }
+
+    public double? PopupBottom { get; set; }
+
     public void Migrate(int fromVersion)
     {
     }

@@ -142,6 +142,14 @@ public sealed partial class VocabViewModel : ObservableObject
 
     public bool HasDetail => Detail is not null;
 
+    /// <summary>The opened word has a word after / before it in the list (Next and Previous).</summary>
+    public bool HasNextWord => Detail is { } d && List.Neighbour(d.Id, 1) is not null;
+
+    public bool HasPreviousWord => Detail is { } d && List.Neighbour(d.Id, -1) is not null;
+
+    /// <summary>"3 / 25" beside Previous and Next.</summary>
+    public string WordPosition => Detail is { } d ? List.Position(d.Id) : "";
+
     public bool HasMessage => !string.IsNullOrEmpty(Message);
 
     public string PendingText => PendingCount == 1
@@ -180,7 +188,30 @@ public sealed partial class VocabViewModel : ObservableObject
         OnPropertyChanged(nameof(AgentWorkText));
     }
 
-    partial void OnDetailChanged(VocabWordDetailViewModel? value) => OnPropertyChanged(nameof(HasDetail));
+    partial void OnDetailChanged(VocabWordDetailViewModel? value)
+    {
+        OnPropertyChanged(nameof(HasDetail));
+        OnNeighboursChanged();
+    }
+
+    private void OnNeighboursChanged()
+    {
+        OnPropertyChanged(nameof(HasNextWord));
+        OnPropertyChanged(nameof(HasPreviousWord));
+        OnPropertyChanged(nameof(WordPosition));
+    }
+
+    /// <summary>The next word of the list, opened in place of this one.</summary>
+    [RelayCommand]
+    private void NextWord() => Step(1);
+
+    [RelayCommand]
+    private void PreviousWord() => Step(-1);
+
+    private void Step(int step)
+    {
+        if (Detail is { } detail && List.Neighbour(detail.Id, step) is { } id) Open(id);
+    }
 
     partial void OnMessageChanged(string? value) => OnPropertyChanged(nameof(HasMessage));
 
@@ -235,9 +266,10 @@ public sealed partial class VocabViewModel : ObservableObject
     public void Open(string id, string? partId = null)
     {
         if (_store.GetWord(id) is not { } word) return;
+        // The list first: Previous and Next walk the word's own language.
+        List.Language = word.Language;
         Detail = Build(id, word, partId);
         Tab = VocabTab.Words;
-        List.Language = word.Language;
     }
 
     /// <summary>The opened word again after a change (an analysis arriving, a sync), on whichever tab is in front.</summary>
@@ -245,7 +277,7 @@ public sealed partial class VocabViewModel : ObservableObject
         Detail = _store.GetWord(detail.Id) is { } word ? Build(detail.Id, word, detail.SelectedNode?.Node.PartId) : null;
 
     private VocabWordDetailViewModel Build(string id, VocabWord word, string? partId) =>
-        new(_store, id, word, _quiz.StatsOf(id), Settings.ShowTraditional, w => Open(w), partId, _voice, Settings.ShowYouGlish);
+        new(_store, id, word, _quiz.StatsOf(id), Settings.ShowTraditional, w => Open(w), partId, _voice, Settings.ShowYouGlish, m => Message = m);
 
     [RelayCommand]
     private void CloseDetail() => Detail = null;
@@ -281,6 +313,7 @@ public sealed partial class VocabViewModel : ObservableObject
         RefreshRecent(all);
         List.Refresh();
         Roots.Refresh();
+        OnNeighboursChanged();
         // The opened word follows its changes (an analysis arriving from the agent, a sync), keeping the box selected.
         if (Detail is { } detail && !detail.IsEditing) Reload(detail);
         if (!Card.HasWord) Card.ShowNext();

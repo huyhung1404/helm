@@ -79,7 +79,13 @@
                 <Border Grid.ColumnSpan="2" Width="1.5" HorizontalAlignment="Center" Background="{StaticResource TreeLine}" />
             </Grid>
             <Button Style="{StaticResource NodeBox}" Margin="5,0" HorizontalAlignment="Center" Command="{Binding SelectCommand}"
-                    AutomationProperties.Name="{Binding Form}" ToolTip="{Binding Node.Meaning}">
+                    AutomationProperties.Name="{Binding Form}" ToolTip="{Binding Node.Meaning}" ContextMenuService.IsEnabled="{Binding CanAddAsWord}">
+                <!-- Right-click: make this part (挽 of 挽昼) one of your words -->
+                <Button.ContextMenu>
+                    <ContextMenu>
+                        <MenuItem Header="{Binding AddAsWordText}" Command="{Binding AddAsWordCommand}" />
+                    </ContextMenu>
+                </Button.ContextMenu>
                 <StackPanel>
                     <TextBlock Text="{Binding RoleText}" FontSize="10" FontWeight="SemiBold" HorizontalAlignment="Center"
                                Visibility="{Binding HasRole, Converter={StaticResource BoolToVisibility}}">
@@ -115,7 +121,7 @@
     <!-- How a word is built: its tree, then the tapped box. Shown on the Learn card and on the Words tab. -->
     <DataTemplate x:Key="PartsView" DataType="{x:Type local:VocabWordDetailViewModel}">
         <StackPanel>
-            <ScrollViewer HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Disabled" PanningMode="HorizontalOnly">
+            <ScrollViewer HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Disabled" PanningMode="HorizontalOnly" pc:WheelToParent.IsEnabled="True">
                 <ContentControl Content="{Binding Root}" HorizontalAlignment="Center" Margin="0,4,0,8" Focusable="False" />
             </ScrollViewer>
             <TextBlock Margin="0,4,0,0" HorizontalAlignment="Center" Style="{DynamicResource HelmSecondaryText}"
@@ -125,6 +131,9 @@
                     Visibility="{Binding IsPartSelected, Converter={StaticResource BoolToVisibility}}">
                 <StackPanel>
                     <DockPanel>
+                        <ui:Button DockPanel.Dock="Right" Appearance="Transparent" Padding="6,4" Margin="4,0,0,0" Icon="{ui:SymbolIcon AddCircle24}"
+                                   Content="{Binding SelectedAddText}" AutomationProperties.Name="{Binding SelectedAddText}" Command="{Binding AddSelectedAsWordCommand}"
+                                   Visibility="{Binding CanAddSelectedAsWord, Converter={StaticResource BoolToVisibility}}" />
                         <ui:Button DockPanel.Dock="Right" Appearance="Transparent" Padding="6" MinWidth="0" Icon="{ui:SymbolIcon Edit24}" ToolTip="Edit this part"
                                    AutomationProperties.Name="Edit this part" Command="{Binding BeginEditPartCommand}" />
                         <ui:Button DockPanel.Dock="Right" Appearance="Transparent" Padding="6" MinWidth="0" Icon="{ui:SymbolIcon Speaker224}" ToolTip="Say it"
@@ -150,7 +159,12 @@
                             </ItemsControl.ItemsPanel>
                             <ItemsControl.ItemTemplate>
                                 <DataTemplate DataType="{x:Type local:VocabWordLink}">
-                                    <ui:Button Margin="0,0,6,6" Content="{Binding Text}" ToolTip="{Binding Meaning}" Command="{Binding Open}" />
+                                    <ui:Button Margin="0,0,6,6" ToolTip="{Binding Meaning}" Command="{Binding Open}" AutomationProperties.Name="{Binding Text}">
+                                        <TextBlock>
+                                            <Run Text="{Binding Split.Before, Mode=OneWay}" /><Run Text="{Binding Split.Match, Mode=OneWay}" FontWeight="Bold" TextDecorations="Underline"
+                                                Foreground="{DynamicResource AccentTextFillColorPrimaryBrush}" /><Run Text="{Binding Split.After, Mode=OneWay}" />
+                                        </TextBlock>
+                                    </ui:Button>
                                 </DataTemplate>
                             </ItemsControl.ItemTemplate>
                         </ItemsControl>

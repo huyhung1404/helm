@@ -52,6 +52,8 @@ public sealed partial class VocabWordListViewModel : ObservableObject
     private readonly VocabSettingsViewModel _settings;
     private readonly Action<string> _open;
     private bool _rebuildingFilters;
+    // Every word the list shows (all pages), in its order: an opened word's Previous and Next.
+    private List<string> _order = [];
 
     [ObservableProperty] private string _searchText = "";
     [ObservableProperty] private VocabLanguage _language = VocabLanguage.English;
@@ -161,6 +163,7 @@ public sealed partial class VocabWordListViewModel : ObservableObject
             _ => matches.OrderBy(w => SortKey(w.Value), StringComparer.Ordinal),
         }).ThenBy(w => w.Value.Text, StringComparer.Ordinal).ToList();
 
+        _order = sorted.Select(w => w.Id).ToList();
         Words.Clear();
         var last = "";
         foreach (var w in Pager.Take(sorted, (SearchText, Language, SortIndex, FilterIndex)))
@@ -180,6 +183,16 @@ public sealed partial class VocabWordListViewModel : ObservableObject
         }
         OnPropertyChanged(nameof(HasNoMatches));
     }
+
+    /// <summary>The word <paramref name="step"/> places after (or before, when negative) this one in the list; null past the ends or when it is not listed.</summary>
+    public string? Neighbour(string id, int step)
+    {
+        var at = _order.IndexOf(id);
+        return at < 0 || at + step < 0 || at + step >= _order.Count ? null : _order[at + step];
+    }
+
+    /// <summary>"3 / 25": where the word is in the list; empty when it is not listed.</summary>
+    public string Position(string id) => _order.IndexOf(id) is var at and >= 0 ? $"{at + 1} / {_order.Count}" : "";
 
     /// <summary>The group a word falls in under the current order.</summary>
     private string Group(VocabWord word, VocabWordStats stats, DateTimeOffset now) => SortIndex switch

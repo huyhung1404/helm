@@ -3,6 +3,29 @@
 All notable changes to Helm. The top section is used as the GitHub release body and as the Velopack release notes.
 Format: [Keep a Changelog](https://keepachangelog.com), versions follow [SemVer](https://semver.org).
 
+## [Unreleased]
+
+### Added
+- **Vocabulary: make a part of the tree a word of its own.** Right-click a character or a word inside a longer one
+  (hold it on the phone), or use the button on its card: 挽 of 挽昼 joins your words with "Trong 挽昼" as its note and
+  waits for its analysis; one you have already opens.
+- **Vocabulary: see where a part sits in each word.** In a family (Roots tab) and under "Also in your words", the part
+  is highlighted inside the word: re**lat**ive, trans**lat**e; a component that is not written apart marks its
+  character (救 for 攵 in 补救).
+- **Vocabulary (PC): drag the pop-up card wherever you like.** It comes back to that spot next time; a double-click
+  puts it back in the corner.
+
+### Changed
+- **Vocabulary: an opened word takes the whole page** (on the PC too), so a wide tree fits. **All words** (or Esc)
+  goes back to the list; **Previous** and **Next** (← and → on the PC) open the words before and after it in the
+  list's order, with where it stands ("3 / 25").
+- **Vocabulary: a family opened on the Roots tab takes the whole tab too,** with all your words that have the part
+  (and their meanings), **All roots** (or Esc) and **Previous** / **Next** (← and →).
+
+### Fixed
+- **Vocabulary (PC): the mouse wheel no longer stops over a word's tree;** it goes on scrolling the page (Shift+wheel
+  scrolls a wide tree sideways).
+
 ## [0.62.1] - 2026-10-30
 
 ### Fixed

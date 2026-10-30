@@ -6,16 +6,21 @@ namespace Helm.Modules.Vocab;
 /// <summary>
 /// One box of the tree on screen. The flags tell the page which connector halves to draw above a box: a line from the
 /// left for every child but the first, to the right for every child but the last, so siblings join under their parent.
+/// A box that is a word by itself (a Chinese character, an English word inside a longer one) can become one of the
+/// user's words (right-click on the PC, hold on the phone).
 /// </summary>
 public sealed partial class VocabNodeViewModel : ObservableObject
 {
     private readonly Action<VocabNodeViewModel> _select;
+    private readonly Action<VocabNodeViewModel>? _addAsWord;
 
     [ObservableProperty] private bool _isSelected;
 
-    public VocabNodeViewModel(VocabTreeNode node, bool showTraditional, Action<VocabNodeViewModel> select, bool isRoot = true, bool isFirst = true, bool isLast = true)
+    public VocabNodeViewModel(VocabTreeNode node, bool showTraditional, Action<VocabNodeViewModel> select, bool isRoot = true, bool isFirst = true, bool isLast = true,
+        Action<VocabNodeViewModel>? addAsWord = null, Func<string, bool>? isWord = null)
     {
         _select = select;
+        _addAsWord = addAsWord;
         Node = node;
         IsRoot = isRoot;
         IsFirst = isFirst;
@@ -23,8 +28,31 @@ public sealed partial class VocabNodeViewModel : ObservableObject
         Form = showTraditional && node.Traditional.Length > 0 ? $"{node.Form} ({node.Traditional})" : node.Form;
         // "jiù · CỨU" as in Chinese dictionaries; English parts show their IPA or nothing.
         Caption = string.Join(" · ", new[] { node.Phonetic, node.HanViet.ToUpperInvariant() }.Where(s => s.Length > 0));
-        Children = node.Children.Select((c, i) => new VocabNodeViewModel(c, showTraditional, select, false, i == 0, i == node.Children.Count - 1)).ToList();
+        Children = node.Children.Select((c, i) => new VocabNodeViewModel(c, showTraditional, select, false, i == 0, i == node.Children.Count - 1, addAsWord, isWord)).ToList();
+        CanAddAsWord = !isRoot && addAsWord is not null && IsWordByItself(node);
+        IsOneOfYourWords = CanAddAsWord && isWord?.Invoke(node.Form) == true;
     }
+
+    /// <summary>This box can become one of the user's words.</summary>
+    public bool CanAddAsWord { get; }
+
+    /// <summary>The user has this word already: the action opens it.</summary>
+    public bool IsOneOfYourWords { get; }
+
+    /// <summary>"Add 挽 as a word", or "Open 挽" when the user has it.</summary>
+    public string AddAsWordText => IsOneOfYourWords ? $"Open “{Node.Form}”" : $"Add “{Node.Form}” as a word";
+
+    /// <summary>A Chinese character or component written as one character, or an English word (not an affix or a Latin root).</summary>
+    internal static bool IsWordByItself(VocabTreeNode node) => node.Kind switch
+    {
+        VocabPartKind.Character => true,
+        VocabPartKind.Component => VocabText.Length(node.Form) == 1 && node.Form.Any(VocabText.IsHan),
+        VocabPartKind.Word => node.Form.Trim('-').Length > 0,
+        _ => false,
+    };
+
+    [RelayCommand]
+    private void AddAsWord() => _addAsWord?.Invoke(this);
 
     public VocabTreeNode Node { get; }
 

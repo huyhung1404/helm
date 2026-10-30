@@ -282,6 +282,150 @@ public sealed class VocabPracticeTests
         Assert.Equal(["connect", "link"], _store.GetWord(id)!.Synonyms);
     }
 
+    // ---- a part of the tree made a word ------------------------------------------------------------------------
+
+    [Fact]
+    public void A_character_or_inner_word_of_the_tree_becomes_a_word_of_its_own()
+    {
+        var (id, _) = _store.AddWord("relative");
+        _store.SaveAnalysis(id, new WordAnalysis
+        {
+            Phonetic = "/ˈrel.ə.tɪv/", Meaning = "họ hàng",
+            Parts =
+            [
+                new AnalysisPart
+                {
+                    Form = "relate", Kind = VocabPartKind.Word, Meaning = "liên hệ",
+                    Parts =
+                    [
+                        new AnalysisPart { Form = "re-", Kind = VocabPartKind.Prefix, Meaning = "lại" },
+                        new AnalysisPart { Form = "lat", Kind = VocabPartKind.Root, Meaning = "mang" },
+                    ],
+                },
+                new AnalysisPart { Form = "-ive", Kind = VocabPartKind.Suffix, Meaning = "có tính chất" },
+            ],
+        });
+        var opened = new List<string>();
+        var notes = new List<string>();
+        var detail = new VocabWordDetailViewModel(_store, id, _store.GetWord(id)!, _quiz.StatsOf(id), false, opened.Add, notify: notes.Add);
+        var relate = detail.Root.Children[0];
+        Assert.False(detail.Root.CanAddAsWord);
+        Assert.True(relate.CanAddAsWord);
+        Assert.False(relate.Children[0].CanAddAsWord); // re- is an affix
+        Assert.False(relate.Children[1].CanAddAsWord); // lat is a Latin root
+        Assert.False(detail.Root.Children[1].CanAddAsWord);
+        Assert.Equal("Add “relate” as a word", relate.AddAsWordText);
+
+        relate.SelectCommand.Execute(null);
+        Assert.True(detail.CanAddSelectedAsWord);
+        detail.AddSelectedAsWordCommand.Execute(null);
+        var added = _store.FindWord("relate")!;
+        Assert.Equal(VocabStatus.Pending, added.Value.Status);
+        Assert.Equal("Trong relative", added.Value.Note);
+        Assert.Single(notes);
+
+        // Rebuilt after the change, the box knows the word is there and opens it.
+        detail = new VocabWordDetailViewModel(_store, id, _store.GetWord(id)!, _quiz.StatsOf(id), false, opened.Add, notify: notes.Add);
+        relate = detail.Root.Children[0];
+        Assert.True(relate.IsOneOfYourWords);
+        Assert.Equal("Open “relate”", relate.AddAsWordText);
+        relate.AddAsWordCommand.Execute(null);
+        Assert.Equal([added.Id], opened);
+        Assert.Equal(2, _store.Words().Count);
+    }
+
+    [Fact]
+    public void Chinese_characters_and_single_character_components_can_become_words()
+    {
+        VocabTreeNode Node(string form, VocabPartKind kind) => new() { Form = form, Kind = kind };
+        Assert.True(VocabNodeViewModel.IsWordByItself(Node("挽", VocabPartKind.Character)));
+        Assert.True(VocabNodeViewModel.IsWordByItself(Node("求", VocabPartKind.Component)));
+        Assert.False(VocabNodeViewModel.IsWordByItself(Node("-ive", VocabPartKind.Suffix)));
+    }
+
+    // ---- where a part sits in a word ----------------------------------------------------------------------------
+
+    [Fact]
+    public void A_part_is_highlighted_where_it_sits_in_each_word()
+    {
+        var (relative, _) = _store.AddWord("relative");
+        _store.SaveAnalysis(relative, new WordAnalysis
+        {
+            Phonetic = "/x/", Meaning = "họ hàng",
+            Parts =
+            [
+                new AnalysisPart
+                {
+                    Form = "relate", Kind = VocabPartKind.Word, Meaning = "liên hệ",
+                    Parts =
+                    [
+                        new AnalysisPart { Form = "re-", Kind = VocabPartKind.Prefix, Meaning = "lại" },
+                        new AnalysisPart { Form = "lat", Kind = VocabPartKind.Root, Meaning = "mang" },
+                    ],
+                },
+                new AnalysisPart { Form = "-ive", Kind = VocabPartKind.Suffix, Meaning = "có tính chất" },
+            ],
+        });
+        var (buJiu, _) = _store.AddWord("补救");
+        _store.SaveAnalysis(buJiu, new WordAnalysis
+        {
+            Phonetic = "bǔjiù", Meaning = "cứu vãn", HanViet = "bổ cứu",
+            Parts =
+            [
+                new AnalysisPart { Form = "补", Kind = VocabPartKind.Character, Meaning = "vá", Phonetic = "bǔ", HanViet = "bổ" },
+                new AnalysisPart
+                {
+                    Form = "救", Kind = VocabPartKind.Character, Meaning = "cứu", Phonetic = "jiù", HanViet = "cứu",
+                    Parts = [new AnalysisPart { Form = "攵", Kind = VocabPartKind.Component, Role = VocabPartRole.Meaning, Meaning = "đánh", HanViet = "phộc" }],
+                },
+            ],
+        });
+        string Part(string form) => _store.Parts().Single(p => p.Value.Form == form).Id;
+        VocabWordSplit Find(string wordId, string form) => VocabHighlight.Find(_store, _store.GetWord(wordId)!, Part(form));
+
+        Assert.Equal(new VocabWordSplit("re", "lat", "ive"), Find(relative, "lat"));
+        Assert.Equal(new VocabWordSplit("", "relat", "ive"), Find(relative, "relate"));
+        Assert.Equal(new VocabWordSplit("relat", "ive", ""), Find(relative, "-ive"));
+        // A component is not written apart: its character is the spot.
+        Assert.Equal(new VocabWordSplit("补", "救", ""), Find(buJiu, "攵"));
+        Assert.Equal(VocabWordSplit.None("relative"), VocabHighlight.Find(_store, _store.GetWord(relative)!, Part("攵")));
+
+        // The Roots tab lists each family's words with the spot marked.
+        var lat = VocabRootsViewModel.Families(_store, VocabLanguage.English, _ => { }).Single(r => r.Form == "lat");
+        Assert.Equal("lat", lat.Words.Single().Split.Match);
+    }
+
+    // ---- an opened word: back, previous, next --------------------------------------------------------------------
+
+    [Fact]
+    public void An_opened_word_steps_through_the_list_in_its_order()
+    {
+        using var dir = new TempDir();
+        using var settings = new SettingsStoreFactory(new HelmPaths(dir.Path));
+        var translate = Analyzed("translate");
+        var apple = Analyzed("apple");
+        var relative = Analyzed("relative");
+        var viewModel = VocabKit.ViewModel(_store, _quiz, settings);
+        viewModel.ShowWordsCommand.Execute(null);
+
+        viewModel.Open(apple);
+        Assert.Equal("1 / 3", viewModel.WordPosition);
+        Assert.False(viewModel.HasPreviousWord);
+        Assert.True(viewModel.HasNextWord);
+        viewModel.NextWordCommand.Execute(null);
+        Assert.Equal(relative, viewModel.Detail!.Id);
+        viewModel.NextWordCommand.Execute(null);
+        Assert.Equal(translate, viewModel.Detail!.Id);
+        Assert.False(viewModel.HasNextWord);
+        Assert.False(viewModel.NextWordCommand.CanExecute(null) && viewModel.HasNextWord);
+        viewModel.PreviousWordCommand.Execute(null);
+        Assert.Equal("2 / 3", viewModel.WordPosition);
+
+        viewModel.CloseDetailCommand.Execute(null);
+        Assert.False(viewModel.HasDetail);
+        Assert.Equal("", viewModel.WordPosition);
+    }
+
     // ---- the agent working by itself -----------------------------------------------------------------------------
 
     [Fact]
