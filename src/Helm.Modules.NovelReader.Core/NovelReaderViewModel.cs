@@ -136,7 +136,7 @@ public sealed partial class NovelReaderViewModel : ObservableObject, IReadAloudH
         IDialogService dialogs, IDeviceInfo device, SpeechCatalog catalog, IAudioOutput audio, IProcessLauncher launcher,
         IClipboardService clipboard, ILogger<NovelReaderViewModel> logger, TimeProvider? time = null, VieNeuInstaller? vieneu = null,
         INameScanAgent? nameAgent = null, WordPronouncer? pronouncer = null, TranslationReportStore? reports = null,
-        ITranslationAgent? translator = null)
+        ITranslationAgent? translator = null, IEnumerable<Helm.Core.Capture.ICaptureTarget>? captureTargets = null)
     {
         _store = store;
         _dictionaries = dictionaries;
@@ -149,6 +149,7 @@ public sealed partial class NovelReaderViewModel : ObservableObject, IReadAloudH
         _catalog = catalog;
         _nameAgent = nameAgent;
         _pronouncer = pronouncer;
+        HeldWord = new HeldWordViewModel(captureTargets);
         if (vieneu is not null)
         {
             VieNeu = new VieNeuVoiceViewModel(vieneu, ui, dialogs);
@@ -767,6 +768,9 @@ public sealed partial class NovelReaderViewModel : ObservableObject, IReadAloudH
 
     /// <summary>The reading-aloud engine; the page's player bar drives it through the commands below.</summary>
     public ReadAloudController Reader => _reader;
+
+    /// <summary>After a long press on a word: the bar that offers to add it to Vocabulary.</summary>
+    public HeldWordViewModel HeldWord { get; }
 
     /// <summary>A long press on a word in study mode: says its Chinese in standard Mandarin, to learn how it sounds.</summary>
     public async Task PronounceAsync(string chinese)

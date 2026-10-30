@@ -80,6 +80,30 @@ public sealed record VocabWord
 
     public IReadOnlyList<VocabPartLink> Parts { get; init; } = [];
 
+    /// <summary>Sentences that use the word, each with a Vietnamese translation (the fill-the-gap card hides the word in them).</summary>
+    public IReadOnlyList<VocabExample> Examples { get; init; } = [];
+
+    /// <summary>Words it usually goes with: "make a decision", "补救措施".</summary>
+    public IReadOnlyList<string> Collocations { get; init; } = [];
+
+    /// <summary>In Vietnamese: a short story that ties the parts to the meaning, to remember it by.</summary>
+    public string Mnemonic { get; init; } = "";
+
+    /// <summary>Words easy to mix it up with (affect / effect; 己 / 已), each with what tells them apart.</summary>
+    public IReadOnlyList<VocabConfusable> Confusables { get; init; } = [];
+
+    /// <summary>CEFR level for English (A1 … C2), HSK level for Chinese (HSK1 … HSK9); empty when unknown.</summary>
+    public string Level { get; init; } = "";
+
+    /// <summary>In Vietnamese: "danh từ", "động từ"…</summary>
+    public string PartOfSpeech { get; init; } = "";
+
+    /// <summary>In Vietnamese, one or two words: "gia đình", "công việc"…</summary>
+    public string Topic { get; init; } = "";
+
+    /// <summary>The user's own labels: "Aptis", "Truyện"…</summary>
+    public IReadOnlyList<string> Tags { get; init; } = [];
+
     /// <summary>What the user said was wrong when asking for the word to be analyzed again.</summary>
     public string RedoNote { get; init; } = "";
 
@@ -120,6 +144,22 @@ public sealed record VocabPart
     public IReadOnlyList<VocabPartLink> Parts { get; init; } = [];
 
     public DateTimeOffset UpdatedAt { get; init; }
+}
+
+/// <summary>A sentence with the word in it, and its Vietnamese translation.</summary>
+public sealed record VocabExample
+{
+    public string Sentence { get; init; } = "";
+
+    public string Translation { get; init; } = "";
+}
+
+/// <summary>A word easy to mix up with another, and what tells them apart (in Vietnamese).</summary>
+public sealed record VocabConfusable
+{
+    public string Word { get; init; } = "";
+
+    public string Note { get; init; } = "";
 }
 
 /// <summary>One answer to the quiz (append-only log <c>vocab.reviews</c>): did the user remember the word.</summary>

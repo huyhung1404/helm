@@ -287,7 +287,11 @@ public partial class NovelReaderContentPage : UserControl
     }
 
     /// <summary>A long press on a word in study mode says its Chinese.</summary>
-    private async void OnWordHeld(object? sender, WordHeldEventArgs e) => await _viewModel.PronounceAsync(e.Chinese);
+    private async void OnWordHeld(object? sender, WordHeldEventArgs e)
+    {
+        _viewModel.HeldWord.Show(e.Chinese, e.Sentence);
+        await _viewModel.PronounceAsync(e.Chinese);
+    }
 
     private void EndTouch()
     {

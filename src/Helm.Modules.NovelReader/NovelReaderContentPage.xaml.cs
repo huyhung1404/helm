@@ -175,7 +175,11 @@ public partial class NovelReaderContentPage : Page
     }
 
     /// <summary>The mouse held down on a word in study mode says its Chinese.</summary>
-    private async void Word_Held(object? sender, WordHeldEventArgs e) => await _viewModel.PronounceAsync(e.Chinese);
+    private async void Word_Held(object? sender, WordHeldEventArgs e)
+    {
+        _viewModel.HeldWord.Show(e.Chinese, e.Sentence);
+        await _viewModel.PronounceAsync(e.Chinese);
+    }
 
     /// <summary>A double-click on a sentence reads aloud from it.</summary>
     private void Paragraph_ReadFromClicked(object? sender, WordClickedEventArgs e)

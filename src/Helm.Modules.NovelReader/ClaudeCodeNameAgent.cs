@@ -1,3 +1,4 @@
+using Helm.Core.Mcp;
 using Helm.Modules.NovelReader.Names;
 
 namespace Helm.Modules.NovelReader;

@@ -29,6 +29,8 @@ public static class HelmCoreServices
         services.AddSingleton<IStartupTaskService, StartupTaskService>();
         services.AddSingleton<IProcessLauncher, ProcessLauncher>();
         services.AddSingleton<IChildProcessLauncher, ChildProcessLauncher>();
+        // Claude Code without a window, for the tools' AI helpers.
+        services.AddSingleton<Mcp.ClaudeCodeRunner>();
         services.TryAddSingleton<IAppLocation, ProcessAppLocation>();
         services.AddSingleton<IModuleHost, ModuleRegistry>();
         return services;

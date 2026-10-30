@@ -2,6 +2,7 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:ic="using:FluentIcons.Avalonia"
              xmlns:vm="using:Helm.Modules.Vocab"
+             xmlns:local="using:Helm.Modules.Vocab"
              x:Class="Helm.Modules.Vocab.VocabContentPage"
              x:DataType="vm:VocabViewModel">
 
@@ -53,6 +54,12 @@
             <Setter Property="Background" Value="{DynamicResource HelmSubtleFill}" />
             <Setter Property="CornerRadius" Value="4" />
             <Setter Property="Padding" Value="6,0" />
+        </Style>
+        <Style Selector="TextBlock.group">
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="FontSize" Value="12" />
+            <Setter Property="Margin" Value="10,10,10,2" />
+            <Setter Property="Foreground" Value="{DynamicResource SystemAccentColor}" />
         </Style>
         <Style Selector="Button.icon">
             <Setter Property="Width" Value="44" />
@@ -125,7 +132,7 @@
                                 </Button>
                             </StackPanel>
                         </Grid>
-                        <TextBlock Text="{Binding CardPhonetic}" Classes="secondary" IsVisible="{Binding HasCardPhonetic}" />
+                        <TextBlock local:ToneText.Text="{Binding CardPhonetic}" IsVisible="{Binding HasCardPhonetic}" />
                         <TextBlock Text="{Binding CardHanViet}" Classes="secondary" IsVisible="{Binding HasCardHanViet}" />
                         <TextBlock Text="{Binding CardMeaning}" FontSize="16" TextWrapping="Wrap" />
                         <TextBlock Text="{Binding CardOrigin}" Classes="secondary" TextWrapping="Wrap" IsVisible="{Binding HasCardOrigin}" />
@@ -163,30 +170,74 @@
                 </Border>
             </StackPanel>
         </DataTemplate>
-        <!-- One word in a list: the word, its reading, meaning (or "Waiting") and how well it is known -->
+        <!-- One word in a list: the group it starts, the word, its reading (tones in colour), level, meaning, how well it is known -->
         <DataTemplate x:Key="WordRow" x:DataType="vm:VocabWordRow">
-            <Button Classes="flat" HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch" Padding="10,8" Command="{Binding Open}"
-                    AutomationProperties.Name="{Binding Text}">
-                <StackPanel>
-                    <Grid ColumnDefinitions="*,Auto">
-                        <WrapPanel>
-                            <TextBlock Text="{Binding Text}" FontSize="16" FontWeight="SemiBold" Margin="0,0,8,0" />
-                            <TextBlock Text="{Binding Phonetic}" Classes="secondary" VerticalAlignment="Center" IsVisible="{Binding HasPhonetic}" />
-                        </WrapPanel>
-                        <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
-                            <Border Classes="badge" IsVisible="{Binding IsPending}" VerticalAlignment="Center">
-                                <TextBlock Text="Waiting" FontSize="11" FontWeight="SemiBold" Foreground="#E5A50A" />
-                            </Border>
-                            <Button Classes="icon flat" Command="{Binding Remove}" IsVisible="{Binding CanRemove}" AutomationProperties.Name="Remove">
-                                <ic:SymbolIcon Symbol="Dismiss" FontSize="14" />
-                            </Button>
-                        </StackPanel>
-                    </Grid>
-                    <TextBlock Text="{Binding Meaning}" Classes="secondary" TextTrimming="CharacterEllipsis" />
-                    <TextBlock Text="{Binding LevelText}" Classes="secondary" FontSize="11"
-                               IsVisible="{Binding LevelText, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+            <StackPanel>
+                <TextBlock Text="{Binding Header}" Classes="group" IsVisible="{Binding HasHeader}" />
+                <Button Classes="flat" HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch" Padding="10,8" Command="{Binding Open}"
+                        AutomationProperties.Name="{Binding Text}">
+                    <StackPanel>
+                        <Grid ColumnDefinitions="*,Auto">
+                            <WrapPanel>
+                                <TextBlock Text="{Binding Text}" FontSize="16" FontWeight="SemiBold" Margin="0,0,8,0" />
+                                <TextBlock local:ToneText.Text="{Binding Phonetic}" VerticalAlignment="Center" IsVisible="{Binding HasPhonetic}" />
+                            </WrapPanel>
+                            <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center" Spacing="4">
+                                <Border Classes="badge" IsVisible="{Binding HasLevel}">
+                                    <TextBlock Text="{Binding Level}" FontSize="11" FontWeight="SemiBold" />
+                                </Border>
+                                <Border Classes="badge" IsVisible="{Binding IsPending}">
+                                    <TextBlock Text="Waiting" FontSize="11" FontWeight="SemiBold" Foreground="#E5A50A" />
+                                </Border>
+                                <Button Classes="icon flat" Command="{Binding Remove}" IsVisible="{Binding CanRemove}" AutomationProperties.Name="Remove">
+                                    <ic:SymbolIcon Symbol="Dismiss" FontSize="14" />
+                                </Button>
+                            </StackPanel>
+                        </Grid>
+                        <TextBlock Text="{Binding Meaning}" Classes="secondary" TextTrimming="CharacterEllipsis" />
+                        <TextBlock Text="{Binding LevelText}" Classes="secondary" FontSize="11"
+                                   IsVisible="{Binding LevelText, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+                    </StackPanel>
+                </Button>
+            </StackPanel>
+        </DataTemplate>
+
+        <!-- What helps to use a word: examples (gap card source), collocations, mnemonic, words easy to mix up, labels -->
+        <DataTemplate x:Key="InfoView" x:DataType="vm:VocabWordInfo">
+            <StackPanel Spacing="8">
+                <TextBlock Text="{Binding Labels}" FontSize="12" Classes="accent" IsVisible="{Binding HasLabels}" TextWrapping="Wrap" />
+                <StackPanel IsVisible="{Binding HasExamples}" Spacing="2">
+                    <TextBlock Text="Examples" FontWeight="SemiBold" />
+                    <ItemsControl ItemsSource="{Binding Examples}">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate DataType="vm:VocabExample">
+                                <StackPanel Margin="0,2,0,4">
+                                    <TextBlock Text="{Binding Sentence}" TextWrapping="Wrap" />
+                                    <TextBlock Text="{Binding Translation}" TextWrapping="Wrap" Classes="secondary" />
+                                </StackPanel>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
                 </StackPanel>
-            </Button>
+                <StackPanel IsVisible="{Binding HasCollocations}" Spacing="2">
+                    <TextBlock Text="Goes with" FontWeight="SemiBold" />
+                    <TextBlock Text="{Binding Collocations}" TextWrapping="Wrap" />
+                </StackPanel>
+                <StackPanel IsVisible="{Binding HasMnemonic}" Spacing="2">
+                    <TextBlock Text="To remember it" FontWeight="SemiBold" />
+                    <TextBlock Text="{Binding Mnemonic}" TextWrapping="Wrap" FontStyle="Italic" />
+                </StackPanel>
+                <StackPanel IsVisible="{Binding HasConfusables}" Spacing="2">
+                    <TextBlock Text="Easy to mix up with" FontWeight="SemiBold" Foreground="#E5A50A" />
+                    <ItemsControl ItemsSource="{Binding Confusables}">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate x:DataType="x:String">
+                                <TextBlock Text="{Binding}" TextWrapping="Wrap" Margin="0,1" />
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </StackPanel>
+            </StackPanel>
         </DataTemplate>
     </UserControl.Resources>
 
@@ -200,24 +251,30 @@
         </Border>
 
         <StackPanel x:Name="Body">
-            <!-- Learn or Words -->
-            <Grid ColumnDefinitions="*,6,*,6,*" Margin="0,0,0,12">
+            <!-- Learn, Add, Words, Roots -->
+            <Grid ColumnDefinitions="*,4,*,4,*,4,*" Margin="0,0,0,12">
                 <Button Classes="tab" Classes.accent="{Binding IsLearning}" Command="{Binding ShowLearnCommand}" AutomationProperties.Name="Learn">
-                    <StackPanel Orientation="Horizontal" Spacing="6">
-                        <ic:SymbolIcon Symbol="HatGraduation" FontSize="18" />
-                        <TextBlock Text="Learn" VerticalAlignment="Center" />
+                    <StackPanel Spacing="2">
+                        <ic:SymbolIcon Symbol="HatGraduation" FontSize="18" HorizontalAlignment="Center" />
+                        <TextBlock Text="Learn" FontSize="12" HorizontalAlignment="Center" />
                     </StackPanel>
                 </Button>
                 <Button Grid.Column="2" Classes="tab" Classes.accent="{Binding IsAdding}" Command="{Binding ShowAddCommand}" AutomationProperties.Name="Add words">
-                    <StackPanel Orientation="Horizontal" Spacing="6">
-                        <ic:SymbolIcon Symbol="Add" FontSize="18" />
-                        <TextBlock Text="Add" VerticalAlignment="Center" />
+                    <StackPanel Spacing="2">
+                        <ic:SymbolIcon Symbol="Add" FontSize="18" HorizontalAlignment="Center" />
+                        <TextBlock Text="Add" FontSize="12" HorizontalAlignment="Center" />
                     </StackPanel>
                 </Button>
                 <Button Grid.Column="4" Classes="tab" Classes.accent="{Binding IsWordsTab}" Command="{Binding ShowWordsCommand}" AutomationProperties.Name="Words">
-                    <StackPanel Orientation="Horizontal" Spacing="6">
-                        <ic:SymbolIcon Symbol="BookLetter" FontSize="18" />
-                        <TextBlock Text="{Binding WordsTabText}" VerticalAlignment="Center" />
+                    <StackPanel Spacing="2">
+                        <ic:SymbolIcon Symbol="BookLetter" FontSize="18" HorizontalAlignment="Center" />
+                        <TextBlock Text="{Binding WordsTabText}" FontSize="12" HorizontalAlignment="Center" />
+                    </StackPanel>
+                </Button>
+                <Button Grid.Column="6" Classes="tab" Classes.accent="{Binding IsRootsTab}" Command="{Binding ShowRootsCommand}" AutomationProperties.Name="Roots">
+                    <StackPanel Spacing="2">
+                        <ic:SymbolIcon Symbol="Organization" FontSize="18" HorizontalAlignment="Center" />
+                        <TextBlock Text="Roots" FontSize="12" HorizontalAlignment="Center" />
                     </StackPanel>
                 </Button>
             </Grid>
@@ -231,9 +288,15 @@
                 </Grid>
             </Border>
 
-            <!-- ===== Learn: one word at a time, nothing else ===== -->
-            <StackPanel IsVisible="{Binding IsLearning}">
-                <TextBlock Text="{Binding LearnSummary}" Classes="secondary" HorizontalAlignment="Center" Margin="0,0,0,8" FontSize="12" />
+            <!-- ===== Learn: one word at a time ===== -->
+            <StackPanel IsVisible="{Binding IsLearning}" Spacing="8">
+                <Grid ColumnDefinitions="*,Auto">
+                    <TextBlock Text="{Binding LearnSummary}" Classes="secondary" FontSize="12" VerticalAlignment="Center" TextWrapping="Wrap" />
+                    <ComboBox Grid.Column="1" Width="160" ItemsSource="{Binding Settings.CardModes}" SelectedIndex="{Binding Settings.CardModeIndex}"
+                              AutomationProperties.Name="Kind of card" />
+                </Grid>
+                <TextBlock Text="All caught up: nothing is due now. These cards are extra rounds." TextWrapping="Wrap" FontSize="12"
+                           Foreground="{DynamicResource HelmSuccess}" IsVisible="{Binding IsCaughtUp}" />
                 <Border Classes="card" DataContext="{Binding Card}" x:DataType="vm:VocabCardViewModel">
                     <StackPanel>
                         <!-- Nothing to learn yet -->
@@ -254,43 +317,56 @@
                                 </Button>
                             </Grid>
 
-                            <!-- The word: a tap shows the meaning -->
-                            <Button Classes="flat" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Padding="8,32" Command="{Binding RevealCommand}"
-                                    AutomationProperties.Name="Show the meaning">
+                            <!-- The front: a tap shows the answer -->
+                            <Button Classes="flat" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Padding="8,28" Command="{Binding RevealCommand}"
+                                    AutomationProperties.Name="Show the answer">
                                 <StackPanel Spacing="6">
-                                    <TextBlock Text="{Binding Text}" FontSize="42" FontWeight="SemiBold" HorizontalAlignment="Center" TextWrapping="Wrap" TextAlignment="Center" />
-                                    <TextBlock Text="Say the meaning in your head, then tap to check" Classes="secondary" HorizontalAlignment="Center"
-                                               TextWrapping="Wrap" TextAlignment="Center" IsVisible="{Binding !IsRevealed}" />
+                                    <TextBlock Text="{Binding FrontText}" FontSize="42" FontWeight="SemiBold" HorizontalAlignment="Center" TextWrapping="Wrap" TextAlignment="Center"
+                                               IsVisible="{Binding FrontIsWord}" />
+                                    <TextBlock Text="{Binding FrontText}" FontSize="20" HorizontalAlignment="Center" TextWrapping="Wrap" TextAlignment="Center"
+                                               IsVisible="{Binding FrontIsText}" />
+                                    <Button Classes="accent" HorizontalAlignment="Center" Padding="20,12" Command="{Binding SayCommand}" IsVisible="{Binding FrontIsListen}"
+                                            AutomationProperties.Name="Play">
+                                        <StackPanel Orientation="Horizontal" Spacing="8">
+                                            <ic:SymbolIcon Symbol="Speaker2" FontSize="20" />
+                                            <TextBlock Text="Play" VerticalAlignment="Center" FontSize="16" />
+                                        </StackPanel>
+                                    </Button>
+                                    <TextBlock Text="{Binding FrontNote}" Classes="secondary" HorizontalAlignment="Center" TextWrapping="Wrap" TextAlignment="Center"
+                                               IsVisible="{Binding HasFrontNote}" />
+                                    <TextBlock Text="{Binding FrontHint}" Classes="secondary" HorizontalAlignment="Center" TextWrapping="Wrap" TextAlignment="Center"
+                                               IsVisible="{Binding !IsRevealed}" />
                                 </StackPanel>
                             </Button>
 
-                            <!-- Hear it: a neural voice, or real speakers on YouGlish -->
-                            <WrapPanel HorizontalAlignment="Center">
-                                <Button Classes="flat" Command="{Binding SayCommand}" IsVisible="{Binding CanSay}" AutomationProperties.Name="Listen">
-                                    <StackPanel Orientation="Horizontal" Spacing="6">
-                                        <ic:SymbolIcon Symbol="Speaker2" FontSize="18" />
-                                        <TextBlock Text="Listen" VerticalAlignment="Center" />
-                                    </StackPanel>
-                                </Button>
-                                <Button Classes="flat" Command="{Binding YouGlishCommand}" IsVisible="{Binding ShowYouGlish}" AutomationProperties.Name="YouGlish">
-                                    <StackPanel Orientation="Horizontal" Spacing="6">
-                                        <ic:SymbolIcon Symbol="Video" FontSize="18" />
-                                        <TextBlock Text="YouGlish" VerticalAlignment="Center" />
-                                    </StackPanel>
-                                </Button>
-                            </WrapPanel>
-
-                            <!-- The answer, how the word is built, then the user's own verdict -->
+                            <!-- The answer, what helps to use it, how it is built, then the user's own verdict -->
                             <StackPanel IsVisible="{Binding IsRevealed}" Spacing="4">
+                                <TextBlock Text="{Binding Text}" FontSize="34" FontWeight="SemiBold" HorizontalAlignment="Center" TextWrapping="Wrap"
+                                           IsVisible="{Binding ShowsWordOnReveal}" />
                                 <WrapPanel HorizontalAlignment="Center">
-                                    <TextBlock Text="{Binding Phonetic}" Classes="secondary" FontSize="15" Margin="0,0,8,0" />
+                                    <TextBlock local:ToneText.Text="{Binding Phonetic}" FontSize="17" Margin="0,0,8,0" />
                                     <TextBlock Text="{Binding HanViet}" Classes="secondary" FontSize="15" FontWeight="SemiBold" Margin="0,0,8,0" />
                                     <TextBlock Text="{Binding Traditional}" Classes="secondary" FontSize="15" />
                                 </WrapPanel>
+                                <WrapPanel HorizontalAlignment="Center">
+                                    <Button Classes="flat" Command="{Binding SayCommand}" IsVisible="{Binding CanSay}" AutomationProperties.Name="Listen">
+                                        <StackPanel Orientation="Horizontal" Spacing="6">
+                                            <ic:SymbolIcon Symbol="Speaker2" FontSize="18" />
+                                            <TextBlock Text="Listen" VerticalAlignment="Center" />
+                                        </StackPanel>
+                                    </Button>
+                                    <Button Classes="flat" Command="{Binding YouGlishCommand}" IsVisible="{Binding ShowYouGlish}" AutomationProperties.Name="YouGlish">
+                                        <StackPanel Orientation="Horizontal" Spacing="6">
+                                            <ic:SymbolIcon Symbol="Video" FontSize="18" />
+                                            <TextBlock Text="YouGlish" VerticalAlignment="Center" />
+                                        </StackPanel>
+                                    </Button>
+                                </WrapPanel>
                                 <TextBlock Text="{Binding Meaning}" FontSize="20" TextWrapping="Wrap" TextAlignment="Center" HorizontalAlignment="Center" />
                                 <TextBlock Text="{Binding Explanation}" Classes="secondary" TextWrapping="Wrap" TextAlignment="Center" HorizontalAlignment="Center" />
+                                <ContentControl Margin="0,10,0,0" Content="{Binding Info}" ContentTemplate="{StaticResource InfoView}" />
 
-                                <StackPanel IsVisible="{Binding HasExplanationTree}" Margin="0,12,0,0" Spacing="6">
+                                <StackPanel IsVisible="{Binding HasExplanationTree}" Margin="0,10,0,0" Spacing="6">
                                     <TextBlock Text="How it's built" FontWeight="SemiBold" />
                                     <ContentControl Content="{Binding ExplanationTree}" ContentTemplate="{StaticResource PartsView}" />
                                 </StackPanel>
@@ -308,25 +384,27 @@
 
             <!-- ===== Add: new words, and what waits for the agent ===== -->
             <StackPanel IsVisible="{Binding IsAdding}">
-                    <Border Classes="card">
-                        <StackPanel Spacing="8">
-                            <TextBlock Text="Add a word" Classes="title" />
-                            <TextBox PlaceholderText="relative, 补救…" Text="{Binding NewWord}" FontSize="16" AutomationProperties.Name="New word">
-                                <TextBox.KeyBindings>
-                                    <KeyBinding Gesture="Enter" Command="{Binding AddCommand}" />
-                                </TextBox.KeyBindings>
-                            </TextBox>
-                            <TextBox PlaceholderText="Where you met it (optional)" Text="{Binding NewNote}" AutomationProperties.Name="Note" />
-                            <Button Classes="accent" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Content="Add" Command="{Binding AddCommand}" />
-                        </StackPanel>
-                    </Border>
+                <Border Classes="card">
+                    <StackPanel Spacing="8">
+                        <TextBlock Text="Add a word" Classes="title" />
+                        <TextBox PlaceholderText="relative, 补救…" Text="{Binding NewWord}" FontSize="16" AutomationProperties.Name="New word">
+                            <TextBox.KeyBindings>
+                                <KeyBinding Gesture="Enter" Command="{Binding AddCommand}" />
+                            </TextBox.KeyBindings>
+                        </TextBox>
+                        <TextBox PlaceholderText="Where you met it (optional)" Text="{Binding NewNote}" AutomationProperties.Name="Note" />
+                        <Button Classes="accent" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Content="Add" Command="{Binding AddCommand}" />
+                        <TextBlock Classes="secondary" TextWrapping="Wrap" FontSize="12"
+                                   Text="Faster: select a word in any app and tap Add word, or share it to Save to Helm." />
+                    </StackPanel>
+                </Border>
 
-                    <Border Classes="infobar" IsVisible="{Binding HasPending}" Margin="0,4,0,0">
-                        <StackPanel Spacing="6">
-                            <TextBlock Text="{Binding PendingText}" TextWrapping="Wrap" />
-                            <TextBlock Text="Ask Claude Code on your PC to analyze them; the result syncs here." Classes="secondary" TextWrapping="Wrap" />
-                        </StackPanel>
-                    </Border>
+                <Border Classes="infobar" IsVisible="{Binding HasPending}" Margin="0,4,0,0">
+                    <StackPanel Spacing="6">
+                        <TextBlock Text="{Binding PendingText}" TextWrapping="Wrap" />
+                        <TextBlock Text="Helm on your PC breaks them down with Claude Code (by itself when that is on); the result syncs here." Classes="secondary" TextWrapping="Wrap" />
+                    </StackPanel>
+                </Border>
 
                 <TextBlock Text="Recently added" Classes="section" IsVisible="{Binding HasRecentWords}" />
                 <Border Classes="card" Padding="4" IsVisible="{Binding HasRecentWords}">
@@ -334,9 +412,9 @@
                 </Border>
             </StackPanel>
 
-            <!-- ===== Words: the list, a word's tree ===== -->
+            <!-- ===== Words: the list, a word's page ===== -->
             <StackPanel IsVisible="{Binding IsWordsTab}">
-                <!-- A word opened: back, its fields, how it is built -->
+                <!-- A word opened: back, its fields, what helps to use it, how it is built -->
                 <StackPanel IsVisible="{Binding HasDetail}">
                     <Grid ColumnDefinitions="Auto,*,Auto">
                         <Button Classes="flat" Command="{Binding CloseDetailCommand}" AutomationProperties.Name="Back to the words">
@@ -352,7 +430,7 @@
                             <Button Classes="icon flat" Command="{Binding Detail.YouGlishCommand}" IsVisible="{Binding Detail.ShowYouGlish}" AutomationProperties.Name="YouGlish">
                                 <ic:SymbolIcon Symbol="Video" FontSize="18" />
                             </Button>
-                            <Button Classes="icon flat" Command="{Binding Detail.BeginEditWordCommand}" AutomationProperties.Name="Edit the word">
+                            <Button Classes="icon flat" Command="{Binding Detail.Editor.BeginCommand}" AutomationProperties.Name="Edit the word">
                                 <ic:SymbolIcon Symbol="Edit" FontSize="18" />
                             </Button>
                             <Button Classes="icon flat" Command="{Binding DeleteWordCommand}" AutomationProperties.Name="Delete the word">
@@ -369,36 +447,56 @@
                                     <TextBlock Text="{Binding Word.Traditional}" FontSize="22" Classes="secondary" VerticalAlignment="Bottom" IsVisible="{Binding ShowTraditional}" />
                                 </WrapPanel>
                                 <WrapPanel>
-                                    <TextBlock Text="{Binding Word.Phonetic}" Classes="secondary" FontSize="15" Margin="0,0,8,0" />
+                                    <TextBlock local:ToneText.Text="{Binding Word.Phonetic}" FontSize="16" Margin="0,0,8,0" />
                                     <TextBlock Text="{Binding Word.HanViet}" Classes="secondary" FontSize="15" FontWeight="SemiBold" IsVisible="{Binding HasHanViet}" />
                                 </WrapPanel>
                                 <TextBlock Text="{Binding Word.Meaning}" FontSize="17" TextWrapping="Wrap" />
                                 <TextBlock Text="{Binding Word.Explanation}" Classes="secondary" TextWrapping="Wrap" IsVisible="{Binding HasExplanation}" />
                                 <TextBlock Text="{Binding Word.Note, StringFormat='Your note: {0}'}" Classes="secondary" FontStyle="Italic" TextWrapping="Wrap" IsVisible="{Binding HasNote}" />
-                                <TextBlock Text="{Binding LevelText}" Classes="secondary" FontSize="12" />
+                                <TextBlock Text="{Binding LevelText}" Classes="secondary" FontSize="12" Margin="0,0,0,6" />
+                                <ContentControl Content="{Binding Info}" ContentTemplate="{StaticResource InfoView}" />
                                 <Border Classes="infobar" IsVisible="{Binding IsPending}" Margin="0,6,0,0">
                                     <TextBlock Text="{Binding PendingText}" TextWrapping="Wrap" />
                                 </Border>
-                                <Button Classes="flat" Content="Ask for a new analysis" Command="{Binding BeginRedoCommand}" Margin="0,4,0,0" />
-                                <!-- Edit by hand: make the meaning easier to read -->
-                                <StackPanel Spacing="4" IsVisible="{Binding IsEditingWord}" Margin="0,8,0,0">
+
+                                <!-- Edit by hand -->
+                                <StackPanel Spacing="4" DataContext="{Binding Editor}" x:DataType="vm:VocabWordEditor" IsVisible="{Binding IsOpen}" Margin="0,8,0,0">
                                     <TextBlock Text="Phonetic" Classes="secondary" />
-                                    <TextBox Text="{Binding EditPhonetic}" AutomationProperties.Name="Phonetic" />
+                                    <TextBox Text="{Binding Phonetic}" AutomationProperties.Name="Phonetic" />
                                     <TextBlock Text="Meaning" Classes="secondary" />
-                                    <TextBox Text="{Binding EditMeaning}" AutomationProperties.Name="Meaning" TextWrapping="Wrap" AcceptsReturn="True" />
+                                    <TextBox Text="{Binding Meaning}" TextWrapping="Wrap" AcceptsReturn="True" AutomationProperties.Name="Meaning" />
                                     <TextBlock Text="Hán Việt" Classes="secondary" />
-                                    <TextBox Text="{Binding EditHanViet}" AutomationProperties.Name="Hán Việt" />
+                                    <TextBox Text="{Binding HanViet}" AutomationProperties.Name="Hán Việt" />
                                     <TextBlock Text="Traditional" Classes="secondary" />
-                                    <TextBox Text="{Binding EditTraditional}" AutomationProperties.Name="Traditional" />
+                                    <TextBox Text="{Binding Traditional}" AutomationProperties.Name="Traditional" />
                                     <TextBlock Text="Explanation" Classes="secondary" />
-                                    <TextBox Text="{Binding EditExplanation}" AutomationProperties.Name="Explanation" TextWrapping="Wrap" AcceptsReturn="True" />
+                                    <TextBox Text="{Binding Explanation}" TextWrapping="Wrap" AcceptsReturn="True" AutomationProperties.Name="Explanation" />
+                                    <TextBlock Text="To remember it (mnemonic)" Classes="secondary" />
+                                    <TextBox Text="{Binding Mnemonic}" TextWrapping="Wrap" AcceptsReturn="True" AutomationProperties.Name="Mnemonic" />
+                                    <TextBlock Text="Examples: one per line, sentence | translation" Classes="secondary" TextWrapping="Wrap" />
+                                    <TextBox Text="{Binding Examples}" TextWrapping="Wrap" AcceptsReturn="True" AutomationProperties.Name="Examples" />
+                                    <TextBlock Text="Goes with: separated by commas" Classes="secondary" />
+                                    <TextBox Text="{Binding Collocations}" AutomationProperties.Name="Collocations" />
+                                    <TextBlock Text="Easy to mix up with: one per line, word | what tells them apart" Classes="secondary" TextWrapping="Wrap" />
+                                    <TextBox Text="{Binding Confusables}" TextWrapping="Wrap" AcceptsReturn="True" AutomationProperties.Name="Confusables" />
+                                    <TextBlock Text="Level (B1, HSK3)" Classes="secondary" />
+                                    <TextBox Text="{Binding Level}" AutomationProperties.Name="Level" />
+                                    <TextBlock Text="Part of speech" Classes="secondary" />
+                                    <TextBox Text="{Binding PartOfSpeech}" AutomationProperties.Name="Part of speech" />
+                                    <TextBlock Text="Topic" Classes="secondary" />
+                                    <TextBox Text="{Binding Topic}" AutomationProperties.Name="Topic" />
+                                    <TextBlock Text="Your tags: separated by commas (Aptis, Truyện)" Classes="secondary" TextWrapping="Wrap" />
+                                    <TextBox Text="{Binding Tags}" AutomationProperties.Name="Tags" />
                                     <TextBlock Text="Your note" Classes="secondary" />
-                                    <TextBox Text="{Binding EditNote}" AutomationProperties.Name="Your note" TextWrapping="Wrap" AcceptsReturn="True" />
+                                    <TextBox Text="{Binding Note}" TextWrapping="Wrap" AcceptsReturn="True" AutomationProperties.Name="Your note" />
+                                    <TextBlock Text="{Binding Error}" TextWrapping="Wrap" Foreground="{DynamicResource HelmDanger}" IsVisible="{Binding HasError}" />
                                     <Grid ColumnDefinitions="*,8,*" Margin="0,8,0,0">
-                                        <Button Classes="accent" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Content="Save" Command="{Binding SaveWordCommand}" />
-                                        <Button Grid.Column="2" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Content="Cancel" Command="{Binding CancelEditWordCommand}" />
+                                        <Button Classes="accent" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Content="Save" Command="{Binding SaveCommand}" />
+                                        <Button Grid.Column="2" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Content="Cancel" Command="{Binding CancelCommand}" />
                                     </Grid>
                                 </StackPanel>
+
+                                <Button Classes="flat" Content="Ask for a new analysis" Command="{Binding BeginRedoCommand}" Margin="0,4,0,0" />
                                 <StackPanel Spacing="8" IsVisible="{Binding IsAskingRedo}">
                                     <TextBox PlaceholderText="What should change? e.g. tách lat thành ferre" Text="{Binding RedoNote}" TextWrapping="Wrap"
                                              AutomationProperties.Name="What should change" />
@@ -412,21 +510,25 @@
                     </StackPanel>
                 </StackPanel>
 
-                <!-- The list -->
-                <StackPanel IsVisible="{Binding !HasDetail}">
-                    <!-- One language at a time, alphabetical (Chinese by pinyin) -->
-                    <Grid ColumnDefinitions="*,6,*" Margin="0,0,0,8">
-                        <Button Classes="tab" Classes.accent="{Binding IsEnglishList}" Content="{Binding EnglishTabText}" Command="{Binding ShowEnglishCommand}"
+                <!-- The list: one language, searched, filtered, sorted, in groups -->
+                <Panel IsVisible="{Binding !HasDetail}">
+                <StackPanel DataContext="{Binding List}" x:DataType="vm:VocabWordListViewModel" Spacing="8">
+                    <Grid ColumnDefinitions="*,6,*">
+                        <Button Classes="tab" Classes.accent="{Binding IsEnglish}" Content="{Binding EnglishTabText}" Command="{Binding ShowEnglishCommand}"
                                 AutomationProperties.Name="English words" />
-                        <Button Grid.Column="2" Classes="tab" Classes.accent="{Binding IsChineseList}" Content="{Binding ChineseTabText}" Command="{Binding ShowChineseCommand}"
+                        <Button Grid.Column="2" Classes="tab" Classes.accent="{Binding IsChinese}" Content="{Binding ChineseTabText}" Command="{Binding ShowChineseCommand}"
                                 AutomationProperties.Name="Chinese words" />
                     </Grid>
-                    <TextBox PlaceholderText="Search words and meanings" Text="{Binding SearchText}" Margin="0,0,0,8" IsVisible="{Binding HasWords}"
-                             AutomationProperties.Name="Search words" />
+                    <TextBox PlaceholderText="Search words and meanings" Text="{Binding SearchText}" IsVisible="{Binding HasWords}" AutomationProperties.Name="Search words" />
+                    <Grid ColumnDefinitions="*,6,*" IsVisible="{Binding HasWords}">
+                        <ComboBox HorizontalAlignment="Stretch" ItemsSource="{Binding Sorts}" SelectedIndex="{Binding SortIndex}" AutomationProperties.Name="Order" />
+                        <ComboBox Grid.Column="2" HorizontalAlignment="Stretch" ItemsSource="{Binding FilterNames}" SelectedIndex="{Binding FilterIndex}" AutomationProperties.Name="Show" />
+                    </Grid>
                     <Border Classes="card" Padding="4">
                         <StackPanel>
                             <TextBlock Margin="12" TextWrapping="Wrap" Classes="secondary" IsVisible="{Binding HasNoWords}"
                                        Text="Words show up here once an AI agent has broken them down. Add the words you meet on the Add tab, one at a time: learning them as they come is what makes them stick." />
+                            <TextBlock Margin="12" Text="No word matches." Classes="secondary" IsVisible="{Binding HasNoMatches}" />
                             <ItemsControl ItemsSource="{Binding Words}" ItemTemplate="{StaticResource WordRow}" />
                             <!-- A page at a time: the phone draws every row it is given -->
                             <Button Classes="flat" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Margin="0,0,0,8"
@@ -435,7 +537,123 @@
                         </StackPanel>
                     </Border>
                 </StackPanel>
+                </Panel>
             </StackPanel>
+
+            <!-- ===== Roots: families of words that share a part ===== -->
+            <Panel IsVisible="{Binding IsRootsTab}">
+            <StackPanel DataContext="{Binding Roots}" x:DataType="vm:VocabRootsViewModel" Spacing="8">
+                <Grid ColumnDefinitions="*,6,*">
+                    <Button Classes="tab" Classes.accent="{Binding IsEnglish}" Content="English" Command="{Binding ShowEnglishCommand}" />
+                    <Button Grid.Column="2" Classes="tab" Classes.accent="{Binding IsChinese}" Content="中文" Command="{Binding ShowChineseCommand}" />
+                </Grid>
+                <Button HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Command="{Binding NextRootCommand}" AutomationProperties.Name="Practise roots">
+                    <StackPanel Orientation="Horizontal" Spacing="6">
+                        <ic:SymbolIcon Symbol="HatGraduation" FontSize="18" />
+                        <TextBlock Text="Practise roots" VerticalAlignment="Center" />
+                    </StackPanel>
+                </Button>
+
+                <!-- Practising a root -->
+                <Border Classes="card" IsVisible="{Binding HasPractice}">
+                    <StackPanel Spacing="6">
+                        <Grid ColumnDefinitions="*,Auto">
+                            <TextBlock Text="What does this part mean?" Classes="secondary" VerticalAlignment="Center" />
+                            <Button Grid.Column="1" Classes="icon flat" Command="{Binding ClosePracticeCommand}" AutomationProperties.Name="Stop practising">
+                                <ic:SymbolIcon Symbol="Dismiss" FontSize="16" />
+                            </Button>
+                        </Grid>
+                        <Button Classes="flat" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Padding="8,16" Command="{Binding RevealRootCommand}"
+                                AutomationProperties.Name="Show the meaning">
+                            <StackPanel>
+                                <TextBlock Text="{Binding Practice.Form}" FontSize="40" FontWeight="SemiBold" HorizontalAlignment="Center" />
+                                <TextBlock Text="{Binding Practice.Kind}" Classes="secondary" HorizontalAlignment="Center" />
+                            </StackPanel>
+                        </Button>
+                        <StackPanel IsVisible="{Binding IsPracticeRevealed}" Spacing="4">
+                            <TextBlock Text="{Binding Practice.Meaning}" FontSize="18" HorizontalAlignment="Center" TextWrapping="Wrap" TextAlignment="Center" />
+                            <TextBlock Text="{Binding Practice.Origin}" Classes="secondary" HorizontalAlignment="Center" TextWrapping="Wrap" TextAlignment="Center" />
+                            <TextBlock Text="Its family" FontWeight="SemiBold" Margin="0,6,0,0" />
+                            <ItemsControl ItemsSource="{Binding Practice.Words}">
+                                <ItemsControl.ItemsPanel>
+                                    <ItemsPanelTemplate>
+                                        <WrapPanel />
+                                    </ItemsPanelTemplate>
+                                </ItemsControl.ItemsPanel>
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate DataType="vm:VocabWordLink">
+                                        <Button Margin="0,0,6,6" Content="{Binding Text}" Command="{Binding Open}" />
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </StackPanel>
+                        <Button Classes="accent" HorizontalAlignment="Center" Content="Next root" Command="{Binding NextRootCommand}" />
+                    </StackPanel>
+                </Border>
+
+                <!-- The chosen family -->
+                <Border Classes="card" IsVisible="{Binding HasSelected}">
+                    <StackPanel Spacing="4">
+                        <Grid ColumnDefinitions="*,Auto">
+                            <WrapPanel>
+                                <TextBlock Text="{Binding Selected.Form}" FontSize="24" FontWeight="SemiBold" Margin="0,0,8,0" />
+                                <TextBlock Text="{Binding Selected.Kind}" Classes="secondary" VerticalAlignment="Center" />
+                            </WrapPanel>
+                            <Button Grid.Column="1" Classes="icon flat" Command="{Binding CloseSelectedCommand}" AutomationProperties.Name="Close the family">
+                                <ic:SymbolIcon Symbol="Dismiss" FontSize="16" />
+                            </Button>
+                        </Grid>
+                        <TextBlock Text="{Binding Selected.Meaning}" FontSize="16" TextWrapping="Wrap" />
+                        <TextBlock Text="{Binding Selected.Origin}" Classes="secondary" TextWrapping="Wrap" />
+                        <TextBlock Classes="secondary" FontSize="12" TextWrapping="Wrap"
+                                   Text="More words of this family: on the PC, Helm's Roots tab has Suggest 3 more words (Claude Code)." />
+                    </StackPanel>
+                </Border>
+
+                <!-- Every part, the biggest families first -->
+                <Border Classes="card" Padding="4">
+                    <StackPanel>
+                        <TextBlock Margin="12" TextWrapping="Wrap" Classes="secondary" IsVisible="{Binding HasNoRoots}"
+                                   Text="The parts of your words show up here once they are broken down; a part shared by several words makes a family." />
+                        <ItemsControl ItemsSource="{Binding Roots}">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate DataType="vm:VocabRootRow">
+                                    <StackPanel>
+                                        <TextBlock Text="{Binding Header}" Classes="group" IsVisible="{Binding HasHeader}" />
+                                        <Button Classes="flat" HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch" Padding="10,8" Command="{Binding Select}"
+                                                AutomationProperties.Name="{Binding Form}">
+                                            <StackPanel>
+                                                <Grid ColumnDefinitions="*,Auto">
+                                                    <WrapPanel>
+                                                        <TextBlock Text="{Binding Form}" FontSize="17" FontWeight="SemiBold" Margin="0,0,8,0" />
+                                                        <TextBlock Text="{Binding Meaning}" VerticalAlignment="Center" TextWrapping="Wrap" />
+                                                    </WrapPanel>
+                                                    <TextBlock Grid.Column="1" Text="{Binding CountText}" Classes="secondary" FontSize="12" />
+                                                </Grid>
+                                                <ItemsControl ItemsSource="{Binding Words}">
+                                                    <ItemsControl.ItemsPanel>
+                                                        <ItemsPanelTemplate>
+                                                            <WrapPanel />
+                                                        </ItemsPanelTemplate>
+                                                    </ItemsControl.ItemsPanel>
+                                                    <ItemsControl.ItemTemplate>
+                                                        <DataTemplate DataType="vm:VocabWordLink">
+                                                            <TextBlock Margin="0,0,10,0" Text="{Binding Text}" Classes="accent" />
+                                                        </DataTemplate>
+                                                    </ItemsControl.ItemTemplate>
+                                                </ItemsControl>
+                                            </StackPanel>
+                                        </Button>
+                                    </StackPanel>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                        <Button Classes="flat" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Margin="0,0,0,8"
+                                Content="{Binding Pager.MoreText}" Command="{Binding Pager.ShowMoreCommand}" IsVisible="{Binding Pager.HasMore}" />
+                    </StackPanel>
+                </Border>
+            </StackPanel>
+            </Panel>
         </StackPanel>
     </StackPanel>
 </UserControl>

@@ -16,6 +16,18 @@ public sealed class VocabSettings : IVersionedSettings
     /// <summary>Show a Chinese word's traditional form next to it when it has one.</summary>
     public bool ShowTraditional { get; set; } = true;
 
+    /// <summary>How the Learn tab's cards ask: the word, its meaning, its sound, a sentence with a gap, or a mix.</summary>
+    public VocabCardMode CardMode { get; set; } = VocabCardMode.WordToMeaning;
+
+    /// <summary>Say the word when its meaning is shown.</summary>
+    public bool AutoSay { get; set; }
+
+    /// <summary>PC: new words are broken down by Claude Code by itself, a moment after they arrive (from any device).</summary>
+    public bool AutoAnalyze { get; set; } = true;
+
+    /// <summary>The Words tab's order: 0 A–Z, 1 newest, 2 weakest first, 3 due soonest.</summary>
+    public int WordsSort { get; set; }
+
     /// <summary>Android: a word to guess on the lock screen (a silent notification) each time the screen turns on.</summary>
     public bool LockScreenWord { get; set; } = true;
 

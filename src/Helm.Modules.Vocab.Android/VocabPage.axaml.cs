@@ -26,11 +26,11 @@ public partial class VocabPage : ModulePageBase
         // The view model is shared with Windows and knows nothing about the Android module type.
         Module = module;
         AddWidgetButton.IsVisible = VocabWidgets.CanRequestPin(Android.App.Application.Context);
-        viewModel.PropertyChanged += (_, e) =>
+        viewModel.Settings.PropertyChanged += (_, e) =>
         {
-            if (e.PropertyName != nameof(VocabViewModel.LockScreenWord)) return;
+            if (e.PropertyName != nameof(VocabSettingsViewModel.LockScreenWord)) return;
             var context = Android.App.Application.Context;
-            if (viewModel.LockScreenWord) VocabLockScreen.AskPermissionOnce(context);
+            if (viewModel.Settings.LockScreenWord) VocabLockScreen.AskPermissionOnce(context);
             VocabLockScreen.Refresh(context);
         };
     }

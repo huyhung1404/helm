@@ -200,23 +200,166 @@ public sealed class VocabTests
     }
 
     [Fact]
-    public void Forgotten_words_come_up_more_often_than_known_ones()
+    public void Words_come_back_when_due_and_the_gap_doubles_each_time_they_are_remembered()
     {
-        var (known, _) = _store.AddWord("cat");
-        var (forgotten, _) = _store.AddWord("dog");
+        var (cat, _) = _store.AddWord("cat");
+        var (dog, _) = _store.AddWord("dog");
         _store.AddWord("pending");
-        foreach (var id in new[] { known, forgotten }) _store.SaveAnalysis(id, new WordAnalysis { Phonetic = "/x/", Meaning = "x" });
-        for (var i = 0; i < 5; i++) _store.Record(known, remembered: true);
-        _store.Record(forgotten, remembered: false);
-        _time.Advance(TimeSpan.FromHours(1));
-
+        foreach (var id in new[] { cat, dog }) _store.SaveAnalysis(id, new WordAnalysis { Phonetic = "/x/", Meaning = "x" });
         var quiz = new VocabQuiz(_store, new Random(7));
-        Assert.Equal(VocabQuiz.TopLevel, quiz.StatsOf(known).Level);
-        Assert.Equal(0, quiz.StatsOf(forgotten).Level);
-        var picks = Enumerable.Range(0, 1000).Select(_ => quiz.Next()!.Id).ToList();
+        Assert.Equal(new VocabDay(0, 2, 0, 2), quiz.Today()); // the pending word does not count
+        Assert.Equal(cat, quiz.Next()!.Id); // new words in the order they were added
+
+        _store.Record(cat, remembered: true); // level 1: back tomorrow
+        _store.Record(dog, remembered: false); // back in 10 minutes
+        Assert.Equal(_time.GetUtcNow() + TimeSpan.FromDays(1), quiz.StatsOf(cat).Due);
+        _time.Advance(TimeSpan.FromMinutes(11));
+        Assert.Equal(new VocabDay(1, 0, 0, 2), quiz.Today());
+        Assert.Equal(dog, quiz.Next()!.Id); // overdue first
+
+        // Remembered early (extra practice): it counts, but the gap does not grow.
+        _store.Record(cat, remembered: true);
+        Assert.Equal(1, quiz.StatsOf(cat).Level);
+        for (var day = 1; day <= 4; day++)
+        {
+            _time.Advance(VocabQuiz.Interval(quiz.StatsOf(cat).Level));
+            _store.Record(cat, remembered: true);
+        }
+        Assert.Equal(5, quiz.StatsOf(cat).Level); // 1 → 2 → 3 → 4 → 5
+        Assert.Equal(TimeSpan.FromDays(16), quiz.StatsOf(cat).Due - _time.GetUtcNow());
+        Assert.True(quiz.StatsOf(cat).IsLearned);
+
+        // Nothing due and nothing new: extra rounds, weaker words more often, never the pending one.
+        _store.Record(dog, remembered: true);
+        _time.Advance(TimeSpan.FromMinutes(30));
+        var picks = Enumerable.Range(0, 500).Select(_ => quiz.Next()!.Id).ToList();
         Assert.DoesNotContain(picks, p => _store.GetWord(p)!.Text == "pending");
-        Assert.InRange(picks.Count(p => p == forgotten), 900, 970); // 8 : 0.5
-        Assert.Equal(forgotten, quiz.Next(except: known)!.Id);
+        Assert.True(picks.Count(p => p == dog) > picks.Count(p => p == cat));
+    }
+
+    [Fact]
+    public void A_card_can_ask_the_meaning_the_sound_or_a_sentence_with_a_gap()
+    {
+        var (id, _) = _store.AddWord("relative");
+        _store.SaveAnalysis(id, Relative() with
+        {
+            Examples = [new VocabExample { Sentence = "She lives with her relatives in Hanoi.", Translation = "Cô ấy sống với họ hàng ở Hà Nội." }],
+            Level = "b1",
+        });
+        Assert.Equal("B1", _store.GetWord(id)!.Level);
+        var mode = VocabCardMode.FillGap;
+        var card = new VocabCardViewModel(_store, new VocabQuiz(_store), options: () => new VocabCardOptions(mode, false));
+        card.ShowNext();
+        Assert.Equal(VocabCardMode.FillGap, card.Mode);
+        Assert.Equal("She lives with her _____ in Hanoi.", card.FrontText);
+        Assert.Equal("Cô ấy sống với họ hàng ở Hà Nội.", card.FrontNote);
+
+        mode = VocabCardMode.MeaningToWord;
+        card.AskAgain();
+        Assert.Equal("họ hàng; tương đối", card.FrontText);
+        card.RevealCommand.Execute(null);
+        Assert.True(card.ShowsWordOnReveal);
+
+        mode = VocabCardMode.Listen; // no voice here: asked the usual way
+        card.ShowNext();
+        Assert.Equal(VocabCardMode.WordToMeaning, card.Mode);
+        Assert.Equal("relative", card.FrontText);
+    }
+
+    [Theory]
+    [InlineData("bǔjiù", "bǔ:3 jiù:4")]
+    [InlineData("xuéxí", "xué:2 xí:2")]
+    [InlineData("Zhōngguó", "Zhōng:1 guó:2")]
+    [InlineData("nǐ hǎo ma", "nǐ:3  :0 hǎo:3  :0 ma:5")]
+    [InlineData("bàn'gōngshì", "bàn:4 ':0 gōng:1 shì:4")]
+    [InlineData("/ˈrel.ə.tɪv/", "/ˈrel.ə.tɪv/:0")]
+    public void Pinyin_is_cut_into_syllables_with_their_tones(string pinyin, string expected) =>
+        Assert.Equal(expected, string.Join(" ", PinyinTones.Split(pinyin).Select(p => $"{p.Text}:{p.Tone}")));
+
+    [Fact]
+    public void Roots_list_families_biggest_first()
+    {
+        var (relative, _) = _store.AddWord("relative");
+        _store.SaveAnalysis(relative, Relative());
+        var (translate, _) = _store.AddWord("translate");
+        _store.SaveAnalysis(translate, new WordAnalysis
+        {
+            Phonetic = "/x/", Meaning = "dịch",
+            Parts = [new AnalysisPart { Form = "trans-", Kind = VocabPartKind.Prefix, Meaning = "qua" }, new AnalysisPart { Form = "lat", Kind = VocabPartKind.Root, Meaning = "mang" }],
+        });
+        var families = VocabRootsViewModel.Families(_store, VocabLanguage.English, _ => { });
+        Assert.Equal("lat", families[0].Form);
+        Assert.Equal(["relative", "translate"], families[0].Words.Select(w => w.Text));
+        Assert.All(families.Skip(1), f => Assert.Single(f.Words));
+    }
+
+    [Fact]
+    public void The_editor_reads_examples_and_confusables_one_per_line()
+    {
+        Assert.Equal([("I agree.", "Tôi đồng ý."), ("Hi", "")],
+            VocabWordEditor.Pairs("I agree. | Tôi đồng ý." + Environment.NewLine + Environment.NewLine + "  Hi  ").ToList());
+        Assert.Equal(["Aptis", "Truyện"], VocabTags.Parse("#Aptis, Truyện, aptis"));
+        Assert.Equal("HSK3", VocabLevels.Normalize("hsk 3", VocabLanguage.Chinese));
+        Assert.Null(VocabLevels.Normalize("B3", VocabLanguage.English));
+    }
+
+    [Fact]
+    public async Task New_words_are_broken_down_by_themselves_a_moment_after_they_arrive()
+    {
+        using var dir = new TempDir();
+        using var settings = new Helm.Core.Settings.SettingsStoreFactory(new Helm.Core.Settings.HelmPaths(dir.Path));
+        var agent = new FakeAgent();
+        var options = VocabKit.Settings(settings);
+        using var vm = new VocabAgentViewModel(agent, _store, options, new InlineUi());
+        vm.Watch(true);
+        _store.AddWord("relative");
+        Assert.Equal(0, agent.Runs); // waits for words added in a row
+        await vm.AnalyzeCommand.ExecuteAsync(null);
+        Assert.Equal(1, agent.Runs);
+        Assert.Equal("Đã phân tích 1 từ.", vm.Status);
+
+        agent.Fail = true;
+        await vm.AnalyzeCommand.ExecuteAsync(null);
+        Assert.Equal("Claude Code is not installed on this PC.", vm.Status);
+        Assert.False(vm.IsBusy);
+    }
+
+    [Fact]
+    public void A_word_held_in_novel_reader_goes_to_vocabulary_with_its_sentence()
+    {
+        const string paragraph = "他说：“我们必须补救。”然后走了。";
+        var sentence = Helm.Modules.NovelReader.Text.ChineseText.SentenceAround(paragraph, paragraph.IndexOf("补救", StringComparison.Ordinal));
+        Assert.Equal("他说：“我们必须补救。”", sentence);
+        Assert.Equal("然后走了。", Helm.Modules.NovelReader.Text.ChineseText.SentenceAround(paragraph, paragraph.IndexOf("走", StringComparison.Ordinal)));
+
+        var held = new Helm.Modules.NovelReader.HeldWordViewModel([new VocabCaptureTarget(_store)]);
+        held.Show("补救", sentence);
+        Assert.True(held.IsShown);
+        held.AddCommand.Execute(null);
+        Assert.Equal(sentence, _store.FindWord("补救")!.Value.Note);
+        Assert.Contains("Added", held.Result);
+
+        var without = new Helm.Modules.NovelReader.HeldWordViewModel([]);
+        without.Show("补救", sentence);
+        Assert.False(without.IsShown); // no Vocabulary, no bar
+    }
+
+    private sealed class FakeAgent : IVocabAgent
+    {
+        public int Runs { get; private set; }
+
+        public bool Fail { get; set; }
+
+        public string? Unavailable() => null;
+
+        public Task<string> AnalyzeAsync(IProgress<string>? progress, CancellationToken ct)
+        {
+            Runs++;
+            return Fail ? throw new VocabAgentException("Claude Code is not installed on this PC.") : Task.FromResult("Đã phân tích 1 từ.");
+        }
+
+        public Task<string> SuggestAsync(string partId, string form, string meaning, VocabLanguage language, IProgress<string>? progress, CancellationToken ct) =>
+            Task.FromResult("");
     }
 
     [Fact]
@@ -250,10 +393,10 @@ public sealed class VocabTests
     {
         using var dir = new TempDir();
         using var settings = new Helm.Core.Settings.SettingsStoreFactory(new Helm.Core.Settings.HelmPaths(dir.Path));
-        var vm = new VocabViewModel(_store, new VocabQuiz(_store), settings, new InlineUi(), new AcceptDialogs(), new MemoryClipboard());
+        var vm = VocabKit.Settings(settings);
         var store = settings.Get<VocabSettings>(VocabIds.ModuleId);
 
-        vm.PopupFrequencyIndex = VocabViewModel.CustomFrequencyIndex;
+        vm.PopupFrequencyIndex = VocabSettingsViewModel.CustomFrequencyIndex;
         Assert.True(vm.IsCustomFrequency);
         vm.CustomToText = "10";
         vm.CustomFromText = "30";
@@ -395,10 +538,10 @@ public sealed class VocabTests
         var (id, _) = _store.AddWord("relative");
         _store.SaveAnalysis(id, Relative());
         var detail = new VocabWordDetailViewModel(_store, id, _store.GetWord(id)!, VocabWordStats.New, showTraditional: true, open: _ => { });
-        detail.BeginEditWordCommand.Execute(null);
-        Assert.Equal("họ hàng; tương đối", detail.EditMeaning);
-        detail.EditMeaning = "  người thân ";
-        detail.SaveWordCommand.Execute(null);
+        detail.Editor.BeginCommand.Execute(null);
+        Assert.Equal("họ hàng; tương đối", detail.Editor.Meaning);
+        detail.Editor.Meaning = "  người thân ";
+        detail.Editor.SaveCommand.Execute(null);
         Assert.Equal("người thân", _store.GetWord(id)!.Meaning);
 
         detail.Root.Children[0].Children[1].SelectCommand.Execute(null); // lat

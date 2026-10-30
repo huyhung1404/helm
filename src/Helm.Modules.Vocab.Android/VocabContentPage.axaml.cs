@@ -40,7 +40,7 @@ public partial class VocabContentPage : UserControl
         ApplyEnabled();
         OpenOfferedWord();
         // Opening Vocabulary is the moment to ask for notifications (Android 13+, once) for the lock-screen word.
-        if (_viewModel.LockScreenWord) VocabLockScreen.AskPermissionOnce(Android.App.Application.Context);
+        if (_viewModel.Settings.LockScreenWord) VocabLockScreen.AskPermissionOnce(Android.App.Application.Context);
     }
 
     protected override void OnDetachedFromVisualTree(VisualTreeAttachmentEventArgs e)

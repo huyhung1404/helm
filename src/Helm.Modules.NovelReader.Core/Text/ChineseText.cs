@@ -6,6 +6,24 @@ namespace Helm.Modules.NovelReader.Text;
 /// <summary>Character classes and the clean-up applied to Chinese text before it is looked up.</summary>
 public static class ChineseText
 {
+    private const string SentenceEnds = "。！？!?…";
+
+    /// <summary>
+    /// The sentence of <paramref name="paragraph"/> around position <paramref name="at"/>: from after the previous 。！？ to
+    /// the next one (with it and the closing quotes after it), trimmed; the whole paragraph when it has no such marks.
+    /// </summary>
+    public static string SentenceAround(string paragraph, int at)
+    {
+        if (paragraph.Length == 0) return "";
+        at = Math.Clamp(at, 0, paragraph.Length - 1);
+        var start = paragraph.LastIndexOfAny(SentenceEnds.ToCharArray(), Math.Max(0, at - 1)) + 1;
+        if (start > at) start = 0;
+        var end = paragraph.IndexOfAny(SentenceEnds.ToCharArray(), at);
+        end = end < 0 ? paragraph.Length : end + 1;
+        while (end < paragraph.Length && paragraph[end] is '”' or '"' or '」' or '』' or '…' or '！' or '？') end++;
+        return paragraph[start..end].Trim().TrimStart('”', '"', '」', '』').Trim();
+    }
+
     /// <summary>A Han character (CJK unified ideographs, extension A, compatibility ideographs) or 〇.</summary>
     public static bool IsHan(char c) =>
         c is >= '一' and <= '鿿' or >= '㐀' and <= '䶿' or >= '豈' and <= '﫿' or '〇';

@@ -78,15 +78,35 @@
         <ui:InfoBar x:Name="OffBar" Grid.Row="1" Severity="Informational" IsClosable="False" IsOpen="False" Visibility="Collapsed" Margin="0,0,0,12"
                     Title="Novel Reader is turned off" Message="Your novels and names are kept. Turn Novel Reader on in its settings to read." />
 
-        <!-- What happened: a problem, an import -->
-        <Border Grid.Row="2" Style="{DynamicResource HelmSurface}" Margin="0,0,0,12" Padding="12,8"
-                Visibility="{Binding HasMessage, Converter={StaticResource BoolToVisibility}}">
-            <core:RowLayout>
-                <TextBlock Text="{Binding Message}" TextWrapping="Wrap" VerticalAlignment="Center" />
-                <ui:Button Style="{StaticResource IconAction}" Icon="{ui:SymbolIcon Dismiss24}" ToolTip="Dismiss" AutomationProperties.Name="Dismiss"
-                           Command="{Binding DismissMessageCommand}" />
-            </core:RowLayout>
-        </Border>
+        <StackPanel Grid.Row="2">
+            <!-- What happened: a problem, an import -->
+            <Border Style="{DynamicResource HelmSurface}" Margin="0,0,0,12" Padding="12,8"
+                    Visibility="{Binding HasMessage, Converter={StaticResource BoolToVisibility}}">
+                <core:RowLayout>
+                    <TextBlock Text="{Binding Message}" TextWrapping="Wrap" VerticalAlignment="Center" />
+                    <ui:Button Style="{StaticResource IconAction}" Icon="{ui:SymbolIcon Dismiss24}" ToolTip="Dismiss" AutomationProperties.Name="Dismiss"
+                               Command="{Binding DismissMessageCommand}" />
+                </core:RowLayout>
+            </Border>
+
+            <!-- A word was held: add it to Vocabulary, with its sentence as the note -->
+            <Border Style="{DynamicResource HelmSurface}" Margin="0,0,0,12" Padding="12,8" DataContext="{Binding HeldWord}"
+                    Visibility="{Binding IsShown, Converter={StaticResource BoolToVisibility}}">
+                <DockPanel>
+                    <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center">
+                        <ui:Button Appearance="Primary" Content="Add to Vocabulary" Icon="{ui:SymbolIcon Add24}" Command="{Binding AddCommand}" />
+                        <ui:Button Style="{StaticResource IconAction}" Icon="{ui:SymbolIcon Dismiss24}" ToolTip="Dismiss" AutomationProperties.Name="Dismiss"
+                                   Command="{Binding DismissCommand}" />
+                    </StackPanel>
+                    <StackPanel VerticalAlignment="Center">
+                        <TextBlock Text="{Binding Word}" FontSize="18" FontWeight="SemiBold" />
+                        <TextBlock Text="{Binding Sentence}" TextWrapping="Wrap" TextTrimming="CharacterEllipsis" MaxHeight="40" Style="{DynamicResource HelmSecondaryText}" />
+                        <TextBlock Text="{Binding Result}" TextWrapping="Wrap" Foreground="{DynamicResource AccentTextFillColorPrimaryBrush}"
+                                   Visibility="{Binding HasResult, Converter={StaticResource BoolToVisibility}}" />
+                    </StackPanel>
+                </DockPanel>
+            </Border>
+        </StackPanel>
 
         <!-- Another device read further -->
         <Border Grid.Row="3" Style="{DynamicResource HelmSurface}" Margin="0,0,0,12" Padding="12,8"

@@ -3,29 +3,48 @@ using Helm.Core.Sync;
 namespace Helm.Modules.Vocab;
 
 /// <summary>How well the user knows a word, from their quiz answers.</summary>
-/// <param name="Level">0 (new, or forgotten last time) up to <see cref="VocabQuiz.TopLevel"/>: each "remembered" moves it up one,
-/// a "forgot" drops it back to 0.</param>
-public sealed record VocabWordStats(int Level, int Remembered, int Forgot, DateTimeOffset? LastAnswer)
+/// <param name="Level">0 (new, or forgotten last time) up to <see cref="VocabQuiz.TopLevel"/>: each "remembered" on or after the
+/// due time moves it up one, a "forgot" drops it back to 0.</param>
+/// <param name="Due">When to see it again (null for a new word: due now).</param>
+public sealed record VocabWordStats(int Level, int Remembered, int Forgot, DateTimeOffset? LastAnswer, DateTimeOffset? Due)
 {
-    public static VocabWordStats New { get; } = new(0, 0, 0, null);
+    public static VocabWordStats New { get; } = new(0, 0, 0, null, null);
 
     public bool IsNew => Remembered + Forgot == 0;
+
+    public bool IsDue(DateTimeOffset now) => !IsNew && Due is { } due && due <= now;
+
+    /// <summary>Known well enough to wait a week or more.</summary>
+    public bool IsLearned => Level >= VocabQuiz.LearnedLevel;
 }
 
+/// <summary>What the Learn tab has for today.</summary>
+public sealed record VocabDay(int Due, int New, int Learned, int Total);
+
 /// <summary>
-/// Picks the word to show next: at random, but the less the user knows a word the more often it comes up, and a word
-/// answered a moment ago waits a little. Only analyzed words take part (a pending one has no meaning to check yet).
+/// Spaced repetition: each word comes back when it is about to be forgotten. Remembering a word that is due doubles its
+/// gap (1, 2, 4 … 128 days); forgetting it brings it back in 10 minutes and starts over. The next word is the most
+/// overdue one, else a new one, else (all done for now) extra practice, picked at random with the weaker words more
+/// often. Only analyzed words take part (a pending one has no meaning to check yet).
 /// </summary>
 public sealed class VocabQuiz(VocabStore store, Random? random = null)
 {
-    public const int TopLevel = 5;
+    public const int TopLevel = 8;
 
-    /// <summary>A word answered within this time comes up far less often.</summary>
+    public const int LearnedLevel = 4;
+
+    /// <summary>A forgotten word comes back this soon.</summary>
+    public static readonly TimeSpan Relearn = TimeSpan.FromMinutes(10);
+
+    /// <summary>A word answered within this time waits during extra practice.</summary>
     public static readonly TimeSpan Rest = TimeSpan.FromMinutes(10);
 
     private readonly Random _random = random ?? Random.Shared;
 
-    /// <summary>Relative chance by level: a forgotten or new word is 8 times as likely as one known well.</summary>
+    /// <summary>The gap after reaching a level: 1 day at level 1, doubling up to 128 days.</summary>
+    public static TimeSpan Interval(int level) => level <= 0 ? Relearn : TimeSpan.FromDays(Math.Pow(2, Math.Min(level, TopLevel) - 1));
+
+    /// <summary>Relative chance during extra practice: a forgotten or new word is 8 times as likely as one known well.</summary>
     internal static double Weight(VocabWordStats stats) => stats.Level switch
     {
         0 => stats.IsNew ? 6 : 8,
@@ -42,14 +61,30 @@ public sealed class VocabQuiz(VocabStore store, Random? random = null)
         foreach (var r in store.Reviews())
         {
             var s = stats.GetValueOrDefault(r.WordId) ?? VocabWordStats.New;
-            stats[r.WordId] = r.Remembered
-                ? s with { Level = Math.Min(TopLevel, s.Level + 1), Remembered = s.Remembered + 1, LastAnswer = r.At }
-                : s with { Level = 0, Forgot = s.Forgot + 1, LastAnswer = r.At };
+            if (!r.Remembered)
+            {
+                stats[r.WordId] = s with { Level = 0, Forgot = s.Forgot + 1, LastAnswer = r.At, Due = r.At + Relearn };
+                continue;
+            }
+            // Remembered before it was due (extra practice): it counts, but the gap does not grow.
+            var onTime = s.Due is not { } due || r.At >= due;
+            var level = onTime ? Math.Min(TopLevel, s.Level + 1) : Math.Max(1, s.Level);
+            stats[r.WordId] = s with { Level = level, Remembered = s.Remembered + 1, LastAnswer = r.At, Due = r.At + Interval(level) };
         }
         return stats;
     }
 
     public VocabWordStats StatsOf(string wordId) => Stats().GetValueOrDefault(wordId) ?? VocabWordStats.New;
+
+    /// <summary>How many words are due, new and learned now.</summary>
+    public VocabDay Today()
+    {
+        var words = store.Words().Where(w => w.Value.IsAnalyzed).ToList();
+        var stats = Stats();
+        var now = store.Now;
+        var all = words.Select(w => stats.GetValueOrDefault(w.Id) ?? VocabWordStats.New).ToList();
+        return new VocabDay(all.Count(s => s.IsDue(now)), all.Count(s => s.IsNew), all.Count(s => s.IsLearned), all.Count);
+    }
 
     /// <summary>The next word, never <paramref name="except"/> unless it is the only one; null when no word is analyzed yet.</summary>
     public SyncedItem<VocabWord>? Next(string? except = null)
@@ -59,9 +94,16 @@ public sealed class VocabQuiz(VocabStore store, Random? random = null)
         if (words.Count > 1) words.RemoveAll(w => w.Id == except);
         var stats = Stats();
         var now = store.Now;
+        VocabWordStats Of(SyncedItem<VocabWord> w) => stats.GetValueOrDefault(w.Id) ?? VocabWordStats.New;
+
+        // 1. The most overdue word.
+        if (words.Where(w => Of(w).IsDue(now)).MinBy(w => Of(w).Due) is { } due) return due;
+        // 2. A word never answered, the oldest first (the order they were added).
+        if (words.Where(w => Of(w).IsNew).OrderBy(w => w.Value.CreatedAt).ThenBy(w => w.Id, StringComparer.Ordinal).FirstOrDefault() is { } fresh) return fresh;
+        // 3. All done for now: extra practice, weaker words more often.
         var weights = words.Select(w =>
         {
-            var s = stats.GetValueOrDefault(w.Id) ?? VocabWordStats.New;
+            var s = Of(w);
             var weight = Weight(s);
             return s.LastAnswer is { } at && now - at < Rest ? weight * 0.1 : weight;
         }).ToList();

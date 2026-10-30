@@ -1,0 +1,267 @@
+<ResourceDictionary
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:sys="clr-namespace:System;assembly=mscorlib"
+    xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
+    xmlns:local="clr-namespace:Helm.Modules.Vocab;assembly=Helm.Modules.Vocab.Core"
+    xmlns:pc="clr-namespace:Helm.Modules.Vocab">
+
+    <!-- The Vocabulary page's styles and templates: the tree, a word's parts, list rows, what helps to use a word. -->
+    <SolidColorBrush x:Key="TreeLine" Color="#808A8A8A" />
+
+    <!-- A whole area as one flat button (hover shading, keyboard focus) -->
+    <Style x:Key="FlatButton" TargetType="Button">
+        <Setter Property="Background" Value="Transparent" />
+        <Setter Property="Cursor" Value="Hand" />
+        <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+        <Setter Property="FocusVisualStyle" Value="{x:Null}" />
+        <Setter Property="Foreground" Value="{DynamicResource TextFillColorPrimaryBrush}" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="Button">
+                    <Border x:Name="Bd" Background="{TemplateBinding Background}" Padding="{TemplateBinding Padding}" CornerRadius="6" BorderThickness="1" BorderBrush="Transparent">
+                        <ContentPresenter HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}" />
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter TargetName="Bd" Property="Background" Value="{DynamicResource SubtleFillColorSecondaryBrush}" />
+                        </Trigger>
+                        <Trigger Property="IsKeyboardFocused" Value="True">
+                            <Setter TargetName="Bd" Property="BorderBrush" Value="{DynamicResource AccentTextFillColorPrimaryBrush}" />
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!-- One box of the tree; the word's own box is filled, the selected one outlined -->
+    <Style x:Key="NodeBox" TargetType="Button">
+        <Setter Property="Cursor" Value="Hand" />
+        <Setter Property="FocusVisualStyle" Value="{x:Null}" />
+        <Setter Property="Foreground" Value="{DynamicResource TextFillColorPrimaryBrush}" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="Button">
+                    <Border x:Name="Bd" CornerRadius="8" BorderThickness="1.5" Padding="10,6" MinWidth="64"
+                            Background="{DynamicResource ControlFillColorDefaultBrush}" BorderBrush="{DynamicResource CardStrokeColorDefaultBrush}">
+                        <ContentPresenter HorizontalAlignment="Center" />
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter TargetName="Bd" Property="Background" Value="{DynamicResource ControlFillColorSecondaryBrush}" />
+                        </Trigger>
+                        <DataTrigger Binding="{Binding IsRoot}" Value="True">
+                            <Setter TargetName="Bd" Property="Background" Value="{DynamicResource AccentFillColorDefaultBrush}" />
+                            <Setter Property="Foreground" Value="{DynamicResource TextOnAccentFillColorPrimaryBrush}" />
+                        </DataTrigger>
+                        <DataTrigger Binding="{Binding IsSelected}" Value="True">
+                            <Setter TargetName="Bd" Property="BorderBrush" Value="{DynamicResource AccentTextFillColorPrimaryBrush}" />
+                            <Setter TargetName="Bd" Property="BorderThickness" Value="2.5" />
+                        </DataTrigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!-- The tree, drawn top-down: a line up to the parent, the box, a line down, then the children side by side.
+         Siblings' half lines (LineFromLeft / LineToRight) meet into one bar under their parent. -->
+    <DataTemplate DataType="{x:Type local:VocabNodeViewModel}">
+        <StackPanel>
+            <Grid Height="14" Visibility="{Binding HasParent, Converter={StaticResource BoolToVisibility}}">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
+                <Border BorderThickness="0,1.5,0,0" BorderBrush="{StaticResource TreeLine}" Visibility="{Binding LineFromLeft, Converter={StaticResource BoolToVisibility}}" />
+                <Border Grid.Column="1" BorderThickness="0,1.5,0,0" BorderBrush="{StaticResource TreeLine}" Visibility="{Binding LineToRight, Converter={StaticResource BoolToVisibility}}" />
+                <Border Grid.ColumnSpan="2" Width="1.5" HorizontalAlignment="Center" Background="{StaticResource TreeLine}" />
+            </Grid>
+            <Button Style="{StaticResource NodeBox}" Margin="5,0" HorizontalAlignment="Center" Command="{Binding SelectCommand}"
+                    AutomationProperties.Name="{Binding Form}" ToolTip="{Binding Node.Meaning}">
+                <StackPanel>
+                    <TextBlock Text="{Binding RoleText}" FontSize="10" FontWeight="SemiBold" HorizontalAlignment="Center"
+                               Visibility="{Binding HasRole, Converter={StaticResource BoolToVisibility}}">
+                        <TextBlock.Style>
+                            <Style TargetType="TextBlock">
+                                <Setter Property="Foreground" Value="{DynamicResource SystemFillColorSuccessBrush}" />
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding IsSound}" Value="True">
+                                        <Setter Property="Foreground" Value="{DynamicResource SystemFillColorCautionBrush}" />
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </TextBlock.Style>
+                    </TextBlock>
+                    <TextBlock Text="{Binding Form}" FontSize="20" FontWeight="SemiBold" HorizontalAlignment="Center" />
+                    <TextBlock Text="{Binding Caption}" FontSize="11" HorizontalAlignment="Center" Opacity="0.8"
+                               Visibility="{Binding HasCaption, Converter={StaticResource BoolToVisibility}}" />
+                    <TextBlock Text="{Binding ShortMeaning}" FontSize="11" HorizontalAlignment="Center" Opacity="0.8"
+                               Visibility="{Binding HasShortMeaning, Converter={StaticResource BoolToVisibility}}" />
+                </StackPanel>
+            </Button>
+            <Border Width="1.5" Height="14" HorizontalAlignment="Center" Background="{StaticResource TreeLine}"
+                    Visibility="{Binding HasChildren, Converter={StaticResource BoolToVisibility}}" />
+            <ItemsControl ItemsSource="{Binding Children}" HorizontalAlignment="Center" Focusable="False">
+                <ItemsControl.ItemsPanel>
+                    <ItemsPanelTemplate>
+                        <StackPanel Orientation="Horizontal" />
+                    </ItemsPanelTemplate>
+                </ItemsControl.ItemsPanel>
+            </ItemsControl>
+        </StackPanel>
+    </DataTemplate>
+    <!-- How a word is built: its tree, then the tapped box. Shown on the Learn card and on the Words tab. -->
+    <DataTemplate x:Key="PartsView" DataType="{x:Type local:VocabWordDetailViewModel}">
+        <StackPanel>
+            <ScrollViewer HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Disabled" PanningMode="HorizontalOnly">
+                <ContentControl Content="{Binding Root}" HorizontalAlignment="Center" Margin="0,4,0,8" Focusable="False" />
+            </ScrollViewer>
+            <TextBlock Margin="0,4,0,0" HorizontalAlignment="Center" Style="{DynamicResource HelmSecondaryText}"
+                       Text="Tap a part to see what it means and which of your words share it."
+                       Visibility="{Binding IsWordSelected, Converter={StaticResource BoolToVisibility}}" />
+            <Border Margin="0,8,0,0" Padding="0,10,0,0" BorderThickness="0,1,0,0" BorderBrush="{DynamicResource CardStrokeColorDefaultBrush}"
+                    Visibility="{Binding IsPartSelected, Converter={StaticResource BoolToVisibility}}">
+                <StackPanel>
+                    <DockPanel>
+                        <ui:Button DockPanel.Dock="Right" Appearance="Transparent" Padding="6" MinWidth="0" Icon="{ui:SymbolIcon Edit24}" ToolTip="Edit this part"
+                                   AutomationProperties.Name="Edit this part" Command="{Binding BeginEditPartCommand}" />
+                        <ui:Button DockPanel.Dock="Right" Appearance="Transparent" Padding="6" MinWidth="0" Icon="{ui:SymbolIcon Speaker224}" ToolTip="Say it"
+                                   AutomationProperties.Name="Say this part" Command="{Binding SayPartCommand}"
+                                   Visibility="{Binding CanSayPart, Converter={StaticResource BoolToVisibility}}" />
+                        <TextBlock TextWrapping="Wrap" VerticalAlignment="Center">
+                            <Run Text="{Binding CardTitle, Mode=OneWay}" FontSize="22" FontWeight="SemiBold" />
+                            <Run Text="  " /><Run Text="{Binding CardKind, Mode=OneWay}" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+                        </TextBlock>
+                    </DockPanel>
+                    <TextBlock pc:ToneText.Text="{Binding CardPhonetic}" FontSize="14" Visibility="{Binding HasCardPhonetic, Converter={StaticResource BoolToVisibility}}" />
+                    <TextBlock Text="{Binding CardHanViet}" Style="{DynamicResource HelmSecondaryText}" Visibility="{Binding HasCardHanViet, Converter={StaticResource BoolToVisibility}}" />
+                    <TextBlock Margin="0,4,0,0" Text="{Binding CardMeaning}" FontSize="15" TextWrapping="Wrap" />
+                    <TextBlock Margin="0,4,0,0" Text="{Binding CardOrigin}" TextWrapping="Wrap" Style="{DynamicResource HelmSecondaryText}"
+                               Visibility="{Binding HasCardOrigin, Converter={StaticResource BoolToVisibility}}" />
+                    <StackPanel Margin="0,8,0,0" Visibility="{Binding HasAlsoIn, Converter={StaticResource BoolToVisibility}}">
+                        <TextBlock Text="Also in your words" FontWeight="SemiBold" Margin="0,0,0,4" />
+                        <ItemsControl ItemsSource="{Binding AlsoIn}" Focusable="False">
+                            <ItemsControl.ItemsPanel>
+                                <ItemsPanelTemplate>
+                                    <WrapPanel />
+                                </ItemsPanelTemplate>
+                            </ItemsControl.ItemsPanel>
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate DataType="{x:Type local:VocabWordLink}">
+                                    <ui:Button Margin="0,0,6,6" Content="{Binding Text}" ToolTip="{Binding Meaning}" Command="{Binding Open}" />
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </StackPanel>
+                    <!-- Edit the tapped part by hand (every word with it shows the change) -->
+                    <StackPanel Margin="0,8,0,0" Visibility="{Binding IsEditingPart, Converter={StaticResource BoolToVisibility}}">
+                            <TextBlock Text="Meaning" Style="{DynamicResource HelmSecondaryText}" Margin="0,6,0,2" />
+                            <ui:TextBox Text="{Binding EditPartMeaning, UpdateSourceTrigger=PropertyChanged}" AutomationProperties.Name="Meaning" AcceptsReturn="True" TextWrapping="Wrap" MinHeight="48" />
+                            <TextBlock Text="Origin" Style="{DynamicResource HelmSecondaryText}" Margin="0,6,0,2" />
+                            <ui:TextBox Text="{Binding EditPartOrigin, UpdateSourceTrigger=PropertyChanged}" AutomationProperties.Name="Origin" AcceptsReturn="True" TextWrapping="Wrap" MinHeight="48" />
+                            <TextBlock Text="Phonetic" Style="{DynamicResource HelmSecondaryText}" Margin="0,6,0,2" />
+                            <ui:TextBox Text="{Binding EditPartPhonetic, UpdateSourceTrigger=PropertyChanged}" AutomationProperties.Name="Phonetic" />
+                            <TextBlock Text="Hán Việt" Style="{DynamicResource HelmSecondaryText}" Margin="0,6,0,2" />
+                            <ui:TextBox Text="{Binding EditPartHanViet, UpdateSourceTrigger=PropertyChanged}" AutomationProperties.Name="Hán Việt" />
+                        <StackPanel Orientation="Horizontal" Margin="0,10,0,0">
+                            <ui:Button Appearance="Primary" Content="Save" Icon="{ui:SymbolIcon Checkmark24}" Command="{Binding SavePartCommand}" />
+                            <ui:Button Margin="8,0,0,0" Content="Cancel" Command="{Binding CancelEditPartCommand}" />
+                        </StackPanel>
+                    </StackPanel>
+                </StackPanel>
+            </Border>
+        </StackPanel>
+    </DataTemplate>
+
+    <!-- A tab or switch button: filled while its Tag (bound to "is this one in front") is true -->
+    <Style x:Key="Segment" TargetType="ui:Button" BasedOn="{StaticResource {x:Type ui:Button}}">
+        <Setter Property="Appearance" Value="Secondary" />
+        <Setter Property="MinWidth" Value="110" />
+        <Style.Triggers>
+            <DataTrigger Binding="{Binding Tag, RelativeSource={RelativeSource Self}}">
+                <DataTrigger.Value><sys:Boolean>True</sys:Boolean></DataTrigger.Value>
+                <Setter Property="Appearance" Value="Primary" />
+            </DataTrigger>
+        </Style.Triggers>
+    </Style>
+
+    <!-- A group's title in a list ("A", "Due now", "Families") -->
+    <Style x:Key="GroupHeader" TargetType="TextBlock">
+        <Setter Property="FontWeight" Value="SemiBold" />
+        <Setter Property="FontSize" Value="12" />
+        <Setter Property="Margin" Value="10,10,10,2" />
+        <Setter Property="Foreground" Value="{DynamicResource AccentTextFillColorPrimaryBrush}" />
+    </Style>
+
+    <!-- One word in a list: the group it starts, the word, its reading (tones in colour), level, meaning, how well it is known -->
+    <DataTemplate x:Key="WordRow" DataType="{x:Type local:VocabWordRow}">
+        <StackPanel>
+            <TextBlock Text="{Binding Header}" Style="{StaticResource GroupHeader}" Visibility="{Binding HasHeader, Converter={StaticResource BoolToVisibility}}" />
+            <Button Style="{StaticResource FlatButton}" Padding="10,6" Command="{Binding Open}" AutomationProperties.Name="{Binding Text}">
+                <StackPanel>
+                    <DockPanel>
+                        <ui:Button DockPanel.Dock="Right" Appearance="Transparent" Padding="4" MinWidth="0" Margin="6,0,0,0" Icon="{ui:SymbolIcon Dismiss16}"
+                                   ToolTip="Remove (a typo, or not worth learning)" AutomationProperties.Name="Remove" Command="{Binding Remove}"
+                                   Visibility="{Binding CanRemove, Converter={StaticResource BoolToVisibility}}" />
+                        <Border DockPanel.Dock="Right" CornerRadius="4" Padding="6,0" VerticalAlignment="Center" Background="{DynamicResource ControlFillColorSecondaryBrush}"
+                                Visibility="{Binding IsPending, Converter={StaticResource BoolToVisibility}}">
+                            <TextBlock Text="Waiting" FontSize="12" FontWeight="SemiBold" Foreground="{DynamicResource SystemFillColorCautionBrush}" />
+                        </Border>
+                        <Border DockPanel.Dock="Right" CornerRadius="4" Padding="6,0" VerticalAlignment="Center" Background="{DynamicResource ControlFillColorSecondaryBrush}"
+                                Visibility="{Binding HasLevel, Converter={StaticResource BoolToVisibility}}">
+                            <TextBlock Text="{Binding Level}" FontSize="11" FontWeight="SemiBold" />
+                        </Border>
+                        <WrapPanel VerticalAlignment="Center">
+                            <TextBlock Text="{Binding Text}" FontSize="16" FontWeight="SemiBold" Margin="0,0,6,0" />
+                            <TextBlock pc:ToneText.Text="{Binding Phonetic}" VerticalAlignment="Center" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+                        </WrapPanel>
+                    </DockPanel>
+                    <TextBlock Text="{Binding Meaning}" TextTrimming="CharacterEllipsis" Style="{DynamicResource HelmSecondaryText}" />
+                    <TextBlock Text="{Binding LevelText}" FontSize="11" Style="{DynamicResource HelmSecondaryText}"
+                               Visibility="{Binding LevelText, Converter={StaticResource NotEmptyToVisibility}}" />
+                </StackPanel>
+            </Button>
+        </StackPanel>
+    </DataTemplate>
+
+    <!-- What helps to use a word: examples (gap card source), collocations, mnemonic, words easy to mix up, labels -->
+    <DataTemplate x:Key="InfoView" DataType="{x:Type local:VocabWordInfo}">
+        <StackPanel>
+            <TextBlock Text="{Binding Labels}" FontSize="12" Margin="0,0,0,6" Foreground="{DynamicResource AccentTextFillColorPrimaryBrush}"
+                       Visibility="{Binding HasLabels, Converter={StaticResource BoolToVisibility}}" />
+            <StackPanel Visibility="{Binding HasExamples, Converter={StaticResource BoolToVisibility}}" Margin="0,0,0,8">
+                <TextBlock Text="Examples" FontWeight="SemiBold" Margin="0,0,0,2" />
+                <ItemsControl ItemsSource="{Binding Examples}" Focusable="False">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate DataType="{x:Type local:VocabExample}">
+                            <StackPanel Margin="0,2,0,4">
+                                <TextBlock Text="{Binding Sentence}" TextWrapping="Wrap" FontSize="14" />
+                                <TextBlock Text="{Binding Translation}" TextWrapping="Wrap" Style="{DynamicResource HelmSecondaryText}" />
+                            </StackPanel>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+            </StackPanel>
+            <StackPanel Visibility="{Binding HasCollocations, Converter={StaticResource BoolToVisibility}}" Margin="0,0,0,8">
+                <TextBlock Text="Goes with" FontWeight="SemiBold" Margin="0,0,0,2" />
+                <TextBlock Text="{Binding Collocations}" TextWrapping="Wrap" />
+            </StackPanel>
+            <StackPanel Visibility="{Binding HasMnemonic, Converter={StaticResource BoolToVisibility}}" Margin="0,0,0,8">
+                <TextBlock Text="To remember it" FontWeight="SemiBold" Margin="0,0,0,2" />
+                <TextBlock Text="{Binding Mnemonic}" TextWrapping="Wrap" FontStyle="Italic" />
+            </StackPanel>
+            <StackPanel Visibility="{Binding HasConfusables, Converter={StaticResource BoolToVisibility}}" Margin="0,0,0,8">
+                <TextBlock Text="Easy to mix up with" FontWeight="SemiBold" Margin="0,0,0,2" Foreground="{DynamicResource SystemFillColorCautionBrush}" />
+                <ItemsControl ItemsSource="{Binding Confusables}" Focusable="False">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate>
+                            <TextBlock Text="{Binding}" TextWrapping="Wrap" Margin="0,1" />
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+            </StackPanel>
+        </StackPanel>
+    </DataTemplate>
+</ResourceDictionary>

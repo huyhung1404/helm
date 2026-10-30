@@ -26,31 +26,31 @@
                 <core:CardHeader Title="Show a word now and then"
                                  Description="A card with one of your words appears in the bottom-right corner, without taking the focus. Click it to see the meaning, then say whether you remembered. Words you forget come back more often. Not while you are away or something is full screen." />
             </ui:CardControl.Header>
-            <ui:ToggleSwitch AutomationProperties.Name="Show a word now and then" IsChecked="{Binding PopupEnabled}" />
+            <ui:ToggleSwitch AutomationProperties.Name="Show a word now and then" IsChecked="{Binding Settings.PopupEnabled}" />
         </ui:CardControl>
         <ui:CardControl Margin="0,0,0,4" Icon="{ui:SymbolIcon Timer24}">
             <ui:CardControl.Header>
                 <core:CardHeader Title="How often" Description="A random time in this range, so it never comes on the clock. Custom: type the shortest and longest gap in seconds." />
             </ui:CardControl.Header>
-            <ComboBox Width="280" AutomationProperties.Name="How often" ItemsSource="{Binding PopupFrequencyNames}" SelectedIndex="{Binding PopupFrequencyIndex}"
-                      IsEnabled="{Binding PopupEnabled}" />
+            <ComboBox Width="280" AutomationProperties.Name="How often" ItemsSource="{Binding Settings.PopupFrequencyNames}" SelectedIndex="{Binding Settings.PopupFrequencyIndex}"
+                      IsEnabled="{Binding Settings.PopupEnabled}" />
         </ui:CardControl>
         <!-- Custom: the range in seconds -->
-        <ui:CardControl Margin="0,0,0,4" Icon="{ui:SymbolIcon NumberSymbol24}" Visibility="{Binding IsCustomFrequency, Converter={StaticResource BoolToVisibility}}"
-                        IsEnabled="{Binding PopupEnabled}">
+        <ui:CardControl Margin="0,0,0,4" Icon="{ui:SymbolIcon NumberSymbol24}" Visibility="{Binding Settings.IsCustomFrequency, Converter={StaticResource BoolToVisibility}}"
+                        IsEnabled="{Binding Settings.PopupEnabled}">
             <ui:CardControl.Header>
                 <StackPanel>
                     <core:CardHeader Title="Custom gap (seconds)" Description="A word pops up after a random number of seconds between these two, e.g. 30 to 90." />
-                    <TextBlock Margin="0,4,0,0" Text="{Binding CustomError}" TextWrapping="Wrap" Foreground="{DynamicResource SystemFillColorCriticalBrush}"
-                               Visibility="{Binding HasCustomError, Converter={StaticResource BoolToVisibility}}" />
+                    <TextBlock Margin="0,4,0,0" Text="{Binding Settings.CustomError}" TextWrapping="Wrap" Foreground="{DynamicResource SystemFillColorCriticalBrush}"
+                               Visibility="{Binding Settings.HasCustomError, Converter={StaticResource BoolToVisibility}}" />
                 </StackPanel>
             </ui:CardControl.Header>
             <StackPanel Orientation="Horizontal">
                 <ui:TextBox Width="90" PlaceholderText="From" AutomationProperties.Name="Shortest gap in seconds"
-                            Text="{Binding CustomFromText, UpdateSourceTrigger=PropertyChanged}" />
+                            Text="{Binding Settings.CustomFromText, UpdateSourceTrigger=PropertyChanged}" />
                 <TextBlock Text="to" Margin="8,0" VerticalAlignment="Center" />
                 <ui:TextBox Width="90" PlaceholderText="To" AutomationProperties.Name="Longest gap in seconds"
-                            Text="{Binding CustomToText, UpdateSourceTrigger=PropertyChanged}" />
+                            Text="{Binding Settings.CustomToText, UpdateSourceTrigger=PropertyChanged}" />
                 <TextBlock Text="seconds" Margin="8,0,0,0" VerticalAlignment="Center" Style="{DynamicResource HelmSecondaryText}" />
             </StackPanel>
         </ui:CardControl>
@@ -67,19 +67,25 @@
             <ui:CardControl.Header>
                 <core:CardHeader Title="Show traditional characters" Description="Next to a Chinese word or part, when its traditional form differs (补救 (補救))." />
             </ui:CardControl.Header>
-            <ui:ToggleSwitch AutomationProperties.Name="Show traditional characters" IsChecked="{Binding ShowTraditional}" />
+            <ui:ToggleSwitch AutomationProperties.Name="Show traditional characters" IsChecked="{Binding Settings.ShowTraditional}" />
+        </ui:CardControl>
+        <ui:CardControl Margin="0,0,0,4" Icon="{ui:SymbolIcon Speaker224}">
+            <ui:CardControl.Header>
+                <core:CardHeader Title="Say the word when its meaning shows" Description="On the Learn tab, the word is read aloud as you check it." />
+            </ui:CardControl.Header>
+            <ui:ToggleSwitch AutomationProperties.Name="Say the word when its meaning shows" IsChecked="{Binding Settings.AutoSay}" />
         </ui:CardControl>
         <ui:CardControl Margin="0,0,0,4" Icon="{ui:SymbolIcon Video24}">
             <ui:CardControl.Header>
                 <core:CardHeader Title="YouGlish button" Description="Next to the word: hear real people say it in YouTube videos (opens youglish.com in your browser)." />
             </ui:CardControl.Header>
-            <ui:ToggleSwitch AutomationProperties.Name="YouGlish button" IsChecked="{Binding ShowYouGlish}" />
+            <ui:ToggleSwitch AutomationProperties.Name="YouGlish button" IsChecked="{Binding Settings.ShowYouGlish}" />
         </ui:CardControl>
         <ui:CardControl Margin="0,0,0,4" Icon="{ui:SymbolIcon TextBulletListLtr24}">
             <ui:CardControl.Header>
                 <core:CardHeader Title="Words shown at first" Description="Show more lists as many again." />
             </ui:CardControl.Header>
-            <ComboBox Width="120" AutomationProperties.Name="Words shown at first" ItemsSource="{Binding ItemsShownNames}" SelectedIndex="{Binding ItemsShownIndex}" />
+            <ComboBox Width="120" AutomationProperties.Name="Words shown at first" ItemsSource="{Binding Settings.ItemsShownNames}" SelectedIndex="{Binding Settings.ItemsShownIndex}" />
         </ui:CardControl>
 
         <!-- Analysis -->
@@ -90,6 +96,13 @@
                                  Description="Words you add wait until an AI agent breaks them down. Let AI agents use Helm's tools (General → AI agents), then paste this into Claude Code." />
             </ui:CardControl.Header>
             <ui:Button Content="Copy request" Icon="{ui:SymbolIcon Copy24}" Command="{Binding CopyPromptCommand}" />
+        </ui:CardControl>
+        <ui:CardControl Margin="0,0,0,4" Icon="{ui:SymbolIcon Sparkle24}">
+            <ui:CardControl.Header>
+                <core:CardHeader Title="Break new words down by itself"
+                                 Description="A moment after words arrive (typed here, from Quick Capture or from the phone), Claude Code breaks them down without a window. Needs Claude Code with Helm added (General → AI agents)." />
+            </ui:CardControl.Header>
+            <ui:ToggleSwitch AutomationProperties.Name="Break new words down by itself" IsChecked="{Binding Settings.AutoAnalyze}" />
         </ui:CardControl>
     </StackPanel>
 </core:ModulePageBase>

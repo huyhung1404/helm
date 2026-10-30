@@ -24,17 +24,17 @@ public sealed class VocabViewsTests : IDisposable
         var store = new VocabStore(new MemorySynced<VocabWord>(), new MemorySynced<VocabPart>(), new MemorySyncedLog<VocabReview>());
         Seed(store);
         var quiz = new VocabQuiz(store, new Random(1));
-        var viewModel = new VocabViewModel(store, quiz, settings, new InlineUi(), new AcceptDialogs(), new MemoryClipboard());
+        var viewModel = VocabKit.ViewModel(store, quiz, settings);
         var windows = new WindowService(NullLogger<WindowService>.Instance);
         var popup = new VocabPopup(store, quiz, settings, windows, new UserActivity(), new InlineUi(), new NoServices(), new VocabVoice(null, null), NullLogger<VocabPopup>.Instance);
-        var module = new VocabModule(popup) { IsEnabled = true };
+        var module = new VocabModule(popup, viewModel.Agent) { IsEnabled = true };
 
         // Words: only analyzed ones, one language at a time, alphabetical; the waiting word is on the Add tab only.
-        Assert.Equal(["relative", "translate"], viewModel.Words.Select(w => w.Text));
-        Assert.Equal("English (2)", viewModel.EnglishTabText);
-        viewModel.ShowChineseCommand.Execute(null);
-        Assert.Equal(["补救"], viewModel.Words.Select(w => w.Text));
-        viewModel.ShowEnglishCommand.Execute(null);
+        Assert.Equal(["relative", "translate"], viewModel.List.Words.Select(w => w.Text));
+        Assert.Equal("English (2)", viewModel.List.EnglishTabText);
+        viewModel.List.ShowChineseCommand.Execute(null);
+        Assert.Equal(["补救"], viewModel.List.Words.Select(w => w.Text));
+        viewModel.List.ShowEnglishCommand.Execute(null);
         var waiting = Assert.Single(viewModel.RecentWords, w => w.IsPending);
         Assert.Equal("ubiquitous", waiting.Text);
         Assert.True(waiting.CanRemove);
@@ -54,10 +54,28 @@ public sealed class VocabViewsTests : IDisposable
         viewModel.RecentWords.First(w => w.Text == "serendipity").Remove!.Execute(null);
         Assert.Null(store.FindWord("serendipity"));
         viewModel.ShowLearnCommand.Execute(null);
-        while (viewModel.Card.Text != "补救") viewModel.Card.SkipCommand.Execute(null);
+        var buJiu = store.FindWord("补救")!;
+        viewModel.Card.Show(buJiu.Id, buJiu.Value);
         viewModel.Card.RevealCommand.Execute(null);
         Assert.NotNull(viewModel.Card.ExplanationTree);
         Layout(page, new Size(1100, 1150), "2-learn-revealed");
+
+        // The rich answer: examples, collocations, mnemonic, words easy to mix up, labels.
+        var relativeWord = store.FindWord("relative")!;
+        viewModel.Card.Show(relativeWord.Id, relativeWord.Value);
+        viewModel.Card.RevealCommand.Execute(null);
+        Assert.True(viewModel.Card.Info!.HasExamples);
+        Assert.True(viewModel.Card.Info.HasConfusables);
+        Layout(page, new Size(1100, 1250), "2b-learn-rich");
+
+        // Roots: the families the words share; lat holds relative and translate.
+        viewModel.ShowRootsCommand.Execute(null);
+        var latRow = Assert.Single(viewModel.Roots.Roots, r => r.Form == "lat");
+        Assert.Equal(2, latRow.Words.Count);
+        Layout(page, new Size(1100, 760), "8-roots");
+        latRow.Select.Execute(null);
+        Assert.True(viewModel.Roots.HasSelected);
+        Layout(page, new Size(1100, 760), "8b-root-family");
 
         viewModel.Open(store.FindWord("补救")!.Id);
         Assert.False(viewModel.IsLearning);
@@ -98,6 +116,13 @@ public sealed class VocabViewsTests : IDisposable
             Phonetic = "/ˈrel.ə.tɪv/",
             Meaning = "họ hàng; tương đối",
             Explanation = "\"mang trở lại\" → có liên quan → người có quan hệ với mình.",
+            Examples = [new VocabExample { Sentence = "She is staying with relatives in London.", Translation = "Cô ấy đang ở nhà họ hàng ở London." }],
+            Collocations = ["close relative", "relative to"],
+            Mnemonic = "re (lại) + lat (mang): người \"mang lại\" liên hệ → họ hàng.",
+            Confusables = [new VocabConfusable { Word = "relevant", Note = "relevant = liên quan; relative = họ hàng / tương đối" }],
+            Level = "B1",
+            PartOfSpeech = "danh từ; tính từ",
+            Topic = "gia đình",
             Parts =
             [
                 new AnalysisPart

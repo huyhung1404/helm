@@ -27,7 +27,7 @@
                     <TextBlock Classes="secondary" TextWrapping="Wrap"
                                Text="Each time the screen turns on, a silent notification shows one of your words. Tap Show meaning, then Forgot or Remembered, without unlocking." />
                 </StackPanel>
-                <ToggleSwitch Grid.Column="1" IsChecked="{Binding LockScreenWord}" OnContent="" OffContent="" AutomationProperties.Name="A word on the lock screen" />
+                <ToggleSwitch Grid.Column="1" IsChecked="{Binding Settings.LockScreenWord}" OnContent="" OffContent="" AutomationProperties.Name="A word on the lock screen" />
             </Grid>
         </Border>
 
@@ -51,18 +51,25 @@
                         <TextBlock Text="Show traditional characters" />
                         <TextBlock Text="Next to a Chinese word or part when it differs (补救 (補救))." Classes="secondary" TextWrapping="Wrap" />
                     </StackPanel>
-                    <ToggleSwitch Grid.Column="1" IsChecked="{Binding ShowTraditional}" OnContent="" OffContent="" AutomationProperties.Name="Show traditional characters" />
+                    <ToggleSwitch Grid.Column="1" IsChecked="{Binding Settings.ShowTraditional}" OnContent="" OffContent="" AutomationProperties.Name="Show traditional characters" />
+                </Grid>
+                <Grid ColumnDefinitions="*,Auto">
+                    <StackPanel>
+                        <TextBlock Text="Say the word when its meaning shows" />
+                        <TextBlock Text="On the Learn tab, the word is read aloud as you check it." Classes="secondary" TextWrapping="Wrap" />
+                    </StackPanel>
+                    <ToggleSwitch Grid.Column="1" IsChecked="{Binding Settings.AutoSay}" OnContent="" OffContent="" AutomationProperties.Name="Say the word when its meaning shows" />
                 </Grid>
                 <Grid ColumnDefinitions="*,Auto">
                     <StackPanel>
                         <TextBlock Text="YouGlish button" />
                         <TextBlock Text="Next to the word: hear real people say it in YouTube videos (opens youglish.com)." Classes="secondary" TextWrapping="Wrap" />
                     </StackPanel>
-                    <ToggleSwitch Grid.Column="1" IsChecked="{Binding ShowYouGlish}" OnContent="" OffContent="" AutomationProperties.Name="YouGlish button" />
+                    <ToggleSwitch Grid.Column="1" IsChecked="{Binding Settings.ShowYouGlish}" OnContent="" OffContent="" AutomationProperties.Name="YouGlish button" />
                 </Grid>
                 <StackPanel Spacing="4">
                     <TextBlock Text="Words shown at first" />
-                    <ComboBox HorizontalAlignment="Stretch" ItemsSource="{Binding ItemsShownNames}" SelectedIndex="{Binding ItemsShownIndex}"
+                    <ComboBox HorizontalAlignment="Stretch" ItemsSource="{Binding Settings.ItemsShownNames}" SelectedIndex="{Binding Settings.ItemsShownIndex}"
                               AutomationProperties.Name="Words shown at first" />
                 </StackPanel>
             </StackPanel>

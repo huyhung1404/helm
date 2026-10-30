@@ -12,7 +12,6 @@ public static class NovelReaderServices
             // the system media controls. The VieNeu voice itself comes with the shared core.
             .AddSingleton<ISpeechEngine, WindowsSpeechEngine>()
             // The AI name scan and suggested translations: Claude Code on this PC, through Helm's MCP tools.
-            .AddSingleton<ClaudeCodeRunner>()
             .AddSingleton<Helm.Modules.NovelReader.Names.INameScanAgent, ClaudeCodeNameAgent>()
             .AddSingleton<Helm.Modules.NovelReader.Reports.ITranslationAgent, ClaudeCodeTranslationAgent>()
             .AddSingleton<WindowsAudioOutput>()

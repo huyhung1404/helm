@@ -1,18 +1,17 @@
 using System.IO;
 using System.Text;
 using System.Text.Json;
-using Helm.Core.Mcp;
 using Helm.Core.Processes;
 using Microsoft.Extensions.Logging;
 
-namespace Helm.Modules.NovelReader;
+namespace Helm.Core.Mcp;
 
 /// <summary>Claude Code could not do the job: not installed, not connected to Helm, stopped with an error, too slow.</summary>
 public sealed class ClaudeCodeException(string message, Exception? inner = null) : Exception(message, inner);
 
 /// <summary>
 /// Runs Claude Code (the user's own Claude plan, no API key) without a window (<c>claude -p</c>), allowed only some of
-/// Helm's MCP tools, for Novel Reader's AI helpers. Claude Code reaches Helm's MCP server, which runs inside this Helm, so
+/// Helm's MCP tools, for the tools' AI helpers (Novel Reader's name scan and suggestions, Vocabulary's analysis). Claude Code reaches Helm's MCP server, which runs inside this Helm, so
 /// what it writes arrives in the library while it works. Needs Claude Code installed and Helm added to it (the AI &amp;
 /// MCP page). The instructions go in on standard input, never through cmd.exe; it runs with the user's normal rights even
 /// when Helm is elevated, and stops with Helm.

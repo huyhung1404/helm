@@ -20,14 +20,7 @@ public sealed partial class VocabWordDetailViewModel : ObservableObject
     [ObservableProperty] private string _redoNote = "";
     [ObservableProperty] private bool _isAskingRedo;
 
-    // Editing by hand: the word's fields, or the tapped part's.
-    [ObservableProperty] private bool _isEditingWord;
-    [ObservableProperty] private string _editPhonetic = "";
-    [ObservableProperty] private string _editMeaning = "";
-    [ObservableProperty] private string _editHanViet = "";
-    [ObservableProperty] private string _editTraditional = "";
-    [ObservableProperty] private string _editExplanation = "";
-    [ObservableProperty] private string _editNote = "";
+    // Editing the tapped part by hand (the word's own fields: Editor).
     [ObservableProperty] private bool _isEditingPart;
     [ObservableProperty] private string _editPartPhonetic = "";
     [ObservableProperty] private string _editPartMeaning = "";
@@ -43,12 +36,23 @@ public sealed partial class VocabWordDetailViewModel : ObservableObject
         ShowYouGlish = showYouGlish;
         Id = id;
         Word = word;
-        LevelText = VocabCardViewModel.Level(stats);
+        LevelText = VocabFormat.Level(stats, store.Now);
         Root = new VocabNodeViewModel(VocabTree.Build(store, word), showTraditional, n => SelectedNode = n);
         Tree = [Root];
         SelectedNode = (selectPartId is null ? null : Root.SelfAndDescendants().FirstOrDefault(n => n.Node.PartId == selectPartId)) ?? Root;
         ShowTraditional = showTraditional && word.Traditional.Length > 0;
+        Info = new VocabWordInfo(word);
+        Editor = new VocabWordEditor(store, id);
     }
+
+    /// <summary>Examples, collocations, mnemonic, confusables and labels.</summary>
+    public VocabWordInfo Info { get; }
+
+    /// <summary>The word's own fields, edited by hand.</summary>
+    public VocabWordEditor Editor { get; }
+
+    /// <summary>Something is being typed here (a sync must not throw it away).</summary>
+    public bool IsEditing => Editor.IsOpen || IsEditingPart || IsAskingRedo;
 
     public string Id { get; }
 
@@ -149,37 +153,6 @@ public sealed partial class VocabWordDetailViewModel : ObservableObject
 
     [RelayCommand]
     private void YouGlish() => _voice?.OpenYouGlish(Word.Text, Word.Language);
-
-    [RelayCommand]
-    private void BeginEditWord()
-    {
-        EditPhonetic = Word.Phonetic;
-        EditMeaning = Word.Meaning;
-        EditHanViet = Word.HanViet;
-        EditTraditional = Word.Traditional;
-        EditExplanation = Word.Explanation;
-        EditNote = Word.Note;
-        IsEditingWord = true;
-    }
-
-    /// <summary>Keeps the user's wording; the page shows it once the store reports the change.</summary>
-    [RelayCommand]
-    private void SaveWord()
-    {
-        _store.UpdateWord(Id, w => w with
-        {
-            Phonetic = EditPhonetic.Trim(),
-            Meaning = EditMeaning.Trim(),
-            HanViet = EditHanViet.Trim(),
-            Traditional = EditTraditional.Trim(),
-            Explanation = EditExplanation.Trim(),
-            Note = EditNote.Trim(),
-        });
-        IsEditingWord = false;
-    }
-
-    [RelayCommand]
-    private void CancelEditWord() => IsEditingWord = false;
 
     [RelayCommand]
     private void BeginEditPart()

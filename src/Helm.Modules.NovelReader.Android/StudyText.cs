@@ -7,6 +7,7 @@ using Avalonia.Media;
 using Avalonia.Styling;
 using Avalonia.Threading;
 using Helm.Modules.NovelReader.Conversion;
+using Helm.Modules.NovelReader.Text;
 
 namespace Helm.Modules.NovelReader;
 
@@ -181,7 +182,8 @@ public sealed class StudyText : WrapPanel
         _held = false;
         if (WordOf(sender) is not { } word) return;
         _pressedAt = e.GetPosition(this);
-        _holdWait = DispatcherTimer.RunOnce(() => OnHeld(word.Block, word.Chinese), HoldTime);
+        var sentence = Line is { } line ? ChineseText.SentenceAround(line.Source, word.Segment.Start) : "";
+        _holdWait = DispatcherTimer.RunOnce(() => OnHeld(word.Block, word.Chinese, sentence), HoldTime);
     }
 
     private void OnMoved(object? sender, PointerEventArgs e)
@@ -192,7 +194,7 @@ public sealed class StudyText : WrapPanel
     }
 
     /// <summary>Says the word, and flashes it so the press is seen to have worked.</summary>
-    private void OnHeld(TextBlock block, string chinese)
+    private void OnHeld(TextBlock block, string chinese, string sentence)
     {
         _holdWait = null;
         _held = true;
@@ -200,7 +202,7 @@ public sealed class StudyText : WrapPanel
         _tapWait = null;
         block.Background = new SolidColorBrush(Accent("SystemAccentColor"), 0.38);
         DispatcherTimer.RunOnce(ApplyHighlight, TimeSpan.FromMilliseconds(500));
-        RaiseEvent(new WordHeldEventArgs(WordHeldEvent, chinese));
+        RaiseEvent(new WordHeldEventArgs(WordHeldEvent, chinese, sentence));
     }
 
     private void CancelHold()
@@ -235,7 +237,10 @@ public sealed class StudyText : WrapPanel
 }
 
 /// <summary>A word pressed long in study mode, with the Chinese to say.</summary>
-public sealed class WordHeldEventArgs(RoutedEvent routedEvent, string chinese) : RoutedEventArgs(routedEvent)
+public sealed class WordHeldEventArgs(RoutedEvent routedEvent, string chinese, string sentence = "") : RoutedEventArgs(routedEvent)
 {
     public string Chinese { get; } = chinese;
+
+    /// <summary>The Chinese sentence the word is in (a note for Vocabulary).</summary>
+    public string Sentence { get; } = sentence;
 }

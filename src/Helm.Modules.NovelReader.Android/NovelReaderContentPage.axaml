@@ -102,6 +102,21 @@
                     </DockPanel>
                 </Border>
 
+                <!-- A word was held: add it to Vocabulary, with its sentence as the note -->
+                <Border Classes="infobar" DataContext="{Binding HeldWord}" x:DataType="vm:HeldWordViewModel" IsVisible="{Binding IsShown}">
+                    <StackPanel Spacing="6">
+                        <DockPanel>
+                            <Button DockPanel.Dock="Right" Classes="icon" Command="{Binding DismissCommand}" AutomationProperties.Name="Dismiss">
+                                <ic:SymbolIcon Symbol="Dismiss" FontSize="16" />
+                            </Button>
+                            <TextBlock Text="{Binding Word}" FontSize="18" FontWeight="SemiBold" VerticalAlignment="Center" />
+                        </DockPanel>
+                        <TextBlock Text="{Binding Sentence}" TextWrapping="Wrap" MaxLines="2" TextTrimming="CharacterEllipsis" Classes="secondary" />
+                        <Button Classes="accent" Content="Add to Vocabulary" Command="{Binding AddCommand}" />
+                        <TextBlock Text="{Binding Result}" TextWrapping="Wrap" IsVisible="{Binding HasResult}" />
+                    </StackPanel>
+                </Border>
+
                 <!-- Another device read further -->
                 <Border Classes="infobar" IsVisible="{Binding HasRemoteProgressOffer}">
                     <StackPanel Spacing="8">

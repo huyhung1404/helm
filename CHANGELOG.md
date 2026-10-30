@@ -3,6 +3,28 @@
 All notable changes to Helm. The top section is used as the GitHub release body and as the Velopack release notes.
 Format: [Keep a Changelog](https://keepachangelog.com), versions follow [SemVer](https://semver.org).
 
+## [Unreleased]
+
+### Added
+- **Vocabulary: words come back when you are about to forget them.** Each word climbs eight levels as you remember
+  it (10 minutes, then 1, 2, 4… up to 128 days) and drops back when you forget. Learn shows the words due first, then
+  new ones, and says how many are due today; once you are caught up it keeps going with extra rounds that do not
+  change a word's level.
+- **Vocabulary: four kinds of card.** Word → meaning, meaning → word, listen and guess, and fill the gap in an example
+  sentence, or a mix of them. On the PC, Space or Enter shows the answer, 1 is Forgot, 2 is Remembered, L listens and
+  S skips. Pinyin is coloured by tone, and the word can be read aloud as its answer shows.
+- **Vocabulary: more to hold on to.** The agent now also gives example sentences (with their translation), words it
+  often goes with, a way to remember it, words easy to mix up with it (and what tells them apart), its level (A1–C2,
+  HSK 1–9), part of speech and topic. Add your own tags. Words lists them sorted A–Z, newest, weakest or due first,
+  in groups, and filters by level, topic or tag.
+- **Vocabulary: Roots tab.** The parts your words share, with every word of each family; practise what a root means,
+  or ask Claude Code for more words with it.
+- **Vocabulary: no more copying a request to Claude.** On the PC, **Analyze now** on the Add tab runs Claude Code
+  without a window with only Vocabulary's tools allowed, and (unless you turn it off) Helm does so by itself a little
+  after you add words, from either device.
+- **Novel Reader: add a word while you read.** Long-press a word, then tap **Add word**: it goes to Vocabulary with
+  its sentence as the note.
+
 ## [0.60.0] - 2026-10-30
 
 ### Added

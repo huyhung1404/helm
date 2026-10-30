@@ -120,6 +120,14 @@ public sealed class VocabStore
                 Traditional = analysis.Traditional?.Trim() is { } t && t != word.Text ? t : "",
                 Explanation = analysis.Explanation?.Trim() ?? "",
                 Parts = links,
+                Examples = analysis.Examples?.Select(e => new VocabExample { Sentence = e.Sentence.Trim(), Translation = e.Translation.Trim() }).ToList() ?? word.Examples,
+                Collocations = analysis.Collocations?.Select(c => c.Trim()).Where(c => c.Length > 0).ToList() ?? word.Collocations,
+                Mnemonic = analysis.Mnemonic?.Trim() ?? word.Mnemonic,
+                Confusables = analysis.Confusables?.Where(c => c.Word.Trim().Length > 0)
+                    .Select(c => new VocabConfusable { Word = c.Word.Trim(), Note = c.Note.Trim() }).ToList() ?? word.Confusables,
+                Level = analysis.Level is { } level ? VocabLevels.Normalize(level, word.Language) ?? "" : word.Level,
+                PartOfSpeech = analysis.PartOfSpeech?.Trim() ?? word.PartOfSpeech,
+                Topic = analysis.Topic?.Trim() ?? word.Topic,
                 RedoNote = "",
                 AnalyzedAt = Now,
             };

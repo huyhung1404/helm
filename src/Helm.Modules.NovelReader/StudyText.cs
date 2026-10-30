@@ -7,6 +7,7 @@ using System.Windows.Threading;
 using Helm.Modules.NovelReader.Conversion;
 using Helm.Modules.NovelReader.Grammar;
 using Helm.Modules.NovelReader.Speech;
+using Helm.Modules.NovelReader.Text;
 
 namespace Helm.Modules.NovelReader;
 
@@ -282,7 +283,7 @@ public sealed class StudyText : WrapPanel
             Apply();
         };
         flash.Start();
-        RaiseEvent(new WordHeldEventArgs(WordHeldEvent, word.Chinese));
+        RaiseEvent(new WordHeldEventArgs(WordHeldEvent, word.Chinese, Line is { } line ? ChineseText.SentenceAround(line.Source, word.Segment.Start) : ""));
     }
 
     private void CancelHold()
@@ -314,7 +315,10 @@ public sealed class StudyText : WrapPanel
 }
 
 /// <summary>A word held down in study mode, with the Chinese to say.</summary>
-public sealed class WordHeldEventArgs(RoutedEvent routedEvent, string chinese) : RoutedEventArgs(routedEvent)
+public sealed class WordHeldEventArgs(RoutedEvent routedEvent, string chinese, string sentence = "") : RoutedEventArgs(routedEvent)
 {
     public string Chinese { get; } = chinese;
+
+    /// <summary>The Chinese sentence the word is in (a note for Vocabulary).</summary>
+    public string Sentence { get; } = sentence;
 }

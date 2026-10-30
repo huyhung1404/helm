@@ -1,3 +1,4 @@
+using Helm.Core.Mcp;
 using System.Text;
 using System.Text.Json;
 using Helm.Core.Services;

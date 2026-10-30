@@ -82,7 +82,7 @@ public sealed class VocabPopup : IDisposable
         if (!_running) return;
         var s = _settings.Current;
         _range = (s.PopupMinSeconds, s.PopupMaxSeconds);
-        var min = Math.Max(VocabViewModel.MinPopupSeconds, Math.Min(s.PopupMinSeconds, s.PopupMaxSeconds));
+        var min = Math.Max(VocabSettingsViewModel.MinPopupSeconds, Math.Min(s.PopupMinSeconds, s.PopupMaxSeconds));
         var max = Math.Max(min, s.PopupMaxSeconds);
         Schedule(TimeSpan.FromSeconds(min + Random.Shared.NextDouble() * (max - min)));
     }
@@ -127,7 +127,7 @@ public sealed class VocabPopup : IDisposable
 
     private TimeSpan RetryAfter()
     {
-        var max = TimeSpan.FromSeconds(Math.Max(VocabViewModel.MinPopupSeconds, _settings.Current.PopupMaxSeconds));
+        var max = TimeSpan.FromSeconds(Math.Max(VocabSettingsViewModel.MinPopupSeconds, _settings.Current.PopupMaxSeconds));
         return max < Retry ? max : Retry;
     }
 
