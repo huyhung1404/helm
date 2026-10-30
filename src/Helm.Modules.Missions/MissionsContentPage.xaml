@@ -581,7 +581,7 @@
                             </WrapPanel>
                         </StackPanel>
                     </Border>
-                    <self:ConfettiView x:Name="Confetti" VerticalAlignment="Stretch" HorizontalAlignment="Stretch" />
+                    <core:ConfettiView x:Name="Confetti" VerticalAlignment="Stretch" HorizontalAlignment="Stretch" />
                 </Grid>
 
                 <!-- Overview: progress, pace, deadline, reward, and what can be done with the mission -->

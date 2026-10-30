@@ -443,7 +443,7 @@
                             <Button Classes="wide" Content="Close" Command="{Binding DismissCelebrationCommand}" />
                         </StackPanel>
                     </Border>
-                    <vm:ConfettiView x:Name="Confetti" />
+                    <core:ConfettiView x:Name="Confetti" />
                 </Panel>
 
                 <!-- Overview: progress, pace, deadline, reward, and what can be done with the mission -->
