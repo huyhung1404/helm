@@ -3,7 +3,7 @@
 All notable changes to Helm. The top section is used as the GitHub release body and as the Velopack release notes.
 Format: [Keep a Changelog](https://keepachangelog.com), versions follow [SemVer](https://semver.org).
 
-## [Unreleased]
+## [0.66.0] - 2026-10-30
 
 ### Added
 - **Vocabulary: practise the pinyin of Chinese words.** On the Learn tab every card of a Chinese word asks for its
