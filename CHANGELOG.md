@@ -3,7 +3,7 @@
 All notable changes to Helm. The top section is used as the GitHub release body and as the Velopack release notes.
 Format: [Keep a Changelog](https://keepachangelog.com), versions follow [SemVer](https://semver.org).
 
-## [Unreleased]
+## [0.67.0] - 2026-10-30
 
 ### Added
 - **Habits (PC and Android): build habits day by day.** Add the habits you want to build in the settings; each gets a
