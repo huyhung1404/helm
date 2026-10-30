@@ -3,7 +3,7 @@
 All notable changes to Helm. The top section is used as the GitHub release body and as the Velopack release notes.
 Format: [Keep a Changelog](https://keepachangelog.com), versions follow [SemVer](https://semver.org).
 
-## [Unreleased]
+## [0.62.0] - 2026-10-30
 
 ### Added
 - **Vocabulary: type the word.** A new kind of card shows the meaning and you type the word; Helm checks it letter
