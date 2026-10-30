@@ -271,6 +271,39 @@ public sealed class VocabTests
         Assert.Equal((600, 1800, false), (store.Current.PopupMinSeconds, store.Current.PopupMaxSeconds, store.Current.PopupCustom));
     }
 
+    // ---- Quick Capture -------------------------------------------------------------------------------------------
+
+    [Fact]
+    public void Quick_capture_adds_several_words_with_a_note_to_the_waiting_list()
+    {
+        var target = new VocabCaptureTarget(_store);
+        _store.AddWord("relative");
+        var (picked, rest) = Helm.Core.Capture.CaptureRouter.SplitPrefix([target], "/v relative, translate，补救 | Aptis p.4");
+        Assert.Same(target, picked);
+
+        var preview = target.Preview(rest);
+        Assert.True(preview.CanSave);
+        Assert.Contains("2 words to learn: translate, 补救", preview.Text);
+        Assert.Contains("relative already there", preview.Text);
+
+        var result = target.Capture(rest);
+        Assert.True(result.Saved);
+        Assert.Equal(["relative", "translate", "补救"], _store.Pending().Select(w => w.Value.Text));
+        Assert.Equal("Aptis p.4", _store.FindWord("补救")!.Value.Note);
+        Assert.False(target.Capture("Relative").Saved); // already there
+        Assert.False(target.Preview("  ").CanSave);
+    }
+
+    [Theory]
+    [InlineData("ubiquitous", true)]
+    [InlineData("  self-aware ", true)]
+    [InlineData("补救", true)]
+    [InlineData("buy milk tomorrow", false)] // a task, not a word
+    [InlineData("https://example.com", false)]
+    [InlineData("他说了一句很长很长很长的话", false)]
+    public void A_lone_shared_word_picks_vocabulary_by_itself(string shared, bool claimed) =>
+        Assert.Equal(claimed, new VocabCaptureTarget(_store).Claims(shared));
+
     // ---- MCP -----------------------------------------------------------------------------------------------------
 
     private McpServer Server() => new(new VocabMcpTools(_store, new VocabQuiz(_store)).Tools, "1.0", "");

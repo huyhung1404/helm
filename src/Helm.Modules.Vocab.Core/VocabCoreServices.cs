@@ -35,6 +35,9 @@ public static class VocabCoreServices
             sp.GetRequiredService<ISyncedLog<VocabReview>>()));
         services.AddSingleton(sp => new VocabQuiz(sp.GetRequiredService<VocabStore>()));
         services.AddSingleton(sp => new VocabVoice(() => sp.GetService<Helm.Modules.NovelReader.Speech.WordPronouncer>(), sp.GetService<Helm.Core.Services.IProcessLauncher>()));
+        // Quick Capture ("/v relative"), the share sheet and the phone's text selection add words through this.
+        services.AddSingleton(sp => new VocabCaptureTarget(sp.GetRequiredService<VocabStore>()));
+        services.AddSingleton<Helm.Core.Capture.ICaptureTarget>(sp => sp.GetRequiredService<VocabCaptureTarget>());
         // The AI agents break words down through these (Helm's MCP server, Windows).
         services.AddSingleton<Helm.Core.Mcp.IMcpToolProvider, VocabMcpTools>();
         // Windows registers it again through AddHelmModule; one instance either way.

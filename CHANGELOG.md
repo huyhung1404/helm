@@ -3,6 +3,15 @@
 All notable changes to Helm. The top section is used as the GitHub release body and as the Velopack release notes.
 Format: [Keep a Changelog](https://keepachangelog.com), versions follow [SemVer](https://semver.org).
 
+## [Unreleased]
+
+### Added
+- **Vocabulary: add words in a second, from anywhere.** In Quick Capture (Win+Alt+N on the PC, the Quick Settings
+  tile or Share → "Save to Helm" on the phone) type `/v relative`, or several at once with a note:
+  `/v relative, translate, 补救 | Aptis p.4`. A single word shared from another app goes to Vocabulary by itself. On
+  the phone, select a word in any app and tap **Add word** in the menu over the selection: it joins the words waiting
+  for the agent, with a short message, and you stay where you were reading.
+
 ## [0.59.0] - 2026-10-29
 
 ### Added
