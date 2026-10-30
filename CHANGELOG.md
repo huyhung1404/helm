@@ -3,6 +3,14 @@
 All notable changes to Helm. The top section is used as the GitHub release body and as the Velopack release notes.
 Format: [Keep a Changelog](https://keepachangelog.com), versions follow [SemVer](https://semver.org).
 
+## [Unreleased]
+
+### Fixed
+- **Windows: "GitHub refused the request (probably its hourly rate limit)".** The stable channel now reads the
+  newest release straight from its download links instead of GitHub's API, which allows only 60 anonymous calls an
+  hour per network address and runs out when many computers share one (an office network). The preview channel
+  still uses the API.
+
 ## [0.62.0] - 2026-10-30
 
 ### Added

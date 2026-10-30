@@ -58,6 +58,14 @@ public class UpdatePolicyTests
         Assert.True(UpdatePolicy.IncludePrereleases(UpdateChannel.Preview));
     }
 
+    [Fact]
+    public void Stable_reads_the_latest_release_directly_preview_uses_the_api()
+    {
+        Assert.Equal("https://github.com/o/r/releases/latest/download/", UpdatePolicy.DirectFeedUrl(UpdateChannel.Stable, "https://github.com/o/r"));
+        Assert.Equal("https://github.com/o/r/releases/latest/download/", UpdatePolicy.DirectFeedUrl(UpdateChannel.Stable, "https://github.com/o/r/"));
+        Assert.Null(UpdatePolicy.DirectFeedUrl(UpdateChannel.Preview, "https://github.com/o/r"));
+    }
+
     [Theory]
     [InlineData(UpdateChannel.Stable, "stable", false)]
     [InlineData(UpdateChannel.Preview, "preview", false)]

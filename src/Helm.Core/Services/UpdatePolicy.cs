@@ -27,6 +27,14 @@ public static class UpdatePolicy
     /// <summary>GitHub pre-releases are only considered on the preview channel.</summary>
     public static bool IncludePrereleases(UpdateChannel channel) => channel == UpdateChannel.Preview;
 
+    /// <summary>
+    /// Where the stable channel reads its feed and packages without GitHub's API (60 anonymous calls an hour per IP, so a
+    /// shared office IP runs out): github.com/…/releases/latest/download/ redirects to the newest non-pre-release's
+    /// assets and is not rate-limited. Null for preview, which needs the API to see pre-releases.
+    /// </summary>
+    public static string? DirectFeedUrl(UpdateChannel channel, string repositoryUrl) =>
+        IncludePrereleases(channel) ? null : repositoryUrl.TrimEnd('/') + "/releases/latest/download/";
+
     /// <summary>Switching away from the channel the installed build came from may need a "downgrade" (preview → stable).</summary>
     public static bool AllowDowngrade(UpdateChannel selected, string? installedChannel) =>
         !string.Equals(ChannelName(selected), installedChannel ?? StableChannel, StringComparison.OrdinalIgnoreCase);

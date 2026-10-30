@@ -260,7 +260,9 @@ internal sealed class VelopackUpdateService : IUpdateService, IDisposable
             var path = Uri.TryCreate(source, UriKind.Absolute, out var fileUri) && fileUri.IsFile ? fileUri.LocalPath : source;
             return new SimpleFileSource(new DirectoryInfo(path));
         }
-        // The repository is public: anonymous GitHub API access, no token.
+        if (UpdatePolicy.DirectFeedUrl(u.Channel, AppInfo.RepositoryUrl) is { } direct)
+            return new SimpleWebSource(new Uri(direct));
+        // Preview: the repository is public, so anonymous GitHub API access, no token.
         return new GithubSource(AppInfo.RepositoryUrl, null, UpdatePolicy.IncludePrereleases(u.Channel), null);
     }
 
