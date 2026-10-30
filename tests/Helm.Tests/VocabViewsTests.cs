@@ -79,6 +79,16 @@ public sealed class VocabViewsTests : IDisposable
         Layout(page, new Size(1100, 700), "2d-type-checked");
         viewModel.Settings.CardModeIndex = 0;
 
+        // A Chinese word asks for its pinyin first.
+        var buJiuWord = store.FindWord("补救")!;
+        viewModel.Card.Show(buJiuWord.Id, buJiuWord.Value);
+        Assert.True(viewModel.Card.IsTyping);
+        Layout(page, new Size(1100, 600), "2e-pinyin");
+        viewModel.Card.Typed = "bujiu";
+        viewModel.Card.CheckCommand.Execute(null);
+        Assert.True(viewModel.Card.AnswerIsCorrect);
+        Layout(page, new Size(1100, 800), "2f-pinyin-checked");
+
         // Roots: the families the words share; lat holds relative and translate.
         viewModel.ShowRootsCommand.Execute(null);
         var latRow = Assert.Single(viewModel.Roots.Roots, r => r.Form == "lat");

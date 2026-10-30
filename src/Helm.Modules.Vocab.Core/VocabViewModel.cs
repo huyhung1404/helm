@@ -358,7 +358,7 @@ public sealed partial class VocabViewModel : ObservableObject
                 List.Refresh();
                 Roots.Refresh();
                 break;
-            case nameof(VocabSettingsViewModel.CardModeIndex):
+            case nameof(VocabSettingsViewModel.CardModeIndex) or nameof(VocabSettingsViewModel.TypePinyin):
                 Card.AskAgain();
                 break;
             case nameof(VocabSettingsViewModel.AutoAnalyze):

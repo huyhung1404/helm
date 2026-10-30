@@ -28,8 +28,8 @@ public sealed record VocabDay(int Due, int New, int Learned, int Total);
 /// <summary>
 /// Spaced repetition: each word comes back when it is about to be forgotten. Remembering a word that is due doubles its
 /// gap (1, 2, 4 … 128 days); forgetting it brings it back in 10 minutes and starts over. The next word is the most
-/// overdue one, else a new one, else (all done for now) extra practice, picked at random with the weaker words more
-/// often. Only analyzed words take part (a pending one has no meaning to check yet), and none the user hid.
+/// overdue one, else a new one (English or Chinese at random, then the most overdue or oldest of that language), else
+/// (all done for now) extra practice, picked at random with the weaker words more often. Only analyzed words take part (a pending one has no meaning to check yet), and none the user hid.
 /// </summary>
 public sealed class VocabQuiz(VocabStore store, Random? random = null)
 {
@@ -117,6 +117,15 @@ public sealed class VocabQuiz(VocabStore store, Random? random = null)
         return new VocabDay(all.Count(s => s.IsDue(now)), all.Count(s => s.IsNew), all.Count(s => s.IsLearned), all.Count);
     }
 
+    /// <summary>The words of one language, picked at random among the languages these words have.</summary>
+    private List<SyncedItem<VocabWord>> OneLanguage(List<SyncedItem<VocabWord>> words)
+    {
+        var languages = words.Select(w => w.Value.Language).Distinct().ToList();
+        if (languages.Count < 2) return words;
+        var language = languages[_random.Next(languages.Count)];
+        return words.Where(w => w.Value.Language == language).ToList();
+    }
+
     /// <summary>The next word, never <paramref name="except"/> unless it is the only one; null when no word is analyzed yet.</summary>
     public SyncedItem<VocabWord>? Next(string? except = null)
     {
@@ -127,10 +136,11 @@ public sealed class VocabQuiz(VocabStore store, Random? random = null)
         var now = store.Now;
         VocabWordStats Of(SyncedItem<VocabWord> w) => stats.GetValueOrDefault(w.Id) ?? VocabWordStats.New;
 
-        // 1. The most overdue word.
-        if (words.Where(w => Of(w).IsDue(now)).MinBy(w => Of(w).Due) is { } due) return due;
-        // 2. A word never answered, the oldest first (the order they were added).
-        if (words.Where(w => Of(w).IsNew).OrderBy(w => w.Value.CreatedAt).ThenBy(w => w.Id, StringComparer.Ordinal).FirstOrDefault() is { } fresh) return fresh;
+        // 1. The most overdue word, 2. else a word never answered, the oldest first (the order they were added). In both,
+        // English and Chinese are picked at random first, so a run of words added in one language does not hide the other.
+        if (OneLanguage(words.Where(w => Of(w).IsDue(now)).ToList()).MinBy(w => Of(w).Due) is { } due) return due;
+        if (OneLanguage(words.Where(w => Of(w).IsNew).ToList())
+                .OrderBy(w => w.Value.CreatedAt).ThenBy(w => w.Id, StringComparer.Ordinal).FirstOrDefault() is { } fresh) return fresh;
         // 3. All done for now: extra practice, weaker words more often.
         var weights = words.Select(w =>
         {

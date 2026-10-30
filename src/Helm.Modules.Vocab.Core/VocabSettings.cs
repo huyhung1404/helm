@@ -22,6 +22,9 @@ public sealed class VocabSettings : IVersionedSettings
     /// <summary>Say the word when its meaning is shown.</summary>
     public bool AutoSay { get; set; }
 
+    /// <summary>Chinese words' cards ask for the pinyin before the answer (tones optional), to practise the reading.</summary>
+    public bool TypePinyin { get; set; } = true;
+
     /// <summary>PC: new words are broken down by Claude Code by itself, a moment after they arrive (from any device).</summary>
     public bool AutoAnalyze { get; set; } = true;
 

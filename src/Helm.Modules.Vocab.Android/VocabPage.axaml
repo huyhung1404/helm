@@ -63,6 +63,13 @@
                 </Grid>
                 <Grid ColumnDefinitions="*,Auto">
                     <StackPanel>
+                        <TextBlock Text="Chinese: type the pinyin" />
+                        <TextBlock Text="Every card of a Chinese word asks for its pinyin before the answer; no tones is fine (bujiu)." Classes="secondary" TextWrapping="Wrap" />
+                    </StackPanel>
+                    <ToggleSwitch Grid.Column="1" IsChecked="{Binding Settings.TypePinyin}" OnContent="" OffContent="" AutomationProperties.Name="Chinese: type the pinyin" />
+                </Grid>
+                <Grid ColumnDefinitions="*,Auto">
+                    <StackPanel>
                         <TextBlock Text="Say the word when its meaning shows" />
                         <TextBlock Text="On the Learn tab, the word is read aloud as you check it." Classes="secondary" TextWrapping="Wrap" />
                     </StackPanel>

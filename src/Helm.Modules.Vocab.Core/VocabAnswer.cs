@@ -42,6 +42,16 @@ public static class VocabAnswer
     private const string Marked = "āáǎàēéěèīíǐìōóǒòūúǔùǖǘǚǜ";
     private const string Bases = "aeiouv";
 
+    /// <summary>A Chinese word's pinyin, typed with tone marks, tone numbers or no tones (practising the reading).</summary>
+    public static VocabAnswerResult CheckPinyin(VocabWord word, string typed)
+    {
+        typed = typed.Trim();
+        if (typed.Length == 0) return new VocabAnswerResult(VocabAnswerVerdict.Wrong, [], $"Not typed. Its pinyin: {word.Phonetic}.");
+        if (typed.Any(VocabText.IsHan))
+            return new VocabAnswerResult(VocabAnswerVerdict.Wrong, [], $"Type the pinyin in letters (tones optional): {word.Phonetic}.");
+        return Pinyin(word, typed);
+    }
+
     public static VocabAnswerResult Check(VocabWord word, string typed)
     {
         typed = typed.Trim();

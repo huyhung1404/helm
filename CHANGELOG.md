@@ -3,6 +3,18 @@
 All notable changes to Helm. The top section is used as the GitHub release body and as the Velopack release notes.
 Format: [Keep a Changelog](https://keepachangelog.com), versions follow [SemVer](https://semver.org).
 
+## [Unreleased]
+
+### Added
+- **Vocabulary: practise the pinyin of Chinese words.** On the Learn tab every card of a Chinese word asks for its
+  pinyin before the answer, whatever the kind of card: no tones is fine (bujiu), or with tone marks or numbers
+  (bǔjiù, bu3jiu4); wrong tones are marked close. You can still show the answer without typing; the verdict
+  (Forgot or Remembered) stays yours. Turn it off in the settings ("Chinese: type the pinyin").
+
+### Changed
+- **Vocabulary: English and Chinese cards take turns at random.** The next word due, or the next new one, comes from
+  either language at random, so a batch of words added in one language no longer keeps the other out of sight.
+
 ## [0.65.0] - 2026-10-30
 
 ### Changed

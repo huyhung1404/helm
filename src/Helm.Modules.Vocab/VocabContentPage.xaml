@@ -117,7 +117,7 @@
                                     <ColumnDefinition Width="8" />
                                     <ColumnDefinition Width="Auto" />
                                 </Grid.ColumnDefinitions>
-                                <ui:TextBox x:Name="TypeBox" FontSize="20" PlaceholderText="Type the word" AutomationProperties.Name="Type the word"
+                                <ui:TextBox x:Name="TypeBox" FontSize="20" PlaceholderText="{Binding TypePrompt}" AutomationProperties.Name="{Binding TypePrompt}"
                                             Text="{Binding Typed, UpdateSourceTrigger=PropertyChanged}">
                                     <ui:TextBox.InputBindings>
                                         <KeyBinding Key="Enter" Command="{Binding CheckCommand}" />

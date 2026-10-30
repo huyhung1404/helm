@@ -39,6 +39,7 @@ public sealed partial class VocabSettingsViewModel : ObservableObject
     [ObservableProperty] private bool _showYouGlish;
     [ObservableProperty] private bool _lockScreenWord;
     [ObservableProperty] private bool _autoSay;
+    [ObservableProperty] private bool _typePinyin;
     [ObservableProperty] private bool _autoAnalyze;
     [ObservableProperty] private int _cardModeIndex;
     [ObservableProperty] private int _itemsShownIndex;
@@ -64,6 +65,7 @@ public sealed partial class VocabSettingsViewModel : ObservableObject
         ShowYouGlish = s.ShowYouGlish;
         LockScreenWord = s.LockScreenWord;
         AutoSay = s.AutoSay;
+        TypePinyin = s.TypePinyin;
         AutoAnalyze = s.AutoAnalyze;
         CardModeIndex = (int)s.CardMode;
         ItemsShownIndex = PageSizes.ToList().IndexOf(PageSizeOf(s.ItemsShown));
@@ -83,7 +85,7 @@ public sealed partial class VocabSettingsViewModel : ObservableObject
     public VocabSettings Current => _settings.Current;
 
     /// <summary>How the Learn tab asks its cards now.</summary>
-    public VocabCardOptions CardOptions => new(_settings.Current.CardMode, _settings.Current.AutoSay);
+    public VocabCardOptions CardOptions => new(_settings.Current.CardMode, _settings.Current.AutoSay, _settings.Current.TypePinyin);
 
     public IReadOnlyList<string> CardModes => CardModeNames;
 
@@ -136,6 +138,8 @@ public sealed partial class VocabSettingsViewModel : ObservableObject
     partial void OnLockScreenWordChanged(bool value) => Save(nameof(LockScreenWord), s => s.LockScreenWord = value);
 
     partial void OnAutoSayChanged(bool value) => Save(nameof(AutoSay), s => s.AutoSay = value);
+
+    partial void OnTypePinyinChanged(bool value) => Save(nameof(TypePinyin), s => s.TypePinyin = value);
 
     partial void OnAutoAnalyzeChanged(bool value) => Save(nameof(AutoAnalyze), s => s.AutoAnalyze = value);
 

@@ -109,6 +109,65 @@ public sealed class VocabPracticeTests
         Assert.Equal("", card.Typed);
     }
 
+    [Fact]
+    public void A_chinese_card_asks_for_the_pinyin_before_the_answer()
+    {
+        var id = Analyzed("补救", phonetic: "bǔjiù", meaning: "cứu vãn", hanViet: "bổ cứu");
+        var pinyin = true;
+        var card = new VocabCardViewModel(_store, _quiz, options: () => new VocabCardOptions(VocabCardMode.WordToMeaning, false, pinyin));
+        card.Show(id, _store.GetWord(id));
+        Assert.True(card.AsksPinyin);
+        Assert.True(card.IsTyping);
+        Assert.Equal("Type its pinyin (tones optional)", card.TypePrompt);
+
+        // No tones is fine.
+        card.Typed = "bujiu";
+        card.CheckCommand.Execute(null);
+        Assert.True(card.IsRevealed);
+        Assert.True(card.AnswerIsCorrect);
+        Assert.Contains("bǔjiù", card.AnswerMessage);
+
+        // Wrong tones are close; characters are not the pinyin; showing the answer without typing just shows it.
+        card.Show(id, _store.GetWord(id));
+        card.Typed = "bu2jiu4";
+        card.CheckCommand.Execute(null);
+        Assert.True(card.AnswerIsClose);
+        card.Show(id, _store.GetWord(id));
+        card.Typed = "补救";
+        card.CheckCommand.Execute(null);
+        Assert.True(card.AnswerIsWrong);
+        card.Show(id, _store.GetWord(id));
+        card.RevealCommand.Execute(null);
+        Assert.True(card.IsRevealed);
+        Assert.False(card.HasAnswer);
+
+        // Turned off, a Chinese card is asked as before; English words never ask for pinyin.
+        pinyin = false;
+        card.Show(id, _store.GetWord(id));
+        Assert.False(card.IsTyping);
+        pinyin = true;
+        var english = Analyzed("relative");
+        card.Show(english, _store.GetWord(english));
+        Assert.False(card.AsksPinyin);
+        Assert.False(card.IsTyping);
+    }
+
+    [Fact]
+    public void New_words_come_from_both_languages_at_random()
+    {
+        // Three English words added before any Chinese one: Chinese still comes up from the start.
+        Analyzed("relative");
+        Analyzed("translate");
+        Analyzed("transfer");
+        Analyzed("补救", phonetic: "bǔjiù", hanViet: "bổ cứu");
+        Analyzed("学习", phonetic: "xuéxí", hanViet: "học tập");
+        var first = Enumerable.Range(0, 40).Select(seed => new VocabQuiz(_store, new Random(seed)).Next()!.Value).ToList();
+        Assert.Contains(first, w => w.Language == VocabLanguage.Chinese);
+        Assert.Contains(first, w => w.Language == VocabLanguage.English);
+        // Within a language, still the oldest new word first.
+        Assert.All(first, w => Assert.Contains(w.Text, new[] { "relative", "补救" }));
+    }
+
     // ---- I know this, hidden words -------------------------------------------------------------------------------
 
     [Fact]

@@ -414,7 +414,7 @@
 
                             <!-- Type cards: the word typed here, checked on Enter or Check -->
                             <Grid ColumnDefinitions="*,8,Auto" IsVisible="{Binding IsTyping}" Margin="0,0,0,8">
-                                <TextBox x:Name="TypeBox" FontSize="18" PlaceholderText="Type the word" Text="{Binding Typed}" AutomationProperties.Name="Type the word">
+                                <TextBox x:Name="TypeBox" FontSize="18" PlaceholderText="{Binding TypePrompt}" Text="{Binding Typed}" AutomationProperties.Name="{Binding TypePrompt}">
                                     <TextBox.KeyBindings>
                                         <KeyBinding Gesture="Enter" Command="{Binding CheckCommand}" />
                                     </TextBox.KeyBindings>

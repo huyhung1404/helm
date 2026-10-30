@@ -23,7 +23,8 @@ public enum VocabCardMode
 /// <summary>How the Learn tab's cards are asked.</summary>
 /// <param name="Mode">The kind of card.</param>
 /// <param name="AutoSay">Say the word when its meaning is shown.</param>
-public sealed record VocabCardOptions(VocabCardMode Mode, bool AutoSay)
+/// <param name="TypePinyin">A Chinese word's card asks for its pinyin before the answer (tones optional).</param>
+public sealed record VocabCardOptions(VocabCardMode Mode, bool AutoSay, bool TypePinyin = false)
 {
     public static VocabCardOptions Default { get; } = new(VocabCardMode.WordToMeaning, false);
 }
@@ -99,8 +100,14 @@ public sealed partial class VocabCardViewModel(VocabStore store, VocabQuiz quiz,
     /// <summary>The front has a box to type the word in.</summary>
     public bool FrontIsType => Mode == VocabCardMode.Type;
 
-    /// <summary>The box to type the word in is open: a Type card before its answer.</summary>
-    public bool IsTyping => FrontIsType && !IsRevealed;
+    /// <summary>This card asks for the Chinese word's pinyin (the setting is on), whatever its kind.</summary>
+    public bool AsksPinyin { get; private set; }
+
+    /// <summary>The box to type in is open: a Type card, or a Chinese card asking its pinyin, before its answer.</summary>
+    public bool IsTyping => (FrontIsType || AsksPinyin) && !IsRevealed;
+
+    /// <summary>What the box asks for.</summary>
+    public string TypePrompt => AsksPinyin ? "Type its pinyin (tones optional)" : "Type the word";
 
     public bool HasAnswer => TypedResult is not null;
 
@@ -216,10 +223,25 @@ public sealed partial class VocabCardViewModel(VocabStore store, VocabQuiz quiz,
         }
         // A word without a sentence to hide it in, or no voice to say it: asked the usual way.
         if (mode == VocabCardMode.FillGap && cloze is null || mode == VocabCardMode.Listen && !CanSay) mode = VocabCardMode.WordToMeaning;
+        var asksPinyin = word is { Language: VocabLanguage.Chinese, Phonetic.Length: > 0 } && (options?.Invoke() ?? VocabCardOptions.Default).TypePinyin;
+        if (asksPinyin != AsksPinyin)
+        {
+            AsksPinyin = asksPinyin;
+            OnPropertyChanged(nameof(AsksPinyin));
+            OnPropertyChanged(nameof(TypePrompt));
+        }
         Mode = mode;
+        OnPropertyChanged(nameof(IsTyping));
         Typed = "";
         TypedResult = null;
-        (FrontText, FrontHint, FrontNote) = mode switch
+        (FrontText, FrontHint, FrontNote) = asksPinyin ? mode switch
+        {
+            // Chinese, reading practised: every kind of card asks for the pinyin.
+            VocabCardMode.Type or VocabCardMode.MeaningToWord => (Meaning, "Which word means this? Type its pinyin (no tones is fine), then Enter.", ""),
+            VocabCardMode.Listen => ("", "Play it, then type its pinyin (no tones is fine).", ""),
+            VocabCardMode.FillGap => (cloze!.Value.Sentence, "Which word fills the gap? Type its pinyin (no tones is fine).", cloze.Value.Translation),
+            _ => (Text, "How is it read? Type its pinyin (no tones is fine), then Enter.", ""),
+        } : mode switch
         {
             VocabCardMode.Type => (Meaning, IsChinese ? "Type the word: its characters or its pinyin (tones as marks or numbers), then Enter." : "Type the word, then Enter.", ""),
             VocabCardMode.MeaningToWord => (Meaning, "Which word means this? Say it, then check.", ""),
@@ -245,7 +267,7 @@ public sealed partial class VocabCardViewModel(VocabStore store, VocabQuiz quiz,
     private void Check()
     {
         if (_word is null || IsRevealed) return;
-        TypedResult = VocabAnswer.Check(_word, Typed);
+        TypedResult = AsksPinyin ? VocabAnswer.CheckPinyin(_word, Typed) : VocabAnswer.Check(_word, Typed);
         Reveal();
     }
 

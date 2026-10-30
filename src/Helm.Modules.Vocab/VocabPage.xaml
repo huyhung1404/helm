@@ -69,6 +69,12 @@
             </ui:CardControl.Header>
             <ui:ToggleSwitch AutomationProperties.Name="Show traditional characters" IsChecked="{Binding Settings.ShowTraditional}" />
         </ui:CardControl>
+        <ui:CardControl Margin="0,0,0,4" Icon="{ui:SymbolIcon Keyboard24}">
+            <ui:CardControl.Header>
+                <core:CardHeader Title="Chinese: type the pinyin" Description="Every card of a Chinese word asks for its pinyin before the answer; no tones is fine (bujiu), or with marks or numbers (bǔjiù, bu3jiu4)." />
+            </ui:CardControl.Header>
+            <ui:ToggleSwitch AutomationProperties.Name="Chinese: type the pinyin" IsChecked="{Binding Settings.TypePinyin}" />
+        </ui:CardControl>
         <ui:CardControl Margin="0,0,0,4" Icon="{ui:SymbolIcon Speaker224}">
             <ui:CardControl.Header>
                 <core:CardHeader Title="Say the word when its meaning shows" Description="On the Learn tab, the word is read aloud as you check it." />
