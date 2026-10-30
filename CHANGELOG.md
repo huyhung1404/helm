@@ -3,7 +3,7 @@
 All notable changes to Helm. The top section is used as the GitHub release body and as the Velopack release notes.
 Format: [Keep a Changelog](https://keepachangelog.com), versions follow [SemVer](https://semver.org).
 
-## [Unreleased]
+## [0.60.0] - 2026-10-30
 
 ### Added
 - **Vocabulary: add words in a second, from anywhere.** In Quick Capture (Win+Alt+N on the PC, the Quick Settings
