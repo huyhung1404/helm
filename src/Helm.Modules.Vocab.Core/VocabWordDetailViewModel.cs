@@ -37,6 +37,7 @@ public sealed partial class VocabWordDetailViewModel : ObservableObject
         Id = id;
         Word = word;
         LevelText = VocabFormat.Level(stats, store.Now);
+        IsHard = !word.Hidden && VocabQuiz.IsHard(word, stats);
         Root = new VocabNodeViewModel(VocabTree.Build(store, word), showTraditional, n => SelectedNode = n);
         Tree = [Root];
         SelectedNode = (selectPartId is null ? null : Root.SelfAndDescendants().FirstOrDefault(n => n.Node.PartId == selectPartId)) ?? Root;
@@ -71,6 +72,20 @@ public sealed partial class VocabWordDetailViewModel : ObservableObject
     public IReadOnlyList<VocabNodeViewModel> Tree { get; }
 
     public bool IsPending => !Word.IsAnalyzed;
+
+    /// <summary>Left out of the cards; "Show in cards again" brings it back.</summary>
+    public bool IsHidden => Word.Hidden;
+
+    /// <summary>The user keeps forgetting it (an agent is asked for a new way to remember it).</summary>
+    public bool IsHard { get; }
+
+    /// <summary>The store reports the change, and the page rebuilds this view model.</summary>
+    [RelayCommand]
+    private void ToggleHidden() => _store.SetHidden(Id, !Word.Hidden);
+
+    /// <summary>"I know this": back in a month.</summary>
+    [RelayCommand]
+    private void Know() => _store.RecordKnown(Id);
 
     public bool IsChinese => Word.Language == VocabLanguage.Chinese;
 

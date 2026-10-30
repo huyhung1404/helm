@@ -31,14 +31,20 @@ user's note, and what they found wrong in an analysis they sent back), `vocab_fi
 has so a root keeps one meaning across words, and `vocab_save_analysis` / `vocab_save_analyses` (many words in one
 call) save a word's phonetic, Vietnamese meaning, Hán Việt and tree of parts, and optionally up to 3 example sentences
 (with translation), up to 6 collocations, a mnemonic, up to 3 confusable words (with what tells them apart), its
-level (`A1`–`C2` or `HSK1`–`HSK9`), part of speech and topic. Helm checks each analysis before saving
+level (`A1`–`C2` or `HSK1`–`HSK9`), part of speech, topic, up to 8 word forms (each with its part of speech and
+meaning), up to 6 synonyms and up to 4 antonyms. Helm checks each analysis before saving
 anything (a Chinese word splits into its characters in order, characters need pinyin and Hán Việt, no strokes, no
 loops) and answers what to fix. `vocab_edit` rewords words and parts without touching their trees; `vocab_words`,
 `vocab_get` and `vocab_add_words` read and add words (`level` there is the CEFR/HSK level; `quiz_level` 0–8 and
-`due` are the user's spaced-repetition progress). Nothing is deleted through them. On the PC, Vocabulary's
-**Analyze now** (and its automatic analysis a little after words are added) runs Claude Code without a window with
-only these tools allowed (`claude -p --allowedTools mcp__helm__vocab_…`), 12 words per run; "Suggest words with this
-root" on the Roots tab does the same to add a family's words.
+`due` are the user's spaced-repetition progress). `vocab_follow_ups` lists the words that need more than their
+analysis: `often_forgotten` (forgotten 4 times or more since the last help: they need a new mnemonic) and
+`missing_details` (analyzed before Helm asked for word forms, synonyms and antonyms); `vocab_save_details` saves those
+details without touching the trees, marks a hard word as helped, and takes a word off `missing_details` even when it
+has no forms (`[]`). Nothing is deleted through them. On the PC, Vocabulary's **Analyze now** (and its automatic run
+a little after there is something to do) runs Claude Code without a window with only these tools allowed
+(`claude -p --allowedTools mcp__helm__vocab_…`), 12 words of each kind per run; when a run leaves the same work behind
+it does not start by itself again until something changes. "Suggest words with this root" on the Roots tab does the
+same to add a family's words.
 
 Novel Reader's tools (`novel_list`, `novel_name_candidates`, `novel_names`, `novel_add_names`, `novel_ignore_names`)
 let an agent find a novel's character names: it reads the possible names with sentences where they appear and adds

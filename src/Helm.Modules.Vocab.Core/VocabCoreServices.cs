@@ -40,10 +40,11 @@ public static class VocabCoreServices
         services.AddSingleton<Helm.Core.Capture.ICaptureTarget>(sp => sp.GetRequiredService<VocabCaptureTarget>());
         // The AI agents break words down through these (Helm's MCP server, Windows).
         services.AddSingleton<Helm.Core.Mcp.IMcpToolProvider, VocabMcpTools>();
+        services.AddSingleton<Helm.Core.Mcp.IMcpToolProvider, VocabFollowUpTools>();
         services.AddSingleton(sp => new VocabSettingsViewModel(
             sp.GetRequiredService<Helm.Core.Settings.ISettingsStoreFactory>().Get<VocabSettings>(VocabIds.ModuleId)));
         // The agent that breaks words down: Claude Code on Windows (IVocabAgent), none on the phone.
-        services.AddSingleton(sp => new VocabAgentViewModel(sp.GetService<IVocabAgent>(), sp.GetRequiredService<VocabStore>(),
+        services.AddSingleton(sp => new VocabAgentViewModel(sp.GetService<IVocabAgent>(), sp.GetRequiredService<VocabStore>(), sp.GetRequiredService<VocabQuiz>(),
             sp.GetRequiredService<VocabSettingsViewModel>(), sp.GetRequiredService<Helm.Core.Services.IUiDispatcher>()));
         // Windows registers it again through AddHelmModule; one instance either way.
         services.TryAddSingleton<VocabViewModel>();

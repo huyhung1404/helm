@@ -10,7 +10,8 @@ namespace Helm.Modules.Vocab;
 /// <summary>
 /// Vocabulary itself, opened from the menu and the Quick access tile (see <see cref="IModuleContent"/>). While the tool
 /// is off the words stay visible but read-only, with a note pointing to the settings (Home → Utilities). On the Learn
-/// tab the keyboard answers: Space shows the answer, 1 Forgot, 2 Remembered, L listens, S skips.
+/// tab the keyboard answers: Space shows the answer, 1 Forgot, 2 Remembered, L listens, S skips, K "I know it"; a Type
+/// card puts the cursor in its box, and Enter there checks the word.
 /// </summary>
 public partial class VocabContentPage : Page
 {
@@ -26,6 +27,7 @@ public partial class VocabContentPage : Page
         // Module and page are both singletons, so the subscriptions live as long as the page.
         module.PropertyChanged += OnModuleChanged;
         viewModel.PropertyChanged += OnViewModelChanged;
+        viewModel.Card.PropertyChanged += OnCardChanged;
         PreviewKeyDown += OnPreviewKeyDown;
         Loaded += (_, _) => FocusLearn();
         ApplyEnabled();
@@ -41,10 +43,18 @@ public partial class VocabContentPage : Page
         if (e.PropertyName == nameof(VocabViewModel.IsLearning)) Dispatcher.BeginInvoke(FocusLearn);
     }
 
+    /// <summary>A Type card opens with the cursor in its box; once checked, the keys answer again.</summary>
+    private void OnCardChanged(object? sender, PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName == nameof(VocabCardViewModel.IsTyping)) Dispatcher.BeginInvoke(FocusLearn);
+    }
+
     /// <summary>The keys reach the card only while focus is on the page, so the Learn tab takes it when shown.</summary>
     private void FocusLearn()
     {
-        if (_viewModel.IsLearning && IsVisible) LearnPanel.Focus();
+        if (!_viewModel.IsLearning || !IsVisible) return;
+        if (_viewModel.Card.IsTyping) TypeBox.Focus();
+        else LearnPanel.Focus();
     }
 
     private void OnPreviewKeyDown(object sender, KeyEventArgs e)
@@ -60,6 +70,7 @@ public partial class VocabContentPage : Page
             Key.D2 or Key.NumPad2 => card.RememberedCommand,
             Key.L => card.SayCommand,
             Key.S => card.SkipCommand,
+            Key.K => card.KnowCommand,
             _ => null,
         };
         if (command is null || !command.CanExecute(null)) return;

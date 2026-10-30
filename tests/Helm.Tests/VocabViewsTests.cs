@@ -66,7 +66,18 @@ public sealed class VocabViewsTests : IDisposable
         viewModel.Card.RevealCommand.Execute(null);
         Assert.True(viewModel.Card.Info!.HasExamples);
         Assert.True(viewModel.Card.Info.HasConfusables);
-        Layout(page, new Size(1100, 1250), "2b-learn-rich");
+        Layout(page, new Size(1100, 1400), "2b-learn-rich");
+
+        // Typing the word: checked letter by letter.
+        viewModel.Settings.CardModeIndex = (int)VocabCardMode.Type;
+        viewModel.Card.Show(relativeWord.Id, relativeWord.Value);
+        Assert.True(viewModel.Card.IsTyping);
+        Layout(page, new Size(1100, 600), "2c-type");
+        viewModel.Card.Typed = "relitive";
+        viewModel.Card.CheckCommand.Execute(null);
+        Assert.True(viewModel.Card.AnswerIsClose);
+        Layout(page, new Size(1100, 700), "2d-type-checked");
+        viewModel.Settings.CardModeIndex = 0;
 
         // Roots: the families the words share; lat holds relative and translate.
         viewModel.ShowRootsCommand.Execute(null);
@@ -123,6 +134,13 @@ public sealed class VocabViewsTests : IDisposable
             Level = "B1",
             PartOfSpeech = "danh từ; tính từ",
             Topic = "gia đình",
+            Forms =
+            [
+                new VocabForm { Word = "relation", PartOfSpeech = "danh từ", Meaning = "mối quan hệ" },
+                new VocabForm { Word = "relatively", PartOfSpeech = "trạng từ", Meaning = "tương đối" },
+            ],
+            Synonyms = ["kin", "family member"],
+            Antonyms = ["absolute"],
             Parts =
             [
                 new AnalysisPart

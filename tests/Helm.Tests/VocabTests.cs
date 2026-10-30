@@ -310,7 +310,7 @@ public sealed class VocabTests
         using var settings = new Helm.Core.Settings.SettingsStoreFactory(new Helm.Core.Settings.HelmPaths(dir.Path));
         var agent = new FakeAgent();
         var options = VocabKit.Settings(settings);
-        using var vm = new VocabAgentViewModel(agent, _store, options, new InlineUi());
+        using var vm = new VocabAgentViewModel(agent, _store, new VocabQuiz(_store), options, new InlineUi());
         vm.Watch(true);
         _store.AddWord("relative");
         Assert.Equal(0, agent.Runs); // waits for words added in a row

@@ -25,6 +25,19 @@ public sealed class VocabWordInfo(VocabWord word)
 
     public bool HasConfusables => word.Confusables.Count > 0;
 
+    /// <summary>The other words of its family, each with its part of speech and meaning.</summary>
+    public IReadOnlyList<VocabForm> Forms => word.Forms;
+
+    public bool HasForms => word.Forms.Count > 0;
+
+    public string Synonyms => string.Join(" · ", word.Synonyms);
+
+    public bool HasSynonyms => word.Synonyms.Count > 0;
+
+    public string Antonyms => string.Join(" · ", word.Antonyms);
+
+    public bool HasAntonyms => word.Antonyms.Count > 0;
+
     /// <summary>"B1 · danh từ · gia đình · #Aptis".</summary>
     public string Labels => string.Join(" · ", new[] { word.Level, word.PartOfSpeech, word.Topic }.Where(s => s.Length > 0)
         .Concat(word.Tags.Select(t => "#" + t)));
@@ -32,7 +45,7 @@ public sealed class VocabWordInfo(VocabWord word)
     public bool HasLabels => Labels.Length > 0;
 
     /// <summary>Something more than the meaning to show.</summary>
-    public bool HasAny => HasExamples || HasCollocations || HasMnemonic || HasConfusables;
+    public bool HasAny => HasExamples || HasCollocations || HasMnemonic || HasConfusables || HasForms || HasSynonyms || HasAntonyms;
 }
 
 /// <summary>Fill-the-gap: an example sentence with the word hidden.</summary>

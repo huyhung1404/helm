@@ -111,7 +111,7 @@ public sealed class VocabStore
             var word = _words.Get(wordId) ?? throw new VocabAnalysisException($"There is no word {wordId}.");
             var analyzer = new VocabAnalyzer(this, word);
             var links = analyzer.Write(analysis);
-            var saved = word with
+            var saved = VocabDetails.Apply(word, analysis) with
             {
                 Status = VocabStatus.Analyzed,
                 Phonetic = analysis.Phonetic.Trim(),
@@ -120,17 +120,27 @@ public sealed class VocabStore
                 Traditional = analysis.Traditional?.Trim() is { } t && t != word.Text ? t : "",
                 Explanation = analysis.Explanation?.Trim() ?? "",
                 Parts = links,
-                Examples = analysis.Examples?.Select(e => new VocabExample { Sentence = e.Sentence.Trim(), Translation = e.Translation.Trim() }).ToList() ?? word.Examples,
-                Collocations = analysis.Collocations?.Select(c => c.Trim()).Where(c => c.Length > 0).ToList() ?? word.Collocations,
-                Mnemonic = analysis.Mnemonic?.Trim() ?? word.Mnemonic,
-                Confusables = analysis.Confusables?.Where(c => c.Word.Trim().Length > 0)
-                    .Select(c => new VocabConfusable { Word = c.Word.Trim(), Note = c.Note.Trim() }).ToList() ?? word.Confusables,
-                Level = analysis.Level is { } level ? VocabLevels.Normalize(level, word.Language) ?? "" : word.Level,
-                PartOfSpeech = analysis.PartOfSpeech?.Trim() ?? word.PartOfSpeech,
-                Topic = analysis.Topic?.Trim() ?? word.Topic,
                 RedoNote = "",
                 AnalyzedAt = Now,
             };
+            _words.Upsert(wordId, saved);
+            return saved;
+        }
+    }
+
+    /// <summary>
+    /// Fills in an analyzed word's details (the fields <paramref name="details"/> gives; its tree, phonetic and meaning
+    /// stay). <paramref name="helped"/>: they are a new way to remember a word the user keeps forgetting.
+    /// </summary>
+    /// <exception cref="VocabAnalysisException">The word is not there or not analyzed, or a detail does not pass.</exception>
+    public VocabWord SaveDetails(string wordId, WordAnalysis details, bool helped)
+    {
+        lock (_gate)
+        {
+            var word = _words.Get(wordId) ?? throw new VocabAnalysisException($"There is no word {wordId}.");
+            if (!word.IsAnalyzed) throw new VocabAnalysisException($"{word.Text} waits for an analysis: save it with vocab_save_analysis.");
+            VocabDetails.Check(word, details);
+            var saved = VocabDetails.Apply(word, details) with { HelpedAt = helped ? Now : word.HelpedAt };
             _words.Upsert(wordId, saved);
             return saved;
         }
@@ -189,6 +199,13 @@ public sealed class VocabStore
 
     public void Record(string wordId, bool remembered) =>
         _reviews.Append(new VocabReview { WordId = wordId, At = Now, Remembered = remembered });
+
+    /// <summary>"I know this": the word was known already, it comes back in a month (<see cref="VocabQuiz.KnownLevel"/>).</summary>
+    public void RecordKnown(string wordId) =>
+        _reviews.Append(new VocabReview { WordId = wordId, At = Now, Remembered = true, Known = true });
+
+    /// <summary>Hides the word from the cards, the pop-up, the widget and the lock screen, or shows it again.</summary>
+    public bool SetHidden(string id, bool hidden) => UpdateWord(id, w => w with { Hidden = hidden });
 
     public IReadOnlyList<VocabReview> Reviews() => _reviews.All().Select(r => r.Value).OrderBy(r => r.At).ToList();
 

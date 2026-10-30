@@ -3,6 +3,24 @@
 All notable changes to Helm. The top section is used as the GitHub release body and as the Velopack release notes.
 Format: [Keep a Changelog](https://keepachangelog.com), versions follow [SemVer](https://semver.org).
 
+## [Unreleased]
+
+### Added
+- **Vocabulary: type the word.** A new kind of card shows the meaning and you type the word; Helm checks it letter
+  by letter (right ones green, wrong ones struck through, missing ones underlined) and says when you are one letter
+  off. Chinese takes the characters (simplified or traditional) or the pinyin, with tone marks, tone numbers
+  (bu3jiu4) or no tones at all. The verdict stays yours: Forgot or Remembered. On the PC the cursor waits in the box
+  and Enter checks.
+- **Vocabulary: words you keep forgetting get a new way to remember them.** A word forgotten four times is marked
+  "Often forgotten" (also a filter on the Words tab), and Claude Code writes it a new mnemonic, a clearer explanation
+  or the word that trips you up; the card then says "New way to remember it".
+- **Vocabulary: word family, similar and opposite words.** relate → relation, relationship, relative, relatively,
+  each with its part of speech and meaning, plus synonyms and antonyms. Words analyzed before get them filled in by
+  Claude Code once; you can edit them by hand.
+- **Vocabulary: "I know it" and Hide.** A word you already know goes a month away in one tap (K on the PC); a word
+  not worth learning can be hidden from the cards, the pop-up, the widget and the lock screen (Words → Hidden shows
+  it again).
+
 ## [0.61.0] - 2026-10-30
 
 ### Added

@@ -10,7 +10,10 @@ public interface IVocabAgent
     /// <summary>Why it cannot run now (not installed, not connected to Helm), or null when it can.</summary>
     string? Unavailable();
 
-    /// <summary>Breaks down the words waiting for an analysis; returns its last answer.</summary>
+    /// <summary>
+    /// Breaks down the words waiting for an analysis, then helps with the words the user keeps forgetting and fills in
+    /// missing details; returns its last answer.
+    /// </summary>
     Task<string> AnalyzeAsync(IProgress<string>? progress, CancellationToken ct);
 
     /// <summary>Adds and breaks down a few useful words with this part (<paramref name="partId"/>) that the user does not have yet.</summary>
@@ -21,9 +24,10 @@ public interface IVocabAgent
 public sealed class VocabAgentException(string message, Exception? inner = null) : Exception(message, inner);
 
 /// <summary>
-/// The agent on the page: "Analyze now", "Suggest words with this root", and (PC, when the setting is on) breaking down
-/// new words by itself a moment after they arrive from any device. One job at a time. UI thread only, except the
-/// timer, which posts to it.
+/// The agent on the page: "Analyze now", "Suggest words with this root", and (PC, when the setting is on) working by
+/// itself a moment after there is something to do: new words from any device, a word forgotten again and again, words
+/// that lack details Helm asks for now. One job at a time; when a run leaves the same work behind (the agent could not
+/// do it), it does not start by itself again until something changes. UI thread only, except the timer, which posts to it.
 /// </summary>
 public sealed partial class VocabAgentViewModel : ObservableObject, IDisposable
 {
@@ -35,24 +39,32 @@ public sealed partial class VocabAgentViewModel : ObservableObject, IDisposable
 
     private readonly IVocabAgent? _agent;
     private readonly VocabStore _store;
+    private readonly VocabQuiz _quiz;
     private readonly VocabSettingsViewModel _settings;
     private readonly IUiDispatcher _ui;
     private readonly Timer _timer;
     private CancellationTokenSource? _running;
     private DateTimeOffset _restUntil = DateTimeOffset.MinValue;
     private bool _watching;
+    // The work a finished run left behind: not started again by itself while nothing changes.
+    private string? _leftBehind;
+
+    /// <summary>For tests: the work the last finished run left behind.</summary>
+    internal string? LeftBehind => _leftBehind;
 
     [ObservableProperty] [NotifyCanExecuteChangedFor(nameof(AnalyzeCommand))] private bool _isBusy;
     [ObservableProperty] private string _status = "";
 
-    public VocabAgentViewModel(IVocabAgent? agent, VocabStore store, VocabSettingsViewModel settings, IUiDispatcher ui)
+    public VocabAgentViewModel(IVocabAgent? agent, VocabStore store, VocabQuiz quiz, VocabSettingsViewModel settings, IUiDispatcher ui)
     {
         _agent = agent;
         _store = store;
+        _quiz = quiz;
         _settings = settings;
         _ui = ui;
         _timer = new Timer(_ => _ui.Post(RunIfWaiting), null, Timeout.Infinite, Timeout.Infinite);
         _store.Changed += (_, _) => Nudge();
+        _store.ReviewsChanged += (_, _) => Nudge();
     }
 
     /// <summary>There is an agent on this device (the PC); on the phone the analysis comes from the PC by sync.</summary>
@@ -98,6 +110,7 @@ public sealed partial class VocabAgentViewModel : ObservableObject, IDisposable
         {
             var answer = await job(new Progress<string>(p => Status = p), running.Token);
             Status = answer.Trim() is { Length: > 0 } a ? a : "Done.";
+            _leftBehind = Work();
         }
         catch (OperationCanceledException)
         {
@@ -121,7 +134,7 @@ public sealed partial class VocabAgentViewModel : ObservableObject, IDisposable
     public void Nudge()
     {
         if (!_watching || _agent is null || !_settings.Current.AutoAnalyze || IsBusy) return;
-        if (_store.Pending().Count == 0) return;
+        if (Work() is not { } work || work == _leftBehind) return;
         try
         {
             _timer.Change(Settle, Timeout.InfiniteTimeSpan);
@@ -133,8 +146,19 @@ public sealed partial class VocabAgentViewModel : ObservableObject, IDisposable
 
     private void RunIfWaiting()
     {
-        if (!_watching || !_settings.Current.AutoAnalyze || IsBusy || _store.Now < _restUntil || _store.Pending().Count == 0) return;
+        if (!_watching || !_settings.Current.AutoAnalyze || IsBusy || _store.Now < _restUntil) return;
+        if (Work() is not { } work || work == _leftBehind) return;
         _ = AnalyzeAsync();
+    }
+
+    /// <summary>What there is to do, as one key (the words' ids by kind of work); null when nothing.</summary>
+    internal string? Work()
+    {
+        var pending = _store.Pending().Select(w => w.Id);
+        var hard = _quiz.HardWords().Select(w => w.Id);
+        var lacking = _store.Words().Where(w => w.Value.LacksDetails && !w.Value.Hidden).Select(w => w.Id);
+        var key = string.Join("|", string.Join(",", pending), string.Join(",", hard.Order(StringComparer.Ordinal)), string.Join(",", lacking));
+        return key == "||" ? null : key;
     }
 
     public void Dispose()

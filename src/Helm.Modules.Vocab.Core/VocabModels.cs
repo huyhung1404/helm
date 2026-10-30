@@ -104,6 +104,27 @@ public sealed record VocabWord
     /// <summary>The user's own labels: "Aptis", "Truyện"…</summary>
     public IReadOnlyList<string> Tags { get; init; } = [];
 
+    /// <summary>Other words of its family: relate → relation, relationship, relative, relatively.</summary>
+    public IReadOnlyList<VocabForm> Forms { get; init; } = [];
+
+    /// <summary>Words that mean about the same.</summary>
+    public IReadOnlyList<string> Synonyms { get; init; } = [];
+
+    /// <summary>Words that mean the opposite.</summary>
+    public IReadOnlyList<string> Antonyms { get; init; } = [];
+
+    /// <summary>
+    /// Which set of details an agent filled in (<see cref="CurrentDetails"/>): a word analyzed before Helm asked for word
+    /// forms, synonyms and antonyms gets them filled in later, once.
+    /// </summary>
+    public int Details { get; init; }
+
+    /// <summary>When an agent last wrote a new way to remember it because the user kept forgetting it.</summary>
+    public DateTimeOffset? HelpedAt { get; init; }
+
+    /// <summary>Left out of the cards, the pop-up, the widget and the lock screen (the user hid it).</summary>
+    public bool Hidden { get; init; }
+
     /// <summary>What the user said was wrong when asking for the word to be analyzed again.</summary>
     public string RedoNote { get; init; } = "";
 
@@ -113,6 +134,12 @@ public sealed record VocabWord
 
     [JsonIgnore]
     public bool IsAnalyzed => Status == VocabStatus.Analyzed;
+
+    /// <summary>The details an analysis has today: examples … topic, then word forms, synonyms and antonyms.</summary>
+    public const int CurrentDetails = 1;
+
+    [JsonIgnore]
+    public bool LacksDetails => IsAnalyzed && Details < CurrentDetails;
 }
 
 /// <summary>
@@ -154,6 +181,16 @@ public sealed record VocabExample
     public string Translation { get; init; } = "";
 }
 
+/// <summary>Another word of the same family, with its part of speech and meaning in Vietnamese.</summary>
+public sealed record VocabForm
+{
+    public string Word { get; init; } = "";
+
+    public string PartOfSpeech { get; init; } = "";
+
+    public string Meaning { get; init; } = "";
+}
+
 /// <summary>A word easy to mix up with another, and what tells them apart (in Vietnamese).</summary>
 public sealed record VocabConfusable
 {
@@ -170,4 +207,7 @@ public sealed record VocabReview
     public DateTimeOffset At { get; init; }
 
     public bool Remembered { get; init; }
+
+    /// <summary>"I know this": the user knew it already, so it jumps to <see cref="VocabQuiz.KnownLevel"/> (Remembered is true too).</summary>
+    public bool Known { get; init; }
 }

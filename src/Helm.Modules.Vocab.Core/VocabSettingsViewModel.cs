@@ -30,7 +30,7 @@ public sealed partial class VocabSettingsViewModel : ObservableObject
     public static int CustomFrequencyIndex => PopupFrequencies.Count;
 
     /// <summary>The card modes, in <see cref="VocabCardMode"/> order.</summary>
-    public static IReadOnlyList<string> CardModeNames { get; } = ["Word → meaning", "Meaning → word", "Listen → word", "Fill the gap", "Mixed"];
+    public static IReadOnlyList<string> CardModeNames { get; } = ["Word → meaning", "Meaning → word", "Listen → word", "Fill the gap", "Mixed", "Type the word"];
 
     private readonly ISettingsStore<VocabSettings> _settings;
     private readonly bool _loading;

@@ -16,6 +16,8 @@ public enum VocabCardMode
     FillGap,
     /// <summary>Each card one of the others, at random (Listen and FillGap only where they can be).</summary>
     Mixed,
+    /// <summary>The meaning: type the word (spelling; Chinese: the characters or the pinyin), Helm checks it.</summary>
+    Type,
 }
 
 /// <summary>How the Learn tab's cards are asked.</summary>
@@ -59,6 +61,16 @@ public sealed partial class VocabCardViewModel(VocabStore store, VocabQuiz quiz,
     [ObservableProperty] private string _frontHint = "";
     [ObservableProperty] private string _frontNote = "";
 
+    // Typing the word (Type cards): what was typed, and how it compares once checked.
+    [ObservableProperty] [NotifyCanExecuteChangedFor(nameof(CheckCommand))] private string _typed = "";
+    [ObservableProperty] private VocabAnswerResult? _typedResult;
+
+    /// <summary>The user keeps forgetting this word (an agent is asked for a new way to remember it).</summary>
+    [ObservableProperty] private bool _isHard;
+
+    /// <summary>An agent wrote a new way to remember it in the last week.</summary>
+    [ObservableProperty] private bool _isNewlyHelped;
+
     /// <summary>Each part with its meaning and pieces ("补 · vá, bù ← 衤 áo + 卜 (âm)"), shown with the meaning.</summary>
     [ObservableProperty] private IReadOnlyList<string> _partLines = [];
 
@@ -82,7 +94,35 @@ public sealed partial class VocabCardViewModel(VocabStore store, VocabQuiz quiz,
     public bool FrontIsListen => Mode == VocabCardMode.Listen;
 
     /// <summary>The front is a meaning or a sentence: written smaller than a word.</summary>
-    public bool FrontIsText => Mode is VocabCardMode.MeaningToWord or VocabCardMode.FillGap;
+    public bool FrontIsText => Mode is VocabCardMode.MeaningToWord or VocabCardMode.FillGap or VocabCardMode.Type;
+
+    /// <summary>The front has a box to type the word in.</summary>
+    public bool FrontIsType => Mode == VocabCardMode.Type;
+
+    /// <summary>The box to type the word in is open: a Type card before its answer.</summary>
+    public bool IsTyping => FrontIsType && !IsRevealed;
+
+    public bool HasAnswer => TypedResult is not null;
+
+    public IReadOnlyList<VocabAnswerPiece> AnswerPieces => TypedResult?.Pieces ?? [];
+
+    public string AnswerMessage => TypedResult?.Message ?? "";
+
+    public bool AnswerIsCorrect => TypedResult?.Verdict == VocabAnswerVerdict.Correct;
+
+    public bool AnswerIsClose => TypedResult?.Verdict == VocabAnswerVerdict.Close;
+
+    public bool AnswerIsWrong => TypedResult?.Verdict == VocabAnswerVerdict.Wrong;
+
+    partial void OnTypedResultChanged(VocabAnswerResult? value)
+    {
+        OnPropertyChanged(nameof(HasAnswer));
+        OnPropertyChanged(nameof(AnswerPieces));
+        OnPropertyChanged(nameof(AnswerMessage));
+        OnPropertyChanged(nameof(AnswerIsCorrect));
+        OnPropertyChanged(nameof(AnswerIsClose));
+        OnPropertyChanged(nameof(AnswerIsWrong));
+    }
 
     public bool HasFrontNote => FrontNote.Length > 0;
 
@@ -98,15 +138,24 @@ public sealed partial class VocabCardViewModel(VocabStore store, VocabQuiz quiz,
         OnPropertyChanged(nameof(FrontIsWord));
         OnPropertyChanged(nameof(FrontIsListen));
         OnPropertyChanged(nameof(FrontIsText));
+        OnPropertyChanged(nameof(FrontIsType));
+        OnPropertyChanged(nameof(IsTyping));
         OnPropertyChanged(nameof(ShowsWordOnReveal));
     }
 
     partial void OnFrontNoteChanged(string value) => OnPropertyChanged(nameof(HasFrontNote));
 
-    partial void OnIsRevealedChanged(bool value) => OnPropertyChanged(nameof(ShowsWordOnReveal));
+    partial void OnIsRevealedChanged(bool value)
+    {
+        OnPropertyChanged(nameof(ShowsWordOnReveal));
+        OnPropertyChanged(nameof(IsTyping));
+    }
 
     /// <summary>Raised after an answer is recorded (the PC pop-up closes on it).</summary>
     public event EventHandler? Answered;
+
+    /// <summary>Raised with the word's text after the user hid it from the cards.</summary>
+    public event EventHandler<string>? WordHidden;
 
     /// <summary>The word on the card; null when there is none.</summary>
     public string? WordId => _wordId;
@@ -137,7 +186,10 @@ public sealed partial class VocabCardViewModel(VocabStore store, VocabQuiz quiz,
         // "补 (衤 + 卜) + 救 (求 + 攵)": two levels, as a reminder of how the word is built.
         PartsText = word is null ? "" : VocabTree.Outline(store, word);
         PartLines = word is null ? [] : VocabTree.Lines(store, word);
-        LevelText = id is null ? "" : VocabFormat.Level(quiz.StatsOf(id), store.Now);
+        var stats = id is null ? VocabWordStats.New : quiz.StatsOf(id);
+        LevelText = id is null ? "" : VocabFormat.Level(stats, store.Now);
+        IsHard = word is not null && VocabQuiz.IsHard(word, stats);
+        IsNewlyHelped = word?.HelpedAt is { } helped && store.Now - helped < TimeSpan.FromDays(7);
         OnPropertyChanged(nameof(IsChinese));
         AskFront(word);
     }
@@ -159,13 +211,17 @@ public sealed partial class VocabCardViewModel(VocabStore store, VocabQuiz quiz,
             var ways = new List<VocabCardMode> { VocabCardMode.WordToMeaning, VocabCardMode.MeaningToWord };
             if (CanSay) ways.Add(VocabCardMode.Listen);
             if (cloze is not null) ways.Add(VocabCardMode.FillGap);
+            ways.Add(VocabCardMode.Type);
             mode = ways[_random.Next(ways.Count)];
         }
         // A word without a sentence to hide it in, or no voice to say it: asked the usual way.
         if (mode == VocabCardMode.FillGap && cloze is null || mode == VocabCardMode.Listen && !CanSay) mode = VocabCardMode.WordToMeaning;
         Mode = mode;
+        Typed = "";
+        TypedResult = null;
         (FrontText, FrontHint, FrontNote) = mode switch
         {
+            VocabCardMode.Type => (Meaning, IsChinese ? "Type the word: its characters or its pinyin (tones as marks or numbers), then Enter." : "Type the word, then Enter.", ""),
             VocabCardMode.MeaningToWord => (Meaning, "Which word means this? Say it, then check.", ""),
             VocabCardMode.Listen => ("", "Play it, then say the word and its meaning.", ""),
             VocabCardMode.FillGap => (cloze!.Value.Sentence, "Which word fills the gap? Say it, then check.", cloze.Value.Translation),
@@ -180,6 +236,38 @@ public sealed partial class VocabCardViewModel(VocabStore store, VocabQuiz quiz,
         if (!IsRevealed) return;
         if (explain is not null && _wordId is { } id && _word is { } word && word.Parts.Count > 0) ExplanationTree = explain(id, word);
         if (options?.Invoke().AutoSay == true && Mode != VocabCardMode.Listen) _ = SayAsync();
+    }
+
+    private bool CanCheck() => Typed.Trim().Length > 0;
+
+    /// <summary>Checks the typed word (Type cards) and shows the answer.</summary>
+    [RelayCommand(CanExecute = nameof(CanCheck))]
+    private void Check()
+    {
+        if (_word is null || IsRevealed) return;
+        TypedResult = VocabAnswer.Check(_word, Typed);
+        Reveal();
+    }
+
+    /// <summary>"I know this": it was known already, back in a month; the next word comes up.</summary>
+    [RelayCommand]
+    private void Know()
+    {
+        if (_wordId is null) return;
+        store.RecordKnown(_wordId);
+        Answered?.Invoke(this, EventArgs.Empty);
+        ShowNext();
+    }
+
+    /// <summary>Leaves the word out of the cards, the pop-up, the widget and the lock screen (Words → Hidden shows it again).</summary>
+    [RelayCommand]
+    private void Hide()
+    {
+        if (_wordId is null || _word is null) return;
+        var text = _word.Text;
+        store.SetHidden(_wordId, true);
+        WordHidden?.Invoke(this, text);
+        ShowNext();
     }
 
     [RelayCommand]

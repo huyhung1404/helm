@@ -11,7 +11,7 @@ internal static class VocabKit
     public static VocabViewModel ViewModel(VocabStore store, VocabQuiz quiz, ISettingsStoreFactory settings, IVocabAgent? agent = null)
     {
         var options = Settings(settings);
-        var agents = new VocabAgentViewModel(agent, store, options, new InlineUi());
+        var agents = new VocabAgentViewModel(agent, store, quiz, options, new InlineUi());
         return new VocabViewModel(store, quiz, options, agents, new InlineUi(), new AcceptDialogs(), new MemoryClipboard());
     }
 }

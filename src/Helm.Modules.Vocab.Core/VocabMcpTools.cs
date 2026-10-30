@@ -32,7 +32,10 @@ public sealed class VocabMcpTools(VocabStore store, VocabQuiz quiz) : IMcpToolPr
         "in use: 1-2 short natural example sentences in the word's language that contain the word as written, each with its " +
         "Vietnamese translation; up to 4 collocations; a mnemonic in Vietnamese (a short story tying the parts to the " +
         "meaning); up to 2 confusables (words easy to mix it up with, with what tells them apart in Vietnamese); the level " +
-        "(CEFR A1-C2 for English, HSK1-HSK9 for Chinese); the part of speech and a one- or two-word topic, in Vietnamese.";
+        "(CEFR A1-C2 for English, HSK1-HSK9 for Chinese); the part of speech and a one- or two-word topic, in Vietnamese; " +
+        "its common word forms (relate: relation n., relationship n., relative adj./n., relatively adv.; Chinese: common words " +
+        "built on it, 补救 → 补救措施), each with its part of speech and Vietnamese meaning; up to 4 synonyms and up to 3 " +
+        "antonyms (none when there are none).";
 
     public string? ModuleId => VocabIds.ModuleId;
 
@@ -177,6 +180,9 @@ public sealed class VocabMcpTools(VocabStore store, VocabQuiz quiz) : IMcpToolPr
                 Collocations = item.TryGetProperty("collocations", out _) ? McpArgs.Strings(item, "collocations") : w.Collocations,
                 Confusables = ReadConfusables(item) ?? w.Confusables,
                 Tags = item.TryGetProperty("tags", out _) ? VocabTags.Clean(McpArgs.Strings(item, "tags")) : w.Tags,
+                Forms = ReadForms(item) ?? w.Forms,
+                Synonyms = item.TryGetProperty("synonyms", out _) ? McpArgs.Strings(item, "synonyms") : w.Synonyms,
+                Antonyms = item.TryGetProperty("antonyms", out _) ? McpArgs.Strings(item, "antonyms") : w.Antonyms,
             });
             edited.Add(store.GetWord(id)!.Text);
         }
@@ -207,21 +213,13 @@ public sealed class VocabMcpTools(VocabStore store, VocabQuiz quiz) : IMcpToolPr
     {
         var id = McpArgs.RequiredString(args, "id");
         var wordId = store.GetWord(id) is not null ? id : store.FindWord(id)?.Id ?? throw new McpToolException($"The user has no word {id}.");
-        var analysis = new WordAnalysis
+        var analysis = ReadDetails(args) with
         {
             Phonetic = McpArgs.String(args, "phonetic") ?? "",
             Meaning = McpArgs.String(args, "meaning") ?? "",
             HanViet = McpArgs.String(args, "han_viet"),
             Traditional = McpArgs.String(args, "traditional"),
-            Explanation = McpArgs.String(args, "explanation"),
             Parts = args.TryGetProperty("parts", out var parts) ? ReadParts(parts, 0) : [],
-            Examples = ReadExamples(args),
-            Collocations = args.TryGetProperty("collocations", out _) ? McpArgs.Strings(args, "collocations") : null,
-            Mnemonic = McpArgs.String(args, "mnemonic"),
-            Confusables = ReadConfusables(args),
-            Level = McpArgs.String(args, "level"),
-            PartOfSpeech = McpArgs.String(args, "part_of_speech"),
-            Topic = McpArgs.String(args, "topic"),
         };
         try
         {
@@ -284,8 +282,40 @@ public sealed class VocabMcpTools(VocabStore store, VocabQuiz quiz) : IMcpToolPr
             part_of_speech = NullIfEmpty(word.PartOfSpeech),
             topic = NullIfEmpty(word.Topic),
             tags = word.Tags.Count > 0 ? word.Tags : null,
+            forms = word.Forms.Count > 0 ? word.Forms.Select(f => new { word = f.Word, part_of_speech = f.PartOfSpeech, meaning = f.Meaning }).ToList() : null,
+            synonyms = word.Synonyms.Count > 0 ? word.Synonyms : null,
+            antonyms = word.Antonyms.Count > 0 ? word.Antonyms : null,
+            hidden = word.Hidden ? true : (bool?)null,
+            often_forgotten = VocabQuiz.IsHard(word, stats) ? true : (bool?)null,
         };
     }
+
+    /// <summary>The optional details of a word (explanation, examples … antonyms); fields left out are null.</summary>
+    internal static WordAnalysis ReadDetails(JsonElement args) => new()
+    {
+        Explanation = McpArgs.String(args, "explanation"),
+        Examples = ReadExamples(args),
+        Collocations = args.TryGetProperty("collocations", out _) ? McpArgs.Strings(args, "collocations") : null,
+        Mnemonic = McpArgs.String(args, "mnemonic"),
+        Confusables = ReadConfusables(args),
+        Level = McpArgs.String(args, "level"),
+        PartOfSpeech = McpArgs.String(args, "part_of_speech"),
+        Topic = McpArgs.String(args, "topic"),
+        Forms = ReadForms(args),
+        Synonyms = args.TryGetProperty("synonyms", out _) ? McpArgs.Strings(args, "synonyms") : null,
+        Antonyms = args.TryGetProperty("antonyms", out _) ? McpArgs.Strings(args, "antonyms") : null,
+    };
+
+    private static IReadOnlyList<VocabForm>? ReadForms(JsonElement args) =>
+        args.TryGetProperty("forms", out var list) && list.ValueKind == JsonValueKind.Array
+            ? list.EnumerateArray().Where(e => e.ValueKind == JsonValueKind.Object)
+                .Select(e => new VocabForm
+                {
+                    Word = McpArgs.String(e, "word") ?? "",
+                    PartOfSpeech = McpArgs.String(e, "part_of_speech") ?? "",
+                    Meaning = McpArgs.String(e, "meaning") ?? "",
+                }).ToList()
+            : null;
 
     private static IReadOnlyList<VocabExample>? ReadExamples(JsonElement args) =>
         args.TryGetProperty("examples", out var list) && list.ValueKind == JsonValueKind.Array
@@ -408,6 +438,9 @@ public sealed class VocabMcpTools(VocabStore store, VocabQuiz quiz) : IMcpToolPr
                 ["collocations"] = McpArgs.List("New collocations (replace the old ones)."),
                 ["confusables"] = new JsonObject { ["type"] = "array", ["items"] = new JsonObject { ["type"] = "object" }, ["description"] = "New confusables { word, note } (replace the old ones)." },
                 ["tags"] = McpArgs.List("The user's labels (replace the old ones): Aptis, Truyện…"),
+                ["forms"] = new JsonObject { ["type"] = "array", ["items"] = new JsonObject { ["type"] = "object" }, ["description"] = "New word forms { word, part_of_speech, meaning } (replace the old ones)." },
+                ["synonyms"] = McpArgs.List("New synonyms (replace the old ones)."),
+                ["antonyms"] = McpArgs.List("New antonyms (replace the old ones)."),
             },
             ["required"] = new JsonArray("id"),
         };
@@ -429,6 +462,65 @@ public sealed class VocabMcpTools(VocabStore store, VocabQuiz quiz) : IMcpToolPr
             ("words", new JsonObject { ["type"] = "array", ["items"] = word, ["description"] = "Words to reword." }, false),
             ("parts", new JsonObject { ["type"] = "array", ["items"] = part, ["description"] = "Parts to reword (every word that has the part shows the change)." }, false));
     }
+
+    /// <summary>The optional details, as properties of a schema (vocab_save_analysis, vocab_save_details).</summary>
+    internal static (string Name, JsonObject Schema, bool Required)[] DetailProperties() =>
+    [
+        ("explanation", McpArgs.Text("In Vietnamese, one sentence: how the parts' meanings make the word's."), false),
+        ("examples", new JsonObject
+        {
+            ["type"] = "array",
+            ["items"] = new JsonObject
+            {
+                ["type"] = "object",
+                ["properties"] = new JsonObject
+                {
+                    ["sentence"] = McpArgs.Text("A short natural sentence in the word's language, with the word as written."),
+                    ["translation"] = McpArgs.Text("Its Vietnamese translation."),
+                },
+                ["required"] = new JsonArray("sentence", "translation"),
+            },
+            ["description"] = "1-2 example sentences.",
+        }, false),
+        ("collocations", McpArgs.List("Up to 4 words it usually goes with: make a decision, 补救措施."), false),
+        ("mnemonic", McpArgs.Text("In Vietnamese: a short story tying the parts to the meaning."), false),
+        ("confusables", new JsonObject
+        {
+            ["type"] = "array",
+            ["items"] = new JsonObject
+            {
+                ["type"] = "object",
+                ["properties"] = new JsonObject
+                {
+                    ["word"] = McpArgs.Text("A word easy to mix it up with."),
+                    ["note"] = McpArgs.Text("In Vietnamese: what tells them apart."),
+                },
+                ["required"] = new JsonArray("word", "note"),
+            },
+            ["description"] = "Up to 2 words easy to mix it up with (affect / effect; 己 / 已).",
+        }, false),
+        ("level", McpArgs.Text("CEFR A1-C2 for English, HSK1-HSK9 for Chinese."), false),
+        ("part_of_speech", McpArgs.Text("In Vietnamese: danh từ, động từ, tính từ…"), false),
+        ("topic", McpArgs.Text("In Vietnamese, one or two words: gia đình, công việc…"), false),
+        ("forms", new JsonObject
+        {
+            ["type"] = "array",
+            ["items"] = new JsonObject
+            {
+                ["type"] = "object",
+                ["properties"] = new JsonObject
+                {
+                    ["word"] = McpArgs.Text("Another word of its family: relation, relatively; 补救措施."),
+                    ["part_of_speech"] = McpArgs.Text("In Vietnamese, short: danh từ, trạng từ…"),
+                    ["meaning"] = McpArgs.Text("In Vietnamese, short."),
+                },
+                ["required"] = new JsonArray("word", "part_of_speech", "meaning"),
+            },
+            ["description"] = $"Its common word forms, up to {VocabDetails.MaxForms} (empty when it has none).",
+        }, false),
+        ("synonyms", McpArgs.List("Up to 4 words that mean about the same (empty when none)."), false),
+        ("antonyms", McpArgs.List("Up to 3 words that mean the opposite (empty when none)."), false),
+    ];
 
     private static JsonObject SaveSchema()
     {
@@ -454,48 +546,14 @@ public sealed class VocabMcpTools(VocabStore store, VocabQuiz quiz) : IMcpToolPr
                 },
             },
         };
-        return McpArgs.Schema(
+        return McpArgs.Schema([
             ("id", McpArgs.Text("The word's id (vocab_pending) or the word itself."), true),
             ("phonetic", McpArgs.Text("English: IPA, British (/ˈrel.ə.tɪv/). Chinese: pinyin with tone marks (bǔjiù)."), true),
             ("meaning", McpArgs.Text("In Vietnamese: the word's main meanings, short."), true),
             ("han_viet", McpArgs.Text("Chinese words: the Hán Việt reading (bổ cứu)."), false),
             ("traditional", McpArgs.Text("Chinese words: the traditional form, only when it differs (補救)."), false),
-            ("explanation", McpArgs.Text("In Vietnamese, one sentence: how the parts' meanings make the word's."), false),
             ("parts", new JsonObject { ["type"] = "array", ["items"] = part, ["description"] = "The word's parts, top level first." }, false),
-            ("examples", new JsonObject
-            {
-                ["type"] = "array",
-                ["items"] = new JsonObject
-                {
-                    ["type"] = "object",
-                    ["properties"] = new JsonObject
-                    {
-                        ["sentence"] = McpArgs.Text("A short natural sentence in the word's language, with the word as written."),
-                        ["translation"] = McpArgs.Text("Its Vietnamese translation."),
-                    },
-                    ["required"] = new JsonArray("sentence", "translation"),
-                },
-                ["description"] = "1-2 example sentences.",
-            }, false),
-            ("collocations", McpArgs.List("Up to 4 words it usually goes with: make a decision, 补救措施."), false),
-            ("mnemonic", McpArgs.Text("In Vietnamese: a short story tying the parts to the meaning."), false),
-            ("confusables", new JsonObject
-            {
-                ["type"] = "array",
-                ["items"] = new JsonObject
-                {
-                    ["type"] = "object",
-                    ["properties"] = new JsonObject
-                    {
-                        ["word"] = McpArgs.Text("A word easy to mix it up with."),
-                        ["note"] = McpArgs.Text("In Vietnamese: what tells them apart."),
-                    },
-                    ["required"] = new JsonArray("word", "note"),
-                },
-                ["description"] = "Up to 2 words easy to mix it up with (affect / effect; 己 / 已).",
-            }, false),
-            ("level", McpArgs.Text("CEFR A1-C2 for English, HSK1-HSK9 for Chinese."), false),
-            ("part_of_speech", McpArgs.Text("In Vietnamese: danh từ, động từ, tính từ…"), false),
-            ("topic", McpArgs.Text("In Vietnamese, one or two words: gia đình, công việc…"), false));
+            .. DetailProperties(),
+        ]);
     }
 }

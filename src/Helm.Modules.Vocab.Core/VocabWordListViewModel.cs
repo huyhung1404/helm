@@ -19,6 +19,12 @@ public sealed record VocabWordRow(string Id, string Text, string Phonetic, strin
 
     public bool IsChinese { get; init; }
 
+    /// <summary>Left out of the cards (the user hid it).</summary>
+    public bool IsHidden { get; init; }
+
+    /// <summary>The user keeps forgetting it.</summary>
+    public bool IsHard { get; init; }
+
     public bool HasPhonetic => Phonetic.Length > 0;
 
     public bool CanRemove => Remove is not null;
@@ -28,8 +34,8 @@ public sealed record VocabWordRow(string Id, string Text, string Phonetic, strin
     public bool HasLevel => Level.Length > 0;
 }
 
-/// <summary>A choice of the Words tab's filter: everything, a level, a topic or one of the user's tags.</summary>
-public sealed record VocabWordFilter(string Name, Func<VocabWord, bool> Matches);
+/// <summary>A choice of the Words tab's filter: everything, often forgotten, hidden, a level, a topic or one of the user's tags.</summary>
+public sealed record VocabWordFilter(string Name, Func<VocabWord, VocabWordStats, bool> Matches);
 
 /// <summary>
 /// The Words tab's list: the analyzed words of one language, searched, filtered (level, topic, tag) and sorted (A–Z,
@@ -55,7 +61,7 @@ public sealed partial class VocabWordListViewModel : ObservableObject
     [ObservableProperty] private int _filterIndex;
     [ObservableProperty] private IReadOnlyList<string> _filterNames = [AllWords];
 
-    private IReadOnlyList<VocabWordFilter> _filters = [new(AllWords, _ => true)];
+    private IReadOnlyList<VocabWordFilter> _filters = [new(AllWords, (_, _) => true)];
 
     public VocabWordListViewModel(VocabStore store, VocabQuiz quiz, VocabSettingsViewModel settings, Action<string> open)
     {
@@ -137,15 +143,15 @@ public sealed partial class VocabWordListViewModel : ObservableObject
         EnglishCount = analyzed.Count(w => w.Value.Language == VocabLanguage.English);
         ChineseCount = analyzed.Count - EnglishCount;
         var mine = analyzed.Where(w => w.Value.Language == Language).ToList();
-        RebuildFilters(mine.Select(w => w.Value));
-
-        var terms = TextSearch.Terms(SearchText);
-        var filter = _filters[Math.Clamp(FilterIndex, 0, _filters.Count - 1)];
         var stats = _quiz.Stats();
         var now = _store.Now;
         VocabWordStats Of(string id) => stats.GetValueOrDefault(id) ?? VocabWordStats.New;
+        RebuildFilters(mine.Select(w => (w.Value, Of(w.Id))).ToList());
+
+        var terms = TextSearch.Terms(SearchText);
+        var filter = _filters[Math.Clamp(FilterIndex, 0, _filters.Count - 1)];
         var matches = mine
-            .Where(w => filter.Matches(w.Value))
+            .Where(w => filter.Matches(w.Value, Of(w.Id)))
             .Where(w => terms.Count == 0 || TextSearch.Score(terms, w.Value.Text, $"{w.Value.Meaning} {w.Value.HanViet} {w.Value.Note}") > 0);
         var sorted = (SortIndex switch
         {
@@ -167,6 +173,8 @@ public sealed partial class VocabWordListViewModel : ObservableObject
                 Header = group == last ? "" : group,
                 Level = w.Value.Level,
                 IsChinese = w.Value.Language == VocabLanguage.Chinese,
+                IsHidden = w.Value.Hidden,
+                IsHard = !w.Value.Hidden && VocabQuiz.IsHard(w.Value, s),
             });
             last = group;
         }
@@ -183,17 +191,20 @@ public sealed partial class VocabWordListViewModel : ObservableObject
         _ => SortKey(word) is { Length: > 0 } key ? key[..1].ToUpperInvariant() : "#",
     };
 
-    /// <summary>The filters this list offers: every level, topic and tag its words have.</summary>
-    private void RebuildFilters(IEnumerable<VocabWord> words)
+    /// <summary>The filters this list offers: often forgotten and hidden when there are such words, every level, topic and tag.</summary>
+    private void RebuildFilters(IReadOnlyList<(VocabWord Word, VocabWordStats Stats)> words)
     {
-        var list = words.ToList();
-        var filters = new List<VocabWordFilter> { new(AllWords, _ => true) };
+        var list = words.Select(w => w.Word).ToList();
+        var filters = new List<VocabWordFilter> { new(AllWords, (_, _) => true) };
+        if (words.Any(w => !w.Word.Hidden && VocabQuiz.IsHard(w.Word, w.Stats)))
+            filters.Add(new("Often forgotten", (w, s) => !w.Hidden && VocabQuiz.IsHard(w, s)));
+        if (list.Any(w => w.Hidden)) filters.Add(new("Hidden", (w, _) => w.Hidden));
         foreach (var level in list.Select(w => w.Level).Where(l => l.Length > 0).Distinct().OrderBy(VocabLevels.Rank))
-            filters.Add(new($"Level {level}", w => w.Level == level));
+            filters.Add(new($"Level {level}", (w, _) => w.Level == level));
         foreach (var topic in list.Select(w => w.Topic).Where(t => t.Length > 0).Distinct(StringComparer.CurrentCultureIgnoreCase).Order(StringComparer.CurrentCulture))
-            filters.Add(new($"Topic: {topic}", w => string.Equals(w.Topic, topic, StringComparison.CurrentCultureIgnoreCase)));
+            filters.Add(new($"Topic: {topic}", (w, _) => string.Equals(w.Topic, topic, StringComparison.CurrentCultureIgnoreCase)));
         foreach (var tag in list.SelectMany(w => w.Tags).Distinct(StringComparer.CurrentCultureIgnoreCase).Order(StringComparer.CurrentCulture))
-            filters.Add(new($"#{tag}", w => w.Tags.Contains(tag, StringComparer.CurrentCultureIgnoreCase)));
+            filters.Add(new($"#{tag}", (w, _) => w.Tags.Contains(tag, StringComparer.CurrentCultureIgnoreCase)));
         var names = filters.Select(f => f.Name).ToList();
         if (names.SequenceEqual(FilterNames)) return;
         // Keep the chosen filter when it is still there.

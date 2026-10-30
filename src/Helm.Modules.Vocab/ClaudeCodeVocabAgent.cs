@@ -16,7 +16,8 @@ public sealed class ClaudeCodeVocabAgent(ClaudeCodeRunner claude) : IVocabAgent
 
     /// <summary>The only tools it may call.</summary>
     public static IReadOnlyList<string> AllowedTools { get; } = ClaudeCodeRunner.ToolNames(
-        "vocab_pending", "vocab_find_parts", "vocab_save_analysis", "vocab_save_analyses", "vocab_get", "vocab_words", "vocab_add_words");
+        "vocab_pending", "vocab_find_parts", "vocab_save_analysis", "vocab_save_analyses", "vocab_get", "vocab_words", "vocab_add_words",
+        "vocab_follow_ups", "vocab_save_details");
 
     public string? Unavailable() => claude.Unavailable();
 
@@ -26,13 +27,17 @@ public sealed class ClaudeCodeVocabAgent(ClaudeCodeRunner claude) : IVocabAgent
         Break down the words the user is learning in Helm's Vocabulary, using only Helm's vocabulary tools.
 
         1. Call vocab_pending with limit {WordsPerRun}. Read the guide in the tools' descriptions and follow it exactly.
-           A word with a redo_note was sent back by the user: fix what the note says.
+           A word with a redo_note was sent back by the user: fix what the note says. When none wait, go to step 4.
         2. For every piece you will use, call vocab_find_parts (all forms of a language in one call) and reuse the id
            of the same piece with the same meaning.
         3. Save all the words with one vocab_save_analyses call. If some come back with something to fix, fix them and
            save those again.
+        4. Call vocab_follow_ups with limit {WordsPerRun}. For each often_forgotten word write a new mnemonic, different
+           from the old one and more vivid (and a clearer explanation, examples or confusables when they help); for each
+           missing_details word give the fields it lacks ([] for forms, synonyms or antonyms it has none of). Save them
+           all with one vocab_save_details call; fix and save again any that come back with something to fix.
 
-        Then answer with one short line in Vietnamese: how many words you broke down.
+        Then answer with one short line in Vietnamese: what you did (words broken down, helped, filled in).
         """;
 
     /// <summary>What Claude Code is asked to do for a family.</summary>
@@ -59,6 +64,8 @@ public sealed class ClaudeCodeVocabAgent(ClaudeCodeRunner claude) : IVocabAgent
         "vocab_find_parts" => $"Claude Code is looking up their parts… ({calls} steps)",
         "vocab_save_analysis" or "vocab_save_analyses" => $"Claude Code is saving the analyses… ({calls} steps)",
         "vocab_add_words" => $"Claude Code is adding words… ({calls} steps)",
+        "vocab_follow_ups" => $"Claude Code is reading the words you keep forgetting… ({calls} steps)",
+        "vocab_save_details" => $"Claude Code is saving new details… ({calls} steps)",
         _ => $"Claude Code is working… ({calls} steps)",
     };
 

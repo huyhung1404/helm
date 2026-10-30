@@ -72,9 +72,26 @@
 
                         <StackPanel Visibility="{Binding HasWord, Converter={StaticResource BoolToVisibility}}">
                             <DockPanel>
-                                <ui:Button DockPanel.Dock="Right" Appearance="Transparent" Content="Skip" Icon="{ui:SymbolIcon ArrowNext24}" Command="{Binding SkipCommand}"
-                                           ToolTip="Another word, without answering this one (S)" />
-                                <TextBlock Text="{Binding LevelText}" VerticalAlignment="Center" Style="{DynamicResource HelmSecondaryText}" />
+                                <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
+                                    <ui:Button Appearance="Transparent" Content="I know it" Icon="{ui:SymbolIcon CheckmarkStarburst24}" Command="{Binding KnowCommand}"
+                                               ToolTip="Known already: it comes back in a month (K)" />
+                                    <ui:Button Appearance="Transparent" Margin="4,0,0,0" Content="Hide" Icon="{ui:SymbolIcon EyeOff24}" Command="{Binding HideCommand}"
+                                               ToolTip="Leave it out of the cards, the pop-up and the phone (Words → Hidden shows it again)" />
+                                    <ui:Button Appearance="Transparent" Margin="4,0,0,0" Content="Skip" Icon="{ui:SymbolIcon ArrowNext24}" Command="{Binding SkipCommand}"
+                                               ToolTip="Another word, without answering this one (S)" />
+                                </StackPanel>
+                                <WrapPanel VerticalAlignment="Center">
+                                    <TextBlock Text="{Binding LevelText}" VerticalAlignment="Center" Margin="0,0,8,0" Style="{DynamicResource HelmSecondaryText}" />
+                                    <Border CornerRadius="4" Padding="6,1" VerticalAlignment="Center" Margin="0,0,6,0" Background="{DynamicResource ControlFillColorSecondaryBrush}"
+                                            Visibility="{Binding IsHard, Converter={StaticResource BoolToVisibility}}"
+                                            ToolTip="You forgot it several times: Claude Code writes a new way to remember it">
+                                        <TextBlock Text="Often forgotten" FontSize="11" FontWeight="SemiBold" Foreground="{DynamicResource SystemFillColorCautionBrush}" />
+                                    </Border>
+                                    <Border CornerRadius="4" Padding="6,1" VerticalAlignment="Center" Background="{DynamicResource ControlFillColorSecondaryBrush}"
+                                            Visibility="{Binding IsNewlyHelped, Converter={StaticResource BoolToVisibility}}">
+                                        <TextBlock Text="New way to remember it" FontSize="11" FontWeight="SemiBold" Foreground="{DynamicResource AccentTextFillColorPrimaryBrush}" />
+                                    </Border>
+                                </WrapPanel>
                             </DockPanel>
 
                             <!-- The front: a click (or Space) shows the answer -->
@@ -93,8 +110,49 @@
                                 </StackPanel>
                             </Button>
 
+                            <!-- Type cards: the word typed here, checked on Enter -->
+                            <Grid Margin="0,0,0,8" MaxWidth="460" Visibility="{Binding IsTyping, Converter={StaticResource BoolToVisibility}}">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="8" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <ui:TextBox x:Name="TypeBox" FontSize="20" PlaceholderText="Type the word" AutomationProperties.Name="Type the word"
+                                            Text="{Binding Typed, UpdateSourceTrigger=PropertyChanged}">
+                                    <ui:TextBox.InputBindings>
+                                        <KeyBinding Key="Enter" Command="{Binding CheckCommand}" />
+                                    </ui:TextBox.InputBindings>
+                                </ui:TextBox>
+                                <ui:Button Grid.Column="2" Appearance="Primary" Content="Check" Icon="{ui:SymbolIcon Checkmark24}" Command="{Binding CheckCommand}" />
+                            </Grid>
+
                             <!-- The answer, what helps to use it, how it is built, then the user's own verdict -->
                             <StackPanel Visibility="{Binding IsRevealed, Converter={StaticResource BoolToVisibility}}">
+                                <!-- What was typed, letter by letter against the word -->
+                                <StackPanel HorizontalAlignment="Center" Margin="0,0,0,6" Visibility="{Binding HasAnswer, Converter={StaticResource BoolToVisibility}}">
+                                    <ItemsControl ItemsSource="{Binding AnswerPieces}" ItemTemplate="{StaticResource AnswerPiece}" Focusable="False" HorizontalAlignment="Center">
+                                        <ItemsControl.ItemsPanel>
+                                            <ItemsPanelTemplate>
+                                                <StackPanel Orientation="Horizontal" />
+                                            </ItemsPanelTemplate>
+                                        </ItemsControl.ItemsPanel>
+                                    </ItemsControl>
+                                    <TextBlock Text="{Binding AnswerMessage}" HorizontalAlignment="Center" FontWeight="SemiBold" TextWrapping="Wrap" TextAlignment="Center">
+                                        <TextBlock.Style>
+                                            <Style TargetType="TextBlock">
+                                                <Setter Property="Foreground" Value="{DynamicResource SystemFillColorCriticalBrush}" />
+                                                <Style.Triggers>
+                                                    <DataTrigger Binding="{Binding AnswerIsCorrect}" Value="True">
+                                                        <Setter Property="Foreground" Value="{DynamicResource SystemFillColorSuccessBrush}" />
+                                                    </DataTrigger>
+                                                    <DataTrigger Binding="{Binding AnswerIsClose}" Value="True">
+                                                        <Setter Property="Foreground" Value="{DynamicResource SystemFillColorCautionBrush}" />
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </TextBlock.Style>
+                                    </TextBlock>
+                                </StackPanel>
                                 <TextBlock Text="{Binding Text}" FontSize="40" FontWeight="SemiBold" HorizontalAlignment="Center" TextWrapping="Wrap"
                                            Visibility="{Binding ShowsWordOnReveal, Converter={StaticResource BoolToVisibility}}" />
                                 <WrapPanel HorizontalAlignment="Center">
@@ -131,7 +189,7 @@
                                 </Grid>
                             </StackPanel>
                             <TextBlock Margin="0,12,0,0" HorizontalAlignment="Center" FontSize="11" Style="{DynamicResource HelmSecondaryText}"
-                                       Text="Keys: Space shows the answer · 1 Forgot · 2 Remembered · L listen · S skip" />
+                                       Text="Keys: Space shows the answer · 1 Forgot · 2 Remembered · L listen · S skip · K I know it" />
                         </StackPanel>
                     </StackPanel>
                 </Border>
@@ -170,12 +228,12 @@
                 </Border>
 
                 <!-- Words waiting for the agent, and the agent itself -->
-                <Border Style="{DynamicResource HelmSurface}" Margin="0,0,0,8" Padding="12,10" Visibility="{Binding HasPending, Converter={StaticResource BoolToVisibility}}">
+                <Border Style="{DynamicResource HelmSurface}" Margin="0,0,0,8" Padding="12,10" Visibility="{Binding HasAgentWork, Converter={StaticResource BoolToVisibility}}">
                     <StackPanel>
                         <DockPanel>
                             <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
                                 <ui:Button Appearance="Primary" Content="Analyze now" Icon="{ui:SymbolIcon Sparkle24}" Command="{Binding Agent.AnalyzeCommand}"
-                                           ToolTip="Claude Code breaks the waiting words down without a window"
+                                           ToolTip="Claude Code does this without a window: breaks new words down, writes new ways to remember the words you keep forgetting, fills in missing details"
                                            Visibility="{Binding Agent.CanRun, Converter={StaticResource BoolToVisibility}}" />
                                 <ui:Button Margin="6,0,0,0" Content="Stop" Icon="{ui:SymbolIcon Stop24}" Command="{Binding Agent.StopCommand}"
                                            Visibility="{Binding Agent.IsBusy, Converter={StaticResource BoolToVisibility}}" />
@@ -183,7 +241,7 @@
                                            ToolTip="Paste it into Claude Code yourself" />
                             </StackPanel>
                             <ui:SymbolIcon Symbol="HourglassHalf24" Margin="0,0,10,0" VerticalAlignment="Center" />
-                            <TextBlock Text="{Binding PendingText}" TextWrapping="Wrap" VerticalAlignment="Center" />
+                            <TextBlock Text="{Binding AgentWorkText}" TextWrapping="Wrap" VerticalAlignment="Center" />
                         </DockPanel>
                         <TextBlock Margin="0,6,0,0" Text="{Binding Agent.Status}" TextWrapping="Wrap" Style="{DynamicResource HelmSecondaryText}"
                                    Visibility="{Binding Agent.HasStatus, Converter={StaticResource BoolToVisibility}}" />
@@ -266,6 +324,15 @@
                                                Visibility="{Binding ShowYouGlish, Converter={StaticResource BoolToVisibility}}" />
                                     <ui:Button Appearance="Transparent" Padding="6" MinWidth="0" Icon="{ui:SymbolIcon Edit24}" ToolTip="Edit the meaning, examples, labels…"
                                                AutomationProperties.Name="Edit the word" Command="{Binding Editor.BeginCommand}" />
+                                    <ui:Button Appearance="Transparent" Padding="6" MinWidth="0" Icon="{ui:SymbolIcon CheckmarkStarburst24}"
+                                               ToolTip="I know it: it comes back in a month" AutomationProperties.Name="I know it" Command="{Binding KnowCommand}"
+                                               Visibility="{Binding IsPending, Converter={StaticResource InverseBoolToVisibility}}" />
+                                    <ui:Button Appearance="Transparent" Padding="6" MinWidth="0" Icon="{ui:SymbolIcon EyeOff24}"
+                                               ToolTip="Hide it from the cards, the pop-up and the phone" AutomationProperties.Name="Hide from the cards"
+                                               Command="{Binding ToggleHiddenCommand}" Visibility="{Binding IsHidden, Converter={StaticResource InverseBoolToVisibility}}" />
+                                    <ui:Button Appearance="Transparent" Padding="6" MinWidth="0" Icon="{ui:SymbolIcon Eye24}"
+                                               ToolTip="Show it in the cards again" AutomationProperties.Name="Show in the cards again"
+                                               Command="{Binding ToggleHiddenCommand}" Visibility="{Binding IsHidden, Converter={StaticResource BoolToVisibility}}" />
                                     <ui:Button Appearance="Transparent" Padding="6" MinWidth="0" Icon="{ui:SymbolIcon ArrowClockwise24}" ToolTip="Ask for a new analysis"
                                                AutomationProperties.Name="Ask for a new analysis" Command="{Binding BeginRedoCommand}" />
                                     <ui:Button Appearance="Transparent" Padding="6" MinWidth="0" Icon="{ui:SymbolIcon Delete24}" ToolTip="Delete the word"
@@ -291,7 +358,17 @@
                                        Visibility="{Binding HasNote, Converter={StaticResource BoolToVisibility}}">
                                 <Run Text="Your note:" /> <Run Text="{Binding Word.Note, Mode=OneWay}" />
                             </TextBlock>
-                            <TextBlock Margin="0,6,0,10" Text="{Binding LevelText}" FontSize="12" Style="{DynamicResource HelmSecondaryText}" />
+                            <WrapPanel Margin="0,6,0,10">
+                                <TextBlock Text="{Binding LevelText}" FontSize="12" Margin="0,0,8,0" VerticalAlignment="Center" Style="{DynamicResource HelmSecondaryText}" />
+                                <Border CornerRadius="4" Padding="6,1" Margin="0,0,6,0" VerticalAlignment="Center" Background="{DynamicResource ControlFillColorSecondaryBrush}"
+                                        Visibility="{Binding IsHard, Converter={StaticResource BoolToVisibility}}">
+                                    <TextBlock Text="Often forgotten: Claude Code writes a new way to remember it" FontSize="11" FontWeight="SemiBold" Foreground="{DynamicResource SystemFillColorCautionBrush}" />
+                                </Border>
+                                <Border CornerRadius="4" Padding="6,1" VerticalAlignment="Center" Background="{DynamicResource ControlFillColorSecondaryBrush}"
+                                        Visibility="{Binding IsHidden, Converter={StaticResource BoolToVisibility}}">
+                                    <TextBlock Text="Hidden from the cards" FontSize="11" FontWeight="SemiBold" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+                                </Border>
+                            </WrapPanel>
                             <ContentControl Content="{Binding Info}" ContentTemplate="{StaticResource InfoView}" Focusable="False" />
 
                             <ui:InfoBar Margin="0,10,0,0" Severity="Informational" IsClosable="False" IsOpen="{Binding IsPending}" Title="Waiting for analysis"
@@ -328,6 +405,23 @@
                                 <ui:TextBox Text="{Binding Collocations, UpdateSourceTrigger=PropertyChanged}" AutomationProperties.Name="Collocations" />
                                 <TextBlock Text="Easy to mix up with: one per line, word | what tells them apart" Style="{DynamicResource HelmSecondaryText}" Margin="0,6,0,2" />
                                 <ui:TextBox Text="{Binding Confusables, UpdateSourceTrigger=PropertyChanged}" AutomationProperties.Name="Confusables" AcceptsReturn="True" TextWrapping="Wrap" MinHeight="48" />
+                                <TextBlock Text="Word family: one per line, word | part of speech | meaning" Style="{DynamicResource HelmSecondaryText}" Margin="0,6,0,2" />
+                                <ui:TextBox Text="{Binding Forms, UpdateSourceTrigger=PropertyChanged}" AutomationProperties.Name="Word family" AcceptsReturn="True" TextWrapping="Wrap" MinHeight="64" />
+                                <Grid Margin="0,6,0,0">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="8" />
+                                        <ColumnDefinition Width="*" />
+                                    </Grid.ColumnDefinitions>
+                                    <StackPanel>
+                                        <TextBlock Text="Similar: separated by commas" Style="{DynamicResource HelmSecondaryText}" Margin="0,0,0,2" />
+                                        <ui:TextBox Text="{Binding Synonyms, UpdateSourceTrigger=PropertyChanged}" AutomationProperties.Name="Synonyms" />
+                                    </StackPanel>
+                                    <StackPanel Grid.Column="2">
+                                        <TextBlock Text="Opposite: separated by commas" Style="{DynamicResource HelmSecondaryText}" Margin="0,0,0,2" />
+                                        <ui:TextBox Text="{Binding Antonyms, UpdateSourceTrigger=PropertyChanged}" AutomationProperties.Name="Antonyms" />
+                                    </StackPanel>
+                                </Grid>
                                 <Grid Margin="0,6,0,0">
                                     <Grid.ColumnDefinitions>
                                         <ColumnDefinition Width="*" />

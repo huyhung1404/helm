@@ -21,6 +21,9 @@ public sealed record WordAnalysis
     public string? Level { get; init; }
     public string? PartOfSpeech { get; init; }
     public string? Topic { get; init; }
+    public IReadOnlyList<VocabForm>? Forms { get; init; }
+    public IReadOnlyList<string>? Synonyms { get; init; }
+    public IReadOnlyList<string>? Antonyms { get; init; }
 }
 
 /// <summary>
@@ -50,9 +53,6 @@ internal sealed class VocabAnalyzer(VocabStore store, VocabWord word)
 {
     public const int MaxDepth = 8;
     public const int MaxParts = 80;
-    public const int MaxExamples = 3;
-    public const int MaxCollocations = 6;
-    public const int MaxConfusables = 3;
     private const int MaxForm = 24;
     private const int MaxText = 600;
 
@@ -78,15 +78,7 @@ internal sealed class VocabAnalyzer(VocabStore store, VocabWord word)
         Require(a.Meaning, "meaning (in Vietnamese)", word.Text);
         if (_chinese) Require(a.HanViet, "han_viet", word.Text);
         Limit(a.Meaning, "meaning", word.Text);
-        Limit(a.Explanation, "explanation", word.Text);
-        Limit(a.Mnemonic, "mnemonic", word.Text);
-        if (a.Examples is { Count: > MaxExamples }) throw new VocabAnalysisException($"{word.Text}: at most {MaxExamples} examples.");
-        if (a.Examples?.FirstOrDefault(e => string.IsNullOrWhiteSpace(e.Sentence)) is not null)
-            throw new VocabAnalysisException($"{word.Text}: an example has no sentence.");
-        if (a.Collocations is { Count: > MaxCollocations }) throw new VocabAnalysisException($"{word.Text}: at most {MaxCollocations} collocations.");
-        if (a.Confusables is { Count: > MaxConfusables }) throw new VocabAnalysisException($"{word.Text}: at most {MaxConfusables} confusable words.");
-        if (a.Level is { Length: > 0 } level && VocabLevels.Normalize(level, word.Language) is null)
-            throw new VocabAnalysisException($"{word.Text}: level is {(_chinese ? "HSK1 … HSK9" : "A1, A2, B1, B2, C1 or C2")}.");
+        VocabDetails.Check(word, a);
         if (_chinese && VocabText.Length(word.Text) > 1 && a.Parts.Count > 0)
         {
             // A Chinese word breaks into its characters first, in order.

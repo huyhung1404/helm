@@ -25,7 +25,8 @@ public enum VocabTab
 public sealed partial class VocabViewModel : ObservableObject
 {
     /// <summary>What to ask Claude Code for the waiting words (copied by the button next to the count).</summary>
-    public const string AgentPrompt = "Phân tích các từ mới trong Helm Vocabulary (vocab_pending, rồi vocab_save_analyses cho các từ đó).";
+    public const string AgentPrompt = "Phân tích các từ mới trong Helm Vocabulary (vocab_pending, rồi vocab_save_analyses cho các từ đó), " +
+        "rồi làm vocab_follow_ups (mẹo nhớ mới cho từ hay quên, bổ sung chi tiết còn thiếu) bằng vocab_save_details.";
 
     private const int RecentCount = 8;
 
@@ -42,6 +43,8 @@ public sealed partial class VocabViewModel : ObservableObject
     [ObservableProperty] private string? _message;
     [ObservableProperty] private VocabWordDetailViewModel? _detail;
     [ObservableProperty] private int _pendingCount;
+    [ObservableProperty] private int _hardCount;
+    [ObservableProperty] private int _lackingCount;
     [ObservableProperty] private VocabDay _today = new(0, 0, 0, 0);
 
     /// <summary>The tab in front: Learn (only the card), Add (new words and what waits), Words (the list, a word's tree), Roots (families).</summary>
@@ -65,6 +68,7 @@ public sealed partial class VocabViewModel : ObservableObject
         {
             ShowYouGlish = settings.Current.ShowYouGlish,
         };
+        Card.WordHidden += (_, text) => Message = $"“{text}” is hidden from the cards. Words → Hidden shows it again.";
         if (voice is not null) voice.Problem += (_, problem) => _ui.Post(() => Message = problem);
         settings.Changed += (_, name) => OnSettingChanged(name);
 
@@ -115,6 +119,27 @@ public sealed partial class VocabViewModel : ObservableObject
 
     public bool HasPending => PendingCount > 0;
 
+    /// <summary>Something for the agent: words to break down, words often forgotten, words lacking details.</summary>
+    public bool HasAgentWork => PendingCount + HardCount + LackingCount > 0;
+
+    /// <summary>What waits for the agent, one line per kind.</summary>
+    public string AgentWorkText => string.Join(Environment.NewLine, new[]
+    {
+        PendingCount == 0 ? "" : PendingText,
+        HardCount switch
+        {
+            0 => "",
+            1 => "1 word you keep forgetting waits for a new way to remember it.",
+            _ => $"{HardCount} words you keep forgetting wait for a new way to remember them.",
+        },
+        LackingCount switch
+        {
+            0 => "",
+            1 => "1 word waits for its word forms, synonyms and antonyms.",
+            _ => $"{LackingCount} words wait for their word forms, synonyms and antonyms.",
+        },
+    }.Where(s => s.Length > 0));
+
     public bool HasDetail => Detail is not null;
 
     public bool HasMessage => !string.IsNullOrEmpty(Message);
@@ -142,6 +167,17 @@ public sealed partial class VocabViewModel : ObservableObject
     {
         OnPropertyChanged(nameof(HasPending));
         OnPropertyChanged(nameof(PendingText));
+        OnAgentWorkChanged();
+    }
+
+    partial void OnHardCountChanged(int value) => OnAgentWorkChanged();
+
+    partial void OnLackingCountChanged(int value) => OnAgentWorkChanged();
+
+    private void OnAgentWorkChanged()
+    {
+        OnPropertyChanged(nameof(HasAgentWork));
+        OnPropertyChanged(nameof(AgentWorkText));
     }
 
     partial void OnDetailChanged(VocabWordDetailViewModel? value) => OnPropertyChanged(nameof(HasDetail));
@@ -239,6 +275,8 @@ public sealed partial class VocabViewModel : ObservableObject
     {
         var all = _store.Words();
         PendingCount = all.Count(w => !w.Value.IsAnalyzed);
+        HardCount = _quiz.HardWords().Count;
+        LackingCount = all.Count(w => w.Value.LacksDetails && !w.Value.Hidden);
         Today = _quiz.Today();
         RefreshRecent(all);
         List.Refresh();

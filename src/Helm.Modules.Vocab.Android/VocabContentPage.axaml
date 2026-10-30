@@ -50,6 +50,29 @@
         <Style Selector="TextBlock.accent">
             <Setter Property="Foreground" Value="{DynamicResource SystemAccentColor}" />
         </Style>
+        <!-- A typed answer: right letters green, wrong ones red and struck through, missing ones amber and underlined -->
+        <Style Selector="TextBlock.piece">
+            <Setter Property="FontSize" Value="24" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="Foreground" Value="#2E9E44" />
+        </Style>
+        <Style Selector="TextBlock.piece.wrong">
+            <Setter Property="Foreground" Value="#D13438" />
+            <Setter Property="TextDecorations" Value="Strikethrough" />
+        </Style>
+        <Style Selector="TextBlock.piece.missing">
+            <Setter Property="Foreground" Value="#E5A50A" />
+            <Setter Property="TextDecorations" Value="Underline" />
+        </Style>
+        <Style Selector="TextBlock.verdict">
+            <Setter Property="Foreground" Value="#D13438" />
+        </Style>
+        <Style Selector="TextBlock.verdict.close">
+            <Setter Property="Foreground" Value="#E5A50A" />
+        </Style>
+        <Style Selector="TextBlock.verdict.correct">
+            <Setter Property="Foreground" Value="#2E9E44" />
+        </Style>
         <Style Selector="Border.badge">
             <Setter Property="Background" Value="{DynamicResource HelmSubtleFill}" />
             <Setter Property="CornerRadius" Value="4" />
@@ -189,6 +212,12 @@
                                 <Border Classes="badge" IsVisible="{Binding IsPending}">
                                     <TextBlock Text="Waiting" FontSize="11" FontWeight="SemiBold" Foreground="#E5A50A" />
                                 </Border>
+                                <Border Classes="badge" IsVisible="{Binding IsHard}">
+                                    <TextBlock Text="Often forgotten" FontSize="11" FontWeight="SemiBold" Foreground="#E5A50A" />
+                                </Border>
+                                <Border Classes="badge" IsVisible="{Binding IsHidden}">
+                                    <TextBlock Text="Hidden" FontSize="11" FontWeight="SemiBold" Classes="secondary" />
+                                </Border>
                                 <Button Classes="icon flat" Command="{Binding Remove}" IsVisible="{Binding CanRemove}" AutomationProperties.Name="Remove">
                                     <ic:SymbolIcon Symbol="Dismiss" FontSize="14" />
                                 </Button>
@@ -222,6 +251,28 @@
                 <StackPanel IsVisible="{Binding HasCollocations}" Spacing="2">
                     <TextBlock Text="Goes with" FontWeight="SemiBold" />
                     <TextBlock Text="{Binding Collocations}" TextWrapping="Wrap" />
+                </StackPanel>
+                <StackPanel IsVisible="{Binding HasForms}" Spacing="2">
+                    <TextBlock Text="Word family" FontWeight="SemiBold" />
+                    <ItemsControl ItemsSource="{Binding Forms}">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate x:DataType="vm:VocabForm">
+                                <WrapPanel Margin="0,1">
+                                    <TextBlock Text="{Binding Word}" FontWeight="SemiBold" Margin="0,0,8,0" />
+                                    <TextBlock Text="{Binding PartOfSpeech}" Classes="secondary" Margin="0,0,8,0" />
+                                    <TextBlock Text="{Binding Meaning}" TextWrapping="Wrap" />
+                                </WrapPanel>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </StackPanel>
+                <StackPanel IsVisible="{Binding HasSynonyms}" Spacing="2">
+                    <TextBlock Text="Similar" FontWeight="SemiBold" />
+                    <TextBlock Text="{Binding Synonyms}" TextWrapping="Wrap" />
+                </StackPanel>
+                <StackPanel IsVisible="{Binding HasAntonyms}" Spacing="2">
+                    <TextBlock Text="Opposite" FontWeight="SemiBold" />
+                    <TextBlock Text="{Binding Antonyms}" TextWrapping="Wrap" />
                 </StackPanel>
                 <StackPanel IsVisible="{Binding HasMnemonic}" Spacing="2">
                     <TextBlock Text="To remember it" FontWeight="SemiBold" />
@@ -308,13 +359,26 @@
 
                         <StackPanel IsVisible="{Binding HasWord}" Spacing="4">
                             <Grid ColumnDefinitions="*,Auto">
-                                <TextBlock Text="{Binding LevelText}" Classes="secondary" FontSize="12" VerticalAlignment="Center" TextWrapping="Wrap" />
-                                <Button Grid.Column="1" Classes="flat" Command="{Binding SkipCommand}" AutomationProperties.Name="Skip">
-                                    <StackPanel Orientation="Horizontal" Spacing="4">
-                                        <TextBlock Text="Skip" VerticalAlignment="Center" />
-                                        <ic:SymbolIcon Symbol="ArrowNext" FontSize="16" />
-                                    </StackPanel>
-                                </Button>
+                                <WrapPanel VerticalAlignment="Center">
+                                    <TextBlock Text="{Binding LevelText}" Classes="secondary" FontSize="12" VerticalAlignment="Center" Margin="0,0,6,0" />
+                                    <Border Classes="badge" IsVisible="{Binding IsHard}" Margin="0,2,6,2">
+                                        <TextBlock Text="Often forgotten" FontSize="11" FontWeight="SemiBold" Foreground="#E5A50A" />
+                                    </Border>
+                                    <Border Classes="badge" IsVisible="{Binding IsNewlyHelped}" Margin="0,2">
+                                        <TextBlock Text="New way to remember it" FontSize="11" FontWeight="SemiBold" Classes="accent" />
+                                    </Border>
+                                </WrapPanel>
+                                <StackPanel Grid.Column="1" Orientation="Horizontal">
+                                    <Button Classes="icon flat" Command="{Binding KnowCommand}" AutomationProperties.Name="I know it">
+                                        <ic:SymbolIcon Symbol="CheckmarkStarburst" FontSize="18" />
+                                    </Button>
+                                    <Button Classes="icon flat" Command="{Binding HideCommand}" AutomationProperties.Name="Hide from the cards">
+                                        <ic:SymbolIcon Symbol="EyeOff" FontSize="18" />
+                                    </Button>
+                                    <Button Classes="icon flat" Command="{Binding SkipCommand}" AutomationProperties.Name="Skip">
+                                        <ic:SymbolIcon Symbol="ArrowNext" FontSize="18" />
+                                    </Button>
+                                </StackPanel>
                             </Grid>
 
                             <!-- The front: a tap shows the answer -->
@@ -339,8 +403,35 @@
                                 </StackPanel>
                             </Button>
 
+                            <!-- Type cards: the word typed here, checked on Enter or Check -->
+                            <Grid ColumnDefinitions="*,8,Auto" IsVisible="{Binding IsTyping}" Margin="0,0,0,8">
+                                <TextBox x:Name="TypeBox" FontSize="18" PlaceholderText="Type the word" Text="{Binding Typed}" AutomationProperties.Name="Type the word">
+                                    <TextBox.KeyBindings>
+                                        <KeyBinding Gesture="Enter" Command="{Binding CheckCommand}" />
+                                    </TextBox.KeyBindings>
+                                </TextBox>
+                                <Button Grid.Column="2" Classes="accent" Content="Check" Command="{Binding CheckCommand}" />
+                            </Grid>
+
                             <!-- The answer, what helps to use it, how it is built, then the user's own verdict -->
                             <StackPanel IsVisible="{Binding IsRevealed}" Spacing="4">
+                                <!-- What was typed, letter by letter against the word -->
+                                <StackPanel IsVisible="{Binding HasAnswer}" HorizontalAlignment="Center" Spacing="2" Margin="0,0,0,6">
+                                    <ItemsControl ItemsSource="{Binding AnswerPieces}" HorizontalAlignment="Center">
+                                        <ItemsControl.ItemsPanel>
+                                            <ItemsPanelTemplate>
+                                                <StackPanel Orientation="Horizontal" />
+                                            </ItemsPanelTemplate>
+                                        </ItemsControl.ItemsPanel>
+                                        <ItemsControl.ItemTemplate>
+                                            <DataTemplate x:DataType="vm:VocabAnswerPiece">
+                                                <TextBlock Text="{Binding Text}" Classes="piece" Classes.wrong="{Binding IsWrong}" Classes.missing="{Binding IsMissing}" />
+                                            </DataTemplate>
+                                        </ItemsControl.ItemTemplate>
+                                    </ItemsControl>
+                                    <TextBlock Text="{Binding AnswerMessage}" Classes="verdict" Classes.correct="{Binding AnswerIsCorrect}" Classes.close="{Binding AnswerIsClose}"
+                                               FontWeight="SemiBold" HorizontalAlignment="Center" TextWrapping="Wrap" TextAlignment="Center" />
+                                </StackPanel>
                                 <TextBlock Text="{Binding Text}" FontSize="34" FontWeight="SemiBold" HorizontalAlignment="Center" TextWrapping="Wrap"
                                            IsVisible="{Binding ShowsWordOnReveal}" />
                                 <WrapPanel HorizontalAlignment="Center">
@@ -399,10 +490,10 @@
                     </StackPanel>
                 </Border>
 
-                <Border Classes="infobar" IsVisible="{Binding HasPending}" Margin="0,4,0,0">
+                <Border Classes="infobar" IsVisible="{Binding HasAgentWork}" Margin="0,4,0,0">
                     <StackPanel Spacing="6">
-                        <TextBlock Text="{Binding PendingText}" TextWrapping="Wrap" />
-                        <TextBlock Text="Helm on your PC breaks them down with Claude Code (by itself when that is on); the result syncs here." Classes="secondary" TextWrapping="Wrap" />
+                        <TextBlock Text="{Binding AgentWorkText}" TextWrapping="Wrap" />
+                        <TextBlock Text="Helm on your PC does this with Claude Code (by itself when that is on); the result syncs here." Classes="secondary" TextWrapping="Wrap" />
                     </StackPanel>
                 </Border>
 
@@ -430,6 +521,15 @@
                             <Button Classes="icon flat" Command="{Binding Detail.YouGlishCommand}" IsVisible="{Binding Detail.ShowYouGlish}" AutomationProperties.Name="YouGlish">
                                 <ic:SymbolIcon Symbol="Video" FontSize="18" />
                             </Button>
+                            <Button Classes="icon flat" Command="{Binding Detail.KnowCommand}" IsVisible="{Binding !Detail.IsPending}" AutomationProperties.Name="I know it">
+                                <ic:SymbolIcon Symbol="CheckmarkStarburst" FontSize="18" />
+                            </Button>
+                            <Button Classes="icon flat" Command="{Binding Detail.ToggleHiddenCommand}" AutomationProperties.Name="Hide from the cards, or show again">
+                                <Panel>
+                                    <ic:SymbolIcon Symbol="EyeOff" FontSize="18" IsVisible="{Binding !Detail.IsHidden}" />
+                                    <ic:SymbolIcon Symbol="Eye" FontSize="18" IsVisible="{Binding Detail.IsHidden}" />
+                                </Panel>
+                            </Button>
                             <Button Classes="icon flat" Command="{Binding Detail.Editor.BeginCommand}" AutomationProperties.Name="Edit the word">
                                 <ic:SymbolIcon Symbol="Edit" FontSize="18" />
                             </Button>
@@ -453,7 +553,15 @@
                                 <TextBlock Text="{Binding Word.Meaning}" FontSize="17" TextWrapping="Wrap" />
                                 <TextBlock Text="{Binding Word.Explanation}" Classes="secondary" TextWrapping="Wrap" IsVisible="{Binding HasExplanation}" />
                                 <TextBlock Text="{Binding Word.Note, StringFormat='Your note: {0}'}" Classes="secondary" FontStyle="Italic" TextWrapping="Wrap" IsVisible="{Binding HasNote}" />
-                                <TextBlock Text="{Binding LevelText}" Classes="secondary" FontSize="12" Margin="0,0,0,6" />
+                                <TextBlock Text="{Binding LevelText}" Classes="secondary" FontSize="12" />
+                                <WrapPanel Margin="0,0,0,6">
+                                    <Border Classes="badge" IsVisible="{Binding IsHard}" Margin="0,2,6,2">
+                                        <TextBlock Text="Often forgotten: Claude Code writes a new way to remember it" FontSize="11" FontWeight="SemiBold" Foreground="#E5A50A" TextWrapping="Wrap" />
+                                    </Border>
+                                    <Border Classes="badge" IsVisible="{Binding IsHidden}" Margin="0,2">
+                                        <TextBlock Text="Hidden from the cards" FontSize="11" FontWeight="SemiBold" Classes="secondary" />
+                                    </Border>
+                                </WrapPanel>
                                 <ContentControl Content="{Binding Info}" ContentTemplate="{StaticResource InfoView}" />
                                 <Border Classes="infobar" IsVisible="{Binding IsPending}" Margin="0,6,0,0">
                                     <TextBlock Text="{Binding PendingText}" TextWrapping="Wrap" />
@@ -479,6 +587,12 @@
                                     <TextBox Text="{Binding Collocations}" AutomationProperties.Name="Collocations" />
                                     <TextBlock Text="Easy to mix up with: one per line, word | what tells them apart" Classes="secondary" TextWrapping="Wrap" />
                                     <TextBox Text="{Binding Confusables}" TextWrapping="Wrap" AcceptsReturn="True" AutomationProperties.Name="Confusables" />
+                                    <TextBlock Text="Word family: one per line, word | part of speech | meaning" Classes="secondary" TextWrapping="Wrap" />
+                                    <TextBox Text="{Binding Forms}" TextWrapping="Wrap" AcceptsReturn="True" AutomationProperties.Name="Word family" />
+                                    <TextBlock Text="Similar: separated by commas" Classes="secondary" />
+                                    <TextBox Text="{Binding Synonyms}" AutomationProperties.Name="Synonyms" />
+                                    <TextBlock Text="Opposite: separated by commas" Classes="secondary" />
+                                    <TextBox Text="{Binding Antonyms}" AutomationProperties.Name="Antonyms" />
                                     <TextBlock Text="Level (B1, HSK3)" Classes="secondary" />
                                     <TextBox Text="{Binding Level}" AutomationProperties.Name="Level" />
                                     <TextBlock Text="Part of speech" Classes="secondary" />
