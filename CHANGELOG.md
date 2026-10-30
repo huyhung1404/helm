@@ -3,7 +3,7 @@
 All notable changes to Helm. The top section is used as the GitHub release body and as the Velopack release notes.
 Format: [Keep a Changelog](https://keepachangelog.com), versions follow [SemVer](https://semver.org).
 
-## [Unreleased]
+## [0.61.0] - 2026-10-30
 
 ### Added
 - **Vocabulary: words come back when you are about to forget them.** Each word climbs eight levels as you remember
