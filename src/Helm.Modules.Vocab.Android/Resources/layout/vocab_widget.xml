@@ -1,11 +1,19 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- The Vocabulary widget: one word; a tap on it shows the reading, the meaning and each part with its meaning, with
-     Forgot and Remembered. The title opens Helm; the arrow skips to another word. With the meaning shown, the title row
-     goes and the word gets smaller, so everything fits a 4 x 2 widget. -->
+<!-- The Vocabulary widget: one word; a tap on it shows the reading, the meaning, each part and an example in a list
+     that scrolls when it is long. Forgot and Remembered are small round buttons on the top row, so they always fit.
+     The title opens Helm (on the word once its meaning shows); the arrow skips to another word. The background is a
+     picture so its colour and opacity can follow the settings. -->
 <FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
-    android:layout_height="match_parent"
-    android:background="@drawable/vocab_widget_background">
+    android:layout_height="match_parent">
+
+    <ImageView
+        android:id="@+id/vocab_widget_bg"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:scaleType="fitXY"
+        android:src="@drawable/vocab_widget_background"
+        android:importantForAccessibility="no" />
 
     <TextView
         android:id="@+id/vocab_widget_empty"
@@ -22,7 +30,10 @@
         android:layout_width="match_parent"
         android:layout_height="match_parent"
         android:orientation="vertical"
-        android:padding="12dp">
+        android:paddingStart="12dp"
+        android:paddingEnd="8dp"
+        android:paddingTop="8dp"
+        android:paddingBottom="10dp">
 
         <LinearLayout
             android:id="@+id/vocab_widget_header"
@@ -42,15 +53,37 @@
                 android:singleLine="true" />
 
             <ImageView
+                android:id="@+id/vocab_widget_forgot"
+                android:layout_width="30dp"
+                android:layout_height="30dp"
+                android:padding="6dp"
+                android:background="@drawable/vocab_widget_round"
+                android:src="@drawable/vocab_widget_forgot"
+                android:contentDescription="Forgot"
+                android:visibility="gone" />
+
+            <ImageView
+                android:id="@+id/vocab_widget_remembered"
+                android:layout_width="30dp"
+                android:layout_height="30dp"
+                android:layout_marginStart="8dp"
+                android:padding="6dp"
+                android:background="@drawable/vocab_widget_round_accent"
+                android:src="@drawable/vocab_widget_remembered"
+                android:contentDescription="Remembered"
+                android:visibility="gone" />
+
+            <ImageView
                 android:id="@+id/vocab_widget_skip"
-                android:layout_width="32dp"
-                android:layout_height="32dp"
+                android:layout_width="30dp"
+                android:layout_height="30dp"
+                android:layout_marginStart="4dp"
                 android:padding="6dp"
                 android:src="@drawable/vocab_widget_skip"
                 android:contentDescription="Another word" />
         </LinearLayout>
 
-        <!-- Tap: show the meaning -->
+        <!-- Before the answer: the word alone; a tap shows the meaning -->
         <LinearLayout
             android:id="@+id/vocab_widget_word_area"
             android:layout_width="match_parent"
@@ -77,74 +110,18 @@
                 android:text="Tap to see the meaning"
                 android:textSize="12sp"
                 android:textColor="@color/vocab_widget_secondary" />
-
-            <LinearLayout
-                android:id="@+id/vocab_widget_answer"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:orientation="vertical"
-                android:gravity="center_horizontal"
-                android:visibility="gone">
-
-                <TextView
-                    android:id="@+id/vocab_widget_phonetic"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:textSize="13sp"
-                    android:textColor="@color/vocab_widget_secondary"
-                    android:singleLine="true" />
-
-                <TextView
-                    android:id="@+id/vocab_widget_meaning"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:textSize="15sp"
-                    android:textColor="@color/vocab_widget_text"
-                    android:maxLines="2"
-                    android:ellipsize="end"
-                    android:gravity="center" />
-
-                <TextView
-                    android:id="@+id/vocab_widget_parts"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="2dp"
-                    android:textSize="12sp"
-                    android:textColor="@color/vocab_widget_accent"
-                    android:maxLines="2"
-                    android:ellipsize="end" />
-
-                <LinearLayout
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:orientation="horizontal"
-                    android:layout_marginTop="6dp">
-
-                    <TextView
-                        android:id="@+id/vocab_widget_forgot"
-                        android:layout_width="0dp"
-                        android:layout_height="36dp"
-                        android:layout_weight="1"
-                        android:layout_marginEnd="8dp"
-                        android:background="@drawable/vocab_widget_button"
-                        android:gravity="center"
-                        android:text="Forgot"
-                        android:textSize="14sp"
-                        android:textColor="@color/vocab_widget_text" />
-
-                    <TextView
-                        android:id="@+id/vocab_widget_remembered"
-                        android:layout_width="0dp"
-                        android:layout_height="36dp"
-                        android:layout_weight="1"
-                        android:background="@drawable/vocab_widget_button_accent"
-                        android:gravity="center"
-                        android:text="Remembered"
-                        android:textSize="14sp"
-                        android:textStyle="bold"
-                        android:textColor="@color/vocab_widget_on_accent" />
-                </LinearLayout>
-            </LinearLayout>
         </LinearLayout>
+
+        <!-- The answer: scrolls with a swipe when it does not fit -->
+        <ListView
+            android:id="@+id/vocab_widget_list"
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="1"
+            android:layout_marginTop="2dp"
+            android:divider="@null"
+            android:dividerHeight="0dp"
+            android:scrollbarStyle="outsideOverlay"
+            android:visibility="gone" />
     </LinearLayout>
 </FrameLayout>

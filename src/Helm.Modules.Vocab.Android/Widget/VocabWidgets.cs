@@ -1,5 +1,9 @@
 using Android.Appwidget;
 using Android.Content;
+using Android.Content.Res;
+using Android.Graphics;
+using Android.Text;
+using Android.Text.Style;
 using Helm.Core;
 using Helm.Core.Settings;
 using Microsoft.Extensions.DependencyInjection;
@@ -7,14 +11,29 @@ using Microsoft.Extensions.Logging;
 using PendingIntent = Android.App.PendingIntent;
 using PendingIntentFlags = Android.App.PendingIntentFlags;
 using RemoteViews = Android.Widget.RemoteViews;
+using AndroidUri = Android.Net.Uri;
 using ViewStates = Android.Views.ViewStates;
 
 namespace Helm.Modules.Vocab;
 
+/// <summary>One line of the widget's answer list: what it says and how it looks.</summary>
+internal enum VocabWidgetLineKind
+{
+    Word,
+    Reading,
+    Meaning,
+    Part,
+    Example,
+}
+
+internal sealed record VocabWidgetLine(string Text, VocabWidgetLineKind Kind);
+
 /// <summary>
 /// Draws the Vocabulary widgets and handles their taps. Each widget remembers its word and whether the meaning is
-/// shown. Runs in the app process, possibly without the activity (Android starts the provider on its own), so
-/// services come from <see cref="HelmAndroidServices"/>.
+/// shown; the answer is a list that scrolls when it is long, with Forgot and Remembered as small buttons on the top
+/// row. Colours follow the widget settings (background, opacity, text), as on Tracker and Wallet. Runs in the app
+/// process, possibly without the activity (Android starts the provider on its own), so services come from
+/// <see cref="HelmAndroidServices"/>.
 /// </summary>
 internal static class VocabWidgets
 {
@@ -89,7 +108,8 @@ internal static class VocabWidgets
     public static void Update(Context context, AppWidgetManager manager, int widgetId)
     {
         var views = new RemoteViews(context.PackageName, R.Layout(context, "vocab_widget"));
-        var (enabled, store) = Load();
+        var (enabled, store, look) = Load();
+        var colours = Colours.For(context, look);
         var word = store is null || WordId(context, widgetId) is not { } id ? null : store.GetWord(id);
         if (store is not null && enabled && word is not { IsAnalyzed: true })
         {
@@ -100,6 +120,10 @@ internal static class VocabWidgets
         }
         var revealed = word is not null && IsRevealed(context, widgetId);
 
+        var bg = R.Id(context, "vocab_widget_bg");
+        views.SetInt(bg, "setColorFilter", look.BackgroundColor is { } solid ? unchecked((int)(solid | 0xFF000000)) : 0);
+        views.SetInt(bg, "setImageAlpha", look.Alpha);
+
         var hasWord = enabled && word is not null;
         views.SetViewVisibility(R.Id(context, "vocab_widget_card"), hasWord ? ViewStates.Visible : ViewStates.Gone);
         views.SetViewVisibility(R.Id(context, "vocab_widget_empty"), hasWord ? ViewStates.Gone : ViewStates.Visible);
@@ -107,36 +131,107 @@ internal static class VocabWidgets
             ? "Vocabulary is turned off. Turn it on in Helm."
             : store is null ? "Open Helm to load your words."
             : "Add words in Helm. Once an AI agent breaks them down, they show up here to guess.");
+        views.SetTextColor(R.Id(context, "vocab_widget_empty"), colours.Secondary);
+        views.SetTextColor(R.Id(context, "vocab_widget_title"), colours.Secondary);
+        views.SetTextColor(R.Id(context, "vocab_widget_word"), colours.Main);
+        views.SetTextColor(R.Id(context, "vocab_widget_hint"), colours.Secondary);
+        views.SetInt(R.Id(context, "vocab_widget_skip"), "setColorFilter", colours.Secondary.ToArgb());
+        views.SetInt(R.Id(context, "vocab_widget_forgot"), "setColorFilter", colours.Main.ToArgb());
         if (hasWord)
         {
             views.SetTextViewText(R.Id(context, "vocab_widget_word"), word!.Text);
-            // With the meaning shown there is a lot to fit: the title row goes and the word gets smaller.
-            views.SetViewVisibility(R.Id(context, "vocab_widget_header"), revealed ? ViewStates.Gone : ViewStates.Visible);
-            views.SetTextViewTextSize(R.Id(context, "vocab_widget_word"), (int)Android.Util.ComplexUnitType.Sp, revealed ? 22 : 28);
-            views.SetViewVisibility(R.Id(context, "vocab_widget_hint"), revealed ? ViewStates.Gone : ViewStates.Visible);
-            views.SetViewVisibility(R.Id(context, "vocab_widget_answer"), revealed ? ViewStates.Visible : ViewStates.Gone);
-            var reading = string.Join("  ", new[] { word.Phonetic, word.HanViet, word.Traditional }.Where(s => s.Length > 0));
-            views.SetTextViewText(R.Id(context, "vocab_widget_phonetic"), reading);
-            views.SetTextViewText(R.Id(context, "vocab_widget_meaning"), word.Meaning);
-            // Each part with its meaning: enough to remember a forgotten word at once.
-            var parts = string.Join(Environment.NewLine, VocabTree.Lines(store!, word));
-            views.SetTextViewText(R.Id(context, "vocab_widget_parts"), parts);
-            views.SetViewVisibility(R.Id(context, "vocab_widget_parts"), parts.Length > 0 ? ViewStates.Visible : ViewStates.Gone);
+            views.SetViewVisibility(R.Id(context, "vocab_widget_word_area"), revealed ? ViewStates.Gone : ViewStates.Visible);
+            views.SetViewVisibility(R.Id(context, "vocab_widget_list"), revealed ? ViewStates.Visible : ViewStates.Gone);
+            views.SetViewVisibility(R.Id(context, "vocab_widget_forgot"), revealed ? ViewStates.Visible : ViewStates.Gone);
+            views.SetViewVisibility(R.Id(context, "vocab_widget_remembered"), revealed ? ViewStates.Visible : ViewStates.Gone);
+            if (revealed) SetList(context, views, widgetId, Lines(store!, word), colours);
         }
 
         views.SetOnClickPendingIntent(R.Id(context, "vocab_widget_word_area"), Broadcast(context, widgetId, ActionReveal, 0));
         views.SetOnClickPendingIntent(R.Id(context, "vocab_widget_remembered"), Broadcast(context, widgetId, ActionRemembered, 1));
         views.SetOnClickPendingIntent(R.Id(context, "vocab_widget_forgot"), Broadcast(context, widgetId, ActionForgot, 2));
         views.SetOnClickPendingIntent(R.Id(context, "vocab_widget_skip"), Broadcast(context, widgetId, ActionSkip, 3));
-        // The parts open the word in Helm with its whole tree.
-        if (OpenAppIntent(context, RequestCode(widgetId, 5), WordId(context, widgetId)) is { } openWord)
-            views.SetOnClickPendingIntent(R.Id(context, "vocab_widget_parts"), openWord);
-        if (OpenAppIntent(context, RequestCode(widgetId, 4)) is { } open)
+        // The title, and a tap on the answer, open the word in Helm with its whole tree.
+        var wordId = revealed ? WordId(context, widgetId) : null;
+        if (OpenAppIntent(context, RequestCode(widgetId, 4), wordId) is { } open)
         {
             views.SetOnClickPendingIntent(R.Id(context, "vocab_widget_title"), open);
             views.SetOnClickPendingIntent(R.Id(context, "vocab_widget_empty"), open);
         }
+        if (revealed && OpenAppIntent(context, RequestCode(widgetId, 5), wordId, mutable: true) is { } openWord)
+            views.SetPendingIntentTemplate(R.Id(context, "vocab_widget_list"), openWord);
         manager.UpdateAppWidget(widgetId, views);
+        if (revealed && !OperatingSystem.IsAndroidVersionAtLeast(31))
+            manager.NotifyAppWidgetViewDataChanged(widgetId, R.Id(context, "vocab_widget_list"));
+    }
+
+    /// <summary>The answer, line by line: the word, its reading, its meaning, each part with its meaning, an example.</summary>
+    internal static IReadOnlyList<VocabWidgetLine> Lines(VocabStore store, VocabWord word)
+    {
+        var lines = new List<VocabWidgetLine> { new(word.Text, VocabWidgetLineKind.Word) };
+        var reading = string.Join("  ", new[] { word.Phonetic, word.HanViet, word.Traditional }.Where(s => s.Length > 0));
+        if (reading.Length > 0) lines.Add(new(reading, VocabWidgetLineKind.Reading));
+        lines.Add(new(word.Meaning, VocabWidgetLineKind.Meaning));
+        lines.AddRange(VocabTree.Lines(store, word).Select(l => new VocabWidgetLine(l, VocabWidgetLineKind.Part)));
+        if (word.Examples.FirstOrDefault() is { } example)
+        {
+            lines.Add(new(example.Sentence, VocabWidgetLineKind.Example));
+            if (example.Translation.Length > 0) lines.Add(new(example.Translation, VocabWidgetLineKind.Example));
+        }
+        return lines;
+    }
+
+    /// <summary>The lines of a widget whose meaning is shown (the list service asks for them before Android 12).</summary>
+    internal static (IReadOnlyList<VocabWidgetLine> Lines, Colours Colours) LinesOf(Context context, int widgetId)
+    {
+        var (_, store, look) = Load();
+        var colours = Colours.For(context, look);
+        if (store is null || WordId(context, widgetId) is not { } id || store.GetWord(id) is not { IsAnalyzed: true } word) return ([], colours);
+        return (Lines(store, word), colours);
+    }
+
+    internal static RemoteViews BuildLine(Context context, VocabWidgetLine line, Colours colours)
+    {
+        var row = new RemoteViews(context.PackageName, R.Layout(context, "vocab_widget_line"));
+        var view = R.Id(context, "vocab_widget_line");
+        var (size, colour, bold) = line.Kind switch
+        {
+            VocabWidgetLineKind.Word => (22, colours.Main, true),
+            VocabWidgetLineKind.Reading => (13, colours.Secondary, false),
+            VocabWidgetLineKind.Meaning => (15, colours.Main, false),
+            VocabWidgetLineKind.Part => (12, colours.Accent, false),
+            _ => (12, colours.Secondary, false),
+        };
+        if (bold)
+        {
+            var text = new SpannableString(line.Text);
+            text.SetSpan(new StyleSpan(TypefaceStyle.Bold), 0, line.Text.Length, SpanTypes.ExclusiveExclusive);
+            row.SetTextViewText(view, text);
+        }
+        else row.SetTextViewText(view, line.Text);
+        row.SetTextViewTextSize(view, (int)Android.Util.ComplexUnitType.Sp, size);
+        row.SetTextColor(view, colour);
+        // Any line opens the word in Helm (the list's template carries the word).
+        row.SetOnClickFillInIntent(view, new Intent());
+        return row;
+    }
+
+    private static void SetList(Context context, RemoteViews views, int widgetId, IReadOnlyList<VocabWidgetLine> lines, Colours colours)
+    {
+        var list = R.Id(context, "vocab_widget_list");
+        if (OperatingSystem.IsAndroidVersionAtLeast(31))
+        {
+            // Android 12+: the lines travel with the widget itself (no service).
+            var items = new RemoteViews.RemoteCollectionItems.Builder().SetHasStableIds(false)!.SetViewTypeCount(1)!;
+            for (var i = 0; i < lines.Count; i++) items.AddItem(i, BuildLine(context, lines[i], colours));
+            views.SetRemoteAdapter(list, items.Build()!);
+            return;
+        }
+        // Lines come from VocabWidgetService; the data URI keeps one factory per widget.
+        var adapter = new Intent(context, typeof(VocabWidgetService));
+        adapter.PutExtra(AppWidgetManager.ExtraAppwidgetId, widgetId);
+        adapter.SetData(AndroidUri.Parse(adapter.ToUri(IntentUriType.Scheme)));
+        views.SetRemoteAdapter(list, adapter);
     }
 
     /// <summary>Whether the launcher can place a widget when the app asks (Android 8+, most launchers).</summary>
@@ -168,19 +263,20 @@ internal static class VocabWidgets
     private static int[] Ids(Context context, AppWidgetManager manager) =>
         manager.GetAppWidgetIds(new ComponentName(context, Java.Lang.Class.FromType(typeof(VocabWidgetProvider)))) ?? [];
 
-    private static (bool Enabled, VocabStore? Store) Load()
+    private static (bool Enabled, VocabStore? Store, WidgetLook Look) Load()
     {
         try
         {
             var services = HelmAndroidServices.Current;
-            var general = services.GetRequiredService<ISettingsStoreFactory>().Get<GeneralSettings>(GeneralSettings.StoreId).Current;
+            var settings = services.GetRequiredService<ISettingsStoreFactory>();
+            var general = settings.Get<GeneralSettings>(GeneralSettings.StoreId).Current;
             var enabled = !general.EnabledModules.TryGetValue(VocabIds.ModuleId, out var on) || on;
-            return (enabled, services.GetRequiredService<VocabStore>());
+            return (enabled, services.GetRequiredService<VocabStore>(), settings.Get<VocabSettings>(VocabIds.ModuleId).Current.WidgetLook);
         }
         catch (Exception ex)
         {
             Log(ex, "Could not load the Vocabulary widget data");
-            return (true, null);
+            return (true, null, new WidgetLook(WidgetBackground.Card, 100, WidgetText.Automatic));
         }
     }
 
@@ -205,7 +301,8 @@ internal static class VocabWidgets
         return PendingIntent.GetBroadcast(context, RequestCode(widgetId, slot), intent, PendingIntentFlags.UpdateCurrent | PendingIntentFlags.Immutable)!;
     }
 
-    private static PendingIntent? OpenAppIntent(Context context, int requestCode, string? wordId = null)
+    /// <param name="mutable">A list's click template: each line fills in its own (empty) extras.</param>
+    private static PendingIntent? OpenAppIntent(Context context, int requestCode, string? wordId = null, bool mutable = false)
     {
         var launch = context.PackageManager?.GetLaunchIntentForPackage(context.PackageName!);
         if (launch is null) return null;
@@ -213,10 +310,29 @@ internal static class VocabWidgets
         launch.PutExtra(ShellIntents.ExtraModule, VocabIds.ModuleId);
         // The page opens this word with its whole tree (ShellIntents hands it over).
         if (wordId is not null) launch.PutExtra(ShellIntents.ExtraItem, wordId);
-        return PendingIntent.GetActivity(context, requestCode, launch, PendingIntentFlags.UpdateCurrent | PendingIntentFlags.Immutable);
+        var flags = !mutable ? PendingIntentFlags.UpdateCurrent | PendingIntentFlags.Immutable
+            : OperatingSystem.IsAndroidVersionAtLeast(31) ? PendingIntentFlags.UpdateCurrent | PendingIntentFlags.Mutable
+            : PendingIntentFlags.UpdateCurrent;
+        return PendingIntent.GetActivity(context, requestCode, launch, flags);
     }
 
     private static int RequestCode(int widgetId, int slot) => widgetId * 8 + slot;
+
+    /// <summary>The widget's colours on its background: the settings', or the phone theme's when they follow it.</summary>
+    internal sealed record Colours(Color Main, Color Secondary, Color Accent)
+    {
+        public static Colours For(Context context, WidgetLook look)
+        {
+            var night = ((context.Resources?.Configuration?.UiMode ?? UiMode.NightNo) & UiMode.NightMask) == UiMode.NightYes;
+            var dark = look.LightText ?? night;
+            var (main, secondary) = look.TextColors ?? (night ? (0xFFFFFFFFu, 0xFFC5C5C5u) : (0xFF1A1A1Au, 0xFF5F5F5Fu));
+            // On the accent background the accent would vanish: the parts take the main colour there.
+            var accent = look.Background == WidgetBackground.Accent ? main : dark ? 0xFF4CC2FFu : 0xFF0067C0u;
+            return new Colours(Of(main), Of(secondary), Of(accent));
+        }
+
+        private static Color Of(uint argb) => new(unchecked((int)argb));
+    }
 
     private static void Log(Exception ex, string message)
     {

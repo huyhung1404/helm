@@ -28,8 +28,14 @@ public partial class VocabPage : ModulePageBase
         AddWidgetButton.IsVisible = VocabWidgets.CanRequestPin(Android.App.Application.Context);
         viewModel.Settings.PropertyChanged += (_, e) =>
         {
-            if (e.PropertyName != nameof(VocabSettingsViewModel.LockScreenWord)) return;
             var context = Android.App.Application.Context;
+            if (e.PropertyName is nameof(VocabSettingsViewModel.WidgetBackgroundIndex) or nameof(VocabSettingsViewModel.WidgetOpacity)
+                or nameof(VocabSettingsViewModel.WidgetTextIndex))
+            {
+                VocabWidgets.RefreshAll(context);
+                return;
+            }
+            if (e.PropertyName != nameof(VocabSettingsViewModel.LockScreenWord)) return;
             if (viewModel.Settings.LockScreenWord) VocabLockScreen.AskPermissionOnce(context);
             VocabLockScreen.Refresh(context);
         };

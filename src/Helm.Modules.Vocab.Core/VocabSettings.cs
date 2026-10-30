@@ -56,6 +56,16 @@ public sealed class VocabSettings : IVersionedSettings
 
     public double? PopupBottom { get; set; }
 
+    /// <summary>Android widget background (see <see cref="Helm.Core.Settings.WidgetLook"/>).</summary>
+    public WidgetBackground WidgetBackground { get; set; } = WidgetBackground.Card;
+
+    /// <summary>Android widget background opacity, 0-100 %.</summary>
+    public int WidgetOpacity { get; set; } = 100;
+
+    public WidgetText WidgetText { get; set; } = WidgetText.Automatic;
+
+    public WidgetLook WidgetLook => new(WidgetBackground, WidgetOpacity, WidgetText);
+
     public void Migrate(int fromVersion)
     {
     }

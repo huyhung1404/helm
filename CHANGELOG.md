@@ -3,6 +3,17 @@
 All notable changes to Helm. The top section is used as the GitHub release body and as the Velopack release notes.
 Format: [Keep a Changelog](https://keepachangelog.com), versions follow [SemVer](https://semver.org).
 
+## [Unreleased]
+
+### Changed
+- **Vocabulary widget (Android): a long answer no longer pushes the buttons off the widget.** The meaning, the reading,
+  each part and an example are in a list you swipe up and down; Forgot and Remembered are small ✗ and ✓ buttons on
+  the top row, so they always show. A tap on the answer opens the word in Helm.
+
+### Added
+- **Vocabulary widget (Android): background, opacity and text colour,** as on the Tracker and Wallet widgets
+  (Vocabulary settings → Home-screen widget).
+
 ## [0.63.0] - 2026-10-30
 
 ### Added

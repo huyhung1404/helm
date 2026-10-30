@@ -426,6 +426,29 @@ public sealed class VocabPracticeTests
         Assert.Equal("", viewModel.WordPosition);
     }
 
+    // ---- the phone widget's look ---------------------------------------------------------------------------------
+
+    [Fact]
+    public void The_widget_look_is_saved_and_transparent_starts_see_through()
+    {
+        using var dir = new TempDir();
+        using var factory = new SettingsStoreFactory(new HelmPaths(dir.Path));
+        var settings = VocabKit.Settings(factory);
+        var changed = new List<string>();
+        settings.Changed += (_, name) => changed.Add(name);
+        Assert.Equal(100, settings.WidgetOpacity);
+
+        settings.WidgetBackgroundIndex = (int)Helm.Core.Settings.WidgetBackground.Transparent;
+        Assert.Equal(Helm.Core.Settings.WidgetLook.TransparentOpacity, settings.WidgetOpacity);
+        settings.WidgetOpacity = 60;
+        settings.WidgetTextIndex = (int)Helm.Core.Settings.WidgetText.Light;
+        var look = settings.Current.WidgetLook;
+        Assert.Equal(Helm.Core.Settings.WidgetBackground.Transparent, look.Background);
+        Assert.Equal(60, look.Opacity);
+        Assert.True(look.LightText);
+        Assert.Contains(nameof(VocabSettingsViewModel.WidgetOpacity), changed);
+    }
+
     // ---- the agent working by itself -----------------------------------------------------------------------------
 
     [Fact]

@@ -50,6 +50,11 @@ public sealed partial class VocabSettingsViewModel : ObservableObject
     /// <summary>What is wrong with the typed range; empty when it is saved.</summary>
     [ObservableProperty] private string _customError = "";
 
+    // The Android widget's look, as on Tracker and Wallet.
+    [ObservableProperty] private int _widgetBackgroundIndex;
+    [ObservableProperty] private int _widgetOpacity;
+    [ObservableProperty] private int _widgetTextIndex;
+
     public VocabSettingsViewModel(ISettingsStore<VocabSettings> settings)
     {
         _settings = settings;
@@ -66,6 +71,9 @@ public sealed partial class VocabSettingsViewModel : ObservableObject
         PopupFrequencyIndex = s.PopupCustom ? CustomFrequencyIndex : FrequencyIndex(s.PopupMinSeconds, s.PopupMaxSeconds);
         CustomFromText = s.PopupMinSeconds.ToString(System.Globalization.CultureInfo.CurrentCulture);
         CustomToText = s.PopupMaxSeconds.ToString(System.Globalization.CultureInfo.CurrentCulture);
+        WidgetBackgroundIndex = (int)s.WidgetBackground;
+        WidgetOpacity = Math.Clamp(s.WidgetOpacity, 0, 100);
+        WidgetTextIndex = (int)s.WidgetText;
         _loading = false;
     }
 
@@ -84,6 +92,29 @@ public sealed partial class VocabSettingsViewModel : ObservableObject
     public IReadOnlyList<string> PopupFrequencyNames { get; } = [.. PopupFrequencies.Select(f => f.Name), "Custom (type the seconds)"];
 
     public bool IsCustomFrequency => PopupFrequencyIndex == CustomFrequencyIndex;
+
+    public IReadOnlyList<string> WidgetBackgroundNames => WidgetLook.BackgroundNames;
+
+    public IReadOnlyList<string> WidgetTextNames => WidgetLook.TextNames;
+
+    partial void OnWidgetBackgroundIndexChanged(int oldValue, int newValue)
+    {
+        if (_loading) return;
+        var background = (WidgetBackground)Math.Clamp(newValue, 0, WidgetLook.BackgroundNames.Count - 1);
+        // Picking Transparent from a solid background starts see-through.
+        var opacity = WidgetLook.OpacityAfter((WidgetBackground)Math.Max(oldValue, 0), background, WidgetOpacity);
+        Save(nameof(WidgetBackgroundIndex), s =>
+        {
+            s.WidgetBackground = background;
+            s.WidgetOpacity = opacity;
+        });
+        WidgetOpacity = opacity;
+    }
+
+    partial void OnWidgetOpacityChanged(int value) => Save(nameof(WidgetOpacity), s => s.WidgetOpacity = Math.Clamp(value, 0, 100));
+
+    partial void OnWidgetTextIndexChanged(int value) =>
+        Save(nameof(WidgetTextIndex), s => s.WidgetText = (WidgetText)Math.Clamp(value, 0, WidgetLook.TextNames.Count - 1));
 
     public bool HasCustomError => CustomError.Length > 0;
 

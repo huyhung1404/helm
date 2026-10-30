@@ -37,8 +37,16 @@
             <StackPanel Spacing="8">
                 <TextBlock Text="A word to guess on your home screen" Classes="title" />
                 <TextBlock Classes="secondary" TextWrapping="Wrap"
-                           Text="Tap the word to see its meaning, then say whether you remembered. Each unlock brings a new word (while Helm runs), and words you forget come back more often." />
+                           Text="Tap the word to see its meaning (swipe the answer up and down when it is long), then tap ✓ remembered or ✗ forgot. Each unlock brings a new word (while Helm runs), and words you forget come back more often." />
                 <Button x:Name="AddWidgetButton" Content="Add the widget" Click="AddWidget_Click" />
+                <TextBlock Text="Background" Classes="secondary" Margin="0,4,0,0" />
+                <ComboBox HorizontalAlignment="Stretch" ItemsSource="{Binding Settings.WidgetBackgroundNames}" SelectedIndex="{Binding Settings.WidgetBackgroundIndex}"
+                          AutomationProperties.Name="Widget background" />
+                <TextBlock Text="{Binding Settings.WidgetOpacity, StringFormat='Opacity {0}%'}" />
+                <Slider Minimum="0" Maximum="100" TickFrequency="5" IsSnapToTickEnabled="True" Value="{Binding Settings.WidgetOpacity}" AutomationProperties.Name="Widget opacity" />
+                <TextBlock Text="Text" Classes="secondary" />
+                <ComboBox HorizontalAlignment="Stretch" ItemsSource="{Binding Settings.WidgetTextNames}" SelectedIndex="{Binding Settings.WidgetTextIndex}"
+                          AutomationProperties.Name="Widget text colour" />
             </StackPanel>
         </Border>
 
