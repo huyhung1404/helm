@@ -13,6 +13,7 @@ public class NavGroupTests
         ["notes"] = ModuleGroup.Planning,
         ["tracker"] = ModuleGroup.Planning,
         ["missions"] = ModuleGroup.Planning,
+        ["habits"] = ModuleGroup.Planning,
         ["quick-capture"] = ModuleGroup.Planning,
         ["wallet"] = ModuleGroup.MoneyAndMedia,
         ["scratch"] = ModuleGroup.MoneyAndMedia,

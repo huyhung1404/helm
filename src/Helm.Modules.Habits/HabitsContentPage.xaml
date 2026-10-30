@@ -1,0 +1,281 @@
+<Page
+    x:Class="Helm.Modules.Habits.HabitsContentPage"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:sys="clr-namespace:System;assembly=mscorlib"
+    xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
+    xmlns:core="clr-namespace:Helm.Core.Ui;assembly=Helm.Core.Windows"
+    xmlns:local="clr-namespace:Helm.Modules.Habits;assembly=Helm.Modules.Habits.Core"
+    xmlns:self="clr-namespace:Helm.Modules.Habits"
+    Title="Habits">
+
+    <!-- Habits itself (menu and Quick access): the habits to do today, the ones done, and the report. Habits are added
+         and managed on HabitsPage (Home → Utilities). -->
+    <Page.Resources>
+        <!-- A tab button: filled while its Tag (bound to "is this one in front") is true -->
+        <Style x:Key="Segment" TargetType="ui:Button" BasedOn="{StaticResource {x:Type ui:Button}}">
+            <Setter Property="Appearance" Value="Secondary" />
+            <Setter Property="MinWidth" Value="110" />
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding Tag, RelativeSource={RelativeSource Self}}">
+                    <DataTrigger.Value><sys:Boolean>True</sys:Boolean></DataTrigger.Value>
+                    <Setter Property="Appearance" Value="Primary" />
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+
+        <!-- Small icon-only action -->
+        <Style x:Key="RowAction" TargetType="ui:Button" BasedOn="{StaticResource {x:Type ui:Button}}">
+            <Setter Property="Appearance" Value="Transparent" />
+            <Setter Property="Padding" Value="6" />
+            <Setter Property="Margin" Value="4,0,0,0" />
+            <Setter Property="MinWidth" Value="0" />
+            <Setter Property="VerticalAlignment" Value="Center" />
+        </Style>
+
+        <!-- A habit's card: the whole card is a button, tinted and outlined in the colour of its last 30 days -->
+        <Style x:Key="HabitCard" TargetType="Button">
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="Margin" Value="0,0,0,8" />
+            <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+            <Setter Property="FocusVisualStyle" Value="{x:Null}" />
+            <Setter Property="Foreground" Value="{DynamicResource TextFillColorPrimaryBrush}" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Grid>
+                            <Border Background="{DynamicResource CardBackgroundFillColorDefaultBrush}" CornerRadius="8" />
+                            <Border x:Name="Bd" Background="{Binding Tint}" BorderBrush="{Binding Color}" BorderThickness="1.5" CornerRadius="8" Padding="16,12">
+                                <ContentPresenter HorizontalAlignment="Stretch" />
+                            </Border>
+                            <Border x:Name="Hover" CornerRadius="8" Background="{DynamicResource SubtleFillColorSecondaryBrush}" Visibility="Collapsed" IsHitTestVisible="False" />
+                        </Grid>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Hover" Property="Visibility" Value="Visible" />
+                            </Trigger>
+                            <Trigger Property="IsKeyboardFocused" Value="True">
+                                <Setter TargetName="Bd" Property="BorderThickness" Value="2.5" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <DataTemplate x:Key="CardTemplate" DataType="{x:Type local:HabitCard}">
+            <Button Style="{StaticResource HabitCard}" AutomationProperties.Name="{Binding Summary}" ToolTip="{Binding Summary}"
+                    Command="{Binding DataContext.TapCardCommand, RelativeSource={RelativeSource AncestorType=Page}}" CommandParameter="{Binding}">
+                <StackPanel>
+                    <DockPanel>
+                        <ui:SymbolIcon DockPanel.Dock="Right" Symbol="CheckmarkCircle24" Filled="True" FontSize="22" Foreground="{DynamicResource SystemFillColorSuccessBrush}"
+                                       Visibility="{Binding IsDone, Converter={StaticResource BoolToVisibility}}" />
+                        <TextBlock Text="{Binding Title}" FontSize="16" FontWeight="SemiBold" TextWrapping="Wrap" VerticalAlignment="Center" />
+                    </DockPanel>
+                    <self:HabitGrid Margin="0,10,0,0" HorizontalAlignment="Left" Grid="{Binding Grid}"
+                                    Command="{Binding DataContext.TapDayCommand, RelativeSource={RelativeSource AncestorType=Page}}" />
+                </StackPanel>
+            </Button>
+        </DataTemplate>
+
+        <!-- A number on the report -->
+        <Style x:Key="Tile" TargetType="Border" BasedOn="{StaticResource HelmSurface}">
+            <Setter Property="Margin" Value="0,0,8,8" />
+            <Setter Property="MinWidth" Value="150" />
+            <Setter Property="Padding" Value="14,10" />
+        </Style>
+        <Style x:Key="TileValue" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="22" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+        </Style>
+    </Page.Resources>
+
+    <StackPanel Margin="24,16,24,24">
+        <StackPanel Orientation="Horizontal" Margin="0,0,0,20">
+            <Image Source="{x:Static self:HabitsLogo.Image}" Width="32" Height="32" Margin="0,0,12,0" />
+            <TextBlock Text="Habits" FontSize="28" FontWeight="SemiBold" VerticalAlignment="Center" />
+        </StackPanel>
+
+        <!-- Shown while the tool is turned off -->
+        <ui:InfoBar x:Name="OffBar" Severity="Informational" IsClosable="False" IsOpen="False" Visibility="Collapsed" Margin="0,0,0,12"
+                    Title="Habits is turned off" Message="Your habits are kept. Turn Habits on in its settings to tick them off." />
+
+        <StackPanel x:Name="Body">
+            <!-- Days skipped: nothing else until the reason is written -->
+            <Border Style="{DynamicResource HelmSurface}" Padding="20" BorderThickness="2" BorderBrush="{DynamicResource SystemFillColorCautionBrush}"
+                    Visibility="{Binding HasPendingLapse, Converter={StaticResource BoolToVisibility}}">
+                <StackPanel MaxWidth="640" HorizontalAlignment="Left">
+                    <TextBlock Text="{Binding PendingLapse.Heading}" FontSize="20" FontWeight="SemiBold" TextWrapping="Wrap" />
+                    <TextBlock Text="{Binding PendingLapse.Dates}" Margin="0,2,0,0" Style="{DynamicResource HelmSecondaryText}" />
+                    <TextBlock Margin="0,12,0,8" TextWrapping="Wrap"
+                               Text="What got in the way? Be honest: the reason stays with the habit, so you (or an AI agent) can spot the pattern later and plan around it." />
+                    <ui:TextBox x:Name="ReasonBox" MinHeight="80" AcceptsReturn="True" TextWrapping="Wrap" MaxLength="1000" AutomationProperties.Name="Why you skipped it"
+                                PlaceholderText="e.g. Worked late two nights and was too tired" Text="{Binding LapseReason, UpdateSourceTrigger=PropertyChanged}" />
+                    <WrapPanel Margin="0,12,0,0">
+                        <ui:Button Margin="0,0,8,8" Appearance="Primary" Content="Save the reason" Icon="{ui:SymbolIcon Save24}" Command="{Binding SaveReasonCommand}"
+                                   IsEnabled="{Binding CanSaveReason}" />
+                        <ui:Button Margin="0,0,8,8" Content="I did it, I just forgot to tick it" Icon="{ui:SymbolIcon Checkmark24}" Command="{Binding MarkLapseDoneCommand}" />
+                    </WrapPanel>
+                </StackPanel>
+            </Border>
+
+            <StackPanel Visibility="{Binding HasPendingLapse, Converter={StaticResource InverseBoolToVisibility}}">
+                <!-- Habits, Report -->
+                <WrapPanel Margin="0,0,0,16">
+                    <ui:Button Style="{StaticResource Segment}" Margin="0,0,6,0" Tag="{Binding IsHabitsTab}" Content="Habits" Icon="{ui:SymbolIcon CalendarCheckmark24}"
+                               Command="{Binding ShowHabitsCommand}" AutomationProperties.Name="Habits" />
+                    <ui:Button Style="{StaticResource Segment}" Tag="{Binding IsReportTab}" Content="Report" Icon="{ui:SymbolIcon DataBarVertical24}"
+                               Command="{Binding ShowReportCommand}" AutomationProperties.Name="Report" />
+                </WrapPanel>
+
+                <!-- A problem or a notice from the last action -->
+                <Border Style="{DynamicResource HelmSurface}" Margin="0,0,0,8" Padding="12,8"
+                        Visibility="{Binding HasMessage, Converter={StaticResource BoolToVisibility}}">
+                    <core:RowLayout>
+                        <TextBlock Text="{Binding Message}" TextWrapping="Wrap" VerticalAlignment="Center" />
+                        <ui:Button Style="{StaticResource RowAction}" Icon="{ui:SymbolIcon Dismiss24}" ToolTip="Dismiss" AutomationProperties.Name="Dismiss"
+                                   Command="{Binding DismissMessageCommand}" />
+                    </core:RowLayout>
+                </Border>
+
+                <!-- No habit yet (both tabs) -->
+                <Border Style="{DynamicResource HelmSurface}" Padding="20" Visibility="{Binding HasNoHabits, Converter={StaticResource BoolToVisibility}}">
+                    <StackPanel HorizontalAlignment="Center">
+                        <Image Source="{x:Static self:HabitsLogo.Image}" Width="48" Height="48" Margin="0,0,0,10" />
+                        <TextBlock Text="No habits yet" FontSize="18" FontWeight="SemiBold" HorizontalAlignment="Center" />
+                        <TextBlock Margin="0,4,0,12" Style="{DynamicResource HelmSecondaryText}" TextWrapping="Wrap" TextAlignment="Center" MaxWidth="460"
+                                   Text="Add the habits you want to build in the settings. Each gets a card here: tap it on the days you do it, and watch the year fill up." />
+                        <ui:Button HorizontalAlignment="Center" Appearance="Primary" Content="Add a habit" Icon="{ui:SymbolIcon Add24}" Click="Settings_Click" />
+                    </StackPanel>
+                </Border>
+
+                <!-- The Habits tab -->
+                <StackPanel Visibility="{Binding IsHabitsTab, Converter={StaticResource BoolToVisibility}}">
+                    <!-- Done for today -->
+                    <Grid x:Name="CelebrationPanel" Margin="0,0,0,12" Visibility="{Binding HasCelebration, Converter={StaticResource BoolToVisibility}}">
+                        <Border Style="{DynamicResource HelmSurface}" BorderThickness="2" BorderBrush="{DynamicResource SystemFillColorSuccessBrush}" Padding="20">
+                            <StackPanel HorizontalAlignment="Center" MaxWidth="560">
+                                <Image Source="{x:Static self:HabitsLogo.Image}" Width="48" Height="48" Margin="0,0,0,10" />
+                                <TextBlock Text="{Binding Celebration.Title}" FontSize="24" FontWeight="SemiBold" HorizontalAlignment="Center" TextAlignment="Center" TextWrapping="Wrap" />
+                                <TextBlock Text="{Binding Celebration.Message}" Margin="0,6,0,0" HorizontalAlignment="Center" TextAlignment="Center" TextWrapping="Wrap" />
+                                <ItemsControl ItemsSource="{Binding Celebration.Stats}" Margin="0,10,0,0" Focusable="False" HorizontalAlignment="Center">
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate>
+                                            <TextBlock Text="{Binding}" Style="{DynamicResource HelmSecondaryText}" HorizontalAlignment="Center" TextAlignment="Center" TextWrapping="Wrap" />
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                                <ui:Button Margin="0,16,0,0" HorizontalAlignment="Center" Content="Close" Command="{Binding DismissCelebrationCommand}" />
+                            </StackPanel>
+                        </Border>
+                        <core:ConfettiView x:Name="Confetti" VerticalAlignment="Stretch" HorizontalAlignment="Stretch" />
+                    </Grid>
+
+                    <ItemsControl ItemsSource="{Binding ToDo}" ItemTemplate="{StaticResource CardTemplate}" Focusable="False" />
+
+                    <TextBlock Text="Everything is done for today. See you tomorrow!" Margin="0,0,0,12" Style="{DynamicResource HelmSecondaryText}"
+                               Visibility="{Binding AllDone, Converter={StaticResource BoolToVisibility}}" />
+
+                    <TextBlock Text="Done today" Style="{DynamicResource HelmSectionHeader}"
+                               Visibility="{Binding HasDoneToday, Converter={StaticResource BoolToVisibility}}" />
+                    <ItemsControl ItemsSource="{Binding DoneToday}" ItemTemplate="{StaticResource CardTemplate}" Focusable="False" />
+                </StackPanel>
+
+                <!-- The Report tab -->
+                <StackPanel Visibility="{Binding IsReportTab, Converter={StaticResource BoolToVisibility}}">
+                    <StackPanel Visibility="{Binding HasReport, Converter={StaticResource BoolToVisibility}}">
+                        <WrapPanel Margin="0,0,0,8">
+                            <ComboBox Width="260" Margin="0,0,8,8" AutomationProperties.Name="Habit" ItemsSource="{Binding ReportHabits}" DisplayMemberPath="Title"
+                                      SelectedItem="{Binding ReportHabit}" />
+                            <ComboBox Width="110" Margin="0,0,8,8" AutomationProperties.Name="Year" ItemsSource="{Binding ReportYears}" SelectedItem="{Binding ReportYear}" />
+                        </WrapPanel>
+
+                        <Border Style="{DynamicResource HelmSurface}" Margin="0,0,0,8">
+                            <StackPanel>
+                                <self:HabitGrid HorizontalAlignment="Left" MaxCell="16" Grid="{Binding ReportGrid}" Command="{Binding TapDayCommand}" />
+                                <TextBlock Text="{Binding ReportStarted}" Margin="0,8,0,0" Style="{DynamicResource HelmSecondaryText}" />
+                            </StackPanel>
+                        </Border>
+
+                        <WrapPanel>
+                            <Border Style="{StaticResource Tile}">
+                                <StackPanel>
+                                    <TextBlock Text="{Binding ReportStreak}" Style="{StaticResource TileValue}" />
+                                    <TextBlock Text="Current streak" Style="{DynamicResource HelmSecondaryText}" />
+                                </StackPanel>
+                            </Border>
+                            <Border Style="{StaticResource Tile}">
+                                <StackPanel>
+                                    <TextBlock Text="{Binding ReportLongest}" Style="{StaticResource TileValue}" />
+                                    <TextBlock Text="Longest streak that year" Style="{DynamicResource HelmSecondaryText}" />
+                                </StackPanel>
+                            </Border>
+                            <Border Style="{StaticResource Tile}">
+                                <StackPanel>
+                                    <TextBlock Text="{Binding ReportRateYear}" Style="{StaticResource TileValue}" />
+                                    <TextBlock Text="{Binding ReportDone}" Style="{DynamicResource HelmSecondaryText}" />
+                                </StackPanel>
+                            </Border>
+                            <Border Style="{StaticResource Tile}">
+                                <StackPanel>
+                                    <TextBlock Text="{Binding ReportRate30}" Style="{StaticResource TileValue}" />
+                                    <TextBlock Text="Last 30 days" Style="{DynamicResource HelmSecondaryText}" />
+                                </StackPanel>
+                            </Border>
+                        </WrapPanel>
+
+                        <TextBlock Text="Month by month" Style="{DynamicResource HelmSectionHeader}" />
+                        <Border Style="{DynamicResource HelmSurface}" Margin="0,0,0,8">
+                            <ItemsControl ItemsSource="{Binding ReportMonths}" Focusable="False" MaxWidth="720" HorizontalAlignment="Left">
+                                <ItemsControl.ItemsPanel>
+                                    <ItemsPanelTemplate>
+                                        <UniformGrid Rows="1" Columns="12" />
+                                    </ItemsPanelTemplate>
+                                </ItemsControl.ItemsPanel>
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate DataType="{x:Type local:HabitMonthBar}">
+                                        <StackPanel Margin="3,0" ToolTip="{Binding Text}">
+                                            <TextBlock Text="{Binding Text}" FontSize="11" HorizontalAlignment="Center" Style="{DynamicResource HelmSecondaryText}" />
+                                            <Grid Height="60" Margin="0,2,0,4">
+                                                <Border CornerRadius="3" Background="{DynamicResource SubtleFillColorSecondaryBrush}" />
+                                                <Border CornerRadius="3" VerticalAlignment="Bottom" Height="{Binding Height}" Background="{DynamicResource SystemFillColorSuccessBrush}" />
+                                            </Grid>
+                                            <TextBlock Text="{Binding Name}" FontSize="11" HorizontalAlignment="Center" />
+                                        </StackPanel>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </Border>
+
+                        <TextBlock Text="Missed days" Style="{DynamicResource HelmSectionHeader}" />
+                        <TextBlock Text="No missed days that year. Impressive!" Style="{DynamicResource HelmSecondaryText}"
+                                   Visibility="{Binding HasReportLapses, Converter={StaticResource InverseBoolToVisibility}}" />
+                        <ItemsControl ItemsSource="{Binding ReportLapses}" Focusable="False">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate DataType="{x:Type local:HabitLapseRow}">
+                                    <Border Style="{DynamicResource HelmSurface}" Margin="0,0,0,4" Padding="14,10">
+                                        <StackPanel>
+                                            <TextBlock Text="{Binding Dates}" FontWeight="SemiBold" />
+                                            <TextBlock Text="{Binding Reason}" Margin="0,2,0,0" TextWrapping="Wrap">
+                                                <TextBlock.Style>
+                                                    <Style TargetType="TextBlock">
+                                                        <Style.Triggers>
+                                                            <DataTrigger Binding="{Binding HasReason}" Value="False">
+                                                                <Setter Property="Foreground" Value="{DynamicResource TextFillColorSecondaryBrush}" />
+                                                                <Setter Property="FontStyle" Value="Italic" />
+                                                            </DataTrigger>
+                                                        </Style.Triggers>
+                                                    </Style>
+                                                </TextBlock.Style>
+                                            </TextBlock>
+                                        </StackPanel>
+                                    </Border>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </StackPanel>
+                </StackPanel>
+            </StackPanel>
+        </StackPanel>
+    </StackPanel>
+</Page>

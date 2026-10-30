@@ -29,6 +29,7 @@ body:
     attributes:
       label: Tool
       options:
+        - Habits
         - Missions
         - Notes
         - Quick Capture

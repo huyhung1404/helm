@@ -1,0 +1,132 @@
+<ui:ModulePageBase xmlns="https://github.com/avaloniaui"
+                   xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                   xmlns:ic="using:FluentIcons.Avalonia"
+                   xmlns:ui="using:Helm.Core.Ui"
+                   xmlns:vm="using:Helm.Modules.Habits"
+                   x:Class="Helm.Modules.Habits.HabitsPage"
+                   x:DataType="vm:HabitsViewModel">
+
+    <!-- Habits' settings (Home → Utilities): add and manage the habits, reminders, celebrations. The habits themselves
+         are on HabitsContentPage. -->
+    <ui:ModulePageBase.Styles>
+        <!-- Square icon button (44 dp touch target) -->
+        <Style Selector="Button.icon">
+            <Setter Property="Width" Value="44" />
+            <Setter Property="Height" Value="44" />
+            <Setter Property="Padding" Value="0" />
+            <Setter Property="HorizontalContentAlignment" Value="Center" />
+            <Setter Property="VerticalContentAlignment" Value="Center" />
+        </Style>
+    </ui:ModulePageBase.Styles>
+
+    <StackPanel>
+        <Border Classes="infobar" IsVisible="{Binding HasMessage}">
+            <TextBlock Text="{Binding Message}" TextWrapping="Wrap" />
+        </Border>
+        <Border Classes="card">
+            <StackPanel Spacing="8">
+                <TextBlock Text="Open Habits" Classes="title" />
+                <TextBlock Text="Today's habits to tick off, and the report. Also in the menu and on Home." Classes="secondary" TextWrapping="Wrap" />
+                <Button Classes="accent" Content="Open Habits" Click="Open_Click" />
+            </StackPanel>
+        </Border>
+
+        <!-- Habits -->
+        <TextBlock Text="Habits" Classes="section" />
+        <Border Classes="card">
+            <StackPanel Spacing="8">
+                <TextBlock Text="Add a habit" Classes="title" />
+                <TextBlock Text="Something to do every day, e.g. &quot;Read 20 pages&quot;. It starts today; the days before do not count." Classes="secondary" TextWrapping="Wrap" />
+                <Grid ColumnDefinitions="*,8,Auto">
+                    <TextBox MaxLength="120" PlaceholderText="New habit" AutomationProperties.Name="New habit" Text="{Binding NewHabitTitle}" KeyDown="NewHabit_KeyDown" />
+                    <Button Grid.Column="2" Classes="accent" Content="Add" Command="{Binding AddHabitCommand}" IsEnabled="{Binding CanAddHabit}" />
+                </Grid>
+            </StackPanel>
+        </Border>
+        <Border Classes="card" IsVisible="{Binding HasHabits}">
+            <StackPanel Spacing="8">
+                <TextBlock Text="Manage habits" Classes="title" />
+                <TextBlock Text="Rename a habit in place, change the order of the cards, or delete a habit with its history." Classes="secondary" TextWrapping="Wrap" />
+                <ItemsControl ItemsSource="{Binding ManageHabits}">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate DataType="vm:HabitRow">
+                            <Border Classes="row">
+                                <StackPanel Spacing="4">
+                                    <TextBox MaxLength="120" AutomationProperties.Name="Habit name" Text="{Binding Title, UpdateSourceTrigger=LostFocus}" />
+                                    <DockPanel>
+                                        <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" Spacing="4">
+                                            <Button Classes="icon flat" IsEnabled="{Binding CanMoveUp}" AutomationProperties.Name="Move up"
+                                                    Command="{Binding $parent[ui:ModulePageBase].((vm:HabitsViewModel)DataContext).MoveHabitUpCommand}" CommandParameter="{Binding}">
+                                                <ic:SymbolIcon Symbol="ArrowUp" FontSize="18" />
+                                            </Button>
+                                            <Button Classes="icon flat" IsEnabled="{Binding CanMoveDown}" AutomationProperties.Name="Move down"
+                                                    Command="{Binding $parent[ui:ModulePageBase].((vm:HabitsViewModel)DataContext).MoveHabitDownCommand}" CommandParameter="{Binding}">
+                                                <ic:SymbolIcon Symbol="ArrowDown" FontSize="18" />
+                                            </Button>
+                                            <Button Classes="icon flat" AutomationProperties.Name="Delete"
+                                                    Command="{Binding $parent[ui:ModulePageBase].((vm:HabitsViewModel)DataContext).DeleteHabitCommand}" CommandParameter="{Binding}">
+                                                <ic:SymbolIcon Symbol="Delete" FontSize="18" />
+                                            </Button>
+                                        </StackPanel>
+                                        <TextBlock Text="{Binding Detail}" Classes="secondary" VerticalAlignment="Center" TextWrapping="Wrap" />
+                                    </DockPanel>
+                                </StackPanel>
+                            </Border>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+            </StackPanel>
+        </Border>
+
+        <!-- Behavior -->
+        <TextBlock Text="Behavior" Classes="section" />
+        <Border Classes="card">
+            <DockPanel>
+                <ToggleSwitch DockPanel.Dock="Right" IsChecked="{Binding PlayCelebrations}" OnContent="" OffContent="" AutomationProperties.Name="Play celebrations" />
+                <StackPanel VerticalAlignment="Center">
+                    <TextBlock Text="Play celebrations" Classes="title" />
+                    <TextBlock Text="Confetti when you tick off a habit for the day. The congratulations show either way." Classes="secondary" TextWrapping="Wrap" />
+                </StackPanel>
+            </DockPanel>
+        </Border>
+
+        <!-- Reminders -->
+        <TextBlock Text="Reminders" Classes="section" />
+        <Border Classes="card">
+            <StackPanel>
+                <DockPanel>
+                    <ToggleSwitch DockPanel.Dock="Right" IsChecked="{Binding RemindersEnabled}" OnContent="" OffContent="" AutomationProperties.Name="Skipped habit reminder" />
+                    <StackPanel VerticalAlignment="Center">
+                        <TextBlock Text="Skipped habit reminder" Classes="title" />
+                        <TextBlock Text="Once a day, a notification about the habits you have skipped for two days or more in a row." Classes="secondary" TextWrapping="Wrap" />
+                    </StackPanel>
+                </DockPanel>
+                <Border Classes="row" IsEnabled="{Binding RemindersEnabled}">
+                    <DockPanel>
+                        <ComboBox DockPanel.Dock="Right" MinWidth="110" ItemsSource="{Binding ReminderHourNames}" SelectedIndex="{Binding ReminderHourIndex}"
+                                  AutomationProperties.Name="Reminder time" />
+                        <StackPanel VerticalAlignment="Center">
+                            <TextBlock Text="Reminder time" />
+                            <TextBlock Text="The day's reminder comes at this hour or later." Classes="secondary" TextWrapping="Wrap" />
+                        </StackPanel>
+                    </DockPanel>
+                </Border>
+                <Border Classes="row" IsEnabled="{Binding RemindersEnabled}">
+                    <DockPanel>
+                        <Button DockPanel.Dock="Right" Content="Remind me now" Command="{Binding RemindNowCommand}" />
+                        <StackPanel VerticalAlignment="Center">
+                            <TextBlock Text="Try it" />
+                            <TextBlock Text="Shows the reminder now, if a habit is slipping." Classes="secondary" TextWrapping="Wrap" />
+                        </StackPanel>
+                    </DockPanel>
+                </Border>
+            </StackPanel>
+        </Border>
+        <Border Classes="card">
+            <StackPanel>
+                <TextBlock Text="Reasons for skipped days" Classes="title" />
+                <TextBlock Text="After two or more days in a row without a habit, Habits asks why before you go on. The reasons are in the report." Classes="secondary" TextWrapping="Wrap" />
+            </StackPanel>
+        </Border>
+    </StackPanel>
+</ui:ModulePageBase>

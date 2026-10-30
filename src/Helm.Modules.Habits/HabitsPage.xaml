@@ -1,0 +1,112 @@
+<core:ModulePageBase
+    x:Class="Helm.Modules.Habits.HabitsPage"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
+    xmlns:core="clr-namespace:Helm.Core.Ui;assembly=Helm.Core.Windows"
+    xmlns:local="clr-namespace:Helm.Modules.Habits;assembly=Helm.Modules.Habits.Core"
+    xmlns:self="clr-namespace:Helm.Modules.Habits"
+    ExtraMessage="{Binding Message}">
+
+    <!-- Habits' settings (Home → Utilities): add and manage the habits, reminders, celebrations. The habits themselves
+         are on HabitsContentPage. -->
+    <StackPanel>
+        <ui:CardControl Margin="0,0,0,4">
+            <ui:CardControl.Icon>
+                <ui:ImageIcon Width="24" Height="24" Source="{x:Static self:HabitsLogo.Image}" />
+            </ui:CardControl.Icon>
+            <ui:CardControl.Header>
+                <core:CardHeader Title="Open Habits" Description="Today's habits to tick off, and the report. Also in the menu and on Home." />
+            </ui:CardControl.Header>
+            <ui:Button Appearance="Primary" Content="Open Habits" Click="Open_Click" />
+        </ui:CardControl>
+
+        <!-- Habits -->
+        <TextBlock Text="Habits" Style="{DynamicResource HelmSectionHeader}" />
+        <ui:CardControl Margin="0,0,0,4" Icon="{ui:SymbolIcon Add24}">
+            <ui:CardControl.Header>
+                <core:CardHeader Title="Add a habit" Description="Something to do every day, e.g. &quot;Read 20 pages&quot;. It starts today; the days before do not count." />
+            </ui:CardControl.Header>
+            <StackPanel Orientation="Horizontal">
+                <ui:TextBox x:Name="NewHabitBox" Width="240" Margin="0,0,8,0" MaxLength="120" PlaceholderText="New habit" AutomationProperties.Name="New habit"
+                            Text="{Binding NewHabitTitle, UpdateSourceTrigger=PropertyChanged}" KeyDown="NewHabit_KeyDown" />
+                <ui:Button Appearance="Primary" Content="Add" Icon="{ui:SymbolIcon Add24}" Command="{Binding AddHabitCommand}" IsEnabled="{Binding CanAddHabit}" />
+            </StackPanel>
+        </ui:CardControl>
+        <ui:CardExpander Margin="0,0,0,4" Icon="{ui:SymbolIcon Edit24}" IsExpanded="True" IsEnabled="{Binding HasHabits}">
+            <ui:CardExpander.Header>
+                <core:CardHeader Title="Manage habits" Description="Rename a habit in place, change the order of the cards, or delete a habit with its history." />
+            </ui:CardExpander.Header>
+            <ItemsControl ItemsSource="{Binding ManageHabits}" Focusable="False">
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate DataType="{x:Type local:HabitRow}">
+                        <Border Style="{DynamicResource HelmExpanderRow}">
+                            <core:RowLayout>
+                                <StackPanel>
+                                    <ui:TextBox MinWidth="240" MaxWidth="420" HorizontalAlignment="Left" MaxLength="120" AutomationProperties.Name="Habit name"
+                                                Text="{Binding Title, UpdateSourceTrigger=LostFocus}" />
+                                    <TextBlock Text="{Binding Detail}" Margin="0,4,0,0" Style="{DynamicResource HelmSecondaryText}" />
+                                </StackPanel>
+                                <StackPanel Orientation="Horizontal">
+                                    <ui:Button Margin="0,0,4,0" Icon="{ui:SymbolIcon ArrowUp24}" ToolTip="Move up" AutomationProperties.Name="Move up" IsEnabled="{Binding CanMoveUp}"
+                                               Command="{Binding DataContext.MoveHabitUpCommand, RelativeSource={RelativeSource AncestorType=core:ModulePageBase}}" CommandParameter="{Binding}" />
+                                    <ui:Button Margin="0,0,4,0" Icon="{ui:SymbolIcon ArrowDown24}" ToolTip="Move down" AutomationProperties.Name="Move down" IsEnabled="{Binding CanMoveDown}"
+                                               Command="{Binding DataContext.MoveHabitDownCommand, RelativeSource={RelativeSource AncestorType=core:ModulePageBase}}" CommandParameter="{Binding}" />
+                                    <ui:Button Icon="{ui:SymbolIcon Delete24}" ToolTip="Delete" AutomationProperties.Name="Delete"
+                                               Command="{Binding DataContext.DeleteHabitCommand, RelativeSource={RelativeSource AncestorType=core:ModulePageBase}}" CommandParameter="{Binding}" />
+                                </StackPanel>
+                            </core:RowLayout>
+                        </Border>
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+        </ui:CardExpander>
+
+        <!-- Behavior -->
+        <TextBlock Text="Behavior" Style="{DynamicResource HelmSectionHeader}" />
+        <ui:CardControl Margin="0,0,0,4" Icon="{ui:SymbolIcon Sparkle24}">
+            <ui:CardControl.Header>
+                <core:CardHeader Title="Play celebrations" Description="Confetti when you tick off a habit for the day. The congratulations show either way." />
+            </ui:CardControl.Header>
+            <ui:ToggleSwitch AutomationProperties.Name="Play celebrations" IsChecked="{Binding PlayCelebrations}" />
+        </ui:CardControl>
+
+        <!-- Reminders -->
+        <TextBlock Text="Reminders" Style="{DynamicResource HelmSectionHeader}" />
+        <ui:CardExpander Margin="0,0,0,4" Icon="{ui:SymbolIcon AlertOn24}" IsExpanded="True">
+            <ui:CardExpander.Header>
+                <core:RowLayout>
+                    <core:CardHeader Title="Skipped habit reminder" Description="Once a day, a notification about the habits you have skipped for two days or more in a row." />
+                    <ui:ToggleSwitch HorizontalAlignment="Right" Margin="0,0,16,0" AutomationProperties.Name="Skipped habit reminder" IsChecked="{Binding RemindersEnabled}" />
+                </core:RowLayout>
+            </ui:CardExpander.Header>
+            <StackPanel IsEnabled="{Binding RemindersEnabled}">
+                <Border Style="{DynamicResource HelmExpanderRow}" BorderThickness="0">
+                    <core:RowLayout>
+                        <core:CardHeader Title="Reminder time" Description="The day's reminder comes at this hour, or when Helm starts later." />
+                        <ComboBox Width="140" AutomationProperties.Name="Reminder time" ItemsSource="{Binding ReminderHourNames}" SelectedIndex="{Binding ReminderHourIndex}" />
+                    </core:RowLayout>
+                </Border>
+                <Border Style="{DynamicResource HelmExpanderRow}">
+                    <core:RowLayout>
+                        <core:CardHeader Title="Try it" Description="Shows the reminder now, if a habit is slipping." />
+                        <ui:Button Content="Remind me now" Icon="{ui:SymbolIcon Alert24}" Command="{Binding RemindNowCommand}" />
+                    </core:RowLayout>
+                </Border>
+            </StackPanel>
+        </ui:CardExpander>
+        <ui:CardControl Margin="0,0,0,4" Icon="{ui:SymbolIcon NoteEdit24}">
+            <ui:CardControl.Header>
+                <core:CardHeader Title="Reasons for skipped days" Description="After two or more days in a row without a habit, Habits asks why before you go on. The reasons are in the report." />
+            </ui:CardControl.Header>
+        </ui:CardControl>
+
+        <!-- AI -->
+        <TextBlock Text="AI agents" Style="{DynamicResource HelmSectionHeader}" />
+        <ui:CardControl Margin="0,0,0,4" Icon="{ui:SymbolIcon Chat24}">
+            <ui:CardControl.Header>
+                <core:CardHeader Title="Ask an AI agent" Description="With Helm tools for AI agents on (AI &amp; MCP page), an agent such as Claude Code can read your habits and the reasons you skipped them: try &quot;why do I keep skipping my reading habit?&quot;." />
+            </ui:CardControl.Header>
+        </ui:CardControl>
+    </StackPanel>
+</core:ModulePageBase>

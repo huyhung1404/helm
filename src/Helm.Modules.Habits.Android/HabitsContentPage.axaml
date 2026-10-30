@@ -1,0 +1,264 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:ic="using:FluentIcons.Avalonia"
+             xmlns:core="using:Helm.Core.Ui"
+             xmlns:vm="using:Helm.Modules.Habits"
+             x:Class="Helm.Modules.Habits.HabitsContentPage"
+             x:DataType="vm:HabitsViewModel">
+
+    <!-- Habits itself (drawer and Quick access): the habits to do today, the ones done, and the report. Habits are
+         added and managed on HabitsPage (Home → Utilities). -->
+    <UserControl.Styles>
+        <!-- Square icon button (44 dp touch target) -->
+        <Style Selector="Button.icon">
+            <Setter Property="Width" Value="44" />
+            <Setter Property="Height" Value="44" />
+            <Setter Property="Padding" Value="0" />
+            <Setter Property="HorizontalContentAlignment" Value="Center" />
+            <Setter Property="VerticalContentAlignment" Value="Center" />
+        </Style>
+        <!-- A wide button with its text centred -->
+        <Style Selector="Button.wide">
+            <Setter Property="HorizontalAlignment" Value="Stretch" />
+            <Setter Property="HorizontalContentAlignment" Value="Center" />
+            <Setter Property="VerticalContentAlignment" Value="Center" />
+            <Setter Property="MinHeight" Value="44" />
+        </Style>
+        <!-- The two tabs: the one in front is filled -->
+        <Style Selector="Button.tab">
+            <Setter Property="HorizontalAlignment" Value="Stretch" />
+            <Setter Property="HorizontalContentAlignment" Value="Center" />
+            <Setter Property="Padding" Value="8,10" />
+        </Style>
+        <Style Selector="TextBlock.big">
+            <Setter Property="FontSize" Value="20" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+        </Style>
+        <!-- A number on the report -->
+        <Style Selector="TextBlock.value">
+            <Setter Property="FontSize" Value="22" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+        </Style>
+        <Style Selector="Border.tile">
+            <Setter Property="Background" Value="{DynamicResource HelmCardBackground}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource HelmCardStroke}" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="CornerRadius" Value="8" />
+            <Setter Property="Padding" Value="12,10" />
+        </Style>
+        <!-- The sideways grid: no visible bar, a swipe scrolls it -->
+        <Style Selector="ScrollViewer.grid">
+            <Setter Property="HorizontalScrollBarVisibility" Value="Hidden" />
+            <Setter Property="VerticalScrollBarVisibility" Value="Disabled" />
+        </Style>
+    </UserControl.Styles>
+
+    <UserControl.Resources>
+        <!-- A habit's card: tap it to tick today, tap a day of the grid to tick that day -->
+        <DataTemplate x:Key="CardTemplate" x:DataType="vm:HabitCard">
+            <Panel Margin="0,0,0,8">
+                <Border Background="{DynamicResource HelmCardBackground}" CornerRadius="8" />
+                <Border Background="{Binding Tint, Converter={x:Static vm:HabitBrushes.Hex}}" BorderBrush="{Binding Color, Converter={x:Static vm:HabitBrushes.Hex}}"
+                        BorderThickness="1.5" CornerRadius="8" Padding="12" Tapped="Card_Tapped" AutomationProperties.Name="{Binding Summary}">
+                    <StackPanel Spacing="8">
+                        <DockPanel>
+                            <ic:SymbolIcon DockPanel.Dock="Right" Symbol="CheckmarkCircle" IconVariant="Filled" FontSize="22" Foreground="{DynamicResource HelmSuccess}"
+                                           IsVisible="{Binding IsDone}" />
+                            <TextBlock Text="{Binding Title}" FontSize="16" FontWeight="SemiBold" TextWrapping="Wrap" VerticalAlignment="Center" />
+                        </DockPanel>
+                        <ScrollViewer Classes="grid">
+                            <vm:HabitGrid Grid="{Binding Grid}" Command="{Binding $parent[UserControl].((vm:HabitsViewModel)DataContext).TapDayCommand}" />
+                        </ScrollViewer>
+                    </StackPanel>
+                </Border>
+            </Panel>
+        </DataTemplate>
+    </UserControl.Resources>
+
+    <StackPanel>
+        <!-- Shown while the tool is turned off -->
+        <Border x:Name="OffBar" Classes="infobar warning" IsVisible="False">
+            <TextBlock Text="Habits is turned off. Your habits are kept; turn it on in its settings to tick them off." TextWrapping="Wrap" />
+        </Border>
+
+        <StackPanel x:Name="Body" Spacing="8">
+            <!-- Days skipped: nothing else until the reason is written -->
+            <Border Classes="card" BorderThickness="2" BorderBrush="{DynamicResource SystemAccentColor}" IsVisible="{Binding HasPendingLapse}">
+                <StackPanel Spacing="8">
+                    <TextBlock Text="{Binding PendingLapse.Heading}" Classes="big" TextWrapping="Wrap" />
+                    <TextBlock Text="{Binding PendingLapse.Dates}" Classes="secondary" />
+                    <TextBlock TextWrapping="Wrap"
+                               Text="What got in the way? Be honest: the reason stays with the habit, so you (or an AI agent) can spot the pattern later and plan around it." />
+                    <TextBox x:Name="ReasonBox" MinHeight="96" AcceptsReturn="True" TextWrapping="Wrap" MaxLength="1000" AutomationProperties.Name="Why you skipped it"
+                             PlaceholderText="e.g. Worked late two nights and was too tired" Text="{Binding LapseReason}" />
+                    <Button Classes="accent wide" Command="{Binding SaveReasonCommand}" IsEnabled="{Binding CanSaveReason}">
+                        <StackPanel Orientation="Horizontal" Spacing="6">
+                            <ic:SymbolIcon Symbol="Save" FontSize="16" VerticalAlignment="Center" />
+                            <TextBlock Text="Save the reason" VerticalAlignment="Center" />
+                        </StackPanel>
+                    </Button>
+                    <Button Classes="wide" Content="I did it, I just forgot to tick it" Command="{Binding MarkLapseDoneCommand}" />
+                </StackPanel>
+            </Border>
+
+            <StackPanel Spacing="8" IsVisible="{Binding !HasPendingLapse}">
+                <!-- Habits, Report -->
+                <Grid ColumnDefinitions="*,4,*">
+                    <Button Classes="tab" Classes.accent="{Binding IsHabitsTab}" Command="{Binding ShowHabitsCommand}" AutomationProperties.Name="Habits">
+                        <StackPanel Spacing="2">
+                            <ic:SymbolIcon Symbol="CalendarCheckmark" FontSize="18" HorizontalAlignment="Center" />
+                            <TextBlock Text="Habits" FontSize="12" HorizontalAlignment="Center" />
+                        </StackPanel>
+                    </Button>
+                    <Button Grid.Column="2" Classes="tab" Classes.accent="{Binding IsReportTab}" Command="{Binding ShowReportCommand}" AutomationProperties.Name="Report">
+                        <StackPanel Spacing="2">
+                            <ic:SymbolIcon Symbol="DataBarVertical" FontSize="18" HorizontalAlignment="Center" />
+                            <TextBlock Text="Report" FontSize="12" HorizontalAlignment="Center" />
+                        </StackPanel>
+                    </Button>
+                </Grid>
+
+                <!-- A problem or a notice from the last action -->
+                <Border Classes="infobar" IsVisible="{Binding HasMessage}">
+                    <DockPanel>
+                        <Button DockPanel.Dock="Right" Classes="icon flat" Command="{Binding DismissMessageCommand}" AutomationProperties.Name="Dismiss">
+                            <ic:SymbolIcon Symbol="Dismiss" FontSize="16" />
+                        </Button>
+                        <TextBlock Text="{Binding Message}" TextWrapping="Wrap" VerticalAlignment="Center" />
+                    </DockPanel>
+                </Border>
+
+                <!-- No habit yet (both tabs) -->
+                <Border Classes="card" IsVisible="{Binding HasNoHabits}">
+                    <StackPanel Spacing="8">
+                        <Image Source="{x:Static vm:HabitsIcon.Image}" Width="44" Height="44" HorizontalAlignment="Center" />
+                        <TextBlock Text="No habits yet" Classes="big" HorizontalAlignment="Center" />
+                        <TextBlock Classes="secondary" TextWrapping="Wrap" TextAlignment="Center"
+                                   Text="Add the habits you want to build in the settings. Each gets a card here: tap it on the days you do it, and watch the year fill up." />
+                        <Button Classes="accent wide" Content="Add a habit" Click="Settings_Click" />
+                    </StackPanel>
+                </Border>
+
+                <!-- The Habits tab -->
+                <StackPanel IsVisible="{Binding IsHabitsTab}">
+                    <!-- Done for today -->
+                    <Panel x:Name="CelebrationPanel" Margin="0,0,0,8" IsVisible="{Binding HasCelebration}">
+                        <Border Classes="card" BorderThickness="2" BorderBrush="{DynamicResource HelmSuccess}">
+                            <StackPanel Spacing="6" HorizontalAlignment="Stretch">
+                                <Image Source="{x:Static vm:HabitsIcon.Image}" Width="44" Height="44" HorizontalAlignment="Center" />
+                                <TextBlock Text="{Binding Celebration.Title}" Classes="big" HorizontalAlignment="Center" TextAlignment="Center" TextWrapping="Wrap" />
+                                <TextBlock Text="{Binding Celebration.Message}" HorizontalAlignment="Center" TextAlignment="Center" TextWrapping="Wrap" />
+                                <ItemsControl ItemsSource="{Binding Celebration.Stats}" HorizontalAlignment="Center">
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate x:DataType="x:String">
+                                            <TextBlock Text="{Binding}" Classes="secondary" HorizontalAlignment="Center" TextAlignment="Center" TextWrapping="Wrap" />
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                                <Button Classes="wide" Margin="0,6,0,0" Content="Close" Command="{Binding DismissCelebrationCommand}" />
+                            </StackPanel>
+                        </Border>
+                        <core:ConfettiView x:Name="Confetti" />
+                    </Panel>
+
+                    <ItemsControl ItemsSource="{Binding ToDo}" ItemTemplate="{StaticResource CardTemplate}" />
+
+                    <TextBlock Text="Everything is done for today. See you tomorrow!" Classes="secondary" Margin="0,0,0,8" TextWrapping="Wrap"
+                               IsVisible="{Binding AllDone}" />
+
+                    <TextBlock Text="Done today" Classes="section" IsVisible="{Binding HasDoneToday}" />
+                    <ItemsControl ItemsSource="{Binding DoneToday}" ItemTemplate="{StaticResource CardTemplate}" />
+                </StackPanel>
+
+                <!-- The Report tab -->
+                <StackPanel Spacing="8" IsVisible="{Binding IsReportTab}">
+                    <StackPanel Spacing="8" IsVisible="{Binding HasReport}">
+                        <Grid ColumnDefinitions="*,8,Auto">
+                            <ComboBox HorizontalAlignment="Stretch" ItemsSource="{Binding ReportHabits}" SelectedItem="{Binding ReportHabit}" AutomationProperties.Name="Habit">
+                                <ComboBox.ItemTemplate>
+                                    <DataTemplate DataType="vm:HabitChoice">
+                                        <TextBlock Text="{Binding Title}" TextTrimming="CharacterEllipsis" />
+                                    </DataTemplate>
+                                </ComboBox.ItemTemplate>
+                            </ComboBox>
+                            <ComboBox Grid.Column="2" MinWidth="96" ItemsSource="{Binding ReportYears}" SelectedItem="{Binding ReportYear}" AutomationProperties.Name="Year" />
+                        </Grid>
+
+                        <Border Classes="card">
+                            <StackPanel Spacing="8">
+                                <ScrollViewer Classes="grid">
+                                    <vm:HabitGrid CellSize="14" Grid="{Binding ReportGrid}" Command="{Binding TapDayCommand}" />
+                                </ScrollViewer>
+                                <TextBlock Text="{Binding ReportStarted}" Classes="secondary" />
+                            </StackPanel>
+                        </Border>
+
+                        <Grid ColumnDefinitions="*,8,*" RowDefinitions="Auto,8,Auto">
+                            <Border Classes="tile">
+                                <StackPanel>
+                                    <TextBlock Text="{Binding ReportStreak}" Classes="value" />
+                                    <TextBlock Text="Current streak" Classes="secondary" />
+                                </StackPanel>
+                            </Border>
+                            <Border Grid.Column="2" Classes="tile">
+                                <StackPanel>
+                                    <TextBlock Text="{Binding ReportLongest}" Classes="value" />
+                                    <TextBlock Text="Longest that year" Classes="secondary" />
+                                </StackPanel>
+                            </Border>
+                            <Border Grid.Row="2" Classes="tile">
+                                <StackPanel>
+                                    <TextBlock Text="{Binding ReportRateYear}" Classes="value" />
+                                    <TextBlock Text="{Binding ReportDone}" Classes="secondary" TextWrapping="Wrap" />
+                                </StackPanel>
+                            </Border>
+                            <Border Grid.Row="2" Grid.Column="2" Classes="tile">
+                                <StackPanel>
+                                    <TextBlock Text="{Binding ReportRate30}" Classes="value" />
+                                    <TextBlock Text="Last 30 days" Classes="secondary" />
+                                </StackPanel>
+                            </Border>
+                        </Grid>
+
+                        <TextBlock Text="Month by month" Classes="section" />
+                        <Border Classes="card">
+                            <ItemsControl ItemsSource="{Binding ReportMonths}">
+                                <ItemsControl.ItemsPanel>
+                                    <ItemsPanelTemplate>
+                                        <UniformGrid Rows="1" Columns="12" />
+                                    </ItemsPanelTemplate>
+                                </ItemsControl.ItemsPanel>
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate DataType="vm:HabitMonthBar">
+                                        <StackPanel Margin="1,0" Spacing="2">
+                                            <Panel Height="60">
+                                                <Border CornerRadius="3" Background="{DynamicResource HelmSubtleFill}" />
+                                                <Border CornerRadius="3" VerticalAlignment="Bottom" Height="{Binding Height}" Background="{DynamicResource HelmSuccess}" />
+                                            </Panel>
+                                            <TextBlock Text="{Binding Name}" FontSize="10" HorizontalAlignment="Center" />
+                                        </StackPanel>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </Border>
+
+                        <TextBlock Text="Missed days" Classes="section" />
+                        <TextBlock Text="No missed days that year. Impressive!" Classes="secondary" IsVisible="{Binding !HasReportLapses}" />
+                        <ItemsControl ItemsSource="{Binding ReportLapses}">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate DataType="vm:HabitLapseRow">
+                                    <Border Classes="card" Margin="0,0,0,6">
+                                        <StackPanel Spacing="2">
+                                            <TextBlock Text="{Binding Dates}" FontWeight="SemiBold" TextWrapping="Wrap" />
+                                            <TextBlock Text="{Binding Reason}" TextWrapping="Wrap" Classes.secondary="{Binding !HasReason}" />
+                                        </StackPanel>
+                                    </Border>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </StackPanel>
+                </StackPanel>
+            </StackPanel>
+        </StackPanel>
+    </StackPanel>
+</UserControl>

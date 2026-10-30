@@ -1,3 +1,4 @@
+using Helm.Modules.Habits;
 using Helm.Modules.Missions;
 using Helm.Modules.Notes;
 using Helm.Modules.NovelReader;
@@ -26,6 +27,7 @@ internal static class HelmModules
         services.AddVaultModule();
         services.AddTrackerModule();
         services.AddMissionsModule();
+        services.AddHabitsModule();
         services.AddWalletModule();
         services.AddNotesModule();
         services.AddNovelReaderModule();

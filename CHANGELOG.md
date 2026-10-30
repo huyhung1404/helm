@@ -3,6 +3,27 @@
 All notable changes to Helm. The top section is used as the GitHub release body and as the Velopack release notes.
 Format: [Keep a Changelog](https://keepachangelog.com), versions follow [SemVer](https://semver.org).
 
+## [Unreleased]
+
+### Added
+- **Habits (PC and Android): build habits day by day.** Add the habits you want to build in the settings; each gets a
+  card with its title and its year as a GitHub-style grid, one square a day, greener as a streak grows. Tap the card
+  to tick today (after a "sure?"), with a celebration and confetti; done habits move below the others. Tap a day of
+  the grid to tick or untick it after the fact. The days before a habit started are greyed out and never counted; the
+  grid starts over each January, and past years stay in the report. Each card turns from red to green with how often
+  it was done in the last 30 days.
+- **Habits: a reminder, and a reason for skipped days.** A habit skipped for two days or more in a row brings a daily
+  reminder (tray on the PC, a notification on the phone, at the hour you choose). Back in Habits, you write why
+  before anything else ("I did it, I just forgot to tick it" ticks those days instead).
+- **Habits: a report** on its own tab: the year's grid of each habit (earlier years too), the current and longest
+  streak, the share of days done this year and in the last 30 days, month by month, and every run of missed days with
+  its reason.
+- **Habits for AI agents.** `habits_list`, `habit_report` (with the reasons for skipped days, to look for patterns) and
+  `habit_check` in Helm's MCP tools.
+
+### Changed
+- The confetti of Missions moved to the shared controls of both apps, so Habits plays the same one.
+
 ## [0.66.0] - 2026-10-30
 
 ### Added

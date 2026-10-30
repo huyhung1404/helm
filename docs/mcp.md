@@ -3,7 +3,7 @@
 Helm can give AI agents its own tools through the [Model Context Protocol](https://modelcontextprotocol.io) (MCP):
 Claude Code in a terminal or in the VS Code extension, VS Code's own agent mode, Claude Desktop, and any other MCP
 client (Cursor, Windsurf, Gemini CLI…) can then find,
-read and (when you allow it) change your notes, to-do lists, debt book and missions, and find the character names of
+read and (when you allow it) change your notes, to-do lists, debt book, missions and habits, and find the character names of
 your novels. Everything is set up on the
 **AI & MCP** page, right after General. Windows only: the server runs inside Helm on the PC.
 
@@ -20,10 +20,10 @@ The **Tools AI agents can reach** card lists every tool offered right now, in th
 | Group | What a call does |
 |---|---|
 | **Read** | Only reads Helm's own data (search notes, list tasks, show a mission). |
-| **Change** | Changes Helm's data: add or edit notes and tasks, tick tasks, add debts, create, re-plan and advance missions. Changes sync to your other devices. Nothing is deleted for good: notes go to a 30-day trash. |
+| **Change** | Changes Helm's data: add or edit notes and tasks, tick tasks, add debts, create, re-plan and advance missions, tick a habit. Changes sync to your other devices. Nothing is deleted for good: notes go to a 30-day trash. |
 | **Remote** | Runs something on another machine (an item of a server's SSH menu). Only on servers you allowed, and Helm always asks you first. |
 
-Only the tools of Helm tools that are turned on (Notes, Tracker, Wallet, Missions, SSH, Novel Reader, Vocabulary) are offered. The **Vault is never reachable**: no tool reads or writes
+Only the tools of Helm tools that are turned on (Notes, Tracker, Wallet, Missions, Habits, SSH, Novel Reader, Vocabulary) are offered. The **Vault is never reachable**: no tool reads or writes
 it, whatever the settings.
 
 Vocabulary's tools let an agent break down the words the user adds: `vocab_pending` lists the words waiting (with the
@@ -45,6 +45,14 @@ a little after there is something to do) runs Claude Code without a window with 
 (`claude -p --allowedTools mcp__helm__vocab_…`), 12 words of each kind per run; when a run leaves the same work behind
 it does not start by itself again until something changes. "Suggest words with this root" on the Roots tab does the
 same to add a family's words.
+
+Habits' tools let an agent see how the user's habits are going and why they slip: `habits_list` gives each habit with
+whether it is done today, its current and longest streak, the share of days done in the last 30 days and this year,
+and how many days in a row it has been skipped; `habit_report` gives one habit's year (default: this year): the days
+done, each month's share, and every run of missed days with the reason the user wrote when they came back (Habits
+asks for one after two or more days in a row). `habit_check` ticks a day (today by default, never before the habit
+started or in the future). Nothing is unticked or deleted through them. Try "why do I keep skipping my reading
+habit?".
 
 Novel Reader's tools (`novel_list`, `novel_name_candidates`, `novel_names`, `novel_add_names`, `novel_ignore_names`)
 let an agent find a novel's character names: it reads the possible names with sentences where they appear and adds

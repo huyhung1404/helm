@@ -48,6 +48,7 @@
     <ProjectReference Include="..\Helm.Modules.Workspace\Helm.Modules.Workspace.csproj" />
     <ProjectReference Include="..\Helm.Modules.WindowZones\Helm.Modules.WindowZones.csproj" />
     <ProjectReference Include="..\Helm.Modules.Vocab\Helm.Modules.Vocab.csproj" />
+    <ProjectReference Include="..\Helm.Modules.Habits\Helm.Modules.Habits.csproj" />
   </ItemGroup>
 
 </Project>

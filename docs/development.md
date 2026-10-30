@@ -47,7 +47,7 @@ src/
   Helm.Core/                 net8.0, no UI: module contract (IModule, ModuleRegistry<T>), settings, sync, update rules
   Helm.Shell/                net8.0: view models shared by both apps' Home and General (Updates, Sync)
   Helm.Core.Windows/         Windows: IHelmModule, Win32 (CsWin32), hooks, hotkeys, window/monitor services,
-                             GDI overlay window, DPAPI, shared WPF controls (Ui/); namespaces stay Helm.Core.*
+                             GDI overlay window, DPAPI, shared WPF controls (Ui/, also the confetti); namespaces stay Helm.Core.*
   Helm.App/                  WPF-UI shell: DI host, MainWindow, tray, Home/General/Diagnostics pages
   Helm.Core.Android/         Android: IAndroidModule, ModulePageBase, ActivityHost, HelmAndroidServices (not in Helm.sln)
   Helm.App.Android/          Avalonia Android app: shell, Home/General, Keystore, APK updater (not in Helm.sln)
@@ -56,8 +56,11 @@ src/
   Helm.Modules.Tracker/      Windows: Tracker page
   Helm.Modules.Tracker.Android/ Android: Tracker page and home-screen widget (not in Helm.sln)
   Helm.Modules.Missions.Core/ net8.0: missions (on Helm Sync), JSON import, prompt, pace, MCP tools, shared view model
-  Helm.Modules.Missions/     Windows: Missions pages and confetti
+  Helm.Modules.Missions/     Windows: Missions pages
   Helm.Modules.Missions.Android/ Android: Missions pages, reminders and home-screen widget (not in Helm.sln)
+  Helm.Modules.Habits.Core/  net8.0: habits and their days (on Helm Sync), streaks, the year grid, reasons, MCP tools, shared view model
+  Helm.Modules.Habits/       Windows: Habits pages and the year grid
+  Helm.Modules.Habits.Android/ Android: Habits pages, the year grid and the skipped-habit reminder (not in Helm.sln)
   Helm.Modules.Wallet.Core/  net8.0: transactions (on Helm Sync), bank notification parser, statistics, shared view model
   Helm.Modules.Wallet/       Windows: Wallet pages
   Helm.Modules.Wallet.Android/ Android: Wallet pages, bank notification listener, "what was it?" notification, widget (not in Helm.sln)
@@ -65,7 +68,7 @@ src/
   Helm.Modules.Vault/        Windows: vault window and page, Windows Hello, protected clipboard
   Helm.Modules.Vault.Android/ Android: vault page, fingerprint unlock, FLAG_SECURE, SAF backups (not in Helm.sln)
   Helm.VaultRestore/         helm-vault-restore: opens a vault backup without Helm
-tests/Helm.Tests/            xUnit: settings, sync (+ end-to-end against a local worker), updates, hotkeys, MCP, Tracker, Missions, Wallet, Vault
+tests/Helm.Tests/            xUnit: settings, sync (+ end-to-end against a local worker), updates, hotkeys, MCP, Tracker, Missions, Habits, Wallet, Vault
 ```
 
 Windows modules reference `Helm.Core.Windows`, Android modules reference `Helm.Core.Android`, and shared tool logic references `Helm.Core`; `Helm.App` / `Helm.App.Android` reference everything they ship.
