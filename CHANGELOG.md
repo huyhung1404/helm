@@ -3,7 +3,7 @@
 All notable changes to Helm. The top section is used as the GitHub release body and as the Velopack release notes.
 Format: [Keep a Changelog](https://keepachangelog.com), versions follow [SemVer](https://semver.org).
 
-## [Unreleased]
+## [0.63.0] - 2026-10-30
 
 ### Added
 - **Vocabulary: make a part of the tree a word of its own.** Right-click a character or a word inside a longer one
