@@ -263,7 +263,7 @@
                 </Grid.RowDefinitions>
 
                 <!-- The list: one language, searched, filtered, sorted, in groups -->
-                <StackPanel Grid.Row="1" DataContext="{Binding List}"
+                <StackPanel x:Name="WordsList" Grid.Row="1" DataContext="{Binding List}"
                             Visibility="{Binding DataContext.HasDetail, RelativeSource={RelativeSource AncestorType=Page}, Converter={StaticResource InverseBoolToVisibility}}">
                     <Grid Margin="0,0,0,8">
                         <Grid.ColumnDefinitions>
@@ -295,8 +295,16 @@
                             <TextBlock Margin="12" Text="No word matches." Style="{DynamicResource HelmSecondaryText}"
                                        Visibility="{Binding HasNoMatches, Converter={StaticResource BoolToVisibility}}" />
                             <ItemsControl ItemsSource="{Binding Words}" Focusable="False" ItemTemplate="{StaticResource WordRow}" />
-                            <ui:Button Margin="8" HorizontalAlignment="Center" Content="{Binding Pager.MoreText}" Command="{Binding Pager.ShowMoreCommand}"
-                                       Visibility="{Binding Pager.HasMore, Converter={StaticResource BoolToVisibility}}" />
+    <DockPanel Margin="8,4,8,8" Visibility="{Binding Pages.HasPages, Converter={StaticResource BoolToVisibility}}">
+                                <ui:Button DockPanel.Dock="Left" Appearance="Transparent" Content="Previous" Icon="{ui:SymbolIcon ChevronLeft24}"
+                                           Command="{Binding Pages.PreviousPageCommand}" AutomationProperties.Name="Previous page" />
+                                <ui:Button DockPanel.Dock="Right" Appearance="Transparent" Content="Next" Icon="{ui:SymbolIcon ChevronRight24}"
+                                           Command="{Binding Pages.NextPageCommand}" AutomationProperties.Name="Next page" />
+                                <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
+                                    <TextBlock Text="{Binding Pages.PageText}" HorizontalAlignment="Center" />
+                                    <TextBlock Text="{Binding Pages.RangeText}" FontSize="11" HorizontalAlignment="Center" Style="{DynamicResource HelmSecondaryText}" />
+                                </StackPanel>
+                            </DockPanel>
                         </StackPanel>
                     </Border>
                 </StackPanel>
@@ -595,8 +603,8 @@
                     </StackPanel>
                 </Border>
 
-                <!-- Every part, the biggest families first -->
-                <Border Style="{DynamicResource HelmSurface}" Padding="4" Visibility="{Binding ShowsList, Converter={StaticResource BoolToVisibility}}">
+                <!-- Every part, the biggest families first, a page at a time -->
+                <Border x:Name="RootsList" Style="{DynamicResource HelmSurface}" Padding="4" Visibility="{Binding ShowsList, Converter={StaticResource BoolToVisibility}}">
                     <StackPanel>
                         <TextBlock Margin="12" TextWrapping="Wrap" Style="{DynamicResource HelmSecondaryText}" Visibility="{Binding HasNoRoots, Converter={StaticResource BoolToVisibility}}"
                                    Text="The parts of your words show up here once they are broken down; a part shared by several words makes a family." />
@@ -613,7 +621,7 @@
                                                         <Run Text="{Binding Form, Mode=OneWay}" FontSize="17" FontWeight="SemiBold" />
                                                         <Run Text="  " /><Run Text="{Binding Meaning, Mode=OneWay}" />
                                                     </TextBlock>
-                                                    <ItemsControl ItemsSource="{Binding Words}" Focusable="False" Margin="0,2,0,0">
+                                                    <ItemsControl ItemsSource="{Binding FirstWords}" Focusable="False" Margin="0,2,0,0">
                                                         <ItemsControl.ItemsPanel>
                                                             <ItemsPanelTemplate>
                                                                 <WrapPanel />
@@ -628,6 +636,8 @@
                                                             </DataTemplate>
                                                         </ItemsControl.ItemTemplate>
                                                     </ItemsControl>
+                                                    <TextBlock Text="{Binding MoreWordsText}" FontSize="12" Style="{DynamicResource HelmSecondaryText}"
+                                                               Visibility="{Binding HasMoreWords, Converter={StaticResource BoolToVisibility}}" />
                                                 </StackPanel>
                                             </DockPanel>
                                         </Button>
@@ -635,8 +645,16 @@
                                 </DataTemplate>
                             </ItemsControl.ItemTemplate>
                         </ItemsControl>
-                        <ui:Button Margin="8" HorizontalAlignment="Center" Content="{Binding Pager.MoreText}" Command="{Binding Pager.ShowMoreCommand}"
-                                   Visibility="{Binding Pager.HasMore, Converter={StaticResource BoolToVisibility}}" />
+<DockPanel Margin="8,4,8,8" Visibility="{Binding Pages.HasPages, Converter={StaticResource BoolToVisibility}}">
+                            <ui:Button DockPanel.Dock="Left" Appearance="Transparent" Content="Previous" Icon="{ui:SymbolIcon ChevronLeft24}"
+                                       Command="{Binding Pages.PreviousPageCommand}" AutomationProperties.Name="Previous page" />
+                            <ui:Button DockPanel.Dock="Right" Appearance="Transparent" Content="Next" Icon="{ui:SymbolIcon ChevronRight24}"
+                                       Command="{Binding Pages.NextPageCommand}" AutomationProperties.Name="Next page" />
+                            <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
+                                <TextBlock Text="{Binding Pages.PageText}" HorizontalAlignment="Center" />
+                                <TextBlock Text="{Binding Pages.RangeText}" FontSize="11" HorizontalAlignment="Center" Style="{DynamicResource HelmSecondaryText}" />
+                            </StackPanel>
+                        </DockPanel>
                     </StackPanel>
                 </Border>
             </StackPanel>

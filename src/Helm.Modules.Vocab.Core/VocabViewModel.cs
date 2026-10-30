@@ -62,7 +62,7 @@ public sealed partial class VocabViewModel : ObservableObject
         Settings = settings;
         Agent = agent;
         List = new VocabWordListViewModel(store, quiz, settings, id => Open(id));
-        Roots = new VocabRootsViewModel(store, agent, settings.Current.ItemsShown, id => Open(id));
+        Roots = new VocabRootsViewModel(store, agent, settings.PageSize, id => Open(id));
         // Revealing a card shows how the word is built: the same tree as the Words tab, its links open the word there.
         Card = new VocabCardViewModel(store, quiz, (id, word) => Build(id, word, null), voice, () => Settings.CardOptions)
         {
@@ -279,8 +279,13 @@ public sealed partial class VocabViewModel : ObservableObject
     private VocabWordDetailViewModel Build(string id, VocabWord word, string? partId) =>
         new(_store, id, word, _quiz.StatsOf(id), Settings.ShowTraditional, w => Open(w), partId, _voice, Settings.ShowYouGlish, m => Message = m);
 
+    /// <summary>Back to the list, on the page of the word last shown (Next may have walked past the first page).</summary>
     [RelayCommand]
-    private void CloseDetail() => Detail = null;
+    private void CloseDetail()
+    {
+        if (Detail is { } detail) List.ShowPageOf(detail.Id);
+        Detail = null;
+    }
 
     [RelayCommand]
     private async Task DeleteWordAsync()
@@ -348,8 +353,8 @@ public sealed partial class VocabViewModel : ObservableObject
                 if (Detail is { } detail) Reload(detail);
                 break;
             case nameof(VocabSettingsViewModel.ItemsShownIndex):
-                List.Pager.PageSize = Settings.Current.ItemsShown;
-                Roots.Pager.PageSize = Settings.Current.ItemsShown;
+                List.Pages.PageSize = Settings.PageSize;
+                Roots.Pages.PageSize = Settings.PageSize;
                 List.Refresh();
                 Roots.Refresh();
                 break;

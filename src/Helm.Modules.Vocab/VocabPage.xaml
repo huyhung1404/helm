@@ -83,9 +83,9 @@
         </ui:CardControl>
         <ui:CardControl Margin="0,0,0,4" Icon="{ui:SymbolIcon TextBulletListLtr24}">
             <ui:CardControl.Header>
-                <core:CardHeader Title="Words shown at first" Description="Show more lists as many again." />
+                <core:CardHeader Title="Words per page" Description="The Words and Roots lists show one page at a time, with Previous and Next, so they stay quick however many words you have." />
             </ui:CardControl.Header>
-            <ComboBox Width="120" AutomationProperties.Name="Words shown at first" ItemsSource="{Binding Settings.ItemsShownNames}" SelectedIndex="{Binding Settings.ItemsShownIndex}" />
+            <ComboBox Width="120" AutomationProperties.Name="Words per page" ItemsSource="{Binding Settings.ItemsShownNames}" SelectedIndex="{Binding Settings.ItemsShownIndex}" />
         </ui:CardControl>
 
         <!-- Analysis -->

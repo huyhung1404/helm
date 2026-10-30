@@ -3,6 +3,16 @@
 All notable changes to Helm. The top section is used as the GitHub release body and as the Velopack release notes.
 Format: [Keep a Changelog](https://keepachangelog.com), versions follow [SemVer](https://semver.org).
 
+## [Unreleased]
+
+### Changed
+- **Vocabulary: the Words and Roots lists show one page at a time** (20 by default; 10, 50 or 100 in the settings,
+  "Words per page"), with **Previous** and **Next** under the list and where you are ("21–40 of 135"). Before, the
+  PC drew every word at once and "Show more" on the phone kept adding rows, which got slow with many words. Back
+  from a word you walked to with Next, the list is on that word's page.
+- **Vocabulary: a root's row shows its first 8 words** and how many more ("+12"); open the root for all of them. The
+  part is now marked only in the rows on screen, so answering a card no longer redoes it for every word.
+
 ## [0.64.0] - 2026-10-30
 
 ### Changed

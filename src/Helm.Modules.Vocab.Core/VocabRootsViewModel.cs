@@ -17,12 +17,23 @@ public sealed record VocabRootRow(string PartId, string Form, string Kind, strin
     public string CountText => Words.Count == 1 ? "1 word" : $"{Words.Count} words";
 
     public bool HasOrigin => Origin.Length > 0;
+
+    /// <summary>A row of the list shows this many of its words, then "+12".</summary>
+    public const int WordsInRow = 8;
+
+    public IReadOnlyList<VocabWordLink> FirstWords => Words.Count <= WordsInRow ? Words : Words.Take(WordsInRow).ToList();
+
+    /// <summary>"+12" after the first words; empty when they are all shown.</summary>
+    public string MoreWordsText => Words.Count > WordsInRow ? $"+{Words.Count - WordsInRow}" : "";
+
+    public bool HasMoreWords => Words.Count > WordsInRow;
 }
 
 /// <summary>
 /// The Roots tab: every part of the user's words with the words that share it, the biggest families first; a card to
 /// practise roots alone (the root, then its meaning and family); and, on the PC, "Suggest words" to add more of a
-/// family. A family opened takes the whole tab, with Previous and Next through the list. UI thread only.
+/// family. A family opened takes the whole tab, with Previous and Next through the list. The list shows one page at a
+/// time. UI thread only.
 /// </summary>
 public sealed partial class VocabRootsViewModel : ObservableObject
 {
@@ -45,12 +56,13 @@ public sealed partial class VocabRootsViewModel : ObservableObject
         _open = open;
         _random = random ?? Random.Shared;
         Agent = agent;
-        Pager = new ListPager(Refresh, pageSize);
+        Pages = new ListPages(Refresh, pageSize);
     }
 
     public ObservableCollection<VocabRootRow> Roots { get; } = [];
 
-    public ListPager Pager { get; }
+    /// <summary>One page of the list at a time (Previous / Next under it).</summary>
+    public ListPages Pages { get; }
 
     public VocabAgentViewModel Agent { get; }
 
@@ -82,10 +94,10 @@ public sealed partial class VocabRootsViewModel : ObservableObject
     }
 
     [RelayCommand]
-    private void NextFamily() => Selected = Neighbour(1) ?? Selected;
+    private void NextFamily() => Selected = Neighbour(1) is { } next ? Highlighted(_store, next) : Selected;
 
     [RelayCommand]
-    private void PreviousFamily() => Selected = Neighbour(-1) ?? Selected;
+    private void PreviousFamily() => Selected = Neighbour(-1) is { } previous ? Highlighted(_store, previous) : Selected;
 
     public bool HasPractice => Practice is not null;
 
@@ -137,7 +149,7 @@ public sealed partial class VocabRootsViewModel : ObservableObject
         var pool = all.Where(r => r.Words.Count > 1 && r.PartId != Practice?.PartId).ToList();
         if (pool.Count == 0) pool = all.Where(r => r.PartId != Practice?.PartId).ToList();
         if (pool.Count == 0) pool = all;
-        Practice = pool[_random.Next(pool.Count)];
+        Practice = Highlighted(_store, pool[_random.Next(pool.Count)]);
     }
 
     [RelayCommand]
@@ -156,17 +168,19 @@ public sealed partial class VocabRootsViewModel : ObservableObject
 
     public void Refresh()
     {
-        var all = Families(_store, Language, _open, row => Selected = row);
+        var all = Families(_store, Language, _open, row => Selected = Highlighted(_store, row));
         _all = all;
         Roots.Clear();
         var last = "";
-        foreach (var row in Pager.Take(all, Language))
+        // Only the page shown gets its highlights worked out (each one walks a word's tree).
+        foreach (var row in Pages.Take(all, Language))
         {
             var group = row.Words.Count > 1 ? "Families" : "Used once";
-            Roots.Add(group == last ? row : row with { Header = group });
+            var shown = Highlighted(_store, row, VocabRootRow.WordsInRow);
+            Roots.Add(group == last ? shown : shown with { Header = group });
             last = group;
         }
-        if (Selected is { } chosen) Selected = all.FirstOrDefault(r => r.PartId == chosen.PartId);
+        if (Selected is { } chosen) Selected = all.FirstOrDefault(r => r.PartId == chosen.PartId) is { } again ? Highlighted(_store, again) : null;
         OnNeighboursChanged();
         OnPropertyChanged(nameof(HasRoots));
         OnPropertyChanged(nameof(HasNoRoots));
@@ -201,10 +215,7 @@ public sealed partial class VocabRootsViewModel : ObservableObject
         {
             if (store.GetPart(partId) is not { } part) continue;
             var links = family.OrderBy(f => f.Word.Text, StringComparer.CurrentCulture)
-                .Select(f => new VocabWordLink(f.Id, f.Word.Text, f.Word.Meaning, new RelayCommand(() => open(f.Id)))
-                {
-                    Split = VocabHighlight.Find(store, f.Word, partId),
-                }).ToList();
+                .Select(f => new VocabWordLink(f.Id, f.Word.Text, f.Word.Meaning, new RelayCommand(() => open(f.Id)))).ToList();
             VocabRootRow? row = null;
             row = new VocabRootRow(partId, part.Form, KindText(part.Kind), part.Meaning, part.Origin, links,
                 new RelayCommand(() => select?.Invoke(row!)));
@@ -212,6 +223,14 @@ public sealed partial class VocabRootsViewModel : ObservableObject
         }
         return rows.OrderByDescending(r => r.Words.Count).ThenBy(r => r.Form, StringComparer.CurrentCulture).ToList();
     }
+
+    /// <summary>The row with the part marked inside its first <paramref name="max"/> words (re<b>lat</b>ive).</summary>
+    internal static VocabRootRow Highlighted(VocabStore store, VocabRootRow row, int max = int.MaxValue) => row with
+    {
+        Words = row.Words.Select((w, i) => i < max && store.GetWord(w.Id) is { } word
+            ? w with { Split = VocabHighlight.Find(store, word, row.PartId) }
+            : w).ToList(),
+    };
 
     private static string KindText(VocabPartKind kind) => kind switch
     {

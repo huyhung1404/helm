@@ -76,9 +76,10 @@
                     <ToggleSwitch Grid.Column="1" IsChecked="{Binding Settings.ShowYouGlish}" OnContent="" OffContent="" AutomationProperties.Name="YouGlish button" />
                 </Grid>
                 <StackPanel Spacing="4">
-                    <TextBlock Text="Words shown at first" />
+                    <TextBlock Text="Words per page" />
+                    <TextBlock Text="The Words and Roots lists show one page at a time, so they stay quick." Classes="secondary" TextWrapping="Wrap" />
                     <ComboBox HorizontalAlignment="Stretch" ItemsSource="{Binding Settings.ItemsShownNames}" SelectedIndex="{Binding Settings.ItemsShownIndex}"
-                              AutomationProperties.Name="Words shown at first" />
+                              AutomationProperties.Name="Words per page" />
                 </StackPanel>
             </StackPanel>
         </Border>

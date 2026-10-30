@@ -34,8 +34,8 @@ public sealed class VocabSettings : IVersionedSettings
     /// <summary>Show a button that opens YouGlish: the word said by real people in YouTube videos.</summary>
     public bool ShowYouGlish { get; set; } = true;
 
-    /// <summary>Words listed at first; "Show more" adds as many again (0: all).</summary>
-    public int ItemsShown { get; set; } = ListPager.DefaultSize;
+    /// <summary>Words (and roots) per page of the lists; see <see cref="VocabSettingsViewModel.PageSizes"/>.</summary>
+    public int ItemsShown { get; set; } = VocabSettingsViewModel.DefaultPageSize;
 
     /// <summary>PC: now and then a word pops up in a corner to guess (see <see cref="PopupMinSeconds"/>).</summary>
     public bool PopupEnabled { get; set; } = true;

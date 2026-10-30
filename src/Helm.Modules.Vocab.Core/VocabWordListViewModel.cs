@@ -72,12 +72,13 @@ public sealed partial class VocabWordListViewModel : ObservableObject
         _settings = settings;
         _open = open;
         _sortIndex = Math.Clamp(settings.Current.WordsSort, 0, SortNames.Count - 1);
-        Pager = new ListPager(Refresh, settings.Current.ItemsShown);
+        Pages = new ListPages(Refresh, settings.PageSize);
     }
 
     public ObservableCollection<VocabWordRow> Words { get; } = [];
 
-    public ListPager Pager { get; }
+    /// <summary>One page of the list at a time (Previous / Next under it).</summary>
+    public ListPages Pages { get; }
 
     public IReadOnlyList<string> Sorts => SortNames;
 
@@ -166,7 +167,7 @@ public sealed partial class VocabWordListViewModel : ObservableObject
         _order = sorted.Select(w => w.Id).ToList();
         Words.Clear();
         var last = "";
-        foreach (var w in Pager.Take(sorted, (SearchText, Language, SortIndex, FilterIndex)))
+        foreach (var w in Pages.Take(sorted, (SearchText, Language, SortIndex, FilterIndex)))
         {
             var s = Of(w.Id);
             var group = Group(w.Value, s, now);
@@ -189,6 +190,15 @@ public sealed partial class VocabWordListViewModel : ObservableObject
     {
         var at = _order.IndexOf(id);
         return at < 0 || at + step < 0 || at + step >= _order.Count ? null : _order[at + step];
+    }
+
+    /// <summary>Shows the page that holds this word (back from walking the words with Previous and Next).</summary>
+    public void ShowPageOf(string id)
+    {
+        var at = _order.IndexOf(id);
+        if (at < 0) return;
+        Pages.ShowPageOf(at);
+        Refresh();
     }
 
     /// <summary>"3 / 25": where the word is in the list; empty when it is not listed.</summary>

@@ -32,6 +32,9 @@ public partial class VocabContentPage : Page
         viewModel.PropertyChanged += OnViewModelChanged;
         viewModel.Card.PropertyChanged += OnCardChanged;
         viewModel.Roots.PropertyChanged += OnRootsChanged;
+        // A new page starts at the top of its list.
+        viewModel.List.Pages.Turned += (_, _) => Dispatcher.BeginInvoke(() => WordsList.BringIntoView(new Rect(0, 0, 1, 1)));
+        viewModel.Roots.Pages.Turned += (_, _) => Dispatcher.BeginInvoke(() => RootsPanel.BringIntoView(new Rect(0, 0, 1, 1)));
         PreviewKeyDown += OnPreviewKeyDown;
         Loaded += (_, _) => FocusLearn();
         ApplyEnabled();

@@ -392,7 +392,7 @@ public sealed class VocabPracticeTests
 
         // The Roots tab lists each family's words with the spot marked.
         var lat = VocabRootsViewModel.Families(_store, VocabLanguage.English, _ => { }).Single(r => r.Form == "lat");
-        Assert.Equal("lat", lat.Words.Single().Split.Match);
+        Assert.Equal("lat", VocabRootsViewModel.Highlighted(_store, lat).Words.Single().Split.Match);
     }
 
     // ---- an opened word: back, previous, next --------------------------------------------------------------------
@@ -424,6 +424,34 @@ public sealed class VocabPracticeTests
         viewModel.CloseDetailCommand.Execute(null);
         Assert.False(viewModel.HasDetail);
         Assert.Equal("", viewModel.WordPosition);
+    }
+
+    // ---- pages of words ------------------------------------------------------------------------------------------
+
+    [Fact]
+    public void The_words_list_shows_one_page_and_returns_to_the_page_of_the_last_word()
+    {
+        using var dir = new TempDir();
+        using var settings = new SettingsStoreFactory(new HelmPaths(dir.Path));
+        for (var i = 0; i < 25; i++) Analyzed($"word{i:00}");
+        var viewModel = VocabKit.ViewModel(_store, _quiz, settings);
+        // Saved before pages (the PC's "everything"): a page of 20.
+        Assert.Equal(VocabSettingsViewModel.DefaultPageSize, viewModel.Settings.PageSize);
+        viewModel.ShowWordsCommand.Execute(null);
+        Assert.Equal(20, viewModel.List.Words.Count);
+        Assert.Equal("Page 1 of 2", viewModel.List.Pages.PageText);
+
+        // Walking past the page with Next, then back: the list is on the second page.
+        viewModel.Open(viewModel.List.Words[^1].Id);
+        viewModel.NextWordCommand.Execute(null);
+        Assert.Equal("word20", viewModel.Detail!.Word.Text);
+        viewModel.CloseDetailCommand.Execute(null);
+        Assert.Equal("Page 2 of 2", viewModel.List.Pages.PageText);
+        Assert.Equal(5, viewModel.List.Words.Count);
+
+        viewModel.Settings.ItemsShownIndex = VocabSettingsViewModel.PageSizes.ToList().IndexOf(50);
+        Assert.Equal(25, viewModel.List.Words.Count);
+        Assert.False(viewModel.List.Pages.HasPages);
     }
 
     // ---- the phone widget's look ---------------------------------------------------------------------------------

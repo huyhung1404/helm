@@ -66,7 +66,7 @@ public sealed partial class VocabSettingsViewModel : ObservableObject
         AutoSay = s.AutoSay;
         AutoAnalyze = s.AutoAnalyze;
         CardModeIndex = (int)s.CardMode;
-        ItemsShownIndex = ListPager.IndexOf(s.ItemsShown);
+        ItemsShownIndex = PageSizes.ToList().IndexOf(PageSizeOf(s.ItemsShown));
         PopupEnabled = s.PopupEnabled;
         PopupFrequencyIndex = s.PopupCustom ? CustomFrequencyIndex : FrequencyIndex(s.PopupMinSeconds, s.PopupMaxSeconds);
         CustomFromText = s.PopupMinSeconds.ToString(System.Globalization.CultureInfo.CurrentCulture);
@@ -87,7 +87,18 @@ public sealed partial class VocabSettingsViewModel : ObservableObject
 
     public IReadOnlyList<string> CardModes => CardModeNames;
 
-    public IReadOnlyList<string> ItemsShownNames => ListPager.SizeNames;
+    /// <summary>The choices of "Words per page": a page is all that is ever drawn, so the lists stay quick.</summary>
+    public static IReadOnlyList<int> PageSizes { get; } = [10, 20, 50, 100];
+
+    public const int DefaultPageSize = 20;
+
+    /// <summary>A saved page size, or the default for one from before pages (5 on the phone, "all" on the PC).</summary>
+    public static int PageSizeOf(int saved) => PageSizes.Contains(saved) ? saved : DefaultPageSize;
+
+    /// <summary>Rows per page of the Words and Roots lists.</summary>
+    public int PageSize => PageSizeOf(_settings.Current.ItemsShown);
+
+    public IReadOnlyList<string> ItemsShownNames { get; } = PageSizes.Select(n => n.ToString(System.Globalization.CultureInfo.CurrentCulture)).ToList();
 
     public IReadOnlyList<string> PopupFrequencyNames { get; } = [.. PopupFrequencies.Select(f => f.Name), "Custom (type the seconds)"];
 
@@ -131,7 +142,8 @@ public sealed partial class VocabSettingsViewModel : ObservableObject
     partial void OnCardModeIndexChanged(int value) =>
         Save(nameof(CardModeIndex), s => s.CardMode = (VocabCardMode)Math.Clamp(value, 0, CardModeNames.Count - 1));
 
-    partial void OnItemsShownIndexChanged(int value) => Save(nameof(ItemsShownIndex), s => s.ItemsShown = ListPager.SizeAt(value));
+    partial void OnItemsShownIndexChanged(int value) =>
+        Save(nameof(ItemsShownIndex), s => s.ItemsShown = PageSizes[Math.Clamp(value, 0, PageSizes.Count - 1)]);
 
     partial void OnPopupEnabledChanged(bool value) => Save(nameof(PopupEnabled), s => s.PopupEnabled = value);
 

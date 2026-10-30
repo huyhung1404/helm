@@ -39,6 +39,8 @@ public partial class VocabContentPage : UserControl
         base.OnAttachedToVisualTree(e);
         _module.PropertyChanged += OnModuleChanged;
         ShellIntents.ItemOffered += OnItemOffered;
+        _viewModel.List.Pages.Turned += OnWordsPageTurned;
+        _viewModel.Roots.Pages.Turned += OnRootsPageTurned;
         ApplyEnabled();
         OpenOfferedWord();
         // Opening Vocabulary is the moment to ask for notifications (Android 13+, once) for the lock-screen word.
@@ -49,8 +51,15 @@ public partial class VocabContentPage : UserControl
     {
         _module.PropertyChanged -= OnModuleChanged;
         ShellIntents.ItemOffered -= OnItemOffered;
+        _viewModel.List.Pages.Turned -= OnWordsPageTurned;
+        _viewModel.Roots.Pages.Turned -= OnRootsPageTurned;
         base.OnDetachedFromVisualTree(e);
     }
+
+    // A new page starts at the top of its list.
+    private void OnWordsPageTurned(object? sender, EventArgs e) => Dispatcher.UIThread.Post(() => WordsList.BringIntoView(new Avalonia.Rect(0, 0, 1, 1)));
+
+    private void OnRootsPageTurned(object? sender, EventArgs e) => Dispatcher.UIThread.Post(() => RootsList.BringIntoView(new Avalonia.Rect(0, 0, 1, 1)));
 
     private void OnItemOffered(object? sender, EventArgs e) => Dispatcher.UIThread.Post(OpenOfferedWord);
 

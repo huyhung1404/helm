@@ -653,7 +653,7 @@
                 </StackPanel>
 
                 <!-- The list: one language, searched, filtered, sorted, in groups -->
-                <Panel IsVisible="{Binding !HasDetail}">
+                <Panel x:Name="WordsList" IsVisible="{Binding !HasDetail}">
                 <StackPanel DataContext="{Binding List}" x:DataType="vm:VocabWordListViewModel" Spacing="8">
                     <Grid ColumnDefinitions="*,6,*">
                         <Button Classes="tab" Classes.accent="{Binding IsEnglish}" Content="{Binding EnglishTabText}" Command="{Binding ShowEnglishCommand}"
@@ -673,9 +673,24 @@
                             <TextBlock Margin="12" Text="No word matches." Classes="secondary" IsVisible="{Binding HasNoMatches}" />
                             <ItemsControl ItemsSource="{Binding Words}" ItemTemplate="{StaticResource WordRow}" />
                             <!-- A page at a time: the phone draws every row it is given -->
-                            <Button Classes="flat" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Margin="0,0,0,8"
-                                    Content="{Binding Pager.MoreText}" Command="{Binding Pager.ShowMoreCommand}" IsVisible="{Binding Pager.HasMore}"
-                                    AutomationProperties.Name="Show more words" />
+                            <Grid ColumnDefinitions="Auto,*,Auto" Margin="4,0,4,6" IsVisible="{Binding Pages.HasPages}">
+                                <Button Classes="flat" Command="{Binding Pages.PreviousPageCommand}" AutomationProperties.Name="Previous page">
+                                    <StackPanel Orientation="Horizontal" Spacing="4">
+                                        <ic:SymbolIcon Symbol="ChevronLeft" FontSize="16" />
+                                        <TextBlock Text="Previous" VerticalAlignment="Center" />
+                                    </StackPanel>
+                                </Button>
+                                <StackPanel Grid.Column="1" HorizontalAlignment="Center" VerticalAlignment="Center">
+                                    <TextBlock Text="{Binding Pages.PageText}" HorizontalAlignment="Center" />
+                                    <TextBlock Text="{Binding Pages.RangeText}" Classes="secondary" FontSize="11" HorizontalAlignment="Center" />
+                                </StackPanel>
+                                <Button Grid.Column="2" Classes="flat" Command="{Binding Pages.NextPageCommand}" AutomationProperties.Name="Next page">
+                                    <StackPanel Orientation="Horizontal" Spacing="4">
+                                        <TextBlock Text="Next" VerticalAlignment="Center" />
+                                        <ic:SymbolIcon Symbol="ChevronRight" FontSize="16" />
+                                    </StackPanel>
+                                </Button>
+                            </Grid>
                         </StackPanel>
                     </Border>
                 </StackPanel>
@@ -683,7 +698,7 @@
             </StackPanel>
 
             <!-- ===== Roots: families of words that share a part ===== -->
-            <Panel IsVisible="{Binding IsRootsTab}">
+            <Panel x:Name="RootsList" IsVisible="{Binding IsRootsTab}">
             <StackPanel DataContext="{Binding Roots}" x:DataType="vm:VocabRootsViewModel" Spacing="8">
                 <Grid ColumnDefinitions="*,6,*" IsVisible="{Binding ShowsList}">
                     <Button Classes="tab" Classes.accent="{Binding IsEnglish}" Content="English" Command="{Binding ShowEnglishCommand}" />
@@ -815,7 +830,7 @@
                                                     </WrapPanel>
                                                     <TextBlock Grid.Column="1" Text="{Binding CountText}" Classes="secondary" FontSize="12" />
                                                 </Grid>
-                                                <ItemsControl ItemsSource="{Binding Words}">
+                                                <ItemsControl ItemsSource="{Binding FirstWords}">
                                                     <ItemsControl.ItemsPanel>
                                                         <ItemsPanelTemplate>
                                                             <WrapPanel />
@@ -827,14 +842,31 @@
                                                         </DataTemplate>
                                                     </ItemsControl.ItemTemplate>
                                                 </ItemsControl>
+                                                <TextBlock Text="{Binding MoreWordsText}" Classes="secondary" FontSize="12" IsVisible="{Binding HasMoreWords}" />
                                             </StackPanel>
                                         </Button>
                                     </StackPanel>
                                 </DataTemplate>
                             </ItemsControl.ItemTemplate>
                         </ItemsControl>
-                        <Button Classes="flat" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Margin="0,0,0,8"
-                                Content="{Binding Pager.MoreText}" Command="{Binding Pager.ShowMoreCommand}" IsVisible="{Binding Pager.HasMore}" />
+                        <Grid ColumnDefinitions="Auto,*,Auto" Margin="4,0,4,6" IsVisible="{Binding Pages.HasPages}">
+                                <Button Classes="flat" Command="{Binding Pages.PreviousPageCommand}" AutomationProperties.Name="Previous page">
+                                    <StackPanel Orientation="Horizontal" Spacing="4">
+                                        <ic:SymbolIcon Symbol="ChevronLeft" FontSize="16" />
+                                        <TextBlock Text="Previous" VerticalAlignment="Center" />
+                                    </StackPanel>
+                                </Button>
+                                <StackPanel Grid.Column="1" HorizontalAlignment="Center" VerticalAlignment="Center">
+                                    <TextBlock Text="{Binding Pages.PageText}" HorizontalAlignment="Center" />
+                                    <TextBlock Text="{Binding Pages.RangeText}" Classes="secondary" FontSize="11" HorizontalAlignment="Center" />
+                                </StackPanel>
+                                <Button Grid.Column="2" Classes="flat" Command="{Binding Pages.NextPageCommand}" AutomationProperties.Name="Next page">
+                                    <StackPanel Orientation="Horizontal" Spacing="4">
+                                        <TextBlock Text="Next" VerticalAlignment="Center" />
+                                        <ic:SymbolIcon Symbol="ChevronRight" FontSize="16" />
+                                    </StackPanel>
+                                </Button>
+                            </Grid>
                     </StackPanel>
                 </Border>
             </StackPanel>
