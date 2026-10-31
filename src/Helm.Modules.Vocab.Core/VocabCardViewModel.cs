@@ -129,6 +129,8 @@ public sealed partial class VocabCardViewModel(VocabStore store, VocabQuiz quiz,
         OnPropertyChanged(nameof(AnswerIsCorrect));
         OnPropertyChanged(nameof(AnswerIsClose));
         OnPropertyChanged(nameof(AnswerIsWrong));
+        OnPropertyChanged(nameof(SuggestsRemembered));
+        OnPropertyChanged(nameof(SuggestsForgot));
     }
 
     public bool HasFrontNote => FrontNote.Length > 0;
@@ -166,6 +168,15 @@ public sealed partial class VocabCardViewModel(VocabStore store, VocabQuiz quiz,
 
     /// <summary>The word on the card; null when there is none.</summary>
     public string? WordId => _wordId;
+
+    /// <summary>The pop-up cards' "Full details": everything known about the word, by section (built when asked).</summary>
+    public IReadOnlyList<VocabDetailSection> Details() => _word is null ? [] : VocabCardDetails.Build(store, _word);
+
+    /// <summary>The typed answer was right (or the right sounds): the card suggests Remembered.</summary>
+    public bool SuggestsRemembered => TypedResult?.Verdict == VocabAnswerVerdict.Correct;
+
+    /// <summary>The typed answer was wrong: the card suggests Forgot.</summary>
+    public bool SuggestsForgot => TypedResult?.Verdict == VocabAnswerVerdict.Wrong;
 
     /// <summary>Shows a word picked by the quiz (another than the one shown); false when no word is analyzed yet.</summary>
     public bool ShowNext()

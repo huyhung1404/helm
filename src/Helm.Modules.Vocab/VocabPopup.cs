@@ -128,7 +128,12 @@ public sealed class VocabPopup : IDisposable
         {
             // A card still on screen (not answered yet) stays as it is.
             if (_window is { IsVisible: true }) return;
-            var card = new VocabCardViewModel(_store, _quiz, voice: _voice) { ShowYouGlish = _settings.Current.ShowYouGlish };
+            // A Chinese word asks for its pinyin first when the Learn tab does (the same setting).
+            var card = new VocabCardViewModel(_store, _quiz, voice: _voice,
+                options: () => new VocabCardOptions(VocabCardMode.WordToMeaning, false, _settings.Current.TypePinyin))
+            {
+                ShowYouGlish = _settings.Current.ShowYouGlish,
+            };
             if (!card.ShowNext()) return;
             var s = _settings.Current;
             _window = new VocabPopupWindow(card, _windows, OpenWord,

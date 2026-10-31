@@ -138,6 +138,21 @@ public sealed class VocabViewsTests : IDisposable
         card.RevealCommand.Execute(null);
         Layout(window, new Size(352, 420), "7-popup-revealed");
         window.Close();
+
+        // A Chinese word asks for its pinyin first; checked, the answer shows with the suggested verdict; Full details.
+        var bujiu = store.FindWord("补救")!;
+        var zh = new VocabCardViewModel(store, quiz, options: () => new VocabCardOptions(VocabCardMode.WordToMeaning, false, TypePinyin: true));
+        zh.Show(bujiu.Id, bujiu.Value);
+        Assert.True(zh.IsTyping);
+        var zhWindow = new VocabPopupWindow(zh, windows);
+        Layout(zhWindow, new Size(352, 300), "8-popup-pinyin");
+        zh.Typed = "bu3jiu4";
+        zh.CheckCommand.Execute(null);
+        Assert.True(zh.SuggestsRemembered);
+        Layout(zhWindow, new Size(352, 520), "9-popup-checked");
+        zhWindow.ToggleFull();
+        Layout(zhWindow, new Size(352, 900), "10-popup-full");
+        zhWindow.Close();
     });
 
     private static void Seed(VocabStore store)

@@ -4,91 +4,207 @@
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
     xmlns:local="clr-namespace:Helm.Modules.Vocab"
+    xmlns:core="clr-namespace:Helm.Modules.Vocab;assembly=Helm.Modules.Vocab.Core"
     Title="Vocabulary"
     WindowStyle="None" AllowsTransparency="True" Background="Transparent" ResizeMode="NoResize"
     ShowInTaskbar="False" ShowActivated="False" Topmost="True" SizeToContent="Height" Width="352"
     UseLayoutRounding="True">
 
-    <!-- One word to guess; a click on it shows the meaning, then the user says whether they remembered it. -->
-    <Border Margin="16" Padding="16,12,16,16" CornerRadius="12" BorderThickness="1" MouseLeftButtonDown="Card_MouseLeftButtonDown"
+    <!-- One word to guess. A Chinese word asks for its pinyin first (the Learn tab's setting); a click on the word, or
+         "Show meaning", shows the answer; then the user says whether they remembered it. Long content scrolls inside. -->
+    <Window.Resources>
+        <!-- A round icon-only button of the answer's row -->
+        <Style x:Key="RoundIcon" TargetType="ui:Button" BasedOn="{StaticResource {x:Type ui:Button}}">
+            <Setter Property="Width" Value="36" />
+            <Setter Property="Height" Value="36" />
+            <Setter Property="MinWidth" Value="0" />
+            <Setter Property="Padding" Value="0" />
+            <Setter Property="CornerRadius" Value="18" />
+            <Setter Property="Margin" Value="0,0,6,0" />
+            <Setter Property="Appearance" Value="Transparent" />
+            <Setter Property="BorderThickness" Value="0" />
+        </Style>
+    </Window.Resources>
+
+    <Border Margin="16" CornerRadius="12" BorderThickness="1" MouseLeftButtonDown="Card_MouseLeftButtonDown"
             ToolTip="Drag to move it; double-click to put it back in the corner" ToolTipService.InitialShowDelay="1500"
             Background="{DynamicResource ApplicationBackgroundBrush}" BorderBrush="{DynamicResource CardStrokeColorDefaultBrush}"
             TextElement.Foreground="{DynamicResource TextFillColorPrimaryBrush}">
         <Border.Effect>
             <DropShadowEffect BlurRadius="18" ShadowDepth="3" Opacity="0.3" Direction="270" />
         </Border.Effect>
-        <StackPanel>
-            <DockPanel Margin="0,0,0,6">
+        <DockPanel>
+            <DockPanel DockPanel.Dock="Top" Margin="16,10,10,0">
                 <ui:Button DockPanel.Dock="Right" Appearance="Transparent" Padding="4" MinWidth="0" Icon="{ui:SymbolIcon Dismiss16}"
                            ToolTip="Close (no answer)" AutomationProperties.Name="Close" Click="Close_Click" />
                 <Image Width="16" Height="16" Source="{x:Static local:VocabLogo.Image}" VerticalAlignment="Center" />
                 <TextBlock Margin="8,0,0,0" Text="Do you remember this word?" VerticalAlignment="Center" Style="{DynamicResource HelmSecondaryText}" />
             </DockPanel>
 
-            <!-- The word: a click shows the meaning -->
-            <Button Cursor="Hand" HorizontalAlignment="Stretch" Command="{Binding RevealCommand}" AutomationProperties.Name="Show the meaning" FocusVisualStyle="{x:Null}">
-                <Button.Template>
-                    <ControlTemplate TargetType="Button">
-                        <Border x:Name="Bd" Background="Transparent" CornerRadius="8" Padding="8,6">
-                            <ContentPresenter HorizontalAlignment="Center" />
-                        </Border>
-                        <ControlTemplate.Triggers>
-                            <Trigger Property="IsMouseOver" Value="True">
-                                <Setter TargetName="Bd" Property="Background" Value="{DynamicResource SubtleFillColorSecondaryBrush}" />
-                            </Trigger>
-                        </ControlTemplate.Triggers>
-                    </ControlTemplate>
-                </Button.Template>
-                <StackPanel>
-                    <TextBlock Text="{Binding Text}" FontSize="30" FontWeight="SemiBold" TextWrapping="Wrap" HorizontalAlignment="Center"
-                               Foreground="{DynamicResource TextFillColorPrimaryBrush}" />
-                    <TextBlock Text="Click to see the meaning" HorizontalAlignment="Center" Style="{DynamicResource HelmSecondaryText}"
-                               Visibility="{Binding IsRevealed, Converter={StaticResource InverseBoolToVisibility}}" />
-                </StackPanel>
-            </Button>
+            <ScrollViewer x:Name="Scroller" MaxHeight="460" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Focusable="False">
+                <StackPanel Margin="16,4,16,14">
+                    <!-- The word: a click shows the meaning (or, while the pinyin is asked, goes to the box) -->
+                    <Button Cursor="Hand" HorizontalAlignment="Stretch" Click="Word_Click" AutomationProperties.Name="Show the meaning" FocusVisualStyle="{x:Null}">
+                        <Button.Template>
+                            <ControlTemplate TargetType="Button">
+                                <Border x:Name="Bd" Background="Transparent" CornerRadius="8" Padding="8,6">
+                                    <ContentPresenter HorizontalAlignment="Center" />
+                                </Border>
+                                <ControlTemplate.Triggers>
+                                    <Trigger Property="IsMouseOver" Value="True">
+                                        <Setter TargetName="Bd" Property="Background" Value="{DynamicResource SubtleFillColorSecondaryBrush}" />
+                                    </Trigger>
+                                </ControlTemplate.Triggers>
+                            </ControlTemplate>
+                        </Button.Template>
+                        <StackPanel>
+                            <TextBlock Text="{Binding Text}" FontSize="30" FontWeight="SemiBold" TextWrapping="Wrap" HorizontalAlignment="Center"
+                                       Foreground="{DynamicResource TextFillColorPrimaryBrush}" />
+                            <TextBlock x:Name="TapHint" Text="Click to see the meaning" HorizontalAlignment="Center" Style="{DynamicResource HelmSecondaryText}" />
+                        </StackPanel>
+                    </Button>
 
-            <!-- The answer -->
-            <StackPanel Margin="0,8,0,0" Visibility="{Binding IsRevealed, Converter={StaticResource BoolToVisibility}}">
-                <TextBlock HorizontalAlignment="Center" Style="{DynamicResource HelmSecondaryText}">
-                    <Run Text="{Binding Phonetic, Mode=OneWay}" />
-                    <Run Text="{Binding HanViet, Mode=OneWay}" FontWeight="SemiBold" />
-                    <Run Text="{Binding Traditional, Mode=OneWay}" />
-                </TextBlock>
-                <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,4,0,0">
-                    <ui:Button Appearance="Transparent" Padding="6,2" Content="Listen" Icon="{ui:SymbolIcon Speaker224}" Command="{Binding SayCommand}"
-                               Visibility="{Binding CanSay, Converter={StaticResource BoolToVisibility}}" />
-                    <ui:Button Appearance="Transparent" Padding="6,2" Margin="4,0,0,0" Content="YouGlish" Icon="{ui:SymbolIcon Video24}" Command="{Binding YouGlishCommand}"
-                               Visibility="{Binding ShowYouGlish, Converter={StaticResource BoolToVisibility}}" />
-                </StackPanel>
-                <TextBlock Margin="0,6,0,0" Text="{Binding Meaning}" FontSize="16" TextWrapping="Wrap" HorizontalAlignment="Center" TextAlignment="Center" />
-                <TextBlock Margin="0,4,0,0" Text="{Binding Explanation}" TextWrapping="Wrap" TextAlignment="Center" FontSize="12"
-                           Style="{DynamicResource HelmSecondaryText}" />
-                <!-- Each part with its meaning: enough to remember a forgotten word at once -->
-                <Border Margin="0,10,0,0" Padding="10,8" CornerRadius="8" Background="{DynamicResource SubtleFillColorSecondaryBrush}"
-                        Visibility="{Binding HasParts, Converter={StaticResource BoolToVisibility}}">
-                    <StackPanel>
-                        <ItemsControl ItemsSource="{Binding PartLines}" Focusable="False">
-                            <ItemsControl.ItemTemplate>
-                                <DataTemplate>
-                                    <TextBlock Text="{Binding}" TextWrapping="Wrap" FontSize="13" Margin="0,1" />
-                                </DataTemplate>
-                            </ItemsControl.ItemTemplate>
-                        </ItemsControl>
-                        <ui:Button Margin="0,6,0,0" Appearance="Transparent" Padding="0,2" Content="See the whole tree" Icon="{ui:SymbolIcon Organization24}"
-                                   Foreground="{DynamicResource AccentTextFillColorPrimaryBrush}" Click="SeeTree_Click" />
+                    <!-- The pinyin, typed: the card takes the keyboard while the box is used -->
+                    <StackPanel x:Name="TypePanel" Margin="0,6,0,0">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="8" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <ui:TextBox x:Name="TypeBox" FontSize="14" PlaceholderText="{Binding TypePrompt}" AutomationProperties.Name="{Binding TypePrompt}"
+                                        Text="{Binding Typed, UpdateSourceTrigger=PropertyChanged}" PreviewMouseLeftButtonDown="TypeBox_MouseDown" KeyDown="TypeBox_KeyDown" />
+                            <ui:Button Grid.Column="2" Appearance="Primary" Content="Check" Click="Check_Click" />
+                        </Grid>
+                        <ui:Button Margin="0,4,0,0" Appearance="Transparent" Padding="0,2" Content="Show meaning" Click="ShowMeaning_Click"
+                                   Foreground="{DynamicResource AccentTextFillColorPrimaryBrush}" />
                     </StackPanel>
-                </Border>
-                <Grid Margin="0,14,0,0">
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="*" />
-                        <ColumnDefinition Width="8" />
-                        <ColumnDefinition Width="*" />
-                    </Grid.ColumnDefinitions>
-                    <ui:Button HorizontalAlignment="Stretch" Content="Forgot" Icon="{ui:SymbolIcon DismissCircle24}" Command="{Binding ForgotCommand}" />
-                    <ui:Button Grid.Column="2" HorizontalAlignment="Stretch" Appearance="Primary" Content="Remembered" Icon="{ui:SymbolIcon CheckmarkCircle24}"
-                               Command="{Binding RememberedCommand}" />
-                </Grid>
-            </StackPanel>
-        </StackPanel>
+
+                    <!-- The answer -->
+                    <StackPanel Margin="0,8,0,0" Visibility="{Binding IsRevealed, Converter={StaticResource BoolToVisibility}}">
+                        <!-- What was typed, letter by letter, and the verdict -->
+                        <StackPanel HorizontalAlignment="Center" Margin="0,0,0,6" Visibility="{Binding HasAnswer, Converter={StaticResource BoolToVisibility}}">
+                            <ItemsControl ItemsSource="{Binding AnswerPieces}" HorizontalAlignment="Center" Focusable="False">
+                                <ItemsControl.ItemsPanel>
+                                    <ItemsPanelTemplate>
+                                        <StackPanel Orientation="Horizontal" />
+                                    </ItemsPanelTemplate>
+                                </ItemsControl.ItemsPanel>
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate DataType="{x:Type core:VocabAnswerPiece}">
+                                        <TextBlock Text="{Binding Text}" FontSize="17" FontFamily="Consolas">
+                                            <TextBlock.Style>
+                                                <Style TargetType="TextBlock">
+                                                    <Style.Triggers>
+                                                        <DataTrigger Binding="{Binding IsWrong}" Value="True">
+                                                            <Setter Property="Foreground" Value="{DynamicResource SystemFillColorCriticalBrush}" />
+                                                            <Setter Property="TextDecorations" Value="Underline" />
+                                                        </DataTrigger>
+                                                        <DataTrigger Binding="{Binding IsMissing}" Value="True">
+                                                            <Setter Property="Foreground" Value="{DynamicResource SystemFillColorCriticalBrush}" />
+                                                            <Setter Property="Opacity" Value="0.55" />
+                                                        </DataTrigger>
+                                                    </Style.Triggers>
+                                                </Style>
+                                            </TextBlock.Style>
+                                        </TextBlock>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                            <TextBlock Text="{Binding AnswerMessage}" FontWeight="SemiBold" TextWrapping="Wrap" TextAlignment="Center" HorizontalAlignment="Center">
+                                <TextBlock.Style>
+                                    <Style TargetType="TextBlock">
+                                        <Setter Property="Foreground" Value="{DynamicResource SystemFillColorCriticalBrush}" />
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding AnswerIsCorrect}" Value="True">
+                                                <Setter Property="Foreground" Value="{DynamicResource SystemFillColorSuccessBrush}" />
+                                            </DataTrigger>
+                                            <DataTrigger Binding="{Binding AnswerIsClose}" Value="True">
+                                                <Setter Property="Foreground" Value="{DynamicResource SystemFillColorCautionBrush}" />
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </TextBlock.Style>
+                            </TextBlock>
+                        </StackPanel>
+
+                        <WrapPanel HorizontalAlignment="Center">
+                            <TextBlock local:ToneText.Text="{Binding Phonetic}" FontSize="16" Margin="0,0,8,0" />
+                            <TextBlock Text="{Binding HanViet}" FontWeight="SemiBold" Margin="0,0,8,0" Style="{DynamicResource HelmSecondaryText}" VerticalAlignment="Bottom" />
+                            <TextBlock Text="{Binding Traditional}" Style="{DynamicResource HelmSecondaryText}" VerticalAlignment="Bottom" />
+                        </WrapPanel>
+                        <TextBlock Margin="0,6,0,0" Text="{Binding Meaning}" FontSize="16" TextWrapping="Wrap" HorizontalAlignment="Center" TextAlignment="Center" />
+                        <TextBlock Margin="0,4,0,0" Text="{Binding Explanation}" TextWrapping="Wrap" TextAlignment="Center" FontSize="12"
+                                   Style="{DynamicResource HelmSecondaryText}" />
+
+                        <!-- Each part with its meaning: enough to remember a forgotten word at once -->
+                        <Border x:Name="PartsBox" Margin="0,10,0,0" Padding="10,8" CornerRadius="8" Background="{DynamicResource SubtleFillColorSecondaryBrush}">
+                            <ItemsControl ItemsSource="{Binding PartLines}" Focusable="False">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate>
+                                        <TextBlock Text="{Binding}" TextWrapping="Wrap" FontSize="13" Margin="0,1" />
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </Border>
+
+                        <!-- Full details: everything Helm knows about the word, so there is no need to open the app -->
+                        <StackPanel x:Name="DetailsPanel" Margin="0,8,0,0" Visibility="Collapsed">
+                            <Border HorizontalAlignment="Left" CornerRadius="10" Padding="9,2" Margin="0,0,0,4" Background="{DynamicResource SubtleFillColorSecondaryBrush}"
+                                    Visibility="{Binding Info.HasLabels, Converter={StaticResource BoolToVisibility}}">
+                                <TextBlock Text="{Binding Info.Labels}" FontSize="12" />
+                            </Border>
+                            <ItemsControl x:Name="DetailsList" Focusable="False">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate DataType="{x:Type core:VocabDetailSection}">
+                                        <StackPanel Margin="0,8,0,0">
+                                            <TextBlock Text="{Binding Title}" FontSize="11" FontWeight="SemiBold" Margin="0,0,0,3" Style="{DynamicResource HelmSecondaryText}" />
+                                            <ItemsControl ItemsSource="{Binding Items}" Focusable="False">
+                                                <ItemsControl.ItemTemplate>
+                                                    <DataTemplate DataType="{x:Type core:VocabDetailItem}">
+                                                        <StackPanel Margin="0,1">
+                                                            <TextBlock Text="{Binding Text}" TextWrapping="Wrap" FontSize="13">
+                                                                <TextBlock.Style>
+                                                                    <Style TargetType="TextBlock">
+                                                                        <Style.Triggers>
+                                                                            <DataTrigger Binding="{Binding DataContext.IsTree, RelativeSource={RelativeSource AncestorType=ItemsControl}}" Value="True">
+                                                                                <Setter Property="FontFamily" Value="Consolas, Microsoft YaHei" />
+                                                                                <Setter Property="TextWrapping" Value="NoWrap" />
+                                                                            </DataTrigger>
+                                                                        </Style.Triggers>
+                                                                    </Style>
+                                                                </TextBlock.Style>
+                                                            </TextBlock>
+                                                            <TextBlock Text="{Binding Note}" TextWrapping="Wrap" FontSize="12" Margin="10,0,0,0" Style="{DynamicResource HelmSecondaryText}"
+                                                                       Visibility="{Binding HasNote, Converter={StaticResource BoolToVisibility}}" />
+                                                        </StackPanel>
+                                                    </DataTemplate>
+                                                </ItemsControl.ItemTemplate>
+                                            </ItemsControl>
+                                        </StackPanel>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </StackPanel>
+
+                        <!-- One row of icons: the tools on the left, the verdict on the right -->
+                        <DockPanel Margin="0,12,0,0" LastChildFill="False">
+                            <ui:Button DockPanel.Dock="Right" Margin="0" Appearance="Primary" Style="{StaticResource RoundIcon}" Icon="{ui:SymbolIcon Checkmark24}"
+                                       ToolTip="Remembered" AutomationProperties.Name="Remembered" Command="{Binding RememberedCommand}" x:Name="RememberedButton" />
+                            <ui:Button DockPanel.Dock="Right" Appearance="Danger" Style="{StaticResource RoundIcon}" Icon="{ui:SymbolIcon Dismiss24}"
+                                       ToolTip="Forgot" AutomationProperties.Name="Forgot" Command="{Binding ForgotCommand}" x:Name="ForgotButton" />
+                            <ui:Button Style="{StaticResource RoundIcon}" Icon="{ui:SymbolIcon Speaker224}" ToolTip="Listen" AutomationProperties.Name="Listen"
+                                       Command="{Binding SayCommand}" Visibility="{Binding CanSay, Converter={StaticResource BoolToVisibility}}" />
+                            <ui:Button Style="{StaticResource RoundIcon}" Icon="{ui:SymbolIcon Video24}" ToolTip="YouGlish" AutomationProperties.Name="YouGlish"
+                                       Command="{Binding YouGlishCommand}" Visibility="{Binding ShowYouGlish, Converter={StaticResource BoolToVisibility}}" />
+                            <ui:Button x:Name="FullButton" Style="{StaticResource RoundIcon}" Icon="{ui:SymbolIcon ArrowMaximize24}" ToolTip="Full details"
+                                       AutomationProperties.Name="Full details" Click="Full_Click" />
+                            <ui:Button Style="{StaticResource RoundIcon}" Icon="{ui:SymbolIcon Open24}" ToolTip="Open in Helm" AutomationProperties.Name="Open in Helm"
+                                       Click="Open_Click" />
+                        </DockPanel>
+                    </StackPanel>
+                </StackPanel>
+            </ScrollViewer>
+        </DockPanel>
     </Border>
 </Window>

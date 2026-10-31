@@ -3,12 +3,11 @@
 All notable changes to Helm. The top section is used as the GitHub release body and as the Velopack release notes.
 Format: [Keep a Changelog](https://keepachangelog.com), versions follow [SemVer](https://semver.org).
 
-## [0.68.0] - 2026-10-31
+## [Unreleased]
 
 ### Added
 - **Vocabulary on the phone: a word pops up over your apps now and then**, as on the PC: tap the word for its
-  meaning, then Forgot or Remembered, Listen, or Open in Helm; unanswered, the card goes away after a minute and a
-  half. It uses the same "How often" choices as the PC, and "Show a word now" tries it. Vocabulary's settings show
+  meaning, then Forgot or Remembered; unanswered, the card goes away after a minute and a half. It uses the same "How often" choices as the PC, and "Show a word now" tries it. Vocabulary's settings show
   a button to allow "Display over other apps", which the card needs.
 - **Vocabulary: a floating bubble** (off by default), see-through while you leave it alone so it hides little of the
   app below. Tap it for a word; drag it to move it (it settles against the
@@ -17,6 +16,15 @@ Format: [Keep a Changelog](https://keepachangelog.com), versions follow [SemVer]
   picked from your apps, with usage access so Helm can tell which app is open). Neither ever shows while the phone is
   sideways, so games and videos are left alone. No notification is used, and the alarm behind the card never wakes
   the phone.
+- **Vocabulary: the pop-up card asks for the pinyin** of a Chinese word first, on the PC and the phone, checked like
+  on the Learn tab (no tones, tone numbers or tone marks; wrong tones are close) and following the same "Chinese:
+  type the pinyin" setting. On the PC the card takes the keyboard only while you type in it, and gives it back to the
+  app you were in once checked; "Show meaning" skips the typing.
+- **Vocabulary: Full details on the pop-up card.** One row of icons under the answer (Listen, YouGlish, Full details,
+  Open in Helm, Forgot, Remembered); Full details grows the card to the screen's height with everything known about
+  the word (examples, collocations, the mnemonic, words easy to mix up, the word family, synonyms, antonyms and the
+  whole tree of parts), so there is no need to open Helm. Long cards scroll inside, never sideways. A typed answer
+  suggests Forgot or Remembered; you still choose.
 
 ### Removed
 - **Vocabulary: the home-screen widget and the word on the lock screen** are gone; the pop-up card and the bubble take

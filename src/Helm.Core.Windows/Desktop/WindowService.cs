@@ -67,6 +67,12 @@ public interface IWindowService
     /// </summary>
     bool MakeNonActivating(nint hwnd) => false;
 
+    /// <summary>
+    /// Lets a window made with <see cref="MakeNonActivating"/> take the keyboard for a moment (a box to type in on the
+    /// card), or makes it non-activating again.
+    /// </summary>
+    bool AllowActivation(nint hwnd, bool allow) => false;
+
     /// <summary>Restores (if minimized) and brings a window to the foreground.</summary>
     bool Activate(nint hwnd);
 
@@ -353,6 +359,16 @@ public sealed class WindowService(ILogger<WindowService> logger) : IWindowServic
         if (!PInvoke.IsWindow(h)) return false;
         var ex = (WINDOW_EX_STYLE)(uint)PInvoke.GetWindowLongPtr(h, WINDOW_LONG_PTR_INDEX.GWL_EXSTYLE);
         ex |= WINDOW_EX_STYLE.WS_EX_NOACTIVATE | WINDOW_EX_STYLE.WS_EX_TOOLWINDOW;
+        PInvoke.SetWindowLongPtr(h, WINDOW_LONG_PTR_INDEX.GWL_EXSTYLE, (nint)(uint)ex);
+        return true;
+    }
+
+    public bool AllowActivation(nint hwnd, bool allow)
+    {
+        var h = hwnd.ToHwnd();
+        if (!PInvoke.IsWindow(h)) return false;
+        var ex = (WINDOW_EX_STYLE)(uint)PInvoke.GetWindowLongPtr(h, WINDOW_LONG_PTR_INDEX.GWL_EXSTYLE);
+        ex = allow ? ex & ~WINDOW_EX_STYLE.WS_EX_NOACTIVATE : ex | WINDOW_EX_STYLE.WS_EX_NOACTIVATE;
         PInvoke.SetWindowLongPtr(h, WINDOW_LONG_PTR_INDEX.GWL_EXSTYLE, (nint)(uint)ex);
         return true;
     }

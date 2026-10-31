@@ -94,3 +94,103 @@ public sealed class VocabOverlayTests
         Assert.False(VocabOverlayRules.IsBlocked(null, ["com.game"]));
     }
 }
+
+/// <summary>The pop-up cards' pinyin box and "Full details".</summary>
+public sealed class VocabPopupCardTests
+{
+    private readonly ManualTime _time = new(new DateTimeOffset(2026, 10, 31, 8, 0, 0, TimeSpan.Zero));
+    private readonly VocabStore _store;
+    private readonly VocabQuiz _quiz;
+
+    public VocabPopupCardTests()
+    {
+        _store = new VocabStore(new MemorySynced<VocabWord>(), new MemorySynced<VocabPart>(), new MemorySyncedLog<VocabReview>(), _time);
+        _quiz = new VocabQuiz(_store);
+    }
+
+    private string BuJiu()
+    {
+        var (id, _) = _store.AddWord("补救");
+        _store.SaveAnalysis(id, new WordAnalysis
+        {
+            Phonetic = "bǔjiù", Meaning = "cứu vãn", HanViet = "bổ cứu", Traditional = "補救",
+            Examples = [new VocabExample { Sentence = "现在补救还来得及。", Translation = "Bây giờ cứu vãn vẫn còn kịp." }],
+            Collocations = ["补救措施"],
+            Mnemonic = "Vá lại cho kịp.",
+            Synonyms = ["弥补"],
+            Parts =
+            [
+                new AnalysisPart { Form = "补", Kind = VocabPartKind.Character, Meaning = "vá, bù", Phonetic = "bǔ", HanViet = "bổ", Traditional = "補" },
+                new AnalysisPart
+                {
+                    Form = "救", Kind = VocabPartKind.Character, Meaning = "cứu", Phonetic = "jiù", HanViet = "cứu",
+                    Parts =
+                    [
+                        new AnalysisPart { Form = "求", Kind = VocabPartKind.Component, Role = VocabPartRole.Sound, Meaning = "cầu xin", Phonetic = "qiú", HanViet = "cầu" },
+                        new AnalysisPart { Form = "攵", Kind = VocabPartKind.Component, Role = VocabPartRole.Meaning, Meaning = "đánh, thúc", HanViet = "phộc" },
+                    ],
+                },
+            ],
+        });
+        return id;
+    }
+
+    private VocabCardViewModel Card(bool typePinyin) =>
+        new(_store, _quiz, options: () => new VocabCardOptions(VocabCardMode.WordToMeaning, false, typePinyin));
+
+    [Fact]
+    public void A_chinese_word_asks_for_its_pinyin_and_suggests_the_verdict()
+    {
+        BuJiu();
+        var card = Card(typePinyin: true);
+        Assert.True(card.ShowNext());
+        Assert.True(card.IsTyping);
+
+        card.Typed = "bu3jiu4";
+        card.CheckCommand.Execute(null);
+
+        Assert.True(card.IsRevealed);
+        Assert.True(card.SuggestsRemembered);
+        Assert.False(card.SuggestsForgot);
+
+        card.ShowNext();
+        card.Typed = "baojiu";
+        card.CheckCommand.Execute(null);
+        Assert.True(card.SuggestsForgot);
+    }
+
+    [Fact]
+    public void Without_the_pinyin_setting_the_card_is_only_tapped()
+    {
+        BuJiu();
+        var card = Card(typePinyin: false);
+        card.ShowNext();
+
+        Assert.False(card.IsTyping);
+        card.RevealCommand.Execute(null);
+        Assert.False(card.SuggestsRemembered);
+    }
+
+    [Fact]
+    public void Full_details_hold_every_section_and_the_whole_tree()
+    {
+        BuJiu();
+        var card = Card(typePinyin: false);
+        card.ShowNext();
+
+        var details = card.Details();
+
+        Assert.Equal(["Examples", "Goes with", "To remember it", "Synonyms", "How it's built"], details.Select(d => d.Title));
+        Assert.Equal(("现在补救还来得及。", "Bây giờ cứu vãn vẫn còn kịp."), (details[0].Items[0].Text, details[0].Items[0].Note));
+        var tree = details[^1];
+        Assert.True(tree.IsTree);
+        Assert.Equal(
+        [
+            "补救 bǔjiù · bổ cứu · cứu vãn",
+            "├─ 补 bǔ · bổ · vá, bù",
+            "└─ 救 jiù · cứu · cứu",
+            "   ├─ 求 qiú · cầu · cầu xin (sound)",
+            "   └─ 攵 · phộc · đánh, thúc (meaning)",
+        ], tree.Items.Select(i => i.Text));
+    }
+}

@@ -190,25 +190,51 @@ public sealed class VocabOverlay
     private bool ShowCard(bool nearBubble)
     {
         if (_card is not null) return true;
-        var card = new VocabCardViewModel(_store, _quiz, voice: _voice) { ShowYouGlish = false };
+        // A Chinese word asks for its pinyin first when the Learn tab does (the same setting).
+        var card = new VocabCardViewModel(_store, _quiz, voice: _voice,
+            options: () => new VocabCardOptions(VocabCardMode.WordToMeaning, false, _settings.Current.TypePinyin))
+        {
+            ShowYouGlish = _settings.Current.ShowYouGlish,
+        };
         if (!card.ShowNext()) return false;
         try
         {
             var windows = Windows();
             var metrics = _context.Resources!.DisplayMetrics!;
-            var view = new VocabCardOverlay(_context, card, CloseCard, OpenWord);
             var width = Math.Min(metrics.WidthPixels - Dp(24), Dp(420));
             var p = Params(width, ViewGroup.LayoutParams.WrapContent, touchable: true);
             p.Gravity = GravityFlags.Top | GravityFlags.CenterHorizontal;
+            p.SoftInputMode = SoftInput.StateHidden | SoftInput.AdjustNothing;
             p.Y = nearBubble && _bubble is { IsShown: true } bubble
                 ? Math.Min(bubble.Bounds.Y + bubble.Bounds.Size + Dp(8), (int)(metrics.HeightPixels * 0.45))
                 : Dp(48);
+            var restY = p.Y;
+            VocabCardOverlay? view = null;
+            view = new VocabCardOverlay(_context, card, CloseCard, OpenWord,
+                keyboard: typing =>
+                {
+                    // Typing: the card takes the keyboard and moves to the top, above it; done, it hands both back.
+                    if (typing) p.Flags &= ~WindowManagerFlags.NotFocusable;
+                    else p.Flags |= WindowManagerFlags.NotFocusable;
+                    p.Y = typing ? Math.Min(p.Y, Dp(48)) : restY;
+                    view!.MaxHeight = typing ? (int)(metrics.HeightPixels * 0.42) : CompactHeight(metrics);
+                    Update(view, p);
+                },
+                full: full =>
+                {
+                    p.Y = full ? Dp(36) : restY;
+                    view!.MaxHeight = full ? metrics.HeightPixels - Dp(72) : CompactHeight(metrics);
+                    Update(view, p);
+                })
+            {
+                MaxHeight = CompactHeight(metrics),
+            };
             windows.AddView(view.View, p);
             _card = view;
-            // Unread, it goes away by itself; once the meaning shows it waits for an answer or ✕.
+            // Unread, it goes away by itself; being typed in or read, it waits for an answer or ✕.
             _lingerTimeout = () =>
             {
-                if (_card is { IsRevealed: false }) CloseCard();
+                if (_card is { IsBusy: false }) CloseCard();
             };
             _main.PostDelayed(_lingerTimeout, (long)Linger.TotalMilliseconds);
             return true;
@@ -217,6 +243,21 @@ public sealed class VocabOverlay
         {
             _logger.LogWarning(ex, "Could not show the Vocabulary pop-up");
             return false;
+        }
+    }
+
+    /// <summary>The card's height before it scrolls: about two thirds of the screen.</summary>
+    private static int CompactHeight(Android.Util.DisplayMetrics metrics) => (int)(metrics.HeightPixels * 0.62);
+
+    private void Update(VocabCardOverlay view, WindowManagerLayoutParams p)
+    {
+        try
+        {
+            Windows().UpdateViewLayout(view.View, p);
+        }
+        catch (Java.Lang.IllegalArgumentException)
+        {
+            // Closed meanwhile.
         }
     }
 
