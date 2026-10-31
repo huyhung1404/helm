@@ -204,7 +204,7 @@ public sealed class VocabStore
     public void RecordKnown(string wordId) =>
         _reviews.Append(new VocabReview { WordId = wordId, At = Now, Remembered = true, Known = true });
 
-    /// <summary>Hides the word from the cards, the pop-up, the widget and the lock screen, or shows it again.</summary>
+    /// <summary>Hides the word from the cards, the pop-up and the bubble, or shows it again.</summary>
     public bool SetHidden(string id, bool hidden) => UpdateWord(id, w => w with { Hidden = hidden });
 
     public IReadOnlyList<VocabReview> Reviews() => _reviews.All().Select(r => r.Value).OrderBy(r => r.At).ToList();

@@ -18,37 +18,113 @@
             </StackPanel>
         </Border>
 
-        <!-- Lock screen -->
-        <TextBlock Text="Lock screen" Classes="section" />
-        <Border Classes="card">
-            <Grid ColumnDefinitions="*,Auto">
-                <StackPanel Spacing="4">
-                    <TextBlock Text="A word on the lock screen" Classes="title" />
-                    <TextBlock Classes="secondary" TextWrapping="Wrap"
-                               Text="Each time the screen turns on, a silent notification shows one of your words. Tap Show meaning, then Forgot or Remembered, without unlocking." />
-                </StackPanel>
-                <ToggleSwitch Grid.Column="1" IsChecked="{Binding Settings.LockScreenWord}" OnContent="" OffContent="" AutomationProperties.Name="A word on the lock screen" />
-            </Grid>
-        </Border>
+        <!-- Over other apps: the pop-up card, the bubble, the apps they stay out of (DataContext: VocabOverlaySettingsViewModel) -->
+        <StackPanel x:Name="OverlayPanel" x:DataType="vm:VocabOverlaySettingsViewModel">
+            <Border Classes="infobar" IsVisible="{Binding HasMessage}">
+                <DockPanel>
+                    <Button DockPanel.Dock="Right" Content="✕" Command="{Binding DismissMessageCommand}" AutomationProperties.Name="Dismiss" />
+                    <TextBlock Text="{Binding Message}" TextWrapping="Wrap" VerticalAlignment="Center" />
+                </DockPanel>
+            </Border>
 
-        <!-- Widget -->
-        <TextBlock Text="Home-screen widget" Classes="section" />
-        <Border Classes="card">
-            <StackPanel Spacing="8">
-                <TextBlock Text="A word to guess on your home screen" Classes="title" />
-                <TextBlock Classes="secondary" TextWrapping="Wrap"
-                           Text="Tap the word to see its meaning (swipe the answer up and down when it is long), then tap ✓ remembered or ✗ forgot. Each unlock brings a new word (while Helm runs), and words you forget come back more often." />
-                <Button x:Name="AddWidgetButton" Content="Add the widget" Click="AddWidget_Click" />
-                <TextBlock Text="Background" Classes="secondary" Margin="0,4,0,0" />
-                <ComboBox HorizontalAlignment="Stretch" ItemsSource="{Binding Settings.WidgetBackgroundNames}" SelectedIndex="{Binding Settings.WidgetBackgroundIndex}"
-                          AutomationProperties.Name="Widget background" />
-                <TextBlock Text="{Binding Settings.WidgetOpacity, StringFormat='Opacity {0}%'}" />
-                <Slider Minimum="0" Maximum="100" TickFrequency="5" IsSnapToTickEnabled="True" Value="{Binding Settings.WidgetOpacity}" AutomationProperties.Name="Widget opacity" />
-                <TextBlock Text="Text" Classes="secondary" />
-                <ComboBox HorizontalAlignment="Stretch" ItemsSource="{Binding Settings.WidgetTextNames}" SelectedIndex="{Binding Settings.WidgetTextIndex}"
-                          AutomationProperties.Name="Widget text colour" />
-            </StackPanel>
-        </Border>
+            <!-- Permissions, only while one is missing -->
+            <Border Classes="infobar warning" IsVisible="{Binding NeedsDraw}">
+                <StackPanel Spacing="8">
+                    <TextBlock TextWrapping="Wrap"
+                               Text="To show words over your other apps, Helm needs “Display over other apps”. Turn it on for Helm, then come back." />
+                    <Button Classes="accent" Content="Allow display over other apps" Command="{Binding OpenDrawSettingsCommand}" />
+                </StackPanel>
+            </Border>
+            <Border Classes="infobar warning" IsVisible="{Binding NeedsUsageAccess}">
+                <StackPanel Spacing="8">
+                    <TextBlock TextWrapping="Wrap"
+                               Text="To stay out of the apps below, Helm needs to see which app is open: turn on “Usage access” for Helm, then come back." />
+                    <Button Classes="accent" Content="Allow usage access" Command="{Binding OpenUsageSettingsCommand}" />
+                </StackPanel>
+            </Border>
+
+            <!-- Pop-up card -->
+            <TextBlock Text="Pop-up card" Classes="section" />
+            <Border Classes="card">
+                <StackPanel Spacing="8">
+                    <Grid ColumnDefinitions="*,Auto">
+                        <StackPanel Spacing="4">
+                            <TextBlock Text="A word now and then" Classes="title" />
+                            <TextBlock Classes="secondary" TextWrapping="Wrap"
+                                       Text="From time to time a card with one of your words appears over the app you are using. Tap the word for its meaning, then Forgot or Remembered. Unanswered, it goes away after a minute and a half." />
+                        </StackPanel>
+                        <ToggleSwitch Grid.Column="1" IsChecked="{Binding Settings.PopupEnabled}" OnContent="" OffContent="" AutomationProperties.Name="A word now and then" />
+                    </Grid>
+                    <TextBlock Text="How often" Classes="secondary" />
+                    <ComboBox HorizontalAlignment="Stretch" ItemsSource="{Binding Settings.PopupFrequencyNames}" SelectedIndex="{Binding Settings.PopupFrequencyIndex}"
+                              IsEnabled="{Binding Settings.PopupEnabled}" AutomationProperties.Name="How often" />
+                    <Grid ColumnDefinitions="*,8,*" IsVisible="{Binding Settings.IsCustomFrequency}">
+                        <TextBox Text="{Binding Settings.CustomFromText}" PlaceholderText="Shortest (seconds)" AutomationProperties.Name="Shortest gap in seconds" />
+                        <TextBox Grid.Column="2" Text="{Binding Settings.CustomToText}" PlaceholderText="Longest (seconds)" AutomationProperties.Name="Longest gap in seconds" />
+                    </Grid>
+                    <TextBlock Text="{Binding Settings.CustomError}" Classes="secondary" TextWrapping="Wrap" IsVisible="{Binding Settings.HasCustomError}" />
+                    <Button Content="Show a word now" Command="{Binding ShowNowCommand}" />
+                </StackPanel>
+            </Border>
+
+            <!-- Bubble -->
+            <TextBlock Text="Floating bubble" Classes="section" />
+            <Border Classes="card">
+                <Grid ColumnDefinitions="*,Auto">
+                    <StackPanel Spacing="4">
+                        <TextBlock Text="A bubble over your apps" Classes="title" />
+                        <TextBlock Classes="secondary" TextWrapping="Wrap"
+                                   Text="Tap it for a word to guess; drag it to move it. Drag it onto the ✕ at the bottom to put it away until you next unlock the phone." />
+                    </StackPanel>
+                    <ToggleSwitch Grid.Column="1" IsChecked="{Binding Settings.BubbleEnabled}" OnContent="" OffContent="" AutomationProperties.Name="A bubble over your apps" />
+                </Grid>
+            </Border>
+
+            <!-- Blocked apps -->
+            <TextBlock Text="Don't show in these apps" Classes="section" />
+            <Border Classes="card">
+                <StackPanel Spacing="8">
+                    <TextBlock Classes="secondary" TextWrapping="Wrap"
+                               Text="Neither the card nor the bubble appears while one of these apps is open. Neither ever appears while the phone is sideways (games, videos)." />
+                    <!-- Hidden while picking: a tick would add a row here and push the list under the finger -->
+                    <ItemsControl ItemsSource="{Binding Blocked}" IsVisible="{Binding !IsPicking}">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate DataType="vm:VocabAppRow">
+                                <Border Classes="row">
+                                    <Grid ColumnDefinitions="Auto,*,Auto">
+                                        <Image Source="{Binding Icon}" Width="32" Height="32" Margin="0,0,12,0" VerticalAlignment="Center" />
+                                        <TextBlock Grid.Column="1" Text="{Binding Label}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
+                                        <Button Grid.Column="2" Content="Remove" AutomationProperties.Name="Remove" Click="Unblock_Click" />
+                                    </Grid>
+                                </Border>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                    <Button Content="Choose apps…" Command="{Binding ChooseAppsCommand}" IsVisible="{Binding !IsPicking}" />
+
+                    <!-- The picker: every app in the launcher, ticked when blocked -->
+                    <StackPanel Spacing="8" IsVisible="{Binding IsPicking}">
+                        <Grid ColumnDefinitions="*,8,Auto">
+                            <TextBox Text="{Binding Search}" PlaceholderText="Search apps" AutomationProperties.Name="Search apps" />
+                            <Button Grid.Column="2" Classes="accent" Content="Done" Command="{Binding DonePickingCommand}" />
+                        </Grid>
+                        <TextBlock Text="Loading your apps…" Classes="secondary" IsVisible="{Binding IsLoadingApps}" />
+                        <ItemsControl ItemsSource="{Binding Apps}">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate DataType="vm:VocabAppRow">
+                                    <CheckBox IsChecked="{Binding IsBlocked}" HorizontalAlignment="Stretch" Margin="0,2">
+                                        <StackPanel Orientation="Horizontal" Spacing="12">
+                                            <Image Source="{Binding Icon}" Width="32" Height="32" VerticalAlignment="Center" />
+                                            <TextBlock Text="{Binding Label}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
+                                        </StackPanel>
+                                    </CheckBox>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </StackPanel>
+                </StackPanel>
+            </Border>
+        </StackPanel>
 
         <!-- Display -->
         <TextBlock Text="Display" Classes="section" />

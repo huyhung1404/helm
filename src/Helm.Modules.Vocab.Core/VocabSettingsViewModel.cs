@@ -37,7 +37,7 @@ public sealed partial class VocabSettingsViewModel : ObservableObject
 
     [ObservableProperty] private bool _showTraditional;
     [ObservableProperty] private bool _showYouGlish;
-    [ObservableProperty] private bool _lockScreenWord;
+    [ObservableProperty] private bool _bubbleEnabled;
     [ObservableProperty] private bool _autoSay;
     [ObservableProperty] private bool _typePinyin;
     [ObservableProperty] private bool _autoAnalyze;
@@ -51,11 +51,6 @@ public sealed partial class VocabSettingsViewModel : ObservableObject
     /// <summary>What is wrong with the typed range; empty when it is saved.</summary>
     [ObservableProperty] private string _customError = "";
 
-    // The Android widget's look, as on Tracker and Wallet.
-    [ObservableProperty] private int _widgetBackgroundIndex;
-    [ObservableProperty] private int _widgetOpacity;
-    [ObservableProperty] private int _widgetTextIndex;
-
     public VocabSettingsViewModel(ISettingsStore<VocabSettings> settings)
     {
         _settings = settings;
@@ -63,7 +58,7 @@ public sealed partial class VocabSettingsViewModel : ObservableObject
         var s = settings.Current;
         ShowTraditional = s.ShowTraditional;
         ShowYouGlish = s.ShowYouGlish;
-        LockScreenWord = s.LockScreenWord;
+        BubbleEnabled = s.BubbleEnabled;
         AutoSay = s.AutoSay;
         TypePinyin = s.TypePinyin;
         AutoAnalyze = s.AutoAnalyze;
@@ -73,9 +68,6 @@ public sealed partial class VocabSettingsViewModel : ObservableObject
         PopupFrequencyIndex = s.PopupCustom ? CustomFrequencyIndex : FrequencyIndex(s.PopupMinSeconds, s.PopupMaxSeconds);
         CustomFromText = s.PopupMinSeconds.ToString(System.Globalization.CultureInfo.CurrentCulture);
         CustomToText = s.PopupMaxSeconds.ToString(System.Globalization.CultureInfo.CurrentCulture);
-        WidgetBackgroundIndex = (int)s.WidgetBackground;
-        WidgetOpacity = Math.Clamp(s.WidgetOpacity, 0, 100);
-        WidgetTextIndex = (int)s.WidgetText;
         _loading = false;
     }
 
@@ -106,28 +98,24 @@ public sealed partial class VocabSettingsViewModel : ObservableObject
 
     public bool IsCustomFrequency => PopupFrequencyIndex == CustomFrequencyIndex;
 
-    public IReadOnlyList<string> WidgetBackgroundNames => WidgetLook.BackgroundNames;
+    /// <summary>Android: the apps the pop-up and the bubble stay out of (package names, in the order they were added).</summary>
+    public IReadOnlyList<string> BlockedApps => _settings.Current.BlockedApps;
 
-    public IReadOnlyList<string> WidgetTextNames => WidgetLook.TextNames;
-
-    partial void OnWidgetBackgroundIndexChanged(int oldValue, int newValue)
+    /// <summary>Android: keeps the pop-up and the bubble out of these apps (or lets them back).</summary>
+    public void SetBlockedApps(IEnumerable<string> packages)
     {
-        if (_loading) return;
-        var background = (WidgetBackground)Math.Clamp(newValue, 0, WidgetLook.BackgroundNames.Count - 1);
-        // Picking Transparent from a solid background starts see-through.
-        var opacity = WidgetLook.OpacityAfter((WidgetBackground)Math.Max(oldValue, 0), background, WidgetOpacity);
-        Save(nameof(WidgetBackgroundIndex), s =>
-        {
-            s.WidgetBackground = background;
-            s.WidgetOpacity = opacity;
-        });
-        WidgetOpacity = opacity;
+        var list = packages.Where(p => !string.IsNullOrWhiteSpace(p)).Distinct(StringComparer.Ordinal).ToList();
+        Save(nameof(BlockedApps), s => s.BlockedApps = list);
+        OnPropertyChanged(nameof(BlockedApps));
     }
 
-    partial void OnWidgetOpacityChanged(int value) => Save(nameof(WidgetOpacity), s => s.WidgetOpacity = Math.Clamp(value, 0, 100));
-
-    partial void OnWidgetTextIndexChanged(int value) =>
-        Save(nameof(WidgetTextIndex), s => s.WidgetText = (WidgetText)Math.Clamp(value, 0, WidgetLook.TextNames.Count - 1));
+    /// <summary>Android: where the user left the bubble (fractions of the screen).</summary>
+    public void SaveBubblePosition(double x, double y) =>
+        Save(nameof(VocabSettings.BubbleX), s =>
+        {
+            s.BubbleX = Math.Clamp(x, 0, 1);
+            s.BubbleY = Math.Clamp(y, 0, 1);
+        });
 
     public bool HasCustomError => CustomError.Length > 0;
 
@@ -135,7 +123,7 @@ public sealed partial class VocabSettingsViewModel : ObservableObject
 
     partial void OnShowYouGlishChanged(bool value) => Save(nameof(ShowYouGlish), s => s.ShowYouGlish = value);
 
-    partial void OnLockScreenWordChanged(bool value) => Save(nameof(LockScreenWord), s => s.LockScreenWord = value);
+    partial void OnBubbleEnabledChanged(bool value) => Save(nameof(BubbleEnabled), s => s.BubbleEnabled = value);
 
     partial void OnAutoSayChanged(bool value) => Save(nameof(AutoSay), s => s.AutoSay = value);
 

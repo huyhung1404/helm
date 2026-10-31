@@ -16,9 +16,6 @@ public sealed class VocabPopup : IDisposable
     /// <summary>Nobody touched the keyboard or mouse for this long: nobody is there to read a card.</summary>
     internal static readonly TimeSpan Away = TimeSpan.FromMinutes(3);
 
-    /// <summary>When the card could not be shown (away, full screen), the next try is this soon (or sooner with a short range).</summary>
-    internal static readonly TimeSpan Retry = TimeSpan.FromMinutes(5);
-
     private readonly VocabStore _store;
     private readonly VocabQuiz _quiz;
     private readonly ISettingsStore<VocabSettings> _settings;
@@ -82,9 +79,7 @@ public sealed class VocabPopup : IDisposable
         if (!_running) return;
         var s = _settings.Current;
         _range = (s.PopupMinSeconds, s.PopupMaxSeconds);
-        var min = Math.Max(VocabSettingsViewModel.MinPopupSeconds, Math.Min(s.PopupMinSeconds, s.PopupMaxSeconds));
-        var max = Math.Max(min, s.PopupMaxSeconds);
-        Schedule(TimeSpan.FromSeconds(min + Random.Shared.NextDouble() * (max - min)));
+        Schedule(VocabPopupSchedule.NextDelay(s.PopupMinSeconds, s.PopupMaxSeconds));
     }
 
     private void Schedule(TimeSpan due)
@@ -125,11 +120,7 @@ public sealed class VocabPopup : IDisposable
         }
     }
 
-    private TimeSpan RetryAfter()
-    {
-        var max = TimeSpan.FromSeconds(Math.Max(VocabSettingsViewModel.MinPopupSeconds, _settings.Current.PopupMaxSeconds));
-        return max < Retry ? max : Retry;
-    }
+    private TimeSpan RetryAfter() => VocabPopupSchedule.RetryAfter(_settings.Current.PopupMaxSeconds);
 
     private void ShowCard()
     {

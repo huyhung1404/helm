@@ -1,6 +1,6 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
-  <!-- Vocabulary on Android: the module, its Avalonia pages and the home-screen widget that shows a word to guess. The
+  <!-- Vocabulary on Android: the module, its Avalonia pages, and the pop-up card and bubble that show a word to guess over the other apps. The
        logic and the view models come from Helm.Modules.Vocab.Core (shared with Windows). Not in Helm.sln; CI builds it
        with the app. -->
   <PropertyGroup>

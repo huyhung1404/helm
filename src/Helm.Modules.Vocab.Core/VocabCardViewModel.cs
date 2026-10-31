@@ -281,7 +281,7 @@ public sealed partial class VocabCardViewModel(VocabStore store, VocabQuiz quiz,
         ShowNext();
     }
 
-    /// <summary>Leaves the word out of the cards, the pop-up, the widget and the lock screen (Words → Hidden shows it again).</summary>
+    /// <summary>Leaves the word out of the cards, the pop-up and the bubble (Words → Hidden shows it again).</summary>
     [RelayCommand]
     private void Hide()
     {

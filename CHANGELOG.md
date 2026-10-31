@@ -3,6 +3,26 @@
 All notable changes to Helm. The top section is used as the GitHub release body and as the Velopack release notes.
 Format: [Keep a Changelog](https://keepachangelog.com), versions follow [SemVer](https://semver.org).
 
+## [Unreleased]
+
+### Added
+- **Vocabulary on the phone: a word pops up over your apps now and then**, as on the PC: tap the word for its
+  meaning, then Forgot or Remembered, Listen, or Open in Helm; unanswered, the card goes away after a minute and a
+  half. It uses the same "How often" choices as the PC, and "Show a word now" tries it. Vocabulary's settings show
+  a button to allow "Display over other apps", which the card needs.
+- **Vocabulary: a floating bubble** (off by default), see-through while you leave it alone so it hides little of the
+  app below. Tap it for a word; drag it to move it (it settles against the
+  nearer side); drag it onto the ✕ at the bottom to put it away until you next unlock the phone.
+- **Vocabulary: keep the card and the bubble out of the apps you choose** (Settings → "Don't show in these apps",
+  picked from your apps, with usage access so Helm can tell which app is open). Neither ever shows while the phone is
+  sideways, so games and videos are left alone. No notification is used, and the alarm behind the card never wakes
+  the phone.
+
+### Removed
+- **Vocabulary: the home-screen widget and the word on the lock screen** are gone; the pop-up card and the bubble take
+  their place. The lock-screen notification disappears by itself after the update; remove the widget from your home
+  screen by hand ("Can't load widget").
+
 ## [0.67.0] - 2026-10-30
 
 ### Added

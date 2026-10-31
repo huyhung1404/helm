@@ -43,8 +43,8 @@ public partial class VocabContentPage : UserControl
         _viewModel.Roots.Pages.Turned += OnRootsPageTurned;
         ApplyEnabled();
         OpenOfferedWord();
-        // Opening Vocabulary is the moment to ask for notifications (Android 13+, once) for the lock-screen word.
-        if (_viewModel.Settings.LockScreenWord) VocabLockScreen.AskPermissionOnce(Android.App.Application.Context);
+        // Back in Vocabulary: the pop-up's permissions may have changed in the phone's settings meanwhile.
+        _module.PageShown();
     }
 
     protected override void OnDetachedFromVisualTree(VisualTreeAttachmentEventArgs e)
@@ -63,7 +63,7 @@ public partial class VocabContentPage : UserControl
 
     private void OnItemOffered(object? sender, EventArgs e) => Dispatcher.UIThread.Post(OpenOfferedWord);
 
-    /// <summary>A tap on the widget's parts: that word with its whole tree.</summary>
+    /// <summary>"Open in Helm" on the pop-up card: that word with its whole tree.</summary>
     private void OpenOfferedWord()
     {
         if (ShellIntents.TakeItem(VocabIds.ModuleId) is { } wordId) _viewModel.Open(wordId);

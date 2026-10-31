@@ -31,19 +31,19 @@ public sealed class VocabSettings : IVersionedSettings
     /// <summary>The Words tab's order: 0 A–Z, 1 newest, 2 weakest first, 3 due soonest.</summary>
     public int WordsSort { get; set; }
 
-    /// <summary>Android: a word to guess on the lock screen (a silent notification) each time the screen turns on.</summary>
-    public bool LockScreenWord { get; set; } = true;
-
     /// <summary>Show a button that opens YouGlish: the word said by real people in YouTube videos.</summary>
     public bool ShowYouGlish { get; set; } = true;
 
     /// <summary>Words (and roots) per page of the lists; see <see cref="VocabSettingsViewModel.PageSizes"/>.</summary>
     public int ItemsShown { get; set; } = VocabSettingsViewModel.DefaultPageSize;
 
-    /// <summary>PC: now and then a word pops up in a corner to guess (see <see cref="PopupMinSeconds"/>).</summary>
+    /// <summary>
+    /// Now and then a word pops up to guess (see <see cref="PopupMinSeconds"/>): in a corner on the PC, over the other
+    /// apps on the phone (once Helm may draw over them).
+    /// </summary>
     public bool PopupEnabled { get; set; } = true;
 
-    /// <summary>PC: the pop-up comes back after a random time between these two (seconds).</summary>
+    /// <summary>The pop-up comes back after a random time between these two (seconds).</summary>
     public int PopupMinSeconds { get; set; } = 20 * 60;
 
     public int PopupMaxSeconds { get; set; } = 60 * 60;
@@ -59,15 +59,19 @@ public sealed class VocabSettings : IVersionedSettings
 
     public double? PopupBottom { get; set; }
 
-    /// <summary>Android widget background (see <see cref="Helm.Core.Settings.WidgetLook"/>).</summary>
-    public WidgetBackground WidgetBackground { get; set; } = WidgetBackground.Card;
+    /// <summary>Android: a bubble that floats over the other apps; tapping it shows a word to guess.</summary>
+    public bool BubbleEnabled { get; set; }
 
-    /// <summary>Android widget background opacity, 0-100 %.</summary>
-    public int WidgetOpacity { get; set; } = 100;
+    /// <summary>
+    /// Android: where the user left the bubble, as fractions of the screen's width and height (it sticks to the nearer
+    /// side); null puts it at the right edge, a third of the way down.
+    /// </summary>
+    public double? BubbleX { get; set; }
 
-    public WidgetText WidgetText { get; set; } = WidgetText.Automatic;
+    public double? BubbleY { get; set; }
 
-    public WidgetLook WidgetLook => new(WidgetBackground, WidgetOpacity, WidgetText);
+    /// <summary>Android: apps (package names) over which neither the pop-up nor the bubble ever shows.</summary>
+    public List<string> BlockedApps { get; set; } = [];
 
     public void Migrate(int fromVersion)
     {

@@ -122,7 +122,7 @@ public sealed record VocabWord
     /// <summary>When an agent last wrote a new way to remember it because the user kept forgetting it.</summary>
     public DateTimeOffset? HelpedAt { get; init; }
 
-    /// <summary>Left out of the cards, the pop-up, the widget and the lock screen (the user hid it).</summary>
+    /// <summary>Left out of the cards, the pop-up and the bubble (the user hid it).</summary>
     public bool Hidden { get; init; }
 
     /// <summary>What the user said was wrong when asking for the word to be analyzed again.</summary>

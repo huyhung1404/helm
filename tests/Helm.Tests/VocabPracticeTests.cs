@@ -513,27 +513,44 @@ public sealed class VocabPracticeTests
         Assert.False(viewModel.List.Pages.HasPages);
     }
 
-    // ---- the phone widget's look ---------------------------------------------------------------------------------
+    // ---- the phone's bubble and blocked apps ----------------------------------------------------------------------
 
     [Fact]
-    public void The_widget_look_is_saved_and_transparent_starts_see_through()
+    public void The_bubble_starts_off_and_the_blocked_apps_and_its_place_are_saved()
     {
         using var dir = new TempDir();
         using var factory = new SettingsStoreFactory(new HelmPaths(dir.Path));
         var settings = VocabKit.Settings(factory);
         var changed = new List<string>();
         settings.Changed += (_, name) => changed.Add(name);
-        Assert.Equal(100, settings.WidgetOpacity);
+        Assert.False(settings.BubbleEnabled);
+        Assert.Empty(settings.BlockedApps);
 
-        settings.WidgetBackgroundIndex = (int)Helm.Core.Settings.WidgetBackground.Transparent;
-        Assert.Equal(Helm.Core.Settings.WidgetLook.TransparentOpacity, settings.WidgetOpacity);
-        settings.WidgetOpacity = 60;
-        settings.WidgetTextIndex = (int)Helm.Core.Settings.WidgetText.Light;
-        var look = settings.Current.WidgetLook;
-        Assert.Equal(Helm.Core.Settings.WidgetBackground.Transparent, look.Background);
-        Assert.Equal(60, look.Opacity);
-        Assert.True(look.LightText);
-        Assert.Contains(nameof(VocabSettingsViewModel.WidgetOpacity), changed);
+        settings.BubbleEnabled = true;
+        settings.SetBlockedApps(["com.game", "com.video", "com.game", " "]);
+        settings.SaveBubblePosition(1.4, 0.25);
+
+        Assert.True(settings.Current.BubbleEnabled);
+        Assert.Equal(["com.game", "com.video"], settings.BlockedApps);
+        Assert.Equal((1.0, 0.25), (settings.Current.BubbleX!.Value, settings.Current.BubbleY!.Value));
+        Assert.Contains(nameof(VocabSettingsViewModel.BubbleEnabled), changed);
+        Assert.Contains(nameof(VocabSettingsViewModel.BlockedApps), changed);
+    }
+
+    [Fact]
+    public void Settings_from_before_the_bubble_still_load()
+    {
+        using var dir = new TempDir();
+        var file = Path.Combine(dir.Path, "settings", "vocab.json");
+        Directory.CreateDirectory(Path.GetDirectoryName(file)!);
+        File.WriteAllText(file, """{"version":1,"lockScreenWord":true,"widgetBackground":"accent","widgetOpacity":40,"popupEnabled":false}""");
+        using var factory = new SettingsStoreFactory(new HelmPaths(dir.Path));
+
+        var settings = VocabKit.Settings(factory);
+
+        Assert.False(settings.PopupEnabled);
+        Assert.False(settings.BubbleEnabled);
+        Assert.Empty(settings.BlockedApps);
     }
 
     // ---- the agent working by itself -----------------------------------------------------------------------------
