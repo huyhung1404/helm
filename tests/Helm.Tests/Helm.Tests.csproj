@@ -46,6 +46,7 @@
     <ProjectReference Include="..\..\src\Helm.Modules.Vocab\Helm.Modules.Vocab.csproj" />
     <ProjectReference Include="..\..\src\Helm.Modules.Habits\Helm.Modules.Habits.csproj" />
     <ProjectReference Include="..\..\src\Helm.Keyboard.Engine\Helm.Keyboard.Engine.csproj" />
+    <ProjectReference Include="..\..\src\Helm.Modules.Keyboard\Helm.Modules.Keyboard.csproj" />
   </ItemGroup>
 
 </Project>

@@ -1,6 +1,6 @@
 using Microsoft.Win32;
 
-namespace Helm.Keyboard.Tip;
+namespace Helm.Typing.Tip;
 
 /// <summary>
 /// The typing options Helm writes to HKCU\Software\Helm\Keyboard (DWORD values, 1 = on), read each time the input
@@ -8,18 +8,16 @@ namespace Helm.Keyboard.Tip;
 /// </summary>
 internal static class Settings
 {
-    public const string KeyPath = @"Software\Helm\Keyboard";
-
     public static TelexOptions Load()
     {
         try
         {
-            using var key = Registry.CurrentUser.OpenSubKey(KeyPath);
+            using var key = Registry.CurrentUser.OpenSubKey(KeyboardIds.SettingsKey);
             if (key is null) return TelexOptions.Default;
             return new TelexOptions
             {
-                ModernToneStyle = Read(key, nameof(TelexOptions.ModernToneStyle), TelexOptions.Default.ModernToneStyle),
-                SpellCheck = Read(key, nameof(TelexOptions.SpellCheck), TelexOptions.Default.SpellCheck),
+                ModernToneStyle = Read(key, KeyboardIds.ModernToneStyleValue, TelexOptions.Default.ModernToneStyle),
+                SpellCheck = Read(key, KeyboardIds.SpellCheckValue, TelexOptions.Default.SpellCheck),
             };
         }
         catch (Exception ex)

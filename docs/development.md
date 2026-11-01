@@ -52,6 +52,10 @@ src/
   Helm.Core.Android/         Android: IAndroidModule, ModulePageBase, ActivityHost, HelmAndroidServices (not in Helm.sln)
   Helm.App.Android/          Avalonia Android app: shell, Home/General, Keystore, APK updater (not in Helm.sln)
   Helm.Modules.AlwaysOnTop/  Windows only: engine, settings page
+  Helm.Keyboard.Engine/      net8.0: Telex (namespace Helm.Typing), the ids Helm and the input method share
+  Helm.Keyboard.Tip/         HelmKeyboard.dll: the Vietnamese input method (TSF, NativeAOT, 64- and 32-bit);
+                             built by scripts/build-keyboard.ps1, needs the C++ build tools
+  Helm.Modules.Keyboard/     Windows only: installs the input method, EN / VI / 中 shortcut, keyboard per app (on Helm Sync)
   Helm.Modules.Tracker.Core/ net8.0: Tracker data (on Helm Sync), reports, CSV, shared view model
   Helm.Modules.Tracker/      Windows: Tracker page
   Helm.Modules.Tracker.Android/ Android: Tracker page and home-screen widget (not in Helm.sln)

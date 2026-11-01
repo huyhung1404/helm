@@ -1,9 +1,9 @@
 using System.Runtime.InteropServices;
 using System.Runtime.InteropServices.Marshalling;
-using Helm.Keyboard.Tip.Interop;
+using Helm.Typing.Tip.Interop;
 using Microsoft.Win32;
 
-namespace Helm.Keyboard.Tip;
+namespace Helm.Typing.Tip;
 
 /// <summary>
 /// The DLL's entry points: COM gets the class factory here, and regsvr32 registers the input method (the COM class,
@@ -11,11 +11,11 @@ namespace Helm.Keyboard.Tip;
 /// </summary>
 internal static unsafe class Exports
 {
-    public static readonly Guid Clsid = new("6710956b-fb8a-44c4-bedf-ed7b2bc5961e");
-    public static readonly Guid Profile = new("9294b09c-ed79-41b8-98b6-a3ddb5151a74");
+    public static readonly Guid Clsid = KeyboardIds.Clsid;
+    public static readonly Guid Profile = KeyboardIds.Profile;
     /// <summary>Helm Keyboard is an English (US) keyboard with a Vietnamese switch, on the US layout (digits stay digits).</summary>
-    public const ushort EnglishUs = 0x0409;
-    private const uint UsLayout = 0x0409;
+    public const ushort EnglishUs = KeyboardIds.EnglishUs;
+    private const uint UsLayout = KeyboardIds.EnglishUs;
     private const string Name = "Helm Keyboard";
 
     private static readonly StrategyBasedComWrappers Wrappers = new();

@@ -1,4 +1,4 @@
-using Helm.Keyboard;
+using Helm.Typing;
 
 namespace Helm.Tests;
 

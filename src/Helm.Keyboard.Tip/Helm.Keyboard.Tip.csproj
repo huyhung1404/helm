@@ -8,7 +8,7 @@
     <TargetFramework>net10.0-windows</TargetFramework>
     <SupportedOSPlatformVersion></SupportedOSPlatformVersion>
     <PlatformTarget>AnyCPU</PlatformTarget>
-    <RootNamespace>Helm.Keyboard.Tip</RootNamespace>
+    <RootNamespace>Helm.Typing.Tip</RootNamespace>
     <AssemblyName>HelmKeyboard</AssemblyName>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     <PublishAot>true</PublishAot>

@@ -66,6 +66,14 @@ internal static class VelopackLifecycle
         HookLog.Write($"Uninstalling {version}.");
         RemoveStartupTask();
         RemoveTrayRegistrations();
+        try
+        {
+            Modules.Keyboard.KeyboardInstaller.RemoveWithHelm(HookLog.Write);
+        }
+        catch (Exception ex)
+        {
+            HookLog.Write($"Could not remove Helm Keyboard: {ex.Message}");
+        }
 
         var general = ReadGeneralSettings();
         if (general?.PurgeDataOnUninstall == true)

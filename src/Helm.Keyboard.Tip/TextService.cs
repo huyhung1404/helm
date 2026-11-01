@@ -1,8 +1,8 @@
 using System.Runtime.InteropServices;
 using System.Runtime.InteropServices.Marshalling;
-using Helm.Keyboard.Tip.Interop;
+using Helm.Typing.Tip.Interop;
 
-namespace Helm.Keyboard.Tip;
+namespace Helm.Typing.Tip;
 
 /// <summary>
 /// Helm Keyboard inside an app: one instance per app thread the user types in. It is the English keyboard with a
@@ -17,8 +17,6 @@ internal sealed unsafe partial class TextService
     : ITfTextInputProcessorEx, ITfKeyEventSink, ITfThreadMgrEventSink, ITfCompositionSink, ITfDisplayAttributeProvider,
       ITfCompartmentEventSink
 {
-    /// <summary>The V/E switch: a global compartment, 1 = Vietnamese. Helm sets it per app and from its shortcut.</summary>
-    public static readonly Guid VietnameseSwitch = new("7a8b8185-0051-4d0a-807c-b1f4ce5b7731");
 
 
     /// <summary>The longest word taken back from before the caret.</summary>
@@ -37,6 +35,8 @@ internal sealed unsafe partial class TextService
     private readonly HashSet<int> _eatenKeys = [];
     private ITfThreadMgr? _threadMgr;
     private ITfCompartment? _switch;
+    /// <summary><see cref="KeyboardIds.HelmSwitching"/>: Helm has the shortcut while it is 1.</summary>
+    private ITfCompartment? _helmSwitching;
     private uint _clientId;
     private uint _threadMgrSinkCookie = TsfIds.TF_INVALID_COOKIE;
     private uint _switchSinkCookie = TsfIds.TF_INVALID_COOKIE;
@@ -77,11 +77,12 @@ internal sealed unsafe partial class TextService
             _threadMgrSinkCookie = Advise(threadMgr, this, TsfIds.ThreadMgrEventSink);
             Exports.Create<ITfCategoryMgr>(TsfIds.CategoryMgr).RegisterGUID(DisplayAttribute.Id, out _displayAttribute);
             threadMgr.GetGlobalCompartment(out var compartments);
-            if (compartments is not null && compartments.GetCompartment(VietnameseSwitch, out _switch) >= 0 && _switch is not null)
+            if (compartments is not null && compartments.GetCompartment(KeyboardIds.VietnameseSwitch, out _switch) >= 0 && _switch is not null)
             {
                 _switchSinkCookie = Advise(_switch, this, TsfIds.CompartmentEventSink);
                 _vietnamese = ReadSwitch();
             }
+            compartments?.GetCompartment(KeyboardIds.HelmSwitching, out _helmSwitching);
             _modeButton = new ModeButton(Flip);
             _modeButton.Show(_vietnamese);
             ((ITfLangBarItemMgr)threadMgr).AddItem(_modeButton);
@@ -115,6 +116,7 @@ internal sealed unsafe partial class TextService
         }
         _threadMgrSinkCookie = _switchSinkCookie = TsfIds.TF_INVALID_COOKIE;
         _switch = null;
+        _helmSwitching = null;
         _modeButton = null;
         _threadMgr = null;
         return TsfIds.S_OK;
@@ -229,7 +231,7 @@ internal sealed unsafe partial class TextService
     {
         try
         {
-            if (guid != VietnameseSwitch) return TsfIds.S_OK;
+            if (guid != KeyboardIds.VietnameseSwitch) return TsfIds.S_OK;
             _vietnamese = ReadSwitch();
             if (!_vietnamese) CommitLater();
             _modeButton?.Show(_vietnamese);
@@ -326,8 +328,8 @@ internal sealed unsafe partial class TextService
             if (Log.IsVerbose) Log.Info($"{call} 0x{virtualKey:X2}{(_chordSpoiled ? ", spoiled" : "")}");
             var ctrl = IsCtrl(virtualKey);
             if (!ctrl && !IsShift(virtualKey)) return;
-            // Let go of one, the other still held.
-            if (!_chordSpoiled && IsLeft(virtualKey, lParam) && Native.IsDown(ctrl ? Native.VK_LSHIFT : Native.VK_LCONTROL)
+            // Let go of one, the other still held; while Helm runs, the shortcut is Helm's (EN / VI / 中).
+            if (!_chordSpoiled && !HelmSwitches() && IsLeft(virtualKey, lParam) && Native.IsDown(ctrl ? Native.VK_LSHIFT : Native.VK_LCONTROL)
                 && !Native.IsDown(Native.VK_RCONTROL) && !Native.IsDown(Native.VK_RSHIFT) && !Native.IsDown(Native.VK_MENU)
                 && !Native.IsDown(Native.VK_LWIN) && !Native.IsDown(Native.VK_RWIN))
             {
@@ -355,16 +357,39 @@ internal sealed unsafe partial class TextService
         _ => ((lParam >> 16) & 0xFF) != 0x36,
     };
 
-    private bool ReadSwitch()
+    private bool ReadSwitch() => IsOn(_switch);
+
+    private static bool IsOn(ITfCompartment? compartment) => Read(compartment) != 0;
+
+    private static int Read(ITfCompartment? compartment)
     {
+        if (compartment is null) return 0;
         var value = default(ComVariant);
         try
         {
-            return _switch!.GetValue(&value) >= 0 && value.VarType == VarEnum.VT_I4 && value.As<int>() != 0;
+            return compartment.GetValue(&value) >= 0 && value.VarType == VarEnum.VT_I4 ? value.As<int>() : 0;
         }
         finally
         {
             value.Dispose();
+        }
+    }
+
+    /// <summary>Helm runs and switches keyboards with its own shortcut (<see cref="KeyboardIds.HelmSwitching"/>).</summary>
+    private bool HelmSwitches()
+    {
+        var process = Read(_helmSwitching);
+        if (process <= 0) return false;
+        var handle = Native.OpenProcess(Native.SYNCHRONIZE, 0, (uint)process);
+        // An app in a sandbox may not look at Helm (running as administrator): it lives, then.
+        if (handle == 0) return Marshal.GetLastPInvokeError() == Native.ERROR_ACCESS_DENIED;
+        try
+        {
+            return Native.WaitForSingleObject(handle, 0) == Native.WAIT_TIMEOUT;
+        }
+        finally
+        {
+            Native.CloseHandle(handle);
         }
     }
 

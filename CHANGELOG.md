@@ -3,6 +3,19 @@
 All notable changes to Helm. The top section is used as the GitHub release body and as the Velopack release notes.
 Format: [Keep a Changelog](https://keepachangelog.com), versions follow [SemVer](https://semver.org).
 
+## [Unreleased]
+
+### Added
+- **Helm Keyboard (PC): type Vietnamese with Telex, and go round English, Vietnamese and Chinese with one shortcut.**
+  Helm installs its own input method as the English keyboard (in place of US): Telex with the tone anywhere in the
+  word, the new tone placement (hoà, thuý) and a spell check that leaves words such as "windows" as typed. Words go
+  straight into the text, with no underline (address bars keep theirs), and never through fake Backspaces, so
+  Chrome's and Edge's address bars no longer turn "đại học" into "dđại học". Left Ctrl+Shift, pressed and let go,
+  goes round English → Vietnamese → Chinese (Sogou or any Chinese keyboard), with EN / VI / 中 on screen and a sound;
+  V or E next to ENG in the taskbar shows the switch, and a click flips it. Every app gets back the keyboard you last
+  used in it (English the first time), and the list syncs to your other PCs. Installing turns off Windows' own
+  Ctrl+Shift (switch keyboards within a language); removing Helm Keyboard gives English its US keyboard back.
+
 ## [0.70.1] - 2026-11-01
 
 ### Fixed

@@ -24,6 +24,7 @@ public class NavGroupTests
         ["shortcut-guide"] = ModuleGroup.WindowsAndDesktop,
         ["workspace-controller"] = ModuleGroup.WindowsAndDesktop,
         ["window-zones"] = ModuleGroup.WindowsAndDesktop,
+        ["keyboard"] = ModuleGroup.WindowsAndDesktop,
         ["vocab"] = ModuleGroup.Learning,
     };
 

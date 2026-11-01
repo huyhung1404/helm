@@ -1,6 +1,6 @@
-using Helm.Keyboard.Tip.Interop;
+using Helm.Typing.Tip.Interop;
 
-namespace Helm.Keyboard.Tip;
+namespace Helm.Typing.Tip;
 
 /// <summary>
 /// Messages for DebugView (OutputDebugString): the input method runs inside other apps, some of which may not write

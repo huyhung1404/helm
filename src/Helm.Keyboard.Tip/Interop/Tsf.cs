@@ -1,7 +1,7 @@
 using System.Runtime.InteropServices;
 using System.Runtime.InteropServices.Marshalling;
 
-namespace Helm.Keyboard.Tip.Interop;
+namespace Helm.Typing.Tip.Interop;
 
 // The parts of the Text Services Framework (msctf.h) Helm Keyboard uses. A COM interface is a table of functions, so
 // every method is declared in the order of the header, up to the last one called here; methods never called are

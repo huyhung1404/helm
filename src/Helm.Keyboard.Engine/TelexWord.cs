@@ -1,6 +1,6 @@
 using System.Text;
 
-namespace Helm.Keyboard;
+namespace Helm.Typing;
 
 /// <summary>
 /// The word being typed: the input method keeps it as the app's composition text and hands it over (commits it)

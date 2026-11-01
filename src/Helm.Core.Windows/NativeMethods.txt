@@ -148,3 +148,10 @@ SHCNE_ID
 SHCNF_FLAGS
 SHGetFileInfo
 DestroyIcon
+
+// Keyboards & input methods (Helm Keyboard)
+GetKeyboardLayout
+GetKeyboardLayoutList
+WM_INPUTLANGCHANGEREQUEST
+SystemParametersInfo
+GetGUIThreadInfo

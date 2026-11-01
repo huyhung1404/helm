@@ -1,4 +1,5 @@
 using Helm.Modules.Habits;
+using Helm.Modules.Keyboard;
 using Helm.Modules.Missions;
 using Helm.Modules.Notes;
 using Helm.Modules.NovelReader;
@@ -36,6 +37,7 @@ internal static class HelmModules
         services.AddQuickCaptureModule();
         services.AddShortcutGuideModule();
         services.AddWindowZonesModule();
+        services.AddKeyboardModule();
         services.AddWorkspaceModule();
         services.AddVocabModule();
 

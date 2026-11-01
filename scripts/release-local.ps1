@@ -12,11 +12,14 @@
   ./scripts/release-local.ps1
   ./scripts/release-local.ps1 -Version 0.3.1
   ./scripts/release-local.ps1 -SelfContained      # bundle the .NET runtime (one switch)
+  ./scripts/release-local.ps1 -SkipKeyboard       # no C++ build tools: pack without Helm Keyboard's input method
 #>
 param(
     [string]$Version,
     [string]$Channel,
     [switch]$SelfContained,
+    # Pack without Helm Keyboard's input method (no C++ build tools here); Helm then cannot install Helm Keyboard.
+    [switch]$SkipKeyboard,
     [string]$OutputDir = 'releases',
     [string]$Configuration = 'Release'
 )
@@ -32,6 +35,13 @@ try {
 
     $publishDir = Join-Path 'artifacts' "publish-$Version"
     if (Test-Path $publishDir) { Remove-Item -Recurse -Force $publishDir }
+
+    # Helm Keyboard's input method (NativeAOT) ships next to Helm in keyboard\; Helm.Modules.Keyboard picks it up from
+    # artifacts/keyboard. A release without it could not install Helm Keyboard, so a failure stops here.
+    if (-not $SkipKeyboard) {
+        Write-Host "== Building Helm Keyboard $Version" -ForegroundColor Cyan
+        & (Join-Path $PSScriptRoot 'build-keyboard.ps1') -Version $Version
+    }
 
     Write-Host "== Publishing Helm $Version ($Channel, self-contained: $([bool]$SelfContained))" -ForegroundColor Cyan
     dotnet publish src/Helm.App -c $Configuration -r win-x64 --self-contained:$([bool]$SelfContained) `

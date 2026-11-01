@@ -1,6 +1,6 @@
 using System.Runtime.InteropServices;
 
-namespace Helm.Keyboard.Tip.Interop;
+namespace Helm.Typing.Tip.Interop;
 
 internal static partial class Native
 {
@@ -21,8 +21,22 @@ internal static partial class Native
     public const uint GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS = 0x4;
     public const uint GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT = 0x2;
 
+    public const uint SYNCHRONIZE = 0x00100000;
+    public const int ERROR_ACCESS_DENIED = 5;
+    public const uint WAIT_TIMEOUT = 0x102;
+
     [LibraryImport("user32.dll")]
     public static partial short GetKeyState(int virtualKey);
+
+    [LibraryImport("kernel32.dll", SetLastError = true)]
+    public static partial nint OpenProcess(uint access, int inherit, uint processId);
+
+    [LibraryImport("kernel32.dll")]
+    public static partial uint WaitForSingleObject(nint handle, uint milliseconds);
+
+    [LibraryImport("kernel32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    public static partial bool CloseHandle(nint handle);
 
     [LibraryImport("ole32.dll")]
     public static partial int CoCreateInstance(in Guid clsid, nint outer, uint context, in Guid iid, out nint instance);

@@ -30,6 +30,7 @@ body:
       label: Tool
       options:
         - Habits
+        - Helm Keyboard
         - Missions
         - Notes
         - Quick Capture

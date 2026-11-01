@@ -1,8 +1,8 @@
 using System.Runtime.InteropServices;
 using System.Runtime.InteropServices.Marshalling;
-using Helm.Keyboard.Tip.Interop;
+using Helm.Typing.Tip.Interop;
 
-namespace Helm.Keyboard.Tip;
+namespace Helm.Typing.Tip;
 
 /// <summary>What COM asks for the input method's class: makes a <see cref="TextService"/>.</summary>
 [GeneratedComClass]

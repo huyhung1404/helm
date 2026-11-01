@@ -1,7 +1,7 @@
 using System.Runtime.InteropServices.Marshalling;
-using Helm.Keyboard.Tip.Interop;
+using Helm.Typing.Tip.Interop;
 
-namespace Helm.Keyboard.Tip;
+namespace Helm.Typing.Tip;
 
 /// <summary>TSF only lets an input method touch the app's text inside an edit session: this runs a callback in one.</summary>
 [GeneratedComClass]

@@ -1,8 +1,8 @@
 using System.Runtime.InteropServices;
 using System.Runtime.InteropServices.Marshalling;
-using Helm.Keyboard.Tip.Interop;
+using Helm.Typing.Tip.Interop;
 
-namespace Helm.Keyboard.Tip;
+namespace Helm.Typing.Tip;
 
 /// <summary>
 /// How the word being typed looks in the app: exactly like the rest of the text, with no underline, the way a

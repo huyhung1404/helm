@@ -1,6 +1,6 @@
 using System.Text;
 
-namespace Helm.Keyboard;
+namespace Helm.Typing;
 
 /// <summary>
 /// The spell check: whether a word being typed can still become a Vietnamese syllable. Built from the parts of a

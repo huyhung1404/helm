@@ -1,9 +1,9 @@
 using System.Runtime.InteropServices;
 using System.Runtime.InteropServices.Marshalling;
-using Helm.Keyboard.Tip.Interop;
+using Helm.Typing.Tip.Interop;
 using Microsoft.Win32;
 
-namespace Helm.Keyboard.Tip;
+namespace Helm.Typing.Tip;
 
 /// <summary>
 /// The V/E sign next to ENG in the taskbar (the input mode button, like 中/英 for Chinese keyboards): V while typing

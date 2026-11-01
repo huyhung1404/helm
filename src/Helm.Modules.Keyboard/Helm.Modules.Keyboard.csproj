@@ -1,0 +1,26 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <UseWPF>true</UseWPF>
+    <RootNamespace>Helm.Modules.Keyboard</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Helm.Core.Windows\Helm.Core.Windows.csproj" />
+    <ProjectReference Include="..\Helm.Keyboard.Engine\Helm.Keyboard.Engine.csproj" />
+  </ItemGroup>
+
+  <!-- The input method itself (NativeAOT, 64- and 32-bit), built by scripts/build-keyboard.ps1 into artifacts/keyboard.
+       It ships next to Helm in keyboard\x64 and keyboard\x86; Helm copies it to Program Files when it is installed. -->
+  <ItemGroup>
+    <None Include="..\..\artifacts\keyboard\x64\HelmKeyboard.dll" Link="keyboard\x64\HelmKeyboard.dll" CopyToOutputDirectory="PreserveNewest"
+          Condition="Exists('..\..\artifacts\keyboard\x64\HelmKeyboard.dll')" />
+    <None Include="..\..\artifacts\keyboard\x86\HelmKeyboard.dll" Link="keyboard\x86\HelmKeyboard.dll" CopyToOutputDirectory="PreserveNewest"
+          Condition="Exists('..\..\artifacts\keyboard\x86\HelmKeyboard.dll')" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="Helm.Tests" />
+  </ItemGroup>
+
+</Project>

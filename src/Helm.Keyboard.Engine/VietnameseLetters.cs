@@ -1,4 +1,4 @@
-namespace Helm.Keyboard;
+namespace Helm.Typing;
 
 /// <summary>What a Telex modifier key adds to a letter: â ê ô (aa ee oo), ă (aw), ơ ư (ow uw), đ (dd).</summary>
 internal enum Mark : byte

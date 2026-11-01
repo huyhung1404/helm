@@ -1,0 +1,122 @@
+<core:ModulePageBase
+    x:Class="Helm.Modules.Keyboard.KeyboardPage"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
+    xmlns:core="clr-namespace:Helm.Core.Ui;assembly=Helm.Core.Windows"
+    xmlns:local="clr-namespace:Helm.Modules.Keyboard"
+    Module="{Binding Module}">
+
+    <StackPanel>
+        <!-- Install -->
+        <TextBlock Text="Input method" Style="{DynamicResource HelmSectionHeader}" />
+        <ui:CardControl Margin="0,0,0,4" Icon="{ui:SymbolIcon Keyboard24}">
+            <ui:CardControl.Header>
+                <core:CardHeader Title="Install Helm Keyboard" Description="{Binding InstallDescription}" />
+            </ui:CardControl.Header>
+            <StackPanel Orientation="Horizontal">
+                <ui:Button Content="{Binding InstallButton}" Appearance="Primary" Icon="{ui:SymbolIcon ArrowDownload24}"
+                           Command="{Binding InstallCommand}" Visibility="{Binding CanInstall, Converter={StaticResource BoolToVisibility}}" />
+                <ui:Button Margin="8,0,0,0" Content="Remove" Icon="{ui:SymbolIcon Delete24}" Command="{Binding UninstallCommand}"
+                           Visibility="{Binding IsInstalled, Converter={StaticResource BoolToVisibility}}" />
+            </StackPanel>
+        </ui:CardControl>
+
+        <!-- Switching -->
+        <TextBlock Text="Switching" Style="{DynamicResource HelmSectionHeader}" />
+        <ui:CardExpander Margin="0,0,0,4" IsExpanded="True" Icon="{ui:SymbolIcon Keyboard24}">
+            <ui:CardExpander.Header>
+                <core:RowLayout>
+                    <core:CardHeader Title="Switch keyboard shortcut" Description="Goes round English, Vietnamese and Chinese in the app you are typing in." />
+                    <ComboBox HorizontalAlignment="Right" Margin="0,0,16,0" MinWidth="260" AutomationProperties.Name="Switch keyboard shortcut"
+                              ItemsSource="{Binding Shortcuts}" DisplayMemberPath="Label" SelectedValuePath="Value" SelectedValue="{Binding Shortcut}" />
+                </core:RowLayout>
+            </ui:CardExpander.Header>
+            <StackPanel>
+                <Border Style="{DynamicResource HelmExpanderRow}" BorderThickness="0" IsEnabled="{Binding IsOwnHotkey}">
+                    <core:RowLayout>
+                        <core:CardHeader Title="Your own shortcut" Description="Used when the shortcut above is set to a shortcut of your own." />
+                        <core:HotkeyPicker HorizontalAlignment="Right" Gesture="{Binding Hotkey}" DefaultGesture="{Binding DefaultHotkey}" />
+                    </core:RowLayout>
+                </Border>
+                <Border Style="{DynamicResource HelmExpanderRow}" IsEnabled="{Binding HasChinese}">
+                    <core:RowLayout>
+                        <core:CardHeader Title="Include Chinese" Description="Needs a Chinese keyboard, such as Sogou, in Windows' keyboard list." />
+                        <ui:ToggleSwitch HorizontalAlignment="Right" IsChecked="{Binding IncludeChinese}" />
+                    </core:RowLayout>
+                </Border>
+            </StackPanel>
+        </ui:CardExpander>
+        <ui:CardControl Margin="0,0,0,4" Icon="{ui:SymbolIcon Window24}">
+            <ui:CardControl.Header>
+                <core:CardHeader Title="Show the keyboard on screen" Description="EN, VI or 中 appears for a moment after the shortcut." />
+            </ui:CardControl.Header>
+            <ui:ToggleSwitch IsChecked="{Binding ShowIndicator}" />
+        </ui:CardControl>
+        <ui:CardControl Margin="0,0,0,4" Icon="{ui:SymbolIcon Speaker224}">
+            <ui:CardControl.Header>
+                <core:CardHeader Title="Play a sound when switching" />
+            </ui:CardControl.Header>
+            <ui:ToggleSwitch IsChecked="{Binding PlaySound}" />
+        </ui:CardControl>
+
+        <!-- Typing -->
+        <TextBlock Text="Typing Vietnamese (Telex)" Style="{DynamicResource HelmSectionHeader}" />
+        <ui:CardControl Margin="0,0,0,4" Icon="{ui:SymbolIcon TextEditStyle24}">
+            <ui:CardControl.Header>
+                <core:CardHeader Title="New tone placement" Description="Puts the tone on the second vowel of oa, oe and uy: hoà, khoẻ, thuý (off: hòa, khỏe, thúy)." />
+            </ui:CardControl.Header>
+            <ui:ToggleSwitch IsChecked="{Binding ModernToneStyle}" />
+        </ui:CardControl>
+        <ui:CardControl Margin="0,0,0,4" Icon="{ui:SymbolIcon TextGrammarCheckmark24}">
+            <ui:CardControl.Header>
+                <core:CardHeader Title="Check spelling" Description="Words that cannot be Vietnamese, such as windows or class, stay as you type them." />
+            </ui:CardControl.Header>
+            <ui:ToggleSwitch IsChecked="{Binding SpellCheck}" />
+        </ui:CardControl>
+
+        <!-- Excluded apps -->
+        <TextBlock Text="Excluded apps" Style="{DynamicResource HelmSectionHeader}" />
+        <ui:CardExpander Margin="0,0,0,4" Icon="{ui:SymbolIcon AppsList24}">
+            <ui:CardExpander.Header>
+                <core:CardHeader Title="Excluded apps" Description="Programs Helm never switches the keyboard for, one per line (e.g. Unity.exe)." />
+            </ui:CardExpander.Header>
+            <ui:TextBox Text="{Binding ExcludedApps, UpdateSourceTrigger=LostFocus}" AcceptsReturn="True" TextWrapping="Wrap"
+                        MinHeight="100" MaxHeight="240" VerticalScrollBarVisibility="Auto" PlaceholderText="Example: Unity.exe" />
+        </ui:CardExpander>
+
+        <!-- Remembered apps -->
+        <TextBlock Text="Apps with their own keyboard" Style="{DynamicResource HelmSectionHeader}" />
+        <Border Style="{DynamicResource HelmSurface}" Padding="0">
+            <StackPanel>
+                <TextBlock Margin="16" TextWrapping="Wrap" Style="{DynamicResource HelmSecondaryText}"
+                           Text="Every app starts in English. Switch the keyboard in an app and Helm gives it back the next time you use that app, on every PC you sync."
+                           Visibility="{Binding HasApps, Converter={StaticResource InverseBoolToVisibility}}" />
+                <ItemsControl ItemsSource="{Binding Apps}">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate DataType="{x:Type local:KeyboardAppRow}">
+                            <Border BorderThickness="0,0,0,1" BorderBrush="{DynamicResource CardStrokeColorDefaultBrush}">
+                                <Grid Margin="16,8">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="32" />
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <ui:SymbolIcon Symbol="Apps24" VerticalAlignment="Center" />
+                                    <TextBlock Grid.Column="1" Text="{Binding App}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
+                                    <ComboBox Grid.Column="2" MinWidth="140" AutomationProperties.Name="Keyboard"
+                                              ItemsSource="{Binding DataContext.Modes, RelativeSource={RelativeSource AncestorType=core:ModulePageBase}}"
+                                              DisplayMemberPath="Label" SelectedValuePath="Value" SelectedValue="{Binding Mode}" />
+                                    <ui:Button Grid.Column="3" Margin="8,0,0,0" Content="Forget"
+                                               Command="{Binding DataContext.ForgetCommand, RelativeSource={RelativeSource AncestorType=core:ModulePageBase}}"
+                                               CommandParameter="{Binding}" />
+                                </Grid>
+                            </Border>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+            </StackPanel>
+        </Border>
+    </StackPanel>
+</core:ModulePageBase>

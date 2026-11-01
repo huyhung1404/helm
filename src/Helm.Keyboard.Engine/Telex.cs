@@ -1,6 +1,6 @@
 using System.Text;
 
-namespace Helm.Keyboard;
+namespace Helm.Typing;
 
 /// <summary>How Helm Keyboard writes Vietnamese; the defaults match the EVKey setup it replaces.</summary>
 public sealed record TelexOptions
