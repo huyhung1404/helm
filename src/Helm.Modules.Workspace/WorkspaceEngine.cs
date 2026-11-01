@@ -237,6 +237,24 @@ public sealed class WorkspaceEngine : IAsyncDisposable
     }
 
     /// <summary>
+    /// The name of the editor tab showing <paramref name="sessionId"/> in <paramref name="window"/>; null when no tab is
+    /// matched to it (it may be in the side bar) or another tab has the same name.
+    /// </summary>
+    private string? TabOf(BridgeConnection window, string sessionId)
+    {
+        if (window.Info.Tabs is not { } tabs) return null;
+        var running = _running?.Of(window.Info.Pid) ?? [];
+        var (open, _) = MatchTabs(tabs, InWindow(window, Registry.Sessions, running), running);
+        for (var i = 0; i < open.Count; i++)
+        {
+            if (open[i] != sessionId) continue;
+            var label = tabs[i].Label;
+            return tabs.Count(t => t.Label == label) == 1 ? label : null;
+        }
+        return null;
+    }
+
+    /// <summary>
     /// The windows' claude processes changed: a session one runs that Helm does not know yet (opened before Helm started,
     /// or its hooks lost) is listed from Claude's records, and Claude Code's busy or idle corrects a state a lost hook left.
     /// </summary>
@@ -568,7 +586,7 @@ public sealed class WorkspaceEngine : IAsyncDisposable
             var setup = command.Kind == WorkspaceCommandKind.NewSession
                 ? new NewSessionSetup(command.Model, command.Effort, command.Mode is { } m ? Math.Max(0, PermissionModes.Presses(PermissionModes.Manual, m, AutoModeAvailable)) : 0)
                 : null;
-            await _sender.SendAsync(window, sessionId, text, setup, ct, receipt.Task, step).ConfigureAwait(false);
+            await _sender.SendAsync(window, sessionId, text, setup, ct, receipt.Task, step, sessionId is null ? null : TabOf(window, sessionId)).ConfigureAwait(false);
         }
         catch (PromptSendException ex)
         {
@@ -670,17 +688,17 @@ public sealed class WorkspaceEngine : IAsyncDisposable
             switch (command.Kind)
             {
                 case WorkspaceCommandKind.SetModel:
-                    await _sender.SendAsync(window, session.SessionId, "/model " + command.Text.Trim(), null, ct).ConfigureAwait(false);
+                    await _sender.SendAsync(window, session.SessionId, "/model " + command.Text.Trim(), null, ct, tab: TabOf(window, session.SessionId)).ConfigureAwait(false);
                     break;
                 case WorkspaceCommandKind.SetEffort:
-                    await _sender.SendAsync(window, session.SessionId, "/effort " + command.Text.Trim(), null, ct).ConfigureAwait(false);
+                    await _sender.SendAsync(window, session.SessionId, "/effort " + command.Text.Trim(), null, ct, tab: TabOf(window, session.SessionId)).ConfigureAwait(false);
                     break;
                 case WorkspaceCommandKind.SetMode:
                     var mode = PermissionModes.Normalize(command.Text.Trim());
                     var presses = PermissionModes.Presses(session.PermissionMode, mode, AutoModeAvailable);
                     if (presses < 0)
                         return new WorkspaceCommandResult(command.Id, WorkspaceCommandStatus.Failed, $"Helm cannot switch from {PermissionModes.Label(session.PermissionMode)} to {PermissionModes.Label(mode)}; do it in VS Code.", session.SessionId);
-                    if (presses > 0) await _sender.CycleModeAsync(window, session.SessionId, presses, ct).ConfigureAwait(false);
+                    if (presses > 0) await _sender.CycleModeAsync(window, session.SessionId, presses, ct, TabOf(window, session.SessionId)).ConfigureAwait(false);
                     Registry.SetMode(session.SessionId, mode);
                     return new WorkspaceCommandResult(command.Id, WorkspaceCommandStatus.Received, null, session.SessionId);
                 case WorkspaceCommandKind.CloseTab:

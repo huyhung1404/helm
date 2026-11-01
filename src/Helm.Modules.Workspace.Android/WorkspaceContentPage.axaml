@@ -119,10 +119,10 @@
                                         <Panel Width="15" Height="15" HorizontalAlignment="Left" VerticalAlignment="Top" Margin="-3,10,0,0" Background="{DynamicResource VsBg}">
                                             <Ellipse Width="9" Height="9" Fill="{DynamicResource VsFaint}" IsVisible="{Binding IsThought}" />
                                             <Ellipse Width="9" Height="9" Fill="{DynamicResource VsAnswerDot}" IsVisible="{Binding IsAnswer}" />
-                                            <Ellipse Width="9" Height="9" Fill="{DynamicResource VsAccent}" Classes="pulse" IsVisible="{Binding IsWorking}" />
-                                            <Ellipse Width="9" Height="9" Fill="{DynamicResource VsAccent}" Classes="pulse" IsVisible="{Binding ShowRunning}" />
+                                            <Ellipse Width="9" Height="9" Fill="{DynamicResource VsAccent}" Classes.pulse="{Binding IsWorking}" IsVisible="{Binding IsWorking}" />
+                                            <Ellipse Width="9" Height="9" Fill="{DynamicResource VsAccent}" Classes.pulse="{Binding ShowRunning}" IsVisible="{Binding ShowRunning}" />
                                             <Ellipse Width="7" Height="7" Fill="{DynamicResource VsFaint}" IsVisible="{Binding StepDone}" />
-                                            <Ellipse Width="9" Height="9" Fill="{DynamicResource VsAccent}" Classes="pulse" IsVisible="{Binding StepActive}" />
+                                            <Ellipse Width="9" Height="9" Fill="{DynamicResource VsAccent}" Classes.pulse="{Binding StepActive}" IsVisible="{Binding StepActive}" />
                                             <Ellipse Width="9" Height="9" Fill="{DynamicResource VsBad}" IsVisible="{Binding StepFailed}" />
                                             <Panel IsVisible="{Binding IsTool}">
                                                 <Ellipse Width="9" Height="9" Fill="{DynamicResource VsOk}" IsVisible="{Binding !Running}" />
@@ -133,13 +133,13 @@
                                             <TextBlock Text="{Binding Time}" Classes="faint" FontSize="11" HorizontalAlignment="Right" IsVisible="{Binding IsAnswer}" Margin="0,0,0,2" />
                                             <TextBlock Text="{Binding Text}" Classes="muted" IsVisible="{Binding IsThought}" />
                                             <StackPanel Orientation="Horizontal" Spacing="6" IsVisible="{Binding IsWorking}">
-                                                <TextBlock Text="✻" Classes="spin" />
+                                                <TextBlock Text="✻" Classes.spin="{Binding IsWorking}" />
                                                 <TextBlock Text="{Binding Text}" Foreground="{DynamicResource VsAccent}" />
                                             </StackPanel>
                                             <!-- A step of your message on its way: small and quiet, like VS Code's notes on the rail -->
                                             <StackPanel IsVisible="{Binding IsStep}" Spacing="2">
                                                 <DockPanel>
-                                                    <TextBlock DockPanel.Dock="Left" Text="✻" Classes="spin" FontSize="12" Margin="0,0,6,0" IsVisible="{Binding StepActive}" VerticalAlignment="Center" />
+                                                    <TextBlock DockPanel.Dock="Left" Text="✻" Classes.spin="{Binding StepActive}" FontSize="12" Margin="0,0,6,0" IsVisible="{Binding StepActive}" VerticalAlignment="Center" />
                                                     <TextBlock TextWrapping="Wrap" FontSize="12.5" FontStyle="Italic" VerticalAlignment="Center" Classes="muted" Classes.failed="{Binding StepFailed}">
                                                         <Run Text="{Binding Text}" />
                                                         <Run Text="  " />
@@ -172,7 +172,7 @@
                                                         <Grid ColumnDefinitions="34,*" Background="{DynamicResource VsCodeOut}" IsVisible="{Binding ShowRunning}">
                                                             <TextBlock Text="OUT" Classes="lbl" />
                                                             <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="6" Margin="0,7,10,7">
-                                                                <TextBlock Text="✻" Classes="spin" FontSize="12" />
+                                                                <TextBlock Text="✻" Classes.spin="{Binding ShowRunning}" FontSize="12" />
                                                                 <TextBlock Text="Running…" Classes="mono" />
                                                             </StackPanel>
                                                         </Grid>

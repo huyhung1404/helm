@@ -141,6 +141,8 @@ function activate(context) {
   context.subscriptions.push(
     vscode.workspace.onDidChangeWorkspaceFolders(changed),
     vscode.window.tabGroups.onDidChangeTabs(changed),
+    // Another group taking the keyboard changes which Claude tab is in front without changing any tab.
+    vscode.window.tabGroups.onDidChangeTabGroups(changed),
     vscode.window.onDidChangeWindowState(changed),
     vscode.workspace.onDidChangeConfiguration(e => { if (e.affectsConfiguration('claudeCode.useCtrlEnterToSend')) changed(); }),
   );

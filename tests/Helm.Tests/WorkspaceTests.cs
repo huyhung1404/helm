@@ -617,8 +617,19 @@ internal sealed class FakeBridge(string pipe) : IAsyncDisposable
     /// <summary>The tab in front, sent with every reply as Bridge 1.2 does; null plays an older bridge.</summary>
     public string? Editor { get; set; }
 
+    /// <summary>
+    /// The Claude tabs after a request (op, session), reported before its reply as Bridge 1.3 does when a tab or the
+    /// active group changes; null reports nothing.
+    /// </summary>
+    public Func<string, string?, (string Label, bool Active)[]?>? TabsAfter { get; set; }
+
+    private string _name = "";
+    private string[] _folders = [];
+
     public async Task ConnectAsync(string name, string[] folders, string sendKey = "enter", bool focused = true)
     {
+        _name = name;
+        _folders = folders;
         await _stream.ConnectAsync(5000);
         _writer = new StreamWriter(_stream, new UTF8Encoding(false)) { AutoFlush = true, NewLine = "\n" };
         await _writer.WriteLineAsync(JsonSerializer.Serialize(new { type = "hello", protocol = 1, pid = 1, name, folders, sendKey, claudeTabs = 0, focused }));
@@ -634,6 +645,7 @@ internal sealed class FakeBridge(string pipe) : IAsyncDisposable
                 lock (Requests) Requests.Add((op, session));
                 var fail = FailNext;
                 FailNext = null;
+                if (TabsAfter?.Invoke(op, session) is { } tabs) await TabsAsync(_name, _folders, tabs);
                 await _writer.WriteLineAsync(JsonSerializer.Serialize(new { type = "reply", id = r.GetProperty("id").GetString(), ok = fail is null, error = fail, editor = Editor }));
             }
         });
@@ -795,6 +807,47 @@ public class PromptSenderTests
         Assert.Contains("did not confirm", typing.Message);
         var mode = await Assert.ThrowsAsync<PromptSendException>(() => sender.CycleModeAsync(window, "s1", 2, CancellationToken.None));
         Assert.Contains("did not confirm", mode.Message);
+        Assert.Empty(keys.Log);
+    }
+
+    [Fact]
+    public async Task With_two_claude_tabs_side_by_side_the_keyboard_is_put_back_in_the_sessions_tab()
+    {
+        // Claude's focus command focuses every Claude panel in view; here the other tab ends up with the keyboard.
+        var (host, bridge, window) = await ConnectAsync();
+        await using var _ = host;
+        await using var __ = bridge;
+        bridge.TabsAfter = (op, session) => op switch
+        {
+            "open" => [("Keyboard", true), ("GitHub", false)],
+            "focus" => [("Keyboard", false), ("GitHub", true)],
+            _ => null,
+        };
+        var keys = new FakeKeyboard(target: 42, title: "alpha - Visual Studio Code", previous: 0);
+        var sender = new PromptSender(keys, NullLogger<PromptSender>.Instance);
+
+        await sender.SendAsync(window, "s1", "Go", null, CancellationToken.None, tab: "Keyboard");
+        Assert.Equal(["type:Go", "submit:enter"], keys.Log);
+        Assert.Equal([("open", "s1"), ("focus", null), ("open", "s1"), ("focusEditor", null)], bridge.Requests);
+
+        bridge.Requests.Clear();
+        await sender.CycleModeAsync(window, "s1", 1, CancellationToken.None, "Keyboard");
+        Assert.Equal([("open", "s1"), ("focus", null), ("open", "s1"), ("focusEditor", null)], bridge.Requests);
+    }
+
+    [Fact]
+    public async Task Nothing_is_typed_while_another_claude_tab_has_the_keyboard()
+    {
+        var (host, bridge, window) = await ConnectAsync();
+        await using var _ = host;
+        await using var __ = bridge;
+        bridge.TabsAfter = (_, _) => [("Keyboard", false), ("GitHub", true)];
+        var keys = new FakeKeyboard(target: 42, title: "alpha - Visual Studio Code", previous: 0);
+        var sender = new PromptSender(keys, NullLogger<PromptSender>.Instance);
+
+        var ex = await Assert.ThrowsAsync<PromptSendException>(() => sender.SendAsync(window, "s1", "Go", null, CancellationToken.None, tab: "Keyboard"));
+        Assert.Contains("Another Claude tab", ex.Message);
+        await Assert.ThrowsAsync<PromptSendException>(() => sender.CycleModeAsync(window, "s1", 1, CancellationToken.None, "Keyboard"));
         Assert.Empty(keys.Log);
     }
 

@@ -103,9 +103,14 @@ public sealed class PromptSender(IPromptKeyboard keyboard, ILogger<PromptSender>
     /// </param>
     /// <exception cref="PromptSendException">Nothing or only part was typed; the message says why.</exception>
     /// <param name="step">Told each step as it starts, in words for the phone ("Typing your prompt").</param>
+    /// <param name="tab">
+    /// The name of the editor tab showing the session, when Helm knows it (null: in the side bar, or not told apart).
+    /// Keys only go in while that tab has the keyboard.
+    /// </param>
     public async Task SendAsync(BridgeConnection window, string? sessionId, string text, NewSessionSetup? setup, CancellationToken ct, Task? received = null,
-        Action<string>? step = null)
+        Action<string>? step = null, string? tab = null)
     {
+        if (sessionId is null) tab = null;
         step ??= _ => { };
         if (_gate.CurrentCount == 0) step("Waiting for the prompt before it on this PC");
         await _gate.WaitAsync(ct).ConfigureAwait(false);
@@ -129,13 +134,13 @@ public sealed class PromptSender(IPromptKeyboard keyboard, ILogger<PromptSender>
                 if (!string.IsNullOrWhiteSpace(setup.Model))
                 {
                     step($"Setting the model to {setup.Model.Trim()}");
-                    await TypeAndSubmitAsync(window, target, focus, "/model " + setup.Model.Trim(), ct).ConfigureAwait(false);
+                    await TypeAndSubmitAsync(window, target, focus, null, null, "/model " + setup.Model.Trim(), ct).ConfigureAwait(false);
                     await keyboard.Pause(2500, ct).ConfigureAwait(false);
                 }
                 if (!string.IsNullOrWhiteSpace(setup.Effort))
                 {
                     step($"Setting the effort to {setup.Effort.Trim()}");
-                    await TypeAndSubmitAsync(window, target, focus, "/effort " + setup.Effort.Trim(), ct).ConfigureAwait(false);
+                    await TypeAndSubmitAsync(window, target, focus, null, null, "/effort " + setup.Effort.Trim(), ct).ConfigureAwait(false);
                     await keyboard.Pause(1500, ct).ConfigureAwait(false);
                 }
                 if (setup.ModePresses > 0)
@@ -147,16 +152,16 @@ public sealed class PromptSender(IPromptKeyboard keyboard, ILogger<PromptSender>
                     await keyboard.Pause(300, ct).ConfigureAwait(false);
                     for (var i = 0; i < setup.ModePresses; i++)
                     {
-                        Guard(window, target, "The mode was not set; nothing was typed.");
+                        Guard(window, target, null, "The mode was not set; nothing was typed.");
                         keyboard.NextMode();
                         await keyboard.Pause(150, ct).ConfigureAwait(false);
                     }
                 }
             }
             step("Typing your prompt into VS Code");
-            await TypeAndSubmitAsync(window, target, focus, text, ct).ConfigureAwait(false);
+            await TypeAndSubmitAsync(window, target, focus, sessionId, tab, text, ct).ConfigureAwait(false);
             step("Waiting for Claude to take it");
-            if (received is not null) await ConfirmAsync(window, target, focus, received, ct).ConfigureAwait(false);
+            if (received is not null) await ConfirmAsync(window, target, focus, sessionId, tab, received, ct).ConfigureAwait(false);
         }
         finally
         {
@@ -171,7 +176,7 @@ public sealed class PromptSender(IPromptKeyboard keyboard, ILogger<PromptSender>
     /// mode. Same guards as typing: only into that window, never with a modifier held.
     /// </summary>
     /// <exception cref="PromptSendException">Nothing or only part was pressed; the message says why.</exception>
-    public async Task CycleModeAsync(BridgeConnection window, string sessionId, int presses, CancellationToken ct)
+    public async Task CycleModeAsync(BridgeConnection window, string sessionId, int presses, CancellationToken ct, string? tab = null)
     {
         await _gate.WaitAsync(ct).ConfigureAwait(false);
         var previous = keyboard.Foreground();
@@ -183,11 +188,11 @@ public sealed class PromptSender(IPromptKeyboard keyboard, ILogger<PromptSender>
             target = FindWindow(window, editor, "The mode did not change.");
             if (!keyboard.ForceActivate(target)) throw new PromptSendException("Windows did not let Helm bring VS Code to the front. The mode did not change.");
             await ConfirmFocusAsync(window, "The mode did not change.", ct).ConfigureAwait(false);
-            await Bridge(window, "focus", null, ct).ConfigureAwait(false);
+            await FocusInputAsync(window, "focus", sessionId, tab, ct).ConfigureAwait(false);
             await keyboard.Pause(300, ct).ConfigureAwait(false);
             for (var i = 0; i < presses; i++)
             {
-                Guard(window, target, i == 0 ? "The mode did not change." : "The mode changed only part of the way.");
+                Guard(window, target, tab, i == 0 ? "The mode did not change." : "The mode changed only part of the way.");
                 keyboard.NextMode();
                 await keyboard.Pause(150, ct).ConfigureAwait(false);
             }
@@ -201,37 +206,37 @@ public sealed class PromptSender(IPromptKeyboard keyboard, ILogger<PromptSender>
         }
     }
 
-    private async Task TypeAndSubmitAsync(BridgeConnection window, nint target, string focus, string text, CancellationToken ct)
+    private async Task TypeAndSubmitAsync(BridgeConnection window, nint target, string focus, string? sessionId, string? tab, string text, CancellationToken ct)
     {
         if (!keyboard.ForceActivate(target)) throw new PromptSendException("Windows did not let Helm bring VS Code to the front. Nothing was typed.");
         await ConfirmFocusAsync(window, "Nothing was typed.", ct).ConfigureAwait(false);
-        await Bridge(window, focus, null, ct).ConfigureAwait(false);
+        await FocusInputAsync(window, focus, sessionId, tab, ct).ConfigureAwait(false);
         await keyboard.Pause(300, ct).ConfigureAwait(false);
 
         var lines = SessionRegistry.Normalize(text).Split('\n');
         for (var i = 0; i < lines.Length; i++)
         {
-            Guard(window, target, i == 0 ? "Nothing was typed." : "Part of the prompt was typed; nothing was sent.");
+            Guard(window, target, tab, i == 0 ? "Nothing was typed." : "Part of the prompt was typed; nothing was sent.");
             if (i > 0) keyboard.NewLine();
             if (lines[i].Length > 0) keyboard.Type(lines[i]);
         }
         await keyboard.Pause(400, ct).ConfigureAwait(false);
-        Guard(window, target, "The prompt was typed but not sent.");
+        Guard(window, target, tab, "The prompt was typed but not sent.");
         keyboard.Submit(window.Info.CtrlEnterSends);
         Interlocked.Exchange(ref _typedUntil, Environment.TickCount64 + 1500);
         logger.LogInformation("Workspace: typed a prompt ({Length} chars) into VS Code window {Name}", text.Length, window.Info.Name);
     }
 
-    private async Task ConfirmAsync(BridgeConnection window, nint target, string focus, Task received, CancellationToken ct)
+    private async Task ConfirmAsync(BridgeConnection window, nint target, string focus, string? sessionId, string? tab, Task received, CancellationToken ct)
     {
         for (var attempt = 0; attempt < SubmitRetries; attempt++)
         {
             if (await keyboard.WaitFor(received, ConfirmMilliseconds, ct).ConfigureAwait(false)) return;
             // Back to the same tab and input, then Enter once more.
             if (!keyboard.ForceActivate(target)) return;
-            await Bridge(window, focus, null, ct).ConfigureAwait(false);
+            await FocusInputAsync(window, focus, sessionId, tab, ct).ConfigureAwait(false);
             await keyboard.Pause(300, ct).ConfigureAwait(false);
-            if (keyboard.Foreground() != target || !window.Info.Focused || keyboard.ModifierDown()) return;
+            if (keyboard.Foreground() != target || !window.Info.Focused || !HasKeyboard(window, tab) || keyboard.ModifierDown()) return;
             keyboard.Submit(window.Info.CtrlEnterSends);
             logger.LogInformation("Workspace: Claude had not taken the prompt in {Name}; pressed Enter again", window.Info.Name);
         }
@@ -242,10 +247,31 @@ public sealed class PromptSender(IPromptKeyboard keyboard, ILogger<PromptSender>
     /// front must be the one found by its title AND the bridge inside it must say it has the keyboard: a title alone
     /// can belong to another VS Code window with the same name.
     /// </summary>
-    private void Guard(BridgeConnection window, nint target, string state)
+    private void Guard(BridgeConnection window, nint target, string? tab, string state)
     {
         if (keyboard.Foreground() != target || !window.Info.Focused) throw new PromptSendException("Another window came to the front. " + state);
+        if (!HasKeyboard(window, tab)) throw new PromptSendException($"Another Claude tab in VS Code has the keyboard, not “{tab}”. " + state);
         if (keyboard.ModifierDown()) throw new PromptSendException("A key (Ctrl, Alt, Shift or Win) is held down on the PC. " + state);
+    }
+
+    /// <summary>
+    /// True when the session's editor tab is the one in front of the active group, as the bridge last reported (always
+    /// true when Helm does not know the tab, or an older bridge does not list tabs).
+    /// </summary>
+    private static bool HasKeyboard(BridgeConnection window, string? tab) =>
+        tab is null || window.Info.Tabs is not { } tabs || tabs.Any(t => t.Active && t.Label == tab);
+
+    /// <summary>
+    /// Puts the keyboard in Claude's input. Claude's own focus command focuses the input of every Claude panel in view,
+    /// so with two side by side the keyboard could end up in the other one. For a session in an editor tab Helm then
+    /// shows that tab again and focuses its group: the keyboard goes back into that tab, where the input is focused.
+    /// </summary>
+    private static async Task FocusInputAsync(BridgeConnection window, string focus, string? sessionId, string? tab, CancellationToken ct)
+    {
+        await Bridge(window, focus, null, ct).ConfigureAwait(false);
+        if (focus != "focus" || sessionId is null || tab is null) return;
+        await Bridge(window, "open", sessionId, ct).ConfigureAwait(false);
+        await Bridge(window, "focusEditor", null, ct).ConfigureAwait(false);
     }
 
     /// <summary>How long the bridge may take to report that its window got the keyboard after Helm raised it.</summary>

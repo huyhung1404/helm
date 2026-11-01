@@ -3,6 +3,22 @@
 All notable changes to Helm. The top section is used as the GitHub release body and as the Velopack release notes.
 Format: [Keep a Changelog](https://keepachangelog.com), versions follow [SemVer](https://semver.org).
 
+## [Unreleased]
+
+### Fixed
+- **Workspace: a message for one Claude tab was typed into another.** With two Claude tabs in view (side by side, or
+  one in the side bar), Claude's own focus command puts the cursor in the input of every one of them, so the keyboard
+  could end up in the other tab. For a session in an editor tab Helm now shows that tab again and focuses it, and types
+  nothing unless that very tab has the keyboard ("Another Claude tab in VS Code has the keyboard"). The same goes for
+  switching a session's model, effort or mode. Needs Helm Bridge 1.3: Helm installs it, then reload each VS Code
+  window once.
+- **Workspace on the phone: smooth to scroll after "Show earlier steps".** Every row of the conversation carried the
+  spinning ✻ and the pulsing dot of a running step, hidden but still animating, so each "Show earlier" made scrolling
+  heavier. They now animate only on the steps that are running.
+- **Workspace on the phone: scrolling up while Claude works no longer snaps back to the end.** Every update from the
+  PC was taken for opening another conversation, which starts at its end. The end is now followed only while you are
+  at it, and never while your finger is on the chat.
+
 ## [0.70.0] - 2026-11-01
 
 ### Added

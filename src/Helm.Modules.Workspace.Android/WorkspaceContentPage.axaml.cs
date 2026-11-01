@@ -27,6 +27,8 @@ public partial class WorkspaceContentPage : UserControl, IFullPage
     private readonly EdgeHints _sessionEdges;
     private TopLevel? _topLevel;
     private bool _stickToEnd = true;
+    private bool _touching;
+    private string? _openSession;
     private System.Collections.ObjectModel.ObservableCollection<TimelineRow> _timeline = [];
     private readonly Dictionary<System.Collections.ObjectModel.ObservableCollection<TimelineRow>, (ItemsControl View, double Offset, bool AtEnd)> _views = new();
 
@@ -47,6 +49,9 @@ public partial class WorkspaceContentPage : UserControl, IFullPage
         module.PropertyChanged += OnModuleChanged;
         ApplyEnabled();
         ChatScroller.ScrollChanged += OnChatScrolled;
+        // The scroll gesture handles the touch itself: seen here even so.
+        ChatScroller.AddHandler(PointerPressedEvent, (_, _) => _touching = true, RoutingStrategies.Tunnel | RoutingStrategies.Bubble, handledEventsToo: true);
+        ChatScroller.AddHandler(PointerReleasedEvent, (_, _) => _touching = false, RoutingStrategies.Tunnel | RoutingStrategies.Bubble, handledEventsToo: true);
         // A tab switch draws the new tab first, then makes the rows (the tap answers at once).
         viewModel.DeferTimeline = work =>
         {
@@ -80,6 +85,7 @@ public partial class WorkspaceContentPage : UserControl, IFullPage
         Helm.Core.Platform.ActivityHost.Paused += OnAppPaused;
         Helm.Core.Platform.ActivityHost.Resumed += OnAppResumed;
         _viewModel.IsOnScreen = Helm.Core.Platform.ActivityHost.Current is not null;
+        _openSession = _viewModel.OpenSessionId;
         _timeline = _viewModel.Timeline;
         _timeline.CollectionChanged += OnTimelineChanged;
         ShowTimeline(_timeline, null);
@@ -136,7 +142,9 @@ public partial class WorkspaceContentPage : UserControl, IFullPage
         if (e.PropertyName == nameof(WorkspaceRemoteViewModel.OpenSessionId))
         {
             ClearNotification();
-            // Another conversation: start at its end.
+            // Every refresh says so (Claude at work: many a second); only another conversation starts at its end.
+            if (_viewModel.OpenSessionId == _openSession) return;
+            _openSession = _viewModel.OpenSessionId;
             _stickToEnd = true;
             Dispatcher.UIThread.Post(ScrollToEnd, DispatcherPriority.Background);
         }
@@ -162,7 +170,7 @@ public partial class WorkspaceContentPage : UserControl, IFullPage
     /// <summary>New steps keep the end in sight, unless you scrolled up to read.</summary>
     private void OnTimelineChanged(object? sender, NotifyCollectionChangedEventArgs e)
     {
-        if (_stickToEnd) Dispatcher.UIThread.Post(ScrollToEnd, DispatcherPriority.Background);
+        if (_stickToEnd) Dispatcher.UIThread.Post(FollowEnd, DispatcherPriority.Background);
     }
 
     private void OnChatScrolled(object? sender, ScrollChangedEventArgs e)
@@ -171,13 +179,20 @@ public partial class WorkspaceContentPage : UserControl, IFullPage
         // in) after the jump to the end when a conversation opens: at the end, the end is followed as it moves.
         if ((e.ExtentDelta.Y != 0 || e.ViewportDelta.Y != 0) && e.OffsetDelta.Y == 0)
         {
-            if (_stickToEnd) Dispatcher.UIThread.Post(ScrollToEnd, DispatcherPriority.Background);
+            if (_stickToEnd) Dispatcher.UIThread.Post(FollowEnd, DispatcherPriority.Background);
             return;
         }
         _stickToEnd = ChatScroller.Offset.Y + ChatScroller.Viewport.Height >= ChatScroller.Extent.Height - 48;
     }
 
     private void ScrollToEnd() => ChatScroller.ScrollToEnd();
+
+    /// <summary>The end moved: followed only if you are still at it when this runs, and not while your finger is on
+    /// the chat (a drag starts near the end, and the clock changes a row every second).</summary>
+    private void FollowEnd()
+    {
+        if (_stickToEnd && !_touching) ScrollToEnd();
+    }
 
     /// <summary>
     /// Shows the drawn list of <paramref name="list"/> and hides the others: a tab seen before comes back as it was,
