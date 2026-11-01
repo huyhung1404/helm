@@ -1,9 +1,11 @@
 using System.ComponentModel;
 using Avalonia;
 using Avalonia.Controls;
+using Avalonia.Controls.Primitives;
 using Avalonia.Input;
 using Avalonia.Interactivity;
 using Avalonia.Threading;
+using Avalonia.VisualTree;
 using Helm.Core;
 using Helm.Core.Modules;
 using Helm.Core.Platform;
@@ -15,7 +17,9 @@ namespace Helm.Modules.Habits;
 /// <summary>
 /// Habits itself, opened from the drawer and the Quick access tile (see <see cref="IModuleContent"/>). While the tool
 /// is off the habits stay visible but read-only, with a note pointing to the settings. Opening the page, or coming
-/// back to the app on it, asks for the reason of skipped days; plays the celebrations the view model asks for.
+/// back to the app on it, asks for the reason of skipped days. The view model's pop-up (<see cref="HabitsPopup"/>) goes
+/// on the overlay layer over the whole screen while the page is shown, so it stays put however far the page is
+/// scrolled; it plays the celebrations' confetti.
 /// </summary>
 public partial class HabitsContentPage : UserControl
 {
@@ -23,6 +27,8 @@ public partial class HabitsContentPage : UserControl
     private readonly HabitsViewModel _viewModel;
     private readonly IShellNavigation? _navigation;
     private readonly DispatcherTimer _clock;
+    private HabitsPopup? _popup;
+    private TopLevel? _top;
 
     /// <summary>For the XAML runtime loader and the designer; the shell resolves the page from DI.</summary>
     public HabitsContentPage()
@@ -52,10 +58,12 @@ public partial class HabitsContentPage : UserControl
         ApplyEnabled();
         _clock.Start();
         Shown();
+        UpdatePopup();
     }
 
     protected override void OnDetachedFromVisualTree(VisualTreeAttachmentEventArgs e)
     {
+        HidePopup();
         _clock.Stop();
         ActivityHost.Resumed -= OnResumed;
         _module.PropertyChanged -= OnModuleChanged;
@@ -80,19 +88,66 @@ public partial class HabitsContentPage : UserControl
 
     private void OnViewModelChanged(object? sender, PropertyChangedEventArgs e)
     {
-        if (e.PropertyName != nameof(HabitsViewModel.Celebration) || _viewModel.Celebration is null) return;
-        // After layout, so the card has its size and can be scrolled to.
-        Dispatcher.UIThread.Post(() =>
+        switch (e.PropertyName)
         {
-            CelebrationPanel.BringIntoView();
-            if (_viewModel.PlayConfetti) Confetti.Play(_viewModel.IsBigCelebration);
-        }, DispatcherPriority.Loaded);
+            case nameof(HabitsViewModel.HasPopup) or nameof(HabitsViewModel.ShowLapse):
+                Dispatcher.UIThread.Post(UpdatePopup);
+                break;
+            case nameof(HabitsViewModel.Celebration) when _viewModel.Celebration is not null:
+                // After layout, so the confetti knows the pop-up's size.
+                Dispatcher.UIThread.Post(() =>
+                {
+                    if (_viewModel.PlayConfetti) _popup?.PlayConfetti(_viewModel.IsBigCelebration);
+                }, DispatcherPriority.Loaded);
+                break;
+        }
     }
 
-    /// <summary>A tap on a card (not on a day of its grid, which takes its own taps): tick today.</summary>
+    /// <summary>Puts the pop-up on the overlay layer, sized to the window, or takes it off.</summary>
+    private void UpdatePopup()
+    {
+        if (!_viewModel.HasPopup || VisualRoot is null)
+        {
+            HidePopup();
+            return;
+        }
+        if (OverlayLayer.GetOverlayLayer(this) is not { } layer || TopLevel.GetTopLevel(this) is not { } top) return;
+        _popup ??= new HabitsPopup(_viewModel);
+        _popup.Place();
+        if (_popup.Parent is null)
+        {
+            _top = top;
+            _top.PropertyChanged += OnTopChanged;
+            Fit();
+            layer.Children.Add(_popup);
+        }
+    }
+
+    private void HidePopup()
+    {
+        if (_top is not null) _top.PropertyChanged -= OnTopChanged;
+        _top = null;
+        if (_popup?.Parent is Panel panel) panel.Children.Remove(_popup);
+    }
+
+    /// <summary>The window turned, or the keyboard took part of it: the pop-up follows.</summary>
+    private void OnTopChanged(object? sender, AvaloniaPropertyChangedEventArgs e)
+    {
+        if (e.Property == TopLevel.ClientSizeProperty) Fit();
+    }
+
+    private void Fit()
+    {
+        if (_popup is null || _top is null) return;
+        _popup.Width = _top.ClientSize.Width;
+        _popup.Height = _top.ClientSize.Height;
+    }
+
+    /// <summary>A tap on a card (not on a day of its grid, which takes its own taps, nor on a button): mark today.</summary>
     private void Card_Tapped(object? sender, TappedEventArgs e)
     {
         if (e.Handled || sender is not Control { DataContext: HabitCard card }) return;
+        if (e.Source is Visual source && source.FindAncestorOfType<Button>(includeSelf: true) is not null) return;
         e.Handled = true;
         _viewModel.TapCardCommand.Execute(card);
     }

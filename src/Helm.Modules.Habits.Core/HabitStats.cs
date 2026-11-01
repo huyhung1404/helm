@@ -6,14 +6,25 @@ public static class HabitDays
     public static DateOnly Day(DateTimeOffset at, TimeZoneInfo zone) => DateOnly.FromDateTime(TimeZoneInfo.ConvertTime(at, zone).DateTime);
 
     /// <summary>
-    /// Whether a day counts in the statistics: from the day the habit started to yesterday, plus today once it is done
-    /// (an unfinished today never pulls a rate down).
+    /// The last day that can be ticked: today for a habit to build; yesterday for one to quit, since a day is clean only
+    /// once it is over. Everything about a habit (stats, grid, missed days) runs up to this day, as "today" does for a
+    /// habit to build.
     /// </summary>
-    public static bool IsTracked(Habit habit, DateOnly day, DateOnly today, IReadOnlySet<DateOnly> done) =>
-        day >= habit.StartDay && (day < today || (day == today && done.Contains(day)));
+    public static DateOnly ActionDay(Habit habit, DateOnly today) => habit.Kind == HabitKind.Quit ? today.AddDays(-1) : today;
+
+    /// <summary>
+    /// Whether a day counts in the statistics: from the day the habit started to the day before its action day, plus
+    /// the action day once it is done (an unfinished today never pulls a rate down).
+    /// </summary>
+    public static bool IsTracked(Habit habit, DateOnly day, DateOnly actionDay, IReadOnlySet<DateOnly> done) =>
+        day >= habit.StartDay && (day < actionDay || (day == actionDay && done.Contains(day)));
 }
 
-/// <summary>A habit's numbers as of today.</summary>
+/// <summary>
+/// A habit's numbers as of today. <see cref="DoneToday"/> is about the habit's action day (for a habit to quit: whether
+/// yesterday is ticked clean), and the streaks of a habit to quit count clean days. A day done in part counts in full
+/// for the streaks (showing up is what builds a habit) and by its share in the rates (<see cref="Score30"/>).
+/// </summary>
 public sealed record HabitSummary(
     bool DoneToday,
     int CurrentStreak,
@@ -22,48 +33,76 @@ public sealed record HabitSummary(
     int Tracked30,
     int DoneYear,
     int TrackedYear,
-    int MissedRun)
+    int MissedRun,
+    double Score30,
+    double ScoreYear)
 {
-    /// <summary>Share of the last 30 tracked days that were done; null before any day counts.</summary>
-    public double? Rate30 => Tracked30 == 0 ? null : (double)Done30 / Tracked30;
+    /// <summary>How much of the last 30 tracked days was done (a half day is half); null before any day counts.</summary>
+    public double? Rate30 => Tracked30 == 0 ? null : Score30 / Tracked30;
 
-    /// <summary>Share of this year's tracked days that were done; null before any day counts.</summary>
-    public double? RateYear => TrackedYear == 0 ? null : (double)DoneYear / TrackedYear;
+    /// <summary>How much of this year's tracked days was done; null before any day counts.</summary>
+    public double? RateYear => TrackedYear == 0 ? null : ScoreYear / TrackedYear;
 }
 
-/// <summary>Done and tracked days of one month.</summary>
-public sealed record HabitMonth(int Month, int Done, int Tracked)
+/// <summary>Done and tracked days of one month, and how much of them was done (<see cref="Score"/>, a half day is 0.5).</summary>
+public sealed record HabitMonth(int Month, int Done, int Tracked, double Score)
 {
-    public double? Rate => Tracked == 0 ? null : (double)Done / Tracked;
+    public double? Rate => Tracked == 0 ? null : Score / Tracked;
 }
 
-/// <summary>Streaks, rates and the run of missed days, worked out from the done days.</summary>
+/// <summary>Done and tracked days between two days, and how much of the tracked days was done.</summary>
+public readonly record struct HabitCount(int Done, int Tracked, double Score);
+
+/// <summary>
+/// Streaks, rates and the run of missed days, worked out from the done days. Methods that take the habit take the real
+/// today and work up to the habit's action day (<see cref="HabitDays.ActionDay"/>); the others take the day to count to.
+/// The rates weigh each day by its share in <c>percents</c> (a day missing from it, or no percents at all, is a full one).
+/// </summary>
 public static class HabitStats
 {
     public const int RecentDays = 30;
 
-    public static HabitSummary Compute(Habit habit, IReadOnlySet<DateOnly> done, DateOnly today)
+    /// <summary>
+    /// The numbers as of today. With <paramref name="lapses"/>, an action day that has a reason (a habit to quit that
+    /// slipped yesterday) breaks the current streak at once, instead of leaving it open until the day is done.
+    /// </summary>
+    public static HabitSummary Compute(Habit habit, IReadOnlySet<DateOnly> done, DateOnly today, IEnumerable<HabitLapse>? lapses = null,
+        IReadOnlyDictionary<DateOnly, int>? percents = null)
     {
-        var doneToday = done.Contains(today);
-        var (done30, tracked30) = Count(habit, done, today, today.AddDays(-(RecentDays - 1)), today);
-        var (doneYear, trackedYear) = Count(habit, done, today, new DateOnly(today.Year, 1, 1), today);
-        return new HabitSummary(doneToday, CurrentStreak(done, today), LongestStreak(done), done30, tracked30, doneYear, trackedYear, MissedRun(habit, done, today));
+        var last = HabitDays.ActionDay(habit, today);
+        var recent = Count(habit, done, today, last.AddDays(-(RecentDays - 1)), last, percents);
+        var year = Count(habit, done, today, new DateOnly(last.Year, 1, 1), last, percents);
+        var slipped = !done.Contains(last) && lapses is not null && lapses.Any(l => l.From <= last && l.To >= last);
+        return new HabitSummary(done.Contains(last), slipped ? 0 : CurrentStreak(done, last), LongestStreak(done), recent.Done, recent.Tracked, year.Done,
+            year.Tracked, MissedRun(habit, done, today), recent.Score, year.Score);
     }
 
-    /// <summary>Done and tracked days between two days (inclusive).</summary>
-    public static (int Done, int Tracked) Count(Habit habit, IReadOnlySet<DateOnly> done, DateOnly today, DateOnly from, DateOnly to)
+    /// <summary>Done and tracked days between two days (inclusive), and how much of them was done.</summary>
+    public static HabitCount Count(Habit habit, IReadOnlySet<DateOnly> done, DateOnly today, DateOnly from, DateOnly to,
+        IReadOnlyDictionary<DateOnly, int>? percents = null)
     {
+        var last = HabitDays.ActionDay(habit, today);
         int d = 0, t = 0;
+        var score = 0.0;
         for (var day = from; day <= to; day = day.AddDays(1))
         {
-            if (!HabitDays.IsTracked(habit, day, today, done)) continue;
+            if (!HabitDays.IsTracked(habit, day, last, done)) continue;
             t++;
-            if (done.Contains(day)) d++;
+            if (!done.Contains(day)) continue;
+            d++;
+            score += Share(percents, day);
         }
-        return (d, t);
+        return new HabitCount(d, t, score);
     }
 
-    /// <summary>Days in a row up to today, or up to yesterday while today is not done yet (the chain is not broken yet).</summary>
+    /// <summary>How much of a done day was done (0–1): its percent, or all of it when it has none.</summary>
+    public static double Share(IReadOnlyDictionary<DateOnly, int>? percents, DateOnly day) =>
+        percents is not null && percents.TryGetValue(day, out var p) ? HabitLimits.Percent(p) / 100.0 : 1;
+
+    /// <summary>
+    /// Days in a row up to <paramref name="today"/> (a habit's action day), or up to the day before while that day is not
+    /// done yet (the chain is not broken yet).
+    /// </summary>
     public static int CurrentStreak(IReadOnlySet<DateOnly> done, DateOnly today)
     {
         var day = done.Contains(today) ? today : today.AddDays(-1);
@@ -91,39 +130,31 @@ public static class HabitStats
         return best;
     }
 
-    /// <summary>Tracked days in a row not done, ending yesterday (0 when yesterday was done or not tracked).</summary>
+    /// <summary>
+    /// Tracked days in a row not done, ending the day before the action day (yesterday for a habit to build); 0 when
+    /// that day was done or not tracked.
+    /// </summary>
     public static int MissedRun(Habit habit, IReadOnlySet<DateOnly> done, DateOnly today)
     {
         var n = 0;
-        for (var day = today.AddDays(-1); day >= habit.StartDay && !done.Contains(day); day = day.AddDays(-1)) n++;
-        return n;
-    }
-
-    /// <summary>The done days in a row that end on <paramref name="day"/> (0 when it was not done).</summary>
-    public static int RunEndingOn(IReadOnlySet<DateOnly> done, DateOnly day)
-    {
-        var n = 0;
-        while (done.Contains(day))
-        {
-            n++;
-            day = day.AddDays(-1);
-        }
+        for (var day = HabitDays.ActionDay(habit, today).AddDays(-1); day >= habit.StartDay && !done.Contains(day); day = day.AddDays(-1)) n++;
         return n;
     }
 
     /// <summary>The twelve months of a year.</summary>
-    public static IReadOnlyList<HabitMonth> Months(Habit habit, IReadOnlySet<DateOnly> done, DateOnly today, int year) =>
+    public static IReadOnlyList<HabitMonth> Months(Habit habit, IReadOnlySet<DateOnly> done, DateOnly today, int year,
+        IReadOnlyDictionary<DateOnly, int>? percents = null) =>
         Enumerable.Range(1, 12).Select(m =>
         {
             var first = new DateOnly(year, m, 1);
-            var (d, t) = Count(habit, done, today, first, first.AddMonths(1).AddDays(-1));
-            return new HabitMonth(m, d, t);
+            var c = Count(habit, done, today, first, first.AddMonths(1).AddDays(-1), percents);
+            return new HabitMonth(m, c.Done, c.Tracked, c.Score);
         }).ToList();
 }
 
 /// <summary>
 /// The colours of Habits, shared by both apps (ARGB). A card goes from red to green with how often the habit was done
-/// lately; the grid uses GitHub's greens, one set for each theme.
+/// lately; the grid uses GitHub's greens, one pair for each theme, deeper as more of the day was done.
 /// </summary>
 public static class HabitColors
 {
@@ -134,15 +165,24 @@ public static class HabitColors
     /// <summary>A habit with no tracked day yet.</summary>
     public const uint Neutral = 0xFF8B8D98;
 
-    /// <summary>Done days, from a first day to a long run (index = level - 1).</summary>
-    public static readonly uint[] DarkLevels = [0xFF196C2E, 0xFF2EA043, 0xFF3FB950, 0xFF56D364];
+    /// <summary>Done days: the green of a small share (least) blends into the green of all of it (most).</summary>
+    public const uint DarkLeast = 0xFF196C2E;
 
-    public static readonly uint[] LightLevels = [0xFF9BE9A8, 0xFF40C463, 0xFF30A14E, 0xFF216E39];
+    public const uint DarkMost = 0xFF56D364;
+
+    public const uint LightLeast = 0xFF9BE9A8;
+
+    public const uint LightMost = 0xFF216E39;
 
     /// <summary>A tracked day not done.</summary>
     public const uint DarkEmpty = 0x24FFFFFF;
 
     public const uint LightEmpty = 0x1A000000;
+
+    /// <summary>A day a habit to quit slipped (a reason was written for it): a soft red, apart from a day not marked.</summary>
+    public const uint DarkSlipped = 0xA6E5484D;
+
+    public const uint LightSlipped = 0x8CE5484D;
 
     /// <summary>Days that do not count: before the habit started, and the rest of the year.</summary>
     public const uint DarkFaded = 0x0DFFFFFF;
@@ -163,15 +203,12 @@ public static class HabitColors
     /// <summary>"#AARRGGBB", which both XAML dialects read as a brush.</summary>
     public static string Hex(uint argb) => $"#{argb:X8}";
 
-    /// <summary>The green of a done day: deeper as the run that ends on it grows (1, 2-3, 4-6, 7+ days).</summary>
-    public static int Level(int run) => run switch
+    /// <summary>The green of a done day, from <see cref="LightLeast"/> at 1 % to <see cref="LightMost"/> at 100 % (or the dark pair).</summary>
+    public static uint ForPercent(int percent, bool dark)
     {
-        <= 0 => 0,
-        1 => 1,
-        <= 3 => 2,
-        <= 6 => 3,
-        _ => 4,
-    };
+        var t = (Math.Clamp(percent, 1, 100) - 1) / 99.0;
+        return dark ? Blend(DarkLeast, DarkMost, t) : Blend(LightLeast, LightMost, t);
+    }
 
     private static uint Blend(uint a, uint b, double t)
     {

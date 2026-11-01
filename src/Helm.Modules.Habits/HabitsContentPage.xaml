@@ -70,7 +70,16 @@
                     <DockPanel>
                         <ui:SymbolIcon DockPanel.Dock="Right" Symbol="CheckmarkCircle24" Filled="True" FontSize="22" Foreground="{DynamicResource SystemFillColorSuccessBrush}"
                                        Visibility="{Binding IsDone, Converter={StaticResource BoolToVisibility}}" />
+                        <ui:SymbolIcon DockPanel.Dock="Left" Symbol="Prohibited24" FontSize="18" Margin="0,0,8,0" ToolTip="A habit to quit"
+                                       Foreground="{DynamicResource TextFillColorSecondaryBrush}" Visibility="{Binding IsQuit, Converter={StaticResource BoolToVisibility}}" />
                         <TextBlock Text="{Binding Title}" FontSize="16" FontWeight="SemiBold" TextWrapping="Wrap" VerticalAlignment="Center" />
+                    </DockPanel>
+                    <!-- A habit to quit: its clean run, and owning up to a slip yesterday; a habit to build done in part today: its share -->
+                    <DockPanel Margin="0,6,0,0" Visibility="{Binding HasStatus, Converter={StaticResource BoolToVisibility}}">
+                        <ui:Button DockPanel.Dock="Right" Margin="8,0,0,0" Padding="10,4" Content="I slipped" Icon="{ui:SymbolIcon ArrowUndo24}"
+                                   ToolTip="Yesterday was not clean: write what led to it" Visibility="{Binding CanSlip, Converter={StaticResource BoolToVisibility}}"
+                                   Command="{Binding DataContext.SlipCommand, RelativeSource={RelativeSource AncestorType=Page}}" CommandParameter="{Binding}" />
+                        <TextBlock Text="{Binding Status}" Style="{DynamicResource HelmSecondaryText}" TextWrapping="Wrap" VerticalAlignment="Center" />
                     </DockPanel>
                     <self:HabitGrid Margin="0,10,0,0" HorizontalAlignment="Left" Grid="{Binding Grid}"
                                     Command="{Binding DataContext.TapDayCommand, RelativeSource={RelativeSource AncestorType=Page}}" />
@@ -100,26 +109,9 @@
         <ui:InfoBar x:Name="OffBar" Severity="Informational" IsClosable="False" IsOpen="False" Visibility="Collapsed" Margin="0,0,0,12"
                     Title="Habits is turned off" Message="Your habits are kept. Turn Habits on in its settings to tick them off." />
 
+        <!-- Marking a day, the celebration and the reasons are in the pop-up (HabitsPopup) -->
         <StackPanel x:Name="Body">
-            <!-- Days skipped: nothing else until the reason is written -->
-            <Border Style="{DynamicResource HelmSurface}" Padding="20" BorderThickness="2" BorderBrush="{DynamicResource SystemFillColorCautionBrush}"
-                    Visibility="{Binding HasPendingLapse, Converter={StaticResource BoolToVisibility}}">
-                <StackPanel MaxWidth="640" HorizontalAlignment="Left">
-                    <TextBlock Text="{Binding PendingLapse.Heading}" FontSize="20" FontWeight="SemiBold" TextWrapping="Wrap" />
-                    <TextBlock Text="{Binding PendingLapse.Dates}" Margin="0,2,0,0" Style="{DynamicResource HelmSecondaryText}" />
-                    <TextBlock Margin="0,12,0,8" TextWrapping="Wrap"
-                               Text="What got in the way? Be honest: the reason stays with the habit, so you (or an AI agent) can spot the pattern later and plan around it." />
-                    <ui:TextBox x:Name="ReasonBox" MinHeight="80" AcceptsReturn="True" TextWrapping="Wrap" MaxLength="1000" AutomationProperties.Name="Why you skipped it"
-                                PlaceholderText="e.g. Worked late two nights and was too tired" Text="{Binding LapseReason, UpdateSourceTrigger=PropertyChanged}" />
-                    <WrapPanel Margin="0,12,0,0">
-                        <ui:Button Margin="0,0,8,8" Appearance="Primary" Content="Save the reason" Icon="{ui:SymbolIcon Save24}" Command="{Binding SaveReasonCommand}"
-                                   IsEnabled="{Binding CanSaveReason}" />
-                        <ui:Button Margin="0,0,8,8" Content="I did it, I just forgot to tick it" Icon="{ui:SymbolIcon Checkmark24}" Command="{Binding MarkLapseDoneCommand}" />
-                    </WrapPanel>
-                </StackPanel>
-            </Border>
-
-            <StackPanel Visibility="{Binding HasPendingLapse, Converter={StaticResource InverseBoolToVisibility}}">
+            <StackPanel>
                 <!-- Habits, Report -->
                 <WrapPanel Margin="0,0,0,16">
                     <ui:Button Style="{StaticResource Segment}" Margin="0,0,6,0" Tag="{Binding IsHabitsTab}" Content="Habits" Icon="{ui:SymbolIcon CalendarCheckmark24}"
@@ -144,39 +136,19 @@
                         <Image Source="{x:Static self:HabitsLogo.Image}" Width="48" Height="48" Margin="0,0,0,10" />
                         <TextBlock Text="No habits yet" FontSize="18" FontWeight="SemiBold" HorizontalAlignment="Center" />
                         <TextBlock Margin="0,4,0,12" Style="{DynamicResource HelmSecondaryText}" TextWrapping="Wrap" TextAlignment="Center" MaxWidth="460"
-                                   Text="Add the habits you want to build in the settings. Each gets a card here: tap it on the days you do it, and watch the year fill up." />
+                                   Text="Add the habits you want to build (or quit) in the settings. Each gets a card here: tap it on the days you do it, and watch the year fill up." />
                         <ui:Button HorizontalAlignment="Center" Appearance="Primary" Content="Add a habit" Icon="{ui:SymbolIcon Add24}" Click="Settings_Click" />
                     </StackPanel>
                 </Border>
 
                 <!-- The Habits tab -->
                 <StackPanel Visibility="{Binding IsHabitsTab, Converter={StaticResource BoolToVisibility}}">
-                    <!-- Done for today -->
-                    <Grid x:Name="CelebrationPanel" Margin="0,0,0,12" Visibility="{Binding HasCelebration, Converter={StaticResource BoolToVisibility}}">
-                        <Border Style="{DynamicResource HelmSurface}" BorderThickness="2" BorderBrush="{DynamicResource SystemFillColorSuccessBrush}" Padding="20">
-                            <StackPanel HorizontalAlignment="Center" MaxWidth="560">
-                                <Image Source="{x:Static self:HabitsLogo.Image}" Width="48" Height="48" Margin="0,0,0,10" />
-                                <TextBlock Text="{Binding Celebration.Title}" FontSize="24" FontWeight="SemiBold" HorizontalAlignment="Center" TextAlignment="Center" TextWrapping="Wrap" />
-                                <TextBlock Text="{Binding Celebration.Message}" Margin="0,6,0,0" HorizontalAlignment="Center" TextAlignment="Center" TextWrapping="Wrap" />
-                                <ItemsControl ItemsSource="{Binding Celebration.Stats}" Margin="0,10,0,0" Focusable="False" HorizontalAlignment="Center">
-                                    <ItemsControl.ItemTemplate>
-                                        <DataTemplate>
-                                            <TextBlock Text="{Binding}" Style="{DynamicResource HelmSecondaryText}" HorizontalAlignment="Center" TextAlignment="Center" TextWrapping="Wrap" />
-                                        </DataTemplate>
-                                    </ItemsControl.ItemTemplate>
-                                </ItemsControl>
-                                <ui:Button Margin="0,16,0,0" HorizontalAlignment="Center" Content="Close" Command="{Binding DismissCelebrationCommand}" />
-                            </StackPanel>
-                        </Border>
-                        <core:ConfettiView x:Name="Confetti" VerticalAlignment="Stretch" HorizontalAlignment="Stretch" />
-                    </Grid>
-
                     <ItemsControl ItemsSource="{Binding ToDo}" ItemTemplate="{StaticResource CardTemplate}" Focusable="False" />
 
                     <TextBlock Text="Everything is done for today. See you tomorrow!" Margin="0,0,0,12" Style="{DynamicResource HelmSecondaryText}"
                                Visibility="{Binding AllDone, Converter={StaticResource BoolToVisibility}}" />
 
-                    <TextBlock Text="Done today" Style="{DynamicResource HelmSectionHeader}"
+                    <TextBlock Text="Done for today" Style="{DynamicResource HelmSectionHeader}"
                                Visibility="{Binding HasDoneToday, Converter={StaticResource BoolToVisibility}}" />
                     <ItemsControl ItemsSource="{Binding DoneToday}" ItemTemplate="{StaticResource CardTemplate}" Focusable="False" />
                 </StackPanel>
@@ -247,8 +219,8 @@
                             </ItemsControl>
                         </Border>
 
-                        <TextBlock Text="Missed days" Style="{DynamicResource HelmSectionHeader}" />
-                        <TextBlock Text="No missed days that year. Impressive!" Style="{DynamicResource HelmSecondaryText}"
+                        <TextBlock Text="{Binding ReportMissedTitle}" Style="{DynamicResource HelmSectionHeader}" />
+                        <TextBlock Text="{Binding ReportNoMissed}" Style="{DynamicResource HelmSecondaryText}"
                                    Visibility="{Binding HasReportLapses, Converter={StaticResource InverseBoolToVisibility}}" />
                         <ItemsControl ItemsSource="{Binding ReportLapses}" Focusable="False">
                             <ItemsControl.ItemTemplate>

@@ -8,7 +8,10 @@ public enum HabitCheckResult
     Checked,
     AlreadyDone,
 
-    /// <summary>The day is before the habit started or in the future: it is not tracked.</summary>
+    /// <summary>The day was done already; its share changed.</summary>
+    Updated,
+
+    /// <summary>The day is before the habit started or after its action day (today, or yesterday for a habit to quit).</summary>
     NotTracked,
     NotFound,
 }
@@ -89,14 +92,36 @@ public sealed class HabitsStore
         return map.ToDictionary(p => p.Key, p => (IReadOnlySet<DateOnly>)p.Value, StringComparer.Ordinal);
     }
 
+    /// <summary>How much of the habit was done on each day done (1–100).</summary>
+    public IReadOnlyDictionary<DateOnly, int> Percents(string habitId) =>
+        _checks.All().Where(c => c.Value.HabitId == habitId).ToDictionary(c => c.Value.Day, c => HabitLimits.Percent(c.Value.Percent));
+
+    /// <summary>How much of each habit was done on each day done, read in one pass.</summary>
+    public IReadOnlyDictionary<string, IReadOnlyDictionary<DateOnly, int>> AllPercents()
+    {
+        var map = new Dictionary<string, Dictionary<DateOnly, int>>(StringComparer.Ordinal);
+        foreach (var c in _checks.All())
+        {
+            if (!map.TryGetValue(c.Value.HabitId, out var days)) map[c.Value.HabitId] = days = [];
+            days[c.Value.Day] = HabitLimits.Percent(c.Value.Percent);
+        }
+        return map.ToDictionary(p => p.Key, p => (IReadOnlyDictionary<DateOnly, int>)p.Value, StringComparer.Ordinal);
+    }
+
+    /// <summary>How much of the habit was done on a day (1–100), or null when it was not done.</summary>
+    public int? PercentOn(string habitId, DateOnly day) => _checks.Get(CheckId(habitId, day)) is { } c ? HabitLimits.Percent(c.Percent) : null;
+
     /// <summary>The reasons written for missed days (one habit, or all), oldest first.</summary>
     public IReadOnlyList<HabitLapse> Lapses(string? habitId = null) =>
         _lapses.All().Select(l => l.Value).Where(l => habitId is null || l.HabitId == habitId).OrderBy(l => l.From).ThenBy(l => l.WrittenAt).ToList();
 
     // ---- Habits --------------------------------------------------------------------------------------------------
 
-    /// <summary>Creates a habit that starts today; returns its id, or null for an empty title or too many habits.</summary>
-    public string? Add(string title)
+    /// <summary>
+    /// Creates a habit that starts today (a habit to quit: today is its first day, marked clean tomorrow); returns its
+    /// id, or null for an empty title or too many habits.
+    /// </summary>
+    public string? Add(string title, HabitKind kind = HabitKind.Build)
     {
         var clipped = HabitLimits.Clip(title, HabitLimits.Title);
         if (clipped.Length == 0) return null;
@@ -107,6 +132,7 @@ public sealed class HabitsStore
             return _habits.Add(new Habit
             {
                 Title = clipped,
+                Kind = kind,
                 CreatedAt = Now,
                 StartDay = Today,
                 Order = all.Count == 0 ? 0 : all.Max(h => h.Value.Order) + 1,
@@ -162,16 +188,26 @@ public sealed class HabitsStore
 
     // ---- Days ----------------------------------------------------------------------------------------------------
 
-    /// <summary>Marks a day done. Days before the habit started and days after today are not tracked.</summary>
-    public HabitCheckResult Check(string habitId, DateOnly day)
+    /// <summary>
+    /// Marks a day done (for a habit to quit: clean), with how much of it was done (1–100; a habit to quit is always all
+    /// of it). A day done already takes the new share. Days before the habit started and days after its action day are
+    /// not tracked, so today cannot be marked clean while it is not over.
+    /// </summary>
+    public HabitCheckResult Check(string habitId, DateOnly day, int percent = 100)
     {
         lock (_gate)
         {
             if (_habits.Get(habitId) is not { } habit) return HabitCheckResult.NotFound;
-            if (day < habit.StartDay || day > Today) return HabitCheckResult.NotTracked;
+            if (day < habit.StartDay || day > HabitDays.ActionDay(habit, Today)) return HabitCheckResult.NotTracked;
+            var share = habit.Kind == HabitKind.Quit ? 100 : Math.Clamp(percent, 1, 100);
             var id = CheckId(habitId, day);
-            if (_checks.Get(id) is not null) return HabitCheckResult.AlreadyDone;
-            _checks.Upsert(id, new HabitCheck { HabitId = habitId, Day = day, CheckedAt = Now });
+            if (_checks.Get(id) is { } done)
+            {
+                if (HabitLimits.Percent(done.Percent) == share) return HabitCheckResult.AlreadyDone;
+                _checks.Upsert(id, done with { Percent = share });
+                return HabitCheckResult.Updated;
+            }
+            _checks.Upsert(id, new HabitCheck { HabitId = habitId, Day = day, CheckedAt = Now, Percent = share });
             return HabitCheckResult.Checked;
         }
     }

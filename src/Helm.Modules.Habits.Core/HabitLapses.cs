@@ -8,9 +8,9 @@ public sealed record HabitGap(string HabitId, DateOnly From, DateOnly To)
 
 /// <summary>
 /// Finds the runs of missed days the user must explain when they come back: at least <see cref="MinDays"/> tracked days
-/// in a row not done, ending before today, within the last <see cref="LookBackDays"/> days. Days already covered by a
-/// reason (written here or on another device) are left out, so a run that keeps growing asks again only once two more
-/// days are missed.
+/// in a row not done, ending before the habit's action day (today, or yesterday for a habit to quit), within the last
+/// <see cref="LookBackDays"/> days. Days already covered by a reason (written here or on another device) are left out,
+/// so a run that keeps growing asks again only once two more days are missed.
 /// </summary>
 public static class HabitLapses
 {
@@ -24,13 +24,14 @@ public static class HabitLapses
         {
             for (var d = l.From; d <= l.To; d = d.AddDays(1)) covered.Add(d);
         }
-        var start = today.AddDays(-LookBackDays);
+        var last = HabitDays.ActionDay(habit, today);
+        var start = last.AddDays(-LookBackDays);
         if (habit.StartDay > start) start = habit.StartDay;
         var gaps = new List<HabitGap>();
         DateOnly? runStart = null;
-        for (var day = start; day <= today; day = day.AddDays(1))
+        for (var day = start; day <= last; day = day.AddDays(1))
         {
-            var open = day < today && !done.Contains(day) && !covered.Contains(day);
+            var open = day < last && !done.Contains(day) && !covered.Contains(day);
             if (open)
             {
                 runStart ??= day;
@@ -47,6 +48,16 @@ public static class HabitLapses
     }
 
     /// <summary>
+    /// Whether the habit's action day needs nothing more: it is done, it has a reason (a habit to quit that slipped),
+    /// or the habit starts after it (a habit to quit created today).
+    /// </summary>
+    public static bool IsAnswered(Habit habit, IReadOnlySet<DateOnly> done, IEnumerable<HabitLapse> lapses, DateOnly today)
+    {
+        var day = HabitDays.ActionDay(habit, today);
+        return day < habit.StartDay || done.Contains(day) || lapses.Any(l => l.From <= day && l.To >= day);
+    }
+
+    /// <summary>
     /// Every run of missed days in a year (for the report and AI agents), oldest first, each with the reason that covers
     /// it, if any. A run is cut where a reason starts or ends, so a reason never seems to explain days it does not cover.
     /// </summary>
@@ -56,7 +67,10 @@ public static class HabitLapses
         var first = new DateOnly(year, 1, 1);
         if (habit.StartDay > first) first = habit.StartDay;
         var last = new DateOnly(year, 12, 31);
-        if (today.AddDays(-1) < last) last = today.AddDays(-1);
+        // Up to the day before the action day, which can still be done; or up to it once it has a reason (a slip).
+        var actionDay = HabitDays.ActionDay(habit, today);
+        var end = !done.Contains(actionDay) && lapses.Any(l => l.From <= actionDay && l.To >= actionDay) ? actionDay : actionDay.AddDays(-1);
+        if (end < last) last = end;
         DateOnly? runStart = null;
         HabitLapse? runReason = null;
         for (var day = first; day <= last.AddDays(1); day = day.AddDays(1))

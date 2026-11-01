@@ -9,7 +9,7 @@ namespace Helm.Modules.Habits;
 
 /// <summary>
 /// Habits on Android. The data lives in Helm Sync; the module sets the hourly alarm behind the skipped-habit reminder
-/// while the tool is on. Back closes the celebration before leaving the page, and never leaves while a reason for
+/// while the tool is on. Back closes the pop-up before leaving the page, and never leaves while a reason for
 /// skipped days is being asked for.
 /// </summary>
 public sealed class HabitsModule : AndroidModuleBase, IModuleContent, IBackHandler
@@ -78,12 +78,12 @@ public sealed class HabitsModule : AndroidModuleBase, IModuleContent, IBackHandl
         HabitReminders.CheckNow(context);
     }
 
-    /// <summary>Android back: the celebration closes first; a reason still to write keeps the page.</summary>
+    /// <summary>Android back: the pop-up closes first; a reason still to write for skipped days keeps it (and the page).</summary>
     public bool HandleBack()
     {
-        if (_viewModel.HasPendingLapse && IsEnabled) return true;
-        if (!_viewModel.HasCelebration) return false;
-        _viewModel.DismissCelebrationCommand.Execute(null);
+        if (!_viewModel.HasPopup) return false;
+        if (!_viewModel.CanDismissPopup) return IsEnabled;
+        _viewModel.DismissPopupCommand.Execute(null);
         return true;
     }
 }

@@ -1,6 +1,8 @@
 using System.ComponentModel;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Documents;
+using System.Windows.Media;
 using System.Windows.Threading;
 using Helm.Core.Modules;
 using Helm.Core.Services;
@@ -10,8 +12,9 @@ namespace Helm.Modules.Habits;
 /// <summary>
 /// Habits itself, opened from the menu and the Quick access tile (see <see cref="IModuleContent"/>). While the tool is
 /// off the habits stay visible but read-only, with a note pointing to the settings (Home → Utilities). Coming back to
-/// the page (or to the window while it shows) asks for the reason of skipped days; plays the celebrations the view
-/// model asks for.
+/// the page (or to the window while it shows) asks for the reason of skipped days. The view model's pop-up
+/// (<see cref="HabitsPopup"/>) covers the area the page scrolls in, not the menu, so the rest of Helm stays usable; it
+/// plays the celebrations' confetti.
 /// </summary>
 public partial class HabitsContentPage : Page
 {
@@ -20,6 +23,8 @@ public partial class HabitsContentPage : Page
     private readonly IShellNavigation _navigation;
     private readonly DispatcherTimer _clock = new() { Interval = TimeSpan.FromSeconds(60) };
     private Window? _window;
+    private HabitsPopup? _popup;
+    private HabitsPopupAdorner? _adorner;
 
     public HabitsContentPage(HabitsModule module, HabitsViewModel viewModel, IShellNavigation navigation)
     {
@@ -41,9 +46,11 @@ public partial class HabitsContentPage : Page
             _clock.Start();
             _window = Window.GetWindow(this);
             if (_window is not null) _window.Activated += OnWindowActivated;
+            Dispatcher.BeginInvoke(DispatcherPriority.Loaded, UpdatePopup);
         };
         Unloaded += (_, _) =>
         {
+            HidePopup();
             _clock.Stop();
             if (_window is not null) _window.Activated -= OnWindowActivated;
             _window = null;
@@ -61,17 +68,51 @@ public partial class HabitsContentPage : Page
     {
         switch (e.PropertyName)
         {
+            case nameof(HabitsViewModel.HasPopup) or nameof(HabitsViewModel.ShowLapse) or nameof(HabitsViewModel.ShowMark):
+                Dispatcher.BeginInvoke(DispatcherPriority.Loaded, UpdatePopup);
+                break;
             case nameof(HabitsViewModel.Celebration) when _viewModel.Celebration is not null:
                 Dispatcher.BeginInvoke(DispatcherPriority.Loaded, () =>
                 {
-                    CelebrationPanel.BringIntoView();
-                    if (_viewModel.PlayConfetti) Confetti.Play(_viewModel.IsBigCelebration);
+                    if (_viewModel.PlayConfetti) _popup?.PlayConfetti(_viewModel.IsBigCelebration);
                 });
                 break;
-            case nameof(HabitsViewModel.PendingLapse) when _viewModel.PendingLapse is not null:
-                Dispatcher.BeginInvoke(DispatcherPriority.Loaded, () => ReasonBox.Focus());
-                break;
         }
+    }
+
+    /// <summary>Shows the pop-up over the page's scroll area (or the page itself), or takes it away.</summary>
+    private void UpdatePopup()
+    {
+        if (!_viewModel.HasPopup || !IsLoaded)
+        {
+            HidePopup();
+            return;
+        }
+        if (_adorner is null)
+        {
+            UIElement host = FindAncestor<ScrollViewer>(this) ?? (UIElement)this;
+            if (AdornerLayer.GetAdornerLayer(host) is not { } layer) return;
+            _popup ??= new HabitsPopup(_viewModel);
+            _adorner = new HabitsPopupAdorner(host, _popup);
+            layer.Add(_adorner);
+        }
+        _popup?.FocusContent();
+    }
+
+    private void HidePopup()
+    {
+        if (_adorner is null) return;
+        AdornerLayer.GetAdornerLayer(_adorner.AdornedElement)?.Remove(_adorner);
+        _adorner = null;
+    }
+
+    private static T? FindAncestor<T>(DependencyObject child) where T : DependencyObject
+    {
+        for (var p = VisualTreeHelper.GetParent(child); p is not null; p = VisualTreeHelper.GetParent(p))
+        {
+            if (p is T match) return match;
+        }
+        return null;
     }
 
     private void Settings_Click(object sender, RoutedEventArgs e) => _navigation.ShowPage(typeof(HabitsPage));

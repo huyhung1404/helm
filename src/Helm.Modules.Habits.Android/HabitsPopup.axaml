@@ -1,0 +1,99 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:ic="using:FluentIcons.Avalonia"
+             xmlns:core="using:Helm.Core.Ui"
+             xmlns:vm="using:Helm.Modules.Habits"
+             x:Class="Helm.Modules.Habits.HabitsPopup"
+             x:DataType="vm:HabitsViewModel">
+
+    <!-- The pop-up over the whole screen (HabitsContentPage puts it on the overlay layer): marking a day, the celebration,
+         and the reason for skipped days or a slip. A tap on the scrim closes it when the view model allows. -->
+    <UserControl.Styles>
+        <Style Selector="Button.wide">
+            <Setter Property="HorizontalAlignment" Value="Stretch" />
+            <Setter Property="HorizontalContentAlignment" Value="Center" />
+            <Setter Property="VerticalContentAlignment" Value="Center" />
+            <Setter Property="MinHeight" Value="44" />
+        </Style>
+        <!-- A quick share under the slider -->
+        <Style Selector="Button.share">
+            <Setter Property="HorizontalAlignment" Value="Stretch" />
+            <Setter Property="HorizontalContentAlignment" Value="Center" />
+            <Setter Property="VerticalContentAlignment" Value="Center" />
+            <Setter Property="MinHeight" Value="40" />
+            <Setter Property="Margin" Value="3,0" />
+        </Style>
+        <Style Selector="TextBlock.big">
+            <Setter Property="FontSize" Value="20" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+        </Style>
+    </UserControl.Styles>
+
+    <Grid x:Name="Scrim" Background="{DynamicResource HelmScrim}">
+        <Border x:Name="Card" Classes="card" MaxWidth="440" Margin="16" Padding="20" VerticalAlignment="Center" BoxShadow="0 8 32 0 #40000000">
+            <Panel>
+                <!-- Marking a day -->
+                <StackPanel Spacing="10" IsVisible="{Binding ShowMark}">
+                    <TextBlock Text="{Binding Mark.Title, FallbackValue=''}" Classes="big" TextWrapping="Wrap" />
+                    <TextBlock Text="{Binding Mark.DayText, FallbackValue=''}" Classes="secondary" />
+                    <TextBlock Text="{Binding Mark.Question, FallbackValue=''}" TextWrapping="Wrap" />
+                    <StackPanel Spacing="8" IsVisible="{Binding Mark.AsksPercent, FallbackValue=False}">
+                        <TextBlock Text="{Binding Mark.PercentText, FallbackValue=''}" FontSize="40" FontWeight="SemiBold" HorizontalAlignment="Center" />
+                        <Slider Minimum="5" Maximum="100" TickFrequency="5" IsSnapToTickEnabled="True" Value="{Binding Mark.Percent, FallbackValue=100}"
+                                AutomationProperties.Name="How much of it was done" />
+                        <UniformGrid Columns="4">
+                            <Button Classes="share" Content="25%" Command="{Binding SetMarkPercentCommand}" CommandParameter="25" />
+                            <Button Classes="share" Content="50%" Command="{Binding SetMarkPercentCommand}" CommandParameter="50" />
+                            <Button Classes="share" Content="75%" Command="{Binding SetMarkPercentCommand}" CommandParameter="75" />
+                            <Button Classes="share" Content="100%" Command="{Binding SetMarkPercentCommand}" CommandParameter="100" />
+                        </UniformGrid>
+                    </StackPanel>
+                    <Button Classes="accent wide" Margin="0,6,0,0" Command="{Binding SaveMarkCommand}">
+                        <StackPanel Orientation="Horizontal" Spacing="6">
+                            <ic:SymbolIcon Symbol="Checkmark" FontSize="16" VerticalAlignment="Center" />
+                            <TextBlock Text="{Binding Mark.SaveText, FallbackValue=''}" VerticalAlignment="Center" />
+                        </StackPanel>
+                    </Button>
+                    <Button Classes="wide" Content="I slipped" Command="{Binding SlipFromMarkCommand}" IsVisible="{Binding Mark.CanSlip, FallbackValue=False}" />
+                    <Button Classes="wide" Content="{Binding Mark.UnmarkText, FallbackValue=''}" Command="{Binding UnmarkDayCommand}"
+                            IsVisible="{Binding Mark.WasDone, FallbackValue=False}" />
+                    <Button Classes="wide" Content="Cancel" Command="{Binding DismissPopupCommand}" />
+                </StackPanel>
+
+                <!-- Done for the day -->
+                <StackPanel Spacing="6" IsVisible="{Binding ShowCelebration}">
+                    <Image Source="{x:Static vm:HabitsIcon.Image}" Width="48" Height="48" HorizontalAlignment="Center" />
+                    <TextBlock Text="{Binding Celebration.Title, FallbackValue=''}" Classes="big" HorizontalAlignment="Center" TextAlignment="Center" TextWrapping="Wrap" />
+                    <TextBlock Text="{Binding Celebration.Message, FallbackValue=''}" HorizontalAlignment="Center" TextAlignment="Center" TextWrapping="Wrap" />
+                    <ItemsControl ItemsSource="{Binding Celebration.Stats, FallbackValue={x:Null}}" HorizontalAlignment="Center">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate x:DataType="x:String">
+                                <TextBlock Text="{Binding}" Classes="secondary" HorizontalAlignment="Center" TextAlignment="Center" TextWrapping="Wrap" />
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                    <Button Classes="accent wide" Margin="0,8,0,0" Content="Close" Command="{Binding DismissCelebrationCommand}" />
+                </StackPanel>
+
+                <!-- Days skipped, or a slip: nothing else until the reason is written -->
+                <StackPanel Spacing="8" IsVisible="{Binding ShowLapse}">
+                    <TextBlock Text="{Binding PendingLapse.Heading, FallbackValue=''}" Classes="big" TextWrapping="Wrap" />
+                    <TextBlock Text="{Binding PendingLapse.Dates, FallbackValue=''}" Classes="secondary" />
+                    <TextBlock TextWrapping="Wrap" Text="{Binding PendingLapse.Question, FallbackValue=''}" />
+                    <TextBox x:Name="ReasonBox" MinHeight="96" AcceptsReturn="True" TextWrapping="Wrap" MaxLength="1000" AutomationProperties.Name="The reason"
+                             PlaceholderText="{Binding PendingLapse.Placeholder, FallbackValue=''}" Text="{Binding LapseReason}" />
+                    <Button Classes="accent wide" Command="{Binding SaveReasonCommand}" IsEnabled="{Binding CanSaveReason}">
+                        <StackPanel Orientation="Horizontal" Spacing="6">
+                            <ic:SymbolIcon Symbol="Save" FontSize="16" VerticalAlignment="Center" />
+                            <TextBlock Text="Save the reason" VerticalAlignment="Center" />
+                        </StackPanel>
+                    </Button>
+                    <Button Classes="wide" Content="{Binding PendingLapse.DoneText, FallbackValue=''}" Command="{Binding MarkLapseDoneCommand}"
+                            IsVisible="{Binding PendingLapse.CanMarkDone, FallbackValue=False}" />
+                    <Button Classes="wide" Content="Cancel" Command="{Binding CancelSlipCommand}" IsVisible="{Binding PendingLapse.IsSlip, FallbackValue=False}" />
+                </StackPanel>
+            </Panel>
+        </Border>
+        <core:ConfettiView x:Name="Confetti" IsHitTestVisible="False" />
+    </Grid>
+</UserControl>

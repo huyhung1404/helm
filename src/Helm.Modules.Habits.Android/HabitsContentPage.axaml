@@ -1,7 +1,6 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:ic="using:FluentIcons.Avalonia"
-             xmlns:core="using:Helm.Core.Ui"
              xmlns:vm="using:Helm.Modules.Habits"
              x:Class="Helm.Modules.Habits.HabitsContentPage"
              x:DataType="vm:HabitsViewModel">
@@ -54,7 +53,7 @@
     </UserControl.Styles>
 
     <UserControl.Resources>
-        <!-- A habit's card: tap it to tick today, tap a day of the grid to tick that day -->
+        <!-- A habit's card: tap it to mark today, tap a day of the grid (the whole year, in two halves) to mark that day -->
         <DataTemplate x:Key="CardTemplate" x:DataType="vm:HabitCard">
             <Panel Margin="0,0,0,8">
                 <Border Background="{DynamicResource HelmCardBackground}" CornerRadius="8" />
@@ -64,11 +63,18 @@
                         <DockPanel>
                             <ic:SymbolIcon DockPanel.Dock="Right" Symbol="CheckmarkCircle" IconVariant="Filled" FontSize="22" Foreground="{DynamicResource HelmSuccess}"
                                            IsVisible="{Binding IsDone}" />
+                            <ic:SymbolIcon DockPanel.Dock="Left" Symbol="Prohibited" FontSize="18" Margin="0,0,8,0" Foreground="{DynamicResource HelmSecondaryText}"
+                                           IsVisible="{Binding IsQuit}" />
                             <TextBlock Text="{Binding Title}" FontSize="16" FontWeight="SemiBold" TextWrapping="Wrap" VerticalAlignment="Center" />
                         </DockPanel>
-                        <ScrollViewer Classes="grid">
-                            <vm:HabitGrid Grid="{Binding Grid}" Command="{Binding $parent[UserControl].((vm:HabitsViewModel)DataContext).TapDayCommand}" />
-                        </ScrollViewer>
+                        <!-- A habit to quit: its clean run, and owning up to a slip yesterday (the card does not take this tap);
+                             a habit to build done in part today: its share -->
+                        <DockPanel IsVisible="{Binding HasStatus}">
+                            <Button DockPanel.Dock="Right" Margin="8,0,0,0" MinHeight="36" VerticalContentAlignment="Center" Content="I slipped" IsVisible="{Binding CanSlip}"
+                                    Command="{Binding $parent[UserControl].((vm:HabitsViewModel)DataContext).SlipCommand}" CommandParameter="{Binding}" />
+                            <TextBlock Text="{Binding Status}" Classes="secondary" TextWrapping="Wrap" VerticalAlignment="Center" />
+                        </DockPanel>
+                        <vm:HabitGrid Fit="True" Grid="{Binding Grid}" Command="{Binding $parent[UserControl].((vm:HabitsViewModel)DataContext).TapDayCommand}" />
                     </StackPanel>
                 </Border>
             </Panel>
@@ -81,27 +87,9 @@
             <TextBlock Text="Habits is turned off. Your habits are kept; turn it on in its settings to tick them off." TextWrapping="Wrap" />
         </Border>
 
+        <!-- Marking a day, the celebration and the reasons are in the pop-up (HabitsPopup) -->
         <StackPanel x:Name="Body" Spacing="8">
-            <!-- Days skipped: nothing else until the reason is written -->
-            <Border Classes="card" BorderThickness="2" BorderBrush="{DynamicResource SystemAccentColor}" IsVisible="{Binding HasPendingLapse}">
-                <StackPanel Spacing="8">
-                    <TextBlock Text="{Binding PendingLapse.Heading}" Classes="big" TextWrapping="Wrap" />
-                    <TextBlock Text="{Binding PendingLapse.Dates}" Classes="secondary" />
-                    <TextBlock TextWrapping="Wrap"
-                               Text="What got in the way? Be honest: the reason stays with the habit, so you (or an AI agent) can spot the pattern later and plan around it." />
-                    <TextBox x:Name="ReasonBox" MinHeight="96" AcceptsReturn="True" TextWrapping="Wrap" MaxLength="1000" AutomationProperties.Name="Why you skipped it"
-                             PlaceholderText="e.g. Worked late two nights and was too tired" Text="{Binding LapseReason}" />
-                    <Button Classes="accent wide" Command="{Binding SaveReasonCommand}" IsEnabled="{Binding CanSaveReason}">
-                        <StackPanel Orientation="Horizontal" Spacing="6">
-                            <ic:SymbolIcon Symbol="Save" FontSize="16" VerticalAlignment="Center" />
-                            <TextBlock Text="Save the reason" VerticalAlignment="Center" />
-                        </StackPanel>
-                    </Button>
-                    <Button Classes="wide" Content="I did it, I just forgot to tick it" Command="{Binding MarkLapseDoneCommand}" />
-                </StackPanel>
-            </Border>
-
-            <StackPanel Spacing="8" IsVisible="{Binding !HasPendingLapse}">
+            <StackPanel Spacing="8">
                 <!-- Habits, Report -->
                 <Grid ColumnDefinitions="*,4,*">
                     <Button Classes="tab" Classes.accent="{Binding IsHabitsTab}" Command="{Binding ShowHabitsCommand}" AutomationProperties.Name="Habits">
@@ -134,39 +122,19 @@
                         <Image Source="{x:Static vm:HabitsIcon.Image}" Width="44" Height="44" HorizontalAlignment="Center" />
                         <TextBlock Text="No habits yet" Classes="big" HorizontalAlignment="Center" />
                         <TextBlock Classes="secondary" TextWrapping="Wrap" TextAlignment="Center"
-                                   Text="Add the habits you want to build in the settings. Each gets a card here: tap it on the days you do it, and watch the year fill up." />
+                                   Text="Add the habits you want to build (or quit) in the settings. Each gets a card here: tap it on the days you do it, and watch the year fill up." />
                         <Button Classes="accent wide" Content="Add a habit" Click="Settings_Click" />
                     </StackPanel>
                 </Border>
 
                 <!-- The Habits tab -->
                 <StackPanel IsVisible="{Binding IsHabitsTab}">
-                    <!-- Done for today -->
-                    <Panel x:Name="CelebrationPanel" Margin="0,0,0,8" IsVisible="{Binding HasCelebration}">
-                        <Border Classes="card" BorderThickness="2" BorderBrush="{DynamicResource HelmSuccess}">
-                            <StackPanel Spacing="6" HorizontalAlignment="Stretch">
-                                <Image Source="{x:Static vm:HabitsIcon.Image}" Width="44" Height="44" HorizontalAlignment="Center" />
-                                <TextBlock Text="{Binding Celebration.Title}" Classes="big" HorizontalAlignment="Center" TextAlignment="Center" TextWrapping="Wrap" />
-                                <TextBlock Text="{Binding Celebration.Message}" HorizontalAlignment="Center" TextAlignment="Center" TextWrapping="Wrap" />
-                                <ItemsControl ItemsSource="{Binding Celebration.Stats}" HorizontalAlignment="Center">
-                                    <ItemsControl.ItemTemplate>
-                                        <DataTemplate x:DataType="x:String">
-                                            <TextBlock Text="{Binding}" Classes="secondary" HorizontalAlignment="Center" TextAlignment="Center" TextWrapping="Wrap" />
-                                        </DataTemplate>
-                                    </ItemsControl.ItemTemplate>
-                                </ItemsControl>
-                                <Button Classes="wide" Margin="0,6,0,0" Content="Close" Command="{Binding DismissCelebrationCommand}" />
-                            </StackPanel>
-                        </Border>
-                        <core:ConfettiView x:Name="Confetti" />
-                    </Panel>
-
                     <ItemsControl ItemsSource="{Binding ToDo}" ItemTemplate="{StaticResource CardTemplate}" />
 
                     <TextBlock Text="Everything is done for today. See you tomorrow!" Classes="secondary" Margin="0,0,0,8" TextWrapping="Wrap"
                                IsVisible="{Binding AllDone}" />
 
-                    <TextBlock Text="Done today" Classes="section" IsVisible="{Binding HasDoneToday}" />
+                    <TextBlock Text="Done for today" Classes="section" IsVisible="{Binding HasDoneToday}" />
                     <ItemsControl ItemsSource="{Binding DoneToday}" ItemTemplate="{StaticResource CardTemplate}" />
                 </StackPanel>
 
@@ -242,8 +210,8 @@
                             </ItemsControl>
                         </Border>
 
-                        <TextBlock Text="Missed days" Classes="section" />
-                        <TextBlock Text="No missed days that year. Impressive!" Classes="secondary" IsVisible="{Binding !HasReportLapses}" />
+                        <TextBlock Text="{Binding ReportMissedTitle}" Classes="section" />
+                        <TextBlock Text="{Binding ReportNoMissed}" Classes="secondary" IsVisible="{Binding !HasReportLapses}" />
                         <ItemsControl ItemsSource="{Binding ReportLapses}">
                             <ItemsControl.ItemTemplate>
                                 <DataTemplate DataType="vm:HabitLapseRow">

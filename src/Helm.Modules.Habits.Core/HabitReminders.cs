@@ -58,23 +58,34 @@ public sealed class HabitReminderService
         return true;
     }
 
-    /// <summary>One line per habit not done today and skipped for days in a row.</summary>
+    /// <summary>
+    /// One line per habit not done for its action day and skipped for days in a row. A habit to quit is never named: the
+    /// notification can show on a locked screen, and what someone is quitting is private.
+    /// </summary>
     public static HabitReminder? Build(HabitsStore store)
     {
         var today = store.Today;
         var done = store.AllDoneDays();
         var lines = new List<string>();
+        var toBuild = false;
         foreach (var h in store.Habits())
         {
             var days = done.TryGetValue(h.Id, out var d) ? d : new HashSet<DateOnly>();
-            if (days.Contains(today)) continue;
+            if (days.Contains(HabitDays.ActionDay(h.Value, today))) continue;
             var missed = HabitStats.MissedRun(h.Value, days, today);
-            if (missed >= HabitLapses.MinDays) lines.Add($"{h.Value.Title}: skipped for {missed} days");
+            if (missed < HabitLapses.MinDays) continue;
+            if (h.Value.Kind == HabitKind.Quit) lines.Add($"A habit you are quitting: not marked for {missed} days");
+            else
+            {
+                lines.Add($"{h.Value.Title}: skipped for {missed} days");
+                toBuild = true;
+            }
         }
         if (lines.Count == 0) return null;
         var shown = lines.Take(MaxLines).ToList();
         if (lines.Count > MaxLines) shown.Add($"…and {lines.Count - MaxLines} more");
         var title = lines.Count == 1 ? "A habit is slipping" : $"{lines.Count} habits are slipping";
-        return new HabitReminder(lines.Count, title, string.Join("\n", shown) + "\nDo it today to start a new streak.");
+        var footer = toBuild ? "Do it today to start a new streak." : "Open Habits to mark the days you stayed clean.";
+        return new HabitReminder(lines.Count, title, string.Join("\n", shown) + "\n" + footer);
     }
 }

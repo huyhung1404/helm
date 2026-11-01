@@ -8,8 +8,9 @@ namespace Helm.Modules.Habits;
 
 /// <summary>
 /// A habit's year as a GitHub-style contribution grid (<see cref="HabitYearGrid"/>): month names on top, Mon/Wed/Fri on
-/// the left, one rounded square per day. Done days are green (deeper as the run grows), missed days empty, days that do
-/// not count faded, today outlined. The cells grow with the width up to <see cref="MaxCell"/>. Clicking a day runs
+/// the left, one rounded square per day. Done days are green (deeper as more of the day was done), missed days empty,
+/// the slips of a habit to quit soft red, days that do not count faded, today outlined. The cells grow with the width up
+/// to <see cref="MaxCell"/>. Clicking a day runs
 /// <see cref="Command"/> with a <see cref="HabitDayTap"/>; the click stops here, so a card around the grid does not
 /// take it too.
 /// </summary>
@@ -93,9 +94,10 @@ public sealed class HabitGrid : FrameworkElement
             dc.DrawText(text, new Point(0, g.Y(row) + (g.Cell - text.Height) / 2));
         }
 
-        var levels = (dark ? HabitColors.DarkLevels : HabitColors.LightLevels).Select(Frozen).ToArray();
+        var done = new Dictionary<int, SolidColorBrush>();
         var empty = Frozen(dark ? HabitColors.DarkEmpty : HabitColors.LightEmpty);
         var faded = Frozen(dark ? HabitColors.DarkFaded : HabitColors.LightFaded);
+        var slipped = Frozen(dark ? HabitColors.DarkSlipped : HabitColors.LightSlipped);
         var todayPen = new Pen(accent, 1.5);
         todayPen.Freeze();
         var radius = Math.Max(1.5, g.Cell / 5);
@@ -103,8 +105,9 @@ public sealed class HabitGrid : FrameworkElement
         {
             var fill = cell.State switch
             {
-                HabitCellState.Done => levels[Math.Clamp(cell.Level, 1, 4) - 1],
+                HabitCellState.Done => done.TryGetValue(cell.Percent, out var f) ? f : done[cell.Percent] = Frozen(HabitColors.ForPercent(cell.Percent, dark)),
                 HabitCellState.Missed => empty,
+                HabitCellState.Slipped => slipped,
                 _ => faded,
             };
             var rect = new Rect(g.X(cell.Column), g.Y(cell.Row), g.Cell, g.Cell);
@@ -116,7 +119,7 @@ public sealed class HabitGrid : FrameworkElement
     {
         base.OnMouseMove(e);
         var cell = CellAt(e.GetPosition(this));
-        ToolTip = cell is { } c ? Describe(c) : null;
+        ToolTip = cell is { } c && Grid is { } grid ? Describe(c, grid.Kind == HabitKind.Quit) : null;
     }
 
     protected override void OnMouseLeftButtonDown(MouseButtonEventArgs e)
@@ -144,15 +147,16 @@ public sealed class HabitGrid : FrameworkElement
     private HabitGridCell? CellAt(Point p) =>
         Grid is { } grid && _geometry.Hit(p.X, p.Y, grid.Columns) is { } hit ? grid.At(hit.Column, hit.Row) : null;
 
-    private static string Describe(HabitGridCell cell)
+    private static string Describe(HabitGridCell cell, bool quit)
     {
         var day = cell.Day.ToString("ddd d MMM yyyy", CultureInfo.CurrentCulture);
         return cell.State switch
         {
-            HabitCellState.Done => $"{day}: done",
-            HabitCellState.Missed => cell.IsToday ? $"{day}: not done yet" : $"{day}: missed",
+            HabitCellState.Done => quit ? $"{day}: clean" : cell.Percent < 100 ? $"{day}: {cell.Percent}% done" : $"{day}: done",
+            HabitCellState.Missed => quit ? $"{day}: not marked" : cell.IsToday ? $"{day}: not done yet" : $"{day}: missed",
+            HabitCellState.Slipped => $"{day}: slipped",
             HabitCellState.BeforeStart => $"{day}: before the habit started",
-            _ => day,
+            _ => quit && cell.IsToday ? $"{day}: today, to mark clean tomorrow" : day,
         };
     }
 

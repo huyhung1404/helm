@@ -42,6 +42,15 @@ public sealed class HabitsTests : IDisposable
         return id;
     }
 
+    /// <summary>A habit to quit created on <paramref name="start"/> (the clock stays at <see cref="T0"/>).</summary>
+    private string NewQuit(string title, DateOnly start)
+    {
+        _time.Now = new DateTimeOffset(start.ToDateTime(new TimeOnly(8, 0)), TimeSpan.Zero);
+        var id = _store.Add(title, HabitKind.Quit)!;
+        _time.Now = T0;
+        return id;
+    }
+
     private void Done(string id, params DateOnly[] days)
     {
         foreach (var d in days) Assert.Equal(HabitCheckResult.Checked, _store.Check(id, d));
@@ -177,8 +186,8 @@ public sealed class HabitsTests : IDisposable
 
         Assert.Equal(12, months.Count);
         Assert.Null(months[7].Rate);
-        Assert.Equal(new HabitMonth(9, 2, 15), months[8]);
-        Assert.Equal(new HabitMonth(10, 1, 29), months[9]);
+        Assert.Equal(new HabitMonth(9, 2, 15, 2), months[8]);
+        Assert.Equal(new HabitMonth(10, 1, 29, 1), months[9]);
         Assert.Equal(0, months[10].Tracked);
     }
 
@@ -194,7 +203,10 @@ public sealed class HabitsTests : IDisposable
         Assert.NotEqual(HabitColors.Green, between);
         Assert.Equal("#1C30A46C", HabitColors.Hex(HabitColors.WithAlpha(HabitColors.Green, 0x1C)));
 
-        Assert.Equal([0, 1, 2, 2, 3, 3, 3, 4, 4], Enumerable.Range(0, 9).Select(HabitColors.Level));
+        Assert.Equal(HabitColors.LightLeast, HabitColors.ForPercent(1, dark: false));
+        Assert.Equal(HabitColors.DarkMost, HabitColors.ForPercent(100, dark: true));
+        Assert.Equal(HabitColors.LightMost, HabitColors.ForPercent(250, dark: false));
+        Assert.NotEqual(HabitColors.ForPercent(40, dark: false), HabitColors.ForPercent(60, dark: false));
     }
 
     // ---- The year grid -------------------------------------------------------------------------------------------
@@ -218,8 +230,8 @@ public sealed class HabitsTests : IDisposable
         Assert.Equal(HabitCellState.BeforeStart, Cell(D(10, 19)).State);
         Assert.Equal(HabitCellState.Missed, Cell(D(10, 20)).State);
         Assert.Equal(HabitCellState.Done, Cell(D(10, 21)).State);
-        Assert.Equal(1, Cell(D(10, 21)).Level);
-        Assert.Equal(2, Cell(D(10, 22)).Level);
+        Assert.Equal(100, Cell(D(10, 21)).Percent);
+        Assert.Equal(0, Cell(D(10, 20)).Percent);
         Assert.Equal(HabitCellState.Missed, Cell(Today).State);
         Assert.True(Cell(Today).IsToday);
         Assert.Equal(HabitCellState.Future, Cell(D(10, 31)).State);
@@ -237,6 +249,33 @@ public sealed class HabitsTests : IDisposable
 
         Assert.Equal(columns, grid.Columns);
         Assert.Equal(DateTime.IsLeapYear(year) ? 366 : 365, grid.Cells.Count);
+    }
+
+    [Fact]
+    public void On_a_phone_the_year_fits_in_two_half_year_bands()
+    {
+        var grid = HabitYearGrid.Build("h", new Habit { Title = "Read", StartDay = D(1, 1) }, Days(), Today, 2026);
+
+        var bands = HabitGridBands.Fit(330, grid, 4, 16);
+
+        // 2026-07-01 is in week 26: 26 weeks on top, 27 below.
+        Assert.Equal(26, bands.Split);
+        Assert.Equal(27, bands.Widest);
+        Assert.True(bands.Width <= 330);
+        Assert.InRange(bands.Cell, 9, 12);
+        var aug = (HabitYearGrid.Column(D(8, 3)), HabitYearGrid.Row(D(8, 3)));
+        Assert.Equal(1, bands.Band(aug.Item1));
+        Assert.Equal(aug, bands.Hit(bands.X(aug.Item1) + 1, bands.Y(aug.Item1, aug.Item2) + 1));
+        var jan = HabitYearGrid.Column(D(1, 5));
+        Assert.Equal((jan, 0), bands.Hit(bands.X(jan) + 1, bands.Y(jan, 0) + 1));
+        // A phone held upright needs the two bands; sideways (or a tablet) the year fits in one.
+        Assert.False(HabitGridGeometry.FitsOneBand(330, grid.Columns, 9));
+        Assert.True(HabitGridGeometry.FitsOneBand(840, grid.Columns, 9));
+        Assert.False(HabitGridGeometry.FitsOneBand(double.PositiveInfinity, grid.Columns, 9));
+
+        // The month names are not days.
+        Assert.Null(bands.Hit(5, 2));
+        Assert.Null(bands.Hit(5, bands.BandHeight + HabitGridBands.BandGap + 2));
     }
 
     [Fact]
@@ -345,50 +384,106 @@ public sealed class HabitsTests : IDisposable
         new(_store, _settings, new InlineUi(), dialogs ?? new AcceptDialogs(), new HabitReminderService(_store, _settings), NullLogger<HabitsViewModel>.Instance);
 
     [Fact]
-    public async Task Tapping_a_card_asks_then_ticks_today_moves_it_down_and_celebrates()
+    public void Tapping_a_card_opens_the_pop_up_then_saving_ticks_today_moves_it_down_and_celebrates()
     {
         var read = NewHabit("Read", D(10, 20));
-        var run = NewHabit("Run", D(10, 20));
+        NewHabit("Run", D(10, 20));
         Done(read, D(10, 28), D(10, 29));
         var vm = ViewModel();
         var big = new List<bool>();
         vm.Celebrated += (_, b) => big.Add(b);
 
         Assert.Equal(["Read", "Run"], vm.ToDo.Select(c => c.Title));
-        await vm.TapCardCommand.ExecuteAsync(vm.ToDo[0]);
+        vm.TapCardCommand.Execute(vm.ToDo[0]);
+
+        Assert.True(vm.ShowMark);
+        Assert.Equal((read, Today, 100, false), (vm.Mark!.HabitId, vm.Mark.Day, vm.Mark.Value, vm.Mark.WasDone));
+        Assert.Equal("Today", vm.Mark.DayText);
+        Assert.False(_store.IsDone(read, Today));
+        vm.SaveMarkCommand.Execute(null);
 
         Assert.True(_store.IsDone(read, Today));
         Assert.Equal(["Run"], vm.ToDo.Select(c => c.Title));
         Assert.Equal(["Read"], vm.DoneToday.Select(c => c.Title));
-        Assert.True(vm.HasCelebration);
+        Assert.True(vm.ShowCelebration);
+        Assert.Null(vm.Mark);
         Assert.Contains("3 days in a row", vm.Celebration!.Message);
         Assert.Equal([false], big);
 
-        // The last habit of the day is a big one.
-        await vm.TapCardCommand.ExecuteAsync(vm.ToDo[0]);
+        // While the pop-up is open the cards do nothing; the last habit of the day is a big one.
+        vm.TapCardCommand.Execute(vm.ToDo[0]);
+        Assert.Null(vm.Mark);
+        vm.DismissPopupCommand.Execute(null);
+        Assert.False(vm.HasPopup);
+        vm.TapCardCommand.Execute(vm.ToDo[0]);
+        vm.SaveMarkCommand.Execute(null);
         Assert.True(vm.AllDone);
         Assert.Equal([false, true], big);
     }
 
     [Fact]
-    public async Task Saying_no_changes_nothing_and_a_done_card_can_be_undone()
+    public void Closing_the_pop_up_changes_nothing_and_a_done_card_can_be_undone()
     {
         var read = NewHabit("Read", D(10, 20));
-        var vm = ViewModel(new RefuseDialogs());
+        var vm = ViewModel();
 
-        await vm.TapCardCommand.ExecuteAsync(vm.ToDo[0]);
+        vm.TapCardCommand.Execute(vm.ToDo[0]);
+        vm.DismissPopupCommand.Execute(null);
+        Assert.False(vm.HasPopup);
         Assert.False(_store.IsDone(read, Today));
-        Assert.False(vm.HasCelebration);
 
-        vm = ViewModel();
-        await vm.TapCardCommand.ExecuteAsync(vm.ToDo[0]);
-        await vm.TapCardCommand.ExecuteAsync(vm.DoneToday[0]);
+        vm.TapCardCommand.Execute(vm.ToDo[0]);
+        vm.SaveMarkCommand.Execute(null);
+        vm.DismissCelebrationCommand.Execute(null);
+        vm.TapCardCommand.Execute(vm.DoneToday[0]);
+        Assert.True(vm.Mark!.WasDone);
+        vm.UnmarkDayCommand.Execute(null);
         Assert.False(_store.IsDone(read, Today));
+        Assert.False(vm.HasPopup);
         Assert.Single(vm.ToDo);
     }
 
     [Fact]
-    public async Task A_week_in_a_row_is_a_big_celebration()
+    public void A_day_done_in_part_counts_for_the_streak_by_its_share_for_the_rate_and_in_a_paler_green()
+    {
+        var read = NewHabit("Read", D(10, 27));
+        Done(read, D(10, 27), D(10, 28), D(10, 29));
+        var vm = ViewModel();
+
+        vm.TapCardCommand.Execute(vm.ToDo[0]);
+        vm.SetMarkPercentCommand.Execute("50");
+        Assert.Equal("50%", vm.Mark!.PercentText);
+        vm.Mark.Percent = 41.7; // the slider snaps to 5s, but anything is rounded
+        vm.SaveMarkCommand.Execute(null);
+
+        Assert.Equal(42, _store.PercentOn(read, Today));
+        Assert.Contains("4 days in a row", vm.Celebration!.Message);
+        Assert.Contains(vm.Celebration.Stats, s => s.StartsWith("Today: 42%", StringComparison.Ordinal));
+        var card = Assert.Single(vm.DoneToday);
+        Assert.Equal("Today: 42% done", card.Status);
+        var cell = card.Grid!.Cells.Single(c => c.Day == Today);
+        Assert.Equal(42, cell.Percent);
+        Assert.Equal(100, card.Grid.Cells.Single(c => c.Day == D(10, 29)).Percent);
+
+        // Three full days and 0.42 of one: 86 % (not 100).
+        var s = HabitStats.Compute(_store.Get(read)!, _store.DoneDays(read), Today, percents: _store.Percents(read));
+        Assert.Equal(3.42 / 4, s.Rate30!.Value, 6);
+        Assert.Equal(4, s.CurrentStreak);
+
+        // Opened again, the pop-up shows the share and saves a new one.
+        vm.DismissPopupCommand.Execute(null);
+        vm.TapCardCommand.Execute(card);
+        Assert.Equal(42, vm.Mark!.Value);
+        Assert.Equal("Save", vm.Mark.SaveText);
+        vm.SetMarkPercentCommand.Execute("100");
+        vm.SaveMarkCommand.Execute(null);
+        Assert.Equal(100, _store.PercentOn(read, Today));
+        Assert.False(vm.HasCelebration);
+        Assert.Equal("", card.Status);
+    }
+
+    [Fact]
+    public void A_week_in_a_row_is_a_big_celebration()
     {
         var read = NewHabit("Read", D(10, 1));
         NewHabit("Run", D(10, 1));
@@ -397,7 +492,8 @@ public sealed class HabitsTests : IDisposable
         var big = new List<bool>();
         vm.Celebrated += (_, b) => big.Add(b);
 
-        await vm.TapCardCommand.ExecuteAsync(vm.ToDo.First(c => c.Title == "Read"));
+        vm.TapCardCommand.Execute(vm.ToDo.First(c => c.Title == "Read"));
+        vm.SaveMarkCommand.Execute(null);
 
         Assert.Equal([true], big);
         Assert.True(vm.IsBigCelebration);
@@ -405,41 +501,49 @@ public sealed class HabitsTests : IDisposable
     }
 
     [Fact]
-    public async Task A_past_day_on_the_grid_can_be_ticked_or_unticked_but_not_one_before_the_start()
+    public void A_past_day_on_the_grid_can_be_ticked_or_unticked_but_not_one_before_the_start()
     {
         var read = NewHabit("Read", D(10, 20));
         var vm = ViewModel();
 
-        await vm.TapDayCommand.ExecuteAsync(new HabitDayTap(read, D(10, 22)));
+        vm.TapDayCommand.Execute(new HabitDayTap(read, D(10, 22)));
+        Assert.Equal(D(10, 22).ToString("ddd d MMM", System.Globalization.CultureInfo.CurrentCulture), vm.Mark!.DayText);
+        vm.SaveMarkCommand.Execute(null);
         Assert.True(_store.IsDone(read, D(10, 22)));
         Assert.False(vm.HasCelebration);
+        Assert.False(vm.HasPopup);
 
-        await vm.TapDayCommand.ExecuteAsync(new HabitDayTap(read, D(10, 22)));
+        vm.TapDayCommand.Execute(new HabitDayTap(read, D(10, 22)));
+        vm.UnmarkDayCommand.Execute(null);
         Assert.False(_store.IsDone(read, D(10, 22)));
 
-        await vm.TapDayCommand.ExecuteAsync(new HabitDayTap(read, D(10, 10)));
-        Assert.Empty(_checks.All());
+        vm.TapDayCommand.Execute(new HabitDayTap(read, D(10, 10)));
+        Assert.False(vm.HasPopup);
         Assert.Contains("do not count", vm.Message);
 
-        await vm.TapDayCommand.ExecuteAsync(new HabitDayTap(read, Today));
+        vm.TapDayCommand.Execute(new HabitDayTap(read, Today));
+        vm.SaveMarkCommand.Execute(null);
         Assert.True(vm.HasCelebration);
     }
 
     [Fact]
-    public async Task Skipped_days_must_be_explained_before_going_on()
+    public void Skipped_days_must_be_explained_before_going_on()
     {
         var read = NewHabit("Read", D(10, 20));
         Done(read, D(10, 20), D(10, 21), D(10, 22), D(10, 23), D(10, 24), D(10, 25));
         var vm = ViewModel();
 
         vm.CheckLapses();
-        Assert.True(vm.HasPendingLapse);
+        Assert.True(vm.ShowLapse);
+        Assert.False(vm.CanDismissPopup);
         Assert.Equal(new HabitGap(read, D(10, 26), D(10, 29)), vm.PendingLapse!.Gap);
         Assert.Contains("for 4 days", vm.PendingLapse.Heading);
 
-        // Nothing else works meanwhile, and an empty reason does not count.
-        await vm.TapCardCommand.ExecuteAsync(vm.ToDo[0]);
-        Assert.False(_store.IsDone(read, Today));
+        // Nothing else works meanwhile, closing does not either, and an empty reason does not count.
+        vm.TapCardCommand.Execute(vm.ToDo[0]);
+        Assert.Null(vm.Mark);
+        vm.DismissPopupCommand.Execute(null);
+        Assert.True(vm.ShowLapse);
         vm.LapseReason = "   ";
         Assert.False(vm.CanSaveReason);
         vm.SaveReasonCommand.Execute(null);
@@ -449,6 +553,7 @@ public sealed class HabitsTests : IDisposable
         vm.SaveReasonCommand.Execute(null);
 
         Assert.False(vm.HasPendingLapse);
+        Assert.False(vm.HasPopup);
         var lapse = Assert.Single(_store.Lapses(read));
         Assert.Equal((D(10, 26), D(10, 29), "Night shifts all week"), (lapse.From, lapse.To, lapse.Reason));
         vm.CheckLapses();
@@ -456,14 +561,14 @@ public sealed class HabitsTests : IDisposable
     }
 
     [Fact]
-    public async Task Days_done_but_not_ticked_can_be_ticked_instead_of_explained()
+    public void Days_done_but_not_ticked_can_be_ticked_instead_of_explained()
     {
         var read = NewHabit("Read", D(10, 25));
         Done(read, D(10, 25));
         var vm = ViewModel();
         vm.CheckLapses();
 
-        await vm.MarkLapseDoneCommand.ExecuteAsync(null);
+        vm.MarkLapseDoneCommand.Execute(null);
 
         Assert.False(vm.HasPendingLapse);
         Assert.Equal(5, _store.DoneDays(read).Count);
@@ -535,7 +640,283 @@ public sealed class HabitsTests : IDisposable
         Assert.Single(vm.ToDo);
     }
 
+    // ---- Habits to quit ------------------------------------------------------------------------------------------
+
+    [Fact]
+    public void A_habit_to_quit_is_marked_the_day_after_and_never_for_today()
+    {
+        var smoking = NewQuit("Smoking", D(10, 20));
+
+        Assert.Equal(HabitKind.Quit, _store.Get(smoking)!.Kind);
+        Assert.Equal(HabitCheckResult.NotTracked, _store.Check(smoking, Today));
+        Assert.Equal(HabitCheckResult.NotTracked, _store.Check(smoking, D(10, 19)));
+        Assert.Equal(HabitCheckResult.Checked, _store.Check(smoking, D(10, 29)));
+
+        // Renaming or moving keeps the kind.
+        Assert.True(_store.Rename(smoking, "No smoking"));
+        NewHabit("Read", D(10, 20));
+        Assert.True(_store.Move(smoking, 1));
+        Assert.Equal(HabitKind.Quit, _store.Get(smoking)!.Kind);
+    }
+
+    [Fact]
+    public void A_habit_from_an_older_app_is_one_to_build_and_the_kind_survives_sync()
+    {
+        var old = System.Text.Json.JsonSerializer.Deserialize<Habit>("""{"title":"Read","startDay":"2026-10-01"}""", HelmJson.Options)!;
+        Assert.Equal(HabitKind.Build, old.Kind);
+
+        var json = System.Text.Json.JsonSerializer.Serialize(new Habit { Title = "Smoking", Kind = HabitKind.Quit }, HelmJson.Options);
+        Assert.Equal(HabitKind.Quit, System.Text.Json.JsonSerializer.Deserialize<Habit>(json, HelmJson.Options)!.Kind);
+
+        // A day ticked before shares were kept was done in full.
+        var read = NewHabit("Read", D(10, 20));
+        _checks.SetRemote(HabitsStore.CheckId(read, D(10, 21)), new HabitCheck { HabitId = read, Day = D(10, 21) });
+        Assert.Equal(100, _store.PercentOn(read, D(10, 21)));
+        Assert.Equal(100, _store.Percents(read)[D(10, 21)]);
+        Assert.Equal(HabitCheckResult.AlreadyDone, _store.Check(read, D(10, 21)));
+        Assert.Equal(HabitCheckResult.Updated, _store.Check(read, D(10, 21), 30));
+        Assert.Equal(30, _store.PercentOn(read, D(10, 21)));
+    }
+
+    [Fact]
+    public void The_numbers_of_a_habit_to_quit_run_to_yesterday()
+    {
+        var habit = new Habit { Title = "Smoking", Kind = HabitKind.Quit, StartDay = D(10, 21) };
+        // 21–29 can be marked (9 days); the 24th is not.
+        var done = Days(D(10, 21), D(10, 22), D(10, 23), D(10, 25), D(10, 26), D(10, 27), D(10, 28), D(10, 29));
+
+        var s = HabitStats.Compute(habit, done, Today);
+        Assert.True(s.DoneToday);
+        Assert.Equal(5, s.CurrentStreak);
+        Assert.Equal(9, s.Tracked30);
+        Assert.Equal(8, s.Done30);
+        Assert.Equal(0, s.MissedRun);
+
+        // Yesterday not marked yet: the run is not broken, and the day does not count yet.
+        done.Remove(D(10, 29));
+        s = HabitStats.Compute(habit, done, Today);
+        Assert.False(s.DoneToday);
+        Assert.Equal(4, s.CurrentStreak);
+        Assert.Equal(8, s.Tracked30);
+
+        // A slip written for yesterday breaks it at once.
+        var slip = new HabitLapse { HabitId = "h", From = D(10, 29), To = D(10, 29), Reason = "Party" };
+        Assert.Equal(0, HabitStats.Compute(habit, done, Today, [slip]).CurrentStreak);
+
+        var grid = HabitYearGrid.Build("h", habit, done, Today, 2026, [slip]);
+        Assert.Equal(HabitKind.Quit, grid.Kind);
+        Assert.Equal(HabitCellState.Slipped, grid.Cells.Single(c => c.Day == D(10, 29)).State);
+        Assert.Equal(HabitCellState.Missed, grid.Cells.Single(c => c.Day == D(10, 24)).State);
+        var today = grid.Cells.Single(c => c.Day == Today);
+        Assert.Equal(HabitCellState.Future, today.State);
+        Assert.True(today.IsToday);
+    }
+
+    [Fact]
+    public void A_habit_to_quit_created_today_has_nothing_to_mark_until_tomorrow()
+    {
+        var vm = ViewModel();
+        vm.NewHabitTitle = "Smoking";
+        vm.NewHabitIsQuit = true;
+        vm.AddHabitCommand.Execute(null);
+
+        Assert.False(vm.NewHabitIsQuit);
+        Assert.Contains("tomorrow", vm.Message);
+        Assert.Empty(vm.ToDo);
+        var card = Assert.Single(vm.DoneToday);
+        Assert.True(card.IsQuit);
+        Assert.False(card.CanSlip);
+        Assert.Contains("day one", card.Status);
+        Assert.StartsWith("To quit", vm.ManageHabits[0].Detail);
+
+        vm.TapCardCommand.Execute(card);
+        Assert.False(vm.HasPopup);
+        Assert.Empty(_checks.All());
+        Assert.Contains("tomorrow", vm.Message);
+    }
+
+    [Fact]
+    public void Tapping_a_card_to_quit_asks_about_yesterday_and_celebrates_a_clean_day()
+    {
+        var smoking = NewQuit("Smoking", D(10, 27));
+        Done(smoking, D(10, 27), D(10, 28));
+        var vm = ViewModel();
+
+        var card = Assert.Single(vm.ToDo);
+        Assert.True(card.CanSlip);
+        Assert.Equal("2 clean days in a row · was yesterday clean?", card.Status);
+
+        vm.TapCardCommand.Execute(card);
+        // No share for a habit to quit: clean, or a slip.
+        Assert.Equal((D(10, 29), false, true), (vm.Mark!.Day, vm.Mark.AsksPercent, vm.Mark.CanSlip));
+        Assert.StartsWith("Yesterday, ", vm.Mark.DayText);
+        Assert.Contains("all of yesterday", vm.Mark.Question);
+        vm.SaveMarkCommand.Execute(null);
+
+        Assert.True(_store.IsDone(smoking, D(10, 29)));
+        Assert.Equal(100, _store.PercentOn(smoking, D(10, 29)));
+        Assert.False(_store.IsDone(smoking, Today));
+        Assert.Same(card, Assert.Single(vm.DoneToday));
+        Assert.False(card.CanSlip);
+        Assert.Equal("3 clean days in a row", card.Status);
+        Assert.Contains("a clean day", vm.Celebration!.Title);
+        Assert.Contains("3 clean days in a row", vm.Celebration.Message);
+
+        // Undone: yesterday is open again, and "I slipped" from the pop-up asks for the reason.
+        vm.DismissPopupCommand.Execute(null);
+        vm.TapCardCommand.Execute(card);
+        Assert.False(vm.Mark!.CanSlip);
+        vm.UnmarkDayCommand.Execute(null);
+        Assert.False(_store.IsDone(smoking, D(10, 29)));
+        Assert.Single(vm.ToDo);
+
+        vm.TapCardCommand.Execute(card);
+        vm.SlipFromMarkCommand.Execute(null);
+        Assert.Null(vm.Mark);
+        Assert.True(vm.ShowLapse);
+        Assert.True(vm.PendingLapse!.IsSlip);
+        Assert.True(vm.CanDismissPopup);
+        // Closing a slip takes it back.
+        vm.DismissPopupCommand.Execute(null);
+        Assert.False(vm.HasPopup);
+        Assert.Empty(_store.Lapses());
+    }
+
+    [Fact]
+    public void Owning_up_to_a_slip_needs_a_reason_and_starts_the_run_again()
+    {
+        var smoking = NewQuit("Smoking", D(10, 25));
+        Done(smoking, D(10, 25), D(10, 26), D(10, 27), D(10, 28));
+        var vm = ViewModel();
+
+        vm.SlipCommand.Execute(vm.ToDo[0]);
+        Assert.True(vm.PendingLapse!.IsSlip);
+        Assert.False(vm.PendingLapse.CanMarkDone);
+        Assert.Equal(new HabitGap(smoking, D(10, 29), D(10, 29)), vm.PendingLapse.Gap);
+        // Coming back to the page keeps it; taking it back writes nothing.
+        vm.CheckLapses();
+        Assert.True(vm.PendingLapse!.IsSlip);
+        vm.CancelSlipCommand.Execute(null);
+        Assert.False(vm.HasPendingLapse);
+        Assert.Empty(_store.Lapses());
+
+        vm.SlipCommand.Execute(vm.ToDo[0]);
+        vm.LapseReason = "A party where everyone smoked";
+        vm.SaveReasonCommand.Execute(null);
+
+        Assert.False(vm.HasPendingLapse);
+        Assert.Contains("slip", vm.Message);
+        var lapse = Assert.Single(_store.Lapses(smoking));
+        Assert.Equal((D(10, 29), D(10, 29)), (lapse.From, lapse.To));
+        var card = Assert.Single(vm.DoneToday);
+        Assert.False(card.CanSlip);
+        Assert.StartsWith("Slipped yesterday", card.Status);
+        Assert.Equal(HabitCellState.Slipped, card.Grid!.Cells.Single(c => c.Day == D(10, 29)).State);
+
+        // The report has the slip right away, and the run is back to zero.
+        Assert.Equal("0 clean days", vm.ReportStreak);
+        Assert.Equal("Slips and days not marked", vm.ReportMissedTitle);
+        Assert.Equal("A party where everyone smoked", vm.ReportLapses[0].Reason);
+    }
+
+    [Fact]
+    public void Days_to_quit_not_marked_ask_about_slips_or_can_be_marked_clean()
+    {
+        var smoking = NewQuit("Smoking", D(10, 20));
+        Done(smoking, D(10, 20), D(10, 21), D(10, 22), D(10, 23), D(10, 24), D(10, 25));
+        var vm = ViewModel();
+
+        vm.CheckLapses();
+        // Yesterday is still to mark, so the run ends the day before.
+        Assert.Equal(new HabitGap(smoking, D(10, 26), D(10, 28)), vm.PendingLapse!.Gap);
+        Assert.Contains("3 days not marked", vm.PendingLapse.Heading);
+        Assert.Contains("stayed clean", vm.PendingLapse.DoneText);
+        Assert.True(vm.PendingLapse.CanMarkDone);
+
+        vm.MarkLapseDoneCommand.Execute(null);
+
+        Assert.False(vm.HasPendingLapse);
+        Assert.Equal(9, _store.DoneDays(smoking).Count);
+        Assert.False(_store.IsDone(smoking, D(10, 29)));
+        Assert.Single(vm.ToDo);
+    }
+
+    [Fact]
+    public void The_reminder_never_names_a_habit_to_quit()
+    {
+        var porn = NewQuit("Watching porn", D(10, 1));
+        Done(porn, D(10, 26));
+
+        var reminder = HabitReminderService.Build(_store)!;
+
+        Assert.DoesNotContain("porn", reminder.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("porn", reminder.Title, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("A habit you are quitting: not marked for 2 days", reminder.Message);
+        Assert.Contains("Open Habits", reminder.Message);
+
+        // Yesterday marked clean: nothing to remind about.
+        Done(porn, D(10, 29));
+        Assert.Null(HabitReminderService.Build(_store));
+    }
+
+    [Fact]
+    public async Task Agents_see_a_habit_to_quit_and_mark_only_days_that_are_over()
+    {
+        var smoking = NewQuit("Smoking", D(10, 25));
+        Done(smoking, D(10, 25), D(10, 26), D(10, 27), D(10, 28));
+        var server = new McpServer(new HabitsMcpTools(_store).Tools.ToList(), "0.70.0", McpEndpoint.Instructions);
+
+        var (error, text) = await Call(server, "habits_list", []);
+        Assert.False(error);
+        var habit = JsonNode.Parse(text)!["habits"]![0]!;
+        Assert.Equal("quit", habit["kind"]!.GetValue<string>());
+        Assert.False(habit["cleanYesterday"]!.GetValue<bool>());
+        Assert.Null(habit["doneToday"]);
+        Assert.Equal(4, habit["currentStreak"]!.GetValue<int>());
+
+        (error, text) = await Call(server, "habit_check", new JsonObject { ["habit"] = "smoking" });
+        Assert.False(error);
+        Assert.Equal("clean", JsonNode.Parse(text)!["result"]!.GetValue<string>());
+        Assert.True(_store.IsDone(smoking, D(10, 29)));
+
+        (error, text) = await Call(server, "habit_check", new JsonObject { ["habit"] = smoking, ["day"] = "2026-10-30" });
+        Assert.True(error);
+        Assert.Contains("yesterday", text);
+
+        (error, text) = await Call(server, "habit_report", new JsonObject { ["habit"] = smoking });
+        Assert.False(error);
+        Assert.Equal("quit", JsonNode.Parse(text)!["kind"]!.GetValue<string>());
+        Assert.Equal(5, JsonNode.Parse(text)!["currentStreak"]!.GetValue<int>());
+    }
+
     // ---- MCP -----------------------------------------------------------------------------------------------------
+
+    [Fact]
+    public async Task Agents_can_tick_a_day_in_part()
+    {
+        var read = NewHabit("Read", D(10, 20));
+        var server = new McpServer(new HabitsMcpTools(_store).Tools.ToList(), "0.70.0", McpEndpoint.Instructions);
+
+        var (error, text) = await Call(server, "habit_check", new JsonObject { ["habit"] = read, ["percent"] = 60 });
+        Assert.False(error);
+        Assert.Equal(60, JsonNode.Parse(text)!["percent"]!.GetValue<int>());
+
+        (error, text) = await Call(server, "habit_check", new JsonObject { ["habit"] = read, ["percent"] = 80 });
+        Assert.False(error);
+        Assert.Equal("percent changed", JsonNode.Parse(text)!["result"]!.GetValue<string>());
+
+        (error, text) = await Call(server, "habit_check", new JsonObject { ["habit"] = read, ["percent"] = 0 });
+        Assert.True(error);
+        Assert.Contains("percent", text);
+
+        (_, text) = await Call(server, "habits_list", []);
+        Assert.Equal(80, JsonNode.Parse(text)!["habits"]![0]!["percentToday"]!.GetValue<int>());
+        (_, text) = await Call(server, "habit_report", new JsonObject { ["habit"] = read });
+        var partial = JsonNode.Parse(text)!["partialDays"]![0]!;
+        Assert.Equal(("2026-10-30", 80), (partial["day"]!.GetValue<string>(), partial["percent"]!.GetValue<int>()));
+        // Ten days missed and today at 80 %.
+        Assert.Equal(Math.Round(0.8 / 11, 3), JsonNode.Parse(text)!["rate"]!.GetValue<double>(), 6);
+    }
 
     [Fact]
     public async Task Agents_read_the_habits_and_the_reasons_and_can_tick_a_day()
@@ -583,10 +964,5 @@ public sealed class HabitsTests : IDisposable
         var reply = await server.HandleAsync(request.ToJsonString(), default);
         var result = reply!["result"]!;
         return (result["isError"]!.GetValue<bool>(), result["content"]![0]!["text"]!.GetValue<string>());
-    }
-
-    private sealed class RefuseDialogs : Helm.Shell.Services.IDialogService
-    {
-        public Task<bool> ConfirmAsync(string title, string message, string confirmText) => Task.FromResult(false);
     }
 }

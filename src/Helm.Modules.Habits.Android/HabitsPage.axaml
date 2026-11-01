@@ -36,11 +36,13 @@
         <Border Classes="card">
             <StackPanel Spacing="8">
                 <TextBlock Text="Add a habit" Classes="title" />
-                <TextBlock Text="Something to do every day, e.g. &quot;Read 20 pages&quot;. It starts today; the days before do not count." Classes="secondary" TextWrapping="Wrap" />
+                <TextBlock Text="Something to do every day, e.g. &quot;Read 20 pages&quot;, or a habit to quit, e.g. &quot;Smoking&quot;: each day you keep clear of it is marked the day after. It starts today; the days before do not count."
+                           Classes="secondary" TextWrapping="Wrap" />
                 <Grid ColumnDefinitions="*,8,Auto">
                     <TextBox MaxLength="120" PlaceholderText="New habit" AutomationProperties.Name="New habit" Text="{Binding NewHabitTitle}" KeyDown="NewHabit_KeyDown" />
                     <Button Grid.Column="2" Classes="accent" Content="Add" Command="{Binding AddHabitCommand}" IsEnabled="{Binding CanAddHabit}" />
                 </Grid>
+                <CheckBox Content="A habit to quit" IsChecked="{Binding NewHabitIsQuit}" />
             </StackPanel>
         </Border>
         <Border Classes="card" IsVisible="{Binding HasHabits}">

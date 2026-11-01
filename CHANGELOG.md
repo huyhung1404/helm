@@ -3,6 +3,33 @@
 All notable changes to Helm. The top section is used as the GitHub release body and as the Velopack release notes.
 Format: [Keep a Changelog](https://keepachangelog.com), versions follow [SemVer](https://semver.org).
 
+## [Unreleased]
+
+### Added
+- **Habits (PC and Android): habits to quit.** Tick "A habit to quit" when you add one. A day is clean only once it
+  is over, so its card asks about yesterday: tap it to mark yesterday clean, or "I slipped" to write what led to it
+  (the reason is required, so the report and AI agents can show the triggers later). The card shows the run of clean
+  days; slips are soft red on the grid and listed in the report with their reasons. Days left unmarked for two days
+  in a row ask, like skipped days, whether you slipped or just forgot to mark them. A habit to quit is never named
+  in reminders, which can show on a locked screen.
+- **Habits: done in part.** Marking a day asks how much of it you did (a slider, or 25 / 50 / 75 / 100 %). The
+  day's green is paler the less was done; it counts in full for the streak (showing up is what builds a habit) and by
+  its share in the rates and the month bars. Opening a day marked already shows its share, to change it or unmark the
+  day.
+- **Habits for AI agents:** `habits_list` and `habit_report` give each habit's kind (`build` or `quit`); for a habit
+  to quit `habit_check` marks yesterday clean by default and never today. `habit_check` takes a `percent`, and the
+  report lists the days done in part.
+
+### Changed
+- **Habits: everything in a pop-up.** Marking a day, the celebration and the reason for skipped days or a slip open
+  over the page instead of on it, so the page no longer jumps to the top. On the PC the menu stays usable; on the
+  phone Back closes it (except while skipped days wait for their reason).
+- **Habits on the phone: the whole year on each card**, in two half-year rows that fit the screen, instead of a grid
+  to scroll sideways. The report keeps the large grid.
+- Habits: a 90-day milestone celebration. Install the new version on every device before you add a habit to quit or
+  mark a day in part: an older version that renames or moves a habit to quit turns it into a habit to build, and shows
+  a day done in part as done in full.
+
 ## [0.69.0] - 2026-10-31
 
 ### Added

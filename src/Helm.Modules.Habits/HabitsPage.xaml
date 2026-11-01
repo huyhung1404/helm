@@ -25,12 +25,16 @@
         <TextBlock Text="Habits" Style="{DynamicResource HelmSectionHeader}" />
         <ui:CardControl Margin="0,0,0,4" Icon="{ui:SymbolIcon Add24}">
             <ui:CardControl.Header>
-                <core:CardHeader Title="Add a habit" Description="Something to do every day, e.g. &quot;Read 20 pages&quot;. It starts today; the days before do not count." />
+                <core:CardHeader Title="Add a habit"
+                                 Description="Something to do every day, e.g. &quot;Read 20 pages&quot;, or a habit to quit, e.g. &quot;Smoking&quot;: each day you keep clear of it is marked the day after. It starts today; the days before do not count." />
             </ui:CardControl.Header>
-            <StackPanel Orientation="Horizontal">
-                <ui:TextBox x:Name="NewHabitBox" Width="240" Margin="0,0,8,0" MaxLength="120" PlaceholderText="New habit" AutomationProperties.Name="New habit"
-                            Text="{Binding NewHabitTitle, UpdateSourceTrigger=PropertyChanged}" KeyDown="NewHabit_KeyDown" />
-                <ui:Button Appearance="Primary" Content="Add" Icon="{ui:SymbolIcon Add24}" Command="{Binding AddHabitCommand}" IsEnabled="{Binding CanAddHabit}" />
+            <StackPanel>
+                <StackPanel Orientation="Horizontal">
+                    <ui:TextBox x:Name="NewHabitBox" Width="240" Margin="0,0,8,0" MaxLength="120" PlaceholderText="New habit" AutomationProperties.Name="New habit"
+                                Text="{Binding NewHabitTitle, UpdateSourceTrigger=PropertyChanged}" KeyDown="NewHabit_KeyDown" />
+                    <ui:Button Appearance="Primary" Content="Add" Icon="{ui:SymbolIcon Add24}" Command="{Binding AddHabitCommand}" IsEnabled="{Binding CanAddHabit}" />
+                </StackPanel>
+                <CheckBox Margin="0,6,0,0" Content="A habit to quit" IsChecked="{Binding NewHabitIsQuit}" />
             </StackPanel>
         </ui:CardControl>
         <ui:CardExpander Margin="0,0,0,4" Icon="{ui:SymbolIcon Edit24}" IsExpanded="True" IsEnabled="{Binding HasHabits}">
