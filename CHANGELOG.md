@@ -3,7 +3,7 @@
 All notable changes to Helm. The top section is used as the GitHub release body and as the Velopack release notes.
 Format: [Keep a Changelog](https://keepachangelog.com), versions follow [SemVer](https://semver.org).
 
-## [Unreleased]
+## [0.71.0] - 2026-11-01
 
 ### Added
 - **Helm Keyboard (PC): type Vietnamese with Telex, and go round English, Vietnamese and Chinese with one shortcut.**
