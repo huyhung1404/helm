@@ -3,7 +3,7 @@
 All notable changes to Helm. The top section is used as the GitHub release body and as the Velopack release notes.
 Format: [Keep a Changelog](https://keepachangelog.com), versions follow [SemVer](https://semver.org).
 
-## [Unreleased]
+## [0.70.1] - 2026-11-01
 
 ### Fixed
 - **Workspace: a message for one Claude tab was typed into another.** With two Claude tabs in view (side by side, or
