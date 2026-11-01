@@ -1,0 +1,26 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- Helm Keyboard as a Windows input method (a TSF text input processor): a COM DLL that Windows loads into every
+       app the user types in, compiled to native code with NativeAOT. Published twice, for 64-bit and 32-bit apps:
+         dotnet publish src/Helm.Keyboard.Tip -c Release -r win-x64   (and -r win-x86)
+       The Telex rules come from Helm.Keyboard.Engine, the code the tests run. -->
+  <PropertyGroup>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <SupportedOSPlatformVersion></SupportedOSPlatformVersion>
+    <PlatformTarget>AnyCPU</PlatformTarget>
+    <RootNamespace>Helm.Keyboard.Tip</RootNamespace>
+    <AssemblyName>HelmKeyboard</AssemblyName>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <PublishAot>true</PublishAot>
+    <!-- Loaded into other people's processes: stay small and quiet. -->
+    <InvariantGlobalization>true</InvariantGlobalization>
+    <UseSystemResourceKeys>true</UseSystemResourceKeys>
+    <ConcurrentGarbageCollection>false</ConcurrentGarbageCollection>
+    <OptimizationPreference>Size</OptimizationPreference>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Helm.Keyboard.Engine\Helm.Keyboard.Engine.csproj" />
+  </ItemGroup>
+
+</Project>
