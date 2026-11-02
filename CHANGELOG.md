@@ -3,7 +3,7 @@
 All notable changes to Helm. The top section is used as the GitHub release body and as the Velopack release notes.
 Format: [Keep a Changelog](https://keepachangelog.com), versions follow [SemVer](https://semver.org).
 
-## [Unreleased]
+## [0.73.0] - 2026-11-02
 
 ### Added
 - **Slack Bot: Lumi looks into the project before answering.** Give a conversation where Write is on its project
@@ -12,10 +12,6 @@ Format: [Keep a Changelog](https://keepachangelog.com), versions follow [SemVer]
   outside the folder; never .env files, keys or keystores) and answers with what it found, as a possibility you will
   confirm, or says it could not find it and you will answer. An answer that looks like it holds a key, a token or a
   password is never sent.
-
-## [0.73.0] - 2026-11-02
-
-### Added
 - **Helm Keyboard: every web site keeps its own keyboard.** A browser is one program for all its tabs, so until now
   one site's keyboard was given to every site in that browser — and a sign-in pop-up or a file dialog could pull the
   keyboard you were typing in back to English. Now each web site is remembered on its own (by its domain, read from the
