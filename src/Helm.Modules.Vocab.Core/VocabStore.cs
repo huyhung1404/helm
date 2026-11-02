@@ -7,11 +7,12 @@ namespace Helm.Modules.Vocab;
 /// uploads it in the background). Callable from any thread; <see cref="Changed"/> may be raised on a background thread
 /// after a sync.
 /// </summary>
-public sealed class VocabStore
+public sealed partial class VocabStore
 {
     public const string WordsCollection = "vocab.words";
     public const string PartsCollection = "vocab.parts";
     public const string ReviewsCollection = "vocab.reviews";
+    public const string SourcesCollection = "vocab.sources";
 
     private readonly ISyncedCollection<VocabWord> _words;
     private readonly ISyncedCollection<VocabPart> _parts;
@@ -19,8 +20,10 @@ public sealed class VocabStore
     private readonly TimeProvider _time;
     private readonly object _gate = new();
 
-    public VocabStore(ISyncedCollection<VocabWord> words, ISyncedCollection<VocabPart> parts, ISyncedLog<VocabReview> reviews, TimeProvider? time = null)
+    public VocabStore(ISyncedCollection<VocabWord> words, ISyncedCollection<VocabPart> parts, ISyncedLog<VocabReview> reviews, TimeProvider? time = null,
+        ISyncedCollection<VocabSource>? sources = null)
     {
+        _sources = sources;
         _words = words;
         _parts = parts;
         _reviews = reviews;
@@ -28,6 +31,7 @@ public sealed class VocabStore
         _words.Changed += OnChanged;
         _parts.Changed += OnChanged;
         _reviews.Changed += OnReviewsChanged;
+        if (_sources is not null) _sources.Changed += OnChanged;
     }
 
     /// <summary>Raised after any local write or synced change of words or parts.</summary>

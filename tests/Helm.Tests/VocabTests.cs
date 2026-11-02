@@ -12,11 +12,12 @@ public sealed class VocabTests
     private readonly MemorySynced<VocabWord> _words = new();
     private readonly MemorySynced<VocabPart> _parts = new();
     private readonly MemorySyncedLog<VocabReview> _reviews = new();
+    private readonly MemorySynced<VocabSource> _sources = new();
     private readonly VocabStore _store;
 
     public VocabTests()
     {
-        _store = new VocabStore(_words, _parts, _reviews, _time);
+        _store = new VocabStore(_words, _parts, _reviews, _time, _sources);
     }
 
     private static WordAnalysis Relative() => new()
@@ -322,6 +323,49 @@ public sealed class VocabTests
         await vm.AnalyzeCommand.ExecuteAsync(null);
         Assert.Equal("Claude Code is not installed on this PC.", vm.Status);
         Assert.False(vm.IsBusy);
+    }
+
+    [Fact]
+    public async Task A_pasted_text_gets_its_words_proposed_and_only_the_ticked_ones_are_added_with_their_line()
+    {
+        _store.AddWord("琵琶");
+        var id = _store.AddSource("琵琶曲 - 郑浩", "弹一首琵琶曲\n回首人间，笑谈你我初遇");
+        var server = new McpServer(new VocabTextTools(_store).Tools, "1.0", "");
+
+        var waiting = await CallAsync(server, "vocab_pending_texts", []);
+        Assert.Equal(id, waiting["texts"]![0]!["id"]!.GetValue<string>());
+        Assert.Empty(_store.WaitingSourcesUnclaimed()); // reading it takes it from Helm's own agent
+
+        var proposed = await CallAsync(server, "vocab_propose_words", new JsonObject
+        {
+            ["text_id"] = id,
+            ["words"] = new JsonArray(
+                Pick("琵琶", "弹一首琵琶曲"), Pick("回首", "回首人间，笑谈你我初遇"), Pick("初遇", "回首人间，笑谈你我初遇"), Pick("回首", "again")),
+        });
+        Assert.Equal(2, proposed["proposed"]!.GetValue<int>());
+        Assert.Equal("琵琶", proposed["already_there"]![0]!.GetValue<string>()); // kept in the list, not ticked
+        var source = _store.GetSource(id)!;
+        Assert.Equal(VocabSourceStatus.Proposed, source.Status);
+        Assert.Equal([false, true, true], source.Proposals.Select(p => p.Chosen));
+
+        _store.SetChosen(id, "初遇", false);
+        Assert.Equal(1, _store.AddChosen(id));
+        var word = _store.FindWord("回首")!.Value;
+        Assert.Equal(id, word.SourceId);
+        Assert.Equal("回首人间，笑谈你我初遇", word.SourceSentence);
+        Assert.Equal("琵琶曲 - 郑浩", word.Note);
+        Assert.Null(_store.FindWord("初遇"));
+        Assert.Equal(VocabSourceStatus.Done, _store.GetSource(id)!.Status);
+    }
+
+    private static JsonObject Pick(string word, string sentence) =>
+        new() { ["word"] = word, ["meaning"] = "nghĩa", ["sentence"] = sentence };
+
+    [Fact]
+    public void A_pasted_text_must_have_words_and_a_sane_length()
+    {
+        Assert.Throws<ArgumentException>(() => _store.AddSource("x", "   "));
+        Assert.Throws<ArgumentException>(() => _store.AddSource("x", new string('字', VocabSource.MaxBodyLength + 1)));
     }
 
     [Fact]

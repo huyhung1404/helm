@@ -147,6 +147,12 @@ public sealed record VocabWord
     /// </summary>
     public DateTimeOffset? ClaimedUntil { get; init; }
 
+    /// <summary>The pasted text (<see cref="VocabSource"/>) the word was picked from, if any.</summary>
+    public string? SourceId { get; init; }
+
+    /// <summary>The line of that text the word comes from.</summary>
+    public string SourceSentence { get; init; } = "";
+
     [JsonIgnore]
     public bool IsAnalyzed => Status == VocabStatus.Analyzed;
 
