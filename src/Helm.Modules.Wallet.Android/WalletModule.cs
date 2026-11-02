@@ -10,7 +10,7 @@ namespace Helm.Modules.Wallet;
 /// <summary>
 /// Wallet on Android. <see cref="BankNotificationListener"/> reads the banks' notifications (once the user grants
 /// notification access) and saves their transactions, with or without the activity; the module keeps the home-screen
-/// widgets in step with the data. Back closes the add panel before leaving the page.
+/// widgets in step with the data. Back closes the open sheet before leaving the page.
 /// </summary>
 public sealed class WalletModule : AndroidModuleBase, IModuleContent, IBackHandler, IDisposable
 {
@@ -87,11 +87,12 @@ public sealed class WalletModule : AndroidModuleBase, IModuleContent, IBackHandl
         }
     }
 
-    /// <summary>Android back: an open add panel closes before the page does.</summary>
+    /// <summary>Android back: an open sheet closes (back to the one it was opened from) before the page does.</summary>
     public bool HandleBack()
     {
-        if (!_viewModel.IsAddOpen) return false;
-        _viewModel.CancelAddCommand.Execute(null);
+        if (!_viewModel.HasPopup) return false;
+        // An editor goes back to the transaction it edits, a transaction to the list it was opened from.
+        _viewModel.DismissPopupCommand.Execute(null);
         return true;
     }
 }
