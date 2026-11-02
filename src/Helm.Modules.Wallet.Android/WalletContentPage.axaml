@@ -22,20 +22,22 @@
     <!-- Room at the bottom for the floating buttons -->
     <StackPanel Spacing="12" Margin="0,0,0,88">
         <!-- Money (the month) or Debts (who owes whom) -->
-        <Grid ColumnDefinitions="*,8,*" IsVisible="{Binding HasDebts}">
-            <Button Classes="wide" Classes.accent="{Binding IsMoneyView}" Command="{Binding ShowMoneyCommand}" AutomationProperties.Name="Show the money">
-                <StackPanel Orientation="Horizontal" Spacing="6">
-                    <ic:SymbolIcon Symbol="Wallet" FontSize="16" />
-                    <TextBlock Text="Money" />
-                </StackPanel>
-            </Button>
-            <Button Grid.Column="2" Classes="wide" Classes.accent="{Binding IsDebtsView}" Command="{Binding ShowDebtsCommand}" AutomationProperties.Name="Show the debts">
-                <StackPanel Orientation="Horizontal" Spacing="6">
-                    <ic:SymbolIcon Symbol="People" FontSize="16" />
-                    <TextBlock Text="Debts" />
-                </StackPanel>
-            </Button>
-        </Grid>
+        <Border Classes="seg" IsVisible="{Binding HasDebts}">
+            <Grid ColumnDefinitions="*,3,*">
+                <Button Classes="seg" Classes.on="{Binding IsMoneyView}" Command="{Binding ShowMoneyCommand}" AutomationProperties.Name="Show the money">
+                    <StackPanel Orientation="Horizontal" Spacing="6">
+                        <ic:SymbolIcon Symbol="Wallet" FontSize="18" />
+                        <TextBlock Text="Money" VerticalAlignment="Center" />
+                    </StackPanel>
+                </Button>
+                <Button Grid.Column="2" Classes="seg" Classes.on="{Binding IsDebtsView}" Command="{Binding ShowDebtsCommand}" AutomationProperties.Name="Show the debts">
+                    <StackPanel Orientation="Horizontal" Spacing="6">
+                        <ic:SymbolIcon Symbol="People" FontSize="18" />
+                        <TextBlock Text="Debts" VerticalAlignment="Center" />
+                    </StackPanel>
+                </Button>
+            </Grid>
+        </Border>
 
         <!-- Shown while the tool is turned off -->
         <Border x:Name="OffBar" Classes="infobar" IsVisible="False">
@@ -91,30 +93,25 @@
                     </Button>
                 </Grid>
 
-                <!-- The month in three numbers -->
+                <!-- The month in three numbers, short, and one line under them -->
                 <Border Classes="card" Padding="14,12" Margin="0">
                     <StackPanel Spacing="4">
                         <Grid ColumnDefinitions="*,8,*,8,*">
                             <StackPanel>
-                                <TextBlock Text="Spent" Classes="secondary" FontWeight="SemiBold" />
-                                <Viewbox StretchDirection="DownOnly" HorizontalAlignment="Left">
-                                    <TextBlock Text="{Binding SpentText}" Classes="figure" />
-                                </Viewbox>
+                                <TextBlock Text="Spent" Classes="lbl" />
+                                <TextBlock Text="{Binding SpentShort}" Classes="figure" TextWrapping="NoWrap" />
                             </StackPanel>
                             <StackPanel Grid.Column="2">
-                                <TextBlock Text="Money in" Classes="secondary" FontWeight="SemiBold" />
-                                <Viewbox StretchDirection="DownOnly" HorizontalAlignment="Left">
-                                    <TextBlock Text="{Binding IncomeText}" Classes="figure income" />
-                                </Viewbox>
+                                <TextBlock Text="Money in" Classes="lbl" />
+                                <TextBlock Text="{Binding IncomeShort}" Classes="figure income" TextWrapping="NoWrap" />
                             </StackPanel>
                             <StackPanel Grid.Column="4">
-                                <TextBlock Text="Net" Classes="secondary" FontWeight="SemiBold" />
-                                <Viewbox StretchDirection="DownOnly" HorizontalAlignment="Left">
-                                    <TextBlock Text="{Binding NetText}" Classes="figure" Classes.danger="{Binding IsNetNegative}" />
-                                </Viewbox>
+                                <TextBlock Text="Net" Classes="lbl" />
+                                <TextBlock Text="{Binding NetShort}" Classes="figure" Classes.danger="{Binding IsNetNegative}" TextWrapping="NoWrap" />
                             </StackPanel>
                         </Grid>
-                        <TextBlock Text="{Binding SpentTodayText}" Classes="secondary" IsVisible="{Binding HasSpentToday}" />
+                        <TextBlock Text="{Binding MonthLine}" Classes="secondary" TextWrapping="Wrap"
+                                   IsVisible="{Binding MonthLine, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
                     </StackPanel>
                 </Border>
 
@@ -206,7 +203,11 @@
                 <!-- The month's transactions -->
                 <TextBlock Text="Transactions" Classes="cardTitle" Margin="4,4,0,0" />
                 <ListBox Classes="seg" ItemsSource="{x:Static vm:WalletViewModel.FilterNames}" SelectedIndex="{Binding FilterIndex}" AutomationProperties.Name="Show" />
-                <TextBox Text="{Binding SearchText}" PlaceholderText="Search" AutomationProperties.Name="Search transactions" />
+                <TextBox Classes="search" Text="{Binding SearchText}" PlaceholderText="Search" AutomationProperties.Name="Search transactions">
+                    <TextBox.InnerLeftContent>
+                        <ic:SymbolIcon Symbol="Search" FontSize="18" Margin="12,0,0,0" Foreground="{DynamicResource HelmSecondaryText}" />
+                    </TextBox.InnerLeftContent>
+                </TextBox>
                 <TextBlock Text="{Binding EmptyText}" Classes="secondary" Margin="4,0" IsVisible="{Binding !HasDays}" />
                 <ItemsControl ItemsSource="{Binding Days}">
                     <ItemsControl.ItemTemplate>

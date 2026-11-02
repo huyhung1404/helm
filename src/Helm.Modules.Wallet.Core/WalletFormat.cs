@@ -62,6 +62,16 @@ public static class WalletFormat
         return Money(a, culture);
     }
 
+    /// <summary>"9.84M ₫", "182k ₫": the phone's month card (up to two decimals in millions, whole thousands below).</summary>
+    public static string Compact(decimal amount, CultureInfo? culture = null)
+    {
+        culture ??= CultureInfo.CurrentCulture;
+        var a = Math.Abs(amount);
+        if (a >= 1_000_000) return $"{(a / 1_000_000).ToString("0.##", culture)}M {Currency}";
+        if (a >= 1_000) return $"{Math.Round(a / 1_000).ToString("0", culture)}k {Currency}";
+        return Money(a, culture);
+    }
+
     /// <summary>"October 2026".</summary>
     public static string Month(DateOnly month, CultureInfo? culture = null) =>
         month.ToString("MMMM yyyy", culture ?? CultureInfo.CurrentCulture);

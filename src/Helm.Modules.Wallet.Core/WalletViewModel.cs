@@ -59,6 +59,13 @@ public sealed partial class WalletViewModel : ObservableObject
     [ObservableProperty] private string _compareText = "";
     [ObservableProperty] private string _spentTodayText = "";
 
+    // The phone's month card: short amounts ("9.84M ₫", "+18.5M ₫") and one line under them
+    // ("604,000 ₫ today · 12% less than September by this day").
+    [ObservableProperty] private string _spentShort = "";
+    [ObservableProperty] private string _incomeShort = "";
+    [ObservableProperty] private string _netShort = "";
+    [ObservableProperty] private string _monthLine = "";
+
     // The budget
     [ObservableProperty] private bool _hasBudget;
     [ObservableProperty] private double _budgetPercent;
@@ -718,6 +725,14 @@ public sealed partial class WalletViewModel : ObservableObject
             CountText = WalletFormat.Count(summary.Count, "transaction");
             SpentTodayText = IsCurrentMonth && summary.SpentToday > 0 ? $"Today {WalletFormat.Money(summary.SpentToday)}" : "";
             CompareText = Compare(summary);
+            SpentShort = WalletFormat.Compact(summary.Spent);
+            IncomeShort = (summary.Income > 0 ? "+" : "") + WalletFormat.Compact(summary.Income);
+            NetShort = (summary.Net > 0 ? "+" : summary.Net < 0 ? "−" : "") + WalletFormat.Compact(summary.Net);
+            MonthLine = string.Join(" · ", new[]
+            {
+                IsCurrentMonth && summary.SpentToday > 0 ? $"{WalletFormat.Money(summary.SpentToday)} today" : "",
+                CompareText,
+            }.Where(s => s.Length > 0));
             RefreshBudget(summary, now);
             Funds?.Update(transactions, categories, _month, now);
             OnPropertyChanged(nameof(ShowBudgetCard));

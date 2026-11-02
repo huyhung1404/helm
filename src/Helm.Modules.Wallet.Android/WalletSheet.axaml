@@ -103,11 +103,22 @@
                         </Border>
                         <ScrollViewer>
                             <StackPanel Margin="20,8,20,8">
-                                <ListBox Classes="seg" Margin="0,0,0,16" ItemsSource="{x:Static vm:WalletViewModel.KindNames}" SelectedIndex="{Binding NewKindIndex}" AutomationProperties.Name="Kind" />
+                                <ListBox Classes="seg" Margin="0,0,0,16" ItemsSource="{x:Static vm:WalletViewModel.KindNames}" SelectedIndex="{Binding NewKindIndex}" AutomationProperties.Name="Kind">
+                                    <!-- "Transfer": the phone's short word for a move between my accounts -->
+                                    <ListBox.ItemTemplate>
+                                        <DataTemplate x:DataType="x:String">
+                                            <TextBlock Text="{Binding Converter={x:Static vm:WalletConverters.KindName}}" />
+                                        </DataTemplate>
+                                    </ListBox.ItemTemplate>
+                                </ListBox>
                                 <StackPanel Classes="field">
                                     <TextBlock Text="Amount" Classes="label" />
-                                    <TextBox x:Name="NewAmountBox" Classes="amount" FontSize="22" FontWeight="SemiBold" PlaceholderText="50k, 1.5tr" Text="{Binding NewAmount}"
-                                             AutomationProperties.Name="Amount" InnerRightContent="₫" />
+                                    <TextBox x:Name="NewAmountBox" Classes="amount" FontSize="24" FontWeight="SemiBold" PlaceholderText="50k, 1.5tr" Text="{Binding NewAmount}"
+                                             AutomationProperties.Name="Amount">
+                                        <TextBox.InnerRightContent>
+                                            <TextBlock Text="₫" FontSize="18" FontWeight="Normal" Foreground="{DynamicResource HelmSecondaryText}" VerticalAlignment="Center" Margin="0,0,14,0" />
+                                        </TextBox.InnerRightContent>
+                                    </TextBox>
                                     <TextBlock Text="{Binding NewAmountHint}" Classes="hint" Classes.income="{Binding NewAmountReads}" />
                                 </StackPanel>
                                 <StackPanel Classes="field">
@@ -160,7 +171,11 @@
                                         <ListBox Classes="seg" Margin="0,0,0,16" ItemsSource="{x:Static vm:WalletSheet.EditKinds}" SelectedIndex="{Binding EditKindIndex}" AutomationProperties.Name="Kind" />
                                         <StackPanel Classes="field">
                                             <TextBlock Text="Amount" Classes="label" />
-                                            <TextBox Classes="amount" FontSize="22" FontWeight="SemiBold" Text="{Binding EditAmount}" AutomationProperties.Name="Amount" InnerRightContent="₫" />
+                                            <TextBox Classes="amount" FontSize="24" FontWeight="SemiBold" Text="{Binding EditAmount}" AutomationProperties.Name="Amount">
+                                                <TextBox.InnerRightContent>
+                                                    <TextBlock Text="₫" FontSize="18" FontWeight="Normal" Foreground="{DynamicResource HelmSecondaryText}" VerticalAlignment="Center" Margin="0,0,14,0" />
+                                                </TextBox.InnerRightContent>
+                                            </TextBox>
                                         </StackPanel>
                                         <StackPanel Classes="field">
                                             <TextBlock Text="Description" Classes="label" />
@@ -212,10 +227,11 @@
                                         <Grid ColumnDefinitions="110,*" RowDefinitions="Auto,Auto,Auto" Margin="0,0,0,12">
                                             <TextBlock Text="Account" Classes="secondary" FontSize="14" Margin="0,0,0,6" />
                                             <TextBlock Grid.Column="1" Text="{Binding AccountText}" TextWrapping="Wrap" Margin="0,0,0,6" />
-                                            <TextBlock Grid.Row="1" Text="Balance" Classes="secondary" FontSize="14" Margin="0,0,0,6" IsVisible="{Binding HasBalance}" />
-                                            <TextBlock Grid.Row="1" Grid.Column="1" Text="{Binding BalanceText}" TextWrapping="Wrap" Margin="0,0,0,6" IsVisible="{Binding HasBalance}" />
-                                            <TextBlock Grid.Row="2" Text="Note" Classes="secondary" FontSize="14" IsVisible="{Binding HasNote}" />
-                                            <TextBlock Grid.Row="2" Grid.Column="1" Text="{Binding Note}" TextWrapping="Wrap" IsVisible="{Binding HasNote}" />
+                                            <TextBlock Grid.Row="1" Text="Balance after" Classes="secondary" FontSize="14" Margin="0,0,0,6" IsVisible="{Binding HasBalance}" />
+                                            <TextBlock Grid.Row="1" Grid.Column="1" Text="{Binding BalanceText, Converter={x:Static vm:WalletConverters.BalanceOnly}}" TextWrapping="Wrap" Margin="0,0,0,6"
+                                                       IsVisible="{Binding HasBalance}" />
+                                            <TextBlock Grid.Row="2" Text="Note" Classes="secondary" FontSize="14" />
+                                            <TextBlock Grid.Row="2" Grid.Column="1" Text="{Binding Note, Converter={x:Static vm:WalletConverters.OrDash}}" TextWrapping="Wrap" />
                                         </Grid>
                                         <Border Classes="box" Margin="0,0,0,12" IsVisible="{Binding IsDebt}">
                                             <Grid ColumnDefinitions="Auto,*,Auto">
@@ -467,7 +483,11 @@
                                         <StackPanel Classes="field">
                                             <TextBlock Text="Amount" Classes="label" />
                                             <TextBox Classes="amount" FontSize="20" FontWeight="SemiBold" PlaceholderText="2tr, 500k" Text="{Binding FormAmount}" AutomationProperties.Name="Fund amount"
-                                                     InnerRightContent="₫" />
+                                                    >
+                                                <TextBox.InnerRightContent>
+                                                    <TextBlock Text="₫" FontSize="18" FontWeight="Normal" Foreground="{DynamicResource HelmSecondaryText}" VerticalAlignment="Center" Margin="0,0,14,0" />
+                                                </TextBox.InnerRightContent>
+                                            </TextBox>
                                             <TextBlock Text="{Binding FormAmountHint}" Classes="hint" />
                                         </StackPanel>
                                         <StackPanel Classes="field">
@@ -533,7 +553,11 @@
                                         </StackPanel>
                                         <StackPanel Classes="field">
                                             <TextBlock Text="Amount" Classes="label" />
-                                            <TextBox Classes="amount" FontSize="20" FontWeight="SemiBold" Text="{Binding CoverAmount}" AutomationProperties.Name="Amount to move" InnerRightContent="₫" />
+                                            <TextBox Classes="amount" FontSize="20" FontWeight="SemiBold" Text="{Binding CoverAmount}" AutomationProperties.Name="Amount to move">
+                                                <TextBox.InnerRightContent>
+                                                    <TextBlock Text="₫" FontSize="18" FontWeight="Normal" Foreground="{DynamicResource HelmSecondaryText}" VerticalAlignment="Center" Margin="0,0,14,0" />
+                                                </TextBox.InnerRightContent>
+                                            </TextBox>
                                             <TextBlock Text="{Binding CoverHint}" Classes="hint" />
                                         </StackPanel>
                                         <Border Classes="box" IsVisible="{Binding HasCoverPreview}">
@@ -611,7 +635,11 @@
                                         <StackPanel Classes="field">
                                             <TextBlock Text="Amount" Classes="label" />
                                             <TextBox Classes="amount" FontSize="20" FontWeight="SemiBold" PlaceholderText="150k, 1.5tr" Text="{Binding NewAmount}" AutomationProperties.Name="Amount"
-                                                     InnerRightContent="₫" />
+                                                    >
+                                                <TextBox.InnerRightContent>
+                                                    <TextBlock Text="₫" FontSize="18" FontWeight="Normal" Foreground="{DynamicResource HelmSecondaryText}" VerticalAlignment="Center" Margin="0,0,14,0" />
+                                                </TextBox.InnerRightContent>
+                                            </TextBox>
                                             <TextBlock Text="{Binding NewAmountHint}" Classes="hint" />
                                         </StackPanel>
                                         <StackPanel Classes="field">
@@ -639,8 +667,9 @@
                             <DockPanel x:DataType="vm:DebtPersonViewModel">
                                 <Border DockPanel.Dock="Top" Width="36" Height="4" CornerRadius="2" Margin="0,8,0,0" HorizontalAlignment="Center" Background="{DynamicResource HelmSecondaryText}" Opacity="0.5" />
                                 <Grid DockPanel.Dock="Top" ColumnDefinitions="Auto,*,Auto" Margin="20,10,8,0">
-                                    <Border Width="44" Height="44" CornerRadius="22" Margin="0,0,12,0" Background="{DynamicResource HelmSubtleFill}">
-                                        <TextBlock Text="{Binding Initial}" FontSize="18" FontWeight="SemiBold" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                    <Border Width="44" Height="44" CornerRadius="22" Margin="0,0,12,0" Background="{Binding Name, Converter={x:Static vm:WalletConverters.PersonFill}}">
+                                        <TextBlock Text="{Binding Initial}" FontSize="18" FontWeight="SemiBold" HorizontalAlignment="Center" VerticalAlignment="Center"
+                                                   Foreground="{Binding Name, Converter={x:Static vm:WalletConverters.PersonInk}}" />
                                     </Border>
                                     <StackPanel Grid.Column="1" VerticalAlignment="Center">
                                         <TextBlock Text="{Binding Name}" Classes="sheetTitle" />
