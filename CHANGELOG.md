@@ -12,6 +12,10 @@ Format: [Keep a Changelog](https://keepachangelog.com), versions follow [SemVer]
   line it comes from and why. You tick the ones to keep (words you already have stay dimmed) and press **Add N words**;
   only those are analyzed, and each word keeps its line (“From the text: …”) on its page. AI agents use
   `vocab_pending_texts` and `vocab_propose_words`.
+- **Vocabulary (PC): follow Claude Code as it works.** Analysis → Activity lists every step of the run in progress
+  (and keeps the last one): which words it reads, the parts it looks up, the analyses it saves and the ones it has to
+  fix, what Claude says between steps, and how long the run took, each with its time. The box under Stop counts the
+  steps; Copy log puts it all on the clipboard.
 - **Vocabulary (PC): choose the Claude model that breaks words down.** Settings → Vocabulary → Claude model: Sonnet
   (the new default), Haiku, Opus or Claude Code's own default. Analyses, help with hard words, pinyin hooks and
   suggested words used to run on Claude Code's default, often a bigger model than the job needs.

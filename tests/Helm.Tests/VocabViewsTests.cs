@@ -72,6 +72,27 @@ public sealed class VocabViewsTests : IDisposable
         Assert.True(viewModel.IsAgentWaiting);
         viewModel.OpenAgentCommand.Execute(null);
         Layout(page, size, "03-analysis");
+        // The last run's Activity: each step, result, Claude's own words and how it ended.
+        var at = DateTimeOffset.Now;
+        foreach (var (text, kind) in new[]
+        {
+            ("Analyzing with Sonnet (recommended) · 3 words waiting", VocabLogKind.Start),
+            ("“I'll break down the 3 words, then the follow-ups.”", VocabLogKind.Note),
+            ("Reading the words waiting to be broken down", VocabLogKind.Step),
+            ("✓ 3 waiting", VocabLogKind.Result),
+            ("Looking up parts: re, lat, -ive, luct and 2 more", VocabLogKind.Step),
+            ("Saving 3 analyses: relative, 补救, reluctant", VocabLogKind.Step),
+            ("✓ 2 saved · 1 to fix: reluctant (The parts of reluctant must be re- + luct + -ant.)", VocabLogKind.Result),
+            ("✗ words must be a list.", VocabLogKind.Problem),
+            ("Done in 1 min 12 s · 4 steps. Broke down 3 words.", VocabLogKind.End),
+        })
+        {
+            viewModel.Agent.Log.Add(new VocabAgentLogLine(at, text, kind));
+            at = at.AddSeconds(9);
+        }
+        Assert.True(viewModel.Agent.HasLog);
+        Assert.True(Shows(page, "Activity"));
+        Layout(page, size, "03b-analysis-log");
         Assert.True(Shows(page, "Waiting for Claude Code"));
         Assert.True(Shows(page, viewModel.AgentWorkText));
         viewModel.CloseAgentCommand.Execute(null);

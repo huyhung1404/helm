@@ -343,6 +343,15 @@ public sealed partial class VocabViewModel : ObservableObject
         Message = "Copied. Paste it into Claude Code (Helm's MCP server must be connected).";
     }
 
+    /// <summary>The agent's log (Analysis → Activity) to the clipboard, to keep or to share.</summary>
+    [RelayCommand]
+    private void CopyLog()
+    {
+        if (!Agent.HasLog) return;
+        _clipboard.SetText(Agent.LogText);
+        Message = "The agent's log is copied.";
+    }
+
     [RelayCommand]
     private void DismissMessage() => Message = null;
 

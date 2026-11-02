@@ -4,9 +4,10 @@ namespace Helm.Modules.Vocab;
 
 /// <summary>
 /// Vocabulary's agent on Windows: Claude Code without a window (<see cref="ClaudeCodeRunner"/>), allowed only the
-/// vocabulary tools. What it saves arrives in the list while it works, and syncs to the phone.
+/// vocabulary tools. What it saves arrives in the list while it works, and syncs to the phone; each step is told in
+/// full (<see cref="VocabNarrator"/>) for the Analysis dialog's log.
 /// </summary>
-public sealed class ClaudeCodeVocabAgent(ClaudeCodeRunner claude) : IVocabAgent
+public sealed class ClaudeCodeVocabAgent(ClaudeCodeRunner claude, VocabStore store) : IVocabAgent
 {
     /// <summary>A handful of words take a few minutes.</summary>
     public static readonly TimeSpan Timeout = TimeSpan.FromMinutes(15);
@@ -85,7 +86,7 @@ public sealed class ClaudeCodeVocabAgent(ClaudeCodeRunner claude) : IVocabAgent
     {
         try
         {
-            return await claude.RunAsync(AllowedTools, instructions, Describe, progress, Timeout, ct, model).ConfigureAwait(false);
+            return await claude.RunAsync(AllowedTools, instructions, Describe, progress, Timeout, ct, model, new VocabNarrator(store)).ConfigureAwait(false);
         }
         catch (ClaudeCodeException ex)
         {

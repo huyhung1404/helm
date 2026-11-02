@@ -709,6 +709,83 @@ public sealed class VocabPracticeTests
         Assert.DoesNotContain("--model", ClaudeCodeRunner.RunArguments(["mcp__helm__vocab_get"], null));
     }
 
+    // ---- the agent's log ------------------------------------------------------------------------------------------
+
+    [Fact]
+    public async Task Each_step_of_claude_code_is_told_with_the_words_it_works_on()
+    {
+        var (relative, _) = _store.AddWord("relative");
+        var (reluctant, _) = _store.AddWord("reluctant");
+        var lines = string.Join("\n",
+            """{"type":"assistant","message":{"content":[{"type":"text","text":"I'll break down 2 words.\nThen the follow-ups."}]}}""",
+            """{"type":"assistant","message":{"content":[{"type":"tool_use","id":"t1","name":"mcp__helm__vocab_pending","input":{"limit":12}}]}}""",
+            """{"type":"user","message":{"content":[{"type":"tool_result","tool_use_id":"t1","content":"{\"total\":2,\"words\":[]}"}]}}""",
+            """{"type":"assistant","message":{"content":[{"type":"tool_use","id":"t2","name":"mcp__helm__vocab_find_parts","input":{"forms":["re","lat","ive","luct","ant"],"language":"english"}}]}}""",
+            $$$"""{"type":"assistant","message":{"content":[{"type":"tool_use","id":"t3","name":"mcp__helm__vocab_save_analyses","input":{"analyses":[{"id":"{{{relative}}}"},{"id":"{{{reluctant}}}"}]}}]}}""",
+            $$$"""{"type":"user","message":{"content":[{"type":"tool_result","tool_use_id":"t3","content":[{"type":"text","text":"{\"saved\":[\"{{{relative}}}\"],\"failed\":[{\"id\":\"{{{reluctant}}}\",\"fix\":\"The parts of reluctant must be re- + luct + -ant.\"}]}"}]}]}}""",
+            """{"type":"user","message":{"content":[{"type":"tool_result","tool_use_id":"t9","is_error":true,"content":"words must be a list."}]}}""",
+            """{"type":"result","subtype":"success","is_error":false,"result":"Broke down 1 word."}""");
+        var steps = new List<string>();
+
+        var (result, _, calls) = await ClaudeCodeRunner.ReadEventsAsync(new MemoryStream(System.Text.Encoding.UTF8.GetBytes(lines)),
+            new Inline(steps.Add), ClaudeCodeVocabAgent.Describe, new VocabNarrator(_store));
+
+        Assert.Equal(("Broke down 1 word.", 3), (result, calls));
+        Assert.Equal([
+            "“I'll break down 2 words.”",
+            "Reading the words waiting to be broken down",
+            "✓ 2 waiting",
+            "Looking up parts: re, lat, ive, luct and 1 more",
+            "Saving 2 analyses: relative, reluctant",
+            "✓ 1 saved · 1 to fix: reluctant (The parts of reluctant must be re- + luct + -ant.)",
+            "✗ words must be a list.",
+        ], steps);
+        Assert.Equal([VocabLogKind.Note, VocabLogKind.Step, VocabLogKind.Result, VocabLogKind.Step, VocabLogKind.Step, VocabLogKind.Result, VocabLogKind.Problem],
+            steps.Select(VocabAgentLogLine.KindOf));
+    }
+
+    [Fact]
+    public async Task The_log_keeps_every_step_of_the_last_run()
+    {
+        using var dir = new TempDir();
+        using var settings = new SettingsStoreFactory(new HelmPaths(dir.Path));
+        var agent = new TalkingAgent();
+        using var vm = new VocabAgentViewModel(agent, _store, _quiz, VocabKit.Settings(settings), new InlineUi());
+        _store.AddWord("relative");
+
+        await vm.AnalyzeCommand.ExecuteAsync(null);
+        Assert.Equal([VocabLogKind.Start, VocabLogKind.Step, VocabLogKind.Result, VocabLogKind.Note, VocabLogKind.End], vm.Log.Select(l => l.Kind));
+        Assert.Equal("Analyzing with Sonnet (recommended) · 1 word waiting", vm.Log[0].Text);
+        Assert.Equal(1, vm.Steps);
+        Assert.StartsWith("Done in 0 s · 1 steps.", vm.Log[^1].Text);
+        Assert.Contains("✓ 1 saved", vm.LogText);
+
+        // A new run starts a new log.
+        await vm.AnalyzeCommand.ExecuteAsync(null);
+        Assert.Equal(5, vm.Log.Count);
+    }
+
+    private sealed class Inline(Action<string> report) : IProgress<string>
+    {
+        public void Report(string value) => report(value);
+    }
+
+    private sealed class TalkingAgent : IVocabAgent
+    {
+        public string? Unavailable() => null;
+
+        public Task<string> AnalyzeAsync(string? model, IProgress<string>? progress, CancellationToken ct)
+        {
+            progress?.Report("Saving the analysis of relative");
+            progress?.Report("✓ 1 saved");
+            progress?.Report("“Done for now.”");
+            return Task.FromResult("Broke down 1 word.");
+        }
+
+        public Task<string> SuggestAsync(string partId, string form, string meaning, VocabLanguage language, string? model, IProgress<string>? progress, CancellationToken ct) =>
+            Task.FromResult("");
+    }
+
     private sealed class IdleAgent : IVocabAgent
     {
         public string? Unavailable() => null;

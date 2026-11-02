@@ -4,14 +4,14 @@
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml">
 
-    <!-- Analysis (the header's chip): what Claude Code does by itself, what waits for it, the run in progress with Stop,
-         and the request to copy into Claude Code by hand. DataContext: VocabViewModel. -->
+    <!-- Analysis (the header's chip): what Claude Code does by itself, the run in progress with Stop and its Activity log,
+         what waits for it, and the request to copy into Claude Code by hand. DataContext: VocabViewModel. -->
     <UserControl.Resources>
         <ResourceDictionary Source="/Helm.Modules.Vocab;component/VocabTemplates.xaml" />
     </UserControl.Resources>
 
     <Grid Style="{StaticResource DialogScrim}" Visibility="{Binding IsAgentOpen, Converter={StaticResource BoolToVisibility}}">
-        <Border Style="{StaticResource DialogCard}" Width="560" AutomationProperties.Name="Analysis">
+        <Border Style="{StaticResource DialogCard}" Width="640" AutomationProperties.Name="Analysis">
             <DockPanel>
                 <DockPanel DockPanel.Dock="Top" Margin="24,20,16,4">
                     <ui:Button DockPanel.Dock="Right" Style="{StaticResource IconButton}" Icon="{ui:SymbolIcon Dismiss24}" ToolTip="Close (Esc)"
@@ -35,16 +35,62 @@
                         <TextBlock FontSize="14" Style="{DynamicResource HelmSecondaryText}"
                                    Text="Claude Code works without a window: it breaks new words into parts, writes new ways to remember the words you keep forgetting, a pinyin hook for the Chinese words whose reading keeps slipping, and fills in missing details. With “Break new words down by itself” on (settings), it runs a moment after words arrive." />
 
-                        <!-- The run in progress -->
+                        <!-- The run in progress: how far it got, and Stop -->
                         <Border Margin="0,14,0,0" Style="{StaticResource InsetBox}" Padding="12,8" Visibility="{Binding Agent.IsBusy, Converter={StaticResource BoolToVisibility}}">
                             <DockPanel>
                                 <ui:Button DockPanel.Dock="Right" Content="Stop" Icon="{ui:SymbolIcon Stop24}" Command="{Binding Agent.StopCommand}" />
                                 <ui:ProgressRing DockPanel.Dock="Left" IsIndeterminate="True" Width="18" Height="18" Margin="0,0,10,0" />
-                                <TextBlock Text="Claude Code is at work…" VerticalAlignment="Center" />
+                                <TextBlock VerticalAlignment="Center">
+                                    <Run Text="Claude Code is at work" FontWeight="SemiBold" /><Run Text=" · step " /><Run Text="{Binding Agent.Steps, Mode=OneWay}" />
+                                </TextBlock>
                             </DockPanel>
                         </Border>
-                        <TextBlock Margin="0,8,0,0" Text="{Binding Agent.Status}" Style="{DynamicResource HelmSecondaryText}"
-                                   Visibility="{Binding Agent.HasStatus, Converter={StaticResource BoolToVisibility}}" />
+                        <TextBlock Margin="0,8,0,0" Text="{Binding Agent.Status}" TextWrapping="Wrap" Style="{DynamicResource HelmSecondaryText}"
+                                   Visibility="{Binding Agent.HasLog, Converter={StaticResource InverseBoolToVisibility}}" />
+
+                        <!-- Activity: every step of the run in progress (or of the last one), the newest at the bottom -->
+                        <StackPanel Margin="0,16,0,0" Visibility="{Binding Agent.HasLog, Converter={StaticResource BoolToVisibility}}">
+                            <DockPanel Margin="0,0,0,6">
+                                <ui:Button DockPanel.Dock="Right" Appearance="Transparent" Padding="8,3" Content="Copy log" Icon="{ui:SymbolIcon Copy24}"
+                                           Command="{Binding CopyLogCommand}" ToolTip="Copy every line, to keep or to share" />
+                                <TextBlock Text="Activity" Style="{StaticResource SectionTitle}" FontSize="14" VerticalAlignment="Center" Margin="0"
+                                           Foreground="{DynamicResource TextFillColorPrimaryBrush}" />
+                            </DockPanel>
+                            <Border Style="{StaticResource InsetBox}" Padding="0">
+                                <ScrollViewer x:Name="LogScroller" MaxHeight="280" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled"
+                                              Focusable="False" AutomationProperties.Name="Activity">
+                                    <ItemsControl ItemsSource="{Binding Agent.Log}" Margin="12,8" Focusable="False">
+                                        <ItemsControl.ItemTemplate>
+                                            <DataTemplate>
+                                                <Grid Margin="0,2">
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="64" />
+                                                        <ColumnDefinition Width="*" />
+                                                    </Grid.ColumnDefinitions>
+                                                    <TextBlock Text="{Binding Time}" FontFamily="Consolas" FontSize="12" Margin="0,1,0,0" Style="{DynamicResource HelmSecondaryText}" />
+                                                    <TextBlock x:Name="Line" Grid.Column="1" Text="{Binding Text}" TextWrapping="Wrap" FontSize="13" />
+                                                </Grid>
+                                                <DataTemplate.Triggers>
+                                                    <DataTrigger Binding="{Binding IsResult}" Value="True">
+                                                        <Setter TargetName="Line" Property="Foreground" Value="{DynamicResource SystemFillColorSuccessBrush}" />
+                                                    </DataTrigger>
+                                                    <DataTrigger Binding="{Binding IsProblem}" Value="True">
+                                                        <Setter TargetName="Line" Property="Foreground" Value="{DynamicResource SystemFillColorCriticalBrush}" />
+                                                    </DataTrigger>
+                                                    <DataTrigger Binding="{Binding IsNote}" Value="True">
+                                                        <Setter TargetName="Line" Property="Foreground" Value="{DynamicResource TextFillColorSecondaryBrush}" />
+                                                        <Setter TargetName="Line" Property="FontStyle" Value="Italic" />
+                                                    </DataTrigger>
+                                                    <DataTrigger Binding="{Binding IsEdge}" Value="True">
+                                                        <Setter TargetName="Line" Property="FontWeight" Value="SemiBold" />
+                                                    </DataTrigger>
+                                                </DataTemplate.Triggers>
+                                            </DataTemplate>
+                                        </ItemsControl.ItemTemplate>
+                                    </ItemsControl>
+                                </ScrollViewer>
+                            </Border>
+                        </StackPanel>
 
                         <!-- What waits: words to break down, words often forgotten, pinyin that keeps slipping, missing details -->
                         <TextBlock Margin="0,18,0,0" Text="Waiting for Claude Code" Style="{StaticResource SectionTitle}" FontSize="14"
