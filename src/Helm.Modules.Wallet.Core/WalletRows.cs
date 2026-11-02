@@ -7,6 +7,39 @@ namespace Helm.Modules.Wallet;
 /// <summary>A category in a picker, with its icon and colour slot.</summary>
 public sealed record CategoryChoice(string Id, string Name, string Icon, int Color);
 
+/// <summary>A category chip in a form or the details: picked or not; a tap picks it.</summary>
+public sealed partial class CategoryPick : ObservableObject
+{
+    [ObservableProperty] private bool _isSelected;
+
+    public CategoryPick(string id, string name, string icon, int color, Action<CategoryPick> pick)
+    {
+        Id = id;
+        Name = name;
+        Icon = icon;
+        Color = color;
+        PickCommand = new RelayCommand(() => pick(this));
+    }
+
+    public string Id { get; }
+
+    public string Name { get; }
+
+    public string Icon { get; }
+
+    public int Color { get; }
+
+    /// <summary>Why the chip says more ("in Eating": another fund has the category this month); empty otherwise.</summary>
+    public string Note { get; init; } = "";
+
+    public bool HasNote => Note.Length > 0;
+
+    public IRelayCommand PickCommand { get; }
+
+    internal static List<CategoryPick> For(IEnumerable<CategoryInfo> categories, string? selected, Action<CategoryPick> pick) =>
+        categories.Select(c => new CategoryPick(c.Id, c.Name, c.Icon, c.Color, pick) { IsSelected = c.Id == selected }).ToList();
+}
+
 /// <summary>A one-tap category button under a transaction to categorize.</summary>
 public sealed class CategoryChip(string id, string name, string icon, int color, Action<string> pick)
 {
@@ -137,8 +170,9 @@ public sealed partial class CategoryEditRow : ObservableObject
 }
 
 /// <summary>
-/// A transaction on the Wallet page: one tap on a suggested category files it; tap the row to change its category
-/// (or make a new one), edit it, see the bank's notification, or delete it.
+/// A transaction on the Wallet page: one tap on a suggested category files it; a tap on the row opens its details (a
+/// pop-up) to change its category (or make a new one), edit it, put it in the debt book, see the bank's notification,
+/// or delete it.
 /// </summary>
 public sealed partial class TransactionRow : ObservableObject
 {
@@ -154,11 +188,16 @@ public sealed partial class TransactionRow : ObservableObject
     [ObservableProperty] private string _categoryName = "";
     [ObservableProperty] private string _categoryIcon = WalletIcons.Uncategorized;
     [ObservableProperty] private int _categoryColor;
-    [ObservableProperty] private bool _isExpanded;
     [ObservableProperty] private CategoryChoice? _selectedChoice;
     [ObservableProperty] private string _balanceText = "";
     [ObservableProperty] private string _originalText = "";
     [ObservableProperty] private string _newCategoryName = "";
+
+    /// <summary>"Spending · Saturday 24 October · 20:05", the details' line under the amount.</summary>
+    [ObservableProperty] private string _whenText = "";
+
+    /// <summary>"Techcombank ·· 1234", "Cash"; the details' account line.</summary>
+    [ObservableProperty] private string _accountText = "";
 
     // The editor
     [ObservableProperty] private bool _isEditing;
@@ -212,10 +251,25 @@ public sealed partial class TransactionRow : ObservableObject
             foreach (var n in names) DebtNames.Add(n);
         }
         IsDebtFormOpen = true;
+        _owner.OpenDebtForm(this);
     }
 
     [RelayCommand]
-    private void CancelDebtForm() => IsDebtFormOpen = false;
+    private void CancelDebtForm()
+    {
+        IsDebtFormOpen = false;
+        _owner.DismissPopupCommand.Execute(null);
+    }
+
+    /// <summary>What the chosen kind means, under the kind buttons.</summary>
+    public string DebtKindHelp => (DebtEntryKind)Math.Clamp(DebtKindIndex, 0, 2) switch
+    {
+        DebtEntryKind.OwesMe => "You lent it: it adds to what they owe you.",
+        DebtEntryKind.IOwe => "You borrowed it: it adds to what you owe them.",
+        _ => "Money paid back: the balance goes back toward 0.",
+    };
+
+    partial void OnDebtKindIndexChanged(int value) => OnPropertyChanged(nameof(DebtKindHelp));
 
     [RelayCommand]
     private void PickDebtPerson(string? name)
@@ -227,7 +281,9 @@ public sealed partial class TransactionRow : ObservableObject
     private void SaveDebt()
     {
         var kind = (DebtEntryKind)Math.Clamp(DebtKindIndex, 0, DebtKindNames.Count - 1);
-        if (_owner.AddDebt(this, DebtPerson, kind, DebtNote)) IsDebtFormOpen = false;
+        if (!_owner.AddDebt(this, DebtPerson, kind, DebtNote)) return;
+        IsDebtFormOpen = false;
+        _owner.DismissPopupCommand.Execute(null);
     }
 
     /// <summary>Shows the person this transaction's money is with in the debt book.</summary>
@@ -279,6 +335,18 @@ public sealed partial class TransactionRow : ObservableObject
     /// <summary>Every category for this direction (the picker in the expanded row).</summary>
     public ObservableCollection<CategoryChoice> Choices { get; } = [];
 
+    /// <summary>The same categories as chips in the details; the transaction's own is picked.</summary>
+    public ObservableCollection<CategoryPick> Picks { get; } = [];
+
+    /// <summary>The editor's kind: 0 spending, 1 money in.</summary>
+    public int EditKindIndex
+    {
+        get => EditIsIncome ? 1 : 0;
+        set => EditIsIncome = value == 1;
+    }
+
+    partial void OnEditIsIncomeChanged(bool value) => OnPropertyChanged(nameof(EditKindIndex));
+
     internal void Update(WalletTransaction t, string title, string details, CategoryInfo? category, IReadOnlyList<CategoryInfo> choices)
     {
         _loading = true;
@@ -301,6 +369,16 @@ public sealed partial class TransactionRow : ObservableObject
             foreach (var c in list) Choices.Add(c);
         }
         SelectedChoice = t.CategoryId is { } id ? Choices.FirstOrDefault(c => c.Id == id) : null;
+        var visible = choices.Where(c => !c.Hidden || c.Id == t.CategoryId).ToList();
+        if (Picks.Count != visible.Count || !Picks.Select(p => (p.Id, p.Name, p.Icon, p.Color)).SequenceEqual(visible.Select(c => (c.Id, c.Name, c.Icon, c.Color))))
+        {
+            Picks.Clear();
+            foreach (var p in CategoryPick.For(visible, t.CategoryId, PickChip)) Picks.Add(p);
+        }
+        else
+        {
+            foreach (var p in Picks) p.IsSelected = p.Id == t.CategoryId;
+        }
         _loading = false;
         OnPropertyChanged(nameof(IsSpending));
         OnPropertyChanged(nameof(HasBalance));
@@ -320,17 +398,19 @@ public sealed partial class TransactionRow : ObservableObject
 
     private void Pick(string categoryId) => _owner.Categorize(this, categoryId);
 
+    private void PickChip(CategoryPick pick)
+    {
+        if (pick.Id != Transaction.CategoryId) _owner.Categorize(this, pick.Id);
+    }
+
     partial void OnSelectedChoiceChanged(CategoryChoice? value)
     {
         if (!_loading && value is not null && value.Id != Transaction.CategoryId) _owner.Categorize(this, value.Id);
     }
 
+    /// <summary>Opens the details pop-up.</summary>
     [RelayCommand]
-    private void ToggleExpanded()
-    {
-        IsExpanded = !IsExpanded;
-        if (!IsExpanded) IsEditing = false;
-    }
+    private void Open() => _owner.OpenDetails(this);
 
     [RelayCommand]
     private void Uncategorize() => _owner.Categorize(this, null);
@@ -353,15 +433,18 @@ public sealed partial class TransactionRow : ObservableObject
         EditTime = new TimeSpan(time.Hours, time.Minutes, 0);
         EditNote = Transaction.Note;
         IsEditing = true;
+        _owner.OpenEdit(this);
     }
 
     [RelayCommand]
-    private void CancelEdit() => IsEditing = false;
+    private void CancelEdit() => _owner.DismissPopupCommand.Execute(null);
 
     [RelayCommand]
     private void SaveEdit()
     {
-        if (_owner.SaveEdit(this)) IsEditing = false;
+        if (!_owner.SaveEdit(this)) return;
+        IsEditing = false;
+        _owner.DismissPopupCommand.Execute(null);
     }
 
     [RelayCommand]
