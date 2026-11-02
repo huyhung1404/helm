@@ -25,6 +25,23 @@ public sealed record VocabWordRow(string Id, string Text, string Phonetic, strin
     /// <summary>The user keeps forgetting it.</summary>
     public bool IsHard { get; init; }
 
+    /// <summary>Chinese: its pinyin keeps slipping while the meaning is known.</summary>
+    public bool IsSlipping { get; init; }
+
+    /// <summary>Never answered yet.</summary>
+    public bool IsNew { get; init; }
+
+    /// <summary>How well it is known: its quiz level, 0 to <see cref="VocabQuiz.TopLevel"/> (the row's dots).</summary>
+    public int Strength { get; init; }
+
+    /// <summary>One flag per level, true up to <see cref="Strength"/>: the dots drawn on the row.</summary>
+    public IReadOnlyList<bool> Dots => [.. Enumerable.Range(0, VocabQuiz.TopLevel).Select(i => i < Strength)];
+
+    /// <summary>The one label worth showing next to the word: Hidden, Often forgotten, Pinyin slips or New; empty for none.</summary>
+    public string Flag => IsHidden ? "Hidden" : IsHard ? "Often forgotten" : IsSlipping ? "Pinyin slips" : IsNew ? "New" : "";
+
+    public bool HasFlag => Flag.Length > 0;
+
     public bool HasPhonetic => Phonetic.Length > 0;
 
     public bool CanRemove => Remove is not null;
@@ -34,8 +51,11 @@ public sealed record VocabWordRow(string Id, string Text, string Phonetic, strin
     public bool HasLevel => Level.Length > 0;
 }
 
-/// <summary>A choice of the Words tab's filter: everything, often forgotten, hidden, a level, a topic or one of the user's tags.</summary>
+/// <summary>A choice of the Words tab's filter: everything, due, new, often forgotten, pinyin slips, hidden, a level, a topic or a tag.</summary>
 public sealed record VocabWordFilter(string Name, Func<VocabWord, VocabWordStats, bool> Matches);
+
+/// <summary>A filter as a chip above the list: its name, how many words it would show (with the search), whether it is on.</summary>
+public sealed record VocabFilterChip(string Name, int Count, bool IsOn, IRelayCommand Pick);
 
 /// <summary>
 /// The Words tab's list: the analyzed words of one language, searched, filtered (level, topic, tag) and sorted (A–Z,
@@ -76,6 +96,9 @@ public sealed partial class VocabWordListViewModel : ObservableObject
     }
 
     public ObservableCollection<VocabWordRow> Words { get; } = [];
+
+    /// <summary>The filters as chips with their counts (the same choices as <see cref="FilterNames"/>).</summary>
+    public ObservableCollection<VocabFilterChip> Chips { get; } = [];
 
     /// <summary>One page of the list at a time (Previous / Next under it).</summary>
     public ListPages Pages { get; }
@@ -153,9 +176,11 @@ public sealed partial class VocabWordListViewModel : ObservableObject
 
         var terms = TextSearch.Terms(SearchText);
         var filter = _filters[Math.Clamp(FilterIndex, 0, _filters.Count - 1)];
-        var matches = mine
-            .Where(w => filter.Matches(w.Value, Of(w.Id)))
-            .Where(w => terms.Count == 0 || TextSearch.Score(terms, w.Value.Text, $"{w.Value.Meaning} {w.Value.HanViet} {w.Value.Note}") > 0);
+        var searched = mine
+            .Where(w => terms.Count == 0 || TextSearch.Score(terms, w.Value.Text, $"{w.Value.Meaning} {w.Value.HanViet} {w.Value.Note}") > 0)
+            .ToList();
+        RefreshChips(searched.Select(w => (w.Value, Of(w.Id))).ToList());
+        var matches = searched.Where(w => filter.Matches(w.Value, Of(w.Id)));
         var sorted = (SortIndex switch
         {
             1 => matches.OrderByDescending(w => w.Value.CreatedAt),
@@ -179,6 +204,9 @@ public sealed partial class VocabWordListViewModel : ObservableObject
                 IsChinese = w.Value.Language == VocabLanguage.Chinese,
                 IsHidden = w.Value.Hidden,
                 IsHard = !w.Value.Hidden && VocabQuiz.IsHard(w.Value, s),
+                IsSlipping = !w.Value.Hidden && VocabQuiz.IsSlipping(w.Value, s),
+                IsNew = s.IsNew,
+                Strength = s.Level,
             });
             last = group;
         }
@@ -214,13 +242,23 @@ public sealed partial class VocabWordListViewModel : ObservableObject
         _ => SortKey(word) is { Length: > 0 } key ? key[..1].ToUpperInvariant() : "#",
     };
 
-    /// <summary>The filters this list offers: often forgotten and hidden when there are such words, every level, topic and tag.</summary>
+    /// <summary>
+    /// The filters this list offers: due now, new, often forgotten, pinyin slips and hidden when there are such words, then
+    /// every level, topic and tag.
+    /// </summary>
     private void RebuildFilters(IReadOnlyList<(VocabWord Word, VocabWordStats Stats)> words)
     {
         var list = words.Select(w => w.Word).ToList();
+        var now = _store.Now;
         var filters = new List<VocabWordFilter> { new(AllWords, (_, _) => true) };
-        if (words.Any(w => !w.Word.Hidden && VocabQuiz.IsHard(w.Word, w.Stats)))
-            filters.Add(new("Often forgotten", (w, s) => !w.Hidden && VocabQuiz.IsHard(w, s)));
+        void AddIfAny(string name, Func<VocabWord, VocabWordStats, bool> matches)
+        {
+            if (words.Any(w => matches(w.Word, w.Stats))) filters.Add(new(name, matches));
+        }
+        AddIfAny("Due now", (w, s) => !w.Hidden && s.IsDue(now));
+        AddIfAny("New", (w, s) => !w.Hidden && s.IsNew);
+        AddIfAny("Often forgotten", (w, s) => !w.Hidden && VocabQuiz.IsHard(w, s));
+        AddIfAny("Pinyin slips", (w, s) => !w.Hidden && VocabQuiz.IsSlipping(w, s));
         if (list.Any(w => w.Hidden)) filters.Add(new("Hidden", (w, _) => w.Hidden));
         foreach (var level in list.Select(w => w.Level).Where(l => l.Length > 0).Distinct().OrderBy(VocabLevels.Rank))
             filters.Add(new($"Level {level}", (w, _) => w.Level == level));
@@ -237,6 +275,19 @@ public sealed partial class VocabWordListViewModel : ObservableObject
         FilterNames = names;
         FilterIndex = Math.Max(0, names.IndexOf(chosen ?? AllWords));
         _rebuildingFilters = false;
+    }
+
+    /// <summary>The chips: every filter with the number of searched words it keeps.</summary>
+    private void RefreshChips(IReadOnlyList<(VocabWord Word, VocabWordStats Stats)> searched)
+    {
+        Chips.Clear();
+        for (var i = 0; i < _filters.Count; i++)
+        {
+            var index = i;
+            var filter = _filters[i];
+            Chips.Add(new VocabFilterChip(filter.Name, searched.Count(w => filter.Matches(w.Word, w.Stats)), i == FilterIndex,
+                new RelayCommand(() => FilterIndex = index)));
+        }
     }
 
     /// <summary>Alphabetical: English by the word, Chinese by its pinyin without tone marks.</summary>

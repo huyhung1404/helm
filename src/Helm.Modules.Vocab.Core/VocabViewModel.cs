@@ -7,18 +7,17 @@ using Helm.Shell.Services;
 
 namespace Helm.Modules.Vocab;
 
-/// <summary>The page's tabs: learning, adding new words, looking words up, their roots.</summary>
+/// <summary>The page's tabs: learning, looking words up, their roots. Adding words and the agent's work are dialogs.</summary>
 public enum VocabTab
 {
     Learn,
-    Add,
     Words,
     Roots,
 }
 
 /// <summary>
-/// The Vocabulary page, shared by the Windows and Android apps. It holds the tabs, the guessing card, adding words and
-/// the opened word; the list (<see cref="List"/>), the roots (<see cref="Roots"/>), the agent (<see cref="Agent"/>) and
+/// The Vocabulary page, shared by the Windows and Android apps. It holds the tabs, the guessing card, the Add words and
+/// Analysis dialogs (a dialog on Windows, a bottom sheet on Android) and the opened word; the list (<see cref="List"/>), the roots (<see cref="Roots"/>), the agent (<see cref="Agent"/>) and
 /// the options (<see cref="Settings"/>) are their own view models. All members are used on the UI thread; store changes
 /// (local or synced) are coalesced into one refresh through <see cref="IUiDispatcher"/>.
 /// </summary>
@@ -26,7 +25,8 @@ public sealed partial class VocabViewModel : ObservableObject
 {
     /// <summary>What to ask Claude Code for the waiting words (copied by the button next to the count).</summary>
     public const string AgentPrompt = "Phân tích các từ mới trong Helm Vocabulary (vocab_pending, rồi vocab_save_analyses cho các từ đó), " +
-        "rồi làm vocab_follow_ups (mẹo nhớ mới cho từ hay quên, bổ sung chi tiết còn thiếu) bằng vocab_save_details.";
+        "rồi làm vocab_follow_ups (mẹo nhớ mới cho từ hay quên, mẹo nhớ pinyin cho từ hay sai pinyin, bổ sung chi tiết còn thiếu) " +
+        "bằng vocab_save_details.";
 
     private const int RecentCount = 8;
 
@@ -44,11 +44,18 @@ public sealed partial class VocabViewModel : ObservableObject
     [ObservableProperty] private VocabWordDetailViewModel? _detail;
     [ObservableProperty] private int _pendingCount;
     [ObservableProperty] private int _hardCount;
+    [ObservableProperty] private int _slipCount;
     [ObservableProperty] private int _lackingCount;
     [ObservableProperty] private VocabDay _today = new(0, 0, 0, 0);
 
-    /// <summary>The tab in front: Learn (only the card), Add (new words and what waits), Words (the list, a word's tree), Roots (families).</summary>
+    /// <summary>The tab in front: Learn (the card), Words (the list, a word's page), Roots (families).</summary>
     [ObservableProperty] private VocabTab _tab = VocabTab.Learn;
+
+    /// <summary>The Add words dialog is open: new words, and the ones added lately.</summary>
+    [ObservableProperty] private bool _isAddOpen;
+
+    /// <summary>The Analysis dialog is open: what waits for the agent, and the agent itself.</summary>
+    [ObservableProperty] private bool _isAgentOpen;
 
     public VocabViewModel(VocabStore store, VocabQuiz quiz, VocabSettingsViewModel settings, VocabAgentViewModel agent, IUiDispatcher ui,
         IDialogService dialogs, IClipboardService clipboard, VocabVoice? voice = null)
@@ -71,6 +78,10 @@ public sealed partial class VocabViewModel : ObservableObject
         Card.WordHidden += (_, text) => Message = $"“{text}” is hidden from the cards. Words → Hidden shows it again.";
         if (voice is not null) voice.Problem += (_, problem) => _ui.Post(() => Message = problem);
         settings.Changed += (_, name) => OnSettingChanged(name);
+        agent.PropertyChanged += (_, e) =>
+        {
+            if (e.PropertyName == nameof(VocabAgentViewModel.IsBusy)) OnAgentWorkChanged();
+        };
 
         _store.Changed += (_, _) => ScheduleRefresh();
         _store.ReviewsChanged += (_, _) => ScheduleRefresh();
@@ -89,21 +100,26 @@ public sealed partial class VocabViewModel : ObservableObject
     /// <summary>The guessing card on the Learn tab.</summary>
     public VocabCardViewModel Card { get; }
 
-    /// <summary>The words added last (Add tab), newest first: what was just added and whether the agent got to it.</summary>
+    /// <summary>The words added last (Add words dialog), newest first: what was just added and whether the agent got to it.</summary>
     public ObservableCollection<VocabWordRow> RecentWords { get; } = [];
 
     public bool HasRecentWords => RecentWords.Count > 0;
 
     public bool IsLearning => Tab == VocabTab.Learn;
 
-    public bool IsAdding => Tab == VocabTab.Add;
 
     public bool IsWordsTab => Tab == VocabTab.Words;
 
     public bool IsRootsTab => Tab == VocabTab.Roots;
 
-    /// <summary>"Words (6)" on the tab.</summary>
-    public string WordsTabText => $"Words ({Today.Total})";
+    /// <summary>The count on the Learn tab: words due now.</summary>
+    public int LearnCount => Today.Due;
+
+    /// <summary>The count on the Words tab: the words on the cards.</summary>
+    public int WordsCount => Today.Total;
+
+    /// <summary>Learned words as a share of all (0-100), for the "Learned" bar.</summary>
+    public double LearnedPercent => Today.Total == 0 ? 0 : 100.0 * Today.Learned / Today.Total;
 
     /// <summary>Above the card: what is due today, what is new, what is learned.</summary>
     public string LearnSummary => Today.Total == 0 ? ""
@@ -119,8 +135,23 @@ public sealed partial class VocabViewModel : ObservableObject
 
     public bool HasPending => PendingCount > 0;
 
-    /// <summary>Something for the agent: words to break down, words often forgotten, words lacking details.</summary>
-    public bool HasAgentWork => PendingCount + HardCount + LackingCount > 0;
+    /// <summary>Something for the agent: words to break down, often forgotten, whose pinyin slips, lacking details.</summary>
+    public bool HasAgentWork => PendingCount + HardCount + SlipCount + LackingCount > 0;
+
+    /// <summary>The Analysis chip in the page's header: "Analyzing…", "3 waiting for analysis", "All words analyzed".</summary>
+    public string AgentChipText => Agent.IsBusy ? "Analyzing…" : PendingCount switch
+    {
+        0 => "All words analyzed",
+        1 => "1 waiting for analysis",
+        _ => $"{PendingCount} waiting for analysis",
+    };
+
+    /// <summary>The chip's look: the agent at work, words waiting, or all done.</summary>
+    public bool IsAgentBusy => Agent.IsBusy;
+
+    public bool IsAgentWaiting => !Agent.IsBusy && PendingCount > 0;
+
+    public bool IsAllAnalyzed => !Agent.IsBusy && PendingCount == 0;
 
     /// <summary>What waits for the agent, one line per kind.</summary>
     public string AgentWorkText => string.Join(Environment.NewLine, new[]
@@ -131,6 +162,12 @@ public sealed partial class VocabViewModel : ObservableObject
             0 => "",
             1 => "1 word you keep forgetting waits for a new way to remember it.",
             _ => $"{HardCount} words you keep forgetting wait for a new way to remember them.",
+        },
+        SlipCount switch
+        {
+            0 => "",
+            1 => "1 Chinese word whose pinyin keeps slipping waits for a pinyin hook (no new analysis).",
+            _ => $"{SlipCount} Chinese words whose pinyin keeps slipping wait for a pinyin hook (no new analysis).",
         },
         LackingCount switch
         {
@@ -159,14 +196,15 @@ public sealed partial class VocabViewModel : ObservableObject
     partial void OnTodayChanged(VocabDay value)
     {
         OnPropertyChanged(nameof(LearnSummary));
-        OnPropertyChanged(nameof(WordsTabText));
+        OnPropertyChanged(nameof(LearnCount));
+        OnPropertyChanged(nameof(WordsCount));
+        OnPropertyChanged(nameof(LearnedPercent));
         OnPropertyChanged(nameof(IsCaughtUp));
     }
 
     partial void OnTabChanged(VocabTab value)
     {
         OnPropertyChanged(nameof(IsLearning));
-        OnPropertyChanged(nameof(IsAdding));
         OnPropertyChanged(nameof(IsWordsTab));
         OnPropertyChanged(nameof(IsRootsTab));
     }
@@ -180,12 +218,18 @@ public sealed partial class VocabViewModel : ObservableObject
 
     partial void OnHardCountChanged(int value) => OnAgentWorkChanged();
 
+    partial void OnSlipCountChanged(int value) => OnAgentWorkChanged();
+
     partial void OnLackingCountChanged(int value) => OnAgentWorkChanged();
 
     private void OnAgentWorkChanged()
     {
         OnPropertyChanged(nameof(HasAgentWork));
         OnPropertyChanged(nameof(AgentWorkText));
+        OnPropertyChanged(nameof(AgentChipText));
+        OnPropertyChanged(nameof(IsAgentBusy));
+        OnPropertyChanged(nameof(IsAgentWaiting));
+        OnPropertyChanged(nameof(IsAllAnalyzed));
     }
 
     partial void OnDetailChanged(VocabWordDetailViewModel? value)
@@ -220,8 +264,29 @@ public sealed partial class VocabViewModel : ObservableObject
     [RelayCommand]
     private void ShowLearn() => Tab = VocabTab.Learn;
 
+    // ---- dialogs -------------------------------------------------------------------------------------------------
+
+    /// <summary>Opens Add words (PC Ctrl+N, the header's button, the phone's +).</summary>
     [RelayCommand]
-    private void ShowAdd() => Tab = VocabTab.Add;
+    private void OpenAdd()
+    {
+        IsAgentOpen = false;
+        IsAddOpen = true;
+    }
+
+    [RelayCommand]
+    private void CloseAdd() => IsAddOpen = false;
+
+    /// <summary>Opens Analysis (the header's chip).</summary>
+    [RelayCommand]
+    private void OpenAgent()
+    {
+        IsAddOpen = false;
+        IsAgentOpen = true;
+    }
+
+    [RelayCommand]
+    private void CloseAgent() => IsAgentOpen = false;
 
     [RelayCommand]
     private void ShowWords() => Tab = VocabTab.Words;
@@ -313,6 +378,7 @@ public sealed partial class VocabViewModel : ObservableObject
         var all = _store.Words();
         PendingCount = all.Count(w => !w.Value.IsAnalyzed);
         HardCount = _quiz.HardWords().Count;
+        SlipCount = _quiz.SlippingWords().Count;
         LackingCount = all.Count(w => w.Value.LacksDetails && !w.Value.Hidden);
         Today = _quiz.Today();
         RefreshRecent(all);

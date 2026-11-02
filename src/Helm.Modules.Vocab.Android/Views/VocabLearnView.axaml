@@ -1,0 +1,154 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:ic="using:FluentIcons.Avalonia"
+             xmlns:vm="using:Helm.Modules.Vocab"
+             xmlns:local="using:Helm.Modules.Vocab"
+             x:Class="Helm.Modules.Vocab.VocabLearnView"
+             x:DataType="vm:VocabViewModel">
+
+    <!-- The Learn tab: today's numbers, then one card. The answer buttons are in the bar at the bottom of the page
+         (VocabContentPage), in thumb reach; ⋯ opens the card's sheet (I know it, Hide, Open its page, Edit). -->
+    <StackPanel Spacing="10">
+        <StackPanel Spacing="6" Margin="2,2,2,0">
+            <Grid ColumnDefinitions="*,Auto">
+                <TextBlock FontSize="13" VerticalAlignment="Center"><Run Text="{Binding Today.Due}" FontWeight="SemiBold" /><Run Text=" due · " /><Run Text="{Binding Today.New}" FontWeight="SemiBold" /><Run Text=" new" /></TextBlock>
+                <TextBlock Grid.Column="1" Classes="hint" VerticalAlignment="Center"><Run Text="{Binding Today.Learned}" /><Run Text=" of " /><Run Text="{Binding Today.Total}" /><Run Text=" learned" /></TextBlock>
+            </Grid>
+            <ProgressBar Value="{Binding LearnedPercent}" Minimum="0" Maximum="100" Height="4" MinHeight="4" CornerRadius="2" AutomationProperties.Name="Learned" />
+        </StackPanel>
+        <TextBlock Text="All caught up: nothing is due now. These cards are extra rounds." TextWrapping="Wrap" FontSize="13"
+                   Foreground="{DynamicResource HelmSuccess}" IsVisible="{Binding IsCaughtUp}" />
+
+        <Panel>
+            <Border Classes="card" Padding="0" DataContext="{Binding Card}" x:DataType="vm:VocabCardViewModel">
+                <StackPanel>
+                    <!-- Nothing to learn yet -->
+                    <StackPanel IsVisible="{Binding !HasWord}" Spacing="10" Margin="20,48">
+                        <ic:SymbolIcon Symbol="HatGraduation" FontSize="40" HorizontalAlignment="Center" Foreground="{DynamicResource HelmSecondaryText}" />
+                        <TextBlock Text="No word to learn yet" FontSize="20" FontWeight="SemiBold" HorizontalAlignment="Center" />
+                        <TextBlock Classes="hint" TextAlignment="Center" FontSize="14"
+                                   Text="Add the words you meet with +. Once an AI agent breaks them down, they come here one at a time." />
+                    </StackPanel>
+
+                    <StackPanel IsVisible="{Binding HasWord}">
+                        <!-- What the card asks, how well the word is known, its menu -->
+                        <Grid ColumnDefinitions="Auto,*,Auto" Margin="14,6,4,0">
+                            <Border Classes="tag acc">
+                                <TextBlock Text="{Binding KindText}" />
+                            </Border>
+                            <TextBlock Grid.Column="1" Text="{Binding LevelText}" Classes="hint" FontSize="12" TextWrapping="NoWrap" TextTrimming="CharacterEllipsis"
+                                       VerticalAlignment="Center" Margin="8,0" />
+                            <Button Grid.Column="2" Classes="icon" Click="CardMenu_Click" AutomationProperties.Name="More for this word">
+                                <ic:SymbolIcon Symbol="MoreVertical" FontSize="20" />
+                            </Button>
+                        </Grid>
+                        <WrapPanel Margin="14,2,14,0">
+                            <Border Classes="tag warn" IsVisible="{Binding IsHard}" Margin="0,0,6,0">
+                                <TextBlock Text="Often forgotten" />
+                            </Border>
+                            <Border Classes="tag py" IsVisible="{Binding IsSlipping}" Margin="0,0,6,0">
+                                <TextBlock Text="Pinyin slips" />
+                            </Border>
+                            <Border Classes="tag acc" IsVisible="{Binding IsNewlyHelped}">
+                                <TextBlock Text="New way to remember it" />
+                            </Border>
+                        </WrapPanel>
+
+                        <!-- The front: a tap shows the answer -->
+                        <Button Classes="front" Classes.revealed="{Binding IsRevealed}" Command="{Binding RevealCommand}" AutomationProperties.Name="Show the answer">
+                            <StackPanel Spacing="10">
+                                <TextBlock Text="{Binding FrontText}" FontSize="48" FontWeight="SemiBold" HorizontalAlignment="Center" TextWrapping="Wrap" TextAlignment="Center"
+                                           IsVisible="{Binding FrontIsWord}" />
+                                <TextBlock Text="{Binding FrontText}" FontSize="22" HorizontalAlignment="Center" TextWrapping="Wrap" TextAlignment="Center"
+                                           IsVisible="{Binding FrontIsText}" />
+                                <Button Classes="accent" HorizontalAlignment="Center" MinHeight="48" Padding="20,0" Command="{Binding SayCommand}" IsVisible="{Binding FrontIsListen}"
+                                        AutomationProperties.Name="Play">
+                                    <StackPanel Orientation="Horizontal" Spacing="8">
+                                        <ic:SymbolIcon Symbol="Speaker2" FontSize="20" />
+                                        <TextBlock Text="Play" VerticalAlignment="Center" FontSize="16" />
+                                    </StackPanel>
+                                </Button>
+                                <TextBlock Text="{Binding FrontNote}" Classes="hint" HorizontalAlignment="Center" TextAlignment="Center" IsVisible="{Binding HasFrontNote}" />
+                                <TextBlock Text="{Binding FrontHint}" Classes="hint" HorizontalAlignment="Center" TextAlignment="Center" IsVisible="{Binding !IsRevealed}" />
+                            </StackPanel>
+                        </Button>
+
+                        <!-- Type cards and Chinese pinyin cards: typed here, checked on Enter or Check -->
+                        <Grid ColumnDefinitions="*,8,Auto" IsVisible="{Binding IsTyping}" Margin="16,0,16,16">
+                            <TextBox x:Name="TypeBox" FontSize="18" MinHeight="44" PlaceholderText="{Binding TypePrompt}" Text="{Binding Typed}"
+                                     AutomationProperties.Name="{Binding TypePrompt}">
+                                <TextBox.KeyBindings>
+                                    <KeyBinding Gesture="Enter" Command="{Binding CheckCommand}" />
+                                </TextBox.KeyBindings>
+                            </TextBox>
+                            <Button Grid.Column="2" Classes="accent tall" Content="Check" Command="{Binding CheckCommand}" />
+                        </Grid>
+
+                        <!-- The answer -->
+                        <Border IsVisible="{Binding IsRevealed}" Margin="16,0" Padding="0,16,0,6" BorderBrush="{DynamicResource VocabLine}" BorderThickness="0,1,0,0">
+                            <StackPanel Spacing="6">
+                                <!-- What was typed, letter by letter, and the verdict -->
+                                <StackPanel IsVisible="{Binding HasAnswer}" HorizontalAlignment="Center" Spacing="4" Margin="0,0,0,6">
+                                    <ItemsControl ItemsSource="{Binding AnswerPieces}" HorizontalAlignment="Center">
+                                        <ItemsControl.ItemsPanel>
+                                            <ItemsPanelTemplate>
+                                                <StackPanel Orientation="Horizontal" />
+                                            </ItemsPanelTemplate>
+                                        </ItemsControl.ItemsPanel>
+                                        <ItemsControl.ItemTemplate>
+                                            <DataTemplate x:DataType="vm:VocabAnswerPiece">
+                                                <TextBlock Text="{Binding Text}" Classes="piece" Classes.wrong="{Binding IsWrong}" Classes.missing="{Binding IsMissing}" />
+                                            </DataTemplate>
+                                        </ItemsControl.ItemTemplate>
+                                    </ItemsControl>
+                                    <TextBlock Text="{Binding AnswerMessage}" Classes="verdict" Classes.correct="{Binding AnswerIsCorrect}" Classes.close="{Binding AnswerIsClose}"
+                                               FontWeight="SemiBold" HorizontalAlignment="Center" TextWrapping="Wrap" TextAlignment="Center" />
+                                    <TextBlock Text="{Binding VerdictHint}" Classes="hint" HorizontalAlignment="Center" TextAlignment="Center" IsVisible="{Binding HasVerdictHint}" />
+                                </StackPanel>
+                                <TextBlock Text="{Binding Text}" FontSize="34" FontWeight="SemiBold" HorizontalAlignment="Center" TextWrapping="Wrap" TextAlignment="Center"
+                                           IsVisible="{Binding ShowsWordOnReveal}" />
+                                <WrapPanel HorizontalAlignment="Center">
+                                    <TextBlock local:ToneText.Text="{Binding Phonetic}" FontSize="18" Margin="0,0,10,0" VerticalAlignment="Center" />
+                                    <TextBlock Text="{Binding HanViet}" Foreground="{DynamicResource HelmSecondaryText}" FontSize="15" FontWeight="SemiBold" Margin="0,0,10,0"
+                                               VerticalAlignment="Center" />
+                                    <TextBlock Text="{Binding Traditional}" Foreground="{DynamicResource HelmSecondaryText}" FontSize="15" VerticalAlignment="Center" />
+                                </WrapPanel>
+                                <WrapPanel HorizontalAlignment="Center">
+                                    <Button Classes="ghost" Command="{Binding SayCommand}" IsVisible="{Binding CanSay}" AutomationProperties.Name="Listen">
+                                        <StackPanel Orientation="Horizontal" Spacing="6">
+                                            <ic:SymbolIcon Symbol="Speaker2" FontSize="18" />
+                                            <TextBlock Text="Listen" VerticalAlignment="Center" />
+                                        </StackPanel>
+                                    </Button>
+                                    <Button Classes="ghost" Command="{Binding YouGlishCommand}" IsVisible="{Binding ShowYouGlish}" AutomationProperties.Name="YouGlish">
+                                        <StackPanel Orientation="Horizontal" Spacing="6">
+                                            <ic:SymbolIcon Symbol="Video" FontSize="18" />
+                                            <TextBlock Text="YouGlish" VerticalAlignment="Center" />
+                                        </StackPanel>
+                                    </Button>
+                                </WrapPanel>
+                                <Border Classes="hook" IsVisible="{Binding HasPinyinMnemonic}">
+                                    <StackPanel Spacing="2">
+                                        <TextBlock Text="Remembering the pinyin" Classes="hooklabel" />
+                                        <TextBlock Text="{Binding PinyinMnemonic}" FontSize="14" TextWrapping="Wrap" />
+                                    </StackPanel>
+                                </Border>
+                                <TextBlock Text="{Binding Meaning}" FontSize="20" TextWrapping="Wrap" TextAlignment="Center" HorizontalAlignment="Center" />
+                                <TextBlock Text="{Binding Explanation}" Classes="hint" FontSize="14" TextAlignment="Center" HorizontalAlignment="Center"
+                                           IsVisible="{Binding Explanation, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+                            </StackPanel>
+                        </Border>
+
+                        <!-- What helps to use it, how it is built: collapsible -->
+                        <StackPanel IsVisible="{Binding IsRevealed}" Margin="16,4,16,8">
+                            <local:VocabSection Title="How it's built" Key="learn.tree" IsVisible="{Binding HasExplanationTree}">
+                                <local:VocabOutlineView DataContext="{Binding ExplanationTree}" />
+                            </local:VocabSection>
+                            <local:VocabInfoView DataContext="{Binding Info}" />
+                        </StackPanel>
+                    </StackPanel>
+                </StackPanel>
+            </Border>
+        </Panel>
+    </StackPanel>
+</UserControl>

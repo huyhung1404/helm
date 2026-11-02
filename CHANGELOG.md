@@ -25,6 +25,36 @@ Format: [Keep a Changelog](https://keepachangelog.com), versions follow [SemVer]
   them, post a report where you allow writing (always asked first with the exact text, behind the AI signature, never
   pinging a whole channel), and, when you ask, wait for the team's replies in that thread to rework the task. Messages and tokens stay on this PC, encrypted for your Windows user, and are
   never synced.
+- **Wallet: funds.** A fund holds an amount every month (or for one month only) and owns categories; what you spend
+  in them comes off it. Each fund shows what it held (with money moved in and the leftover carried over), what was
+  spent and what is left, and whether it is on track, running low, used up or over, with the day it runs out at this
+  month's pace. Funds are drawn as honey pots whose level drops as you spend; a fund can cover another's overspend,
+  and "Outside funds" shows what no fund holds. On the phone a fund that runs low, is used up or goes over sends one
+  notification per level and month (a switch in Wallet's settings turns them off), and a new Funds widget shows the
+  month's pots, the ones in trouble first.
+- **Vocabulary: see-through pop-up cards.** The word card over other apps (PC and phone) is see-through at rest, so
+  the app below stays readable, and turns solid while you use it. Settings → Card opacity (40–100 %, 85 % by default).
+
+### Changed
+- **Wallet: dialogs instead of fold-outs.** Every add, edit and delete opens a dialog on the PC and a bottom sheet on
+  the phone, and goes back to the one it came from; the transactions waiting for a category moved behind a "To
+  categorize (n)" button, and a short notice says what happened ("Added 35,000 đ · Eating: 841,000 đ left").
+- **Helm Keyboard's icon is a plain keyboard**, the same size and weight as the other tools' icons.
+- **Vocabulary: a new look, the same on the PC and the phone.** Three tabs, Learn · Words · Roots, with their counts;
+  adding words is a dialog (Ctrl+N on the PC, + on the phone) with the words added lately, and what waits for Claude
+  Code sits behind one chip in the header ("3 waiting for analysis"). The Learn card says what it asks ("Word →
+  meaning", "Type its pinyin"), its answer buttons stay in reach and say when the word comes back ("again in 10
+  minutes", "next in 8 days"), and a side panel shows today's numbers. The Words list filters with chips that count
+  their words (Due now, New, Often forgotten, Pinyin slips, levels, tags) and shows how well each word is known as
+  eight dots. Editing, asking for a new analysis and deleting open a dialog on the PC and a bottom sheet on the phone;
+  a word's other actions sit in a ⋯ menu. On the phone, how a word is built reads top-down as an outline, so nothing
+  scrolls sideways.
+- **Vocabulary: a wrong pinyin is no longer a forgotten word.** On a Chinese card the pinyin you type is checked by
+  itself, and the buttons ask only about the meaning ("Forgot the meaning" / "Knew the meaning"). Knowing the meaning
+  but typing the pinyin wrong is a pinyin slip: the word keeps its level, comes back tomorrow, and does not count
+  towards "often forgotten", so Claude Code no longer rewrites its analysis or its story. After 3 slips it writes only
+  a way to remember the reading (the sound component, the Hán Việt, the tones), shown with the answer, on the pop-up
+  cards and on the word's page, and editable by hand.
 
 ## [0.71.0] - 2026-11-01
 

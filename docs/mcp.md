@@ -37,10 +37,12 @@ anything (a Chinese word splits into its characters in order, characters need pi
 loops) and answers what to fix. `vocab_edit` rewords words and parts without touching their trees; `vocab_words`,
 `vocab_get` and `vocab_add_words` read and add words (`level` there is the CEFR/HSK level; `quiz_level` 0–8 and
 `due` are the user's spaced-repetition progress). `vocab_follow_ups` lists the words that need more than their
-analysis: `often_forgotten` (forgotten 4 times or more since the last help: they need a new mnemonic) and
-`missing_details` (analyzed before Helm asked for word forms, synonyms and antonyms); `vocab_save_details` saves those
-details without touching the trees, marks a hard word as helped, and takes a word off `missing_details` even when it
-has no forms (`[]`). Nothing is deleted through them. On the PC, Vocabulary's **Analyze now** (and its automatic run
+analysis: `often_forgotten` (forgotten 4 times or more since the last help: they need a new mnemonic),
+`pinyin_slips` (Chinese words whose meaning the user knows but whose pinyin they typed wrong 3 times or more since the
+last pinyin help: they get a `pinyin_mnemonic` only, never a new analysis) and `missing_details` (analyzed before Helm
+asked for word forms, synonyms and antonyms); `vocab_save_details` saves those details without touching the trees,
+marks a hard word as helped (a slipping word once it has a `pinyin_mnemonic`), and takes a word off `missing_details`
+even when it has no forms (`[]`). Nothing is deleted through them. On the PC, Vocabulary's **Analyze now** (and its automatic run
 a little after there is something to do) runs Claude Code without a window with only these tools allowed
 (`claude -p --allowedTools mcp__helm__vocab_…`), 12 words of each kind per run; when a run leaves the same work behind
 it does not start by itself again until something changes. "Suggest words with this root" on the Roots tab does the

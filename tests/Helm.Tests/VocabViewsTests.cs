@@ -1,4 +1,6 @@
 using System.Windows;
+using System.Windows.Controls;
+using System.Windows.Media;
 using Helm.Core.Desktop;
 using Helm.Core.Settings;
 using Helm.Modules.Vocab;
@@ -17,7 +19,7 @@ public sealed class VocabViewsTests : IDisposable
     public void Dispose() => _dir.Dispose();
 
     [Fact]
-    public void The_pages_and_the_card_load_with_a_word_open() => RunSta(() =>
+    public void The_page_shows_every_tab_and_dialog() => RunSta(() =>
     {
         System.Threading.SynchronizationContext.SetSynchronizationContext(new System.Windows.Threading.DispatcherSynchronizationContext());
         using var settings = new SettingsStoreFactory(new HelmPaths(_dir.Path));
@@ -28,10 +30,10 @@ public sealed class VocabViewsTests : IDisposable
         var windows = new WindowService(NullLogger<WindowService>.Instance);
         var popup = new VocabPopup(store, quiz, settings, windows, new UserActivity(), new InlineUi(), new NoServices(), new VocabVoice(null, null), NullLogger<VocabPopup>.Instance);
         var module = new VocabModule(popup, viewModel.Agent) { IsEnabled = true };
+        var size = new Size(1280, 900);
 
-        // Words: only analyzed ones, one language at a time, alphabetical; the waiting word is on the Add tab only.
+        // Words: only analyzed ones, one language at a time, alphabetical; the waiting word is in Add words only.
         Assert.Equal(["relative", "translate"], viewModel.List.Words.Select(w => w.Text));
-        Assert.Equal("English (2)", viewModel.List.EnglishTabText);
         viewModel.List.ShowChineseCommand.Execute(null);
         Assert.Equal(["补救"], viewModel.List.Words.Select(w => w.Text));
         viewModel.List.ShowEnglishCommand.Execute(null);
@@ -39,119 +41,236 @@ public sealed class VocabViewsTests : IDisposable
         Assert.Equal("ubiquitous", waiting.Text);
         Assert.True(waiting.CanRemove);
 
-        var page = new VocabContentPage(module, viewModel);
+        // Learn: the card, Today, the kind of card and the keys; the tabs show their counts.
+        var page = new VocabContentPage(module, viewModel, new NoNavigation());
         Assert.True(viewModel.IsLearning);
-        Layout(page, new Size(1100, 760), "1-learn");
+        var relative = store.FindWord("relative")!;
+        viewModel.Card.Show(relative.Id, relative.Value);
+        Layout(page, size, "01-learn");
+        Assert.True(Shows(page, "Today"));
+        Assert.True(Shows(page, "Show the answer"));
+        Assert.True(Shows(page, "Word → meaning"));
+        Assert.False(Shows(page, "Knew the meaning"));
 
-        // Adding stays on the Add tab; the new word heads "Recently added", waiting for the agent.
-        viewModel.ShowAddCommand.Execute(null);
+        // Add words: a dialog over the page; the new word heads "Added recently", waiting, with ✕.
+        viewModel.OpenAddCommand.Execute(null);
         viewModel.NewWord = "serendipity";
+        viewModel.NewNote = "a novel, chapter 3";
         viewModel.AddCommand.Execute(null);
-        Assert.True(viewModel.IsAdding);
+        Assert.True(viewModel.IsAddOpen);
         Assert.Equal("serendipity", viewModel.RecentWords[0].Text);
         Assert.True(viewModel.RecentWords[0].IsPending);
-        Layout(page, new Size(1100, 760), "1b-add");
+        Layout(page, size, "02-add");
+        Assert.True(Shows(page, "Added recently"));
+        Assert.True(Shows(page, "Waiting"));
         viewModel.RecentWords.First(w => w.Text == "serendipity").Remove!.Execute(null);
         Assert.Null(store.FindWord("serendipity"));
-        viewModel.ShowLearnCommand.Execute(null);
-        var buJiu = store.FindWord("补救")!;
-        viewModel.Card.Show(buJiu.Id, buJiu.Value);
+        viewModel.CloseAddCommand.Execute(null);
+
+        // Analysis: what waits for Claude Code; the chip says how many.
+        Assert.Equal("1 waiting for analysis", viewModel.AgentChipText);
+        Assert.True(viewModel.IsAgentWaiting);
+        viewModel.OpenAgentCommand.Execute(null);
+        Layout(page, size, "03-analysis");
+        Assert.True(Shows(page, "Waiting for Claude Code"));
+        Assert.True(Shows(page, viewModel.AgentWorkText));
+        viewModel.CloseAgentCommand.Execute(null);
+
+        // The rich answer: the tree beside examples, collocations, mnemonic, words easy to mix up; Forgot / Remembered below.
         viewModel.Card.RevealCommand.Execute(null);
         Assert.NotNull(viewModel.Card.ExplanationTree);
-        Layout(page, new Size(1100, 1150), "2-learn-revealed");
-
-        // The rich answer: examples, collocations, mnemonic, words easy to mix up, labels.
-        var relativeWord = store.FindWord("relative")!;
-        viewModel.Card.Show(relativeWord.Id, relativeWord.Value);
-        viewModel.Card.RevealCommand.Execute(null);
-        Assert.True(viewModel.Card.Info!.HasExamples);
-        Assert.True(viewModel.Card.Info.HasConfusables);
-        Layout(page, new Size(1100, 1400), "2b-learn-rich");
+        Layout(page, size, "04-learn-revealed");
+        Assert.True(Shows(page, "How it's built"));
+        Assert.True(Shows(page, "Remembered"));
+        Assert.True(Shows(page, viewModel.Card.RememberedHint));
 
         // Typing the word: checked letter by letter.
         viewModel.Settings.CardModeIndex = (int)VocabCardMode.Type;
-        viewModel.Card.Show(relativeWord.Id, relativeWord.Value);
+        viewModel.Card.Show(relative.Id, relative.Value);
         Assert.True(viewModel.Card.IsTyping);
-        Layout(page, new Size(1100, 600), "2c-type");
         viewModel.Card.Typed = "relitive";
         viewModel.Card.CheckCommand.Execute(null);
         Assert.True(viewModel.Card.AnswerIsClose);
-        Layout(page, new Size(1100, 700), "2d-type-checked");
+        Layout(page, size, "05-type-checked");
         viewModel.Settings.CardModeIndex = 0;
 
-        // A Chinese word asks for its pinyin first.
-        var buJiuWord = store.FindWord("补救")!;
-        viewModel.Card.Show(buJiuWord.Id, buJiuWord.Value);
+        // A Chinese word asks for its pinyin; the tones slipped, the meaning was known: the buttons ask about the
+        // meaning, Remembered keeps the level ("pinyin slip · back tomorrow"), the pinyin hook shows.
+        var buJiu = store.FindWord("补救")!;
+        for (var i = 0; i < VocabQuiz.PinyinSlips; i++) store.Record(buJiu.Id, remembered: true, pinyinSlip: true);
+        store.UpdateWord(buJiu.Id, w => w with { PinyinMnemonic = "补 mượn âm của 卜 bǔ, 救 mượn vần của 求 qiú → bǔ jiù." });
+        buJiu = store.FindWord("补救")!;
+        viewModel.Card.Show(buJiu.Id, buJiu.Value);
         Assert.True(viewModel.Card.IsTyping);
-        Layout(page, new Size(1100, 600), "2e-pinyin");
-        viewModel.Card.Typed = "bujiu";
+        Assert.True(viewModel.Card.IsSlipping);
+        Assert.Equal("Type its pinyin", viewModel.Card.KindText);
+        Layout(page, size, "06-pinyin");
+        viewModel.Card.Typed = "bu3jiu2";
         viewModel.Card.CheckCommand.Execute(null);
-        Assert.True(viewModel.Card.AnswerIsCorrect);
-        Layout(page, new Size(1100, 800), "2f-pinyin-checked");
+        Assert.True(viewModel.Card.PinyinSlipped);
+        Assert.Equal("Knew the meaning", viewModel.Card.RememberedText);
+        Assert.StartsWith("pinyin slip", viewModel.Card.RememberedHint);
+        Layout(page, size, "07-pinyin-slipped");
+        Assert.True(Shows(page, "Pinyin slips"));
+        Assert.True(Shows(page, "Remembering the pinyin"));
+        Assert.True(Shows(page, viewModel.Card.VerdictHint));
+        Assert.True(Shows(page, "Knew the meaning"));
+        Assert.True(Shows(page, "Forgot the meaning"));
 
-        // Roots: the families the words share; lat holds relative and translate.
-        viewModel.ShowRootsCommand.Execute(null);
-        var latRow = Assert.Single(viewModel.Roots.Roots, r => r.Form == "lat");
-        Assert.Equal(2, latRow.Words.Count);
-        Layout(page, new Size(1100, 760), "8-roots");
-        latRow.Select.Execute(null);
-        Assert.True(viewModel.Roots.HasSelected);
-        // An open family takes the tab and walks the list.
-        Assert.False(viewModel.Roots.ShowsList);
-        Assert.Equal($"1 / {viewModel.Roots.Roots.Count}", viewModel.Roots.RootPosition);
-        Assert.True(viewModel.Roots.HasNextRoot);
-        viewModel.Roots.NextFamilyCommand.Execute(null);
-        Assert.NotEqual("lat", viewModel.Roots.Selected!.Form);
-        viewModel.Roots.PreviousFamilyCommand.Execute(null);
-        Assert.Equal("lat", viewModel.Roots.Selected!.Form);
-        Layout(page, new Size(1100, 760), "8b-root-family");
+        // Words: the list with its chips (each with its count); a chip narrows it.
+        viewModel.ShowWordsCommand.Execute(null);
+        Assert.Equal("All words", viewModel.List.Chips[0].Name);
+        Assert.True(viewModel.List.Chips[0].IsOn);
+        Layout(page, size, "08-words");
+        Assert.True(Shows(page, "How well you know it"));
+        Assert.True(Shows(page, "relative"));
+        var newChip = viewModel.List.Chips.First(c => c.Name == "New");
+        newChip.Pick.Execute(null);
+        Assert.True(viewModel.List.Chips.First(c => c.Name == "New").IsOn);
+        Assert.Equal(newChip.Count, viewModel.List.Words.Count);
+        viewModel.List.Chips[0].Pick.Execute(null);
 
-        viewModel.Open(store.FindWord("补救")!.Id);
-        Assert.False(viewModel.IsLearning);
+        // A Chinese word's page: its labels (Pinyin slips among them), dots, the pinyin hook first, how it is built.
+        viewModel.Open(buJiu.Id);
+        Assert.True(viewModel.IsWordsTab);
         Assert.Equal(["补", "救"], viewModel.Detail!.Root.Children.Select(c => c.Node.Form));
         var jiu = viewModel.Detail.Root.Children[1].Children[0];
         jiu.SelectCommand.Execute(null);
         Assert.Equal("求", viewModel.Detail.CardTitle);
-        Layout(page, new Size(1100, 900), "3-chinese-word");
+        Layout(page, size, "09-chinese-word");
+        Assert.True(viewModel.Detail.IsSlipping);
+        Assert.Equal(VocabQuiz.TopLevel, viewModel.Detail.Dots.Count);
+        Assert.True(Shows(page, "Remembering the pinyin"));
+        Assert.True(Shows(page, "Pinyin slips"));
 
-        viewModel.Open(store.FindWord("relative")!.Id);
+        // An English word's page: labels, the family of a part.
+        store.UpdateWord(relative.Id, w => w with { Tags = ["Aptis"] });
+        viewModel.Open(relative.Id);
         var lat = viewModel.Detail!.Root.Children[0].Children[1];
         lat.SelectCommand.Execute(null);
         Assert.Equal(["translate"], viewModel.Detail.AlsoIn.Select(w => w.Text));
-        // Opened from another language's list, it still walks its own: relative → translate.
         Assert.True(viewModel.HasNextWord);
         Assert.Equal("1 / 2", viewModel.WordPosition);
-        Layout(page, new Size(1100, 900), "4-english-word");
+        Layout(page, size, "10-english-word");
+        Assert.False(viewModel.Detail!.IsSlipping);
+        Assert.True(Shows(page, "B1"));
+        Assert.True(Shows(page, "#Aptis"));
+        Assert.True(Shows(page, "Also in your words"));
 
-        // A change arriving (an answer from another device) refreshes the open word but leaves the Learn tab in front.
+        // Edit: a dialog with the word's fields; the pinyin hook only for a Chinese word.
+        viewModel.Detail.Editor.BeginCommand.Execute(null);
+        Assert.False(viewModel.Detail.Editor.IsChinese);
+        Layout(page, size, "11-edit");
+        Assert.True(Shows(page, "Help to remember and use it"));
+        Assert.False(Shows(page, "To remember the pinyin"));
+        viewModel.Detail.Editor.CancelCommand.Execute(null);
+        viewModel.Open(buJiu.Id);
+        viewModel.Detail!.Editor.BeginCommand.Execute(null);
+        Assert.True(viewModel.Detail.Editor.IsChinese);
+        Layout(page, size, "11b-edit-chinese");
+        Assert.True(Shows(page, "To remember the pinyin"));
+        viewModel.Detail.Editor.PinyinMnemonic = "Thanh 3 rồi 4.";
+        viewModel.Detail.Editor.SaveCommand.Execute(null);
+        Assert.Equal("Thanh 3 rồi 4.", store.FindWord("补救")!.Value.PinyinMnemonic);
+
+        // Ask for a new analysis: a dialog with the note.
+        viewModel.Detail!.BeginRedoCommand.Execute(null);
+        Assert.True(viewModel.Detail.IsAskingRedo);
+        Layout(page, size, "12-redo");
+        Assert.True(Shows(page, "What should change?"));
+        viewModel.Detail.BeginRedoCommand.Execute(null);
+
+        // Roots: family cards in groups; a family takes the tab and walks the list; a root practised alone.
+        viewModel.ShowRootsCommand.Execute(null);
+        var latRow = Assert.Single(viewModel.Roots.Roots, r => r.Form == "lat");
+        Assert.Equal(2, latRow.Words.Count);
+        Layout(page, size, "13-roots");
+        Assert.True(Shows(page, VocabRootGroups.Families));
+        Assert.True(Shows(page, VocabRootGroups.Single));
+        viewModel.Roots.NextRootCommand.Execute(null);
+        viewModel.Roots.RevealRootCommand.Execute(null);
+        Layout(page, size, "14-root-practice");
+        Assert.True(Shows(page, "Its family in your words"));
+        Assert.False(Shows(page, VocabRootGroups.Families));
+        viewModel.Roots.ClosePracticeCommand.Execute(null);
+        latRow.Select.Execute(null);
+        Assert.False(viewModel.Roots.ShowsList);
+        Assert.Equal($"1 / {viewModel.Roots.Roots.Count}", viewModel.Roots.RootPosition);
+        viewModel.Roots.NextFamilyCommand.Execute(null);
+        Assert.NotEqual("lat", viewModel.Roots.Selected!.Form);
+        viewModel.Roots.PreviousFamilyCommand.Execute(null);
+        Assert.Equal("lat", viewModel.Roots.Selected!.Form);
+        Layout(page, size, "15-root-family");
+        Assert.True(Shows(page, "Your words with it"));
+
+        // A change arriving (an answer from another device) refreshes the open word but leaves the tab in front.
         viewModel.ShowLearnCommand.Execute(null);
         store.Record(store.FindWord("translate")!.Id, remembered: true);
         Assert.True(viewModel.IsLearning);
         Assert.NotNull(viewModel.Detail);
 
-        Layout(new VocabPage(module, viewModel, popup, new NoNavigation()), new Size(900, 900), "5-settings");
+        // Delete asks first, then the word goes.
+        viewModel.Open(relative.Id);
+        viewModel.DeleteWordCommand.Execute(null);
+        Assert.Null(store.FindWord("relative"));
+        Assert.False(viewModel.HasDetail);
+
+        // The settings page: the pop-up card's opacity.
+        Layout(new VocabPage(module, viewModel, popup, new NoNavigation()), new Size(900, 1100), "16-settings");
+        viewModel.Settings.CardOpacity = 60;
+        Assert.Equal(60, settings.Get<VocabSettings>(VocabIds.ModuleId).Current.CardOpacity);
+    });
+
+    [Fact]
+    public void The_pop_up_card_is_see_through_at_rest() => RunSta(() =>
+    {
+        System.Threading.SynchronizationContext.SetSynchronizationContext(new System.Windows.Threading.DispatcherSynchronizationContext());
+        var store = new VocabStore(new MemorySynced<VocabWord>(), new MemorySynced<VocabPart>(), new MemorySyncedLog<VocabReview>());
+        Seed(store);
+        var quiz = new VocabQuiz(store, new Random(1));
+        var windows = new WindowService(NullLogger<WindowService>.Instance);
 
         var card = new VocabCardViewModel(store, quiz);
-        card.ShowNext();
-        var window = new VocabPopupWindow(card, windows);
-        Layout(window, new Size(352, 260), "6-popup");
+        var relative = store.FindWord("relative")!;
+        card.Show(relative.Id, relative.Value);
+        var window = new VocabPopupWindow(card, windows, opacity: 0.6);
+        Layout(window, new Size(352, 260), "20-popup");
+        Assert.Equal(0.6, window.CardBorder.Opacity, 3);
         card.RevealCommand.Execute(null);
-        Layout(window, new Size(352, 420), "7-popup-revealed");
+        Layout(window, new Size(352, 460), "21-popup-revealed");
+        Assert.Equal("Remembered", System.Windows.Automation.AutomationProperties.GetName(window.RememberedButton));
+        Assert.False(Shows(window, "✗ / ✓ answer for the meaning"));
+        // Full details is read: solid; closed again, see-through.
+        window.ToggleFull();
+        Assert.Equal(1, window.CardBorder.Opacity);
+        window.ToggleFull();
+        Assert.Equal(0.6, window.CardBorder.Opacity, 3);
+        // Never below the lowest opacity, whatever the setting.
+        window.SetRestOpacity(0.1);
+        Assert.Equal(VocabSettingsViewModel.MinCardOpacity / 100.0, window.CardBorder.Opacity, 3);
         window.Close();
 
-        // A Chinese word asks for its pinyin first; checked, the answer shows with the suggested verdict; Full details.
-        var bujiu = store.FindWord("补救")!;
+        // A Chinese word asks for its pinyin first; the tones slipped: the verdict hint, the pinyin hook, and ✗ / ✓
+        // about the meaning.
+        var buJiu = store.FindWord("补救")!;
+        store.UpdateWord(buJiu.Id, w => w with { PinyinMnemonic = "补 mượn âm của 卜 bǔ, 救 mượn vần của 求 qiú → bǔ jiù." });
+        buJiu = store.FindWord("补救")!;
         var zh = new VocabCardViewModel(store, quiz, options: () => new VocabCardOptions(VocabCardMode.WordToMeaning, false, TypePinyin: true));
-        zh.Show(bujiu.Id, bujiu.Value);
+        zh.Show(buJiu.Id, buJiu.Value);
         Assert.True(zh.IsTyping);
-        var zhWindow = new VocabPopupWindow(zh, windows);
-        Layout(zhWindow, new Size(352, 300), "8-popup-pinyin");
-        zh.Typed = "bu3jiu4";
+        var zhWindow = new VocabPopupWindow(zh, windows, opacity: 0.85);
+        Layout(zhWindow, new Size(352, 300), "22-popup-pinyin");
+        zh.Typed = "bu3jiu2";
         zh.CheckCommand.Execute(null);
-        Assert.True(zh.SuggestsRemembered);
-        Layout(zhWindow, new Size(352, 520), "9-popup-checked");
+        Assert.True(zh.PinyinSlipped);
+        Layout(zhWindow, new Size(352, 620), "23-popup-slipped");
+        Assert.True(Shows(zhWindow, zh.VerdictHint));
+        Assert.True(Shows(zhWindow, "Remembering the pinyin"));
+        Assert.True(Shows(zhWindow, "✗ / ✓ answer for the meaning"));
+        Assert.Equal("Knew the meaning", System.Windows.Automation.AutomationProperties.GetName(zhWindow.RememberedButton));
+        Assert.Equal("Forgot the meaning", System.Windows.Automation.AutomationProperties.GetName(zhWindow.ForgotButton));
         zhWindow.ToggleFull();
-        Layout(zhWindow, new Size(352, 900), "10-popup-full");
+        Layout(zhWindow, new Size(352, 900), "24-popup-full");
         zhWindow.Close();
     });
 
@@ -243,6 +362,44 @@ public sealed class VocabViewsTests : IDisposable
             ],
         });
         store.AddWord("ubiquitous");
+    }
+
+    /// <summary>
+    /// Some text block under <paramref name="root"/> shows this text (alone, or followed by more runs: "Your words with
+    /// it (2)"), and nothing above it is collapsed.
+    /// </summary>
+    private static bool Shows(DependencyObject root, string text)
+    {
+        if (root is Window { Content: DependencyObject content }) root = content;
+        return Descendants(root).OfType<TextBlock>().Any(t => Says(TextOf(t), text) && Visible(t, root));
+    }
+
+    /// <summary>All of a text block's runs ("Text" alone may hold only the first).</summary>
+    private static string TextOf(TextBlock block) =>
+        block.Inlines.Count > 0 ? new System.Windows.Documents.TextRange(block.ContentStart, block.ContentEnd).Text : block.Text;
+
+    private static bool Says(string shown, string text)
+    {
+        shown = string.Join(' ', shown.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries));
+        text = string.Join(' ', text.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries));
+        return shown == text || shown.StartsWith(text + " ", StringComparison.Ordinal);
+    }
+
+    private static bool Visible(DependencyObject element, DependencyObject root)
+    {
+        for (var at = element; at is not null && at != root; at = VisualTreeHelper.GetParent(at))
+            if (at is UIElement { Visibility: not Visibility.Visible }) return false;
+        return true;
+    }
+
+    private static IEnumerable<DependencyObject> Descendants(DependencyObject root)
+    {
+        for (var i = 0; i < VisualTreeHelper.GetChildrenCount(root); i++)
+        {
+            var child = VisualTreeHelper.GetChild(root, i);
+            yield return child;
+            foreach (var nested in Descendants(child)) yield return nested;
+        }
     }
 
     private sealed class NoServices : IServiceProvider

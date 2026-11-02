@@ -5,6 +5,7 @@
     xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
     xmlns:core="clr-namespace:Helm.Core.Ui;assembly=Helm.Core.Windows"
     xmlns:local="clr-namespace:Helm.Modules.Vocab"
+    xmlns:vocab="clr-namespace:Helm.Modules.Vocab;assembly=Helm.Modules.Vocab.Core"
     ExtraMessage="{Binding Message}">
 
     <!-- Vocabulary's settings (Home → Utilities). The words are on VocabContentPage. -->
@@ -52,6 +53,18 @@
                 <ui:TextBox Width="90" PlaceholderText="To" AutomationProperties.Name="Longest gap in seconds"
                             Text="{Binding Settings.CustomToText, UpdateSourceTrigger=PropertyChanged}" />
                 <TextBlock Text="seconds" Margin="8,0,0,0" VerticalAlignment="Center" Style="{DynamicResource HelmSecondaryText}" />
+            </StackPanel>
+        </ui:CardControl>
+        <!-- How solid the card is at rest: see-through enough to keep the app below readable -->
+        <ui:CardControl Margin="0,0,0,4" Icon="{ui:SymbolIcon Square24}" IsEnabled="{Binding Settings.PopupEnabled}">
+            <ui:CardControl.Header>
+                <core:CardHeader Title="Card opacity" Description="Lower lets the app under the card show through; it turns solid while the pointer is on it or you type in it." />
+            </ui:CardControl.Header>
+            <StackPanel Orientation="Horizontal">
+                <Slider Width="200" VerticalAlignment="Center" AutomationProperties.Name="Card opacity" IsSnapToTickEnabled="True" TickFrequency="5"
+                        Minimum="{Binding Source={x:Static vocab:VocabSettingsViewModel.MinCardOpacity}, Mode=OneTime}" Maximum="100"
+                        Value="{Binding Settings.CardOpacity}" />
+                <TextBlock Width="44" Margin="10,0,0,0" VerticalAlignment="Center" TextAlignment="Right" Text="{Binding Settings.CardOpacityText}" />
             </StackPanel>
         </ui:CardControl>
         <ui:CardControl Margin="0,0,0,4" Icon="{ui:SymbolIcon Play24}">

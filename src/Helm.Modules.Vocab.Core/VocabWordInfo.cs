@@ -20,6 +20,11 @@ public sealed class VocabWordInfo(VocabWord word)
 
     public bool HasMnemonic => word.Mnemonic.Length > 0;
 
+    /// <summary>Chinese: how to remember the reading (written when the pinyin keeps slipping).</summary>
+    public string PinyinMnemonic => word.PinyinMnemonic;
+
+    public bool HasPinyinMnemonic => word.PinyinMnemonic.Length > 0;
+
     /// <summary>"affect: động từ, tác động lên…".</summary>
     public IReadOnlyList<string> Confusables => word.Confusables.Select(c => c.Note.Length > 0 ? $"{c.Word}: {c.Note}" : c.Word).ToList();
 
@@ -45,7 +50,7 @@ public sealed class VocabWordInfo(VocabWord word)
     public bool HasLabels => Labels.Length > 0;
 
     /// <summary>Something more than the meaning to show.</summary>
-    public bool HasAny => HasExamples || HasCollocations || HasMnemonic || HasConfusables || HasForms || HasSynonyms || HasAntonyms;
+    public bool HasAny => HasExamples || HasCollocations || HasMnemonic || HasPinyinMnemonic || HasConfusables || HasForms || HasSynonyms || HasAntonyms;
 }
 
 /// <summary>Fill-the-gap: an example sentence with the word hidden.</summary>

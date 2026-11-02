@@ -1,6 +1,7 @@
 using Avalonia.Media;
 using FluentIcons.Common;
 using Helm.Core.Modules;
+using Helm.Core.Platform;
 
 namespace Helm.Modules.Vocab;
 
@@ -9,7 +10,7 @@ namespace Helm.Modules.Vocab;
 /// floating bubble shows one when tapped (<see cref="VocabOverlay"/>); both stay out of blocked apps and away while the
 /// phone is sideways. No notification and no widget.
 /// </summary>
-public sealed class VocabModule : AndroidModuleBase, IModuleContent
+public sealed class VocabModule : AndroidModuleBase, IModuleContent, IBackHandler
 {
     private readonly VocabOverlay _overlay;
 
@@ -45,4 +46,9 @@ public sealed class VocabModule : AndroidModuleBase, IModuleContent
 
     /// <summary>A Vocabulary page is on screen: the permissions may have changed in the phone's settings meanwhile.</summary>
     public void PageShown() => _overlay.Refresh();
+
+    /// <summary>The shown Vocabulary page's own back (its sheets, a word's page); set while the page is on screen.</summary>
+    internal Func<bool>? PageBack { get; set; }
+
+    public bool HandleBack() => PageBack?.Invoke() == true;
 }

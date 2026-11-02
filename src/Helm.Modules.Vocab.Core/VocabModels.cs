@@ -122,6 +122,15 @@ public sealed record VocabWord
     /// <summary>When an agent last wrote a new way to remember it because the user kept forgetting it.</summary>
     public DateTimeOffset? HelpedAt { get; init; }
 
+    /// <summary>
+    /// Chinese, in Vietnamese: how to remember the way the word is read (its sound components, the Hán Việt, the tones).
+    /// Written by an agent when the user keeps typing the pinyin wrong while knowing the meaning; the tree stays as it is.
+    /// </summary>
+    public string PinyinMnemonic { get; init; } = "";
+
+    /// <summary>When an agent last wrote <see cref="PinyinMnemonic"/> because the pinyin kept slipping.</summary>
+    public DateTimeOffset? PinyinHelpedAt { get; init; }
+
     /// <summary>Left out of the cards, the pop-up and the bubble (the user hid it).</summary>
     public bool Hidden { get; init; }
 
@@ -210,4 +219,10 @@ public sealed record VocabReview
 
     /// <summary>"I know this": the user knew it already, so it jumps to <see cref="VocabQuiz.KnownLevel"/> (Remembered is true too).</summary>
     public bool Known { get; init; }
+
+    /// <summary>
+    /// The meaning was there but the pinyin typed on the card was wrong (Remembered is true too): not a forget, yet no
+    /// step up either; the word comes back tomorrow, and enough of these ask an agent for a way to remember the reading.
+    /// </summary>
+    public bool PinyinSlip { get; init; }
 }

@@ -27,6 +27,7 @@ public static class VocabCardDetails
         Add("Examples", word.Examples.Select(e => new VocabDetailItem(e.Sentence, e.Translation)));
         Add("Goes with", word.Collocations.Select(c => new VocabDetailItem(c)));
         Add("To remember it", [new VocabDetailItem(word.Mnemonic)]);
+        Add("Remembering the pinyin", [new VocabDetailItem(word.PinyinMnemonic)]);
         Add("Easy to mix up", word.Confusables.Select(c => new VocabDetailItem(c.Word, c.Note)));
         Add("Word family", word.Forms.Select(f => new VocabDetailItem(f.PartOfSpeech.Length > 0 ? $"{f.Word} ({f.PartOfSpeech})" : f.Word, f.Meaning)));
         Add("Synonyms", word.Synonyms.Select(s => new VocabDetailItem(s)));

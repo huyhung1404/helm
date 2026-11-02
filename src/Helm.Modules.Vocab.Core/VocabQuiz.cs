@@ -7,12 +7,17 @@ namespace Helm.Modules.Vocab;
 /// due time moves it up one, a "forgot" drops it back to 0.</param>
 /// <param name="Due">When to see it again (null for a new word: due now).</param>
 /// <param name="ForgotAt">When each "forgot" was, oldest first.</param>
-public sealed record VocabWordStats(int Level, int Remembered, int Forgot, DateTimeOffset? LastAnswer, DateTimeOffset? Due, IReadOnlyList<DateTimeOffset> ForgotAt)
+/// <param name="SlipAt">When each pinyin slip was (meaning known, pinyin typed wrong), oldest first.</param>
+public sealed record VocabWordStats(int Level, int Remembered, int Forgot, DateTimeOffset? LastAnswer, DateTimeOffset? Due, IReadOnlyList<DateTimeOffset> ForgotAt,
+    IReadOnlyList<DateTimeOffset> SlipAt)
 {
-    public static VocabWordStats New { get; } = new(0, 0, 0, null, null, []);
+    public static VocabWordStats New { get; } = new(0, 0, 0, null, null, [], []);
 
     /// <summary>"Forgot" answers after a moment (an agent's help): the ones that count towards a word being hard.</summary>
     public int ForgotSince(DateTimeOffset? since) => since is { } at ? ForgotAt.Count(f => f > at) : Forgot;
+
+    /// <summary>Pinyin slips after a moment (an agent's pinyin help): the ones that ask for a way to remember the reading.</summary>
+    public int SlipsSince(DateTimeOffset? since) => since is { } at ? SlipAt.Count(f => f > at) : SlipAt.Count;
 
     public bool IsNew => Remembered + Forgot == 0;
 
@@ -42,6 +47,12 @@ public sealed class VocabQuiz(VocabStore store, Random? random = null)
 
     /// <summary>A word forgotten this many times (since an agent last helped with it) is often forgotten.</summary>
     public const int HardForgets = 4;
+
+    /// <summary>A Chinese word whose pinyin slipped this many times (since an agent last helped with it) gets a pinyin mnemonic.</summary>
+    public const int PinyinSlips = 3;
+
+    /// <summary>A pinyin slip brings the word back this soon (its level stays).</summary>
+    public static readonly TimeSpan SlipAgain = TimeSpan.FromDays(1);
 
     /// <summary>A forgotten word comes back this soon.</summary>
     public static readonly TimeSpan Relearn = TimeSpan.FromMinutes(10);
@@ -76,6 +87,12 @@ public sealed class VocabQuiz(VocabStore store, Random? random = null)
                 stats[r.WordId] = s with { Level = 0, Forgot = s.Forgot + 1, LastAnswer = r.At, Due = r.At + Relearn, ForgotAt = [.. s.ForgotAt, r.At] };
                 continue;
             }
+            if (r.PinyinSlip)
+            {
+                // The meaning was there, the reading was not: no forget, no step up, back tomorrow.
+                stats[r.WordId] = s with { Remembered = s.Remembered + 1, LastAnswer = r.At, Due = r.At + SlipAgain, SlipAt = [.. s.SlipAt, r.At] };
+                continue;
+            }
             if (r.Known)
             {
                 var known = Math.Max(KnownLevel, s.Level);
@@ -94,6 +111,19 @@ public sealed class VocabQuiz(VocabStore store, Random? random = null)
 
     /// <summary>Forgotten <see cref="HardForgets"/> times or more since an agent last helped with it.</summary>
     public static bool IsHard(VocabWord word, VocabWordStats stats) => word.IsAnalyzed && stats.ForgotSince(word.HelpedAt) >= HardForgets;
+
+    /// <summary>A Chinese word whose pinyin slipped <see cref="PinyinSlips"/> times or more since an agent last helped with its reading.</summary>
+    public static bool IsSlipping(VocabWord word, VocabWordStats stats) =>
+        word.IsAnalyzed && word.Language == VocabLanguage.Chinese && stats.SlipsSince(word.PinyinHelpedAt) >= PinyinSlips;
+
+    /// <summary>The Chinese words whose pinyin keeps slipping (hidden ones aside), the most slipped first.</summary>
+    public IReadOnlyList<SyncedItem<VocabWord>> SlippingWords()
+    {
+        var stats = Stats();
+        return store.Words()
+            .Where(w => !w.Value.Hidden && stats.GetValueOrDefault(w.Id) is { } s && IsSlipping(w.Value, s))
+            .OrderByDescending(w => stats[w.Id].SlipsSince(w.Value.PinyinHelpedAt)).ToList();
+    }
 
     /// <summary>The words the user keeps forgetting (hidden ones aside), the most forgotten first.</summary>
     public IReadOnlyList<SyncedItem<VocabWord>> HardWords()

@@ -21,6 +21,8 @@ public static class VocabDetails
         var chinese = word.Language == VocabLanguage.Chinese;
         Limit(a.Explanation, "explanation", word.Text);
         Limit(a.Mnemonic, "mnemonic", word.Text);
+        Limit(a.PinyinMnemonic, "pinyin_mnemonic", word.Text);
+        if (!chinese && a.PinyinMnemonic is { Length: > 0 }) throw new VocabAnalysisException($"{word.Text}: pinyin_mnemonic is for Chinese words only.");
         if (a.Examples is { Count: > MaxExamples }) throw new VocabAnalysisException($"{word.Text}: at most {MaxExamples} examples.");
         if (a.Examples?.FirstOrDefault(e => string.IsNullOrWhiteSpace(e.Sentence)) is not null)
             throw new VocabAnalysisException($"{word.Text}: an example has no sentence.");
@@ -42,6 +44,7 @@ public static class VocabDetails
         Examples = a.Examples?.Select(e => new VocabExample { Sentence = e.Sentence.Trim(), Translation = e.Translation.Trim() }).ToList() ?? word.Examples,
         Collocations = Words(a.Collocations) ?? word.Collocations,
         Mnemonic = a.Mnemonic?.Trim() ?? word.Mnemonic,
+        PinyinMnemonic = a.PinyinMnemonic?.Trim() ?? word.PinyinMnemonic,
         Confusables = a.Confusables?.Where(c => c.Word.Trim().Length > 0)
             .Select(c => new VocabConfusable { Word = c.Word.Trim(), Note = c.Note.Trim() }).ToList() ?? word.Confusables,
         Level = a.Level is { } level ? VocabLevels.Normalize(level, word.Language) ?? "" : word.Level,

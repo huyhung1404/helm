@@ -131,16 +131,21 @@ public sealed class VocabStore
     /// <summary>
     /// Fills in an analyzed word's details (the fields <paramref name="details"/> gives; its tree, phonetic and meaning
     /// stay). <paramref name="helped"/>: they are a new way to remember a word the user keeps forgetting.
+    /// <paramref name="pinyinHelped"/>: they hold a new pinyin mnemonic for a word whose pinyin keeps slipping.
     /// </summary>
     /// <exception cref="VocabAnalysisException">The word is not there or not analyzed, or a detail does not pass.</exception>
-    public VocabWord SaveDetails(string wordId, WordAnalysis details, bool helped)
+    public VocabWord SaveDetails(string wordId, WordAnalysis details, bool helped, bool pinyinHelped = false)
     {
         lock (_gate)
         {
             var word = _words.Get(wordId) ?? throw new VocabAnalysisException($"There is no word {wordId}.");
             if (!word.IsAnalyzed) throw new VocabAnalysisException($"{word.Text} waits for an analysis: save it with vocab_save_analysis.");
             VocabDetails.Check(word, details);
-            var saved = VocabDetails.Apply(word, details) with { HelpedAt = helped ? Now : word.HelpedAt };
+            var saved = VocabDetails.Apply(word, details) with
+            {
+                HelpedAt = helped ? Now : word.HelpedAt,
+                PinyinHelpedAt = pinyinHelped ? Now : word.PinyinHelpedAt,
+            };
             _words.Upsert(wordId, saved);
             return saved;
         }
@@ -197,8 +202,8 @@ public sealed class VocabStore
 
     // ---- Reviews -------------------------------------------------------------------------------------------------
 
-    public void Record(string wordId, bool remembered) =>
-        _reviews.Append(new VocabReview { WordId = wordId, At = Now, Remembered = remembered });
+    public void Record(string wordId, bool remembered, bool pinyinSlip = false) =>
+        _reviews.Append(new VocabReview { WordId = wordId, At = Now, Remembered = remembered, PinyinSlip = remembered && pinyinSlip });
 
     /// <summary>"I know this": the word was known already, it comes back in a month (<see cref="VocabQuiz.KnownLevel"/>).</summary>
     public void RecordKnown(string wordId) =>

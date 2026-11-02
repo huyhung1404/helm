@@ -44,6 +44,8 @@ public sealed partial class VocabWordDetailViewModel : ObservableObject
         Word = word;
         LevelText = VocabFormat.Level(stats, store.Now);
         IsHard = !word.Hidden && VocabQuiz.IsHard(word, stats);
+        IsSlipping = !word.Hidden && VocabQuiz.IsSlipping(word, stats);
+        Dots = [.. Enumerable.Range(0, VocabQuiz.TopLevel).Select(i => i < stats.Level)];
         Root = new VocabNodeViewModel(VocabTree.Build(store, word), showTraditional, n => SelectedNode = n,
             addAsWord: AddPartAsWord, isWord: form => store.FindWord(form) is not null);
         Tree = [Root];
@@ -85,6 +87,12 @@ public sealed partial class VocabWordDetailViewModel : ObservableObject
 
     /// <summary>The user keeps forgetting it (an agent is asked for a new way to remember it).</summary>
     public bool IsHard { get; }
+
+    /// <summary>Chinese: its pinyin keeps slipping while the meaning is known (an agent is asked for a pinyin hook).</summary>
+    public bool IsSlipping { get; }
+
+    /// <summary>How well it is known: one flag per quiz level, true up to its level (the dots under the word).</summary>
+    public IReadOnlyList<bool> Dots { get; }
 
     /// <summary>The store reports the change, and the page rebuilds this view model.</summary>
     [RelayCommand]
@@ -175,7 +183,7 @@ public sealed partial class VocabWordDetailViewModel : ObservableObject
         try
         {
             _store.AddWord(form, $"Trong {Word.Text}");
-            _notify?.Invoke($"“{form}” is one of your words now; it waits for an AI agent to break it down (Add tab).");
+            _notify?.Invoke($"“{form}” is one of your words now; it waits for an AI agent to break it down (Add words).");
         }
         catch (ArgumentException ex)
         {

@@ -173,6 +173,7 @@ public sealed class VocabMcpTools(VocabStore store, VocabQuiz quiz) : IMcpToolPr
                 Explanation = Field(item, "explanation") ?? w.Explanation,
                 Note = Field(item, "note") ?? w.Note,
                 Mnemonic = Field(item, "mnemonic") ?? w.Mnemonic,
+                PinyinMnemonic = Field(item, "pinyin_mnemonic") ?? w.PinyinMnemonic,
                 Level = Field(item, "level") is { } level ? VocabLevels.Normalize(level, w.Language) ?? w.Level : w.Level,
                 PartOfSpeech = Field(item, "part_of_speech") ?? w.PartOfSpeech,
                 Topic = Field(item, "topic") ?? w.Topic,
@@ -277,6 +278,7 @@ public sealed class VocabMcpTools(VocabStore store, VocabQuiz quiz) : IMcpToolPr
             examples = word.Examples.Count > 0 ? word.Examples.Select(e => new { sentence = e.Sentence, translation = e.Translation }).ToList() : null,
             collocations = word.Collocations.Count > 0 ? word.Collocations : null,
             mnemonic = NullIfEmpty(word.Mnemonic),
+            pinyin_mnemonic = NullIfEmpty(word.PinyinMnemonic),
             confusables = word.Confusables.Count > 0 ? word.Confusables.Select(c => new { word = c.Word, note = c.Note }).ToList() : null,
             level = NullIfEmpty(word.Level),
             part_of_speech = NullIfEmpty(word.PartOfSpeech),
@@ -287,6 +289,7 @@ public sealed class VocabMcpTools(VocabStore store, VocabQuiz quiz) : IMcpToolPr
             antonyms = word.Antonyms.Count > 0 ? word.Antonyms : null,
             hidden = word.Hidden ? true : (bool?)null,
             often_forgotten = VocabQuiz.IsHard(word, stats) ? true : (bool?)null,
+            pinyin_slips = stats.SlipAt.Count > 0 ? stats.SlipAt.Count : (int?)null,
         };
     }
 
@@ -297,6 +300,7 @@ public sealed class VocabMcpTools(VocabStore store, VocabQuiz quiz) : IMcpToolPr
         Examples = ReadExamples(args),
         Collocations = args.TryGetProperty("collocations", out _) ? McpArgs.Strings(args, "collocations") : null,
         Mnemonic = McpArgs.String(args, "mnemonic"),
+        PinyinMnemonic = McpArgs.String(args, "pinyin_mnemonic"),
         Confusables = ReadConfusables(args),
         Level = McpArgs.String(args, "level"),
         PartOfSpeech = McpArgs.String(args, "part_of_speech"),
@@ -431,6 +435,7 @@ public sealed class VocabMcpTools(VocabStore store, VocabQuiz quiz) : IMcpToolPr
                 ["explanation"] = McpArgs.Text("New explanation, in Vietnamese."),
                 ["note"] = McpArgs.Text("New note of the user's."),
                 ["mnemonic"] = McpArgs.Text("New mnemonic, in Vietnamese."),
+                ["pinyin_mnemonic"] = McpArgs.Text("Chinese only, in Vietnamese: new way to remember how the word is read."),
                 ["level"] = McpArgs.Text("New level: CEFR A1-C2 or HSK1-HSK9."),
                 ["part_of_speech"] = McpArgs.Text("New part of speech, in Vietnamese."),
                 ["topic"] = McpArgs.Text("New topic, in Vietnamese."),
@@ -484,6 +489,8 @@ public sealed class VocabMcpTools(VocabStore store, VocabQuiz quiz) : IMcpToolPr
         }, false),
         ("collocations", McpArgs.List("Up to 4 words it usually goes with: make a decision, 补救措施."), false),
         ("mnemonic", McpArgs.Text("In Vietnamese: a short story tying the parts to the meaning."), false),
+        ("pinyin_mnemonic", McpArgs.Text("Chinese only, in Vietnamese: how to remember the reading (sound components, Hán Việt, tones). " +
+            "Only for words in pinyin_slips; leave it out otherwise."), false),
         ("confusables", new JsonObject
         {
             ["type"] = "array",

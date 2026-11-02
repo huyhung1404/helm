@@ -48,6 +48,9 @@ public sealed partial class VocabSettingsViewModel : ObservableObject
     [ObservableProperty] private string _customFromText = "";
     [ObservableProperty] private string _customToText = "";
 
+    /// <summary>The pop-up card's opacity, in percent (<see cref="MinCardOpacity"/> to 100).</summary>
+    [ObservableProperty] private int _cardOpacity;
+
     /// <summary>What is wrong with the typed range; empty when it is saved.</summary>
     [ObservableProperty] private string _customError = "";
 
@@ -68,6 +71,7 @@ public sealed partial class VocabSettingsViewModel : ObservableObject
         PopupFrequencyIndex = s.PopupCustom ? CustomFrequencyIndex : FrequencyIndex(s.PopupMinSeconds, s.PopupMaxSeconds);
         CustomFromText = s.PopupMinSeconds.ToString(System.Globalization.CultureInfo.CurrentCulture);
         CustomToText = s.PopupMaxSeconds.ToString(System.Globalization.CultureInfo.CurrentCulture);
+        CardOpacity = Math.Clamp(s.CardOpacity, MinCardOpacity, 100);
         _loading = false;
     }
 
@@ -75,6 +79,24 @@ public sealed partial class VocabSettingsViewModel : ObservableObject
     public event EventHandler<string>? Changed;
 
     public VocabSettings Current => _settings.Current;
+
+    public const int DefaultCardOpacity = 85;
+
+    /// <summary>Below this the card's text gets hard to read over a busy app.</summary>
+    public const int MinCardOpacity = 40;
+
+    /// <summary>"85 %" beside the slider.</summary>
+    public string CardOpacityText => $"{CardOpacity} %";
+
+    /// <summary>The card's opacity at rest, 0-1 (it turns solid while used).</summary>
+    public double CardAlpha => CardOpacity / 100.0;
+
+    partial void OnCardOpacityChanged(int value)
+    {
+        OnPropertyChanged(nameof(CardOpacityText));
+        OnPropertyChanged(nameof(CardAlpha));
+        Save(nameof(CardOpacity), s => s.CardOpacity = Math.Clamp(value, MinCardOpacity, 100));
+    }
 
     /// <summary>How the Learn tab asks its cards now.</summary>
     public VocabCardOptions CardOptions => new(_settings.Current.CardMode, _settings.Current.AutoSay, _settings.Current.TypePinyin);
