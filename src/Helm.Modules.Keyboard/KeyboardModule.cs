@@ -20,6 +20,7 @@ public sealed class KeyboardModule : HelmModuleBase
     private readonly IWindowService _windows;
     private readonly IInputMethods _inputMethods;
     private readonly IMonitorService _monitors;
+    private readonly IBrowserSites _sites;
     private readonly LowLevelKeyboardHook _keyboard;
     private readonly ILogger<KeyboardModule> _logger;
     private readonly SemaphoreSlim _gate = new(1, 1);
@@ -28,7 +29,7 @@ public sealed class KeyboardModule : HelmModuleBase
     private bool _enabled;
 
     public KeyboardModule(ISettingsStoreFactory settings, KeyboardApps apps, KeyboardInstaller installer, IHotkeyManager hotkeys,
-        IWindowService windows, IInputMethods inputMethods, IMonitorService monitors, LowLevelKeyboardHook keyboard, ILogger<KeyboardModule> logger)
+        IWindowService windows, IInputMethods inputMethods, IMonitorService monitors, IBrowserSites sites, LowLevelKeyboardHook keyboard, ILogger<KeyboardModule> logger)
     {
         Settings = settings.Get<KeyboardSettings>(ModuleId);
         Apps = apps;
@@ -37,6 +38,7 @@ public sealed class KeyboardModule : HelmModuleBase
         _windows = windows;
         _inputMethods = inputMethods;
         _monitors = monitors;
+        _sites = sites;
         _keyboard = keyboard;
         _logger = logger;
         Settings.Changed += (_, _) => _ = ApplySettingsAsync();
@@ -44,7 +46,7 @@ public sealed class KeyboardModule : HelmModuleBase
 
     public override string Id => ModuleId;
     public override string DisplayName => "Helm Keyboard";
-    public override string Description => "Type Vietnamese with Telex, go round English, Vietnamese and Chinese with one shortcut, and let every app keep the keyboard you last used in it.";
+    public override string Description => "Type Vietnamese with Telex, go round English, Vietnamese and Chinese with one shortcut, and let every app — and every web site — keep the keyboard you last used in it.";
     public override ModuleGroup Group => ModuleGroup.WindowsAndDesktop;
     public override SymbolRegular Icon => SymbolRegular.Keyboard24;
     public override ImageSource? IconImage => KeyboardLogo.Image;
@@ -150,7 +152,7 @@ public sealed class KeyboardModule : HelmModuleBase
                 InstallChanged?.Invoke(this, EventArgs.Empty);
             }
             if (Installer.GetStatus().State != KeyboardInstallState.Installed) return;
-            _engine = await KeyboardEngine.StartAsync(_windows, _inputMethods, _monitors, Apps, _keyboard, _logger,
+            _engine = await KeyboardEngine.StartAsync(_windows, _inputMethods, _monitors, _sites, Apps, _keyboard, _logger,
                 KeyboardEngine.Options.From(Settings.Current)).ConfigureAwait(false);
             await RegisterHotkeyAsync().ConfigureAwait(false);
         }

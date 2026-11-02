@@ -24,9 +24,13 @@ internal sealed class KeyboardEngine : IAsyncDisposable
 
     private static readonly TimeSpan IndicatorTime = TimeSpan.FromSeconds(0.9);
 
+    /// <summary>While a browser is in front, how often its address is read again to notice a tab or site change.</summary>
+    private static readonly TimeSpan SitePoll = TimeSpan.FromMilliseconds(500);
+
     private readonly IWindowService _windows;
     private readonly IInputMethods _inputMethods;
     private readonly IMonitorService _monitors;
+    private readonly IBrowserSites _sites;
     private readonly KeyboardApps _apps;
     private readonly LowLevelKeyboardHook _keyboard;
     private readonly ILogger _logger;
@@ -38,6 +42,11 @@ internal sealed class KeyboardEngine : IAsyncDisposable
     private volatile ModifierTap? _tap; // used on the hook thread only
     private Options _options;
     private string? _app;
+    /// <summary>The site the front browser shows ("facebook.com"), or null when the front app is not a browser on a page.</summary>
+    private string? _site;
+    /// <summary>What the keyboard is remembered against right now: a site key for a browser page, else the app name.</summary>
+    private string? _identity;
+    private IDisposable? _sitePollTimer;
     private nint _window;
     /// <summary>The keyboard the app in front should type with.</summary>
     private KeyboardMode _mode;
@@ -47,12 +56,13 @@ internal sealed class KeyboardEngine : IAsyncDisposable
     private KeyboardMode _indicated;
     private IDisposable? _indicatorTimer;
 
-    private KeyboardEngine(IWindowService windows, IInputMethods inputMethods, IMonitorService monitors, KeyboardApps apps,
-        LowLevelKeyboardHook keyboard, ILogger logger, Options options)
+    private KeyboardEngine(IWindowService windows, IInputMethods inputMethods, IMonitorService monitors, IBrowserSites sites,
+        KeyboardApps apps, LowLevelKeyboardHook keyboard, ILogger logger, Options options)
     {
         _windows = windows;
         _inputMethods = inputMethods;
         _monitors = monitors;
+        _sites = sites;
         _apps = apps;
         _keyboard = keyboard;
         _logger = logger;
@@ -61,9 +71,9 @@ internal sealed class KeyboardEngine : IAsyncDisposable
     }
 
     public static async Task<KeyboardEngine> StartAsync(IWindowService windows, IInputMethods inputMethods, IMonitorService monitors,
-        KeyboardApps apps, LowLevelKeyboardHook keyboard, ILogger logger, Options options)
+        IBrowserSites sites, KeyboardApps apps, LowLevelKeyboardHook keyboard, ILogger logger, Options options)
     {
-        var engine = new KeyboardEngine(windows, inputMethods, monitors, apps, keyboard, logger, options);
+        var engine = new KeyboardEngine(windows, inputMethods, monitors, sites, apps, keyboard, logger, options);
         try
         {
             await engine._thread.InvokeAsync(() =>
@@ -98,19 +108,27 @@ internal sealed class KeyboardEngine : IAsyncDisposable
     {
         var hwnd = _windows.GetForegroundWindow();
         var app = _windows.GetProcessName(hwnd);
+        var site = _sites.SiteKey(hwnd, app);
+        var identity = IdentityOf(app, site);
         // Pressed again before the last switch shows in the window: go on from the last one.
-        var current = _shows || !SameApp(app, _app) ? CurrentMode(hwnd) : _mode;
+        var current = _shows || identity != _identity ? CurrentMode(hwnd) : _mode;
         var withChinese = _options.IncludeChinese && _inputMethods.HasLanguage(KeyboardModes.ChineseSimplified);
         var mode = KeyboardModes.Next(current, withChinese);
         Apply(hwnd, mode);
         if (!string.IsNullOrEmpty(app))
         {
             _app = app;
+            _site = site;
+            _identity = identity;
             _window = hwnd;
             _mode = mode;
-            if (!_options.Exclusions.IsExcluded(app)) _apps.Remember(app, mode);
+            // A browser page is remembered by its site, so Facebook and Bilibili keep their own keyboard; the browser
+            // itself is never remembered as an app (that would pull every site back to one keyboard). Other apps are
+            // remembered by name. A browser window with no readable site keeps the keyboard for this moment only.
+            if (site is not null) _apps.Remember(KeyboardApps.SiteKeyOf(site), mode);
+            else if (!_sites.IsBrowser(app) && !_options.Exclusions.IsExcluded(app)) _apps.Remember(app, mode);
         }
-        _logger.LogDebug("Switched {App} to {Mode}", app, mode);
+        _logger.LogDebug("Switched {Identity} to {Mode}", identity ?? app, mode);
         Indicate(hwnd, mode);
         PlaySound(mode);
     });
@@ -125,6 +143,7 @@ internal sealed class KeyboardEngine : IAsyncDisposable
             await _thread.InvokeAsync(() =>
             {
                 _foregroundHook?.Dispose();
+                _sitePollTimer?.Dispose();
                 _indicatorTimer?.Dispose();
                 _indicator?.Dispose();
                 // The input method takes its own shortcut back.
@@ -188,32 +207,85 @@ internal sealed class KeyboardEngine : IAsyncDisposable
             return;
         }
         var app = _windows.GetProcessName(hwnd);
-        if (string.IsNullOrEmpty(app) || SameApp(app, _app)) return;
+        if (string.IsNullOrEmpty(app)) return;
+        var site = _sites.SiteKey(hwnd, app);
+        WatchSite(_sites.IsBrowser(app));
+        Settle(hwnd, app, site);
+    }
 
-        // The keyboard the last app was left with, maybe changed some other way (the V/E button, Win+Space): read from its
-        // own window, as the new one may still show its own last keyboard. Only when Helm's own switch had shown: one
-        // that did not take is not the user's choice. A closed window says nothing.
-        if (_app is not null && _shows && !_options.Exclusions.IsExcluded(_app) && _inputMethods.GetLanguage(_window) is var language and not 0)
+    /// <summary>Starts or stops the timer that re-reads a browser's address, so a tab or site change is noticed.</summary>
+    private void WatchSite(bool browserInFront)
+    {
+        if (browserInFront && _sitePollTimer is null)
+            _sitePollTimer = _thread.StartTimer(SitePoll, PollSite);
+        else if (!browserInFront && _sitePollTimer is not null)
+        {
+            _sitePollTimer.Dispose();
+            _sitePollTimer = null;
+        }
+    }
+
+    /// <summary>On the engine thread, on a timer: if the front browser now shows a different site, treat it as new.</summary>
+    private void PollSite()
+    {
+        var hwnd = _windows.GetForegroundWindow();
+        if (hwnd != _window || !_sites.IsBrowser(_app ?? "")) return;
+        var site = _sites.SiteKey(hwnd, _app!);
+        if (site != _site) Settle(hwnd, _app!, site);
+    }
+
+    /// <summary>
+    /// Gives <paramref name="hwnd"/> the keyboard its identity (its site when a browser is on a page, else its app)
+    /// was last left with. A browser page never seen before, or a browser window with no readable site, keeps the
+    /// keyboard it has now — so typing is never pulled to another keyboard the moment a page opens or a window pops up.
+    /// </summary>
+    private void Settle(nint hwnd, string app, string? site)
+    {
+        var identity = IdentityOf(app, site);
+        if (identity == _identity && SameApp(app, _app) && site == _site) return;
+
+        // The keyboard the last identity was left with, maybe changed some other way (the V/E button, Win+Space): read
+        // from its own window, as the new one may still show its own last keyboard. Only when Helm's own switch had
+        // shown, and only for an identity Helm remembers (a site, or a non-browser app): one that did not take is not
+        // the user's choice, and a browser window with no site is not something we remember. A site is only learnt back
+        // once the user has set it by hand (the shortcut): merely passing through a page on some keyboard never pins it.
+        if (_identity is not null && _shows && !_options.Exclusions.IsExcluded(_app ?? "")
+            && (_site is null || _apps.Knows(_site))
+            && _inputMethods.GetLanguage(_window) is var language and not 0)
         {
             var left = KeyboardModes.From(language, _vietnamese?.Read() == 1);
-            if (left != _mode) _apps.Remember(_app, left);
+            if (left != _mode) _apps.Remember(_identity, left);
         }
 
         _app = app;
+        _site = site;
+        _identity = identity;
         _window = hwnd;
         var current = CurrentMode(hwnd);
-        if (_options.Exclusions.IsExcluded(app))
+
+        // No identity to go by (a browser window with no readable page), or a known app that is excluded, or a browser
+        // page never seen before: leave the keyboard as it is and remember what it is for next time this identity leaves.
+        if (identity is null || _options.Exclusions.IsExcluded(app) || (site is not null && !_apps.Knows(site)))
         {
             _mode = current;
             _shows = true;
+            _logger.LogDebug("{Identity} in front: kept {Mode}", identity ?? app, current);
             return;
         }
-        _mode = _apps.ModeOf(app);
+
+        _mode = _apps.ModeOf(identity);
         if (_mode == KeyboardMode.Chinese && !_inputMethods.HasLanguage(KeyboardModes.ChineseSimplified)) _mode = KeyboardMode.English;
-        _logger.LogDebug("{App} in front: {Mode} (was {Current})", app, _mode, current);
+        _logger.LogDebug("{Identity} in front: {Mode} (was {Current})", identity, _mode, current);
         if (current != _mode) Apply(hwnd, _mode);
         else _shows = true;
     }
+
+    /// <summary>What the keyboard is remembered against: a browser page's site key, else the app name; null when neither.</summary>
+    private string? IdentityOf(string app, string? site) =>
+        site is not null ? KeyboardApps.SiteKeyOf(site)
+        : _sites.IsBrowser(app) ? null  // a browser window with no readable page: nothing to remember it by
+        : string.IsNullOrEmpty(app) ? null
+        : app;
 
     /// <summary>Whether the switch to <paramref name="mode"/> showed in the window; if not, asks once more.</summary>
     private void Verify(nint hwnd, KeyboardMode mode, bool again)
