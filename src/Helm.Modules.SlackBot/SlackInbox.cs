@@ -160,7 +160,8 @@ public sealed class SlackInbox
 
     /// <summary>
     /// The user wrote <paramref name="message"/>: what it answers is handled. In a DM or group DM that is everything
-    /// before it; in a thread, the thread's earlier messages; outside threads, the earlier messages that called them.
+    /// before it; in a thread, the thread's earlier messages and the message that started it; outside threads, the
+    /// earlier messages that called them.
     /// </summary>
     public void Mine(SlackMessage message, SlackConversationKind kind)
     {
@@ -170,7 +171,10 @@ public sealed class SlackInbox
             if (!_data.LastMine.TryGetValue(scope, out var last) || SlackIds.Compare(message.Ts, last) > 0) _data.LastMine[scope] = message.Ts;
             foreach (var item in _data.Items)
             {
-                if (item.Handled != HandledBy.None || item.Scope != scope || SlackIds.Compare(item.Ts, message.Ts) >= 0) continue;
+                if (item.Handled != HandledBy.None || SlackIds.Compare(item.Ts, message.Ts) >= 0) continue;
+                // A reply in a thread also answers the message that started it.
+                var startsThread = message.IsReply && item.Channel == message.Channel && item.Ts == message.ThreadTs;
+                if (item.Scope != scope && !startsThread) continue;
                 // Writing in a channel answers only those who called the user there.
                 if (scope.StartsWith("root:", StringComparison.Ordinal) && !item.Direct) continue;
                 Handle(item, HandledBy.Replied);

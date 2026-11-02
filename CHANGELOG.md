@@ -13,6 +13,10 @@ Format: [Keep a Changelog](https://keepachangelog.com), versions follow [SemVer]
   per project (estimated from your activity), what you coordinated on Slack. Ask for changes ("shorter", "build work
   first") as many times as you like, go back to an earlier version, edit by hand, then Copy; copied reports are kept
   on this PC, encrypted. Claude only reads what Helm found, with no tools.
+- **Slack Bot: answer from the list.** Reply on a message opens a box under the list on screen (and on the Slack Bot
+  page): write your answer, Enter sends it to Slack as you (no AI signature; in the message's thread in a channel),
+  and the message leaves the list. The list takes the keyboard only while you write and gives it back after. A reply in
+  a thread now also answers the message that started the thread.
 - **Slack Bot: news on your phone while you are away from the PC.** Through your own Telegram bot (made with
   @BotFather in a minute; Helm sends to it straight from the PC), Slack Bot tells you when Lumi replied for you and,
   with the hourly reminders, what still waits; every new to-do too if you want. It sends only while nobody touched the

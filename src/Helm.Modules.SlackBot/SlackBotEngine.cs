@@ -151,6 +151,36 @@ public sealed class SlackBotEngine : IAsyncDisposable
         Api = api;
     }
 
+    /// <summary>
+    /// Sends the user's own reply to a message on the list, as them (it is theirs: no AI signature): in a DM where it
+    /// was written, in a channel in the message's thread. The item is then answered. Null when it went, else why not.
+    /// </summary>
+    public async Task<string?> ReplyAsUserAsync(string itemId, string text, CancellationToken ct)
+    {
+        if (text.Trim().Length == 0) return "Write something first.";
+        if (Api is not { } api || Me is not { } me) return "Slack Bot is not connected to Slack right now.";
+        if (Inbox.Snapshot().FirstOrDefault(i => i.Id == itemId) is not { } item) return "That message is no longer on the list.";
+        var thread = item.Kind is SlackConversationKind.DirectMessage or SlackConversationKind.GroupMessage ? item.ThreadTs : item.ThreadTs ?? item.Ts;
+        try
+        {
+            var ts = await api.PostMessageAsync(item.Channel, text.Trim(), null, thread, ct).ConfigureAwait(false);
+            // Answered now, before Slack echoes it back.
+            Inbox.Mine(new SlackMessage(item.Channel, ts ?? SlackIds.Ts(DateTimeOffset.UtcNow), thread, me.UserId, text, false), item.Kind);
+            return null;
+        }
+        catch (SlackApiException ex)
+        {
+            _logger.LogWarning(ex, "Slack Bot could not send the user's reply");
+            return ex.Error == "missing_scope"
+                ? "The Slack app cannot write yet: update it from the manifest (chat:write) and reinstall it."
+                : $"Slack refused it ({ex.Error}).";
+        }
+        catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException)
+        {
+            return "Slack cannot be reached right now.";
+        }
+    }
+
     /// <summary>Tests: as if Lumi had just replied.</summary>
     internal void RaiseRepliedForTests(SlackAlertLine line) => Replied?.Invoke(this, line);
 

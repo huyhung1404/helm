@@ -95,6 +95,12 @@ public sealed class SlackBotViewsTests : IDisposable
         Layout(new System.Windows.Controls.Image { Source = SlackBotLogo.Image, Width = 128, Height = 128 }, new Size(128, 128), "0-icon");
         var open = new SlackBotOverlayWindow(inbox, windows, null, false, _ => { }, _ => { });
         Layout(open, new Size(400, 520), "1-overlay");
+        inbox.StartReplyCommand.Execute(inbox.ToDo[0]);
+        inbox.ReplyText = "Ok em, chiều nay anh xem nhé";
+        Assert.Same(inbox.ToDo[0], inbox.ReplyTo);
+        Layout(open, new Size(400, 700), "1b-overlay-reply");
+        inbox.CancelReplyCommand.Execute(null);
+        Assert.Null(inbox.ReplyTo);
         var folded = new SlackBotOverlayWindow(inbox, windows, null, true, _ => { }, _ => { });
         Layout(folded, new Size(200, 80), "2-overlay-folded");
 
