@@ -17,6 +17,7 @@ public sealed record WordAnalysis
     public IReadOnlyList<VocabExample>? Examples { get; init; }
     public IReadOnlyList<string>? Collocations { get; init; }
     public string? Mnemonic { get; init; }
+    public string? PinyinMnemonic { get; init; }
     public IReadOnlyList<VocabConfusable>? Confusables { get; init; }
     public string? Level { get; init; }
     public string? PartOfSpeech { get; init; }

@@ -34,10 +34,11 @@ public sealed class ClaudeCodeVocabAgent(ClaudeCodeRunner claude) : IVocabAgent
            save those again.
         4. Call vocab_follow_ups with limit {WordsPerRun}. For each often_forgotten word write a new mnemonic, different
            from the old one and more vivid (and a clearer explanation, examples or confusables when they help); for each
-           missing_details word give the fields it lacks ([] for forms, synonyms or antonyms it has none of). Save them
+           pinyin_slips word write only a pinyin_mnemonic (the user knows its meaning, only the reading slips: do not
+           touch its mnemonic or analysis); for each missing_details word give the fields it lacks ([] for forms, synonyms or antonyms it has none of). Save them
            all with one vocab_save_details call; fix and save again any that come back with something to fix.
 
-        Then answer with one short line in Vietnamese: what you did (words broken down, helped, filled in).
+        Then answer with one short line in Vietnamese: what you did (words broken down, helped, pinyin hooks, filled in).
         """;
 
     /// <summary>What Claude Code is asked to do for a family.</summary>

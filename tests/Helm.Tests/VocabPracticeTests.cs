@@ -553,6 +553,115 @@ public sealed class VocabPracticeTests
         Assert.Empty(settings.BlockedApps);
     }
 
+    // ---- pinyin slips: the meaning known, the reading not ------------------------------------------------------
+
+    [Fact]
+    public void A_wrong_pinyin_with_the_meaning_known_is_a_slip_not_a_forget()
+    {
+        var id = Analyzed("补救", phonetic: "bǔjiù", meaning: "cứu vãn", hanViet: "bổ cứu");
+        _store.Record(id, remembered: true);
+        Assert.Equal(1, _quiz.StatsOf(id).Level);
+        _time.Advance(VocabQuiz.Interval(1));
+
+        var card = new VocabCardViewModel(_store, _quiz, options: () => new VocabCardOptions(VocabCardMode.WordToMeaning, false, TypePinyin: true));
+        card.Show(id, _store.GetWord(id));
+        Assert.Equal("Type its pinyin", card.KindText);
+        Assert.Equal("Forgot the meaning", card.ForgotText);
+        Assert.Equal("Knew the meaning", card.RememberedText);
+        card.Typed = "bu2jiu4";
+        card.CheckCommand.Execute(null);
+        // A wrong pinyin says nothing of the meaning: neither button is suggested, Remembered records a slip.
+        Assert.True(card.PinyinSlipped);
+        Assert.False(card.SuggestsForgot);
+        Assert.StartsWith("pinyin slip · back tomorrow", card.RememberedHint);
+        Assert.True(card.HasVerdictHint);
+        card.RememberedCommand.Execute(null);
+
+        var stats = _quiz.StatsOf(id);
+        Assert.Equal(1, stats.Level);
+        Assert.Equal(0, stats.Forgot);
+        Assert.Single(stats.SlipAt);
+        Assert.Equal(_store.Now + VocabQuiz.SlipAgain, stats.Due);
+        Assert.Equal("1 done · 1 remembered", card.RoundText);
+
+        // The right pinyin with the meaning known moves the level up as before.
+        _time.Advance(VocabQuiz.SlipAgain);
+        card.Show(id, _store.GetWord(id));
+        card.Typed = "bujiu";
+        card.CheckCommand.Execute(null);
+        Assert.False(card.PinyinSlipped);
+        card.RememberedCommand.Execute(null);
+        Assert.Equal(2, _quiz.StatsOf(id).Level);
+
+        // A wrong pinyin and the meaning forgotten is a forget, as before.
+        card.Show(id, _store.GetWord(id));
+        card.Typed = "baojiu";
+        card.CheckCommand.Execute(null);
+        card.ForgotCommand.Execute(null);
+        stats = _quiz.StatsOf(id);
+        Assert.Equal(0, stats.Level);
+        Assert.Equal(1, stats.Forgot);
+        Assert.Single(stats.SlipAt);
+    }
+
+    [Fact]
+    public async Task Words_whose_pinyin_keeps_slipping_get_a_pinyin_hook_only()
+    {
+        var server = Server();
+        var id = Analyzed("经验", phonetic: "jīngyàn", meaning: "kinh nghiệm", hanViet: "kinh nghiệm");
+        _store.UpdateWord(id, w => w with { Mnemonic = "mẹo cũ" });
+        for (var i = 0; i < VocabQuiz.PinyinSlips; i++) _store.Record(id, remembered: true, pinyinSlip: true);
+        Assert.Single(_quiz.SlippingWords());
+        // Slips are never forgets: the word is not often forgotten, so its meaning is not helped again.
+        Assert.Empty(_quiz.HardWords());
+
+        var follow = await CallAsync(server, "vocab_follow_ups", []);
+        Assert.Equal(1, follow["pinyin_slips_total"]!.GetValue<int>());
+        Assert.Equal("经验", follow["pinyin_slips"]![0]!["word"]!.GetValue<string>());
+        Assert.Equal(0, follow["often_forgotten_total"]!.GetValue<int>());
+
+        var saved = await CallAsync(server, "vocab_save_details", new JsonObject
+        {
+            ["words"] = new JsonArray(new JsonObject { ["id"] = id, ["pinyin_mnemonic"] = "kinh → jīng, nghiệm → yàn; thanh 1 rồi 4" }),
+        });
+        Assert.Equal(0, saved["pinyin_slips_left"]!.GetValue<int>());
+        var word = _store.GetWord(id)!;
+        Assert.Equal("kinh → jīng, nghiệm → yàn; thanh 1 rồi 4", word.PinyinMnemonic);
+        Assert.Equal("mẹo cũ", word.Mnemonic);
+        Assert.Null(word.HelpedAt);
+        Assert.NotNull(word.PinyinHelpedAt);
+        Assert.Contains(VocabCardDetails.Build(_store, word), s => s.Title == "Remembering the pinyin");
+
+        // An English word has no pinyin to remember.
+        var english = Analyzed("relative");
+        var refused = await CallAsync(server, "vocab_save_details", new JsonObject
+        {
+            ["words"] = new JsonArray(new JsonObject { ["id"] = english, ["pinyin_mnemonic"] = "x" }),
+        });
+        Assert.Contains("Chinese words only", refused["failed"]![0]!["fix"]!.GetValue<string>());
+    }
+
+    [Fact]
+    public void The_list_offers_filters_as_chips_with_counts()
+    {
+        using var dir = new TempDir();
+        using var store = new SettingsStoreFactory(new HelmPaths(dir.Path));
+        var settings = VocabKit.Settings(store);
+        var known = Analyzed("relative");
+        Analyzed("translate");
+        _store.Record(known, remembered: true);
+        var list = new VocabWordListViewModel(_store, _quiz, settings, _ => { });
+        list.Refresh();
+        Assert.Equal(["All words", "New"], list.Chips.Select(c => c.Name));
+        Assert.Equal([2, 1], list.Chips.Select(c => c.Count));
+        list.Chips[1].Pick.Execute(null);
+        Assert.Single(list.Words);
+        Assert.True(list.Words[0].IsNew);
+        Assert.Equal("New", list.Words[0].Flag);
+        Assert.True(list.Chips[1].IsOn);
+        Assert.Equal(VocabQuiz.TopLevel, list.Words[0].Dots.Count);
+    }
+
     // ---- the agent working by itself -----------------------------------------------------------------------------
 
     [Fact]

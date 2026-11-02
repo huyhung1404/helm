@@ -155,7 +155,7 @@ public sealed partial class VocabAgentViewModel : ObservableObject, IDisposable
     internal string? Work()
     {
         var pending = _store.Pending().Select(w => w.Id);
-        var hard = _quiz.HardWords().Select(w => w.Id);
+        var hard = _quiz.HardWords().Select(w => w.Id).Concat(_quiz.SlippingWords().Select(w => "py:" + w.Id));
         var lacking = _store.Words().Where(w => w.Value.LacksDetails && !w.Value.Hidden).Select(w => w.Id);
         var key = string.Join("|", string.Join(",", pending), string.Join(",", hard.Order(StringComparer.Ordinal)), string.Join(",", lacking));
         return key == "||" ? null : key;

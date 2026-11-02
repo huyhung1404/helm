@@ -43,6 +43,7 @@ public sealed partial class VocabCardViewModel(VocabStore store, VocabQuiz quiz,
     private readonly Random _random = random ?? Random.Shared;
     private string? _wordId;
     private VocabWord? _word;
+    private VocabWordStats _stats = VocabWordStats.New;
 
     [ObservableProperty] private bool _hasWord;
     [ObservableProperty] private bool _isRevealed;
@@ -71,6 +72,16 @@ public sealed partial class VocabCardViewModel(VocabStore store, VocabQuiz quiz,
 
     /// <summary>An agent wrote a new way to remember it in the last week.</summary>
     [ObservableProperty] private bool _isNewlyHelped;
+
+    /// <summary>A Chinese word whose pinyin keeps slipping (an agent is asked for a way to remember the reading).</summary>
+    [ObservableProperty] private bool _isSlipping;
+
+    /// <summary>Chinese: how to remember the reading (an agent's), shown with the answer.</summary>
+    [ObservableProperty] private string _pinyinMnemonic = "";
+
+    /// <summary>Cards answered since the page opened, and how many of them were remembered.</summary>
+    [ObservableProperty] private int _answeredCount;
+    [ObservableProperty] private int _rememberedCount;
 
     /// <summary>Each part with its meaning and pieces ("补 · vá, bù ← 衤 áo + 卜 (âm)"), shown with the meaning.</summary>
     [ObservableProperty] private IReadOnlyList<string> _partLines = [];
@@ -131,9 +142,76 @@ public sealed partial class VocabCardViewModel(VocabStore store, VocabQuiz quiz,
         OnPropertyChanged(nameof(AnswerIsWrong));
         OnPropertyChanged(nameof(SuggestsRemembered));
         OnPropertyChanged(nameof(SuggestsForgot));
+        OnAnswerLabelsChanged();
     }
 
     public bool HasFrontNote => FrontNote.Length > 0;
+
+    public bool HasPinyinMnemonic => PinyinMnemonic.Length > 0;
+
+    partial void OnPinyinMnemonicChanged(string value) => OnPropertyChanged(nameof(HasPinyinMnemonic));
+
+    /// <summary>"3 done · 2 remembered", or "No cards yet".</summary>
+    public string RoundText => AnsweredCount == 0 ? "No cards yet" : $"{AnsweredCount} done · {RememberedCount} remembered";
+
+    partial void OnAnsweredCountChanged(int value) => OnPropertyChanged(nameof(RoundText));
+
+    partial void OnRememberedCountChanged(int value) => OnPropertyChanged(nameof(RoundText));
+
+    /// <summary>What the card asks, shown as its label: "Word → meaning", "Type its pinyin"…</summary>
+    public string KindText => AsksPinyin ? "Type its pinyin" : Mode switch
+    {
+        VocabCardMode.MeaningToWord => "Meaning → word",
+        VocabCardMode.Listen => "Listen → word",
+        VocabCardMode.FillGap => "Fill the gap",
+        VocabCardMode.Type => "Type the word",
+        _ => "Word → meaning",
+    };
+
+    /// <summary>
+    /// The typed pinyin was wrong (or only its tones): if the meaning was there, "Remembered" records a pinyin slip, not a
+    /// forget. A Chinese card's buttons answer for the meaning only.
+    /// </summary>
+    public bool PinyinSlipped => AsksPinyin && TypedResult?.Verdict is VocabAnswerVerdict.Close or VocabAnswerVerdict.Wrong;
+
+    /// <summary>"Forgot", or "Forgot the meaning" on a card that asked the pinyin.</summary>
+    public string ForgotText => AsksPinyin ? "Forgot the meaning" : "Forgot";
+
+    /// <summary>"Remembered", or "Knew the meaning" on a card that asked the pinyin.</summary>
+    public string RememberedText => AsksPinyin ? "Knew the meaning" : "Remembered";
+
+    /// <summary>When a forgotten word comes back.</summary>
+    public string ForgotHint => "again " + VocabFormat.In(VocabQuiz.Relearn);
+
+    /// <summary>When the word comes back if remembered: "next in 8 days", or after a pinyin slip "pinyin slip · back tomorrow".</summary>
+    public string RememberedHint
+    {
+        get
+        {
+            if (PinyinSlipped) return "pinyin slip · back " + VocabFormat.In(VocabQuiz.SlipAgain);
+            var onTime = _stats.Due is not { } due || store.Now >= due;
+            var level = onTime ? Math.Min(VocabQuiz.TopLevel, _stats.Level + 1) : Math.Max(1, _stats.Level);
+            return "next " + VocabFormat.In(VocabQuiz.Interval(level));
+        }
+    }
+
+    /// <summary>Under the typed pinyin's verdict: what the two buttons now mean.</summary>
+    public string VerdictHint => !AsksPinyin || TypedResult is null ? ""
+        : PinyinSlipped ? "Only the pinyin slipped? Press “Knew the meaning”: a pinyin slip never counts as forgetting the word."
+        : "Now: did you know the meaning?";
+
+    public bool HasVerdictHint => VerdictHint.Length > 0;
+
+    private void OnAnswerLabelsChanged()
+    {
+        OnPropertyChanged(nameof(KindText));
+        OnPropertyChanged(nameof(PinyinSlipped));
+        OnPropertyChanged(nameof(ForgotText));
+        OnPropertyChanged(nameof(RememberedText));
+        OnPropertyChanged(nameof(RememberedHint));
+        OnPropertyChanged(nameof(VerdictHint));
+        OnPropertyChanged(nameof(HasVerdictHint));
+    }
 
     /// <summary>After revealing a card that did not show the word, the word comes up large.</summary>
     public bool ShowsWordOnReveal => IsRevealed && !FrontIsWord;
@@ -150,6 +228,7 @@ public sealed partial class VocabCardViewModel(VocabStore store, VocabQuiz quiz,
         OnPropertyChanged(nameof(FrontIsType));
         OnPropertyChanged(nameof(IsTyping));
         OnPropertyChanged(nameof(ShowsWordOnReveal));
+        OnPropertyChanged(nameof(KindText));
     }
 
     partial void OnFrontNoteChanged(string value) => OnPropertyChanged(nameof(HasFrontNote));
@@ -172,11 +251,11 @@ public sealed partial class VocabCardViewModel(VocabStore store, VocabQuiz quiz,
     /// <summary>The pop-up cards' "Full details": everything known about the word, by section (built when asked).</summary>
     public IReadOnlyList<VocabDetailSection> Details() => _word is null ? [] : VocabCardDetails.Build(store, _word);
 
-    /// <summary>The typed answer was right (or the right sounds): the card suggests Remembered.</summary>
-    public bool SuggestsRemembered => TypedResult?.Verdict == VocabAnswerVerdict.Correct;
+    /// <summary>The typed word was right: the card suggests Remembered (not on pinyin cards: the pinyin says nothing of the meaning).</summary>
+    public bool SuggestsRemembered => !AsksPinyin && TypedResult?.Verdict == VocabAnswerVerdict.Correct;
 
-    /// <summary>The typed answer was wrong: the card suggests Forgot.</summary>
-    public bool SuggestsForgot => TypedResult?.Verdict == VocabAnswerVerdict.Wrong;
+    /// <summary>The typed word was wrong: the card suggests Forgot (not on pinyin cards: a wrong pinyin is a slip, not a forget).</summary>
+    public bool SuggestsForgot => !AsksPinyin && TypedResult?.Verdict == VocabAnswerVerdict.Wrong;
 
     /// <summary>Shows a word picked by the quiz (another than the one shown); false when no word is analyzed yet.</summary>
     public bool ShowNext()
@@ -205,8 +284,11 @@ public sealed partial class VocabCardViewModel(VocabStore store, VocabQuiz quiz,
         PartsText = word is null ? "" : VocabTree.Outline(store, word);
         PartLines = word is null ? [] : VocabTree.Lines(store, word);
         var stats = id is null ? VocabWordStats.New : quiz.StatsOf(id);
+        _stats = stats;
         LevelText = id is null ? "" : VocabFormat.Level(stats, store.Now);
         IsHard = word is not null && VocabQuiz.IsHard(word, stats);
+        IsSlipping = word is not null && VocabQuiz.IsSlipping(word, stats);
+        PinyinMnemonic = word?.PinyinMnemonic ?? "";
         IsNewlyHelped = word?.HelpedAt is { } helped && store.Now - helped < TimeSpan.FromDays(7);
         OnPropertyChanged(nameof(IsChinese));
         AskFront(word);
@@ -241,6 +323,7 @@ public sealed partial class VocabCardViewModel(VocabStore store, VocabQuiz quiz,
             OnPropertyChanged(nameof(AsksPinyin));
             OnPropertyChanged(nameof(TypePrompt));
         }
+        OnAnswerLabelsChanged();
         Mode = mode;
         OnPropertyChanged(nameof(IsTyping));
         Typed = "";
@@ -325,7 +408,9 @@ public sealed partial class VocabCardViewModel(VocabStore store, VocabQuiz quiz,
     private void Answer(bool remembered)
     {
         if (_wordId is null || !IsRevealed) return;
-        store.Record(_wordId, remembered);
+        store.Record(_wordId, remembered, pinyinSlip: remembered && PinyinSlipped);
+        AnsweredCount++;
+        if (remembered) RememberedCount++;
         Answered?.Invoke(this, EventArgs.Empty);
         ShowNext();
     }

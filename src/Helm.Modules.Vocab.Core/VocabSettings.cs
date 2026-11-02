@@ -43,6 +43,12 @@ public sealed class VocabSettings : IVersionedSettings
     /// </summary>
     public bool PopupEnabled { get; set; } = true;
 
+    /// <summary>
+    /// How solid the pop-up card is over other apps (PC and phone), in percent: see-through enough to keep the app below
+    /// readable. It turns solid while the pointer is on it or the pinyin is typed (see <see cref="VocabSettingsViewModel.MinCardOpacity"/>).
+    /// </summary>
+    public int CardOpacity { get; set; } = VocabSettingsViewModel.DefaultCardOpacity;
+
     /// <summary>The pop-up comes back after a random time between these two (seconds).</summary>
     public int PopupMinSeconds { get; set; } = 20 * 60;
 

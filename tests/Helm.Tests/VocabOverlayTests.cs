@@ -139,7 +139,7 @@ public sealed class VocabPopupCardTests
         new(_store, _quiz, options: () => new VocabCardOptions(VocabCardMode.WordToMeaning, false, typePinyin));
 
     [Fact]
-    public void A_chinese_word_asks_for_its_pinyin_and_suggests_the_verdict()
+    public void A_chinese_word_asks_for_its_pinyin_and_leaves_the_verdict_to_the_meaning()
     {
         BuJiu();
         var card = Card(typePinyin: true);
@@ -149,14 +149,18 @@ public sealed class VocabPopupCardTests
         card.Typed = "bu3jiu4";
         card.CheckCommand.Execute(null);
 
+        // The pinyin says nothing of the meaning: no verdict is suggested, the buttons ask for the meaning.
         Assert.True(card.IsRevealed);
-        Assert.True(card.SuggestsRemembered);
+        Assert.False(card.SuggestsRemembered);
         Assert.False(card.SuggestsForgot);
+        Assert.False(card.PinyinSlipped);
 
+        // A wrong pinyin is a slip if the meaning was there, not a forget.
         card.ShowNext();
         card.Typed = "baojiu";
         card.CheckCommand.Execute(null);
-        Assert.True(card.SuggestsForgot);
+        Assert.False(card.SuggestsForgot);
+        Assert.True(card.PinyinSlipped);
     }
 
     [Fact]

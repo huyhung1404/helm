@@ -43,11 +43,11 @@ public sealed class VocabViewsTests : IDisposable
         Assert.True(viewModel.IsLearning);
         Layout(page, new Size(1100, 760), "1-learn");
 
-        // Adding stays on the Add tab; the new word heads "Recently added", waiting for the agent.
-        viewModel.ShowAddCommand.Execute(null);
+        // Adding stays in the Add words dialog; the new word heads "Recently added", waiting for the agent.
+        viewModel.OpenAddCommand.Execute(null);
         viewModel.NewWord = "serendipity";
         viewModel.AddCommand.Execute(null);
-        Assert.True(viewModel.IsAdding);
+        Assert.True(viewModel.IsAddOpen);
         Assert.Equal("serendipity", viewModel.RecentWords[0].Text);
         Assert.True(viewModel.RecentWords[0].IsPending);
         Layout(page, new Size(1100, 760), "1b-add");
@@ -139,7 +139,7 @@ public sealed class VocabViewsTests : IDisposable
         Layout(window, new Size(352, 420), "7-popup-revealed");
         window.Close();
 
-        // A Chinese word asks for its pinyin first; checked, the answer shows with the suggested verdict; Full details.
+        // A Chinese word asks for its pinyin first; checked, the answer shows and the buttons ask for the meaning; Full details.
         var bujiu = store.FindWord("补救")!;
         var zh = new VocabCardViewModel(store, quiz, options: () => new VocabCardOptions(VocabCardMode.WordToMeaning, false, TypePinyin: true));
         zh.Show(bujiu.Id, bujiu.Value);
@@ -148,7 +148,8 @@ public sealed class VocabViewsTests : IDisposable
         Layout(zhWindow, new Size(352, 300), "8-popup-pinyin");
         zh.Typed = "bu3jiu4";
         zh.CheckCommand.Execute(null);
-        Assert.True(zh.SuggestsRemembered);
+        Assert.True(zh.AnswerIsCorrect);
+        Assert.Equal("Knew the meaning", zh.RememberedText);
         Layout(zhWindow, new Size(352, 520), "9-popup-checked");
         zhWindow.ToggleFull();
         Layout(zhWindow, new Size(352, 900), "10-popup-full");
