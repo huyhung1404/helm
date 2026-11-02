@@ -15,17 +15,14 @@ public static class KeyboardLogo
         const double size = KeyboardIconShape.Size;
         var gradient = new LinearGradientBrush(Argb(KeyboardIconShape.GradientStart), Argb(KeyboardIconShape.GradientEnd),
             new Point(0, size), new Point(size, 0)) { MappingMode = BrushMappingMode.Absolute };
-        var pen = new Pen(gradient, KeyboardIconShape.Stroke)
-        {
-            LineJoin = PenLineJoin.Round,
-            StartLineCap = PenLineCap.Round,
-            EndLineCap = PenLineCap.Round,
-        };
         var group = new DrawingGroup();
         // A transparent box keeps the icon's own margins at any size.
         group.Children.Add(new GeometryDrawing(Brushes.Transparent, null, new RectangleGeometry(new Rect(0, 0, size, size))));
-        group.Children.Add(new GeometryDrawing(null, pen, Geometry.Parse(KeyboardIconShape.Keycap)));
-        group.Children.Add(new GeometryDrawing(null, pen, Geometry.Parse(KeyboardIconShape.Letter)));
+        foreach (var (x, y, width, height) in KeyboardIconShape.Keys)
+        {
+            var key = new RectangleGeometry(new Rect(x, y, width, height), KeyboardIconShape.Radius, KeyboardIconShape.Radius);
+            group.Children.Add(new GeometryDrawing(gradient, null, key));
+        }
         var image = new DrawingImage(group);
         image.Freeze();
         return image;
