@@ -17,6 +17,8 @@ internal static class TsfIds
     public static readonly Guid PropAttribute = new("34b45670-7526-11d2-a147-00105a2799b5");        // GUID_PROP_ATTRIBUTE
     public static readonly Guid PropInputScope = new("1713dd5a-68e7-4a5b-9af6-592a595c778d");       // GUID_PROP_INPUTSCOPE
     public const int IS_URL = 1;
+    public static readonly Guid KeyboardDisabled = new("71a5b253-1951-466b-9fbc-9c8808fa84f2");    // GUID_COMPARTMENT_KEYBOARD_DISABLED
+    public static readonly Guid EmptyContext = new("d7487dbf-804e-41c5-894d-ad96fd4eea13");        // GUID_COMPARTMENT_EMPTYCONTEXT
     public static readonly Guid InputProcessorProfiles = new("33c53a50-f456-4884-b049-85fd643ecfed"); // CLSID_TF_InputProcessorProfiles
     public static readonly Guid CategoryMgr = new("a4b544a1-438d-4b41-9325-869523e2d6c7");          // CLSID_TF_CategoryMgr
     public static readonly Guid InputModeItem = new("2c77a81e-41cc-4178-a3a7-5f8a987568e6");        // GUID_LBI_INPUTMODE

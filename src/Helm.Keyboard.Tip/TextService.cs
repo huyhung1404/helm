@@ -132,7 +132,7 @@ internal sealed unsafe partial class TextService
         try
         {
             WatchKeyDown((int)wParam, "test key down");
-            if (context is null) return TsfIds.S_OK;
+            if (context is null || TakesNoTyping(context)) return TsfIds.S_OK;
             switch (Classify((int)wParam, out _))
             {
                 case KeyKind.Letter:
@@ -160,7 +160,7 @@ internal sealed unsafe partial class TextService
         try
         {
             WatchKeyDown((int)wParam, "key down");
-            if (context is null) return TsfIds.S_OK;
+            if (context is null || TakesNoTyping(context)) return TsfIds.S_OK;
             var virtualKey = (int)wParam;
             switch (Classify(virtualKey, out var letter))
             {
@@ -357,9 +357,25 @@ internal sealed unsafe partial class TextService
         _ => ((lParam >> 16) & 0xFF) != 0x36,
     };
 
+    /// <summary>
+    /// The app says nothing may be typed here through an input method: no text box has the focus (a web page, where
+    /// Chromium gives TSF an empty context) or it is a password box. Letters then reach the app as keys, so the page's
+    /// own keys work: web shortcuts, games, Chrome Remote Desktop sending them on to the other computer.
+    /// </summary>
+    private static bool TakesNoTyping(ITfContext context)
+    {
+        if (context is not ITfCompartmentMgr compartments) return false;
+        var none = IsOn(compartments, TsfIds.EmptyContext) || IsOn(compartments, TsfIds.KeyboardDisabled);
+        if (none && Log.IsVerbose) Log.Info("no typing here: the key is the app's");
+        return none;
+    }
+
     private bool ReadSwitch() => IsOn(_switch);
 
     private static bool IsOn(ITfCompartment? compartment) => Read(compartment) != 0;
+
+    private static bool IsOn(ITfCompartmentMgr compartments, in Guid id) =>
+        compartments.GetCompartment(id, out var compartment) >= 0 && IsOn(compartment);
 
     private static int Read(ITfCompartment? compartment)
     {
