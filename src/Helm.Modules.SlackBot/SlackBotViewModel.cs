@@ -29,6 +29,7 @@ public sealed partial class SlackBotViewModel : ObservableObject
     [ObservableProperty] private string _reportTimes = "";
     [ObservableProperty] private int _channelSeconds;
     [ObservableProperty] private bool _readBots;
+    [ObservableProperty] private bool _catchUpQuietDms;
     [ObservableProperty] private string _aboutMe = "";
     [ObservableProperty] private string _model = "";
     [ObservableProperty] private bool _playSound;
@@ -130,6 +131,8 @@ public sealed partial class SlackBotViewModel : ObservableObject
 
     partial void OnReadBotsChanged(bool value) => Save(s => s.ReadBots = value);
 
+    partial void OnCatchUpQuietDmsChanged(bool value) => Save(s => s.CatchUpQuietDms = value);
+
     partial void OnAboutMeChanged(string value) => Save(s => s.AboutMe = value);
 
     partial void OnModelChanged(string value) => Save(s => s.Model = value);
@@ -183,6 +186,7 @@ public sealed partial class SlackBotViewModel : ObservableObject
             ReportTimes = string.Join(", ", s.ReportTimes);
             ChannelSeconds = s.ChannelSeconds;
             ReadBots = s.ReadBots;
+            CatchUpQuietDms = s.CatchUpQuietDms;
             AboutMe = s.AboutMe;
             Model = s.Model;
             PlaySound = s.PlaySound;
@@ -207,7 +211,8 @@ public sealed partial class SlackBotViewModel : ObservableObject
     {
         HasTokens = _tokens.Exist;
         Status = _engine.Status is { Length: > 0 } s ? s : _engine.State == SlackBotState.Off ? "Slack Bot is turned off." : "";
-        var conversations = _engine.Conversations;
+        // DMs with people who left are not worth a switch.
+        var conversations = _engine.Conversations.Where(c => !c.Gone).ToList();
         if (conversations.Count == _allChannels.Count && conversations.Select(c => c.Id).SequenceEqual(_allChannels.Select(r => r.Id)))
         {
             UpdateSummary();

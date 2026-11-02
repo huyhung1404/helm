@@ -74,6 +74,41 @@ public sealed class SlackInbox
         }
     }
 
+    /// <summary>A message was seen in <paramref name="channel"/> (anyone's, kept or not).</summary>
+    public void Touch(string channel, string ts)
+    {
+        lock (_gate)
+        {
+            if (_data.Activity.TryGetValue(channel, out var last) && SlackIds.Compare(ts, last) <= 0) return;
+            _data.Activity[channel] = ts;
+            _save?.Invoke(_data);
+        }
+    }
+
+    /// <summary>Every DM's latest message was looked up once (so quiet DMs can be left out of catching up).</summary>
+    public bool ActivityLearned
+    {
+        get
+        {
+            lock (_gate) return _data.ActivityLearned;
+        }
+        set
+        {
+            lock (_gate)
+            {
+                _data.ActivityLearned = value;
+                _save?.Invoke(_data);
+            }
+        }
+    }
+
+    /// <summary>Conversations with a message seen in the last <paramref name="within"/>.</summary>
+    public IReadOnlySet<string> RecentChannels(TimeSpan within)
+    {
+        var since = SlackIds.Ts(_clock.GetUtcNow() - within);
+        lock (_gate) return _data.Activity.Where(p => SlackIds.Compare(p.Value, since) > 0).Select(p => p.Key).ToHashSet();
+    }
+
     /// <summary>The user has written in this DM or thread (lately).</summary>
     public bool WroteIn(string scope)
     {
@@ -405,6 +440,9 @@ public sealed class SlackInbox
         lock (_gate)
         {
             var set = _data.Items.Select(i => i.Channel).ToHashSet();
+            var since = SlackIds.Ts(_clock.GetUtcNow() - Keep);
+            foreach (var (channel, ts) in _data.Activity)
+                if (SlackIds.Compare(ts, since) > 0) set.Add(channel);
             foreach (var scope in _data.LastMine.Keys)
                 set.Add(scope.StartsWith("root:", StringComparison.Ordinal) ? scope[5..] : scope.Split(':')[0]);
             return set;

@@ -100,6 +100,13 @@
                 </ScrollViewer>
             </StackPanel>
         </ui:CardExpander>
+        <ui:CardControl Margin="0,0,0,4" Icon="{ui:SymbolIcon History24}">
+            <ui:CardControl.Header>
+                <core:CardHeader Title="Catch up on quiet DMs"
+                                 Description="Off: after Helm was off, only DMs with a message in the last 30 days are read back (fast). Quiet DMs still arrive live while Helm runs." />
+            </ui:CardControl.Header>
+            <ui:ToggleSwitch IsChecked="{Binding CatchUpQuietDms}" />
+        </ui:CardControl>
         <ui:CardControl Margin="0,0,0,4" Icon="{ui:SymbolIcon Bot24}">
             <ui:CardControl.Header>
                 <core:CardHeader Title="Messages from bots and apps" Description="Off: only those that call you by name are read." />

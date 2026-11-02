@@ -42,6 +42,12 @@ public sealed class SlackBotSettings : IVersionedSettings
     /// <summary>Shorter than this would run Claude Code almost without a break.</summary>
     public const int MinChannelSeconds = 10;
 
+    /// <summary>
+    /// After Helm was off, DMs nobody wrote in for <see cref="SlackBotEngine.ActiveFor"/> are read back too (slow: a
+    /// workspace keeps hundreds). Off: only the recent ones; quiet DMs still arrive live while Helm runs.
+    /// </summary>
+    public bool CatchUpQuietDms { get; set; }
+
     /// <summary>Messages from bots and apps are read (only those that call the user otherwise).</summary>
     public bool ReadBots { get; set; }
 

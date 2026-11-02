@@ -98,7 +98,7 @@ public sealed class SlackApi : ISlackApi, IDisposable
             {
                 if (Str(c, "id") is not { } id) continue;
                 if (Bool(c, "is_im"))
-                    list.Add(new SlackConversation(id, "", SlackConversationKind.DirectMessage, Str(c, "user")));
+                    list.Add(new SlackConversation(id, "", SlackConversationKind.DirectMessage, Str(c, "user"), Bool(c, "is_user_deleted")));
                 else if (Bool(c, "is_mpim"))
                     list.Add(new SlackConversation(id, GroupName(Str(c, "name") ?? id), SlackConversationKind.GroupMessage));
                 else

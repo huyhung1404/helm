@@ -111,6 +111,12 @@ public sealed class InboxData
 
     public List<InboxCorrection> Corrections { get; set; } = [];
 
+    /// <summary>The latest message seen per conversation (anyone's): catching up reads the active ones first.</summary>
+    public Dictionary<string, string> Activity { get; set; } = [];
+
+    /// <summary>Every DM's latest message was looked up once: <see cref="Activity"/> knows which DMs are quiet.</summary>
+    public bool ActivityLearned { get; set; }
+
     /// <summary>Messages Slack Bot sent (channel:ts): they are the user's account but not the user's answer.</summary>
     public List<string> BotMessages { get; set; } = [];
 

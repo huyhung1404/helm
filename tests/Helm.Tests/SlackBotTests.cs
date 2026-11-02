@@ -235,6 +235,18 @@ public sealed class SlackInboxTests
     }
 
     [Fact]
+    public void Activity_says_which_conversations_to_catch_up_on_first()
+    {
+        var inbox = NewInbox();
+        inbox.Touch("D1", SlackIds.Ts(Now - TimeSpan.FromDays(2)));
+        inbox.Touch("D2", SlackIds.Ts(Now - TimeSpan.FromDays(60)));
+        inbox.Touch("D1", SlackIds.Ts(Now - TimeSpan.FromDays(40)));
+        Assert.Equal(["D1"], inbox.RecentChannels(TimeSpan.FromDays(30)).Order());
+        Assert.Contains("D1", inbox.ActiveChannels());
+        Assert.DoesNotContain("D2", inbox.ActiveChannels());
+    }
+
+    [Fact]
     public void Seen_only_moves_forward()
     {
         var inbox = NewInbox();
@@ -592,6 +604,7 @@ public sealed class SlackApiTests
         Assert.Equal(["Channel", "PrivateChannel", "GroupMessage", "DirectMessage"], list.Select(c => c.Kind.ToString()));
         Assert.Equal("an, binh", list[2].Name);
         Assert.Equal("U2", list[3].UserId);
+        Assert.False(list[3].Gone);
         Assert.Equal(2, handler.Calls.Count);
     }
 
@@ -644,5 +657,31 @@ public sealed class SlackBotScheduleTests
         Assert.Equal(["09:00"], SlackBotViewModel.ParseTimes("9"));
         Assert.Null(SlackBotViewModel.ParseTimes("12:00, noon"));
         Assert.Empty(SlackBotViewModel.ParseTimes("")!);
+    }
+}
+
+public sealed class SlackListSyncTests
+{
+    private static InboxItemViewModel Row(string ts, string? summary = null) =>
+        new(new InboxItem { Channel = "C1", Ts = ts, Text = "t" + ts, Summary = summary }, "https://x/" + ts);
+
+    [Fact]
+    public void Rows_on_screen_stay_and_only_changed_ones_are_replaced()
+    {
+        var list = new System.Collections.ObjectModel.ObservableCollection<InboxItemViewModel>();
+        SlackBotInboxViewModel.Sync(list, [Row("1.0"), Row("2.0"), Row("3.0")]);
+        var kept = list[0];
+        var changes = 0;
+        list.CollectionChanged += (_, _) => changes++;
+
+        // Same content again: nothing moves.
+        SlackBotInboxViewModel.Sync(list, [Row("1.0"), Row("2.0"), Row("3.0")]);
+        Assert.Equal(0, changes);
+        Assert.Same(kept, list[0]);
+
+        // One sorted, one gone, one new, one moved.
+        SlackBotInboxViewModel.Sync(list, [Row("4.0"), Row("3.0"), Row("1.0", "tóm tắt")]);
+        Assert.Equal(["C1:4.0", "C1:3.0", "C1:1.0"], list.Select(r => r.Id));
+        Assert.Equal("tóm tắt", list[2].Headline);
     }
 }

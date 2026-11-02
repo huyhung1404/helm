@@ -42,6 +42,7 @@ public sealed partial class SlackReader(ISlackApi api, SlackIdentity me, SlackIn
     public async Task<bool> ReadAsync(SlackMessage m, CancellationToken ct)
     {
         if (!Reads(m.Channel)) return false;
+        inbox.Touch(m.Channel, m.Ts);
         var conversation = Conversation(m.Channel);
         if (m.User == me.UserId)
         {
