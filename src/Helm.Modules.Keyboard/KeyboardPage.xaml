@@ -59,6 +59,13 @@
             </ui:CardControl.Header>
             <ui:ToggleSwitch IsChecked="{Binding PlaySound}" />
         </ui:CardControl>
+        <ui:CardControl Margin="0,0,0,4" Icon="{ui:SymbolIcon Desktop24}">
+            <ui:CardControl.Header>
+                <core:CardHeader Title="Leave the shortcut to a computer you control"
+                                 Description="In Chrome Remote Desktop, Remote Desktop, UltraViewer and the like, the shortcut switches the other computer's keyboard (with Helm there), and this one stays English. Your own shortcut (like Ctrl+Alt+K) cannot reach it." />
+            </ui:CardControl.Header>
+            <ui:ToggleSwitch IsChecked="{Binding RemoteGetsShortcut}" />
+        </ui:CardControl>
 
         <!-- Typing -->
         <TextBlock Text="Typing Vietnamese (Telex)" Style="{DynamicResource HelmSectionHeader}" />

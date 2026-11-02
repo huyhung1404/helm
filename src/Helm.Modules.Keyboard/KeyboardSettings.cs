@@ -34,6 +34,12 @@ public sealed class KeyboardSettings : IVersionedSettings
 
     public bool PlaySound { get; set; } = true;
 
+    /// <summary>
+    /// In a window that controls another computer (Chrome Remote Desktop, Remote Desktop…), a press-and-let-go shortcut
+    /// is the other computer's: it goes there, and this computer stays on English.
+    /// </summary>
+    public bool RemoteGetsShortcut { get; set; } = true;
+
     /// <summary>The tone mark on the second vowel of oa, oe, uy (hoà, thuý), as Vietnamese is written today.</summary>
     public bool ModernToneStyle { get; set; } = true;
 

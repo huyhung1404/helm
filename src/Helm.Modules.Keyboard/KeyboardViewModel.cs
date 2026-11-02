@@ -51,6 +51,7 @@ public sealed partial class KeyboardViewModel : ObservableObject
     [ObservableProperty] private bool _includeChinese;
     [ObservableProperty] private bool _showIndicator;
     [ObservableProperty] private bool _playSound;
+    [ObservableProperty] private bool _remoteGetsShortcut;
     [ObservableProperty] private bool _modernToneStyle;
     [ObservableProperty] private bool _spellCheck;
     [ObservableProperty] private string _excludedApps = string.Empty;
@@ -137,6 +138,7 @@ public sealed partial class KeyboardViewModel : ObservableObject
     partial void OnIncludeChineseChanged(bool value) => Save(s => s.IncludeChinese = value);
     partial void OnShowIndicatorChanged(bool value) => Save(s => s.ShowIndicator = value);
     partial void OnPlaySoundChanged(bool value) => Save(s => s.PlaySound = value);
+    partial void OnRemoteGetsShortcutChanged(bool value) => Save(s => s.RemoteGetsShortcut = value);
     partial void OnModernToneStyleChanged(bool value) => Save(s => s.ModernToneStyle = value);
     partial void OnSpellCheckChanged(bool value) => Save(s => s.SpellCheck = value);
     partial void OnExcludedAppsChanged(string value) => Save(s => s.ExcludedApps = ProcessExclusions.ParseLines(value));
@@ -149,6 +151,7 @@ public sealed partial class KeyboardViewModel : ObservableObject
         IncludeChinese = s.IncludeChinese;
         ShowIndicator = s.ShowIndicator;
         PlaySound = s.PlaySound;
+        RemoteGetsShortcut = s.RemoteGetsShortcut;
         ModernToneStyle = s.ModernToneStyle;
         SpellCheck = s.SpellCheck;
         ExcludedApps = string.Join(Environment.NewLine, s.ExcludedApps);

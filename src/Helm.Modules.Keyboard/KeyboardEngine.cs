@@ -46,6 +46,8 @@ internal sealed class KeyboardEngine : IAsyncDisposable
     private string? _site;
     /// <summary>What the keyboard is remembered against right now: a site key for a browser page, else the app name.</summary>
     private string? _identity;
+    /// <summary>The window in front controls another computer (<see cref="RemoteWindows"/>).</summary>
+    private bool _remote;
     private IDisposable? _sitePollTimer;
     private nint _window;
     /// <summary>The keyboard the app in front should type with.</summary>
@@ -108,7 +110,13 @@ internal sealed class KeyboardEngine : IAsyncDisposable
     {
         var hwnd = _windows.GetForegroundWindow();
         var app = _windows.GetProcessName(hwnd);
-        var site = _sites.SiteKey(hwnd, app);
+        var (site, remote) = Locate(hwnd, app);
+        // The keys go on to the other computer, whose Helm switches its own keyboard.
+        if (remote)
+        {
+            _logger.LogDebug("{App} controls another computer: the shortcut is its own", app);
+            return;
+        }
         var identity = IdentityOf(app, site);
         // Pressed again before the last switch shows in the window: go on from the last one.
         var current = _shows || identity != _identity ? CurrentMode(hwnd) : _mode;
@@ -208,9 +216,20 @@ internal sealed class KeyboardEngine : IAsyncDisposable
         }
         var app = _windows.GetProcessName(hwnd);
         if (string.IsNullOrEmpty(app)) return;
-        var site = _sites.SiteKey(hwnd, app);
+        var (site, remote) = Locate(hwnd, app);
         WatchSite(_sites.IsBrowser(app));
-        Settle(hwnd, app, site);
+        Settle(hwnd, app, site, remote);
+    }
+
+    /// <summary>
+    /// The site a browser window shows (null when none, or not a browser), and whether the window controls another
+    /// computer: a remote desktop app, or a Chrome Remote Desktop session in a browser.
+    /// </summary>
+    private (string? Site, bool Remote) Locate(nint hwnd, string app)
+    {
+        var address = _sites.Address(hwnd, app);
+        var remote = _options.RemoteGetsShortcut && (RemoteWindows.IsRemoteApp(app) || RemoteWindows.IsRemoteAddress(address));
+        return (remote ? null : BrowserSites.RegistrableDomain(address), remote);
     }
 
     /// <summary>Starts or stops the timer that re-reads a browser's address, so a tab or site change is noticed.</summary>
@@ -230,19 +249,20 @@ internal sealed class KeyboardEngine : IAsyncDisposable
     {
         var hwnd = _windows.GetForegroundWindow();
         if (hwnd != _window || !_sites.IsBrowser(_app ?? "")) return;
-        var site = _sites.SiteKey(hwnd, _app!);
-        if (site != _site) Settle(hwnd, _app!, site);
+        var (site, remote) = Locate(hwnd, _app!);
+        if (site != _site || remote != _remote) Settle(hwnd, _app!, site, remote);
     }
 
     /// <summary>
     /// Gives <paramref name="hwnd"/> the keyboard its identity (its site when a browser is on a page, else its app)
     /// was last left with. A browser page never seen before, or a browser window with no readable site, keeps the
     /// keyboard it has now — so typing is never pulled to another keyboard the moment a page opens or a window pops up.
+    /// A window that controls another computer gets English and is never remembered.
     /// </summary>
-    private void Settle(nint hwnd, string app, string? site)
+    private void Settle(nint hwnd, string app, string? site, bool remote)
     {
-        var identity = IdentityOf(app, site);
-        if (identity == _identity && SameApp(app, _app) && site == _site) return;
+        var identity = remote ? null : IdentityOf(app, site);
+        if (identity == _identity && SameApp(app, _app) && site == _site && remote == _remote) return;
 
         // The keyboard the last identity was left with, maybe changed some other way (the V/E button, Win+Space): read
         // from its own window, as the new one may still show its own last keyboard. Only when Helm's own switch had
@@ -260,8 +280,20 @@ internal sealed class KeyboardEngine : IAsyncDisposable
         _app = app;
         _site = site;
         _identity = identity;
+        _remote = remote;
         _window = hwnd;
         var current = CurrentMode(hwnd);
+
+        // Letters go on to the other computer as keys and its Helm types them: an input method here (Sogou) must not
+        // take them first.
+        if (remote)
+        {
+            _mode = KeyboardMode.English;
+            _logger.LogDebug("{App} controls another computer: English here (was {Current})", app, current);
+            if (current != _mode) Apply(hwnd, _mode);
+            else _shows = true;
+            return;
+        }
 
         // No identity to go by (a browser window with no readable page), or a known app that is excluded, or a browser
         // page never seen before: leave the keyboard as it is and remember what it is for next time this identity leaves.
@@ -395,9 +427,10 @@ internal sealed class KeyboardEngine : IAsyncDisposable
         bool IncludeChinese,
         bool ShowIndicator,
         bool PlaySound,
+        bool RemoteGetsShortcut,
         ProcessExclusions Exclusions)
     {
         public static Options From(KeyboardSettings s) =>
-            new(s.Shortcut, s.IncludeChinese, s.ShowIndicator, s.PlaySound, new ProcessExclusions(s.ExcludedApps));
+            new(s.Shortcut, s.IncludeChinese, s.ShowIndicator, s.PlaySound, s.RemoteGetsShortcut, new ProcessExclusions(s.ExcludedApps));
     }
 }

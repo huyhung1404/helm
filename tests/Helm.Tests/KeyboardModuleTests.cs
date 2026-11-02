@@ -165,3 +165,35 @@ public sealed class BrowserSiteDomainTests
     public void A_page_with_no_site_of_its_own_gives_nothing(string url) =>
         Assert.Null(Helm.Core.Desktop.BrowserSites.RegistrableDomain(url));
 }
+
+public sealed class RemoteWindowsTests
+{
+    [Theory]
+    [InlineData("https://remotedesktop.google.com/u/1/access/session/e571e5f3-7d02-4ebd-9c60-0e9")]
+    [InlineData("remotedesktop.google.com/access/session/e571e5f3")]
+    [InlineData("REMOTEDESKTOP.google.com/support/session/123")]
+    public void A_Chrome_Remote_Desktop_session_controls_another_computer(string address) =>
+        Assert.True(RemoteWindows.IsRemoteAddress(address));
+
+    [Theory]
+    [InlineData("https://remotedesktop.google.com/access")]
+    [InlineData("remotedesktop.google.com/u/1/access")]
+    [InlineData("remotedesktop.google.com")]
+    [InlineData("https://www.google.com/search?q=remotedesktop.google.com/access/session")]
+    [InlineData("https://evil.example/remotedesktop.google.com/access/session/1")]
+    [InlineData(null)]
+    [InlineData("")]
+    public void Other_pages_do_not(string? address) => Assert.False(RemoteWindows.IsRemoteAddress(address));
+
+    [Theory]
+    [InlineData("mstsc.exe", true)]
+    [InlineData("msrdc.exe", true)]
+    [InlineData("UltraViewer_Desktop.exe", true)]
+    [InlineData("anydesk.exe", true)]
+    [InlineData("TeamViewer", true)]
+    [InlineData("chrome.exe", false)]
+    [InlineData("Code.exe", false)]
+    [InlineData(null, false)]
+    public void Remote_desktop_apps_are_known_by_name(string? process, bool remote) =>
+        Assert.Equal(remote, RemoteWindows.IsRemoteApp(process));
+}
