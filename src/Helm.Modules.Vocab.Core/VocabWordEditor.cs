@@ -18,6 +18,10 @@ public sealed partial class VocabWordEditor(VocabStore store, string id) : Obser
     [ObservableProperty] private string _explanation = "";
     [ObservableProperty] private string _note = "";
     [ObservableProperty] private string _mnemonic = "";
+    /// <summary>Chinese: how to remember the reading (the agent's pinyin hook), edited by hand.</summary>
+    [ObservableProperty] private string _pinyinMnemonic = "";
+    /// <summary>The word is Chinese: the editor shows the pinyin hook.</summary>
+    [ObservableProperty] private bool _isChinese;
     [ObservableProperty] private string _examples = "";
     [ObservableProperty] private string _collocations = "";
     [ObservableProperty] private string _confusables = "";
@@ -45,6 +49,8 @@ public sealed partial class VocabWordEditor(VocabStore store, string id) : Obser
         Explanation = w.Explanation;
         Note = w.Note;
         Mnemonic = w.Mnemonic;
+        PinyinMnemonic = w.PinyinMnemonic;
+        IsChinese = w.Language == VocabLanguage.Chinese;
         Examples = string.Join(Environment.NewLine, w.Examples.Select(e => e.Translation.Length > 0 ? $"{e.Sentence} | {e.Translation}" : e.Sentence));
         Collocations = string.Join(", ", w.Collocations);
         Confusables = string.Join(Environment.NewLine, w.Confusables.Select(c => c.Note.Length > 0 ? $"{c.Word} | {c.Note}" : c.Word));
@@ -80,6 +86,7 @@ public sealed partial class VocabWordEditor(VocabStore store, string id) : Obser
             Explanation = Explanation.Trim(),
             Note = Note.Trim(),
             Mnemonic = Mnemonic.Trim(),
+            PinyinMnemonic = IsChinese ? PinyinMnemonic.Trim() : word.PinyinMnemonic,
             Examples = Pairs(Examples).Select(p => new VocabExample { Sentence = p.Left, Translation = p.Right }).ToList(),
             Collocations = List(Collocations),
             Confusables = Pairs(Confusables).Select(p => new VocabConfusable { Word = p.Left, Note = p.Right }).ToList(),
