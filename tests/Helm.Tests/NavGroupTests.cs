@@ -27,6 +27,7 @@ public class NavGroupTests
         ["keyboard"] = ModuleGroup.WindowsAndDesktop,
         ["vocab"] = ModuleGroup.Learning,
         ["slackbot"] = ModuleGroup.Messages,
+        ["weekly-report"] = ModuleGroup.Messages,
     };
 
     /// <summary>Tools on their way out; they only need some group.</summary>

@@ -15,6 +15,9 @@ public static class SlackBotServices
             .AddSingleton<SlackBotEngine>()
             .AddSingleton<SlackBotInboxViewModel>()
             .AddSingleton<SlackBotOverlay>()
+            .AddSingleton<ITelegram, TelegramApi>()
+            .AddSingleton<SlackTelegramToken>()
+            .AddSingleton<SlackPhoneAlerts>()
             .AddSingleton<IMcpToolProvider, SlackMcpTools>()
             .AddHelmModule<SlackBotModule, SlackBotPage, SlackBotViewModel>()
             .AddSingleton<SlackBotContentPage>();

@@ -81,6 +81,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Helm.Modules.Keyboard", "sr
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Helm.Modules.SlackBot", "src\Helm.Modules.SlackBot\Helm.Modules.SlackBot.csproj", "{02FE79A9-1B57-4442-A328-25F6D87B3575}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Helm.Modules.WeeklyReport", "src\Helm.Modules.WeeklyReport\Helm.Modules.WeeklyReport.csproj", "{992B4025-7542-48EF-9F7D-145D0E49C29C}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -535,6 +537,18 @@ Global
 		{02FE79A9-1B57-4442-A328-25F6D87B3575}.Release|x64.Build.0 = Release|Any CPU
 		{02FE79A9-1B57-4442-A328-25F6D87B3575}.Release|x86.ActiveCfg = Release|Any CPU
 		{02FE79A9-1B57-4442-A328-25F6D87B3575}.Release|x86.Build.0 = Release|Any CPU
+		{992B4025-7542-48EF-9F7D-145D0E49C29C}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{992B4025-7542-48EF-9F7D-145D0E49C29C}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{992B4025-7542-48EF-9F7D-145D0E49C29C}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{992B4025-7542-48EF-9F7D-145D0E49C29C}.Debug|x64.Build.0 = Debug|Any CPU
+		{992B4025-7542-48EF-9F7D-145D0E49C29C}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{992B4025-7542-48EF-9F7D-145D0E49C29C}.Debug|x86.Build.0 = Debug|Any CPU
+		{992B4025-7542-48EF-9F7D-145D0E49C29C}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{992B4025-7542-48EF-9F7D-145D0E49C29C}.Release|Any CPU.Build.0 = Release|Any CPU
+		{992B4025-7542-48EF-9F7D-145D0E49C29C}.Release|x64.ActiveCfg = Release|Any CPU
+		{992B4025-7542-48EF-9F7D-145D0E49C29C}.Release|x64.Build.0 = Release|Any CPU
+		{992B4025-7542-48EF-9F7D-145D0E49C29C}.Release|x86.ActiveCfg = Release|Any CPU
+		{992B4025-7542-48EF-9F7D-145D0E49C29C}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -577,5 +591,6 @@ Global
 		{883E19E4-3A78-43BF-AA99-9168F3D71743} = {827E0CD3-B72D-47B6-A68D-7590B98EB39B}
 		{9783888B-D2FD-4074-B5A4-24E37E0B7C42} = {827E0CD3-B72D-47B6-A68D-7590B98EB39B}
 		{02FE79A9-1B57-4442-A328-25F6D87B3575} = {827E0CD3-B72D-47B6-A68D-7590B98EB39B}
+		{992B4025-7542-48EF-9F7D-145D0E49C29C} = {827E0CD3-B72D-47B6-A68D-7590B98EB39B}
 	EndGlobalSection
 EndGlobal

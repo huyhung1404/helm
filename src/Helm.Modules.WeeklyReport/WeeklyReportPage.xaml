@@ -1,0 +1,64 @@
+<core:ModulePageBase
+    x:Class="Helm.Modules.WeeklyReport.WeeklyReportPage"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
+    xmlns:core="clr-namespace:Helm.Core.Ui;assembly=Helm.Core.Windows"
+    Module="{Binding Module}">
+
+    <StackPanel>
+        <ui:CardControl Margin="0,0,0,4" Icon="{ui:SymbolIcon DocumentData24}">
+            <ui:CardControl.Header>
+                <core:CardHeader Title="Open Weekly Report" Description="Write this week's report, or read a past one." />
+            </ui:CardControl.Header>
+            <ui:Button Content="Open" Appearance="Primary" Command="{Binding OpenContentCommand}" />
+        </ui:CardControl>
+
+        <!-- Where the work is -->
+        <TextBlock Text="Sources" Style="{DynamicResource HelmSectionHeader}" />
+        <ui:CardExpander Margin="0,0,0,4" IsExpanded="True" Icon="{ui:SymbolIcon Folder24}">
+            <ui:CardExpander.Header>
+                <core:CardHeader Title="Repository folders" Description="One folder per line; repositories are found inside, a few levels deep." />
+            </ui:CardExpander.Header>
+            <StackPanel>
+                <ui:TextBox AcceptsReturn="True" TextWrapping="NoWrap" MinHeight="70" VerticalContentAlignment="Top" PlaceholderText="C:\Project"
+                            Text="{Binding RepoFolders, UpdateSourceTrigger=LostFocus}" AutomationProperties.Name="Repository folders" />
+                <TextBlock Margin="0,6,0,0" Text="{Binding UsualFolders}" Style="{DynamicResource HelmSecondaryText}" />
+            </StackPanel>
+        </ui:CardExpander>
+        <ui:CardExpander Margin="0,0,0,4" Icon="{ui:SymbolIcon Person24}">
+            <ui:CardExpander.Header>
+                <core:CardHeader Title="You in git" Description="Your commit e-mails or names, one per line. Empty: git's own user.email and user.name." />
+            </ui:CardExpander.Header>
+            <ui:TextBox AcceptsReturn="True" TextWrapping="NoWrap" MinHeight="60" VerticalContentAlignment="Top"
+                        Text="{Binding Authors, UpdateSourceTrigger=LostFocus}" AutomationProperties.Name="You in git" />
+        </ui:CardExpander>
+        <ui:CardControl Margin="0,0,0,4" Icon="{ui:SymbolIcon EyeOff24}">
+            <ui:CardControl.Header>
+                <core:CardHeader Title="Projects and conversations you unticked" Description="They stay unticked every week; this ticks them all again." />
+            </ui:CardControl.Header>
+            <ui:Button Content="Tick all again" Command="{Binding ShowAllAgainCommand}" />
+        </ui:CardControl>
+        <TextBlock Margin="0,0,0,4" TextWrapping="Wrap" Style="{DynamicResource HelmSecondaryText}"
+                   Text="Slack comes through Slack Bot: what you wrote that week, found with Slack's search. Connect Slack Bot to include it." />
+
+        <!-- How it is written -->
+        <TextBlock Text="Writing" Style="{DynamicResource HelmSectionHeader}" />
+        <ui:CardExpander Margin="0,0,0,4" IsExpanded="True" Icon="{ui:SymbolIcon Note24}">
+            <ui:CardExpander.Header>
+                <core:CardHeader Title="Notes for every report"
+                                 Description="Your role, your manager's taste, the format your team uses: Claude reads it each time." />
+            </ui:CardExpander.Header>
+            <ui:TextBox AcceptsReturn="True" TextWrapping="Wrap" MinHeight="80" VerticalContentAlignment="Top"
+                        PlaceholderText="e.g. I lead the Unity client. My manager likes numbers (build time, crash rate) and a short list."
+                        Text="{Binding Notes, UpdateSourceTrigger=LostFocus}" AutomationProperties.Name="Notes for every report" />
+        </ui:CardExpander>
+        <ui:CardControl Margin="0,0,0,4" Icon="{ui:SymbolIcon Sparkle24}">
+            <ui:CardControl.Header>
+                <core:CardHeader Title="Claude model" Description="Claude Code writes the report with no tools: it only reads what Helm found and answers." />
+            </ui:CardControl.Header>
+            <ComboBox MinWidth="220" ItemsSource="{Binding Models}" DisplayMemberPath="Label" SelectedValuePath="Value" SelectedValue="{Binding Model}"
+                      AutomationProperties.Name="Claude model" />
+        </ui:CardControl>
+    </StackPanel>
+</core:ModulePageBase>

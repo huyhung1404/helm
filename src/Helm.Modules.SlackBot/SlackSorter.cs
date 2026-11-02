@@ -91,7 +91,8 @@ public sealed class SlackSorter(ISlackAgent agent)
               anything that changes their work.
             - "skip": chatter, greetings, thanks, jokes, automatic notices, other teams' details.
             A message with "for_you": true (a DM, a message that calls them, a reply in their thread) is "act" unless it
-            clearly needs nothing from them; it is never "skip".
+            clearly needs nothing from them; it is never "skip". A message with "for_you": false is never "act", even
+            when it asks someone to do something ({me} may only be following that thread): "know" at most.
 
             {(learned.Length > 0 ? "How " + me + " corrected you before (follow the pattern):\n" + learned : "")}
             Messages (JSON):

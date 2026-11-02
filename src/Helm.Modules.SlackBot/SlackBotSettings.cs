@@ -42,6 +42,12 @@ public sealed class SlackBotSettings : IVersionedSettings
     /// <summary>Shorter than this would run Claude Code almost without a break.</summary>
     public const int MinChannelSeconds = 10;
 
+    /// <summary>
+    /// After Helm was off, DMs nobody wrote in for <see cref="SlackBotEngine.ActiveFor"/> are read back too (slow: a
+    /// workspace keeps hundreds). Off: only the recent ones; quiet DMs still arrive live while Helm runs.
+    /// </summary>
+    public bool CatchUpQuietDms { get; set; }
+
     /// <summary>Messages from bots and apps are read (only those that call the user otherwise).</summary>
     public bool ReadBots { get; set; }
 
@@ -60,8 +66,39 @@ public sealed class SlackBotSettings : IVersionedSettings
     /// <summary>How the user wants replies written (tone, language, what to say), in their own words; may be empty.</summary>
     public string ReplyStyle { get; set; } = "";
 
+    /// <summary>"lumi, …" or "@lumi …" on Slack gets an answer (from the user anywhere, from others where Write is on).</summary>
+    public bool AnswerCalls { get; set; } = true;
+
     /// <summary>A message waits this long for the user to answer it before the reply goes.</summary>
     public int ReplyAfterMinutes { get; set; } = 3;
+
+    /// <summary>
+    /// Minutes after which a message still to do brings the list back (unfolded, lit up, with the sound when on), and
+    /// again every so often while it waits; 0 = never.
+    /// </summary>
+    public int RemindEveryMinutes { get; set; } = 60;
+
+    /// <summary>Alerts go to the user's phone through their own Telegram bot (token kept apart, encrypted).</summary>
+    public bool TelegramEnabled { get; set; } = true;
+
+    /// <summary>The user's private chat with the bot (found after they send /start), or null.</summary>
+    public long? TelegramChatId { get; set; }
+
+    public string TelegramChatName { get; set; } = "";
+
+    /// <summary>Tell the phone when Lumi replied for the user.</summary>
+    public bool TelegramOnReply { get; set; } = true;
+
+    /// <summary>Tell the phone when the list reminds of what still waits.</summary>
+    public bool TelegramOnRemind { get; set; } = true;
+
+    /// <summary>Tell the phone of every new to-do message.</summary>
+    public bool TelegramOnNewToDo { get; set; }
+
+    /// <summary>Only while the user is away from the PC (no keyboard or mouse for <see cref="AwayMinutes"/>).</summary>
+    public bool TelegramOnlyAway { get; set; } = true;
+
+    public int AwayMinutes { get; set; } = 5;
 
     /// <summary>A sound when something new lands on the to-do list.</summary>
     public bool PlaySound { get; set; }

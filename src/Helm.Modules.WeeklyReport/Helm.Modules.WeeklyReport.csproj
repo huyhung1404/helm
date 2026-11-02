@@ -1,0 +1,18 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <UseWPF>true</UseWPF>
+    <RootNamespace>Helm.Modules.WeeklyReport</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Helm.Core.Windows\Helm.Core.Windows.csproj" />
+    <!-- Slack comes through Slack Bot's connection (what the user wrote this week). -->
+    <ProjectReference Include="..\Helm.Modules.SlackBot\Helm.Modules.SlackBot.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="Helm.Tests" />
+  </ItemGroup>
+
+</Project>

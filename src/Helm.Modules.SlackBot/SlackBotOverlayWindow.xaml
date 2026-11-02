@@ -84,6 +84,31 @@
                     </DockPanel>
                 </Button>
 
+                <!-- The reply being written: as the user, to the message chosen with Reply -->
+                <Border x:Name="ReplyPanel" DockPanel.Dock="Bottom" Margin="8,0,8,8" Padding="10,8" CornerRadius="8"
+                        Background="{DynamicResource CardBackgroundFillColorDefaultBrush}" BorderThickness="1"
+                        BorderBrush="{DynamicResource AccentTextFillColorPrimaryBrush}"
+                        Visibility="{Binding ReplyTo, Converter={StaticResource NotEmptyToVisibility}}">
+                    <StackPanel>
+                        <TextBlock TextTrimming="CharacterEllipsis" Style="{DynamicResource HelmSecondaryText}">
+                            <Run Text="Reply to" />
+                            <Run Text="{Binding ReplyTo.From, Mode=OneWay}" FontWeight="SemiBold" />
+                            <Run Text="·" />
+                            <Run Text="{Binding ReplyTo.Where, Mode=OneWay}" />
+                        </TextBlock>
+                        <ui:TextBox x:Name="ReplyBox" Margin="0,6,0,0" AcceptsReturn="True" TextWrapping="Wrap" MaxHeight="120" MinHeight="36"
+                                    VerticalScrollBarVisibility="Auto" PlaceholderText="Your answer (Enter sends, Shift+Enter for a new line, Esc closes)"
+                                    Text="{Binding ReplyText, UpdateSourceTrigger=PropertyChanged}" PreviewKeyDown="ReplyBox_PreviewKeyDown"
+                                    PreviewMouseLeftButtonDown="ReplyBox_MouseDown" AutomationProperties.Name="Your answer" />
+                        <TextBlock Margin="0,4,0,0" Text="{Binding ReplyProblem}" TextWrapping="Wrap" Foreground="{DynamicResource SystemFillColorCriticalBrush}"
+                                   Visibility="{Binding ReplyProblem, Converter={StaticResource NotEmptyToVisibility}}" />
+                        <StackPanel Margin="0,6,0,0" Orientation="Horizontal" HorizontalAlignment="Right">
+                            <ui:Button Content="Cancel" Padding="8,3" Click="CancelReply_Click" />
+                            <ui:Button Margin="6,0,0,0" Content="Send" Appearance="Primary" Icon="{ui:SymbolIcon Send16}" Padding="8,3" Click="SendReply_Click" />
+                        </StackPanel>
+                    </StackPanel>
+                </Border>
+
                 <ScrollViewer MaxHeight="440" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Focusable="False">
                     <ItemsControl ItemsSource="{Binding ToDo}" Margin="0,0,0,4">
                         <ItemsControl.ItemTemplate>
@@ -99,6 +124,8 @@
                                                 <Run Text="{Binding Where, Mode=OneWay}" />
                                             </TextBlock>
                                         </DockPanel>
+                                        <TextBlock Margin="0,2,0,0" Text="{Binding Waiting}" FontWeight="SemiBold" Foreground="{DynamicResource SystemFillColorCautionBrush}"
+                                                   Visibility="{Binding HasWaiting, Converter={StaticResource BoolToVisibility}}" />
                                         <TextBlock Margin="0,4,0,0" Text="{Binding Headline}" TextWrapping="Wrap" FontWeight="SemiBold" />
                                         <TextBlock Margin="0,2,0,0" Text="{Binding Text}" TextWrapping="Wrap" MaxHeight="54" TextTrimming="WordEllipsis"
                                                    Style="{DynamicResource HelmSecondaryText}" Visibility="{Binding HasSummary, Converter={StaticResource BoolToVisibility}}" />
@@ -111,6 +138,9 @@
                                         <StackPanel Margin="0,6,0,0" Orientation="Horizontal">
                                             <ui:Button Content="Open in Slack" Icon="{ui:SymbolIcon Open16}" Padding="8,3"
                                                        Command="{Binding DataContext.OpenCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}" CommandParameter="{Binding}" />
+                                            <ui:Button Margin="6,0,0,0" Content="Reply" Icon="{ui:SymbolIcon ArrowReply16}" Padding="8,3"
+                                                       ToolTip="Write your answer here; it goes to Slack as you"
+                                                       Command="{Binding DataContext.StartReplyCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}" CommandParameter="{Binding}" />
                                             <ui:Button Margin="6,0,0,0" Content="Done" Icon="{ui:SymbolIcon Checkmark16}" Padding="8,3"
                                                        ToolTip="Takes it off the list (replying in Slack or an emoji does too)"
                                                        Command="{Binding DataContext.DoneCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}" CommandParameter="{Binding}" />

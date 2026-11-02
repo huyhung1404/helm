@@ -14,6 +14,20 @@ public partial class SlackBotPage : ModulePageBase
         InitializeComponent();
         // Open on the steps until the app is connected.
         AppExpander.IsExpanded = !viewModel.HasTokens;
+        TelegramExpander.IsExpanded = !viewModel.TelegramConnected;
+    }
+
+    /// <summary>The token is read from the password box here, handed over once and cleared.</summary>
+    private void SaveTelegramToken_Click(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            if (_viewModel.SaveTelegramToken(TelegramTokenBox.Password)) TelegramTokenBox.Password = "";
+        }
+        catch (Exception ex)
+        {
+            _viewModel.TelegramStatus = "Could not save the token: " + ex.Message;
+        }
     }
 
     private void CopyManifest_Click(object sender, RoutedEventArgs e)

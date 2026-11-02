@@ -3,6 +3,49 @@
 All notable changes to Helm. The top section is used as the GitHub release body and as the Velopack release notes.
 Format: [Keep a Changelog](https://keepachangelog.com), versions follow [SemVer](https://semver.org).
 
+## [Unreleased]
+
+### Added
+- **Weekly Report (PC): your week, written up for your manager.** Press Find my work: it lists the projects you
+  committed to that week (every repository under the folders you choose, all branches, only your commits) and the
+  Slack conversations you wrote in (through Slack Bot), each with its commits, days and estimated hours. Tick what goes
+  in, add what to stress, and Claude Code writes a short report in Vietnamese: achievements first, about how many hours
+  per project (estimated from your activity), what you coordinated on Slack. Ask for changes ("shorter", "build work
+  first") as many times as you like, go back to an earlier version, edit by hand, then Copy; copied reports are kept
+  on this PC, encrypted. Claude only reads what Helm found, with no tools.
+- **Slack Bot: call Lumi on Slack.** Write "lumi, …" or "@lumi …" in a thread or a conversation, and Lumi answers
+  in the thread from that conversation only (the thread, or the conversation's latest messages), behind the AI
+  signature, tagging whoever asked so they are told (Lumi's replies for you tag the person too). You may call Lumi
+  anywhere; others only where Write is on. It never brings in another channel or DM, never
+  pings anyone or adds links the conversation did not have, and never promises or decides for you when someone else
+  asks; a message that only mentions Lumi gets nothing; each call is answered once, never a stale one, at most 20 an
+  hour. "Answer when someone calls Lumi" turns it off.
+- **Slack Bot: answer from the list.** Reply on a message opens a box under the list on screen (and on the Slack Bot
+  page): write your answer, Enter sends it to Slack as you (no AI signature; in the message's thread in a channel),
+  and the message leaves the list. The list takes the keyboard only while you write and gives it back after. A reply in
+  a thread now also answers the message that started the thread.
+- **Slack Bot: news on your phone while you are away from the PC.** Through your own Telegram bot (made with
+  @BotFather in a minute; Helm sends to it straight from the PC), Slack Bot tells you when Lumi replied for you and,
+  with the hourly reminders, what still waits; every new to-do too if you want. It sends only while nobody touched the
+  keyboard or mouse for a few minutes (you choose), and only who wrote, where, Claude's one line and a link to open it
+  in Slack, never the message itself. The bot's token stays on this PC, encrypted.
+
+### Fixed
+- **Slack Bot: catching up is quick, and the lists stop jumping.** After Helm was off it reads the conversations active
+  in the last 30 days first and is ready at once; DMs nobody wrote in for a month, and DMs with people who left, are no
+  longer read back every time (a workspace keeps hundreds; they still arrive live while Helm runs, and "Catch up on
+  quiet DMs" reads them again). The to-do, worth-knowing and handled lists now change row by row, keeping their place
+  and folds, and follow a catch-up every few seconds instead of redrawing all the time.
+- **Slack Bot: only what calls you is on your list.** In channels and threads, a request that does not tag you (for
+  example in a thread you only follow) is no longer put on your to-do list, even when Claude reads it as a request; it
+  goes to the worth-knowing report. DMs, your tags and your own threads are as before, and "Needs me" still puts any
+  message on the list.
+- **Slack Bot: a tag is never lost, and what waits is brought back.** A message that tags you is kept even from a
+  channel you turned off (only that message; nothing else is read there, and Slack Bot never writes there), and your
+  answer there takes it off the list. A message still to do after an hour shows "Waiting 2 h", and the list comes back
+  (unfolded, lit up, with the sound when on) every hour while something waits; "Remind me of what still waits" sets how
+  often, or never.
+
 ## [0.72.0] - 2026-11-02
 
 ### Added

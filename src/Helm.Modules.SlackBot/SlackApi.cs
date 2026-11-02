@@ -37,6 +37,13 @@ public interface ISlackApi
     Task<string?> UserNameAsync(string userId, CancellationToken ct);
 
     /// <summary>
+    /// Everything <paramref name="userId"/> wrote from <paramref name="from"/> to <paramref name="to"/> (local days, both
+    /// included), anywhere, oldest first, with the conversation's name as people read it (search; at most 1000).
+    /// </summary>
+    Task<IReadOnlyList<(SlackMessage Message, string Where)>> SearchMineAsync(string userId, DateOnly from, DateOnly to, CancellationToken ct) =>
+        throw new NotSupportedException();
+
+    /// <summary>
     /// Writes as the user (in a thread when given): <paramref name="blocks"/> (Block Kit JSON) when given, with
     /// <paramref name="text"/> for notifications; the new message's ts.
     /// </summary>
@@ -98,7 +105,7 @@ public sealed class SlackApi : ISlackApi, IDisposable
             {
                 if (Str(c, "id") is not { } id) continue;
                 if (Bool(c, "is_im"))
-                    list.Add(new SlackConversation(id, "", SlackConversationKind.DirectMessage, Str(c, "user")));
+                    list.Add(new SlackConversation(id, "", SlackConversationKind.DirectMessage, Str(c, "user"), Bool(c, "is_user_deleted")));
                 else if (Bool(c, "is_mpim"))
                     list.Add(new SlackConversation(id, GroupName(Str(c, "name") ?? id), SlackConversationKind.GroupMessage));
                 else
@@ -156,6 +163,34 @@ public sealed class SlackApi : ISlackApi, IDisposable
             list.Add(message.ThreadTs is null && ThreadFromLink(Str(m, "permalink")) is { } thread ? message with { ThreadTs = thread } : message);
         }
         list.Sort((a, b) => SlackIds.Compare(a.Ts, b.Ts));
+        return list;
+    }
+
+    public async Task<IReadOnlyList<(SlackMessage Message, string Where)>> SearchMineAsync(string userId, DateOnly from, DateOnly to,
+        CancellationToken ct)
+    {
+        // Slack's after:/before: leave the day itself out.
+        var query = $"from:<@{userId}> after:{from.AddDays(-1):yyyy-MM-dd} before:{to.AddDays(1):yyyy-MM-dd}";
+        var list = new List<(SlackMessage, string)>();
+        for (var page = 1; page <= 10; page++)
+        {
+            using var json = await CallAsync("search.messages",
+                [("query", query), ("sort", "timestamp"), ("sort_dir", "asc"), ("count", "100"), ("page", page.ToString(System.Globalization.CultureInfo.InvariantCulture))],
+                _userToken, ct).ConfigureAwait(false);
+            if (!json.RootElement.TryGetProperty("messages", out var messages)) break;
+            foreach (var m in Array(messages, "matches"))
+            {
+                if (!m.TryGetProperty("channel", out var c) || Str(c, "id") is not { } channel) continue;
+                if (SlackEventParser.Message(m, channel) is not { } message) continue;
+                var where = Bool(c, "is_im") ? "DM: " + (await UserNameAsync(Str(c, "name") ?? "", ct).ConfigureAwait(false) ?? Str(c, "name"))
+                    : Bool(c, "is_mpim") ? "Group DM: " + GroupName(Str(c, "name") ?? channel)
+                    : "#" + (Str(c, "name") ?? channel);
+                list.Add((message.ThreadTs is null && ThreadFromLink(Str(m, "permalink")) is { } thread ? message with { ThreadTs = thread } : message, where));
+            }
+            var pages = messages.TryGetProperty("paging", out var paging) && paging.TryGetProperty("pages", out var p) && p.ValueKind == JsonValueKind.Number
+                ? p.GetInt32() : 1;
+            if (page >= pages) break;
+        }
         return list;
     }
 
