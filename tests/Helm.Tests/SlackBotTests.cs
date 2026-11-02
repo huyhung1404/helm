@@ -189,6 +189,22 @@ public sealed class SlackInboxTests
     }
 
     [Fact]
+    public void A_request_that_does_not_call_the_user_is_only_worth_knowing()
+    {
+        var inbox = NewInbox();
+        inbox.Add(Item("C1", "100.0", SlackConversationKind.Channel, thread: "90.0", direct: false));
+        inbox.Sorted(inbox.ToSort(false, 10), new Dictionary<string, (InboxLevel, string?)> { ["C1:100.0"] = (InboxLevel.Act, "tick Done giúp") });
+        var item = Get(inbox, "C1", "100.0");
+        Assert.Equal(InboxLevel.Know, item.Level);
+        Assert.False(item.IsToDo);
+        Assert.True(item.IsWorthKnowing);
+
+        // "Needs me" puts it on the list all the same.
+        inbox.Relevel("C1:100.0", InboxLevel.Act);
+        Assert.True(Get(inbox, "C1", "100.0").IsToDo);
+    }
+
+    [Fact]
     public void A_message_Claude_keeps_skipping_is_shown_as_it_is()
     {
         var inbox = NewInbox();

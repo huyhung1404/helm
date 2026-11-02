@@ -29,6 +29,10 @@ Format: [Keep a Changelog](https://keepachangelog.com), versions follow [SemVer]
   longer read back every time (a workspace keeps hundreds; they still arrive live while Helm runs, and "Catch up on
   quiet DMs" reads them again). The to-do, worth-knowing and handled lists now change row by row, keeping their place
   and folds, and follow a catch-up every few seconds instead of redrawing all the time.
+- **Slack Bot: only what calls you is on your list.** In channels and threads, a request that does not tag you (for
+  example in a thread you only follow) is no longer put on your to-do list, even when Claude reads it as a request; it
+  goes to the worth-knowing report. DMs, your tags and your own threads are as before, and "Needs me" still puts any
+  message on the list.
 - **Slack Bot: a tag is never lost, and what waits is brought back.** A message that tags you is kept even from a
   channel you turned off (only that message; nothing else is read there, and Slack Bot never writes there), and your
   answer there takes it off the list. A message still to do after an hour shows "Waiting 2 h", and the list comes back

@@ -278,8 +278,11 @@ public sealed class SlackInbox
                 if (!_byId.TryGetValue(copy.Id, out var item) || item.Level != InboxLevel.Pending) continue;
                 if (levels.TryGetValue(item.Id, out var sorted) && sorted.Level != InboxLevel.Pending)
                 {
-                    // Claude never takes a message for the user off the screen: at worst it is to do.
-                    item.Level = item.Direct && sorted.Level == InboxLevel.Skip ? InboxLevel.Know : sorted.Level;
+                    // Claude never takes a message for the user off the screen, and never puts one that does not call
+                    // them on it: a request in a thread they only follow is at most worth knowing.
+                    item.Level = item.Direct && sorted.Level == InboxLevel.Skip ? InboxLevel.Know
+                        : !item.Direct && sorted.Level == InboxLevel.Act ? InboxLevel.Know
+                        : sorted.Level;
                     item.Summary = sorted.Summary;
                 }
                 else if (++item.SortTries >= MaxSortTries)
@@ -381,6 +384,8 @@ public sealed class SlackInbox
     public void Relevel(string id, InboxLevel level) => Update(id, item =>
     {
         item.Level = level;
+        // "Needs me": the user says it is for them.
+        if (level == InboxLevel.Act) item.Direct = true;
         item.Read = false;
         _data.Corrections.Add(new InboxCorrection(item.Where, SlackText.Clip(item.Text, 200), level));
         if (_data.Corrections.Count > MaxCorrections) _data.Corrections.RemoveRange(0, _data.Corrections.Count - MaxCorrections);

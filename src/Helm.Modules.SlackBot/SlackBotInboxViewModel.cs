@@ -289,7 +289,7 @@ public sealed partial class SlackBotInboxViewModel : ObservableObject
         var before = ToDo.Select(i => i.Id).ToHashSet();
         Sync(ToDo, items.Where(i => i.IsToDo).Select(View).ToList());
         var lastReport = _engine.Inbox.LastDigest;
-        var knowing = items.Where(i => i.Level == InboxLevel.Know && i.Handled == HandledBy.None && !i.Read).ToList();
+        var knowing = items.Where(i => i.IsWorthKnowing).ToList();
         SyncGroups(knowing
             .GroupBy(i => i.Where)
             .OrderByDescending(g => g.Max(i => i.Time))
