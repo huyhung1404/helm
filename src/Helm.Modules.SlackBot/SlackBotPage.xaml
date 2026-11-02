@@ -10,7 +10,7 @@
     <StackPanel>
         <ui:CardControl Margin="0,0,0,4" Icon="{ui:SymbolIcon Chat24}">
             <ui:CardControl.Header>
-                <core:CardHeader Title="Open SlackBot" Description="What needs you, and the report of what is worth knowing." />
+                <core:CardHeader Title="Open Slack Bot" Description="What needs you, and the report of what is worth knowing." />
             </ui:CardControl.Header>
             <ui:Button Content="Open" Appearance="Primary" Command="{Binding OpenContentCommand}" />
         </ui:CardControl>
@@ -31,7 +31,7 @@
         <ui:CardExpander x:Name="AppExpander" Margin="0,0,0,4" Icon="{ui:SymbolIcon Key24}">
             <ui:CardExpander.Header>
                 <core:CardHeader Title="Your Slack app"
-                                 Description="SlackBot reads Slack as you, through an app you make in your workspace. The tokens stay on this PC, encrypted." />
+                                 Description="Slack Bot reads Slack as you, through an app you make in your workspace. The tokens stay on this PC, encrypted." />
             </ui:CardExpander.Header>
             <StackPanel>
                 <Border Style="{DynamicResource HelmExpanderRow}" BorderThickness="0">
@@ -72,13 +72,13 @@
         <TextBlock Text="Reading" Style="{DynamicResource HelmSectionHeader}" />
         <ui:CardExpander Margin="0,0,0,4" Icon="{ui:SymbolIcon Channel24}">
             <ui:CardExpander.Header>
-                <core:CardHeader Title="Channels SlackBot reads" Description="{Binding ChannelsSummary}" />
+                <core:CardHeader Title="Channels and DMs" Description="{Binding ChannelsSummary}" />
             </ui:CardExpander.Header>
             <StackPanel>
                 <ui:TextBox Margin="0,0,0,8" PlaceholderText="Find a channel or person" Icon="{ui:SymbolIcon Search24}"
                             Text="{Binding ChannelFilter, UpdateSourceTrigger=PropertyChanged}" AutomationProperties.Name="Find a channel" />
                 <TextBlock Margin="0,0,0,8" TextWrapping="Wrap" Style="{DynamicResource HelmSecondaryText}"
-                           Text="Turn a channel off and nothing from it is read, kept or shown to Claude; what was kept from it is removed." />
+                           Text="Off: nothing from it is read, kept or shown to Claude (what was kept is removed). Read: on your list and in the report. Read and reply: messages for you also get the reply below." />
                 <ScrollViewer MaxHeight="380" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
                     <ItemsControl ItemsSource="{Binding Channels}" VirtualizingPanel.IsVirtualizing="True">
                         <ItemsControl.ItemTemplate>
@@ -86,7 +86,9 @@
                                 <Border Style="{DynamicResource HelmExpanderRow}" Padding="0,6">
                                     <core:RowLayout>
                                         <TextBlock Text="{Binding Name}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
-                                        <ui:ToggleSwitch HorizontalAlignment="Right" IsChecked="{Binding IsRead}" AutomationProperties.Name="{Binding Name}" />
+                                        <ComboBox HorizontalAlignment="Right" MinWidth="170" ItemsSource="{x:Static local:SlackChannelRow.Modes}"
+                                                  DisplayMemberPath="Label" SelectedValuePath="Value" SelectedValue="{Binding Mode}"
+                                                  AutomationProperties.Name="{Binding Name}" />
                                     </core:RowLayout>
                                 </Border>
                             </DataTemplate>
@@ -122,17 +124,45 @@
         </ui:CardControl>
         <ui:CardControl Margin="0,0,0,4" Icon="{ui:SymbolIcon Timer24}">
             <ui:CardControl.Header>
-                <core:CardHeader Title="Sort channel messages" Description="Messages for you (DMs, mentions, your threads) are sorted within seconds." />
+                <core:CardHeader Title="Sort channel messages every" Description="1800 = every 30 minutes; at least 10. Each run with new messages uses Claude Code. Messages for you are sorted within seconds anyway." />
             </ui:CardControl.Header>
-            <ComboBox MinWidth="200" ItemsSource="{Binding ChannelMinuteChoices}" DisplayMemberPath="Label" SelectedValuePath="Value"
-                      SelectedValue="{Binding ChannelMinutes}" AutomationProperties.Name="Sort channel messages" />
+            <StackPanel Orientation="Horizontal">
+                <ui:TextBox Width="110" HorizontalContentAlignment="Right" Text="{Binding ChannelSeconds, UpdateSourceTrigger=LostFocus}"
+                            AutomationProperties.Name="Sort channel messages every, in seconds" />
+                <TextBlock Margin="8,0,0,0" VerticalAlignment="Center" Text="seconds" />
+            </StackPanel>
+        </ui:CardControl>
+
+        <!-- Replying for the user, openly as an AI assistant -->
+        <TextBlock Text="Replies" Style="{DynamicResource HelmSectionHeader}" />
+        <ui:CardExpander Margin="0,0,0,4" IsExpanded="True" Icon="{ui:SymbolIcon ChatArrowBack20}">
+            <ui:CardExpander.Header>
+                <core:CardHeader Title="Reply template"
+                                 Description="Sent only in conversations set to Read and reply, to a message for you that is still waiting. It always says it comes from an AI. {me} is your name." />
+            </ui:CardExpander.Header>
+            <StackPanel>
+                <ui:TextBox AcceptsReturn="True" TextWrapping="Wrap" MinHeight="70" VerticalContentAlignment="Top" AutomationProperties.Name="Reply template"
+                            Text="{Binding ReplyTemplate, UpdateSourceTrigger=LostFocus}" />
+                <TextBlock Margin="0,8,0,0" Text="What people will see:" Style="{DynamicResource HelmSecondaryText}" />
+                <TextBlock Margin="0,2,0,0" Text="{Binding ReplyPreview}" TextWrapping="Wrap" />
+                <ui:Button Margin="0,8,0,0" Appearance="Transparent" Content="Back to the default" Command="{Binding ResetReplyTemplateCommand}" />
+            </StackPanel>
+        </ui:CardExpander>
+        <ui:CardControl Margin="0,0,0,4" Icon="{ui:SymbolIcon Timer24}">
+            <ui:CardControl.Header>
+                <core:CardHeader Title="Reply when you have not answered"
+                                 Description="Once per DM or thread every 4 hours, never to messages older than 2 hours. The message stays on your list." />
+            </ui:CardControl.Header>
+            <ComboBox MinWidth="200" ItemsSource="{Binding ReplyAfterChoices}" DisplayMemberPath="Label" SelectedValuePath="Value"
+                      SelectedValue="{Binding ReplyAfterMinutes}" AutomationProperties.Name="Reply when you have not answered" />
         </ui:CardControl>
 
         <!-- The report and the list on screen -->
         <TextBlock Text="On screen" Style="{DynamicResource HelmSectionHeader}" />
         <ui:CardControl Margin="0,0,0,4" Icon="{ui:SymbolIcon Clock24}">
             <ui:CardControl.Header>
-                <core:CardHeader Title="Report times" Description="When what is worth knowing shows up on screen, e.g. 12:00, 17:00." />
+                <core:CardHeader Title="Worth-knowing report times"
+                                 Description="Messages that need nothing from you wait and show up on the list together at these times of day, e.g. 12:00, 17:00. To-do messages show at once." />
             </ui:CardControl.Header>
             <ui:TextBox MinWidth="200" Text="{Binding ReportTimes, UpdateSourceTrigger=LostFocus}" AutomationProperties.Name="Report times" />
         </ui:CardControl>
@@ -141,6 +171,16 @@
                 <core:CardHeader Title="Sound for new items" Description="Plays when something lands on the list." />
             </ui:CardControl.Header>
             <ui:ToggleSwitch IsChecked="{Binding PlaySound}" />
+        </ui:CardControl>
+        <ui:CardControl Margin="0,0,0,4" Icon="{ui:SymbolIcon Eye24}">
+            <ui:CardControl.Header>
+                <core:CardHeader Title="See-through list" Description="How much the list on screen shows while the mouse is not on it." />
+            </ui:CardControl.Header>
+            <StackPanel Orientation="Horizontal">
+                <Slider Width="180" Minimum="0.3" Maximum="1" SmallChange="0.05" LargeChange="0.1" TickFrequency="0.05" IsSnapToTickEnabled="True"
+                        VerticalAlignment="Center" Value="{Binding OverlayOpacity}" AutomationProperties.Name="See-through list" />
+                <TextBlock Margin="8,0,0,0" MinWidth="36" VerticalAlignment="Center" Text="{Binding OverlayOpacity, StringFormat={}{0:P0}}" />
+            </StackPanel>
         </ui:CardControl>
         <ui:CardControl Margin="0,0,0,4" Icon="{ui:SymbolIcon WindowArrowUp24}">
             <ui:CardControl.Header>

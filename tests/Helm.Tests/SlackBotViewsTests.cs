@@ -132,6 +132,7 @@ public sealed class SlackBotViewsTests : IDisposable
             Text = "Anh gửi em file design nhé", Level = InboxLevel.Act, Summary = "Mai xin file design",
         });
         inbox.Reacted("D2", "1700000050.000100");
+        inbox.BotReplied("D1:1700000000.000100", "D1", "1700000001.000100", SlackReplier.Text(SlackBotSettings.DefaultReplyTemplate, "Hưng"));
         inbox.Digest(DateTimeOffset.FromUnixTimeSeconds(1_650_000_000));
     }
 

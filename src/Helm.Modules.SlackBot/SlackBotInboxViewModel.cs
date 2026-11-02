@@ -30,6 +30,11 @@ public sealed class InboxItemViewModel(InboxItem item, string link)
 
     public bool HasSummary => item.Summary is not null;
 
+    /// <summary>What Slack Bot answered for the user, or null.</summary>
+    public string? BotReply => item.BotReply;
+
+    public bool HasBotReply => item.BotReply is not null;
+
     /// <summary>For the user, not sorted yet (or Claude Code is not working): shown as it is.</summary>
     public bool IsUnsorted => item.Level == InboxLevel.Pending;
 
@@ -203,7 +208,7 @@ public sealed partial class SlackBotInboxViewModel : ObservableObject
         HasToDo = ToDoCount > 0;
         HasReport = ReportCount > 0;
         HasOverlay = HasToDo || HasReport;
-        Status = _engine.Status is { Length: > 0 } status ? status : _engine.State == SlackBotState.Off ? "Not connected (SlackBot is off)." : "";
+        Status = _engine.Status is { Length: > 0 } status ? status : _engine.State == SlackBotState.Off ? "Not connected (Slack Bot is off)." : "";
         SortProblem = _engine.SortProblem;
         HasSortProblem = SortProblem is not null;
         HasKnowing = Knowing.Count > 0;

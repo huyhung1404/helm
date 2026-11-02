@@ -12,7 +12,7 @@ public static class SlackAppManifest
     public const string Json = """
         {
           "display_information": {
-            "name": "Helm SlackBot",
+            "name": "Helm Slack Bot",
             "description": "Reads my Slack for Helm on my own PC, so I never miss what needs me."
           },
           "oauth_config": {

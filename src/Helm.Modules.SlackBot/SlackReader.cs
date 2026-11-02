@@ -5,7 +5,7 @@ namespace Helm.Modules.SlackBot;
 /// <summary>
 /// Turns what Slack sends into the inbox: other people's messages become items (with names, where they were written
 /// and whether they are for the user), the user's own messages and reactions mark what they answer as handled.
-/// Blocked conversations are dropped here, before anything is kept.
+/// Conversations the user has not turned on are dropped here, before anything is kept.
 /// </summary>
 public sealed partial class SlackReader(ISlackApi api, SlackIdentity me, SlackInbox inbox, Func<SlackBotSettings> settings)
 {
@@ -26,7 +26,7 @@ public sealed partial class SlackReader(ISlackApi api, SlackIdentity me, SlackIn
             case SlackMessagePosted posted:
                 await ReadAsync(posted.Message, ct).ConfigureAwait(false);
                 break;
-            case SlackMessageEdited edited when !IsBlocked(edited.Channel):
+            case SlackMessageEdited edited when Reads(edited.Channel):
                 inbox.Edited(edited.Channel, edited.Ts, await PlainAsync(edited.Text, ct).ConfigureAwait(false));
                 break;
             case SlackMessageDeleted deleted:
@@ -41,11 +41,12 @@ public sealed partial class SlackReader(ISlackApi api, SlackIdentity me, SlackIn
     /// <summary>Takes in one message (live or caught up); false when it was not kept.</summary>
     public async Task<bool> ReadAsync(SlackMessage m, CancellationToken ct)
     {
-        if (IsBlocked(m.Channel)) return false;
+        if (!Reads(m.Channel)) return false;
         var conversation = Conversation(m.Channel);
         if (m.User == me.UserId)
         {
-            inbox.Mine(m, conversation.Kind);
+            // Slack Bot's own replies are sent as the user, but they answer nothing.
+            if (!inbox.IsBotMessage(m.Channel, m.Ts)) inbox.Mine(m, conversation.Kind);
             return false;
         }
         var callsMe = SlackText.Mentions(m.Text, me.UserId);
@@ -76,7 +77,13 @@ public sealed partial class SlackReader(ISlackApi api, SlackIdentity me, SlackIn
         _ => (reply ? "thread in #" : "#") + c.Name,
     };
 
-    private bool IsBlocked(string channel) => settings().Blocked.Contains(channel);
+    /// <summary>The user turned this conversation on (read, or read and reply).</summary>
+    public bool Reads(string channel) => ModeOf(channel) != SlackChannelMode.Off;
+
+    public SlackChannelMode ModeOf(string channel) => settings().ModeOf(channel, Conversation(channel).Kind);
+
+    /// <summary>The conversation, if Slack listed it.</summary>
+    public SlackConversation? Find(string id) => _conversations.GetValueOrDefault(id);
 
     /// <summary>A conversation Slack has not listed yet (joined a moment ago): guessed from its id.</summary>
     private SlackConversation Conversation(string id) =>

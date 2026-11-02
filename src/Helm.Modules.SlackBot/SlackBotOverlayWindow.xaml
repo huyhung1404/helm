@@ -4,7 +4,7 @@
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
     xmlns:local="clr-namespace:Helm.Modules.SlackBot"
-    Title="SlackBot"
+    Title="Slack Bot"
     WindowStyle="None" AllowsTransparency="True" Background="Transparent" ResizeMode="NoResize"
     ShowInTaskbar="False" ShowActivated="False" Topmost="True" SizeToContent="WidthAndHeight"
     UseLayoutRounding="True">
@@ -30,7 +30,7 @@
         <!-- Folded: the icon and the count -->
         <Border x:Name="Folded" CornerRadius="18" BorderThickness="1" Padding="10,6" Cursor="Hand"
                 Background="{DynamicResource ApplicationBackgroundBrush}" BorderBrush="{DynamicResource CardStrokeColorDefaultBrush}"
-                AutomationProperties.Name="Open SlackBot's list">
+                AutomationProperties.Name="Open Slack Bot's list">
             <StackPanel Orientation="Horizontal">
                 <Image Width="18" Height="18" Source="{x:Static local:SlackBotLogo.Image}" VerticalAlignment="Center" />
                 <Border Margin="8,0,0,0" MinWidth="22" Height="22" CornerRadius="11" Padding="6,0" Background="{DynamicResource SystemFillColorCriticalBrush}"
@@ -52,10 +52,10 @@
                     <ui:Button DockPanel.Dock="Right" Style="{StaticResource SmallIcon}" Icon="{ui:SymbolIcon ChevronDown16}"
                                ToolTip="Fold" AutomationProperties.Name="Fold" Click="Fold_Click" />
                     <ui:Button DockPanel.Dock="Right" Style="{StaticResource SmallIcon}" Icon="{ui:SymbolIcon Open16}"
-                               ToolTip="Open SlackBot" AutomationProperties.Name="Open SlackBot" Command="{Binding ShowPageCommand}" />
+                               ToolTip="Open Slack Bot" AutomationProperties.Name="Open Slack Bot" Command="{Binding ShowPageCommand}" />
                     <Image Width="16" Height="16" Source="{x:Static local:SlackBotLogo.Image}" VerticalAlignment="Center" />
                     <TextBlock Margin="8,0,0,0" VerticalAlignment="Center" FontWeight="SemiBold">
-                        <Run Text="SlackBot" />
+                        <Run Text="Slack Bot" />
                         <Run Text="·" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
                         <Run Text="{Binding ToDoCount, Mode=OneWay}" />
                         <Run Text="to do" />
@@ -102,6 +102,11 @@
                                         <TextBlock Margin="0,4,0,0" Text="{Binding Headline}" TextWrapping="Wrap" FontWeight="SemiBold" />
                                         <TextBlock Margin="0,2,0,0" Text="{Binding Text}" TextWrapping="Wrap" MaxHeight="54" TextTrimming="WordEllipsis"
                                                    Style="{DynamicResource HelmSecondaryText}" Visibility="{Binding HasSummary, Converter={StaticResource BoolToVisibility}}" />
+                                        <TextBlock Margin="0,4,0,0" TextWrapping="Wrap" FontStyle="Italic" Style="{DynamicResource HelmSecondaryText}"
+                                                   Visibility="{Binding HasBotReply, Converter={StaticResource BoolToVisibility}}">
+                                            <Run Text="Replied for you:" FontWeight="SemiBold" />
+                                            <Run Text="{Binding BotReply, Mode=OneWay}" />
+                                        </TextBlock>
                                         <TextBlock x:Name="Unsorted" Margin="0,2,0,0" Text="Not sorted yet" Style="{DynamicResource HelmSecondaryText}" Visibility="Collapsed" />
                                         <StackPanel Margin="0,6,0,0" Orientation="Horizontal">
                                             <ui:Button Content="Open in Slack" Icon="{ui:SymbolIcon Open16}" Padding="8,3"

@@ -22,6 +22,7 @@ public sealed class SlackInbox
     private readonly Dictionary<string, InboxItem> _byId;
     private readonly TimeProvider _clock;
     private readonly Action<InboxData>? _save;
+    private readonly HashSet<string> _sending = [];
 
     /// <param name="save">Called under the lock after each change (debounced by the caller), or null in tests.</param>
     public SlackInbox(InboxData data, TimeProvider clock, Action<InboxData>? save = null)
@@ -246,6 +247,65 @@ public sealed class SlackInbox
         Changed?.Invoke(this, EventArgs.Empty);
     }
 
+    /// <summary>
+    /// Messages for the user that are still to do, sorted, at least <paramref name="after"/> old (the user had time to
+    /// answer) and at most <paramref name="maxAge"/> (no reply hours later), with no reply from Slack Bot in their DM or
+    /// thread for <paramref name="perScope"/>: the latest one per DM or thread.
+    /// </summary>
+    public IReadOnlyList<InboxItem> ToReply(DateTimeOffset now, TimeSpan after, TimeSpan maxAge, TimeSpan perScope)
+    {
+        lock (_gate)
+        {
+            return _data.Items
+                .Where(i => i.IsToDo && i.Level == InboxLevel.Act && i.Direct && i.BotReplyAt is null
+                            && i.Time <= now - after && i.Time >= now - maxAge
+                            && !(_data.BotScopes.TryGetValue(i.Scope, out var last) && last > now - perScope))
+                .GroupBy(i => i.Scope)
+                .Select(g => Copy(g.OrderBy(i => i.Ts, Comparer<string>.Create(SlackIds.Compare)).Last()))
+                .ToList();
+        }
+    }
+
+    /// <summary>A reply is on its way to <paramref name="channel"/>: the user's account writing there now is Slack Bot.</summary>
+    public void Sending(string channel)
+    {
+        lock (_gate) _sending.Add(channel);
+    }
+
+    /// <summary>The reply could not be sent.</summary>
+    public void NotSent(string channel)
+    {
+        lock (_gate) _sending.Remove(channel);
+    }
+
+    /// <summary>Slack Bot replied to <paramref name="id"/> with <paramref name="text"/>; the item stays to do.</summary>
+    public void BotReplied(string id, string channel, string? ts, string text)
+    {
+        lock (_gate)
+        {
+            _sending.Remove(channel);
+            if (ts is not null)
+            {
+                _data.BotMessages.Add(SlackIds.Message(channel, ts));
+                if (_data.BotMessages.Count > 500) _data.BotMessages.RemoveRange(0, _data.BotMessages.Count - 500);
+            }
+            if (_byId.TryGetValue(id, out var item))
+            {
+                item.BotReply = text;
+                item.BotReplyAt = _clock.GetUtcNow();
+                _data.BotScopes[item.Scope] = _clock.GetUtcNow();
+            }
+            _save?.Invoke(_data);
+        }
+        Changed?.Invoke(this, EventArgs.Empty);
+    }
+
+    /// <summary>A message of the user's account that Slack Bot wrote (sent, or being sent to that channel).</summary>
+    public bool IsBotMessage(string channel, string ts)
+    {
+        lock (_gate) return _sending.Contains(channel) || _data.BotMessages.Contains(SlackIds.Message(channel, ts));
+    }
+
     /// <summary>Done: off the to-do list.</summary>
     public void Dismiss(string id) => Update(id, item => Handle(item, HandledBy.Dismissed));
 
@@ -314,12 +374,26 @@ public sealed class SlackInbox
         {
             var gone = _data.Items.RemoveAll(i => SlackIds.Compare(i.Ts, oldest) < 0);
             foreach (var key in _data.LastMine.Where(p => SlackIds.Compare(p.Value, oldest) < 0).Select(p => p.Key).ToList()) _data.LastMine.Remove(key);
+            var since = _clock.GetUtcNow() - Keep;
+            foreach (var key in _data.BotScopes.Where(p => p.Value < since).Select(p => p.Key).ToList()) _data.BotScopes.Remove(key);
             if (gone == 0) return;
             _byId.Clear();
             foreach (var item in _data.Items) _byId[item.Id] = item;
             _save?.Invoke(_data);
         }
         Changed?.Invoke(this, EventArgs.Empty);
+    }
+
+    /// <summary>Conversations with anything kept or written by the user in them (the last <see cref="Keep"/>).</summary>
+    public IReadOnlySet<string> ActiveChannels()
+    {
+        lock (_gate)
+        {
+            var set = _data.Items.Select(i => i.Channel).ToHashSet();
+            foreach (var scope in _data.LastMine.Keys)
+                set.Add(scope.StartsWith("root:", StringComparison.Ordinal) ? scope[5..] : scope.Split(':')[0]);
+            return set;
+        }
     }
 
     /// <summary>Threads the user wrote in lately (channel, thread ts): checked for replies missed while offline.</summary>
@@ -357,6 +431,6 @@ public sealed class SlackInbox
     {
         Channel = i.Channel, Ts = i.Ts, ThreadTs = i.ThreadTs, Kind = i.Kind, Where = i.Where, From = i.From, Text = i.Text,
         ThreadStart = i.ThreadStart, Direct = i.Direct, Level = i.Level, Summary = i.Summary, SortTries = i.SortTries,
-        Handled = i.Handled, HandledAt = i.HandledAt, Read = i.Read,
+        Handled = i.Handled, HandledAt = i.HandledAt, Read = i.Read, BotReply = i.BotReply, BotReplyAt = i.BotReplyAt,
     };
 }

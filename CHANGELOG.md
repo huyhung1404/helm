@@ -6,17 +6,22 @@ Format: [Keep a Changelog](https://keepachangelog.com), versions follow [SemVer]
 ## [Unreleased]
 
 ### Added
-- **SlackBot (PC): never miss what needs you in Slack.** SlackBot reads your workspace as you, through a Slack app you
-  make in a minute from the manifest on its settings page (Socket Mode: Helm connects out, nothing listens on your PC),
-  in every channel and DM you are in except the ones you switch off. Claude Code sorts each message: to do, worth
-  knowing or not for you, with one line in Vietnamese. DMs, mentions and replies in your threads are sorted within
-  seconds, channels every 30 minutes. What needs you stays in a small list on top of your apps (it never takes the
-  keyboard; drag it anywhere, fold it into a badge) until you reply in Slack, react with an emoji or press Done.
-  What is worth knowing shows up at the report times you set (12:00 and 17:00 to start with), grouped by channel.
-  While Helm was off it catches up on what came meanwhile, and every 10 minutes it reads your DMs, mentions and threads
+- **Slack Bot (PC): never miss what needs you in Slack.** Slack Bot reads your workspace as you, through a Slack app
+  you make in a minute from the manifest on its settings page (Socket Mode: Helm connects out, nothing listens on your
+  PC). You choose per conversation: Off, Read, or Read and reply. DMs are read unless you turn them off; channels stay
+  off until you turn them on. Claude Code sorts each message: to do, worth knowing or not for you, with one line in
+  Vietnamese. DMs, mentions and replies in your threads are sorted within seconds, channels as often as you set (in
+  seconds; every 30 minutes to start with). What needs you stays in a small see-through list on top of your apps (it
+  never takes the keyboard; solid under the mouse; drag it anywhere, fold it into a badge) until you reply in Slack,
+  react with an emoji or press Done. What is worth knowing waits for the report times you set (12:00 and 17:00 to start
+  with) and shows up together, grouped by channel. Where you allow it, a message you have not answered within a few
+  minutes gets your reply template, which says openly that it comes from an AI assistant ("🤖 Em là Lumi, trợ lý AI
+  của…"), once per DM or thread every 4 hours; the message stays on your list until you answer it yourself. While Helm
+  was off it catches up on what came meanwhile, and every 10 minutes it reads your recent DMs, mentions and threads
   again in case Slack's live connection missed one. Claude reads the messages with no tools at all (no files, no web,
-  no MCP), so a message cannot make it do anything but sort; "Only worth knowing" and "Needs me" teach it what matters
-  to you. Messages and tokens stay on this PC, encrypted for your Windows user, and are never synced.
+  no MCP) and never writes the reply, so a message cannot make it do anything but sort; "Only worth knowing" and
+  "Needs me" teach it what matters to you. Messages and tokens stay on this PC, encrypted for your Windows user, and are
+  never synced.
 
 ## [0.71.0] - 2026-11-01
 

@@ -31,6 +31,10 @@ public sealed class SlackBotOverlay
         _logger = logger;
         inbox.PropertyChanged += OnInboxChanged;
         inbox.NewToDo += (_, _) => OnNewToDo();
+        _settings.Changed += (_, s) => _ui.Post(() =>
+        {
+            if (_window is not null) _window.RestOpacity = s.OverlayOpacity;
+        });
     }
 
     /// <summary>Back to the bottom-right corner, open (the settings page).</summary>
@@ -110,7 +114,7 @@ public sealed class SlackBotOverlay
     private SlackBotOverlayWindow Create()
     {
         var s = _settings.Current;
-        return new SlackBotOverlayWindow(_inbox, _windows,
+        var window = new SlackBotOverlayWindow(_inbox, _windows,
             s.OverlayLeft is { } left && s.OverlayBottom is { } bottom ? new System.Windows.Point(left, bottom) : null,
             s.OverlayFolded,
             at => _settings.Update(v =>
@@ -119,5 +123,7 @@ public sealed class SlackBotOverlay
                 v.OverlayBottom = at?.Y;
             }),
             folded => _settings.Update(v => v.OverlayFolded = folded));
+        window.RestOpacity = s.OverlayOpacity;
+        return window;
     }
 }

@@ -79,6 +79,9 @@ public sealed class SlackBotEngine : IAsyncDisposable
     /// <summary>Who is signed in, once connected.</summary>
     public SlackIdentity? Me { get; private set; }
 
+    /// <summary>The user's display name, once connected (for Claude and the reply template).</summary>
+    public string MeName { get; private set; } = "";
+
     /// <summary>The user's conversations, once listed (names filled in for DMs).</summary>
     public IReadOnlyList<SlackConversation> Conversations { get; private set; } = [];
 
@@ -155,8 +158,11 @@ public sealed class SlackBotEngine : IAsyncDisposable
                 Set(SlackBotState.Connecting, "Connecting to Slack…");
                 Me = await api.AuthTestAsync(ct).ConfigureAwait(false);
                 Inbox.WorkspaceUrl = Me.Url;
+                MeName = await api.UserNameAsync(Me.UserId, ct).ConfigureAwait(false) ?? Me.UserName;
+                _logger.LogInformation("Slack Bot signed in to {Workspace}", Me.Url);
                 var reader = new SlackReader(api, Me, Inbox, () => _settings.Current);
                 reader.ForYou += (_, _) => SortSoon(ct);
+                var replier = new SlackReplier(api, Inbox, reader, () => _settings.Current, MeName, _logger);
                 await RefreshConversationsAsync(api, reader, ct).ConfigureAwait(false);
                 _reader = reader;
                 var socket = new SlackSocket(api);
@@ -166,7 +172,7 @@ public sealed class SlackBotEngine : IAsyncDisposable
                     if (!connected && !ct.IsCancellationRequested) Set(SlackBotState.Offline, "Lost the connection to Slack; trying again…");
                 };
                 using var timers = CancellationTokenSource.CreateLinkedTokenSource(ct);
-                var background = TimersAsync(api, reader, timers.Token);
+                var background = TimersAsync(api, reader, replier, timers.Token);
                 try
                 {
                     await socket.RunAsync(
@@ -241,9 +247,9 @@ public sealed class SlackBotEngine : IAsyncDisposable
             var first = Inbox.LastSeen is null;
             var floor = SlackIds.Ts(started - (first ? FirstCatchUp : MaxCatchUp));
             var since = first || SlackIds.Compare(Inbox.LastSeen, floor) < 0 ? floor : Inbox.LastSeen!;
-            var blocked = _settings.Current.Blocked.ToHashSet();
-            // The first time, channels start from now: a day of every channel would bury what matters.
-            var conversations = Conversations.Where(c => !blocked.Contains(c.Id) && (!first || c.IsDirect)).ToList();
+            // Only what the user turned on; the first time, channels start from now: a day of every channel would bury what matters.
+            var conversations = Conversations.Where(c => reader.Reads(c.Id) && (!first || c.IsDirect)).ToList();
+            _logger.LogInformation("Slack Bot catching up on {Count} conversations since {Since}", conversations.Count, SlackIds.Time(since));
             var done = 0;
             foreach (var c in conversations)
             {
@@ -251,9 +257,10 @@ public sealed class SlackBotEngine : IAsyncDisposable
                 foreach (var m in await api.HistoryAsync(c.Id, since, 200, ct).ConfigureAwait(false))
                     await reader.ReadAsync(m, ct).ConfigureAwait(false);
             }
-            await ReadForYouAsync(api, reader, since, blocked, ct).ConfigureAwait(false);
+            await ReadForYouAsync(api, reader, since, ct).ConfigureAwait(false);
             Inbox.Seen(SlackIds.Ts(started));
             _caughtUp = true;
+            _logger.LogInformation("Slack Bot caught up in {Seconds:0} s", (DateTimeOffset.UtcNow - started).TotalSeconds);
             Set(SlackBotState.Connected, Connected());
             SortSoon(ct);
         }
@@ -269,11 +276,11 @@ public sealed class SlackBotEngine : IAsyncDisposable
     }
 
     /// <summary>Replies in the user's threads and mentions anywhere since <paramref name="since"/>.</summary>
-    private async Task ReadForYouAsync(ISlackApi api, SlackReader reader, string since, HashSet<string> blocked, CancellationToken ct)
+    private async Task ReadForYouAsync(ISlackApi api, SlackReader reader, string since, CancellationToken ct)
     {
         foreach (var (channel, thread) in Inbox.MyThreads(TimeSpan.FromDays(7)))
         {
-            if (blocked.Contains(channel)) continue;
+            if (!reader.Reads(channel)) continue;
             try
             {
                 foreach (var m in await api.RepliesAsync(channel, thread, since, ct).ConfigureAwait(false))
@@ -296,15 +303,16 @@ public sealed class SlackBotEngine : IAsyncDisposable
     }
 
     /// <summary>
-    /// The safety net beside the live connection: what is for the user (DMs, group DMs, their threads, mentions) of
-    /// the last <see cref="SafetyWindow"/> is read again. Anything the socket already brought is skipped; anything it
-    /// missed lands on the list within <see cref="SafetyEvery"/>.
+    /// The safety net beside the live connection: what is for the user of the last <see cref="SafetyWindow"/> is read
+    /// again — the DMs and group DMs that were active lately (a workspace keeps hundreds of old ones), their threads
+    /// and mentions anywhere. Anything the socket already brought is skipped; anything it missed lands on the list
+    /// within <see cref="SafetyEvery"/>.
     /// </summary>
     private async Task CheckForYouAsync(ISlackApi api, SlackReader reader, CancellationToken ct)
     {
         var since = SlackIds.Ts(DateTimeOffset.UtcNow - SafetyWindow);
-        var blocked = _settings.Current.Blocked.ToHashSet();
-        foreach (var c in Conversations.Where(c => c.IsDirect && !blocked.Contains(c.Id)))
+        var active = Inbox.ActiveChannels();
+        foreach (var c in Conversations.Where(c => c.IsDirect && active.Contains(c.Id) && reader.Reads(c.Id)))
         {
             try
             {
@@ -316,17 +324,18 @@ public sealed class SlackBotEngine : IAsyncDisposable
                 // A DM closed meanwhile.
             }
         }
-        await ReadForYouAsync(api, reader, since, blocked, ct).ConfigureAwait(false);
+        await ReadForYouAsync(api, reader, since, ct).ConfigureAwait(false);
     }
 
     /// <summary>Channel sorting, report times, "seen", the conversation list and forgetting old messages.</summary>
-    private async Task TimersAsync(ISlackApi api, SlackReader reader, CancellationToken ct)
+    private async Task TimersAsync(ISlackApi api, SlackReader reader, SlackReplier replier, CancellationToken ct)
     {
         var lastChannelSort = DateTimeOffset.UtcNow;
         var lastList = DateTimeOffset.UtcNow;
         var lastCheck = DateTimeOffset.UtcNow;
         Inbox.Prune();
-        using var tick = new PeriodicTimer(TimeSpan.FromMinutes(1));
+        // Every few seconds: channel sorting may be set in seconds; each tick is cheap when nothing is due.
+        using var tick = new PeriodicTimer(TimeSpan.FromSeconds(5));
         try
         {
             while (await tick.WaitForNextTickAsync(ct).ConfigureAwait(false))
@@ -336,11 +345,12 @@ public sealed class SlackBotEngine : IAsyncDisposable
                     var now = DateTimeOffset.UtcNow;
                     if (_caughtUp) Inbox.Seen(SlackIds.Ts(now - TimeSpan.FromMinutes(1)));
                     if (ReportDue(_settings.Current.ReportTimes, Inbox.LastDigest, DateTimeOffset.Now) is { } due) Inbox.Digest(due);
-                    if (now - lastChannelSort >= TimeSpan.FromMinutes(Math.Max(5, _settings.Current.ChannelMinutes)))
+                    if (now - lastChannelSort >= TimeSpan.FromSeconds(Math.Max(SlackBotSettings.MinChannelSeconds, _settings.Current.ChannelSeconds)))
                     {
                         lastChannelSort = now;
                         await SortAsync(directOnly: false, ct).ConfigureAwait(false);
                     }
+                    if (_caughtUp) await replier.ReplyAsync(now, ct).ConfigureAwait(false);
                     if (_caughtUp && now - lastCheck >= SafetyEvery)
                     {
                         lastCheck = now;
@@ -391,6 +401,8 @@ public sealed class SlackBotEngine : IAsyncDisposable
         }
         list.Sort((a, b) => (a.IsDirect, a.Name).CompareTo((b.IsDirect, b.Name)));
         reader.SetConversations(list);
+        // Turned off (or off by default): nothing from it is kept.
+        foreach (var c in list.Where(c => !reader.Reads(c.Id))) Inbox.Forget(c.Id);
         Conversations = list;
         Changed?.Invoke(this, EventArgs.Empty);
     }
@@ -428,7 +440,7 @@ public sealed class SlackBotEngine : IAsyncDisposable
             // A few runs at most: the rest waits for the next turn.
             for (var run = 0; run < 5; run++)
             {
-                var sorted = await _sorter.SortAsync(Inbox, directOnly, me.UserName, _settings.Current, ct).ConfigureAwait(false);
+                var sorted = await _sorter.SortAsync(Inbox, directOnly, MeName is { Length: > 0 } name ? name : me.UserName, _settings.Current, ct).ConfigureAwait(false);
                 if (sorted < SlackSorter.BatchSize) break;
             }
             SetSortProblem(null);

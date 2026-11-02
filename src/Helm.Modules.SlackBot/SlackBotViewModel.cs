@@ -10,34 +10,6 @@ namespace Helm.Modules.SlackBot;
 
 public sealed record SlackBotChoice<T>(T Value, string Label);
 
-/// <summary>A channel or DM in the "Channels SlackBot reads" list.</summary>
-public sealed partial class SlackChannelRow : ObservableObject
-{
-    private readonly Action<string, bool> _changed;
-
-    [ObservableProperty] private bool _isRead;
-
-    public SlackChannelRow(SlackConversation conversation, bool read, Action<string, bool> changed)
-    {
-        Id = conversation.Id;
-        Name = conversation.Kind switch
-        {
-            SlackConversationKind.DirectMessage => "DM: " + conversation.Name,
-            SlackConversationKind.GroupMessage => "Group DM: " + conversation.Name,
-            SlackConversationKind.PrivateChannel => "🔒 " + conversation.Name,
-            _ => "#" + conversation.Name,
-        };
-        _isRead = read;
-        _changed = changed;
-    }
-
-    public string Id { get; }
-
-    public string Name { get; }
-
-    partial void OnIsReadChanged(bool value) => _changed(Id, value);
-}
-
 /// <summary>The settings page: the connection, the channels it reads, how it sorts, and when it reports.</summary>
 public sealed partial class SlackBotViewModel : ObservableObject
 {
@@ -55,13 +27,17 @@ public sealed partial class SlackBotViewModel : ObservableObject
     [ObservableProperty] private bool _hasTokens;
     [ObservableProperty] private string? _tokenProblem;
     [ObservableProperty] private string _reportTimes = "";
-    [ObservableProperty] private int _channelMinutes;
+    [ObservableProperty] private int _channelSeconds;
     [ObservableProperty] private bool _readBots;
     [ObservableProperty] private string _aboutMe = "";
     [ObservableProperty] private string _model = "";
     [ObservableProperty] private bool _playSound;
     [ObservableProperty] private string _channelFilter = "";
     [ObservableProperty] private string _channelsSummary = "";
+    [ObservableProperty] private string _replyTemplate = "";
+    [ObservableProperty] private string _replyPreview = "";
+    [ObservableProperty] private int _replyAfterMinutes;
+    [ObservableProperty] private double _overlayOpacity;
 
     public SlackBotViewModel(SlackBotModule module, SlackBotEngine engine, SlackTokens tokens, ISettingsStoreFactory settings, IUiDispatcher ui,
         IProcessLauncher launcher, IServiceProvider services, SlackBotOverlay overlay)
@@ -85,12 +61,13 @@ public sealed partial class SlackBotViewModel : ObservableObject
 
     public ObservableCollection<SlackChannelRow> Channels { get; } = [];
 
-    public IReadOnlyList<SlackBotChoice<int>> ChannelMinuteChoices { get; } =
+    public IReadOnlyList<SlackBotChoice<int>> ReplyAfterChoices { get; } =
     [
-        new(15, "Every 15 minutes"),
-        new(30, "Every 30 minutes"),
-        new(60, "Every hour"),
-        new(120, "Every 2 hours"),
+        new(1, "After 1 minute"),
+        new(3, "After 3 minutes"),
+        new(5, "After 5 minutes"),
+        new(10, "After 10 minutes"),
+        new(30, "After 30 minutes"),
     ];
 
     public IReadOnlyList<SlackBotChoice<string>> Models { get; } =
@@ -139,7 +116,15 @@ public sealed partial class SlackBotViewModel : ObservableObject
         if (times is not null) _store.Update(s => s.ReportTimes = times);
     }
 
-    partial void OnChannelMinutesChanged(int value) => Save(s => s.ChannelMinutes = value);
+    partial void OnChannelSecondsChanged(int value)
+    {
+        if (value < SlackBotSettings.MinChannelSeconds)
+        {
+            ChannelSeconds = SlackBotSettings.MinChannelSeconds;
+            return;
+        }
+        Save(s => s.ChannelSeconds = value);
+    }
 
     partial void OnReadBotsChanged(bool value) => Save(s => s.ReadBots = value);
 
@@ -148,6 +133,19 @@ public sealed partial class SlackBotViewModel : ObservableObject
     partial void OnModelChanged(string value) => Save(s => s.Model = value);
 
     partial void OnPlaySoundChanged(bool value) => Save(s => s.PlaySound = value);
+
+    partial void OnReplyTemplateChanged(string value)
+    {
+        UpdatePreview();
+        Save(s => s.ReplyTemplate = value);
+    }
+
+    partial void OnReplyAfterMinutesChanged(int value) => Save(s => s.ReplyAfterMinutes = value);
+
+    partial void OnOverlayOpacityChanged(double value) => Save(s => s.OverlayOpacity = Math.Clamp(value, 0.3, 1));
+
+    [RelayCommand]
+    private void ResetReplyTemplate() => ReplyTemplate = SlackBotSettings.DefaultReplyTemplate;
 
     partial void OnChannelFilterChanged(string value) => FilterChannels();
 
@@ -169,11 +167,14 @@ public sealed partial class SlackBotViewModel : ObservableObject
         try
         {
             ReportTimes = string.Join(", ", s.ReportTimes);
-            ChannelMinutes = s.ChannelMinutes;
+            ChannelSeconds = s.ChannelSeconds;
             ReadBots = s.ReadBots;
             AboutMe = s.AboutMe;
             Model = s.Model;
             PlaySound = s.PlaySound;
+            ReplyTemplate = s.ReplyTemplate;
+            ReplyAfterMinutes = s.ReplyAfterMinutes;
+            OverlayOpacity = s.OverlayOpacity;
         }
         finally
         {
@@ -189,26 +190,24 @@ public sealed partial class SlackBotViewModel : ObservableObject
     private void RefreshEngine()
     {
         HasTokens = _tokens.Exist;
-        Status = _engine.Status is { Length: > 0 } s ? s : _engine.State == SlackBotState.Off ? "SlackBot is turned off." : "";
+        Status = _engine.Status is { Length: > 0 } s ? s : _engine.State == SlackBotState.Off ? "Slack Bot is turned off." : "";
         var conversations = _engine.Conversations;
         if (conversations.Count == _allChannels.Count && conversations.Select(c => c.Id).SequenceEqual(_allChannels.Select(r => r.Id)))
         {
             UpdateSummary();
             return;
         }
-        var blocked = _store.Current.Blocked.ToHashSet();
-        _allChannels = conversations.Select(c => new SlackChannelRow(c, !blocked.Contains(c.Id), SetRead)).ToList();
+        var settings = _store.Current;
+        _allChannels = conversations.Select(c => new SlackChannelRow(c, settings.ModeOf(c.Id, c.Kind), SetMode)).ToList();
         FilterChannels();
+        UpdatePreview();
     }
 
-    private void SetRead(string id, bool read)
+    private void SetMode(string id, SlackChannelMode mode)
     {
-        _store.Update(s =>
-        {
-            s.Blocked.Remove(id);
-            if (!read) s.Blocked.Add(id);
-        });
-        if (!read) _engine.Inbox.Forget(id);
+        _store.Update(s => s.Channels[id] = mode);
+        // Turned off: nothing from it is kept any more.
+        if (mode == SlackChannelMode.Off) _engine.Inbox.Forget(id);
         UpdateSummary();
     }
 
@@ -223,9 +222,13 @@ public sealed partial class SlackBotViewModel : ObservableObject
 
     private void UpdateSummary()
     {
-        var blocked = _allChannels.Count(r => !r.IsRead);
+        var read = _allChannels.Count(r => r.Mode != SlackChannelMode.Off);
+        var reply = _allChannels.Count(r => r.Mode == SlackChannelMode.Reply);
         ChannelsSummary = _allChannels.Count == 0
-            ? "The list appears once SlackBot is connected."
-            : blocked == 0 ? $"All {_allChannels.Count} channels and DMs are read." : $"{blocked} of {_allChannels.Count} are not read.";
+            ? "The list appears once Slack Bot is connected."
+            : $"Reads {read} of {_allChannels.Count}, replies in {reply}. DMs are read unless you turn them off; channels are off until you turn them on.";
     }
+
+    private void UpdatePreview() =>
+        ReplyPreview = SlackReplier.Text(ReplyTemplate, _engine.MeName is { Length: > 0 } me ? me : "you");
 }

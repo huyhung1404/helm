@@ -16,6 +16,7 @@ public partial class SlackBotOverlayWindow : Window
     private readonly Action<Point?> _moved;
     private readonly Action<bool> _folded;
     private Point? _anchor;
+    private double _rest = 1;
 
     /// <param name="anchor">Where the user put it last: its bottom-left corner; null for the bottom-right corner.</param>
     /// <param name="moved">Keeps the new bottom-left corner after a drag (null after going back to the corner).</param>
@@ -30,7 +31,21 @@ public partial class SlackBotOverlayWindow : Window
         SourceInitialized += (_, _) => windows.MakeNonActivating(new WindowInteropHelper(this).Handle);
         // It grows and shrinks from its bottom edge, as items come and go.
         SizeChanged += (_, _) => Place();
+        // See-through while the mouse is elsewhere, solid under it.
+        MouseEnter += (_, _) => Opacity = 1;
+        MouseLeave += (_, _) => Opacity = _rest;
         SetFolded(fold);
+    }
+
+    /// <summary>How opaque it is while the mouse is not on it.</summary>
+    public double RestOpacity
+    {
+        get => _rest;
+        set
+        {
+            _rest = Math.Clamp(value, 0.3, 1);
+            if (!IsMouseOver) Opacity = _rest;
+        }
     }
 
     public bool IsFolded => Folded.Visibility == Visibility.Visible;

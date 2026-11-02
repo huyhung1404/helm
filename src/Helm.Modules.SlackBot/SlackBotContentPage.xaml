@@ -5,7 +5,7 @@
     xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
     xmlns:core="clr-namespace:Helm.Core.Ui;assembly=Helm.Core.Windows"
     xmlns:local="clr-namespace:Helm.Modules.SlackBot"
-    Title="SlackBot">
+    Title="Slack Bot">
 
     <!-- SlackBot itself (menu and Quick access): the to-do list, the report, what was handled. Its options live on
          SlackBotPage (Home → Utilities). -->
@@ -29,16 +29,21 @@
                 <TextBlock Margin="0,4,0,0" Text="{Binding Headline}" TextWrapping="Wrap" FontWeight="SemiBold" />
                 <TextBlock Margin="0,2,0,0" Text="{Binding Text}" TextWrapping="Wrap" Style="{DynamicResource HelmSecondaryText}"
                            Visibility="{Binding HasSummary, Converter={StaticResource BoolToVisibility}}" />
+                <TextBlock Margin="0,4,0,0" TextWrapping="Wrap" FontStyle="Italic" Style="{DynamicResource HelmSecondaryText}"
+                           Visibility="{Binding HasBotReply, Converter={StaticResource BoolToVisibility}}">
+                    <Run Text="Replied for you:" FontWeight="SemiBold" />
+                    <Run Text="{Binding BotReply, Mode=OneWay}" />
+                </TextBlock>
             </StackPanel>
         </DataTemplate>
     </Page.Resources>
 
     <StackPanel Margin="24,16,24,24">
-        <TextBlock Text="SlackBot" FontSize="28" FontWeight="SemiBold" Margin="0,0,0,16" />
+        <TextBlock Text="Slack Bot" FontSize="28" FontWeight="SemiBold" Margin="0,0,0,16" />
 
         <!-- Shown while the tool is turned off -->
         <ui:InfoBar x:Name="OffBar" Severity="Informational" IsClosable="False" IsOpen="False" Visibility="Collapsed" Margin="0,0,0,8"
-                    Title="SlackBot is turned off" Message="What it kept is still here. Turn SlackBot on in its settings to read Slack again." />
+                    Title="Slack Bot is turned off" Message="What it kept is still here. Turn Slack Bot on in its settings to read Slack again." />
 
         <StackPanel x:Name="Body">
             <!-- The connection, first -->

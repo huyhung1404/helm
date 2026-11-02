@@ -16,10 +16,10 @@ public sealed class SlackBotModule(SlackBotEngine engine, SlackBotOverlay overla
     public const string ModuleId = "slackbot";
 
     public override string Id => ModuleId;
-    public override string DisplayName => "SlackBot";
+    public override string DisplayName => "Slack Bot";
     public override string Description => "Reads your Slack, has Claude pick out what needs you, and keeps it on screen until you answer.";
     public override ModuleGroup Group => ModuleGroup.Messages;
-    public override SymbolRegular Icon => SymbolRegular.Chat24;
+    public override SymbolRegular Icon => SymbolRegular.Bot24;
     public override ImageSource IconImage => SlackBotLogo.Image;
     public override Type SettingsPageType => typeof(SlackBotPage);
     public Type ContentPageType => typeof(SlackBotContentPage);
