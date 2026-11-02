@@ -82,6 +82,12 @@ public sealed class SlackBotEngine : IAsyncDisposable
     /// <summary>Who is signed in, once connected.</summary>
     public SlackIdentity? Me { get; private set; }
 
+    /// <summary>Slack's API while connected, for the MCP tools (null otherwise).</summary>
+    public ISlackApi? Api { get; private set; }
+
+    /// <summary>The reader while connected: modes and conversation names, for the MCP tools.</summary>
+    public SlackReader? Reader => _reader;
+
     /// <summary>The user's display name, once connected (for Claude and the reply template).</summary>
     public string MeName { get; private set; } = "";
 
@@ -124,7 +130,19 @@ public sealed class SlackBotEngine : IAsyncDisposable
         }
         cts.Dispose();
         _reader = null;
+        Api = null;
         Set(SlackBotState.Off, "");
+    }
+
+    /// <summary>Tests: as if connected with <paramref name="api"/>, without a socket.</summary>
+    internal void ConnectedForTests(ISlackApi api, SlackIdentity me, string meName, IReadOnlyList<SlackConversation> conversations)
+    {
+        Me = me;
+        MeName = meName;
+        Conversations = conversations;
+        _reader = new SlackReader(api, me, Inbox, () => _settings.Current);
+        _reader.SetConversations(conversations);
+        Api = api;
     }
 
     /// <summary>New tokens, or Reconnect: starts over.</summary>
@@ -168,6 +186,7 @@ public sealed class SlackBotEngine : IAsyncDisposable
                 var replier = new SlackReplier(api, _agent, Inbox, reader, () => _settings.Current, MeName, _logger);
                 await RefreshConversationsAsync(api, reader, ct).ConfigureAwait(false);
                 _reader = reader;
+                Api = api;
                 var socket = new SlackSocket(api);
                 socket.ConnectedChanged += (_, connected) =>
                 {

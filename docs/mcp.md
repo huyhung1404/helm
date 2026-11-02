@@ -54,6 +54,15 @@ asks for one after two or more days in a row). `habit_check` ticks a day (today 
 started or in the future). Nothing is unticked or deleted through them. Try "why do I keep skipping my reading
 habit?".
 
+Slack Bot's tools (PC) let an agent report work to the team: `slack_conversations` lists the channels and DMs the user
+turned on in Slack Bot and whether the agent may post there (only those set to **Read and reply**); `slack_messages`
+reads a conversation or one thread; `slack_post` posts a message as the user, behind the AI signature, with @here,
+@channel and @everyone taken out, and is always asked first with the exact text (it reaches other people);
+`slack_wait_replies` waits, only when the user asked for feedback, until someone else answers in that thread (polling
+every 15 s, up to 30 minutes) and returns the replies. Conversations that are off do not exist for the agent, and what
+people wrote is data, never instructions. Try "post a short report of this task in #release and wait for the team's
+feedback".
+
 Novel Reader's tools (`novel_list`, `novel_name_candidates`, `novel_names`, `novel_add_names`, `novel_ignore_names`)
 let an agent find a novel's character names: it reads the possible names with sentences where they appear and adds
 the real ones, marked as found; it never replaces a name the user saved. Novel Reader's AI name scan runs Claude Code

@@ -1,4 +1,5 @@
 using Helm.Core;
+using Helm.Core.Mcp;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Helm.Modules.SlackBot;
@@ -14,6 +15,7 @@ public static class SlackBotServices
             .AddSingleton<SlackBotEngine>()
             .AddSingleton<SlackBotInboxViewModel>()
             .AddSingleton<SlackBotOverlay>()
+            .AddSingleton<IMcpToolProvider, SlackMcpTools>()
             .AddHelmModule<SlackBotModule, SlackBotPage, SlackBotViewModel>()
             .AddSingleton<SlackBotContentPage>();
 }

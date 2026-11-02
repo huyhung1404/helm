@@ -303,6 +303,18 @@ public sealed class SlackInbox
         Changed?.Invoke(this, EventArgs.Empty);
     }
 
+    /// <summary>An AI agent posted <paramref name="ts"/> through Slack Bot (a report): the user's account, not the user's answer.</summary>
+    public void BotPosted(string channel, string? ts)
+    {
+        lock (_gate)
+        {
+            _sending.Remove(channel);
+            if (ts is null) return;
+            _data.BotMessages.Add(SlackIds.Message(channel, ts));
+            _save?.Invoke(_data);
+        }
+    }
+
     /// <summary>A message of the user's account that Slack Bot wrote (sent, or being sent to that channel).</summary>
     public bool IsBotMessage(string channel, string ts)
     {

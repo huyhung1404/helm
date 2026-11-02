@@ -21,7 +21,9 @@ Format: [Keep a Changelog](https://keepachangelog.com), versions follow [SemVer]
   it yourself. While Helm was off it catches up on what came meanwhile, and every 10 minutes it reads your recent DMs,
   mentions and threads again in case Slack's live connection missed one. Claude reads the messages with no tools at all
   (no files, no web, no MCP), and a reply is written seeing nothing but the message it answers; "Only worth knowing" and
-  "Needs me" teach it what matters to you. Messages and tokens stay on this PC, encrypted for your Windows user, and are
+  "Needs me" teach it what matters to you. AI agents can use it over MCP: list the conversations you turned on, read
+  them, post a report where you allow writing (always asked first with the exact text, behind the AI signature, never
+  pinging a whole channel), and, when you ask, wait for the team's replies in that thread to rework the task. Messages and tokens stay on this PC, encrypted for your Windows user, and are
   never synced.
 
 ## [0.71.0] - 2026-11-01
