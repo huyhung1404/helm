@@ -47,15 +47,35 @@
         </ResourceDictionary>
     </UserControl.Resources>
 
-    <Grid x:Name="LearnPanel" MaxWidth="1240" Focusable="True" FocusVisualStyle="{x:Null}">
+    <!-- Narrower than the card and its side panel need (see the code), the panel folds into one line above the card -->
+    <Grid x:Name="LearnPanel" MaxWidth="1240" Focusable="True" FocusVisualStyle="{x:Null}" SizeChanged="LearnPanel_SizeChanged">
         <Grid.ColumnDefinitions>
             <ColumnDefinition Width="*" />
-            <ColumnDefinition Width="20" />
-            <ColumnDefinition Width="280" />
+            <ColumnDefinition x:Name="GapColumn" Width="20" />
+            <ColumnDefinition x:Name="SideColumn" Width="280" />
         </Grid.ColumnDefinitions>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+
+        <!-- ===== Narrow: today's numbers, the kind of card and the pinyin switch in one line ===== -->
+        <Border x:Name="NarrowBar" Style="{DynamicResource HelmSurface}" Padding="16,8" Margin="0,0,0,12" Visibility="Collapsed">
+            <DockPanel>
+                <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
+                    <ComboBox Width="170" AutomationProperties.Name="Kind of card" ItemsSource="{Binding Settings.CardModes}" SelectedIndex="{Binding Settings.CardModeIndex}" />
+                    <TextBlock Margin="14,0,8,0" Text="Pinyin first" FontSize="13" VerticalAlignment="Center" />
+                    <ui:ToggleSwitch AutomationProperties.Name="Chinese cards ask for the pinyin first" IsChecked="{Binding Settings.TypePinyin}" />
+                </StackPanel>
+                <TextBlock VerticalAlignment="Center" TextTrimming="CharacterEllipsis" Margin="0,0,12,0">
+                    <Run Text="{Binding Today.Due, Mode=OneWay}" FontWeight="SemiBold" /><Run Text=" due · " /><Run Text="{Binding Today.New, Mode=OneWay}" FontWeight="SemiBold" /><Run Text=" new · " /><Run Text="{Binding Today.Learned, Mode=OneWay}" FontWeight="SemiBold" /><Run Text=" of " /><Run Text="{Binding Today.Total, Mode=OneWay}" /><Run Text=" learned" />
+                    <Run Text="  ·  " Foreground="{DynamicResource TextFillColorSecondaryBrush}" /><Run Text="{Binding Card.RoundText, Mode=OneWay}" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+                </TextBlock>
+            </DockPanel>
+        </Border>
 
         <!-- ===== The card ===== -->
-        <Border Style="{DynamicResource HelmSurface}" Padding="0" VerticalAlignment="Top" DataContext="{Binding Card}" AutomationProperties.Name="Card">
+        <Border Grid.Row="1" Style="{DynamicResource HelmSurface}" Padding="0" VerticalAlignment="Top" DataContext="{Binding Card}" AutomationProperties.Name="Card">
             <Grid>
                 <!-- Nothing to learn yet -->
                 <StackPanel Margin="24,56" HorizontalAlignment="Center" Visibility="{Binding HasWord, Converter={StaticResource InverseBoolToVisibility}}">
@@ -259,17 +279,22 @@
                                     <TextBlock Margin="0,6,0,0" Text="{Binding Explanation}" FontSize="14" MaxWidth="640" TextAlignment="Center" HorizontalAlignment="Center"
                                                Style="{DynamicResource HelmSecondaryText}" Visibility="{Binding Explanation, Converter={StaticResource NotEmptyToVisibility}}" />
 
-                                    <Grid Margin="0,20,0,0">
+                                    <!-- Side by side when the card is wide enough for the tree; else the tree above what helps (see the code) -->
+                                    <Grid x:Name="AnswerGrid" Margin="0,20,0,0" SizeChanged="AnswerGrid_SizeChanged">
                                         <Grid.ColumnDefinitions>
                                             <ColumnDefinition Width="1.25*" />
                                             <ColumnDefinition Width="20" />
                                             <ColumnDefinition Width="*" />
                                         </Grid.ColumnDefinitions>
-                                        <StackPanel Style="{StaticResource TreeColumn}" Visibility="{Binding HasExplanationTree, Converter={StaticResource BoolToVisibility}}">
+                                        <Grid.RowDefinitions>
+                                            <RowDefinition Height="Auto" />
+                                            <RowDefinition Height="Auto" />
+                                        </Grid.RowDefinitions>
+                                        <StackPanel x:Name="TreePart" Style="{StaticResource TreeColumn}" Visibility="{Binding HasExplanationTree, Converter={StaticResource BoolToVisibility}}">
                                             <TextBlock Text="How it's built" Style="{StaticResource SectionTitle}" />
                                             <ContentControl Content="{Binding ExplanationTree}" ContentTemplate="{StaticResource PartsView}" Focusable="False" />
                                         </StackPanel>
-                                        <ContentControl Style="{StaticResource InfoColumn}" Content="{Binding Info}" ContentTemplate="{StaticResource InfoView}" Focusable="False" />
+                                        <ContentControl x:Name="InfoPart" Style="{StaticResource InfoColumn}" Content="{Binding Info}" ContentTemplate="{StaticResource InfoView}" Focusable="False" />
                                     </Grid>
                                 </StackPanel>
                             </Border>
@@ -280,7 +305,7 @@
         </Border>
 
         <!-- ===== Today, the kind of card, the keys ===== -->
-        <ScrollViewer Grid.Column="2" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Focusable="False">
+        <ScrollViewer x:Name="SidePanel" Grid.Row="1" Grid.Column="2" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Focusable="False">
             <StackPanel>
                 <Border Style="{DynamicResource HelmSurface}" Margin="0,0,0,12">
                     <StackPanel>
