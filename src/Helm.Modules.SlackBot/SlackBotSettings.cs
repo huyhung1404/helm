@@ -20,8 +20,8 @@ public sealed class SlackBotSettings : IVersionedSettings
 
     public static readonly IReadOnlyList<string> DefaultReportTimes = ["12:00", "17:00"];
 
-    /// <summary>Put before every reply by Helm (not by Claude), so nobody takes it for the user; {me} is their name.</summary>
-    public const string DefaultSignature = "🤖 Lumi (trợ lý AI của {me}):";
+    /// <summary>The small grey line Helm (not Claude) puts under every message it posts; {me} is the user's name.</summary>
+    public const string DefaultSignature = "Lumi · trợ lý AI của {me}";
 
     public int Version { get; set; }
 
@@ -51,8 +51,11 @@ public sealed class SlackBotSettings : IVersionedSettings
     /// <summary>Claude Code model for sorting ("" = the user's default, "haiku", "sonnet").</summary>
     public string Model { get; set; } = "";
 
-    /// <summary>The AI signature every reply starts with; {me} is the user's name. It always starts with 🤖.</summary>
+    /// <summary>The AI signature under every message Slack Bot posts; {me} is the user's name. It always says AI.</summary>
     public string Signature { get; set; } = DefaultSignature;
+
+    /// <summary>The Slack emoji before the signature: a custom one (:lumi:) or a standard one.</summary>
+    public string SignatureEmoji { get; set; } = SlackSignature.DefaultEmoji;
 
     /// <summary>How the user wants replies written (tone, language, what to say), in their own words; may be empty.</summary>
     public string ReplyStyle { get; set; } = "";

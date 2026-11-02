@@ -53,7 +53,7 @@ public sealed class SlackBotViewsTests : IDisposable
         public Task<IReadOnlyList<SlackMessage>> SearchMentionsAsync(string userId, string oldest, CancellationToken ct) => throw new NotSupportedException();
         public Task<string?> UserNameAsync(string userId, CancellationToken ct) => Task.FromResult<string?>(null);
         public Task<Uri> OpenSocketAsync(CancellationToken ct) => throw new NotSupportedException();
-        public Task<string?> PostMessageAsync(string channel, string text, string? threadTs, CancellationToken ct) => throw new NotSupportedException();
+        public Task<string?> PostMessageAsync(string channel, string text, string? blocks, string? threadTs, CancellationToken ct) => throw new NotSupportedException();
     }
 
     private sealed class NoServices : IServiceProvider
@@ -153,7 +153,7 @@ public sealed class SlackBotViewsTests : IDisposable
             Text = "Anh gửi em file design nhé", Level = InboxLevel.Act, Summary = "Mai xin file design",
         });
         inbox.Reacted("D2", "1700000050.000100");
-        inbox.BotReplied("D1:1700000000.000100", "D1", "1700000001.000100", SlackReplier.Signature(SlackBotSettings.DefaultSignature, "Hưng") + " Dạ em đã nhận được và báo anh ấy rồi ạ, anh ấy sẽ xem trước 15:00.");
+        inbox.BotReplied("D1:1700000000.000100", "D1", "1700000001.000100", "Dạ em đã nhận được và báo anh ấy rồi ạ, anh ấy sẽ xem trước 15:00.");
         inbox.Digest(DateTimeOffset.FromUnixTimeSeconds(1_650_000_000));
     }
 

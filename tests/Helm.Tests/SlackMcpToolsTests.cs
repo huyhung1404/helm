@@ -30,7 +30,7 @@ public sealed class SlackMcpToolsTests : IDisposable
         public Task<IReadOnlyList<SlackMessage>> SearchMentionsAsync(string userId, string oldest, CancellationToken ct) => throw new NotSupportedException();
         public Task<string?> UserNameAsync(string userId, CancellationToken ct) => Task.FromResult<string?>(userId == "U2" ? "An" : null);
         public Task<Uri> OpenSocketAsync(CancellationToken ct) => throw new NotSupportedException();
-        public Task<string?> PostMessageAsync(string channel, string text, string? threadTs, CancellationToken ct)
+        public Task<string?> PostMessageAsync(string channel, string text, string? blocks, string? threadTs, CancellationToken ct)
         {
             Posted.Add((channel, text, threadTs));
             return Task.FromResult<string?>("500.0");
@@ -104,12 +104,12 @@ public sealed class SlackMcpToolsTests : IDisposable
         Assert.Equal(McpRisk.Remote, post.Risk);
         var args = Args(new { conversation = "#release", text = "<!channel> Xong task build Android 2.3 @here" });
         var question = (await post.AskFirst!(args, default))!;
-        Assert.Equal("🤖 Lumi (trợ lý AI của Hưng):\nXong task build Android 2.3", question.Details);
+        Assert.Equal("Xong task build Android 2.3\n\n:robot_face: Lumi · trợ lý AI của Hưng", question.Details);
         Assert.Equal("#release", question.Target);
 
         var result = Json(await post.Run(args, default));
         Assert.Contains("\"ts\":\"500.0\"", result);
-        Assert.Equal(("C1", question.Details!, (string?)null), Assert.Single(rig.Slack.Posted));
+        Assert.Equal(("C1", "Lumi · trợ lý AI của Hưng: Xong task build Android 2.3", (string?)null), Assert.Single(rig.Slack.Posted));
         // The bot's post coming back is not the user's answer.
         Assert.True(rig.Engine.Inbox.IsBotMessage("C1", "500.0"));
     }

@@ -36,8 +36,11 @@ public interface ISlackApi
     /// <summary>A person's display name (remembered), or null when Slack does not know them.</summary>
     Task<string?> UserNameAsync(string userId, CancellationToken ct);
 
-    /// <summary>Writes <paramref name="text"/> as the user (in a thread when given); the new message's ts.</summary>
-    Task<string?> PostMessageAsync(string channel, string text, string? threadTs, CancellationToken ct);
+    /// <summary>
+    /// Writes as the user (in a thread when given): <paramref name="blocks"/> (Block Kit JSON) when given, with
+    /// <paramref name="text"/> for notifications; the new message's ts.
+    /// </summary>
+    Task<string?> PostMessageAsync(string channel, string text, string? blocks, string? threadTs, CancellationToken ct);
 
     /// <summary>A fresh Socket Mode address (apps.connections.open, with the app-level token).</summary>
     Task<Uri> OpenSocketAsync(CancellationToken ct);
@@ -176,10 +179,10 @@ public sealed class SlackApi : ISlackApi, IDisposable
         return name;
     }
 
-    public async Task<string?> PostMessageAsync(string channel, string text, string? threadTs, CancellationToken ct)
+    public async Task<string?> PostMessageAsync(string channel, string text, string? blocks, string? threadTs, CancellationToken ct)
     {
         using var json = await CallAsync("chat.postMessage",
-            [("channel", channel), ("text", text), ("thread_ts", threadTs), ("unfurl_links", "false"), ("unfurl_media", "false")],
+            [("channel", channel), ("text", text), ("blocks", blocks), ("thread_ts", threadTs), ("unfurl_links", "false"), ("unfurl_media", "false")],
             _userToken, ct).ConfigureAwait(false);
         return Str(json.RootElement, "ts");
     }

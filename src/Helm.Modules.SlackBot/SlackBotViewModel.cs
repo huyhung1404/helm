@@ -35,6 +35,7 @@ public sealed partial class SlackBotViewModel : ObservableObject
     [ObservableProperty] private string _channelFilter = "";
     [ObservableProperty] private string _channelsSummary = "";
     [ObservableProperty] private string _signature = "";
+    [ObservableProperty] private string _signatureEmoji = "";
     [ObservableProperty] private string _replyStyle = "";
     [ObservableProperty] private string _replyPreview = "";
     [ObservableProperty] private int _replyAfterMinutes;
@@ -143,12 +144,22 @@ public sealed partial class SlackBotViewModel : ObservableObject
 
     partial void OnReplyStyleChanged(string value) => Save(s => s.ReplyStyle = value);
 
+    partial void OnSignatureEmojiChanged(string value)
+    {
+        UpdatePreview();
+        Save(s => s.SignatureEmoji = value);
+    }
+
     partial void OnReplyAfterMinutesChanged(int value) => Save(s => s.ReplyAfterMinutes = value);
 
     partial void OnOverlayOpacityChanged(double value) => Save(s => s.OverlayOpacity = Math.Clamp(value, 0.3, 1));
 
     [RelayCommand]
-    private void ResetSignature() => Signature = SlackBotSettings.DefaultSignature;
+    private void ResetSignature()
+    {
+        Signature = SlackBotSettings.DefaultSignature;
+        SignatureEmoji = SlackSignature.DefaultEmoji;
+    }
 
     partial void OnChannelFilterChanged(string value) => FilterChannels();
 
@@ -176,6 +187,7 @@ public sealed partial class SlackBotViewModel : ObservableObject
             Model = s.Model;
             PlaySound = s.PlaySound;
             Signature = s.Signature;
+            SignatureEmoji = s.SignatureEmoji;
             ReplyStyle = s.ReplyStyle;
             ReplyAfterMinutes = s.ReplyAfterMinutes;
             OverlayOpacity = s.OverlayOpacity;
@@ -233,8 +245,8 @@ public sealed partial class SlackBotViewModel : ObservableObject
             : $"Reads {read} of {_allChannels.Count}, replies in {reply}. DMs are read unless you turn them off; channels are off until you turn them on.";
     }
 
-    /// <summary>How a reply looks: the signature, then an example of what Claude writes.</summary>
+    /// <summary>How a reply looks: an example of what Claude writes, then the signature line.</summary>
     private void UpdatePreview() =>
-        ReplyPreview = SlackReplier.Signature(Signature, _engine.MeName is { Length: > 0 } me ? me : "you")
-                       + " Dạ em đã nhận được tin nhắn và báo lại rồi ạ, anh ấy sẽ phản hồi sớm nhất có thể.";
+        ReplyPreview = new SlackSignedMessage("Dạ em đã nhận được tin nhắn và báo lại rồi ạ, anh ấy sẽ phản hồi sớm nhất có thể.",
+            SlackSignature.Label(Signature, _engine.MeName is { Length: > 0 } me ? me : "you"), SlackSignature.Emoji(SignatureEmoji)).Preview;
 }

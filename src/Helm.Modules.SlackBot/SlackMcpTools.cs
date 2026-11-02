@@ -46,7 +46,7 @@ public sealed partial class SlackMcpTools(SlackBotEngine engine, ISettingsStoreF
             Messages) { ReadOnly = true },
         new("slack_post",
             "Post a message as the user in a conversation where they allow writing (can_post), e.g. a work report when a task is done. " +
-            "Helm puts the AI signature in front, so write only the message; Slack formatting works (*bold*, bullet lines, <@U…> to " +
+            "Helm adds the AI signature under it, so write only the message; Slack formatting works (*bold*, bullet lines, <@U…> to " +
             "mention a person), @here/@channel are taken out. The user is asked first and sees the exact text; they may say no. " +
             "Returns the message's ts and link. Do not wait for replies unless the user asked you to (then use slack_wait_replies).",
             McpArgs.Schema(
@@ -135,7 +135,7 @@ public sealed partial class SlackMcpTools(SlackBotEngine engine, ISettingsStoreF
             $"Post in “{where}” on Slack",
             $"Posts this message as you, behind the AI signature, in {where}; everyone there can read it.",
             "It goes to other people in your workspace under your name.",
-            Final(McpArgs.RequiredString(args, "text")),
+            Final(McpArgs.RequiredString(args, "text")).Preview,
             where, false, McpDanger.Normal);
     }
 
@@ -143,13 +143,13 @@ public sealed partial class SlackMcpTools(SlackBotEngine engine, ISettingsStoreF
     {
         var (api, _) = Connected();
         var conversation = Find(McpArgs.RequiredString(args, "conversation"), post: true);
-        var text = Final(McpArgs.RequiredString(args, "text"));
+        var message = Final(McpArgs.RequiredString(args, "text"));
         var thread = McpArgs.String(args, "thread_ts") is { Length: > 0 } t ? t : null;
         engine.Inbox.Sending(conversation.Id);
         string? ts;
         try
         {
-            ts = await api.PostMessageAsync(conversation.Id, text, thread, ct).ConfigureAwait(false);
+            ts = await api.PostMessageAsync(conversation.Id, message.Fallback, message.Blocks, thread, ct).ConfigureAwait(false);
         }
         catch
         {
@@ -215,14 +215,14 @@ public sealed partial class SlackMcpTools(SlackBotEngine engine, ISettingsStoreF
         return list;
     }
 
-    /// <summary>The text as it goes out: the AI signature in front, no @here/@channel/@everyone, not too long.</summary>
-    internal string Final(string text)
+    /// <summary>The message as it goes out: the AI signature under it, no @here/@channel/@everyone, not too long.</summary>
+    internal SlackSignedMessage Final(string text)
     {
         var body = Broadcast().Replace(text, "").Trim();
         if (body.Length == 0) throw new McpToolException("The message is empty.");
         if (body.Length > MaxPostLength) throw new McpToolException($"The message is longer than {MaxPostLength} characters; make it shorter.");
         var me = engine.MeName is { Length: > 0 } name ? name : engine.Me?.UserName ?? "the user";
-        return SlackReplier.Signature(_settings.Current.Signature, me) + "\n" + body;
+        return SlackSignature.Sign(body, _settings.Current, me);
     }
 
     [GeneratedRegex(@"<!(here|channel|everyone)[^>]*>|@(here|channel|everyone)\b", RegexOptions.IgnoreCase)]

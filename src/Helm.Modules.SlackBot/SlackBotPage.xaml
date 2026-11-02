@@ -141,11 +141,17 @@
         <ui:CardExpander Margin="0,0,0,4" IsExpanded="True" Icon="{ui:SymbolIcon ChatArrowBack20}">
             <ui:CardExpander.Header>
                 <core:CardHeader Title="AI signature"
-                                 Description="Claude writes a short reply in conversations where Write is on; Helm puts this in front so nobody takes it for you. {me} is your name." />
+                                 Description="A small grey line Helm puts under every message Slack Bot posts, so nobody takes it for you. {me} is your name; it always says AI." />
             </ui:CardExpander.Header>
             <StackPanel>
                 <ui:TextBox AutomationProperties.Name="AI signature" Text="{Binding Signature, UpdateSourceTrigger=LostFocus}" />
-                <TextBlock Margin="0,8,0,0" Text="A reply looks like this (the words after the signature are Claude's):" Style="{DynamicResource HelmSecondaryText}" />
+                <core:RowLayout Margin="0,8,0,0">
+                    <core:CardHeader Title="Signature emoji"
+                                     Description="A Slack emoji code in front of the signature, e.g. :robot_face:, or your own emoji (upload one in Slack as :lumi:)." />
+                    <ui:TextBox Width="180" HorizontalAlignment="Right" AutomationProperties.Name="Signature emoji"
+                                Text="{Binding SignatureEmoji, UpdateSourceTrigger=LostFocus}" />
+                </core:RowLayout>
+                <TextBlock Margin="0,8,0,0" Text="A reply looks like this (the words are Claude's; in Slack the last line is small and grey):" Style="{DynamicResource HelmSecondaryText}" />
                 <TextBlock Margin="0,2,0,0" Text="{Binding ReplyPreview}" TextWrapping="Wrap" />
                 <ui:Button Margin="0,8,0,0" Appearance="Transparent" Content="Back to the default" Command="{Binding ResetSignatureCommand}" />
             </StackPanel>

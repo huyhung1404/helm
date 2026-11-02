@@ -334,9 +334,12 @@ public sealed class SlackReaderTests
 
         public Func<string, string>? OnPost { get; set; }
 
-        public Task<string?> PostMessageAsync(string channel, string text, string? threadTs, CancellationToken ct)
+        public List<string?> Blocks { get; } = [];
+
+        public Task<string?> PostMessageAsync(string channel, string text, string? blocks, string? threadTs, CancellationToken ct)
         {
             Posted.Add((channel, text, threadTs));
+            Blocks.Add(blocks);
             return Task.FromResult<string?>(OnPost?.Invoke(channel) ?? "999.0");
         }
     }
@@ -467,7 +470,7 @@ public sealed class SlackReaderTests
 
         var later = clock.Now + TimeSpan.FromMinutes(4);
         Assert.Equal(2, await replier.ReplyAsync(later, default));
-        Assert.All(api.Posted, p => Assert.Equal("🤖 Lumi (trợ lý AI của Hưng): Dạ em đã nhận, anh ấy sẽ phản hồi sớm ạ.", p.Text));
+        Assert.All(api.Posted, p => Assert.Equal("Lumi · trợ lý AI của Hưng: Dạ em đã nhận, anh ấy sẽ phản hồi sớm ạ.", p.Text));
         Assert.Null(api.Posted.Single(p => p.Channel == "D1").Thread);
         Assert.Equal("9950.0", api.Posted.Single(p => p.Channel == "C1").Thread);
         Assert.All(inbox.Snapshot(), i => Assert.True(i.IsToDo));
@@ -526,10 +529,18 @@ public sealed class SlackReaderTests
     }
 
     [Fact]
-    public void The_signature_always_says_it_is_a_bot()
+    public void The_signature_always_says_it_is_an_ai_and_sits_under_the_words()
     {
-        Assert.Equal("🤖 Trợ lý của Hưng:", SlackReplier.Signature("Trợ lý của {me}:", "Hưng"));
-        Assert.Equal("🤖 Lumi (trợ lý AI của Hưng):", SlackReplier.Signature("", "Hưng"));
+        Assert.Equal("Trợ lý của Hưng (AI)", SlackSignature.Label("Trợ lý của {me}", "Hưng"));
+        Assert.Equal("Lumi · trợ lý AI của Hưng", SlackSignature.Label("", "Hưng"));
+        Assert.Equal(":lumi:", SlackSignature.Emoji(":lumi:"));
+        Assert.Equal(":robot_face:", SlackSignature.Emoji("lumi"));
+        var signed = SlackSignature.Sign("Dạ em đã nhận ạ.", new SlackBotSettings(), "Hưng");
+        using var blocks = JsonDocument.Parse(signed.Blocks);
+        Assert.Equal("section", blocks.RootElement[0].GetProperty("type").GetString());
+        Assert.Equal("Dạ em đã nhận ạ.", blocks.RootElement[0].GetProperty("text").GetProperty("text").GetString());
+        Assert.Equal("context", blocks.RootElement[1].GetProperty("type").GetString());
+        Assert.Equal(":robot_face: Lumi · trợ lý AI của Hưng", blocks.RootElement[1].GetProperty("elements")[0].GetProperty("text").GetString());
     }
 
     [Fact]
