@@ -1,0 +1,89 @@
+<UserControl
+    x:Class="Helm.Modules.Vocab.Views.VocabWordsView"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
+    xmlns:local="clr-namespace:Helm.Modules.Vocab;assembly=Helm.Modules.Vocab.Core">
+
+    <!-- Words: one language at a time, searched, narrowed by a chip, in the chosen order and its groups; a page at a time.
+         A row opens the word's page in place of the list. DataContext: VocabViewModel. -->
+    <UserControl.Resources>
+        <ResourceDictionary Source="/Helm.Modules.Vocab;component/VocabTemplates.xaml" />
+    </UserControl.Resources>
+
+    <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Focusable="False">
+        <StackPanel x:Name="WordsList" MaxWidth="1100" Margin="0,0,0,24" DataContext="{Binding List}">
+            <!-- English / 中文, the search, the order -->
+            <DockPanel Margin="0,0,0,12">
+                <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" Margin="12,0,0,0" Visibility="{Binding HasWords, Converter={StaticResource BoolToVisibility}}">
+                    <TextBlock Text="Order" Margin="0,0,8,0" VerticalAlignment="Center" Style="{DynamicResource HelmSecondaryText}" />
+                    <ComboBox Width="160" ItemsSource="{Binding Sorts}" SelectedIndex="{Binding SortIndex}" AutomationProperties.Name="Order" />
+                </StackPanel>
+                <Border DockPanel.Dock="Left" Style="{StaticResource SegmentBar}" Margin="0,0,12,0">
+                    <StackPanel Orientation="Horizontal">
+                        <Button Style="{StaticResource SegmentButton}" Tag="{Binding IsEnglish}" Command="{Binding ShowEnglishCommand}" AutomationProperties.Name="English words">
+                            <TextBlock><Run Text="English" />  <Run Text="{Binding EnglishCount, Mode=OneWay}" FontWeight="Normal" FontSize="12" Foreground="{DynamicResource TextFillColorSecondaryBrush}" /></TextBlock>
+                        </Button>
+                        <Button Style="{StaticResource SegmentButton}" Tag="{Binding IsChinese}" Command="{Binding ShowChineseCommand}" AutomationProperties.Name="Chinese words">
+                            <TextBlock><Run Text="中文" />  <Run Text="{Binding ChineseCount, Mode=OneWay}" FontWeight="Normal" FontSize="12" Foreground="{DynamicResource TextFillColorSecondaryBrush}" /></TextBlock>
+                        </Button>
+                    </StackPanel>
+                </Border>
+                <ui:TextBox MaxWidth="380" HorizontalAlignment="Left" MinWidth="200" PlaceholderText="Search words and meanings" Icon="{ui:SymbolIcon Search24}"
+                            AutomationProperties.Name="Search words" Text="{Binding SearchText, UpdateSourceTrigger=PropertyChanged}"
+                            Visibility="{Binding HasWords, Converter={StaticResource BoolToVisibility}}" />
+            </DockPanel>
+
+            <!-- Show only: every filter as a chip with how many words it keeps -->
+            <ItemsControl ItemsSource="{Binding Chips}" Focusable="False" Margin="0,0,0,6" AutomationProperties.Name="Show only"
+                          Visibility="{Binding HasWords, Converter={StaticResource BoolToVisibility}}">
+                <ItemsControl.ItemsPanel>
+                    <ItemsPanelTemplate>
+                        <WrapPanel />
+                    </ItemsPanelTemplate>
+                </ItemsControl.ItemsPanel>
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate DataType="{x:Type local:VocabFilterChip}">
+                        <Button Style="{StaticResource ChipButton}" Tag="{Binding IsOn}" Command="{Binding Pick}" AutomationProperties.Name="{Binding Name}">
+                            <TextBlock>
+                                <Run Text="{Binding Name, Mode=OneWay}" />  <Run Text="{Binding Count, Mode=OneWay}" FontSize="12" FontWeight="Normal"
+                                    Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+                            </TextBlock>
+                        </Button>
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+
+            <Border Style="{DynamicResource HelmSurface}" Padding="0">
+                <StackPanel>
+                    <!-- The columns' titles -->
+                    <Grid Style="{StaticResource WordColumns}" Margin="16,10,16,8" Visibility="{Binding HasWords, Converter={StaticResource BoolToVisibility}}">
+                        <TextBlock Text="Word" FontWeight="SemiBold" Style="{DynamicResource HelmSecondaryText}" />
+                        <TextBlock Grid.Column="2" Text="Meaning" FontWeight="SemiBold" Style="{DynamicResource HelmSecondaryText}" />
+                        <TextBlock Grid.Column="4" Text="Level" FontWeight="SemiBold" Style="{DynamicResource HelmSecondaryText}" />
+                        <TextBlock Grid.Column="6" Text="How well you know it" FontWeight="SemiBold" Style="{DynamicResource HelmSecondaryText}" />
+                    </Grid>
+                    <TextBlock Margin="16" FontSize="14" Style="{DynamicResource HelmSecondaryText}" Visibility="{Binding HasNoWords, Converter={StaticResource BoolToVisibility}}"
+                               Text="Words show up here once Claude Code has broken them down. Add the words you meet (Add words, Ctrl+N) one at a time: learning them as they come is what makes them stick." />
+                    <TextBlock Margin="16,8,16,24" FontSize="14" Text="No word matches. Try another word or show all." Style="{DynamicResource HelmSecondaryText}"
+                               Visibility="{Binding HasNoMatches, Converter={StaticResource BoolToVisibility}}" />
+                    <ItemsControl ItemsSource="{Binding Words}" Focusable="False" ItemTemplate="{StaticResource WordRow}" />
+                    <!-- A page at a time -->
+                    <Border Padding="12,8" BorderThickness="0,1,0,0" BorderBrush="{DynamicResource CardStrokeColorDefaultBrush}"
+                            Visibility="{Binding Pages.HasPages, Converter={StaticResource BoolToVisibility}}">
+                        <DockPanel>
+                            <ui:Button DockPanel.Dock="Left" Appearance="Transparent" Content="Previous" Icon="{ui:SymbolIcon ChevronLeft24}"
+                                       Command="{Binding Pages.PreviousPageCommand}" AutomationProperties.Name="Previous page" />
+                            <ui:Button DockPanel.Dock="Right" Appearance="Transparent" Content="Next" Icon="{ui:SymbolIcon ChevronRight24}"
+                                       Command="{Binding Pages.NextPageCommand}" AutomationProperties.Name="Next page" />
+                            <TextBlock HorizontalAlignment="Center" VerticalAlignment="Center" FontSize="13">
+                                <Run Text="{Binding Pages.PageText, Mode=OneWay}" /> <Run Text="·" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+                                <Run Text="{Binding Pages.RangeText, Mode=OneWay}" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+                            </TextBlock>
+                        </DockPanel>
+                    </Border>
+                </StackPanel>
+            </Border>
+        </StackPanel>
+    </ScrollViewer>
+</UserControl>

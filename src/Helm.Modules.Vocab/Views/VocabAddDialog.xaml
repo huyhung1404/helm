@@ -1,0 +1,63 @@
+<UserControl
+    x:Class="Helm.Modules.Vocab.Views.VocabAddDialog"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml">
+
+    <!-- Add words (the header's button, Ctrl+N): a word and where it was met, Enter adds it and keeps the dialog open
+         for the next; the words added lately, and whether the agent got to them. DataContext: VocabViewModel. -->
+    <UserControl.Resources>
+        <ResourceDictionary Source="/Helm.Modules.Vocab;component/VocabTemplates.xaml" />
+    </UserControl.Resources>
+
+    <Grid Style="{StaticResource DialogScrim}" Visibility="{Binding IsAddOpen, Converter={StaticResource BoolToVisibility}}">
+        <Border Style="{StaticResource DialogCard}" Width="560" AutomationProperties.Name="Add words">
+            <DockPanel>
+                <DockPanel DockPanel.Dock="Top" Margin="24,20,16,4">
+                    <ui:Button DockPanel.Dock="Right" Style="{StaticResource IconButton}" Icon="{ui:SymbolIcon Dismiss24}" ToolTip="Close (Esc)"
+                               AutomationProperties.Name="Close" Command="{Binding CloseAddCommand}" />
+                    <TextBlock Text="Add words" Style="{StaticResource DialogTitle}" />
+                </DockPanel>
+                <Border DockPanel.Dock="Bottom" Style="{StaticResource DialogFooter}">
+                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                        <ui:Button Content="Done" MinWidth="80" Command="{Binding CloseAddCommand}" />
+                        <ui:Button Margin="8,0,0,0" MinWidth="80" Appearance="Primary" Content="Add" Icon="{ui:SymbolIcon Add24}" Command="{Binding AddCommand}" />
+                    </StackPanel>
+                </Border>
+                <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Focusable="False">
+                    <StackPanel Margin="24,8,24,24">
+                        <TextBlock Text="Word" Style="{StaticResource FieldLabel}" Margin="0,0,0,4" />
+                        <ui:TextBox x:Name="WordBox" FontSize="20" PlaceholderText="relative, 补救…" AutomationProperties.Name="New word"
+                                    Text="{Binding NewWord, UpdateSourceTrigger=PropertyChanged}">
+                            <ui:TextBox.InputBindings>
+                                <KeyBinding Key="Enter" Command="{Binding AddCommand}" />
+                            </ui:TextBox.InputBindings>
+                        </ui:TextBox>
+                        <TextBlock Style="{StaticResource FieldLabel}" Margin="0,14,0,4">
+                            <Run Text="Where you met it" /> <Run Text="(optional)" FontWeight="Normal" />
+                        </TextBlock>
+                        <ui:TextBox PlaceholderText="Aptis reading, a novel chapter…" AutomationProperties.Name="Note"
+                                    Text="{Binding NewNote, UpdateSourceTrigger=PropertyChanged}">
+                            <ui:TextBox.InputBindings>
+                                <KeyBinding Key="Enter" Command="{Binding AddCommand}" />
+                            </ui:TextBox.InputBindings>
+                        </ui:TextBox>
+                        <!-- "Already in your words", or what was wrong with it -->
+                        <TextBlock Margin="0,8,0,0" Text="{Binding Message}" TextWrapping="Wrap" Foreground="{DynamicResource SystemFillColorCautionBrush}"
+                                   Visibility="{Binding HasMessage, Converter={StaticResource BoolToVisibility}}" />
+                        <TextBlock Margin="0,12,0,0" TextWrapping="Wrap" Style="{DynamicResource HelmSecondaryText}">
+                            <Run Text="English or Chinese. Claude Code breaks each one down, then it joins your cards. From anywhere: Quick Capture" />
+                            <InlineUIContainer BaselineAlignment="Center"><Border Style="{StaticResource Kbd}" Margin="2,0"><TextBlock Text="Win+Alt+N" /></Border></InlineUIContainer>
+                            <Run Text="then" /> <Run Text="/v relative" FontWeight="SemiBold" /><Run Text=", or select a word on the phone and tap Add word." />
+                        </TextBlock>
+
+                        <StackPanel Margin="0,20,0,0" Visibility="{Binding HasRecentWords, Converter={StaticResource BoolToVisibility}}">
+                            <TextBlock Text="Added recently" Style="{StaticResource SectionTitle}" />
+                            <ItemsControl ItemsSource="{Binding RecentWords}" Focusable="False" ItemTemplate="{StaticResource RecentRow}" />
+                        </StackPanel>
+                    </StackPanel>
+                </ScrollViewer>
+            </DockPanel>
+        </Border>
+    </Grid>
+</UserControl>

@@ -48,6 +48,8 @@ public sealed class VocabPopup : IDisposable
         _settings.Changed += (_, s) =>
         {
             if (_running && (s.PopupMinSeconds, s.PopupMaxSeconds) != _range) ScheduleNext();
+            // A card on screen follows the opacity slider.
+            _ui.Post(() => _window?.SetRestOpacity(Opacity(s)));
         };
     }
 
@@ -142,7 +144,8 @@ public sealed class VocabPopup : IDisposable
                 {
                     v.PopupLeft = at?.X;
                     v.PopupBottom = at?.Y;
-                }));
+                }),
+                Opacity(s));
             _window.Closed += (_, _) => _window = null;
             _window.ShowCard();
         }
@@ -151,6 +154,8 @@ public sealed class VocabPopup : IDisposable
             _logger.LogWarning(ex, "Could not open the vocabulary card");
         }
     }
+
+    private static double Opacity(VocabSettings s) => Math.Clamp(s.CardOpacity, VocabSettingsViewModel.MinCardOpacity, 100) / 100.0;
 
     /// <summary>"See the whole tree": the word open on the Words tab of Vocabulary.</summary>
     private void OpenWord(string id)

@@ -11,8 +11,14 @@
     UseLayoutRounding="True">
 
     <!-- One word to guess. A Chinese word asks for its pinyin first (the Learn tab's setting); a click on the word, or
-         "Show meaning", shows the answer; then the user says whether they remembered it. Long content scrolls inside. -->
+         "Show meaning", shows the answer; then the user says whether they remembered it (on a pinyin card: the meaning).
+         Long content scrolls inside. At rest the card is see-through (the settings' Card opacity), so the app below stays
+         readable; it turns solid under the pointer, while its pinyin box is used and while Full details is open. -->
     <Window.Resources>
+        <ResourceDictionary>
+        <ResourceDictionary.MergedDictionaries>
+            <ResourceDictionary Source="/Helm.Modules.Vocab;component/VocabStyles.xaml" />
+        </ResourceDictionary.MergedDictionaries>
         <!-- A round icon-only button of the answer's row -->
         <Style x:Key="RoundIcon" TargetType="ui:Button" BasedOn="{StaticResource {x:Type ui:Button}}">
             <Setter Property="Width" Value="36" />
@@ -24,9 +30,11 @@
             <Setter Property="Appearance" Value="Transparent" />
             <Setter Property="BorderThickness" Value="0" />
         </Style>
+        </ResourceDictionary>
     </Window.Resources>
 
-    <Border Margin="16" CornerRadius="12" BorderThickness="1" MouseLeftButtonDown="Card_MouseLeftButtonDown"
+    <Border x:Name="CardBorder" Margin="16" CornerRadius="12" BorderThickness="1" MouseLeftButtonDown="Card_MouseLeftButtonDown"
+            MouseEnter="Card_MouseEnter" MouseLeave="Card_MouseLeave"
             ToolTip="Drag to move it; double-click to put it back in the corner" ToolTipService.InitialShowDelay="1500"
             Background="{DynamicResource ApplicationBackgroundBrush}" BorderBrush="{DynamicResource CardStrokeColorDefaultBrush}"
             TextElement.Foreground="{DynamicResource TextFillColorPrimaryBrush}">
@@ -126,6 +134,9 @@
                                     </Style>
                                 </TextBlock.Style>
                             </TextBlock>
+                            <!-- On a pinyin card: what the two buttons now ask about -->
+                            <TextBlock Margin="0,2,0,0" Text="{Binding VerdictHint}" FontSize="12" TextAlignment="Center" Style="{DynamicResource HelmSecondaryText}"
+                                       Visibility="{Binding HasVerdictHint, Converter={StaticResource BoolToVisibility}}" />
                         </StackPanel>
 
                         <WrapPanel HorizontalAlignment="Center">
@@ -146,6 +157,15 @@
                                     </DataTemplate>
                                 </ItemsControl.ItemTemplate>
                             </ItemsControl>
+                        </Border>
+
+                        <!-- Chinese: how to remember the reading (written by Claude Code once the pinyin keeps slipping); Full
+                             details has it among the rest -->
+                        <Border x:Name="PinyinHook" Margin="0,8,0,0" Style="{StaticResource PinyinBox}" Padding="10,8">
+                            <StackPanel>
+                                <TextBlock Text="Remembering the pinyin" FontSize="12" FontWeight="SemiBold" Foreground="{StaticResource PinyinBrush}" />
+                                <TextBlock Text="{Binding PinyinMnemonic}" FontSize="13" TextWrapping="Wrap" />
+                            </StackPanel>
                         </Border>
 
                         <!-- Full details: everything Helm knows about the word, so there is no need to open the app -->
@@ -187,12 +207,17 @@
                             </ItemsControl>
                         </StackPanel>
 
+                        <!-- A pinyin card's ✗ / ✓ are about the meaning: a slipped pinyin still counts as remembered -->
+                        <TextBlock Margin="0,12,4,0" HorizontalAlignment="Right" FontSize="12" Style="{DynamicResource HelmSecondaryText}"
+                                   Visibility="{Binding AsksPinyin, Converter={StaticResource BoolToVisibility}}">
+                            <Run Text="✗ / ✓ answer for the" /> <Run Text="meaning" FontWeight="SemiBold" Foreground="{DynamicResource TextFillColorPrimaryBrush}" />
+                        </TextBlock>
                         <!-- One row of icons: the tools on the left, the verdict on the right -->
-                        <DockPanel Margin="0,12,0,0" LastChildFill="False">
+                        <DockPanel Margin="0,8,0,0" LastChildFill="False">
                             <ui:Button DockPanel.Dock="Right" Margin="0" Appearance="Primary" Style="{StaticResource RoundIcon}" Icon="{ui:SymbolIcon Checkmark24}"
-                                       ToolTip="Remembered" AutomationProperties.Name="Remembered" Command="{Binding RememberedCommand}" x:Name="RememberedButton" />
+                                       ToolTip="{Binding RememberedText}" AutomationProperties.Name="{Binding RememberedText}" Command="{Binding RememberedCommand}" x:Name="RememberedButton" />
                             <ui:Button DockPanel.Dock="Right" Appearance="Danger" Style="{StaticResource RoundIcon}" Icon="{ui:SymbolIcon Dismiss24}"
-                                       ToolTip="Forgot" AutomationProperties.Name="Forgot" Command="{Binding ForgotCommand}" x:Name="ForgotButton" />
+                                       ToolTip="{Binding ForgotText}" AutomationProperties.Name="{Binding ForgotText}" Command="{Binding ForgotCommand}" x:Name="ForgotButton" />
                             <ui:Button Style="{StaticResource RoundIcon}" Icon="{ui:SymbolIcon Speaker224}" ToolTip="Listen" AutomationProperties.Name="Listen"
                                        Command="{Binding SayCommand}" Visibility="{Binding CanSay, Converter={StaticResource BoolToVisibility}}" />
                             <ui:Button Style="{StaticResource RoundIcon}" Icon="{ui:SymbolIcon Video24}" ToolTip="YouGlish" AutomationProperties.Name="YouGlish"
