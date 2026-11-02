@@ -79,6 +79,8 @@
                                 <WrapPanel Margin="0,8,0,0">
                                     <ui:Button Style="{StaticResource RowAction}" Content="Open in Slack" Icon="{ui:SymbolIcon Open16}"
                                                Command="{Binding DataContext.OpenCommand, RelativeSource={RelativeSource AncestorType=Page}}" CommandParameter="{Binding}" />
+                                    <ui:Button Style="{StaticResource RowAction}" Content="Reply" Icon="{ui:SymbolIcon ArrowReply16}"
+                                               Command="{Binding DataContext.StartReplyCommand, RelativeSource={RelativeSource AncestorType=Page}}" CommandParameter="{Binding}" />
                                     <ui:Button Style="{StaticResource RowAction}" Content="Done" Icon="{ui:SymbolIcon Checkmark16}"
                                                Command="{Binding DataContext.DoneCommand, RelativeSource={RelativeSource AncestorType=Page}}" CommandParameter="{Binding}" />
                                     <ui:Button Style="{StaticResource RowAction}" Appearance="Transparent" Content="Only worth knowing"
@@ -90,6 +92,28 @@
                     </DataTemplate>
                 </ItemsControl.ItemTemplate>
             </ItemsControl>
+
+            <!-- The reply being written (Reply on a message), sent to Slack as the user -->
+            <Border Margin="0,4,0,4" Style="{DynamicResource HelmSurface}" Visibility="{Binding ReplyTo, Converter={StaticResource NotEmptyToVisibility}}">
+                <StackPanel>
+                    <TextBlock Style="{DynamicResource HelmSecondaryText}">
+                        <Run Text="Reply to" />
+                        <Run Text="{Binding ReplyTo.From, Mode=OneWay}" FontWeight="SemiBold" />
+                        <Run Text="·" />
+                        <Run Text="{Binding ReplyTo.Where, Mode=OneWay}" />
+                    </TextBlock>
+                    <ui:TextBox x:Name="ReplyBox" Margin="0,6,0,0" AcceptsReturn="True" TextWrapping="Wrap" MinHeight="60" MaxHeight="160"
+                                VerticalScrollBarVisibility="Auto" PlaceholderText="Your answer (Enter sends, Shift+Enter for a new line)"
+                                Text="{Binding ReplyText, UpdateSourceTrigger=PropertyChanged}" PreviewKeyDown="ReplyBox_PreviewKeyDown"
+                                AutomationProperties.Name="Your answer" />
+                    <TextBlock Margin="0,4,0,0" Text="{Binding ReplyProblem}" TextWrapping="Wrap" Foreground="{DynamicResource SystemFillColorCriticalBrush}"
+                               Visibility="{Binding ReplyProblem, Converter={StaticResource NotEmptyToVisibility}}" />
+                    <WrapPanel Margin="0,8,0,0">
+                        <ui:Button Content="Send" Appearance="Primary" Icon="{ui:SymbolIcon Send16}" Command="{Binding SendReplyCommand}" />
+                        <ui:Button Margin="8,0,0,0" Content="Cancel" Command="{Binding CancelReplyCommand}" />
+                    </WrapPanel>
+                </StackPanel>
+            </Border>
 
             <!-- Worth knowing -->
             <DockPanel>

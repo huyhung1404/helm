@@ -109,6 +109,10 @@ public sealed partial class SlackBotInboxViewModel : ObservableObject
     [ObservableProperty] private bool _hasOverlay;
     [ObservableProperty] private bool _hasReport;
     [ObservableProperty] private bool _hasToDo;
+    [ObservableProperty] private InboxItemViewModel? _replyTo;
+    [ObservableProperty] private string _replyText = "";
+    [ObservableProperty] private string? _replyProblem;
+    [ObservableProperty] private bool _isSendingReply;
     [ObservableProperty] private bool _hasKnowing;
     [ObservableProperty] private bool _hasSortProblem;
     [ObservableProperty] private string _status = "";
@@ -172,6 +176,41 @@ public sealed partial class SlackBotInboxViewModel : ObservableObject
     private void Open(InboxItemViewModel? item)
     {
         if (item is not null) _launcher.OpenUrl(item.Link);
+    }
+
+    /// <summary>Opens the reply box for <paramref name="item"/> (the overlay takes the keyboard while it is open).</summary>
+    [RelayCommand]
+    private void StartReply(InboxItemViewModel? item)
+    {
+        if (item is null) return;
+        ReplyProblem = null;
+        if (ReplyTo?.Id != item.Id) ReplyText = "";
+        ReplyTo = item;
+    }
+
+    [RelayCommand]
+    private void CancelReply()
+    {
+        ReplyTo = null;
+        ReplyText = "";
+        ReplyProblem = null;
+    }
+
+    /// <summary>Sends the reply as the user; the message is then answered and leaves the list.</summary>
+    [RelayCommand]
+    private async Task SendReply()
+    {
+        if (ReplyTo is not { } item || IsSendingReply || ReplyText.Trim().Length == 0) return;
+        IsSendingReply = true;
+        try
+        {
+            ReplyProblem = await _engine.ReplyAsUserAsync(item.Id, ReplyText, CancellationToken.None);
+            if (ReplyProblem is null) CancelReply();
+        }
+        finally
+        {
+            IsSendingReply = false;
+        }
     }
 
     [RelayCommand]

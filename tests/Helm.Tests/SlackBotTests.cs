@@ -116,7 +116,8 @@ public sealed class SlackInboxTests
         inbox.Add(Item("C1", "110.0", SlackConversationKind.Channel, thread: "100.0"));
         inbox.Add(Item("C1", "120.0", SlackConversationKind.Channel));
         inbox.Mine(Mine("C1", "150.0", thread: "100.0"), SlackConversationKind.Channel);
-        Assert.Equal(HandledBy.None, Get(inbox, "C1", "100.0").Handled);
+        // The message that started the thread is answered too.
+        Assert.Equal(HandledBy.Replied, Get(inbox, "C1", "100.0").Handled);
         Assert.Equal(HandledBy.Replied, Get(inbox, "C1", "110.0").Handled);
         Assert.Equal(HandledBy.None, Get(inbox, "C1", "120.0").Handled);
     }

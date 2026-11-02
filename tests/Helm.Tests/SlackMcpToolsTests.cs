@@ -30,9 +30,12 @@ public sealed class SlackMcpToolsTests : IDisposable
         public Task<IReadOnlyList<SlackMessage>> SearchMentionsAsync(string userId, string oldest, CancellationToken ct) => throw new NotSupportedException();
         public Task<string?> UserNameAsync(string userId, CancellationToken ct) => Task.FromResult<string?>(userId == "U2" ? "An" : null);
         public Task<Uri> OpenSocketAsync(CancellationToken ct) => throw new NotSupportedException();
+        public List<string?> Blocks { get; } = [];
+
         public Task<string?> PostMessageAsync(string channel, string text, string? blocks, string? threadTs, CancellationToken ct)
         {
             Posted.Add((channel, text, threadTs));
+            Blocks.Add(blocks);
             return Task.FromResult<string?>("500.0");
         }
     }
@@ -112,6 +115,26 @@ public sealed class SlackMcpToolsTests : IDisposable
         Assert.Equal(("C1", "Lumi · trợ lý AI của Hưng: Xong task build Android 2.3", (string?)null), Assert.Single(rig.Slack.Posted));
         // The bot's post coming back is not the user's answer.
         Assert.True(rig.Engine.Inbox.IsBotMessage("C1", "500.0"));
+    }
+
+    [Fact]
+    public async Task The_users_own_reply_goes_as_them_in_the_thread_and_answers_the_message()
+    {
+        using var rig = Setup();
+        rig.Engine.Inbox.Add(new InboxItem
+        {
+            Channel = "C1", Ts = "300.0", Kind = SlackConversationKind.Channel, Direct = true, Level = InboxLevel.Act, Text = "<@ME> review?",
+        });
+        rig.Engine.Inbox.Add(new InboxItem { Channel = "D1", Ts = "310.0", Kind = SlackConversationKind.DirectMessage, Direct = true, Level = InboxLevel.Act });
+
+        Assert.Null(await rig.Engine.ReplyAsUserAsync("C1:300.0", "ok để anh xem", default));
+        Assert.Null(await rig.Engine.ReplyAsUserAsync("D1:310.0", "chiều nay nhé", default));
+        Assert.Equal([("C1", "ok để anh xem", "300.0"), ("D1", "chiều nay nhé", (string?)null)], rig.Slack.Posted);
+        // Their own words: no AI signature.
+        Assert.Null(rig.Slack.Blocks[0]);
+        Assert.All(rig.Engine.Inbox.Snapshot(), i => Assert.Equal(HandledBy.Replied, i.Handled));
+        Assert.NotNull(await rig.Engine.ReplyAsUserAsync("D1:999.0", "x", default));
+        Assert.NotNull(await rig.Engine.ReplyAsUserAsync("D1:310.0", "  ", default));
     }
 
     [Fact]

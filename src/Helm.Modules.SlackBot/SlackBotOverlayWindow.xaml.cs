@@ -15,8 +15,13 @@ public partial class SlackBotOverlayWindow : Window
 {
     private readonly Action<Point?> _moved;
     private readonly Action<bool> _folded;
+    private readonly SlackBotInboxViewModel _viewModel;
+    private readonly IWindowService _windows;
     private Point? _anchor;
     private double _rest = 1;
+    private nint _handle;
+    private nint _previous;
+    private bool _typing;
 
     /// <param name="anchor">Where the user put it last: its bottom-left corner; null for the bottom-right corner.</param>
     /// <param name="moved">Keeps the new bottom-left corner after a drag (null after going back to the corner).</param>
@@ -26,9 +31,27 @@ public partial class SlackBotOverlayWindow : Window
         _anchor = anchor;
         _moved = moved;
         _folded = folded;
+        _viewModel = viewModel;
+        _windows = windows;
         DataContext = viewModel;
         InitializeComponent();
-        SourceInitialized += (_, _) => windows.MakeNonActivating(new WindowInteropHelper(this).Handle);
+        SourceInitialized += (_, _) =>
+        {
+            _handle = new WindowInteropHelper(this).Handle;
+            windows.MakeNonActivating(_handle);
+        };
+        // Reply on a message: the box opens and takes the keyboard; closed (sent or cancelled): the keyboard goes back.
+        viewModel.PropertyChanged += (_, e) =>
+        {
+            if (e.PropertyName != nameof(SlackBotInboxViewModel.ReplyTo)) return;
+            if (viewModel.ReplyTo is null) StopTyping();
+            else
+            {
+                if (IsFolded) SetFolded(false);
+                StartTyping();
+            }
+        };
+        Closed += (_, _) => StopTyping();
         // It grows and shrinks from its bottom edge, as items come and go.
         SizeChanged += (_, _) => Place();
         // See-through while the mouse is elsewhere, solid under it.
@@ -123,6 +146,59 @@ public partial class SlackBotOverlayWindow : Window
         _anchor = new Point(Left, Top + ActualHeight);
         _moved(_anchor);
     }
+
+    /// <summary>The overlay takes the keyboard from the app in front, which gets it back when the reply is done.</summary>
+    private void StartTyping()
+    {
+        if (_handle == 0) return;
+        if (!_typing)
+        {
+            _typing = true;
+            _previous = _windows.GetForegroundWindow();
+            _windows.AllowActivation(_handle, true);
+        }
+        Opacity = 1;
+        Activate();
+        Dispatcher.BeginInvoke(DispatcherPriority.Input, () =>
+        {
+            ReplyBox.Focus();
+            Keyboard.Focus(ReplyBox);
+            ReplyBox.CaretIndex = ReplyBox.Text.Length;
+        });
+    }
+
+    private void StopTyping()
+    {
+        if (!_typing) return;
+        _typing = false;
+        if (_handle != 0) _windows.AllowActivation(_handle, false);
+        if (_previous != 0 && _previous != _handle) _windows.Activate(_previous);
+        _previous = 0;
+        if (!IsMouseOver) Opacity = _rest;
+    }
+
+    private void ReplyBox_MouseDown(object sender, MouseButtonEventArgs e)
+    {
+        if (!_typing) StartTyping();
+    }
+
+    private void ReplyBox_PreviewKeyDown(object sender, KeyEventArgs e)
+    {
+        if (e.Key == Key.Escape)
+        {
+            e.Handled = true;
+            _viewModel.CancelReplyCommand.Execute(null);
+        }
+        else if (e.Key == Key.Enter && (Keyboard.Modifiers & ModifierKeys.Shift) == 0)
+        {
+            e.Handled = true;
+            _viewModel.SendReplyCommand.Execute(null);
+        }
+    }
+
+    private void SendReply_Click(object sender, RoutedEventArgs e) => _viewModel.SendReplyCommand.Execute(null);
+
+    private void CancelReply_Click(object sender, RoutedEventArgs e) => _viewModel.CancelReplyCommand.Execute(null);
 
     private void Fold_Click(object sender, RoutedEventArgs e)
     {
