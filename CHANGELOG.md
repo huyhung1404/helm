@@ -3,9 +3,16 @@
 All notable changes to Helm. The top section is used as the GitHub release body and as the Velopack release notes.
 Format: [Keep a Changelog](https://keepachangelog.com), versions follow [SemVer](https://semver.org).
 
-## [Unreleased]
+## [0.73.0] - 2026-11-02
 
 ### Added
+- **Helm Keyboard: every web site keeps its own keyboard.** A browser is one program for all its tabs, so until now
+  one site's keyboard was given to every site in that browser — and a sign-in pop-up or a file dialog could pull the
+  keyboard you were typing in back to English. Now each web site is remembered on its own (by its domain, read from the
+  address bar): Facebook keeps Vietnamese and Bilibili keeps Chinese in the one browser, and switching tabs switches the
+  keyboard with them. A page you have not set yet, and a browser window with no page of its own, keep the keyboard you
+  have now — nothing is forced, and a site is pinned only once you set it by hand with the shortcut. Every other app is
+  remembered by name as before. The Forget list shows your sites with a globe, next to your apps.
 - **Weekly Report (PC): your week, written up for your manager.** Press Find my work: it lists the projects you
   committed to that week (every repository under the folders you choose, all branches, only your commits) and the
   Slack conversations you wrote in (through Slack Bot), each with its commits, days and estimated hours. Tick what goes
