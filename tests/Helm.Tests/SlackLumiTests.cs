@@ -67,12 +67,15 @@ public sealed class SlackLumiTests
     }
 
     [Theory]
-    [InlineData("Lumi ơi, build sao rồi?", true)]
-    [InlineData("lumi oi tóm tắt thread này", true)]
+    [InlineData("lumi tóm tắt thread này", true)]
     [InlineData("@lumi status?", true)]
-    [InlineData("nhờ @Lumi ơi xem giúp", true)]
+    [InlineData("Lumi ơi, build sao rồi?", true)]
+    [InlineData("hỏi LUMI xem", true)]
+    [InlineData("<@U1> @lumi: check", true)]
     [InlineData("illuminate the scene", false)]
-    [InlineData("Lumi đã trả lời rồi", false)]
+    [InlineData("lumière", false)]
+    [InlineData("lumi2 build", false)]
+    [InlineData("helm_lumi_bot", false)]
     public void A_call_is_lumi_oi_or_at_lumi(string text, bool call) => Assert.Equal(call, SlackLumi.IsCall(text));
 
     [Fact]
@@ -118,6 +121,16 @@ public sealed class SlackLumiTests
         Assert.False(await lumi.AnswerAsync(new SlackMessage("C1", "1000.0", null, "U2", "Lumi ơi", false), Now, default));
         settings.AnswerCalls = false;
         Assert.False(await lumi.AnswerAsync(new SlackMessage("C1", "9202.0", null, "U2", "Lumi ơi", false), Now, default));
+        Assert.Empty(slack.Posted);
+    }
+
+    [Fact]
+    public async Task Only_naming_lumi_gets_silence_when_claude_finds_nothing_asked()
+    {
+        var (lumi, slack, agent, _, _) = Rig(answer: "NO_REPLY");
+        Assert.False(await lumi.AnswerAsync(new SlackMessage("C1", "9300.0", null, "U2", "Lumi trả lời rồi đó", false), Now, default));
+        Assert.Single(agent.Asked);
+        Assert.Contains("only mentions Lumi", agent.Asked[0]);
         Assert.Empty(slack.Posted);
     }
 

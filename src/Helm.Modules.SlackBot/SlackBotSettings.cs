@@ -66,7 +66,7 @@ public sealed class SlackBotSettings : IVersionedSettings
     /// <summary>How the user wants replies written (tone, language, what to say), in their own words; may be empty.</summary>
     public string ReplyStyle { get; set; } = "";
 
-    /// <summary>"Lumi ơi, …" on Slack gets an answer (from the user anywhere, from others where Write is on).</summary>
+    /// <summary>"lumi, …" or "@lumi …" on Slack gets an answer (from the user anywhere, from others where Write is on).</summary>
     public bool AnswerCalls { get; set; } = true;
 
     /// <summary>A message waits this long for the user to answer it before the reply goes.</summary>
