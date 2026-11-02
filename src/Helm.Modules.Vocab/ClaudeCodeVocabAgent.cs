@@ -70,16 +70,16 @@ public sealed class ClaudeCodeVocabAgent(ClaudeCodeRunner claude) : IVocabAgent
         _ => $"Claude Code is working… ({calls} steps)",
     };
 
-    public Task<string> AnalyzeAsync(IProgress<string>? progress, CancellationToken ct) => RunAsync(AnalyzeInstructions, progress, ct);
+    public Task<string> AnalyzeAsync(string? model, IProgress<string>? progress, CancellationToken ct) => RunAsync(AnalyzeInstructions, model, progress, ct);
 
-    public Task<string> SuggestAsync(string partId, string form, string meaning, VocabLanguage language, IProgress<string>? progress, CancellationToken ct) =>
-        RunAsync(SuggestInstructions(partId, form, meaning, language), progress, ct);
+    public Task<string> SuggestAsync(string partId, string form, string meaning, VocabLanguage language, string? model, IProgress<string>? progress, CancellationToken ct) =>
+        RunAsync(SuggestInstructions(partId, form, meaning, language), model, progress, ct);
 
-    private async Task<string> RunAsync(string instructions, IProgress<string>? progress, CancellationToken ct)
+    private async Task<string> RunAsync(string instructions, string? model, IProgress<string>? progress, CancellationToken ct)
     {
         try
         {
-            return await claude.RunAsync(AllowedTools, instructions, Describe, progress, Timeout, ct).ConfigureAwait(false);
+            return await claude.RunAsync(AllowedTools, instructions, Describe, progress, Timeout, ct, model).ConfigureAwait(false);
         }
         catch (ClaudeCodeException ex)
         {

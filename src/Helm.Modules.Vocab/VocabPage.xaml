@@ -123,5 +123,12 @@
             </ui:CardControl.Header>
             <ui:ToggleSwitch AutomationProperties.Name="Break new words down by itself" IsChecked="{Binding Settings.AutoAnalyze}" />
         </ui:CardControl>
+        <ui:CardControl Margin="0,0,0,4" Icon="{ui:SymbolIcon BrainCircuit24}">
+            <ui:CardControl.Header>
+                <core:CardHeader Title="Claude model"
+                                 Description="Which model Claude Code breaks words down with (Analyze now, by itself, Suggest words). Sonnet is enough for roots and components; Opus costs more of your plan for little gain." />
+            </ui:CardControl.Header>
+            <ComboBox MinWidth="240" AutomationProperties.Name="Claude model" ItemsSource="{Binding Settings.AnalysisModelNames}" SelectedIndex="{Binding Settings.AnalysisModelIndex}" />
+        </ui:CardControl>
     </StackPanel>
 </core:ModulePageBase>

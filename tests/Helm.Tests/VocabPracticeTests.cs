@@ -685,13 +685,44 @@ public sealed class VocabPracticeTests
         Assert.NotEqual(vm.LeftBehind, vm.Work());
     }
 
+    [Fact]
+    public async Task The_agent_runs_with_the_model_the_settings_pick()
+    {
+        using var dir = new TempDir();
+        using var settings = new SettingsStoreFactory(new HelmPaths(dir.Path));
+        var options = VocabKit.Settings(settings);
+        var agent = new IdleAgent();
+        using var vm = new VocabAgentViewModel(agent, _store, _quiz, options, new InlineUi());
+
+        // Sonnet unless the user picks another: enough for roots and components.
+        await vm.AnalyzeCommand.ExecuteAsync(null);
+        Assert.Equal("sonnet", agent.Model);
+        options.AnalysisModelIndex = VocabSettingsViewModel.AnalysisModels.ToList().FindIndex(m => m.Value == "haiku");
+        await vm.AnalyzeCommand.ExecuteAsync(null);
+        Assert.Equal("haiku", agent.Model);
+        options.AnalysisModelIndex = VocabSettingsViewModel.AnalysisModels.ToList().FindIndex(m => m.Value == "");
+        await vm.AnalyzeCommand.ExecuteAsync(null);
+        Assert.Null(agent.Model);
+
+        // Claude Code gets --model only when one is picked.
+        Assert.Equal(["--model", "haiku"], ClaudeCodeRunner.RunArguments(["mcp__helm__vocab_get"], "haiku").TakeLast(2));
+        Assert.DoesNotContain("--model", ClaudeCodeRunner.RunArguments(["mcp__helm__vocab_get"], null));
+    }
+
     private sealed class IdleAgent : IVocabAgent
     {
         public string? Unavailable() => null;
 
-        public Task<string> AnalyzeAsync(IProgress<string>? progress, CancellationToken ct) => Task.FromResult("Không có gì để làm.");
+        /// <summary>The model the last run was asked to use.</summary>
+        public string? Model { get; private set; } = "unset";
 
-        public Task<string> SuggestAsync(string partId, string form, string meaning, VocabLanguage language, IProgress<string>? progress, CancellationToken ct) =>
+        public Task<string> AnalyzeAsync(string? model, IProgress<string>? progress, CancellationToken ct)
+        {
+            Model = model;
+            return Task.FromResult("Không có gì để làm.");
+        }
+
+        public Task<string> SuggestAsync(string partId, string form, string meaning, VocabLanguage language, string? model, IProgress<string>? progress, CancellationToken ct) =>
             Task.FromResult("");
     }
 }

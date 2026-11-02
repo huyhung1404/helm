@@ -40,14 +40,20 @@ public sealed class ClaudeCodeRunner(McpClientConfig mcp, IChildProcessLauncher 
     /// Runs Claude Code on <paramref name="instructions"/> and returns its last answer. Each tool call reports
     /// <paramref name="describe"/>(tool, calls so far) to <paramref name="progress"/>.
     /// </summary>
+    /// <param name="model">A Claude Code model name (haiku, sonnet, opus), or null for the user's default.</param>
     /// <exception cref="ClaudeCodeException">It could not start, failed, or did not finish within <paramref name="timeout"/>.</exception>
     /// <exception cref="OperationCanceledException"><paramref name="ct"/> stopped it.</exception>
     public Task<string> RunAsync(IReadOnlyList<string> allowedTools, string instructions, Func<string, int, string> describe,
-        IProgress<string>? progress, TimeSpan timeout, CancellationToken ct)
+        IProgress<string>? progress, TimeSpan timeout, CancellationToken ct, string? model = null)
     {
         if (Unavailable() is { } problem) throw new ClaudeCodeException(problem);
-        return StartAsync(["-p", "--output-format", "stream-json", "--verbose", "--allowedTools", string.Join(",", allowedTools)],
-            instructions, describe, progress, timeout, ct);
+        return StartAsync([.. RunArguments(allowedTools, model)], instructions, describe, progress, timeout, ct);
+    }
+
+    internal static IEnumerable<string> RunArguments(IReadOnlyList<string> allowedTools, string? model)
+    {
+        string[] args = ["-p", "--output-format", "stream-json", "--verbose", "--allowedTools", string.Join(",", allowedTools)];
+        return model is { Length: > 0 } ? [.. args, "--model", model] : args;
     }
 
     /// <summary>Why <see cref="AskAsync"/> cannot run now, or null when it can (it needs Claude Code only, not Helm's MCP).</summary>
