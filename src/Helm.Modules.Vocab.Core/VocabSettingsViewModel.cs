@@ -219,6 +219,15 @@ public sealed partial class VocabSettingsViewModel : ObservableObject
         });
     }
 
+    /// <summary>A side section of the Learn tab is folded away (see <see cref="VocabSettings.FoldedPanels"/>).</summary>
+    public bool IsFolded(string panel) => _settings.Current.FoldedPanels.Contains(panel);
+
+    public void SetFolded(string panel, bool folded) => Save(nameof(VocabSettings.FoldedPanels), s =>
+    {
+        s.FoldedPanels.Remove(panel);
+        if (folded) s.FoldedPanels.Add(panel);
+    });
+
     /// <summary>The Words tab's order (chosen on that tab).</summary>
     public void SaveWordsSort(int index) => Save(nameof(VocabSettings.WordsSort), s => s.WordsSort = index);
 

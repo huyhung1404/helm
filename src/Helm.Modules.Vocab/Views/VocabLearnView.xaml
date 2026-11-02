@@ -35,6 +35,11 @@
                     </DataTrigger>
                 </Style.Triggers>
             </Style>
+            <!-- A side section's title: a click folds the section away or opens it (remembered on this device) -->
+            <Style x:Key="Fold" TargetType="Button" BasedOn="{StaticResource FlatButton}">
+                <Setter Property="Margin" Value="-6,-4" />
+                <Setter Property="Padding" Value="6,4" />
+            </Style>
             <Style x:Key="InfoColumn" TargetType="ContentControl">
                 <Setter Property="Grid.Column" Value="2" />
                 <Style.Triggers>
@@ -309,7 +314,17 @@
             <StackPanel>
                 <Border Style="{DynamicResource HelmSurface}" Margin="0,0,0,12">
                     <StackPanel>
-                        <TextBlock Text="Today" Style="{StaticResource CardTitle}" />
+                        <Button x:Name="TodayFold" Style="{StaticResource Fold}" Click="Fold_Click" Tag="today" AutomationProperties.Name="Today">
+                            <DockPanel>
+                                <ui:SymbolIcon DockPanel.Dock="Right" Symbol="ChevronDown16" FontSize="14" RenderTransformOrigin="0.5,0.5" />
+                                <TextBlock Text="Today" FontSize="15" FontWeight="SemiBold" Margin="0,0,10,0" />
+                                <!-- Folded: the day in a few words -->
+                                <TextBlock x:Name="TodayLine" VerticalAlignment="Center" Style="{DynamicResource HelmSecondaryText}">
+                                    <Run Text="{Binding Today.Due, Mode=OneWay}" /><Run Text=" due · " /><Run Text="{Binding Today.New, Mode=OneWay}" /><Run Text=" new" />
+                                </TextBlock>
+                            </DockPanel>
+                        </Button>
+                        <StackPanel x:Name="TodayBody" Margin="0,10,0,0">
                         <Grid>
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="*" />
@@ -342,25 +357,40 @@
                         <TextBlock Margin="0,8,0,0" TextWrapping="Wrap" FontSize="12" Foreground="{DynamicResource SystemFillColorSuccessBrush}"
                                    Text="All caught up: nothing is due now. These cards are extra rounds; come back when words fall due."
                                    Visibility="{Binding IsCaughtUp, Converter={StaticResource BoolToVisibility}}" />
+                        </StackPanel>
                     </StackPanel>
                 </Border>
 
                 <Border Style="{DynamicResource HelmSurface}" Margin="0,0,0,12">
                     <StackPanel>
-                        <TextBlock Text="Cards" Style="{StaticResource CardTitle}" />
+                        <Button x:Name="CardsFold" Style="{StaticResource Fold}" Click="Fold_Click" Tag="cards" AutomationProperties.Name="Cards">
+                            <DockPanel>
+                                <ui:SymbolIcon DockPanel.Dock="Right" Symbol="ChevronDown16" FontSize="14" RenderTransformOrigin="0.5,0.5" />
+                                <TextBlock Text="Cards" FontSize="15" FontWeight="SemiBold" Margin="0,0,10,0" />
+                                <TextBlock x:Name="CardsLine" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" Style="{DynamicResource HelmSecondaryText}"
+                                           Text="{Binding Card.KindText}" />
+                            </DockPanel>
+                        </Button>
+                        <StackPanel x:Name="CardsBody" Margin="0,10,0,0">
                         <TextBlock Text="Kind of card" Style="{StaticResource FieldLabel}" Margin="0,0,0,4" />
                         <ComboBox AutomationProperties.Name="Kind of card" ItemsSource="{Binding Settings.CardModes}" SelectedIndex="{Binding Settings.CardModeIndex}" />
                         <DockPanel Margin="0,12,0,0">
                             <ui:ToggleSwitch DockPanel.Dock="Right" AutomationProperties.Name="Chinese cards ask for the pinyin first" IsChecked="{Binding Settings.TypePinyin}" />
                             <TextBlock Text="Chinese cards ask for the pinyin first" FontSize="13" TextWrapping="Wrap" VerticalAlignment="Center" Margin="0,0,10,0" />
                         </DockPanel>
+                        </StackPanel>
                     </StackPanel>
                 </Border>
 
                 <Border Style="{DynamicResource HelmSurface}">
                     <StackPanel>
-                        <TextBlock Text="Keys" Style="{StaticResource CardTitle}" Margin="0,0,0,8" />
-                            <Grid>
+                        <Button x:Name="KeysFold" Style="{StaticResource Fold}" Click="Fold_Click" Tag="keys" AutomationProperties.Name="Keys">
+                            <DockPanel>
+                                <ui:SymbolIcon DockPanel.Dock="Right" Symbol="ChevronDown16" FontSize="14" RenderTransformOrigin="0.5,0.5" />
+                                <TextBlock Text="Keys" FontSize="15" FontWeight="SemiBold" />
+                            </DockPanel>
+                        </Button>
+                            <Grid x:Name="KeysBody" Margin="0,10,0,0">
                                 <Grid.Resources>
                                     <Style TargetType="Border" BasedOn="{StaticResource Kbd}">
                                         <Setter Property="Margin" Value="0,0,10,6" />

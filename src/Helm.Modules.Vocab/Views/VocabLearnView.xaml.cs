@@ -1,5 +1,6 @@
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Media;
 
 namespace Helm.Modules.Vocab.Views;
 
@@ -12,9 +13,38 @@ public partial class VocabLearnView : UserControl
     /// <summary>Below this a tree beside what helps gets cut off: the tree goes above it, across the card.</summary>
     internal const double SideBySideWidth = 760;
 
-    public VocabLearnView() => InitializeComponent();
+    public VocabLearnView()
+    {
+        InitializeComponent();
+        DataContextChanged += (_, _) => ShowFolds();
+    }
 
     private VocabViewModel? ViewModel => DataContext as VocabViewModel;
+
+    /// <summary>A side section's title: folds it away or opens it, remembered on this device.</summary>
+    private void Fold_Click(object sender, RoutedEventArgs e)
+    {
+        if (ViewModel is not { } vm || sender is not FrameworkElement { Tag: string panel }) return;
+        vm.Settings.SetFolded(panel, !vm.Settings.IsFolded(panel));
+        ShowFolds();
+    }
+
+    /// <summary>Each side section open or folded as saved; folded, Today and Cards keep a one-line summary in their title.</summary>
+    private void ShowFolds()
+    {
+        if (ViewModel is not { } vm) return;
+        Show(TodayFold, TodayBody, TodayLine, vm.Settings.IsFolded("today"));
+        Show(CardsFold, CardsBody, CardsLine, vm.Settings.IsFolded("cards"));
+        Show(KeysFold, KeysBody, null, vm.Settings.IsFolded("keys"));
+    }
+
+    private static void Show(Button title, FrameworkElement body, FrameworkElement? summary, bool folded)
+    {
+        body.Visibility = folded ? Visibility.Collapsed : Visibility.Visible;
+        if (summary is not null) summary.Visibility = folded ? Visibility.Visible : Visibility.Collapsed;
+        if (title.Content is DockPanel { Children: [Wpf.Ui.Controls.SymbolIcon chevron, ..] }) chevron.RenderTransform = new RotateTransform(folded ? 0 : 180);
+        System.Windows.Automation.AutomationProperties.SetHelpText(title, folded ? "Folded: click to open" : "Click to fold away");
+    }
 
     private void LearnPanel_SizeChanged(object sender, SizeChangedEventArgs e)
     {

@@ -49,6 +49,9 @@ public sealed class VocabSettings : IVersionedSettings
     /// </summary>
     public int CardOpacity { get; set; } = VocabSettingsViewModel.DefaultCardOpacity;
 
+    /// <summary>The Learn tab's side sections the user folded away ("today", "cards", "keys"); the keys start folded.</summary>
+    public List<string> FoldedPanels { get; set; } = ["keys"];
+
     /// <summary>The pop-up comes back after a random time between these two (seconds).</summary>
     public int PopupMinSeconds { get; set; } = 20 * 60;
 
