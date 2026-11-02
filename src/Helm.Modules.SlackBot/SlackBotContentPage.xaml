@@ -1,0 +1,149 @@
+<Page
+    x:Class="Helm.Modules.SlackBot.SlackBotContentPage"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
+    xmlns:core="clr-namespace:Helm.Core.Ui;assembly=Helm.Core.Windows"
+    xmlns:local="clr-namespace:Helm.Modules.SlackBot"
+    Title="SlackBot">
+
+    <!-- SlackBot itself (menu and Quick access): the to-do list, the report, what was handled. Its options live on
+         SlackBotPage (Home → Utilities). -->
+    <Page.Resources>
+        <Style x:Key="RowAction" TargetType="ui:Button" BasedOn="{StaticResource {x:Type ui:Button}}">
+            <Setter Property="Padding" Value="8,3" />
+            <Setter Property="Margin" Value="0,0,6,0" />
+        </Style>
+
+        <!-- Who, where, when, Claude's line and the message -->
+        <DataTemplate x:Key="MessageBody" DataType="{x:Type local:InboxItemViewModel}">
+            <StackPanel>
+                <DockPanel>
+                    <TextBlock DockPanel.Dock="Right" Text="{Binding When}" Style="{DynamicResource HelmSecondaryText}" />
+                    <TextBlock TextTrimming="CharacterEllipsis" Style="{DynamicResource HelmSecondaryText}">
+                        <Run Text="{Binding From, Mode=OneWay}" FontWeight="SemiBold" />
+                        <Run Text="·" />
+                        <Run Text="{Binding Where, Mode=OneWay}" />
+                    </TextBlock>
+                </DockPanel>
+                <TextBlock Margin="0,4,0,0" Text="{Binding Headline}" TextWrapping="Wrap" FontWeight="SemiBold" />
+                <TextBlock Margin="0,2,0,0" Text="{Binding Text}" TextWrapping="Wrap" Style="{DynamicResource HelmSecondaryText}"
+                           Visibility="{Binding HasSummary, Converter={StaticResource BoolToVisibility}}" />
+            </StackPanel>
+        </DataTemplate>
+    </Page.Resources>
+
+    <StackPanel Margin="24,16,24,24">
+        <TextBlock Text="SlackBot" FontSize="28" FontWeight="SemiBold" Margin="0,0,0,16" />
+
+        <!-- Shown while the tool is turned off -->
+        <ui:InfoBar x:Name="OffBar" Severity="Informational" IsClosable="False" IsOpen="False" Visibility="Collapsed" Margin="0,0,0,8"
+                    Title="SlackBot is turned off" Message="What it kept is still here. Turn SlackBot on in its settings to read Slack again." />
+
+        <StackPanel x:Name="Body">
+            <!-- The connection, first -->
+            <ui:CardControl Margin="0,0,0,4" Icon="{ui:SymbolIcon PlugConnected24}">
+                <ui:CardControl.Header>
+                    <core:CardHeader Title="Slack" Description="{Binding Status}" />
+                </ui:CardControl.Header>
+                <StackPanel Orientation="Horizontal">
+                    <ui:Button Content="Sort now" Icon="{ui:SymbolIcon Sparkle24}" Command="{Binding SortNowCommand}" />
+                    <ui:Button Margin="8,0,0,0" Content="Reconnect" Icon="{ui:SymbolIcon ArrowSync24}" Command="{Binding ReconnectCommand}" />
+                </StackPanel>
+            </ui:CardControl>
+            <ui:InfoBar Margin="0,0,0,4" Severity="Warning" IsClosable="False" Title="Sorting" Message="{Binding SortProblem}"
+                        IsOpen="{Binding HasSortProblem}" Visibility="{Binding HasSortProblem, Converter={StaticResource BoolToVisibility}}" />
+
+            <!-- To do -->
+            <TextBlock Style="{DynamicResource HelmSectionHeader}">
+                <Run Text="To do" />
+                <Run Text="{Binding ToDoCount, Mode=OneWay}" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+            </TextBlock>
+            <TextBlock Margin="0,0,0,8" TextWrapping="Wrap" Style="{DynamicResource HelmSecondaryText}"
+                       Text="Each stays here and on screen until you reply in Slack, react with an emoji, or press Done." />
+            <TextBlock Margin="0,0,0,8" Text="Nothing waits for you." Style="{DynamicResource HelmSecondaryText}"
+                       Visibility="{Binding HasToDo, Converter={StaticResource InverseBoolToVisibility}}" />
+            <ItemsControl ItemsSource="{Binding ToDo}">
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate DataType="{x:Type local:InboxItemViewModel}">
+                        <Border Margin="0,0,0,4" Style="{DynamicResource HelmSurface}">
+                            <StackPanel>
+                                <ContentPresenter Content="{Binding}" ContentTemplate="{StaticResource MessageBody}" />
+                                <WrapPanel Margin="0,8,0,0">
+                                    <ui:Button Style="{StaticResource RowAction}" Content="Open in Slack" Icon="{ui:SymbolIcon Open16}"
+                                               Command="{Binding DataContext.OpenCommand, RelativeSource={RelativeSource AncestorType=Page}}" CommandParameter="{Binding}" />
+                                    <ui:Button Style="{StaticResource RowAction}" Content="Done" Icon="{ui:SymbolIcon Checkmark16}"
+                                               Command="{Binding DataContext.DoneCommand, RelativeSource={RelativeSource AncestorType=Page}}" CommandParameter="{Binding}" />
+                                    <ui:Button Style="{StaticResource RowAction}" Appearance="Transparent" Content="Only worth knowing"
+                                               ToolTip="Moves it to the report; Claude learns from it"
+                                               Command="{Binding DataContext.OnlyKnowCommand, RelativeSource={RelativeSource AncestorType=Page}}" CommandParameter="{Binding}" />
+                                </WrapPanel>
+                            </StackPanel>
+                        </Border>
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+
+            <!-- Worth knowing -->
+            <DockPanel>
+                <ui:Button DockPanel.Dock="Right" VerticalAlignment="Bottom" Margin="0,0,0,8" Appearance="Transparent" Content="Mark all read"
+                           Command="{Binding MarkAllReadCommand}" />
+                <TextBlock Text="Worth knowing" Style="{DynamicResource HelmSectionHeader}" />
+            </DockPanel>
+            <TextBlock Margin="0,0,0,8" Text="Nothing new." Style="{DynamicResource HelmSecondaryText}"
+                       Visibility="{Binding HasKnowing, Converter={StaticResource InverseBoolToVisibility}}" />
+            <ItemsControl ItemsSource="{Binding Knowing}">
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate DataType="{x:Type local:InboxGroupViewModel}">
+                        <ui:CardExpander Margin="0,0,0,4" IsExpanded="True" Icon="{ui:SymbolIcon Channel24}">
+                            <ui:CardExpander.Header>
+                                <core:RowLayout>
+                                    <core:CardHeader Title="{Binding Where}" Description="{Binding Count}" />
+                                    <ui:Button HorizontalAlignment="Right" Margin="0,0,16,0" Content="Read" Icon="{ui:SymbolIcon Checkmark16}"
+                                               Command="{Binding DataContext.MarkGroupReadCommand, RelativeSource={RelativeSource AncestorType=Page}}" CommandParameter="{Binding}" />
+                                </core:RowLayout>
+                            </ui:CardExpander.Header>
+                            <ItemsControl ItemsSource="{Binding Items}">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate DataType="{x:Type local:InboxItemViewModel}">
+                                        <Border Style="{DynamicResource HelmExpanderRow}" Padding="0,8">
+                                            <StackPanel>
+                                                <ContentPresenter Content="{Binding}" ContentTemplate="{StaticResource MessageBody}" />
+                                                <WrapPanel Margin="0,6,0,0">
+                                                    <ui:Button Style="{StaticResource RowAction}" Content="Open in Slack" Icon="{ui:SymbolIcon Open16}"
+                                                               Command="{Binding DataContext.OpenCommand, RelativeSource={RelativeSource AncestorType=Page}}" CommandParameter="{Binding}" />
+                                                    <ui:Button Style="{StaticResource RowAction}" Appearance="Transparent" Content="Needs me"
+                                                               ToolTip="Moves it to the to-do list; Claude learns from it"
+                                                               Command="{Binding DataContext.NeedsMeCommand, RelativeSource={RelativeSource AncestorType=Page}}" CommandParameter="{Binding}" />
+                                                </WrapPanel>
+                                            </StackPanel>
+                                        </Border>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </ui:CardExpander>
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+
+            <!-- Handled lately -->
+            <TextBlock Text="Handled today" Style="{DynamicResource HelmSectionHeader}" />
+            <ItemsControl ItemsSource="{Binding Handled}">
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate DataType="{x:Type local:InboxItemViewModel}">
+                        <Border Margin="0,0,0,4" Style="{DynamicResource HelmSurface}" Opacity="0.85">
+                            <DockPanel>
+                                <ui:Button DockPanel.Dock="Right" VerticalAlignment="Top" Margin="8,0,0,0" Appearance="Transparent" Content="Back to the list"
+                                           Command="{Binding DataContext.RestoreCommand, RelativeSource={RelativeSource AncestorType=Page}}" CommandParameter="{Binding}" />
+                                <StackPanel>
+                                    <TextBlock Text="{Binding HandledText}" Foreground="{DynamicResource SystemFillColorSuccessBrush}" FontWeight="SemiBold" />
+                                    <ContentPresenter Content="{Binding}" ContentTemplate="{StaticResource MessageBody}" />
+                                </StackPanel>
+                            </DockPanel>
+                        </Border>
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+        </StackPanel>
+    </StackPanel>
+</Page>

@@ -3,6 +3,21 @@
 All notable changes to Helm. The top section is used as the GitHub release body and as the Velopack release notes.
 Format: [Keep a Changelog](https://keepachangelog.com), versions follow [SemVer](https://semver.org).
 
+## [Unreleased]
+
+### Added
+- **SlackBot (PC): never miss what needs you in Slack.** SlackBot reads your workspace as you, through a Slack app you
+  make in a minute from the manifest on its settings page (Socket Mode: Helm connects out, nothing listens on your PC),
+  in every channel and DM you are in except the ones you switch off. Claude Code sorts each message: to do, worth
+  knowing or not for you, with one line in Vietnamese. DMs, mentions and replies in your threads are sorted within
+  seconds, channels every 30 minutes. What needs you stays in a small list on top of your apps (it never takes the
+  keyboard; drag it anywhere, fold it into a badge) until you reply in Slack, react with an emoji or press Done.
+  What is worth knowing shows up at the report times you set (12:00 and 17:00 to start with), grouped by channel.
+  While Helm was off it catches up on what came meanwhile, and every 10 minutes it reads your DMs, mentions and threads
+  again in case Slack's live connection missed one. Claude reads the messages with no tools at all (no files, no web,
+  no MCP), so a message cannot make it do anything but sort; "Only worth knowing" and "Needs me" teach it what matters
+  to you. Messages and tokens stay on this PC, encrypted for your Windows user, and are never synced.
+
 ## [0.71.0] - 2026-11-01
 
 ### Added
