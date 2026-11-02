@@ -326,6 +326,31 @@ public sealed class VocabTests
     }
 
     [Fact]
+    public void The_texts_dialog_shows_the_proposed_words_and_adds_only_the_ticked_ones()
+    {
+        var vm = new VocabTextsViewModel(_store, new InlineUi());
+        vm.NewBody = "回首人间";
+        vm.AddTextCommand.Execute(null);
+        Assert.True(vm.IsDetailOpen);
+        Assert.True(vm.IsDetailWaiting);
+
+        var id = _store.AllSources()[0].Id;
+        _store.Propose(id, [new VocabProposal { Word = "回首", Meaning = "ngoảnh lại", Sentence = "回首人间" }, new VocabProposal { Word = "人间", Meaning = "nhân gian", Sentence = "回首人间" }]);
+        Assert.Equal(2, vm.Proposals.Count);
+        Assert.Equal("Add 2 words", vm.AddSelectedText);
+
+        vm.Proposals[1].IsChosen = false; // the store comes back with the same state: the rows stay
+        Assert.Equal(2, vm.Proposals.Count);
+        Assert.Equal("Add 1 word", vm.AddSelectedText);
+
+        vm.AddSelectedCommand.Execute(null);
+        Assert.Equal(["回首"], _store.Pending().Select(w => w.Value.Text));
+        Assert.True(vm.Proposals[0].IsAdded);
+        Assert.Equal("1 word added", vm.Texts[0].Status);
+        Assert.False(vm.AddSelectedCommand.CanExecute(null));
+    }
+
+    [Fact]
     public async Task A_pasted_text_gets_its_words_proposed_and_only_the_ticked_ones_are_added_with_their_line()
     {
         _store.AddWord("琵琶");

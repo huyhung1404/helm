@@ -11,6 +11,7 @@
          Edit and Ask for a new analysis are dialogs over the page. Its options live on VocabPage (Home → Utilities). -->
     <Page.InputBindings>
         <KeyBinding Key="N" Modifiers="Ctrl" Command="{Binding OpenAddCommand}" />
+        <KeyBinding Key="N" Modifiers="Ctrl+Shift" Command="{Binding Texts.OpenCommand}" />
     </Page.InputBindings>
 
     <Page.Resources>
@@ -82,6 +83,8 @@
                             </StackPanel>
                         </Button>
                         <ui:Button Margin="10,0,0,0" Content="Add words" Icon="{ui:SymbolIcon Add24}" Command="{Binding OpenAddCommand}" ToolTip="Add words (Ctrl+N)" />
+                        <ui:Button Margin="6,0,0,0" Content="Add text" Icon="{ui:SymbolIcon DocumentText24}" Command="{Binding Texts.OpenCommand}"
+                                   ToolTip="Paste an article or song lyrics; Claude Code picks the words worth learning (Ctrl+Shift+N)" />
                     </StackPanel>
                     <ui:Button Style="{StaticResource IconButton}" Margin="6,0,0,0" Icon="{ui:SymbolIcon Settings24}" Click="Settings_Click"
                                ToolTip="Settings: the pop-up card, display, analysis" AutomationProperties.Name="Vocabulary settings" />
@@ -148,6 +151,7 @@
         <!-- ===== Dialogs over the whole page ===== -->
         <views:VocabAddDialog x:Name="AddDialog" Grid.RowSpan="3" />
         <views:VocabAgentDialog Grid.RowSpan="3" />
+        <views:VocabTextsDialog x:Name="TextsDialog" Grid.RowSpan="3" />
         <views:VocabEditDialog x:Name="EditDialog" Grid.RowSpan="3" />
         <views:VocabRedoDialog x:Name="RedoDialog" Grid.RowSpan="3" />
     </Grid>

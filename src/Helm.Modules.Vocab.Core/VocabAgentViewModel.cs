@@ -78,7 +78,7 @@ public sealed partial class VocabAgentViewModel : ObservableObject, IDisposable
     public bool HasStatus => Status.Length > 0;
 
     /// <summary>An AI agent over MCP (not Helm's own) is working on words now; Helm's agent waits for it.</summary>
-    public bool ExternalBusy => !IsBusy && _store.HasClaimedWork();
+    public bool ExternalBusy => !IsBusy && (_store.HasClaimedWork() || _store.HasClaimedSource());
 
     /// <summary>The chip's line when <see cref="ExternalBusy"/>.</summary>
     public string ExternalStatus => "An AI agent is working on your words…";
@@ -152,7 +152,7 @@ public sealed partial class VocabAgentViewModel : ObservableObject, IDisposable
             if (Work() is not { } work || work == _leftBehind)
             {
                 // Words an MCP agent took come back to Helm's agent if it never finishes them.
-                if (_store.HasClaimedWork()) _timer.Change(VocabStore.ClaimFor + Settle, Timeout.InfiniteTimeSpan);
+                if (_store.HasClaimedWork() || _store.HasClaimedSource()) _timer.Change(VocabStore.ClaimFor + Settle, Timeout.InfiniteTimeSpan);
                 return;
             }
             _timer.Change(Settle, Timeout.InfiniteTimeSpan);
@@ -175,8 +175,9 @@ public sealed partial class VocabAgentViewModel : ObservableObject, IDisposable
         var pending = _store.PendingUnclaimed().Select(w => w.Id);
         var hard = _quiz.HardWords().Select(w => w.Id).Concat(_quiz.SlippingWords().Select(w => "py:" + w.Id));
         var lacking = _store.Words().Where(w => w.Value.LacksDetails && !w.Value.Hidden).Select(w => w.Id);
-        var key = string.Join("|", string.Join(",", pending), string.Join(",", hard.Order(StringComparer.Ordinal)), string.Join(",", lacking));
-        return key == "||" ? null : key;
+        var texts = _store.WaitingSourcesUnclaimed().Select(s => s.Id);
+        var key = string.Join("|", string.Join(",", pending), string.Join(",", hard.Order(StringComparer.Ordinal)), string.Join(",", lacking), string.Join(",", texts));
+        return key == "|||" ? null : key;
     }
 
     public void Dispose()
