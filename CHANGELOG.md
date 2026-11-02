@@ -3,6 +3,29 @@
 All notable changes to Helm. The top section is used as the GitHub release body and as the Velopack release notes.
 Format: [Keep a Changelog](https://keepachangelog.com), versions follow [SemVer](https://semver.org).
 
+## [Unreleased]
+
+### Changed
+- **Vocabulary: a new look, the same on the PC and the phone.** Three tabs, Learn · Words · Roots, with their counts;
+  adding words is a dialog (Ctrl+N on the PC, + on the phone) with the words added lately, and what waits for Claude
+  Code sits behind one chip in the header ("3 waiting for analysis"). The Learn card says what it asks ("Word →
+  meaning", "Type its pinyin"), its answer buttons stay in reach and say when the word comes back ("again in 10
+  minutes", "next in 8 days"), and a side panel shows today's numbers. The Words list filters with chips that count
+  their words (Due now, New, Often forgotten, Pinyin slips, levels, tags) and shows how well each word is known as
+  eight dots. Editing, asking for a new analysis and deleting open a dialog on the PC and a bottom sheet on the phone;
+  a word's other actions sit in a ⋯ menu. On the phone, how a word is built reads top-down as an outline, so nothing
+  scrolls sideways.
+- **Vocabulary: a wrong pinyin is no longer a forgotten word.** On a Chinese card the pinyin you type is checked by
+  itself, and the buttons ask only about the meaning ("Forgot the meaning" / "Knew the meaning"). Knowing the meaning
+  but typing the pinyin wrong is a pinyin slip: the word keeps its level, comes back tomorrow, and does not count
+  towards "often forgotten", so Claude Code no longer rewrites its analysis or its story. After 3 slips it writes only
+  a way to remember the reading (the sound component, the Hán Việt, the tones), shown with the answer, on the pop-up
+  cards and on the word's page, and editable by hand.
+
+### Added
+- **Vocabulary: see-through pop-up cards.** The word card over other apps (PC and phone) is see-through at rest, so
+  the app below stays readable, and turns solid while you use it. Settings → Card opacity (40–100 %, 85 % by default).
+
 ## [0.71.0] - 2026-11-01
 
 ### Added
