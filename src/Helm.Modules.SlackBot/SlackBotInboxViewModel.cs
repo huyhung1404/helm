@@ -3,13 +3,26 @@ using System.Globalization;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Helm.Core.Services;
+using Helm.Core.Settings;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Helm.Modules.SlackBot;
 
 /// <summary>One message on the overlay or the SlackBot page.</summary>
-public sealed class InboxItemViewModel(InboxItem item, string link)
+public sealed class InboxItemViewModel(InboxItem item, string link, DateTimeOffset? now = null)
 {
+    /// <summary>"Waiting 2 h" on a message still to do after an hour, else empty.</summary>
+    public string Waiting { get; } = WaitingText(item, now ?? DateTimeOffset.UtcNow);
+
+    public bool HasWaiting => Waiting.Length > 0;
+
+    internal static string WaitingText(InboxItem item, DateTimeOffset now)
+    {
+        if (!item.IsToDo) return "";
+        var hours = (int)Math.Floor((now - item.Time).TotalHours);
+        return hours < 1 ? "" : hours < 24 ? $"Waiting {hours} h" : $"Waiting {hours / 24} d";
+    }
+
     public string Id => item.Id;
 
     public string Link => link;
@@ -36,7 +49,7 @@ public sealed class InboxItemViewModel(InboxItem item, string link)
     public bool HasBotReply => item.BotReply is not null;
 
     /// <summary>Changes when anything shown changes: the lists replace a row only then.</summary>
-    internal string Version => $"{item.Level}|{item.Summary}|{item.Handled}|{item.BotReply}|{item.Text}|{item.Read}|{link}";
+    internal string Version => $"{item.Level}|{item.Summary}|{item.Handled}|{item.BotReply}|{item.Text}|{item.Read}|{link}|{Waiting}";
 
     /// <summary>For the user, not sorted yet (or Claude Code is not working): shown as it is.</summary>
     public bool IsUnsorted => item.Level == InboxLevel.Pending;
@@ -79,6 +92,9 @@ public sealed partial class SlackBotInboxViewModel : ObservableObject
     private readonly IUiDispatcher _ui;
     private readonly IProcessLauncher _launcher;
     private readonly IServiceProvider _services;
+    private readonly ISettingsStore<SlackBotSettings> _settings;
+    private readonly Timer _clock;
+    private DateTimeOffset _lastRemind = DateTimeOffset.UtcNow;
     private int _refreshQueued;
     private bool _shown;
 
@@ -95,8 +111,12 @@ public sealed partial class SlackBotInboxViewModel : ObservableObject
     [ObservableProperty] private string _reportTitle = "";
     [ObservableProperty] private bool _isSorting;
 
-    public SlackBotInboxViewModel(SlackBotEngine engine, IUiDispatcher ui, IProcessLauncher launcher, IServiceProvider services)
+    public SlackBotInboxViewModel(SlackBotEngine engine, IUiDispatcher ui, IProcessLauncher launcher, IServiceProvider services,
+        ISettingsStoreFactory settings)
     {
+        _settings = settings.Get<SlackBotSettings>(SlackBotModule.ModuleId);
+        // Every minute: "Waiting 2 h" moves on, and what waits too long is brought back (Remind).
+        _clock = new Timer(_ => _ui!.Post(Tick), null, TimeSpan.FromMinutes(1), TimeSpan.FromMinutes(1));
         _engine = engine;
         _ui = ui;
         _launcher = launcher;
@@ -115,6 +135,26 @@ public sealed partial class SlackBotInboxViewModel : ObservableObject
 
     /// <summary>Raised on the UI thread when something new lands on the to-do list.</summary>
     public event EventHandler? NewToDo;
+
+    /// <summary>Raised on the UI thread when something has waited too long: bring the list back.</summary>
+    public event EventHandler? Remind;
+
+    /// <summary>
+    /// A reminder is due: a message on the list has waited at least <paramref name="every"/>, and the last reminder was
+    /// at least that long ago.
+    /// </summary>
+    internal static bool RemindDue(IEnumerable<DateTimeOffset> waitingSince, DateTimeOffset now, DateTimeOffset last, TimeSpan every) =>
+        every > TimeSpan.Zero && now - last >= every && waitingSince.Any(t => now - t >= every);
+
+    private void Tick()
+    {
+        Refresh();
+        var every = TimeSpan.FromMinutes(_settings.Current.RemindEveryMinutes);
+        var now = DateTimeOffset.UtcNow;
+        if (!RemindDue(_engine.Inbox.Snapshot().Where(i => i.IsToDo).Select(i => i.Time), now, _lastRemind, every)) return;
+        _lastRemind = now;
+        Remind?.Invoke(this, EventArgs.Empty);
+    }
 
     [RelayCommand]
     private void Open(InboxItemViewModel? item)

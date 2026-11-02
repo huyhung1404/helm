@@ -190,6 +190,14 @@
             </ui:CardControl.Header>
             <ui:TextBox MinWidth="200" Text="{Binding ReportTimes, UpdateSourceTrigger=LostFocus}" AutomationProperties.Name="Report times" />
         </ui:CardControl>
+        <ui:CardControl Margin="0,0,0,4" Icon="{ui:SymbolIcon AlertOn24}">
+            <ui:CardControl.Header>
+                <core:CardHeader Title="Remind me of what still waits"
+                                 Description="A message still on the list after this long brings the list back (unfolded, lit up, with the sound when on), and again as long as it waits." />
+            </ui:CardControl.Header>
+            <ComboBox MinWidth="200" ItemsSource="{Binding RemindChoices}" DisplayMemberPath="Label" SelectedValuePath="Value"
+                      SelectedValue="{Binding RemindEveryMinutes}" AutomationProperties.Name="Remind me of what still waits" />
+        </ui:CardControl>
         <ui:CardControl Margin="0,0,0,4" Icon="{ui:SymbolIcon Speaker224}">
             <ui:CardControl.Header>
                 <core:CardHeader Title="Sound for new items" Description="Plays when something lands on the list." />

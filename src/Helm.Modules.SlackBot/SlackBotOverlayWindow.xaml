@@ -99,6 +99,8 @@
                                                 <Run Text="{Binding Where, Mode=OneWay}" />
                                             </TextBlock>
                                         </DockPanel>
+                                        <TextBlock Margin="0,2,0,0" Text="{Binding Waiting}" FontWeight="SemiBold" Foreground="{DynamicResource SystemFillColorCautionBrush}"
+                                                   Visibility="{Binding HasWaiting, Converter={StaticResource BoolToVisibility}}" />
                                         <TextBlock Margin="0,4,0,0" Text="{Binding Headline}" TextWrapping="Wrap" FontWeight="SemiBold" />
                                         <TextBlock Margin="0,2,0,0" Text="{Binding Text}" TextWrapping="Wrap" MaxHeight="54" TextTrimming="WordEllipsis"
                                                    Style="{DynamicResource HelmSecondaryText}" Visibility="{Binding HasSummary, Converter={StaticResource BoolToVisibility}}" />

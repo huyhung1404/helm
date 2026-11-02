@@ -33,6 +33,7 @@ public sealed partial class SlackBotViewModel : ObservableObject
     [ObservableProperty] private string _aboutMe = "";
     [ObservableProperty] private string _model = "";
     [ObservableProperty] private bool _playSound;
+    [ObservableProperty] private int _remindEveryMinutes;
     [ObservableProperty] private string _channelFilter = "";
     [ObservableProperty] private string _channelsSummary = "";
     [ObservableProperty] private string _signature = "";
@@ -71,6 +72,15 @@ public sealed partial class SlackBotViewModel : ObservableObject
         new(5, "After 5 minutes"),
         new(10, "After 10 minutes"),
         new(30, "After 30 minutes"),
+    ];
+
+    public IReadOnlyList<SlackBotChoice<int>> RemindChoices { get; } =
+    [
+        new(0, "Never"),
+        new(30, "Every 30 minutes"),
+        new(60, "Every hour"),
+        new(120, "Every 2 hours"),
+        new(240, "Every 4 hours"),
     ];
 
     public IReadOnlyList<SlackBotChoice<string>> Models { get; } =
@@ -139,6 +149,8 @@ public sealed partial class SlackBotViewModel : ObservableObject
 
     partial void OnPlaySoundChanged(bool value) => Save(s => s.PlaySound = value);
 
+    partial void OnRemindEveryMinutesChanged(int value) => Save(s => s.RemindEveryMinutes = value);
+
     partial void OnSignatureChanged(string value)
     {
         UpdatePreview();
@@ -190,6 +202,7 @@ public sealed partial class SlackBotViewModel : ObservableObject
             AboutMe = s.AboutMe;
             Model = s.Model;
             PlaySound = s.PlaySound;
+            RemindEveryMinutes = s.RemindEveryMinutes;
             Signature = s.Signature;
             SignatureEmoji = s.SignatureEmoji;
             ReplyStyle = s.ReplyStyle;

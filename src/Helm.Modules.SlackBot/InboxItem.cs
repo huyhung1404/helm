@@ -51,6 +51,9 @@ public sealed class InboxItem
     /// <summary>The thread's first message, when this is a reply (for context), clipped.</summary>
     public string? ThreadStart { get; set; }
 
+    /// <summary>The message calls the user by name (@them): kept even from a conversation that is off.</summary>
+    public bool Tagged { get; set; }
+
     /// <summary>For the user: a DM or group DM, a message that calls them, or a reply in their thread.</summary>
     public bool Direct { get; set; }
 

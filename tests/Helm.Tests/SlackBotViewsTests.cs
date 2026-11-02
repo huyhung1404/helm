@@ -74,7 +74,7 @@ public sealed class SlackBotViewsTests : IDisposable
         var engine = new SlackBotEngine(tokens, file, new SlackSorter(new NoAgent()), new NoAgent(), settings, NullLogger<SlackBotEngine>.Instance);
         var launcher = new Launcher();
         var ui = new StaUi();
-        var inbox = new SlackBotInboxViewModel(engine, ui, launcher, new NoServices());
+        var inbox = new SlackBotInboxViewModel(engine, ui, launcher, new NoServices(), settings);
         var windows = new WindowService(NullLogger<WindowService>.Instance);
         var overlay = new SlackBotOverlay(inbox, settings, windows, ui, NullLogger<SlackBotOverlay>.Instance);
         var module = new SlackBotModule(engine, overlay) { IsEnabled = true };
