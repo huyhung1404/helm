@@ -75,6 +75,28 @@ public sealed class SlackBotSettings : IVersionedSettings
     /// </summary>
     public int RemindEveryMinutes { get; set; } = 60;
 
+    /// <summary>Alerts go to the user's phone through their own Telegram bot (token kept apart, encrypted).</summary>
+    public bool TelegramEnabled { get; set; } = true;
+
+    /// <summary>The user's private chat with the bot (found after they send /start), or null.</summary>
+    public long? TelegramChatId { get; set; }
+
+    public string TelegramChatName { get; set; } = "";
+
+    /// <summary>Tell the phone when Lumi replied for the user.</summary>
+    public bool TelegramOnReply { get; set; } = true;
+
+    /// <summary>Tell the phone when the list reminds of what still waits.</summary>
+    public bool TelegramOnRemind { get; set; } = true;
+
+    /// <summary>Tell the phone of every new to-do message.</summary>
+    public bool TelegramOnNewToDo { get; set; }
+
+    /// <summary>Only while the user is away from the PC (no keyboard or mouse for <see cref="AwayMinutes"/>).</summary>
+    public bool TelegramOnlyAway { get; set; } = true;
+
+    public int AwayMinutes { get; set; } = 5;
+
     /// <summary>A sound when something new lands on the to-do list.</summary>
     public bool PlaySound { get; set; }
 

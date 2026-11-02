@@ -14,7 +14,7 @@ namespace Helm.Modules.SlackBot;
 /// Only once in a while per DM or thread, never hours later, and the item stays on the user's list until they answer.
 /// </summary>
 public sealed partial class SlackReplier(ISlackApi api, ISlackAgent agent, SlackInbox inbox, SlackReader reader, Func<SlackBotSettings> settings,
-    string me, ILogger logger)
+    string me, ILogger logger, Action<InboxItem>? replied = null)
 {
     /// <summary>No reply to a message older than this (after the PC was off, say).</summary>
     internal static readonly TimeSpan MaxAge = TimeSpan.FromHours(2);
@@ -108,6 +108,7 @@ public sealed partial class SlackReplier(ISlackApi api, ISlackAgent agent, Slack
             {
                 var ts = await api.PostMessageAsync(item.Channel, signed.Fallback, signed.Blocks, thread, ct).ConfigureAwait(false);
                 inbox.BotReplied(item.Id, item.Channel, ts, reply);
+                replied?.Invoke(item);
                 sent++;
             }
             catch (SlackApiException ex)
