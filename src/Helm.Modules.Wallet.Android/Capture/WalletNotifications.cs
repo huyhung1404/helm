@@ -36,6 +36,7 @@ internal static class WalletNotifications
     public const string ExtraAfter = "com.huyhung1404.helm.wallet.extra.AFTER";
     public const string ExtraBefore = "com.huyhung1404.helm.wallet.extra.BEFORE";
     private const string ChannelId = "wallet_categorize";
+    private const string FundChannelId = "wallet_funds";
     private const int PermissionRequestCode = 0x5A13;
     private const string PermissionAskedKey = "notification_permission_asked";
 
@@ -134,6 +135,34 @@ internal static class WalletNotifications
         catch (Exception ex)
         {
             Log(ex, "Could not ask about money that moved without a notification");
+        }
+    }
+
+    /// <summary>"Eating is running low · 182,000 ₫ left": a fund past its warning share, used up or over. A tap opens Wallet.</summary>
+    public static void WarnFund(Context context, FundAlerts.Warning warning)
+    {
+        try
+        {
+            if (!CanNotify(context) || context.GetSystemService(Context.NotificationService) is not NotificationManager manager) return;
+            manager.CreateNotificationChannel(new NotificationChannel(FundChannelId, "Fund warnings", NotificationImportance.Default)
+            {
+                Description = "When a fund runs low, is used up or goes over.",
+            });
+            // One per fund: a worse warning replaces the earlier one.
+            var id = NotificationId("fund|" + warning.FundId);
+            var builder = new Notification.Builder(context, FundChannelId)
+                .SetSmallIcon(R.Drawable(context, "wallet_notification"))
+                .SetContentTitle(warning.Title)
+                .SetContentText(warning.Text)
+                .SetStyle(new Notification.BigTextStyle().BigText(warning.Text))
+                .SetAutoCancel(true)
+                .SetShowWhen(true);
+            if (OpenWalletIntent(context, id) is { } open) builder.SetContentIntent(open);
+            manager.Notify(id, builder.Build());
+        }
+        catch (Exception ex)
+        {
+            Log(ex, "Could not warn about a fund");
         }
     }
 

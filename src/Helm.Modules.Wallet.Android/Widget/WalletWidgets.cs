@@ -74,8 +74,10 @@ internal static class WalletWidgets
 
     private static readonly WalletWidgetPeriod[] s_periods = Enum.GetValues<WalletWidgetPeriod>();
 
+    /// <summary>Redraws every Wallet widget, and the Funds widgets with them (the same data changed).</summary>
     public static void RefreshAll(Context context)
     {
+        FundsWidgets.RefreshAll(context);
         var manager = AppWidgetManager.GetInstance(context);
         if (manager is null) return;
         var ids = manager.GetAppWidgetIds(new ComponentName(context, Java.Lang.Class.FromType(typeof(WalletWidgetProvider))));

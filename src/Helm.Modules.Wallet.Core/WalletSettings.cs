@@ -54,6 +54,15 @@ public sealed class WalletSettings : IVersionedSettings
     /// <summary>The widget shows dots instead of the balance (the home screen is seen by anyone holding the phone).</summary>
     public bool WidgetHideBalance { get; set; }
 
+    /// <summary>Warn on the phone when a fund runs low, is used up or goes over.</summary>
+    public bool WarnFunds { get; set; } = true;
+
+    /// <summary>
+    /// What each fund was last warned about ("2026-10|&lt;fund id&gt;" → <see cref="FundStatus"/>), so a fund warns once per
+    /// level and month (see <see cref="FundAlerts"/>).
+    /// </summary>
+    public Dictionary<string, FundStatus> FundWarnings { get; set; } = [];
+
     public WidgetLook WidgetLook => new(WidgetBackground, WidgetOpacity, WidgetText);
 
     public bool IsBankEnabled(string bankId) => !DisabledBanks.Contains(bankId, StringComparer.Ordinal);

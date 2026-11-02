@@ -7,4 +7,5 @@
     <color name="wallet_widget_secondary">#5F5F5F</color>
     <color name="wallet_widget_brand">#047857</color>
     <string name="wallet_widget_description">Your balance in a ring with what you spent and earned today, this week, this month or in total. Tap to open Wallet.</string>
+    <string name="funds_widget_description">Your funds as honey pots: what is left in each, the ones running low or over first. Tap to open Wallet.</string>
 </resources>

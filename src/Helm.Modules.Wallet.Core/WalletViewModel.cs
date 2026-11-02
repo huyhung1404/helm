@@ -105,6 +105,7 @@ public sealed partial class WalletViewModel : ObservableObject
     [ObservableProperty] private bool _askForCategory;
     [ObservableProperty] private bool _autoCategorize;
     [ObservableProperty] private bool _askForMissing;
+    [ObservableProperty] private bool _warnFunds;
     [ObservableProperty] private int _transactionPageIndex;
     [ObservableProperty] private int _widgetChartIndex;
     [ObservableProperty] private int _widgetBackgroundIndex;
@@ -914,6 +915,7 @@ public sealed partial class WalletViewModel : ObservableObject
         AskForCategory = s.AskForCategory;
         AutoCategorize = s.AutoCategorize;
         AskForMissing = s.AskForMissing;
+        WarnFunds = s.WarnFunds;
         TransactionPageIndex = ListPager.IndexOf(s.TransactionsShown);
         if (TransactionPager.PageSize != s.TransactionsShown) TransactionPager.PageSize = s.TransactionsShown;
         WidgetChartIndex = (int)s.WidgetChart;
@@ -970,6 +972,11 @@ public sealed partial class WalletViewModel : ObservableObject
     partial void OnAskForMissingChanged(bool value)
     {
         if (!_loading) _settings.Update(s => s.AskForMissing = value);
+    }
+
+    partial void OnWarnFundsChanged(bool value)
+    {
+        if (!_loading) _settings.Update(s => s.WarnFunds = value);
     }
 
     partial void OnTransactionPageIndexChanged(int value)
