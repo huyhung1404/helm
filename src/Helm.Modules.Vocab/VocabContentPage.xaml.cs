@@ -25,14 +25,13 @@ public partial class VocabContentPage : Page
     private string? _shownPartId;
     private VocabWordDetailViewModel? _watchedDetail;
 
-    public VocabContentPage(VocabModule module, VocabViewModel viewModel, VocabQuiz quiz, IShellNavigation navigation)
+    public VocabContentPage(VocabModule module, VocabViewModel viewModel, IShellNavigation navigation)
     {
         _module = module;
         _viewModel = viewModel;
         _navigation = navigation;
         DataContext = viewModel;
         InitializeComponent();
-        WordView.Quiz = quiz;
         // Module and page are both singletons, so the subscriptions live as long as the page.
         module.PropertyChanged += OnModuleChanged;
         viewModel.PropertyChanged += OnViewModelChanged;

@@ -102,7 +102,7 @@
                             <Run Text="Your note:" /> <Run Text="{Binding Word.Note, Mode=OneWay}" />
                         </TextBlock>
                         <WrapPanel Margin="0,12,0,0">
-                            <ItemsControl Style="{StaticResource Dots}" ItemsSource="{Binding Dots, ElementName=Root}" Margin="0,0,6,4" />
+                            <ItemsControl Style="{StaticResource Dots}" ItemsSource="{Binding Dots}" Margin="0,0,6,4" />
                             <TextBlock Text="{Binding LevelText}" Margin="0,0,12,4" VerticalAlignment="Center" Style="{DynamicResource HelmSecondaryText}" />
                             <Border Style="{StaticResource Tag}" Margin="0,0,6,4" Visibility="{Binding Word.Level, Converter={StaticResource NotEmptyToVisibility}}">
                                 <TextBlock Text="{Binding Word.Level}" />
@@ -126,7 +126,7 @@
                                     ToolTip="You forgot it several times: Claude Code writes a new way to remember it">
                                 <TextBlock Text="Often forgotten" />
                             </Border>
-                            <Border Style="{StaticResource PinyinTag}" Margin="0,0,6,4" Visibility="{Binding IsSlipping, ElementName=Root, Converter={StaticResource BoolToVisibility}}"
+                            <Border Style="{StaticResource PinyinTag}" Margin="0,0,6,4" Visibility="{Binding IsSlipping, Converter={StaticResource BoolToVisibility}}"
                                     ToolTip="Its pinyin keeps slipping while you know the meaning: Claude Code writes a way to remember the reading">
                                 <TextBlock Text="Pinyin slips" />
                             </Border>

@@ -42,7 +42,7 @@ public sealed class VocabViewsTests : IDisposable
         Assert.True(waiting.CanRemove);
 
         // Learn: the card, Today, the kind of card and the keys; the tabs show their counts.
-        var page = new VocabContentPage(module, viewModel, quiz, new NoNavigation());
+        var page = new VocabContentPage(module, viewModel, new NoNavigation());
         Assert.True(viewModel.IsLearning);
         var relative = store.FindWord("relative")!;
         viewModel.Card.Show(relative.Id, relative.Value);
@@ -138,8 +138,8 @@ public sealed class VocabViewsTests : IDisposable
         jiu.SelectCommand.Execute(null);
         Assert.Equal("求", viewModel.Detail.CardTitle);
         Layout(page, size, "09-chinese-word");
-        Assert.True(page.WordView.IsSlipping);
-        Assert.Equal(VocabQuiz.TopLevel, page.WordView.Dots.Count);
+        Assert.True(viewModel.Detail.IsSlipping);
+        Assert.Equal(VocabQuiz.TopLevel, viewModel.Detail.Dots.Count);
         Assert.True(Shows(page, "Remembering the pinyin"));
         Assert.True(Shows(page, "Pinyin slips"));
 
@@ -152,7 +152,7 @@ public sealed class VocabViewsTests : IDisposable
         Assert.True(viewModel.HasNextWord);
         Assert.Equal("1 / 2", viewModel.WordPosition);
         Layout(page, size, "10-english-word");
-        Assert.False(page.WordView.IsSlipping);
+        Assert.False(viewModel.Detail!.IsSlipping);
         Assert.True(Shows(page, "B1"));
         Assert.True(Shows(page, "#Aptis"));
         Assert.True(Shows(page, "Also in your words"));

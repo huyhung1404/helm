@@ -183,7 +183,7 @@ public sealed partial class VocabWordDetailViewModel : ObservableObject
         try
         {
             _store.AddWord(form, $"Trong {Word.Text}");
-            _notify?.Invoke($"“{form}” is one of your words now; it waits for an AI agent to break it down (Add tab).");
+            _notify?.Invoke($"“{form}” is one of your words now; it waits for an AI agent to break it down (Add words).");
         }
         catch (ArgumentException ex)
         {
