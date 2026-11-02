@@ -34,12 +34,15 @@ public static class WalletCoreServices
         services.AddSyncedCollection(new SyncedCollectionOptions<WalletBudget> { Name = WalletStore.BudgetCollection });
         // The debt book: one record per entry, never edited (only settled), so the latest write wins.
         services.AddSyncedCollection(new SyncedCollectionOptions<WalletDebt> { Name = DebtBook.Collection, GuardDeletions = true });
+        // Funds: one small record each (amount, categories, the month's moves); the latest edit wins.
+        services.AddSyncedCollection(new SyncedCollectionOptions<WalletFund> { Name = FundBook.Collection, GuardDeletions = true });
         services.AddSyncGroup("wallet.", WalletIds.DisplayName);
         services.AddSingleton(sp => new WalletStore(
             sp.GetRequiredService<ISyncedCollection<WalletTransaction>>(),
             sp.GetRequiredService<ISyncedCollection<WalletCategory>>(),
             sp.GetRequiredService<ISyncedCollection<WalletBudget>>()));
         services.AddSingleton(sp => new DebtBook(sp.GetRequiredService<ISyncedCollection<WalletDebt>>(), sp.GetRequiredService<WalletStore>()));
+        services.AddSingleton(sp => new FundBook(sp.GetRequiredService<ISyncedCollection<WalletFund>>(), sp.GetRequiredService<WalletStore>()));
         services.AddSingleton<WalletCapture>();
         // Quick Capture: "/s 50k coffee" and "/d Nam 200k".
         services.AddSingleton<Helm.Core.Capture.ICaptureTarget, SpendCaptureTarget>();
