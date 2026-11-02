@@ -27,6 +27,7 @@ public static class HelmCoreServices
         services.AddSingleton<IUserActivity, UserActivity>();
         services.AddSingleton<IMonitorService, MonitorService>();
         services.AddSingleton<IInputMethods, InputMethods>();
+        services.AddSingleton<IBrowserSites, BrowserSites>();
         services.AddSingleton<IStartupTaskService, StartupTaskService>();
         services.AddSingleton<IProcessLauncher, ProcessLauncher>();
         services.AddSingleton<IChildProcessLauncher, ChildProcessLauncher>();

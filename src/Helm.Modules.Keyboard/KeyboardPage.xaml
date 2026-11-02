@@ -90,7 +90,7 @@
         <Border Style="{DynamicResource HelmSurface}" Padding="0">
             <StackPanel>
                 <TextBlock Margin="16" TextWrapping="Wrap" Style="{DynamicResource HelmSecondaryText}"
-                           Text="Every app starts in English. Switch the keyboard in an app and Helm gives it back the next time you use that app, on every PC you sync."
+                           Text="Every app and web site starts in English. Switch the keyboard in an app, or on a web page, and Helm gives it back the next time you use that app or open that site, on every PC you sync."
                            Visibility="{Binding HasApps, Converter={StaticResource InverseBoolToVisibility}}" />
                 <ItemsControl ItemsSource="{Binding Apps}">
                     <ItemsControl.ItemTemplate>
@@ -103,8 +103,8 @@
                                         <ColumnDefinition Width="Auto" />
                                         <ColumnDefinition Width="Auto" />
                                     </Grid.ColumnDefinitions>
-                                    <ui:SymbolIcon Symbol="Apps24" VerticalAlignment="Center" />
-                                    <TextBlock Grid.Column="1" Text="{Binding App}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
+                                    <ui:SymbolIcon Symbol="{Binding Icon}" VerticalAlignment="Center" />
+                                    <TextBlock Grid.Column="1" Text="{Binding Display}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
                                     <ComboBox Grid.Column="2" MinWidth="140" AutomationProperties.Name="Keyboard"
                                               ItemsSource="{Binding DataContext.Modes, RelativeSource={RelativeSource AncestorType=core:ModulePageBase}}"
                                               DisplayMemberPath="Label" SelectedValuePath="Value" SelectedValue="{Binding Mode}" />

@@ -24,7 +24,17 @@ public sealed partial class KeyboardAppRow : ObservableObject
         _mode = app.Mode;
     }
 
+    /// <summary>The stored key: a program file name, or "web:site" for a web site.</summary>
     public string App { get; }
+
+    /// <summary>Whether this row is a web site rather than an app.</summary>
+    public bool IsSite => App.StartsWith("web:", StringComparison.Ordinal);
+
+    /// <summary>What the row shows: the site on its own ("facebook.com"), or the app's file name.</summary>
+    public string Display => IsSite ? App["web:".Length..] : App;
+
+    /// <summary>A globe for a web site, the apps symbol for an app.</summary>
+    public Wpf.Ui.Controls.SymbolRegular Icon => IsSite ? Wpf.Ui.Controls.SymbolRegular.Globe24 : Wpf.Ui.Controls.SymbolRegular.Apps24;
 
     partial void OnModeChanged(KeyboardMode value) => _apps.Remember(App, value);
 }

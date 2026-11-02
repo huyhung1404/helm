@@ -43,6 +43,7 @@ public sealed class AutoTypeService(
     VaultSession session,
     VaultStore store,
     IWindowService windows,
+    IBrowserSites sites,
     IVaultPlatform platform,
     IMonitorService monitors,
     IUiDispatcher ui,
@@ -50,7 +51,6 @@ public sealed class AutoTypeService(
     IServiceProvider services,
     ILogger<AutoTypeService> logger)
 {
-    private static readonly string[] Chromium = ["chrome", "msedge", "brave", "opera", "vivaldi", "browser", "arc", "thorium"];
     private readonly ISettingsStore<VaultWindowsSettings> _settings = settings.Get<VaultWindowsSettings>(VaultWindowsSettings.StoreId);
     private AutoTypePicker? _picker;
     private int _busy;
@@ -69,7 +69,7 @@ public sealed class AutoTypeService(
                 if (target == 0 || windows.GetProcessName(target).Equals("Helm", StringComparison.OrdinalIgnoreCase)) return;
                 var title = windows.GetTitle(target);
                 var process = windows.GetProcessName(target);
-                var url = BrowserAddress(target, process);
+                var url = sites.Address(target, process);
                 await ui.InvokeAsync(() => Offer(target, title, process, url)).ConfigureAwait(false);
             }
             catch (Exception ex)
@@ -152,27 +152,6 @@ public sealed class AutoTypeService(
         }
     }
 
-    /// <summary>What a browser's address bar shows ("github.com/login"), or null for any other window.</summary>
-    private string? BrowserAddress(nint hwnd, string process)
-    {
-        var name = process.ToLowerInvariant();
-        var isFirefox = name is "firefox" or "librewolf" or "waterfox" or "floorp" or "zen";
-        if (!isFirefox && !Chromium.Contains(name)) return null;
-        try
-        {
-            var root = AutomationElement.FromHandle(hwnd);
-            AutomationElement? bar = isFirefox
-                ? root.FindFirst(TreeScope.Descendants, new PropertyCondition(AutomationElement.AutomationIdProperty, "urlbar-input"))
-                // Chromium: the first edit box of the window is the address bar (the page's own come later).
-                : root.FindFirst(TreeScope.Descendants, new PropertyCondition(AutomationElement.ControlTypeProperty, ControlType.Edit));
-            return bar?.GetCurrentPropertyValue(ValuePattern.ValueProperty) as string is { Length: > 0 } value ? value : null;
-        }
-        catch (Exception ex) when (ex is ElementNotAvailableException or InvalidOperationException or System.Runtime.InteropServices.COMException)
-        {
-            logger.LogDebug(ex, "Could not read the address of {Process}", process);
-            return null;
-        }
-    }
 }
 
 /// <summary>The auto-type picker: the likely logins first, a search over all of them, Enter or a click types.</summary>

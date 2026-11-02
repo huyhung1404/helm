@@ -115,4 +115,53 @@ public sealed class KeyboardAppsTests
         _apps.Remember("slack.exe", KeyboardMode.Vietnamese);
         Assert.Equal(0, changes);
     }
+
+    [Fact]
+    public void A_site_keeps_its_own_keyboard_apart_from_the_browser_and_other_sites()
+    {
+        _apps.Remember(KeyboardApps.SiteKeyOf("bilibili.com"), KeyboardMode.Chinese);
+        _apps.Remember(KeyboardApps.SiteKeyOf("facebook.com"), KeyboardMode.Vietnamese);
+        Assert.Equal(KeyboardMode.Chinese, _apps.ModeOf(KeyboardApps.SiteKeyOf("bilibili.com")));
+        Assert.Equal(KeyboardMode.Vietnamese, _apps.ModeOf(KeyboardApps.SiteKeyOf("facebook.com")));
+        // The browser app itself, never remembered, is untouched.
+        Assert.Equal(KeyboardMode.English, _apps.ModeOf("msedge.exe"));
+    }
+
+    [Fact]
+    public void Knows_tells_a_seen_site_from_a_new_one()
+    {
+        Assert.False(_apps.Knows("bilibili.com"));
+        _apps.Remember(KeyboardApps.SiteKeyOf("bilibili.com"), KeyboardMode.Chinese);
+        Assert.True(_apps.Knows("bilibili.com"));
+        Assert.True(_apps.Knows("BILIBILI.COM"));
+        Assert.False(_apps.Knows(null));
+    }
+}
+
+public sealed class BrowserSiteDomainTests
+{
+    [Theory]
+    [InlineData("https://www.facebook.com/me", "facebook.com")]
+    [InlineData("https://m.facebook.com/x", "facebook.com")]
+    [InlineData("https://www.bilibili.com/video/BV1", "bilibili.com")]
+    [InlineData("bilibili.com", "bilibili.com")]
+    [InlineData("https://accounts.google.com/signin", "google.com")]
+    [InlineData("https://news.bbc.co.uk/sport", "bbc.co.uk")]
+    [InlineData("https://shop.example.com.vn/cart", "example.com.vn")]
+    [InlineData("https://example.com.vn/cart", "example.com.vn")]
+    [InlineData("http://sub.deep.example.com/", "example.com")]
+    public void The_registrable_domain_is_what_a_site_is_remembered_by(string url, string domain) =>
+        Assert.Equal(domain, Helm.Core.Desktop.BrowserSites.RegistrableDomain(url));
+
+    [Theory]
+    [InlineData("edge://settings")]
+    [InlineData("chrome://newtab")]
+    [InlineData("about:blank")]
+    [InlineData("file:///C:/notes.html")]
+    [InlineData("http://localhost:3000/")]
+    [InlineData("http://192.168.1.1/admin")]
+    [InlineData("")]
+    [InlineData("   ")]
+    public void A_page_with_no_site_of_its_own_gives_nothing(string url) =>
+        Assert.Null(Helm.Core.Desktop.BrowserSites.RegistrableDomain(url));
 }
