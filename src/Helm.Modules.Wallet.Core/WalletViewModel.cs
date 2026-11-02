@@ -307,6 +307,7 @@ public sealed partial class WalletViewModel : ObservableObject
     partial void OnIsDebtsViewChanged(bool value)
     {
         OnPropertyChanged(nameof(IsMoneyView));
+        OnPropertyChanged(nameof(ShowToCategorizeButton));
         if (value) _debts?.Refresh();
     }
 
@@ -821,6 +822,7 @@ public sealed partial class WalletViewModel : ObservableObject
         ToCategorizeTitle = waiting.Count == 0 ? "" : $"{waiting.Count} to categorize";
         MoreToCategorizeText = waiting.Count > ToCategorizeShown ? $"{waiting.Count - ToCategorizeShown} more after these" : "";
         OnPropertyChanged(nameof(HasToCategorize));
+        OnPropertyChanged(nameof(ShowToCategorizeButton));
         if (_similarIds.Count > 0 && !_similarIds.Any(id => waiting.Any(w => w.Id == id))) DismissSimilar();
     }
 

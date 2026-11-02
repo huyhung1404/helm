@@ -131,6 +131,9 @@ public sealed partial class WalletViewModel
         ShowPopup(WalletPopup.Debt);
     }
 
+    /// <summary>The "To categorize (n)" button: on the money view while some wait for a category.</summary>
+    public bool ShowToCategorizeButton => IsMoneyView && HasToCategorize;
+
     [RelayCommand]
     private void OpenToCategorize() => ShowPopup(WalletPopup.ToCategorize, stack: false);
 
