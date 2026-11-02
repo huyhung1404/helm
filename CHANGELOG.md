@@ -3,6 +3,16 @@
 All notable changes to Helm. The top section is used as the GitHub release body and as the Velopack release notes.
 Format: [Keep a Changelog](https://keepachangelog.com), versions follow [SemVer](https://semver.org).
 
+## [0.75.0] - 2026-11-02
+
+### Added
+- **Helm Keyboard: the shortcut switches the computer you control.** In a Chrome Remote Desktop session (in any
+  browser), Remote Desktop, UltraViewer, TeamViewer, AnyDesk, RustDesk, Parsec or VNC Viewer, left Ctrl+Shift (or
+  right Ctrl) no longer switches this computer: it goes on to the other one, whose Helm switches its keyboard and shows
+  EN / VI / 中 there. This computer stays on English in those windows, so its own input method (Sogou) never takes the
+  letters first, and they are not remembered as a keyboard of their own. Settings → Keyboard → **Leave the shortcut to
+  a computer you control** turns it off. A shortcut of your own (like Ctrl+Alt+K) cannot reach the other computer.
+
 ## [0.74.1] - 2026-11-02
 
 ### Fixed
