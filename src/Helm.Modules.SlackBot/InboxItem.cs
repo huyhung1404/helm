@@ -45,6 +45,9 @@ public sealed class InboxItem
     /// <summary>Who wrote it (display name).</summary>
     public string From { get; set; } = "";
 
+    /// <summary>Who wrote it (Slack's user id), to tag them in a reply; null for a bot.</summary>
+    public string? UserId { get; set; }
+
     /// <summary>The words, as a person reads them (<see cref="SlackText.Plain"/>).</summary>
     public string Text { get; set; } = "";
 

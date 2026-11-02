@@ -73,6 +73,7 @@ public sealed partial class SlackReader(ISlackApi api, SlackIdentity me, SlackIn
             ThreadStart = m.IsReply ? inbox.TextOf(m.Channel, m.ThreadTs!) : null,
             Direct = direct,
             Tagged = callsMe,
+            UserId = m.User,
         };
         if (!inbox.Add(item)) return false;
         if (direct && item.Handled == HandledBy.None) ForYou?.Invoke(this, EventArgs.Empty);

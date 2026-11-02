@@ -499,6 +499,6 @@ public sealed class SlackInbox
     {
         Channel = i.Channel, Ts = i.Ts, ThreadTs = i.ThreadTs, Kind = i.Kind, Where = i.Where, From = i.From, Text = i.Text,
         ThreadStart = i.ThreadStart, Direct = i.Direct, Level = i.Level, Summary = i.Summary, SortTries = i.SortTries,
-        Handled = i.Handled, HandledAt = i.HandledAt, Read = i.Read, BotReply = i.BotReply, BotReplyAt = i.BotReplyAt, Tagged = i.Tagged,
+        Handled = i.Handled, HandledAt = i.HandledAt, Read = i.Read, BotReply = i.BotReply, BotReplyAt = i.BotReplyAt, Tagged = i.Tagged, UserId = i.UserId,
     };
 }

@@ -15,7 +15,8 @@ Format: [Keep a Changelog](https://keepachangelog.com), versions follow [SemVer]
   on this PC, encrypted. Claude only reads what Helm found, with no tools.
 - **Slack Bot: call Lumi on Slack.** Write "lumi, …" or "@lumi …" in a thread or a conversation, and Lumi answers
   in the thread from that conversation only (the thread, or the conversation's latest messages), behind the AI
-  signature. You may call Lumi anywhere; others only where Write is on. It never brings in another channel or DM, never
+  signature, tagging whoever asked so they are told (Lumi's replies for you tag the person too). You may call Lumi
+  anywhere; others only where Write is on. It never brings in another channel or DM, never
   pings anyone or adds links the conversation did not have, and never promises or decides for you when someone else
   asks; a message that only mentions Lumi gets nothing; each call is answered once, never a stale one, at most 20 an
   hour. "Answer when someone calls Lumi" turns it off.

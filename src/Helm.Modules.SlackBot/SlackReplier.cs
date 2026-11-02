@@ -100,7 +100,7 @@ public sealed partial class SlackReplier(ISlackApi api, ISlackAgent agent, Slack
                 inbox.BotReplied(item.Id, item.Channel, null, null);
                 continue;
             }
-            var signed = SlackSignature.Sign(reply, s, me);
+            var signed = SlackSignature.Sign(SlackSignature.ToPerson(reply, item.UserId, reader.Me.UserId), s, me);
             // In a channel the reply goes in the message's thread, so the channel is not flooded.
             var thread = item.Kind is SlackConversationKind.DirectMessage or SlackConversationKind.GroupMessage ? item.ThreadTs : item.ThreadTs ?? item.Ts;
             inbox.Sending(item.Channel);

@@ -71,7 +71,7 @@ public sealed partial class SlackLumi(ISlackApi api, ISlackAgent agent, SlackInb
                 return false;
             }
             if (answer is null) return false;
-            var signed = SlackSignature.Sign(answer, settings(), meName);
+            var signed = SlackSignature.Sign(SlackSignature.ToPerson(answer, m.User, me.UserId), settings(), meName);
             inbox.Sending(m.Channel);
             try
             {
