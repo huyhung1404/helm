@@ -6,6 +6,13 @@ Format: [Keep a Changelog](https://keepachangelog.com), versions follow [SemVer]
 ## [Unreleased]
 
 ### Added
+- **Weekly Report (PC): your week, written up for your manager.** Press Find my work: it lists the projects you
+  committed to that week (every repository under the folders you choose, all branches, only your commits) and the
+  Slack conversations you wrote in (through Slack Bot), each with its commits, days and estimated hours. Tick what goes
+  in, add what to stress, and Claude Code writes a short report in Vietnamese: achievements first, about how many hours
+  per project (estimated from your activity), what you coordinated on Slack. Ask for changes ("shorter", "build work
+  first") as many times as you like, go back to an earlier version, edit by hand, then Copy; copied reports are kept
+  on this PC, encrypted. Claude only reads what Helm found, with no tools.
 - **Slack Bot: news on your phone while you are away from the PC.** Through your own Telegram bot (made with
   @BotFather in a minute; Helm sends to it straight from the PC), Slack Bot tells you when Lumi replied for you and,
   with the hourly reminders, what still waits; every new to-do too if you want. It sends only while nobody touched the

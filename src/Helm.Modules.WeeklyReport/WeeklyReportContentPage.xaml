@@ -1,0 +1,119 @@
+<Page
+    x:Class="Helm.Modules.WeeklyReport.WeeklyReportContentPage"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
+    xmlns:core="clr-namespace:Helm.Core.Ui;assembly=Helm.Core.Windows"
+    xmlns:local="clr-namespace:Helm.Modules.WeeklyReport"
+    Title="Weekly Report">
+
+    <!-- Weekly Report itself (menu and Quick access): the week, what goes in, the report and its versions. Its options
+         live on WeeklyReportPage (Home → Utilities). -->
+    <Page.Resources>
+        <DataTemplate x:Key="PickTemplate" DataType="{x:Type local:PickRow}">
+            <Border Style="{DynamicResource HelmExpanderRow}" Padding="0,6">
+                <core:RowLayout>
+                    <CheckBox IsChecked="{Binding IsSelected}" VerticalAlignment="Center" AutomationProperties.Name="{Binding Name}">
+                        <TextBlock Text="{Binding Name}" TextTrimming="CharacterEllipsis" />
+                    </CheckBox>
+                    <TextBlock HorizontalAlignment="Right" VerticalAlignment="Center" Text="{Binding Detail}" Style="{DynamicResource HelmSecondaryText}" />
+                </core:RowLayout>
+            </Border>
+        </DataTemplate>
+    </Page.Resources>
+
+    <StackPanel Margin="24,16,24,24">
+        <TextBlock Text="Weekly Report" FontSize="28" FontWeight="SemiBold" Margin="0,0,0,16" />
+
+        <!-- Shown while the tool is turned off -->
+        <ui:InfoBar x:Name="OffBar" Severity="Informational" IsClosable="False" IsOpen="False" Visibility="Collapsed" Margin="0,0,0,8"
+                    Title="Weekly Report is turned off" Message="Your past reports are kept. Turn Weekly Report on in its settings to write one." />
+
+        <StackPanel x:Name="Body">
+            <!-- The week, first -->
+            <ui:CardControl Margin="0,0,0,4" Icon="{ui:SymbolIcon CalendarLtr24}">
+                <ui:CardControl.Header>
+                    <core:CardHeader Title="Week" Description="{Binding Status}" />
+                </ui:CardControl.Header>
+                <StackPanel Orientation="Horizontal">
+                    <ComboBox MinWidth="260" ItemsSource="{Binding Weeks}" DisplayMemberPath="Label" SelectedItem="{Binding Week}" AutomationProperties.Name="Week" />
+                    <ui:Button Margin="8,0,0,0" Content="Find my work" Appearance="Primary" Icon="{ui:SymbolIcon Search24}" Command="{Binding FindCommand}" />
+                    <ui:Button Margin="8,0,0,0" Content="Stop" Command="{Binding StopCommand}"
+                               Visibility="{Binding IsBusy, Converter={StaticResource BoolToVisibility}}" />
+                </StackPanel>
+            </ui:CardControl>
+            <ui:ProgressRing Margin="0,8" IsIndeterminate="True" Width="24" Height="24" HorizontalAlignment="Left"
+                             Visibility="{Binding IsBusy, Converter={StaticResource BoolToVisibility}}" />
+
+            <!-- What goes in -->
+            <StackPanel Visibility="{Binding HasScan, Converter={StaticResource BoolToVisibility}}">
+                <TextBlock Text="Projects (your commits)" Style="{DynamicResource HelmSectionHeader}" />
+                <Border Style="{DynamicResource HelmSurface}" Margin="0,0,0,4">
+                    <ItemsControl ItemsSource="{Binding Projects}" ItemTemplate="{StaticResource PickTemplate}" />
+                </Border>
+                <TextBlock Text="Slack (what you wrote)" Style="{DynamicResource HelmSectionHeader}" />
+                <ui:InfoBar Margin="0,0,0,4" Severity="Warning" IsClosable="False" Title="Slack" Message="{Binding SlackNote}"
+                            IsOpen="True" Visibility="{Binding SlackNote, Converter={StaticResource NotEmptyToVisibility}}" />
+                <Border Style="{DynamicResource HelmSurface}" Margin="0,0,0,4">
+                    <ItemsControl ItemsSource="{Binding Conversations}" ItemTemplate="{StaticResource PickTemplate}" />
+                </Border>
+                <ui:CardExpander Margin="0,8,0,4" Icon="{ui:SymbolIcon Star24}">
+                    <ui:CardExpander.Header>
+                        <core:CardHeader Title="Anything to stress this week" Description="Optional: what Claude should bring forward." />
+                    </ui:CardExpander.Header>
+                    <ui:TextBox AcceptsReturn="True" TextWrapping="Wrap" MinHeight="60" VerticalContentAlignment="Top"
+                                PlaceholderText="e.g. the build time went from 20 to 8 minutes; I helped the QA team all Thursday."
+                                Text="{Binding Emphasis, UpdateSourceTrigger=PropertyChanged}" AutomationProperties.Name="Anything to stress this week" />
+                </ui:CardExpander>
+                <ui:Button Margin="0,4,0,0" Content="Write the report" Appearance="Primary" Icon="{ui:SymbolIcon Sparkle24}" Command="{Binding WriteCommand}" />
+            </StackPanel>
+
+            <!-- The report and its versions -->
+            <StackPanel Visibility="{Binding HasDraft, Converter={StaticResource BoolToVisibility}}">
+                <DockPanel Margin="0,16,0,0">
+                    <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Bottom" Margin="0,0,0,8">
+                        <ui:Button Appearance="Transparent" Icon="{ui:SymbolIcon ChevronLeft24}" ToolTip="Earlier version" AutomationProperties.Name="Earlier version"
+                                   Command="{Binding EarlierCommand}" />
+                        <TextBlock Margin="4,0" VerticalAlignment="Center" Text="{Binding VersionText}" Style="{DynamicResource HelmSecondaryText}" />
+                        <ui:Button Appearance="Transparent" Icon="{ui:SymbolIcon ChevronRight24}" ToolTip="Later version" AutomationProperties.Name="Later version"
+                                   Command="{Binding LaterCommand}" />
+                    </StackPanel>
+                    <TextBlock Text="Report" Style="{DynamicResource HelmSectionHeader}" />
+                </DockPanel>
+                <ui:TextBox x:Name="DraftBox" AcceptsReturn="True" TextWrapping="Wrap" MinHeight="260" VerticalContentAlignment="Top" FontSize="14"
+                            Text="{Binding Draft, Mode=OneWay}" AutomationProperties.Name="Report"
+                            ToolTip="You can also edit it here before copying" />
+                <WrapPanel Margin="0,8,0,0">
+                    <ui:Button Content="Copy" Appearance="Primary" Icon="{ui:SymbolIcon Copy24}" Click="Copy_Click" />
+                </WrapPanel>
+                <ui:CardControl Margin="0,12,0,4" Icon="{ui:SymbolIcon ChatSparkle24}">
+                    <ui:CardControl.Header>
+                        <core:CardHeader Title="Ask for changes" Description="e.g. shorter; put the build work first; leave out the hotfix." />
+                    </ui:CardControl.Header>
+                    <StackPanel Orientation="Horizontal">
+                        <ui:TextBox Width="380" Text="{Binding Request, UpdateSourceTrigger=PropertyChanged}" KeyDown="Request_KeyDown"
+                                    PlaceholderText="What to change" AutomationProperties.Name="What to change" />
+                        <ui:Button Margin="8,0,0,0" Content="Revise" Command="{Binding ReviseCommand}" />
+                    </StackPanel>
+                </ui:CardControl>
+            </StackPanel>
+
+            <!-- Past reports -->
+            <TextBlock Text="Past reports" Style="{DynamicResource HelmSectionHeader}" />
+            <TextBlock Text="Reports you copied are kept here, on this PC only." Style="{DynamicResource HelmSecondaryText}" Margin="0,0,0,8" />
+            <ItemsControl ItemsSource="{Binding Past}">
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate DataType="{x:Type local:SavedReport}">
+                        <ui:CardExpander Margin="0,0,0,4" Icon="{ui:SymbolIcon DocumentText24}">
+                            <ui:CardExpander.Header>
+                                <core:CardHeader Title="{Binding Label}" />
+                            </ui:CardExpander.Header>
+                            <TextBox Text="{Binding Text, Mode=OneWay}" IsReadOnly="True" TextWrapping="Wrap" BorderThickness="0" Background="Transparent"
+                                     Foreground="{DynamicResource TextFillColorPrimaryBrush}" />
+                        </ui:CardExpander>
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+        </StackPanel>
+    </StackPanel>
+</Page>

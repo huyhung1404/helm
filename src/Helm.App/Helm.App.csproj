@@ -51,6 +51,7 @@
     <ProjectReference Include="..\Helm.Modules.Habits\Helm.Modules.Habits.csproj" />
     <ProjectReference Include="..\Helm.Modules.Keyboard\Helm.Modules.Keyboard.csproj" />
     <ProjectReference Include="..\Helm.Modules.SlackBot\Helm.Modules.SlackBot.csproj" />
+    <ProjectReference Include="..\Helm.Modules.WeeklyReport\Helm.Modules.WeeklyReport.csproj" />
   </ItemGroup>
 
 </Project>
