@@ -14,26 +14,35 @@ internal enum CardIcon
     Open,
     No,
     Yes,
+    Close,
 }
 
 internal enum IconStyle
 {
+    /// <summary>A plain icon (Listen, YouGlish, Open in Helm, ✕).</summary>
     Plain,
+    /// <summary>Forgot: outlined in red.</summary>
     No,
+    /// <summary>Remembered: a green disc.</summary>
     Yes,
 }
 
-/// <summary>A round 44 dp icon button, drawn on a 24-unit grid like the rest of Helm's line icons.</summary>
+/// <summary>
+/// A round 44 dp icon button, drawn on a 24-unit grid like the rest of Helm's line icons (the icon 20 dp by default).
+/// <see cref="On"/> marks a toggle that is on (Full details open).
+/// </summary>
 internal sealed class IconButton : AndroidView
 {
     private readonly VocabCardOverlay.Palette _c;
     private readonly IconStyle _style;
+    private readonly float _iconDp;
     private CardIcon _icon;
-    private bool _highlighted;
+    private bool _highlighted, _on;
 
-    public IconButton(Context context, CardIcon icon, IconStyle style, VocabCardOverlay.Palette palette, string name, Action click) : base(context)
+    public IconButton(Context context, CardIcon icon, IconStyle style, VocabCardOverlay.Palette palette, string name, Action click, float iconDp = 20) : base(context)
     {
         _icon = icon;
+        _iconDp = iconDp;
         _style = style;
         _c = palette;
         ContentDescription = name;
@@ -54,6 +63,17 @@ internal sealed class IconButton : AndroidView
         }
     }
 
+    public bool On
+    {
+        get => _on;
+        set
+        {
+            if (_on == value) return;
+            _on = value;
+            Invalidate();
+        }
+    }
+
     public void Set(CardIcon icon, string name)
     {
         _icon = icon;
@@ -69,65 +89,75 @@ internal sealed class IconButton : AndroidView
         var center = size / 2f;
         var tint = _style switch
         {
-            IconStyle.Yes => _c.Accent,
+            IconStyle.Yes => _c.Ok,
             IconStyle.No => _c.Bad,
-            _ => _c.Sub,
+            _ => _c.Ink,
         };
+        // A suggested answer (the typed word was right or wrong) gets a soft halo.
         if (_highlighted)
         {
             using var ring = new Paint(PaintFlags.AntiAlias) { Color = AndroidColor.Argb(0x73, tint.R, tint.G, tint.B) };
             canvas.DrawCircle(center, center, center, ring);
         }
-        if (_style != IconStyle.Plain || Pressed)
+        var inset = _highlighted ? size * 0.07f : 0;
+        var fill = _style switch
         {
-            var fill = _style switch
-            {
-                IconStyle.Yes => _c.Accent,
-                IconStyle.No => AndroidColor.Argb(0x24, _c.Bad.R, _c.Bad.G, _c.Bad.B),
-                _ => _c.Btn,
-            };
+            IconStyle.Yes => _c.Ok,
+            _ when _on => _c.AccentFill,
+            _ when Pressed => _c.Btn,
+            _ => AndroidColor.Transparent,
+        };
+        if (fill != AndroidColor.Transparent)
+        {
             using var disc = new Paint(PaintFlags.AntiAlias) { Color = fill };
-            canvas.DrawCircle(center, center, center - (_highlighted ? size * 0.07f : 0), disc);
+            canvas.DrawCircle(center, center, center - inset, disc);
         }
-        var ink = _style == IconStyle.Yes ? _c.OnAccent : tint;
-        var scale = size * 0.5f / 24f;
+        if (_style == IconStyle.No)
+        {
+            var edge = Dp(1.5f);
+            using var outline = new Paint(PaintFlags.AntiAlias) { Color = AndroidColor.Argb(0xB3, tint.R, tint.G, tint.B), StrokeWidth = edge };
+            outline.SetStyle(Paint.Style.Stroke);
+            canvas.DrawCircle(center, center, center - inset - edge / 2, outline);
+        }
+        var ink = _style == IconStyle.Yes ? _c.OnOk : _on ? _c.AccentText : tint;
+        var scale = Dp(_iconDp) / 24f;
         canvas.Save();
         canvas.Translate(center - 12 * scale, center - 12 * scale);
         canvas.Scale(scale, scale);
-        using var pen = new Paint(PaintFlags.AntiAlias) { Color = ink, StrokeWidth = 2, StrokeCap = Paint.Cap.Round, StrokeJoin = Paint.Join.Round };
+        using var pen = new Paint(PaintFlags.AntiAlias) { Color = ink, StrokeWidth = _style == IconStyle.Yes ? 2.4f : 1.7f, StrokeCap = Paint.Cap.Round, StrokeJoin = Paint.Join.Round };
         pen.SetStyle(Paint.Style.Stroke);
-        using var fillPen = new Paint(PaintFlags.AntiAlias) { Color = ink };
         switch (_icon)
         {
+            // The canvas's line icons, point for point.
             case CardIcon.Listen:
-                canvas.DrawPath(Poly(true, 4, 9.5f, 4, 14.5f, 7.5f, 14.5f, 12, 18.5f, 12, 5.5f, 7.5f, 9.5f), fillPen);
-                canvas.DrawArc(new RectF(11.5f, 8.5f, 18.5f, 15.5f), -55, 110, false, pen);
-                canvas.DrawArc(new RectF(9, 4.5f, 24, 19.5f), -50, 100, false, pen);
+                canvas.DrawPath(Poly(true, 4, 9.5f, 7.5f, 9.5f, 12, 5.5f, 12, 18.5f, 7.5f, 14.5f, 4, 14.5f), pen);
+                canvas.DrawArc(new RectF(8.85f, 8, 16.85f, 16), -48.6f, 97.2f, false, pen);
+                canvas.DrawArc(new RectF(5.4f, 4.5f, 20.4f, 19.5f), -47.2f, 94.4f, false, pen);
                 break;
             case CardIcon.Video:
-                canvas.DrawRoundRect(new RectF(3, 6.5f, 15, 17.5f), 2, 2, pen);
-                canvas.DrawPath(Poly(true, 15, 10.5f, 21, 7.5f, 21, 16.5f, 15, 13.5f), pen);
+                canvas.DrawRoundRect(new RectF(3.5f, 5.5f, 20.5f, 18.5f), 2.5f, 2.5f, pen);
+                canvas.DrawPath(Poly(true, 10.5f, 9.5f, 14.7f, 12, 10.5f, 14.5f), pen);
                 break;
             case CardIcon.Expand:
-                canvas.DrawPath(Poly(false, 14, 4, 20, 4, 20, 10), pen);
-                canvas.DrawLine(20, 4, 13, 11, pen);
-                canvas.DrawPath(Poly(false, 10, 20, 4, 20, 4, 14), pen);
-                canvas.DrawLine(4, 20, 11, 13, pen);
+                canvas.DrawPath(Poly(false, 4, 9, 4, 4, 9, 4), pen);
+                canvas.DrawPath(Poly(false, 20, 9, 20, 4, 15, 4), pen);
+                canvas.DrawPath(Poly(false, 4, 15, 4, 20, 9, 20), pen);
+                canvas.DrawPath(Poly(false, 20, 15, 20, 20, 15, 20), pen);
                 break;
             case CardIcon.Collapse:
-                canvas.DrawPath(Poly(false, 4, 14, 10, 14, 10, 20), pen);
-                canvas.DrawLine(10, 14, 3, 21, pen);
-                canvas.DrawPath(Poly(false, 20, 10, 14, 10, 14, 4), pen);
-                canvas.DrawLine(14, 10, 21, 3, pen);
+                canvas.DrawPath(Poly(false, 9, 4, 9, 9, 4, 9), pen);
+                canvas.DrawPath(Poly(false, 15, 4, 15, 9, 20, 9), pen);
+                canvas.DrawPath(Poly(false, 9, 20, 9, 15, 4, 15), pen);
+                canvas.DrawPath(Poly(false, 15, 20, 15, 15, 20, 15), pen);
                 break;
             case CardIcon.Open:
-                canvas.DrawPath(Poly(false, 14, 4, 20, 4, 20, 10), pen);
-                canvas.DrawLine(20, 4, 11, 13, pen);
-                canvas.DrawPath(Poly(false, 18, 14, 18, 20, 4, 20, 4, 6, 10, 6), pen);
+                canvas.DrawPath(Poly(false, 14, 4.5f, 19.5f, 4.5f, 19.5f, 10), pen);
+                canvas.DrawLine(19.5f, 4.5f, 11, 13, pen);
+                canvas.DrawPath(Poly(false, 17, 14, 17, 19.5f, 4.5f, 19.5f, 4.5f, 7, 10, 7), pen);
                 break;
-            case CardIcon.No:
-                canvas.DrawLine(7, 7, 17, 17, pen);
-                canvas.DrawLine(17, 7, 7, 17, pen);
+            case CardIcon.No or CardIcon.Close:
+                canvas.DrawLine(6, 6, 18, 18, pen);
+                canvas.DrawLine(18, 6, 6, 18, pen);
                 break;
             case CardIcon.Yes:
                 canvas.DrawPath(Poly(false, 5, 12.5f, 9.5f, 17, 19, 7.5f), pen);
@@ -135,6 +165,8 @@ internal sealed class IconButton : AndroidView
         }
         canvas.Restore();
     }
+
+    private float Dp(float dp) => VocabOverlayPlatform.Dp(Context!, dp);
 
     protected override void DrawableStateChanged()
     {

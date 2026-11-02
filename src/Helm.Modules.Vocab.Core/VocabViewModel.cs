@@ -69,7 +69,7 @@ public sealed partial class VocabViewModel : ObservableObject
         Settings = settings;
         Agent = agent;
         List = new VocabWordListViewModel(store, quiz, settings, id => Open(id));
-        Roots = new VocabRootsViewModel(store, agent, settings.PageSize, id => Open(id));
+        Roots = new VocabRootsViewModel(store, agent, settings.PageSize, id => Open(id), strengthOf: id => quiz.StatsOf(id).Level);
         // Revealing a card shows how the word is built: the same tree as the Words tab, its links open the word there.
         Card = new VocabCardViewModel(store, quiz, (id, word) => Build(id, word, null), voice, () => Settings.CardOptions)
         {
@@ -102,6 +102,9 @@ public sealed partial class VocabViewModel : ObservableObject
 
     /// <summary>The words added last (Add words dialog), newest first: what was just added and whether the agent got to it.</summary>
     public ObservableCollection<VocabWordRow> RecentWords { get; } = [];
+
+    /// <summary>Every word waiting for its analysis, oldest first (the phone's Analysis sheet lists them all).</summary>
+    public ObservableCollection<VocabWordRow> PendingWords { get; } = [];
 
     public bool HasRecentWords => RecentWords.Count > 0;
 
@@ -357,6 +360,14 @@ public sealed partial class VocabViewModel : ObservableObject
     {
         if (Detail is not { } detail) return;
         if (!await _dialogs.ConfirmAsync("Delete this word?", $"“{detail.Word.Text}” leaves your words. Its parts stay for your other words.", "Delete")) return;
+        DeleteWordConfirmed();
+    }
+
+    /// <summary>Deletes the open word, asked already (the phone asks in its own sheet).</summary>
+    [RelayCommand]
+    private void DeleteWordConfirmed()
+    {
+        if (Detail is not { } detail) return;
         _store.DeleteWord(detail.Id);
         Detail = null;
     }
@@ -403,11 +414,19 @@ public sealed partial class VocabViewModel : ObservableObject
                 {
                     IsChinese = w.Value.Language == VocabLanguage.Chinese,
                     Level = w.Value.Level,
+                    Note = w.Value.Note,
                 }
                 : new VocabWordRow(id, w.Value.Text, "", "Waiting for analysis…", true, "", new RelayCommand(() => { }),
-                    new RelayCommand(() => _store.DeleteWord(id))));
+                    new RelayCommand(() => _store.DeleteWord(id))) { Note = w.Value.Note });
         }
         OnPropertyChanged(nameof(HasRecentWords));
+        PendingWords.Clear();
+        foreach (var w in _store.Pending())
+        {
+            var id = w.Id;
+            PendingWords.Add(new VocabWordRow(id, w.Value.Text, "", "Waiting for analysis…", true, "", new RelayCommand(() => { }),
+                new RelayCommand(() => _store.DeleteWord(id))) { Note = w.Value.Note });
+        }
     }
 
     private void OnSettingChanged(string name)

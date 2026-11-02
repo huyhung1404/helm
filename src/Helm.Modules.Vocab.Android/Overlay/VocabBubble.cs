@@ -197,24 +197,11 @@ internal sealed class VocabBubble
             rim.SetStyle(Paint.Style.Stroke);
             canvas.DrawCircle(size / 2f, size / 2f, size / 2f - 1, rim);
 
-            // The icon in the middle 56 % of the disc, in its 100 × 100 box.
+            // The icon in the middle 56 % of the disc.
             var box = size * 0.56f;
-            var scale = box / (float)VocabIconShape.Size;
             canvas.Save();
             canvas.Translate((size - box) / 2f, (size - box) / 2f);
-            canvas.Scale(scale, scale);
-            static AndroidColor Argb(uint c) => AndroidColor.Argb((int)(c >> 24), (int)((c >> 16) & 0xFF), (int)((c >> 8) & 0xFF), (int)(c & 0xFF));
-            using var gradient = new LinearGradient(0, 100, 100, 0, Argb(VocabIconShape.GradientStart), Argb(VocabIconShape.GradientEnd), Shader.TileMode.Clamp!);
-            using var stroke = new Paint(PaintFlags.AntiAlias) { StrokeWidth = (float)VocabIconShape.Stroke, StrokeCap = Paint.Cap.Round };
-            stroke.SetStyle(Paint.Style.Stroke);
-            stroke.SetShader(gradient);
-            canvas.DrawLine(50, 15, 16, 84, stroke);
-            canvas.DrawLine(50, 15, 84, 84, stroke);
-            using var fill = new Paint(PaintFlags.AntiAlias);
-            fill.SetShader(gradient);
-            canvas.DrawCircle(50, 15, 14, fill);
-            canvas.DrawCircle(16, 84, 14, fill);
-            canvas.DrawCircle(84, 84, 14, fill);
+            VocabLogo.Draw(canvas, box);
             canvas.Restore();
         }
     }

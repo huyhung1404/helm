@@ -13,15 +13,15 @@
         <ItemsControl ItemsSource="{Binding Root, Converter={x:Static local:VocabConverters.Outline}}">
             <ItemsControl.ItemTemplate>
                 <DataTemplate x:DataType="local:VocabOutlineRow">
-                    <Button Classes="orow node" Classes.sel="{Binding Node.IsSelected}" Padding="{Binding Indent}" Command="{Binding Pick}"
+                    <Button Classes="orow node" Classes.sel="{Binding IsPicked}" Padding="{Binding Indent}" Command="{Binding Pick}"
                             AutomationProperties.Name="{Binding Node.Form}">
-                        <StackPanel Orientation="Horizontal" Spacing="8">
+                        <StackPanel Orientation="Horizontal" Spacing="10">
                             <Border Classes="elbow" IsVisible="{Binding HasElbow}" />
                             <Border Classes="obox" Classes.root="{Binding IsRoot}">
                                 <TextBlock Text="{Binding Node.Form}" />
                             </Border>
-                            <StackPanel VerticalAlignment="Center" Margin="2,0,0,0">
-                                <TextBlock Classes="role" Classes.sound="{Binding Node.IsSound}" Text="{Binding Node.RoleText}" IsVisible="{Binding Node.HasRole}" />
+                            <StackPanel VerticalAlignment="Center">
+                                <TextBlock Classes="role" Classes.sound="{Binding Node.IsSound}" Text="{Binding Node.RoleText, Converter={x:Static local:VocabConverters.Upper}}" IsVisible="{Binding Node.HasRole}" />
                                 <TextBlock Classes="hint" Text="{Binding Meaning}" TextWrapping="NoWrap" TextTrimming="CharacterEllipsis" IsVisible="{Binding HasMeaning}" />
                             </StackPanel>
                         </StackPanel>
@@ -30,7 +30,8 @@
             </ItemsControl.ItemTemplate>
         </ItemsControl>
 
-        <TextBlock Classes="hint" IsVisible="{Binding IsWordSelected}"
+        <!-- On a word's page the hint also says how to add a part as a word (VocabOutlineView.ShowsHoldHint) -->
+        <TextBlock x:Name="PickHint" Classes="hint" IsVisible="{Binding IsWordSelected}"
                    Text="Tap a part to see what it means and which of your words share it. Hold a character or an inner word to add it as a word." />
 
         <!-- The tapped part -->

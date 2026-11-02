@@ -31,7 +31,7 @@
             <Button Grid.Column="2" Classes="tall" Padding="12,0" Click="Order_Click" IsVisible="{Binding HasWords}"
                     AutomationProperties.Name="{Binding SortIndex, Converter={x:Static local:VocabConverters.SortName}, StringFormat='Order: {0}'}">
                 <StackPanel Orientation="Horizontal" Spacing="6">
-                    <ic:SymbolIcon Symbol="ArrowSort" FontSize="18" />
+                    <ic:SymbolIcon Symbol="ArrowSortDownLines" FontSize="18" />
                     <TextBlock Text="{Binding SortIndex, Converter={x:Static local:VocabConverters.SortName}}" VerticalAlignment="Center" />
                 </StackPanel>
             </Button>
@@ -49,7 +49,7 @@
                     <DataTemplate x:DataType="vm:VocabFilterChip">
                         <Button Classes="chip" Classes.on="{Binding IsOn}" Command="{Binding Pick}" AutomationProperties.Name="{Binding Name}">
                             <StackPanel Orientation="Horizontal" Spacing="6">
-                                <TextBlock Text="{Binding Name}" VerticalAlignment="Center" />
+                                <TextBlock Text="{Binding Name, Converter={x:Static local:VocabConverters.ChipName}}" VerticalAlignment="Center" />
                                 <TextBlock Text="{Binding Count}" Classes="hint" FontSize="12" VerticalAlignment="Center" />
                             </StackPanel>
                         </Button>

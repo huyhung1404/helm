@@ -86,7 +86,7 @@
                     <TextBlock Text="{Binding PendingText}" TextWrapping="Wrap" />
                 </Border>
 
-                <UniformGrid Rows="1" Margin="-4,8,-4,0">
+                <UniformGrid Rows="1" Margin="-4,8,-4,0" Classes="sm">
                     <Button Classes="tall" HorizontalAlignment="Stretch" Margin="4,0" Command="{Binding SayWordCommand}" IsVisible="{Binding CanSay}"
                             AutomationProperties.Name="Listen">
                         <StackPanel Orientation="Horizontal" Spacing="6">
@@ -97,7 +97,7 @@
                     <Button Classes="tall" HorizontalAlignment="Stretch" Margin="4,0" Command="{Binding YouGlishCommand}" IsVisible="{Binding ShowYouGlish}"
                             AutomationProperties.Name="YouGlish">
                         <StackPanel Orientation="Horizontal" Spacing="6">
-                            <ic:SymbolIcon Symbol="Video" FontSize="18" />
+                            <ic:SymbolIcon Symbol="VideoClip" FontSize="18" />
                             <TextBlock Text="YouGlish" VerticalAlignment="Center" />
                         </StackPanel>
                     </Button>

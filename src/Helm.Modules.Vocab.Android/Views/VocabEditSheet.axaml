@@ -6,17 +6,18 @@
              x:DataType="vm:VocabWordDetailViewModel"
              VerticalAlignment="Bottom">
 
-    <!-- Editing a word by hand, as a full-height bottom sheet: ✕ cancels, Save keeps it. The tree stays the agent's. -->
+    <!-- Editing a word by hand, as a full-height bottom sheet: ✕ cancels, Save keeps it. The tree stays the agent's.
+         The fields the phone edits most come first; the rest follow under a line saying so. -->
     <Border Classes="sheet" VerticalAlignment="Stretch">
         <DockPanel>
             <StackPanel DockPanel.Dock="Top">
                 <Border Classes="grab" />
-                <Grid ColumnDefinitions="Auto,*,Auto" Margin="8,6,12,4">
+                <Grid ColumnDefinitions="Auto,*,Auto" Margin="8,8,8,4">
                     <Button Classes="icon" Command="{Binding Editor.CancelCommand}" AutomationProperties.Name="Cancel">
-                        <ic:SymbolIcon Symbol="Dismiss" FontSize="20" />
+                        <ic:SymbolIcon Symbol="Dismiss" FontSize="22" />
                     </Button>
                     <TextBlock Grid.Column="1" Classes="sheettitle" Margin="6,0" Text="{Binding Word.Text, StringFormat='Edit “{0}”'}" />
-                    <Button Grid.Column="2" Classes="accent tall" Padding="16,0" Content="Save" Command="{Binding Editor.SaveCommand}" />
+                    <Button Grid.Column="2" Classes="accent tall" MinHeight="36" FontSize="14" Padding="12,0" Content="Save" Command="{Binding Editor.SaveCommand}" />
                 </Grid>
             </StackPanel>
             <ScrollViewer HorizontalScrollBarVisibility="Disabled">
@@ -32,6 +33,41 @@
                         <TextBlock Text="Phonetic" Classes="label" />
                         <TextBox Text="{Binding Phonetic}" MinHeight="44" AutomationProperties.Name="Phonetic" />
                     </StackPanel>
+                    <StackPanel Spacing="6">
+                        <TextBlock Text="Explanation" Classes="label" />
+                        <TextBox Text="{Binding Explanation}" TextWrapping="Wrap" AcceptsReturn="True" MinHeight="88" AutomationProperties.Name="Explanation" />
+                    </StackPanel>
+                    <StackPanel Spacing="6">
+                        <TextBlock Text="To remember it" Classes="label" />
+                        <TextBox Text="{Binding Mnemonic}" TextWrapping="Wrap" AcceptsReturn="True" MinHeight="64" AutomationProperties.Name="To remember it" />
+                    </StackPanel>
+                    <StackPanel Spacing="6">
+                        <TextBlock Text="Examples · sentence | translation, one per line" Classes="label" TextWrapping="Wrap" />
+                        <TextBox Text="{Binding Examples}" TextWrapping="Wrap" AcceptsReturn="True" MinHeight="88" AutomationProperties.Name="Examples" />
+                    </StackPanel>
+                    <StackPanel Spacing="6">
+                        <TextBlock Text="Goes with" Classes="label" />
+                        <TextBox Text="{Binding Collocations}" PlaceholderText="separated by commas" MinHeight="44" AutomationProperties.Name="Goes with" />
+                    </StackPanel>
+                    <Grid ColumnDefinitions="*,10,*">
+                        <StackPanel Spacing="6">
+                            <TextBlock Text="Level" Classes="label" />
+                            <TextBox Text="{Binding Level}" PlaceholderText="B1, HSK3" MinHeight="44" AutomationProperties.Name="Level" />
+                        </StackPanel>
+                        <StackPanel Grid.Column="2" Spacing="6">
+                            <TextBlock Text="Topic" Classes="label" />
+                            <TextBox Text="{Binding Topic}" MinHeight="44" AutomationProperties.Name="Topic" />
+                        </StackPanel>
+                    </Grid>
+                    <StackPanel Spacing="6">
+                        <TextBlock Text="Your tags" Classes="label" />
+                        <TextBox Text="{Binding Tags}" PlaceholderText="Aptis, Truyện…" MinHeight="44" AutomationProperties.Name="Your tags" />
+                    </StackPanel>
+                    <StackPanel Spacing="6">
+                        <TextBlock Text="Your note" Classes="label" />
+                        <TextBox Text="{Binding Note}" TextWrapping="Wrap" AcceptsReturn="True" MinHeight="44" AutomationProperties.Name="Your note" />
+                    </StackPanel>
+                    <TextBlock Classes="hint" Text="More fields (word family, similar, mix-ups) sit further down, same as on the PC." />
                     <Grid ColumnDefinitions="*,10,*" IsVisible="{Binding IsChinese}">
                         <StackPanel Spacing="6">
                             <TextBlock Text="Hán Việt" Classes="label" />
@@ -42,47 +78,13 @@
                             <TextBox Text="{Binding Traditional}" MinHeight="44" AutomationProperties.Name="Traditional" />
                         </StackPanel>
                     </Grid>
-                    <StackPanel Spacing="6">
-                        <TextBlock Text="Explanation" Classes="label" />
-                        <TextBox Text="{Binding Explanation}" TextWrapping="Wrap" AcceptsReturn="True" MinHeight="88" AutomationProperties.Name="Explanation" />
-                    </StackPanel>
-                    <StackPanel Spacing="6">
-                        <TextBlock Text="To remember it" Classes="label" />
-                        <TextBox Text="{Binding Mnemonic}" TextWrapping="Wrap" AcceptsReturn="True" MinHeight="64" AutomationProperties.Name="To remember it" />
-                    </StackPanel>
                     <StackPanel Spacing="6" IsVisible="{Binding IsChinese}">
                         <TextBlock Text="To remember the pinyin" Classes="label" />
                         <TextBox Text="{Binding PinyinMnemonic}" TextWrapping="Wrap" AcceptsReturn="True" MinHeight="64" AutomationProperties.Name="To remember the pinyin" />
                     </StackPanel>
                     <StackPanel Spacing="6">
-                        <TextBlock Text="Examples · sentence | translation, one per line" Classes="label" TextWrapping="Wrap" />
-                        <TextBox Text="{Binding Examples}" TextWrapping="Wrap" AcceptsReturn="True" MinHeight="88" AutomationProperties.Name="Examples" />
-                    </StackPanel>
-                    <StackPanel Spacing="6">
-                        <TextBlock Text="Goes with · separated by commas" Classes="label" TextWrapping="Wrap" />
-                        <TextBox Text="{Binding Collocations}" MinHeight="44" AutomationProperties.Name="Goes with" />
-                    </StackPanel>
-                    <Grid ColumnDefinitions="*,10,*">
-                        <StackPanel Spacing="6">
-                            <TextBlock Text="Level (B1, HSK3)" Classes="label" />
-                            <TextBox Text="{Binding Level}" MinHeight="44" AutomationProperties.Name="Level" />
-                        </StackPanel>
-                        <StackPanel Grid.Column="2" Spacing="6">
-                            <TextBlock Text="Topic" Classes="label" />
-                            <TextBox Text="{Binding Topic}" MinHeight="44" AutomationProperties.Name="Topic" />
-                        </StackPanel>
-                    </Grid>
-                    <StackPanel Spacing="6">
                         <TextBlock Text="Part of speech" Classes="label" />
                         <TextBox Text="{Binding PartOfSpeech}" MinHeight="44" AutomationProperties.Name="Part of speech" />
-                    </StackPanel>
-                    <StackPanel Spacing="6">
-                        <TextBlock Text="Your tags · separated by commas (Aptis, Truyện)" Classes="label" TextWrapping="Wrap" />
-                        <TextBox Text="{Binding Tags}" MinHeight="44" AutomationProperties.Name="Your tags" />
-                    </StackPanel>
-                    <StackPanel Spacing="6">
-                        <TextBlock Text="Your note" Classes="label" />
-                        <TextBox Text="{Binding Note}" TextWrapping="Wrap" AcceptsReturn="True" MinHeight="44" AutomationProperties.Name="Your note" />
                     </StackPanel>
                     <StackPanel Spacing="6">
                         <TextBlock Text="Word family · word | part of speech | meaning, one per line" Classes="label" TextWrapping="Wrap" />

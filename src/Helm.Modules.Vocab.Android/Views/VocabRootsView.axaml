@@ -1,6 +1,7 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:ic="using:FluentIcons.Avalonia"
+             xmlns:sys="using:System"
              xmlns:vm="using:Helm.Modules.Vocab"
              x:Class="Helm.Modules.Vocab.VocabRootsView"
              x:DataType="vm:VocabRootsViewModel">
@@ -19,8 +20,12 @@
             <Grid ColumnDefinitions="*,8,Auto">
                 <Border Classes="seg">
                     <Grid ColumnDefinitions="*,2,*">
-                        <Button Classes="seg" Classes.on="{Binding IsEnglish}" Content="English" Command="{Binding ShowEnglishCommand}" AutomationProperties.Name="English roots" />
-                        <Button Grid.Column="2" Classes="seg" Classes.on="{Binding IsChinese}" Content="中文" Command="{Binding ShowChineseCommand}" AutomationProperties.Name="Chinese parts" />
+                        <Button Classes="seg" Classes.on="{Binding IsEnglish}" Command="{Binding ShowEnglishCommand}" AutomationProperties.Name="English roots">
+                            <TextBlock><Run Text="English " /><Run Text="{Binding EnglishCount}" Foreground="{DynamicResource HelmSecondaryText}" FontWeight="Normal" /></TextBlock>
+                        </Button>
+                        <Button Grid.Column="2" Classes="seg" Classes.on="{Binding IsChinese}" Command="{Binding ShowChineseCommand}" AutomationProperties.Name="Chinese parts">
+                            <TextBlock><Run Text="中文 " /><Run Text="{Binding ChineseCount}" Foreground="{DynamicResource HelmSecondaryText}" FontWeight="Normal" /></TextBlock>
+                        </Button>
                     </Grid>
                 </Border>
                 <Button Grid.Column="2" Classes="tall" Padding="12,0" Command="{Binding NextRootCommand}" IsVisible="{Binding HasRoots}" AutomationProperties.Name="Practise roots">
@@ -40,7 +45,7 @@
                 <ItemsControl.ItemTemplate>
                     <DataTemplate x:DataType="vm:VocabRootRow">
                         <StackPanel>
-                            <TextBlock Text="{Binding Header}" Classes="label" Margin="2,6,0,8" IsVisible="{Binding HasHeader}" />
+                            <TextBlock Text="{Binding Header}" Classes="label" Margin="0,6,0,10" IsVisible="{Binding HasHeader}" />
                             <Button Classes="fam" Command="{Binding Select}" AutomationProperties.Name="{Binding Form}">
                                 <StackPanel Spacing="6">
                                     <Grid ColumnDefinitions="Auto,*,Auto">
@@ -100,7 +105,7 @@
                         <ic:SymbolIcon Symbol="Dismiss" FontSize="18" />
                     </Button>
                 </Grid>
-                <Button Classes="front" Classes.revealed="{Binding IsPracticeRevealed}" Command="{Binding RevealRootCommand}" AutomationProperties.Name="Show the meaning">
+                <Button Classes="front" MinHeight="240" Command="{Binding RevealRootCommand}" AutomationProperties.Name="Show the meaning">
                     <StackPanel Spacing="8">
                         <TextBlock Text="What does this part mean?" Classes="hint" HorizontalAlignment="Center" />
                         <TextBlock Text="{Binding Practice.Form}" FontSize="52" FontWeight="SemiBold" HorizontalAlignment="Center" />
@@ -148,15 +153,29 @@
             </Border>
             <Border Classes="card" Padding="0" ClipToBounds="True">
                 <StackPanel>
-                    <TextBlock Text="{Binding Selected.CountText, StringFormat='Your words with it ({0})'}" Classes="label" Margin="16,14,16,6" />
+                    <TextBlock Text="{Binding Selected.Words.Count, StringFormat='Your words with it ({0})', FallbackValue=''}" Classes="label" Margin="16,14,16,6" />
                     <ItemsControl ItemsSource="{Binding Selected.Words}">
                         <ItemsControl.ItemTemplate>
                             <DataTemplate x:DataType="vm:VocabWordLink">
                                 <Button Classes="prow" Command="{Binding Open}" AutomationProperties.Name="{Binding Text}">
-                                    <StackPanel Spacing="2">
-                                        <TextBlock FontSize="17" FontWeight="SemiBold"><Run Text="{Binding Split.Before}" /><Run Classes="hl" Text="{Binding Split.Match}" /><Run Text="{Binding Split.After}" /></TextBlock>
-                                        <TextBlock Text="{Binding Meaning}" Classes="hint" FontSize="14" TextWrapping="NoWrap" TextTrimming="CharacterEllipsis" />
-                                    </StackPanel>
+                                    <Grid ColumnDefinitions="*,Auto">
+                                        <StackPanel Spacing="2">
+                                            <TextBlock FontSize="17" FontWeight="SemiBold"><Run Text="{Binding Split.Before}" /><Run Classes="hl" Text="{Binding Split.Match}" /><Run Text="{Binding Split.After}" /></TextBlock>
+                                            <TextBlock Text="{Binding Meaning}" Classes="hint" FontSize="14" TextWrapping="NoWrap" TextTrimming="CharacterEllipsis" />
+                                        </StackPanel>
+                                        <ItemsControl Grid.Column="1" ItemsSource="{Binding Dots}" VerticalAlignment="Center" Margin="12,0,0,0">
+                                            <ItemsControl.ItemsPanel>
+                                                <ItemsPanelTemplate>
+                                                    <StackPanel Orientation="Horizontal" />
+                                                </ItemsPanelTemplate>
+                                            </ItemsControl.ItemsPanel>
+                                            <ItemsControl.ItemTemplate>
+                                                <DataTemplate x:DataType="sys:Boolean">
+                                                    <Ellipse Classes="dot" Classes.on="{Binding}" />
+                                                </DataTemplate>
+                                            </ItemsControl.ItemTemplate>
+                                        </ItemsControl>
+                                    </Grid>
                                 </Button>
                             </DataTemplate>
                         </ItemsControl.ItemTemplate>

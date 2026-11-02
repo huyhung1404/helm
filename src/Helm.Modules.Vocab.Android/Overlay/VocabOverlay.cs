@@ -207,7 +207,7 @@ public sealed class VocabOverlay
             p.SoftInputMode = SoftInput.StateHidden | SoftInput.AdjustNothing;
             p.Y = nearBubble && _bubble is { IsShown: true } bubble
                 ? Math.Min(bubble.Bounds.Y + bubble.Bounds.Size + Dp(8), (int)(metrics.HeightPixels * 0.45))
-                : Dp(48);
+                : (int)(metrics.HeightPixels * 0.18);
             var restY = p.Y;
             VocabCardOverlay? view = null;
             view = new VocabCardOverlay(_context, card, CloseCard, OpenWord,
@@ -216,14 +216,14 @@ public sealed class VocabOverlay
                     // Typing: the card takes the keyboard and moves to the top, above it; done, it hands both back.
                     if (typing) p.Flags &= ~WindowManagerFlags.NotFocusable;
                     else p.Flags |= WindowManagerFlags.NotFocusable;
-                    p.Y = typing ? Math.Min(p.Y, Dp(48)) : restY;
+                    p.Y = typing ? Dp(16) : restY;
                     view!.MaxHeight = typing ? (int)(metrics.HeightPixels * 0.42) : CompactHeight(metrics);
                     Update(view, p);
                 },
                 full: full =>
                 {
-                    p.Y = full ? Dp(36) : restY;
-                    view!.MaxHeight = full ? metrics.HeightPixels - Dp(72) : CompactHeight(metrics);
+                    p.Y = full ? Dp(64) : restY;
+                    view!.MaxHeight = full ? metrics.HeightPixels - Dp(96) : CompactHeight(metrics);
                     Update(view, p);
                 },
                 // See-through at rest so the app below stays readable; solid while used.
