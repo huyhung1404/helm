@@ -88,6 +88,8 @@ public sealed class SlackLumiTests
         var post = Assert.Single(slack.Posted);
         Assert.Equal(("C1", "9000.0"), (post.Channel, post.Thread));
         Assert.Contains(":robot_face: Lumi · trợ lý AI của Hùng", post.Blocks);
+        // The one who asked is tagged.
+        Assert.StartsWith("Lumi · trợ lý AI của Hùng: <@U2> Đã fix rồi", post.Text);
         Assert.Contains("Đã fix ở commit abc", agent.Asked[0]);
         Assert.Contains("Never promise", agent.Asked[0]);
         Assert.True(inbox.IsBotMessage("C1", "9999.0"));
@@ -106,8 +108,9 @@ public sealed class SlackLumiTests
 
         Assert.True(await lumi.AnswerAsync(new SlackMessage("C2", "9102.0", null, "ME", "Lumi ơi release khi nào?", false), Now, default));
         Assert.Equal(["history:C2"], slack.Read);
-        // Not in a thread: the answer starts one under the call.
+        // Not in a thread: the answer starts one under the call. The user asked: nobody is tagged.
         Assert.Equal("9102.0", slack.Posted.Single().Thread);
+        Assert.DoesNotContain("<@", slack.Posted.Single().Text);
         Assert.DoesNotContain("Never promise", agent.Asked[0]);
     }
 

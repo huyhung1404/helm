@@ -520,7 +520,8 @@ public sealed class SlackReaderTests
 
         var later = clock.Now + TimeSpan.FromMinutes(4);
         Assert.Equal(2, await replier.ReplyAsync(later, default));
-        Assert.All(api.Posted, p => Assert.Equal("Lumi · trợ lý AI của Hưng: Dạ em đã nhận, anh ấy sẽ phản hồi sớm ạ.", p.Text));
+        // The person it answers is tagged, so they are told.
+        Assert.All(api.Posted, p => Assert.Equal("Lumi · trợ lý AI của Hưng: <@U2> Dạ em đã nhận, anh ấy sẽ phản hồi sớm ạ.", p.Text));
         Assert.Null(api.Posted.Single(p => p.Channel == "D1").Thread);
         Assert.Equal("9950.0", api.Posted.Single(p => p.Channel == "C1").Thread);
         Assert.All(inbox.Snapshot(), i => Assert.True(i.IsToDo));
