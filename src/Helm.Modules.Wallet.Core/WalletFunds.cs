@@ -324,3 +324,57 @@ public static class FundMath
         return new FundState(id, fund, budget, spent, left, share, runsOut, status, carried);
     }
 }
+
+/// <summary>
+/// When a fund warns on the phone: once it is past its warning share, used up or over, once per level and month. The
+/// pace ("may run out ~30 Oct") stays on the page: early in a month one big payment would set it off.
+/// </summary>
+public static class FundAlerts
+{
+    /// <summary>A warning to show: the fund, how bad it is, and the words.</summary>
+    public sealed record Warning(string FundId, FundStatus Level, string Title, string Text);
+
+    /// <summary>The level a fund warns at now: over, used up, past its warning share, or none (on track).</summary>
+    public static FundStatus Level(FundState state) => state.Status switch
+    {
+        FundStatus.Over or FundStatus.UsedUp => state.Status,
+        _ when state.Fund.AlertPercent < 100 && state.Share * 100 >= state.Fund.AlertPercent => FundStatus.Low,
+        _ => FundStatus.OnTrack,
+    };
+
+    /// <summary>
+    /// The warnings due in <paramref name="month"/>: funds worse than they were last warned about. <paramref name="told"/>
+    /// is updated (a fund that got better, e.g. after money moved in, may warn again later); older months are forgotten.
+    /// </summary>
+    public static IReadOnlyList<Warning> Due(IReadOnlyList<FundState> states, DateOnly month, IDictionary<string, FundStatus> told)
+    {
+        var prefix = $"{month:yyyy-MM}|";
+        foreach (var stale in told.Keys.Where(k => !k.StartsWith(prefix, StringComparison.Ordinal)).ToList()) told.Remove(stale);
+        var due = new List<Warning>();
+        foreach (var s in states)
+        {
+            var key = prefix + s.Id;
+            var level = Level(s);
+            var before = told.TryGetValue(key, out var t) ? t : FundStatus.OnTrack;
+            if (level > before) due.Add(Describe(s, level));
+            if (level != before)
+            {
+                if (level == FundStatus.OnTrack) told.Remove(key);
+                else told[key] = level;
+            }
+        }
+        return due;
+    }
+
+    private static Warning Describe(FundState s, FundStatus level)
+    {
+        var name = s.Fund.Name;
+        var of = $"{WalletFormat.Money(s.Spent)} of {WalletFormat.Money(s.Budget)}";
+        return level switch
+        {
+            FundStatus.Over => new(s.Id, level, $"{name} is over", $"Over by {WalletFormat.Money(-s.Left)} this month ({of})."),
+            FundStatus.UsedUp => new(s.Id, level, $"{name} is used up", $"{WalletFormat.Money(Math.Max(0, s.Left))} left ({of})."),
+            _ => new(s.Id, level, $"{name} is running low", $"{WalletFormat.Money(s.Left)} left · {Math.Round(s.Share * 100):0}% spent ({of})."),
+        };
+    }
+}

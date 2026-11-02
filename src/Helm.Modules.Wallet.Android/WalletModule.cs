@@ -2,6 +2,7 @@ using Avalonia.Media;
 using FluentIcons.Common;
 using Helm.Core.Modules;
 using Helm.Core.Platform;
+using Helm.Core.Settings;
 using Microsoft.Extensions.Logging;
 using AndroidApp = Android.App.Application;
 
@@ -15,16 +16,23 @@ namespace Helm.Modules.Wallet;
 public sealed class WalletModule : AndroidModuleBase, IModuleContent, IBackHandler, IDisposable
 {
     private readonly WalletViewModel _viewModel;
+    private readonly WalletStore _store;
+    private readonly FundBook _funds;
+    private readonly ISettingsStore<WalletSettings> _settings;
     private readonly ILogger<WalletModule> _logger;
     private readonly Timer _widgetTimer;
 
-    public WalletModule(WalletViewModel viewModel, WalletStore store, ILogger<WalletModule> logger)
+    public WalletModule(WalletViewModel viewModel, WalletStore store, FundBook funds, ISettingsStoreFactory settings, ILogger<WalletModule> logger)
     {
         _viewModel = viewModel;
+        _store = store;
+        _funds = funds;
+        _settings = settings.Get<WalletSettings>(WalletIds.ModuleId);
         _logger = logger;
-        _widgetTimer = new Timer(_ => RefreshWidgets(), null, Timeout.Infinite, Timeout.Infinite);
-        // A sync can change many records in a row: redraw the widgets once it has settled.
+        _widgetTimer = new Timer(_ => Settled(), null, Timeout.Infinite, Timeout.Infinite);
+        // A sync can change many records in a row: redraw the widgets and check the funds once it has settled.
         store.Changed += (_, _) => _widgetTimer.Change(TimeSpan.FromMilliseconds(400), Timeout.InfiniteTimeSpan);
+        funds.Changed += (_, _) => _widgetTimer.Change(TimeSpan.FromMilliseconds(400), Timeout.InfiniteTimeSpan);
     }
 
     public void Dispose() => _widgetTimer.Dispose();
@@ -71,6 +79,33 @@ public sealed class WalletModule : AndroidModuleBase, IModuleContent, IBackHandl
         catch (Exception ex)
         {
             _logger.LogWarning(ex, "Wallet: could not check the notification access");
+        }
+    }
+
+    private void Settled()
+    {
+        RefreshWidgets();
+        WarnFunds();
+    }
+
+    /// <summary>A fund that got worse (past its warning share, used up, over) warns once per level and month.</summary>
+    private void WarnFunds()
+    {
+        try
+        {
+            if (!IsEnabled || !_settings.Current.WarnFunds) return;
+            var zone = TimeZoneInfo.Local;
+            var now = _store.Now;
+            var month = WalletFormat.MonthOf(now, zone);
+            var states = _funds.States(_store.Transactions(), month, now, zone);
+            IReadOnlyList<FundAlerts.Warning> due = [];
+            _settings.Update(s => due = FundAlerts.Due(states, month, s.FundWarnings));
+            foreach (var warning in due) WalletNotifications.WarnFund(AndroidApp.Context, warning);
+        }
+        catch (Exception ex)
+        {
+            // Timer callback: never let an exception escape.
+            _logger.LogWarning(ex, "Could not check the funds");
         }
     }
 

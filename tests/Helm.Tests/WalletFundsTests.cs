@@ -214,4 +214,52 @@ public sealed class WalletFundsTests : IDisposable
         Assert.Equal("1 used up", funds.AlertText);
         Assert.Equal(1_658_000m, State(funds.Rows.Single(r => r.Id != home).Id).Left);
     }
+
+    [Fact]
+    public void A_fund_warns_once_per_level_and_month_and_again_after_it_got_better()
+    {
+        var eating = _funds.Add("Eating", 1_000_000, true, October, [WalletCategories.Food]);
+        var told = new Dictionary<string, FundStatus> { ["2026-09|old"] = FundStatus.Over };
+        IReadOnlyList<FundAlerts.Warning> Due() => FundAlerts.Due(_funds.States(_wallet.Transactions(), October, _time.GetUtcNow(), Ict), October, told);
+
+        Spend(780_000, WalletCategories.Food, 2); // 78%, but at this pace it runs out on the 30th: the page warns, the phone not
+        Assert.Equal(FundStatus.Low, State(eating).Status);
+        Assert.Empty(Due());
+        Assert.DoesNotContain("2026-09|old", told.Keys); // older months are forgotten
+
+        Spend(20_000, WalletCategories.Food, 20); // 80%
+        var low = Assert.Single(Due());
+        Assert.Equal((FundStatus.Low, "Eating is running low"), (low.Level, low.Title));
+        Assert.Empty(Due()); // once
+
+        Spend(300_000, WalletCategories.Food, 21); // 1.1M of 1M
+        var over = Assert.Single(Due());
+        Assert.Equal("Eating is over", over.Title);
+        Assert.Contains("Over by 100,000".Replace(",", System.Globalization.CultureInfo.CurrentCulture.NumberFormat.NumberGroupSeparator), over.Text);
+
+        var health = _funds.Add("Health", 2_000_000, true, October, [WalletCategories.Health]);
+        _funds.Move(health, eating, 500_000, October); // back under its warning share
+        Assert.Empty(Due());
+        Spend(400_000, WalletCategories.Food, 22); // 1.5M of 1.5M: used up
+        Assert.Equal(FundStatus.UsedUp, Assert.Single(Due()).Level);
+    }
+
+    [Fact]
+    public void The_funds_widget_shows_the_ones_that_need_a_look_first()
+    {
+        _funds.Add("Eating", 900_000, true, October, [WalletCategories.Food]);
+        _funds.Add("Home & bills", 5_000_000, true, October, [WalletCategories.Housing]);
+        _funds.Add("Trip", 2_000_000, false, October, [WalletCategories.Travel]);
+        Spend(5_342_000, WalletCategories.Housing, 5);
+        Spend(100_000, WalletCategories.Food, 6);
+        Spend(1_000_000, WalletCategories.Family, 7);
+
+        var model = FundsWidgetModel.Build(_funds, _wallet, 2, _time.GetUtcNow(), Ict);
+        Assert.Equal(["Home & bills", "Eating"], model.Jars.Select(j => j.Name));
+        Assert.True(model.Jars[0].IsOver);
+        Assert.EndsWith(" over", model.Jars[0].AmountText);
+        Assert.Equal(1, model.Hidden);
+        Assert.StartsWith("+1 more · Outside funds", model.Footer);
+        Assert.Equal("Funds · October", model.Title);
+    }
 }

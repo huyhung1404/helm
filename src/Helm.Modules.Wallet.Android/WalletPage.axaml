@@ -102,6 +102,15 @@
                 </Border>
                 <Border Classes="row">
                     <DockPanel>
+                        <ToggleSwitch DockPanel.Dock="Right" IsChecked="{Binding WarnFunds}" OnContent="" OffContent="" AutomationProperties.Name="Warn about funds" />
+                        <StackPanel VerticalAlignment="Center">
+                            <TextBlock Text="Warn about funds" />
+                            <TextBlock Text="A notification when a fund passes its warning share, is used up or goes over: once each, every month." Classes="secondary" TextWrapping="Wrap" />
+                        </StackPanel>
+                    </DockPanel>
+                </Border>
+                <Border Classes="row">
+                    <DockPanel>
                         <ToggleSwitch DockPanel.Dock="Right" IsChecked="{Binding AutoCategorize}" OnContent="" OffContent="" AutomationProperties.Name="Categorize by itself" />
                         <StackPanel VerticalAlignment="Center">
                             <TextBlock Text="Categorize by itself" />
