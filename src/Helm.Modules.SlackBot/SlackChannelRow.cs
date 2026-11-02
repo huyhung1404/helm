@@ -10,10 +10,15 @@ namespace Helm.Modules.SlackBot;
 public sealed partial class SlackChannelRow : ObservableObject
 {
     private readonly Action<string, SlackChannelMode> _changed;
+    private readonly Action<string, string?>? _projectChanged;
     private SlackChannelMode _mode;
+    private string _project;
 
-    public SlackChannelRow(SlackConversation conversation, SlackChannelMode mode, Action<string, SlackChannelMode> changed)
+    public SlackChannelRow(SlackConversation conversation, SlackChannelMode mode, Action<string, SlackChannelMode> changed,
+        string? project = null, Action<string, string?>? projectChanged = null)
     {
+        _project = project ?? "";
+        _projectChanged = projectChanged;
         Id = conversation.Id;
         Name = conversation.Kind switch
         {
@@ -49,6 +54,20 @@ public sealed partial class SlackChannelRow : ObservableObject
     {
         get => _mode != SlackChannelMode.Off;
         set => Mode = value ? (_mode == SlackChannelMode.Off ? SlackChannelMode.Read : _mode) : SlackChannelMode.Off;
+    }
+
+    /// <summary>The project folder Lumi may read before answering here ("" = none).</summary>
+    public string Project
+    {
+        get => _project;
+        set
+        {
+            value = value.Trim().Trim('"');
+            if (_project == value) return;
+            _project = value;
+            OnPropertyChanged();
+            _projectChanged?.Invoke(Id, value.Length > 0 ? value : null);
+        }
     }
 
     /// <summary>Slack Bot may also write there: its replies, and AI agents' reports.</summary>

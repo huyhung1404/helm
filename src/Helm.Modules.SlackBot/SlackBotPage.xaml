@@ -84,6 +84,7 @@
                         <ItemsControl.ItemTemplate>
                             <DataTemplate DataType="{x:Type local:SlackChannelRow}">
                                 <Border Style="{DynamicResource HelmExpanderRow}" Padding="0,6">
+                                    <StackPanel>
                                     <core:RowLayout>
                                         <TextBlock Text="{Binding Name}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
                                         <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
@@ -93,6 +94,14 @@
                                             <ui:ToggleSwitch IsChecked="{Binding CanWrite}" AutomationProperties.Name="{Binding Name, StringFormat=Write in {0}}" />
                                         </StackPanel>
                                     </core:RowLayout>
+                                    <!-- Where Write is on: the project Lumi may read before answering -->
+                                    <DockPanel Margin="0,6,0,0" Visibility="{Binding CanWrite, Converter={StaticResource BoolToVisibility}}">
+                                        <ui:Button DockPanel.Dock="Right" Margin="6,0,0,0" Content="Browse…" Click="BrowseProject_Click" />
+                                        <TextBlock DockPanel.Dock="Left" Margin="0,0,8,0" VerticalAlignment="Center" Text="Project Lumi may read" Style="{DynamicResource HelmSecondaryText}" />
+                                        <ui:TextBox PlaceholderText="None: Lumi answers from the chat only" Text="{Binding Project, UpdateSourceTrigger=LostFocus}"
+                                                    AutomationProperties.Name="{Binding Name, StringFormat=Project folder for {0}}" />
+                                    </DockPanel>
+                                    </StackPanel>
                                 </Border>
                             </DataTemplate>
                         </ItemsControl.ItemTemplate>

@@ -31,6 +31,16 @@ public sealed class SlackBotSettings : IVersionedSettings
     /// </summary>
     public Dictionary<string, SlackChannelMode> Channels { get; set; } = [];
 
+    /// <summary>
+    /// The project folder of a conversation (where Write is on): Lumi may read it, and only it, to look into a question
+    /// before answering.
+    /// </summary>
+    public Dictionary<string, string> ChannelProjects { get; set; } = [];
+
+    /// <summary>The project folder Lumi may read for <paramref name="channel"/>, or null (none set, or it is gone).</summary>
+    public string? ProjectOf(string channel) =>
+        ChannelProjects.TryGetValue(channel, out var folder) && System.IO.Directory.Exists(folder) ? folder : null;
+
     /// <summary>Times of day (HH:mm) when the worth-knowing messages show up on screen.</summary>
     public List<string> ReportTimes { get; set; } = [.. DefaultReportTimes];
 

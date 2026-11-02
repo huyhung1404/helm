@@ -30,6 +30,15 @@ public partial class SlackBotPage : ModulePageBase
         }
     }
 
+    /// <summary>Picks the project folder of a conversation.</summary>
+    private void BrowseProject_Click(object sender, RoutedEventArgs e)
+    {
+        if ((sender as FrameworkElement)?.DataContext is not SlackChannelRow row) return;
+        var dialog = new Microsoft.Win32.OpenFolderDialog { Title = $"Project Lumi may read for {row.Name}" };
+        if (row.Project.Length > 0 && System.IO.Directory.Exists(row.Project)) dialog.InitialDirectory = row.Project;
+        if (dialog.ShowDialog(Window.GetWindow(this)) == true) row.Project = dialog.FolderName;
+    }
+
     private void CopyManifest_Click(object sender, RoutedEventArgs e)
     {
         try

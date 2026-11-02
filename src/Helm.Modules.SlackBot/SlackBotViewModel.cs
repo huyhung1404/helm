@@ -345,10 +345,17 @@ public sealed partial class SlackBotViewModel : ObservableObject
             return;
         }
         var settings = _store.Current;
-        _allChannels = conversations.Select(c => new SlackChannelRow(c, settings.ModeOf(c.Id, c.Kind), SetMode)).ToList();
+        _allChannels = conversations.Select(c => new SlackChannelRow(c, settings.ModeOf(c.Id, c.Kind), SetMode,
+            settings.ChannelProjects.GetValueOrDefault(c.Id), SetProject)).ToList();
         FilterChannels();
         UpdatePreview();
     }
+
+    private void SetProject(string id, string? folder) => _store.Update(s =>
+    {
+        if (folder is null) s.ChannelProjects.Remove(id);
+        else s.ChannelProjects[id] = folder;
+    });
 
     private void SetMode(string id, SlackChannelMode mode)
     {

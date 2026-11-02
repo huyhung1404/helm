@@ -67,6 +67,37 @@ public sealed class ClaudeCodeRunner(McpClientConfig mcp, IChildProcessLauncher 
         return StartAsync([.. AskArguments(model)], instructions, (_, _) => "", null, timeout, ct);
     }
 
+    /// <summary>
+    /// Like <see cref="AskAsync"/>, but Claude Code may read <paramref name="folder"/> (and only it: reading elsewhere
+    /// asks a permission nobody gives) with Read, Grep and Glob: no shell, no edits, no web, no MCP, no hooks, and never
+    /// .env files or keys (<see cref="SecretFiles"/>). For looking into a project to answer someone.
+    /// </summary>
+    public Task<string> AskInFolderAsync(string instructions, string folder, string? model, TimeSpan timeout, CancellationToken ct)
+    {
+        if (AskUnavailable() is { } problem) throw new ClaudeCodeException(problem);
+        if (!Directory.Exists(folder)) throw new ClaudeCodeException($"The project folder {folder} does not exist.");
+        return StartAsync([.. FolderArguments(model)], instructions, (_, _) => "", null, timeout, ct, folder);
+    }
+
+    /// <summary>Files Claude Code never reads in a project, whatever it is asked.</summary>
+    internal static readonly IReadOnlyList<string> SecretFiles =
+    [
+        "**/.env*", "**/*.keystore", "**/*.jks", "**/*.pem", "**/*.key", "**/*.p12", "**/*.pfx", "**/*.mobileprovision",
+        "**/google-services.json", "**/GoogleService-Info.plist", "**/*secret*", "**/*credential*", "**/.git/**", "**/.ssh/**",
+    ];
+
+    internal static IEnumerable<string> FolderArguments(string? model)
+    {
+        var settings = System.Text.Json.JsonSerializer.Serialize(new
+        {
+            disableAllHooks = true,
+            permissions = new { deny = SecretFiles.Select(f => $"Read({f})").ToArray() },
+        });
+        string[] args = ["-p", "--output-format", "stream-json", "--verbose", "--tools", "Read,Grep,Glob", "--strict-mcp-config",
+            "--permission-mode", "default", "--settings", settings];
+        return model is { Length: > 0 } ? [.. args, "--model", model] : args;
+    }
+
     internal static IEnumerable<string> AskArguments(string? model)
     {
         string[] args = ["-p", "--output-format", "stream-json", "--verbose", "--tools", "", "--strict-mcp-config",
@@ -75,7 +106,7 @@ public sealed class ClaudeCodeRunner(McpClientConfig mcp, IChildProcessLauncher 
     }
 
     private async Task<string> StartAsync(IReadOnlyList<string> args, string instructions, Func<string, int, string> describe,
-        IProgress<string>? progress, TimeSpan timeout, CancellationToken ct)
+        IProgress<string>? progress, TimeSpan timeout, CancellationToken ct, string? folder = null)
     {
         var claude = McpClientConfig.FindClaude() ?? throw new ClaudeCodeException("Claude Code is not installed on this PC.");
         string commandLine;
@@ -93,7 +124,7 @@ public sealed class ClaudeCodeRunner(McpClientConfig mcp, IChildProcessLauncher 
         ChildProcess process;
         try
         {
-            process = launcher.Start(new ChildProcessStartInfo(commandLine, Environment.GetFolderPath(Environment.SpecialFolder.UserProfile)));
+            process = launcher.Start(new ChildProcessStartInfo(commandLine, folder ?? Environment.GetFolderPath(Environment.SpecialFolder.UserProfile)));
         }
         catch (ChildProcessException ex)
         {

@@ -13,6 +13,10 @@ public interface ISlackAgent
 
     /// <exception cref="ClaudeCodeException">It failed or was too slow.</exception>
     Task<string> AskAsync(string instructions, string? model, CancellationToken ct);
+
+    /// <summary>The same, allowed to read <paramref name="folder"/> (a project) and nothing else.</summary>
+    /// <exception cref="ClaudeCodeException">It failed or was too slow.</exception>
+    Task<string> AskInFolderAsync(string instructions, string folder, string? model, CancellationToken ct) => AskAsync(instructions, model, ct);
 }
 
 /// <summary>Claude Code with no tools, no MCP and no hooks (<see cref="ClaudeCodeRunner.AskAsync"/>).</summary>
@@ -23,6 +27,12 @@ public sealed class ClaudeCodeSlackAgent(ClaudeCodeRunner claude) : ISlackAgent
     public string? Unavailable() => ClaudeCodeRunner.AskUnavailable();
 
     public Task<string> AskAsync(string instructions, string? model, CancellationToken ct) => claude.AskAsync(instructions, model, Timeout, ct);
+
+    /// <summary>Looking into a project takes longer.</summary>
+    public static readonly TimeSpan FolderTimeout = TimeSpan.FromMinutes(10);
+
+    public Task<string> AskInFolderAsync(string instructions, string folder, string? model, CancellationToken ct) =>
+        claude.AskInFolderAsync(instructions, folder, model, FolderTimeout, ct);
 }
 
 /// <summary>
