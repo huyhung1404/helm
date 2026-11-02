@@ -181,6 +181,14 @@
                       SelectedValue="{Binding ReplyAfterMinutes}" AutomationProperties.Name="Reply when you have not answered" />
         </ui:CardControl>
 
+        <ui:CardControl Margin="0,0,0,4" Icon="{ui:SymbolIcon PersonChat24}">
+            <ui:CardControl.Header>
+                <core:CardHeader Title="Answer &quot;Lumi ơi&quot;"
+                                 Description="Someone writes &quot;Lumi ơi, …&quot; (you anywhere, others where Write is on): Lumi answers in the thread from that conversation only, with the AI signature." />
+            </ui:CardControl.Header>
+            <ui:ToggleSwitch IsChecked="{Binding AnswerCalls}" />
+        </ui:CardControl>
+
         <!-- The report and the list on screen -->
         <TextBlock Text="On screen" Style="{DynamicResource HelmSectionHeader}" />
         <ui:CardControl Margin="0,0,0,4" Icon="{ui:SymbolIcon Clock24}">

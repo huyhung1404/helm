@@ -37,6 +37,7 @@ public sealed partial class SlackBotViewModel : ObservableObject
     [ObservableProperty] private string _model = "";
     [ObservableProperty] private bool _playSound;
     [ObservableProperty] private int _remindEveryMinutes;
+    [ObservableProperty] private bool _answerCalls;
     [ObservableProperty] private bool _telegramEnabled;
     [ObservableProperty] private bool _telegramOnReply;
     [ObservableProperty] private bool _telegramOnRemind;
@@ -165,6 +166,8 @@ public sealed partial class SlackBotViewModel : ObservableObject
     partial void OnPlaySoundChanged(bool value) => Save(s => s.PlaySound = value);
 
     partial void OnRemindEveryMinutesChanged(int value) => Save(s => s.RemindEveryMinutes = value);
+
+    partial void OnAnswerCallsChanged(bool value) => Save(s => s.AnswerCalls = value);
 
     partial void OnTelegramEnabledChanged(bool value) => Save(s => s.TelegramEnabled = value);
 
@@ -302,6 +305,7 @@ public sealed partial class SlackBotViewModel : ObservableObject
             Model = s.Model;
             PlaySound = s.PlaySound;
             RemindEveryMinutes = s.RemindEveryMinutes;
+            AnswerCalls = s.AnswerCalls;
             TelegramEnabled = s.TelegramEnabled;
             TelegramOnReply = s.TelegramOnReply;
             TelegramOnRemind = s.TelegramOnRemind;

@@ -222,6 +222,18 @@ public sealed class SlackBotEngine : IAsyncDisposable
                 _logger.LogInformation("Slack Bot signed in to {Workspace}", Me.Url);
                 var reader = new SlackReader(api, Me, Inbox, () => _settings.Current);
                 reader.ForYou += (_, _) => SortSoon(ct);
+                var lumi = new SlackLumi(api, _agent, Inbox, reader, () => _settings.Current, Me, MeName, _logger);
+                reader.Called += (_, m) => _ = Task.Run(async () =>
+                {
+                    try
+                    {
+                        await lumi.AnswerAsync(m, DateTimeOffset.UtcNow, ct).ConfigureAwait(false);
+                    }
+                    catch (Exception ex) when (ex is not OperationCanceledException)
+                    {
+                        _logger.LogWarning(ex, "Lumi could not answer a call");
+                    }
+                }, CancellationToken.None);
                 var replier = new SlackReplier(api, _agent, Inbox, reader, () => _settings.Current, MeName, _logger,
                     item => Replied?.Invoke(this, new SlackAlertLine(item.From, item.Where, item.Summary,
                         SlackText.Permalink(Me?.Url ?? "https://slack.com/", item.Channel, item.Ts, item.ThreadTs))));
