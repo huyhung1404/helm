@@ -1,0 +1,67 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:Helm.Modules.Vocab"
+             xmlns:local="using:Helm.Modules.Vocab"
+             x:Class="Helm.Modules.Vocab.VocabInfoView"
+             x:DataType="vm:VocabWordInfo">
+
+    <!-- What helps to use a word, one collapsible section each: the mnemonic, examples, collocations, its family,
+         similar and opposite words, words easy to mix up. Sections without content are left out. -->
+    <StackPanel>
+        <local:VocabSection Title="To remember it" Key="info.mnemonic" IsVisible="{Binding HasMnemonic}">
+            <TextBlock Text="{Binding Mnemonic}" TextWrapping="Wrap" FontStyle="Italic" />
+        </local:VocabSection>
+
+        <local:VocabSection Title="Examples" Key="info.examples" IsVisible="{Binding HasExamples}">
+            <ItemsControl ItemsSource="{Binding Examples}">
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate x:DataType="vm:VocabExample">
+                        <Border Classes="ex">
+                            <StackPanel Spacing="2">
+                                <TextBlock Text="{Binding Sentence}" TextWrapping="Wrap" />
+                                <TextBlock Text="{Binding Translation}" Classes="hint" />
+                            </StackPanel>
+                        </Border>
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+        </local:VocabSection>
+
+        <local:VocabSection Title="Goes with" Key="info.collocations" IsVisible="{Binding HasCollocations}">
+            <TextBlock Text="{Binding Collocations}" TextWrapping="Wrap" />
+        </local:VocabSection>
+
+        <local:VocabSection Title="Word family" Key="info.forms" IsVisible="{Binding HasForms}">
+            <ItemsControl ItemsSource="{Binding Forms}">
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate x:DataType="vm:VocabForm">
+                        <TextBlock TextWrapping="Wrap" Margin="0,0,0,6"><Run Text="{Binding Word}" FontWeight="SemiBold" /><Run Text="  " /><Run Text="{Binding PartOfSpeech}" Foreground="{DynamicResource HelmSecondaryText}" /><Run Text="  ·  " /><Run Text="{Binding Meaning}" /></TextBlock>
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+        </local:VocabSection>
+
+        <local:VocabSection Title="Similar · opposite" Key="info.similar">
+            <local:VocabSection.IsVisible>
+                <MultiBinding Converter="{x:Static BoolConverters.Or}">
+                    <Binding Path="HasSynonyms" />
+                    <Binding Path="HasAntonyms" />
+                </MultiBinding>
+            </local:VocabSection.IsVisible>
+            <StackPanel Spacing="4">
+                <TextBlock TextWrapping="Wrap" IsVisible="{Binding HasSynonyms}"><Run Text="Similar: " Foreground="{DynamicResource HelmSecondaryText}" /><Run Text="{Binding Synonyms}" /></TextBlock>
+                <TextBlock TextWrapping="Wrap" IsVisible="{Binding HasAntonyms}"><Run Text="Opposite: " Foreground="{DynamicResource HelmSecondaryText}" /><Run Text="{Binding Antonyms}" /></TextBlock>
+            </StackPanel>
+        </local:VocabSection>
+
+        <local:VocabSection Classes="warn" Title="Easy to mix up with" Key="info.confusables" IsVisible="{Binding HasConfusables}">
+            <ItemsControl ItemsSource="{Binding Confusables}">
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate x:DataType="x:String">
+                        <TextBlock Text="{Binding}" TextWrapping="Wrap" Margin="0,0,0,6" />
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+        </local:VocabSection>
+    </StackPanel>
+</UserControl>

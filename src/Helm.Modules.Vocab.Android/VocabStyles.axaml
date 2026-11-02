@@ -1,0 +1,563 @@
+<Styles xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:ic="using:FluentIcons.Avalonia"
+        xmlns:local="using:Helm.Modules.Vocab">
+
+    <!-- Vocabulary's look on the phone, shared by its pages: tags, segments, chips, the outline of a word's parts,
+         collapsible sections, bottom sheets and the answer bar. Colours are Helm's theme resources; the few of
+         Vocabulary's own (amber warnings, the purple pinyin hooks) have a light and a dark value. -->
+    <Styles.Resources>
+        <ResourceDictionary>
+            <ResourceDictionary.ThemeDictionaries>
+                <ResourceDictionary x:Key="Light">
+                    <SolidColorBrush x:Key="VocabLine" Color="#14000000" />
+                    <SolidColorBrush x:Key="VocabLine2" Color="#24000000" />
+                    <SolidColorBrush x:Key="VocabRaise" Color="#F3F3F3" />
+                    <SolidColorBrush x:Key="VocabSegOn" Color="#FFFFFF" />
+                    <SolidColorBrush x:Key="VocabTagFill" Color="#0F000000" />
+                    <SolidColorBrush x:Key="VocabAccentFill" Color="#1F0067C0" />
+                    <SolidColorBrush x:Key="VocabAccentText" Color="#005A9E" />
+                    <SolidColorBrush x:Key="VocabWarn" Color="#9A6700" />
+                    <SolidColorBrush x:Key="VocabWarnFill" Color="#1F9A6700" />
+                    <SolidColorBrush x:Key="VocabPy" Color="#8A3FA8" />
+                    <SolidColorBrush x:Key="VocabPyFill" Color="#128A3FA8" />
+                    <SolidColorBrush x:Key="VocabPyStroke" Color="#4D8A3FA8" />
+                    <SolidColorBrush x:Key="VocabDotOff" Color="#26000000" />
+                    <SolidColorBrush x:Key="VocabElbow" Color="#47000000" />
+                    <SolidColorBrush x:Key="VocabBadge" Color="#9A6700" />
+                    <SolidColorBrush x:Key="VocabOnBadge" Color="#FFFFFF" />
+                    <SolidColorBrush x:Key="VocabOnAccent" Color="#FFFFFF" />
+                </ResourceDictionary>
+                <ResourceDictionary x:Key="Dark">
+                    <SolidColorBrush x:Key="VocabLine" Color="#12FFFFFF" />
+                    <SolidColorBrush x:Key="VocabLine2" Color="#29FFFFFF" />
+                    <SolidColorBrush x:Key="VocabRaise" Color="#333333" />
+                    <SolidColorBrush x:Key="VocabSegOn" Color="#3A3A3A" />
+                    <SolidColorBrush x:Key="VocabTagFill" Color="#17FFFFFF" />
+                    <SolidColorBrush x:Key="VocabAccentFill" Color="#244CC2FF" />
+                    <SolidColorBrush x:Key="VocabAccentText" Color="#8AD9FF" />
+                    <SolidColorBrush x:Key="VocabWarn" Color="#FFC983" />
+                    <SolidColorBrush x:Key="VocabWarnFill" Color="#24FFB86B" />
+                    <SolidColorBrush x:Key="VocabPy" Color="#E7B5F2" />
+                    <SolidColorBrush x:Key="VocabPyFill" Color="#14D58BEA" />
+                    <SolidColorBrush x:Key="VocabPyStroke" Color="#40D58BEA" />
+                    <SolidColorBrush x:Key="VocabDotOff" Color="#29FFFFFF" />
+                    <SolidColorBrush x:Key="VocabElbow" Color="#47FFFFFF" />
+                    <SolidColorBrush x:Key="VocabBadge" Color="#FFC983" />
+                    <SolidColorBrush x:Key="VocabOnBadge" Color="#000000" />
+                    <SolidColorBrush x:Key="VocabOnAccent" Color="#000000" />
+                </ResourceDictionary>
+            </ResourceDictionary.ThemeDictionaries>
+        </ResourceDictionary>
+    </Styles.Resources>
+
+    <!-- ===== Text ===== -->
+    <Style Selector="TextBlock.hint">
+        <Setter Property="Foreground" Value="{DynamicResource HelmSecondaryText}" />
+        <Setter Property="FontSize" Value="13" />
+        <Setter Property="TextWrapping" Value="Wrap" />
+    </Style>
+    <Style Selector="TextBlock.label">
+        <Setter Property="Foreground" Value="{DynamicResource HelmSecondaryText}" />
+        <Setter Property="FontSize" Value="13" />
+        <Setter Property="FontWeight" Value="SemiBold" />
+    </Style>
+    <Style Selector="TextBlock.accent">
+        <Setter Property="Foreground" Value="{DynamicResource SystemAccentColor}" />
+    </Style>
+    <!-- Where a group of a list starts ("A", "Due now", "Families") -->
+    <Style Selector="TextBlock.group">
+        <Setter Property="FontWeight" Value="SemiBold" />
+        <Setter Property="FontSize" Value="12" />
+        <Setter Property="Margin" Value="16,14,16,6" />
+        <Setter Property="Foreground" Value="{DynamicResource SystemAccentColor}" />
+    </Style>
+    <Style Selector="TextBlock.sheettitle">
+        <Setter Property="FontSize" Value="19" />
+        <Setter Property="FontWeight" Value="SemiBold" />
+        <Setter Property="VerticalAlignment" Value="Center" />
+        <Setter Property="TextTrimming" Value="CharacterEllipsis" />
+    </Style>
+
+    <!-- ===== Buttons ===== -->
+    <!-- A round 44 px icon button (app bar, card header, sheets) -->
+    <Style Selector="Button.icon">
+        <Setter Property="Width" Value="44" />
+        <Setter Property="Height" Value="44" />
+        <Setter Property="Padding" Value="0" />
+        <Setter Property="CornerRadius" Value="22" />
+        <Setter Property="Background" Value="Transparent" />
+        <Setter Property="BorderThickness" Value="0" />
+        <Setter Property="HorizontalContentAlignment" Value="Center" />
+        <Setter Property="VerticalContentAlignment" Value="Center" />
+    </Style>
+    <Style Selector="Button.icon:disabled">
+        <Setter Property="Opacity" Value="0.35" />
+    </Style>
+    <Style Selector="Button.icon:disabled /template/ ContentPresenter#PART_ContentPresenter">
+        <Setter Property="Background" Value="Transparent" />
+    </Style>
+    <!-- A plain button with an icon and a label (Listen, YouGlish, Edit part) -->
+    <Style Selector="Button.ghost">
+        <Setter Property="Background" Value="Transparent" />
+        <Setter Property="BorderThickness" Value="0" />
+        <Setter Property="MinHeight" Value="44" />
+        <Setter Property="Padding" Value="12,0" />
+        <Setter Property="VerticalContentAlignment" Value="Center" />
+    </Style>
+    <Style Selector="Button.tall">
+        <Setter Property="MinHeight" Value="44" />
+        <Setter Property="HorizontalContentAlignment" Value="Center" />
+        <Setter Property="VerticalContentAlignment" Value="Center" />
+    </Style>
+    <!-- The answer bar's two big buttons: a label and, under it, when the word comes back -->
+    <Style Selector="Button.big">
+        <Setter Property="MinHeight" Value="56" />
+        <Setter Property="HorizontalAlignment" Value="Stretch" />
+        <Setter Property="HorizontalContentAlignment" Value="Center" />
+        <Setter Property="VerticalContentAlignment" Value="Center" />
+        <Setter Property="FontWeight" Value="SemiBold" />
+    </Style>
+    <Style Selector="Button.big TextBlock.sub">
+        <Setter Property="FontSize" Value="12" />
+        <Setter Property="FontWeight" Value="Normal" />
+        <Setter Property="Opacity" Value="0.85" />
+        <Setter Property="HorizontalAlignment" Value="Center" />
+    </Style>
+
+    <!-- A segmented row (Learn · Words · Roots, English · 中文): the one in front is raised and underlined -->
+    <Style Selector="Border.seg">
+        <Setter Property="Background" Value="{DynamicResource HelmBarBackground}" />
+        <Setter Property="BorderBrush" Value="{DynamicResource VocabLine}" />
+        <Setter Property="BorderThickness" Value="1" />
+        <Setter Property="CornerRadius" Value="8" />
+        <Setter Property="Padding" Value="2" />
+    </Style>
+    <Style Selector="Button.seg">
+        <Setter Property="MinHeight" Value="42" />
+        <Setter Property="HorizontalAlignment" Value="Stretch" />
+        <Setter Property="HorizontalContentAlignment" Value="Center" />
+        <Setter Property="VerticalContentAlignment" Value="Center" />
+        <Setter Property="Background" Value="Transparent" />
+        <Setter Property="BorderThickness" Value="0" />
+        <Setter Property="CornerRadius" Value="6" />
+        <Setter Property="Padding" Value="8,0" />
+        <Setter Property="Foreground" Value="{DynamicResource HelmSecondaryText}" />
+    </Style>
+    <Style Selector="Button.seg.on">
+        <Setter Property="Background" Value="{DynamicResource VocabSegOn}" />
+        <Setter Property="BorderBrush" Value="{DynamicResource SystemAccentColor}" />
+        <Setter Property="BorderThickness" Value="0,0,0,2" />
+        <Setter Property="Foreground" Value="{DynamicResource TextControlForeground}" />
+        <Setter Property="FontWeight" Value="SemiBold" />
+    </Style>
+    <Style Selector="Button.seg.on:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+        <Setter Property="Background" Value="{DynamicResource VocabSegOn}" />
+        <Setter Property="BorderBrush" Value="{DynamicResource SystemAccentColor}" />
+    </Style>
+
+    <!-- A filter chip with its count; the one on is outlined in the accent -->
+    <Style Selector="Button.chip">
+        <Setter Property="MinHeight" Value="44" />
+        <Setter Property="CornerRadius" Value="22" />
+        <Setter Property="Padding" Value="14,0" />
+        <Setter Property="VerticalContentAlignment" Value="Center" />
+        <Setter Property="Background" Value="{DynamicResource VocabRaise}" />
+        <Setter Property="BorderBrush" Value="{DynamicResource VocabLine2}" />
+        <Setter Property="BorderThickness" Value="1" />
+    </Style>
+    <Style Selector="Button.chip.on">
+        <Setter Property="Background" Value="{DynamicResource VocabAccentFill}" />
+        <Setter Property="BorderBrush" Value="{DynamicResource SystemAccentColor}" />
+    </Style>
+    <Style Selector="Button.chip.on:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+        <Setter Property="Background" Value="{DynamicResource VocabAccentFill}" />
+        <Setter Property="BorderBrush" Value="{DynamicResource SystemAccentColor}" />
+    </Style>
+    <!-- A word as a pill (Also in your words, a root's family): the shared part underlined -->
+    <Style Selector="Button.wl">
+        <Setter Property="MinHeight" Value="44" />
+        <Setter Property="CornerRadius" Value="22" />
+        <Setter Property="Padding" Value="14,0" />
+        <Setter Property="Margin" Value="0,0,6,6" />
+        <Setter Property="VerticalContentAlignment" Value="Center" />
+        <Setter Property="Background" Value="Transparent" />
+        <Setter Property="BorderBrush" Value="{DynamicResource VocabLine2}" />
+        <Setter Property="BorderThickness" Value="1" />
+    </Style>
+    <Style Selector="Run.hl">
+        <Setter Property="FontWeight" Value="Bold" />
+        <Setter Property="TextDecorations" Value="Underline" />
+        <Setter Property="Foreground" Value="{DynamicResource SystemAccentColor}" />
+    </Style>
+
+    <!-- ===== Tags and dots ===== -->
+    <Style Selector="Border.tag">
+        <Setter Property="CornerRadius" Value="4" />
+        <Setter Property="Padding" Value="7,2" />
+        <Setter Property="Background" Value="{DynamicResource VocabTagFill}" />
+        <Setter Property="BorderBrush" Value="Transparent" />
+        <Setter Property="BorderThickness" Value="1" />
+        <Setter Property="VerticalAlignment" Value="Center" />
+    </Style>
+    <Style Selector="Border.tag > TextBlock">
+        <Setter Property="FontSize" Value="11" />
+        <Setter Property="FontWeight" Value="SemiBold" />
+    </Style>
+    <!-- Later ones win when a word is several at once: Hidden over Often forgotten over Pinyin slips over New -->
+    <Style Selector="Border.tag.acc">
+        <Setter Property="Background" Value="{DynamicResource VocabAccentFill}" />
+    </Style>
+    <Style Selector="Border.tag.acc > TextBlock">
+        <Setter Property="Foreground" Value="{DynamicResource VocabAccentText}" />
+    </Style>
+    <Style Selector="Border.tag.user">
+        <Setter Property="Background" Value="Transparent" />
+        <Setter Property="BorderBrush" Value="{DynamicResource SystemAccentColor}" />
+    </Style>
+    <Style Selector="Border.tag.user > TextBlock">
+        <Setter Property="Foreground" Value="{DynamicResource VocabAccentText}" />
+    </Style>
+    <Style Selector="Border.tag.py">
+        <Setter Property="Background" Value="{DynamicResource VocabPyFill}" />
+    </Style>
+    <Style Selector="Border.tag.py > TextBlock">
+        <Setter Property="Foreground" Value="{DynamicResource VocabPy}" />
+    </Style>
+    <Style Selector="Border.tag.warn">
+        <Setter Property="Background" Value="{DynamicResource VocabWarnFill}" />
+    </Style>
+    <Style Selector="Border.tag.warn > TextBlock">
+        <Setter Property="Foreground" Value="{DynamicResource VocabWarn}" />
+    </Style>
+    <Style Selector="Border.tag.mute">
+        <Setter Property="Background" Value="Transparent" />
+        <Setter Property="BorderBrush" Value="{DynamicResource VocabLine2}" />
+    </Style>
+    <Style Selector="Border.tag.mute > TextBlock">
+        <Setter Property="Foreground" Value="{DynamicResource HelmSecondaryText}" />
+    </Style>
+    <!-- How well a word is known: one dot per level -->
+    <Style Selector="Ellipse.dot">
+        <Setter Property="Width" Value="6" />
+        <Setter Property="Height" Value="6" />
+        <Setter Property="Margin" Value="0,0,3,0" />
+        <Setter Property="Fill" Value="{DynamicResource VocabDotOff}" />
+    </Style>
+    <Style Selector="Ellipse.dot.on">
+        <Setter Property="Fill" Value="{DynamicResource SystemAccentColor}" />
+    </Style>
+    <!-- The count on the app bar's Analysis icon -->
+    <Style Selector="Border.badge">
+        <Setter Property="MinWidth" Value="18" />
+        <Setter Property="Height" Value="18" />
+        <Setter Property="Padding" Value="5,0" />
+        <Setter Property="CornerRadius" Value="9" />
+        <Setter Property="Background" Value="{DynamicResource VocabBadge}" />
+        <Setter Property="HorizontalAlignment" Value="Right" />
+        <Setter Property="VerticalAlignment" Value="Top" />
+        <Setter Property="Margin" Value="0,5,3,0" />
+    </Style>
+    <Style Selector="Border.badge > TextBlock">
+        <Setter Property="FontSize" Value="11" />
+        <Setter Property="FontWeight" Value="Bold" />
+        <Setter Property="Foreground" Value="{DynamicResource VocabOnBadge}" />
+        <Setter Property="HorizontalAlignment" Value="Center" />
+        <Setter Property="VerticalAlignment" Value="Center" />
+    </Style>
+
+    <!-- ===== The card ===== -->
+    <!-- The front: tall before the answer, short after it -->
+    <Style Selector="Button.front">
+        <Setter Property="Background" Value="Transparent" />
+        <Setter Property="BorderThickness" Value="0" />
+        <Setter Property="HorizontalAlignment" Value="Stretch" />
+        <Setter Property="HorizontalContentAlignment" Value="Center" />
+        <Setter Property="VerticalContentAlignment" Value="Center" />
+        <Setter Property="MinHeight" Value="260" />
+        <Setter Property="Padding" Value="16,20" />
+    </Style>
+    <Style Selector="Button.front.revealed">
+        <Setter Property="MinHeight" Value="0" />
+        <Setter Property="Padding" Value="16,14" />
+    </Style>
+    <!-- "Remembering the pinyin": a pinyin hook, in purple -->
+    <Style Selector="Border.hook">
+        <Setter Property="Background" Value="{DynamicResource VocabPyFill}" />
+        <Setter Property="BorderBrush" Value="{DynamicResource VocabPyStroke}" />
+        <Setter Property="BorderThickness" Value="1" />
+        <Setter Property="CornerRadius" Value="8" />
+        <Setter Property="Padding" Value="12,10" />
+    </Style>
+    <Style Selector="TextBlock.hooklabel">
+        <Setter Property="FontSize" Value="12" />
+        <Setter Property="FontWeight" Value="SemiBold" />
+        <Setter Property="Foreground" Value="{DynamicResource VocabPy}" />
+    </Style>
+    <!-- A typed answer: right letters green, wrong ones red and struck through, missing ones amber and underlined -->
+    <Style Selector="TextBlock.piece">
+        <Setter Property="FontSize" Value="24" />
+        <Setter Property="FontWeight" Value="SemiBold" />
+        <Setter Property="Foreground" Value="{DynamicResource HelmSuccess}" />
+    </Style>
+    <Style Selector="TextBlock.piece.wrong">
+        <Setter Property="Foreground" Value="{DynamicResource HelmDanger}" />
+        <Setter Property="TextDecorations" Value="Strikethrough" />
+    </Style>
+    <Style Selector="TextBlock.piece.missing">
+        <Setter Property="Foreground" Value="{DynamicResource VocabWarn}" />
+        <Setter Property="TextDecorations" Value="Underline" />
+    </Style>
+    <Style Selector="TextBlock.verdict">
+        <Setter Property="Foreground" Value="{DynamicResource HelmDanger}" />
+    </Style>
+    <Style Selector="TextBlock.verdict.close">
+        <Setter Property="Foreground" Value="{DynamicResource VocabWarn}" />
+    </Style>
+    <Style Selector="TextBlock.verdict.correct">
+        <Setter Property="Foreground" Value="{DynamicResource HelmSuccess}" />
+    </Style>
+    <!-- An example sentence with its translation -->
+    <Style Selector="Border.ex">
+        <Setter Property="BorderBrush" Value="{DynamicResource VocabLine2}" />
+        <Setter Property="BorderThickness" Value="2,0,0,0" />
+        <Setter Property="Padding" Value="10,0,0,0" />
+        <Setter Property="Margin" Value="0,0,0,8" />
+    </Style>
+    <!-- The fixed bar under the Learn card and the root practice, in thumb reach -->
+    <Style Selector="Border.answerbar">
+        <Setter Property="Background" Value="{DynamicResource HelmPageBackground}" />
+        <Setter Property="BorderBrush" Value="{DynamicResource VocabLine}" />
+        <Setter Property="BorderThickness" Value="0,1,0,0" />
+        <Setter Property="Padding" Value="16,10,16,16" />
+    </Style>
+
+    <!-- ===== Lists ===== -->
+    <!-- A row of a list inside a card, a hairline above it -->
+    <Style Selector="Button.prow">
+        <Setter Property="Background" Value="Transparent" />
+        <Setter Property="BorderBrush" Value="{DynamicResource VocabLine}" />
+        <Setter Property="BorderThickness" Value="0,1,0,0" />
+        <Setter Property="CornerRadius" Value="0" />
+        <Setter Property="MinHeight" Value="64" />
+        <Setter Property="Padding" Value="16,10" />
+        <Setter Property="HorizontalAlignment" Value="Stretch" />
+        <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+        <Setter Property="VerticalContentAlignment" Value="Center" />
+    </Style>
+    <!-- A root's family on the Roots tab -->
+    <Style Selector="Button.fam">
+        <Setter Property="Background" Value="{DynamicResource HelmCardBackground}" />
+        <Setter Property="BorderBrush" Value="{DynamicResource HelmCardStroke}" />
+        <Setter Property="BorderThickness" Value="1" />
+        <Setter Property="CornerRadius" Value="10" />
+        <Setter Property="Padding" Value="16,14" />
+        <Setter Property="Margin" Value="0,0,0,8" />
+        <Setter Property="HorizontalAlignment" Value="Stretch" />
+        <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+    </Style>
+    <!-- A row of a bottom sheet's menu -->
+    <Style Selector="Button.mi">
+        <Setter Property="Background" Value="Transparent" />
+        <Setter Property="BorderThickness" Value="0" />
+        <Setter Property="CornerRadius" Value="0" />
+        <Setter Property="MinHeight" Value="52" />
+        <Setter Property="Padding" Value="20,6" />
+        <Setter Property="HorizontalAlignment" Value="Stretch" />
+        <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+        <Setter Property="VerticalContentAlignment" Value="Center" />
+        <Setter Property="FontSize" Value="16" />
+    </Style>
+    <Style Selector="ListBox.menu">
+        <Setter Property="Background" Value="Transparent" />
+    </Style>
+    <Style Selector="ListBox.menu ListBoxItem">
+        <Setter Property="MinHeight" Value="52" />
+        <Setter Property="Padding" Value="20,0" />
+        <Setter Property="VerticalContentAlignment" Value="Center" />
+        <Setter Property="FontSize" Value="16" />
+    </Style>
+    <Style Selector="ListBox.menu ListBoxItem ic|SymbolIcon.check">
+        <Setter Property="IsVisible" Value="False" />
+    </Style>
+    <Style Selector="ListBox.menu ListBoxItem:selected ic|SymbolIcon.check">
+        <Setter Property="IsVisible" Value="True" />
+    </Style>
+
+    <!-- ===== How a word is built: an outline, one indented row per part ===== -->
+    <Style Selector="Button.orow">
+        <Setter Property="Background" Value="Transparent" />
+        <Setter Property="BorderBrush" Value="Transparent" />
+        <Setter Property="BorderThickness" Value="1.5" />
+        <Setter Property="CornerRadius" Value="8" />
+        <Setter Property="MinHeight" Value="44" />
+        <Setter Property="HorizontalAlignment" Value="Stretch" />
+        <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+        <Setter Property="VerticalContentAlignment" Value="Center" />
+        <Setter Property="Margin" Value="0,0,0,2" />
+    </Style>
+    <Style Selector="Button.orow.sel">
+        <Setter Property="Background" Value="{DynamicResource VocabAccentFill}" />
+        <Setter Property="BorderBrush" Value="{DynamicResource SystemAccentColor}" />
+    </Style>
+    <Style Selector="Button.orow.sel:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+        <Setter Property="Background" Value="{DynamicResource VocabAccentFill}" />
+        <Setter Property="BorderBrush" Value="{DynamicResource SystemAccentColor}" />
+    </Style>
+    <!-- A part's box; the word's own is filled -->
+    <Style Selector="Border.obox">
+        <Setter Property="MinWidth" Value="44" />
+        <Setter Property="Height" Value="36" />
+        <Setter Property="Padding" Value="10,0" />
+        <Setter Property="CornerRadius" Value="8" />
+        <Setter Property="Background" Value="{DynamicResource VocabRaise}" />
+        <Setter Property="BorderBrush" Value="{DynamicResource VocabLine2}" />
+        <Setter Property="BorderThickness" Value="1.5" />
+        <Setter Property="VerticalAlignment" Value="Center" />
+    </Style>
+    <Style Selector="Border.obox > TextBlock">
+        <Setter Property="FontSize" Value="19" />
+        <Setter Property="FontWeight" Value="SemiBold" />
+        <Setter Property="HorizontalAlignment" Value="Center" />
+        <Setter Property="VerticalAlignment" Value="Center" />
+    </Style>
+    <Style Selector="Border.obox.root">
+        <Setter Property="Background" Value="{DynamicResource SystemAccentColor}" />
+        <Setter Property="BorderBrush" Value="Transparent" />
+    </Style>
+    <Style Selector="Border.obox.root > TextBlock">
+        <Setter Property="Foreground" Value="{DynamicResource VocabOnAccent}" />
+    </Style>
+    <!-- The connector from the parent's box down to this one: it reaches up past the row's top -->
+    <Style Selector="Border.elbow">
+        <Setter Property="Width" Value="14" />
+        <Setter Property="Height" Value="28" />
+        <Setter Property="Margin" Value="0,-28,0,0" />
+        <Setter Property="VerticalAlignment" Value="Center" />
+        <Setter Property="BorderBrush" Value="{DynamicResource VocabElbow}" />
+        <Setter Property="BorderThickness" Value="1.5,0,0,1.5" />
+        <Setter Property="CornerRadius" Value="0,0,0,6" />
+    </Style>
+    <Style Selector="TextBlock.role">
+        <Setter Property="FontSize" Value="10" />
+        <Setter Property="FontWeight" Value="Bold" />
+        <Setter Property="Foreground" Value="{DynamicResource HelmSuccess}" />
+    </Style>
+    <Style Selector="TextBlock.role.sound">
+        <Setter Property="Foreground" Value="{DynamicResource VocabWarn}" />
+    </Style>
+    <!-- The tapped part's panel under the outline -->
+    <Style Selector="Border.part">
+        <Setter Property="Background" Value="{DynamicResource VocabRaise}" />
+        <Setter Property="BorderBrush" Value="{DynamicResource VocabLine}" />
+        <Setter Property="BorderThickness" Value="1" />
+        <Setter Property="CornerRadius" Value="10" />
+        <Setter Property="Padding" Value="14" />
+    </Style>
+
+    <!-- ===== Collapsible sections (How it's built, Examples…) ===== -->
+    <Style Selector="local|VocabSection">
+        <Setter Property="Template">
+            <ControlTemplate>
+                <Border BorderBrush="{DynamicResource VocabLine}" BorderThickness="0,1,0,0">
+                    <StackPanel>
+                        <ToggleButton Classes="sech" IsChecked="{TemplateBinding IsOpen, Mode=TwoWay}" AutomationProperties.Name="{TemplateBinding Title}">
+                            <Grid ColumnDefinitions="*,Auto">
+                                <TextBlock Name="PART_Title" Text="{TemplateBinding Title}" FontSize="15" FontWeight="SemiBold" VerticalAlignment="Center" TextWrapping="Wrap" />
+                                <Panel Grid.Column="1" VerticalAlignment="Center">
+                                    <ic:SymbolIcon Symbol="ChevronDown" FontSize="18" IsVisible="{TemplateBinding IsOpen, Converter={x:Static BoolConverters.Not}}" />
+                                    <ic:SymbolIcon Symbol="ChevronUp" FontSize="18" IsVisible="{TemplateBinding IsOpen}" />
+                                </Panel>
+                            </Grid>
+                        </ToggleButton>
+                        <ContentPresenter Content="{TemplateBinding Content}" ContentTemplate="{TemplateBinding ContentTemplate}" IsVisible="{TemplateBinding IsOpen}"
+                                          Margin="0,0,0,14" />
+                    </StackPanel>
+                </Border>
+            </ControlTemplate>
+        </Setter>
+    </Style>
+    <!-- A section in Vocabulary's own colour: the pinyin hook purple, the words easy to mix up amber -->
+    <Style Selector="local|VocabSection.py /template/ TextBlock#PART_Title">
+        <Setter Property="Foreground" Value="{DynamicResource VocabPy}" />
+    </Style>
+    <Style Selector="local|VocabSection.warn /template/ TextBlock#PART_Title">
+        <Setter Property="Foreground" Value="{DynamicResource VocabWarn}" />
+    </Style>
+    <Style Selector="ToggleButton.sech">
+        <Setter Property="Background" Value="Transparent" />
+        <Setter Property="BorderThickness" Value="0" />
+        <Setter Property="CornerRadius" Value="0" />
+        <Setter Property="MinHeight" Value="48" />
+        <Setter Property="Padding" Value="0" />
+        <Setter Property="HorizontalAlignment" Value="Stretch" />
+        <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+        <Setter Property="VerticalContentAlignment" Value="Center" />
+    </Style>
+    <Style Selector="ToggleButton.sech:checked /template/ ContentPresenter#PART_ContentPresenter">
+        <Setter Property="Background" Value="Transparent" />
+        <Setter Property="Foreground" Value="{DynamicResource TextControlForeground}" />
+    </Style>
+    <Style Selector="ToggleButton.sech:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+        <Setter Property="Background" Value="Transparent" />
+    </Style>
+
+    <!-- ===== Bottom sheets ===== -->
+    <Style Selector="Border.sheet">
+        <Setter Property="Background" Value="{DynamicResource HelmCardBackground}" />
+        <Setter Property="BorderBrush" Value="{DynamicResource VocabLine}" />
+        <Setter Property="BorderThickness" Value="0,1,0,0" />
+        <Setter Property="CornerRadius" Value="16,16,0,0" />
+        <Setter Property="BoxShadow" Value="0 -8 32 0 #40000000" />
+        <Setter Property="VerticalAlignment" Value="Bottom" />
+    </Style>
+    <Style Selector="Border.grab">
+        <Setter Property="Width" Value="36" />
+        <Setter Property="Height" Value="4" />
+        <Setter Property="CornerRadius" Value="2" />
+        <Setter Property="Background" Value="{DynamicResource HelmSecondaryText}" />
+        <Setter Property="Opacity" Value="0.5" />
+        <Setter Property="HorizontalAlignment" Value="Center" />
+        <Setter Property="Margin" Value="0,8,0,0" />
+    </Style>
+    <!-- A sheet's footer, a hairline above it -->
+    <Style Selector="Border.sheetfoot">
+        <Setter Property="BorderBrush" Value="{DynamicResource VocabLine}" />
+        <Setter Property="BorderThickness" Value="0,1,0,0" />
+        <Setter Property="Padding" Value="20,12,20,16" />
+    </Style>
+    <!-- A line of a sheet's list (Added recently, Waiting) -->
+    <Style Selector="Border.lrow">
+        <Setter Property="BorderBrush" Value="{DynamicResource VocabLine}" />
+        <Setter Property="BorderThickness" Value="0,1,0,0" />
+        <Setter Property="MinHeight" Value="48" />
+    </Style>
+
+    <!-- ===== Settings page ===== -->
+    <!-- A row of a settings card, a hairline above all but the first -->
+    <Style Selector="Border.srow">
+        <Setter Property="BorderBrush" Value="{DynamicResource VocabLine}" />
+        <Setter Property="BorderThickness" Value="0,1,0,0" />
+        <Setter Property="Padding" Value="16,12" />
+        <Setter Property="MinHeight" Value="60" />
+    </Style>
+    <Style Selector="Border.srow.first">
+        <Setter Property="BorderThickness" Value="0" />
+    </Style>
+    <Style Selector="TextBlock.stitle">
+        <Setter Property="FontWeight" Value="SemiBold" />
+        <Setter Property="TextWrapping" Value="Wrap" />
+    </Style>
+    <Style Selector="TextBlock.sdesc">
+        <Setter Property="Foreground" Value="{DynamicResource HelmSecondaryText}" />
+        <Setter Property="FontSize" Value="13" />
+        <Setter Property="TextWrapping" Value="Wrap" />
+        <Setter Property="Margin" Value="0,2,0,0" />
+    </Style>
+    <Style Selector="TextBlock.ssection">
+        <Setter Property="FontWeight" Value="SemiBold" />
+        <Setter Property="FontSize" Value="13" />
+        <Setter Property="Margin" Value="4,18,0,8" />
+        <Setter Property="Foreground" Value="{DynamicResource SystemAccentColor}" />
+    </Style>
+</Styles>

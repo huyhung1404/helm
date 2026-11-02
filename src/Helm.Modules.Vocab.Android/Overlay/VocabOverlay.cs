@@ -225,7 +225,9 @@ public sealed class VocabOverlay
                     p.Y = full ? Dp(36) : restY;
                     view!.MaxHeight = full ? metrics.HeightPixels - Dp(72) : CompactHeight(metrics);
                     Update(view, p);
-                })
+                },
+                // See-through at rest so the app below stays readable; solid while used.
+                restAlpha: () => (float)_settings.CardAlpha)
             {
                 MaxHeight = CompactHeight(metrics),
             };
@@ -382,6 +384,9 @@ public sealed class VocabOverlay
                 break;
             case nameof(VocabSettingsViewModel.BlockedApps):
                 UpdateBubble();
+                break;
+            case nameof(VocabSettingsViewModel.CardOpacity):
+                _card?.RestAlphaChanged();
                 break;
         }
     }

@@ -8,7 +8,7 @@ using Avalonia.VisualTree;
 namespace Helm.Modules.Vocab;
 
 /// <summary>
-/// Holding a box of a tree of parts (挽 of 挽昼) opens a menu to make it one of the user's words, or to open it when
+/// Holding a part of a word's outline (挽 of 挽昼) opens a menu to make it one of the user's words, or to open it when
 /// they have it. A finger that moves further than a few pixels is scrolling, not holding.
 /// </summary>
 internal sealed class TreeNodeHold
@@ -36,7 +36,7 @@ internal sealed class TreeNodeHold
         Cancel();
         if (e.Source is not Visual source) return;
         var box = source.FindAncestorOfType<Button>(includeSelf: true);
-        if (box?.DataContext is not VocabNodeViewModel { CanAddAsWord: true } || !box.Classes.Contains("node")) return;
+        if (box is null || !box.Classes.Contains("node") || Node(box) is not { CanAddAsWord: true }) return;
         _box = box;
         _start = e.GetPosition(box);
         _timer.Start();
@@ -52,12 +52,20 @@ internal sealed class TreeNodeHold
     private void Open()
     {
         _timer.Stop();
-        if (_box is not { DataContext: VocabNodeViewModel node } box) return;
+        if (_box is not { } box || Node(box) is not { } node) return;
         _box = null;
         var menu = new MenuFlyout();
         menu.Items.Add(new MenuItem { Header = node.AddAsWordText, Command = node.AddAsWordCommand });
         menu.ShowAt(box);
     }
+
+    /// <summary>The part behind a row of the outline (or a box of a tree).</summary>
+    private static VocabNodeViewModel? Node(Control box) => box.DataContext switch
+    {
+        VocabOutlineRow row => row.Node,
+        VocabNodeViewModel node => node,
+        _ => null,
+    };
 
     private void Cancel()
     {

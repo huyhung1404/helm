@@ -17,7 +17,10 @@ namespace Helm.Modules.Vocab;
 /// small overlay window grows into a larger opaque one): "Do you remember this word?" and the word; a Chinese word asks
 /// for its pinyin first (the "Chinese: type the pinyin" setting), checked like on the Learn tab. Then its reading,
 /// meaning and parts, and one row of icons: Listen, YouGlish, Full details (everything known about the word, so there
-/// is no need to open the app), Open in Helm, Forgot, Remembered. Long content scrolls inside the card, never sideways.
+/// is no need to open the app), Open in Helm, Forgot, Remembered. On a pinyin card those two answer for the meaning
+/// only (a slipped pinyin is noted apart), which a caption above them says; the agent's way to remember the reading
+/// shows with the answer. Long content scrolls inside the card, never sideways. The card is see-through at rest (the
+/// "Card opacity" setting), so the app below stays readable, and solid while it is touched, typed in or opened in full.
 /// The same card as the PC's pop-up (<see cref="VocabCardViewModel"/>); it closes once answered.
 /// </summary>
 internal sealed class VocabCardOverlay
@@ -25,6 +28,10 @@ internal sealed class VocabCardOverlay
     // Tone 1 red, 2 green, 3 blue, 4 purple, neutral grey: as everywhere in Helm (ToneText).
     private static readonly AndroidColor[] ToneColors =
         [AndroidColor.Rgb(0xE5, 0x39, 0x35), AndroidColor.Rgb(0x43, 0xA0, 0x47), AndroidColor.Rgb(0x1E, 0x88, 0xE5), AndroidColor.Rgb(0xAB, 0x47, 0xBC), AndroidColor.Rgb(0x9E, 0x9E, 0x9E)];
+
+    // A tapped card stays solid this long after the finger lifts, then fades back over FadeMs.
+    private const long SettleMs = 1200;
+    private const long FadeMs = 220;
 
     private readonly Context _context;
     private readonly VocabCardViewModel _card;
@@ -43,18 +50,26 @@ internal sealed class VocabCardOverlay
     private readonly LinearLayout _answer;
     private readonly TextView _pieces;
     private readonly TextView _verdict;
+    private readonly TextView _verdictHint;
+    private readonly LinearLayout _hook;
+    private readonly TextView _hookText;
+    private readonly TextView _answersCaption;
     private readonly TextView _reading;
     private readonly TextView _meaning;
     private readonly TextView _explanation;
     private readonly TextView _parts;
     private readonly LinearLayout _details;
     private readonly IconButton _listen, _youGlish, _fullButton, _forgot, _remembered;
-    private bool _typing, _isFull;
+    private readonly Func<float> _restAlpha;
+    private readonly Action _settle;
+    private bool _typing, _isFull, _touching;
     private string _detailsFor = "";
 
     /// <param name="keyboard">The pinyin box wants the keyboard (true) or is done with it (false).</param>
     /// <param name="full">Full details opened (true) or closed: the card grows to nearly the whole screen, or back.</param>
-    public VocabCardOverlay(Context context, VocabCardViewModel card, Action close, Action<string> open, Action<bool> keyboard, Action<bool> full)
+    /// <param name="restAlpha">How solid the card is while nobody uses it (0.4-1, the "Card opacity" setting).</param>
+    public VocabCardOverlay(Context context, VocabCardViewModel card, Action close, Action<string> open, Action<bool> keyboard, Action<bool> full,
+        Func<float> restAlpha)
     {
         _context = context;
         _card = card;
@@ -62,6 +77,8 @@ internal sealed class VocabCardOverlay
         _open = open;
         _keyboard = keyboard;
         _full = full;
+        _restAlpha = restAlpha;
+        _settle = () => ApplyAlpha(animate: true);
         _dark = VocabOverlayPlatform.Dark(context);
         _c = new Palette(_dark);
 
@@ -134,6 +151,8 @@ internal sealed class VocabCardOverlay
         _pieces = Text("", 18, _c.Ink);
         _pieces.Typeface = Typeface.Monospace;
         _verdict = Text("", 14, _c.Ink, bold: true);
+        _verdictHint = Text("", 13, _c.Sub);
+        _verdictHint.SetPadding(0, Dp(2), 0, Dp(2));
         _reading = Text("", 17, _c.Ink);
         _reading.SetPadding(0, Dp(2), 0, 0);
         _meaning = Text("", 17, _c.Ink);
@@ -142,8 +161,30 @@ internal sealed class VocabCardOverlay
         _parts = Text("", 13, _c.Sub);
         _parts.Typeface = Typeface.Monospace;
         _parts.SetPadding(0, Dp(6), 0, 0);
+        // "Remembering the pinyin": the agent's way to remember the reading, in a purple box.
+        _hook = new LinearLayout(context) { Orientation = Orientation.Vertical, Visibility = ViewStates.Gone, Background = Round(_c.PyFill, 8, _c.PyStroke) };
+        _hook.SetPadding(Dp(10), Dp(8), Dp(10), Dp(8));
+        _hook.AddView(Text("Remembering the pinyin", 12, _c.Py, bold: true));
+        _hookText = Text("", 14, _c.Ink, maxLines: 12);
+        _hook.AddView(_hookText);
+        var hookParams = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MatchParent, ViewGroup.LayoutParams.WrapContent);
+        hookParams.SetMargins(0, Dp(8), Dp(6), 0);
         _details = new LinearLayout(context) { Orientation = Orientation.Vertical, Visibility = ViewStates.Gone };
-        foreach (var view in new AndroidView[] { _pieces, _verdict, _reading, _meaning, _explanation, _parts, _details }) _answer.AddView(view);
+        foreach (var view in new AndroidView[] { _pieces, _verdict, _verdictHint, _reading, _meaning, _explanation, _parts }) _answer.AddView(view);
+        _answer.AddView(_hook, hookParams);
+        _answer.AddView(_details);
+
+        // On a pinyin card: what the two answer buttons are about.
+        _answersCaption = Text("", 12, _c.Sub);
+        _answersCaption.Gravity = GravityFlags.End;
+        _answersCaption.SetPadding(0, Dp(8), Dp(6), 0);
+        var caption = new SpannableStringBuilder("✗ / ✓ answer for the ");
+        var meaning = caption.Length();
+        caption.Append("meaning");
+        caption.SetSpan(new StyleSpan(TypefaceStyle.Bold), meaning, caption.Length(), SpanTypes.ExclusiveExclusive);
+        caption.SetSpan(new ForegroundColorSpan(_c.Ink), meaning, caption.Length(), SpanTypes.ExclusiveExclusive);
+        _answersCaption.TextFormatted = caption;
+        _answer.AddView(_answersCaption);
 
         var icons = new LinearLayout(context) { Orientation = Orientation.Horizontal };
         icons.SetGravity(GravityFlags.CenterVertical);
@@ -161,7 +202,7 @@ internal sealed class VocabCardOverlay
         _answer.AddView(icons);
         content.AddView(_answer);
 
-        _scroll = new CardScroll(context) { Background = Round(_c.Bg, 14, _c.Line), Elevation = Dp(8) };
+        _scroll = new CardScroll(context, Touched) { Background = Round(_c.Bg, 14, _c.Line), Elevation = Dp(8) };
         _scroll.VerticalFadingEdgeEnabled = true;
         _scroll.SetFadingEdgeLength(Dp(28));
         _scroll.HorizontalScrollBarEnabled = false;
@@ -172,6 +213,7 @@ internal sealed class VocabCardOverlay
         _card.PropertyChanged += OnCardChanged;
         _card.Answered += OnAnswered;
         Update();
+        ApplyAlpha(animate: false);
     }
 
     public AndroidView View { get; }
@@ -193,6 +235,7 @@ internal sealed class VocabCardOverlay
     /// <summary>The card left the screen: stop following the word, and give the keyboard back.</summary>
     public void Detach()
     {
+        _scroll.RemoveCallbacks(_settle);
         _card.PropertyChanged -= OnCardChanged;
         _card.Answered -= OnAnswered;
         HideKeyboard();
@@ -212,6 +255,7 @@ internal sealed class VocabCardOverlay
     {
         if (_typing || !_card.IsTyping) return;
         _typing = true;
+        ApplyAlpha(animate: false);
         _keyboard(true);
         _typeBox.Post(() =>
         {
@@ -226,6 +270,7 @@ internal sealed class VocabCardOverlay
         _typing = false;
         HideKeyboard();
         _keyboard(false);
+        ApplyAlpha(animate: true);
     }
 
     private void HideKeyboard() =>
@@ -254,9 +299,31 @@ internal sealed class VocabCardOverlay
     private void ToggleFull()
     {
         _isFull = !_isFull;
+        ApplyAlpha(animate: !_isFull);
         _full(_isFull);
         Update();
         _scroll.ScrollTo(0, 0);
+    }
+
+    /// <summary>The "Card opacity" setting changed: the card at rest follows it at once.</summary>
+    public void RestAlphaChanged() => ApplyAlpha(animate: true);
+
+    /// <summary>A finger on the card (or lifted): solid while touched, back to see-through a moment after.</summary>
+    private void Touched(bool down)
+    {
+        _touching = down;
+        _scroll.RemoveCallbacks(_settle);
+        if (down) ApplyAlpha(animate: false);
+        else _scroll.PostDelayed(_settle, SettleMs);
+    }
+
+    /// <summary>Solid while used (touched, the pinyin box, Full details); the setting's opacity at rest.</summary>
+    private void ApplyAlpha(bool animate)
+    {
+        var target = _touching || _typing || _isFull ? 1f : Math.Clamp(_restAlpha(), 0.4f, 1f);
+        _scroll.Animate()?.Cancel();
+        if (animate) _scroll.Animate()?.Alpha(target)?.SetDuration(FadeMs)?.Start();
+        else _scroll.Alpha = target;
     }
 
     private void OnAnswered(object? sender, EventArgs e) => _close();
@@ -291,18 +358,25 @@ internal sealed class VocabCardOverlay
             _verdict.SetTextColor(_card.AnswerIsCorrect ? _c.Ok : _card.AnswerIsClose ? _c.Close : _c.Bad);
         }
         _pieces.Visibility = _verdict.Visibility = _card.HasAnswer ? ViewStates.Visible : ViewStates.Gone;
+        Show(_verdictHint, _card.VerdictHint);
 
         _reading.TextFormatted = Reading();
         _reading.Visibility = _reading.Text?.Length > 0 ? ViewStates.Visible : ViewStates.Gone;
         Show(_meaning, _card.Meaning);
         Show(_explanation, _card.Explanation);
         Show(_parts, _isFull ? "" : string.Join("\n", _card.PartLines));
+        // Full details has the hook as one of its sections.
+        _hookText.Text = _card.PinyinMnemonic;
+        _hook.Visibility = _card.HasPinyinMnemonic && !_isFull ? ViewStates.Visible : ViewStates.Gone;
         _details.Visibility = _isFull ? ViewStates.Visible : ViewStates.Gone;
         if (_isFull) FillDetails();
+        _answersCaption.Visibility = _card.AsksPinyin ? ViewStates.Visible : ViewStates.Gone;
 
         _listen.Visibility = _card.CanSay ? ViewStates.Visible : ViewStates.Gone;
         _youGlish.Visibility = _card.ShowYouGlish ? ViewStates.Visible : ViewStates.Gone;
         _fullButton.Set(_isFull ? CardIcon.Collapse : CardIcon.Expand, _isFull ? "Less" : "Full details");
+        _forgot.Set(CardIcon.No, _card.ForgotText);
+        _remembered.Set(CardIcon.Yes, _card.RememberedText);
         _remembered.Highlighted = _card.SuggestsRemembered;
         _forgot.Highlighted = _card.SuggestsForgot;
     }
@@ -425,12 +499,31 @@ internal sealed class VocabCardOverlay
         public AndroidColor Ok { get; } = dark ? AndroidColor.Rgb(0x6C, 0xCB, 0x5F) : AndroidColor.Rgb(0x0F, 0x7B, 0x0F);
         public AndroidColor Close { get; } = dark ? AndroidColor.Rgb(0xE3, 0xB3, 0x41) : AndroidColor.Rgb(0x9A, 0x67, 0x00);
         public AndroidColor Bad { get; } = dark ? AndroidColor.Rgb(0xFF, 0x99, 0xA4) : AndroidColor.Rgb(0xC4, 0x2B, 0x1C);
+        // The pinyin hook's purple, as on the Learn tab.
+        public AndroidColor Py { get; } = dark ? AndroidColor.Rgb(0xE7, 0xB5, 0xF2) : AndroidColor.Rgb(0x8A, 0x3F, 0xA8);
+        public AndroidColor PyFill { get; } = dark ? AndroidColor.Argb(0x14, 0xD5, 0x8B, 0xEA) : AndroidColor.Argb(0x12, 0x8A, 0x3F, 0xA8);
+        public AndroidColor PyStroke { get; } = dark ? AndroidColor.Argb(0x40, 0xD5, 0x8B, 0xEA) : AndroidColor.Argb(0x4D, 0x8A, 0x3F, 0xA8);
     }
 
-    /// <summary>A scroll view that grows with its content up to <see cref="MaxHeight"/>, then scrolls.</summary>
-    private sealed class CardScroll(Context context) : ScrollView(context)
+    /// <summary>A scroll view that grows with its content up to <see cref="MaxHeight"/>, then scrolls; it tells when a finger is on it.</summary>
+    private sealed class CardScroll(Context context, Action<bool> touched) : ScrollView(context)
     {
         public int MaxHeight { get; set; } = int.MaxValue;
+
+        // Seen before any child handles the touch (a button, the pinyin box, scrolling).
+        public override bool DispatchTouchEvent(MotionEvent? e)
+        {
+            switch (e?.ActionMasked)
+            {
+                case MotionEventActions.Down:
+                    touched(true);
+                    break;
+                case MotionEventActions.Up or MotionEventActions.Cancel:
+                    touched(false);
+                    break;
+            }
+            return base.DispatchTouchEvent(e);
+        }
 
         protected override void OnMeasure(int widthMeasureSpec, int heightMeasureSpec)
         {
@@ -439,152 +532,5 @@ internal sealed class VocabCardOverlay
             var limit = mode == MeasureSpecMode.Unspecified ? MaxHeight : Math.Min(MaxHeight, size);
             base.OnMeasure(widthMeasureSpec, MeasureSpec.MakeMeasureSpec(limit, MeasureSpecMode.AtMost));
         }
-    }
-}
-
-internal enum CardIcon
-{
-    Listen,
-    Video,
-    Expand,
-    Collapse,
-    Open,
-    No,
-    Yes,
-}
-
-internal enum IconStyle
-{
-    Plain,
-    No,
-    Yes,
-}
-
-/// <summary>A round 44 dp icon button, drawn on a 24-unit grid like the rest of Helm's line icons.</summary>
-internal sealed class IconButton : AndroidView
-{
-    private readonly VocabCardOverlay.Palette _c;
-    private readonly IconStyle _style;
-    private CardIcon _icon;
-    private bool _highlighted;
-
-    public IconButton(Context context, CardIcon icon, IconStyle style, VocabCardOverlay.Palette palette, string name, Action click) : base(context)
-    {
-        _icon = icon;
-        _style = style;
-        _c = palette;
-        ContentDescription = name;
-        TooltipText = name;
-        Clickable = true;
-        Focusable = true;
-        Click += (_, _) => click();
-    }
-
-    public bool Highlighted
-    {
-        get => _highlighted;
-        set
-        {
-            if (_highlighted == value) return;
-            _highlighted = value;
-            Invalidate();
-        }
-    }
-
-    public void Set(CardIcon icon, string name)
-    {
-        _icon = icon;
-        ContentDescription = name;
-        TooltipText = name;
-        Invalidate();
-    }
-
-    protected override void OnDraw(Canvas canvas)
-    {
-        base.OnDraw(canvas);
-        var size = Math.Min(Width, Height);
-        var center = size / 2f;
-        var tint = _style switch
-        {
-            IconStyle.Yes => _c.Accent,
-            IconStyle.No => _c.Bad,
-            _ => _c.Sub,
-        };
-        if (_highlighted)
-        {
-            using var ring = new Paint(PaintFlags.AntiAlias) { Color = AndroidColor.Argb(0x73, tint.R, tint.G, tint.B) };
-            canvas.DrawCircle(center, center, center, ring);
-        }
-        if (_style != IconStyle.Plain || Pressed)
-        {
-            var fill = _style switch
-            {
-                IconStyle.Yes => _c.Accent,
-                IconStyle.No => AndroidColor.Argb(0x24, _c.Bad.R, _c.Bad.G, _c.Bad.B),
-                _ => _c.Btn,
-            };
-            using var disc = new Paint(PaintFlags.AntiAlias) { Color = fill };
-            canvas.DrawCircle(center, center, center - (_highlighted ? size * 0.07f : 0), disc);
-        }
-        var ink = _style == IconStyle.Yes ? _c.OnAccent : tint;
-        var scale = size * 0.5f / 24f;
-        canvas.Save();
-        canvas.Translate(center - 12 * scale, center - 12 * scale);
-        canvas.Scale(scale, scale);
-        using var pen = new Paint(PaintFlags.AntiAlias) { Color = ink, StrokeWidth = 2, StrokeCap = Paint.Cap.Round, StrokeJoin = Paint.Join.Round };
-        pen.SetStyle(Paint.Style.Stroke);
-        using var fillPen = new Paint(PaintFlags.AntiAlias) { Color = ink };
-        switch (_icon)
-        {
-            case CardIcon.Listen:
-                canvas.DrawPath(Poly(true, 4, 9.5f, 4, 14.5f, 7.5f, 14.5f, 12, 18.5f, 12, 5.5f, 7.5f, 9.5f), fillPen);
-                canvas.DrawArc(new RectF(11.5f, 8.5f, 18.5f, 15.5f), -55, 110, false, pen);
-                canvas.DrawArc(new RectF(9, 4.5f, 24, 19.5f), -50, 100, false, pen);
-                break;
-            case CardIcon.Video:
-                canvas.DrawRoundRect(new RectF(3, 6.5f, 15, 17.5f), 2, 2, pen);
-                canvas.DrawPath(Poly(true, 15, 10.5f, 21, 7.5f, 21, 16.5f, 15, 13.5f), pen);
-                break;
-            case CardIcon.Expand:
-                canvas.DrawPath(Poly(false, 14, 4, 20, 4, 20, 10), pen);
-                canvas.DrawLine(20, 4, 13, 11, pen);
-                canvas.DrawPath(Poly(false, 10, 20, 4, 20, 4, 14), pen);
-                canvas.DrawLine(4, 20, 11, 13, pen);
-                break;
-            case CardIcon.Collapse:
-                canvas.DrawPath(Poly(false, 4, 14, 10, 14, 10, 20), pen);
-                canvas.DrawLine(10, 14, 3, 21, pen);
-                canvas.DrawPath(Poly(false, 20, 10, 14, 10, 14, 4), pen);
-                canvas.DrawLine(14, 10, 21, 3, pen);
-                break;
-            case CardIcon.Open:
-                canvas.DrawPath(Poly(false, 14, 4, 20, 4, 20, 10), pen);
-                canvas.DrawLine(20, 4, 11, 13, pen);
-                canvas.DrawPath(Poly(false, 18, 14, 18, 20, 4, 20, 4, 6, 10, 6), pen);
-                break;
-            case CardIcon.No:
-                canvas.DrawLine(7, 7, 17, 17, pen);
-                canvas.DrawLine(17, 7, 7, 17, pen);
-                break;
-            case CardIcon.Yes:
-                canvas.DrawPath(Poly(false, 5, 12.5f, 9.5f, 17, 19, 7.5f), pen);
-                break;
-        }
-        canvas.Restore();
-    }
-
-    protected override void DrawableStateChanged()
-    {
-        base.DrawableStateChanged();
-        Invalidate();
-    }
-
-    private static Android.Graphics.Path Poly(bool closed, params float[] points)
-    {
-        var path = new Android.Graphics.Path();
-        path.MoveTo(points[0], points[1]);
-        for (var i = 2; i < points.Length; i += 2) path.LineTo(points[i], points[i + 1]);
-        if (closed) path.Close();
-        return path;
     }
 }
