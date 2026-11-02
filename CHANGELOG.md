@@ -13,6 +13,11 @@ Format: [Keep a Changelog](https://keepachangelog.com), versions follow [SemVer]
   per project (estimated from your activity), what you coordinated on Slack. Ask for changes ("shorter", "build work
   first") as many times as you like, go back to an earlier version, edit by hand, then Copy; copied reports are kept
   on this PC, encrypted. Claude only reads what Helm found, with no tools.
+- **Slack Bot: "Lumi ơi" on Slack.** Write "Lumi ơi, …" (or "@lumi") in a thread or a conversation, and Lumi answers
+  in the thread from that conversation only (the thread, or the conversation's latest messages), behind the AI
+  signature. You may call Lumi anywhere; others only where Write is on. It never brings in another channel or DM, never
+  pings anyone or adds links the conversation did not have, and never promises or decides for you when someone else
+  asks; each call is answered once, never a stale one, at most 20 an hour. "Answer "Lumi ơi"" turns it off.
 - **Slack Bot: answer from the list.** Reply on a message opens a box under the list on screen (and on the Slack Bot
   page): write your answer, Enter sends it to Slack as you (no AI signature; in the message's thread in a channel),
   and the message leaves the list. The list takes the keyboard only while you write and gives it back after. A reply in
