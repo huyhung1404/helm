@@ -15,7 +15,7 @@ public sealed partial class SlackReader(ISlackApi api, SlackIdentity me, SlackIn
     /// <summary>Raised when a message for the user arrived (sort it soon).</summary>
     public event EventHandler? ForYou;
 
-    /// <summary>Raised for a message that calls Lumi ("Lumi ơi, …"), whoever wrote it and wherever: Lumi decides.</summary>
+    /// <summary>Raised for a message that names Lumi ("lumi, …", "@lumi"), whoever wrote it and wherever: Lumi decides.</summary>
     public event EventHandler<SlackMessage>? Called;
 
     public SlackIdentity Me => me;
