@@ -325,6 +325,49 @@ public sealed class VocabTests
     }
 
     [Fact]
+    public async Task Words_an_mcp_agent_adds_or_reads_are_left_to_it_until_the_claim_runs_out()
+    {
+        using var dir = new TempDir();
+        using var settings = new Helm.Core.Settings.SettingsStoreFactory(new Helm.Core.Settings.HelmPaths(dir.Path));
+        using var vm = new VocabAgentViewModel(new FakeAgent(), _store, new VocabQuiz(_store), VocabKit.Settings(settings), new InlineUi());
+        var server = Server();
+
+        _store.AddWord("relative"); // added in Helm: Helm's agent may take it
+        Assert.Single(_store.PendingUnclaimed());
+        Assert.False(vm.ExternalBusy);
+
+        var added = await CallAsync(server, "vocab_add_words", new JsonObject { ["words"] = new JsonArray("补救", "translate") });
+        Assert.Equal(2, added["added"]!.AsArray().Count);
+        Assert.Equal(["relative"], _store.PendingUnclaimed().Select(w => w.Value.Text));
+        Assert.True(vm.ExternalBusy);
+
+        // The agent that reads the waiting words takes them too.
+        await CallAsync(server, "vocab_pending", []);
+        Assert.Empty(_store.PendingUnclaimed());
+
+        // An agent that never finishes frees them.
+        _time.Advance(VocabStore.ClaimFor + TimeSpan.FromSeconds(1));
+        Assert.Equal(3, _store.PendingUnclaimed().Count);
+        Assert.False(vm.ExternalBusy);
+    }
+
+    [Fact]
+    public async Task A_batch_save_leaves_a_word_that_is_already_analyzed_as_it_is()
+    {
+        var id = _store.AddWord("relative").Id;
+        _store.SaveAnalysis(id, Relative());
+        var before = _store.GetWord(id)!.Meaning;
+
+        var result = await CallAsync(Server(), "vocab_save_analyses", new JsonObject
+        {
+            ["analyses"] = new JsonArray(new JsonObject { ["id"] = "relative", ["phonetic"] = "x", ["meaning"] = "khác" }),
+        });
+        Assert.Empty(result["saved"]!.AsArray());
+        Assert.Contains("already analyzed", result["failed"]![0]!["fix"]!.GetValue<string>());
+        Assert.Equal(before, _store.GetWord(id)!.Meaning);
+    }
+
+    [Fact]
     public void A_word_held_in_novel_reader_goes_to_vocabulary_with_its_sentence()
     {
         const string paragraph = "他说：“我们必须补救。”然后走了。";

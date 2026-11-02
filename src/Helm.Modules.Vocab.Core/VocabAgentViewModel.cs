@@ -63,7 +63,12 @@ public sealed partial class VocabAgentViewModel : ObservableObject, IDisposable
         _settings = settings;
         _ui = ui;
         _timer = new Timer(_ => _ui.Post(RunIfWaiting), null, Timeout.Infinite, Timeout.Infinite);
-        _store.Changed += (_, _) => Nudge();
+        _store.Changed += (_, _) =>
+        {
+            // The store may raise this off the UI thread.
+            _ui.Post(() => OnPropertyChanged(nameof(ExternalBusy)));
+            Nudge();
+        };
         _store.ReviewsChanged += (_, _) => Nudge();
     }
 
@@ -71,6 +76,14 @@ public sealed partial class VocabAgentViewModel : ObservableObject, IDisposable
     public bool CanRun => _agent is not null;
 
     public bool HasStatus => Status.Length > 0;
+
+    /// <summary>An AI agent over MCP (not Helm's own) is working on words now; Helm's agent waits for it.</summary>
+    public bool ExternalBusy => !IsBusy && _store.HasClaimedWork();
+
+    /// <summary>The chip's line when <see cref="ExternalBusy"/>.</summary>
+    public string ExternalStatus => "An AI agent is working on your words…";
+
+    partial void OnIsBusyChanged(bool value) => OnPropertyChanged(nameof(ExternalBusy));
 
     partial void OnStatusChanged(string value) => OnPropertyChanged(nameof(HasStatus));
 
@@ -134,9 +147,14 @@ public sealed partial class VocabAgentViewModel : ObservableObject, IDisposable
     public void Nudge()
     {
         if (!_watching || _agent is null || !_settings.Current.AutoAnalyze || IsBusy) return;
-        if (Work() is not { } work || work == _leftBehind) return;
         try
         {
+            if (Work() is not { } work || work == _leftBehind)
+            {
+                // Words an MCP agent took come back to Helm's agent if it never finishes them.
+                if (_store.HasClaimedWork()) _timer.Change(VocabStore.ClaimFor + Settle, Timeout.InfiniteTimeSpan);
+                return;
+            }
             _timer.Change(Settle, Timeout.InfiniteTimeSpan);
         }
         catch (ObjectDisposedException)
@@ -154,7 +172,7 @@ public sealed partial class VocabAgentViewModel : ObservableObject, IDisposable
     /// <summary>What there is to do, as one key (the words' ids by kind of work); null when nothing.</summary>
     internal string? Work()
     {
-        var pending = _store.Pending().Select(w => w.Id);
+        var pending = _store.PendingUnclaimed().Select(w => w.Id);
         var hard = _quiz.HardWords().Select(w => w.Id).Concat(_quiz.SlippingWords().Select(w => "py:" + w.Id));
         var lacking = _store.Words().Where(w => w.Value.LacksDetails && !w.Value.Hidden).Select(w => w.Id);
         var key = string.Join("|", string.Join(",", pending), string.Join(",", hard.Order(StringComparer.Ordinal)), string.Join(",", lacking));

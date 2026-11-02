@@ -141,6 +141,12 @@ public sealed record VocabWord
 
     public DateTimeOffset? AnalyzedAt { get; init; }
 
+    /// <summary>
+    /// An AI agent over MCP took this word to analyze it itself: Helm's own agent leaves it alone until this time passes,
+    /// so the two do not work on (and pay for) the same word.
+    /// </summary>
+    public DateTimeOffset? ClaimedUntil { get; init; }
+
     [JsonIgnore]
     public bool IsAnalyzed => Status == VocabStatus.Analyzed;
 
