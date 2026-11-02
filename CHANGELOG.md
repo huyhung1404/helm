@@ -8,8 +8,8 @@ Format: [Keep a Changelog](https://keepachangelog.com), versions follow [SemVer]
 ### Added
 - **Slack Bot (PC): never miss what needs you in Slack.** Slack Bot reads your workspace as you, through a Slack app
   you make in a minute from the manifest on its settings page (Socket Mode: Helm connects out, nothing listens on your
-  PC). You choose per conversation: Off, Read, or Read and reply. DMs are read unless you turn them off; channels stay
-  off until you turn them on. Claude Code sorts each message: to do, worth knowing or not for you, with one line in
+  PC). Each conversation has two switches, Read and Write (both off: not read at all). DMs are read unless you turn them
+  off; channels stay off until you turn them on. Claude Code sorts each message: to do, worth knowing or not for you, with one line in
   Vietnamese. DMs, mentions and replies in your threads are sorted within seconds, channels as often as you set (in
   seconds; every 30 minutes to start with). What needs you stays in a small see-through list on top of your apps (it
   never takes the keyboard; solid under the mouse; drag it anywhere, fold it into a badge) until you reply in Slack,

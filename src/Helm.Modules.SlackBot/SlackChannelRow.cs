@@ -2,12 +2,15 @@ using CommunityToolkit.Mvvm.ComponentModel;
 
 namespace Helm.Modules.SlackBot;
 
-/// <summary>A channel or DM in the "Channels" list of the settings page, with what Slack Bot may do there.</summary>
+/// <summary>
+/// A channel or DM in the "Channels and DMs" list of the settings page, with two switches: Read and Write. Both off is
+/// <see cref="SlackChannelMode.Off"/>; Write needs Read, so turning Write on turns Read on and turning Read off turns
+/// Write off.
+/// </summary>
 public sealed partial class SlackChannelRow : ObservableObject
 {
     private readonly Action<string, SlackChannelMode> _changed;
-
-    [ObservableProperty] private SlackChannelMode _mode;
+    private SlackChannelMode _mode;
 
     public SlackChannelRow(SlackConversation conversation, SlackChannelMode mode, Action<string, SlackChannelMode> changed)
     {
@@ -23,16 +26,35 @@ public sealed partial class SlackChannelRow : ObservableObject
         _changed = changed;
     }
 
-    public static IReadOnlyList<SlackBotChoice<SlackChannelMode>> Modes { get; } =
-    [
-        new(SlackChannelMode.Off, "Off"),
-        new(SlackChannelMode.Read, "Read"),
-        new(SlackChannelMode.Reply, "Read and reply"),
-    ];
-
     public string Id { get; }
 
     public string Name { get; }
 
-    partial void OnModeChanged(SlackChannelMode value) => _changed(Id, value);
+    public SlackChannelMode Mode
+    {
+        get => _mode;
+        set
+        {
+            if (_mode == value) return;
+            _mode = value;
+            OnPropertyChanged();
+            OnPropertyChanged(nameof(CanRead));
+            OnPropertyChanged(nameof(CanWrite));
+            _changed(Id, value);
+        }
+    }
+
+    /// <summary>Slack Bot reads it (on the list and in the report).</summary>
+    public bool CanRead
+    {
+        get => _mode != SlackChannelMode.Off;
+        set => Mode = value ? (_mode == SlackChannelMode.Off ? SlackChannelMode.Read : _mode) : SlackChannelMode.Off;
+    }
+
+    /// <summary>Slack Bot may also write there: its replies, and AI agents' reports.</summary>
+    public bool CanWrite
+    {
+        get => _mode == SlackChannelMode.Reply;
+        set => Mode = value ? SlackChannelMode.Reply : _mode == SlackChannelMode.Off ? SlackChannelMode.Off : SlackChannelMode.Read;
+    }
 }

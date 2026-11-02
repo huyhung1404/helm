@@ -44,6 +44,18 @@ public sealed class SlackBotViewsTests : IDisposable
         public Task InvokeAsync(Action action) => _dispatcher.InvokeAsync(action).Task;
     }
 
+    private sealed class NoSlack : ISlackApi
+    {
+        public Task<SlackIdentity> AuthTestAsync(CancellationToken ct) => throw new NotSupportedException();
+        public Task<IReadOnlyList<SlackConversation>> ConversationsAsync(CancellationToken ct) => throw new NotSupportedException();
+        public Task<IReadOnlyList<SlackMessage>> HistoryAsync(string channel, string oldest, int max, CancellationToken ct) => throw new NotSupportedException();
+        public Task<IReadOnlyList<SlackMessage>> RepliesAsync(string channel, string threadTs, string oldest, CancellationToken ct) => throw new NotSupportedException();
+        public Task<IReadOnlyList<SlackMessage>> SearchMentionsAsync(string userId, string oldest, CancellationToken ct) => throw new NotSupportedException();
+        public Task<string?> UserNameAsync(string userId, CancellationToken ct) => Task.FromResult<string?>(null);
+        public Task<Uri> OpenSocketAsync(CancellationToken ct) => throw new NotSupportedException();
+        public Task<string?> PostMessageAsync(string channel, string text, string? threadTs, CancellationToken ct) => throw new NotSupportedException();
+    }
+
     private sealed class NoServices : IServiceProvider
     {
         public object? GetService(Type serviceType) => null;
@@ -88,8 +100,17 @@ public sealed class SlackBotViewsTests : IDisposable
         var content = new SlackBotContentPage(module, inbox);
         Layout(content, new Size(1000, 1300), "3-content");
 
+        engine.ConnectedForTests(new NoSlack(), new SlackIdentity("ME", "hung", "T1", "https://team.slack.com/"), "Hưng",
+        [
+            new SlackConversation("C1", "release", SlackConversationKind.Channel),
+            new SlackConversation("C2", "fast-core-game", SlackConversationKind.PrivateChannel),
+            new SlackConversation("D1", "Tuấn", SlackConversationKind.DirectMessage, "U2"),
+        ]);
+        settings.Get<SlackBotSettings>(SlackBotModule.ModuleId).Update(v => v.Channels["C1"] = SlackChannelMode.Reply);
         var viewModel = new SlackBotViewModel(module, engine, tokens, settings, ui, launcher, new NoServices(), overlay);
         Assert.False(viewModel.HasTokens);
+        Assert.Equal([true, false, true], viewModel.Channels.Select(c => c.CanRead));
+        Assert.Equal([true, false, false], viewModel.Channels.Select(c => c.CanWrite));
         Layout(new SlackBotPage(viewModel), new Size(1000, 1500), "4-settings");
 
         // Done takes it off the list; replying in the thread takes the mention off too.

@@ -55,7 +55,7 @@ started or in the future). Nothing is unticked or deleted through them. Try "why
 habit?".
 
 Slack Bot's tools (PC) let an agent report work to the team: `slack_conversations` lists the channels and DMs the user
-turned on in Slack Bot and whether the agent may post there (only those set to **Read and reply**); `slack_messages`
+turned on in Slack Bot and whether the agent may post there (only those where **Write** is on); `slack_messages`
 reads a conversation or one thread; `slack_post` posts a message as the user, behind the AI signature, with @here,
 @channel and @everyone taken out, and is always asked first with the exact text (it reaches other people);
 `slack_wait_replies` waits, only when the user asked for feedback, until someone else answers in that thread (polling

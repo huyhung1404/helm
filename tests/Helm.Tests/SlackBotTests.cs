@@ -392,6 +392,24 @@ public sealed class SlackReaderTests
     }
 
     [Fact]
+    public void Write_needs_read_and_both_off_is_off()
+    {
+        var modes = new List<SlackChannelMode>();
+        var row = new SlackChannelRow(new SlackConversation("C1", "dev", SlackConversationKind.Channel), SlackChannelMode.Off, (_, m) => modes.Add(m));
+        Assert.False(row.CanRead);
+        row.CanWrite = true;
+        Assert.True(row.CanRead);
+        Assert.Equal(SlackChannelMode.Reply, row.Mode);
+        row.CanWrite = false;
+        Assert.Equal(SlackChannelMode.Read, row.Mode);
+        row.CanWrite = true;
+        row.CanRead = false;
+        Assert.False(row.CanWrite);
+        Assert.Equal(SlackChannelMode.Off, row.Mode);
+        Assert.Equal([SlackChannelMode.Reply, SlackChannelMode.Read, SlackChannelMode.Reply, SlackChannelMode.Off], modes);
+    }
+
+    [Fact]
     public void Dms_are_read_and_channels_off_until_the_user_says_otherwise()
     {
         var settings = new SlackBotSettings();

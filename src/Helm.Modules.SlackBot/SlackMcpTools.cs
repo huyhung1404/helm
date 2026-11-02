@@ -104,7 +104,7 @@ public sealed partial class SlackMcpTools(SlackBotEngine engine, ISettingsStoreF
         if (matches.Count > 1) throw new McpToolException($"“{idOrName}” is several conversations; use the id from slack_conversations.");
         var conversation = matches[0];
         if (post && s.ModeOf(conversation.Id, conversation.Kind) != SlackChannelMode.Reply)
-            throw new McpToolException($"The user does not let Slack Bot write in {SlackReader.Where(conversation, false)}; they can set it to “Read and reply” in Slack Bot's settings.");
+            throw new McpToolException($"The user does not let Slack Bot write in {SlackReader.Where(conversation, false)}; they can turn Write on for it in Slack Bot's settings.");
         return conversation;
     }
 

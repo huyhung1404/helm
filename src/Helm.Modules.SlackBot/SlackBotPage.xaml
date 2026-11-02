@@ -78,7 +78,7 @@
                 <ui:TextBox Margin="0,0,0,8" PlaceholderText="Find a channel or person" Icon="{ui:SymbolIcon Search24}"
                             Text="{Binding ChannelFilter, UpdateSourceTrigger=PropertyChanged}" AutomationProperties.Name="Find a channel" />
                 <TextBlock Margin="0,0,0,8" TextWrapping="Wrap" Style="{DynamicResource HelmSecondaryText}"
-                           Text="Off: nothing from it is read, kept or shown to Claude (what was kept is removed). Read: on your list and in the report. Read and reply: messages for you also get the reply below." />
+                           Text="Read: on your list and in the report. Write: Slack Bot may also reply there and AI agents may post reports (needs Read). Both off: nothing from it is read, kept or shown to Claude, and what was kept is removed." />
                 <ScrollViewer MaxHeight="380" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
                     <ItemsControl ItemsSource="{Binding Channels}" VirtualizingPanel.IsVirtualizing="True">
                         <ItemsControl.ItemTemplate>
@@ -86,9 +86,12 @@
                                 <Border Style="{DynamicResource HelmExpanderRow}" Padding="0,6">
                                     <core:RowLayout>
                                         <TextBlock Text="{Binding Name}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
-                                        <ComboBox HorizontalAlignment="Right" MinWidth="170" ItemsSource="{x:Static local:SlackChannelRow.Modes}"
-                                                  DisplayMemberPath="Label" SelectedValuePath="Value" SelectedValue="{Binding Mode}"
-                                                  AutomationProperties.Name="{Binding Name}" />
+                                        <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                                            <TextBlock Text="Read" VerticalAlignment="Center" Margin="0,0,8,0" Style="{DynamicResource HelmSecondaryText}" />
+                                            <ui:ToggleSwitch IsChecked="{Binding CanRead}" AutomationProperties.Name="{Binding Name, StringFormat=Read {0}}" />
+                                            <TextBlock Text="Write" VerticalAlignment="Center" Margin="20,0,8,0" Style="{DynamicResource HelmSecondaryText}" />
+                                            <ui:ToggleSwitch IsChecked="{Binding CanWrite}" AutomationProperties.Name="{Binding Name, StringFormat=Write in {0}}" />
+                                        </StackPanel>
                                     </core:RowLayout>
                                 </Border>
                             </DataTemplate>
@@ -138,7 +141,7 @@
         <ui:CardExpander Margin="0,0,0,4" IsExpanded="True" Icon="{ui:SymbolIcon ChatArrowBack20}">
             <ui:CardExpander.Header>
                 <core:CardHeader Title="AI signature"
-                                 Description="Claude writes a short reply in conversations set to Read and reply; Helm puts this in front so nobody takes it for you. {me} is your name." />
+                                 Description="Claude writes a short reply in conversations where Write is on; Helm puts this in front so nobody takes it for you. {me} is your name." />
             </ui:CardExpander.Header>
             <StackPanel>
                 <ui:TextBox AutomationProperties.Name="AI signature" Text="{Binding Signature, UpdateSourceTrigger=LostFocus}" />
