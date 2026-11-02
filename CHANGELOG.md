@@ -3,6 +3,14 @@
 All notable changes to Helm. The top section is used as the GitHub release body and as the Velopack release notes.
 Format: [Keep a Changelog](https://keepachangelog.com), versions follow [SemVer](https://semver.org).
 
+## [0.74.1] - 2026-11-02
+
+### Fixed
+- **Helm Keyboard: letters reach web pages that have no text box while Vietnamese is on.** Chrome Remote Desktop got
+  none of them, so nothing reached the other computer; web shortcuts (YouTube's j/k/l…) and games lost them too.
+  Helm Keyboard now leaves keys to the app wherever the app says nothing is typed through an input method: a page
+  with no text box, and password boxes (which now take the keys as they are, like with other input methods).
+
 ## [0.74.0] - 2026-11-02
 
 ### Added
