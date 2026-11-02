@@ -51,6 +51,9 @@ public sealed class InboxItem
     /// <summary>The thread's first message, when this is a reply (for context), clipped.</summary>
     public string? ThreadStart { get; set; }
 
+    /// <summary>The message calls the user by name (@them): kept even from a conversation that is off.</summary>
+    public bool Tagged { get; set; }
+
     /// <summary>For the user: a DM or group DM, a message that calls them, or a reply in their thread.</summary>
     public bool Direct { get; set; }
 
@@ -110,6 +113,12 @@ public sealed class InboxData
     public DateTimeOffset? LastDigest { get; set; }
 
     public List<InboxCorrection> Corrections { get; set; } = [];
+
+    /// <summary>The latest message seen per conversation (anyone's): catching up reads the active ones first.</summary>
+    public Dictionary<string, string> Activity { get; set; } = [];
+
+    /// <summary>Every DM's latest message was looked up once: <see cref="Activity"/> knows which DMs are quiet.</summary>
+    public bool ActivityLearned { get; set; }
 
     /// <summary>Messages Slack Bot sent (channel:ts): they are the user's account but not the user's answer.</summary>
     public List<string> BotMessages { get; set; } = [];

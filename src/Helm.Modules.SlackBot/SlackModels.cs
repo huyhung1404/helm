@@ -12,7 +12,8 @@ public enum SlackConversationKind
 
 /// <summary>A channel, a private channel, a DM or a group DM the user is in.</summary>
 /// <param name="UserId">The other person of a DM.</param>
-public sealed record SlackConversation(string Id, string Name, SlackConversationKind Kind, string? UserId = null)
+/// <param name="Gone">A DM with someone whose account was removed: nothing new can come from it.</param>
+public sealed record SlackConversation(string Id, string Name, SlackConversationKind Kind, string? UserId = null, bool Gone = false)
 {
     /// <summary>A DM or a group DM: everything in it is for the user.</summary>
     public bool IsDirect => Kind is SlackConversationKind.DirectMessage or SlackConversationKind.GroupMessage;

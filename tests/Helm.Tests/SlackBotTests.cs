@@ -235,6 +235,18 @@ public sealed class SlackInboxTests
     }
 
     [Fact]
+    public void Activity_says_which_conversations_to_catch_up_on_first()
+    {
+        var inbox = NewInbox();
+        inbox.Touch("D1", SlackIds.Ts(Now - TimeSpan.FromDays(2)));
+        inbox.Touch("D2", SlackIds.Ts(Now - TimeSpan.FromDays(60)));
+        inbox.Touch("D1", SlackIds.Ts(Now - TimeSpan.FromDays(40)));
+        Assert.Equal(["D1"], inbox.RecentChannels(TimeSpan.FromDays(30)).Order());
+        Assert.Contains("D1", inbox.ActiveChannels());
+        Assert.DoesNotContain("D2", inbox.ActiveChannels());
+    }
+
+    [Fact]
     public void Seen_only_moves_forward()
     {
         var inbox = NewInbox();
@@ -384,7 +396,8 @@ public sealed class SlackReaderTests
     public async Task Channels_not_turned_on_bots_and_own_messages_are_not_kept()
     {
         var (reader, inbox, settings) = NewReader();
-        Assert.False(await reader.ReadAsync(new SlackMessage("C2", "1.0", null, "U2", "<@ME> secret", false), default));
+        // Off: nothing that does not tag the user.
+        Assert.False(await reader.ReadAsync(new SlackMessage("C2", "1.0", null, "U2", "secret plans", false), default));
         Assert.False(await reader.ReadAsync(new SlackMessage("C1", "2.0", null, null, "deploy ok", true), default));
         Assert.True(await reader.ReadAsync(new SlackMessage("C1", "3.0", null, null, "<@ME> deploy failed", true), default));
         Assert.False(await reader.ReadAsync(new SlackMessage("D1", "4.0", null, "ME", "ok", false), default));
@@ -410,6 +423,26 @@ public sealed class SlackReaderTests
         Assert.False(row.CanWrite);
         Assert.Equal(SlackChannelMode.Off, row.Mode);
         Assert.Equal([SlackChannelMode.Reply, SlackChannelMode.Read, SlackChannelMode.Reply, SlackChannelMode.Off], modes);
+    }
+
+    [Fact]
+    public async Task A_tag_in_a_conversation_that_is_off_is_kept_and_answered_there()
+    {
+        var (reader, inbox, settings) = NewReader();
+        // C2 is off: only the message that tags the user is kept.
+        Assert.False(await reader.ReadAsync(new SlackMessage("C2", "1.0", null, "U2", "lunch?", false), default));
+        Assert.True(await reader.ReadAsync(new SlackMessage("C2", "2.0", null, "U2", "<@ME> review giúp em", false), default));
+        var tag = Assert.Single(inbox.Snapshot());
+        Assert.True(tag.Tagged);
+        Assert.True(tag.IsToDo || tag.Level == InboxLevel.Pending);
+
+        // Turning the channel off again (the hourly list refresh) keeps it.
+        inbox.Forget("C2");
+        Assert.Single(inbox.Snapshot());
+
+        // The user's answer there takes it off, though the channel is off.
+        await reader.ReadAsync(new SlackMessage("C2", "3.0", null, "ME", "ok để anh xem", false), default);
+        Assert.Equal(HandledBy.Replied, inbox.Snapshot().Single().Handled);
     }
 
     [Fact]
@@ -592,6 +625,7 @@ public sealed class SlackApiTests
         Assert.Equal(["Channel", "PrivateChannel", "GroupMessage", "DirectMessage"], list.Select(c => c.Kind.ToString()));
         Assert.Equal("an, binh", list[2].Name);
         Assert.Equal("U2", list[3].UserId);
+        Assert.False(list[3].Gone);
         Assert.Equal(2, handler.Calls.Count);
     }
 
@@ -644,5 +678,63 @@ public sealed class SlackBotScheduleTests
         Assert.Equal(["09:00"], SlackBotViewModel.ParseTimes("9"));
         Assert.Null(SlackBotViewModel.ParseTimes("12:00, noon"));
         Assert.Empty(SlackBotViewModel.ParseTimes("")!);
+    }
+}
+
+public sealed class SlackListSyncTests
+{
+    private static InboxItemViewModel Row(string ts, string? summary = null) =>
+        new(new InboxItem { Channel = "C1", Ts = ts, Text = "t" + ts, Summary = summary }, "https://x/" + ts);
+
+    [Fact]
+    public void Rows_on_screen_stay_and_only_changed_ones_are_replaced()
+    {
+        var list = new System.Collections.ObjectModel.ObservableCollection<InboxItemViewModel>();
+        SlackBotInboxViewModel.Sync(list, [Row("1.0"), Row("2.0"), Row("3.0")]);
+        var kept = list[0];
+        var changes = 0;
+        list.CollectionChanged += (_, _) => changes++;
+
+        // Same content again: nothing moves.
+        SlackBotInboxViewModel.Sync(list, [Row("1.0"), Row("2.0"), Row("3.0")]);
+        Assert.Equal(0, changes);
+        Assert.Same(kept, list[0]);
+
+        // One sorted, one gone, one new, one moved.
+        SlackBotInboxViewModel.Sync(list, [Row("4.0"), Row("3.0"), Row("1.0", "tóm tắt")]);
+        Assert.Equal(["C1:4.0", "C1:3.0", "C1:1.0"], list.Select(r => r.Id));
+        Assert.Equal("tóm tắt", list[2].Headline);
+    }
+}
+
+public sealed class SlackRemindTests
+{
+    private static readonly DateTimeOffset Now = DateTimeOffset.FromUnixTimeSeconds(1_730_000_000);
+
+    private static InboxItem ToDo(TimeSpan age) => new()
+    {
+        Channel = "D1", Ts = SlackIds.Ts(Now - age), Kind = SlackConversationKind.DirectMessage, Direct = true, Level = InboxLevel.Act,
+    };
+
+    [Fact]
+    public void Waiting_shows_after_an_hour_on_what_is_still_to_do()
+    {
+        Assert.Equal("", InboxItemViewModel.WaitingText(ToDo(TimeSpan.FromMinutes(59)), Now));
+        Assert.Equal("Waiting 2 h", InboxItemViewModel.WaitingText(ToDo(TimeSpan.FromMinutes(150)), Now));
+        Assert.Equal("Waiting 3 d", InboxItemViewModel.WaitingText(ToDo(TimeSpan.FromDays(3.5)), Now));
+        var done = ToDo(TimeSpan.FromHours(5));
+        done.Handled = HandledBy.Dismissed;
+        Assert.Equal("", InboxItemViewModel.WaitingText(done, Now));
+    }
+
+    [Fact]
+    public void A_reminder_comes_once_per_period_while_something_waits_that_long()
+    {
+        var hour = TimeSpan.FromHours(1);
+        DateTimeOffset[] waiting = [Now - TimeSpan.FromMinutes(70)];
+        Assert.True(SlackBotInboxViewModel.RemindDue(waiting, Now, Now - hour, hour));
+        Assert.False(SlackBotInboxViewModel.RemindDue(waiting, Now, Now - TimeSpan.FromMinutes(30), hour));
+        Assert.False(SlackBotInboxViewModel.RemindDue([Now - TimeSpan.FromMinutes(20)], Now, Now - hour, hour));
+        Assert.False(SlackBotInboxViewModel.RemindDue(waiting, Now, Now - hour, TimeSpan.Zero));
     }
 }

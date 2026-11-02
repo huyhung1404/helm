@@ -3,6 +3,20 @@
 All notable changes to Helm. The top section is used as the GitHub release body and as the Velopack release notes.
 Format: [Keep a Changelog](https://keepachangelog.com), versions follow [SemVer](https://semver.org).
 
+## [Unreleased]
+
+### Fixed
+- **Slack Bot: catching up is quick, and the lists stop jumping.** After Helm was off it reads the conversations active
+  in the last 30 days first and is ready at once; DMs nobody wrote in for a month, and DMs with people who left, are no
+  longer read back every time (a workspace keeps hundreds; they still arrive live while Helm runs, and "Catch up on
+  quiet DMs" reads them again). The to-do, worth-knowing and handled lists now change row by row, keeping their place
+  and folds, and follow a catch-up every few seconds instead of redrawing all the time.
+- **Slack Bot: a tag is never lost, and what waits is brought back.** A message that tags you is kept even from a
+  channel you turned off (only that message; nothing else is read there, and Slack Bot never writes there), and your
+  answer there takes it off the list. A message still to do after an hour shows "Waiting 2 h", and the list comes back
+  (unfolded, lit up, with the sound when on) every hour while something waits; "Remind me of what still waits" sets how
+  often, or never.
+
 ## [0.72.0] - 2026-11-02
 
 ### Added

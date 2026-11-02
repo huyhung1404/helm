@@ -37,6 +37,9 @@ public sealed class SlackBotEngine : IAsyncDisposable
     /// <summary>Catching up never goes further back than this.</summary>
     internal static readonly TimeSpan MaxCatchUp = TimeSpan.FromDays(3);
 
+    /// <summary>A conversation with a message this recent is read first when catching up.</summary>
+    internal static readonly TimeSpan ActiveFor = TimeSpan.FromDays(30);
+
     /// <summary>The very first time, DMs and mentions of this long are read (channels start from now).</summary>
     internal static readonly TimeSpan FirstCatchUp = TimeSpan.FromHours(24);
 
@@ -269,17 +272,42 @@ public sealed class SlackBotEngine : IAsyncDisposable
             var first = Inbox.LastSeen is null;
             var floor = SlackIds.Ts(started - (first ? FirstCatchUp : MaxCatchUp));
             var since = first || SlackIds.Compare(Inbox.LastSeen, floor) < 0 ? floor : Inbox.LastSeen!;
-            // Only what the user turned on; the first time, channels start from now: a day of every channel would bury what matters.
-            var conversations = Conversations.Where(c => reader.Reads(c.Id) && (!first || c.IsDirect)).ToList();
-            _logger.LogInformation("Slack Bot catching up on {Count} conversations since {Since}", conversations.Count, SlackIds.Time(since));
+            // Only what the user turned on, and never DMs with people who left; the first time, channels start from now:
+            // a day of every channel would bury what matters.
+            var conversations = Conversations.Where(c => !c.Gone && reader.Reads(c.Id) && (!first || c.IsDirect)).ToList();
+            // Active ones first (a workspace keeps hundreds of old DMs): once they are in, Slack Bot is ready and the
+            // rest is read in the background. "Seen" moves only when all of it is in.
+            var recent = Inbox.RecentChannels(ActiveFor);
+            var active = conversations.Where(c => recent.Contains(c.Id)).ToList();
+            var older = conversations.Where(c => !recent.Contains(c.Id)).ToList();
+            _logger.LogInformation("Slack Bot catching up on {Active} active and {Older} older conversations since {Since}",
+                active.Count, older.Count, SlackIds.Time(since));
             var done = 0;
-            foreach (var c in conversations)
+            foreach (var c in active)
             {
-                Set(SlackBotState.CatchingUp, $"Catching up: {done++} of {conversations.Count} conversations…");
-                foreach (var m in await api.HistoryAsync(c.Id, since, 200, ct).ConfigureAwait(false))
-                    await reader.ReadAsync(m, ct).ConfigureAwait(false);
+                Set(SlackBotState.CatchingUp, $"Catching up: {done++} of {active.Count} active conversations…");
+                await ReadHistoryAsync(api, reader, c, since, ct).ConfigureAwait(false);
             }
             await ReadForYouAsync(api, reader, since, ct).ConfigureAwait(false);
+            // Quiet DMs (nobody wrote for a month) are left out once Slack Bot knows which they are, unless the user
+            // wants them; the first time each one's latest message is looked up (one call), and read only if it is new.
+            var learned = Inbox.ActivityLearned;
+            if (learned && !_settings.Current.CatchUpQuietDms) older.RemoveAll(c => c.IsDirect);
+            Set(SlackBotState.Connected, older.Count > 0 ? Connected() + $" Checking {older.Count} quieter conversations in the background." : Connected());
+            SortSoon(ct);
+            done = 0;
+            foreach (var c in older)
+            {
+                if (++done % 10 == 0) Set(SlackBotState.Connected, Connected() + $" Checking quieter conversations: {done} of {older.Count}.");
+                if (c.IsDirect && !learned)
+                {
+                    if (await LatestAsync(api, c, ct).ConfigureAwait(false) is not { } latest) continue;
+                    Inbox.Touch(c.Id, latest);
+                    if (SlackIds.Compare(latest, since) <= 0) continue;
+                }
+                await ReadHistoryAsync(api, reader, c, since, ct).ConfigureAwait(false);
+            }
+            if (!learned && conversations.Any(c => c.IsDirect)) Inbox.ActivityLearned = true;
             Inbox.Seen(SlackIds.Ts(started));
             _caughtUp = true;
             _logger.LogInformation("Slack Bot caught up in {Seconds:0} s", (DateTimeOffset.UtcNow - started).TotalSeconds);
@@ -294,6 +322,33 @@ public sealed class SlackBotEngine : IAsyncDisposable
             // The socket stays; the next connection catches up from the same point.
             _logger.LogWarning(ex, "SlackBot could not catch up");
             Set(SlackBotState.Connected, Connected() + " Catching up failed; it runs again on the next connection.");
+        }
+    }
+
+    /// <summary>The ts of a conversation's latest message, or null when it has none or cannot be read.</summary>
+    private static async Task<string?> LatestAsync(ISlackApi api, SlackConversation c, CancellationToken ct)
+    {
+        try
+        {
+            return (await api.HistoryAsync(c.Id, "0", 1, ct).ConfigureAwait(false)).LastOrDefault()?.Ts;
+        }
+        catch (SlackApiException ex) when (!ex.IsAuthProblem)
+        {
+            return null;
+        }
+    }
+
+    /// <summary>One conversation's messages since <paramref name="since"/>; one that went away meanwhile is skipped.</summary>
+    private static async Task ReadHistoryAsync(ISlackApi api, SlackReader reader, SlackConversation c, string since, CancellationToken ct)
+    {
+        try
+        {
+            foreach (var m in await api.HistoryAsync(c.Id, since, 200, ct).ConfigureAwait(false))
+                await reader.ReadAsync(m, ct).ConfigureAwait(false);
+        }
+        catch (SlackApiException ex) when (!ex.IsAuthProblem)
+        {
+            // Archived, left, or a DM closed while catching up.
         }
     }
 
@@ -334,7 +389,7 @@ public sealed class SlackBotEngine : IAsyncDisposable
     {
         var since = SlackIds.Ts(DateTimeOffset.UtcNow - SafetyWindow);
         var active = Inbox.ActiveChannels();
-        foreach (var c in Conversations.Where(c => c.IsDirect && active.Contains(c.Id) && reader.Reads(c.Id)))
+        foreach (var c in Conversations.Where(c => c.IsDirect && !c.Gone && active.Contains(c.Id) && reader.Reads(c.Id)))
         {
             try
             {

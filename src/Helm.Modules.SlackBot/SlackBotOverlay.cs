@@ -31,6 +31,7 @@ public sealed class SlackBotOverlay
         _logger = logger;
         inbox.PropertyChanged += OnInboxChanged;
         inbox.NewToDo += (_, _) => OnNewToDo();
+        inbox.Remind += (_, _) => OnNewToDo(flash: true);
         _settings.Changed += (_, s) => _ui.Post(() =>
         {
             if (_window is not null) _window.RestOpacity = s.OverlayOpacity;
@@ -75,11 +76,13 @@ public sealed class SlackBotOverlay
         if (e.PropertyName == nameof(SlackBotInboxViewModel.HasOverlay)) Update();
     }
 
-    private void OnNewToDo()
+    /// <summary>Something new, or something waiting too long (<paramref name="flash"/>): open the list, play the sound.</summary>
+    private void OnNewToDo(bool flash = false)
     {
         if (!_running) return;
         try
         {
+            if (flash) _window?.Flash();
             if (_settings.Current.PlaySound) SystemSounds.Asterisk.Play();
             if (_window is { IsFolded: true })
             {

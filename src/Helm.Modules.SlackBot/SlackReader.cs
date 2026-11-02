@@ -5,7 +5,8 @@ namespace Helm.Modules.SlackBot;
 /// <summary>
 /// Turns what Slack sends into the inbox: other people's messages become items (with names, where they were written
 /// and whether they are for the user), the user's own messages and reactions mark what they answer as handled.
-/// Conversations the user has not turned on are dropped here, before anything is kept.
+/// Conversations the user has not turned on are dropped here, before anything is kept, except a message that tags the
+/// user (only that message), and the user's own messages there, which answer such a tag.
 /// </summary>
 public sealed partial class SlackReader(ISlackApi api, SlackIdentity me, SlackInbox inbox, Func<SlackBotSettings> settings)
 {
@@ -26,7 +27,7 @@ public sealed partial class SlackReader(ISlackApi api, SlackIdentity me, SlackIn
             case SlackMessagePosted posted:
                 await ReadAsync(posted.Message, ct).ConfigureAwait(false);
                 break;
-            case SlackMessageEdited edited when Reads(edited.Channel):
+            case SlackMessageEdited edited when Reads(edited.Channel) || inbox.Contains(edited.Channel, edited.Ts):
                 inbox.Edited(edited.Channel, edited.Ts, await PlainAsync(edited.Text, ct).ConfigureAwait(false));
                 break;
             case SlackMessageDeleted deleted:
@@ -41,7 +42,8 @@ public sealed partial class SlackReader(ISlackApi api, SlackIdentity me, SlackIn
     /// <summary>Takes in one message (live or caught up); false when it was not kept.</summary>
     public async Task<bool> ReadAsync(SlackMessage m, CancellationToken ct)
     {
-        if (!Reads(m.Channel)) return false;
+        var reads = Reads(m.Channel);
+        if (reads) inbox.Touch(m.Channel, m.Ts);
         var conversation = Conversation(m.Channel);
         if (m.User == me.UserId)
         {
@@ -50,6 +52,8 @@ public sealed partial class SlackReader(ISlackApi api, SlackIdentity me, SlackIn
             return false;
         }
         var callsMe = SlackText.Mentions(m.Text, me.UserId);
+        // A conversation that is off: only a message that tags the user, nothing else from it.
+        if (!reads && !callsMe) return false;
         if (m.FromBot && !settings().ReadBots && !callsMe) return false;
         var scope = SlackInbox.ScopeOf(m.Channel, conversation.Kind, m.ThreadTs);
         var direct = conversation.IsDirect || callsMe || m.ParentUserId == me.UserId || (m.IsReply && inbox.WroteIn(scope));
@@ -64,6 +68,7 @@ public sealed partial class SlackReader(ISlackApi api, SlackIdentity me, SlackIn
             Text = await PlainAsync(m.Text, ct).ConfigureAwait(false),
             ThreadStart = m.IsReply ? inbox.TextOf(m.Channel, m.ThreadTs!) : null,
             Direct = direct,
+            Tagged = callsMe,
         };
         if (!inbox.Add(item)) return false;
         if (direct && item.Handled == HandledBy.None) ForYou?.Invoke(this, EventArgs.Empty);

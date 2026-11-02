@@ -42,6 +42,12 @@ public sealed class SlackBotSettings : IVersionedSettings
     /// <summary>Shorter than this would run Claude Code almost without a break.</summary>
     public const int MinChannelSeconds = 10;
 
+    /// <summary>
+    /// After Helm was off, DMs nobody wrote in for <see cref="SlackBotEngine.ActiveFor"/> are read back too (slow: a
+    /// workspace keeps hundreds). Off: only the recent ones; quiet DMs still arrive live while Helm runs.
+    /// </summary>
+    public bool CatchUpQuietDms { get; set; }
+
     /// <summary>Messages from bots and apps are read (only those that call the user otherwise).</summary>
     public bool ReadBots { get; set; }
 
@@ -62,6 +68,12 @@ public sealed class SlackBotSettings : IVersionedSettings
 
     /// <summary>A message waits this long for the user to answer it before the reply goes.</summary>
     public int ReplyAfterMinutes { get; set; } = 3;
+
+    /// <summary>
+    /// Minutes after which a message still to do brings the list back (unfolded, lit up, with the sound when on), and
+    /// again every so often while it waits; 0 = never.
+    /// </summary>
+    public int RemindEveryMinutes { get; set; } = 60;
 
     /// <summary>A sound when something new lands on the to-do list.</summary>
     public bool PlaySound { get; set; }

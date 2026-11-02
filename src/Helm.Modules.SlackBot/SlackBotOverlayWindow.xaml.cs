@@ -37,6 +37,19 @@ public partial class SlackBotOverlayWindow : Window
         SetFolded(fold);
     }
 
+    /// <summary>Solid for a few seconds, to be seen (a reminder).</summary>
+    public void Flash()
+    {
+        Opacity = 1;
+        var back = new DispatcherTimer { Interval = TimeSpan.FromSeconds(8) };
+        back.Tick += (_, _) =>
+        {
+            back.Stop();
+            if (!IsMouseOver) Opacity = _rest;
+        };
+        back.Start();
+    }
+
     /// <summary>How opaque it is while the mouse is not on it.</summary>
     public double RestOpacity
     {
