@@ -278,8 +278,11 @@ public sealed class SlackInbox
         lock (_gate) _sending.Remove(channel);
     }
 
-    /// <summary>Slack Bot replied to <paramref name="id"/> with <paramref name="text"/>; the item stays to do.</summary>
-    public void BotReplied(string id, string channel, string? ts, string text)
+    /// <summary>
+    /// Slack Bot replied to <paramref name="id"/> with <paramref name="text"/>, or decided not to (null text): it is
+    /// not asked again for that message. The item stays to do.
+    /// </summary>
+    public void BotReplied(string id, string channel, string? ts, string? text)
     {
         lock (_gate)
         {

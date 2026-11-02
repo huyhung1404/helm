@@ -5,8 +5,8 @@ using Helm.Core.Mcp;
 
 namespace Helm.Modules.SlackBot;
 
-/// <summary>Asks a model one question with no tools (a fake in tests).</summary>
-public interface ISlackSortAgent
+/// <summary>Asks a model one question with no tools: sorting, and writing a reply (a fake in tests).</summary>
+public interface ISlackAgent
 {
     /// <summary>Why it cannot run now, or null.</summary>
     string? Unavailable();
@@ -16,7 +16,7 @@ public interface ISlackSortAgent
 }
 
 /// <summary>Claude Code with no tools, no MCP and no hooks (<see cref="ClaudeCodeRunner.AskAsync"/>).</summary>
-public sealed class ClaudeCodeSlackSortAgent(ClaudeCodeRunner claude) : ISlackSortAgent
+public sealed class ClaudeCodeSlackAgent(ClaudeCodeRunner claude) : ISlackAgent
 {
     public static readonly TimeSpan Timeout = TimeSpan.FromMinutes(5);
 
@@ -30,7 +30,7 @@ public sealed class ClaudeCodeSlackSortAgent(ClaudeCodeRunner claude) : ISlackSo
 /// The messages are other people's words, so they go in as data, and Claude's answer can only set those levels and
 /// lines: it has no tools, and nothing it writes is sent anywhere.
 /// </summary>
-public sealed class SlackSorter(ISlackSortAgent agent)
+public sealed class SlackSorter(ISlackAgent agent)
 {
     /// <summary>Messages per run; the rest wait for the next.</summary>
     public const int BatchSize = 40;

@@ -34,7 +34,8 @@ public sealed partial class SlackBotViewModel : ObservableObject
     [ObservableProperty] private bool _playSound;
     [ObservableProperty] private string _channelFilter = "";
     [ObservableProperty] private string _channelsSummary = "";
-    [ObservableProperty] private string _replyTemplate = "";
+    [ObservableProperty] private string _signature = "";
+    [ObservableProperty] private string _replyStyle = "";
     [ObservableProperty] private string _replyPreview = "";
     [ObservableProperty] private int _replyAfterMinutes;
     [ObservableProperty] private double _overlayOpacity;
@@ -134,18 +135,20 @@ public sealed partial class SlackBotViewModel : ObservableObject
 
     partial void OnPlaySoundChanged(bool value) => Save(s => s.PlaySound = value);
 
-    partial void OnReplyTemplateChanged(string value)
+    partial void OnSignatureChanged(string value)
     {
         UpdatePreview();
-        Save(s => s.ReplyTemplate = value);
+        Save(s => s.Signature = value);
     }
+
+    partial void OnReplyStyleChanged(string value) => Save(s => s.ReplyStyle = value);
 
     partial void OnReplyAfterMinutesChanged(int value) => Save(s => s.ReplyAfterMinutes = value);
 
     partial void OnOverlayOpacityChanged(double value) => Save(s => s.OverlayOpacity = Math.Clamp(value, 0.3, 1));
 
     [RelayCommand]
-    private void ResetReplyTemplate() => ReplyTemplate = SlackBotSettings.DefaultReplyTemplate;
+    private void ResetSignature() => Signature = SlackBotSettings.DefaultSignature;
 
     partial void OnChannelFilterChanged(string value) => FilterChannels();
 
@@ -172,7 +175,8 @@ public sealed partial class SlackBotViewModel : ObservableObject
             AboutMe = s.AboutMe;
             Model = s.Model;
             PlaySound = s.PlaySound;
-            ReplyTemplate = s.ReplyTemplate;
+            Signature = s.Signature;
+            ReplyStyle = s.ReplyStyle;
             ReplyAfterMinutes = s.ReplyAfterMinutes;
             OverlayOpacity = s.OverlayOpacity;
         }
@@ -229,6 +233,8 @@ public sealed partial class SlackBotViewModel : ObservableObject
             : $"Reads {read} of {_allChannels.Count}, replies in {reply}. DMs are read unless you turn them off; channels are off until you turn them on.";
     }
 
+    /// <summary>How a reply looks: the signature, then an example of what Claude writes.</summary>
     private void UpdatePreview() =>
-        ReplyPreview = SlackReplier.Text(ReplyTemplate, _engine.MeName is { Length: > 0 } me ? me : "you");
+        ReplyPreview = SlackReplier.Signature(Signature, _engine.MeName is { Length: > 0 } me ? me : "you")
+                       + " Dạ em đã nhận được tin nhắn và báo lại rồi ạ, anh ấy sẽ phản hồi sớm nhất có thể.";
 }

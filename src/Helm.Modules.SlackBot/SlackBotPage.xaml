@@ -137,16 +137,24 @@
         <TextBlock Text="Replies" Style="{DynamicResource HelmSectionHeader}" />
         <ui:CardExpander Margin="0,0,0,4" IsExpanded="True" Icon="{ui:SymbolIcon ChatArrowBack20}">
             <ui:CardExpander.Header>
-                <core:CardHeader Title="Reply template"
-                                 Description="Sent only in conversations set to Read and reply, to a message for you that is still waiting. It always says it comes from an AI. {me} is your name." />
+                <core:CardHeader Title="AI signature"
+                                 Description="Claude writes a short reply in conversations set to Read and reply; Helm puts this in front so nobody takes it for you. {me} is your name." />
             </ui:CardExpander.Header>
             <StackPanel>
-                <ui:TextBox AcceptsReturn="True" TextWrapping="Wrap" MinHeight="70" VerticalContentAlignment="Top" AutomationProperties.Name="Reply template"
-                            Text="{Binding ReplyTemplate, UpdateSourceTrigger=LostFocus}" />
-                <TextBlock Margin="0,8,0,0" Text="What people will see:" Style="{DynamicResource HelmSecondaryText}" />
+                <ui:TextBox AutomationProperties.Name="AI signature" Text="{Binding Signature, UpdateSourceTrigger=LostFocus}" />
+                <TextBlock Margin="0,8,0,0" Text="A reply looks like this (the words after the signature are Claude's):" Style="{DynamicResource HelmSecondaryText}" />
                 <TextBlock Margin="0,2,0,0" Text="{Binding ReplyPreview}" TextWrapping="Wrap" />
-                <ui:Button Margin="0,8,0,0" Appearance="Transparent" Content="Back to the default" Command="{Binding ResetReplyTemplateCommand}" />
+                <ui:Button Margin="0,8,0,0" Appearance="Transparent" Content="Back to the default" Command="{Binding ResetSignatureCommand}" />
             </StackPanel>
+        </ui:CardExpander>
+        <ui:CardExpander Margin="0,0,0,4" Icon="{ui:SymbolIcon TextEditStyle24}">
+            <ui:CardExpander.Header>
+                <core:CardHeader Title="How replies are written"
+                                 Description="Optional: tone, language, what to say. Claude sees only the one message it answers, never your other conversations; it never promises, approves or decides for you." />
+            </ui:CardExpander.Header>
+            <ui:TextBox AcceptsReturn="True" TextWrapping="Wrap" MinHeight="70" VerticalContentAlignment="Top" AutomationProperties.Name="How replies are written"
+                        PlaceholderText="e.g. Xưng em, gọi người nhắn là anh/chị, ngắn gọn, thân thiện."
+                        Text="{Binding ReplyStyle, UpdateSourceTrigger=LostFocus}" />
         </ui:CardExpander>
         <ui:CardControl Margin="0,0,0,4" Icon="{ui:SymbolIcon Timer24}">
             <ui:CardControl.Header>

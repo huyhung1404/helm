@@ -15,11 +15,12 @@ Format: [Keep a Changelog](https://keepachangelog.com), versions follow [SemVer]
   never takes the keyboard; solid under the mouse; drag it anywhere, fold it into a badge) until you reply in Slack,
   react with an emoji or press Done. What is worth knowing waits for the report times you set (12:00 and 17:00 to start
   with) and shows up together, grouped by channel. Where you allow it, a message you have not answered within a few
-  minutes gets your reply template, which says openly that it comes from an AI assistant ("🤖 Em là Lumi, trợ lý AI
-  của…"), once per DM or thread every 4 hours; the message stays on your list until you answer it yourself. While Helm
-  was off it catches up on what came meanwhile, and every 10 minutes it reads your recent DMs, mentions and threads
-  again in case Slack's live connection missed one. Claude reads the messages with no tools at all (no files, no web,
-  no MCP) and never writes the reply, so a message cannot make it do anything but sort; "Only worth knowing" and
+  minutes gets a short reply Claude writes from that one message only, after an AI signature Helm puts in front ("🤖
+  Lumi (trợ lý AI của …):"), so nobody takes it for yours; it never promises, approves or decides for you, cannot ping
+  anyone or post links, comes once per DM or thread every 4 hours, and the message stays on your list until you answer
+  it yourself. While Helm was off it catches up on what came meanwhile, and every 10 minutes it reads your recent DMs,
+  mentions and threads again in case Slack's live connection missed one. Claude reads the messages with no tools at all
+  (no files, no web, no MCP), and a reply is written seeing nothing but the message it answers; "Only worth knowing" and
   "Needs me" teach it what matters to you. Messages and tokens stay on this PC, encrypted for your Windows user, and are
   never synced.
 

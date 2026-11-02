@@ -18,7 +18,7 @@ public sealed class SlackBotViewsTests : IDisposable
 
     public void Dispose() => _dir.Dispose();
 
-    private sealed class NoAgent : ISlackSortAgent
+    private sealed class NoAgent : ISlackAgent
     {
         public string? Unavailable() => "Claude Code is not installed on this PC.";
 
@@ -59,7 +59,7 @@ public sealed class SlackBotViewsTests : IDisposable
         var tokens = new SlackTokens(paths, protector);
         using var file = new SlackInboxFile(paths, protector, NullLogger<SlackInboxFile>.Instance);
         Seed(file.Inbox);
-        var engine = new SlackBotEngine(tokens, file, new SlackSorter(new NoAgent()), settings, NullLogger<SlackBotEngine>.Instance);
+        var engine = new SlackBotEngine(tokens, file, new SlackSorter(new NoAgent()), new NoAgent(), settings, NullLogger<SlackBotEngine>.Instance);
         var launcher = new Launcher();
         var ui = new StaUi();
         var inbox = new SlackBotInboxViewModel(engine, ui, launcher, new NoServices());
@@ -132,7 +132,7 @@ public sealed class SlackBotViewsTests : IDisposable
             Text = "Anh gửi em file design nhé", Level = InboxLevel.Act, Summary = "Mai xin file design",
         });
         inbox.Reacted("D2", "1700000050.000100");
-        inbox.BotReplied("D1:1700000000.000100", "D1", "1700000001.000100", SlackReplier.Text(SlackBotSettings.DefaultReplyTemplate, "Hưng"));
+        inbox.BotReplied("D1:1700000000.000100", "D1", "1700000001.000100", SlackReplier.Signature(SlackBotSettings.DefaultSignature, "Hưng") + " Dạ em đã nhận được và báo anh ấy rồi ạ, anh ấy sẽ xem trước 15:00.");
         inbox.Digest(DateTimeOffset.FromUnixTimeSeconds(1_650_000_000));
     }
 

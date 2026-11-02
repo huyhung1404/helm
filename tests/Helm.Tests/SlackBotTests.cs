@@ -246,7 +246,7 @@ public sealed class SlackInboxTests
 
 public sealed class SlackSorterTests
 {
-    private sealed class FakeAgent(Func<string, string> answer) : ISlackSortAgent
+    private sealed class FakeAgent(Func<string, string> answer) : ISlackAgent
     {
         public string? Asked { get; private set; }
 
@@ -411,34 +411,76 @@ public sealed class SlackReaderTests
         return item;
     }
 
+    /// <summary>Writes replies like Claude would; records what it was asked.</summary>
+    private sealed class ReplyAgent(Func<string, string> answer) : ISlackAgent
+    {
+        public List<string> Asked { get; } = [];
+
+        public string? Unavailable() => null;
+
+        public Task<string> AskAsync(string instructions, string? model, CancellationToken ct)
+        {
+            Asked.Add(instructions);
+            return Task.FromResult(answer(instructions));
+        }
+    }
+
+    private static SlackReplier Replier(FakeApi api, ISlackAgent agent, SlackReader reader, SlackInbox inbox, SlackBotSettings settings) =>
+        new(api, agent, inbox, reader, () => settings, "Hưng", Microsoft.Extensions.Logging.Abstractions.NullLogger.Instance);
+
     [Fact]
-    public async Task Replies_go_only_where_allowed_say_they_are_ai_and_keep_the_item_on_the_list()
+    public async Task Replies_go_only_where_allowed_carry_the_ai_signature_and_keep_the_item_on_the_list()
     {
         var clock = new FakeClock(DateTimeOffset.FromUnixTimeSeconds(10_000));
         var api = new FakeApi();
         var (reader, inbox, settings) = NewReader(api, clock);
-        var replier = new SlackReplier(api, inbox, reader, () => settings, "Hưng", Microsoft.Extensions.Logging.Abstractions.NullLogger.Instance);
-        await ToDo(reader, inbox, "D1", "9900.0");
-        await ToDo(reader, inbox, "C1", "9950.0");
+        var agent = new ReplyAgent(_ => "Dạ em đã nhận, anh ấy sẽ phản hồi sớm ạ.");
+        var replier = Replier(api, agent, reader, inbox, settings);
+        await ToDo(reader, inbox, "D1", "9900.0", text: "<@ME> mật khẩu wifi là gì?");
+        await ToDo(reader, inbox, "C1", "9950.0", text: "<@ME> build lỗi rồi");
 
-        // Read only: nothing is sent.
+        // Read only: nothing is written or sent.
         Assert.Equal(0, await replier.ReplyAsync(clock.Now, default));
         settings.Channels["D1"] = SlackChannelMode.Reply;
         settings.Channels["C1"] = SlackChannelMode.Reply;
         // Too fresh: the user may still answer.
         Assert.Equal(0, await replier.ReplyAsync(clock.Now, default));
+        Assert.Empty(agent.Asked);
 
         var later = clock.Now + TimeSpan.FromMinutes(4);
         Assert.Equal(2, await replier.ReplyAsync(later, default));
-        Assert.All(api.Posted, p => Assert.StartsWith("🤖 Em là Lumi, trợ lý AI của Hưng.", p.Text));
-        Assert.Equal((string?)null, api.Posted.Single(p => p.Channel == "D1").Thread);
+        Assert.All(api.Posted, p => Assert.Equal("🤖 Lumi (trợ lý AI của Hưng): Dạ em đã nhận, anh ấy sẽ phản hồi sớm ạ.", p.Text));
+        Assert.Null(api.Posted.Single(p => p.Channel == "D1").Thread);
         Assert.Equal("9950.0", api.Posted.Single(p => p.Channel == "C1").Thread);
         Assert.All(inbox.Snapshot(), i => Assert.True(i.IsToDo));
         Assert.All(inbox.Snapshot(), i => Assert.NotNull(i.BotReply));
+        // Each reply is written from its own message only: the DM never reaches the channel's run.
+        var channelRun = Assert.Single(agent.Asked, a => a.Contains("build lỗi rồi"));
+        Assert.DoesNotContain("wifi", channelRun);
 
         // Once per DM or thread: a new message right after gets no second reply.
         await ToDo(reader, inbox, "D1", "10100.0", text: "còn đó không?");
         Assert.Equal(0, await replier.ReplyAsync(later + TimeSpan.FromMinutes(5), default));
+    }
+
+    [Fact]
+    public async Task No_reply_needed_or_claude_failing_is_not_asked_again()
+    {
+        var clock = new FakeClock(DateTimeOffset.FromUnixTimeSeconds(10_000));
+        var api = new FakeApi();
+        var (reader, inbox, settings) = NewReader(api, clock);
+        settings.Channels["D1"] = SlackChannelMode.Reply;
+        settings.Channels["C1"] = SlackChannelMode.Reply;
+        var agent = new ReplyAgent(i => i.Contains("cảm ơn") ? SlackReplier.NoReply : throw new ClaudeCodeException("down"));
+        var replier = Replier(api, agent, reader, inbox, settings);
+        await ToDo(reader, inbox, "D1", "9900.0", text: "cảm ơn anh nhé");
+        await ToDo(reader, inbox, "C1", "9950.0");
+        var later = clock.Now + TimeSpan.FromMinutes(4);
+        Assert.Equal(0, await replier.ReplyAsync(later, default));
+        Assert.Equal(0, await replier.ReplyAsync(later + TimeSpan.FromSeconds(5), default));
+        Assert.Equal(2, agent.Asked.Count);
+        Assert.Empty(api.Posted);
+        Assert.All(inbox.Snapshot(), i => Assert.True(i.IsToDo));
     }
 
     [Fact]
@@ -451,13 +493,13 @@ public sealed class SlackReaderTests
         // The socket brings the reply back before Slack answered the post.
         api.OnPost = channel =>
         {
-            reader.ReadAsync(new SlackMessage(channel, "9999.5", null, "ME", "🤖 Em là Lumi…", false), default).GetAwaiter().GetResult();
+            reader.ReadAsync(new SlackMessage(channel, "9999.5", null, "ME", "🤖 Lumi…", false), default).GetAwaiter().GetResult();
             return "9999.5";
         };
-        var replier = new SlackReplier(api, inbox, reader, () => settings, "Hưng", Microsoft.Extensions.Logging.Abstractions.NullLogger.Instance);
+        var replier = Replier(api, new ReplyAgent(_ => "Dạ em đã nhận ạ."), reader, inbox, settings);
         await ToDo(reader, inbox, "D1", "9900.0");
         Assert.Equal(1, await replier.ReplyAsync(clock.Now + TimeSpan.FromMinutes(4), default));
-        await reader.ReadAsync(new SlackMessage("D1", "9999.5", null, "ME", "🤖 Em là Lumi…", false), default);
+        await reader.ReadAsync(new SlackMessage("D1", "9999.5", null, "ME", "🤖 Lumi…", false), default);
         Assert.True(inbox.Snapshot().Single().IsToDo);
 
         // The user's own answer does.
@@ -466,10 +508,20 @@ public sealed class SlackReaderTests
     }
 
     [Fact]
-    public void A_template_without_the_robot_still_says_it_is_a_bot()
+    public void The_signature_always_says_it_is_a_bot()
     {
-        Assert.Equal("🤖 Đã nhận, Hưng sẽ trả lời.", SlackReplier.Text("Đã nhận, {me} sẽ trả lời.", "Hưng"));
-        Assert.Equal("🤖 hi", SlackReplier.Text("🤖 hi", "Hưng"));
+        Assert.Equal("🤖 Trợ lý của Hưng:", SlackReplier.Signature("Trợ lý của {me}:", "Hưng"));
+        Assert.Equal("🤖 Lumi (trợ lý AI của Hưng):", SlackReplier.Signature("", "Hưng"));
+    }
+
+    [Fact]
+    public void Claudes_reply_cannot_ping_people_or_post_links()
+    {
+        Assert.Equal("Dạ em đã nhận, xem thêm ở đây nha.",
+            SlackReplier.Clean("\"<!channel> Dạ em đã nhận, xem thêm ở https://evil.example/login đây nha. @here <@U9>\""));
+        Assert.Null(SlackReplier.Clean(" NO_REPLY "));
+        Assert.Null(SlackReplier.Clean("   "));
+        Assert.True(SlackReplier.Clean(new string('a', 2000))!.Length <= SlackReplier.MaxLength + 1);
     }
 
     [Fact]

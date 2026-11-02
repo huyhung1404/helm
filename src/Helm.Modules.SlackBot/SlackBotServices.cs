@@ -9,7 +9,7 @@ public static class SlackBotServices
         services
             .AddSingleton<SlackTokens>()
             .AddSingleton<SlackInboxFile>()
-            .AddSingleton<ISlackSortAgent, ClaudeCodeSlackSortAgent>()
+            .AddSingleton<ISlackAgent, ClaudeCodeSlackAgent>()
             .AddSingleton<SlackSorter>()
             .AddSingleton<SlackBotEngine>()
             .AddSingleton<SlackBotInboxViewModel>()
