@@ -11,19 +11,21 @@ public static class SlackBotLogo
 
     private static DrawingImage Create()
     {
+        static Color Argb(uint c) => Color.FromArgb((byte)(c >> 24), (byte)(c >> 16), (byte)(c >> 8), (byte)c);
         static Brush Solid(uint c)
         {
-            var brush = new SolidColorBrush(Color.FromArgb((byte)(c >> 24), (byte)(c >> 16), (byte)(c >> 8), (byte)c));
+            var brush = new SolidColorBrush(Argb(c));
             brush.Freeze();
             return brush;
         }
         static Geometry Box((double X, double Y, double Width, double Height, double Radius) b) =>
             new RectangleGeometry(new Rect(b.X, b.Y, b.Width, b.Height), b.Radius, b.Radius);
         const double size = SlackBotIconShape.Size;
-        var head = Solid(SlackBotIconShape.HeadColor);
-        var antenna = Solid(SlackBotIconShape.AntennaColor);
+        var head = new LinearGradientBrush(Argb(SlackBotIconShape.HeadStart), Argb(SlackBotIconShape.HeadEnd),
+            new Point(0, size), new Point(size, 0)) { MappingMode = BrushMappingMode.Absolute };
+        var antenna = Solid(SlackBotIconShape.GlowColor);
         var ears = Solid(SlackBotIconShape.EarColor);
-        var face = Solid(SlackBotIconShape.FaceColor);
+        var face = Solid(SlackBotIconShape.GlowColor);
         var group = new DrawingGroup();
         // A transparent box keeps the icon's own margins at any size.
         group.Children.Add(new GeometryDrawing(Brushes.Transparent, null, new RectangleGeometry(new Rect(0, 0, size, size))));

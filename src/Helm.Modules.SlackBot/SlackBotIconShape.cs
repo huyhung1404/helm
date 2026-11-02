@@ -1,8 +1,9 @@
 namespace Helm.Modules.SlackBot;
 
 /// <summary>
-/// The Slack Bot icon: a robot's head (a rounded outline with ears and an antenna, two eyes and a mouth) in Slack's four
-/// colours, so it sits well next to Slack, with no background. Ears to ears it spans the 100 × 100 box edge to edge, like the other
+/// The Slack Bot icon: a robot's head (a rounded outline with ears and an antenna, two eyes and a mouth) in silver with a
+/// glowing cyan face and antenna (Lumi's colours), with no background. The silver darkens towards the bottom-left so the
+/// outline still shows on a light background. Ears to ears it spans the 100 × 100 box edge to edge, like the other
 /// tool icons. PC only, so the shape lives in the PC project.
 /// </summary>
 public static class SlackBotIconShape
@@ -29,12 +30,13 @@ public static class SlackBotIconShape
     /// <summary>The mouth, filled: x, y, width, height, corner radius.</summary>
     public static readonly (double X, double Y, double Width, double Height, double Radius) Mouth = (40, 76, 20, 7, 3.5);
 
-    /// <summary>Slack's colours (ARGB): the head's outline, the antenna, the ears, the face.</summary>
-    public const uint HeadColor = 0xFF36C5F0;
+    /// <summary>The head's outline: a silver gradient from the bottom-left (darker) to the top-right (lighter), ARGB.</summary>
+    public const uint HeadStart = 0xFF8A9AB2;
 
-    public const uint AntennaColor = 0xFFECB22E;
+    public const uint HeadEnd = 0xFFE2E8F0;
 
-    public const uint EarColor = 0xFF2EB67D;
+    public const uint EarColor = 0xFF8A9AB2;
 
-    public const uint FaceColor = 0xFFE01E5A;
+    /// <summary>The antenna and the face glow cyan.</summary>
+    public const uint GlowColor = 0xFF38BDF8;
 }
