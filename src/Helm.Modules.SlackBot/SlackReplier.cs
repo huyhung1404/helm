@@ -31,8 +31,21 @@ public sealed partial class SlackReplier(ISlackApi api, ISlackAgent agent, Slack
     /// <summary>What Claude answers when the message needs no reply.</summary>
     internal const string NoReply = "NO_REPLY";
 
+    /// <summary>Characters of an answer written after looking into the project.</summary>
+    internal const int MaxProjectLength = 1500;
+
+    /// <summary>What Claude may do in the project folder (the answer is still checked for secrets).</summary>
+    internal static string ProjectRules(string me) =>
+        $"""
+        The current folder is the project this conversation is about. Before answering, look into the problem it raises
+        there with Read, Grep and Glob (you cannot run, change or build anything). If you find a likely cause or the
+        answer, say it briefly as what Lumi found (file and line, at most a few lines of code), as a possibility {me}
+        will confirm. If you cannot find it, say Lumi could not find it and {me} will answer soon. Never quote keys,
+        tokens, passwords, connection strings or any secret, and never content from outside this project.
+        """;
+
     /// <summary>What Claude is asked for one message: the message is data, the reply only acknowledges.</summary>
-    internal static string Instructions(InboxItem item, string me, string style)
+    internal static string Instructions(InboxItem item, string me, string style, bool project = false)
     {
         var message = JsonSerializer.Serialize(new
         {
@@ -50,6 +63,7 @@ public sealed partial class SlackReplier(ISlackApi api, ISlackAgent agent, Slack
             Helm adds your signature, so do not sign or introduce yourself. Write only the reply text.
             If the message needs no reply at all, answer exactly {NoReply}.
             {(style.Trim() is { Length: > 0 } s ? "How " + me + " wants replies written: " + s : "")}
+            {(project ? ProjectRules(me) : "")}
 
             The message (JSON):
             {message}
@@ -60,7 +74,7 @@ public sealed partial class SlackReplier(ISlackApi api, ISlackAgent agent, Slack
     /// Claude's answer made safe to post: no mentions (nobody is pinged), no links, no code fences or quotes around
     /// it, at most <see cref="MaxLength"/> characters; null when nothing is left or Claude said no reply is needed.
     /// </summary>
-    internal static string? Clean(string answer)
+    internal static string? Clean(string answer, int max = MaxLength)
     {
         var text = answer.Trim().Trim('`').Trim();
         if (text.Length == 0 || text.Contains(NoReply, StringComparison.Ordinal)) return null;
@@ -68,7 +82,7 @@ public sealed partial class SlackReplier(ISlackApi api, ISlackAgent agent, Slack
         text = Broadcast().Replace(text, "");
         text = Link().Replace(text, "");
         text = Spaces().Replace(text, " ").Trim().Trim('"', '“', '”').Trim();
-        return text.Length == 0 ? null : SlackText.Clip(text, MaxLength);
+        return text.Length == 0 ? null : SlackText.Clip(text, max);
     }
 
     /// <summary>Writes and sends the replies that are due; how many went.</summary>
@@ -86,7 +100,18 @@ public sealed partial class SlackReplier(ISlackApi api, ISlackAgent agent, Slack
             string? reply;
             try
             {
-                reply = Clean(await agent.AskAsync(Instructions(item, me, s.ReplyStyle), s.Model is { Length: > 0 } m ? m : null, ct).ConfigureAwait(false));
+                var model = s.Model is { Length: > 0 } m ? m : null;
+                var project = s.ProjectOf(item.Channel);
+                var answer = project is null
+                    ? await agent.AskAsync(Instructions(item, me, s.ReplyStyle), model, ct).ConfigureAwait(false)
+                    : await agent.AskInFolderAsync(Instructions(item, me, s.ReplyStyle, project: true), project, model, ct).ConfigureAwait(false);
+                reply = Clean(answer, project is null ? MaxLength : MaxProjectLength);
+                // Something from the project that looks secret never goes out: the plain answer instead.
+                if (reply is not null && SlackSecrets.LooksSecret(reply))
+                {
+                    logger.LogWarning("Slack Bot held back a reply that looked like it held a secret");
+                    reply = $"Lumi đã nhận được và báo lại rồi ạ, {me} sẽ phản hồi sớm nhất có thể.";
+                }
             }
             catch (ClaudeCodeException ex)
             {

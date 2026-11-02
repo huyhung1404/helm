@@ -62,8 +62,18 @@ public sealed partial class SlackLumi(ISlackApi api, ISlackAgent agent, SlackInb
             string? answer;
             try
             {
-                answer = Clean(await agent.AskAsync(Instructions(meName, asker, m.User == me.UserId, question, lines), Model(), ct).ConfigureAwait(false),
+                var project = settings().ProjectOf(m.Channel);
+                var instructions = Instructions(meName, asker, m.User == me.UserId, question, lines)
+                                   + (project is null ? "" : "\n" + SlackReplier.ProjectRules(meName));
+                answer = Clean(project is null
+                        ? await agent.AskAsync(instructions, Model(), ct).ConfigureAwait(false)
+                        : await agent.AskInFolderAsync(instructions, project, Model(), ct).ConfigureAwait(false),
                     lines.Select(l => l.Text));
+                if (answer is not null && SlackSecrets.LooksSecret(answer))
+                {
+                    logger.LogWarning("Lumi held back an answer that looked like it held a secret");
+                    answer = $"Lumi chưa trả lời được câu này, {meName} sẽ trả lời sớm ạ.";
+                }
             }
             catch (ClaudeCodeException ex)
             {

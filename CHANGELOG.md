@@ -3,6 +3,16 @@
 All notable changes to Helm. The top section is used as the GitHub release body and as the Velopack release notes.
 Format: [Keep a Changelog](https://keepachangelog.com), versions follow [SemVer](https://semver.org).
 
+## [Unreleased]
+
+### Added
+- **Slack Bot: Lumi looks into the project before answering.** Give a conversation where Write is on its project
+  folder (Channels and DMs → Project Lumi may read). Before replying for you, or when someone calls Lumi there, Claude
+  Code looks into the question in that folder (read only: Read, Grep, Glob; no commands, no edits, no web; nothing
+  outside the folder; never .env files, keys or keystores) and answers with what it found, as a possibility you will
+  confirm, or says it could not find it and you will answer. An answer that looks like it holds a key, a token or a
+  password is never sent.
+
 ## [0.73.0] - 2026-11-02
 
 ### Added
