@@ -13,6 +13,7 @@ public enum ModuleGroup
     SecurityAndServers,
     WindowsAndDesktop,
     Learning,
+    Messages,
 }
 
 public static class ModuleGroups
@@ -24,6 +25,7 @@ public static class ModuleGroups
         ModuleGroup.SecurityAndServers => "Security & Servers",
         ModuleGroup.WindowsAndDesktop => "Windows & Desktop",
         ModuleGroup.Learning => "Learning",
+        ModuleGroup.Messages => "Messages",
         _ => group.ToString(),
     };
 }

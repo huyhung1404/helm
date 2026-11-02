@@ -42,12 +42,42 @@ public sealed class ClaudeCodeRunner(McpClientConfig mcp, IChildProcessLauncher 
     /// </summary>
     /// <exception cref="ClaudeCodeException">It could not start, failed, or did not finish within <paramref name="timeout"/>.</exception>
     /// <exception cref="OperationCanceledException"><paramref name="ct"/> stopped it.</exception>
-    public async Task<string> RunAsync(IReadOnlyList<string> allowedTools, string instructions, Func<string, int, string> describe,
+    public Task<string> RunAsync(IReadOnlyList<string> allowedTools, string instructions, Func<string, int, string> describe,
         IProgress<string>? progress, TimeSpan timeout, CancellationToken ct)
     {
         if (Unavailable() is { } problem) throw new ClaudeCodeException(problem);
-        var claude = McpClientConfig.FindClaude()!;
-        IReadOnlyList<string> args = ["-p", "--output-format", "stream-json", "--verbose", "--allowedTools", string.Join(",", allowedTools)];
+        return StartAsync(["-p", "--output-format", "stream-json", "--verbose", "--allowedTools", string.Join(",", allowedTools)],
+            instructions, describe, progress, timeout, ct);
+    }
+
+    /// <summary>Why <see cref="AskAsync"/> cannot run now, or null when it can (it needs Claude Code only, not Helm's MCP).</summary>
+    public static string? AskUnavailable() => McpClientConfig.FindClaude() is null ? "Claude Code is not installed on this PC." : null;
+
+    /// <summary>
+    /// Asks Claude Code one question about text Helm hands it and returns the answer, with no tools at all: no files,
+    /// no shell, no web, no MCP server (not even Helm's), and no hooks (so it never shows up as a Workspace session).
+    /// For text from other people (Slack messages): whatever that text says, the answer is the only thing it can change.
+    /// </summary>
+    /// <param name="model">A Claude Code model name (haiku, sonnet), or null for the user's default.</param>
+    /// <exception cref="ClaudeCodeException">It could not start, failed, or did not finish within <paramref name="timeout"/>.</exception>
+    /// <exception cref="OperationCanceledException"><paramref name="ct"/> stopped it.</exception>
+    public Task<string> AskAsync(string instructions, string? model, TimeSpan timeout, CancellationToken ct)
+    {
+        if (AskUnavailable() is { } problem) throw new ClaudeCodeException(problem);
+        return StartAsync([.. AskArguments(model)], instructions, (_, _) => "", null, timeout, ct);
+    }
+
+    internal static IEnumerable<string> AskArguments(string? model)
+    {
+        string[] args = ["-p", "--output-format", "stream-json", "--verbose", "--tools", "", "--strict-mcp-config",
+            "--settings", """{"disableAllHooks":true}"""];
+        return model is { Length: > 0 } ? [.. args, "--model", model] : args;
+    }
+
+    private async Task<string> StartAsync(IReadOnlyList<string> args, string instructions, Func<string, int, string> describe,
+        IProgress<string>? progress, TimeSpan timeout, CancellationToken ct)
+    {
+        var claude = McpClientConfig.FindClaude() ?? throw new ClaudeCodeException("Claude Code is not installed on this PC.");
         string commandLine;
         if (claude.EndsWith(".cmd", StringComparison.OrdinalIgnoreCase))
         {

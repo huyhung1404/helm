@@ -1,0 +1,209 @@
+<core:ModulePageBase
+    x:Class="Helm.Modules.SlackBot.SlackBotPage"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
+    xmlns:core="clr-namespace:Helm.Core.Ui;assembly=Helm.Core.Windows"
+    xmlns:local="clr-namespace:Helm.Modules.SlackBot"
+    Module="{Binding Module}">
+
+    <StackPanel>
+        <ui:CardControl Margin="0,0,0,4" Icon="{ui:SymbolIcon Chat24}">
+            <ui:CardControl.Header>
+                <core:CardHeader Title="Open Slack Bot" Description="What needs you, and the report of what is worth knowing." />
+            </ui:CardControl.Header>
+            <ui:Button Content="Open" Appearance="Primary" Command="{Binding OpenContentCommand}" />
+        </ui:CardControl>
+
+        <!-- Connection -->
+        <TextBlock Text="Connection" Style="{DynamicResource HelmSectionHeader}" />
+        <ui:CardControl Margin="0,0,0,4" Icon="{ui:SymbolIcon PlugConnected24}">
+            <ui:CardControl.Header>
+                <core:CardHeader Title="Slack connection" Description="{Binding Status}" />
+            </ui:CardControl.Header>
+            <StackPanel Orientation="Horizontal">
+                <ui:Button Content="Reconnect" Icon="{ui:SymbolIcon ArrowSync24}" Command="{Binding ReconnectCommand}"
+                           Visibility="{Binding HasTokens, Converter={StaticResource BoolToVisibility}}" />
+                <ui:Button Margin="8,0,0,0" Content="Disconnect" Icon="{ui:SymbolIcon PlugDisconnected24}" Command="{Binding DisconnectCommand}"
+                           Visibility="{Binding HasTokens, Converter={StaticResource BoolToVisibility}}" />
+            </StackPanel>
+        </ui:CardControl>
+        <ui:CardExpander x:Name="AppExpander" Margin="0,0,0,4" Icon="{ui:SymbolIcon Key24}">
+            <ui:CardExpander.Header>
+                <core:CardHeader Title="Your Slack app"
+                                 Description="Slack Bot reads Slack as you, through an app you make in your workspace. The tokens stay on this PC, encrypted." />
+            </ui:CardExpander.Header>
+            <StackPanel>
+                <Border Style="{DynamicResource HelmExpanderRow}" BorderThickness="0">
+                    <core:RowLayout>
+                        <core:CardHeader Title="1. Make the app"
+                                         Description="Create New App → From a manifest → your workspace → paste the manifest → Create → Install to Workspace. Your workspace may ask an admin to approve it." />
+                        <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                            <ui:Button Content="Copy manifest" Icon="{ui:SymbolIcon Copy24}" Click="CopyManifest_Click" />
+                            <ui:Button Margin="8,0,0,0" Content="Open Slack apps" Icon="{ui:SymbolIcon Open24}" Command="{Binding OpenSlackAppsCommand}" />
+                        </StackPanel>
+                    </core:RowLayout>
+                </Border>
+                <Border Style="{DynamicResource HelmExpanderRow}">
+                    <core:RowLayout>
+                        <core:CardHeader Title="2. User token" Description="OAuth &amp; Permissions → User OAuth Token (xoxp-…)." />
+                        <ui:PasswordBox x:Name="UserTokenBox" Width="300" HorizontalAlignment="Right" PlaceholderText="xoxp-…"
+                                        AutomationProperties.Name="User token" />
+                    </core:RowLayout>
+                </Border>
+                <Border Style="{DynamicResource HelmExpanderRow}">
+                    <core:RowLayout>
+                        <core:CardHeader Title="3. App token"
+                                         Description="Basic Information → App-Level Tokens → Generate, with the connections:write scope (xapp-…)." />
+                        <ui:PasswordBox x:Name="AppTokenBox" Width="300" HorizontalAlignment="Right" PlaceholderText="xapp-…"
+                                        AutomationProperties.Name="App token" />
+                    </core:RowLayout>
+                </Border>
+                <Border Style="{DynamicResource HelmExpanderRow}">
+                    <core:RowLayout>
+                        <core:CardHeader Title="4. Connect" Description="{Binding TokenProblem}" />
+                        <ui:Button HorizontalAlignment="Right" Content="Connect" Appearance="Primary" Icon="{ui:SymbolIcon PlugConnected24}" Click="Connect_Click" />
+                    </core:RowLayout>
+                </Border>
+            </StackPanel>
+        </ui:CardExpander>
+
+        <!-- What it reads -->
+        <TextBlock Text="Reading" Style="{DynamicResource HelmSectionHeader}" />
+        <ui:CardExpander Margin="0,0,0,4" Icon="{ui:SymbolIcon Channel24}">
+            <ui:CardExpander.Header>
+                <core:CardHeader Title="Channels and DMs" Description="{Binding ChannelsSummary}" />
+            </ui:CardExpander.Header>
+            <StackPanel>
+                <ui:TextBox Margin="0,0,0,8" PlaceholderText="Find a channel or person" Icon="{ui:SymbolIcon Search24}"
+                            Text="{Binding ChannelFilter, UpdateSourceTrigger=PropertyChanged}" AutomationProperties.Name="Find a channel" />
+                <TextBlock Margin="0,0,0,8" TextWrapping="Wrap" Style="{DynamicResource HelmSecondaryText}"
+                           Text="Read: on your list and in the report. Write: Slack Bot may also reply there and AI agents may post reports (needs Read). Both off: nothing from it is read, kept or shown to Claude, and what was kept is removed." />
+                <ScrollViewer MaxHeight="380" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                    <ItemsControl ItemsSource="{Binding Channels}" VirtualizingPanel.IsVirtualizing="True">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate DataType="{x:Type local:SlackChannelRow}">
+                                <Border Style="{DynamicResource HelmExpanderRow}" Padding="0,6">
+                                    <core:RowLayout>
+                                        <TextBlock Text="{Binding Name}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
+                                        <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                                            <TextBlock Text="Read" VerticalAlignment="Center" Margin="0,0,8,0" Style="{DynamicResource HelmSecondaryText}" />
+                                            <ui:ToggleSwitch IsChecked="{Binding CanRead}" AutomationProperties.Name="{Binding Name, StringFormat=Read {0}}" />
+                                            <TextBlock Text="Write" VerticalAlignment="Center" Margin="20,0,8,0" Style="{DynamicResource HelmSecondaryText}" />
+                                            <ui:ToggleSwitch IsChecked="{Binding CanWrite}" AutomationProperties.Name="{Binding Name, StringFormat=Write in {0}}" />
+                                        </StackPanel>
+                                    </core:RowLayout>
+                                </Border>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </ScrollViewer>
+            </StackPanel>
+        </ui:CardExpander>
+        <ui:CardControl Margin="0,0,0,4" Icon="{ui:SymbolIcon Bot24}">
+            <ui:CardControl.Header>
+                <core:CardHeader Title="Messages from bots and apps" Description="Off: only those that call you by name are read." />
+            </ui:CardControl.Header>
+            <ui:ToggleSwitch IsChecked="{Binding ReadBots}" />
+        </ui:CardControl>
+
+        <!-- How Claude sorts -->
+        <TextBlock Text="Sorting" Style="{DynamicResource HelmSectionHeader}" />
+        <ui:CardExpander Margin="0,0,0,4" IsExpanded="True" Icon="{ui:SymbolIcon Person24}">
+            <ui:CardExpander.Header>
+                <core:CardHeader Title="What matters to you"
+                                 Description="Your role, your projects, who you answer to: Claude reads it with every batch. Write it in any language." />
+            </ui:CardExpander.Header>
+            <ui:TextBox AcceptsReturn="True" TextWrapping="Wrap" MinHeight="90" VerticalContentAlignment="Top" AutomationProperties.Name="What matters to you"
+                        PlaceholderText="e.g. I lead the Unity client of game X. Build failures, release dates and questions from my lead need me."
+                        Text="{Binding AboutMe, UpdateSourceTrigger=LostFocus}" />
+        </ui:CardExpander>
+        <ui:CardControl Margin="0,0,0,4" Icon="{ui:SymbolIcon Sparkle24}">
+            <ui:CardControl.Header>
+                <core:CardHeader Title="Claude model" Description="Claude Code sorts the messages with no tools: it only reads them and answers Helm." />
+            </ui:CardControl.Header>
+            <ComboBox MinWidth="240" ItemsSource="{Binding Models}" DisplayMemberPath="Label" SelectedValuePath="Value" SelectedValue="{Binding Model}"
+                      AutomationProperties.Name="Claude model" />
+        </ui:CardControl>
+        <ui:CardControl Margin="0,0,0,4" Icon="{ui:SymbolIcon Timer24}">
+            <ui:CardControl.Header>
+                <core:CardHeader Title="Sort channel messages every" Description="1800 = every 30 minutes; at least 10. Each run with new messages uses Claude Code. Messages for you are sorted within seconds anyway." />
+            </ui:CardControl.Header>
+            <StackPanel Orientation="Horizontal">
+                <ui:TextBox Width="110" HorizontalContentAlignment="Right" Text="{Binding ChannelSeconds, UpdateSourceTrigger=LostFocus}"
+                            AutomationProperties.Name="Sort channel messages every, in seconds" />
+                <TextBlock Margin="8,0,0,0" VerticalAlignment="Center" Text="seconds" />
+            </StackPanel>
+        </ui:CardControl>
+
+        <!-- Replying for the user, openly as an AI assistant -->
+        <TextBlock Text="Replies" Style="{DynamicResource HelmSectionHeader}" />
+        <ui:CardExpander Margin="0,0,0,4" IsExpanded="True" Icon="{ui:SymbolIcon ChatArrowBack20}">
+            <ui:CardExpander.Header>
+                <core:CardHeader Title="AI signature"
+                                 Description="A small grey line Helm puts under every message Slack Bot posts, so nobody takes it for you. {me} is your name; it always says AI." />
+            </ui:CardExpander.Header>
+            <StackPanel>
+                <ui:TextBox AutomationProperties.Name="AI signature" Text="{Binding Signature, UpdateSourceTrigger=LostFocus}" />
+                <core:RowLayout Margin="0,8,0,0">
+                    <core:CardHeader Title="Signature emoji"
+                                     Description="A Slack emoji code in front of the signature, e.g. :robot_face:, or your own emoji (upload one in Slack as :lumi:)." />
+                    <ui:TextBox Width="180" HorizontalAlignment="Right" AutomationProperties.Name="Signature emoji"
+                                Text="{Binding SignatureEmoji, UpdateSourceTrigger=LostFocus}" />
+                </core:RowLayout>
+                <TextBlock Margin="0,8,0,0" Text="A reply looks like this (the words are Claude's; in Slack the last line is small and grey):" Style="{DynamicResource HelmSecondaryText}" />
+                <TextBlock Margin="0,2,0,0" Text="{Binding ReplyPreview}" TextWrapping="Wrap" />
+                <ui:Button Margin="0,8,0,0" Appearance="Transparent" Content="Back to the default" Command="{Binding ResetSignatureCommand}" />
+            </StackPanel>
+        </ui:CardExpander>
+        <ui:CardExpander Margin="0,0,0,4" Icon="{ui:SymbolIcon TextEditStyle24}">
+            <ui:CardExpander.Header>
+                <core:CardHeader Title="How replies are written"
+                                 Description="Optional: tone, language, what to say. Claude sees only the one message it answers, never your other conversations; it never promises, approves or decides for you." />
+            </ui:CardExpander.Header>
+            <ui:TextBox AcceptsReturn="True" TextWrapping="Wrap" MinHeight="70" VerticalContentAlignment="Top" AutomationProperties.Name="How replies are written"
+                        PlaceholderText="e.g. Xưng em, gọi người nhắn là anh/chị, ngắn gọn, thân thiện."
+                        Text="{Binding ReplyStyle, UpdateSourceTrigger=LostFocus}" />
+        </ui:CardExpander>
+        <ui:CardControl Margin="0,0,0,4" Icon="{ui:SymbolIcon Timer24}">
+            <ui:CardControl.Header>
+                <core:CardHeader Title="Reply when you have not answered"
+                                 Description="Once per DM or thread every 4 hours, never to messages older than 2 hours. The message stays on your list." />
+            </ui:CardControl.Header>
+            <ComboBox MinWidth="200" ItemsSource="{Binding ReplyAfterChoices}" DisplayMemberPath="Label" SelectedValuePath="Value"
+                      SelectedValue="{Binding ReplyAfterMinutes}" AutomationProperties.Name="Reply when you have not answered" />
+        </ui:CardControl>
+
+        <!-- The report and the list on screen -->
+        <TextBlock Text="On screen" Style="{DynamicResource HelmSectionHeader}" />
+        <ui:CardControl Margin="0,0,0,4" Icon="{ui:SymbolIcon Clock24}">
+            <ui:CardControl.Header>
+                <core:CardHeader Title="Worth-knowing report times"
+                                 Description="Messages that need nothing from you wait and show up on the list together at these times of day, e.g. 12:00, 17:00. To-do messages show at once." />
+            </ui:CardControl.Header>
+            <ui:TextBox MinWidth="200" Text="{Binding ReportTimes, UpdateSourceTrigger=LostFocus}" AutomationProperties.Name="Report times" />
+        </ui:CardControl>
+        <ui:CardControl Margin="0,0,0,4" Icon="{ui:SymbolIcon Speaker224}">
+            <ui:CardControl.Header>
+                <core:CardHeader Title="Sound for new items" Description="Plays when something lands on the list." />
+            </ui:CardControl.Header>
+            <ui:ToggleSwitch IsChecked="{Binding PlaySound}" />
+        </ui:CardControl>
+        <ui:CardControl Margin="0,0,0,4" Icon="{ui:SymbolIcon Eye24}">
+            <ui:CardControl.Header>
+                <core:CardHeader Title="See-through list" Description="How much the list on screen shows while the mouse is not on it." />
+            </ui:CardControl.Header>
+            <StackPanel Orientation="Horizontal">
+                <Slider Width="180" Minimum="0.3" Maximum="1" SmallChange="0.05" LargeChange="0.1" TickFrequency="0.05" IsSnapToTickEnabled="True"
+                        VerticalAlignment="Center" Value="{Binding OverlayOpacity}" AutomationProperties.Name="See-through list" />
+                <TextBlock Margin="8,0,0,0" MinWidth="36" VerticalAlignment="Center" Text="{Binding OverlayOpacity, StringFormat={}{0:P0}}" />
+            </StackPanel>
+        </ui:CardControl>
+        <ui:CardControl Margin="0,0,0,4" Icon="{ui:SymbolIcon WindowArrowUp24}">
+            <ui:CardControl.Header>
+                <core:CardHeader Title="Reset the list's place" Description="Back to the bottom-right corner, unfolded." />
+            </ui:CardControl.Header>
+            <ui:Button Content="Reset" Command="{Binding ResetOverlayCommand}" />
+        </ui:CardControl>
+    </StackPanel>
+</core:ModulePageBase>

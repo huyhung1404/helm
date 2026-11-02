@@ -3,6 +3,29 @@
 All notable changes to Helm. The top section is used as the GitHub release body and as the Velopack release notes.
 Format: [Keep a Changelog](https://keepachangelog.com), versions follow [SemVer](https://semver.org).
 
+## [Unreleased]
+
+### Added
+- **Slack Bot (PC): never miss what needs you in Slack.** Slack Bot reads your workspace as you, through a Slack app
+  you make in a minute from the manifest on its settings page (Socket Mode: Helm connects out, nothing listens on your
+  PC). Each conversation has two switches, Read and Write (both off: not read at all). DMs are read unless you turn them
+  off; channels stay off until you turn them on. Claude Code sorts each message: to do, worth knowing or not for you, with one line in
+  Vietnamese. DMs, mentions and replies in your threads are sorted within seconds, channels as often as you set (in
+  seconds; every 30 minutes to start with). What needs you stays in a small see-through list on top of your apps (it
+  never takes the keyboard; solid under the mouse; drag it anywhere, fold it into a badge) until you reply in Slack,
+  react with an emoji or press Done. What is worth knowing waits for the report times you set (12:00 and 17:00 to start
+  with) and shows up together, grouped by channel. Where you allow it, a message you have not answered within a few
+  minutes gets a short reply Claude writes from that one message only, with a small grey AI signature line under it
+  (an emoji of your choice, such as your own :lumi:, and "Lumi · trợ lý AI của …"), so nobody takes it for yours;
+  it never promises, approves or decides for you, cannot ping anyone or post links, comes once per DM or thread every 4 hours, and the message stays on your list until you answer
+  it yourself. While Helm was off it catches up on what came meanwhile, and every 10 minutes it reads your recent DMs,
+  mentions and threads again in case Slack's live connection missed one. Claude reads the messages with no tools at all
+  (no files, no web, no MCP), and a reply is written seeing nothing but the message it answers; "Only worth knowing" and
+  "Needs me" teach it what matters to you. AI agents can use it over MCP: list the conversations you turned on, read
+  them, post a report where you allow writing (always asked first with the exact text, behind the AI signature, never
+  pinging a whole channel), and, when you ask, wait for the team's replies in that thread to rework the task. Messages and tokens stay on this PC, encrypted for your Windows user, and are
+  never synced.
+
 ## [0.71.0] - 2026-11-01
 
 ### Added

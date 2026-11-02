@@ -7,6 +7,7 @@ using Helm.Modules.QuickCapture;
 using Helm.Modules.ShortcutGuide;
 using Helm.Modules.Ssh;
 using Helm.Modules.Scratch;
+using Helm.Modules.SlackBot;
 using Helm.Modules.Vault;
 using Helm.Modules.Vocab;
 using Helm.Modules.WindowZones;
@@ -40,6 +41,7 @@ internal static class HelmModules
         services.AddKeyboardModule();
         services.AddWorkspaceModule();
         services.AddVocabModule();
+        services.AddSlackBotModule();
 
         // Built but hidden; re-enable with (using Helm.Modules.AlwaysOnTop;):
         // services.AddAlwaysOnTopModule();

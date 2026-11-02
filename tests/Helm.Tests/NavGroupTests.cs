@@ -26,6 +26,7 @@ public class NavGroupTests
         ["window-zones"] = ModuleGroup.WindowsAndDesktop,
         ["keyboard"] = ModuleGroup.WindowsAndDesktop,
         ["vocab"] = ModuleGroup.Learning,
+        ["slackbot"] = ModuleGroup.Messages,
     };
 
     /// <summary>Tools on their way out; they only need some group.</summary>
@@ -71,7 +72,7 @@ public class NavGroupTests
             var name = group.DisplayName();
             Assert.DoesNotContain(name, Generic, StringComparer.OrdinalIgnoreCase);
         }
-        Assert.Equal(["Planning", "Money & Media", "Security & Servers", "Windows & Desktop", "Learning"],
+        Assert.Equal(["Planning", "Money & Media", "Security & Servers", "Windows & Desktop", "Learning", "Messages"],
             Enum.GetValues<ModuleGroup>().Select(g => g.DisplayName()));
     }
 

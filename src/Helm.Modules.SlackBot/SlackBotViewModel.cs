@@ -1,0 +1,252 @@
+using System.Collections.ObjectModel;
+using System.Globalization;
+using CommunityToolkit.Mvvm.ComponentModel;
+using CommunityToolkit.Mvvm.Input;
+using Helm.Core.Services;
+using Helm.Core.Settings;
+using Microsoft.Extensions.DependencyInjection;
+
+namespace Helm.Modules.SlackBot;
+
+public sealed record SlackBotChoice<T>(T Value, string Label);
+
+/// <summary>The settings page: the connection, the channels it reads, how it sorts, and when it reports.</summary>
+public sealed partial class SlackBotViewModel : ObservableObject
+{
+    private readonly ISettingsStore<SlackBotSettings> _store;
+    private readonly SlackBotEngine _engine;
+    private readonly SlackTokens _tokens;
+    private readonly IUiDispatcher _ui;
+    private readonly IProcessLauncher _launcher;
+    private readonly IServiceProvider _services;
+    private readonly SlackBotOverlay _overlay;
+    private List<SlackChannelRow> _allChannels = [];
+    private bool _loading;
+
+    [ObservableProperty] private string _status = "";
+    [ObservableProperty] private bool _hasTokens;
+    [ObservableProperty] private string? _tokenProblem;
+    [ObservableProperty] private string _reportTimes = "";
+    [ObservableProperty] private int _channelSeconds;
+    [ObservableProperty] private bool _readBots;
+    [ObservableProperty] private string _aboutMe = "";
+    [ObservableProperty] private string _model = "";
+    [ObservableProperty] private bool _playSound;
+    [ObservableProperty] private string _channelFilter = "";
+    [ObservableProperty] private string _channelsSummary = "";
+    [ObservableProperty] private string _signature = "";
+    [ObservableProperty] private string _signatureEmoji = "";
+    [ObservableProperty] private string _replyStyle = "";
+    [ObservableProperty] private string _replyPreview = "";
+    [ObservableProperty] private int _replyAfterMinutes;
+    [ObservableProperty] private double _overlayOpacity;
+
+    public SlackBotViewModel(SlackBotModule module, SlackBotEngine engine, SlackTokens tokens, ISettingsStoreFactory settings, IUiDispatcher ui,
+        IProcessLauncher launcher, IServiceProvider services, SlackBotOverlay overlay)
+    {
+        _overlay = overlay;
+        Module = module;
+        _engine = engine;
+        _tokens = tokens;
+        _store = settings.Get<SlackBotSettings>(SlackBotModule.ModuleId);
+        _ui = ui;
+        _launcher = launcher;
+        _services = services;
+        Load(_store.Current);
+        engine.Changed += (_, _) => _ui.Post(RefreshEngine);
+        RefreshEngine();
+    }
+
+    public SlackBotModule Module { get; }
+
+    public string Manifest => SlackAppManifest.Json;
+
+    public ObservableCollection<SlackChannelRow> Channels { get; } = [];
+
+    public IReadOnlyList<SlackBotChoice<int>> ReplyAfterChoices { get; } =
+    [
+        new(1, "After 1 minute"),
+        new(3, "After 3 minutes"),
+        new(5, "After 5 minutes"),
+        new(10, "After 10 minutes"),
+        new(30, "After 30 minutes"),
+    ];
+
+    public IReadOnlyList<SlackBotChoice<string>> Models { get; } =
+    [
+        new("", "Claude Code's default"),
+        new("haiku", "Haiku (fast, light on your plan)"),
+        new("sonnet", "Sonnet"),
+    ];
+
+    /// <summary>Saves new tokens and connects with them; false (with <see cref="TokenProblem"/>) when they cannot be right.</summary>
+    public async Task<bool> ConnectAsync(string userToken, string appToken)
+    {
+        var pair = new SlackTokenPair(userToken.Trim(), appToken.Trim());
+        TokenProblem = pair.Problem();
+        if (TokenProblem is not null) return false;
+        _tokens.Save(pair);
+        HasTokens = true;
+        await _engine.RestartAsync();
+        return true;
+    }
+
+    [RelayCommand]
+    private async Task Disconnect()
+    {
+        _tokens.Delete();
+        HasTokens = false;
+        await _engine.RestartAsync();
+    }
+
+    [RelayCommand]
+    private Task Reconnect() => _engine.RestartAsync();
+
+    [RelayCommand]
+    private void OpenSlackApps() => _launcher.OpenUrl(SlackAppManifest.AppsUrl);
+
+    [RelayCommand]
+    private void OpenContent() => _services.GetRequiredService<IShellNavigation>().ShowPage(typeof(SlackBotContentPage));
+
+    [RelayCommand]
+    private void ResetOverlay() => _overlay.Reset();
+
+    partial void OnReportTimesChanged(string value)
+    {
+        if (_loading) return;
+        var times = ParseTimes(value);
+        if (times is not null) _store.Update(s => s.ReportTimes = times);
+    }
+
+    partial void OnChannelSecondsChanged(int value)
+    {
+        if (value < SlackBotSettings.MinChannelSeconds)
+        {
+            ChannelSeconds = SlackBotSettings.MinChannelSeconds;
+            return;
+        }
+        Save(s => s.ChannelSeconds = value);
+    }
+
+    partial void OnReadBotsChanged(bool value) => Save(s => s.ReadBots = value);
+
+    partial void OnAboutMeChanged(string value) => Save(s => s.AboutMe = value);
+
+    partial void OnModelChanged(string value) => Save(s => s.Model = value);
+
+    partial void OnPlaySoundChanged(bool value) => Save(s => s.PlaySound = value);
+
+    partial void OnSignatureChanged(string value)
+    {
+        UpdatePreview();
+        Save(s => s.Signature = value);
+    }
+
+    partial void OnReplyStyleChanged(string value) => Save(s => s.ReplyStyle = value);
+
+    partial void OnSignatureEmojiChanged(string value)
+    {
+        UpdatePreview();
+        Save(s => s.SignatureEmoji = value);
+    }
+
+    partial void OnReplyAfterMinutesChanged(int value) => Save(s => s.ReplyAfterMinutes = value);
+
+    partial void OnOverlayOpacityChanged(double value) => Save(s => s.OverlayOpacity = Math.Clamp(value, 0.3, 1));
+
+    [RelayCommand]
+    private void ResetSignature()
+    {
+        Signature = SlackBotSettings.DefaultSignature;
+        SignatureEmoji = SlackSignature.DefaultEmoji;
+    }
+
+    partial void OnChannelFilterChanged(string value) => FilterChannels();
+
+    /// <summary>"12:00, 17:30" → the times; null when one of them is not a time.</summary>
+    internal static List<string>? ParseTimes(string text)
+    {
+        var list = new List<string>();
+        foreach (var part in text.Split([',', ';', ' '], StringSplitOptions.RemoveEmptyEntries))
+        {
+            if (!TimeOnly.TryParseExact(part, ["H:mm", "HH:mm", "%H"], CultureInfo.InvariantCulture, DateTimeStyles.None, out var t)) return null;
+            list.Add(t.ToString("HH:mm", CultureInfo.InvariantCulture));
+        }
+        return list.Distinct().Order(StringComparer.Ordinal).ToList();
+    }
+
+    private void Load(SlackBotSettings s)
+    {
+        _loading = true;
+        try
+        {
+            ReportTimes = string.Join(", ", s.ReportTimes);
+            ChannelSeconds = s.ChannelSeconds;
+            ReadBots = s.ReadBots;
+            AboutMe = s.AboutMe;
+            Model = s.Model;
+            PlaySound = s.PlaySound;
+            Signature = s.Signature;
+            SignatureEmoji = s.SignatureEmoji;
+            ReplyStyle = s.ReplyStyle;
+            ReplyAfterMinutes = s.ReplyAfterMinutes;
+            OverlayOpacity = s.OverlayOpacity;
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private void Save(Action<SlackBotSettings> change)
+    {
+        if (!_loading) _store.Update(change);
+    }
+
+    private void RefreshEngine()
+    {
+        HasTokens = _tokens.Exist;
+        Status = _engine.Status is { Length: > 0 } s ? s : _engine.State == SlackBotState.Off ? "Slack Bot is turned off." : "";
+        var conversations = _engine.Conversations;
+        if (conversations.Count == _allChannels.Count && conversations.Select(c => c.Id).SequenceEqual(_allChannels.Select(r => r.Id)))
+        {
+            UpdateSummary();
+            return;
+        }
+        var settings = _store.Current;
+        _allChannels = conversations.Select(c => new SlackChannelRow(c, settings.ModeOf(c.Id, c.Kind), SetMode)).ToList();
+        FilterChannels();
+        UpdatePreview();
+    }
+
+    private void SetMode(string id, SlackChannelMode mode)
+    {
+        _store.Update(s => s.Channels[id] = mode);
+        // Turned off: nothing from it is kept any more.
+        if (mode == SlackChannelMode.Off) _engine.Inbox.Forget(id);
+        UpdateSummary();
+    }
+
+    private void FilterChannels()
+    {
+        var filter = ChannelFilter.Trim();
+        Channels.Clear();
+        foreach (var row in _allChannels)
+            if (filter.Length == 0 || row.Name.Contains(filter, StringComparison.OrdinalIgnoreCase)) Channels.Add(row);
+        UpdateSummary();
+    }
+
+    private void UpdateSummary()
+    {
+        var read = _allChannels.Count(r => r.Mode != SlackChannelMode.Off);
+        var reply = _allChannels.Count(r => r.Mode == SlackChannelMode.Reply);
+        ChannelsSummary = _allChannels.Count == 0
+            ? "The list appears once Slack Bot is connected."
+            : $"Reads {read} of {_allChannels.Count}, replies in {reply}. DMs are read unless you turn them off; channels are off until you turn them on.";
+    }
+
+    /// <summary>How a reply looks: an example of what Claude writes, then the signature line.</summary>
+    private void UpdatePreview() =>
+        ReplyPreview = new SlackSignedMessage("Dạ em đã nhận được tin nhắn và báo lại rồi ạ, anh ấy sẽ phản hồi sớm nhất có thể.",
+            SlackSignature.Label(Signature, _engine.MeName is { Length: > 0 } me ? me : "you"), SlackSignature.Emoji(SignatureEmoji)).Preview;
+}
