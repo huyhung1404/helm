@@ -14,7 +14,9 @@ namespace Helm.Modules.Vocab;
 /// a double-click puts it back in the corner). It never takes the keyboard focus from the app in front, except while
 /// its pinyin box is used: then it takes the keyboard and gives it back to that app once checked. Unanswered and
 /// untouched, it goes away by itself after <see cref="Linger"/>; being typed in or read, it stays until answered.
-/// "Full details" grows it to the screen's height with everything known about the word, scrolling inside.
+/// "Full details" grows it to the screen's height with everything known about the word, scrolling inside. At rest it
+/// is see-through (<see cref="VocabSettings.CardOpacity"/>), so the app underneath stays readable; under the pointer,
+/// while its pinyin box is used and while Full details is open it is solid.
 /// </summary>
 public partial class VocabPopupWindow : Window
 {
@@ -32,11 +34,14 @@ public partial class VocabPopupWindow : Window
     private nint _handle;
     private nint _previous;
     private bool _typing, _full;
+    private double _restOpacity;
 
     /// <param name="openWord">Opens a word in Vocabulary with its whole tree ("Open in Helm").</param>
     /// <param name="anchor">Where the user put it last: its bottom-left corner; null for the bottom-right corner.</param>
     /// <param name="moved">Keeps the new bottom-left corner after a drag (null after going back to the corner).</param>
-    public VocabPopupWindow(VocabCardViewModel card, IWindowService windows, Action<string>? openWord = null, Point? anchor = null, Action<Point?>? moved = null)
+    /// <param name="opacity">How solid the card is at rest, 0-1 (the settings' Card opacity).</param>
+    public VocabPopupWindow(VocabCardViewModel card, IWindowService windows, Action<string>? openWord = null, Point? anchor = null, Action<Point?>? moved = null,
+        double opacity = 1)
     {
         _card = card;
         _windows = windows;
@@ -45,6 +50,7 @@ public partial class VocabPopupWindow : Window
         _moved = moved;
         DataContext = card;
         InitializeComponent();
+        SetRestOpacity(opacity);
         SourceInitialized += (_, _) =>
         {
             _handle = new WindowInteropHelper(this).Handle;
@@ -78,9 +84,23 @@ public partial class VocabPopupWindow : Window
         _linger.Start();
     }
 
+    /// <summary>How solid the card is at rest (the setting changed while it is shown).</summary>
+    public void SetRestOpacity(double opacity)
+    {
+        _restOpacity = Math.Clamp(opacity, VocabSettingsViewModel.MinCardOpacity / 100.0, 1);
+        UpdateOpacity();
+    }
+
+    /// <summary>See-through at rest; solid while pointed at, typed in or read in full.</summary>
+    private void UpdateOpacity() => CardBorder.Opacity = CardBorder.IsMouseOver || _typing || _full ? 1 : _restOpacity;
+
+    private void Card_MouseEnter(object sender, MouseEventArgs e) => UpdateOpacity();
+
+    private void Card_MouseLeave(object sender, MouseEventArgs e) => UpdateOpacity();
+
     private void OnCardChanged(object? sender, PropertyChangedEventArgs e)
     {
-        if (e.PropertyName is nameof(VocabCardViewModel.IsRevealed) or nameof(VocabCardViewModel.IsTyping)
+        if (e.PropertyName is nameof(VocabCardViewModel.IsRevealed) or nameof(VocabCardViewModel.IsTyping) or nameof(VocabCardViewModel.HasPinyinMnemonic)
             or nameof(VocabCardViewModel.SuggestsRemembered) or nameof(VocabCardViewModel.SuggestsForgot))
             Update();
     }
@@ -92,6 +112,7 @@ public partial class VocabPopupWindow : Window
         TapHint.Visibility = !typing && !_card.IsRevealed ? Visibility.Visible : Visibility.Collapsed;
         TypePanel.Visibility = typing ? Visibility.Visible : Visibility.Collapsed;
         PartsBox.Visibility = !_full && _card.HasParts ? Visibility.Visible : Visibility.Collapsed;
+        PinyinHook.Visibility = !_full && _card.HasPinyinMnemonic ? Visibility.Visible : Visibility.Collapsed;
         DetailsPanel.Visibility = _full ? Visibility.Visible : Visibility.Collapsed;
         FullButton.Icon = new SymbolIcon(_full ? SymbolRegular.ArrowMinimize24 : SymbolRegular.ArrowMaximize24);
         FullButton.ToolTip = _full ? "Less" : "Full details";
@@ -195,6 +216,7 @@ public partial class VocabPopupWindow : Window
         _typing = true;
         _previous = _windows.GetForegroundWindow();
         _windows.AllowActivation(_handle, true);
+        UpdateOpacity();
         Activate();
         Dispatcher.BeginInvoke(DispatcherPriority.Input, () => Keyboard.Focus(TypeBox));
     }
@@ -203,6 +225,7 @@ public partial class VocabPopupWindow : Window
     {
         if (!_typing) return;
         _typing = false;
+        UpdateOpacity();
         if (_handle != 0) _windows.AllowActivation(_handle, false);
         if (_previous != 0 && _previous != _handle) _windows.Activate(_previous);
         _previous = 0;
@@ -216,6 +239,7 @@ public partial class VocabPopupWindow : Window
         _full = !_full;
         if (_full) DetailsList.ItemsSource = _card.Details();
         Scroller.MaxHeight = _full ? Math.Max(CompactHeight, SystemParameters.WorkArea.Height - 72) : CompactHeight;
+        UpdateOpacity();
         Update();
         Scroller.ScrollToTop();
     }

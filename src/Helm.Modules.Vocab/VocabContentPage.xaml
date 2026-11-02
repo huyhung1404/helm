@@ -3,661 +3,152 @@
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
-    xmlns:core="clr-namespace:Helm.Core.Ui;assembly=Helm.Core.Windows"
-    xmlns:local="clr-namespace:Helm.Modules.Vocab;assembly=Helm.Modules.Vocab.Core"
-    xmlns:pc="clr-namespace:Helm.Modules.Vocab"
-    Title="Vocabulary">
+    xmlns:views="clr-namespace:Helm.Modules.Vocab.Views"
+    Title="Vocabulary" ScrollViewer.CanContentScroll="False" Foreground="{DynamicResource TextFillColorPrimaryBrush}">
 
-    <!-- Vocabulary itself (menu and Quick access). Its options live on VocabPage (Home → Utilities). -->
+    <!-- Vocabulary itself (menu and Quick access): the header (Analysis, Add words, settings), three tabs (Learn, Words,
+         Roots), each scrolling its own parts so the Learn card keeps its answer buttons in reach; Add words, Analysis,
+         Edit and Ask for a new analysis are dialogs over the page. Its options live on VocabPage (Home → Utilities). -->
+    <Page.InputBindings>
+        <KeyBinding Key="N" Modifiers="Ctrl" Command="{Binding OpenAddCommand}" />
+    </Page.InputBindings>
+
     <Page.Resources>
         <ResourceDictionary>
             <ResourceDictionary.MergedDictionaries>
                 <ResourceDictionary Source="/Helm.Modules.Vocab;component/VocabTemplates.xaml" />
             </ResourceDictionary.MergedDictionaries>
+            <!-- The Analysis chip: outlined in the accent colour while the agent works, in amber while words wait -->
+            <Style x:Key="AgentChip" TargetType="Button">
+                <Setter Property="Cursor" Value="Hand" />
+                <Setter Property="FocusVisualStyle" Value="{x:Null}" />
+                <Setter Property="Height" Value="32" />
+                <Setter Property="FontSize" Value="13" />
+                <Setter Property="Foreground" Value="{DynamicResource TextFillColorPrimaryBrush}" />
+                <Setter Property="Background" Value="{DynamicResource ControlFillColorDefaultBrush}" />
+                <Setter Property="BorderBrush" Value="{DynamicResource ControlStrokeColorDefaultBrush}" />
+                <Setter Property="Template">
+                    <Setter.Value>
+                        <ControlTemplate TargetType="Button">
+                            <Border x:Name="Bd" CornerRadius="16" Padding="10,0,12,0" BorderThickness="1" Background="{TemplateBinding Background}"
+                                    BorderBrush="{TemplateBinding BorderBrush}">
+                                <ContentPresenter VerticalAlignment="Center" />
+                            </Border>
+                            <ControlTemplate.Triggers>
+                                <Trigger Property="IsMouseOver" Value="True">
+                                    <Setter TargetName="Bd" Property="Background" Value="{DynamicResource ControlFillColorSecondaryBrush}" />
+                                </Trigger>
+                                <Trigger Property="IsKeyboardFocused" Value="True">
+                                    <Setter TargetName="Bd" Property="BorderBrush" Value="{DynamicResource TextFillColorPrimaryBrush}" />
+                                </Trigger>
+                            </ControlTemplate.Triggers>
+                        </ControlTemplate>
+                    </Setter.Value>
+                </Setter>
+                <Style.Triggers>
+                    <DataTrigger Binding="{Binding IsAgentBusy}" Value="True">
+                        <Setter Property="BorderBrush" Value="{DynamicResource AccentTextFillColorPrimaryBrush}" />
+                    </DataTrigger>
+                    <DataTrigger Binding="{Binding IsAgentWaiting}" Value="True">
+                        <Setter Property="BorderBrush" Value="{DynamicResource SystemFillColorCautionBrush}" />
+                    </DataTrigger>
+                </Style.Triggers>
+            </Style>
         </ResourceDictionary>
     </Page.Resources>
 
-    <StackPanel Margin="24,16,24,24">
-        <TextBlock Text="Vocabulary" FontSize="28" FontWeight="SemiBold" Margin="0,0,0,16" />
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
 
-        <!-- Shown while the tool is turned off -->
-        <ui:InfoBar x:Name="OffBar" Severity="Informational" IsClosable="False" IsOpen="False" Visibility="Collapsed" Margin="0,8,0,0"
-                    Title="Vocabulary is turned off" Message="Your words are kept. Turn Vocabulary on in its settings to use them." />
+        <!-- ===== The title, the Analysis chip, Add words, settings; then the tabs ===== -->
+        <StackPanel Margin="24,16,24,0">
+            <DockPanel>
+                <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center">
+                    <StackPanel x:Name="HeaderActions" Orientation="Horizontal">
+                        <Button Style="{StaticResource AgentChip}" Command="{Binding OpenAgentCommand}" ToolTip="What waits for Claude Code, and the analysis now"
+                                AutomationProperties.Name="{Binding AgentChipText, StringFormat='Analysis: {0}'}">
+                            <StackPanel Orientation="Horizontal">
+                                <ui:ProgressRing IsIndeterminate="True" Width="14" Height="14" Margin="0,0,8,0"
+                                                 Visibility="{Binding IsAgentBusy, Converter={StaticResource BoolToVisibility}}" />
+                                <ui:SymbolIcon Symbol="HourglassHalf24" FontSize="16" Margin="0,0,6,0" Foreground="{DynamicResource SystemFillColorCautionBrush}"
+                                               Visibility="{Binding IsAgentWaiting, Converter={StaticResource BoolToVisibility}}" />
+                                <ui:SymbolIcon Symbol="CheckmarkCircle24" FontSize="16" Margin="0,0,6,0" Foreground="{DynamicResource SystemFillColorSuccessBrush}"
+                                               Visibility="{Binding IsAllAnalyzed, Converter={StaticResource BoolToVisibility}}" />
+                                <TextBlock Text="{Binding AgentChipText}" VerticalAlignment="Center" />
+                            </StackPanel>
+                        </Button>
+                        <ui:Button Margin="10,0,0,0" Content="Add words" Icon="{ui:SymbolIcon Add24}" Command="{Binding OpenAddCommand}" ToolTip="Add words (Ctrl+N)" />
+                    </StackPanel>
+                    <ui:Button Style="{StaticResource IconButton}" Margin="6,0,0,0" Icon="{ui:SymbolIcon Settings24}" Click="Settings_Click"
+                               ToolTip="Settings: the pop-up card, display, analysis" AutomationProperties.Name="Vocabulary settings" />
+                </StackPanel>
+                <TextBlock Text="Vocabulary" FontSize="28" FontWeight="SemiBold" VerticalAlignment="Center" />
+            </DockPanel>
 
-        <StackPanel x:Name="Body">
-            <!-- Learn (only the card), Add, Words, Roots -->
-            <WrapPanel Margin="0,0,0,16">
-                <ui:Button Style="{StaticResource Segment}" Margin="0,0,6,0" Tag="{Binding IsLearning}" Content="Learn" Icon="{ui:SymbolIcon HatGraduation24}"
-                           Command="{Binding ShowLearnCommand}" AutomationProperties.Name="Learn" />
-                <ui:Button Style="{StaticResource Segment}" Margin="0,0,6,0" Tag="{Binding IsAdding}" Content="Add" Icon="{ui:SymbolIcon Add24}"
-                           Command="{Binding ShowAddCommand}" AutomationProperties.Name="Add words" />
-                <ui:Button Style="{StaticResource Segment}" Margin="0,0,6,0" Tag="{Binding IsWordsTab}" Content="{Binding WordsTabText}" Icon="{ui:SymbolIcon BookLetter24}"
-                           Command="{Binding ShowWordsCommand}" AutomationProperties.Name="Words" />
-                <ui:Button Style="{StaticResource Segment}" Tag="{Binding IsRootsTab}" Content="Roots" Icon="{ui:SymbolIcon Organization24}"
-                           Command="{Binding ShowRootsCommand}" AutomationProperties.Name="Roots" />
-            </WrapPanel>
+            <!-- Learn (the card), Words (the list, a word's page), Roots (families) -->
+            <Border x:Name="Tabs" Style="{StaticResource SegmentBar}" Margin="0,16,0,0">
+                <StackPanel Orientation="Horizontal">
+                    <Button Style="{StaticResource TabButton}" Tag="{Binding IsLearning}" Command="{Binding ShowLearnCommand}" AutomationProperties.Name="Learn">
+                        <StackPanel Orientation="Horizontal">
+                            <ui:SymbolIcon Symbol="HatGraduation24" FontSize="18" Margin="0,0,8,0" />
+                            <TextBlock Text="Learn" VerticalAlignment="Center" />
+                            <Border Style="{StaticResource AccentPill}" ToolTip="Due now">
+                                <TextBlock Text="{Binding LearnCount}" HorizontalAlignment="Center" />
+                            </Border>
+                        </StackPanel>
+                    </Button>
+                    <Button Style="{StaticResource TabButton}" Tag="{Binding IsWordsTab}" Command="{Binding ShowWordsCommand}" AutomationProperties.Name="Words">
+                        <StackPanel Orientation="Horizontal">
+                            <ui:SymbolIcon Symbol="BookLetter24" FontSize="18" Margin="0,0,8,0" />
+                            <TextBlock Text="Words" VerticalAlignment="Center" />
+                            <Border Style="{StaticResource Pill}" ToolTip="Words on the cards">
+                                <TextBlock Text="{Binding WordsCount}" HorizontalAlignment="Center" />
+                            </Border>
+                        </StackPanel>
+                    </Button>
+                    <Button Style="{StaticResource TabButton}" Tag="{Binding IsRootsTab}" Command="{Binding ShowRootsCommand}" AutomationProperties.Name="Roots">
+                        <StackPanel Orientation="Horizontal">
+                            <ui:SymbolIcon Symbol="Organization24" FontSize="18" Margin="0,0,8,0" />
+                            <TextBlock Text="Roots" VerticalAlignment="Center" />
+                        </StackPanel>
+                    </Button>
+                </StackPanel>
+            </Border>
+        </StackPanel>
 
-            <!-- A problem or a notice from the last action -->
-            <Border Style="{DynamicResource HelmSurface}" Margin="0,0,0,8" Padding="12,8" Visibility="{Binding HasMessage, Converter={StaticResource BoolToVisibility}}">
+        <!-- ===== Notices: the tool is off, or a problem / notice from the last action ===== -->
+        <StackPanel Grid.Row="1" Margin="24,0">
+            <ui:InfoBar x:Name="OffBar" Severity="Informational" IsClosable="False" IsOpen="False" Visibility="Collapsed" Margin="0,12,0,0"
+                        Title="Vocabulary is turned off" Message="Your words are kept. Turn Vocabulary on in its settings to use them." />
+            <Border Style="{DynamicResource HelmSurface}" Margin="0,12,0,0" Padding="12,8" Visibility="{Binding HasMessage, Converter={StaticResource BoolToVisibility}}">
                 <DockPanel>
-                    <ui:Button DockPanel.Dock="Right" Appearance="Transparent" Padding="6" MinWidth="0" Icon="{ui:SymbolIcon Dismiss24}" ToolTip="Dismiss"
+                    <ui:Button DockPanel.Dock="Right" Style="{StaticResource IconButton}" Icon="{ui:SymbolIcon Dismiss24}" ToolTip="Dismiss"
                                AutomationProperties.Name="Dismiss" Command="{Binding DismissMessageCommand}" />
                     <TextBlock Text="{Binding Message}" TextWrapping="Wrap" VerticalAlignment="Center" />
                 </DockPanel>
             </Border>
-
-            <!-- ===== Learn: one word at a time ===== -->
-            <StackPanel x:Name="LearnPanel" MaxWidth="760" Focusable="True" FocusVisualStyle="{x:Null}"
-                        Visibility="{Binding IsLearning, Converter={StaticResource BoolToVisibility}}">
-                <DockPanel Margin="0,0,0,8">
-                    <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
-                        <TextBlock Text="Cards" VerticalAlignment="Center" Margin="0,0,8,0" Style="{DynamicResource HelmSecondaryText}" />
-                        <ComboBox Width="170" AutomationProperties.Name="Kind of card" ItemsSource="{Binding Settings.CardModes}" SelectedIndex="{Binding Settings.CardModeIndex}" />
-                    </StackPanel>
-                    <TextBlock Text="{Binding LearnSummary}" VerticalAlignment="Center" Style="{DynamicResource HelmSecondaryText}" />
-                </DockPanel>
-                <TextBlock Margin="0,0,0,8" TextWrapping="Wrap" Foreground="{DynamicResource SystemFillColorSuccessBrush}"
-                           Text="All caught up: nothing is due now. These cards are extra rounds; come back when words fall due."
-                           Visibility="{Binding IsCaughtUp, Converter={StaticResource BoolToVisibility}}" />
-                <Border Style="{DynamicResource HelmSurface}" Padding="24,16,24,20" DataContext="{Binding Card}">
-                    <StackPanel>
-                        <!-- Nothing to learn yet -->
-                        <StackPanel Margin="0,24" HorizontalAlignment="Center" Visibility="{Binding HasWord, Converter={StaticResource InverseBoolToVisibility}}">
-                            <TextBlock Text="No word to learn yet" FontSize="18" FontWeight="SemiBold" HorizontalAlignment="Center" />
-                            <TextBlock Margin="0,6,0,14" TextWrapping="Wrap" TextAlignment="Center" MaxWidth="420" Style="{DynamicResource HelmSecondaryText}"
-                                       Text="Add the words you meet on the Add tab. Once an AI agent breaks them down, they come here one at a time." />
-                            <ui:Button HorizontalAlignment="Center" Appearance="Primary" Content="Add words" Icon="{ui:SymbolIcon Add24}"
-                                       Command="{Binding DataContext.ShowAddCommand, RelativeSource={RelativeSource AncestorType=Page}}" />
-                        </StackPanel>
-
-                        <StackPanel Visibility="{Binding HasWord, Converter={StaticResource BoolToVisibility}}">
-                            <DockPanel>
-                                <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
-                                    <ui:Button Appearance="Transparent" Content="I know it" Icon="{ui:SymbolIcon CheckmarkStarburst24}" Command="{Binding KnowCommand}"
-                                               ToolTip="Known already: it comes back in a month (K)" />
-                                    <ui:Button Appearance="Transparent" Margin="4,0,0,0" Content="Hide" Icon="{ui:SymbolIcon EyeOff24}" Command="{Binding HideCommand}"
-                                               ToolTip="Leave it out of the cards, the pop-up and the phone (Words → Hidden shows it again)" />
-                                    <ui:Button Appearance="Transparent" Margin="4,0,0,0" Content="Skip" Icon="{ui:SymbolIcon ArrowNext24}" Command="{Binding SkipCommand}"
-                                               ToolTip="Another word, without answering this one (S)" />
-                                </StackPanel>
-                                <WrapPanel VerticalAlignment="Center">
-                                    <TextBlock Text="{Binding LevelText}" VerticalAlignment="Center" Margin="0,0,8,0" Style="{DynamicResource HelmSecondaryText}" />
-                                    <Border CornerRadius="4" Padding="6,1" VerticalAlignment="Center" Margin="0,0,6,0" Background="{DynamicResource ControlFillColorSecondaryBrush}"
-                                            Visibility="{Binding IsHard, Converter={StaticResource BoolToVisibility}}"
-                                            ToolTip="You forgot it several times: Claude Code writes a new way to remember it">
-                                        <TextBlock Text="Often forgotten" FontSize="11" FontWeight="SemiBold" Foreground="{DynamicResource SystemFillColorCautionBrush}" />
-                                    </Border>
-                                    <Border CornerRadius="4" Padding="6,1" VerticalAlignment="Center" Background="{DynamicResource ControlFillColorSecondaryBrush}"
-                                            Visibility="{Binding IsNewlyHelped, Converter={StaticResource BoolToVisibility}}">
-                                        <TextBlock Text="New way to remember it" FontSize="11" FontWeight="SemiBold" Foreground="{DynamicResource AccentTextFillColorPrimaryBrush}" />
-                                    </Border>
-                                </WrapPanel>
-                            </DockPanel>
-
-                            <!-- The front: a click (or Space) shows the answer -->
-                            <Button Style="{StaticResource FlatButton}" Padding="8,24" Margin="0,4,0,0" Command="{Binding RevealCommand}" AutomationProperties.Name="Show the answer">
-                                <StackPanel HorizontalAlignment="Center">
-                                    <TextBlock Text="{Binding FrontText}" FontSize="52" FontWeight="SemiBold" HorizontalAlignment="Center" TextWrapping="Wrap" TextAlignment="Center"
-                                               Visibility="{Binding FrontIsWord, Converter={StaticResource BoolToVisibility}}" />
-                                    <TextBlock Text="{Binding FrontText}" FontSize="24" HorizontalAlignment="Center" TextWrapping="Wrap" TextAlignment="Center" MaxWidth="620"
-                                               Visibility="{Binding FrontIsText, Converter={StaticResource BoolToVisibility}}" />
-                                    <ui:Button HorizontalAlignment="Center" Appearance="Primary" Padding="20,12" FontSize="16" Content="Play" Icon="{ui:SymbolIcon Speaker224}"
-                                               Command="{Binding SayCommand}" Visibility="{Binding FrontIsListen, Converter={StaticResource BoolToVisibility}}" />
-                                    <TextBlock Margin="0,8,0,0" Text="{Binding FrontNote}" HorizontalAlignment="Center" TextWrapping="Wrap" TextAlignment="Center" MaxWidth="620"
-                                               Style="{DynamicResource HelmSecondaryText}" Visibility="{Binding HasFrontNote, Converter={StaticResource BoolToVisibility}}" />
-                                    <TextBlock Margin="0,8,0,0" Text="{Binding FrontHint}" HorizontalAlignment="Center" Style="{DynamicResource HelmSecondaryText}"
-                                               Visibility="{Binding IsRevealed, Converter={StaticResource InverseBoolToVisibility}}" />
-                                </StackPanel>
-                            </Button>
-
-                            <!-- Type cards: the word typed here, checked on Enter -->
-                            <Grid Margin="0,0,0,8" MaxWidth="460" Visibility="{Binding IsTyping, Converter={StaticResource BoolToVisibility}}">
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="*" />
-                                    <ColumnDefinition Width="8" />
-                                    <ColumnDefinition Width="Auto" />
-                                </Grid.ColumnDefinitions>
-                                <ui:TextBox x:Name="TypeBox" FontSize="20" PlaceholderText="{Binding TypePrompt}" AutomationProperties.Name="{Binding TypePrompt}"
-                                            Text="{Binding Typed, UpdateSourceTrigger=PropertyChanged}">
-                                    <ui:TextBox.InputBindings>
-                                        <KeyBinding Key="Enter" Command="{Binding CheckCommand}" />
-                                    </ui:TextBox.InputBindings>
-                                </ui:TextBox>
-                                <ui:Button Grid.Column="2" Appearance="Primary" Content="Check" Icon="{ui:SymbolIcon Checkmark24}" Command="{Binding CheckCommand}" />
-                            </Grid>
-
-                            <!-- The answer, what helps to use it, how it is built, then the user's own verdict -->
-                            <StackPanel Visibility="{Binding IsRevealed, Converter={StaticResource BoolToVisibility}}">
-                                <!-- What was typed, letter by letter against the word -->
-                                <StackPanel HorizontalAlignment="Center" Margin="0,0,0,6" Visibility="{Binding HasAnswer, Converter={StaticResource BoolToVisibility}}">
-                                    <ItemsControl ItemsSource="{Binding AnswerPieces}" ItemTemplate="{StaticResource AnswerPiece}" Focusable="False" HorizontalAlignment="Center">
-                                        <ItemsControl.ItemsPanel>
-                                            <ItemsPanelTemplate>
-                                                <StackPanel Orientation="Horizontal" />
-                                            </ItemsPanelTemplate>
-                                        </ItemsControl.ItemsPanel>
-                                    </ItemsControl>
-                                    <TextBlock Text="{Binding AnswerMessage}" HorizontalAlignment="Center" FontWeight="SemiBold" TextWrapping="Wrap" TextAlignment="Center">
-                                        <TextBlock.Style>
-                                            <Style TargetType="TextBlock">
-                                                <Setter Property="Foreground" Value="{DynamicResource SystemFillColorCriticalBrush}" />
-                                                <Style.Triggers>
-                                                    <DataTrigger Binding="{Binding AnswerIsCorrect}" Value="True">
-                                                        <Setter Property="Foreground" Value="{DynamicResource SystemFillColorSuccessBrush}" />
-                                                    </DataTrigger>
-                                                    <DataTrigger Binding="{Binding AnswerIsClose}" Value="True">
-                                                        <Setter Property="Foreground" Value="{DynamicResource SystemFillColorCautionBrush}" />
-                                                    </DataTrigger>
-                                                </Style.Triggers>
-                                            </Style>
-                                        </TextBlock.Style>
-                                    </TextBlock>
-                                </StackPanel>
-                                <TextBlock Text="{Binding Text}" FontSize="40" FontWeight="SemiBold" HorizontalAlignment="Center" TextWrapping="Wrap"
-                                           Visibility="{Binding ShowsWordOnReveal, Converter={StaticResource BoolToVisibility}}" />
-                                <WrapPanel HorizontalAlignment="Center">
-                                    <TextBlock pc:ToneText.Text="{Binding Phonetic}" FontSize="18" Margin="0,0,10,0" VerticalAlignment="Center" />
-                                    <TextBlock Text="{Binding HanViet}" FontSize="16" FontWeight="SemiBold" Margin="0,0,10,0" VerticalAlignment="Center" Style="{DynamicResource HelmSecondaryText}" />
-                                    <TextBlock Text="{Binding Traditional}" FontSize="16" VerticalAlignment="Center" Style="{DynamicResource HelmSecondaryText}" />
-                                </WrapPanel>
-                                <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,2,0,0">
-                                    <ui:Button Appearance="Transparent" Content="Listen" Icon="{ui:SymbolIcon Speaker224}" Command="{Binding SayCommand}" ToolTip="Say the word (L)"
-                                               Visibility="{Binding CanSay, Converter={StaticResource BoolToVisibility}}" />
-                                    <ui:Button Appearance="Transparent" Margin="6,0,0,0" Content="YouGlish" Icon="{ui:SymbolIcon Video24}" Command="{Binding YouGlishCommand}"
-                                               Visibility="{Binding ShowYouGlish, Converter={StaticResource BoolToVisibility}}"
-                                               ToolTip="Hear real people say it in YouTube videos (opens your browser)" />
-                                </StackPanel>
-                                <TextBlock Margin="0,6,0,0" Text="{Binding Meaning}" FontSize="22" TextWrapping="Wrap" TextAlignment="Center" HorizontalAlignment="Center" />
-                                <TextBlock Margin="0,6,0,0" Text="{Binding Explanation}" TextWrapping="Wrap" TextAlignment="Center" HorizontalAlignment="Center"
-                                           Style="{DynamicResource HelmSecondaryText}" />
-                                <ContentControl Margin="0,14,0,0" Content="{Binding Info}" ContentTemplate="{StaticResource InfoView}" Focusable="False" />
-
-                                <StackPanel Margin="0,8,0,0" Visibility="{Binding HasExplanationTree, Converter={StaticResource BoolToVisibility}}">
-                                    <TextBlock Text="How it's built" FontWeight="SemiBold" Margin="0,0,0,6" />
-                                    <ContentControl Content="{Binding ExplanationTree}" ContentTemplate="{StaticResource PartsView}" Focusable="False" />
-                                </StackPanel>
-
-                                <Grid Margin="0,20,0,0">
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="*" />
-                                        <ColumnDefinition Width="12" />
-                                        <ColumnDefinition Width="*" />
-                                    </Grid.ColumnDefinitions>
-                                    <ui:Button HorizontalAlignment="Stretch" Padding="12,10" FontSize="15" Content="Forgot (1)" Icon="{ui:SymbolIcon DismissCircle24}" Command="{Binding ForgotCommand}" />
-                                    <ui:Button Grid.Column="2" HorizontalAlignment="Stretch" Padding="12,10" FontSize="15" Appearance="Primary" Content="Remembered (2)"
-                                               Icon="{ui:SymbolIcon CheckmarkCircle24}" Command="{Binding RememberedCommand}" />
-                                </Grid>
-                            </StackPanel>
-                            <TextBlock Margin="0,12,0,0" HorizontalAlignment="Center" FontSize="11" Style="{DynamicResource HelmSecondaryText}"
-                                       Text="Keys: Space shows the answer · 1 Forgot · 2 Remembered · L listen · S skip · K I know it" />
-                        </StackPanel>
-                    </StackPanel>
-                </Border>
-            </StackPanel>
-
-            <!-- ===== Add: new words, and what waits for the agent ===== -->
-            <StackPanel MaxWidth="760" Visibility="{Binding IsAdding, Converter={StaticResource BoolToVisibility}}">
-                <Border Style="{DynamicResource HelmSurface}" Margin="0,0,0,8">
-                    <StackPanel>
-                        <TextBlock Text="Add a word" FontWeight="SemiBold" Margin="0,0,0,8" />
-                        <Grid>
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="2*" />
-                                <ColumnDefinition Width="8" />
-                                <ColumnDefinition Width="3*" />
-                                <ColumnDefinition Width="8" />
-                                <ColumnDefinition Width="Auto" />
-                            </Grid.ColumnDefinitions>
-                            <ui:TextBox PlaceholderText="relative, 补救…" AutomationProperties.Name="New word" FontSize="16"
-                                        Text="{Binding NewWord, UpdateSourceTrigger=PropertyChanged}">
-                                <ui:TextBox.InputBindings>
-                                    <KeyBinding Key="Enter" Command="{Binding AddCommand}" />
-                                </ui:TextBox.InputBindings>
-                            </ui:TextBox>
-                            <ui:TextBox Grid.Column="2" PlaceholderText="Where you met it (optional)" AutomationProperties.Name="Note"
-                                        Text="{Binding NewNote, UpdateSourceTrigger=PropertyChanged}">
-                                <ui:TextBox.InputBindings>
-                                    <KeyBinding Key="Enter" Command="{Binding AddCommand}" />
-                                </ui:TextBox.InputBindings>
-                            </ui:TextBox>
-                            <ui:Button Grid.Column="4" Appearance="Primary" Content="Add" Icon="{ui:SymbolIcon Add24}" Command="{Binding AddCommand}" />
-                        </Grid>
-                        <TextBlock Margin="0,6,0,0" Style="{DynamicResource HelmSecondaryText}" TextWrapping="Wrap"
-                                   Text="English or Chinese. Faster from anywhere: Quick Capture (Win+Alt+N) with /v relative, or select a word on the phone and tap Add word." />
-                    </StackPanel>
-                </Border>
-
-                <!-- Words waiting for the agent, and the agent itself -->
-                <Border Style="{DynamicResource HelmSurface}" Margin="0,0,0,8" Padding="12,10" Visibility="{Binding HasAgentWork, Converter={StaticResource BoolToVisibility}}">
-                    <StackPanel>
-                        <DockPanel>
-                            <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
-                                <ui:Button Appearance="Primary" Content="Analyze now" Icon="{ui:SymbolIcon Sparkle24}" Command="{Binding Agent.AnalyzeCommand}"
-                                           ToolTip="Claude Code does this without a window: breaks new words down, writes new ways to remember the words you keep forgetting, fills in missing details"
-                                           Visibility="{Binding Agent.CanRun, Converter={StaticResource BoolToVisibility}}" />
-                                <ui:Button Margin="6,0,0,0" Content="Stop" Icon="{ui:SymbolIcon Stop24}" Command="{Binding Agent.StopCommand}"
-                                           Visibility="{Binding Agent.IsBusy, Converter={StaticResource BoolToVisibility}}" />
-                                <ui:Button Margin="6,0,0,0" Appearance="Transparent" Content="Copy request" Icon="{ui:SymbolIcon Copy24}" Command="{Binding CopyPromptCommand}"
-                                           ToolTip="Paste it into Claude Code yourself" />
-                            </StackPanel>
-                            <ui:SymbolIcon Symbol="HourglassHalf24" Margin="0,0,10,0" VerticalAlignment="Center" />
-                            <TextBlock Text="{Binding AgentWorkText}" TextWrapping="Wrap" VerticalAlignment="Center" />
-                        </DockPanel>
-                        <TextBlock Margin="0,6,0,0" Text="{Binding Agent.Status}" TextWrapping="Wrap" Style="{DynamicResource HelmSecondaryText}"
-                                   Visibility="{Binding Agent.HasStatus, Converter={StaticResource BoolToVisibility}}" />
-                    </StackPanel>
-                </Border>
-
-                <!-- What was added last, and whether the agent got to it -->
-                <TextBlock Text="Recently added" Style="{DynamicResource HelmSectionHeader}" Visibility="{Binding HasRecentWords, Converter={StaticResource BoolToVisibility}}" />
-                <Border Style="{DynamicResource HelmSurface}" Padding="4" Visibility="{Binding HasRecentWords, Converter={StaticResource BoolToVisibility}}">
-                    <ItemsControl ItemsSource="{Binding RecentWords}" Focusable="False" ItemTemplate="{StaticResource WordRow}" />
-                </Border>
-            </StackPanel>
-
-            <!-- ===== Words: the list; an opened word takes the whole page (Back or Esc returns, Previous / Next walk the list) ===== -->
-            <Grid Visibility="{Binding IsWordsTab, Converter={StaticResource BoolToVisibility}}">
-                <Grid.RowDefinitions>
-                    <RowDefinition Height="Auto" />
-                    <RowDefinition Height="Auto" />
-                </Grid.RowDefinitions>
-
-                <!-- The list: one language, searched, filtered, sorted, in groups -->
-                <StackPanel x:Name="WordsList" Grid.Row="1" DataContext="{Binding List}"
-                            Visibility="{Binding DataContext.HasDetail, RelativeSource={RelativeSource AncestorType=Page}, Converter={StaticResource InverseBoolToVisibility}}">
-                    <Grid Margin="0,0,0,8">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="*" />
-                            <ColumnDefinition Width="6" />
-                            <ColumnDefinition Width="*" />
-                        </Grid.ColumnDefinitions>
-                        <ui:Button Style="{StaticResource Segment}" MinWidth="0" HorizontalAlignment="Stretch" Tag="{Binding IsEnglish}" Content="{Binding EnglishTabText}"
-                                   Command="{Binding ShowEnglishCommand}" AutomationProperties.Name="English words" />
-                        <ui:Button Grid.Column="2" Style="{StaticResource Segment}" MinWidth="0" HorizontalAlignment="Stretch" Tag="{Binding IsChinese}" Content="{Binding ChineseTabText}"
-                                   Command="{Binding ShowChineseCommand}" AutomationProperties.Name="Chinese words" />
-                    </Grid>
-                    <ui:TextBox Margin="0,0,0,8" PlaceholderText="Search words and meanings" Icon="{ui:SymbolIcon Search24}" AutomationProperties.Name="Search words"
-                                Text="{Binding SearchText, UpdateSourceTrigger=PropertyChanged}" Visibility="{Binding HasWords, Converter={StaticResource BoolToVisibility}}" />
-                    <Grid Margin="0,0,0,8" Visibility="{Binding HasWords, Converter={StaticResource BoolToVisibility}}">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="*" />
-                            <ColumnDefinition Width="6" />
-                            <ColumnDefinition Width="*" />
-                        </Grid.ColumnDefinitions>
-                        <ComboBox ItemsSource="{Binding Sorts}" SelectedIndex="{Binding SortIndex}" AutomationProperties.Name="Order" ToolTip="Order" />
-                        <ComboBox Grid.Column="2" ItemsSource="{Binding FilterNames}" SelectedIndex="{Binding FilterIndex}" AutomationProperties.Name="Show"
-                                  ToolTip="Only a level, a topic or one of your tags" />
-                    </Grid>
-                    <Border Style="{DynamicResource HelmSurface}" Padding="4">
-                        <StackPanel>
-                            <TextBlock Margin="12" TextWrapping="Wrap" Style="{DynamicResource HelmSecondaryText}" Visibility="{Binding HasNoWords, Converter={StaticResource BoolToVisibility}}"
-                                       Text="Words show up here once an AI agent has broken them down. Add the words you meet on the Add tab, one at a time: learning them as they come is what makes them stick." />
-                            <TextBlock Margin="12" Text="No word matches." Style="{DynamicResource HelmSecondaryText}"
-                                       Visibility="{Binding HasNoMatches, Converter={StaticResource BoolToVisibility}}" />
-                            <ItemsControl ItemsSource="{Binding Words}" Focusable="False" ItemTemplate="{StaticResource WordRow}" />
-    <DockPanel Margin="8,4,8,8" Visibility="{Binding Pages.HasPages, Converter={StaticResource BoolToVisibility}}">
-                                <ui:Button DockPanel.Dock="Left" Appearance="Transparent" Content="Previous" Icon="{ui:SymbolIcon ChevronLeft24}"
-                                           Command="{Binding Pages.PreviousPageCommand}" AutomationProperties.Name="Previous page" />
-                                <ui:Button DockPanel.Dock="Right" Appearance="Transparent" Content="Next" Icon="{ui:SymbolIcon ChevronRight24}"
-                                           Command="{Binding Pages.NextPageCommand}" AutomationProperties.Name="Next page" />
-                                <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
-                                    <TextBlock Text="{Binding Pages.PageText}" HorizontalAlignment="Center" />
-                                    <TextBlock Text="{Binding Pages.RangeText}" FontSize="11" HorizontalAlignment="Center" Style="{DynamicResource HelmSecondaryText}" />
-                                </StackPanel>
-                            </DockPanel>
-                        </StackPanel>
-                    </Border>
-                </StackPanel>
-
-                <!-- No word picked yet -->
-                <Border Style="{DynamicResource HelmSurface}" Margin="0,0,0,12" VerticalAlignment="Top"
-                        Visibility="{Binding HasDetail, Converter={StaticResource InverseBoolToVisibility}}">
-                    <TextBlock Margin="4,8" TextWrapping="Wrap" Style="{DynamicResource HelmSecondaryText}"
-                               Text="Open a word below to see its parts. Tap any part to see what it means and which of your other words share it; right-click a character or a word inside to make it one of your words." />
-                </Border>
-
-                <!-- The opened word: its fields, what helps to use it, then how it is built -->
-                <StackPanel x:Name="DetailPanel" Margin="0,0,0,16" DataContext="{Binding Detail}" Focusable="True" FocusVisualStyle="{x:Null}"
-                            Visibility="{Binding DataContext.HasDetail, RelativeSource={RelativeSource AncestorType=Page}, Converter={StaticResource BoolToVisibility}}">
-                    <!-- Back to the list, and the words before and after this one -->
-                    <DockPanel Margin="0,0,0,8">
-                        <ui:Button DockPanel.Dock="Left" Appearance="Transparent" Content="All words" Icon="{ui:SymbolIcon ArrowLeft24}" ToolTip="Back to the list (Esc)"
-                                   AutomationProperties.Name="Back to the words"
-                                   Command="{Binding DataContext.CloseDetailCommand, RelativeSource={RelativeSource AncestorType=Page}}" />
-                        <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
-                            <TextBlock Text="{Binding DataContext.WordPosition, RelativeSource={RelativeSource AncestorType=Page}}" VerticalAlignment="Center" Margin="0,0,10,0"
-                                       Style="{DynamicResource HelmSecondaryText}" />
-                            <ui:Button Appearance="Transparent" Content="Previous" Icon="{ui:SymbolIcon ChevronLeft24}" ToolTip="The word before this one in the list (←)"
-                                       Command="{Binding DataContext.PreviousWordCommand, RelativeSource={RelativeSource AncestorType=Page}}"
-                                       IsEnabled="{Binding DataContext.HasPreviousWord, RelativeSource={RelativeSource AncestorType=Page}}" />
-                            <ui:Button Margin="6,0,0,0" Appearance="Transparent" Content="Next" Icon="{ui:SymbolIcon ChevronRight24}" ToolTip="The word after this one in the list (→)"
-                                       Command="{Binding DataContext.NextWordCommand, RelativeSource={RelativeSource AncestorType=Page}}"
-                                       IsEnabled="{Binding DataContext.HasNextWord, RelativeSource={RelativeSource AncestorType=Page}}" />
-                        </StackPanel>
-                        <Border />
-                    </DockPanel>
-                    <Border Style="{DynamicResource HelmSurface}" Margin="0,0,0,8">
-                        <StackPanel>
-                            <DockPanel>
-                                <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Top">
-                                    <ui:Button Appearance="Transparent" Padding="6" MinWidth="0" Icon="{ui:SymbolIcon Speaker224}" ToolTip="Say the word"
-                                               AutomationProperties.Name="Say the word" Command="{Binding SayWordCommand}"
-                                               Visibility="{Binding CanSay, Converter={StaticResource BoolToVisibility}}" />
-                                    <ui:Button Appearance="Transparent" Padding="6" MinWidth="0" Icon="{ui:SymbolIcon Video24}"
-                                               ToolTip="Hear real people say it in YouTube videos (YouGlish, opens your browser)"
-                                               AutomationProperties.Name="YouGlish" Command="{Binding YouGlishCommand}"
-                                               Visibility="{Binding ShowYouGlish, Converter={StaticResource BoolToVisibility}}" />
-                                    <ui:Button Appearance="Transparent" Padding="6" MinWidth="0" Icon="{ui:SymbolIcon Edit24}" ToolTip="Edit the meaning, examples, labels…"
-                                               AutomationProperties.Name="Edit the word" Command="{Binding Editor.BeginCommand}" />
-                                    <ui:Button Appearance="Transparent" Padding="6" MinWidth="0" Icon="{ui:SymbolIcon CheckmarkStarburst24}"
-                                               ToolTip="I know it: it comes back in a month" AutomationProperties.Name="I know it" Command="{Binding KnowCommand}"
-                                               Visibility="{Binding IsPending, Converter={StaticResource InverseBoolToVisibility}}" />
-                                    <ui:Button Appearance="Transparent" Padding="6" MinWidth="0" Icon="{ui:SymbolIcon EyeOff24}"
-                                               ToolTip="Hide it from the cards, the pop-up and the phone" AutomationProperties.Name="Hide from the cards"
-                                               Command="{Binding ToggleHiddenCommand}" Visibility="{Binding IsHidden, Converter={StaticResource InverseBoolToVisibility}}" />
-                                    <ui:Button Appearance="Transparent" Padding="6" MinWidth="0" Icon="{ui:SymbolIcon Eye24}"
-                                               ToolTip="Show it in the cards again" AutomationProperties.Name="Show in the cards again"
-                                               Command="{Binding ToggleHiddenCommand}" Visibility="{Binding IsHidden, Converter={StaticResource BoolToVisibility}}" />
-                                    <ui:Button Appearance="Transparent" Padding="6" MinWidth="0" Icon="{ui:SymbolIcon ArrowClockwise24}" ToolTip="Ask for a new analysis"
-                                               AutomationProperties.Name="Ask for a new analysis" Command="{Binding BeginRedoCommand}" />
-                                    <ui:Button Appearance="Transparent" Padding="6" MinWidth="0" Icon="{ui:SymbolIcon Delete24}" ToolTip="Delete the word"
-                                               AutomationProperties.Name="Delete the word"
-                                               Command="{Binding DataContext.DeleteWordCommand, RelativeSource={RelativeSource AncestorType=Page}}" />
-                                </StackPanel>
-                                <TextBlock TextWrapping="Wrap">
-                                    <Run Text="{Binding Word.Text, Mode=OneWay}" FontSize="32" FontWeight="SemiBold" />
-                                    <Run Text="{Binding Word.Traditional, Mode=OneWay}" FontSize="22" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
-                                </TextBlock>
-                            </DockPanel>
-                            <WrapPanel>
-                                <TextBlock pc:ToneText.Text="{Binding Word.Phonetic}" FontSize="16" Margin="0,0,10,0" />
-                                <TextBlock Text="{Binding Word.HanViet}" FontSize="15" FontWeight="SemiBold" Style="{DynamicResource HelmSecondaryText}" />
-                            </WrapPanel>
-                            <TextBlock Margin="0,6,0,0" Text="{Binding Word.Meaning}" FontSize="17" TextWrapping="Wrap" />
-                            <TextBlock Margin="0,4,0,0" Text="{Binding Word.Explanation}" TextWrapping="Wrap" Style="{DynamicResource HelmSecondaryText}"
-                                       Visibility="{Binding HasExplanation, Converter={StaticResource BoolToVisibility}}" />
-                            <TextBlock Margin="0,6,0,0" TextWrapping="Wrap" FontStyle="Italic" Style="{DynamicResource HelmSecondaryText}"
-                                       Visibility="{Binding HasNote, Converter={StaticResource BoolToVisibility}}">
-                                <Run Text="Your note:" /> <Run Text="{Binding Word.Note, Mode=OneWay}" />
-                            </TextBlock>
-                            <WrapPanel Margin="0,6,0,10">
-                                <TextBlock Text="{Binding LevelText}" FontSize="12" Margin="0,0,8,0" VerticalAlignment="Center" Style="{DynamicResource HelmSecondaryText}" />
-                                <Border CornerRadius="4" Padding="6,1" Margin="0,0,6,0" VerticalAlignment="Center" Background="{DynamicResource ControlFillColorSecondaryBrush}"
-                                        Visibility="{Binding IsHard, Converter={StaticResource BoolToVisibility}}">
-                                    <TextBlock Text="Often forgotten: Claude Code writes a new way to remember it" FontSize="11" FontWeight="SemiBold" Foreground="{DynamicResource SystemFillColorCautionBrush}" />
-                                </Border>
-                                <Border CornerRadius="4" Padding="6,1" VerticalAlignment="Center" Background="{DynamicResource ControlFillColorSecondaryBrush}"
-                                        Visibility="{Binding IsHidden, Converter={StaticResource BoolToVisibility}}">
-                                    <TextBlock Text="Hidden from the cards" FontSize="11" FontWeight="SemiBold" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
-                                </Border>
-                            </WrapPanel>
-                            <ContentControl Content="{Binding Info}" ContentTemplate="{StaticResource InfoView}" Focusable="False" />
-
-                            <ui:InfoBar Margin="0,10,0,0" Severity="Informational" IsClosable="False" IsOpen="{Binding IsPending}" Title="Waiting for analysis"
-                                        Message="{Binding PendingText}" Visibility="{Binding IsPending, Converter={StaticResource BoolToVisibility}}" />
-
-                            <!-- Edit by hand -->
-                            <StackPanel Margin="0,10,0,0" DataContext="{Binding Editor}" Visibility="{Binding IsOpen, Converter={StaticResource BoolToVisibility}}">
-                                <TextBlock Text="Phonetic" Style="{DynamicResource HelmSecondaryText}" Margin="0,6,0,2" />
-                                <ui:TextBox Text="{Binding Phonetic, UpdateSourceTrigger=PropertyChanged}" AutomationProperties.Name="Phonetic" />
-                                <TextBlock Text="Meaning" Style="{DynamicResource HelmSecondaryText}" Margin="0,6,0,2" />
-                                <ui:TextBox Text="{Binding Meaning, UpdateSourceTrigger=PropertyChanged}" AutomationProperties.Name="Meaning" AcceptsReturn="True" TextWrapping="Wrap" MinHeight="48" />
-                                <Grid Margin="0,6,0,0">
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="*" />
-                                        <ColumnDefinition Width="8" />
-                                        <ColumnDefinition Width="*" />
-                                    </Grid.ColumnDefinitions>
-                                    <StackPanel>
-                                        <TextBlock Text="Hán Việt" Style="{DynamicResource HelmSecondaryText}" Margin="0,0,0,2" />
-                                        <ui:TextBox Text="{Binding HanViet, UpdateSourceTrigger=PropertyChanged}" AutomationProperties.Name="Hán Việt" />
-                                    </StackPanel>
-                                    <StackPanel Grid.Column="2">
-                                        <TextBlock Text="Traditional" Style="{DynamicResource HelmSecondaryText}" Margin="0,0,0,2" />
-                                        <ui:TextBox Text="{Binding Traditional, UpdateSourceTrigger=PropertyChanged}" AutomationProperties.Name="Traditional" />
-                                    </StackPanel>
-                                </Grid>
-                                <TextBlock Text="Explanation" Style="{DynamicResource HelmSecondaryText}" Margin="0,6,0,2" />
-                                <ui:TextBox Text="{Binding Explanation, UpdateSourceTrigger=PropertyChanged}" AutomationProperties.Name="Explanation" AcceptsReturn="True" TextWrapping="Wrap" MinHeight="48" />
-                                <TextBlock Text="To remember it (mnemonic)" Style="{DynamicResource HelmSecondaryText}" Margin="0,6,0,2" />
-                                <ui:TextBox Text="{Binding Mnemonic, UpdateSourceTrigger=PropertyChanged}" AutomationProperties.Name="Mnemonic" AcceptsReturn="True" TextWrapping="Wrap" MinHeight="48" />
-                                <TextBlock Text="Examples: one per line, sentence | translation" Style="{DynamicResource HelmSecondaryText}" Margin="0,6,0,2" />
-                                <ui:TextBox Text="{Binding Examples, UpdateSourceTrigger=PropertyChanged}" AutomationProperties.Name="Examples" AcceptsReturn="True" TextWrapping="Wrap" MinHeight="64" />
-                                <TextBlock Text="Goes with: separated by commas" Style="{DynamicResource HelmSecondaryText}" Margin="0,6,0,2" />
-                                <ui:TextBox Text="{Binding Collocations, UpdateSourceTrigger=PropertyChanged}" AutomationProperties.Name="Collocations" />
-                                <TextBlock Text="Easy to mix up with: one per line, word | what tells them apart" Style="{DynamicResource HelmSecondaryText}" Margin="0,6,0,2" />
-                                <ui:TextBox Text="{Binding Confusables, UpdateSourceTrigger=PropertyChanged}" AutomationProperties.Name="Confusables" AcceptsReturn="True" TextWrapping="Wrap" MinHeight="48" />
-                                <TextBlock Text="Word family: one per line, word | part of speech | meaning" Style="{DynamicResource HelmSecondaryText}" Margin="0,6,0,2" />
-                                <ui:TextBox Text="{Binding Forms, UpdateSourceTrigger=PropertyChanged}" AutomationProperties.Name="Word family" AcceptsReturn="True" TextWrapping="Wrap" MinHeight="64" />
-                                <Grid Margin="0,6,0,0">
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="*" />
-                                        <ColumnDefinition Width="8" />
-                                        <ColumnDefinition Width="*" />
-                                    </Grid.ColumnDefinitions>
-                                    <StackPanel>
-                                        <TextBlock Text="Similar: separated by commas" Style="{DynamicResource HelmSecondaryText}" Margin="0,0,0,2" />
-                                        <ui:TextBox Text="{Binding Synonyms, UpdateSourceTrigger=PropertyChanged}" AutomationProperties.Name="Synonyms" />
-                                    </StackPanel>
-                                    <StackPanel Grid.Column="2">
-                                        <TextBlock Text="Opposite: separated by commas" Style="{DynamicResource HelmSecondaryText}" Margin="0,0,0,2" />
-                                        <ui:TextBox Text="{Binding Antonyms, UpdateSourceTrigger=PropertyChanged}" AutomationProperties.Name="Antonyms" />
-                                    </StackPanel>
-                                </Grid>
-                                <Grid Margin="0,6,0,0">
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="*" />
-                                        <ColumnDefinition Width="8" />
-                                        <ColumnDefinition Width="*" />
-                                        <ColumnDefinition Width="8" />
-                                        <ColumnDefinition Width="*" />
-                                    </Grid.ColumnDefinitions>
-                                    <StackPanel>
-                                        <TextBlock Text="Level (B1, HSK3)" Style="{DynamicResource HelmSecondaryText}" Margin="0,0,0,2" />
-                                        <ui:TextBox Text="{Binding Level, UpdateSourceTrigger=PropertyChanged}" AutomationProperties.Name="Level" />
-                                    </StackPanel>
-                                    <StackPanel Grid.Column="2">
-                                        <TextBlock Text="Part of speech" Style="{DynamicResource HelmSecondaryText}" Margin="0,0,0,2" />
-                                        <ui:TextBox Text="{Binding PartOfSpeech, UpdateSourceTrigger=PropertyChanged}" AutomationProperties.Name="Part of speech" />
-                                    </StackPanel>
-                                    <StackPanel Grid.Column="4">
-                                        <TextBlock Text="Topic" Style="{DynamicResource HelmSecondaryText}" Margin="0,0,0,2" />
-                                        <ui:TextBox Text="{Binding Topic, UpdateSourceTrigger=PropertyChanged}" AutomationProperties.Name="Topic" />
-                                    </StackPanel>
-                                </Grid>
-                                <TextBlock Text="Your tags: separated by commas (Aptis, Truyện)" Style="{DynamicResource HelmSecondaryText}" Margin="0,6,0,2" />
-                                <ui:TextBox Text="{Binding Tags, UpdateSourceTrigger=PropertyChanged}" AutomationProperties.Name="Tags" />
-                                <TextBlock Text="Your note" Style="{DynamicResource HelmSecondaryText}" Margin="0,6,0,2" />
-                                <ui:TextBox Text="{Binding Note, UpdateSourceTrigger=PropertyChanged}" AutomationProperties.Name="Your note" AcceptsReturn="True" TextWrapping="Wrap" />
-                                <TextBlock Margin="0,6,0,0" Text="{Binding Error}" TextWrapping="Wrap" Foreground="{DynamicResource SystemFillColorCriticalBrush}"
-                                           Visibility="{Binding HasError, Converter={StaticResource BoolToVisibility}}" />
-                                <StackPanel Orientation="Horizontal" Margin="0,10,0,0">
-                                    <ui:Button Appearance="Primary" Content="Save" Icon="{ui:SymbolIcon Checkmark24}" Command="{Binding SaveCommand}" />
-                                    <ui:Button Margin="8,0,0,0" Content="Cancel" Command="{Binding CancelCommand}" />
-                                </StackPanel>
-                            </StackPanel>
-
-                            <!-- What was wrong, for the next analysis -->
-                            <DockPanel Margin="0,10,0,0" Visibility="{Binding IsAskingRedo, Converter={StaticResource BoolToVisibility}}">
-                                <ui:Button DockPanel.Dock="Right" Margin="8,0,0,0" Content="Send back" Icon="{ui:SymbolIcon Send24}" Command="{Binding SendRedoCommand}" />
-                                <ui:TextBox PlaceholderText="What should change? e.g. tách lat thành ferre" AutomationProperties.Name="What should change"
-                                            Text="{Binding RedoNote, UpdateSourceTrigger=PropertyChanged}">
-                                    <ui:TextBox.InputBindings>
-                                        <KeyBinding Key="Enter" Command="{Binding SendRedoCommand}" />
-                                    </ui:TextBox.InputBindings>
-                                </ui:TextBox>
-                            </DockPanel>
-                        </StackPanel>
-                    </Border>
-
-                    <Border Style="{DynamicResource HelmSurface}" Visibility="{Binding HasTree, Converter={StaticResource BoolToVisibility}}">
-                        <ContentControl Content="{Binding}" ContentTemplate="{StaticResource PartsView}" Focusable="False" />
-                    </Border>
-                </StackPanel>
-            </Grid>
-
-            <!-- ===== Roots: families of words that share a part ===== -->
-            <StackPanel x:Name="RootsPanel" MaxWidth="900" DataContext="{Binding Roots}" Focusable="True" FocusVisualStyle="{x:Null}"
-                        Visibility="{Binding DataContext.IsRootsTab, RelativeSource={RelativeSource AncestorType=Page}, Converter={StaticResource BoolToVisibility}}">
-                <DockPanel Margin="0,0,0,8" Visibility="{Binding ShowsList, Converter={StaticResource BoolToVisibility}}">
-                    <ui:Button DockPanel.Dock="Right" Content="Practise roots" Icon="{ui:SymbolIcon HatGraduation24}" Command="{Binding NextRootCommand}"
-                               ToolTip="A root alone: say its meaning, then see its family" />
-                    <StackPanel Orientation="Horizontal">
-                        <ui:Button Style="{StaticResource Segment}" Margin="0,0,6,0" Tag="{Binding IsEnglish}" Content="English" Command="{Binding ShowEnglishCommand}" />
-                        <ui:Button Style="{StaticResource Segment}" Tag="{Binding IsChinese}" Content="中文" Command="{Binding ShowChineseCommand}" />
-                    </StackPanel>
-                </DockPanel>
-
-                <!-- Practising a root (hidden while a family is open) -->
-                <Grid Visibility="{Binding ShowsList, Converter={StaticResource BoolToVisibility}}">
-                <Border Style="{DynamicResource HelmSurface}" Margin="0,0,0,8" Padding="20,12,20,16" Visibility="{Binding HasPractice, Converter={StaticResource BoolToVisibility}}">
-                    <StackPanel>
-                        <DockPanel>
-                            <ui:Button DockPanel.Dock="Right" Appearance="Transparent" Padding="6" MinWidth="0" Icon="{ui:SymbolIcon Dismiss24}" Command="{Binding ClosePracticeCommand}"
-                                       AutomationProperties.Name="Stop practising" />
-                            <TextBlock Text="What does this part mean?" VerticalAlignment="Center" Style="{DynamicResource HelmSecondaryText}" />
-                        </DockPanel>
-                        <Button Style="{StaticResource FlatButton}" Padding="8,16" Command="{Binding RevealRootCommand}" AutomationProperties.Name="Show the meaning">
-                            <StackPanel HorizontalAlignment="Center">
-                                <TextBlock Text="{Binding Practice.Form}" FontSize="44" FontWeight="SemiBold" HorizontalAlignment="Center" />
-                                <TextBlock Text="{Binding Practice.Kind}" HorizontalAlignment="Center" Style="{DynamicResource HelmSecondaryText}" />
-                            </StackPanel>
-                        </Button>
-                        <StackPanel Visibility="{Binding IsPracticeRevealed, Converter={StaticResource BoolToVisibility}}">
-                            <TextBlock Text="{Binding Practice.Meaning}" FontSize="20" HorizontalAlignment="Center" TextWrapping="Wrap" TextAlignment="Center" />
-                            <TextBlock Margin="0,4,0,0" Text="{Binding Practice.Origin}" HorizontalAlignment="Center" TextWrapping="Wrap" TextAlignment="Center"
-                                       Style="{DynamicResource HelmSecondaryText}" />
-                            <TextBlock Margin="0,10,0,4" Text="Its family" FontWeight="SemiBold" />
-                            <ItemsControl ItemsSource="{Binding Practice.Words}" Focusable="False">
-                                <ItemsControl.ItemsPanel>
-                                    <ItemsPanelTemplate>
-                                        <WrapPanel />
-                                    </ItemsPanelTemplate>
-                                </ItemsControl.ItemsPanel>
-                                <ItemsControl.ItemTemplate>
-                                    <DataTemplate DataType="{x:Type local:VocabWordLink}">
-                                        <ui:Button Margin="0,0,6,6" ToolTip="{Binding Meaning}" Command="{Binding Open}" AutomationProperties.Name="{Binding Text}">
-                                            <TextBlock>
-                                                <Run Text="{Binding Split.Before, Mode=OneWay}" /><Run Text="{Binding Split.Match, Mode=OneWay}" FontWeight="Bold" TextDecorations="Underline"
-                                                    Foreground="{DynamicResource AccentTextFillColorPrimaryBrush}" /><Run Text="{Binding Split.After, Mode=OneWay}" />
-                                            </TextBlock>
-                                        </ui:Button>
-                                    </DataTemplate>
-                                </ItemsControl.ItemTemplate>
-                            </ItemsControl>
-                        </StackPanel>
-                        <ui:Button Margin="0,10,0,0" HorizontalAlignment="Center" Appearance="Primary" Content="Next root" Icon="{ui:SymbolIcon ArrowNext24}" Command="{Binding NextRootCommand}" />
-                    </StackPanel>
-                </Border>
-                </Grid>
-
-                <!-- The chosen family takes the tab: back to the list, the families before and after it -->
-                <DockPanel Margin="0,0,0,8" Visibility="{Binding HasSelected, Converter={StaticResource BoolToVisibility}}">
-                    <ui:Button DockPanel.Dock="Left" Appearance="Transparent" Content="All roots" Icon="{ui:SymbolIcon ArrowLeft24}" ToolTip="Back to the list (Esc)"
-                               AutomationProperties.Name="Back to the roots" Command="{Binding CloseSelectedCommand}" />
-                    <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
-                        <TextBlock Text="{Binding RootPosition}" VerticalAlignment="Center" Margin="0,0,10,0" Style="{DynamicResource HelmSecondaryText}" />
-                        <ui:Button Appearance="Transparent" Content="Previous" Icon="{ui:SymbolIcon ChevronLeft24}" ToolTip="The family before this one (←)"
-                                   Command="{Binding PreviousFamilyCommand}" IsEnabled="{Binding HasPreviousRoot}" />
-                        <ui:Button Margin="6,0,0,0" Appearance="Transparent" Content="Next" Icon="{ui:SymbolIcon ChevronRight24}" ToolTip="The family after this one (→)"
-                                   Command="{Binding NextFamilyCommand}" IsEnabled="{Binding HasNextRoot}" />
-                    </StackPanel>
-                    <Border />
-                </DockPanel>
-
-                <!-- The chosen family, its words, and more of it from the agent -->
-                <Border Style="{DynamicResource HelmSurface}" Margin="0,0,0,8" Visibility="{Binding HasSelected, Converter={StaticResource BoolToVisibility}}">
-                    <StackPanel>
-                        <DockPanel>
-                            <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
-                                <ui:Button Appearance="Primary" Content="Suggest 3 more words" Icon="{ui:SymbolIcon Sparkle24}" Command="{Binding SuggestCommand}"
-                                           ToolTip="Claude Code adds and breaks down a few useful words of this family"
-                                           Visibility="{Binding Agent.CanRun, Converter={StaticResource BoolToVisibility}}" />
-                            </StackPanel>
-                            <TextBlock TextWrapping="Wrap">
-                                <Run Text="{Binding Selected.Form, Mode=OneWay}" FontSize="26" FontWeight="SemiBold" />
-                                <Run Text="  " /><Run Text="{Binding Selected.Kind, Mode=OneWay}" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
-                            </TextBlock>
-                        </DockPanel>
-                        <TextBlock Text="{Binding Selected.Meaning}" FontSize="16" TextWrapping="Wrap" />
-                        <TextBlock Margin="0,4,0,0" Text="{Binding Selected.Origin}" TextWrapping="Wrap" Style="{DynamicResource HelmSecondaryText}" />
-                        <TextBlock Margin="0,14,0,4" FontWeight="SemiBold">
-                            <Run Text="Your words with it" /> <Run Text="{Binding Selected.CountText, Mode=OneWay, StringFormat=({0})}" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
-                        </TextBlock>
-                        <ItemsControl ItemsSource="{Binding Selected.Words}" Focusable="False">
-                            <ItemsControl.ItemTemplate>
-                                <DataTemplate DataType="{x:Type local:VocabWordLink}">
-                                    <Button Style="{StaticResource FlatButton}" Padding="10,6" Command="{Binding Open}" AutomationProperties.Name="{Binding Text}"
-                                            ToolTip="Open the word">
-                                        <TextBlock TextWrapping="Wrap">
-                                            <Run Text="{Binding Split.Before, Mode=OneWay}" FontSize="16" FontWeight="SemiBold" /><Run Text="{Binding Split.Match, Mode=OneWay}" FontSize="16" FontWeight="Bold"
-                                                TextDecorations="Underline" Foreground="{DynamicResource AccentTextFillColorPrimaryBrush}" /><Run Text="{Binding Split.After, Mode=OneWay}" FontSize="16" FontWeight="SemiBold" />
-                                            <Run Text="  " /><Run Text="{Binding Meaning, Mode=OneWay}" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
-                                        </TextBlock>
-                                    </Button>
-                                </DataTemplate>
-                            </ItemsControl.ItemTemplate>
-                        </ItemsControl>
-                        <TextBlock Margin="0,8,0,0" Text="{Binding Agent.Status}" TextWrapping="Wrap" Style="{DynamicResource HelmSecondaryText}"
-                                   Visibility="{Binding Agent.HasStatus, Converter={StaticResource BoolToVisibility}}" />
-                    </StackPanel>
-                </Border>
-
-                <!-- Every part, the biggest families first, a page at a time -->
-                <Border x:Name="RootsList" Style="{DynamicResource HelmSurface}" Padding="4" Visibility="{Binding ShowsList, Converter={StaticResource BoolToVisibility}}">
-                    <StackPanel>
-                        <TextBlock Margin="12" TextWrapping="Wrap" Style="{DynamicResource HelmSecondaryText}" Visibility="{Binding HasNoRoots, Converter={StaticResource BoolToVisibility}}"
-                                   Text="The parts of your words show up here once they are broken down; a part shared by several words makes a family." />
-                        <ItemsControl ItemsSource="{Binding Roots}" Focusable="False">
-                            <ItemsControl.ItemTemplate>
-                                <DataTemplate DataType="{x:Type local:VocabRootRow}">
-                                    <StackPanel>
-                                        <TextBlock Text="{Binding Header}" Style="{StaticResource GroupHeader}" Visibility="{Binding HasHeader, Converter={StaticResource BoolToVisibility}}" />
-                                        <Button Style="{StaticResource FlatButton}" Padding="10,6" Command="{Binding Select}" AutomationProperties.Name="{Binding Form}">
-                                            <DockPanel>
-                                                <TextBlock DockPanel.Dock="Right" Text="{Binding CountText}" VerticalAlignment="Top" Style="{DynamicResource HelmSecondaryText}" />
-                                                <StackPanel>
-                                                    <TextBlock>
-                                                        <Run Text="{Binding Form, Mode=OneWay}" FontSize="17" FontWeight="SemiBold" />
-                                                        <Run Text="  " /><Run Text="{Binding Meaning, Mode=OneWay}" />
-                                                    </TextBlock>
-                                                    <ItemsControl ItemsSource="{Binding FirstWords}" Focusable="False" Margin="0,2,0,0">
-                                                        <ItemsControl.ItemsPanel>
-                                                            <ItemsPanelTemplate>
-                                                                <WrapPanel />
-                                                            </ItemsPanelTemplate>
-                                                        </ItemsControl.ItemsPanel>
-                                                        <ItemsControl.ItemTemplate>
-                                                            <DataTemplate DataType="{x:Type local:VocabWordLink}">
-                                                                <TextBlock Margin="0,0,10,0" Foreground="{DynamicResource AccentTextFillColorPrimaryBrush}">
-                                                                    <Run Text="{Binding Split.Before, Mode=OneWay}" /><Run Text="{Binding Split.Match, Mode=OneWay}" FontWeight="Bold"
-                                                                        TextDecorations="Underline" /><Run Text="{Binding Split.After, Mode=OneWay}" />
-                                                                </TextBlock>
-                                                            </DataTemplate>
-                                                        </ItemsControl.ItemTemplate>
-                                                    </ItemsControl>
-                                                    <TextBlock Text="{Binding MoreWordsText}" FontSize="12" Style="{DynamicResource HelmSecondaryText}"
-                                                               Visibility="{Binding HasMoreWords, Converter={StaticResource BoolToVisibility}}" />
-                                                </StackPanel>
-                                            </DockPanel>
-                                        </Button>
-                                    </StackPanel>
-                                </DataTemplate>
-                            </ItemsControl.ItemTemplate>
-                        </ItemsControl>
-<DockPanel Margin="8,4,8,8" Visibility="{Binding Pages.HasPages, Converter={StaticResource BoolToVisibility}}">
-                            <ui:Button DockPanel.Dock="Left" Appearance="Transparent" Content="Previous" Icon="{ui:SymbolIcon ChevronLeft24}"
-                                       Command="{Binding Pages.PreviousPageCommand}" AutomationProperties.Name="Previous page" />
-                            <ui:Button DockPanel.Dock="Right" Appearance="Transparent" Content="Next" Icon="{ui:SymbolIcon ChevronRight24}"
-                                       Command="{Binding Pages.NextPageCommand}" AutomationProperties.Name="Next page" />
-                            <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
-                                <TextBlock Text="{Binding Pages.PageText}" HorizontalAlignment="Center" />
-                                <TextBlock Text="{Binding Pages.RangeText}" FontSize="11" HorizontalAlignment="Center" Style="{DynamicResource HelmSecondaryText}" />
-                            </StackPanel>
-                        </DockPanel>
-                    </StackPanel>
-                </Border>
-            </StackPanel>
         </StackPanel>
-    </StackPanel>
+
+        <!-- ===== The tab in front ===== -->
+        <Grid x:Name="Body" Grid.Row="2" Margin="24,16,24,0">
+            <views:VocabLearnView x:Name="LearnView" Margin="0,0,0,24" Visibility="{Binding IsLearning, Converter={StaticResource BoolToVisibility}}" />
+            <!-- Words: the list; an opened word takes the whole tab (Back or Esc returns, Previous / Next walk the list) -->
+            <Grid Visibility="{Binding IsWordsTab, Converter={StaticResource BoolToVisibility}}">
+                <views:VocabWordsView x:Name="WordsView" Visibility="{Binding HasDetail, Converter={StaticResource InverseBoolToVisibility}}" />
+                <views:VocabWordView x:Name="WordView" Visibility="{Binding HasDetail, Converter={StaticResource BoolToVisibility}}" />
+            </Grid>
+            <views:VocabRootsView x:Name="RootsView" DataContext="{Binding Roots}"
+                                  Visibility="{Binding DataContext.IsRootsTab, RelativeSource={RelativeSource AncestorType=Page}, Converter={StaticResource BoolToVisibility}}" />
+        </Grid>
+
+        <!-- ===== Dialogs over the whole page ===== -->
+        <views:VocabAddDialog x:Name="AddDialog" Grid.RowSpan="3" />
+        <views:VocabAgentDialog Grid.RowSpan="3" />
+        <views:VocabEditDialog x:Name="EditDialog" Grid.RowSpan="3" />
+        <views:VocabRedoDialog x:Name="RedoDialog" Grid.RowSpan="3" />
+    </Grid>
 </Page>

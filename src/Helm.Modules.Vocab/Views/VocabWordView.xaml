@@ -1,0 +1,179 @@
+<UserControl
+    x:Class="Helm.Modules.Vocab.Views.VocabWordView"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
+    xmlns:pc="clr-namespace:Helm.Modules.Vocab"
+    x:Name="Root">
+
+    <!-- A word's page, in place of the list: back to the list and the words before and after it; the word with its
+         labels and actions; how it is built beside what helps to use it. DataContext: VocabViewModel. -->
+    <UserControl.Resources>
+        <ResourceDictionary>
+            <ResourceDictionary.MergedDictionaries>
+                <ResourceDictionary Source="/Helm.Modules.Vocab;component/VocabTemplates.xaml" />
+            </ResourceDictionary.MergedDictionaries>
+            <!-- What helps beside the tree; alone it takes the whole width -->
+            <Style x:Key="InfoColumn" TargetType="Border" BasedOn="{StaticResource HelmSurface}">
+                <Setter Property="Grid.Column" Value="2" />
+                <Setter Property="Padding" Value="20,16" />
+                <Setter Property="VerticalAlignment" Value="Top" />
+                <Style.Triggers>
+                    <DataTrigger Binding="{Binding HasTree}" Value="False">
+                        <Setter Property="Grid.Column" Value="0" />
+                        <Setter Property="Grid.ColumnSpan" Value="3" />
+                    </DataTrigger>
+                </Style.Triggers>
+            </Style>
+        </ResourceDictionary>
+    </UserControl.Resources>
+
+    <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Focusable="False">
+        <StackPanel x:Name="DetailPanel" MaxWidth="1100" Margin="0,0,0,24" Focusable="True" FocusVisualStyle="{x:Null}">
+            <!-- Back to the list, and the words before and after this one -->
+            <DockPanel Margin="0,0,0,12">
+                <ui:Button DockPanel.Dock="Left" Appearance="Transparent" Content="All words" Icon="{ui:SymbolIcon ArrowLeft24}" ToolTip="Back to the list (Esc)"
+                           AutomationProperties.Name="Back to the words" Command="{Binding CloseDetailCommand}" />
+                <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
+                    <TextBlock Text="{Binding WordPosition}" VerticalAlignment="Center" Margin="0,0,10,0" Style="{DynamicResource HelmSecondaryText}" />
+                    <ui:Button Appearance="Transparent" Content="Previous" Icon="{ui:SymbolIcon ChevronLeft24}" ToolTip="The word before this one in the list (←)"
+                               Command="{Binding PreviousWordCommand}" IsEnabled="{Binding HasPreviousWord}" />
+                    <ui:Button Margin="4,0,0,0" Appearance="Transparent" Content="Next" Icon="{ui:SymbolIcon ChevronRight24}" ToolTip="The word after this one in the list (→)"
+                               Command="{Binding NextWordCommand}" IsEnabled="{Binding HasNextWord}" />
+                </StackPanel>
+                <Border />
+            </DockPanel>
+
+            <!-- The word: its reading, meaning, note, how well it is known and its labels; listen, YouGlish, edit, more -->
+            <Border Style="{DynamicResource HelmSurface}" Padding="24,20" Margin="0,0,0,12" DataContext="{Binding Detail}">
+                <DockPanel>
+                    <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Top" Margin="16,0,0,0">
+                        <ui:Button Appearance="Transparent" Content="Listen" Icon="{ui:SymbolIcon Speaker224}" ToolTip="Say the word"
+                                   AutomationProperties.Name="Say the word" Command="{Binding SayWordCommand}"
+                                   Visibility="{Binding CanSay, Converter={StaticResource BoolToVisibility}}" />
+                        <ui:Button Appearance="Transparent" Margin="4,0,0,0" Content="YouGlish" Icon="{ui:SymbolIcon Video24}"
+                                   ToolTip="Hear real people say it in YouTube videos (YouGlish, opens your browser)"
+                                   AutomationProperties.Name="YouGlish" Command="{Binding YouGlishCommand}"
+                                   Visibility="{Binding ShowYouGlish, Converter={StaticResource BoolToVisibility}}" />
+                        <ui:Button Margin="4,0,0,0" Content="Edit" Icon="{ui:SymbolIcon Edit24}" ToolTip="Edit the meaning, examples, labels…"
+                                   AutomationProperties.Name="Edit the word" Command="{Binding Editor.BeginCommand}" />
+                        <ui:Button Style="{StaticResource IconButton}" Margin="4,0,0,0" Icon="{ui:SymbolIcon MoreHorizontal24}" ToolTip="More for this word"
+                                   AutomationProperties.Name="More for this word" pc:MoreMenu.OpensOnClick="True">
+                            <ui:Button.ContextMenu>
+                                <ContextMenu>
+                                    <MenuItem Header="I know it: back in a month" Command="{Binding KnowCommand}"
+                                              Visibility="{Binding IsPending, Converter={StaticResource InverseBoolToVisibility}}">
+                                        <MenuItem.Icon><ui:SymbolIcon Symbol="CheckmarkStarburst24" /></MenuItem.Icon>
+                                    </MenuItem>
+                                    <MenuItem Header="Hide from the cards" Command="{Binding ToggleHiddenCommand}" ToolTip="Leave it out of the cards and the pop-up"
+                                              Visibility="{Binding IsHidden, Converter={StaticResource InverseBoolToVisibility}}">
+                                        <MenuItem.Icon><ui:SymbolIcon Symbol="EyeOff24" /></MenuItem.Icon>
+                                    </MenuItem>
+                                    <MenuItem Header="Show in the cards again" Command="{Binding ToggleHiddenCommand}"
+                                              Visibility="{Binding IsHidden, Converter={StaticResource BoolToVisibility}}">
+                                        <MenuItem.Icon><ui:SymbolIcon Symbol="Eye24" /></MenuItem.Icon>
+                                    </MenuItem>
+                                    <MenuItem Header="Ask for a new analysis…" Command="{Binding BeginRedoCommand}">
+                                        <MenuItem.Icon><ui:SymbolIcon Symbol="ArrowClockwise24" /></MenuItem.Icon>
+                                    </MenuItem>
+                                    <Separator />
+                                    <MenuItem Header="Delete…" Click="Delete_Click" Foreground="{DynamicResource SystemFillColorCriticalBrush}">
+                                        <MenuItem.Icon><ui:SymbolIcon Symbol="Delete24" /></MenuItem.Icon>
+                                    </MenuItem>
+                                </ContextMenu>
+                            </ui:Button.ContextMenu>
+                        </ui:Button>
+                    </StackPanel>
+
+                    <StackPanel>
+                        <WrapPanel>
+                            <TextBlock Text="{Binding Word.Text}" FontSize="38" FontWeight="SemiBold" Margin="0,0,12,0" VerticalAlignment="Bottom" />
+                            <TextBlock Text="{Binding Word.Traditional}" FontSize="22" Margin="0,0,12,4" VerticalAlignment="Bottom"
+                                       Foreground="{DynamicResource TextFillColorSecondaryBrush}" Visibility="{Binding ShowTraditional, Converter={StaticResource BoolToVisibility}}" />
+                            <TextBlock pc:ToneText.Text="{Binding Word.Phonetic}" FontSize="17" Margin="0,0,12,6" VerticalAlignment="Bottom" />
+                            <TextBlock Text="{Binding Word.HanViet}" FontSize="16" FontWeight="SemiBold" Margin="0,0,0,6" VerticalAlignment="Bottom"
+                                       Foreground="{DynamicResource TextFillColorSecondaryBrush}" Visibility="{Binding HasHanViet, Converter={StaticResource BoolToVisibility}}" />
+                        </WrapPanel>
+                        <TextBlock Margin="0,4,0,0" Text="{Binding Word.Meaning}" FontSize="19" TextWrapping="Wrap" />
+                        <TextBlock Margin="0,4,0,0" Text="{Binding Word.Explanation}" FontSize="14" Style="{DynamicResource HelmSecondaryText}"
+                                   Visibility="{Binding HasExplanation, Converter={StaticResource BoolToVisibility}}" />
+                        <TextBlock Margin="0,4,0,0" FontSize="13" FontStyle="Italic" Style="{DynamicResource HelmSecondaryText}"
+                                   Visibility="{Binding HasNote, Converter={StaticResource BoolToVisibility}}">
+                            <Run Text="Your note:" /> <Run Text="{Binding Word.Note, Mode=OneWay}" />
+                        </TextBlock>
+                        <WrapPanel Margin="0,12,0,0">
+                            <ItemsControl Style="{StaticResource Dots}" ItemsSource="{Binding Dots, ElementName=Root}" Margin="0,0,6,4" />
+                            <TextBlock Text="{Binding LevelText}" Margin="0,0,12,4" VerticalAlignment="Center" Style="{DynamicResource HelmSecondaryText}" />
+                            <Border Style="{StaticResource Tag}" Margin="0,0,6,4" Visibility="{Binding Word.Level, Converter={StaticResource NotEmptyToVisibility}}">
+                                <TextBlock Text="{Binding Word.Level}" />
+                            </Border>
+                            <Border Style="{StaticResource Tag}" Margin="0,0,6,4" Visibility="{Binding Word.PartOfSpeech, Converter={StaticResource NotEmptyToVisibility}}">
+                                <TextBlock Text="{Binding Word.PartOfSpeech}" />
+                            </Border>
+                            <Border Style="{StaticResource Tag}" Margin="0,0,6,4" Visibility="{Binding Word.Topic, Converter={StaticResource NotEmptyToVisibility}}">
+                                <TextBlock Text="{Binding Word.Topic}" />
+                            </Border>
+                            <ItemsControl ItemsSource="{Binding Word.Tags}" Focusable="False" ItemsPanel="{StaticResource Wrap}">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate>
+                                        <Border Style="{StaticResource UserTag}" Margin="0,0,6,4">
+                                            <TextBlock Text="{Binding StringFormat='#{0}'}" />
+                                        </Border>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                            <Border Style="{StaticResource WarnTag}" Margin="0,0,6,4" Visibility="{Binding IsHard, Converter={StaticResource BoolToVisibility}}"
+                                    ToolTip="You forgot it several times: Claude Code writes a new way to remember it">
+                                <TextBlock Text="Often forgotten" />
+                            </Border>
+                            <Border Style="{StaticResource PinyinTag}" Margin="0,0,6,4" Visibility="{Binding IsSlipping, ElementName=Root, Converter={StaticResource BoolToVisibility}}"
+                                    ToolTip="Its pinyin keeps slipping while you know the meaning: Claude Code writes a way to remember the reading">
+                                <TextBlock Text="Pinyin slips" />
+                            </Border>
+                            <Border Style="{StaticResource MuteTag}" Margin="0,0,6,4" Visibility="{Binding IsHidden, Converter={StaticResource BoolToVisibility}}">
+                                <TextBlock Text="Hidden from the cards" />
+                            </Border>
+                        </WrapPanel>
+                        <ui:InfoBar Margin="0,10,0,0" Severity="Informational" IsClosable="False" IsOpen="{Binding IsPending}" Title="Waiting for analysis"
+                                    Message="{Binding PendingText}" Visibility="{Binding IsPending, Converter={StaticResource BoolToVisibility}}" />
+                    </StackPanel>
+                </DockPanel>
+            </Border>
+
+            <!-- How it is built, beside what helps to remember and use it -->
+            <Grid DataContext="{Binding Detail}">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="1.25*" />
+                    <ColumnDefinition Width="12" />
+                    <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
+                <Border Style="{DynamicResource HelmSurface}" Padding="20,16" VerticalAlignment="Top" Visibility="{Binding HasTree, Converter={StaticResource BoolToVisibility}}">
+                    <StackPanel>
+                        <TextBlock Text="How it's built" Style="{StaticResource CardTitle}" />
+                        <ContentControl Content="{Binding}" ContentTemplate="{StaticResource PartsView}" Focusable="False" />
+                    </StackPanel>
+                </Border>
+                <Border Style="{StaticResource InfoColumn}">
+                    <StackPanel>
+                        <!-- Chinese: how to remember the reading, first -->
+                        <Border Margin="0,0,0,14" Style="{StaticResource PinyinBox}" Visibility="{Binding Info.HasPinyinMnemonic, Converter={StaticResource BoolToVisibility}}">
+                            <StackPanel>
+                                <TextBlock Text="Remembering the pinyin" FontSize="13" FontWeight="SemiBold" Margin="0,0,0,4" Foreground="{StaticResource PinyinBrush}" />
+                                <TextBlock Text="{Binding Info.PinyinMnemonic}" TextWrapping="Wrap" />
+                                <TextBlock Margin="0,6,0,0" Style="{DynamicResource HelmSecondaryText}"
+                                           Text="Written by Claude Code from the sound parts and the Hán Việt, once the pinyin kept slipping. A slip never counts as forgetting the word." />
+                            </StackPanel>
+                        </Border>
+                        <ContentControl Content="{Binding Info}" ContentTemplate="{StaticResource InfoView}" Focusable="False" />
+                        <TextBlock FontSize="14" TextWrapping="Wrap" Style="{DynamicResource HelmSecondaryText}"
+                                   Visibility="{Binding Info.HasAny, Converter={StaticResource InverseBoolToVisibility}}">
+                            <Run Text="No examples or memory hooks yet." />
+                            <Hyperlink Command="{Binding Editor.BeginCommand}" Foreground="{DynamicResource AccentTextFillColorPrimaryBrush}">Add them</Hyperlink>
+                            <Run Text="or ask Claude Code to fill them in." />
+                        </TextBlock>
+                    </StackPanel>
+                </Border>
+            </Grid>
+        </StackPanel>
+    </ScrollViewer>
+</UserControl>
