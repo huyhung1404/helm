@@ -1,4 +1,5 @@
 using Avalonia;
+using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 
 namespace Helm.Modules.Vocab;
@@ -7,7 +8,7 @@ namespace Helm.Modules.Vocab;
 /// One row of "How it's built" on the phone: a box of the word's tree, indented under its parent with an elbow from it.
 /// The phone shows the tree as this outline (top to bottom) instead of the PC's wide tree, which would scroll sideways.
 /// </summary>
-public sealed class VocabOutlineRow
+public sealed class VocabOutlineRow : ObservableObject
 {
     private const double Step = 24;
 
@@ -17,7 +18,12 @@ public sealed class VocabOutlineRow
         Depth = depth;
         // Tapping the tapped part again goes back to the word itself (its part card closes).
         Pick = new RelayCommand(() => (node.IsSelected && !node.IsRoot ? root : node).SelectCommand.Execute(null));
-        Meaning = string.Join(" · ", new[] { node.Caption, node.Node.Meaning }.Where(s => s.Length > 0));
+        // Only its meaning beside the box (its reading and Hán Việt are on the part's card); the reading when it has no meaning.
+        Meaning = node.Node.Meaning.Length > 0 ? node.Node.Meaning : node.Caption;
+        node.PropertyChanged += (_, e) =>
+        {
+            if (e.PropertyName == nameof(VocabNodeViewModel.IsSelected)) OnPropertyChanged(nameof(IsPicked));
+        };
     }
 
     public VocabNodeViewModel Node { get; }
@@ -27,12 +33,15 @@ public sealed class VocabOutlineRow
     /// <summary>Selects the box, or the word's own box when this one is selected already.</summary>
     public IRelayCommand Pick { get; }
 
-    /// <summary>"jiù · CỨU · cứu, giúp thoát nạn": its reading and meaning, on one line beside the box.</summary>
+    /// <summary>"cứu, giúp thoát nạn": its meaning, on one line beside the box.</summary>
     public string Meaning { get; }
 
     public bool HasMeaning => Meaning.Length > 0;
 
     public bool IsRoot => Node.IsRoot;
+
+    /// <summary>The tapped part, outlined; the word's own box never is (tapping it closes the part's card).</summary>
+    public bool IsPicked => Node.IsSelected && !Node.IsRoot;
 
     /// <summary>A part (not the word itself) is joined to its parent by an elbow.</summary>
     public bool HasElbow => Depth > 0;

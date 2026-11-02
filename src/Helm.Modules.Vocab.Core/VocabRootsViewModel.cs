@@ -40,18 +40,26 @@ public sealed partial class VocabRootsViewModel : ObservableObject
     private readonly VocabStore _store;
     private readonly Action<string> _open;
     private readonly Random _random;
+    private readonly Func<string, int>? _strengthOf;
     // Every row of the list (all pages), in its order: an opened family's Previous and Next.
     private List<VocabRootRow> _all = [];
 
     [ObservableProperty] private VocabLanguage _language = VocabLanguage.English;
     [ObservableProperty] private VocabRootRow? _selected;
 
+    /// <summary>How many parts each language has (the phone's English · 中文 switch shows them).</summary>
+    [ObservableProperty] private int _englishCount;
+    [ObservableProperty] private int _chineseCount;
+
     // The practice card.
     [ObservableProperty] private VocabRootRow? _practice;
     [ObservableProperty] private bool _isPracticeRevealed;
 
-    public VocabRootsViewModel(VocabStore store, VocabAgentViewModel agent, int pageSize, Action<string> open, Random? random = null)
+    /// <param name="strengthOf">A word's quiz level, for the dots of an opened family's words; null shows none.</param>
+    public VocabRootsViewModel(VocabStore store, VocabAgentViewModel agent, int pageSize, Action<string> open, Random? random = null,
+        Func<string, int>? strengthOf = null)
     {
+        _strengthOf = strengthOf;
         _store = store;
         _open = open;
         _random = random ?? Random.Shared;
@@ -94,10 +102,10 @@ public sealed partial class VocabRootsViewModel : ObservableObject
     }
 
     [RelayCommand]
-    private void NextFamily() => Selected = Neighbour(1) is { } next ? Highlighted(_store, next) : Selected;
+    private void NextFamily() => Selected = Neighbour(1) is { } next ? Opened(next) : Selected;
 
     [RelayCommand]
-    private void PreviousFamily() => Selected = Neighbour(-1) is { } previous ? Highlighted(_store, previous) : Selected;
+    private void PreviousFamily() => Selected = Neighbour(-1) is { } previous ? Opened(previous) : Selected;
 
     public bool HasPractice => Practice is not null;
 
@@ -168,19 +176,21 @@ public sealed partial class VocabRootsViewModel : ObservableObject
 
     public void Refresh()
     {
-        var all = Families(_store, Language, _open, row => Selected = Highlighted(_store, row));
+        var all = Families(_store, Language, _open, row => Selected = Opened(row));
         _all = all;
+        var others = Families(_store, Language == VocabLanguage.English ? VocabLanguage.Chinese : VocabLanguage.English, _open).Count;
+        (EnglishCount, ChineseCount) = Language == VocabLanguage.English ? (all.Count, others) : (others, all.Count);
         Roots.Clear();
         var last = "";
         // Only the page shown gets its highlights worked out (each one walks a word's tree).
         foreach (var row in Pages.Take(all, Language))
         {
-            var group = row.Words.Count > 1 ? "Families" : "Used once";
+            var group = row.Words.Count > 1 ? "Families" : "In one word so far";
             var shown = Highlighted(_store, row, VocabRootRow.WordsInRow);
             Roots.Add(group == last ? shown : shown with { Header = group });
             last = group;
         }
-        if (Selected is { } chosen) Selected = all.FirstOrDefault(r => r.PartId == chosen.PartId) is { } again ? Highlighted(_store, again) : null;
+        if (Selected is { } chosen) Selected = all.FirstOrDefault(r => r.PartId == chosen.PartId) is { } again ? Opened(again) : null;
         OnNeighboursChanged();
         OnPropertyChanged(nameof(HasRoots));
         OnPropertyChanged(nameof(HasNoRoots));
@@ -225,6 +235,13 @@ public sealed partial class VocabRootsViewModel : ObservableObject
     }
 
     /// <summary>The row with the part marked inside its first <paramref name="max"/> words (re<b>lat</b>ive).</summary>
+    /// <summary>A family as opened: every word highlighted, with how well it is known.</summary>
+    private VocabRootRow Opened(VocabRootRow row)
+    {
+        var shown = Highlighted(_store, row);
+        return _strengthOf is null ? shown : shown with { Words = shown.Words.Select(w => w with { Strength = _strengthOf(w.Id) }).ToList() };
+    }
+
     internal static VocabRootRow Highlighted(VocabStore store, VocabRootRow row, int max = int.MaxValue) => row with
     {
         Words = row.Words.Select((w, i) => i < max && store.GetWord(w.Id) is { } word
@@ -234,11 +251,11 @@ public sealed partial class VocabRootsViewModel : ObservableObject
 
     private static string KindText(VocabPartKind kind) => kind switch
     {
-        VocabPartKind.Prefix => "prefix",
-        VocabPartKind.Root => "root",
-        VocabPartKind.Suffix => "suffix",
-        VocabPartKind.Word => "word",
-        VocabPartKind.Character => "character",
-        _ => "component",
+        VocabPartKind.Prefix => "Prefix",
+        VocabPartKind.Root => "Root",
+        VocabPartKind.Suffix => "Suffix",
+        VocabPartKind.Word => "Word",
+        VocabPartKind.Character => "Character",
+        _ => "Component",
     };
 }

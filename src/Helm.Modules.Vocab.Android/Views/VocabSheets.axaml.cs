@@ -12,6 +12,7 @@ public enum VocabSheet
     CardMenu,
     WordMenu,
     Order,
+    DeleteWord,
 }
 
 /// <summary>
@@ -38,6 +39,7 @@ public partial class VocabSheets : UserControl
         CardMenu.IsVisible = sheet == VocabSheet.CardMenu;
         WordMenu.IsVisible = sheet == VocabSheet.WordMenu;
         Order.IsVisible = sheet == VocabSheet.Order;
+        DeleteWord.IsVisible = sheet == VocabSheet.DeleteWord;
     }
 
     /// <summary>Back: closes the sheet on top, if any.</summary>
@@ -83,6 +85,8 @@ public partial class VocabSheets : UserControl
     }
 
     private void Close_Click(object? sender, RoutedEventArgs e) => Show(VocabSheet.None);
+
+    private void AskDelete_Click(object? sender, RoutedEventArgs e) => Show(VocabSheet.DeleteWord);
 
     private void Order_Tapped(object? sender, TappedEventArgs e) => Show(VocabSheet.None);
 

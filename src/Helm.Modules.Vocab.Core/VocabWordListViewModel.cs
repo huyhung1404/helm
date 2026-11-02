@@ -14,6 +14,9 @@ public sealed record VocabWordRow(string Id, string Text, string Phonetic, strin
     /// <summary>The group this row starts ("A", "Due now", "Level 2"); empty when it continues the one above.</summary>
     public string Header { get; init; } = "";
 
+    /// <summary>The user's note (where they met it): the phone's "Added recently" and "Waiting" lists show it.</summary>
+    public string Note { get; init; } = "";
+
     /// <summary>CEFR / HSK level, shown as a small badge.</summary>
     public string Level { get; init; } = "";
 

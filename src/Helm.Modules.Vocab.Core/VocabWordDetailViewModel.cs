@@ -8,6 +8,12 @@ namespace Helm.Modules.Vocab;
 public sealed record VocabWordLink(string Id, string Text, string Meaning, IRelayCommand Open)
 {
     public VocabWordSplit Split { get; init; } = VocabWordSplit.None(Text);
+
+    /// <summary>How well it is known (its quiz level), where the list shows it: a root's family on the phone.</summary>
+    public int Strength { get; init; }
+
+    /// <summary>One flag per level, true up to <see cref="Strength"/>: the row's dots.</summary>
+    public IReadOnlyList<bool> Dots => [.. Enumerable.Range(0, VocabQuiz.TopLevel).Select(i => i < Strength)];
 }
 
 /// <summary>

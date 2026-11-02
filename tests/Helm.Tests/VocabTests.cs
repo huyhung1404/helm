@@ -352,13 +352,13 @@ public sealed class VocabTests
 
         public string? Unavailable() => null;
 
-        public Task<string> AnalyzeAsync(IProgress<string>? progress, CancellationToken ct)
+        public Task<string> AnalyzeAsync(string? model, IProgress<string>? progress, CancellationToken ct)
         {
             Runs++;
             return Fail ? throw new VocabAgentException("Claude Code is not installed on this PC.") : Task.FromResult("Đã phân tích 1 từ.");
         }
 
-        public Task<string> SuggestAsync(string partId, string form, string meaning, VocabLanguage language, IProgress<string>? progress, CancellationToken ct) =>
+        public Task<string> SuggestAsync(string partId, string form, string meaning, VocabLanguage language, string? model, IProgress<string>? progress, CancellationToken ct) =>
             Task.FromResult("");
     }
 

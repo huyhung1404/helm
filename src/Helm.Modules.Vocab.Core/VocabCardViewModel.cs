@@ -132,6 +132,14 @@ public sealed partial class VocabCardViewModel(VocabStore store, VocabQuiz quiz,
 
     public bool AnswerIsWrong => TypedResult?.Verdict == VocabAnswerVerdict.Wrong;
 
+    /// <summary>The phone's short verdict on a typed pinyin, said with the right reading: "tones slipped, it is bǔ jiù".</summary>
+    public string PinyinVerdictText => !AsksPinyin || TypedResult is not { } result ? "" : result.Verdict switch
+    {
+        VocabAnswerVerdict.Correct => $"right, {Phonetic}",
+        VocabAnswerVerdict.Close => $"tones slipped, it is {Phonetic}",
+        _ => Typed.Any(VocabText.IsHan) ? $"that is the character, its sound is {Phonetic}" : $"not quite, it is {Phonetic}",
+    };
+
     partial void OnTypedResultChanged(VocabAnswerResult? value)
     {
         OnPropertyChanged(nameof(HasAnswer));
@@ -140,6 +148,7 @@ public sealed partial class VocabCardViewModel(VocabStore store, VocabQuiz quiz,
         OnPropertyChanged(nameof(AnswerIsCorrect));
         OnPropertyChanged(nameof(AnswerIsClose));
         OnPropertyChanged(nameof(AnswerIsWrong));
+        OnPropertyChanged(nameof(PinyinVerdictText));
         OnPropertyChanged(nameof(SuggestsRemembered));
         OnPropertyChanged(nameof(SuggestsForgot));
         OnAnswerLabelsChanged();

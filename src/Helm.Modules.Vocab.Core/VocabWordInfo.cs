@@ -43,6 +43,10 @@ public sealed class VocabWordInfo(VocabWord word)
 
     public bool HasAntonyms => word.Antonyms.Count > 0;
 
+    /// <summary>The phone's one line for both: "kin, family member  ·  absolute", a dash for the side with none.</summary>
+    public string SimilarOpposite =>
+        (HasSynonyms ? string.Join(", ", word.Synonyms) : "–") + "  ·  " + (HasAntonyms ? string.Join(", ", word.Antonyms) : "–");
+
     /// <summary>"B1 · danh từ · gia đình · #Aptis".</summary>
     public string Labels => string.Join(" · ", new[] { word.Level, word.PartOfSpeech, word.Topic }.Where(s => s.Length > 0)
         .Concat(word.Tags.Select(t => "#" + t)));

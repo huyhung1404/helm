@@ -12,12 +12,12 @@ public interface IVocabAgent
 
     /// <summary>
     /// Breaks down the words waiting for an analysis, then helps with the words the user keeps forgetting and fills in
-    /// missing details; returns its last answer.
+    /// missing details; returns its last answer. <paramref name="model"/>: the Claude model (null: the user's default).
     /// </summary>
-    Task<string> AnalyzeAsync(IProgress<string>? progress, CancellationToken ct);
+    Task<string> AnalyzeAsync(string? model, IProgress<string>? progress, CancellationToken ct);
 
     /// <summary>Adds and breaks down a few useful words with this part (<paramref name="partId"/>) that the user does not have yet.</summary>
-    Task<string> SuggestAsync(string partId, string form, string meaning, VocabLanguage language, IProgress<string>? progress, CancellationToken ct);
+    Task<string> SuggestAsync(string partId, string form, string meaning, VocabLanguage language, string? model, IProgress<string>? progress, CancellationToken ct);
 }
 
 /// <summary>Claude Code (or any agent) could not do the job; the message says why.</summary>
@@ -85,11 +85,14 @@ public sealed partial class VocabAgentViewModel : ObservableObject, IDisposable
     private bool CanAnalyze() => CanRun && !IsBusy;
 
     [RelayCommand(CanExecute = nameof(CanAnalyze))]
-    private Task AnalyzeAsync() => RunAsync("Analyzing", (progress, ct) => _agent!.AnalyzeAsync(progress, ct));
+    private Task AnalyzeAsync() => RunAsync("Analyzing", (progress, ct) => _agent!.AnalyzeAsync(Model, progress, ct));
 
     /// <summary>A few more words with this part, added and broken down.</summary>
     public Task SuggestAsync(string partId, string form, string meaning, VocabLanguage language) =>
-        RunAsync("Suggesting", (progress, ct) => _agent!.SuggestAsync(partId, form, meaning, language, progress, ct));
+        RunAsync("Suggesting", (progress, ct) => _agent!.SuggestAsync(partId, form, meaning, language, Model, progress, ct));
+
+    /// <summary>The model the settings pick for the agent; null leaves it to Claude Code.</summary>
+    private string? Model => _settings.Current.AnalysisModel is { Length: > 0 } model ? model : null;
 
     [RelayCommand]
     private void Stop() => _running?.Cancel();

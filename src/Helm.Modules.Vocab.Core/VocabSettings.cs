@@ -28,6 +28,12 @@ public sealed class VocabSettings : IVersionedSettings
     /// <summary>PC: new words are broken down by Claude Code by itself, a moment after they arrive (from any device).</summary>
     public bool AutoAnalyze { get; set; } = true;
 
+    /// <summary>
+    /// PC: the Claude model that breaks words down ("" = Claude Code's default, "haiku", "sonnet", "opus"). Sonnet is
+    /// enough for roots and components; the default may be a bigger model than the job needs.
+    /// </summary>
+    public string AnalysisModel { get; set; } = "sonnet";
+
     /// <summary>The Words tab's order: 0 A–Z, 1 newest, 2 weakest first, 3 due soonest.</summary>
     public int WordsSort { get; set; }
 
@@ -48,6 +54,9 @@ public sealed class VocabSettings : IVersionedSettings
     /// readable. It turns solid while the pointer is on it or the pinyin is typed (see <see cref="VocabSettingsViewModel.MinCardOpacity"/>).
     /// </summary>
     public int CardOpacity { get; set; } = VocabSettingsViewModel.DefaultCardOpacity;
+
+    /// <summary>The Learn tab's side sections the user folded away ("today", "cards", "keys"); the keys start folded.</summary>
+    public List<string> FoldedPanels { get; set; } = ["keys"];
 
     /// <summary>The pop-up comes back after a random time between these two (seconds).</summary>
     public int PopupMinSeconds { get; set; } = 20 * 60;

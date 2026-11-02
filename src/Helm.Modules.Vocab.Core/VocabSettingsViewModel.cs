@@ -41,6 +41,7 @@ public sealed partial class VocabSettingsViewModel : ObservableObject
     [ObservableProperty] private bool _autoSay;
     [ObservableProperty] private bool _typePinyin;
     [ObservableProperty] private bool _autoAnalyze;
+    [ObservableProperty] private int _analysisModelIndex;
     [ObservableProperty] private int _cardModeIndex;
     [ObservableProperty] private int _itemsShownIndex;
     [ObservableProperty] private bool _popupEnabled;
@@ -65,6 +66,7 @@ public sealed partial class VocabSettingsViewModel : ObservableObject
         AutoSay = s.AutoSay;
         TypePinyin = s.TypePinyin;
         AutoAnalyze = s.AutoAnalyze;
+        AnalysisModelIndex = Math.Max(0, AnalysisModels.ToList().FindIndex(m => m.Value == s.AnalysisModel));
         CardModeIndex = (int)s.CardMode;
         ItemsShownIndex = PageSizes.ToList().IndexOf(PageSizeOf(s.ItemsShown));
         PopupEnabled = s.PopupEnabled;
@@ -153,6 +155,20 @@ public sealed partial class VocabSettingsViewModel : ObservableObject
 
     partial void OnAutoAnalyzeChanged(bool value) => Save(nameof(AutoAnalyze), s => s.AutoAnalyze = value);
 
+    /// <summary>The Claude models the agent can run with, in <see cref="VocabSettings.AnalysisModel"/>'s names.</summary>
+    public static IReadOnlyList<VocabModelChoice> AnalysisModels { get; } =
+    [
+        new("sonnet", "Sonnet (recommended)"),
+        new("haiku", "Haiku (fastest, lightest on your plan)"),
+        new("opus", "Opus (most thorough)"),
+        new("", "Claude Code's default"),
+    ];
+
+    public IReadOnlyList<string> AnalysisModelNames { get; } = [.. AnalysisModels.Select(m => m.Label)];
+
+    partial void OnAnalysisModelIndexChanged(int value) =>
+        Save(nameof(AnalysisModelIndex), s => s.AnalysisModel = AnalysisModels[Math.Clamp(value, 0, AnalysisModels.Count - 1)].Value);
+
     partial void OnCardModeIndexChanged(int value) =>
         Save(nameof(CardModeIndex), s => s.CardMode = (VocabCardMode)Math.Clamp(value, 0, CardModeNames.Count - 1));
 
@@ -219,6 +235,15 @@ public sealed partial class VocabSettingsViewModel : ObservableObject
         });
     }
 
+    /// <summary>A side section of the Learn tab is folded away (see <see cref="VocabSettings.FoldedPanels"/>).</summary>
+    public bool IsFolded(string panel) => _settings.Current.FoldedPanels.Contains(panel);
+
+    public void SetFolded(string panel, bool folded) => Save(nameof(VocabSettings.FoldedPanels), s =>
+    {
+        s.FoldedPanels.Remove(panel);
+        if (folded) s.FoldedPanels.Add(panel);
+    });
+
     /// <summary>The Words tab's order (chosen on that tab).</summary>
     public void SaveWordsSort(int index) => Save(nameof(VocabSettings.WordsSort), s => s.WordsSort = index);
 
@@ -236,3 +261,6 @@ public sealed partial class VocabSettingsViewModel : ObservableObject
         return 1;
     }
 }
+
+/// <summary>A Claude model the agent can run with: its Claude Code name ("" = the default) and how it is shown.</summary>
+public sealed record VocabModelChoice(string Value, string Label);

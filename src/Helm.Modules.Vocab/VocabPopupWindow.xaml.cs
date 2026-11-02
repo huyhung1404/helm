@@ -22,8 +22,11 @@ public partial class VocabPopupWindow : Window
 {
     internal static readonly TimeSpan Linger = TimeSpan.FromSeconds(90);
 
-    /// <summary>How tall the card grows before it scrolls, unless Full details is open.</summary>
-    private const double CompactHeight = 460;
+    /// <summary>How tall the answer grows before it scrolls, unless Full details is open.</summary>
+    private const double CompactHeight = 300;
+
+    /// <summary>Room the card's other rows take (question, word, verdict, icons) when Full details fills the screen.</summary>
+    private const double CardChrome = 300;
 
     private readonly VocabCardViewModel _card;
     private readonly IWindowService _windows;
@@ -105,15 +108,16 @@ public partial class VocabPopupWindow : Window
             Update();
     }
 
-    /// <summary>What shows: the hint or the pinyin box, the short parts or Full details, the suggested verdict.</summary>
+    /// <summary>What shows: the hint or the pinyin box, the parts and the pinyin hook, Full details under them, the suggested verdict.</summary>
     private void Update()
     {
         var typing = _card.IsTyping;
         TapHint.Visibility = !typing && !_card.IsRevealed ? Visibility.Visible : Visibility.Collapsed;
         TypePanel.Visibility = typing ? Visibility.Visible : Visibility.Collapsed;
-        PartsBox.Visibility = !_full && _card.HasParts ? Visibility.Visible : Visibility.Collapsed;
-        PinyinHook.Visibility = !_full && _card.HasPinyinMnemonic ? Visibility.Visible : Visibility.Collapsed;
+        PartsBox.Visibility = _card.HasParts ? Visibility.Visible : Visibility.Collapsed;
+        PinyinHook.Visibility = _card.HasPinyinMnemonic ? Visibility.Visible : Visibility.Collapsed;
         DetailsPanel.Visibility = _full ? Visibility.Visible : Visibility.Collapsed;
+        FullButton.Appearance = _full ? ControlAppearance.Secondary : ControlAppearance.Transparent;
         FullButton.Icon = new SymbolIcon(_full ? SymbolRegular.ArrowMinimize24 : SymbolRegular.ArrowMaximize24);
         FullButton.ToolTip = _full ? "Less" : "Full details";
         System.Windows.Automation.AutomationProperties.SetName(FullButton, _full ? "Less" : "Full details");
@@ -121,11 +125,13 @@ public partial class VocabPopupWindow : Window
         Ring(ForgotButton, _card.SuggestsForgot);
     }
 
-    /// <summary>The verdict the typed answer suggests gets a ring; the user still chooses.</summary>
+    /// <summary>The verdict the typed answer suggests gets a ring; the user still chooses. Forgot keeps its red outline.</summary>
     private void Ring(Wpf.Ui.Controls.Button button, bool on)
     {
-        button.BorderThickness = new Thickness(on ? 2.5 : 0);
-        button.BorderBrush = on ? TryFindResource("AccentTextFillColorPrimaryBrush") as Brush ?? Brushes.DodgerBlue : null;
+        var outlined = button == ForgotButton;
+        button.BorderThickness = new Thickness(on ? 2.5 : outlined ? 1.5 : 0);
+        button.BorderBrush = on ? TryFindResource("AccentTextFillColorPrimaryBrush") as Brush ?? Brushes.DodgerBlue
+            : outlined ? TryFindResource("SystemFillColorCriticalBrush") as Brush : null;
     }
 
     /// <summary>
@@ -237,11 +243,22 @@ public partial class VocabPopupWindow : Window
     internal void ToggleFull()
     {
         _full = !_full;
-        if (_full) DetailsList.ItemsSource = _card.Details();
-        Scroller.MaxHeight = _full ? Math.Max(CompactHeight, SystemParameters.WorkArea.Height - 72) : CompactHeight;
+        if (_full) DetailsList.ItemsSource = FullDetails();
+        Scroller.MaxHeight = _full ? Math.Max(CompactHeight, SystemParameters.WorkArea.Height - CardChrome) : CompactHeight;
         UpdateOpacity();
         Update();
         Scroller.ScrollToTop();
+    }
+
+    /// <summary>
+    /// Everything else known about the word, under the parts: how the parts make the meaning first, then the sections;
+    /// the pinyin hook is already above.
+    /// </summary>
+    private List<VocabDetailSection> FullDetails()
+    {
+        var sections = _card.Details().Where(s => s.Title != "Remembering the pinyin").ToList();
+        if (_card.Explanation.Length > 0) sections.Insert(0, new VocabDetailSection("How the parts make it", [new VocabDetailItem(_card.Explanation)]));
+        return sections;
     }
 
     private void Close_Click(object sender, RoutedEventArgs e) => Close();

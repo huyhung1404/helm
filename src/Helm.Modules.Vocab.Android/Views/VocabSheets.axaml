@@ -7,9 +7,9 @@
              x:DataType="vm:VocabViewModel"
              x:Name="Self">
 
-    <!-- The bottom sheets over the whole Vocabulary page: the card's ⋯ and the word's ⋯ menus and the list's order
-         (opened by the page), Add words and Analysis (the app bar's + and hourglass), Edit (full height) and Ask for a
-         new analysis. A tap on the dimmed page closes a sheet, except Edit, which closes with ✕ or Save. -->
+    <!-- The bottom sheets over the whole Vocabulary page: the card's ⋯ and the word's ⋯ menus, Delete and the list's
+         order (opened by the page), Add words and Analysis (the app bar's + and hourglass; Copy request is in the
+         settings), Edit (full height) and Ask for a new analysis. A tap on the dimmed page closes a sheet, except Edit, which closes with ✕ or Save. -->
     <Panel>
         <!-- ===== The card's ⋯ ===== -->
         <Panel x:Name="CardMenu" IsVisible="False">
@@ -89,12 +89,32 @@
                             <TextBlock Text="Ask for a new analysis" VerticalAlignment="Center" />
                         </StackPanel>
                     </Button>
-                    <Button Classes="mi danger" Command="{Binding DeleteWordCommand}" Click="Close_Click" AutomationProperties.Name="Delete the word">
+                    <Button Classes="mi danger" Click="AskDelete_Click" AutomationProperties.Name="Delete the word">
                         <StackPanel Orientation="Horizontal" Spacing="14">
                             <ic:SymbolIcon Symbol="Delete" FontSize="22" VerticalAlignment="Center" />
                             <TextBlock Text="Delete" VerticalAlignment="Center" />
                         </StackPanel>
                     </Button>
+                </StackPanel>
+            </Border>
+        </Panel>
+
+        <!-- ===== Delete the word? ===== -->
+        <Panel x:Name="DeleteWord" IsVisible="False">
+            <Border Background="{DynamicResource HelmScrim}" PointerPressed="Scrim_PointerPressed" />
+            <Border Classes="sheet">
+                <StackPanel>
+                    <Border Classes="grab" />
+                    <TextBlock Classes="sheettitle" Margin="20,8,20,4" TextWrapping="Wrap" TextTrimming="None"
+                               Text="{Binding Detail.Word.Text, FallbackValue='', StringFormat='Delete “{0}”?'}" />
+                    <TextBlock Margin="20,8,20,20" TextWrapping="Wrap" Text="Its reviews go with it. Its parts stay for your other words." />
+                    <Border Classes="sheetfoot">
+                        <Grid ColumnDefinitions="*,10,*">
+                            <Button Classes="tall" HorizontalAlignment="Stretch" Content="Cancel" Click="Close_Click" />
+                            <Button Grid.Column="2" Classes="tall dangersolid" HorizontalAlignment="Stretch" Content="Delete" Command="{Binding DeleteWordConfirmedCommand}"
+                                    Click="Close_Click" />
+                        </Grid>
+                    </Border>
                 </StackPanel>
             </Border>
         </Panel>
@@ -131,12 +151,12 @@
                         <Grid ColumnDefinitions="*,Auto" Margin="20,6,8,0">
                             <TextBlock Classes="sheettitle" Text="Add words" />
                             <Button Grid.Column="1" Classes="icon" Command="{Binding CloseAddCommand}" AutomationProperties.Name="Close">
-                                <ic:SymbolIcon Symbol="Dismiss" FontSize="20" />
+                                <ic:SymbolIcon Symbol="Dismiss" FontSize="22" />
                             </Button>
                         </Grid>
                     </StackPanel>
                     <Border DockPanel.Dock="Bottom" Classes="sheetfoot">
-                        <Button Classes="accent tall" HorizontalAlignment="Stretch" MinHeight="48" Command="{Binding AddCommand}" AutomationProperties.Name="Add">
+                        <Button Classes="accent tall" HorizontalAlignment="Stretch" Command="{Binding AddCommand}" AutomationProperties.Name="Add">
                             <StackPanel Orientation="Horizontal" Spacing="8">
                                 <ic:SymbolIcon Symbol="Add" FontSize="18" />
                                 <TextBlock Text="Add" VerticalAlignment="Center" FontWeight="SemiBold" />
@@ -161,8 +181,7 @@
                                 <TextBlock Text="Where you met it (optional)" Classes="label" />
                                 <TextBox Text="{Binding NewNote}" MinHeight="44" VerticalContentAlignment="Center" AutomationProperties.Name="Where you met it" />
                             </StackPanel>
-                            <TextBlock Classes="hint" FontSize="14"
-                                       Text="Anywhere on the phone: select a word, then tap Add word (or share it to Save to Helm)." />
+                            <TextBlock Classes="hint"><Run Text="Several at once with commas. Anywhere on the phone: select a word, then tap " /><Run Text="Add word" FontWeight="SemiBold" /><Run Text="." /></TextBlock>
                             <StackPanel IsVisible="{Binding HasRecentWords}">
                                 <TextBlock Text="Added recently" Classes="label" Margin="0,0,0,6" />
                                 <ItemsControl ItemsSource="{Binding RecentWords}">
@@ -170,11 +189,11 @@
                                         <DataTemplate x:DataType="vm:VocabWordRow">
                                             <Border Classes="lrow">
                                                 <Grid ColumnDefinitions="*,Auto,Auto">
-                                                    <Button Classes="flat" Padding="0,6" Command="{Binding Open}" Click="CloseAdd_Click" IsEnabled="{Binding !IsPending}"
+                                                    <Button Classes="flat" Padding="0,6" Command="{Binding Open}" Click="CloseAdd_Click" IsHitTestVisible="{Binding !IsPending}"
                                                             AutomationProperties.Name="{Binding Text}">
                                                         <Grid ColumnDefinitions="Auto,*">
                                                             <TextBlock Text="{Binding Text}" FontWeight="SemiBold" Margin="0,0,10,0" VerticalAlignment="Center" />
-                                                            <TextBlock Grid.Column="1" Text="{Binding Meaning}" Classes="hint" TextWrapping="NoWrap" TextTrimming="CharacterEllipsis"
+                                                            <TextBlock Grid.Column="1" Text="{Binding Note}" Classes="hint" TextWrapping="NoWrap" TextTrimming="CharacterEllipsis"
                                                                        VerticalAlignment="Center" />
                                                         </Grid>
                                                     </Button>
@@ -186,7 +205,7 @@
                                                     </Border>
                                                     <Button Grid.Column="2" Classes="icon" Command="{Binding Remove}" IsVisible="{Binding CanRemove}"
                                                             AutomationProperties.Name="{Binding Text, StringFormat='Remove {0}'}">
-                                                        <ic:SymbolIcon Symbol="Dismiss" FontSize="14" />
+                                                        <ic:SymbolIcon Symbol="Dismiss" FontSize="16" />
                                                     </Button>
                                                 </Grid>
                                             </Border>
@@ -210,18 +229,10 @@
                         <Grid ColumnDefinitions="*,Auto" Margin="20,6,8,0">
                             <TextBlock Classes="sheettitle" Text="Analysis" />
                             <Button Grid.Column="1" Classes="icon" Command="{Binding CloseAgentCommand}" AutomationProperties.Name="Close">
-                                <ic:SymbolIcon Symbol="Dismiss" FontSize="20" />
+                                <ic:SymbolIcon Symbol="Dismiss" FontSize="22" />
                             </Button>
                         </Grid>
                     </StackPanel>
-                    <Border DockPanel.Dock="Bottom" Classes="sheetfoot">
-                        <Button Classes="tall" HorizontalAlignment="Stretch" MinHeight="48" Command="{Binding CopyPromptCommand}" AutomationProperties.Name="Copy request">
-                            <StackPanel Orientation="Horizontal" Spacing="8">
-                                <ic:SymbolIcon Symbol="Copy" FontSize="18" />
-                                <TextBlock Text="Copy request" VerticalAlignment="Center" />
-                            </StackPanel>
-                        </Button>
-                    </Border>
                     <ScrollViewer HorizontalScrollBarVisibility="Disabled">
                         <StackPanel Margin="20,8,20,16" Spacing="14">
                             <Border Classes="part">
@@ -234,20 +245,19 @@
                             <Border Classes="infobar" IsVisible="{Binding HasMessage}" Margin="0">
                                 <TextBlock Text="{Binding Message}" TextWrapping="Wrap" />
                             </Border>
-                            <TextBlock Text="{Binding AgentWorkText}" TextWrapping="Wrap" IsVisible="{Binding HasAgentWork}" />
                             <StackPanel>
                                 <TextBlock Text="{Binding PendingCount, StringFormat='Waiting ({0})'}" Classes="label" Margin="0,0,0,6" />
                                 <TextBlock Text="Nothing waits." Classes="hint" IsVisible="{Binding !HasPending}" />
-                                <!-- The newest of them (the list of words added lately) -->
-                                <ItemsControl ItemsSource="{Binding RecentWords}" IsVisible="{Binding HasPending}">
+                                <ItemsControl ItemsSource="{Binding PendingWords}" IsVisible="{Binding HasPending}">
                                     <ItemsControl.ItemTemplate>
                                         <DataTemplate x:DataType="vm:VocabWordRow">
-                                            <Border Classes="lrow" IsVisible="{Binding IsPending}">
-                                                <Grid ColumnDefinitions="*,Auto">
-                                                    <TextBlock Text="{Binding Text}" FontWeight="SemiBold" VerticalAlignment="Center" />
-                                                    <Button Grid.Column="1" Classes="icon" Command="{Binding Remove}" IsVisible="{Binding CanRemove}"
+                                            <Border Classes="lrow">
+                                                <Grid ColumnDefinitions="*,Auto,Auto">
+                                                    <TextBlock Text="{Binding Text}" FontWeight="SemiBold" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
+                                                    <TextBlock Grid.Column="1" Text="{Binding Note}" Classes="hint" TextWrapping="NoWrap" VerticalAlignment="Center" Margin="10,0,0,0" />
+                                                    <Button Grid.Column="2" Classes="icon" Command="{Binding Remove}" IsVisible="{Binding CanRemove}"
                                                             AutomationProperties.Name="{Binding Text, StringFormat='Remove {0}'}">
-                                                        <ic:SymbolIcon Symbol="Dismiss" FontSize="14" />
+                                                        <ic:SymbolIcon Symbol="Dismiss" FontSize="16" />
                                                     </Button>
                                                 </Grid>
                                             </Border>

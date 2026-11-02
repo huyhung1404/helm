@@ -81,6 +81,23 @@ public sealed class VocabViewsTests : IDisposable
         Assert.NotNull(viewModel.Card.ExplanationTree);
         Layout(page, size, "04-learn-revealed");
         Assert.True(Shows(page, "How it's built"));
+        // A narrower window: the side panel folds into a line above the card, the tree goes above what helps.
+        Layout(page, new Size(820, 900), "04b-learn-revealed-narrow");
+        Assert.Equal(Visibility.Visible, page.LearnView.NarrowBar.Visibility);
+        Assert.Equal(Visibility.Collapsed, page.LearnView.SidePanel.Visibility);
+        Assert.Equal(1, Grid.GetRow(page.LearnView.InfoPart));
+        Layout(page, size, "04-learn-revealed");
+        Assert.Equal(Visibility.Collapsed, page.LearnView.NarrowBar.Visibility);
+        Assert.Equal(0, Grid.GetRow(page.LearnView.InfoPart));
+        // The side sections fold away and stay so: the keys start folded; Today folded keeps its numbers in its title.
+        Assert.Equal(Visibility.Collapsed, page.LearnView.KeysBody.Visibility);
+        page.LearnView.TodayFold.RaiseEvent(new RoutedEventArgs(System.Windows.Controls.Primitives.ButtonBase.ClickEvent));
+        Assert.Equal(Visibility.Collapsed, page.LearnView.TodayBody.Visibility);
+        Assert.Equal(Visibility.Visible, page.LearnView.TodayLine.Visibility);
+        Assert.True(viewModel.Settings.IsFolded("today"));
+        Layout(page, size, "04c-learn-folded");
+        page.LearnView.TodayFold.RaiseEvent(new RoutedEventArgs(System.Windows.Controls.Primitives.ButtonBase.ClickEvent));
+        Assert.Equal(Visibility.Visible, page.LearnView.TodayBody.Visibility);
         Assert.True(Shows(page, "Remembered"));
         Assert.True(Shows(page, viewModel.Card.RememberedHint));
 
@@ -234,10 +251,10 @@ public sealed class VocabViewsTests : IDisposable
         var relative = store.FindWord("relative")!;
         card.Show(relative.Id, relative.Value);
         var window = new VocabPopupWindow(card, windows, opacity: 0.6);
-        Layout(window, new Size(352, 260), "20-popup");
+        Layout(window, new Size(392, 260), "20-popup");
         Assert.Equal(0.6, window.CardBorder.Opacity, 3);
         card.RevealCommand.Execute(null);
-        Layout(window, new Size(352, 460), "21-popup-revealed");
+        Layout(window, new Size(392, 460), "21-popup-revealed");
         Assert.Equal("Remembered", System.Windows.Automation.AutomationProperties.GetName(window.RememberedButton));
         Assert.False(Shows(window, "✗ / ✓ answer for the meaning"));
         // Full details is read: solid; closed again, see-through.
@@ -259,18 +276,18 @@ public sealed class VocabViewsTests : IDisposable
         zh.Show(buJiu.Id, buJiu.Value);
         Assert.True(zh.IsTyping);
         var zhWindow = new VocabPopupWindow(zh, windows, opacity: 0.85);
-        Layout(zhWindow, new Size(352, 300), "22-popup-pinyin");
+        Layout(zhWindow, new Size(392, 300), "22-popup-pinyin");
         zh.Typed = "bu3jiu2";
         zh.CheckCommand.Execute(null);
         Assert.True(zh.PinyinSlipped);
-        Layout(zhWindow, new Size(352, 620), "23-popup-slipped");
+        Layout(zhWindow, new Size(392, 620), "23-popup-slipped");
         Assert.True(Shows(zhWindow, zh.VerdictHint));
         Assert.True(Shows(zhWindow, "Remembering the pinyin"));
         Assert.True(Shows(zhWindow, "✗ / ✓ answer for the meaning"));
         Assert.Equal("Knew the meaning", System.Windows.Automation.AutomationProperties.GetName(zhWindow.RememberedButton));
         Assert.Equal("Forgot the meaning", System.Windows.Automation.AutomationProperties.GetName(zhWindow.ForgotButton));
         zhWindow.ToggleFull();
-        Layout(zhWindow, new Size(352, 900), "24-popup-full");
+        Layout(zhWindow, new Size(392, 900), "24-popup-full");
         zhWindow.Close();
     });
 

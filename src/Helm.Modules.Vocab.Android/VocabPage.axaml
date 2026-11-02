@@ -45,11 +45,11 @@
                 </DockPanel>
             </Border>
             <!-- Only while the permission is missing -->
-            <Border Classes="infobar warning" IsVisible="{Binding NeedsDraw}" Padding="14,12">
+            <Border Classes="warnbox" IsVisible="{Binding NeedsDraw}">
                 <StackPanel Spacing="10">
                     <Grid ColumnDefinitions="Auto,*">
                         <ic:SymbolIcon Symbol="Warning" FontSize="20" Foreground="{DynamicResource VocabWarn}" VerticalAlignment="Top" Margin="0,0,10,0" />
-                        <TextBlock Grid.Column="1" TextWrapping="Wrap"
+                        <TextBlock Grid.Column="1" TextWrapping="Wrap" FontSize="14"
                                    Text="To show words over your other apps, Helm needs “Display over other apps”. Turn it on for Helm, then come back." />
                     </Grid>
                     <Button Classes="accent tall" HorizontalAlignment="Left" Content="Allow display over other apps" Command="{Binding OpenDrawSettingsCommand}" />
@@ -63,7 +63,7 @@
                             <StackPanel VerticalAlignment="Center" Margin="0,0,12,0">
                                 <TextBlock Text="Pop-up card" Classes="stitle" />
                                 <TextBlock Classes="sdesc"
-                                           Text="Now and then a card with one of your words appears over the app you are using. Tap the word for its meaning, then Forgot or Remembered. Unanswered, it goes away after 1½ minutes." />
+                                           Text="Now and then a card with one of your words appears over the app you are using. Unanswered, it goes away after 1½ minutes." />
                             </StackPanel>
                         </DockPanel>
                     </Border>
@@ -117,11 +117,11 @@
             </Border>
 
             <TextBlock Text="Don't show in these apps" Classes="ssection" />
-            <Border Classes="infobar warning" IsVisible="{Binding NeedsUsageAccess}" Padding="14,12">
+            <Border Classes="warnbox" IsVisible="{Binding NeedsUsageAccess}">
                 <StackPanel Spacing="10">
                     <Grid ColumnDefinitions="Auto,*">
                         <ic:SymbolIcon Symbol="Warning" FontSize="20" Foreground="{DynamicResource VocabWarn}" VerticalAlignment="Top" Margin="0,0,10,0" />
-                        <TextBlock Grid.Column="1" TextWrapping="Wrap"
+                        <TextBlock Grid.Column="1" TextWrapping="Wrap" FontSize="14"
                                    Text="To stay out of the apps below, Helm needs to see which app is open: turn on “Usage access” for Helm, then come back." />
                     </Grid>
                     <Button Classes="accent tall" HorizontalAlignment="Left" Content="Allow usage access" Command="{Binding OpenUsageSettingsCommand}" />
@@ -138,7 +138,7 @@
                                     <Grid ColumnDefinitions="Auto,*,Auto">
                                         <Image Source="{Binding Icon}" Width="32" Height="32" Margin="0,0,14,0" VerticalAlignment="Center" />
                                         <TextBlock Grid.Column="1" Text="{Binding Label}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
-                                        <Button Grid.Column="2" Classes="tall" Padding="12,0" Content="Remove" AutomationProperties.Name="{Binding Label, StringFormat='Remove {0}'}"
+                                        <Button Grid.Column="2" Classes="tall sm" Content="Remove" AutomationProperties.Name="{Binding Label, StringFormat='Remove {0}'}"
                                                 Click="Unblock_Click" />
                                     </Grid>
                                 </Border>
@@ -231,13 +231,13 @@
                         <ToggleSwitch DockPanel.Dock="Right" IsChecked="{Binding Settings.ShowYouGlish}" OnContent="" OffContent="" AutomationProperties.Name="YouGlish button" />
                         <StackPanel VerticalAlignment="Center" Margin="0,0,12,0">
                             <TextBlock Text="YouGlish button" Classes="stitle" />
-                            <TextBlock Text="Next to the word: hear real people say it in YouTube videos (opens youglish.com)." Classes="sdesc" />
+                            <TextBlock Text="Next to the word: hear real people say it in YouTube videos." Classes="sdesc" />
                         </StackPanel>
                     </DockPanel>
                 </Border>
                 <Border Classes="srow">
                     <DockPanel>
-                        <ComboBox DockPanel.Dock="Right" Width="96" MinHeight="44" VerticalAlignment="Center" ItemsSource="{Binding Settings.ItemsShownNames}"
+                        <ComboBox DockPanel.Dock="Right" Width="84" MinHeight="44" VerticalAlignment="Center" ItemsSource="{Binding Settings.ItemsShownNames}"
                                   SelectedIndex="{Binding Settings.ItemsShownIndex}" AutomationProperties.Name="Words per page" />
                         <StackPanel VerticalAlignment="Center" Margin="0,0,12,0">
                             <TextBlock Text="Words per page" Classes="stitle" />
@@ -264,13 +264,13 @@
                 </Border>
                 <Border Classes="srow">
                     <DockPanel>
-                        <Button DockPanel.Dock="Right" Classes="tall" Padding="12,0" Command="{Binding CopyPromptCommand}" AutomationProperties.Name="Copy request">
+                        <Button DockPanel.Dock="Right" Classes="tall sm" Command="{Binding CopyPromptCommand}" AutomationProperties.Name="Copy request">
                             <StackPanel Orientation="Horizontal" Spacing="6">
                                 <ic:SymbolIcon Symbol="Copy" FontSize="16" />
                                 <TextBlock Text="Copy request" VerticalAlignment="Center" />
                             </StackPanel>
                         </Button>
-                        <TextBlock Text="{Binding PendingCount, StringFormat='{}{0} waiting'}" Classes="stitle" VerticalAlignment="Center" Margin="0,0,12,0" />
+                        <TextBlock Text="{Binding PendingCount, StringFormat='{}{0} words waiting'}" Classes="stitle" VerticalAlignment="Center" Margin="0,0,12,0" />
                     </DockPanel>
                 </Border>
             </StackPanel>
