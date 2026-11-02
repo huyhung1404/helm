@@ -654,7 +654,7 @@ public sealed class WalletTests : IDisposable
         vm.NewDescription = "pho";
         vm.NewCategory = vm.NewCategories.First(c => c.Id == WalletCategories.Food);
         vm.AddCommand.Execute(null);
-        Assert.False(vm.IsAddOpen);
+        Assert.False(vm.ShowAddPopup);
         Assert.Single(vm.Days);
         Assert.Equal("Today", vm.Days[0].Title);
         Assert.Equal("pho", vm.Days[0].Rows[0].Title);
@@ -742,9 +742,10 @@ public sealed class WalletTests : IDisposable
         vm.NewDate = new DateTime(2026, 10, 2);
         vm.NewTimeText = "18h45";
         Assert.Equal(new TimeSpan(18, 45, 0), vm.NewTime);
+        vm.ToggleNewCategoryCommand.Execute(null);
         vm.AddCategoryName = "Pets";
         vm.AddCommand.Execute(null);
-        Assert.False(vm.IsAddOpen);
+        Assert.False(vm.ShowAddPopup);
         var t = _store.Transactions().Single().Value;
         Assert.Equal(new DateTimeOffset(2026, 10, 2, 18, 45, 0, TimeSpan.FromHours(7)), t.OccurredAt);
         var category = _store.Category(t.CategoryId!)!;
@@ -753,17 +754,18 @@ public sealed class WalletTests : IDisposable
         // The same name again is refused, and nothing is saved.
         vm.OpenAddCommand.Execute(null);
         vm.NewAmount = "50k";
+        vm.ToggleNewCategoryCommand.Execute(null);
         vm.AddCategoryName = "pets";
         vm.AddCommand.Execute(null);
-        Assert.True(vm.IsAddOpen);
-        Assert.Contains("already a category", vm.Message);
+        Assert.True(vm.ShowAddPopup);
+        Assert.Contains("already a category", vm.PopupError);
         Assert.Single(_store.Transactions());
 
         // A bad time is refused too.
         vm.AddCategoryName = "";
         vm.NewTimeText = "25:99";
         vm.AddCommand.Execute(null);
-        Assert.True(vm.IsAddOpen);
+        Assert.True(vm.ShowAddPopup);
     }
 
     [Fact]

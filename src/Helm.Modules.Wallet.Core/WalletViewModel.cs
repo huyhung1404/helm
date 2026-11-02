@@ -77,9 +77,15 @@ public sealed partial class WalletViewModel : ObservableObject
     [ObservableProperty] private string _emptyText = "";
 
     // Adding a transaction by hand
-    [ObservableProperty] private bool _isAddOpen;
     [ObservableProperty] private string _newAmount = "";
     [ObservableProperty] private bool _newIsIncome;
+
+    /// <summary>0 spending, 1 money in, 2 between my own accounts.</summary>
+    [ObservableProperty] private int _newKindIndex;
+
+    /// <summary>The "New category" chip is open: <see cref="AddCategoryName"/> names one for this transaction.</summary>
+    [ObservableProperty] private bool _isNewCategoryOpen;
+    [ObservableProperty] private string _newNote = "";
     [ObservableProperty] private string _newDescription = "";
     [ObservableProperty] private DateTime? _newDate;
     [ObservableProperty] private CategoryChoice? _newCategory;
@@ -124,7 +130,7 @@ public sealed partial class WalletViewModel : ObservableObject
         ILogger<WalletViewModel> logger)
         // The phone's notification access and widget; none on Windows.
         : this(store, capture, settings, ui, dialogs, clipboard, services.GetService(typeof(IWalletPlatform)) as IWalletPlatform, logger, TimeZoneInfo.Local,
-            services.GetService(typeof(DebtsViewModel)) as DebtsViewModel)
+            services.GetService(typeof(DebtsViewModel)) as DebtsViewModel, services.GetService(typeof(FundBook)) as FundBook)
     {
     }
 
@@ -138,7 +144,8 @@ public sealed partial class WalletViewModel : ObservableObject
         IWalletPlatform? platform,
         ILogger<WalletViewModel> logger,
         TimeZoneInfo zone,
-        DebtsViewModel? debts = null)
+        DebtsViewModel? debts = null,
+        FundBook? funds = null)
     {
         _store = store;
         _capture = capture;
@@ -155,8 +162,17 @@ public sealed partial class WalletViewModel : ObservableObject
 
         LoadSettings();
         _store.Changed += (_, _) => ScheduleRefresh();
-        // A transaction shows the debt entry made from it.
-        if (_debts is not null) _debts.Book.Changed += (_, _) => ScheduleRefresh();
+        // A transaction shows the debt entry made from it; the debt book's forms open in the Wallet pop-up.
+        if (_debts is not null)
+        {
+            _debts.Book.Changed += (_, _) => ScheduleRefresh();
+            _debts.Host = this;
+        }
+        if (funds is not null)
+        {
+            Funds = new FundsViewModel(funds, this, dialogs, zone);
+            funds.Changed += (_, _) => ScheduleRefresh();
+        }
         // Unread notifications arrive from the listener; toggles may change on the other page.
         _settings.Changed += (_, _) => _ui.Post(() =>
         {
@@ -314,13 +330,13 @@ public sealed partial class WalletViewModel : ObservableObject
         if (_debts is null) return false;
         if (!_debts.AddFromTransaction(row.Id, person, kind, note))
         {
-            Message = _debts.Message;
+            Say(_debts.Message ?? "Could not put it in the debt book.");
             _debts.Message = null;
             return false;
         }
-        row.IsExpanded = false;
         Message = null;
         Refresh();
+        ShowToast("In the debt book: " + row.DebtText);
         return true;
     }
 
@@ -364,7 +380,7 @@ public sealed partial class WalletViewModel : ObservableObject
         try
         {
             if (!_store.SetCategory(row.Id, categoryId)) return;
-            row.IsExpanded = false;
+            if (categoryId is not null && _store.Category(categoryId) is { } picked) ShowToast($"Filed under {picked.Name}" + FundNote(categoryId));
             // "The same for similar ones": other transactions to categorize with a description like this one.
             var similar = categoryId is null ? [] : _store.SimilarUncategorized(row.Id);
             _similarIds = similar;
@@ -401,12 +417,12 @@ public sealed partial class WalletViewModel : ObservableObject
     {
         if (!WalletText.TryParseAmount(row.EditAmount, out var amount))
         {
-            Message = "Enter the amount, e.g. 50000, 50k or 1.5tr.";
+            Say("Enter the amount, e.g. 50000, 50k or 1.5tr.");
             return false;
         }
         if (!WalletText.TryParseTime(row.EditTimeText, out var typed))
         {
-            Message = "Enter the time as 14:30.";
+            Say("Enter the time as 14:30.");
             return false;
         }
         var date = row.EditDate?.Date ?? LocalDate(row.Transaction.OccurredAt);
@@ -417,6 +433,7 @@ public sealed partial class WalletViewModel : ObservableObject
             _store.Update(row.Id, row.EditIsIncome ? amount : -amount, row.EditDescription, at, row.EditNote);
             Message = null;
             Refresh();
+            ShowToast("Saved" + (row.Transaction.CategoryId is { } c ? FundNote(c) : ""));
             return true;
         }
         catch (Exception ex) when (ex is InvalidOperationException or ArgumentException)
@@ -433,7 +450,9 @@ public sealed partial class WalletViewModel : ObservableObject
         try
         {
             _store.Delete(row.Id);
+            if (Selected == row) SelectedGone();
             Refresh();
+            ShowToast("Transaction deleted");
         }
         catch (InvalidOperationException ex)
         {
@@ -469,23 +488,61 @@ public sealed partial class WalletViewModel : ObservableObject
 
     public bool CanAdd => WalletText.TryParseAmount(NewAmount, out _);
 
-    partial void OnNewAmountChanged(string value) => OnPropertyChanged(nameof(CanAdd));
+    /// <summary>"= 1,200,000 ₫" under the amount box while it reads as an amount, else how to type one.</summary>
+    public string NewAmountHint => WalletText.TryParseAmount(NewAmount, out var a) ? "= " + WalletFormat.Money(a) : "Type 50k, 1.5tr or 1tr2";
+
+    public bool NewAmountReads => WalletText.TryParseAmount(NewAmount, out _);
+
+    /// <summary>Spending and money in have categories; a transfer between own accounts has none to pick.</summary>
+    public bool NewHasCategories => NewKindIndex != 2;
+
+    /// <summary>The categories of the new transaction's direction, as chips.</summary>
+    public ObservableCollection<CategoryPick> NewPicks { get; } = [];
+
+    partial void OnNewAmountChanged(string value)
+    {
+        OnPropertyChanged(nameof(CanAdd));
+        OnPropertyChanged(nameof(NewAmountHint));
+        OnPropertyChanged(nameof(NewAmountReads));
+        PopupError = null;
+    }
 
     partial void OnNewIsIncomeChanged(bool value) => RefreshNewCategories(Categories());
+
+    partial void OnNewKindIndexChanged(int value)
+    {
+        NewIsIncome = value == 1;
+        NewCategory = null;
+        IsNewCategoryOpen = false;
+        OnPropertyChanged(nameof(NewHasCategories));
+        RefreshNewCategories(Categories());
+    }
+
+    [RelayCommand]
+    private void ToggleNewCategory()
+    {
+        IsNewCategoryOpen = !IsNewCategoryOpen;
+        if (IsNewCategoryOpen) NewCategory = null;
+        else AddCategoryName = "";
+        foreach (var p in NewPicks) p.IsSelected = false;
+    }
 
     [RelayCommand]
     private void OpenAdd()
     {
         NewAmount = "";
         NewDescription = "";
+        NewNote = "";
+        NewKindIndex = 0;
         NewIsIncome = false;
         NewDate = LocalDate(_store.Now);
         var now = TimeZoneInfo.ConvertTime(_store.Now, _zone).TimeOfDay;
         NewTime = new TimeSpan(now.Hours, now.Minutes, 0);
         NewCategory = null;
         AddCategoryName = "";
+        IsNewCategoryOpen = false;
         RefreshNewCategories(Categories());
-        IsAddOpen = true;
+        ShowPopup(WalletPopup.Add, stack: false);
     }
 
     private bool _syncingTime;
@@ -510,19 +567,19 @@ public sealed partial class WalletViewModel : ObservableObject
     internal DateTimeOffset At(DateTime day, TimeSpan? time, TimeSpan fallback) => ToInstant(day.Date + (time ?? fallback));
 
     [RelayCommand]
-    private void CancelAdd() => IsAddOpen = false;
+    private void CancelAdd() => DismissPopup();
 
     [RelayCommand]
     private void Add()
     {
         if (!WalletText.TryParseAmount(NewAmount, out var amount))
         {
-            Message = "Enter the amount, e.g. 50000, 50k or 1.5tr.";
+            Say("Enter the amount, e.g. 50000, 50k or 1.5tr.");
             return;
         }
         if (!WalletText.TryParseTime(NewTimeText, out var typed))
         {
-            Message = "Enter the time as 14:30 (or leave it empty for now).";
+            Say("Enter the time as 14:30 (or leave it empty for now).");
             return;
         }
         var now = TimeZoneInfo.ConvertTime(_store.Now, _zone);
@@ -532,7 +589,12 @@ public sealed partial class WalletViewModel : ObservableObject
         {
             var signed = NewIsIncome ? amount : -amount;
             string? category;
-            if (AddCategoryName.Trim().Length > 0)
+            if (NewKindIndex == 2)
+            {
+                // Between the user's own accounts: neither spending nor income.
+                category = WalletCategories.Transfer;
+            }
+            else if (IsNewCategoryOpen && AddCategoryName.Trim().Length > 0)
             {
                 // A new category for it, of its direction.
                 category = _store.AddCategory(AddCategoryName, NewIsIncome ? CategoryKind.Income : CategoryKind.Expense);
@@ -542,17 +604,18 @@ public sealed partial class WalletViewModel : ObservableObject
             {
                 category = NewCategory?.Id ?? _store.SureCategory(NewDescription, signed);
             }
-            _store.AddManual(signed, NewDescription, at, category);
-            IsAddOpen = false;
+            _store.AddManual(signed, NewDescription, at, category, NewNote);
             Message = null;
             // Show the month it went in.
             _month = new DateOnly(day.Year, day.Month, 1);
+            DismissPopup();
             Refresh();
+            ShowToast($"Added {WalletFormat.Money(amount)}" + (category is { } c ? FundNote(c) : ""));
         }
         catch (ArgumentException ex)
         {
             // A new category whose name is taken, or no amount: say so as it is.
-            Message = ex.Message.Split(" (Parameter", StringSplitOptions.None)[0];
+            Say(ex.Message.Split(" (Parameter", StringSplitOptions.None)[0]);
         }
         catch (InvalidOperationException ex)
         {
@@ -565,9 +628,57 @@ public sealed partial class WalletViewModel : ObservableObject
         var selected = NewCategory?.Id;
         var sign = NewIsIncome ? 1m : -1m;
         NewCategories.Clear();
-        foreach (var c in categories.Where(c => c.Fits(sign) && !c.Hidden)) NewCategories.Add(new CategoryChoice(c.Id, c.Name, c.Icon, c.Color));
+        // Transfers have their own button (the third kind); debts come from the debt book.
+        var fitting = categories.Where(c => c.Fits(sign) && !c.Hidden && c.Kind != CategoryKind.Transfer).ToList();
+        foreach (var c in fitting) NewCategories.Add(new CategoryChoice(c.Id, c.Name, c.Icon, c.Color));
         NewCategory = NewCategories.FirstOrDefault(c => c.Id == selected);
+        NewPicks.Clear();
+        foreach (var p in CategoryPick.For(fitting, NewCategory?.Id, PickNew)) NewPicks.Add(p);
     }
+
+    /// <summary>A category chip in the add form: picks it, or unpicks it on a second tap.</summary>
+    private void PickNew(CategoryPick pick)
+    {
+        var on = !pick.IsSelected;
+        foreach (var p in NewPicks) p.IsSelected = on && p == pick;
+        NewCategory = on ? NewCategories.FirstOrDefault(c => c.Id == pick.Id) : null;
+        if (on)
+        {
+            IsNewCategoryOpen = false;
+            AddCategoryName = "";
+        }
+    }
+
+    // ---- Notices -------------------------------------------------------------------------------------------------
+
+    /// <summary>A short notice that goes by itself ("Added 50,000 ₫ · Eating: 120,000 ₫ left"); null when none.</summary>
+    [ObservableProperty] private string? _toast;
+
+    private int _toastId;
+
+    public bool HasToast => !string.IsNullOrEmpty(Toast);
+
+    partial void OnToastChanged(string? value) => OnPropertyChanged(nameof(HasToast));
+
+    internal void ShowToast(string text)
+    {
+        Toast = text;
+        var id = Interlocked.Increment(ref _toastId);
+        _ = Task.Delay(TimeSpan.FromSeconds(3)).ContinueWith(_ => _ui.Post(() =>
+        {
+            if (_toastId == id) Toast = null;
+        }), TaskScheduler.Default);
+    }
+
+    /// <summary>A problem with what was typed: in the pop-up when one is open, else on the page.</summary>
+    private void Say(string text)
+    {
+        if (HasPopup) PopupError = text;
+        else Message = text;
+    }
+
+    /// <summary>" · Eating: 120,000 ₫ left" (or "is over by …") for the fund a category's spending comes off; empty outside funds.</summary>
+    private string FundNote(string categoryId) => Funds?.NoteFor(categoryId, _month, _store.Transactions(), _store.Now) ?? "";
 
     // ---- Refresh -------------------------------------------------------------------------------------------------
 
@@ -606,15 +717,20 @@ public sealed partial class WalletViewModel : ObservableObject
             SpentTodayText = IsCurrentMonth && summary.SpentToday > 0 ? $"Today {WalletFormat.Money(summary.SpentToday)}" : "";
             CompareText = Compare(summary);
             RefreshBudget(summary, now);
+            Funds?.Update(transactions, categories, _month, now);
+            OnPropertyChanged(nameof(ShowBudgetCard));
             CashFlow = WalletCharts.CashFlow(summary);
             SpendingDonut = WalletCharts.Spending(summary, categories);
-            DailyChart = WalletCharts.Daily(transactions, categories, _month, now, _zone, _store.MonthlyBudget);
+            // The funds, when there are any, are the month's budget.
+            var monthBudget = Funds is { HasFunds: true } f ? f.Rows.Sum(r => r.State.Budget) : _store.MonthlyBudget;
+            DailyChart = WalletCharts.Daily(transactions, categories, _month, now, _zone, monthBudget);
             MonthsChart = WalletCharts.Months(transactions, categories, _month, now, _zone, 6, OpenMonth);
             Fill(Earning, summary.Earning.Select(s => Row(s, categories)).ToList());
             OnPropertyChanged(nameof(HasEarning));
 
             RefreshToCategorize(transactions, categories);
             RefreshDays(categories, transactions);
+            RefreshFundRows(transactions, categories);
             RefreshNewCategories(categories);
             RefreshCategoryRows(categories);
             RefreshBudgetText();
@@ -746,7 +862,8 @@ public sealed partial class WalletViewModel : ObservableObject
             : CanListen ? "No transactions this month yet. They appear here as your bank's notifications come in." : "No transactions this month yet.";
         OnPropertyChanged(nameof(HasDays));
         // Rows no longer shown are let go.
-        var shown = new HashSet<string>(groups.SelectMany(g => g.Rows).Concat(ToCategorize).Select(r => r.Id), StringComparer.Ordinal);
+        var shown = new HashSet<string>(groups.SelectMany(g => g.Rows).Concat(ToCategorize).Concat(Funds?.SelectedRows ?? []).Select(r => r.Id), StringComparer.Ordinal);
+        if (Selected is { } selected) shown.Add(selected.Id);
         foreach (var id in _rows.Keys.Where(id => !shown.Contains(id)).ToList()) _rows.Remove(id);
     }
 
@@ -761,6 +878,11 @@ public sealed partial class WalletViewModel : ObservableObject
         else if (t.Source == TransactionSource.Manual) parts.Add("Added by hand");
         var choices = categories.Where(x => x.Fits(t.Amount) && (!x.Hidden || x.Id == t.CategoryId)).ToList();
         row.Update(t, title, string.Join(" · ", parts), category, choices);
+        var local = TimeZoneInfo.ConvertTime(t.OccurredAt, _zone);
+        var day = WalletFormat.Day(DateOnly.FromDateTime(local.DateTime), WalletFormat.LocalDay(_store.Now, _zone));
+        row.WhenText = $"{(t.Amount > 0 ? "Money in" : "Spending")} · {day} · {WalletFormat.Time(t.OccurredAt, _zone)}";
+        row.AccountText = t.Bank.Length == 0 ? t.Source == TransactionSource.Manual ? "Cash (added by hand)" : "—"
+            : t.Account.Length > 0 ? $"{t.Bank} ·· {t.Account[^Math.Min(4, t.Account.Length)..]}" : t.Bank;
         row.SetDebt(_debts?.Book.ForTransaction(id)?.Value, _debts is not null);
         return row;
     }

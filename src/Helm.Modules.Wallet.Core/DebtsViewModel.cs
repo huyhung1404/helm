@@ -63,6 +63,75 @@ public sealed partial class DebtsViewModel : ObservableObject
 
     internal DateTimeOffset Now => _book.Now;
 
+    /// <summary>The Wallet page whose pop-up shows the add form and a person's details.</summary>
+    internal WalletViewModel? Host { get; set; }
+
+    /// <summary>The person the pop-up shows.</summary>
+    [ObservableProperty] private DebtPersonViewModel? _selectedPerson;
+
+    /// <summary>What the chosen kind means, under the kind buttons.</summary>
+    public string NewKindHelp => (DebtEntryKind)Math.Clamp(NewKindIndex, 0, 2) switch
+    {
+        DebtEntryKind.OwesMe => "You lent it: it adds to what they owe you.",
+        DebtEntryKind.IOwe => "You borrowed it: it adds to what you owe them.",
+        _ => "Money paid back: the balance goes back toward 0.",
+    };
+
+    public string NewAmountHint => WalletText.TryParseAmount(NewAmount, out var a) ? "= " + WalletFormat.Money(a) : "Type 150k, 1.5tr";
+
+    partial void OnNewKindIndexChanged(int value) => OnPropertyChanged(nameof(NewKindHelp));
+
+    partial void OnNewAmountChanged(string value) => OnPropertyChanged(nameof(NewAmountHint));
+
+    /// <summary>The add form, empty.</summary>
+    [RelayCommand]
+    private void OpenAdd()
+    {
+        ResetNew();
+        Host?.ShowPopup(WalletPopup.AddDebt, stack: false);
+    }
+
+    /// <summary>The add form for a person (their pop-up's "Add entry"): a repayment while they have a balance.</summary>
+    internal void OpenAddFor(DebtPersonViewModel person)
+    {
+        ResetNew();
+        NewPerson = person.Name;
+        NewKindIndex = (int)(person.IsSettled ? DebtEntryKind.OwesMe : DebtEntryKind.Repayment);
+        Host?.ShowPopup(WalletPopup.AddDebt);
+    }
+
+    internal void OpenPerson(DebtPersonViewModel person)
+    {
+        SelectedPerson = person;
+        person.LoadEditDue();
+        Host?.ShowPopup(WalletPopup.Person, stack: false);
+    }
+
+    /// <summary>The add form's due date: "0" none, else that many days from today.</summary>
+    [RelayCommand]
+    private void DueIn(string? days)
+    {
+        if (!int.TryParse(days, NumberStyles.Integer, CultureInfo.InvariantCulture, out var n) || n <= 0)
+        {
+            NewDueDate = null;
+            NewDueTime = null;
+            return;
+        }
+        NewDueDate = TimeZoneInfo.ConvertTime(_book.Now, TimeZoneInfo.Local).Date.AddDays(n);
+        NewDueTime = null;
+    }
+
+    private void ResetNew()
+    {
+        NewPerson = "";
+        NewAmount = "";
+        NewNote = "";
+        NewDueDate = null;
+        NewDueTime = null;
+        NewKindIndex = 0;
+        Message = null;
+    }
+
     public static IReadOnlyList<string> KindNames => DebtFormat.KindNames;
 
     /// <summary>People with a balance, the largest first.</summary>
@@ -120,20 +189,24 @@ public sealed partial class DebtsViewModel : ObservableObject
     {
         if (!WalletText.TryParseAmount(NewAmount, out var amount))
         {
-            Message = $"“{NewAmount}” is not an amount. Try 150000, 150.000, 150k or 1.5tr.";
+            Say($"“{NewAmount}” is not an amount. Try 150000, 150.000, 150k or 1.5tr.");
             return;
         }
         var kind = (DebtEntryKind)Math.Clamp(NewKindIndex, 0, KindNames.Count - 1);
         var due = DebtDue.FromLocal(NewDueDate, NewDueTime, TimeZoneInfo.Local);
+        var person = DebtLedger.Clean(NewPerson);
         if (!Try(() => _book.Add(NewPerson, amount, kind, NewNote, due))) return;
-        NewPerson = "";
-        NewAmount = "";
-        NewNote = "";
-        NewDueDate = null;
-        NewDueTime = null;
-        NewKindIndex = 0;
-        Message = null;
+        ResetNew();
         Refresh();
+        Host?.DismissPopupCommand.Execute(null);
+        Host?.ShowToast($"Added to the debt book: {person}");
+    }
+
+    /// <summary>A problem: in the pop-up when one is open, else on the page.</summary>
+    private void Say(string text)
+    {
+        if (Host is { HasPopup: true } host) host.PopupError = text;
+        else Message = text;
     }
 
     /// <summary>The money of a transaction as a debt entry; the transaction then counts neither as spending nor income.</summary>
@@ -170,11 +243,11 @@ public sealed partial class DebtsViewModel : ObservableObject
         }
         catch (ArgumentException ex)
         {
-            Message = ex.Message.Split(" (Parameter", StringSplitOptions.None)[0];
+            Say(ex.Message.Split(" (Parameter", StringSplitOptions.None)[0]);
         }
         catch (InvalidOperationException ex)
         {
-            Message = ex.Message;
+            Say(ex.Message);
         }
         return false;
     }
@@ -304,7 +377,6 @@ public sealed partial class DebtPersonViewModel : ObservableObject
     private DebtPerson _person;
     private DateTimeOffset _now;
 
-    [ObservableProperty] private bool _isExpanded;
     [ObservableProperty] private DateTime? _editDueDate;
     [ObservableProperty] private TimeSpan? _editDueTime;
 
@@ -337,11 +409,25 @@ public sealed partial class DebtPersonViewModel : ObservableObject
 
     internal void RefreshLinks() => _links?.Refresh();
 
-    /// <summary>Opens the details; a no-op when they are open.</summary>
-    internal void Open()
-    {
-        if (!IsExpanded) ToggleExpanded();
-    }
+    /// <summary>Notes can be linked to the person (the Notes tool is there).</summary>
+    public bool HasLinks => Links is not null;
+
+    /// <summary>Opens the person's pop-up: history, due date, notes.</summary>
+    [RelayCommand]
+    internal void Open() => _owner.OpenPerson(this);
+
+    /// <summary>Another entry for this person (a repayment while they have a balance).</summary>
+    [RelayCommand]
+    private void AddEntry() => _owner.OpenAddFor(this);
+
+    /// <summary>"Nam owes you", "You owe Linh", "All settled": under the balance in the pop-up.</summary>
+    public string VerbText => IsSettled ? "All settled" : OwedToMe ? $"{Name} owes you" : $"You owe {Name}";
+
+    /// <summary>"Due in 3 days", "Overdue by 2 days", "No due date" or "Settled …": the pop-up's line under the name.</summary>
+    public string DueText => _person.SettledAt is { } at ? "Settled " + DebtFormat.WhenRelative(at, _now)
+        : Due is { } due ? DebtFormat.Due(due, _person.HasDueTime, _now) : IsSettled ? "Settled" : "No due date";
+
+    public string Initial => Name.Length > 0 ? char.ToUpper(Name[0], CultureInfo.CurrentCulture).ToString() : "?";
 
     public string Name => _person.Name;
 
@@ -386,7 +472,7 @@ public sealed partial class DebtPersonViewModel : ObservableObject
         Rebuild();
         OnPropertyChanged(string.Empty);
         // The date and time boxes show the new due time after +1 day, Set or a sync.
-        if (IsExpanded && Due != dueBefore) LoadEditDue();
+        if (Due != dueBefore) LoadEditDue();
     }
 
     private void Rebuild()
@@ -396,14 +482,7 @@ public sealed partial class DebtPersonViewModel : ObservableObject
         foreach (var entry in _person.Entries.Reverse()) Entries.Add(new DebtEntryRow(_owner, this, entry));
     }
 
-    [RelayCommand]
-    private void ToggleExpanded()
-    {
-        IsExpanded = !IsExpanded;
-        if (IsExpanded) LoadEditDue();
-    }
-
-    private void LoadEditDue()
+    internal void LoadEditDue()
     {
         var due = Due is { } d ? TimeZoneInfo.ConvertTime(d, TimeZoneInfo.Local) : (DateTimeOffset?)null;
         EditDueDate = due?.Date;

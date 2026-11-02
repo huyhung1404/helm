@@ -165,7 +165,7 @@ public sealed class WalletDebtsTests : IDisposable
 
         // A linked note or the calendar opens a person.
         vm.ShowPerson(settled.Key);
-        Assert.True(settled.IsExpanded);
+        Assert.Same(settled, vm.SelectedPerson);
         Assert.True(vm.ShowSettled);
     }
 
@@ -184,11 +184,13 @@ public sealed class WalletDebtsTests : IDisposable
         Assert.Equal((int)DebtEntryKind.OwesMe, row.DebtKindIndex); // money out: most often lent
         row.SaveDebtCommand.Execute(null);
         Assert.True(row.IsDebtFormOpen); // no name yet
-        Assert.True(vm.HasMessage);
+        Assert.True(vm.ShowDebtPopup);
+        Assert.True(vm.HasPopupError);
 
         row.DebtPerson = "Nam";
         row.SaveDebtCommand.Execute(null);
         Assert.False(row.IsDebtFormOpen);
+        Assert.False(vm.HasPopup);
         Assert.Empty(vm.ToCategorize);
         Assert.Equal(300_000m, _book.Balance("Nam"));
         var shown = vm.Days.SelectMany(d => d.Rows).Single();
@@ -196,7 +198,8 @@ public sealed class WalletDebtsTests : IDisposable
 
         shown.OpenDebtCommand.Execute(null);
         Assert.True(vm.IsDebtsView);
-        Assert.True(Assert.Single(debts.People).IsExpanded);
+        Assert.Same(Assert.Single(debts.People), debts.SelectedPerson);
+        Assert.True(vm.ShowPersonPopup);
         vm.ShowMoneyCommand.Execute(null);
         Assert.True(vm.IsMoneyView);
     }

@@ -1,9 +1,11 @@
+using Helm.Core.Settings;
 using Helm.Modules.Wallet;
+using Microsoft.Extensions.Logging.Abstractions;
 
 namespace Helm.Tests;
 
 /// <summary>Wallet's funds: what each holds, what comes off it, the warnings, carried leftovers and moved money.</summary>
-public sealed class WalletFundsTests
+public sealed class WalletFundsTests : IDisposable
 {
     // Vietnam time (UTC+7, no daylight saving), as on the phone.
     private static readonly TimeZoneInfo Ict = TimeZoneInfo.CreateCustomTimeZone("ICT", TimeSpan.FromHours(7), "ICT", "ICT");
@@ -12,12 +14,24 @@ public sealed class WalletFundsTests
     private readonly ManualTime _time = new(T0);
     private readonly WalletStore _wallet;
     private readonly FundBook _funds;
+    private readonly TempDir _dir = new();
+    private readonly SettingsStoreFactory _settings;
 
     public WalletFundsTests()
     {
         _wallet = new WalletStore(new MemorySynced<WalletTransaction>(), new MemorySynced<WalletCategory>(), new MemorySynced<WalletBudget>(), _time);
         _funds = new FundBook(new MemorySynced<WalletFund>(), _wallet);
+        _settings = new SettingsStoreFactory(new HelmPaths(_dir.Path));
     }
+
+    public void Dispose()
+    {
+        _settings.Dispose();
+        _dir.Dispose();
+    }
+
+    private WalletViewModel ViewModel() => new(_wallet, new WalletCapture(_wallet, _settings), _settings, new InlineUi(), new AcceptDialogs(), new MemoryClipboard(), null,
+        NullLogger<WalletViewModel>.Instance, Ict, funds: _funds);
 
     private void Spend(decimal amount, string category, int day, int month = 10) =>
         _wallet.AddManual(-amount, category, new DateTimeOffset(2026, month, day, 12, 0, 0, TimeSpan.FromHours(7)), category);
@@ -128,5 +142,76 @@ public sealed class WalletFundsTests
         Assert.Throws<ArgumentException>(() => _funds.Add("Eating", 0, true, October, []));
         var id = _funds.Add("Eating", 900_000.4m, true, October, [], alertPercent: 55);
         Assert.Equal((900_000m, 80), (_funds.Get(id)!.Amount, _funds.Get(id)!.AlertPercent));
+    }
+
+    [Fact]
+    public void A_popup_returns_to_the_one_it_was_opened_from()
+    {
+        _wallet.AddManual(-32_000, "7-Eleven", T0, categoryId: null);
+        var vm = ViewModel();
+        vm.OpenToCategorizeCommand.Execute(null);
+        var row = Assert.Single(vm.ToCategorize);
+        row.OpenCommand.Execute(null);
+        Assert.Same(row, vm.Selected);
+        row.BeginEditCommand.Execute(null);
+        Assert.True(vm.ShowEditPopup);
+        row.CancelEditCommand.Execute(null);
+        Assert.True(vm.ShowDetailsPopup);
+        vm.DismissPopupCommand.Execute(null);
+        Assert.True(vm.ShowToCategorizePopup);
+        vm.ClosePopupCommand.Execute(null);
+        Assert.False(vm.HasPopup);
+    }
+
+    [Fact]
+    public void The_fund_form_adds_a_fund_and_filing_a_transaction_says_what_is_left()
+    {
+        _wallet.AddManual(-59_000, "Highlands", T0, categoryId: null);
+        var vm = ViewModel();
+        var funds = vm.Funds!;
+        Assert.True(funds.HasNoFunds);
+        funds.OpenAddCommand.Execute(null);
+        Assert.True(vm.ShowFundFormPopup);
+        funds.SaveFormCommand.Execute(null);
+        Assert.Equal("Give the fund a name.", vm.PopupError);
+
+        funds.FormName = "Eating";
+        funds.FormAmount = "900k";
+        funds.FormPicks.Single(p => p.Id == WalletCategories.Food).PickCommand.Execute(null);
+        funds.SaveFormCommand.Execute(null);
+        Assert.False(vm.HasPopup);
+        var jar = Assert.Single(funds.Rows);
+        Assert.Equal((1.0, "100%"), (jar.LeftShare, jar.PercentText));
+
+        Assert.Single(vm.ToCategorize).Suggestions.First(s => s.Id == WalletCategories.Food).PickCommand.Execute(null);
+        Assert.Contains("Eating: 841,000".Replace(",", System.Globalization.CultureInfo.CurrentCulture.NumberFormat.NumberGroupSeparator), vm.Toast);
+        Assert.Same(jar, Assert.Single(funds.Rows)); // the same jar, so its water drops smoothly
+        Assert.Equal(841_000m / 900_000m, (decimal)jar.LeftShare, 3);
+        Assert.False(funds.HasOutside);
+    }
+
+    [Fact]
+    public void An_overspent_fund_is_covered_from_another_for_the_month()
+    {
+        var home = _funds.Add("Home & bills", 5_000_000, true, October, [WalletCategories.Housing]);
+        _funds.Add("Trip", 2_000_000, false, October, [WalletCategories.Travel]);
+        Spend(5_342_000, WalletCategories.Housing, 5);
+        var vm = ViewModel();
+        var funds = vm.Funds!;
+        var jar = funds.Rows.Single(r => r.Id == home);
+        Assert.True(jar.IsOver);
+        Assert.Equal("1 over", funds.AlertText);
+
+        jar.OpenCommand.Execute(null);
+        Assert.True(vm.ShowFundPopup);
+        funds.OpenCoverCommand.Execute(null);
+        Assert.True(vm.ShowCoverPopup);
+        Assert.Equal(342_000m, decimal.Parse(funds.CoverAmount, System.Globalization.NumberStyles.Number, System.Globalization.CultureInfo.CurrentCulture));
+        Assert.True(Assert.Single(funds.CoverChoices).IsSelected);
+        funds.SaveCoverCommand.Execute(null);
+        Assert.True(vm.ShowFundPopup); // back to the fund
+        Assert.Equal(FundStatus.UsedUp, jar.Status);
+        Assert.Equal("1 used up", funds.AlertText);
+        Assert.Equal(1_658_000m, State(funds.Rows.Single(r => r.Id != home).Id).Left);
     }
 }

@@ -1,0 +1,847 @@
+<UserControl
+    x:Class="Helm.Modules.Wallet.WalletOverlay"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:sys="clr-namespace:System;assembly=mscorlib"
+    xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
+    xmlns:core="clr-namespace:Helm.Core.Ui;assembly=Helm.Core.Windows"
+    xmlns:local="clr-namespace:Helm.Modules.Wallet;assembly=Helm.Modules.Wallet.Core"
+    xmlns:self="clr-namespace:Helm.Modules.Wallet"
+    Foreground="{DynamicResource TextFillColorPrimaryBrush}">
+
+    <!-- The Wallet pop-up over the page (WalletContentPage shows it on the adorner layer of the page area): one dialog at
+         a time (WalletViewModel.Popup), and the short notice that goes by itself. Escape and ✕ close a dialog, back to
+         the one it was opened from; a click beside a dialog that has no form closes it too. -->
+    <UserControl.Resources>
+        <ResourceDictionary>
+            <ResourceDictionary.MergedDictionaries>
+                <ResourceDictionary Source="/Helm.Modules.Wallet;component/WalletStyles.xaml" />
+            </ResourceDictionary.MergedDictionaries>
+
+            <x:Array x:Key="EditKinds" Type="sys:String">
+                <sys:String>Spending</sys:String>
+                <sys:String>Money in</sys:String>
+            </x:Array>
+
+            <Style x:Key="DialogTitle" TargetType="TextBlock">
+                <Setter Property="FontSize" Value="20" />
+                <Setter Property="FontWeight" Value="SemiBold" />
+                <Setter Property="TextWrapping" Value="Wrap" />
+                <Setter Property="VerticalAlignment" Value="Center" />
+            </Style>
+
+            <Style x:Key="Close" TargetType="ui:Button" BasedOn="{StaticResource RowAction}">
+                <Setter Property="Icon" Value="{ui:SymbolIcon Dismiss24}" />
+                <Setter Property="ToolTip" Value="Close (Esc)" />
+                <Setter Property="AutomationProperties.Name" Value="Close" />
+                <Setter Property="VerticalAlignment" Value="Top" />
+                <Setter Property="Command" Value="{Binding DataContext.DismissPopupCommand, RelativeSource={RelativeSource AncestorType=UserControl}}" />
+            </Style>
+
+            <!-- The bar under a dialog: its buttons -->
+            <Style x:Key="Footer" TargetType="Border">
+                <Setter Property="DockPanel.Dock" Value="Bottom" />
+                <Setter Property="Padding" Value="24,14" />
+                <Setter Property="BorderThickness" Value="0,1,0,0" />
+                <Setter Property="BorderBrush" Value="{DynamicResource CardStrokeColorDefaultBrush}" />
+                <Setter Property="Background" Value="{DynamicResource SubtleFillColorSecondaryBrush}" />
+            </Style>
+
+            <Style x:Key="FooterButton" TargetType="ui:Button" BasedOn="{StaticResource {x:Type ui:Button}}">
+                <Setter Property="Margin" Value="8,0,0,0" />
+            </Style>
+
+            <Style x:Key="Field" TargetType="StackPanel">
+                <Setter Property="Margin" Value="0,0,0,16" />
+            </Style>
+
+            <!-- What is wrong with the form, above its buttons -->
+            <ControlTemplate x:Key="ErrorBand">
+                <Border DockPanel.Dock="Bottom" Margin="24,0,24,12" Padding="12,8" CornerRadius="6" Background="{DynamicResource SystemFillColorCriticalBackgroundBrush}"
+                        Visibility="{Binding DataContext.HasPopupError, RelativeSource={RelativeSource AncestorType=UserControl}, Converter={StaticResource BoolToVisibility}}">
+                    <DockPanel>
+                        <ui:SymbolIcon Symbol="ErrorCircle24" FontSize="16" Margin="0,0,8,0" Foreground="{DynamicResource SystemFillColorCriticalBrush}" VerticalAlignment="Top" />
+                        <TextBlock Text="{Binding DataContext.PopupError, RelativeSource={RelativeSource AncestorType=UserControl}}" TextWrapping="Wrap" />
+                    </DockPanel>
+                </Border>
+            </ControlTemplate>
+        </ResourceDictionary>
+    </UserControl.Resources>
+
+    <Grid>
+        <Grid x:Name="Scrim" Background="#80000000" MouseLeftButtonDown="Scrim_MouseLeftButtonDown"
+              Visibility="{Binding HasPopup, Converter={StaticResource BoolToVisibility}}">
+            <Border x:Name="Card" Width="580" Margin="24" VerticalAlignment="Center" CornerRadius="8" BorderThickness="1" ClipToBounds="True"
+                    Background="{DynamicResource ApplicationBackgroundBrush}" BorderBrush="{DynamicResource CardStrokeColorDefaultBrush}"
+                    MouseLeftButtonDown="Card_MouseLeftButtonDown" KeyboardNavigation.TabNavigation="Cycle">
+                <Border.Effect>
+                    <DropShadowEffect BlurRadius="32" ShadowDepth="8" Opacity="0.35" />
+                </Border.Effect>
+                <Grid>
+
+                    <!-- ============ Add a transaction ============ -->
+                    <DockPanel Visibility="{Binding ShowAddPopup, Converter={StaticResource BoolToVisibility}}">
+                        <DockPanel DockPanel.Dock="Top" Margin="24,20,16,4">
+                            <ui:Button DockPanel.Dock="Right" Style="{StaticResource Close}" />
+                            <TextBlock Text="Add transaction" Style="{StaticResource DialogTitle}" />
+                        </DockPanel>
+                        <Border Style="{StaticResource Footer}">
+                            <DockPanel>
+                                <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
+                                    <ui:Button Style="{StaticResource FooterButton}" Content="Cancel" Command="{Binding CancelAddCommand}" />
+                                    <ui:Button Style="{StaticResource FooterButton}" Appearance="Primary" Content="Add" Icon="{ui:SymbolIcon Checkmark24}" Command="{Binding AddCommand}" />
+                                </StackPanel>
+                                <TextBlock Text="Enter adds · Esc closes" Style="{DynamicResource HelmSecondaryText}" FontSize="12" VerticalAlignment="Center" />
+                            </DockPanel>
+                        </Border>
+                        <ContentControl DockPanel.Dock="Bottom" Template="{StaticResource ErrorBand}" Focusable="False" />
+                        <ScrollViewer VerticalScrollBarVisibility="Auto">
+                            <StackPanel Margin="24,12,24,8">
+                                <ListBox Style="{StaticResource Segmented}" Margin="0,0,0,16" ItemsSource="{x:Static local:WalletViewModel.KindNames}" SelectedIndex="{Binding NewKindIndex}"
+                                         AutomationProperties.Name="Kind" />
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="16" />
+                                        <ColumnDefinition Width="*" />
+                                    </Grid.ColumnDefinitions>
+                                    <StackPanel Style="{StaticResource Field}">
+                                        <TextBlock Text="Amount" Style="{StaticResource FieldLabel}" />
+                                        <Grid>
+                                            <ui:TextBox x:Name="NewAmountBox" FontSize="20" FontWeight="SemiBold" PlaceholderText="50k, 1.5tr" Padding="10,8,32,8" AutomationProperties.Name="Amount"
+                                                        Text="{Binding NewAmount, UpdateSourceTrigger=PropertyChanged}" TextChanged="OnAmountTextChanged" ClearButtonEnabled="False">
+                                                <ui:TextBox.InputBindings>
+                                                    <KeyBinding Key="Enter" Command="{Binding AddCommand}" />
+                                                </ui:TextBox.InputBindings>
+                                            </ui:TextBox>
+                                            <TextBlock Text="₫" HorizontalAlignment="Right" VerticalAlignment="Center" Margin="0,0,12,0" FontSize="16" Style="{DynamicResource HelmSecondaryText}" />
+                                        </Grid>
+                                        <TextBlock Text="{Binding NewAmountHint}">
+                                            <TextBlock.Style>
+                                                <Style TargetType="TextBlock" BasedOn="{StaticResource FieldHint}">
+                                                    <Style.Triggers>
+                                                        <DataTrigger Binding="{Binding NewAmountReads}" Value="True">
+                                                            <Setter Property="Foreground" Value="{DynamicResource SystemFillColorSuccessBrush}" />
+                                                        </DataTrigger>
+                                                    </Style.Triggers>
+                                                </Style>
+                                            </TextBlock.Style>
+                                        </TextBlock>
+                                    </StackPanel>
+                                    <StackPanel Grid.Column="2" Style="{StaticResource Field}">
+                                        <TextBlock Text="When" Style="{StaticResource FieldLabel}" />
+                                        <core:DateTimeBox Date="{Binding NewDate}" Time="{Binding NewTime}" Lean="Past" AutomationProperties.Name="When" />
+                                    </StackPanel>
+                                </Grid>
+                                <StackPanel Style="{StaticResource Field}">
+                                    <TextBlock Text="Description" Style="{StaticResource FieldLabel}" />
+                                    <ui:TextBox PlaceholderText="What it was for" AutomationProperties.Name="Description" Text="{Binding NewDescription, UpdateSourceTrigger=PropertyChanged}">
+                                        <ui:TextBox.InputBindings>
+                                            <KeyBinding Key="Enter" Command="{Binding AddCommand}" />
+                                        </ui:TextBox.InputBindings>
+                                    </ui:TextBox>
+                                </StackPanel>
+                                <StackPanel Style="{StaticResource Field}" Visibility="{Binding NewHasCategories, Converter={StaticResource BoolToVisibility}}">
+                                    <TextBlock Style="{StaticResource FieldLabel}">
+                                        <Run Text="Category" />
+                                        <Run Text="(optional: without one it waits in To categorize)" FontWeight="Normal" />
+                                    </TextBlock>
+                                    <WrapPanel>
+                                        <ItemsControl ItemsSource="{Binding NewPicks}" ItemTemplate="{StaticResource PickChip}" ItemsPanel="{StaticResource Wrap}" Focusable="False" />
+                                        <Button Style="{StaticResource ChipDashed}" Command="{Binding ToggleNewCategoryCommand}" AutomationProperties.Name="New category">
+                                            <StackPanel Orientation="Horizontal">
+                                                <ui:SymbolIcon Symbol="Add24" FontSize="14" Margin="4,0,6,0" />
+                                                <TextBlock Text="New category" VerticalAlignment="Center" />
+                                            </StackPanel>
+                                        </Button>
+                                    </WrapPanel>
+                                    <DockPanel Margin="0,4,0,0" Visibility="{Binding IsNewCategoryOpen, Converter={StaticResource BoolToVisibility}}">
+                                        <TextBlock DockPanel.Dock="Right" Text="Icon and colour: later, in Wallet's settings" Style="{DynamicResource HelmSecondaryText}" FontSize="12"
+                                                   VerticalAlignment="Center" Margin="12,0,0,0" />
+                                        <ui:TextBox PlaceholderText="Name, e.g. Coffee" AutomationProperties.Name="New category name"
+                                                    Text="{Binding AddCategoryName, UpdateSourceTrigger=PropertyChanged}" />
+                                    </DockPanel>
+                                </StackPanel>
+                                <StackPanel Style="{StaticResource Field}">
+                                    <TextBlock Style="{StaticResource FieldLabel}">
+                                        <Run Text="Note" />
+                                        <Run Text="(optional)" FontWeight="Normal" />
+                                    </TextBlock>
+                                    <ui:TextBox AutomationProperties.Name="Note" AcceptsReturn="True" TextWrapping="Wrap" MinHeight="56" Text="{Binding NewNote, UpdateSourceTrigger=PropertyChanged}" />
+                                </StackPanel>
+                            </StackPanel>
+                        </ScrollViewer>
+                    </DockPanel>
+
+                    <!-- ============ Edit a transaction ============ -->
+                    <DockPanel Visibility="{Binding ShowEditPopup, Converter={StaticResource BoolToVisibility}}">
+                        <DockPanel DockPanel.Dock="Top" Margin="24,20,16,4">
+                            <ui:Button DockPanel.Dock="Right" Style="{StaticResource Close}" />
+                            <TextBlock Text="Edit transaction" Style="{StaticResource DialogTitle}" />
+                        </DockPanel>
+                        <Border Style="{StaticResource Footer}">
+                            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" DataContext="{Binding Selected}">
+                                <ui:Button Style="{StaticResource FooterButton}" Content="Cancel" Command="{Binding CancelEditCommand}" />
+                                <ui:Button Style="{StaticResource FooterButton}" Appearance="Primary" Content="Save" Icon="{ui:SymbolIcon Checkmark24}" Command="{Binding SaveEditCommand}" />
+                            </StackPanel>
+                        </Border>
+                        <ContentControl DockPanel.Dock="Bottom" Template="{StaticResource ErrorBand}" Focusable="False" />
+                        <ScrollViewer VerticalScrollBarVisibility="Auto">
+                            <StackPanel Margin="24,12,24,8" DataContext="{Binding Selected}">
+                                <ListBox Style="{StaticResource Segmented}" Margin="0,0,0,16" ItemsSource="{StaticResource EditKinds}" SelectedIndex="{Binding EditKindIndex}"
+                                         AutomationProperties.Name="Kind" />
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="16" />
+                                        <ColumnDefinition Width="*" />
+                                    </Grid.ColumnDefinitions>
+                                    <StackPanel Style="{StaticResource Field}">
+                                        <TextBlock Text="Amount" Style="{StaticResource FieldLabel}" />
+                                        <Grid>
+                                            <ui:TextBox x:Name="EditAmountBox" FontSize="20" FontWeight="SemiBold" Padding="10,8,32,8" AutomationProperties.Name="Amount" ClearButtonEnabled="False"
+                                                        Text="{Binding EditAmount, UpdateSourceTrigger=PropertyChanged}" TextChanged="OnAmountTextChanged">
+                                                <ui:TextBox.InputBindings>
+                                                    <KeyBinding Key="Enter" Command="{Binding SaveEditCommand}" />
+                                                </ui:TextBox.InputBindings>
+                                            </ui:TextBox>
+                                            <TextBlock Text="₫" HorizontalAlignment="Right" VerticalAlignment="Center" Margin="0,0,12,0" FontSize="16" Style="{DynamicResource HelmSecondaryText}" />
+                                        </Grid>
+                                    </StackPanel>
+                                    <StackPanel Grid.Column="2" Style="{StaticResource Field}">
+                                        <TextBlock Text="When" Style="{StaticResource FieldLabel}" />
+                                        <core:DateTimeBox Date="{Binding EditDate}" Time="{Binding EditTime}" Lean="Past" AutomationProperties.Name="When" />
+                                    </StackPanel>
+                                </Grid>
+                                <StackPanel Style="{StaticResource Field}">
+                                    <TextBlock Text="Description" Style="{StaticResource FieldLabel}" />
+                                    <ui:TextBox AutomationProperties.Name="Description" Text="{Binding EditDescription, UpdateSourceTrigger=PropertyChanged}" />
+                                </StackPanel>
+                                <StackPanel Style="{StaticResource Field}">
+                                    <TextBlock Text="Note" Style="{StaticResource FieldLabel}" />
+                                    <ui:TextBox AutomationProperties.Name="Note" AcceptsReturn="True" TextWrapping="Wrap" MinHeight="56" Text="{Binding EditNote, UpdateSourceTrigger=PropertyChanged}" />
+                                </StackPanel>
+                            </StackPanel>
+                        </ScrollViewer>
+                    </DockPanel>
+
+                    <!-- ============ A transaction's details ============ -->
+                    <DockPanel Visibility="{Binding ShowDetailsPopup, Converter={StaticResource BoolToVisibility}}">
+                        <DockPanel DockPanel.Dock="Top" Margin="24,20,16,4" DataContext="{Binding Selected}">
+                            <ui:Button DockPanel.Dock="Right" Style="{StaticResource Close}" />
+                            <self:CategoryBadge DockPanel.Dock="Left" Icon="{Binding CategoryIcon}" Color="{Binding CategoryColor}" Size="44" Margin="0,0,12,0" VerticalAlignment="Top" />
+                            <StackPanel>
+                                <TextBlock Text="{Binding Title}" Style="{StaticResource DialogTitle}" FontSize="18" />
+                                <StackPanel Orientation="Horizontal" Margin="0,2,0,0">
+                                    <TextBlock Text="{Binding CategoryName}" Style="{DynamicResource HelmSecondaryText}" Visibility="{Binding IsCategorized, Converter={StaticResource BoolToVisibility}}" />
+                                    <TextBlock Text="Waiting for a category" Style="{DynamicResource HelmSecondaryText}" Visibility="{Binding IsCategorized, Converter={StaticResource InverseBoolToVisibility}}" />
+                                    <Border Style="{StaticResource Tag}" Margin="8,0,0,0" Visibility="{Binding IsAuto, Converter={StaticResource BoolToVisibility}}"
+                                            ToolTip="Helm picked this category from earlier transactions like it">
+                                        <TextBlock Text="auto" FontSize="11" FontWeight="SemiBold" />
+                                    </Border>
+                                </StackPanel>
+                            </StackPanel>
+                        </DockPanel>
+                        <Border Style="{StaticResource Footer}">
+                            <DockPanel DataContext="{Binding Selected}">
+                                <ui:Button DockPanel.Dock="Left" Content="Delete" Icon="{ui:SymbolIcon Delete24}" Command="{Binding DeleteCommand}"
+                                           Foreground="{DynamicResource SystemFillColorCriticalBrush}" />
+                                <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                                    <ui:Button Style="{StaticResource FooterButton}" Content="Lent, borrowed, paid back…" Icon="{ui:SymbolIcon PersonMoney24}" Command="{Binding OpenDebtFormCommand}"
+                                               Visibility="{Binding CanBeDebt, Converter={StaticResource BoolToVisibility}}"
+                                               ToolTip="Put this money in the debt book: it then counts neither as spending nor as income" />
+                                    <ui:Button Style="{StaticResource FooterButton}" Content="Edit" Icon="{ui:SymbolIcon Edit24}" Command="{Binding BeginEditCommand}" />
+                                    <ui:Button Style="{StaticResource FooterButton}" Appearance="Primary" Content="Done"
+                                               Command="{Binding DataContext.ClosePopupCommand, RelativeSource={RelativeSource AncestorType=UserControl}}" />
+                                </StackPanel>
+                            </DockPanel>
+                        </Border>
+                        <ScrollViewer VerticalScrollBarVisibility="Auto">
+                            <StackPanel Margin="24,12,24,20" DataContext="{Binding Selected}">
+                                <TextBlock Text="{Binding AmountText}" FontSize="32" Style="{StaticResource AmountText}" HorizontalAlignment="Left" />
+                                <TextBlock Text="{Binding WhenText}" Style="{DynamicResource HelmSecondaryText}" Margin="0,0,0,16" />
+                                <Grid Margin="0,0,0,16">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="120" />
+                                        <ColumnDefinition Width="*" />
+                                    </Grid.ColumnDefinitions>
+                                    <Grid.RowDefinitions>
+                                        <RowDefinition Height="Auto" />
+                                        <RowDefinition Height="Auto" />
+                                        <RowDefinition Height="Auto" />
+                                    </Grid.RowDefinitions>
+                                    <TextBlock Text="Account" Style="{DynamicResource HelmSecondaryText}" Margin="0,0,0,6" />
+                                    <TextBlock Grid.Column="1" Text="{Binding AccountText}" Margin="0,0,0,6" TextWrapping="Wrap" />
+                                    <TextBlock Grid.Row="1" Text="Balance" Style="{DynamicResource HelmSecondaryText}" Margin="0,0,0,6"
+                                               Visibility="{Binding HasBalance, Converter={StaticResource BoolToVisibility}}" />
+                                    <TextBlock Grid.Row="1" Grid.Column="1" Text="{Binding BalanceText}" Margin="0,0,0,6" Visibility="{Binding HasBalance, Converter={StaticResource BoolToVisibility}}" />
+                                    <TextBlock Grid.Row="2" Text="Note" Style="{DynamicResource HelmSecondaryText}" Visibility="{Binding HasNote, Converter={StaticResource BoolToVisibility}}" />
+                                    <TextBlock Grid.Row="2" Grid.Column="1" Text="{Binding Note}" TextWrapping="Wrap" Visibility="{Binding HasNote, Converter={StaticResource BoolToVisibility}}" />
+                                </Grid>
+                                <!-- In the debt book: who it is with, one click away -->
+                                <Border Style="{StaticResource Box}" Margin="0,0,0,16" Visibility="{Binding IsDebt, Converter={StaticResource BoolToVisibility}}">
+                                    <DockPanel>
+                                        <ui:Button DockPanel.Dock="Right" Content="Open in Debts" Command="{Binding OpenDebtCommand}" VerticalAlignment="Center" />
+                                        <ui:SymbolIcon Symbol="People24" FontSize="18" Margin="0,0,10,0" VerticalAlignment="Center" />
+                                        <StackPanel>
+                                            <TextBlock Text="{Binding DebtText}" FontWeight="SemiBold" />
+                                            <TextBlock Text="In the debt book: counts neither as spending nor as income" Style="{DynamicResource HelmSecondaryText}" FontSize="12" />
+                                        </StackPanel>
+                                    </DockPanel>
+                                </Border>
+                                <!-- Its category: one click changes it -->
+                                <StackPanel Style="{StaticResource Field}" Visibility="{Binding IsDebt, Converter={StaticResource InverseBoolToVisibility}}">
+                                    <DockPanel Margin="0,0,0,6">
+                                        <ui:Button DockPanel.Dock="Right" Appearance="Transparent" Padding="8,2" Command="{Binding UncategorizeCommand}"
+                                                   Visibility="{Binding IsCategorized, Converter={StaticResource BoolToVisibility}}" ToolTip="Back to the transactions to categorize">
+                                            <StackPanel Orientation="Horizontal">
+                                                <ui:SymbolIcon Symbol="ArrowUndo24" FontSize="14" Margin="0,0,6,0" />
+                                                <TextBlock Text="Back to To categorize" FontSize="12" />
+                                            </StackPanel>
+                                        </ui:Button>
+                                        <TextBlock Text="Category" Style="{StaticResource FieldLabel}" Margin="0" VerticalAlignment="Center" />
+                                    </DockPanel>
+                                    <ItemsControl ItemsSource="{Binding Picks}" ItemTemplate="{StaticResource PickChip}" ItemsPanel="{StaticResource Wrap}" Focusable="False" />
+                                    <DockPanel Margin="0,6,0,0">
+                                        <ui:Button DockPanel.Dock="Right" Margin="8,0,0,0" Content="Add" Icon="{ui:SymbolIcon Add24}" Command="{Binding CreateCategoryCommand}"
+                                                   ToolTip="Make the category and put this transaction in it" />
+                                        <ui:TextBox PlaceholderText="Or a new category" AutomationProperties.Name="New category name" Text="{Binding NewCategoryName, UpdateSourceTrigger=PropertyChanged}">
+                                            <ui:TextBox.InputBindings>
+                                                <KeyBinding Key="Enter" Command="{Binding CreateCategoryCommand}" />
+                                            </ui:TextBox.InputBindings>
+                                        </ui:TextBox>
+                                    </DockPanel>
+                                </StackPanel>
+                                <!-- What the bank said -->
+                                <Border Style="{StaticResource Box}" Visibility="{Binding HasOriginal, Converter={StaticResource BoolToVisibility}}">
+                                    <DockPanel>
+                                        <ui:Button DockPanel.Dock="Right" Style="{StaticResource RowAction}" Icon="{ui:SymbolIcon Copy24}" ToolTip="Copy the notification"
+                                                   AutomationProperties.Name="Copy the notification" Command="{Binding CopyOriginalCommand}" VerticalAlignment="Top" />
+                                        <StackPanel>
+                                            <TextBlock Text="The bank's notification" Style="{DynamicResource HelmSecondaryText}" FontSize="12" Margin="0,0,0,4" />
+                                            <TextBlock Text="{Binding OriginalText}" TextWrapping="Wrap" FontFamily="Cascadia Mono, Consolas" FontSize="12.5" />
+                                        </StackPanel>
+                                    </DockPanel>
+                                </Border>
+                            </StackPanel>
+                        </ScrollViewer>
+                    </DockPanel>
+
+                    <!-- ============ A transaction's money in the debt book ============ -->
+                    <DockPanel Visibility="{Binding ShowDebtPopup, Converter={StaticResource BoolToVisibility}}">
+                        <DockPanel DockPanel.Dock="Top" Margin="24,20,16,4">
+                            <ui:Button DockPanel.Dock="Right" Style="{StaticResource Close}" />
+                            <TextBlock Text="Put it in the debt book" Style="{StaticResource DialogTitle}" />
+                        </DockPanel>
+                        <Border Style="{StaticResource Footer}">
+                            <DockPanel DataContext="{Binding Selected}">
+                                <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
+                                    <ui:Button Style="{StaticResource FooterButton}" Content="Cancel" Command="{Binding CancelDebtFormCommand}" />
+                                    <ui:Button Style="{StaticResource FooterButton}" Appearance="Primary" Content="Save" Icon="{ui:SymbolIcon Checkmark24}" Command="{Binding SaveDebtCommand}" />
+                                </StackPanel>
+                                <TextBlock Text="It then counts neither as spending nor as income" Style="{DynamicResource HelmSecondaryText}" FontSize="12" VerticalAlignment="Center" />
+                            </DockPanel>
+                        </Border>
+                        <ContentControl DockPanel.Dock="Bottom" Template="{StaticResource ErrorBand}" Focusable="False" />
+                        <ScrollViewer VerticalScrollBarVisibility="Auto">
+                            <StackPanel Margin="24,12,24,8" DataContext="{Binding Selected}">
+                                <Border Style="{StaticResource Box}" Margin="0,0,0,16">
+                                    <DockPanel>
+                                        <TextBlock DockPanel.Dock="Right" Text="{Binding AmountText}" Style="{StaticResource AmountText}" Margin="12,0,0,0" />
+                                        <self:CategoryBadge Icon="{Binding CategoryIcon}" Color="{Binding CategoryColor}" Size="30" Margin="0,0,10,0" />
+                                        <TextBlock Text="{Binding Title}" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
+                                    </DockPanel>
+                                </Border>
+                                <StackPanel Style="{StaticResource Field}">
+                                    <TextBlock Text="Person" Style="{StaticResource FieldLabel}" />
+                                    <ComboBox IsEditable="True" IsTextSearchEnabled="True" ItemsSource="{Binding DebtNames}" Text="{Binding DebtPerson, UpdateSourceTrigger=PropertyChanged}"
+                                              AutomationProperties.Name="Person" ToolTip="Who it is with. A name already in the book adds to that person." />
+                                    <ItemsControl ItemsSource="{Binding DebtNames}" ItemsPanel="{StaticResource Wrap}" Focusable="False" Margin="0,8,0,0">
+                                        <ItemsControl.ItemTemplate>
+                                            <DataTemplate>
+                                                <Button Style="{StaticResource Chip}" Padding="12,3" Content="{Binding}"
+                                                        Command="{Binding DataContext.PickDebtPersonCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}" CommandParameter="{Binding}" />
+                                            </DataTemplate>
+                                        </ItemsControl.ItemTemplate>
+                                    </ItemsControl>
+                                    <TextBlock Text="A name already in the book adds to that person." Style="{StaticResource FieldHint}" />
+                                </StackPanel>
+                                <StackPanel Style="{StaticResource Field}">
+                                    <TextBlock Text="Kind" Style="{StaticResource FieldLabel}" />
+                                    <ListBox Style="{StaticResource Segmented}" ItemsSource="{x:Static local:TransactionRow.DebtKindNames}" SelectedIndex="{Binding DebtKindIndex}" AutomationProperties.Name="Kind" />
+                                    <TextBlock Text="{Binding DebtKindHelp}" Style="{StaticResource FieldHint}" />
+                                </StackPanel>
+                                <StackPanel Style="{StaticResource Field}">
+                                    <TextBlock Style="{StaticResource FieldLabel}">
+                                        <Run Text="Note" />
+                                        <Run Text="(optional)" FontWeight="Normal" />
+                                    </TextBlock>
+                                    <ui:TextBox AutomationProperties.Name="Debt note" Text="{Binding DebtNote, UpdateSourceTrigger=PropertyChanged}" />
+                                </StackPanel>
+                            </StackPanel>
+                        </ScrollViewer>
+                    </DockPanel>
+
+                    <!-- ============ Transactions to categorize ============ -->
+                    <DockPanel Visibility="{Binding ShowToCategorizePopup, Converter={StaticResource BoolToVisibility}}">
+                        <DockPanel DockPanel.Dock="Top" Margin="24,20,16,4">
+                            <ui:Button DockPanel.Dock="Right" Style="{StaticResource Close}" />
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Text="To categorize" Style="{StaticResource DialogTitle}" />
+                                <Border Style="{StaticResource Pill}" Margin="10,0,0,0" Visibility="{Binding HasToCategorize, Converter={StaticResource BoolToVisibility}}">
+                                    <TextBlock Text="{Binding ToCategorize.Count}" FontSize="12" FontWeight="SemiBold" HorizontalAlignment="Center" VerticalAlignment="Center"
+                                               Foreground="{DynamicResource TextOnAccentFillColorPrimaryBrush}" />
+                                </Border>
+                            </StackPanel>
+                        </DockPanel>
+                        <Border Style="{StaticResource Footer}">
+                            <ui:Button HorizontalAlignment="Right" Appearance="Primary" Content="Done" Command="{Binding ClosePopupCommand}" />
+                        </Border>
+                        <ScrollViewer VerticalScrollBarVisibility="Auto">
+                            <StackPanel Margin="0,8,0,12">
+                                <TextBlock Margin="24,0,24,10" Style="{DynamicResource HelmSecondaryText}" TextWrapping="Wrap"
+                                           Text="Click a category to file a transaction, or the row for everything else." />
+                                <Border Style="{StaticResource Box}" Margin="24,0,24,12" Visibility="{Binding HasSimilar, Converter={StaticResource BoolToVisibility}}">
+                                    <DockPanel>
+                                        <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center">
+                                            <ui:Button Appearance="Primary" Content="Yes" Command="{Binding ApplySimilarCommand}" Margin="8,0,6,0" />
+                                            <ui:Button Content="No" Command="{Binding DismissSimilarCommand}" />
+                                        </StackPanel>
+                                        <ui:SymbolIcon Symbol="Sparkle24" FontSize="18" Margin="0,0,10,0" Foreground="{DynamicResource AccentTextFillColorPrimaryBrush}" VerticalAlignment="Center" />
+                                        <TextBlock Text="{Binding SimilarText}" TextWrapping="Wrap" VerticalAlignment="Center" />
+                                    </DockPanel>
+                                </Border>
+                                <StackPanel Margin="24,24" HorizontalAlignment="Center" Visibility="{Binding HasToCategorize, Converter={StaticResource InverseBoolToVisibility}}">
+                                    <ui:SymbolIcon Symbol="CheckmarkCircle24" FontSize="32" Foreground="{DynamicResource SystemFillColorSuccessBrush}" HorizontalAlignment="Center" />
+                                    <TextBlock Text="All categorized" FontWeight="SemiBold" HorizontalAlignment="Center" Margin="0,6,0,2" />
+                                    <TextBlock Text="New ones from the bank show up here, and on the button." Style="{DynamicResource HelmSecondaryText}" HorizontalAlignment="Center" />
+                                </StackPanel>
+                                <ItemsControl ItemsSource="{Binding ToCategorize}" ItemTemplate="{StaticResource ToCategorizeRow}" Focusable="False" />
+                                <TextBlock Text="{Binding MoreToCategorizeText}" Style="{DynamicResource HelmSecondaryText}" Margin="24,8,24,0"
+                                           Visibility="{Binding HasMoreToCategorize, Converter={StaticResource BoolToVisibility}}" />
+                            </StackPanel>
+                        </ScrollViewer>
+                    </DockPanel>
+
+                    <!-- ============ A fund ============ -->
+                    <DockPanel Visibility="{Binding ShowFundPopup, Converter={StaticResource BoolToVisibility}}">
+                        <DockPanel DockPanel.Dock="Top" Margin="24,20,16,4" DataContext="{Binding Funds.Selected}">
+                            <ui:Button DockPanel.Dock="Right" Style="{StaticResource Close}" />
+                            <StackPanel>
+                                <TextBlock Text="{Binding Name}" Style="{StaticResource DialogTitle}" />
+                                <TextBlock Style="{DynamicResource HelmSecondaryText}" TextWrapping="Wrap" Margin="0,2,0,0">
+                                    <Run Text="{Binding KindText, Mode=OneWay}" />
+                                    <Run Text="·" />
+                                    <Run Text="{Binding CategoriesText, Mode=OneWay}" />
+                                </TextBlock>
+                            </StackPanel>
+                        </DockPanel>
+                        <Border Style="{StaticResource Footer}">
+                            <DockPanel DataContext="{Binding Funds}">
+                                <ui:Button DockPanel.Dock="Left" Content="Delete" Icon="{ui:SymbolIcon Delete24}" Command="{Binding DeleteSelectedCommand}"
+                                           Foreground="{DynamicResource SystemFillColorCriticalBrush}" />
+                                <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                                    <ui:Button Style="{StaticResource FooterButton}" Content="Move money in…" Icon="{ui:SymbolIcon ArrowSwap24}" Command="{Binding OpenCoverCommand}"
+                                               ToolTip="Take money from another fund for this month" />
+                                    <ui:Button Style="{StaticResource FooterButton}" Content="Edit" Icon="{ui:SymbolIcon Edit24}" Command="{Binding EditSelectedCommand}" />
+                                    <ui:Button Style="{StaticResource FooterButton}" Appearance="Primary" Content="Done"
+                                               Command="{Binding DataContext.ClosePopupCommand, RelativeSource={RelativeSource AncestorType=UserControl}}" />
+                                </StackPanel>
+                            </DockPanel>
+                        </Border>
+                        <ScrollViewer VerticalScrollBarVisibility="Auto">
+                            <StackPanel Margin="24,12,24,20" DataContext="{Binding Funds}">
+                                <DockPanel Margin="0,0,0,12" DataContext="{Binding Selected}">
+                                    <self:FundJar Width="88" Height="98" Margin="0,0,20,0" Level="{Binding LeftShare}" Color="{Binding Color}" Status="{Binding Status}" Text="{Binding PercentText}"
+                                                  TextSize="16" />
+                                    <StackPanel VerticalAlignment="Center">
+                                        <TextBlock>
+                                            <Run Text="{Binding BigText, Mode=OneWay}" FontSize="30" FontWeight="SemiBold" />
+                                            <Run Text="{Binding BigLabel, Mode=OneWay}" FontSize="15" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+                                        </TextBlock>
+                                        <StackPanel Orientation="Horizontal" Margin="0,2,0,0">
+                                            <ui:SymbolIcon Style="{StaticResource FundStatusIcon}" />
+                                            <TextBlock Text="{Binding StatusText}" Style="{StaticResource FundStatusText}" FontSize="13" />
+                                        </StackPanel>
+                                        <self:BudgetMeter Margin="0,10,0,0" Width="300" HorizontalAlignment="Left" Percent="{Binding SpentPercent}"
+                                                          Pace="{Binding DataContext.BudgetPacePercent, RelativeSource={RelativeSource AncestorType=UserControl}}" IsOver="{Binding IsOver}"
+                                                          ToolTip="The mark is where spending would be on track today" />
+                                    </StackPanel>
+                                </DockPanel>
+                                <UniformGrid Columns="3" Margin="0,0,0,10" DataContext="{Binding Selected}">
+                                    <Border Style="{StaticResource Box}" Margin="0,0,4,0">
+                                        <StackPanel>
+                                            <TextBlock Text="Fund" Style="{DynamicResource HelmSecondaryText}" FontSize="12" />
+                                            <TextBlock Text="{Binding AmountText}" FontWeight="SemiBold" />
+                                        </StackPanel>
+                                    </Border>
+                                    <Border Style="{StaticResource Box}" Margin="2,0,2,0">
+                                        <StackPanel>
+                                            <TextBlock Text="Spent" Style="{DynamicResource HelmSecondaryText}" FontSize="12" />
+                                            <TextBlock Text="{Binding SpentText}" FontWeight="SemiBold" />
+                                        </StackPanel>
+                                    </Border>
+                                    <Border Style="{StaticResource Box}" Margin="4,0,0,0">
+                                        <StackPanel>
+                                            <TextBlock Text="At month end" Style="{DynamicResource HelmSecondaryText}" FontSize="12" />
+                                            <TextBlock Text="{Binding CarryText}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+                                        </StackPanel>
+                                    </Border>
+                                </UniformGrid>
+                                <TextBlock Text="{Binding Selected.PerDayText}" Style="{DynamicResource HelmSecondaryText}" TextWrapping="Wrap" Margin="0,0,0,14" />
+                                <Border Style="{StaticResource Box}" Margin="0,0,0,16" BorderBrush="{DynamicResource SystemFillColorCriticalBrush}"
+                                        Visibility="{Binding Selected.IsOver, Converter={StaticResource BoolToVisibility}, FallbackValue=Collapsed}">
+                                    <DockPanel>
+                                        <ui:Button DockPanel.Dock="Right" Appearance="Primary" Content="Cover it…" Command="{Binding OpenCoverCommand}" VerticalAlignment="Center" Margin="12,0,0,0" />
+                                        <ui:SymbolIcon Symbol="ErrorCircle24" FontSize="18" Margin="0,0,10,0" Foreground="{DynamicResource SystemFillColorCriticalBrush}" VerticalAlignment="Center" />
+                                        <TextBlock TextWrapping="Wrap" VerticalAlignment="Center"><Run Text="{Binding Selected.StatusText, Mode=OneWay}" /><Run Text=". Cover it from a fund with money left, or leave it over." /></TextBlock>
+                                    </DockPanel>
+                                </Border>
+                                <TextBlock Text="Categories in this fund" Style="{StaticResource FieldLabel}" />
+                                <ItemsControl ItemsSource="{Binding Selected.Categories}" ItemTemplate="{StaticResource ChoiceChip}" ItemsPanel="{StaticResource Wrap}" Focusable="False"
+                                              Margin="0,0,0,10" />
+                                <TextBlock Text="Spent from it this month" Style="{StaticResource FieldLabel}" />
+                                <TextBlock Text="Nothing yet." Style="{DynamicResource HelmSecondaryText}" Visibility="{Binding HasSelectedRows, Converter={StaticResource InverseBoolToVisibility}}" />
+                                <Border CornerRadius="6" BorderThickness="1" BorderBrush="{DynamicResource CardStrokeColorDefaultBrush}" ClipToBounds="True"
+                                        Visibility="{Binding HasSelectedRows, Converter={StaticResource BoolToVisibility}}">
+                                    <ItemsControl ItemsSource="{Binding SelectedRows}" Focusable="False">
+                                        <ItemsControl.ItemTemplate>
+                                            <DataTemplate>
+                                                <Border BorderThickness="0,0,0,1" BorderBrush="{DynamicResource CardStrokeColorDefaultBrush}">
+                                                    <ContentPresenter Content="{Binding}" ContentTemplate="{StaticResource TransactionRow}" />
+                                                </Border>
+                                            </DataTemplate>
+                                        </ItemsControl.ItemTemplate>
+                                    </ItemsControl>
+                                </Border>
+                            </StackPanel>
+                        </ScrollViewer>
+                    </DockPanel>
+
+                    <!-- ============ Add or edit a fund ============ -->
+                    <DockPanel Visibility="{Binding ShowFundFormPopup, Converter={StaticResource BoolToVisibility}}">
+                        <DockPanel DockPanel.Dock="Top" Margin="24,20,16,4">
+                            <ui:Button DockPanel.Dock="Right" Style="{StaticResource Close}" />
+                            <TextBlock Text="{Binding Funds.FormTitle}" Style="{StaticResource DialogTitle}" />
+                        </DockPanel>
+                        <Border Style="{StaticResource Footer}">
+                            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                                <ui:Button Style="{StaticResource FooterButton}" Content="Cancel" Command="{Binding DismissPopupCommand}" />
+                                <ui:Button Style="{StaticResource FooterButton}" Appearance="Primary" Content="{Binding Funds.FormSaveText}" Icon="{ui:SymbolIcon Checkmark24}"
+                                           Command="{Binding Funds.SaveFormCommand}" />
+                            </StackPanel>
+                        </Border>
+                        <ContentControl DockPanel.Dock="Bottom" Template="{StaticResource ErrorBand}" Focusable="False" />
+                        <ScrollViewer VerticalScrollBarVisibility="Auto">
+                            <StackPanel Margin="24,12,24,8" DataContext="{Binding Funds}">
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="16" />
+                                        <ColumnDefinition Width="*" />
+                                    </Grid.ColumnDefinitions>
+                                    <StackPanel Style="{StaticResource Field}">
+                                        <TextBlock Text="Name" Style="{StaticResource FieldLabel}" />
+                                        <ui:TextBox x:Name="FundNameBox" PlaceholderText="Eating, Trip to Da Lat…" AutomationProperties.Name="Fund name" Padding="10,10"
+                                                    Text="{Binding FormName, UpdateSourceTrigger=PropertyChanged}">
+                                            <ui:TextBox.InputBindings>
+                                                <KeyBinding Key="Enter" Command="{Binding SaveFormCommand}" />
+                                            </ui:TextBox.InputBindings>
+                                        </ui:TextBox>
+                                    </StackPanel>
+                                    <StackPanel Grid.Column="2" Style="{StaticResource Field}">
+                                        <TextBlock Text="Amount" Style="{StaticResource FieldLabel}" />
+                                        <Grid>
+                                            <ui:TextBox FontSize="18" FontWeight="SemiBold" PlaceholderText="2tr, 500k" Padding="10,6,32,6" AutomationProperties.Name="Fund amount" ClearButtonEnabled="False"
+                                                        Text="{Binding FormAmount, UpdateSourceTrigger=PropertyChanged}" TextChanged="OnAmountTextChanged">
+                                                <ui:TextBox.InputBindings>
+                                                    <KeyBinding Key="Enter" Command="{Binding SaveFormCommand}" />
+                                                </ui:TextBox.InputBindings>
+                                            </ui:TextBox>
+                                            <TextBlock Text="₫" HorizontalAlignment="Right" VerticalAlignment="Center" Margin="0,0,12,0" FontSize="16" Style="{DynamicResource HelmSecondaryText}" />
+                                        </Grid>
+                                        <TextBlock Text="{Binding FormAmountHint}" Style="{StaticResource FieldHint}" />
+                                    </StackPanel>
+                                </Grid>
+                                <StackPanel Style="{StaticResource Field}">
+                                    <TextBlock Text="Kind" Style="{StaticResource FieldLabel}" />
+                                    <ListBox Style="{StaticResource Segmented}" ItemsSource="{x:Static local:FundsViewModel.FormKindNames}" SelectedIndex="{Binding FormKindIndex}"
+                                             AutomationProperties.Name="Kind" />
+                                    <TextBlock Text="{Binding FormKindHelp}" Style="{StaticResource FieldHint}" />
+                                </StackPanel>
+                                <StackPanel Style="{StaticResource Field}">
+                                    <TextBlock Text="Categories" Style="{StaticResource FieldLabel}" />
+                                    <ItemsControl ItemsSource="{Binding FormPicks}" ItemTemplate="{StaticResource PickChip}" ItemsPanel="{StaticResource Wrap}" Focusable="False" />
+                                    <TextBlock Style="{StaticResource FieldHint}"
+                                               Text="A category belongs to one fund, so nothing is counted twice. Picking one from another fund moves it here." />
+                                </StackPanel>
+                                <StackPanel Style="{StaticResource Field}" Visibility="{Binding FormEveryMonth, Converter={StaticResource BoolToVisibility}}">
+                                    <TextBlock Text="At the end of the month" Style="{StaticResource FieldLabel}" />
+                                    <ListBox Style="{StaticResource Segmented}" ItemsSource="{x:Static local:FundsViewModel.FormCarryNames}" SelectedIndex="{Binding FormCarryIndex}"
+                                             AutomationProperties.Name="At the end of the month" />
+                                    <TextBlock Text="{Binding FormCarryHelp}" Style="{StaticResource FieldHint}" />
+                                </StackPanel>
+                                <StackPanel Style="{StaticResource Field}">
+                                    <TextBlock Text="Warn me" Style="{StaticResource FieldLabel}" />
+                                    <ListBox Style="{StaticResource Segmented}" ItemsSource="{x:Static local:FundsViewModel.FormAlertNames}" SelectedIndex="{Binding FormAlertIndex}"
+                                             AutomationProperties.Name="Warn me" />
+                                    <TextBlock Text="The fund turns amber, and the phone tells you. Going over always warns." Style="{StaticResource FieldHint}" />
+                                </StackPanel>
+                            </StackPanel>
+                        </ScrollViewer>
+                    </DockPanel>
+
+                    <!-- ============ Move money into a fund ============ -->
+                    <DockPanel Visibility="{Binding ShowCoverPopup, Converter={StaticResource BoolToVisibility}}">
+                        <DockPanel DockPanel.Dock="Top" Margin="24,20,16,4">
+                            <ui:Button DockPanel.Dock="Right" Style="{StaticResource Close}" />
+                            <TextBlock Style="{StaticResource DialogTitle}">
+                                <Run Text="Move money into" />
+                                <Run Text="{Binding Funds.Selected.Name, Mode=OneWay}" />
+                            </TextBlock>
+                        </DockPanel>
+                        <Border Style="{StaticResource Footer}">
+                            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                                <ui:Button Style="{StaticResource FooterButton}" Content="Cancel" Command="{Binding DismissPopupCommand}" />
+                                <ui:Button Style="{StaticResource FooterButton}" Appearance="Primary" Content="Move" Icon="{ui:SymbolIcon ArrowSwap24}" Command="{Binding Funds.SaveCoverCommand}" />
+                            </StackPanel>
+                        </Border>
+                        <ContentControl DockPanel.Dock="Bottom" Template="{StaticResource ErrorBand}" Focusable="False" />
+                        <ScrollViewer VerticalScrollBarVisibility="Auto">
+                            <StackPanel Margin="24,12,24,8" DataContext="{Binding Funds}">
+                                <TextBlock Text="It comes out of another fund for this month only. Next month both start at their usual amounts." Style="{DynamicResource HelmSecondaryText}"
+                                           TextWrapping="Wrap" Margin="0,0,0,16" />
+                                <StackPanel Style="{StaticResource Field}">
+                                    <TextBlock Text="From" Style="{StaticResource FieldLabel}" />
+                                    <TextBlock Text="No other fund has money left this month." Style="{DynamicResource HelmSecondaryText}"
+                                               Visibility="{Binding HasNoCoverChoices, Converter={StaticResource BoolToVisibility}}" />
+                                    <ItemsControl ItemsSource="{Binding CoverChoices}" ItemsPanel="{StaticResource Wrap}" Focusable="False">
+                                        <ItemsControl.ItemTemplate>
+                                            <DataTemplate DataType="{x:Type local:FundChoice}">
+                                                <Button Style="{StaticResource Chip}" Padding="12,3" Content="{Binding Name}" Command="{Binding PickCommand}" />
+                                            </DataTemplate>
+                                        </ItemsControl.ItemTemplate>
+                                    </ItemsControl>
+                                </StackPanel>
+                                <StackPanel Style="{StaticResource Field}">
+                                    <TextBlock Text="Amount" Style="{StaticResource FieldLabel}" />
+                                    <Grid>
+                                        <ui:TextBox FontSize="18" FontWeight="SemiBold" Padding="10,6,32,6" AutomationProperties.Name="Amount to move" ClearButtonEnabled="False"
+                                                    Text="{Binding CoverAmount, UpdateSourceTrigger=PropertyChanged}" TextChanged="OnAmountTextChanged">
+                                            <ui:TextBox.InputBindings>
+                                                <KeyBinding Key="Enter" Command="{Binding SaveCoverCommand}" />
+                                            </ui:TextBox.InputBindings>
+                                        </ui:TextBox>
+                                        <TextBlock Text="₫" HorizontalAlignment="Right" VerticalAlignment="Center" Margin="0,0,12,0" FontSize="16" Style="{DynamicResource HelmSecondaryText}" />
+                                    </Grid>
+                                    <TextBlock Text="{Binding CoverHint}" Style="{StaticResource FieldHint}" />
+                                </StackPanel>
+                                <Border Style="{StaticResource Box}" Visibility="{Binding HasCoverPreview, Converter={StaticResource BoolToVisibility}}">
+                                    <StackPanel>
+                                        <TextBlock Text="After the move" Style="{DynamicResource HelmSecondaryText}" FontSize="12" Margin="0,0,0,4" />
+                                        <TextBlock Text="{Binding CoverPreview}" TextWrapping="Wrap" />
+                                    </StackPanel>
+                                </Border>
+                            </StackPanel>
+                        </ScrollViewer>
+                    </DockPanel>
+
+                    <!-- ============ Add a debt ============ -->
+                    <DockPanel Visibility="{Binding ShowAddDebtPopup, Converter={StaticResource BoolToVisibility}}">
+                        <DockPanel DockPanel.Dock="Top" Margin="24,20,16,4">
+                            <ui:Button DockPanel.Dock="Right" Style="{StaticResource Close}" />
+                            <TextBlock Text="Add debt" Style="{StaticResource DialogTitle}" />
+                        </DockPanel>
+                        <Border Style="{StaticResource Footer}">
+                            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                                <ui:Button Style="{StaticResource FooterButton}" Content="Cancel" Command="{Binding DismissPopupCommand}" />
+                                <ui:Button Style="{StaticResource FooterButton}" Appearance="Primary" Content="Add" Icon="{ui:SymbolIcon Checkmark24}" Command="{Binding Debts.AddCommand}" />
+                            </StackPanel>
+                        </Border>
+                        <ContentControl DockPanel.Dock="Bottom" Template="{StaticResource ErrorBand}" Focusable="False" />
+                        <ScrollViewer VerticalScrollBarVisibility="Auto">
+                            <StackPanel Margin="24,12,24,8" DataContext="{Binding Debts}">
+                                <StackPanel Style="{StaticResource Field}">
+                                    <TextBlock Text="Person" Style="{StaticResource FieldLabel}" />
+                                    <ui:TextBox x:Name="PersonBox" PlaceholderText="Who it is with" AutomationProperties.Name="Person" Icon="{ui:SymbolIcon Person24}"
+                                                Text="{Binding NewPerson, UpdateSourceTrigger=PropertyChanged}">
+                                        <ui:TextBox.InputBindings>
+                                            <KeyBinding Key="Enter" Command="{Binding AddCommand}" />
+                                        </ui:TextBox.InputBindings>
+                                    </ui:TextBox>
+                                    <ItemsControl ItemsSource="{Binding PersonSuggestions}" ItemsPanel="{StaticResource Wrap}" Focusable="False" Margin="0,8,0,0"
+                                                  Visibility="{Binding HasPersonSuggestions, Converter={StaticResource BoolToVisibility}}">
+                                        <ItemsControl.ItemTemplate>
+                                            <DataTemplate>
+                                                <Button Style="{StaticResource Chip}" Padding="12,3" Content="{Binding}"
+                                                        Command="{Binding DataContext.PickPersonCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}" CommandParameter="{Binding}" />
+                                            </DataTemplate>
+                                        </ItemsControl.ItemTemplate>
+                                    </ItemsControl>
+                                    <TextBlock Text="A name already in the book adds to that person." Style="{StaticResource FieldHint}" />
+                                </StackPanel>
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="16" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <StackPanel Style="{StaticResource Field}">
+                                        <TextBlock Text="Amount" Style="{StaticResource FieldLabel}" />
+                                        <Grid>
+                                            <ui:TextBox FontSize="18" FontWeight="SemiBold" PlaceholderText="150k, 1.5tr" Padding="10,6,32,6" AutomationProperties.Name="Amount" ClearButtonEnabled="False"
+                                                        Text="{Binding NewAmount, UpdateSourceTrigger=PropertyChanged}" TextChanged="OnAmountTextChanged">
+                                                <ui:TextBox.InputBindings>
+                                                    <KeyBinding Key="Enter" Command="{Binding AddCommand}" />
+                                                </ui:TextBox.InputBindings>
+                                            </ui:TextBox>
+                                            <TextBlock Text="₫" HorizontalAlignment="Right" VerticalAlignment="Center" Margin="0,0,12,0" FontSize="16" Style="{DynamicResource HelmSecondaryText}" />
+                                        </Grid>
+                                        <TextBlock Text="{Binding NewAmountHint}" Style="{StaticResource FieldHint}" />
+                                    </StackPanel>
+                                    <StackPanel Grid.Column="2" Style="{StaticResource Field}">
+                                        <TextBlock Text="Kind" Style="{StaticResource FieldLabel}" />
+                                        <ListBox Style="{StaticResource Segmented}" ItemsSource="{x:Static local:DebtsViewModel.KindNames}" SelectedIndex="{Binding NewKindIndex}" AutomationProperties.Name="Kind" />
+                                        <TextBlock Text="{Binding NewKindHelp}" Style="{StaticResource FieldHint}" MaxWidth="280" HorizontalAlignment="Left" />
+                                    </StackPanel>
+                                </Grid>
+                                <StackPanel Style="{StaticResource Field}">
+                                    <TextBlock Style="{StaticResource FieldLabel}">
+                                        <Run Text="What it was for" />
+                                        <Run Text="(optional)" FontWeight="Normal" />
+                                    </TextBlock>
+                                    <ui:TextBox AutomationProperties.Name="What it was for" Text="{Binding NewNote, UpdateSourceTrigger=PropertyChanged}">
+                                        <ui:TextBox.InputBindings>
+                                            <KeyBinding Key="Enter" Command="{Binding AddCommand}" />
+                                        </ui:TextBox.InputBindings>
+                                    </ui:TextBox>
+                                </StackPanel>
+                                <StackPanel Style="{StaticResource Field}">
+                                    <TextBlock Style="{StaticResource FieldLabel}">
+                                        <Run Text="Due date" />
+                                        <Run Text="(optional)" FontWeight="Normal" />
+                                    </TextBlock>
+                                    <core:DateTimeBox Width="300" HorizontalAlignment="Left" Date="{Binding NewDueDate}" Time="{Binding NewDueTime}" Lean="Future" AllowEmpty="True"
+                                                      PlaceholderText="No due date" AutomationProperties.Name="Due date and time" />
+                                </StackPanel>
+                            </StackPanel>
+                        </ScrollViewer>
+                    </DockPanel>
+
+                    <!-- ============ A person in the debt book ============ -->
+                    <DockPanel Visibility="{Binding ShowPersonPopup, Converter={StaticResource BoolToVisibility}}">
+                        <DockPanel DockPanel.Dock="Top" Margin="24,20,16,4" DataContext="{Binding Debts.SelectedPerson}">
+                            <ui:Button DockPanel.Dock="Right" Style="{StaticResource Close}" />
+                            <Border DockPanel.Dock="Left" Width="44" Height="44" CornerRadius="22" Margin="0,0,12,0" Background="{DynamicResource ControlFillColorSecondaryBrush}">
+                                <TextBlock Text="{Binding Initial}" FontSize="18" FontWeight="SemiBold" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                            </Border>
+                            <StackPanel VerticalAlignment="Center">
+                                <TextBlock Text="{Binding Name}" Style="{StaticResource DialogTitle}" />
+                                <TextBlock Text="{Binding DueText}" FontSize="13">
+                                    <TextBlock.Style>
+                                        <Style TargetType="TextBlock" BasedOn="{StaticResource HelmSecondaryText}">
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding IsOverdue}" Value="True">
+                                                    <Setter Property="Foreground" Value="{DynamicResource SystemFillColorCriticalBrush}" />
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </TextBlock.Style>
+                                </TextBlock>
+                            </StackPanel>
+                        </DockPanel>
+                        <Border Style="{StaticResource Footer}">
+                            <DockPanel DataContext="{Binding Debts.SelectedPerson}">
+                                <ui:Button DockPanel.Dock="Left" Content="Add entry" Icon="{ui:SymbolIcon Add24}" Command="{Binding AddEntryCommand}" />
+                                <ui:Button HorizontalAlignment="Right" Appearance="Primary" Content="Done"
+                                           Command="{Binding DataContext.ClosePopupCommand, RelativeSource={RelativeSource AncestorType=UserControl}}" />
+                            </DockPanel>
+                        </Border>
+                        <ContentControl DockPanel.Dock="Bottom" Template="{StaticResource ErrorBand}" Focusable="False" />
+                        <ScrollViewer VerticalScrollBarVisibility="Auto">
+                            <StackPanel Margin="24,12,24,20" DataContext="{Binding Debts.SelectedPerson}">
+                                <TextBlock Text="{Binding BalanceText}" FontSize="30" Style="{StaticResource SignedText}" HorizontalAlignment="Left" />
+                                <TextBlock Text="{Binding VerbText}" Style="{DynamicResource HelmSecondaryText}" Margin="0,0,0,16" />
+                                <StackPanel Style="{StaticResource Field}" Visibility="{Binding IsSettled, Converter={StaticResource InverseBoolToVisibility}}">
+                                    <TextBlock Text="Due date" Style="{StaticResource FieldLabel}" />
+                                    <WrapPanel>
+                                        <ui:Button Margin="0,0,6,6" Content="+1 day" Command="{Binding ExtendCommand}" CommandParameter="1" ToolTip="Due one day later" />
+                                        <ui:Button Margin="0,0,6,6" Content="+1 week" Command="{Binding ExtendCommand}" CommandParameter="7" ToolTip="Due a week later" />
+                                        <ui:Button Margin="0,0,12,6" Content="+1 month" Command="{Binding ExtendCommand}" CommandParameter="30" ToolTip="Due 30 days later" />
+                                        <ui:Button Margin="0,0,6,6" Appearance="Transparent" Content="No due date" Command="{Binding ClearDueCommand}" />
+                                    </WrapPanel>
+                                    <StackPanel Orientation="Horizontal">
+                                        <core:DateTimeBox Width="260" Date="{Binding EditDueDate}" Time="{Binding EditDueTime}" Lean="Future" AllowEmpty="True" ShowChips="False"
+                                                          PlaceholderText="Or type: mai 9h, thứ 6" AutomationProperties.Name="Due date and time" />
+                                        <ui:Button Margin="6,0,0,0" Content="Set" Command="{Binding SetDueCommand}" />
+                                    </StackPanel>
+                                </StackPanel>
+                                <StackPanel Style="{StaticResource Field}" Visibility="{Binding HasLinks, Converter={StaticResource BoolToVisibility}}">
+                                    <TextBlock Text="Notes" Style="{StaticResource FieldLabel}" />
+                                    <core:LinksPanel DataContext="{Binding Links}" ShowActions="True" />
+                                </StackPanel>
+                                <TextBlock Text="History" Style="{StaticResource FieldLabel}" />
+                                <ItemsControl ItemsSource="{Binding Entries}" Focusable="False">
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate DataType="{x:Type local:DebtEntryRow}">
+                                            <Border BorderThickness="0,1,0,0" BorderBrush="{DynamicResource CardStrokeColorDefaultBrush}" Padding="0,8">
+                                                <Grid>
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="*" />
+                                                        <ColumnDefinition Width="Auto" />
+                                                        <ColumnDefinition Width="Auto" />
+                                                    </Grid.ColumnDefinitions>
+                                                    <StackPanel VerticalAlignment="Center">
+                                                        <StackPanel Orientation="Horizontal">
+                                                            <TextBlock Text="{Binding KindText}" />
+                                                            <ui:SymbolIcon Symbol="BuildingBank24" FontSize="14" Margin="6,0,0,0" ToolTip="From a Wallet transaction"
+                                                                           Visibility="{Binding FromTransaction, Converter={StaticResource BoolToVisibility}}" />
+                                                        </StackPanel>
+                                                        <TextBlock Style="{DynamicResource HelmSecondaryText}" FontSize="12" TextTrimming="CharacterEllipsis">
+                                                            <Run Text="{Binding When, Mode=OneWay}" />
+                                                            <Run Text="{Binding Note, Mode=OneWay}" />
+                                                        </TextBlock>
+                                                    </StackPanel>
+                                                    <StackPanel Grid.Column="1" Margin="12,0,0,0" VerticalAlignment="Center">
+                                                        <TextBlock Text="{Binding AmountText}" FontWeight="SemiBold" HorizontalAlignment="Right">
+                                                            <TextBlock.Style>
+                                                                <Style TargetType="TextBlock">
+                                                                    <Setter Property="Foreground" Value="{DynamicResource SystemFillColorCriticalBrush}" />
+                                                                    <Style.Triggers>
+                                                                        <DataTrigger Binding="{Binding IsIncrease}" Value="True">
+                                                                            <Setter Property="Foreground" Value="{DynamicResource SystemFillColorSuccessBrush}" />
+                                                                        </DataTrigger>
+                                                                    </Style.Triggers>
+                                                                </Style>
+                                                            </TextBlock.Style>
+                                                        </TextBlock>
+                                                        <TextBlock Text="{Binding BalanceText}" Style="{DynamicResource HelmSecondaryText}" FontSize="12" HorizontalAlignment="Right" />
+                                                    </StackPanel>
+                                                    <ui:Button Grid.Column="2" Style="{StaticResource RowAction}" Margin="12,0,0,0" Icon="{ui:SymbolIcon Delete24}" ToolTip="Delete this entry"
+                                                               AutomationProperties.Name="Delete entry" Command="{Binding DeleteCommand}" />
+                                                </Grid>
+                                            </Border>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                            </StackPanel>
+                        </ScrollViewer>
+                    </DockPanel>
+                </Grid>
+            </Border>
+        </Grid>
+
+        <!-- The notice that goes by itself -->
+        <Border VerticalAlignment="Bottom" HorizontalAlignment="Center" Margin="0,0,0,24" Padding="16,10" CornerRadius="8" BorderThickness="1" IsHitTestVisible="False"
+                Background="{DynamicResource SolidBackgroundFillColorQuarternaryBrush}" BorderBrush="{DynamicResource CardStrokeColorDefaultBrush}"
+                Visibility="{Binding HasToast, Converter={StaticResource BoolToVisibility}}">
+            <Border.Effect>
+                <DropShadowEffect BlurRadius="16" ShadowDepth="4" Opacity="0.3" />
+            </Border.Effect>
+            <StackPanel Orientation="Horizontal">
+                <ui:SymbolIcon Symbol="CheckmarkCircle24" FontSize="16" Margin="0,0,8,0" Foreground="{DynamicResource SystemFillColorSuccessBrush}" />
+                <TextBlock Text="{Binding Toast}" />
+            </StackPanel>
+        </Border>
+    </Grid>
+</UserControl>
