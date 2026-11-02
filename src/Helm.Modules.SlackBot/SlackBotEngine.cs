@@ -100,6 +100,9 @@ public sealed class SlackBotEngine : IAsyncDisposable
     /// <summary>Raised (on a worker thread) when the state, the status or the conversations changed.</summary>
     public event EventHandler? Changed;
 
+    /// <summary>Raised (on a worker thread) after Lumi replied for the user: who, where, Claude's line, the link.</summary>
+    public event EventHandler<SlackAlertLine>? Replied;
+
     public void Start()
     {
         lock (_gate)
@@ -148,6 +151,9 @@ public sealed class SlackBotEngine : IAsyncDisposable
         Api = api;
     }
 
+    /// <summary>Tests: as if Lumi had just replied.</summary>
+    internal void RaiseRepliedForTests(SlackAlertLine line) => Replied?.Invoke(this, line);
+
     /// <summary>New tokens, or Reconnect: starts over.</summary>
     public async Task RestartAsync()
     {
@@ -186,7 +192,9 @@ public sealed class SlackBotEngine : IAsyncDisposable
                 _logger.LogInformation("Slack Bot signed in to {Workspace}", Me.Url);
                 var reader = new SlackReader(api, Me, Inbox, () => _settings.Current);
                 reader.ForYou += (_, _) => SortSoon(ct);
-                var replier = new SlackReplier(api, _agent, Inbox, reader, () => _settings.Current, MeName, _logger);
+                var replier = new SlackReplier(api, _agent, Inbox, reader, () => _settings.Current, MeName, _logger,
+                    item => Replied?.Invoke(this, new SlackAlertLine(item.From, item.Where, item.Summary,
+                        SlackText.Permalink(Me?.Url ?? "https://slack.com/", item.Channel, item.Ts, item.ThreadTs))));
                 await RefreshConversationsAsync(api, reader, ct).ConfigureAwait(false);
                 _reader = reader;
                 Api = api;

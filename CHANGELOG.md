@@ -5,6 +5,13 @@ Format: [Keep a Changelog](https://keepachangelog.com), versions follow [SemVer]
 
 ## [Unreleased]
 
+### Added
+- **Slack Bot: news on your phone while you are away from the PC.** Through your own Telegram bot (made with
+  @BotFather in a minute; Helm sends to it straight from the PC), Slack Bot tells you when Lumi replied for you and,
+  with the hourly reminders, what still waits; every new to-do too if you want. It sends only while nobody touched the
+  keyboard or mouse for a few minutes (you choose), and only who wrote, where, Claude's one line and a link to open it
+  in Slack, never the message itself. The bot's token stays on this PC, encrypted.
+
 ### Fixed
 - **Slack Bot: catching up is quick, and the lists stop jumping.** After Helm was off it reads the conversations active
   in the last 30 days first and is ready at once; DMs nobody wrote in for a month, and DMs with people who left, are no

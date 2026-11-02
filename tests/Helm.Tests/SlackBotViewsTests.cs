@@ -77,7 +77,11 @@ public sealed class SlackBotViewsTests : IDisposable
         var inbox = new SlackBotInboxViewModel(engine, ui, launcher, new NoServices(), settings);
         var windows = new WindowService(NullLogger<WindowService>.Instance);
         var overlay = new SlackBotOverlay(inbox, settings, windows, ui, NullLogger<SlackBotOverlay>.Instance);
-        var module = new SlackBotModule(engine, overlay) { IsEnabled = true };
+        var telegramToken = new SlackTelegramToken(paths, protector);
+        var telegram = new SlackPhoneAlertsTests.FakeTelegram();
+        var phone = new SlackPhoneAlerts(telegram, telegramToken, settings, new SlackPhoneAlertsTests.Activity(0), engine, inbox,
+            NullLogger<SlackPhoneAlerts>.Instance);
+        var module = new SlackBotModule(engine, overlay, phone) { IsEnabled = true };
 
         // To do: the DM and the mention (one unsorted), not the channel chatter or what the user answered.
         Assert.Equal(["Tuấn", "Linh"], inbox.ToDo.Select(i => i.From));
@@ -107,7 +111,7 @@ public sealed class SlackBotViewsTests : IDisposable
             new SlackConversation("D1", "Tuấn", SlackConversationKind.DirectMessage, "U2"),
         ]);
         settings.Get<SlackBotSettings>(SlackBotModule.ModuleId).Update(v => v.Channels["C1"] = SlackChannelMode.Reply);
-        var viewModel = new SlackBotViewModel(module, engine, tokens, settings, ui, launcher, new NoServices(), overlay);
+        var viewModel = new SlackBotViewModel(module, engine, tokens, settings, ui, launcher, new NoServices(), overlay, telegramToken, telegram, phone);
         Assert.False(viewModel.HasTokens);
         Assert.Equal([true, false, true], viewModel.Channels.Select(c => c.CanRead));
         Assert.Equal([true, false, false], viewModel.Channels.Select(c => c.CanWrite));

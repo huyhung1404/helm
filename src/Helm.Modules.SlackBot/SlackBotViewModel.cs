@@ -20,6 +20,9 @@ public sealed partial class SlackBotViewModel : ObservableObject
     private readonly IProcessLauncher _launcher;
     private readonly IServiceProvider _services;
     private readonly SlackBotOverlay _overlay;
+    private readonly SlackTelegramToken _telegramToken;
+    private readonly ITelegram _telegram;
+    private readonly SlackPhoneAlerts _phone;
     private List<SlackChannelRow> _allChannels = [];
     private bool _loading;
 
@@ -34,6 +37,14 @@ public sealed partial class SlackBotViewModel : ObservableObject
     [ObservableProperty] private string _model = "";
     [ObservableProperty] private bool _playSound;
     [ObservableProperty] private int _remindEveryMinutes;
+    [ObservableProperty] private bool _telegramEnabled;
+    [ObservableProperty] private bool _telegramOnReply;
+    [ObservableProperty] private bool _telegramOnRemind;
+    [ObservableProperty] private bool _telegramOnNewToDo;
+    [ObservableProperty] private bool _telegramOnlyAway;
+    [ObservableProperty] private int _awayMinutes;
+    [ObservableProperty] private string _telegramStatus = "";
+    [ObservableProperty] private bool _hasTelegramToken;
     [ObservableProperty] private string _channelFilter = "";
     [ObservableProperty] private string _channelsSummary = "";
     [ObservableProperty] private string _signature = "";
@@ -44,8 +55,12 @@ public sealed partial class SlackBotViewModel : ObservableObject
     [ObservableProperty] private double _overlayOpacity;
 
     public SlackBotViewModel(SlackBotModule module, SlackBotEngine engine, SlackTokens tokens, ISettingsStoreFactory settings, IUiDispatcher ui,
-        IProcessLauncher launcher, IServiceProvider services, SlackBotOverlay overlay)
+        IProcessLauncher launcher, IServiceProvider services, SlackBotOverlay overlay, SlackTelegramToken telegramToken, ITelegram telegram,
+        SlackPhoneAlerts phone)
     {
+        _telegramToken = telegramToken;
+        _telegram = telegram;
+        _phone = phone;
         _overlay = overlay;
         Module = module;
         _engine = engine;
@@ -151,6 +166,90 @@ public sealed partial class SlackBotViewModel : ObservableObject
 
     partial void OnRemindEveryMinutesChanged(int value) => Save(s => s.RemindEveryMinutes = value);
 
+    partial void OnTelegramEnabledChanged(bool value) => Save(s => s.TelegramEnabled = value);
+
+    partial void OnTelegramOnReplyChanged(bool value) => Save(s => s.TelegramOnReply = value);
+
+    partial void OnTelegramOnRemindChanged(bool value) => Save(s => s.TelegramOnRemind = value);
+
+    partial void OnTelegramOnNewToDoChanged(bool value) => Save(s => s.TelegramOnNewToDo = value);
+
+    partial void OnTelegramOnlyAwayChanged(bool value) => Save(s => s.TelegramOnlyAway = value);
+
+    partial void OnAwayMinutesChanged(int value) => Save(s => s.AwayMinutes = Math.Clamp(value, 1, 120));
+
+    public IReadOnlyList<SlackBotChoice<int>> AwayChoices { get; } =
+    [
+        new(2, "2 minutes"),
+        new(5, "5 minutes"),
+        new(10, "10 minutes"),
+        new(30, "30 minutes"),
+    ];
+
+    /// <summary>The phone is set up (a chat was found).</summary>
+    public bool TelegramConnected => _store.Current.TelegramChatId is not null;
+
+    /// <summary>Saves the bot's token (from the password box); false with the reason in <see cref="TelegramStatus"/>.</summary>
+    public bool SaveTelegramToken(string token)
+    {
+        if (SlackTelegramToken.Problem(token) is { } problem)
+        {
+            TelegramStatus = problem;
+            return false;
+        }
+        _telegramToken.Save(token.Trim());
+        HasTelegramToken = true;
+        TelegramStatus = "Token saved. Now send /start to your bot in Telegram, then press Find my chat.";
+        return true;
+    }
+
+    [RelayCommand]
+    private async Task FindTelegramChat()
+    {
+        if (_telegramToken.Load() is not { } token)
+        {
+            TelegramStatus = "Save the bot token first.";
+            return;
+        }
+        try
+        {
+            if (await _telegram.FindChatAsync(token, CancellationToken.None) is not { } chat)
+            {
+                TelegramStatus = "Nobody wrote to the bot yet: open it in Telegram, send /start, then press Find my chat again.";
+                return;
+            }
+            _store.Update(s =>
+            {
+                s.TelegramChatId = chat.Id;
+                s.TelegramChatName = chat.Name;
+            });
+            TelegramStatus = (await _phone.TestAsync(CancellationToken.None)) is { } why
+                ? why
+                : $"Connected to {chat.Name}: a test message is on your phone.";
+        }
+        catch (TelegramException ex)
+        {
+            TelegramStatus = ex.Message;
+        }
+    }
+
+    [RelayCommand]
+    private async Task TestTelegram() =>
+        TelegramStatus = await _phone.TestAsync(CancellationToken.None) ?? "Sent: look at your phone.";
+
+    [RelayCommand]
+    private void ForgetTelegram()
+    {
+        _telegramToken.Delete();
+        _store.Update(s =>
+        {
+            s.TelegramChatId = null;
+            s.TelegramChatName = "";
+        });
+        HasTelegramToken = false;
+        TelegramStatus = "Telegram is disconnected.";
+    }
+
     partial void OnSignatureChanged(string value)
     {
         UpdatePreview();
@@ -203,6 +302,16 @@ public sealed partial class SlackBotViewModel : ObservableObject
             Model = s.Model;
             PlaySound = s.PlaySound;
             RemindEveryMinutes = s.RemindEveryMinutes;
+            TelegramEnabled = s.TelegramEnabled;
+            TelegramOnReply = s.TelegramOnReply;
+            TelegramOnRemind = s.TelegramOnRemind;
+            TelegramOnNewToDo = s.TelegramOnNewToDo;
+            TelegramOnlyAway = s.TelegramOnlyAway;
+            AwayMinutes = s.AwayMinutes;
+            HasTelegramToken = _telegramToken.Exists;
+            TelegramStatus = s.TelegramChatId is null
+                ? (HasTelegramToken ? "Send /start to your bot in Telegram, then press Find my chat." : "Not set up.")
+                : $"Connected to {s.TelegramChatName}.";
             Signature = s.Signature;
             SignatureEmoji = s.SignatureEmoji;
             ReplyStyle = s.ReplyStyle;

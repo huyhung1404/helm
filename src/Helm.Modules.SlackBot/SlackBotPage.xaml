@@ -220,5 +220,77 @@
             </ui:CardControl.Header>
             <ui:Button Content="Reset" Command="{Binding ResetOverlayCommand}" />
         </ui:CardControl>
+
+        <!-- The phone, through the user's own Telegram bot -->
+        <TextBlock Text="Phone (Telegram)" Style="{DynamicResource HelmSectionHeader}" />
+        <ui:CardExpander x:Name="TelegramExpander" Margin="0,0,0,4" Icon="{ui:SymbolIcon Phone24}">
+            <ui:CardExpander.Header>
+                <core:CardHeader Title="Telegram bot" Description="{Binding TelegramStatus}" />
+            </ui:CardExpander.Header>
+            <StackPanel>
+                <Border Style="{DynamicResource HelmExpanderRow}" BorderThickness="0">
+                    <core:CardHeader Title="1. Make your bot"
+                                     Description="In Telegram open @BotFather, send /newbot, name it (Lumi), and copy the token it gives you. Only who wrote, where and Claude's one line go to Telegram, never the message itself." />
+                </Border>
+                <Border Style="{DynamicResource HelmExpanderRow}">
+                    <core:RowLayout>
+                        <core:CardHeader Title="2. Bot token" Description="Kept on this PC only, encrypted." />
+                        <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                            <ui:PasswordBox x:Name="TelegramTokenBox" Width="260" PlaceholderText="123456789:AAH…" AutomationProperties.Name="Telegram bot token" />
+                            <ui:Button Margin="8,0,0,0" Content="Save" Click="SaveTelegramToken_Click" />
+                        </StackPanel>
+                    </core:RowLayout>
+                </Border>
+                <Border Style="{DynamicResource HelmExpanderRow}">
+                    <core:RowLayout>
+                        <core:CardHeader Title="3. Find your chat" Description="Open your bot in Telegram and send /start, then press this: a test message comes to your phone." />
+                        <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                            <ui:Button Content="Find my chat" Appearance="Primary" Command="{Binding FindTelegramChatCommand}" />
+                            <ui:Button Margin="8,0,0,0" Content="Send a test" Command="{Binding TestTelegramCommand}" />
+                            <ui:Button Margin="8,0,0,0" Content="Disconnect" Command="{Binding ForgetTelegramCommand}"
+                                       Visibility="{Binding HasTelegramToken, Converter={StaticResource BoolToVisibility}}" />
+                        </StackPanel>
+                    </core:RowLayout>
+                </Border>
+            </StackPanel>
+        </ui:CardExpander>
+        <ui:CardExpander Margin="0,0,0,4" IsExpanded="True" Icon="{ui:SymbolIcon Alert24}">
+            <ui:CardExpander.Header>
+                <core:RowLayout>
+                    <core:CardHeader Title="Send to my phone" Description="What goes to Telegram." />
+                    <ui:ToggleSwitch HorizontalAlignment="Right" Margin="0,0,16,0" IsChecked="{Binding TelegramEnabled}" AutomationProperties.Name="Send to my phone" />
+                </core:RowLayout>
+            </ui:CardExpander.Header>
+            <StackPanel IsEnabled="{Binding TelegramEnabled}">
+                <Border Style="{DynamicResource HelmExpanderRow}" BorderThickness="0">
+                    <core:RowLayout>
+                        <core:CardHeader Title="When Lumi replied for me" />
+                        <ui:ToggleSwitch HorizontalAlignment="Right" IsChecked="{Binding TelegramOnReply}" />
+                    </core:RowLayout>
+                </Border>
+                <Border Style="{DynamicResource HelmExpanderRow}">
+                    <core:RowLayout>
+                        <core:CardHeader Title="Reminders of what still waits" Description="With the list's reminders (Remind me of what still waits)." />
+                        <ui:ToggleSwitch HorizontalAlignment="Right" IsChecked="{Binding TelegramOnRemind}" />
+                    </core:RowLayout>
+                </Border>
+                <Border Style="{DynamicResource HelmExpanderRow}">
+                    <core:RowLayout>
+                        <core:CardHeader Title="Every new to-do" Description="Each message that lands on the list." />
+                        <ui:ToggleSwitch HorizontalAlignment="Right" IsChecked="{Binding TelegramOnNewToDo}" />
+                    </core:RowLayout>
+                </Border>
+                <Border Style="{DynamicResource HelmExpanderRow}">
+                    <core:RowLayout>
+                        <core:CardHeader Title="Only when I'm away from the PC" Description="Away: no keyboard or mouse for this long." />
+                        <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                            <ComboBox MinWidth="140" ItemsSource="{Binding AwayChoices}" DisplayMemberPath="Label" SelectedValuePath="Value"
+                                      SelectedValue="{Binding AwayMinutes}" IsEnabled="{Binding TelegramOnlyAway}" AutomationProperties.Name="Away after" />
+                            <ui:ToggleSwitch Margin="12,0,0,0" IsChecked="{Binding TelegramOnlyAway}" AutomationProperties.Name="Only when I'm away from the PC" />
+                        </StackPanel>
+                    </core:RowLayout>
+                </Border>
+            </StackPanel>
+        </ui:CardExpander>
     </StackPanel>
 </core:ModulePageBase>

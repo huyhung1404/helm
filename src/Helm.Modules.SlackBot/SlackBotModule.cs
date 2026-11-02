@@ -11,7 +11,7 @@ namespace Helm.Modules.SlackBot;
 /// Quick access open <see cref="SlackBotContentPage"/>; Home → Utilities opens the settings (<see cref="SlackBotPage"/>).
 /// Everything stays on this PC.
 /// </summary>
-public sealed class SlackBotModule(SlackBotEngine engine, SlackBotOverlay overlay) : HelmModuleBase, IModuleContent
+public sealed class SlackBotModule(SlackBotEngine engine, SlackBotOverlay overlay, SlackPhoneAlerts phone) : HelmModuleBase, IModuleContent
 {
     public const string ModuleId = "slackbot";
 
@@ -30,11 +30,13 @@ public sealed class SlackBotModule(SlackBotEngine engine, SlackBotOverlay overla
         StatusMessage = null;
         engine.Start();
         overlay.Start();
+        phone.Start();
         return Task.CompletedTask;
     }
 
     public override async Task DisableAsync()
     {
+        phone.Stop();
         overlay.Stop();
         await engine.StopAsync().ConfigureAwait(false);
     }
