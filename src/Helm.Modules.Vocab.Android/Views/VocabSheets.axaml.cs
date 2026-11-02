@@ -62,6 +62,12 @@ public partial class VocabSheets : UserControl
                 return true;
             }
         }
+        if (vm.Texts.IsOpen)
+        {
+            if (vm.Texts.IsDetailOpen) vm.Texts.BackCommand.Execute(null);
+            else vm.Texts.CloseCommand.Execute(null);
+            return true;
+        }
         if (vm.IsAddOpen)
         {
             vm.CloseAddCommand.Execute(null);
@@ -87,6 +93,9 @@ public partial class VocabSheets : UserControl
     private void Order_Tapped(object? sender, TappedEventArgs e) => Show(VocabSheet.None);
 
     private void CloseAdd_Click(object? sender, RoutedEventArgs e) => ViewModel?.CloseAddCommand.Execute(null);
+
+    /// <summary>A tap on the dimmed page closes Add text (from a text's words it goes back to the list first).</summary>
+    private void CloseTexts_Pressed(object? sender, Avalonia.Input.PointerPressedEventArgs e) => HandleBack();
 
     /// <summary>The card's word on its own page (the Words tab).</summary>
     private void OpenCardWord_Click(object? sender, RoutedEventArgs e)

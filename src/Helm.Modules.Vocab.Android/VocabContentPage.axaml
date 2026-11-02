@@ -19,7 +19,7 @@
             <!-- ===== App bar ===== -->
             <Panel DockPanel.Dock="Top" Height="56" Background="{DynamicResource HelmBarBackground}">
                 <!-- The tool's own -->
-                <Grid x:Name="HomeBar" ColumnDefinitions="Auto,*,Auto,Auto" Margin="4,0">
+                <Grid x:Name="HomeBar" ColumnDefinitions="Auto,*,Auto,Auto,Auto" Margin="4,0">
                     <Button Classes="icon" Click="Menu_Click" AutomationProperties.Name="Open navigation">
                         <ic:SymbolIcon Symbol="Navigation" FontSize="22" />
                     </Button>
@@ -32,7 +32,10 @@
                             </Border>
                         </Panel>
                     </Button>
-                    <Button x:Name="AddButton" Grid.Column="3" Classes="icon" Command="{Binding OpenAddCommand}" AutomationProperties.Name="Add words">
+                    <Button x:Name="TextButton" Grid.Column="3" Classes="icon" Command="{Binding Texts.OpenCommand}" AutomationProperties.Name="Add text">
+                        <ic:SymbolIcon Symbol="Document" FontSize="22" />
+                    </Button>
+                    <Button x:Name="AddButton" Grid.Column="4" Classes="icon" Command="{Binding OpenAddCommand}" AutomationProperties.Name="Add words">
                         <ic:SymbolIcon Symbol="Add" FontSize="24" />
                     </Button>
                 </Grid>

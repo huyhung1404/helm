@@ -101,6 +101,10 @@
                                    Visibility="{Binding HasNote, Converter={StaticResource BoolToVisibility}}">
                             <Run Text="Your note:" /> <Run Text="{Binding Word.Note, Mode=OneWay}" />
                         </TextBlock>
+                        <TextBlock Margin="0,4,0,0" FontSize="13" FontStyle="Italic" TextWrapping="Wrap" Style="{DynamicResource HelmSecondaryText}"
+                                   Visibility="{Binding HasSourceSentence, Converter={StaticResource BoolToVisibility}}">
+                            <Run Text="From the text:" /> <Run Text="{Binding Word.SourceSentence, Mode=OneWay}" />
+                        </TextBlock>
                         <WrapPanel Margin="0,12,0,0">
                             <ItemsControl Style="{StaticResource Dots}" ItemsSource="{Binding Dots}" Margin="0,0,6,4" />
                             <TextBlock Text="{Binding LevelText}" Margin="0,0,12,4" VerticalAlignment="Center" Style="{DynamicResource HelmSecondaryText}" />

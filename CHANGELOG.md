@@ -3,6 +3,22 @@
 All notable changes to Helm. The top section is used as the GitHub release body and as the Velopack release notes.
 Format: [Keep a Changelog](https://keepachangelog.com), versions follow [SemVer](https://semver.org).
 
+## [Unreleased]
+
+### Added
+- **Vocabulary: learn words from a text.** **Add text** (header button, Ctrl+Shift+N; on the phone the document button)
+  takes an article or song lyrics with where it comes from. Claude Code reads it, turns Chinese into simplified
+  characters, skips words you already have and proposes the words worth learning, each with its pinyin, meaning, the
+  line it comes from and why. You tick the ones to keep (words you already have stay dimmed) and press **Add N words**;
+  only those are analyzed, and each word keeps its line (“From the text: …”) on its page. AI agents use
+  `vocab_pending_texts` and `vocab_propose_words`.
+
+### Fixed
+- **Vocabulary: Helm's agent and an AI agent no longer work on the same words.** Words an AI agent over MCP adds or
+  reads are left to it for 10 minutes (Helm's own run, which started 20 seconds after new words arrive, used to pay
+  for the same analysis), the Analysis chip says "AI agent working…", and a batch save keeps a word that is already
+  analyzed as it is.
+
 ## [0.73.1] - 2026-11-02
 
 ### Added
