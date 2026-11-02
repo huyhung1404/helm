@@ -89,6 +89,15 @@ public sealed class VocabViewsTests : IDisposable
         Layout(page, size, "04-learn-revealed");
         Assert.Equal(Visibility.Collapsed, page.LearnView.NarrowBar.Visibility);
         Assert.Equal(0, Grid.GetRow(page.LearnView.InfoPart));
+        // The side sections fold away and stay so: the keys start folded; Today folded keeps its numbers in its title.
+        Assert.Equal(Visibility.Collapsed, page.LearnView.KeysBody.Visibility);
+        page.LearnView.TodayFold.RaiseEvent(new RoutedEventArgs(System.Windows.Controls.Primitives.ButtonBase.ClickEvent));
+        Assert.Equal(Visibility.Collapsed, page.LearnView.TodayBody.Visibility);
+        Assert.Equal(Visibility.Visible, page.LearnView.TodayLine.Visibility);
+        Assert.True(viewModel.Settings.IsFolded("today"));
+        Layout(page, size, "04c-learn-folded");
+        page.LearnView.TodayFold.RaiseEvent(new RoutedEventArgs(System.Windows.Controls.Primitives.ButtonBase.ClickEvent));
+        Assert.Equal(Visibility.Visible, page.LearnView.TodayBody.Visibility);
         Assert.True(Shows(page, "Remembered"));
         Assert.True(Shows(page, viewModel.Card.RememberedHint));
 

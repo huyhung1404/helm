@@ -3,6 +3,22 @@
 All notable changes to Helm. The top section is used as the GitHub release body and as the Velopack release notes.
 Format: [Keep a Changelog](https://keepachangelog.com), versions follow [SemVer](https://semver.org).
 
+## [Unreleased]
+
+### Added
+- **Vocabulary (PC): choose the Claude model that breaks words down.** Settings → Vocabulary → Claude model: Sonnet
+  (the new default), Haiku, Opus or Claude Code's own default. Analyses, help with hard words, pinyin hooks and
+  suggested words used to run on Claude Code's default, often a bigger model than the job needs.
+- **Vocabulary (PC): the Learn tab's Today, Cards and Keys fold away** with a click on their title, and stay so;
+  folded, Today keeps "9 due · 2 new" in its title. Keys starts folded.
+
+### Fixed
+- **Vocabulary (PC): the pop-up card looks like the rest of the redesign.** What the card asks sits in its header,
+  "Show meaning" is centred, the answer reads top-down (reading, meaning, parts, the pinyin hook) and scrolls while the
+  answer buttons stay put; how the parts make the meaning moved into Full details.
+- **Vocabulary (PC): the Learn tab fits a narrower window.** Below about 1060 px the side panel folds into one line
+  above the card, and how a word is built goes above what helps instead of being cut off beside it.
+
 ## [0.72.0] - 2026-11-02
 
 ### Added
