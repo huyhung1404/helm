@@ -33,6 +33,8 @@ public partial class VocabPage : ModulePageBase
         Module = module;
         // The pop-up, the bubble and the blocked apps are phone-only.
         OverlayPanel.DataContext = overlay;
+        // Below this the card gets hard to read over a busy app (the setting clamps to it too).
+        OpacitySlider.Minimum = VocabSettingsViewModel.MinCardOpacity;
     }
 
     // Pages are transient: listen for the return from the phone's settings only while shown.
