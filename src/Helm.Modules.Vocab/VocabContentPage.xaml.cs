@@ -36,6 +36,7 @@ public partial class VocabContentPage : Page
         module.PropertyChanged += OnModuleChanged;
         viewModel.PropertyChanged += OnViewModelChanged;
         viewModel.Card.PropertyChanged += OnCardChanged;
+        viewModel.Texts.PropertyChanged += OnTextsChanged;
         viewModel.Roots.PropertyChanged += OnRootsChanged;
         // A new page starts at the top of its list.
         viewModel.List.Pages.Turned += (_, _) => Dispatcher.BeginInvoke(() => WordsView.WordsList.BringIntoView(new Rect(0, 0, 1, 1)));
@@ -73,6 +74,17 @@ public partial class VocabContentPage : Page
                 Dispatcher.BeginInvoke(RestoreFocus);
                 break;
         }
+    }
+
+    /// <summary>Add text opens with the cursor in its text box; focus returns to the page when it closes.</summary>
+    private void OnTextsChanged(object? sender, PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName != nameof(VocabTextsViewModel.IsOpen)) return;
+        Dispatcher.BeginInvoke(() =>
+        {
+            if (_viewModel.Texts.IsOpen) TextsDialog.BodyBox.Focus();
+            else RestoreFocus();
+        });
     }
 
     /// <summary>The opened word's Edit and Ask for a new analysis dialogs: the cursor goes in when one opens, back when it closes.</summary>
@@ -166,7 +178,7 @@ public partial class VocabContentPage : Page
     }
 
     private bool IsDialogOpen =>
-        _viewModel.IsAddOpen || _viewModel.IsAgentOpen || _viewModel.Detail is { Editor.IsOpen: true } or { IsAskingRedo: true };
+        _viewModel.IsAddOpen || _viewModel.IsAgentOpen || _viewModel.Texts.IsOpen || _viewModel.Detail is { Editor.IsOpen: true } or { IsAskingRedo: true };
 
     /// <summary>Esc: the dialog in front closes (an edit is dropped, unsaved).</summary>
     private bool CloseDialog()
@@ -174,6 +186,8 @@ public partial class VocabContentPage : Page
         var vm = _viewModel;
         if (vm.Detail is { Editor.IsOpen: true } edited) edited.Editor.CancelCommand.Execute(null);
         else if (vm.Detail is { IsAskingRedo: true } redo) redo.BeginRedoCommand.Execute(null);
+        else if (vm.Texts.IsOpen && vm.Texts.IsDetailOpen) vm.Texts.BackCommand.Execute(null);
+        else if (vm.Texts.IsOpen) vm.Texts.CloseCommand.Execute(null);
         else if (vm.IsAddOpen) vm.CloseAddCommand.Execute(null);
         else if (vm.IsAgentOpen) vm.CloseAgentCommand.Execute(null);
         else return false;

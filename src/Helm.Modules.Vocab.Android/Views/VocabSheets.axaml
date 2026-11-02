@@ -141,6 +141,129 @@
             </Border>
         </Panel>
 
+        <!-- ===== Add text: paste a text, then its proposed words ===== -->
+        <Panel DataContext="{Binding Texts}" x:DataType="vm:VocabTextsViewModel" IsVisible="{Binding IsOpen}">
+            <Border Background="{DynamicResource HelmScrim}" PointerPressed="CloseTexts_Pressed" />
+            <Border Classes="sheet" MaxHeight="{Binding #Self.Bounds.Height, Converter={x:Static local:VocabConverters.SheetHeight}}">
+                <DockPanel>
+                    <StackPanel DockPanel.Dock="Top">
+                        <Border Classes="grab" />
+                        <Grid ColumnDefinitions="Auto,*,Auto" Margin="8,6,8,0">
+                            <Button Classes="icon" Command="{Binding BackCommand}" IsVisible="{Binding IsDetailOpen}" AutomationProperties.Name="Back to your texts">
+                                <ic:SymbolIcon Symbol="ArrowLeft" FontSize="20" />
+                            </Button>
+                            <TextBlock Grid.Column="1" Classes="sheettitle" Margin="12,0" Text="Add text" IsVisible="{Binding IsListOpen}" />
+                            <TextBlock Grid.Column="1" Classes="sheettitle" Margin="12,0" Text="{Binding DetailTitle}" IsVisible="{Binding IsDetailOpen}" TextTrimming="CharacterEllipsis" />
+                            <Button Grid.Column="2" Classes="icon" Command="{Binding CloseCommand}" AutomationProperties.Name="Close">
+                                <ic:SymbolIcon Symbol="Dismiss" FontSize="20" />
+                            </Button>
+                        </Grid>
+                    </StackPanel>
+                    <Border DockPanel.Dock="Bottom" Classes="sheetfoot">
+                        <StackPanel Spacing="8">
+                            <TextBlock Text="{Binding Message}" Classes="hint" TextWrapping="Wrap" IsVisible="{Binding HasMessage}" />
+                            <Button Classes="accent tall" HorizontalAlignment="Stretch" MinHeight="48" Command="{Binding AddTextCommand}" IsVisible="{Binding IsListOpen}"
+                                    AutomationProperties.Name="Add text">
+                                <StackPanel Orientation="Horizontal" Spacing="8">
+                                    <ic:SymbolIcon Symbol="Add" FontSize="18" />
+                                    <TextBlock Text="Add text" VerticalAlignment="Center" FontWeight="SemiBold" />
+                                </StackPanel>
+                            </Button>
+                            <Button Classes="accent tall" HorizontalAlignment="Stretch" MinHeight="48" Command="{Binding AddSelectedCommand}" IsVisible="{Binding HasProposals}"
+                                    AutomationProperties.Name="{Binding AddSelectedText}">
+                                <StackPanel Orientation="Horizontal" Spacing="8">
+                                    <ic:SymbolIcon Symbol="Checkmark" FontSize="18" />
+                                    <TextBlock Text="{Binding AddSelectedText}" VerticalAlignment="Center" FontWeight="SemiBold" />
+                                </StackPanel>
+                            </Button>
+                        </StackPanel>
+                    </Border>
+                    <ScrollViewer HorizontalScrollBarVisibility="Disabled">
+                        <StackPanel Margin="20,8,20,16" Spacing="14">
+                            <!-- The paste form and the texts pasted before -->
+                            <StackPanel Spacing="14" IsVisible="{Binding IsListOpen}">
+                                <StackPanel Spacing="6">
+                                    <TextBlock Text="Where it comes from (optional)" Classes="label" />
+                                    <TextBox PlaceholderText="A song and its singer, a chapter…" Text="{Binding NewTitle}" MinHeight="44" VerticalContentAlignment="Center"
+                                             AutomationProperties.Name="Where the text comes from" />
+                                </StackPanel>
+                                <StackPanel Spacing="6">
+                                    <TextBlock Text="Text" Classes="label" />
+                                    <TextBox PlaceholderText="Paste the lyrics or the article here" Text="{Binding NewBody}" AcceptsReturn="True" TextWrapping="Wrap"
+                                             MinHeight="160" MaxHeight="260" AutomationProperties.Name="Text to learn words from" />
+                                </StackPanel>
+                                <TextBlock Classes="hint" FontSize="14" TextWrapping="Wrap"
+                                           Text="Claude Code picks the words worth learning (Chinese in simplified characters). You choose which to keep before any is analyzed." />
+                                <StackPanel IsVisible="{Binding HasTexts}">
+                                    <TextBlock Text="Your texts" Classes="label" Margin="0,0,0,6" />
+                                    <ItemsControl ItemsSource="{Binding Texts}">
+                                        <ItemsControl.ItemTemplate>
+                                            <DataTemplate x:DataType="vm:VocabSourceRow">
+                                                <Border Classes="lrow">
+                                                    <Grid ColumnDefinitions="*,Auto">
+                                                        <Button Classes="flat" Padding="0,8" Command="{Binding Open}" HorizontalContentAlignment="Stretch" AutomationProperties.Name="{Binding Title}">
+                                                            <StackPanel>
+                                                                <TextBlock Text="{Binding Title}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+                                                                <TextBlock Text="{Binding Status}" Classes="hint" />
+                                                            </StackPanel>
+                                                        </Button>
+                                                        <Button Grid.Column="1" Classes="icon" Command="{Binding Remove}" AutomationProperties.Name="{Binding Title, StringFormat='Remove {0}'}">
+                                                            <ic:SymbolIcon Symbol="Delete" FontSize="16" />
+                                                        </Button>
+                                                    </Grid>
+                                                </Border>
+                                            </DataTemplate>
+                                        </ItemsControl.ItemTemplate>
+                                    </ItemsControl>
+                                </StackPanel>
+                            </StackPanel>
+
+                            <!-- One text: waiting, or its proposed words -->
+                            <StackPanel Spacing="10" IsVisible="{Binding IsDetailOpen}">
+                                <Border Classes="infobar" IsVisible="{Binding IsDetailWaiting}" Margin="0">
+                                    <TextBlock Text="Waiting for Claude Code to pick the words. It starts by itself." TextWrapping="Wrap" />
+                                </Border>
+                                <Grid ColumnDefinitions="*,Auto,Auto" IsVisible="{Binding HasProposals}">
+                                    <TextBlock Text="Words to look at" Classes="label" VerticalAlignment="Center" />
+                                    <Button Grid.Column="1" Classes="flat" Command="{Binding SelectAllCommand}" Content="All" AutomationProperties.Name="Tick every new word" />
+                                    <Button Grid.Column="2" Classes="flat" Command="{Binding SelectNoneCommand}" Content="None" AutomationProperties.Name="Untick every word" />
+                                </Grid>
+                                <ItemsControl ItemsSource="{Binding Proposals}">
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate x:DataType="vm:VocabProposalRow">
+                                            <Border Classes="lrow">
+                                                <Grid ColumnDefinitions="Auto,*,Auto">
+                                                    <CheckBox IsChecked="{Binding IsChosen, Mode=TwoWay}" IsEnabled="{Binding CanTick}" MinWidth="0" VerticalAlignment="Top"
+                                                              AutomationProperties.Name="{Binding Word, StringFormat='Add {0}'}" />
+                                                    <StackPanel Grid.Column="1" Margin="4,6,0,6" Spacing="2">
+                                                        <WrapPanel>
+                                                            <TextBlock Text="{Binding Word}" FontSize="18" FontWeight="SemiBold" Margin="0,0,8,0" />
+                                                            <TextBlock Text="{Binding Phonetic}" Classes="hint" IsVisible="{Binding HasPhonetic}" VerticalAlignment="Center" />
+                                                        </WrapPanel>
+                                                        <TextBlock Text="{Binding Meaning}" TextWrapping="Wrap" />
+                                                        <TextBlock Text="{Binding Sentence}" Classes="hint" FontStyle="Italic" TextWrapping="Wrap" />
+                                                        <TextBlock Text="{Binding Reason}" Classes="hint" TextWrapping="Wrap" IsVisible="{Binding HasReason}" />
+                                                    </StackPanel>
+                                                    <Border Grid.Column="2" Classes="tag acc" Margin="8,6,0,0" VerticalAlignment="Top" IsVisible="{Binding IsAdded}">
+                                                        <TextBlock Text="Added" />
+                                                    </Border>
+                                                    <Border Grid.Column="2" Classes="tag" Margin="8,6,0,0" VerticalAlignment="Top" IsVisible="{Binding AlreadyThere}">
+                                                        <TextBlock Text="Already yours" />
+                                                    </Border>
+                                                </Grid>
+                                            </Border>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                                <TextBlock Text="The text" Classes="label" Margin="0,8,0,0" />
+                                <TextBlock Text="{Binding DetailBody}" TextWrapping="Wrap" />
+                            </StackPanel>
+                        </StackPanel>
+                    </ScrollViewer>
+                </DockPanel>
+            </Border>
+        </Panel>
+
         <!-- ===== Add words ===== -->
         <Panel IsVisible="{Binding IsAddOpen}">
             <Border Background="{DynamicResource HelmScrim}" PointerPressed="Scrim_PointerPressed" />

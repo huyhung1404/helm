@@ -141,6 +141,18 @@ public sealed record VocabWord
 
     public DateTimeOffset? AnalyzedAt { get; init; }
 
+    /// <summary>
+    /// An AI agent over MCP took this word to analyze it itself: Helm's own agent leaves it alone until this time passes,
+    /// so the two do not work on (and pay for) the same word.
+    /// </summary>
+    public DateTimeOffset? ClaimedUntil { get; init; }
+
+    /// <summary>The pasted text (<see cref="VocabSource"/>) the word was picked from, if any.</summary>
+    public string? SourceId { get; init; }
+
+    /// <summary>The line of that text the word comes from.</summary>
+    public string SourceSentence { get; init; } = "";
+
     [JsonIgnore]
     public bool IsAnalyzed => Status == VocabStatus.Analyzed;
 

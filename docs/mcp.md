@@ -48,6 +48,17 @@ a little after there is something to do) runs Claude Code without a window with 
 it does not start by itself again until something changes. "Suggest words with this root" on the Roots tab does the
 same to add a family's words.
 
+**Texts.** The user can paste an article or song lyrics (Vocabulary → **Add text**, Ctrl+Shift+N). `vocab_pending_texts` lists the
+texts waiting (with the user's title); `vocab_propose_words` sends the words worth learning from one text (simplified Chinese,
+none the user already has; each with phonetic, Vietnamese meaning, the line of the text it comes from and why). They are
+only *proposed*: the user ticks the ones to keep and adds them, and each added word keeps its line (`SourceSentence`).
+Words the user already has stay in the list, not ticked.
+
+**Not two agents on the same words.** `vocab_add_words` and `vocab_pending` (and `vocab_pending_texts`) take what they return
+for 10 minutes: Helm's own agent does not start on those words or texts by itself while an AI agent over MCP has them, and the
+Analysis chip says an AI agent is working. A claim that is never finished runs out. `vocab_save_analyses` leaves a word that
+is already analyzed as it is (use `vocab_save_analysis` to rebuild one).
+
 Habits' tools let an agent see how the user's habits are going and why they slip: `habits_list` gives each habit with
 whether it is done today, its current and longest streak, the share of days done in the last 30 days and this year,
 and how many days in a row it has been skipped; `habit_report` gives one habit's year (default: this year): the days

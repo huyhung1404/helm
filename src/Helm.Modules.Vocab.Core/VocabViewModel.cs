@@ -24,7 +24,8 @@ public enum VocabTab
 public sealed partial class VocabViewModel : ObservableObject
 {
     /// <summary>What to ask Claude Code for the waiting words (copied by the button next to the count).</summary>
-    public const string AgentPrompt = "Phân tích các từ mới trong Helm Vocabulary (vocab_pending, rồi vocab_save_analyses cho các từ đó), " +
+    public const string AgentPrompt = "Đọc các đoạn văn mới trong Helm Vocabulary (vocab_pending_texts) và đề xuất từ nên học bằng vocab_propose_words " +
+        "(chữ Hán đổi sang giản thể, bỏ từ đã có), rồi phân tích các từ mới trong Helm Vocabulary (vocab_pending, rồi vocab_save_analyses cho các từ đó), " +
         "rồi làm vocab_follow_ups (mẹo nhớ mới cho từ hay quên, mẹo nhớ pinyin cho từ hay sai pinyin, bổ sung chi tiết còn thiếu) " +
         "bằng vocab_save_details.";
 
@@ -44,6 +45,7 @@ public sealed partial class VocabViewModel : ObservableObject
     [ObservableProperty] private VocabWordDetailViewModel? _detail;
     [ObservableProperty] private int _pendingCount;
     [ObservableProperty] private int _hardCount;
+    [ObservableProperty] private int _textCount;
     [ObservableProperty] private int _slipCount;
     [ObservableProperty] private int _lackingCount;
     [ObservableProperty] private VocabDay _today = new(0, 0, 0, 0);
@@ -58,7 +60,7 @@ public sealed partial class VocabViewModel : ObservableObject
     [ObservableProperty] private bool _isAgentOpen;
 
     public VocabViewModel(VocabStore store, VocabQuiz quiz, VocabSettingsViewModel settings, VocabAgentViewModel agent, IUiDispatcher ui,
-        IDialogService dialogs, IClipboardService clipboard, VocabVoice? voice = null)
+        IDialogService dialogs, IClipboardService clipboard, VocabVoice? voice = null, VocabTextsViewModel? texts = null)
     {
         _store = store;
         _quiz = quiz;
@@ -68,6 +70,7 @@ public sealed partial class VocabViewModel : ObservableObject
         _voice = voice;
         Settings = settings;
         Agent = agent;
+        Texts = texts ?? new VocabTextsViewModel(store, ui);
         List = new VocabWordListViewModel(store, quiz, settings, id => Open(id));
         Roots = new VocabRootsViewModel(store, agent, settings.PageSize, id => Open(id), strengthOf: id => quiz.StatsOf(id).Level);
         // Revealing a card shows how the word is built: the same tree as the Words tab, its links open the word there.
@@ -80,7 +83,7 @@ public sealed partial class VocabViewModel : ObservableObject
         settings.Changed += (_, name) => OnSettingChanged(name);
         agent.PropertyChanged += (_, e) =>
         {
-            if (e.PropertyName == nameof(VocabAgentViewModel.IsBusy)) OnAgentWorkChanged();
+            if (e.PropertyName is nameof(VocabAgentViewModel.IsBusy) or nameof(VocabAgentViewModel.ExternalBusy)) OnAgentWorkChanged();
         };
 
         _store.Changed += (_, _) => ScheduleRefresh();
@@ -90,6 +93,9 @@ public sealed partial class VocabViewModel : ObservableObject
     }
 
     public VocabSettingsViewModel Settings { get; }
+
+    /// <summary>Texts to learn words from (the Add text dialog).</summary>
+    public VocabTextsViewModel Texts { get; }
 
     public VocabWordListViewModel List { get; }
 
@@ -139,10 +145,10 @@ public sealed partial class VocabViewModel : ObservableObject
     public bool HasPending => PendingCount > 0;
 
     /// <summary>Something for the agent: words to break down, often forgotten, whose pinyin slips, lacking details.</summary>
-    public bool HasAgentWork => PendingCount + HardCount + SlipCount + LackingCount > 0;
+    public bool HasAgentWork => PendingCount + HardCount + SlipCount + LackingCount + TextCount > 0;
 
     /// <summary>The Analysis chip in the page's header: "Analyzing…", "3 waiting for analysis", "All words analyzed".</summary>
-    public string AgentChipText => Agent.IsBusy ? "Analyzing…" : PendingCount switch
+    public string AgentChipText => Agent.IsBusy ? "Analyzing…" : Agent.ExternalBusy ? "AI agent working…" : PendingCount switch
     {
         0 => "All words analyzed",
         1 => "1 waiting for analysis",
@@ -150,15 +156,24 @@ public sealed partial class VocabViewModel : ObservableObject
     };
 
     /// <summary>The chip's look: the agent at work, words waiting, or all done.</summary>
-    public bool IsAgentBusy => Agent.IsBusy;
+    public bool IsAgentBusy => Agent.IsBusy || Agent.ExternalBusy;
 
-    public bool IsAgentWaiting => !Agent.IsBusy && PendingCount > 0;
+    public bool IsAgentWaiting => !IsAgentBusy && PendingCount > 0;
 
-    public bool IsAllAnalyzed => !Agent.IsBusy && PendingCount == 0;
+    public bool IsAllAnalyzed => !IsAgentBusy && PendingCount == 0;
+
+    /// <summary>An AI agent over MCP (not Helm's own) is working on words or texts: Helm's agent waits for it.</summary>
+    public bool IsExternalAgentBusy => Agent.ExternalBusy;
 
     /// <summary>What waits for the agent, one line per kind.</summary>
     public string AgentWorkText => string.Join(Environment.NewLine, new[]
     {
+        TextCount switch
+        {
+            0 => "",
+            1 => "1 text waits for an AI agent to pick its words.",
+            _ => $"{TextCount} texts wait for an AI agent to pick their words.",
+        },
         PendingCount == 0 ? "" : PendingText,
         HardCount switch
         {
@@ -221,6 +236,8 @@ public sealed partial class VocabViewModel : ObservableObject
 
     partial void OnHardCountChanged(int value) => OnAgentWorkChanged();
 
+    partial void OnTextCountChanged(int value) => OnAgentWorkChanged();
+
     partial void OnSlipCountChanged(int value) => OnAgentWorkChanged();
 
     partial void OnLackingCountChanged(int value) => OnAgentWorkChanged();
@@ -231,6 +248,7 @@ public sealed partial class VocabViewModel : ObservableObject
         OnPropertyChanged(nameof(AgentWorkText));
         OnPropertyChanged(nameof(AgentChipText));
         OnPropertyChanged(nameof(IsAgentBusy));
+        OnPropertyChanged(nameof(IsExternalAgentBusy));
         OnPropertyChanged(nameof(IsAgentWaiting));
         OnPropertyChanged(nameof(IsAllAnalyzed));
     }
@@ -388,6 +406,7 @@ public sealed partial class VocabViewModel : ObservableObject
     {
         var all = _store.Words();
         PendingCount = all.Count(w => !w.Value.IsAnalyzed);
+        TextCount = _store.WaitingSources().Count;
         HardCount = _quiz.HardWords().Count;
         SlipCount = _quiz.SlippingWords().Count;
         LackingCount = all.Count(w => w.Value.LacksDetails && !w.Value.Hidden);

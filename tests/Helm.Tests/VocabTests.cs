@@ -12,11 +12,12 @@ public sealed class VocabTests
     private readonly MemorySynced<VocabWord> _words = new();
     private readonly MemorySynced<VocabPart> _parts = new();
     private readonly MemorySyncedLog<VocabReview> _reviews = new();
+    private readonly MemorySynced<VocabSource> _sources = new();
     private readonly VocabStore _store;
 
     public VocabTests()
     {
-        _store = new VocabStore(_words, _parts, _reviews, _time);
+        _store = new VocabStore(_words, _parts, _reviews, _time, _sources);
     }
 
     private static WordAnalysis Relative() => new()
@@ -322,6 +323,117 @@ public sealed class VocabTests
         await vm.AnalyzeCommand.ExecuteAsync(null);
         Assert.Equal("Claude Code is not installed on this PC.", vm.Status);
         Assert.False(vm.IsBusy);
+    }
+
+    [Fact]
+    public void The_texts_dialog_shows_the_proposed_words_and_adds_only_the_ticked_ones()
+    {
+        var vm = new VocabTextsViewModel(_store, new InlineUi());
+        vm.NewBody = "回首人间";
+        vm.AddTextCommand.Execute(null);
+        Assert.True(vm.IsDetailOpen);
+        Assert.True(vm.IsDetailWaiting);
+
+        var id = _store.AllSources()[0].Id;
+        _store.Propose(id, [new VocabProposal { Word = "回首", Meaning = "ngoảnh lại", Sentence = "回首人间" }, new VocabProposal { Word = "人间", Meaning = "nhân gian", Sentence = "回首人间" }]);
+        Assert.Equal(2, vm.Proposals.Count);
+        Assert.Equal("Add 2 words", vm.AddSelectedText);
+
+        vm.Proposals[1].IsChosen = false; // the store comes back with the same state: the rows stay
+        Assert.Equal(2, vm.Proposals.Count);
+        Assert.Equal("Add 1 word", vm.AddSelectedText);
+
+        vm.AddSelectedCommand.Execute(null);
+        Assert.Equal(["回首"], _store.Pending().Select(w => w.Value.Text));
+        Assert.True(vm.Proposals[0].IsAdded);
+        Assert.Equal("1 word added", vm.Texts[0].Status);
+        Assert.False(vm.AddSelectedCommand.CanExecute(null));
+    }
+
+    [Fact]
+    public async Task A_pasted_text_gets_its_words_proposed_and_only_the_ticked_ones_are_added_with_their_line()
+    {
+        _store.AddWord("琵琶");
+        var id = _store.AddSource("琵琶曲 - 郑浩", "弹一首琵琶曲\n回首人间，笑谈你我初遇");
+        var server = new McpServer(new VocabTextTools(_store).Tools, "1.0", "");
+
+        var waiting = await CallAsync(server, "vocab_pending_texts", []);
+        Assert.Equal(id, waiting["texts"]![0]!["id"]!.GetValue<string>());
+        Assert.Empty(_store.WaitingSourcesUnclaimed()); // reading it takes it from Helm's own agent
+
+        var proposed = await CallAsync(server, "vocab_propose_words", new JsonObject
+        {
+            ["text_id"] = id,
+            ["words"] = new JsonArray(
+                Pick("琵琶", "弹一首琵琶曲"), Pick("回首", "回首人间，笑谈你我初遇"), Pick("初遇", "回首人间，笑谈你我初遇"), Pick("回首", "again")),
+        });
+        Assert.Equal(2, proposed["proposed"]!.GetValue<int>());
+        Assert.Equal("琵琶", proposed["already_there"]![0]!.GetValue<string>()); // kept in the list, not ticked
+        var source = _store.GetSource(id)!;
+        Assert.Equal(VocabSourceStatus.Proposed, source.Status);
+        Assert.Equal([false, true, true], source.Proposals.Select(p => p.Chosen));
+
+        _store.SetChosen(id, "初遇", false);
+        Assert.Equal(1, _store.AddChosen(id));
+        var word = _store.FindWord("回首")!.Value;
+        Assert.Equal(id, word.SourceId);
+        Assert.Equal("回首人间，笑谈你我初遇", word.SourceSentence);
+        Assert.Equal("琵琶曲 - 郑浩", word.Note);
+        Assert.Null(_store.FindWord("初遇"));
+        Assert.Equal(VocabSourceStatus.Done, _store.GetSource(id)!.Status);
+    }
+
+    private static JsonObject Pick(string word, string sentence) =>
+        new() { ["word"] = word, ["meaning"] = "nghĩa", ["sentence"] = sentence };
+
+    [Fact]
+    public void A_pasted_text_must_have_words_and_a_sane_length()
+    {
+        Assert.Throws<ArgumentException>(() => _store.AddSource("x", "   "));
+        Assert.Throws<ArgumentException>(() => _store.AddSource("x", new string('字', VocabSource.MaxBodyLength + 1)));
+    }
+
+    [Fact]
+    public async Task Words_an_mcp_agent_adds_or_reads_are_left_to_it_until_the_claim_runs_out()
+    {
+        using var dir = new TempDir();
+        using var settings = new Helm.Core.Settings.SettingsStoreFactory(new Helm.Core.Settings.HelmPaths(dir.Path));
+        using var vm = new VocabAgentViewModel(new FakeAgent(), _store, new VocabQuiz(_store), VocabKit.Settings(settings), new InlineUi());
+        var server = Server();
+
+        _store.AddWord("relative"); // added in Helm: Helm's agent may take it
+        Assert.Single(_store.PendingUnclaimed());
+        Assert.False(vm.ExternalBusy);
+
+        var added = await CallAsync(server, "vocab_add_words", new JsonObject { ["words"] = new JsonArray("补救", "translate") });
+        Assert.Equal(2, added["added"]!.AsArray().Count);
+        Assert.Equal(["relative"], _store.PendingUnclaimed().Select(w => w.Value.Text));
+        Assert.True(vm.ExternalBusy);
+
+        // The agent that reads the waiting words takes them too.
+        await CallAsync(server, "vocab_pending", []);
+        Assert.Empty(_store.PendingUnclaimed());
+
+        // An agent that never finishes frees them.
+        _time.Advance(VocabStore.ClaimFor + TimeSpan.FromSeconds(1));
+        Assert.Equal(3, _store.PendingUnclaimed().Count);
+        Assert.False(vm.ExternalBusy);
+    }
+
+    [Fact]
+    public async Task A_batch_save_leaves_a_word_that_is_already_analyzed_as_it_is()
+    {
+        var id = _store.AddWord("relative").Id;
+        _store.SaveAnalysis(id, Relative());
+        var before = _store.GetWord(id)!.Meaning;
+
+        var result = await CallAsync(Server(), "vocab_save_analyses", new JsonObject
+        {
+            ["analyses"] = new JsonArray(new JsonObject { ["id"] = "relative", ["phonetic"] = "x", ["meaning"] = "khác" }),
+        });
+        Assert.Empty(result["saved"]!.AsArray());
+        Assert.Contains("already analyzed", result["failed"]![0]!["fix"]!.GetValue<string>());
+        Assert.Equal(before, _store.GetWord(id)!.Meaning);
     }
 
     [Fact]

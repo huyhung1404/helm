@@ -94,6 +94,8 @@ public sealed class VocabMcpTools(VocabStore store, VocabQuiz quiz) : IMcpToolPr
         var language = Language(McpArgs.String(args, "language"));
         var limit = Math.Clamp(McpArgs.Int(args, "limit") ?? DefaultLimit, 1, MaxLimit);
         var pending = store.Pending().Where(w => language is null || w.Value.Language == language).ToList();
+        // The agent that reads them analyzes them: Helm's own agent leaves them alone for a while.
+        store.Claim(pending.Take(limit).Select(w => w.Id));
         return new
         {
             total = pending.Count,
@@ -140,6 +142,11 @@ public sealed class VocabMcpTools(VocabStore store, VocabQuiz quiz) : IMcpToolPr
         {
             try
             {
+                // Helm's own agent (or another one) got there first: keep its analysis; use vocab_save_analysis to rebuild one.
+                var key = McpArgs.String(item, "id") ?? "";
+                var existing = store.GetWord(key) ?? store.FindWord(key)?.Value;
+                if (existing is { IsAnalyzed: true })
+                    throw new McpToolException($"{existing.Text} is already analyzed; left as it is (vocab_save_analysis rebuilds it).");
                 Save(item);
                 saved.Add(McpArgs.String(item, "id") ?? "");
             }
@@ -338,11 +345,13 @@ public sealed class VocabMcpTools(VocabStore store, VocabQuiz quiz) : IMcpToolPr
         var note = McpArgs.String(args, "note") ?? "";
         var added = new List<string>();
         var known = new List<string>();
+        var claimed = new List<string>();
         foreach (var text in McpArgs.Strings(args, "words").Where(w => w.Trim().Length > 0))
         {
             try
             {
-                var (_, isNew) = store.AddWord(text, note);
+                var (id, isNew) = store.AddWord(text, note);
+                if (isNew) claimed.Add(id);
                 (isNew ? added : known).Add(VocabText.Tidy(text));
             }
             catch (ArgumentException ex)
@@ -350,6 +359,8 @@ public sealed class VocabMcpTools(VocabStore store, VocabQuiz quiz) : IMcpToolPr
                 throw new McpToolException($"{text}: {ex.Message}");
             }
         }
+        // Whoever adds them analyzes them: Helm's own agent does not start on them by itself for a while.
+        store.Claim(claimed);
         return new { added, already_there = known };
     }
 

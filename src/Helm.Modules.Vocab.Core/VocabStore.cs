@@ -7,11 +7,12 @@ namespace Helm.Modules.Vocab;
 /// uploads it in the background). Callable from any thread; <see cref="Changed"/> may be raised on a background thread
 /// after a sync.
 /// </summary>
-public sealed class VocabStore
+public sealed partial class VocabStore
 {
     public const string WordsCollection = "vocab.words";
     public const string PartsCollection = "vocab.parts";
     public const string ReviewsCollection = "vocab.reviews";
+    public const string SourcesCollection = "vocab.sources";
 
     private readonly ISyncedCollection<VocabWord> _words;
     private readonly ISyncedCollection<VocabPart> _parts;
@@ -19,8 +20,10 @@ public sealed class VocabStore
     private readonly TimeProvider _time;
     private readonly object _gate = new();
 
-    public VocabStore(ISyncedCollection<VocabWord> words, ISyncedCollection<VocabPart> parts, ISyncedLog<VocabReview> reviews, TimeProvider? time = null)
+    public VocabStore(ISyncedCollection<VocabWord> words, ISyncedCollection<VocabPart> parts, ISyncedLog<VocabReview> reviews, TimeProvider? time = null,
+        ISyncedCollection<VocabSource>? sources = null)
     {
+        _sources = sources;
         _words = words;
         _parts = parts;
         _reviews = reviews;
@@ -28,6 +31,7 @@ public sealed class VocabStore
         _words.Changed += OnChanged;
         _parts.Changed += OnChanged;
         _reviews.Changed += OnReviewsChanged;
+        if (_sources is not null) _sources.Changed += OnChanged;
     }
 
     /// <summary>Raised after any local write or synced change of words or parts.</summary>
@@ -48,6 +52,26 @@ public sealed class VocabStore
     public IReadOnlyList<SyncedItem<VocabWord>> Pending() =>
         _words.All().Where(w => w.Value.Status == VocabStatus.Pending)
             .OrderBy(w => w.Value.CreatedAt).ThenBy(w => w.Id, StringComparer.Ordinal).ToList();
+
+    /// <summary>How long an MCP agent keeps the words it took: long enough for a batch, short enough that a dead agent frees them.</summary>
+    public static readonly TimeSpan ClaimFor = TimeSpan.FromMinutes(10);
+
+    /// <summary>Words waiting for an analysis that no MCP agent has taken: the ones Helm's own agent may work on.</summary>
+    public IReadOnlyList<SyncedItem<VocabWord>> PendingUnclaimed() =>
+        Pending().Where(w => !IsClaimed(w.Value)).ToList();
+
+    /// <summary>An MCP agent is working on words right now (one of them is claimed and still waits).</summary>
+    public bool HasClaimedWork() => Pending().Any(w => IsClaimed(w.Value));
+
+    private bool IsClaimed(VocabWord word) => word.ClaimedUntil is { } until && until > Now;
+
+    /// <summary>Marks words as taken by an MCP agent for <see cref="ClaimFor"/>; words that are gone or analyzed are skipped.</summary>
+    public void Claim(IEnumerable<string> ids)
+    {
+        var until = Now + ClaimFor;
+        foreach (var id in ids)
+            UpdateWord(id, w => w.Status == VocabStatus.Pending ? w with { ClaimedUntil = until } : w);
+    }
 
     public VocabWord? GetWord(string id) => _words.Get(id);
 
@@ -94,7 +118,7 @@ public sealed class VocabStore
 
     /// <summary>Sends the word back to the agents with what the user found wrong; the old analysis stays until a new one.</summary>
     public bool RequestRedo(string id, string note) =>
-        UpdateWord(id, w => w with { Status = VocabStatus.Pending, RedoNote = note.Trim() });
+        UpdateWord(id, w => w with { Status = VocabStatus.Pending, RedoNote = note.Trim(), ClaimedUntil = null });
 
     /// <summary>Deletes the word. Its parts stay: other words may share them.</summary>
     public bool DeleteWord(string id)

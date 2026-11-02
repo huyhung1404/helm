@@ -27,12 +27,14 @@ public static class VocabCoreServices
         // answering on two devices never overwrites a word's analysis.
         services.AddSyncedCollection(new SyncedCollectionOptions<VocabWord> { Name = VocabStore.WordsCollection });
         services.AddSyncedCollection(new SyncedCollectionOptions<VocabPart> { Name = VocabStore.PartsCollection });
+        services.AddSyncedCollection(new SyncedCollectionOptions<VocabSource> { Name = VocabStore.SourcesCollection });
         services.AddSyncedLog<VocabReview>(VocabStore.ReviewsCollection);
         services.AddSyncGroup("vocab.", VocabIds.DisplayName);
         services.AddSingleton(sp => new VocabStore(
             sp.GetRequiredService<ISyncedCollection<VocabWord>>(),
             sp.GetRequiredService<ISyncedCollection<VocabPart>>(),
-            sp.GetRequiredService<ISyncedLog<VocabReview>>()));
+            sp.GetRequiredService<ISyncedLog<VocabReview>>(),
+            sources: sp.GetRequiredService<ISyncedCollection<VocabSource>>()));
         services.AddSingleton(sp => new VocabQuiz(sp.GetRequiredService<VocabStore>()));
         services.AddSingleton(sp => new VocabVoice(() => sp.GetService<Helm.Modules.NovelReader.Speech.WordPronouncer>(), sp.GetService<Helm.Core.Services.IProcessLauncher>()));
         // Quick Capture ("/v relative"), the share sheet and the phone's text selection add words through this.
@@ -41,11 +43,13 @@ public static class VocabCoreServices
         // The AI agents break words down through these (Helm's MCP server, Windows).
         services.AddSingleton<Helm.Core.Mcp.IMcpToolProvider, VocabMcpTools>();
         services.AddSingleton<Helm.Core.Mcp.IMcpToolProvider, VocabFollowUpTools>();
+        services.AddSingleton<Helm.Core.Mcp.IMcpToolProvider, VocabTextTools>();
         services.AddSingleton(sp => new VocabSettingsViewModel(
             sp.GetRequiredService<Helm.Core.Settings.ISettingsStoreFactory>().Get<VocabSettings>(VocabIds.ModuleId)));
         // The agent that breaks words down: Claude Code on Windows (IVocabAgent), none on the phone.
         services.AddSingleton(sp => new VocabAgentViewModel(sp.GetService<IVocabAgent>(), sp.GetRequiredService<VocabStore>(), sp.GetRequiredService<VocabQuiz>(),
             sp.GetRequiredService<VocabSettingsViewModel>(), sp.GetRequiredService<Helm.Core.Services.IUiDispatcher>()));
+        services.AddSingleton(sp => new VocabTextsViewModel(sp.GetRequiredService<VocabStore>(), sp.GetRequiredService<Helm.Core.Services.IUiDispatcher>()));
         // Windows registers it again through AddHelmModule; one instance either way.
         services.TryAddSingleton<VocabViewModel>();
         return services;

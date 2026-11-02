@@ -116,6 +116,9 @@ public sealed partial class VocabWordDetailViewModel : ObservableObject
 
     public bool HasNote => Word.Note.Length > 0;
 
+    /// <summary>The line of a pasted text (Add text) the word was picked from.</summary>
+    public bool HasSourceSentence => Word.SourceSentence.Length > 0;
+
     public bool HasExplanation => Word.Explanation.Length > 0;
 
     public bool HasTree => Root.HasChildren;

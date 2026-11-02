@@ -188,7 +188,7 @@ public partial class VocabContentPage : UserControl, IFullPage
     private void ApplyEnabled()
     {
         var on = _module.IsEnabled;
-        Body.IsEnabled = Tabs.IsEnabled = AnswerBar.IsEnabled = AnalysisButton.IsEnabled = AddButton.IsEnabled = on;
+        Body.IsEnabled = Tabs.IsEnabled = AnswerBar.IsEnabled = AnalysisButton.IsEnabled = AddButton.IsEnabled = TextButton.IsEnabled = on;
         OffBar.IsVisible = !on;
     }
 }

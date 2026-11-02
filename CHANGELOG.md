@@ -6,6 +6,12 @@ Format: [Keep a Changelog](https://keepachangelog.com), versions follow [SemVer]
 ## [Unreleased]
 
 ### Added
+- **Vocabulary: learn words from a text.** **Add text** (header button, Ctrl+Shift+N; on the phone the document button)
+  takes an article or song lyrics with where it comes from. Claude Code reads it, turns Chinese into simplified
+  characters, skips words you already have and proposes the words worth learning, each with its pinyin, meaning, the
+  line it comes from and why. You tick the ones to keep (words you already have stay dimmed) and press **Add N words**;
+  only those are analyzed, and each word keeps its line (“From the text: …”) on its page. AI agents use
+  `vocab_pending_texts` and `vocab_propose_words`.
 - **Vocabulary (PC): choose the Claude model that breaks words down.** Settings → Vocabulary → Claude model: Sonnet
   (the new default), Haiku, Opus or Claude Code's own default. Analyses, help with hard words, pinyin hooks and
   suggested words used to run on Claude Code's default, often a bigger model than the job needs.
@@ -25,6 +31,10 @@ Format: [Keep a Changelog](https://keepachangelog.com), versions follow [SemVer]
   longer run under its amount; "To categorize" is no longer see-through in light mode.
 - **Vocabulary (PC): the Learn tab fits a narrower window.** Below about 1060 px the side panel folds into one line
   above the card, and how a word is built goes above what helps instead of being cut off beside it.
+- **Vocabulary: Helm's agent and an AI agent no longer work on the same words.** Words an AI agent over MCP adds or
+  reads are left to it for 10 minutes (Helm's own run, which started 20 seconds after new words arrive, used to pay
+  for the same analysis), the Analysis chip says "AI agent working…", and a batch save keeps a word that is already
+  analyzed as it is.
 
 ## [0.73.1] - 2026-11-02
 

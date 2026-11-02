@@ -25,6 +25,7 @@
                 <TextBlock Text="{Binding Word.Meaning}" FontSize="18" TextWrapping="Wrap" Margin="0,2,0,0" />
                 <TextBlock Text="{Binding Word.Explanation}" Classes="hint" FontSize="14" IsVisible="{Binding HasExplanation}" />
                 <TextBlock Text="{Binding Word.Note, StringFormat='Your note: {0}'}" Classes="hint" FontStyle="Italic" IsVisible="{Binding HasNote}" />
+                <TextBlock Text="{Binding Word.SourceSentence, StringFormat='From the text: {0}'}" Classes="hint" FontStyle="Italic" TextWrapping="Wrap" IsVisible="{Binding HasSourceSentence}" />
 
                 <StackPanel Orientation="Horizontal" Spacing="8" Margin="0,4,0,0" IsVisible="{Binding !IsPending}">
                     <ItemsControl ItemsSource="{Binding Dots}" VerticalAlignment="Center">
