@@ -89,7 +89,14 @@ public sealed class InboxItem
 
     /// <summary>Shown on screen until handled: to do, or for the user and not sorted yet (so a broken Claude never hides it).</summary>
     [JsonIgnore]
-    public bool IsToDo => Handled == HandledBy.None && (Level == InboxLevel.Act || (Level == InboxLevel.Pending && Direct));
+    public bool IsToDo => Handled == HandledBy.None && Direct && Level is InboxLevel.Act or InboxLevel.Pending;
+
+    /// <summary>
+    /// In the worth-knowing report: sorted so, or a request in a channel that does not call the user (someone else's
+    /// to-do: the user may only be following the thread).
+    /// </summary>
+    [JsonIgnore]
+    public bool IsWorthKnowing => Handled == HandledBy.None && !Read && (Level == InboxLevel.Know || (Level == InboxLevel.Act && !Direct));
 }
 
 /// <summary>A level the user changed by hand: shown to Claude next time, so it learns what matters to them.</summary>
