@@ -3,7 +3,7 @@
 All notable changes to Helm. The top section is used as the GitHub release body and as the Velopack release notes.
 Format: [Keep a Changelog](https://keepachangelog.com), versions follow [SemVer](https://semver.org).
 
-## [Unreleased]
+## [0.72.0] - 2026-11-02
 
 ### Added
 - **Slack Bot (PC): never miss what needs you in Slack.** Slack Bot reads your workspace as you, through a Slack app
