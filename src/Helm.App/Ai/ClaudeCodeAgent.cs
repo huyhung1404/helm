@@ -58,43 +58,31 @@ internal sealed class ClaudeCodeAgentFactory(IChildProcessLauncher launcher, str
         new ClaudeCodeChat(this, launcher, logger, home, model.StartsWith("claude-", StringComparison.Ordinal) ? model : "haiku", effort, system, tools);
 }
 
-/// <summary>One conversation with one Claude Code process (stream-json in and out: each turn takes about a second).</summary>
+/// <summary>
+/// One conversation with one Claude Code process (stream-json in and out: each turn takes about a second). A process
+/// that died or was stopped between turns is started again, and told the whole protocol and what was said so far.
+/// </summary>
 internal sealed class ClaudeCodeChat(ClaudeCodeAgentFactory factory, IChildProcessLauncher launcher, ILogger logger, string home, string model,
     string effort, string system, IReadOnlyList<AssistantTool> tools) : IAssistantChat, IDisposable
 {
+    private readonly CliConversation _conversation = new(system, tools);
     private ChildProcess? _process;
     private StreamWriter? _input;
     private StreamReader? _output;
-    private string _pending = "";
-    private string _more = "";
-    private bool _first = true;
     private int _calls;
 
-    public void AddUser(string text)
-    {
-        _pending = _first ? $"{CliAgentProtocol.Preamble(system, tools)}\n\n{text}" : (_pending.Length > 0 ? _pending + "\n\n" : "") + _more + text;
-        _first = false;
-        _more = "";
-    }
+    public void AddUser(string text) => _conversation.AddUser(text);
 
-    public void AddTools(IReadOnlyList<AssistantTool> added) => _more = CliAgentProtocol.MoreTools(added) + "\n";
+    public void AddTools(IReadOnlyList<AssistantTool> added) => _conversation.AddTools(added);
 
-    public void AddResults(IReadOnlyList<ToolOutcome> results) => _pending = CliAgentProtocol.Results(results);
+    public void AddResults(IReadOnlyList<ToolOutcome> results) => _conversation.AddResults(results);
 
     public async Task<AssistantStep> NextAsync(CancellationToken ct)
     {
-        Start();
         using var stop = ct.Register(Kill);
-        var line = new JsonObject
-        {
-            ["type"] = "user",
-            ["message"] = new JsonObject { ["role"] = "user", ["content"] = _pending },
-        };
-        _pending = "";
-        await _input!.WriteLineAsync(line.ToJsonString().AsMemory(), ct);
-        await _input.FlushAsync(ct);
-
-        while (await _output!.ReadLineAsync(ct) is { } text)
+        await SendAsync(ct);
+        var output = _output!;
+        while (await ReadLineAsync(output, ct) is { } text)
         {
             if (text.Length == 0 || text[0] != '{') continue;
             JsonNode? ev;
@@ -116,17 +104,63 @@ internal sealed class ClaudeCodeChat(ClaudeCodeAgentFactory factory, IChildProce
                 if (answer.Contains("limit", StringComparison.OrdinalIgnoreCase)) factory.ReachedLimit();
                 throw new AssistantException($"Claude Code: {(answer.Length > 0 ? answer : "it stopped with an error")}");
             }
+            _conversation.Answered(answer);
             return CliAgentProtocol.Parse(answer, step, ref _calls);
         }
         ct.ThrowIfCancellationRequested();
+        // It died mid-turn: what was sent waits for the next turn, which starts a new process.
+        Kill();
         throw new AssistantException("Claude Code stopped before it answered.");
     }
 
     public void Dispose() => Kill();
 
+    /// <summary>
+    /// Sends what waits, to the running process or (when there is none, or it died since the last turn and writing
+    /// to it fails) to a new one, which gets the preamble and the recap first.
+    /// </summary>
+    private async Task SendAsync(CancellationToken ct)
+    {
+        for (var attempt = 0; ; attempt++)
+        {
+            if (_process is { HasExited: true }) Kill();
+            var fresh = _process is null;
+            if (fresh) Start();
+            var line = new JsonObject
+            {
+                ["type"] = "user",
+                ["message"] = new JsonObject { ["role"] = "user", ["content"] = _conversation.Message(fresh) },
+            };
+            try
+            {
+                await _input!.WriteLineAsync(line.ToJsonString().AsMemory(), ct);
+                await _input.FlushAsync(ct);
+                return;
+            }
+            catch (Exception ex) when (ex is IOException or ObjectDisposedException && !ct.IsCancellationRequested)
+            {
+                Kill();
+                if (attempt > 0) throw new AssistantException("Claude Code stopped before it answered.", ex);
+                logger.LogInformation("Claude Code's process had ended; Helm starts a new one for the conversation");
+            }
+        }
+    }
+
+    /// <summary>A line of the answer; a stream closed under it (the process killed or gone) ends it.</summary>
+    private static async Task<string?> ReadLineAsync(StreamReader output, CancellationToken ct)
+    {
+        try
+        {
+            return await output.ReadLineAsync(ct);
+        }
+        catch (Exception ex) when (ex is IOException or ObjectDisposedException)
+        {
+            return null;
+        }
+    }
+
     private void Start()
     {
-        if (_process is not null) return;
         var claude = McpClientConfig.FindClaude() ?? throw new AssistantException("Claude Code is not installed on this PC.");
         string[] args = ["-p", "--input-format", "stream-json", "--output-format", "stream-json", "--verbose", "--tools", "", "--strict-mcp-config",
             "--settings", """{"disableAllHooks":true}""", "--model", model, .. effort is { Length: > 0 } ? new[] { "--effort", effort } : []];
@@ -159,21 +193,22 @@ internal sealed class ClaudeCodeChat(ClaudeCodeAgentFactory factory, IChildProce
         {
             while (await reader.ReadLineAsync() is not null) { }
         }
-        catch (IOException)
+        catch (Exception ex) when (ex is IOException or ObjectDisposedException)
         {
         }
     }
 
     private void Kill()
     {
+        var process = Interlocked.Exchange(ref _process, null);
+        if (process is null) return;
         try
         {
-            _process?.Kill();
+            process.Kill();
         }
         catch (Exception ex) when (ex is InvalidOperationException or System.ComponentModel.Win32Exception)
         {
         }
-        _process?.Dispose();
-        _process = null;
+        process.Dispose();
     }
 }
