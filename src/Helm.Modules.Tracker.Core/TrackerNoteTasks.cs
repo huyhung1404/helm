@@ -62,4 +62,12 @@ public sealed class TrackerNoteTasks(TrackerStore store, IAiText? ai, TimeProvid
         foreach (var id in batch.Ids) store.DeleteItem(id);
         if (batch.MadeList is { } list) store.DeleteWorkspace(list);
     }
+
+    public bool? IsDone(string taskId) => store.GetItem(taskId) is { } item ? item.IsCompleted : null;
+
+    public event EventHandler? TasksChanged
+    {
+        add => store.Changed += value;
+        remove => store.Changed -= value;
+    }
 }

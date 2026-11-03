@@ -7,6 +7,7 @@ namespace Helm.Modules.Notes;
 public sealed partial class NotesViewModel
 {
     private readonly ISettingsStore<GeneralSettings> _general;
+    private readonly Helm.Core.Tasks.INoteTaskMaker? _taskMaker;
 
     /// <summary>The "Make tasks" panel of the open note; null without a to-do tool (Tracker) in the app.</summary>
     public NoteTasksViewModel? Tasks { get; }
@@ -37,6 +38,18 @@ public sealed partial class NotesViewModel
             return Task.CompletedTask;
         }
         return Tasks.StartAsync();
+    }
+
+    /// <summary>
+    /// The open note's lines that became tasks show whether each is done: " → Tracker ✓" once done, " → Tracker" again
+    /// when reopened (Tracker's Undo). An edit like typing, so it saves and syncs as one.
+    /// </summary>
+    private void MarkDoneLines()
+    {
+        if (_taskMaker is null || Tasks is null || !IsEditorOpen || EditTrashed || _editorId is not { } id
+            || _store.Get(id) is not { TaskLinks.Count: > 0 } note) return;
+        var marked = NoteTaskLines.MarkDone(EditBody, note.TaskLinks, NoteTaskLines.Tag(Tasks.ToolName), _taskMaker.IsDone);
+        if (marked != EditBody) EditBody = marked;
     }
 
     /// <summary>A card's "Make tasks" (right-click on PC): opens the note, then as the toolbar's.</summary>

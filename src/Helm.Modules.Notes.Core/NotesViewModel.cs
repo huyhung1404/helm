@@ -113,7 +113,10 @@ public sealed partial class NotesViewModel : ObservableObject, IDisposable
         _store = store;
         _links = links;
         _general = settings.Get<GeneralSettings>(GeneralSettings.StoreId);
-        Tasks = taskMaker is null ? null : new NoteTasksViewModel(taskMaker, () => (EditTitle, EditBody), body => EditBody = body);
+        _taskMaker = taskMaker;
+        Tasks = taskMaker is null ? null : new NoteTasksViewModel(taskMaker, () => (EditTitle, EditBody), body => EditBody = body,
+            links => { if (_editorId is { } note) _store.AddTaskLinks(note, links); },
+            tasks => { if (_editorId is { } note) _store.RemoveTaskLinks(note, tasks); });
         _settings = settings.Get<NotesSettings>(NotesIds.ModuleId);
         _ui = ui;
         _dialogs = dialogs;
@@ -132,6 +135,8 @@ public sealed partial class NotesViewModel : ObservableObject, IDisposable
 
         _store.Changed += (_, _) => ScheduleRefresh();
         if (_links is not null) _links.Changed += (_, _) => _ui.Post(() => EditorLinks?.Refresh());
+        // A task made from a line of the open note was done (or opened again): its tag shows it.
+        if (taskMaker is not null) taskMaker.TasksChanged += (_, _) => _ui.Post(MarkDoneLines);
         Refresh();
     }
 
@@ -689,6 +694,7 @@ public sealed partial class NotesViewModel : ObservableObject, IDisposable
         }
         UpdateEditorInfo();
         if (!note.Trashed) RememberSelection(id);
+        MarkDoneLines();
     }
 
     private void CloseEditorKeepingList()
