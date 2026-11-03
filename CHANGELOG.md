@@ -9,6 +9,10 @@ Format: [Keep a Changelog](https://keepachangelog.com), versions follow [SemVer]
 - **Vocabulary: see how far the analysis got.** While Claude Code works, the Analysis chip counts its steps
   (“Analyzing · step 7”, the step it is on as its tooltip), and a pasted text waiting for its words shows the run’s
   step and its last few lines instead of “Waiting for Claude Code”, with **See all steps** opening the Activity log.
+- **Slack Bot: one card per thread.** Messages still to do in the same thread (or the same DM) share one card on the
+  overlay and the Slack Bot page: Claude's line for the newest, “3 messages in this thread”, and the messages under
+  it (with who wrote each when several did). Done, Only know and Needs me act on the whole card; Open goes to the
+  newest message; a new message in the thread still alerts you.
 
 ## [0.77.0] - 2026-11-03
 

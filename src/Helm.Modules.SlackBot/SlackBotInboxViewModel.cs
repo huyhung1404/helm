@@ -8,11 +8,17 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace Helm.Modules.SlackBot;
 
-/// <summary>One message on the overlay or the SlackBot page.</summary>
-public sealed class InboxItemViewModel(InboxItem item, string link, DateTimeOffset? now = null)
+/// <summary>
+/// One card on the overlay or the SlackBot page: a message, or the messages still to do in one thread (or one DM),
+/// shown as the newest (<paramref name="item"/>) with the others under it.
+/// </summary>
+public sealed class InboxItemViewModel(InboxItem item, string link, DateTimeOffset? now = null, IReadOnlyList<InboxItem>? thread = null)
 {
-    /// <summary>"Waiting 2 h" on a message still to do after an hour, else empty.</summary>
-    public string Waiting { get; } = WaitingText(item, now ?? DateTimeOffset.UtcNow);
+    /// <summary>Every message of the card, oldest first.</summary>
+    private readonly IReadOnlyList<InboxItem> _all = thread is { Count: > 0 } t ? t : [item];
+
+    /// <summary>"Waiting 2 h" on a message still to do after an hour (the card's oldest), else empty.</summary>
+    public string Waiting { get; } = WaitingText(thread is { Count: > 0 } t ? t[0] : item, now ?? DateTimeOffset.UtcNow);
 
     public bool HasWaiting => Waiting.Length > 0;
 
@@ -23,7 +29,22 @@ public sealed class InboxItemViewModel(InboxItem item, string link, DateTimeOffs
         return hours < 1 ? "" : hours < 24 ? $"Waiting {hours} h" : $"Waiting {hours / 24} d";
     }
 
-    public string Id => item.Id;
+    /// <summary>The card's first message: it stays the same while more come into the thread.</summary>
+    public string Id => _all[0].Id;
+
+    /// <summary>Every message of the card: Done, Only know and the like act on all of them.</summary>
+    public IReadOnlyList<string> Ids => [.. _all.Select(i => i.Id)];
+
+    public int Count => _all.Count;
+
+    /// <summary>"3 messages in this thread", or empty for one.</summary>
+    public string CountText => Count == 1 ? "" : item.Kind is SlackConversationKind.DirectMessage or SlackConversationKind.GroupMessage
+        ? $"{Count} messages" : $"{Count} messages in this thread";
+
+    public bool HasCount => Count > 1;
+
+    /// <summary>The messages under the headline: once Claude wrote the headline, or always for a thread.</summary>
+    public bool ShowText => HasSummary || HasCount;
 
     public string Link => link;
 
@@ -38,8 +59,14 @@ public sealed class InboxItemViewModel(InboxItem item, string link, DateTimeOffs
     /// <summary>Claude's line, or the start of the message while it is not sorted.</summary>
     public string Headline => item.Summary ?? SlackText.Clip(item.Text, 160);
 
-    /// <summary>The message itself, under Claude's line.</summary>
-    public string Text => SlackText.Clip(item.Text, 600);
+    /// <summary>The message itself, under Claude's line; for a thread, its latest messages, each on a line (who wrote it when several did).</summary>
+    public string Text => Count == 1
+        ? SlackText.Clip(item.Text, 600)
+        : string.Join("\n", _all.TakeLast(MaxLines).Select(i =>
+            (_all.Select(a => a.From).Distinct().Count() > 1 ? i.From + ": " : "• ") + SlackText.Clip(i.Text, 200)));
+
+    /// <summary>Messages of a thread shown on its card.</summary>
+    internal const int MaxLines = 6;
 
     public bool HasSummary => item.Summary is not null;
 
@@ -49,13 +76,14 @@ public sealed class InboxItemViewModel(InboxItem item, string link, DateTimeOffs
     /// <summary>For a phone alert: who, where, Claude's line, the link, how long it waits.</summary>
     public SlackAlertLine Alert => new(From, Where, Summary, Link, Waiting);
 
-    /// <summary>What Slack Bot answered for the user, or null.</summary>
-    public string? BotReply => item.BotReply;
+    /// <summary>What Slack Bot answered for the user (the latest in the card), or null.</summary>
+    public string? BotReply => _all.LastOrDefault(i => i.BotReply is not null)?.BotReply;
 
-    public bool HasBotReply => item.BotReply is not null;
+    public bool HasBotReply => BotReply is not null;
 
     /// <summary>Changes when anything shown changes: the lists replace a row only then.</summary>
-    internal string Version => $"{item.Level}|{item.Summary}|{item.Handled}|{item.BotReply}|{item.Text}|{item.Read}|{link}|{Waiting}";
+    internal string Version => string.Join("/", _all.Select(i => $"{i.Id}|{i.Level}|{i.Summary}|{i.Handled}|{i.BotReply}|{i.Text}|{i.Read}"))
+                               + $"|{link}|{Waiting}";
 
     /// <summary>For the user, not sorted yet (or Claude Code is not working): shown as it is.</summary>
     public bool IsUnsorted => item.Level == InboxLevel.Pending;
@@ -216,27 +244,31 @@ public sealed partial class SlackBotInboxViewModel : ObservableObject
     [RelayCommand]
     private void Done(InboxItemViewModel? item)
     {
-        if (item is not null) _engine.Inbox.Dismiss(item.Id);
+        if (item is null) return;
+        foreach (var id in item.Ids) _engine.Inbox.Dismiss(id);
     }
 
     [RelayCommand]
     private void Restore(InboxItemViewModel? item)
     {
-        if (item is not null) _engine.Inbox.Restore(item.Id);
+        if (item is null) return;
+        foreach (var id in item.Ids) _engine.Inbox.Restore(id);
     }
 
     /// <summary>Claude put it on the to-do list but it only needs knowing.</summary>
     [RelayCommand]
     private void OnlyKnow(InboxItemViewModel? item)
     {
-        if (item is not null) _engine.Inbox.Relevel(item.Id, InboxLevel.Know);
+        if (item is null) return;
+        foreach (var id in item.Ids) _engine.Inbox.Relevel(id, InboxLevel.Know);
     }
 
     /// <summary>Claude put it under worth knowing but the user has to act on it.</summary>
     [RelayCommand]
     private void NeedsMe(InboxItemViewModel? item)
     {
-        if (item is not null) _engine.Inbox.Relevel(item.Id, InboxLevel.Act);
+        if (item is null) return;
+        foreach (var id in item.Ids) _engine.Inbox.Relevel(id, InboxLevel.Act);
     }
 
     [RelayCommand]
@@ -286,8 +318,8 @@ public sealed partial class SlackBotInboxViewModel : ObservableObject
         var url = _engine.Me?.Url ?? _engine.Inbox.WorkspaceUrl ?? "https://slack.com/";
         InboxItemViewModel View(InboxItem i) => new(i, SlackText.Permalink(url, i.Channel, i.Ts, i.ThreadTs));
 
-        var before = ToDo.Select(i => i.Id).ToHashSet();
-        Sync(ToDo, items.Where(i => i.IsToDo).Select(View).ToList());
+        var before = ToDo.SelectMany(i => i.Ids).ToHashSet();
+        Sync(ToDo, Cards(items.Where(i => i.IsToDo), url));
         var lastReport = _engine.Inbox.LastDigest;
         var knowing = items.Where(i => i.IsWorthKnowing).ToList();
         SyncGroups(knowing
@@ -317,13 +349,27 @@ public sealed partial class SlackBotInboxViewModel : ObservableObject
         HasKnowing = Knowing.Count > 0;
         IsConnected = _engine.State == SlackBotState.Connected;
         // Not for what was already there when Helm started.
-        if (_shown && ToDo.Where(i => !before.Contains(i.Id)).Select(i => i.Alert).ToList() is { Count: > 0 } added)
+        // A card with a message not seen before: a new one, or one more in a thread already on the list.
+        if (_shown && ToDo.Where(i => i.Ids.Any(id => !before.Contains(id))).Select(i => i.Alert).ToList() is { Count: > 0 } added)
         {
             NewToDo?.Invoke(this, EventArgs.Empty);
             NewToDoLines?.Invoke(this, added);
         }
         _shown = true;
     }
+
+    /// <summary>
+    /// The to-do messages as cards, one per thread (a DM's unthreaded messages are one thread, a channel message
+    /// starts its own), in the order their first messages came: a card stays where it is as its thread grows.
+    /// </summary>
+    internal static List<InboxItemViewModel> Cards(IEnumerable<InboxItem> toDo, string url, DateTimeOffset? now = null) =>
+        toDo.GroupBy(i => i.Kind is SlackConversationKind.DirectMessage or SlackConversationKind.GroupMessage && i.ThreadTs is null
+                ? i.Channel
+                : i.Channel + ":" + (i.ThreadTs ?? i.Ts))
+            .Select(g => g.OrderBy(i => i.Time).ToList())
+            .Select(g => (Newest: g[^1], All: g))
+            .Select(g => new InboxItemViewModel(g.Newest, SlackText.Permalink(url, g.Newest.Channel, g.Newest.Ts, g.Newest.ThreadTs), now, g.All))
+            .ToList();
 
     /// <summary>
     /// Makes <paramref name="list"/> show <paramref name="target"/> by moving, inserting and removing rows, and
