@@ -1,5 +1,6 @@
 using Android.Content;
 using Android.Content.PM;
+using Helm.Ai.Assistant;
 using Helm.Core;
 using Helm.Core.Platform;
 using Microsoft.Extensions.DependencyInjection;
@@ -18,8 +19,9 @@ namespace Helm.Modules.Wallet;
 
 /// <summary>
 /// "−65,000 ₫ · Techcombank — what was it?": after a payment Helm could not file by itself, a quiet notification with
-/// the likeliest categories as buttons (<see cref="WalletCategoryReceiver"/> files it); a tap opens Wallet. Runs
-/// without the activity.
+/// the likeliest categories as buttons (<see cref="WalletCategoryReceiver"/> files it), AI's pick or proposed new
+/// category first once it answered, and a microphone that opens Ask Helm about it; a tap opens Wallet. Runs without
+/// the activity.
 /// </summary>
 internal static class WalletNotifications
 {
@@ -29,6 +31,10 @@ internal static class WalletNotifications
     public const string ActionCategorize = "com.huyhung1404.helm.wallet.CATEGORIZE";
     public const string ExtraTransaction = "com.huyhung1404.helm.wallet.extra.TRANSACTION";
     public const string ExtraCategory = "com.huyhung1404.helm.wallet.extra.CATEGORY";
+
+    /// <summary>With <see cref="ActionCategorize"/>: the name of a category AI proposed, created only by this tap.</summary>
+    public const string ExtraNewCategory = "com.huyhung1404.helm.wallet.extra.NEW_CATEGORY";
+    public const string ExtraNewKind = "com.huyhung1404.helm.wallet.extra.NEW_KIND";
     public const string ActionAddGap = "com.huyhung1404.helm.wallet.ADD_GAP";
     public const string ExtraBank = "com.huyhung1404.helm.wallet.extra.BANK";
     public const string ExtraAccount = "com.huyhung1404.helm.wallet.extra.ACCOUNT";
@@ -40,7 +46,10 @@ internal static class WalletNotifications
     private const int PermissionRequestCode = 0x5A13;
     private const string PermissionAskedKey = "notification_permission_asked";
 
-    public static void AskCategory(Context context, string transactionId, WalletTransaction transaction, IReadOnlyList<CategoryInfo> suggestions)
+    /// <param name="proposal">AI's answer (<see cref="WalletCategoryAi"/>), shown first; null before it answered.</param>
+    /// <param name="category">Looks up AI's pick when the history did not suggest it.</param>
+    public static void AskCategory(Context context, string transactionId, WalletTransaction transaction, IReadOnlyList<CategoryInfo> suggestions,
+        CategoryProposal? proposal = null, Func<string, CategoryInfo?>? category = null)
     {
         try
         {
@@ -56,7 +65,12 @@ internal static class WalletNotifications
 
             var id = NotificationId(transactionId);
             var title = transaction.Bank.Length > 0 ? $"{WalletFormat.Signed(transaction.Amount)} · {transaction.Bank}" : WalletFormat.Signed(transaction.Amount);
-            var text = transaction.Description.Length > 0 ? $"{transaction.Description}\nWhat was it?" : "What was it?";
+            // The microphone takes the last button: the user says what it was and Ask Helm fills it in.
+            var mic = CanAskHelm(context);
+            var buttons = CategoryButtons.For(suggestions, proposal, category ?? (wanted => suggestions.FirstOrDefault(c => c.Id == wanted)), MaxActions - (mic ? 1 : 0));
+            var guess = proposal is null ? null : buttons.FirstOrDefault()?.NewName ?? buttons.FirstOrDefault()?.Label;
+            var question = guess is null ? "What was it?" : $"What was it? Maybe {guess}.";
+            var text = transaction.Description.Length > 0 ? $"{transaction.Description}\n{question}" : question;
             var builder = new Notification.Builder(context, ChannelId)
                 .SetSmallIcon(R.Drawable(context, "wallet_notification"))
                 .SetContentTitle(title)
@@ -68,21 +82,62 @@ internal static class WalletNotifications
                 .SetShowWhen(true);
             if (OpenWalletIntent(context, id) is { } open) builder.SetContentIntent(open);
             var icon = Icon.CreateWithResource(context, R.Drawable(context, "wallet_notification"));
-            for (var i = 0; i < Math.Min(MaxActions, suggestions.Count); i++)
+            for (var i = 0; i < buttons.Count; i++)
             {
                 var intent = new Intent(context, Java.Lang.Class.FromType(typeof(WalletCategoryReceiver)))
                     .SetAction(ActionCategorize)
-                    .PutExtra(ExtraTransaction, transactionId)
-                    .PutExtra(ExtraCategory, suggestions[i].Id);
+                    .PutExtra(ExtraTransaction, transactionId);
+                if (buttons[i].NewName is { } name) intent.PutExtra(ExtraNewCategory, name).PutExtra(ExtraNewKind, (int)buttons[i].Kind);
+                else intent.PutExtra(ExtraCategory, buttons[i].CategoryId);
                 var pending = PendingIntent.GetBroadcast(context, id * 4 + i, intent, PendingIntentFlags.UpdateCurrent | PendingIntentFlags.Immutable);
-                builder.AddAction(new Notification.Action.Builder(icon, suggestions[i].Name, pending).Build());
+                builder.AddAction(new Notification.Action.Builder(icon, buttons[i].Label, pending).Build());
             }
+            if (mic && AskHelmIntent(context, transactionId, transaction, id) is { } ask)
+                builder.AddAction(new Notification.Action.Builder(icon, "Say it", ask).Build());
             manager.Notify(id, builder.Build());
         }
         catch (Exception ex)
         {
             Log(ex, "Could not ask for the category of a transaction");
         }
+    }
+
+    /// <summary>Whether Ask Helm's card can open here: Quick Capture is on (its activity enabled) and it has a way to answer.</summary>
+    private static bool CanAskHelm(Context context)
+    {
+        try
+        {
+            var state = context.PackageManager?.GetComponentEnabledSetting(new ComponentName(context.PackageName!, AskHelmContext.ActivityName));
+            if (state is ComponentEnabledState.Disabled or ComponentEnabledState.DisabledUser) return false;
+            return HelmAndroidServices.Current.GetService<HelmAssistant>()?.Unavailable() is null;
+        }
+        catch (Exception ex)
+        {
+            Log(ex, "Could not tell whether Ask Helm can open");
+            return false;
+        }
+    }
+
+    /// <summary>Opens Ask Helm's card about this transaction; it clears this notification once the answer saved it.</summary>
+    private static PendingIntent? AskHelmIntent(Context context, string transactionId, WalletTransaction transaction, int notificationId)
+    {
+        var ask = WalletAskContext.For(transactionId, transaction);
+        var intent = new Intent()
+            .SetClassName(context.PackageName!, AskHelmContext.ActivityName)
+            .AddFlags(ActivityFlags.NewTask)
+            .PutExtra(AskHelmContext.ExtraTitle, ask.Title)
+            .PutExtra(AskHelmContext.ExtraPrompt, ask.Prompt)
+            .PutExtra(AskHelmContext.ExtraGroups, string.Join(",", ask.Groups))
+            .PutExtra(AskHelmContext.ExtraNotification, notificationId);
+        return PendingIntent.GetActivity(context, notificationId * 4 + 3, intent, PendingIntentFlags.UpdateCurrent | PendingIntentFlags.Immutable);
+    }
+
+    /// <summary>Whether the "what was it?" notification of a transaction is still shown (AI's answer updates only that).</summary>
+    public static bool IsAsking(Context context, string transactionId)
+    {
+        if (context.GetSystemService(Context.NotificationService) is not NotificationManager manager) return false;
+        var id = NotificationId(transactionId);
+        return manager.GetActiveNotifications()?.Any(n => n.Id == id) == true;
     }
 
     /// <summary>
@@ -236,10 +291,19 @@ public sealed class WalletCategoryReceiver : BroadcastReceiver
         if (context is null || intent?.Action != WalletNotifications.ActionCategorize) return;
         var transactionId = intent.GetStringExtra(WalletNotifications.ExtraTransaction);
         var categoryId = intent.GetStringExtra(WalletNotifications.ExtraCategory);
-        if (string.IsNullOrEmpty(transactionId) || string.IsNullOrEmpty(categoryId)) return;
+        var newName = intent.GetStringExtra(WalletNotifications.ExtraNewCategory);
+        if (string.IsNullOrEmpty(transactionId) || string.IsNullOrEmpty(categoryId) && string.IsNullOrEmpty(newName)) return;
         try
         {
-            HelmAndroidServices.Current.GetRequiredService<WalletStore>().SetCategory(transactionId, categoryId);
+            var store = HelmAndroidServices.Current.GetRequiredService<WalletStore>();
+            // AI's new category exists from this tap on (one of that name made meanwhile is the same one).
+            if (string.IsNullOrEmpty(categoryId))
+            {
+                var kind = (CategoryKind)intent.GetIntExtra(WalletNotifications.ExtraNewKind, (int)CategoryKind.Expense);
+                categoryId = store.Categories(includeHidden: true).FirstOrDefault(c => c.Kind == kind
+                    && string.Equals(c.Name, newName!.Trim(), StringComparison.CurrentCultureIgnoreCase))?.Id ?? store.AddCategory(newName!, kind);
+            }
+            store.SetCategory(transactionId, categoryId);
             WalletNotifications.Cancel(context, transactionId);
             WalletWidgets.RefreshAll(context);
         }

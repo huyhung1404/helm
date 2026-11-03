@@ -5,7 +5,8 @@ using Helm.Core.Mcp;
 namespace Helm.Modules.Wallet;
 
 /// <summary>
-/// The Wallet for AI agents over MCP: the debt book (read it, add an entry) and a transaction typed by hand. Nothing is
+/// The Wallet for AI agents over MCP: the debt book (read it, add an entry), a transaction typed by hand, and what a
+/// transaction was (its category and description, after Helm asked). Nothing is
 /// ever deleted through here. Dates are the user's local ones: "2026-10-01" or "2026-10-01T18:00".
 /// </summary>
 public sealed class WalletMcpTools(DebtBook book, WalletStore store) : IMcpToolProvider
@@ -38,6 +39,23 @@ public sealed class WalletMcpTools(DebtBook book, WalletStore store) : IMcpToolP
             (args, _) => Task.FromResult<object?>(AddTransaction(args)))
         {
             Undo = (result, _) => { store.Delete(Id(result)); return Task.CompletedTask; },
+        },
+        new("wallet_update_transaction", "Fill in what a transaction already in the Wallet was: its category and/or its description (after Helm asked the user “what was it?”). Only what is given changes.",
+            McpArgs.Schema(
+                ("id", McpArgs.Text("The transaction's id, as Helm gave it."), true),
+                ("category", McpArgs.Text($"One of the categories. For spending: {Names(CategoryKind.Expense)}. For money in: {Names(CategoryKind.Income)}. Between the user's own accounts: {Names(CategoryKind.Transfer)}."), false),
+                ("description", McpArgs.Text("What it was, in the user's words, e.g. Ăn trưa với Nam."), false)),
+            (args, _) => Task.FromResult<object?>(UpdateTransaction(args)))
+        {
+            Undo = (result, _) =>
+            {
+                // Results leave nulls out: no category before is no category_id.
+                var before = result.GetProperty("before");
+                store.Restore(Id(result), before.TryGetProperty("category_id", out var c) ? c.GetString() : null,
+                    before.TryGetProperty("auto", out var auto) && auto.GetBoolean(),
+                    before.TryGetProperty("description", out var d) ? d.GetString() ?? "" : "");
+                return Task.CompletedTask;
+            },
         },
         new("wallet_summary", "What the user spent and received over some days, in đồng, with the spending by category (largest first). Transfers between their own accounts count as neither.",
             McpArgs.Schema(
@@ -110,6 +128,32 @@ public sealed class WalletMcpTools(DebtBook book, WalletStore store) : IMcpToolP
             description,
             category = categoryId is null ? null : store.Category(categoryId)?.Name,
             when,
+        };
+    }
+
+    private object UpdateTransaction(JsonElement args)
+    {
+        var id = McpArgs.RequiredString(args, "id").Trim();
+        if (store.Get(id) is not { } transaction) throw new McpToolException($"There is no transaction {id}.");
+        string? categoryId = null;
+        if (McpArgs.String(args, "category") is { Length: > 0 } wanted)
+        {
+            var kind = transaction.Amount < 0 ? CategoryKind.Expense : CategoryKind.Income;
+            categoryId = (store.Categories().FirstOrDefault(c => c.Fits(transaction.Amount) && string.Equals(c.Name, wanted.Trim(), StringComparison.CurrentCultureIgnoreCase))
+                ?? throw new McpToolException($"There is no {(kind == CategoryKind.Expense ? "spending" : "income")} category {wanted}. Use one of: {Names(kind)}, {Names(CategoryKind.Transfer)}.")).Id;
+        }
+        var description = McpArgs.String(args, "description")?.Trim();
+        if (categoryId is null && string.IsNullOrEmpty(description)) throw new McpToolException("Give a category, a description, or both.");
+        var before = store.Describe(id, categoryId, description) ?? throw new McpToolException($"There is no transaction {id}.");
+        var now = store.Get(id)!;
+        return new
+        {
+            id,
+            amount = now.Amount,
+            currency = WalletFormat.Currency,
+            description = now.Description,
+            category = now.CategoryId is { } c ? store.Category(c)?.Name : null,
+            before = new { category_id = before.CategoryId, auto = before.AutoCategorized, description = before.Description },
         };
     }
 

@@ -76,8 +76,12 @@ public sealed class ColorChoice(int slot, Action<int> pick)
     public IRelayCommand PickCommand { get; } = new RelayCommand(() => pick(slot));
 }
 
-/// <summary>A notification Helm could not read, on the settings page.</summary>
-public sealed class UnreadRow(UnreadNotification notification, string when, Action<UnreadNotification> copy)
+/// <summary>
+/// A notification Helm could not read, on the settings page; or one AI just read (<see cref="UnreadReading"/>), which
+/// says what was saved and offers Undo in the same place.
+/// </summary>
+public sealed class UnreadRow(UnreadNotification notification, string when, Action<UnreadNotification> copy, string? text = null,
+    string? actionText = null, Func<Task>? action = null)
 {
     public string When { get; } = when;
 
@@ -85,9 +89,17 @@ public sealed class UnreadRow(UnreadNotification notification, string when, Acti
 
     public string Title { get; } = notification.Title;
 
-    public string Text { get; } = notification.Text;
+    public string Text { get; } = text ?? notification.Text;
 
     public IRelayCommand CopyCommand { get; } = new RelayCommand(() => copy(notification));
+
+    /// <summary>"Read with AI", or "Undo" once it was; empty when AI is not set up on this device.</summary>
+    public string ActionText { get; } = action is null ? "" : actionText ?? "";
+
+    public bool HasAction => ActionText.Length > 0;
+
+    /// <summary>Off while it runs, so a second tap does not read it twice.</summary>
+    public IAsyncRelayCommand ActionCommand { get; } = new AsyncRelayCommand(action ?? (() => Task.CompletedTask));
 }
 
 /// <summary>A category on the settings page: rename, hide, change its icon and colour, or delete (the user's own only).</summary>

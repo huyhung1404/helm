@@ -245,3 +245,24 @@ Redirects are not followed; the answer is capped at 1 MB.
 **For a new feature.** Add its id to `AiFeatureIds` (it is fetched from then on: the refresher reads the constants) and
 take its prompt through `IAiPrompts.Get(featureId, builtIn)`, passing the template before its placeholders are filled.
 Code: `src/Helm.Ai.Core/Prompts/` (`AiPrompts`, `AiPromptRefresher`, `SkillHubPromptSource`, `SkillHubSettings`).
+
+## Wallet's AI
+
+Wallet uses AI only where the history and the bank parser fall short, through `AiOneShot`
+(`Helm.Ai.Core/Assistant/AiOneShot.cs`: one question, no tools, agents on a Helm PC first, the API last). A feature
+with no choice of its own takes Ask Helm's model; one that runs by itself goes to a PC agent only.
+
+- **Filing a new payment** (`wallet-categorize`, runs by itself: PC agent only). `WalletClassifier` files it from the
+  history first, without AI: earlier transactions of the same direction with the same words (or most of them) vote
+  for their category, a little more in the same amount band; sure from two that agree. Only when it is not sure, AI
+  gets the user's categories for that direction and up to 5 filed transactions like it (`WalletCategoryAi`), and
+  answers one of them or a new name. Its answer goes first on the phone's "What was it?" notification; a new
+  category shows as "+ Name" and is created only when tapped. AI never files anything by itself.
+- **Read with AI** (`wallet-read-notification`, started by the user). Under Wallet → Troubleshooting → *Notifications
+  Helm could not read*, each one has **Read with AI**: that one notification's text (never a one-time code) goes to
+  AI, which answers the amount, direction, counterpart, description and balance as JSON. `WalletNotificationAi`
+  checks it against the text (the amount and the balance must be written in it, a sign in it must agree) and saves
+  the transaction the usual way; the row then says what was saved, with **Undo**.
+- **Say it** on "What was it?" opens Ask Helm about that transaction (`AskHelmContext`, `WalletAskContext`): "ăn trưa
+  với Nam" fills in its category and description with `wallet_update_transaction` (Undo in the card), and the
+  notification goes away.

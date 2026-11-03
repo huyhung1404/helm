@@ -129,7 +129,10 @@ public sealed class BankNotificationListener : NotificationListenerService
                 added = true;
                 // Money out that Helm could not file by itself: ask what it was.
                 if (capture.Settings.Current.AskForCategory && saved.Transaction.Amount < 0 && !saved.Transaction.IsCategorized)
+                {
                     WalletNotifications.AskCategory(context, saved.Id, saved.Transaction, store.Suggest(saved.Transaction, WalletNotifications.MaxActions));
+                    _ = Task.Run(() => ProposeAsync(context, saved.Id));
+                }
                 // The balance shows money that moved without a notification (a payment made in the bank's own app).
                 if (capture.Settings.Current.AskForMissing && store.FindGap(saved.Id) is { } gap)
                     WalletNotifications.AskGap(context, gap,
@@ -140,6 +143,36 @@ public sealed class BankNotificationListener : NotificationListenerService
         catch (Exception ex)
         {
             Log(ex, "Could not save a transaction from a notification");
+        }
+    }
+
+    /// <summary>How long AI may take to file a new payment before the question stays as it is.</summary>
+    private static readonly TimeSpan ProposeFor = TimeSpan.FromMinutes(3);
+
+    /// <summary>
+    /// The history could not file it: AI (a PC agent) picks one of the user's categories or proposes a new one, and the
+    /// "what was it?" notification, while it is still shown and the payment still unfiled, puts that first.
+    /// </summary>
+    private static async Task ProposeAsync(Context context, string transactionId)
+    {
+        try
+        {
+            var services = HelmAndroidServices.Current;
+            using var limit = new CancellationTokenSource(ProposeFor);
+            var proposal = await services.GetRequiredService<WalletCategoryAi>().ProposeAsync(transactionId, limit.Token);
+            var store = services.GetRequiredService<WalletStore>();
+            if (proposal is null || store.Get(transactionId) is not { IsCategorized: false } transaction
+                || !WalletNotifications.IsAsking(context, transactionId)) return;
+            WalletNotifications.AskCategory(context, transactionId, transaction, store.Suggest(transaction, WalletNotifications.MaxActions), proposal,
+                store.Category);
+        }
+        catch (OperationCanceledException)
+        {
+            // AI took too long: the question stays as the history put it.
+        }
+        catch (Exception ex)
+        {
+            Log(ex, "Could not ask AI for the category of a transaction");
         }
     }
 

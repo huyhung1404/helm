@@ -7,6 +7,12 @@ public static class AiFeatureIds
 {
     /// <summary>The phone's voice assistant: the Quick Settings tile and its card.</summary>
     public const string AskHelm = "ask-helm";
+
+    /// <summary>Wallet: a new transaction the history cannot file (runs by itself: a PC agent only, unless chosen otherwise).</summary>
+    public const string WalletCategorize = "wallet-categorize";
+
+    /// <summary>Wallet: reads a bank notification Helm's parser missed, when the user asks it to.</summary>
+    public const string WalletReadNotification = "wallet-read-notification";
 }
 
 /// <summary>Where a feature's calls may run: Claude Code on a Helm PC (the user's plan, no cost per call) or the API.</summary>

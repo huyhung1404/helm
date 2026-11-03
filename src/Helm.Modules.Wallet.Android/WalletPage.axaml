@@ -258,7 +258,7 @@
         <Border Classes="card">
             <StackPanel Spacing="8">
                 <TextBlock Text="Notifications Helm could not read" Classes="title" />
-                <TextBlock Text="Your bank's notifications that talk about money but that Helm did not understand, kept on this phone only. Copy one and add it by hand, or send it to the developer so Helm learns the format."
+                <TextBlock Text="Your bank's notifications that talk about money but that Helm did not understand, kept on this phone only. Read with AI sends that one notification to AI, which finds the transaction in it; or copy one and add it by hand, or send it to the developer so Helm learns the format."
                            Classes="secondary" TextWrapping="Wrap" />
                 <TextBlock Text="None." Classes="secondary" IsVisible="{Binding !HasUnread}" />
                 <ItemsControl ItemsSource="{Binding Unread}">
@@ -271,7 +271,11 @@
                                         <TextBlock Text="{Binding When}" Classes="secondary" FontSize="12" />
                                         <TextBlock Text="{Binding Text}" TextWrapping="Wrap" />
                                     </StackPanel>
-                                    <Button Grid.Column="1" Classes="flat" Content="Copy" Command="{Binding CopyCommand}" VerticalAlignment="Top" />
+                                    <StackPanel Grid.Column="1" VerticalAlignment="Top">
+                                        <Button Classes="flat" Content="Copy" Command="{Binding CopyCommand}" HorizontalAlignment="Stretch" />
+                                        <Button Classes="flat" Content="{Binding ActionText}" Command="{Binding ActionCommand}" IsVisible="{Binding HasAction}"
+                                                HorizontalAlignment="Stretch" />
+                                    </StackPanel>
                                 </Grid>
                             </Border>
                         </DataTemplate>

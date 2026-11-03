@@ -54,6 +54,7 @@ public sealed class HelmAssistant(
     public static readonly IReadOnlySet<string> Tools = new HashSet<string>(StringComparer.Ordinal)
     {
         "wallet_add_transaction", "wallet_add_debt", "wallet_debts", "wallet_summary",
+        "wallet_update_transaction",
         "tracker_lists", "tracker_tasks", "tracker_add_task", "tracker_complete_task", "tracker_start_task",
         "notes_create", "notes_search", "notes_read",
         "habits_list", "habit_report", "habit_check",
@@ -152,7 +153,8 @@ public sealed class HelmAssistant(
         : null;
 
     /// <param name="phone">The phone's own tools for this card (alarm, calendar, clipboard), which need its screen.</param>
-    public AssistantSession Start(IEnumerable<IMcpToolProvider>? phone = null) => new(this, [.. phone ?? []]);
+    /// <param name="context">What the card was opened about (a transaction to describe), or null.</param>
+    public AssistantSession Start(IEnumerable<IMcpToolProvider>? phone = null, AskHelmContext? context = null) => new(this, [.. phone ?? []], context);
 
     internal IReadOnlyList<AssistantTool> OfferedTools(IReadOnlyList<IMcpToolProvider> phone) =>
     [
@@ -207,6 +209,7 @@ public sealed class AssistantSession
 {
     private readonly HelmAssistant _helm;
     private readonly IReadOnlyList<IMcpToolProvider> _phone;
+    private readonly AskHelmContext? _context;
     private readonly string _conversationId = Guid.NewGuid().ToString("N");
     private readonly List<(string Role, string Text)> _history = [];
     private IReadOnlyList<AssistantTool>? _all;
@@ -215,10 +218,13 @@ public sealed class AssistantSession
     private (IAssistantChat Chat, AssistantModelOption Model, string KeyId)? _open;
     private IAgentRoute? _pc;
 
-    internal AssistantSession(HelmAssistant helm, IReadOnlyList<IMcpToolProvider> phone)
+    internal AssistantSession(HelmAssistant helm, IReadOnlyList<IMcpToolProvider> phone, AskHelmContext? context = null)
     {
         _helm = helm;
         _phone = phone;
+        _context = context;
+        // The groups the context needs, whatever the first words name.
+        if (context is not null) _scope.UnionWith(context.Groups);
     }
 
     /// <summary>The model this conversation talks to (a new pick in the card starts a new conversation).</summary>
@@ -237,6 +243,8 @@ public sealed class AssistantSession
         var before = _tools;
         _tools = ToolScope.Pick(_all, _scope, text);
         if (_open is { } open && _tools.Where(t => before.All(b => b.Name != t.Name)).ToList() is { Count: > 0 } added) open.Chat.AddTools(added);
+        // The first turn of a card opened about something says what it is about.
+        if (first && _context is { } context) text = context.Before(text);
         var model = Model!;
         var choice = _helm.Choice;
 
