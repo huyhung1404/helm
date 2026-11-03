@@ -5,8 +5,8 @@ namespace Helm.Modules.Vocab;
 
 /// <summary>
 /// A collapsible section of a card or a word's page (How it's built, Examples, Goes with…): its title is a full-width
-/// row that opens and closes it (the template is in VocabStyles.axaml). Classes <c>py</c> and <c>warn</c> colour the
-/// title. A section closed by the user stays closed for every word until Helm restarts, so the next card looks the same.
+/// row that opens and closes it (the template is in VocabStyles.axaml). Classes <c>py</c> (purple), <c>memo</c> (blue)
+/// and <c>warn</c> (amber) colour the title. A section closed by the user stays closed for every word until Helm restarts, so the next card looks the same.
 /// </summary>
 public sealed class VocabSection : ContentControl
 {

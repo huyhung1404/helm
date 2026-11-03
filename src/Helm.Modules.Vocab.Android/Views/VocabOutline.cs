@@ -11,6 +11,7 @@ namespace Helm.Modules.Vocab;
 public sealed class VocabOutlineRow : ObservableObject
 {
     private const double Step = 24;
+    private const double Edge = 1.5;
 
     public VocabOutlineRow(VocabNodeViewModel node, int depth, VocabNodeViewModel root)
     {
@@ -46,8 +47,11 @@ public sealed class VocabOutlineRow : ObservableObject
     /// <summary>A part (not the word itself) is joined to its parent by an elbow.</summary>
     public bool HasElbow => Depth > 0;
 
-    /// <summary>The row's left padding: the word at the edge, each level 24 px further in.</summary>
-    public Thickness Indent => new(6 + Math.Max(0, Depth - 1) * Step, 4, 10, 4);
+    /// <summary>
+    /// The row's padding (4 10 4 6): the word at the edge, each level 24 px further in. The row's 1.5 outline (drawn
+    /// inside it in the design) is taken off, so the boxes stand where the design has them.
+    /// </summary>
+    public Thickness Indent => new(6 - Edge + Math.Max(0, Depth - 1) * Step, 4 - Edge, 10 - Edge, 4 - Edge);
 
     /// <summary>The tree, depth first: the word, then each part followed by its own parts.</summary>
     public static IReadOnlyList<VocabOutlineRow> Flatten(VocabNodeViewModel? root)

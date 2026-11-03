@@ -1,16 +1,20 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-             xmlns:ic="using:FluentIcons.Avalonia"
              xmlns:vm="using:Helm.Modules.Vocab"
              xmlns:local="using:Helm.Modules.Vocab"
              x:Class="Helm.Modules.Vocab.VocabOutlineView"
              x:DataType="vm:VocabWordDetailViewModel">
 
     <!-- How a word is built, on the Learn card and the word's page: the outline of its parts (tap one; hold a character
-         or an inner word to add it as a word), then the tapped part's panel: what it means, where it comes from, the
-         other words that have it, add it as a word, edit it. -->
+         or an inner word to add it as a word), 2 between its rows, then the tapped part's panel: what it means, where it
+         comes from, the other words that have it, add it as a word, edit it. -->
     <StackPanel Spacing="8">
         <ItemsControl ItemsSource="{Binding Root, Converter={x:Static local:VocabConverters.Outline}}">
+            <ItemsControl.ItemsPanel>
+                <ItemsPanelTemplate>
+                    <StackPanel Spacing="2" />
+                </ItemsPanelTemplate>
+            </ItemsControl.ItemsPanel>
             <ItemsControl.ItemTemplate>
                 <DataTemplate x:DataType="local:VocabOutlineRow">
                     <Button Classes="orow node" Classes.sel="{Binding IsPicked}" Padding="{Binding Indent}" Command="{Binding Pick}"
@@ -34,57 +38,63 @@
         <TextBlock x:Name="PickHint" Classes="hint" IsVisible="{Binding IsWordSelected}"
                    Text="Tap a part to see what it means and which of your words share it. Hold a character or an inner word to add it as a word." />
 
-        <!-- The tapped part -->
+        <!-- .part: the tapped part, 6 between its lines -->
         <Border Classes="part" IsVisible="{Binding IsPartSelected}">
             <StackPanel Spacing="6">
                 <Grid ColumnDefinitions="*,Auto">
                     <WrapPanel VerticalAlignment="Center">
-                        <TextBlock Text="{Binding CardTitle}" FontSize="22" FontWeight="SemiBold" Margin="0,0,8,0" />
-                        <TextBlock Text="{Binding CardKind}" Classes="hint" VerticalAlignment="Center" />
+                        <TextBlock Text="{Binding CardTitle}" FontSize="22" FontWeight="SemiBold" Margin="0,0,8,0" VerticalAlignment="Bottom" />
+                        <TextBlock Text="{Binding CardKind}" Classes="hint" VerticalAlignment="Bottom" Margin="0,0,0,3" />
                     </WrapPanel>
-                    <Button Grid.Column="1" Classes="icon" Command="{Binding SayPartCommand}" IsVisible="{Binding CanSayPart}" AutomationProperties.Name="Say this part">
-                        <ic:SymbolIcon Symbol="Speaker2" FontSize="18" />
+                    <!-- Not in the design: hear the part -->
+                    <Button Grid.Column="1" Classes="icon" Margin="0,-10,-10,-10" Command="{Binding SayPartCommand}" IsVisible="{Binding CanSayPart}" AutomationProperties.Name="Say this part">
+                        <local:LineIcon Kind="Speaker" Size="18" />
                     </Button>
                 </Grid>
+                <!-- Its reading in its tones' colours, the Hán Việt right after it -->
                 <WrapPanel>
-                    <TextBlock local:ToneText.Text="{Binding CardPhonetic}" Margin="0,0,8,0" IsVisible="{Binding HasCardPhonetic}" />
-                    <TextBlock Text="{Binding CardHanViet}" Classes="hint" IsVisible="{Binding HasCardHanViet}" />
+                    <WrapPanel.IsVisible>
+                        <MultiBinding Converter="{x:Static BoolConverters.Or}">
+                            <Binding Path="HasCardPhonetic" />
+                            <Binding Path="HasCardHanViet" />
+                        </MultiBinding>
+                    </WrapPanel.IsVisible>
+                    <TextBlock local:ToneText.Text="{Binding CardPhonetic}" Margin="0,0,4,0" VerticalAlignment="Bottom" IsVisible="{Binding HasCardPhonetic}" />
+                    <TextBlock Text="{Binding CardHanViet}" Classes="hint" VerticalAlignment="Bottom" Margin="0,0,0,1" IsVisible="{Binding HasCardHanViet}" />
                 </WrapPanel>
-                <TextBlock Text="{Binding CardMeaning}" FontSize="16" TextWrapping="Wrap" />
+                <TextBlock Text="{Binding CardMeaning}" TextWrapping="Wrap" />
                 <TextBlock Text="{Binding CardOrigin}" Classes="hint" IsVisible="{Binding HasCardOrigin}" />
 
-                <StackPanel IsVisible="{Binding HasAlsoIn}" Margin="0,4,0,0" Spacing="6">
-                    <TextBlock Text="Also in your words" Classes="label" />
-                    <ItemsControl ItemsSource="{Binding AlsoIn}">
-                        <ItemsControl.ItemsPanel>
-                            <ItemsPanelTemplate>
-                                <WrapPanel />
-                            </ItemsPanelTemplate>
-                        </ItemsControl.ItemsPanel>
-                        <ItemsControl.ItemTemplate>
-                            <DataTemplate x:DataType="vm:VocabWordLink">
-                                <Button Classes="wl" Command="{Binding Open}" AutomationProperties.Name="{Binding Text}">
-                                    <TextBlock><Run Text="{Binding Split.Before}" /><Run Classes="hl" Text="{Binding Split.Match}" /><Run Text="{Binding Split.After}" /></TextBlock>
-                                </Button>
-                            </DataTemplate>
-                        </ItemsControl.ItemTemplate>
-                    </ItemsControl>
-                </StackPanel>
+                <TextBlock Text="Also in your words" Classes="lbl" Margin="0,4,0,0" IsVisible="{Binding HasAlsoIn}" />
+                <ItemsControl ItemsSource="{Binding AlsoIn}" IsVisible="{Binding HasAlsoIn}">
+                    <ItemsControl.ItemsPanel>
+                        <ItemsPanelTemplate>
+                            <WrapPanel ItemSpacing="6" LineSpacing="6" />
+                        </ItemsPanelTemplate>
+                    </ItemsControl.ItemsPanel>
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate x:DataType="vm:VocabWordLink">
+                            <Button Classes="wl" Command="{Binding Open}" AutomationProperties.Name="{Binding Text}">
+                                <TextBlock><Run Text="{Binding Split.Before}" /><Run Classes="hl" Text="{Binding Split.Match}" /><Run Text="{Binding Split.After}" /></TextBlock>
+                            </Button>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
 
-                <WrapPanel IsVisible="{Binding !IsEditingPart}">
+                <StackPanel Orientation="Horizontal" Spacing="4" Margin="0,4,0,0" IsVisible="{Binding !IsEditingPart}">
                     <Button Classes="ghost" Command="{Binding AddSelectedAsWordCommand}" IsVisible="{Binding CanAddSelectedAsWord}" AutomationProperties.Name="{Binding SelectedAddText}">
-                        <StackPanel Orientation="Horizontal" Spacing="6">
-                            <ic:SymbolIcon Symbol="Add" FontSize="18" />
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                            <local:LineIcon Kind="Plus" Size="18" VerticalAlignment="Center" />
                             <TextBlock Text="{Binding SelectedAddText}" VerticalAlignment="Center" />
                         </StackPanel>
                     </Button>
                     <Button Classes="ghost" Command="{Binding BeginEditPartCommand}" AutomationProperties.Name="Edit this part">
-                        <StackPanel Orientation="Horizontal" Spacing="6">
-                            <ic:SymbolIcon Symbol="Edit" FontSize="18" />
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                            <local:LineIcon Kind="Edit" Size="18" VerticalAlignment="Center" />
                             <TextBlock Text="Edit part" VerticalAlignment="Center" />
                         </StackPanel>
                     </Button>
-                </WrapPanel>
+                </StackPanel>
 
                 <!-- Editing the part by hand: every word with it shows the change -->
                 <StackPanel Spacing="6" IsVisible="{Binding IsEditingPart}" Margin="0,6,0,0">
@@ -96,7 +106,7 @@
                     <TextBox Text="{Binding EditPartPhonetic}" AutomationProperties.Name="Phonetic" />
                     <TextBlock Text="Hán Việt" Classes="label" />
                     <TextBox Text="{Binding EditPartHanViet}" AutomationProperties.Name="Hán Việt" />
-                    <Grid ColumnDefinitions="*,8,*" Margin="0,6,0,0">
+                    <Grid ColumnDefinitions="*,10,*" Margin="0,6,0,0">
                         <Button Classes="tall" HorizontalAlignment="Stretch" Content="Cancel" Command="{Binding CancelEditPartCommand}" />
                         <Button Grid.Column="2" Classes="accent tall" HorizontalAlignment="Stretch" Content="Save" Command="{Binding SavePartCommand}" />
                     </Grid>

@@ -1,30 +1,32 @@
 <ui:ModulePageBase xmlns="https://github.com/avaloniaui"
                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-                   xmlns:ic="using:FluentIcons.Avalonia"
                    xmlns:ui="using:Helm.Core.Ui"
                    xmlns:vm="using:Helm.Modules.Vocab"
+                   xmlns:local="using:Helm.Modules.Vocab"
                    x:Class="Helm.Modules.Vocab.VocabPage"
                    x:DataType="vm:VocabViewModel">
 
-    <!-- Vocabulary's settings (Home → Utilities), in grouped cards: over other apps (the card, the bubble, how solid the
-         card is), the apps they stay out of, the cards, the display and the analysis. The words are on VocabContentPage. -->
+    <!-- Vocabulary's settings (Home → Utilities), as the design's settings page (AndroidSettings.dc.html): grouped cards
+         of rows (60 high at least, padding 12 16, the control 14 from its text) under accent headings: over other apps
+         (the card, the bubble, and how solid the card is), the apps they stay out of, the cards, the display and the
+         analysis. The words are on VocabContentPage. -->
     <ui:ModulePageBase.Styles>
         <StyleInclude Source="avares://Helm.Modules.Vocab.Android/VocabStyles.axaml" />
     </ui:ModulePageBase.Styles>
 
-    <StackPanel>
+    <StackPanel TextElement.FontSize="15" Classes="css">
         <Border Classes="infobar" IsVisible="{Binding HasMessage}">
             <DockPanel>
                 <Button DockPanel.Dock="Right" Classes="icon" Command="{Binding DismissMessageCommand}" AutomationProperties.Name="Dismiss">
-                    <ic:SymbolIcon Symbol="Dismiss" FontSize="16" />
+                    <local:LineIcon Kind="X" Size="16" />
                 </Button>
                 <TextBlock Text="{Binding Message}" TextWrapping="Wrap" VerticalAlignment="Center" />
             </DockPanel>
         </Border>
         <Border Classes="card" Padding="0" ClipToBounds="True">
-            <Button Classes="flat" Padding="16,12" MinHeight="60" Click="OpenVocabulary_Click" AutomationProperties.Name="Open Vocabulary">
+            <Button Classes="flat" Padding="16,12" MinHeight="60" CornerRadius="0" Click="OpenVocabulary_Click" AutomationProperties.Name="Open Vocabulary">
                 <DockPanel>
-                    <ic:SymbolIcon DockPanel.Dock="Right" Symbol="ChevronRight" FontSize="20" Foreground="{DynamicResource HelmSecondaryText}" VerticalAlignment="Center" />
+                    <local:LineIcon DockPanel.Dock="Right" Kind="Right" Size="20" Margin="14,0,0,0" Foreground="{DynamicResource VocabMuted}" VerticalAlignment="Center" />
                     <StackPanel VerticalAlignment="Center">
                         <TextBlock Text="Open Vocabulary" Classes="stitle" />
                         <TextBlock Text="Your words and their parts. Also in the menu and on Home." Classes="sdesc" />
@@ -39,16 +41,16 @@
             <Border Classes="infobar" IsVisible="{Binding HasMessage}">
                 <DockPanel>
                     <Button DockPanel.Dock="Right" Classes="icon" Command="{Binding DismissMessageCommand}" AutomationProperties.Name="Dismiss">
-                        <ic:SymbolIcon Symbol="Dismiss" FontSize="16" />
+                        <local:LineIcon Kind="X" Size="16" />
                     </Button>
                     <TextBlock Text="{Binding Message}" TextWrapping="Wrap" VerticalAlignment="Center" />
                 </DockPanel>
             </Border>
-            <!-- Only while the permission is missing -->
+            <!-- .warn, only while the permission is missing -->
             <Border Classes="warnbox" IsVisible="{Binding NeedsDraw}">
                 <StackPanel Spacing="10">
                     <Grid ColumnDefinitions="Auto,*">
-                        <ic:SymbolIcon Symbol="Warning" FontSize="20" Foreground="{DynamicResource VocabWarn}" VerticalAlignment="Top" Margin="0,0,10,0" />
+                        <local:LineIcon Kind="Warn" Size="20" Foreground="{DynamicResource VocabWarn}" VerticalAlignment="Top" Margin="0,0,10,0" />
                         <TextBlock Grid.Column="1" TextWrapping="Wrap" FontSize="14"
                                    Text="To show words over your other apps, Helm needs “Display over other apps”. Turn it on for Helm, then come back." />
                     </Grid>
@@ -59,8 +61,8 @@
                 <StackPanel>
                     <Border Classes="srow first">
                         <DockPanel>
-                            <ToggleSwitch DockPanel.Dock="Right" IsChecked="{Binding Settings.PopupEnabled}" OnContent="" OffContent="" AutomationProperties.Name="Pop-up card" />
-                            <StackPanel VerticalAlignment="Center" Margin="0,0,12,0">
+                            <ToggleButton Classes="sw" DockPanel.Dock="Right" Margin="14,0,0,0" IsChecked="{Binding Settings.PopupEnabled}" AutomationProperties.Name="Pop-up card" />
+                            <StackPanel VerticalAlignment="Center">
                                 <TextBlock Text="Pop-up card" Classes="stitle" />
                                 <TextBlock Classes="sdesc"
                                            Text="Now and then a card with one of your words appears over the app you are using. Unanswered, it goes away after 1½ minutes." />
@@ -70,22 +72,22 @@
                     <Border Classes="srow" IsVisible="{Binding Settings.PopupEnabled}">
                         <StackPanel Spacing="8">
                             <TextBlock Text="How often" Classes="label" />
-                            <ComboBox HorizontalAlignment="Stretch" MinHeight="44" ItemsSource="{Binding Settings.PopupFrequencyNames}" SelectedIndex="{Binding Settings.PopupFrequencyIndex}"
+                            <ComboBox HorizontalAlignment="Stretch" ItemsSource="{Binding Settings.PopupFrequencyNames}" SelectedIndex="{Binding Settings.PopupFrequencyIndex}"
                                       AutomationProperties.Name="How often" />
                             <Grid ColumnDefinitions="*,10,*" IsVisible="{Binding Settings.IsCustomFrequency}">
-                                <StackPanel Spacing="4">
-                                    <TextBlock Text="Shortest (seconds)" Classes="sdesc" />
-                                    <TextBox Text="{Binding Settings.CustomFromText}" MinHeight="44" AutomationProperties.Name="Shortest gap in seconds" />
+                                <StackPanel>
+                                    <TextBlock Text="Shortest (seconds)" Classes="sdesc" Margin="0" />
+                                    <TextBox Text="{Binding Settings.CustomFromText}" FontSize="15" AutomationProperties.Name="Shortest gap in seconds" />
                                 </StackPanel>
-                                <StackPanel Grid.Column="2" Spacing="4">
-                                    <TextBlock Text="Longest (seconds)" Classes="sdesc" />
-                                    <TextBox Text="{Binding Settings.CustomToText}" MinHeight="44" AutomationProperties.Name="Longest gap in seconds" />
+                                <StackPanel Grid.Column="2">
+                                    <TextBlock Text="Longest (seconds)" Classes="sdesc" Margin="0" />
+                                    <TextBox Text="{Binding Settings.CustomToText}" FontSize="15" AutomationProperties.Name="Longest gap in seconds" />
                                 </StackPanel>
                             </Grid>
-                            <TextBlock Text="{Binding Settings.CustomError}" Classes="sdesc" Foreground="{DynamicResource HelmDanger}" IsVisible="{Binding Settings.HasCustomError}" />
-                            <Button Classes="tall" HorizontalAlignment="Left" Padding="14,0" Command="{Binding ShowNowCommand}" AutomationProperties.Name="Show a word now">
+                            <TextBlock Text="{Binding Settings.CustomError}" Classes="sdesc" Foreground="{DynamicResource VocabBad}" IsVisible="{Binding Settings.HasCustomError}" />
+                            <Button Classes="tall" HorizontalAlignment="Left" Command="{Binding ShowNowCommand}" AutomationProperties.Name="Show a word now">
                                 <StackPanel Orientation="Horizontal" Spacing="8">
-                                    <ic:SymbolIcon Symbol="Play" FontSize="18" />
+                                    <local:LineIcon Kind="Play" Size="18" VerticalAlignment="Center" />
                                     <TextBlock Text="Show a word now" VerticalAlignment="Center" />
                                 </StackPanel>
                             </Button>
@@ -93,21 +95,22 @@
                     </Border>
                     <Border Classes="srow">
                         <DockPanel>
-                            <ToggleSwitch DockPanel.Dock="Right" IsChecked="{Binding Settings.BubbleEnabled}" OnContent="" OffContent="" AutomationProperties.Name="Floating bubble" />
-                            <StackPanel VerticalAlignment="Center" Margin="0,0,12,0">
+                            <ToggleButton Classes="sw" DockPanel.Dock="Right" Margin="14,0,0,0" IsChecked="{Binding Settings.BubbleEnabled}" AutomationProperties.Name="Floating bubble" />
+                            <StackPanel VerticalAlignment="Center">
                                 <TextBlock Text="Floating bubble" Classes="stitle" />
                                 <TextBlock Classes="sdesc"
                                            Text="Tap it for a word to guess; drag it to move it. Drag it onto the ✕ at the bottom to put it away until you next unlock the phone." />
                             </StackPanel>
                         </DockPanel>
                     </Border>
+                    <!-- Not in the design: how solid the card is at rest -->
                     <Border Classes="srow">
-                        <StackPanel Spacing="4">
+                        <StackPanel Spacing="2">
                             <DockPanel>
-                                <TextBlock DockPanel.Dock="Right" Text="{Binding Settings.CardOpacityText}" FontWeight="SemiBold" VerticalAlignment="Center" />
+                                <TextBlock DockPanel.Dock="Right" Text="{Binding Settings.CardOpacityText}" FontWeight="SemiBold" VerticalAlignment="Center" Margin="14,0,0,0" />
                                 <TextBlock Text="Card opacity" Classes="stitle" VerticalAlignment="Center" />
                             </DockPanel>
-                            <TextBlock Classes="sdesc"
+                            <TextBlock Classes="sdesc" Margin="0"
                                        Text="How solid the card is while you are not using it, so the app below stays readable. It turns solid while you touch it, type its pinyin or read its full details." />
                             <Slider x:Name="OpacitySlider" Maximum="100" TickFrequency="5" IsSnapToTickEnabled="True"
                                     Value="{Binding Settings.CardOpacity}" AutomationProperties.Name="Card opacity" />
@@ -120,7 +123,7 @@
             <Border Classes="warnbox" IsVisible="{Binding NeedsUsageAccess}">
                 <StackPanel Spacing="10">
                     <Grid ColumnDefinitions="Auto,*">
-                        <ic:SymbolIcon Symbol="Warning" FontSize="20" Foreground="{DynamicResource VocabWarn}" VerticalAlignment="Top" Margin="0,0,10,0" />
+                        <local:LineIcon Kind="Warn" Size="20" Foreground="{DynamicResource VocabWarn}" VerticalAlignment="Top" Margin="0,0,10,0" />
                         <TextBlock Grid.Column="1" TextWrapping="Wrap" FontSize="14"
                                    Text="To stay out of the apps below, Helm needs to see which app is open: turn on “Usage access” for Helm, then come back." />
                     </Grid>
@@ -129,51 +132,54 @@
             </Border>
             <Border Classes="card" Padding="0" ClipToBounds="True">
                 <!-- The first row's hairline hides under the card's edge -->
-                <StackPanel Margin="0,-1,0,0">
-                    <!-- Hidden while picking: a tick would add a row here and push the list under the finger -->
-                    <ItemsControl ItemsSource="{Binding Blocked}" IsVisible="{Binding !IsPicking}">
-                        <ItemsControl.ItemTemplate>
-                            <DataTemplate DataType="vm:VocabAppRow">
-                                <Border Classes="srow" Padding="16,8" MinHeight="56">
-                                    <Grid ColumnDefinitions="Auto,*,Auto">
-                                        <Image Source="{Binding Icon}" Width="32" Height="32" Margin="0,0,14,0" VerticalAlignment="Center" />
-                                        <TextBlock Grid.Column="1" Text="{Binding Label}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
-                                        <Button Grid.Column="2" Classes="tall sm" Content="Remove" AutomationProperties.Name="{Binding Label, StringFormat='Remove {0}'}"
-                                                Click="Unblock_Click" />
-                                    </Grid>
-                                </Border>
-                            </DataTemplate>
-                        </ItemsControl.ItemTemplate>
-                    </ItemsControl>
-                    <Button Classes="flat" Padding="16,0" MinHeight="56" BorderBrush="{DynamicResource VocabLine}" BorderThickness="0,1,0,0" CornerRadius="0"
-                            Command="{Binding ChooseAppsCommand}" IsVisible="{Binding !IsPicking}" AutomationProperties.Name="Choose apps">
-                        <StackPanel Orientation="Horizontal" Spacing="12" VerticalAlignment="Center">
-                            <ic:SymbolIcon Symbol="Add" FontSize="20" Foreground="{DynamicResource SystemAccentColor}" />
-                            <TextBlock Text="Choose apps…" Foreground="{DynamicResource SystemAccentColor}" VerticalAlignment="Center" />
-                        </StackPanel>
-                    </Button>
-
-                    <!-- The picker: every app in the launcher, ticked when blocked -->
-                    <StackPanel Spacing="8" Margin="16,12" IsVisible="{Binding IsPicking}">
-                        <Grid ColumnDefinitions="*,8,Auto">
-                            <TextBox Text="{Binding Search}" PlaceholderText="Search apps" MinHeight="44" AutomationProperties.Name="Search apps" />
-                            <Button Grid.Column="2" Classes="accent tall" Padding="16,0" Content="Done" Command="{Binding DonePickingCommand}" />
-                        </Grid>
-                        <TextBlock Text="Loading your apps…" Classes="sdesc" IsVisible="{Binding IsLoadingApps}" />
-                        <ItemsControl ItemsSource="{Binding Apps}">
+                <Panel ClipToBounds="True">
+                    <StackPanel Margin="0,-1,0,0">
+                        <!-- Hidden while picking: a tick would add a row here and push the list under the finger -->
+                        <ItemsControl ItemsSource="{Binding Blocked}" IsVisible="{Binding !IsPicking}">
                             <ItemsControl.ItemTemplate>
                                 <DataTemplate DataType="vm:VocabAppRow">
-                                    <CheckBox IsChecked="{Binding IsBlocked}" HorizontalAlignment="Stretch" MinHeight="48" Margin="0,2">
-                                        <StackPanel Orientation="Horizontal" Spacing="12">
-                                            <Image Source="{Binding Icon}" Width="32" Height="32" VerticalAlignment="Center" />
-                                            <TextBlock Text="{Binding Label}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
-                                        </StackPanel>
-                                    </CheckBox>
+                                    <Border Classes="srow">
+                                        <Grid ColumnDefinitions="Auto,*,Auto">
+                                            <Image Source="{Binding Icon}" Width="32" Height="32" Margin="0,0,14,0" VerticalAlignment="Center" />
+                                            <TextBlock Grid.Column="1" Text="{Binding Label}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
+                                            <Button Grid.Column="2" Classes="tall sm" Margin="14,0,0,0" Content="Remove" AutomationProperties.Name="{Binding Label, StringFormat='Remove {0}'}"
+                                                    Click="Unblock_Click" />
+                                        </Grid>
+                                    </Border>
                                 </DataTemplate>
                             </ItemsControl.ItemTemplate>
                         </ItemsControl>
+                        <!-- button.row in the accent -->
+                        <Button Classes="flat" Padding="16,12" MinHeight="60" BorderBrush="{DynamicResource VocabLine06}" BorderThickness="0,1,0,0" CornerRadius="0"
+                                Command="{Binding ChooseAppsCommand}" IsVisible="{Binding !IsPicking}" AutomationProperties.Name="Choose apps">
+                            <StackPanel Orientation="Horizontal" Spacing="14" VerticalAlignment="Center">
+                                <local:LineIcon Kind="Plus" Size="20" Foreground="{DynamicResource VocabAccent}" VerticalAlignment="Center" />
+                                <TextBlock Text="Choose apps…" Foreground="{DynamicResource VocabAccent}" VerticalAlignment="Center" />
+                            </StackPanel>
+                        </Button>
+
+                        <!-- The picker: every app in the launcher, ticked when blocked -->
+                        <StackPanel Spacing="8" Margin="16,12" IsVisible="{Binding IsPicking}">
+                            <Grid ColumnDefinitions="*,8,Auto">
+                                <TextBox Text="{Binding Search}" PlaceholderText="Search apps" FontSize="15" AutomationProperties.Name="Search apps" />
+                                <Button Grid.Column="2" Classes="accent tall" Content="Done" Command="{Binding DonePickingCommand}" />
+                            </Grid>
+                            <TextBlock Text="Loading your apps…" Classes="sdesc" IsVisible="{Binding IsLoadingApps}" />
+                            <ItemsControl ItemsSource="{Binding Apps}">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate DataType="vm:VocabAppRow">
+                                        <CheckBox IsChecked="{Binding IsBlocked}" HorizontalAlignment="Stretch" MinHeight="48" Margin="0,2">
+                                            <StackPanel Orientation="Horizontal" Spacing="12">
+                                                <Image Source="{Binding Icon}" Width="32" Height="32" VerticalAlignment="Center" />
+                                                <TextBlock Text="{Binding Label}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
+                                            </StackPanel>
+                                        </CheckBox>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </StackPanel>
                     </StackPanel>
-                </StackPanel>
+                </Panel>
             </Border>
             <TextBlock Classes="sdesc" Margin="4,8,4,0"
                        Text="Neither the card nor the bubble shows over these apps, over Helm, or while the phone is sideways (games, videos)." />
@@ -183,18 +189,21 @@
         <TextBlock Text="Cards" Classes="ssection" />
         <Border Classes="card" Padding="0" ClipToBounds="True">
             <StackPanel>
+                <!-- Not in the design: what the Learn tab's cards ask -->
                 <Border Classes="srow first">
-                    <StackPanel Spacing="6">
-                        <TextBlock Text="Kind of card" Classes="stitle" />
-                        <TextBlock Text="What the Learn tab's cards ask: the meaning, the word, its sound, a gap to fill, or a mix." Classes="sdesc" />
-                        <ComboBox HorizontalAlignment="Stretch" MinHeight="44" ItemsSource="{Binding Settings.CardModes}" SelectedIndex="{Binding Settings.CardModeIndex}"
+                    <StackPanel Spacing="8">
+                        <StackPanel>
+                            <TextBlock Text="Kind of card" Classes="stitle" />
+                            <TextBlock Text="What the Learn tab's cards ask: the meaning, the word, its sound, a gap to fill, or a mix." Classes="sdesc" />
+                        </StackPanel>
+                        <ComboBox HorizontalAlignment="Stretch" ItemsSource="{Binding Settings.CardModes}" SelectedIndex="{Binding Settings.CardModeIndex}"
                                   AutomationProperties.Name="Kind of card" />
                     </StackPanel>
                 </Border>
                 <Border Classes="srow">
                     <DockPanel>
-                        <ToggleSwitch DockPanel.Dock="Right" IsChecked="{Binding Settings.TypePinyin}" OnContent="" OffContent="" AutomationProperties.Name="Chinese: type the pinyin" />
-                        <StackPanel VerticalAlignment="Center" Margin="0,0,12,0">
+                        <ToggleButton Classes="sw" DockPanel.Dock="Right" Margin="14,0,0,0" IsChecked="{Binding Settings.TypePinyin}" AutomationProperties.Name="Chinese: type the pinyin" />
+                        <StackPanel VerticalAlignment="Center">
                             <TextBlock Text="Chinese: type the pinyin" Classes="stitle" />
                             <TextBlock Classes="sdesc"
                                        Text="Every card of a Chinese word asks for its pinyin first; no tones is fine (bujiu). Forgot / Remembered then answer for the meaning only." />
@@ -203,8 +212,8 @@
                 </Border>
                 <Border Classes="srow">
                     <DockPanel>
-                        <ToggleSwitch DockPanel.Dock="Right" IsChecked="{Binding Settings.AutoSay}" OnContent="" OffContent="" AutomationProperties.Name="Say the word when its meaning shows" />
-                        <StackPanel VerticalAlignment="Center" Margin="0,0,12,0">
+                        <ToggleButton Classes="sw" DockPanel.Dock="Right" Margin="14,0,0,0" IsChecked="{Binding Settings.AutoSay}" AutomationProperties.Name="Say the word when its meaning shows" />
+                        <StackPanel VerticalAlignment="Center">
                             <TextBlock Text="Say the word when its meaning shows" Classes="stitle" />
                             <TextBlock Text="On the Learn tab, the word is read aloud as you check it." Classes="sdesc" />
                         </StackPanel>
@@ -219,8 +228,8 @@
             <StackPanel>
                 <Border Classes="srow first">
                     <DockPanel>
-                        <ToggleSwitch DockPanel.Dock="Right" IsChecked="{Binding Settings.ShowTraditional}" OnContent="" OffContent="" AutomationProperties.Name="Show traditional characters" />
-                        <StackPanel VerticalAlignment="Center" Margin="0,0,12,0">
+                        <ToggleButton Classes="sw" DockPanel.Dock="Right" Margin="14,0,0,0" IsChecked="{Binding Settings.ShowTraditional}" AutomationProperties.Name="Show traditional characters" />
+                        <StackPanel VerticalAlignment="Center">
                             <TextBlock Text="Show traditional characters" Classes="stitle" />
                             <TextBlock Text="Next to a Chinese word or part when it differs (补救 (補救))." Classes="sdesc" />
                         </StackPanel>
@@ -228,8 +237,8 @@
                 </Border>
                 <Border Classes="srow">
                     <DockPanel>
-                        <ToggleSwitch DockPanel.Dock="Right" IsChecked="{Binding Settings.ShowYouGlish}" OnContent="" OffContent="" AutomationProperties.Name="YouGlish button" />
-                        <StackPanel VerticalAlignment="Center" Margin="0,0,12,0">
+                        <ToggleButton Classes="sw" DockPanel.Dock="Right" Margin="14,0,0,0" IsChecked="{Binding Settings.ShowYouGlish}" AutomationProperties.Name="YouGlish button" />
+                        <StackPanel VerticalAlignment="Center">
                             <TextBlock Text="YouGlish button" Classes="stitle" />
                             <TextBlock Text="Next to the word: hear real people say it in YouTube videos." Classes="sdesc" />
                         </StackPanel>
@@ -237,9 +246,9 @@
                 </Border>
                 <Border Classes="srow">
                     <DockPanel>
-                        <ComboBox DockPanel.Dock="Right" Width="84" MinHeight="44" VerticalAlignment="Center" ItemsSource="{Binding Settings.ItemsShownNames}"
+                        <ComboBox DockPanel.Dock="Right" Width="84" Margin="14,0,0,0" VerticalAlignment="Center" ItemsSource="{Binding Settings.ItemsShownNames}"
                                   SelectedIndex="{Binding Settings.ItemsShownIndex}" AutomationProperties.Name="Words per page" />
-                        <StackPanel VerticalAlignment="Center" Margin="0,0,12,0">
+                        <StackPanel VerticalAlignment="Center">
                             <TextBlock Text="Words per page" Classes="stitle" />
                             <TextBlock Text="The Words and Roots lists show one page at a time, so they stay quick." Classes="sdesc" />
                         </StackPanel>
@@ -254,7 +263,7 @@
             <StackPanel>
                 <Border Classes="srow first">
                     <Grid ColumnDefinitions="Auto,*">
-                        <ic:SymbolIcon Symbol="Desktop" FontSize="22" Foreground="{DynamicResource SystemAccentColor}" VerticalAlignment="Top" Margin="0,2,14,0" />
+                        <local:LineIcon Kind="Pc" Size="22" Foreground="{DynamicResource VocabAccent}" VerticalAlignment="Top" Margin="0,2,14,0" />
                         <StackPanel Grid.Column="1">
                             <TextBlock Text="Breaking words down" Classes="stitle" />
                             <TextBlock Classes="sdesc"
@@ -264,13 +273,13 @@
                 </Border>
                 <Border Classes="srow">
                     <DockPanel>
-                        <Button DockPanel.Dock="Right" Classes="tall sm" Command="{Binding CopyPromptCommand}" AutomationProperties.Name="Copy request">
-                            <StackPanel Orientation="Horizontal" Spacing="6">
-                                <ic:SymbolIcon Symbol="Copy" FontSize="16" />
+                        <Button DockPanel.Dock="Right" Classes="tall sm" Margin="14,0,0,0" Command="{Binding CopyPromptCommand}" AutomationProperties.Name="Copy request">
+                            <StackPanel Orientation="Horizontal" Spacing="8">
+                                <local:LineIcon Kind="Copy" Size="16" VerticalAlignment="Center" />
                                 <TextBlock Text="Copy request" VerticalAlignment="Center" />
                             </StackPanel>
                         </Button>
-                        <TextBlock Text="{Binding PendingCount, StringFormat='{}{0} words waiting'}" Classes="stitle" VerticalAlignment="Center" Margin="0,0,12,0" />
+                        <TextBlock Text="{Binding PendingCount, StringFormat='{}{0} words waiting'}" Classes="stitle" VerticalAlignment="Center" />
                     </DockPanel>
                 </Border>
             </StackPanel>

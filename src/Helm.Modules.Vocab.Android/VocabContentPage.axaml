@@ -1,79 +1,81 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-             xmlns:ic="using:FluentIcons.Avalonia"
              xmlns:vm="using:Helm.Modules.Vocab"
              xmlns:local="using:Helm.Modules.Vocab"
              x:Class="Helm.Modules.Vocab.VocabContentPage"
-             x:DataType="vm:VocabViewModel">
+             x:DataType="vm:VocabViewModel"
+             FontSize="15" Classes="css">
 
-    <!-- Vocabulary itself (drawer and Quick access). It fills the page area (IFullPage): its own app bar (the menu,
-         Analysis and +; or back, Previous, Next and ⋯ on a word's or a root's page), the Learn · Words · Roots tabs, the
-         content scrolling between them and, on Learn and in root practice, the answer bar in thumb reach. Adding words,
-         the analysis, menus and editing are bottom sheets (VocabSheets). Its options live on VocabPage (Home → Utilities). -->
+    <!-- Vocabulary itself (drawer and Quick access), as the design's Android page (Android.dc.html): 15 px text with a
+         line 1.4 times as tall. It fills the page area (IFullPage): its own app bar (the menu, Analysis, Add text and +;
+         or back, Previous, Next and ⋯ on a word's or a root's page), the Learn · Words · Roots tabs, the content
+         scrolling between them and, on Learn and in root practice, the answer bar in thumb reach. Adding words, the
+         analysis, menus and editing are bottom sheets (VocabSheets). Its options live on VocabPage (Home → Utilities). -->
     <UserControl.Styles>
         <StyleInclude Source="avares://Helm.Modules.Vocab.Android/VocabStyles.axaml" />
     </UserControl.Styles>
 
     <Panel x:Name="Root">
         <DockPanel>
-            <!-- ===== App bar ===== -->
+            <!-- ===== App bar: 56 high, padding 0 4, 2 between its items ===== -->
             <Panel DockPanel.Dock="Top" Height="56" Background="{DynamicResource HelmBarBackground}">
                 <!-- The tool's own -->
                 <Grid x:Name="HomeBar" ColumnDefinitions="Auto,*,Auto,Auto,Auto" Margin="4,0">
-                    <Button Classes="icon" Click="Menu_Click" AutomationProperties.Name="Open navigation">
-                        <ic:SymbolIcon Symbol="Navigation" FontSize="22" />
+                    <Button Classes="icon" Click="Menu_Click" AutomationProperties.Name="Open the menu">
+                        <local:LineIcon Kind="Menu" Size="22" />
                     </Button>
                     <TextBlock Grid.Column="1" Text="Vocabulary" FontSize="20" FontWeight="SemiBold" VerticalAlignment="Center" Margin="2,0" TextTrimming="CharacterEllipsis" />
                     <Button x:Name="AnalysisButton" Grid.Column="2" Classes="icon" Command="{Binding OpenAgentCommand}" AutomationProperties.Name="{Binding AgentChipText, StringFormat='Analysis: {0}'}">
                         <Panel Width="44" Height="44">
-                            <ic:SymbolIcon Symbol="Hourglass" FontSize="22" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                            <local:LineIcon Kind="Hourglass" Size="22" HorizontalAlignment="Center" VerticalAlignment="Center" />
                             <Border Classes="badge" IsVisible="{Binding HasPending}">
                                 <TextBlock Text="{Binding PendingCount}" />
                             </Border>
                         </Panel>
                     </Button>
-                    <Button x:Name="TextButton" Grid.Column="3" Classes="icon" Command="{Binding Texts.OpenCommand}" AutomationProperties.Name="Add text">
-                        <ic:SymbolIcon Symbol="Document" FontSize="22" />
+                    <!-- Not in the design: Add text, drawn like its neighbours -->
+                    <Button x:Name="TextButton" Grid.Column="3" Classes="icon" Margin="2,0,0,0" Command="{Binding Texts.OpenCommand}" AutomationProperties.Name="Add text">
+                        <local:LineIcon Kind="Document" Size="22" />
                     </Button>
-                    <Button x:Name="AddButton" Grid.Column="4" Classes="icon" Command="{Binding OpenAddCommand}" AutomationProperties.Name="Add words">
-                        <ic:SymbolIcon Symbol="Add" FontSize="24" />
+                    <Button x:Name="AddButton" Grid.Column="4" Classes="icon" Margin="2,0,0,0" Command="{Binding OpenAddCommand}" AutomationProperties.Name="Add words">
+                        <local:LineIcon Kind="Plus" Size="24" />
                     </Button>
                 </Grid>
 
                 <!-- A word's page: back, the word and where it is in the list, Previous, Next, ⋯ -->
                 <Grid x:Name="WordBar" ColumnDefinitions="Auto,*,Auto,Auto,Auto" Margin="4,0" IsVisible="False">
                     <Button Classes="icon" Command="{Binding CloseDetailCommand}" AutomationProperties.Name="All words">
-                        <ic:SymbolIcon Symbol="ArrowLeft" FontSize="22" />
+                        <local:LineIcon Kind="Back" Size="22" />
                     </Button>
                     <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="2,0">
                         <TextBlock Text="{Binding Detail.Word.Text, FallbackValue=''}" FontSize="18" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
                         <TextBlock Text="{Binding WordPosition, Converter={x:Static local:VocabConverters.Position}}" Classes="hint" FontSize="12" />
                     </StackPanel>
-                    <Button Grid.Column="2" Classes="icon" Command="{Binding PreviousWordCommand}" IsEnabled="{Binding HasPreviousWord}" AutomationProperties.Name="Previous word">
-                        <ic:SymbolIcon Symbol="ChevronLeft" FontSize="22" />
+                    <Button Grid.Column="2" Classes="icon" Command="{Binding PreviousWordCommand}" IsEnabled="{Binding HasPreviousWord}" AutomationProperties.Name="Previous">
+                        <local:LineIcon Kind="Left" Size="22" />
                     </Button>
-                    <Button Grid.Column="3" Classes="icon" Command="{Binding NextWordCommand}" IsEnabled="{Binding HasNextWord}" AutomationProperties.Name="Next word">
-                        <ic:SymbolIcon Symbol="ChevronRight" FontSize="22" />
+                    <Button Grid.Column="3" Classes="icon" Margin="2,0,0,0" Command="{Binding NextWordCommand}" IsEnabled="{Binding HasNextWord}" AutomationProperties.Name="Next">
+                        <local:LineIcon Kind="Right" Size="22" />
                     </Button>
-                    <Button Grid.Column="4" Classes="icon" Click="WordMenu_Click" AutomationProperties.Name="More for this word">
-                        <ic:SymbolIcon Symbol="MoreVertical" FontSize="22" />
+                    <Button Grid.Column="4" Classes="icon" Margin="2,0,0,0" Click="WordMenu_Click" AutomationProperties.Name="More for this word">
+                        <local:LineIcon Kind="Dots" Size="22" />
                     </Button>
                 </Grid>
 
                 <!-- A family's page: back, the root and where it is in the list, Previous, Next -->
                 <Grid x:Name="FamilyBar" ColumnDefinitions="Auto,*,Auto,Auto" Margin="4,0" IsVisible="False">
                     <Button Classes="icon" Command="{Binding Roots.CloseSelectedCommand}" AutomationProperties.Name="All roots">
-                        <ic:SymbolIcon Symbol="ArrowLeft" FontSize="22" />
+                        <local:LineIcon Kind="Back" Size="22" />
                     </Button>
                     <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="2,0">
                         <TextBlock FontSize="18" FontWeight="SemiBold" TextTrimming="CharacterEllipsis"><Run Text="{Binding Roots.Selected.Form, FallbackValue=''}" /><Run Text="  " /><Run Text="{Binding Roots.Selected.Meaning, FallbackValue=''}" /></TextBlock>
                         <TextBlock Text="{Binding Roots.RootPosition, Converter={x:Static local:VocabConverters.Position}}" Classes="hint" FontSize="12" />
                     </StackPanel>
-                    <Button Grid.Column="2" Classes="icon" Command="{Binding Roots.PreviousFamilyCommand}" IsEnabled="{Binding Roots.HasPreviousRoot}" AutomationProperties.Name="Previous root">
-                        <ic:SymbolIcon Symbol="ChevronLeft" FontSize="22" />
+                    <Button Grid.Column="2" Classes="icon" Command="{Binding Roots.PreviousFamilyCommand}" IsEnabled="{Binding Roots.HasPreviousRoot}" AutomationProperties.Name="Previous">
+                        <local:LineIcon Kind="Left" Size="22" />
                     </Button>
-                    <Button Grid.Column="3" Classes="icon" Command="{Binding Roots.NextFamilyCommand}" IsEnabled="{Binding Roots.HasNextRoot}" AutomationProperties.Name="Next root">
-                        <ic:SymbolIcon Symbol="ChevronRight" FontSize="22" />
+                    <Button Grid.Column="3" Classes="icon" Margin="2,0,0,0" Command="{Binding Roots.NextFamilyCommand}" IsEnabled="{Binding Roots.HasNextRoot}" AutomationProperties.Name="Next">
+                        <local:LineIcon Kind="Right" Size="22" />
                     </Button>
                 </Grid>
             </Panel>
@@ -86,37 +88,32 @@
                 </StackPanel>
             </Border>
 
-            <!-- ===== Learn · Words · Roots ===== -->
+            <!-- ===== Learn · Words · Roots: padding 10 16 6 ===== -->
             <Border x:Name="Tabs" DockPanel.Dock="Top" Classes="seg" Margin="16,10,16,6">
                 <Grid ColumnDefinitions="*,2,*,2,*">
                     <Button Classes="seg" Classes.on="{Binding IsLearning}" Command="{Binding ShowLearnCommand}" AutomationProperties.Name="Learn">
                         <StackPanel Orientation="Horizontal" Spacing="6">
-                            <ic:SymbolIcon Symbol="HatGraduation" FontSize="18" />
+                            <local:LineIcon Kind="Cap" Size="18" VerticalAlignment="Center" />
                             <TextBlock Text="Learn" VerticalAlignment="Center" />
                         </StackPanel>
                     </Button>
                     <Button Grid.Column="2" Classes="seg" Classes.on="{Binding IsWordsTab}" Command="{Binding ShowWordsCommand}" AutomationProperties.Name="Words">
                         <StackPanel Orientation="Horizontal" Spacing="6">
-                            <ic:SymbolIcon Symbol="Book" FontSize="18" />
+                            <local:LineIcon Kind="Book" Size="18" VerticalAlignment="Center" />
                             <TextBlock Text="Words" VerticalAlignment="Center" />
                         </StackPanel>
                     </Button>
                     <Button Grid.Column="4" Classes="seg" Classes.on="{Binding IsRootsTab}" Command="{Binding ShowRootsCommand}" AutomationProperties.Name="Roots">
                         <StackPanel Orientation="Horizontal" Spacing="6">
-                            <Viewbox Width="18" Height="18">
-                                <Canvas Width="24" Height="24">
-                                    <Path Data="{StaticResource VocabRootsGlyph}" Stroke="{Binding $parent[Button].Foreground}" StrokeThickness="1.7"
-                                          StrokeLineCap="Round" StrokeJoin="Round" />
-                                </Canvas>
-                            </Viewbox>
+                            <local:LineIcon Kind="Branch" Size="18" VerticalAlignment="Center" />
                             <TextBlock Text="Roots" VerticalAlignment="Center" />
                         </StackPanel>
                     </Button>
                 </Grid>
             </Border>
 
-            <!-- ===== The answer bar (Learn) ===== -->
-            <Border DockPanel.Dock="Bottom" Classes="answerbar">
+            <!-- ===== The answer bar (Learn): padding 10 16 16, 10 between its buttons ===== -->
+            <Border x:Name="LearnBar" DockPanel.Dock="Bottom" Classes="answerbar">
                 <Border.IsVisible>
                     <MultiBinding Converter="{x:Static BoolConverters.And}">
                         <Binding Path="IsLearning" />
@@ -124,11 +121,11 @@
                     </MultiBinding>
                 </Border.IsVisible>
                 <Panel x:Name="AnswerBar" DataContext="{Binding Card}" x:DataType="vm:VocabCardViewModel">
-                    <!-- Before the answer: skip it, or see it -->
+                    <!-- Before the answer: skip it, or see it (a typed card shows it by Check) -->
                     <Grid ColumnDefinitions="Auto,10,*" IsVisible="{Binding !IsRevealed}">
-                        <Button Classes="tall" MinHeight="56" Padding="16,0" Command="{Binding SkipCommand}" AutomationProperties.Name="Skip">
+                        <Button Classes="tall" MinHeight="56" Command="{Binding SkipCommand}" AutomationProperties.Name="Skip">
                             <StackPanel Orientation="Horizontal" Spacing="8">
-                                <ic:SymbolIcon Symbol="Next" FontSize="18" />
+                                <local:LineIcon Kind="Skip" Size="18" VerticalAlignment="Center" />
                                 <TextBlock Text="Skip" VerticalAlignment="Center" />
                             </StackPanel>
                         </Button>
@@ -139,7 +136,7 @@
                         <Button Classes="big" Command="{Binding ForgotCommand}" AutomationProperties.Name="{Binding ForgotText}">
                             <StackPanel>
                                 <StackPanel Orientation="Horizontal" Spacing="6" HorizontalAlignment="Center">
-                                    <ic:SymbolIcon Symbol="DismissCircle" FontSize="18" Foreground="{DynamicResource HelmDanger}" />
+                                    <local:LineIcon Kind="XCircle" Size="18" Foreground="{DynamicResource VocabBad}" VerticalAlignment="Center" />
                                     <TextBlock Text="{Binding ForgotText, Converter={x:Static local:VocabConverters.Short}}" VerticalAlignment="Center" />
                                 </StackPanel>
                                 <TextBlock Classes="sub" Text="{Binding ForgotHint, Converter={x:Static local:VocabConverters.Short}}" />
@@ -148,7 +145,7 @@
                         <Button Grid.Column="2" Classes="accent big" Command="{Binding RememberedCommand}" AutomationProperties.Name="{Binding RememberedText}">
                             <StackPanel>
                                 <StackPanel Orientation="Horizontal" Spacing="6" HorizontalAlignment="Center">
-                                    <ic:SymbolIcon Symbol="CheckmarkCircle" FontSize="18" />
+                                    <local:LineIcon Kind="CheckCircle" Size="18" VerticalAlignment="Center" />
                                     <TextBlock Text="{Binding RememberedText, Converter={x:Static local:VocabConverters.Short}}" VerticalAlignment="Center" />
                                 </StackPanel>
                                 <TextBlock Classes="sub" Text="{Binding RememberedHint, Converter={x:Static local:VocabConverters.Short}}" />
@@ -159,7 +156,7 @@
             </Border>
 
             <!-- ===== The root practice bar ===== -->
-            <Border DockPanel.Dock="Bottom" Classes="answerbar">
+            <Border x:Name="PracticeBar" DockPanel.Dock="Bottom" Classes="answerbar">
                 <Border.IsVisible>
                     <MultiBinding Converter="{x:Static BoolConverters.And}">
                         <Binding Path="IsRootsTab" />
@@ -168,20 +165,20 @@
                     </MultiBinding>
                 </Border.IsVisible>
                 <Grid ColumnDefinitions="Auto,10,*" DataContext="{Binding Roots}" x:DataType="vm:VocabRootsViewModel">
-                    <Button Classes="tall" MinHeight="56" Padding="16,0" Content="Stop" Command="{Binding ClosePracticeCommand}" />
+                    <Button Classes="tall" MinHeight="56" Content="Stop" Command="{Binding ClosePracticeCommand}" />
                     <Button Grid.Column="2" Classes="accent big" Content="Show the meaning" Command="{Binding RevealRootCommand}" IsVisible="{Binding !IsPracticeRevealed}" />
                     <Button Grid.Column="2" Classes="accent big" Content="Next root" Command="{Binding NextRootCommand}" IsVisible="{Binding IsPracticeRevealed}" />
                 </Grid>
             </Border>
 
-            <!-- ===== The tab's content ===== -->
+            <!-- ===== The tab's content: padding 6 16 24 (12 on a word's or a root's page; the page sets it) ===== -->
             <ScrollViewer x:Name="MainScroll" HorizontalScrollBarVisibility="Disabled">
-                <StackPanel x:Name="Body" Margin="16,8,16,24" Spacing="0">
+                <StackPanel x:Name="Body" Margin="16,6,16,24" Spacing="0">
                     <Border Classes="infobar" IsVisible="{Binding HasMessage}" Margin="0,0,0,10">
                         <Grid ColumnDefinitions="*,Auto">
                             <TextBlock Text="{Binding Message}" TextWrapping="Wrap" VerticalAlignment="Center" />
                             <Button Grid.Column="1" Classes="icon" Command="{Binding DismissMessageCommand}" AutomationProperties.Name="Dismiss">
-                                <ic:SymbolIcon Symbol="Dismiss" FontSize="16" />
+                                <local:LineIcon Kind="X" Size="16" />
                             </Button>
                         </Grid>
                     </Border>

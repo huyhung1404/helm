@@ -5,6 +5,9 @@ namespace Helm.Modules.Vocab;
 /// <summary>The converters Vocabulary's pages bind with.</summary>
 public static class VocabConverters
 {
+    /// <summary>The design's line-height: 1.4 times the text's size (VocabStyles' <c>.css TextBlock</c>).</summary>
+    public static readonly IValueConverter Leading = new FuncValueConverter<double, double>(size => Math.Round(size * 1.4, 1));
+
     /// <summary>A word's tree as the rows of its outline.</summary>
     public static readonly IValueConverter Outline = new FuncValueConverter<VocabNodeViewModel?, IReadOnlyList<VocabOutlineRow>>(VocabOutlineRow.Flatten);
 
@@ -12,14 +15,14 @@ public static class VocabConverters
     public static readonly IValueConverter SortName = new FuncValueConverter<int, string>(i =>
         VocabWordListViewModel.SortNames[Math.Clamp(i, 0, VocabWordListViewModel.SortNames.Count - 1)]);
 
-    /// <summary>A bottom sheet's tallest: nine tenths of the page it covers.</summary>
-    public static readonly IValueConverter SheetHeight = new FuncValueConverter<double, double>(h => h > 0 ? h * 0.9 : double.PositiveInfinity);
+    /// <summary>A bottom sheet's tallest (.sheet's max-height: 92%) of the page it covers.</summary>
+    public static readonly IValueConverter SheetHeight = new FuncValueConverter<double, double>(h => h > 0 ? h * 0.92 : double.PositiveInfinity);
 
-    /// <summary>The edit sheet's height: nearly the whole page.</summary>
-    public static readonly IValueConverter FullSheetHeight = new FuncValueConverter<double, double>(h => h > 0 ? Math.Round(h * 0.94) : double.NaN);
+    /// <summary>The edit sheet's height (.sheet.full: 92%).</summary>
+    public static readonly IValueConverter FullSheetHeight = new FuncValueConverter<double, double>(h => h > 0 ? Math.Round(h * 0.92) : double.NaN);
 
     /// <summary>The Learn card's typing box: an example of how pinyin may be typed, or what to type.</summary>
-    public static readonly IValueConverter TypePlaceholder = new FuncValueConverter<bool, string>(pinyin => pinyin ? "nihao, ni3hao3…" : "Type the word");
+    public static readonly IValueConverter TypePlaceholder = new FuncValueConverter<bool, string>(pinyin => pinyin ? "bujiu, bu3jiu4…" : "Type the word");
 
     /// <summary>"3 of 21" for the app bar ("3 / 21" in the shared view models).</summary>
     public static readonly IValueConverter Position = new FuncValueConverter<string, string>(p => p?.Replace(" / ", " of ") ?? "");
@@ -38,6 +41,12 @@ public static class VocabConverters
         .Replace("Forgot the meaning", "Forgot meaning").Replace("Knew the meaning", "Knew meaning")
         .Replace("pinyin slip · back ", "pinyin slip · ").Replace(" minutes", " min").Replace(" minute", " min")
         .Replace("Press “Knew meaning”: a pinyin slip never counts", "Tap “Knew meaning”: it never counts"));
+
+    /// <summary>A word easy to mix up with ("relevant: liên quan…" from <see cref="VocabWordInfo.Confusables"/>): the word.</summary>
+    public static readonly IValueConverter MixWord = new FuncValueConverter<string, string>(t => t is null ? "" : t.IndexOf(": ", StringComparison.Ordinal) is var at and >= 0 ? t[..at] : t);
+
+    /// <summary>The rest after the word, ": liên quan…", or nothing.</summary>
+    public static readonly IValueConverter MixNote = new FuncValueConverter<string, string>(t => t is null ? "" : t.IndexOf(": ", StringComparison.Ordinal) is var at and >= 0 ? t[at..] : "");
 
     /// <summary>"#Aptis": one of the user's tags.</summary>
     public static readonly IValueConverter Hashtag = new FuncValueConverter<string, string>(t => "#" + t);

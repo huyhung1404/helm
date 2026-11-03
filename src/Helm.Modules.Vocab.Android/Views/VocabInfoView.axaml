@@ -5,15 +5,23 @@
              x:Class="Helm.Modules.Vocab.VocabInfoView"
              x:DataType="vm:VocabWordInfo">
 
-    <!-- What helps to use a word, one collapsible section each: the mnemonic, examples, collocations, its family,
-         similar and opposite words, words easy to mix up. Sections without content are left out. -->
+    <!-- What helps to use a word, one collapsible section each, in the design's order: the mnemonic (a blue box under a
+         blue title), examples, collocations, its family, similar and opposite words, words easy to mix up (amber).
+         Sections without content are left out; 8 between the lines of a section. -->
     <StackPanel>
-        <local:VocabSection Title="To remember it" Key="info.mnemonic" IsVisible="{Binding HasMnemonic}">
-            <TextBlock Text="{Binding Mnemonic}" TextWrapping="Wrap" FontStyle="Italic" />
+        <local:VocabSection Classes="memo" Title="To remember it" Key="info.mnemonic" IsVisible="{Binding HasMnemonic}">
+            <Border Classes="memo">
+                <TextBlock Text="{Binding Mnemonic}" TextWrapping="Wrap" FontStyle="Italic" />
+            </Border>
         </local:VocabSection>
 
         <local:VocabSection Title="Examples" Key="info.examples" IsVisible="{Binding HasExamples}">
             <ItemsControl ItemsSource="{Binding Examples}">
+                <ItemsControl.ItemsPanel>
+                    <ItemsPanelTemplate>
+                        <StackPanel Spacing="8" />
+                    </ItemsPanelTemplate>
+                </ItemsControl.ItemsPanel>
                 <ItemsControl.ItemTemplate>
                     <DataTemplate x:DataType="vm:VocabExample">
                         <Border Classes="ex">
@@ -40,7 +48,7 @@
                 </ItemsControl.ItemsPanel>
                 <ItemsControl.ItemTemplate>
                     <DataTemplate x:DataType="vm:VocabForm">
-                        <TextBlock TextWrapping="Wrap"><Run Text="{Binding Word}" FontWeight="SemiBold" /><Run Text=" " /><Run Text="{Binding PartOfSpeech}" FontSize="13" Foreground="{DynamicResource HelmSecondaryText}" /><Run Text=" · " /><Run Text="{Binding Meaning}" /></TextBlock>
+                        <TextBlock TextWrapping="Wrap"><Run Text="{Binding Word}" FontWeight="Bold" /><Run Text=" " /><Run Text="{Binding PartOfSpeech}" FontSize="13" Foreground="{DynamicResource HelmSecondaryText}" /><Run Text=" · " /><Run Text="{Binding Meaning}" /></TextBlock>
                     </DataTemplate>
                 </ItemsControl.ItemTemplate>
             </ItemsControl>
@@ -58,9 +66,14 @@
 
         <local:VocabSection Classes="warn" Title="Easy to mix up with" Key="info.confusables" IsVisible="{Binding HasConfusables}">
             <ItemsControl ItemsSource="{Binding Confusables}">
+                <ItemsControl.ItemsPanel>
+                    <ItemsPanelTemplate>
+                        <StackPanel Spacing="8" />
+                    </ItemsPanelTemplate>
+                </ItemsControl.ItemsPanel>
                 <ItemsControl.ItemTemplate>
                     <DataTemplate x:DataType="x:String">
-                        <TextBlock Text="{Binding}" TextWrapping="Wrap" Margin="0,0,0,6" />
+                        <TextBlock TextWrapping="Wrap"><Run Text="{Binding Converter={x:Static local:VocabConverters.MixWord}}" FontWeight="Bold" /><Run Text="{Binding Converter={x:Static local:VocabConverters.MixNote}}" /></TextBlock>
                     </DataTemplate>
                 </ItemsControl.ItemTemplate>
             </ItemsControl>
