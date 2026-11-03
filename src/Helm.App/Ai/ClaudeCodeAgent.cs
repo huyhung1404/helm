@@ -72,7 +72,7 @@ internal sealed class ClaudeCodeChat(ClaudeCodeAgentFactory factory, IChildProce
 
     public void AddUser(string text)
     {
-        _pending = _first ? $"{CliAgentProtocol.Preamble(system, tools)}\n\n{text}" : _more + text;
+        _pending = _first ? $"{CliAgentProtocol.Preamble(system, tools)}\n\n{text}" : (_pending.Length > 0 ? _pending + "\n\n" : "") + _more + text;
         _first = false;
         _more = "";
     }
@@ -90,6 +90,7 @@ internal sealed class ClaudeCodeChat(ClaudeCodeAgentFactory factory, IChildProce
             ["type"] = "user",
             ["message"] = new JsonObject { ["role"] = "user", ["content"] = _pending },
         };
+        _pending = "";
         await _input!.WriteLineAsync(line.ToJsonString().AsMemory(), ct);
         await _input.FlushAsync(ct);
 

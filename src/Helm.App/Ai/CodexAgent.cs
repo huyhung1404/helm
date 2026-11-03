@@ -72,7 +72,7 @@ internal sealed class CodexChat(CodexAgentFactory factory, IChildProcessLauncher
 
     public void AddUser(string text)
     {
-        _pending = _first ? $"{CliAgentProtocol.Preamble(system, tools)}\n\n{text}" : _more + text;
+        _pending = _first ? $"{CliAgentProtocol.Preamble(system, tools)}\n\n{text}" : (_pending.Length > 0 ? _pending + "\n\n" : "") + _more + text;
         _first = false;
         _more = "";
     }
@@ -107,6 +107,7 @@ internal sealed class CodexChat(CodexAgentFactory factory, IChildProcessLauncher
         {
             await using (var input = new StreamWriter(process.StandardInput, new UTF8Encoding(false)))
                 await input.WriteAsync(_pending.AsMemory(), ct);
+            _pending = "";
             _ = Drain(process.StandardError);
             using var output = new StreamReader(process.StandardOutput, Encoding.UTF8);
             string? answer = null, error = null;

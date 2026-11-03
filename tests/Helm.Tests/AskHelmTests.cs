@@ -35,8 +35,7 @@ public sealed class AskHelmTests
     public async Task A_spending_is_saved_at_once_and_can_be_undone()
     {
         var factory = new ScriptedFactory(
-            Step(Call("1", "wallet_add_transaction", """{"amount":"45k","direction":"spend","description":"Phở","summary":"Chi 45.000đ · Phở"}""")),
-            Step(text: "Em ghi rồi nha Anh."));
+            Step(Call("1", "wallet_add_transaction", """{"amount":"45k","direction":"spend","description":"Phở","summary":"Chi 45.000đ · Phở"}""")));
         var assistant = Assistant(factory);
         var asked = false;
 
@@ -44,7 +43,8 @@ public sealed class AskHelmTests
 
         Assert.Null(reply.Problem);
         Assert.False(asked);
-        Assert.Equal("Em ghi rồi nha Anh.", reply.Text);
+        // Only changes, all done: no second call to say so.
+        Assert.Equal(AssistantLoop.DoneText, reply.Text);
         var action = Assert.Single(reply.Done);
         Assert.Equal("Chi 45.000đ · Phở", action.Summary);
         Assert.True(action.CanUndo);
@@ -166,16 +166,26 @@ public sealed class AskHelmTests
         var assistant = new HelmAssistant(keys, _features, new AiUsageBook(_usage), [new WalletMcpTools(debts, _wallet)],
             [new ClaudeAssistantChatFactory(http)], _ => true);
 
-        var reply = await assistant.Start().SendAsync("phở 45k", _ => Task.FromResult(true), CancellationToken.None);
+        var session = assistant.Start();
+        var reply = await session.SendAsync("phở 45k", _ => Task.FromResult(true), CancellationToken.None);
 
+        // Only a change: the turn ends without a second call.
         Assert.Null(reply.Problem);
-        Assert.Equal("Xong rồi Anh.", reply.Text);
+        Assert.Equal(AssistantLoop.DoneText, reply.Text);
         Assert.Single(_wallet.Transactions());
+        Assert.Single(bodies);
+
+        // The next turn carries the results first, in the same user message as its text.
+        var next = await session.SendAsync("thanks em", _ => Task.FromResult(true), CancellationToken.None);
+        Assert.Equal("Xong rồi Anh.", next.Text);
         Assert.Equal(2, bodies.Count);
         var second = JsonNode.Parse(bodies[1])!;
         Assert.Equal("claude-haiku-5-5", second["model"]!.GetValue<string>());
-        Assert.Contains("tool_result", second["messages"]!.ToJsonString());
-        Assert.Contains("toolu_1", second["messages"]!.ToJsonString());
+        var messages = second["messages"]!.AsArray();
+        Assert.Equal(3, messages.Count);
+        Assert.Contains("tool_result", messages[2]!.ToJsonString());
+        Assert.Contains("toolu_1", messages[2]!.ToJsonString());
+        Assert.Contains("thanks em", messages[2]!.ToJsonString());
         Assert.Equal(2, _usage.All().Count);
     }
 

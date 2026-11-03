@@ -158,7 +158,7 @@ internal sealed class GrokChat(GrokAgentFactory factory, IChildProcessLauncher l
 
     public void AddUser(string text)
     {
-        _pending = _first ? $"{CliAgentProtocol.Preamble(system, tools)}\n\n{text}" : _more + text;
+        _pending = _first ? $"{CliAgentProtocol.Preamble(system, tools)}\n\n{text}" : (_pending.Length > 0 ? _pending + "\n\n" : "") + _more + text;
         _first = false;
         _more = "";
     }
@@ -171,7 +171,9 @@ internal sealed class GrokChat(GrokAgentFactory factory, IChildProcessLauncher l
     {
         var grok = GrokAgentFactory.FindGrok() ?? throw new AssistantException("Grok CLI is not installed on this PC.");
         var prompt = Path.Combine(workFolder, _session + ".txt");
-        await File.WriteAllTextAsync(prompt, _pending, new UTF8Encoding(false), ct);
+        var sent = _pending;
+        _pending = "";
+        await File.WriteAllTextAsync(prompt, sent, new UTF8Encoding(false), ct);
         try
         {
             string[] args =
@@ -179,7 +181,8 @@ internal sealed class GrokChat(GrokAgentFactory factory, IChildProcessLauncher l
                 "--prompt-file", prompt, "--output-format", "json", "--cwd", workFolder,
                 "--disallowed-tools", GrokAgentFactory.BuiltInTools, "--disable-web-search", "--no-subagents", "--no-plan", "--no-alt-screen",
                 "--system-prompt-override", "You are Helm's assistant. Follow the instructions in the user's first message exactly.",
-                .. model.StartsWith("grok-", StringComparison.Ordinal) ? new[] { "-m", model } : [],
+                // A Grok model picked in the card runs as picked; any other pick on the plan's fastest (1.5 s, 2 s for grok-4.7).
+                "-m", model.StartsWith("grok-", StringComparison.Ordinal) ? model : "grok-4.7-build-fast",
                 // Grok thinks long by default (20 s for a one-line answer): Helm's jobs are short.
                 "--reasoning-effort", effort is { Length: > 0 } ? effort : "low",
                 .. _started ? new[] { "-r", _session } : ["-s", _session],
@@ -220,7 +223,7 @@ internal sealed class GrokChat(GrokAgentFactory factory, IChildProcessLauncher l
                 }
                 _started = true;
                 // Without usage in the answer: estimated from the text (about 4 characters a token), for what it saved.
-                return CliAgentProtocol.Parse(answer, usage ?? new AssistantUsage(_pending.Length / 4, answer.Length / 4, 0, 0), ref _calls);
+                return CliAgentProtocol.Parse(answer, usage ?? new AssistantUsage(sent.Length / 4, answer.Length / 4, 0, 0), ref _calls);
             }
         }
         finally

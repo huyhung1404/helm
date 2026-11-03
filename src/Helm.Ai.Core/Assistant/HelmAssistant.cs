@@ -78,6 +78,8 @@ public sealed class HelmAssistant(
         - Answer in Vietnamese, one or two short sentences, warm and plain, calling the user "Anh" and yourself "em".
           No markdown, no lists: the answer is shown on a small card and may be read aloud.
         - Never ask for or repeat passwords, keys or codes.
+        - Make all of a request's changes in one reply. A reply that only makes changes ends the turn: Helm shows their
+          summaries to the user, so when the request also asks something, call the reading tools in that same reply.
         """;
 
     private static readonly JsonSerializerOptions Output = new(JsonSerializerDefaults.Web)

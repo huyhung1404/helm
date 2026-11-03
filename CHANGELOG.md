@@ -27,6 +27,8 @@ Format: [Keep a Changelog](https://keepachangelog.com), versions follow [SemVer]
   `wallet_summary` (what was spent and received over some days, by category).
 
 ### Changed
+- **Ask Helm answers a recording in one call:** “phở 45k” is saved and listed with Undo without a second call to say
+  so: about half the time (4–5 s on Grok, sooner on Claude Code) and one call fewer on the API.
 - **Ask Helm sends only the tools a request needs:** “phở 45k” carries the Wallet's 4 tools, not all 19 (about 60%
   fewer tokens a call, on the API and on your agents); a later turn adds only the tools it needs.
 - **The Grok management key now syncs** (end-to-end encrypted, like the API keys), so the phone and every PC show the

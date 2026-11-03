@@ -13,6 +13,9 @@ internal static class AssistantLoop
 {
     public const int MaxSteps = 8;
 
+    /// <summary>The answer when a step only made changes and all of them went through: the card lists each with Undo.</summary>
+    public const string DoneText = "Em làm xong rồi nha Anh.";
+
     public sealed record Outcome(
         string Text,
         IReadOnlyList<AssistantAction> Done,
@@ -100,6 +103,10 @@ internal static class AssistantLoop
                 }
             }
             chat.AddResults(results);
+            // A step that only recorded things (no reading, nothing waiting for a yes, nothing failed) needs no second
+            // call to say so: the summaries are the answer. Half the time and one call fewer for "phở 45k".
+            if (answer.Calls.All(c => byName.TryGetValue(c.Name, out var t) && t.Mode == AssistantToolMode.Auto) && results.All(r => !r.IsError))
+                return End(DoneText, null);
         }
         return End("Em dừng lại vì việc này cần quá nhiều bước. Anh nói ngắn hơn giúp em nha.", null);
     }

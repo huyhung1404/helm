@@ -23,12 +23,32 @@ internal sealed class ClaudeAssistantChat(AnthropicClient client, string model, 
     private readonly List<MessageParam> _messages = [];
     private readonly List<ToolUnion> _tools = [.. tools.Select(ToTool)];
 
-    public void AddUser(string text) => _messages.Add(new UserMessageParam { Content = text });
+    /// <summary>Tool results not sent yet: a turn that ended on its changes sends them with the next turn's text.</summary>
+    private List<ContentBlockParam>? _results;
+
+    public void AddUser(string text)
+    {
+        if (_results is { } results)
+        {
+            List<ContentBlockParam> blocks = [.. results, new TextBlockParam { Text = text }];
+            _messages.Add(new UserMessageParam { Content = blocks });
+            _results = null;
+        }
+        else
+        {
+            _messages.Add(new UserMessageParam { Content = text });
+        }
+    }
 
     public void AddTools(IReadOnlyList<AssistantTool> tools) => _tools.AddRange(tools.Select(ToTool));
 
     public async Task<AssistantStep> NextAsync(CancellationToken ct)
     {
+        if (_results is { } pending)
+        {
+            _messages.Add(new UserMessageParam { Content = pending });
+            _results = null;
+        }
         Message response;
         try
         {
@@ -102,16 +122,13 @@ internal sealed class ClaudeAssistantChat(AnthropicClient client, string model, 
             Refused: response.StopReason == "refusal");
     }
 
-    public void AddResults(IReadOnlyList<ToolOutcome> results)
-    {
-        List<ContentBlockParam> blocks = [.. results.Select(r => (ContentBlockParam)new ToolResultBlockParam
+    public void AddResults(IReadOnlyList<ToolOutcome> results) =>
+        _results = [.. results.Select(r => (ContentBlockParam)new ToolResultBlockParam
         {
             ToolUseID = r.CallId,
             Content = r.Content,
             IsError = r.IsError,
         })];
-        _messages.Add(new UserMessageParam { Content = blocks });
-    }
 
     private static ToolUnion ToTool(AssistantTool tool)
     {

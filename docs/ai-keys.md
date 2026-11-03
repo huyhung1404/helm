@@ -129,6 +129,11 @@ the phone for “báo thức”…), and the groups of the conversation's earlie
 them all. A later turn that needs another group adds only that group (`IAssistantChat.AddTools`). For “phở 45k”: 4
 tools instead of 19, 4,800 characters instead of 12,600, on the API and on an agent alike.
 
+**A turn that only records things needs one call.** When every call of a step is a change Helm can undo (or a phone
+action) and all of them went through, the turn ends there: the card shows their summaries with Undo, instead of a
+second call to say so ("phở 45k" on Grok: 8.4 s became 4.8 s). The results go to the model with the next turn's text.
+A question still takes two calls (the tools' answer, then the reply).
+
 **Grok carries nothing of its own.** Grok CLI brings 24 built-in tools, 19 skills, workflows and the user's Claude
 and Cursor set-up (MCP servers, hooks): 15,000 tokens and 10 s a call. Helm's agent removes the tools
 (`--disallowed-tools`), turns skills, workflows and the Claude/Cursor compatibility off, and gives it a home folder of

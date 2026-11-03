@@ -35,7 +35,8 @@ public sealed class AgentJobsTests
 
         var result = await local.RunAsync(Job(), TimeSpan.FromSeconds(10), CancellationToken.None);
 
-        Assert.Equal("Xong rồi Anh.", result.Text);
+        // Only changes and phone handovers: no second call.
+        Assert.Equal(AssistantLoop.DoneText, result.Text);
         var done = Assert.Single(result.Done);
         Assert.Equal("Chi 45.000đ · Phở", done.Summary);
         Assert.Single(_wallet.Transactions());
