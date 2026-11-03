@@ -55,6 +55,26 @@ internal static class HelmHost
                 () => engine.DeviceId, sp.GetRequiredService<IDeviceInfo>().DeviceName, agents.Ready,
                 logger: sp.GetRequiredService<ILoggerFactory>().CreateLogger<Helm.Ai.Assistant.AgentJobWorker>());
         });
+        // The jobs this PC runs by itself on the same agents (the morning brief, the evening review…): Helm's own read
+        // tools in-process, plus what Scratch holds (never on the MCP server); never while a Vault is unlocked.
+        builder.Services.AddSingleton(sp =>
+        {
+            var settings = sp.GetRequiredService<ISettingsStoreFactory>();
+            bool IsOn(string? moduleId) => moduleId is null
+                || !settings.Get<GeneralSettings>(GeneralSettings.StoreId).Current.EnabledModules.TryGetValue(moduleId, out var on) || on;
+            var engine = sp.GetRequiredService<Core.Sync.SyncEngine>();
+            var loggers = sp.GetRequiredService<ILoggerFactory>();
+            var tools = new Helm.Ai.Auto.AutoJobTools(
+                [.. sp.GetServices<Core.Mcp.IMcpToolProvider>(), new Modules.Scratch.ScratchDigestTool(sp.GetRequiredService<Modules.Scratch.ScratchStore>())], IsOn);
+            var asker = new Helm.Ai.Auto.AutoJobAsker(sp.GetRequiredService<Ai.AgentRegistry>(), sp.GetRequiredService<Helm.Ai.AiKeyStore>(),
+                sp.GetServices<Helm.Ai.Assistant.IAssistantChatFactory>(), sp.GetRequiredService<Helm.Ai.AiUsageBook>(),
+                loggers.CreateLogger<Helm.Ai.Auto.AutoJobAsker>());
+            return new Helm.Ai.Auto.AutoJobScheduler(Helm.Ai.Auto.Jobs.AutoJobs.All(),
+                sp.GetRequiredService<Core.Sync.ISyncedSettings<Helm.Ai.AiFeatureSettings>>(), sp.GetRequiredService<Helm.Ai.Auto.AutoJobRuns>(),
+                sp.GetRequiredService<Core.Sync.ISyncedCollection<Helm.Ai.Assistant.AiWorkerRecord>>(), asker, tools,
+                sp.GetRequiredService<Helm.Ai.Auto.AiBriefBook>(), () => engine.DeviceId, sp.GetRequiredService<IDeviceInfo>().DeviceName,
+                () => sp.GetService<Core.Secrets.IVaultSecrets>()?.IsUnlocked == true, logger: loggers.CreateLogger<Helm.Ai.Auto.AutoJobScheduler>());
+        });
         // The same agents serve the user's own VPS too, when set up on AI → Proxy (this PC only: address and token are
         // never synced).
         builder.Services.AddSingleton(sp => new Helm.Ai.Vps.VpsWorkerToken(paths, sp.GetRequiredService<Core.Sync.ISecretProtector>()));

@@ -17,10 +17,12 @@ public static partial class ToolScope
         ("wallet", ["tien", "nghin", "ngan", "trieu", "chi ", "tieu", "mua", "tra ", "no ", "muon", "vay", "luong", "thu nhap", "nhan ",
             "an ", "uong", "ca phe", "cafe", "xang", "vi ", "wallet", "spend", "money", "owe", "pho", "com ", "bun"]),
         ("tracker", ["nhac", "viec", "todo", "task", "lam ", "deadline", "can ", "phai", "han ", "xong", "danh sach", "list"]),
-        ("notes", ["ghi chu", "note", "luu ", "y tuong", "ghi lai", "ghi nho"]),
+        ("notes", ["ghi chu", "note", "luu ", "y tuong", "ghi lai", "ghi nho",
+            "ngay quan trong", "sinh nhat", "ngay gio", "dam gio", "dang kiem", "bao hiem", "ten mien", "gia han"]),
         ("habit", ["thoi quen", "habit", "tap ", "chay bo", "doc sach", "streak", "diem danh", "thien"]),
         ("mission", ["muc tieu", "mission", "ke hoach", "buoc", "lo trinh", "aptis", "on thi"]),
         ("vocab", ["tu vung", "tu moi", "word", "vocab", "nghia", "tieng anh", "english"]),
+        ("ai", ["ban tin", "tong ket", "tom tat", "brief", "huan luyen", "tu dong", "don scratch", "dat tieu de", "hoan tac tieu de"]),
         ("phone", ["bao thuc", "danh thuc", "goi dau", "goi day", " day", "hen gio", "timer", "lich", "calendar", "su kien", "hop ",
             "copy", "clipboard", "dan ", "sao chep"]),
     ];

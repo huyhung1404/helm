@@ -20,9 +20,19 @@ public static class AiCoreServices
         // Agent jobs between devices: urgent, so a turn reaches the PC (and its answer the phone) within a moment.
         services.AddSyncedCollection(new SyncedCollectionOptions<AiJobRecord> { Name = AgentJobs.JobsCollection, Urgent = true });
         services.AddSyncedCollection(new SyncedCollectionOptions<AiWorkerRecord> { Name = AgentJobs.WorkersCollection, Urgent = true });
+        // What the PC's automatic jobs wrote (urgent: the phone hears of a brief at once) and when each last ran.
+        services.AddSyncedCollection(new SyncedCollectionOptions<Auto.AiBrief> { Name = Auto.AiBriefBook.Collection, Urgent = true });
+        services.AddSyncedCollection(new SyncedCollectionOptions<Auto.AutoJobRun> { Name = Auto.AutoJobRuns.Collection });
         services.AddSyncGroup("ai.", "AI keys and usage");
         services.AddSyncedSettings<AiFeatureSettings>(AiFeatureSettings.StoreId);
         services.AddSingleton(sp => new AiKeyStore(sp.GetRequiredService<ISyncedCollection<AiKey>>()));
+        services.AddSingleton(sp => new Auto.AiBriefBook(sp.GetRequiredService<ISyncedCollection<Auto.AiBrief>>()));
+        services.AddSingleton(sp => new Auto.AutoJobRuns(sp.GetRequiredService<ISyncedCollection<Auto.AutoJobRun>>()));
+        services.AddSingleton(sp => new Auto.AiBriefAlerts(sp.GetRequiredService<Auto.AiBriefBook>(),
+            sp.GetRequiredService<ISettingsStoreFactory>().Get<Auto.AiBriefAlertState>(Auto.AiBriefAlertState.StoreId)));
+        // Ask Helm reads the briefs and sets the jobs; undoing a job's change runs the tool's own Undo.
+        services.AddSingleton<IMcpToolProvider>(sp => new Auto.AiBriefTools(sp.GetRequiredService<Auto.AiBriefBook>(),
+            sp.GetRequiredService<ISyncedSettings<AiFeatureSettings>>(), () => sp.GetServices<IMcpToolProvider>()));
         services.AddSingleton(sp => new AiUsageBook(sp.GetRequiredService<ISyncedLog<AiUsageEntry>>()));
         services.AddSingleton(sp => new AiManagementKeys(sp.GetRequiredService<ISyncedCollection<AiManagementKey>>(),
             sp.GetRequiredService<HelmPaths>(), sp.GetRequiredService<ISecretProtector>()));

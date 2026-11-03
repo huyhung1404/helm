@@ -92,6 +92,11 @@ public partial class App : Application
                 worker.Beat();
                 vps.SendStatus();
             };
+            // The jobs this PC runs by itself on those agents (AI → the features' switches), and a tray balloon for each
+            // new brief, from this PC or another.
+            Services.GetRequiredService<Helm.Ai.Auto.AutoJobScheduler>().Start();
+            var tray = Services.GetRequiredService<IUserNotifications>();
+            Services.GetRequiredService<Helm.Ai.Auto.AiBriefAlerts>().Start(brief => tray.Show(brief.Value.Title, brief.Value.Text));
             // The AI agents' tools (a pipe only this user can open; each connection checks the MCP settings).
             Services.GetRequiredService<Core.Mcp.McpPipeHost>().Start();
         }
