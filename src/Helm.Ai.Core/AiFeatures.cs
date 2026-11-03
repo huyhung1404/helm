@@ -13,6 +13,18 @@ public static class AiFeatureIds
 
     /// <summary>Wallet: reads a bank notification Helm's parser missed, when the user asks it to.</summary>
     public const string WalletReadNotification = "wallet-read-notification";
+
+    /// <summary>Translate, fix, rewrite, summarize or answer a selected text (Android's text selection → Ask Helm's card).</summary>
+    public const string TextActions = "text-actions";
+
+    /// <summary>A word added on the phone, analysed at once instead of waiting for the PC (Vocabulary).</summary>
+    public const string VocabQuick = "vocab-quick";
+
+    /// <summary>A held sentence in Novel Reader: meaning, grammar, a natural translation, words to learn.</summary>
+    public const string SentenceExplain = "sentence-explain";
+
+    /// <summary>Tracker: steps proposed for a big task, tasks proposed from a note.</summary>
+    public const string TaskProposals = "task-proposals";
 }
 
 /// <summary>Where a feature's calls may run: Claude Code on a Helm PC (the user's plan, no cost per call) or the API.</summary>

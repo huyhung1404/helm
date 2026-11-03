@@ -24,6 +24,12 @@ public sealed class QuickCaptureModule(ILogger<QuickCaptureModule> logger) : And
     public const string AskHelmActivityName = Helm.Ai.Assistant.AskHelmContext.ActivityName;
     public const string AskHelmTileName = "com.huyhung1404.helm.AskHelmTile";
 
+    /// <summary>The text selection menu's entries ("Helm", "Helm: Dịch", "Helm: Sửa", "Helm: Viết lại").</summary>
+    public const string AskHelmSelectionName = "com.huyhung1404.helm.AskHelmSelection";
+    public const string AskHelmTranslateName = "com.huyhung1404.helm.AskHelmTranslate";
+    public const string AskHelmFixName = "com.huyhung1404.helm.AskHelmFix";
+    public const string AskHelmRewriteName = "com.huyhung1404.helm.AskHelmRewrite";
+
     public override string Id => ModuleId;
     public override string DisplayName => "Quick Capture";
     public override string Description => "Save a note, a task or a debt from any app: Share → Save to Helm, or the Quick Settings tile. Ask Helm, its second tile, takes it by voice.";
@@ -64,7 +70,8 @@ public sealed class QuickCaptureModule(ILogger<QuickCaptureModule> logger) : And
         {
             var context = AndroidApp.Context;
             var state = enabled ? ComponentEnabledState.Enabled : ComponentEnabledState.Disabled;
-            foreach (var name in new[] { ActivityName, TileName, AskHelmActivityName, AskHelmTileName })
+            foreach (var name in new[] { ActivityName, TileName, AskHelmActivityName, AskHelmTileName,
+                AskHelmSelectionName, AskHelmTranslateName, AskHelmFixName, AskHelmRewriteName })
                 context.PackageManager?.SetComponentEnabledSetting(new ComponentName(context, name), state, ComponentEnableOption.DontKillApp);
         }
         catch (Exception ex)

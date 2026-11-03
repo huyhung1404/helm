@@ -199,6 +199,10 @@ public sealed partial class TrackerItemViewModel : ObservableObject
     [RelayCommand]
     private void Start() => _owner.Start(this);
 
+    /// <summary>AI proposes this task's steps (the picker is the page's <see cref="TrackerViewModel.Proposals"/>).</summary>
+    [RelayCommand]
+    private Task BreakDownAsync() => _owner.BreakDownAsync(this);
+
     [RelayCommand]
     private Task DeleteAsync() => _owner.DeleteAsync(this);
 

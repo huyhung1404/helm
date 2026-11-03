@@ -288,3 +288,29 @@ More of Ask Helm's tools, each reached by saying it (no new screens). Changes ru
 
 The phone tools are in `PhoneToolSpecs` (one place for both the phone's `PhoneTools` and the PC, which hands their
 calls back to the phone). `workspace_send` is also offered to other MCP clients on the PC, behind the usual consent.
+
+## Text calls of the tools
+
+Some features only need text back from a model: no Helm tool, no phone tool. They go through `IAiText`
+(`Helm.Core/Ai/AiText.cs`, implemented by `Helm.Ai.Core/Assistant/AiTextService.cs`) on the same router: an agent on
+a Helm PC first, as a text-only job (`AiJob.System` set, no tools; an agent on this device gets up to 60 s, one reached
+through sync the usual claim wait), then the API with the feature's model, within its daily cap. Nothing a text call
+does changes data, so a PC that took it and failed does not stop the API from answering. A feature with no choice of
+its own on the AI page uses Ask Helm's (the model picked in the card). Every call is in `ai.usage` under its feature.
+Only user-started calls use it: nothing here runs by itself.
+
+| Feature id | Where | What |
+|---|---|---|
+| `text-actions` | Android text selection: **Helm**, **Helm: Dịch**, **Helm: Sửa**, **Helm: Viết lại** | Ask Helm's card on the selected text: translate (into Vietnamese; Vietnamese into English), fix, rewrite politely, summarize, explain a comment and draft a reply in its language, or what the user says. **Thay thế** puts the result back when the app allows it, **Chép**, **Chia sẻ** (`Helm.Ai.Core/Text/TextActions.cs`) |
+| `vocab-quick` | Vocabulary on the phone: **Add word** in the selection menu, and Add words | One word is analysed at once, with the same guide and save shape as `vocab_save_analysis` and the parts Helm has that it may reuse, checked and saved the same way (`VocabQuickAnalyzer`); one retry with what Helm found to fix. Lists of words and texts still wait for the PC's agent |
+| `sentence-explain` | Novel Reader, after holding a word | The sentence's meaning, grammar, a natural translation and the words worth learning, which go to Vocabulary with the sentence as their note (`SentenceExplainer`, `HeldWordViewModel.Explain`) |
+| `task-proposals` | Tracker | The steps of a big task, the tasks in a note, as choices the user keeps or drops before anything is added; one Undo for the batch (`TaskProposals`, `TrackerProposalViewModel`) |
+
+Each prompt puts what the user selected or wrote between `<<<` and `>>>` and tells the model it is data, never
+instructions. Answers are one JSON object, read leniently (`AiJson`: a code fence or a word before it is fine).
+
+In Ask Helm itself: `tracker_add_tasks` adds a batch of tasks to a list by name (made when missing) or as one task's
+subtasks, with one Undo, for "biến ghi chú họp thành task trong list Công việc" (the model reads the note first) and
+"chia task … thành bước nhỏ" (the model proposes the steps, asks which to keep, and adds those). A request that starts
+with "ghi chú" or "note" carries only the notes tools, and `notes_create` asks for a dictated note to be cleaned up:
+punctuation, paragraphs, a title.

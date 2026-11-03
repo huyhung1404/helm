@@ -71,6 +71,10 @@ public static class AiCoreServices
         // One answer, no tools (file a transaction, read a bank notification): agents first, the API last.
         services.AddSingleton(sp => new AiOneShot(sp.GetRequiredService<AiKeyStore>(), sp.GetRequiredService<ISyncedSettings<AiFeatureSettings>>(),
             sp.GetRequiredService<AiUsageBook>(), sp.GetServices<IAssistantChatFactory>(), new AiRouter(sp.GetServices<IAgentRoute>())));
+        // Text-only calls of the tools (translate a selection, analyse a word on the phone…), on the same router.
+        services.AddSingleton<Helm.Core.Ai.IAiText>(sp => new AiTextService(sp.GetRequiredService<AiKeyStore>(),
+            sp.GetRequiredService<ISyncedSettings<AiFeatureSettings>>(), sp.GetRequiredService<AiUsageBook>(),
+            sp.GetServices<IAssistantChatFactory>(), new AiRouter(sp.GetServices<IAgentRoute>())));
         return services;
     }
 }

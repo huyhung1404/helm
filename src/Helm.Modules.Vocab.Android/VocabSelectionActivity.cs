@@ -34,12 +34,36 @@ public sealed class VocabSelectionActivity : Activity
             var services = HelmAndroidServices.Current;
             var module = services.GetRequiredService<IModuleHost<IAndroidModule>>().Find(VocabIds.ModuleId);
             if (module is { IsEnabled: false }) return "Vocabulary is turned off. Turn it on in Helm.";
-            return services.GetRequiredService<VocabCaptureTarget>().Capture(text).Message;
+            var result = services.GetRequiredService<VocabCaptureTarget>().Capture(text);
+            // One word: analysed now on the phone instead of waiting for the PC; its meaning comes as a second toast.
+            if (result.Saved && services.GetService<VocabQuickAnalyzer>() is { } quick && quick.WordToAnalyse(text) is { } id)
+            {
+                _ = AnalyseAsync(quick, id);
+                return $"Added “{VocabText.Tidy(text)}” to Vocabulary; analysing it now…";
+            }
+            return result.Message;
         }
         catch (Exception ex)
         {
             Android.Util.Log.Warn("Helm", $"Could not add a word from a selection: {ex}");
             return "Could not add the word: open Helm once, then try again.";
         }
+    }
+
+    /// <summary>Runs after the activity has gone: the toast is the application's.</summary>
+    private static async Task AnalyseAsync(VocabQuickAnalyzer quick, string id)
+    {
+        string message;
+        try
+        {
+            message = (await Task.Run(() => quick.AnalyzeAsync(id, CancellationToken.None))).Message;
+        }
+        catch (Exception ex)
+        {
+            Android.Util.Log.Warn("Helm", $"Could not analyse a word on the phone: {ex.Message}");
+            return;
+        }
+        new Android.OS.Handler(Android.OS.Looper.MainLooper!).Post(() =>
+            Toast.MakeText(Android.App.Application.Context, message, ToastLength.Long)?.Show());
     }
 }

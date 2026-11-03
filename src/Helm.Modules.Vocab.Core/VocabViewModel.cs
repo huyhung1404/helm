@@ -37,6 +37,7 @@ public sealed partial class VocabViewModel : ObservableObject
     private readonly IDialogService _dialogs;
     private readonly IClipboardService _clipboard;
     private readonly VocabVoice? _voice;
+    private readonly VocabQuickAnalyzer? _quick;
     private int _refreshQueued;
 
     [ObservableProperty] [NotifyCanExecuteChangedFor(nameof(AddCommand))] private string _newWord = "";
@@ -60,8 +61,10 @@ public sealed partial class VocabViewModel : ObservableObject
     [ObservableProperty] private bool _isAgentOpen;
 
     public VocabViewModel(VocabStore store, VocabQuiz quiz, VocabSettingsViewModel settings, VocabAgentViewModel agent, IUiDispatcher ui,
-        IDialogService dialogs, IClipboardService clipboard, VocabVoice? voice = null, VocabTextsViewModel? texts = null)
+        IDialogService dialogs, IClipboardService clipboard, VocabVoice? voice = null, VocabTextsViewModel? texts = null,
+        VocabQuickAnalyzer? quick = null)
     {
+        _quick = quick;
         _store = store;
         _quiz = quiz;
         _ui = ui;
@@ -331,15 +334,31 @@ public sealed partial class VocabViewModel : ObservableObject
     {
         try
         {
-            var (_, added) = _store.AddWord(NewWord, NewNote);
+            var (id, added) = _store.AddWord(NewWord, NewNote);
             // The new word shows at the top of "Recently added", waiting for the agent; the user can add the next one.
             Message = added ? null : $"“{VocabText.Tidy(NewWord)}” is already in your words.";
+            // On the phone a single word is analysed at once, instead of waiting for the PC.
+            if (added && _quick?.WordToAnalyse(NewWord) is { } quickId && quickId == id) _ = AnalyseNowAsync(quickId);
             NewWord = "";
             NewNote = "";
         }
         catch (ArgumentException ex)
         {
             Message = ex.Message;
+        }
+    }
+
+    private async Task AnalyseNowAsync(string id)
+    {
+        try
+        {
+            var result = await Task.Run(() => _quick!.AnalyzeAsync(id, CancellationToken.None));
+            _ui.Post(() => Message = result.Message);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            // It waits for the PC's agent, as before.
+            _ui.Post(() => Message = $"Could not analyse it here ({ex.Message}); it waits for the PC.");
         }
     }
 

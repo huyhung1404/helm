@@ -229,14 +229,7 @@ public sealed class VocabMcpTools(VocabStore store, VocabQuiz quiz) : IMcpToolPr
     {
         var id = McpArgs.RequiredString(args, "id");
         var wordId = store.GetWord(id) is not null ? id : store.FindWord(id)?.Id ?? throw new McpToolException($"The user has no word {id}.");
-        var analysis = ReadDetails(args) with
-        {
-            Phonetic = McpArgs.String(args, "phonetic") ?? "",
-            Meaning = McpArgs.String(args, "meaning") ?? "",
-            HanViet = McpArgs.String(args, "han_viet"),
-            Traditional = McpArgs.String(args, "traditional"),
-            Parts = args.TryGetProperty("parts", out var parts) ? ReadParts(parts, 0) : [],
-        };
+        var analysis = ReadAnalysis(args);
         try
         {
             var saved = store.SaveAnalysis(wordId, analysis);
@@ -307,6 +300,17 @@ public sealed class VocabMcpTools(VocabStore store, VocabQuiz quiz) : IMcpToolPr
             pinyin_slips = stats.SlipAt.Count > 0 ? stats.SlipAt.Count : (int?)null,
         };
     }
+
+    /// <summary>A whole analysis in vocab_save_analysis's shape (the phone's own analysis answers in it too).</summary>
+    /// <exception cref="McpToolException">The parts are not in that shape.</exception>
+    internal static WordAnalysis ReadAnalysis(JsonElement args) => ReadDetails(args) with
+    {
+        Phonetic = McpArgs.String(args, "phonetic") ?? "",
+        Meaning = McpArgs.String(args, "meaning") ?? "",
+        HanViet = McpArgs.String(args, "han_viet"),
+        Traditional = McpArgs.String(args, "traditional"),
+        Parts = args.TryGetProperty("parts", out var parts) && parts.ValueKind != JsonValueKind.Null ? ReadParts(parts, 0) : [],
+    };
 
     /// <summary>The optional details of a word (explanation, examples … antonyms); fields left out are null.</summary>
     internal static WordAnalysis ReadDetails(JsonElement args) => new()
@@ -548,7 +552,8 @@ public sealed class VocabMcpTools(VocabStore store, VocabQuiz quiz) : IMcpToolPr
         ("antonyms", McpArgs.List("Up to 3 words that mean the opposite (empty when none)."), false),
     ];
 
-    private static JsonObject SaveSchema()
+    /// <summary>vocab_save_analysis's arguments: the shape every analysis is written in, on the PC and on the phone.</summary>
+    internal static JsonObject SaveSchema()
     {
         var part = new JsonObject
         {

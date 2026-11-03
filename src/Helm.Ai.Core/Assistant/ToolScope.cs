@@ -17,7 +17,8 @@ public static partial class ToolScope
         ("wallet", ["tien", "nghin", "ngan", "trieu", "chi ", "tieu", "mua", "tra ", "no ", "muon", "vay", "luong", "thu nhap", "nhan ",
             "an ", "uong", "ca phe", "cafe", "xang", "vi ", "wallet", "spend", "money", "owe", "pho", "com ", "bun", "chia"]),
         ("bill", ["hoa don", "tien dien", "tien nuoc", "tien nha", "tien mang", "internet", "wifi", "dong tien", "dinh ky", "hang thang", "bill"]),
-        ("tracker", ["nhac", "viec", "todo", "task", "lam ", "deadline", "can ", "phai", "han ", "xong", "danh sach", "list"]),
+        ("tracker", ["nhac", "viec", "todo", "task", "lam ", "deadline", "can ", "phai", "han ", "xong", "danh sach", "list",
+            "chia nho", "buoc nho", "cac buoc"]),
         ("notes", ["ghi chu", "note", "luu ", "y tuong", "ghi lai", "ghi nho"]),
         ("habit", ["thoi quen", "habit", "tap ", "chay bo", "doc sach", "streak", "diem danh", "thien"]),
         ("mission", ["muc tieu", "mission", "ke hoach", "buoc", "lo trinh", "aptis", "on thi", "ky thi", "ielts", "toeic", "chung chi"]),
@@ -39,6 +40,10 @@ public static partial class ToolScope
     public static IReadOnlySet<string> GroupsFor(string text)
     {
         var plain = " " + Plain(text) + " ";
+        // A dictated note ("ghi chú: …") is a note whatever its words say: they are its content, not the request.
+        if (plain.TrimStart().StartsWith("ghi chu", StringComparison.Ordinal) || plain.TrimStart().StartsWith("note ", StringComparison.Ordinal)
+            || plain.TrimStart().StartsWith("note:", StringComparison.Ordinal))
+            return new HashSet<string>(StringComparer.Ordinal) { "notes" };
         var found = new HashSet<string>(StringComparer.Ordinal);
         foreach (var (group, words) in Groups)
             if (words.Any(w => plain.Contains(w, StringComparison.Ordinal))) found.Add(group);

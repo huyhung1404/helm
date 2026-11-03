@@ -61,6 +61,7 @@ public sealed class HelmAssistant(
         "bill_add",
         "bill_pay",
         "tracker_lists", "tracker_tasks", "tracker_add_task", "tracker_complete_task", "tracker_start_task",
+        "tracker_add_tasks",
         "notes_create", "notes_search", "notes_read",
         "habits_list", "habit_report", "habit_check",
         "missions_list", "mission_get",

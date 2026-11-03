@@ -136,7 +136,8 @@ public sealed partial class NovelReaderViewModel : ObservableObject, IReadAloudH
         IDialogService dialogs, IDeviceInfo device, SpeechCatalog catalog, IAudioOutput audio, IProcessLauncher launcher,
         IClipboardService clipboard, ILogger<NovelReaderViewModel> logger, TimeProvider? time = null, VieNeuInstaller? vieneu = null,
         INameScanAgent? nameAgent = null, WordPronouncer? pronouncer = null, TranslationReportStore? reports = null,
-        ITranslationAgent? translator = null, IEnumerable<Helm.Core.Capture.ICaptureTarget>? captureTargets = null)
+        ITranslationAgent? translator = null, IEnumerable<Helm.Core.Capture.ICaptureTarget>? captureTargets = null,
+        Helm.Core.Ai.IAiText? ai = null)
     {
         _store = store;
         _dictionaries = dictionaries;
@@ -149,7 +150,7 @@ public sealed partial class NovelReaderViewModel : ObservableObject, IReadAloudH
         _catalog = catalog;
         _nameAgent = nameAgent;
         _pronouncer = pronouncer;
-        HeldWord = new HeldWordViewModel(captureTargets);
+        HeldWord = new HeldWordViewModel(captureTargets, ai);
         if (vieneu is not null)
         {
             VieNeu = new VieNeuVoiceViewModel(vieneu, ui, dialogs);

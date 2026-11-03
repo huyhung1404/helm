@@ -30,7 +30,7 @@ namespace Helm.Modules.QuickCapture;
     ConfigurationChanges = ConfigChanges.Orientation | ConfigChanges.ScreenSize | ConfigChanges.ScreenLayout | ConfigChanges.SmallestScreenSize
         | ConfigChanges.UiMode | ConfigChanges.Keyboard | ConfigChanges.KeyboardHidden,
     WindowSoftInputMode = SoftInput.AdjustResize | SoftInput.StateHidden)]
-public sealed class AskHelmActivity : Activity, IRecognitionListener
+public partial class AskHelmActivity : Activity, IRecognitionListener
 {
     private const int MicPermissionRequest = 41;
     private const int AutoCloseMs = 7000;
@@ -72,6 +72,7 @@ public sealed class AskHelmActivity : Activity, IRecognitionListener
             _assistant = services.GetRequiredService<HelmAssistant>();
             SetContentView(Build());
             ShowModel();
+            if (StartWithSelection(services)) return;
             if (_assistant.Unavailable() is { } problem)
             {
                 ShowProblem(problem);
@@ -355,7 +356,7 @@ public sealed class AskHelmActivity : Activity, IRecognitionListener
 
     private async Task SendAsync(string text)
     {
-        if (_session is null || _busy) return;
+        if (SendToSelection(text) || _session is null || _busy) return;
         _busy = true;
         ClearResult();
         _status.Text = $"{Short(_session.Model?.Name ?? "")} đang hiểu câu của Anh…";
