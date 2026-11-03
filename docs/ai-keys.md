@@ -80,3 +80,41 @@ removes it from every device; to stop the key itself, delete it in the provider'
 
 A new provider is an `AiProviders` entry plus an `IAiKeyChecker` (and an `IAiBalanceReader` if its API tells the
 balance), registered in `AiCoreServices`.
+
+## Ask Helm and the AI router
+
+**Ask Helm** (Android) is a Quick Settings tile that opens a card over any app: it listens (the phone's own speech
+recognition, Vietnamese), sends what you said, and lists what it did with Undo. It runs on the model picked in the
+card, with Helm's own tools and the phone's (alarm, timer, calendar, clipboard).
+
+Every Ask Helm turn goes through the **router** (`Helm.Ai.Core/Assistant/AiRouter.cs`), per feature
+(`AiFeatureChoice.Route`):
+
+| Policy | What happens |
+|---|---|
+| Prefer PC (default) | Claude Code on a Helm PC if one takes the turn within `PcWaitSeconds` (8 s), else the API |
+| PC only | Only a Helm PC; nothing is spent on the API |
+| API only | Only the API |
+
+A Grok pick always goes to the API (no agent runs Grok's models). A conversation that started on a PC stays there;
+if the PC stops answering, the API takes over with what was said so far.
+
+**How a phone reaches the PC.** Each PC running Helm with Claude Code writes a heartbeat to the synced collection
+`ai.workers` every minute. The phone writes the turn to `ai.jobs` (urgent, so it syncs at once) and keeps sync's
+live channel open while it waits. The PC claims it, runs it, and writes the result back. The phone waits only
+`PcWaitSeconds` for the claim; once claimed it waits for the result (up to 2 minutes) and never sends the same turn
+to the API, so nothing is saved twice. Undo goes back to the PC that made the record. Jobs and heartbeats are
+end-to-end encrypted like all Helm data.
+
+**On the PC** (`Helm.App/Ai/ClaudeCodeAgent.cs`, `LocalAgentRoute`), Claude Code runs with its own tools off, no MCP
+server and no hooks: Helm lists its tools in the first message, Claude answers with the calls it wants as JSON
+(`CliAgentProtocol`), Helm runs them in-process and sends the results back. One Claude Code process per conversation
+(about 3 s for the first turn, 1–2 s after). Calls that would need a yes are not offered there, and phone tools are
+handed back to the phone. When Claude Code reports its plan's limit, the PC takes no job for 30 minutes.
+
+**Costs.** Every call goes in the synced collection `ai.usage`: route (`api` or `claude-code`), model, tokens, the
+estimated USD (`AiPrices`), and on Claude Code what the same call would have cost (`SavedUsd`). The daily cap
+(`DailyCapUsd`, 0.50 USD) only stops the API.
+
+Only Helm's own features and your own services use the router. Other apps (Cursor, n8n, Open WebUI…) use their own
+API keys: lending a Claude plan to other apps is against Anthropic's terms.

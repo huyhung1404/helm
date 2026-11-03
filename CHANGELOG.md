@@ -3,6 +3,30 @@
 All notable changes to Helm. The top section is used as the GitHub release body and as the Velopack release notes.
 Format: [Keep a Changelog](https://keepachangelog.com), versions follow [SemVer](https://semver.org).
 
+## [Unreleased]
+
+### Added
+- **Ask Helm on the phone (preview).** A new Quick Settings tile, **Ask Helm**, opens a card over whatever app is
+  open and listens at once (Vietnamese): the words show as you speak, and it sends them by itself when you stop (or
+  type instead). Say “trưa nay ăn phở 45 nghìn”, “Nam mượn anh 200k”, “mai 9 giờ nhắc anh gọi khách”, “tháng này
+  anh tiêu bao nhiêu?”, “6 rưỡi sáng mai gọi anh dậy”. What it adds is saved at once and listed with **Hoàn tác**
+  (Undo); only a change Helm cannot take back asks first. A question back (“bao nhiêu tiền?”) listens for the answer.
+  The model is picked right in the card (Claude Haiku, Sonnet… or Grok, from the keys on the AI page). It uses
+  Helm's own tools (Wallet, Tracker, Notes, Habits, Missions, Vocabulary) plus the phone's alarm, timer, calendar
+  and clipboard. It needs the microphone once, and Quick Capture turned on.
+- **AI router: your PC's Claude Code first, the API last.** An AI request goes to Claude Code on a Helm PC (on
+  your plan, no cost per call) when one answers in time, through Helm Sync, end-to-end encrypted; only when no PC
+  takes it within a few seconds does it go to the API with your key. A turn the PC has taken never runs twice. On
+  the PC, Helm runs its own tools for Claude Code (no MCP, so no consent dialog for a request from your own phone).
+  The card says where it ran (“Claude Code trên PC-… · miễn phí” or “Haiku 5.5 qua API”), and every call goes in a
+  synced cost book with what the PC saved.
+- **Wallet for AI agents:** `wallet_add_transaction` (money spent or in, typed by hand, with its category) and
+  `wallet_summary` (what was spent and received over some days, by category).
+
+### Changed
+- **AI agents' tools that add or tick something can be undone** (a transaction, a debt entry, a task, a note, a
+  habit's day, words to learn): Ask Helm uses it for Undo; the MCP tools themselves behave as before.
+
 ## [0.78.0] - 2026-11-03
 
 ### Added

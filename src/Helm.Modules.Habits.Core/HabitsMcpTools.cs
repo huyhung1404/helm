@@ -41,7 +41,16 @@ public sealed class HabitsMcpTools(HabitsStore store) : IMcpToolProvider
                 ("habit", McpArgs.Text("The habit's id or title."), true),
                 ("day", McpArgs.Text("The day, e.g. 2026-10-01. Default: today (yesterday for a habit to quit)."), false),
                 ("percent", McpArgs.Number($"How much of it was done, {HabitLimits.MinPercent}–100. Default: 100."), false)),
-            (args, _) => Task.FromResult<object?>(Check(args))),
+            (args, _) => Task.FromResult<object?>(Check(args)))
+        {
+            // Only a day this call ticked: a day that was done before stays done.
+            Undo = (result, _) =>
+            {
+                if (result.TryGetProperty("checked_now", out var now) && now.ValueKind == JsonValueKind.True)
+                    store.Uncheck(result.GetProperty("id").GetString()!, DateOnly.ParseExact(result.GetProperty("day").GetString()!, "yyyy-MM-dd", CultureInfo.InvariantCulture));
+                return Task.CompletedTask;
+            },
+        },
     ];
 
     private object List()
@@ -144,6 +153,7 @@ public sealed class HabitsMcpTools(HabitsStore store) : IMcpToolProvider
             ["title"] = habit.Value.Title,
             ["kind"] = Kind(habit.Value),
             ["day"] = Day(day),
+            ["checked_now"] = result == HabitCheckResult.Checked,
             ["result"] = result switch
             {
                 HabitCheckResult.AlreadyDone => $"already {word}",

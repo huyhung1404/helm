@@ -34,6 +34,27 @@ internal static class HelmHost
 
         // The AI models Helm calls with the user's API keys (on Helm Sync).
         Helm.Ai.AiCoreServices.AddHelmAi(builder.Services);
+        // This PC's Claude Code as an agent for Helm's AI jobs (free on the user's plan): for this PC's own features, and
+        // for the phone's, which reach it through Helm Sync (AgentJobWorker). Helm runs its own tools for it.
+        builder.Services.AddSingleton<Ai.ClaudeCodeAgentFactory>();
+        builder.Services.AddSingleton(sp =>
+        {
+            var agent = sp.GetRequiredService<Ai.ClaudeCodeAgentFactory>();
+            var settings = sp.GetRequiredService<ISettingsStoreFactory>();
+            bool IsOn(string? moduleId) => moduleId is null
+                || !settings.Get<GeneralSettings>(GeneralSettings.StoreId).Current.EnabledModules.TryGetValue(moduleId, out var on) || on;
+            return new Helm.Ai.Assistant.LocalAgentRoute(Environment.MachineName, Helm.Ai.AiProviders.Claude, agent,
+                sp.GetServices<Core.Mcp.IMcpToolProvider>(), IsOn, agent.Unavailable);
+        });
+        builder.Services.AddSingleton<Helm.Ai.Assistant.IAgentRoute>(sp => sp.GetRequiredService<Helm.Ai.Assistant.LocalAgentRoute>());
+        builder.Services.AddSingleton(sp =>
+        {
+            var engine = sp.GetRequiredService<Core.Sync.SyncEngine>();
+            return new Helm.Ai.Assistant.AgentJobWorker(sp.GetRequiredService<Core.Sync.ISyncedCollection<Helm.Ai.Assistant.AiJobRecord>>(),
+                sp.GetRequiredService<Core.Sync.ISyncedCollection<Helm.Ai.Assistant.AiWorkerRecord>>(), sp.GetRequiredService<Helm.Ai.Assistant.LocalAgentRoute>(),
+                () => engine.DeviceId, sp.GetRequiredService<IDeviceInfo>().DeviceName, [Helm.Ai.AiProviders.Claude],
+                logger: sp.GetRequiredService<ILoggerFactory>().CreateLogger<Helm.Ai.Assistant.AgentJobWorker>());
+        });
 
         // Modules — each module assembly exposes one registration extension.
         HelmModules.Register(builder.Services);

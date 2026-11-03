@@ -86,7 +86,15 @@ public sealed class VocabMcpTools(VocabStore store, VocabQuiz quiz) : IMcpToolPr
             McpArgs.Schema(
                 ("words", McpArgs.List("English or Chinese words or short phrases."), true),
                 ("note", McpArgs.Text("Where they come from, for the user (optional)."), false)),
-            (args, _) => Task.FromResult<object?>(Add(args))),
+            (args, _) => Task.FromResult<object?>(Add(args)))
+        {
+            // Only the words this call added: words the user had before stay.
+            Undo = (result, _) =>
+            {
+                foreach (var id in result.GetProperty("ids").EnumerateArray()) store.DeleteWord(id.GetString()!);
+                return Task.CompletedTask;
+            },
+        },
     ];
 
     private object Pending(JsonElement args)
@@ -361,7 +369,7 @@ public sealed class VocabMcpTools(VocabStore store, VocabQuiz quiz) : IMcpToolPr
         }
         // Whoever adds them analyzes them: Helm's own agent does not start on them by itself for a while.
         store.Claim(claimed);
-        return new { added, already_there = known };
+        return new { added, already_there = known, ids = claimed };
     }
 
     // ---- shapes --------------------------------------------------------------------------------------------------

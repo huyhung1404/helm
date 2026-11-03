@@ -1,0 +1,78 @@
+namespace Helm.Ai.Assistant;
+
+/// <summary>
+/// One turn of a conversation for Claude Code to run: the user's words, the Helm tools it may use (by their MCP names),
+/// the phone tools it may hand back, and the Claude model. A conversation keeps its id across turns, so a worker can
+/// keep one Claude Code process for it.
+/// </summary>
+public sealed record AiJob(
+    string Feature,
+    string ConversationId,
+    string Text,
+    IReadOnlyList<string> Tools,
+    IReadOnlyList<string> PhoneTools,
+    string Model,
+    string Effort);
+
+/// <summary>A change Claude Code made with one of Helm's tools on the PC, with the tool's result (for Undo).</summary>
+public sealed record AiJobAction(string Tool, string Summary, string ResultJson);
+
+/// <summary>A phone tool Claude Code asked for (alarm, calendar…): the phone runs it when the result arrives.</summary>
+public sealed record AiJobPhoneAction(string Tool, string ArgumentsJson, string Summary);
+
+/// <param name="SavedUsd">What the same turn would have cost on the API (Claude Code's own estimate), if known.</param>
+public sealed record AiJobResult(string Text, IReadOnlyList<AiJobAction> Done, IReadOnlyList<AiJobPhoneAction> PhoneActions, decimal? SavedUsd);
+
+/// <summary>Claude Code could not take or finish the job in time; the router tries the next way.</summary>
+public sealed class AiRouteException(string message, Exception? inner = null) : Exception(message, inner);
+
+/// <summary>
+/// A way to an AI agent on the user's own plan (Claude Code first; Codex, Gemini CLI or a local model can follow): on
+/// this PC itself, or on another Helm PC through Helm Sync. Helm runs its own tools there for it; what they write syncs
+/// to every device.
+/// </summary>
+public interface IAgentRoute
+{
+    /// <summary>Whether it can run this provider's models (Claude Code runs Claude's).</summary>
+    bool Serves(AiProvider provider);
+
+    /// <summary>The device that runs the jobs, as the user knows it ("this PC", the PC's name).</summary>
+    string Device { get; }
+
+    /// <summary>Why it cannot take a job now (not installed, offline, busy at its limit), or null when it can.</summary>
+    string? Unavailable();
+
+    /// <exception cref="AiRouteException">No answer within <paramref name="wait"/>, or it failed.</exception>
+    Task<AiJobResult> RunAsync(AiJob job, TimeSpan wait, CancellationToken ct);
+
+    /// <summary>Takes back an action it did (Undo runs where the record was made, so it never misses one not synced yet).</summary>
+    Task UndoAsync(AiJobAction action, CancellationToken ct);
+
+    /// <summary>The conversation is over: the process kept for it may stop.</summary>
+    void End(string conversationId);
+}
+
+/// <summary>The ways a feature's call may take, in order: Claude Code first (free) as its policy allows, the API last.</summary>
+public sealed class AiRouter(IEnumerable<IAgentRoute> routes)
+{
+    private readonly IReadOnlyList<IAgentRoute> _routes = [.. routes];
+
+    /// <summary>
+    /// The agent ways to try for this choice, best first: those that run the picked provider's models, never for
+    /// <see cref="AiRoutePolicy.ApiOnly"/>, and only those that can take a job now.
+    /// </summary>
+    public IReadOnlyList<IAgentRoute> Agents(AiFeatureChoice choice, AiProvider provider) =>
+        choice.Route == AiRoutePolicy.ApiOnly
+            ? []
+            // An agent on this device answers sooner than one reached through sync.
+            : [.. _routes.Where(r => r.Serves(provider) && r.Unavailable() is null).OrderBy(r => r is SyncAgentRoute ? 1 : 0)];
+
+    /// <summary>Whether the API may be used when no agent answered (a provider no agent runs always may).</summary>
+    public bool MayUseApi(AiFeatureChoice choice, AiProvider provider) =>
+        choice.Route != AiRoutePolicy.PcOnly || !_routes.Any(r => r.Serves(provider));
+
+    /// <summary>Why a <see cref="AiRoutePolicy.PcOnly"/> call found no PC, said to the user.</summary>
+    public string NoPc() => _routes.Count == 0
+        ? "No Helm PC with Claude Code is set up for this."
+        : $"No Helm PC with Claude Code can take it now ({string.Join("; ", _routes.Select(r => $"{r.Device}: {r.Unavailable() ?? "busy"}"))}).";
+}

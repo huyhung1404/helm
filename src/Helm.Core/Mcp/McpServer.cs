@@ -31,6 +31,12 @@ public sealed record McpTool(string Name, string Description, JsonObject InputSc
     /// </summary>
     public Func<JsonElement, CancellationToken, Task<McpConsentRequest?>>? AskFirst { get; init; }
 
+    /// <summary>
+    /// Takes back what one call did, given that call's result (as JSON): a tool that only adds or ticks something can
+    /// offer it, so Helm's own assistant saves at once and shows Undo instead of asking first. Null: not undoable.
+    /// </summary>
+    public Func<JsonElement, CancellationToken, Task>? Undo { get; init; }
+
     /// <summary>A tool that takes no arguments.</summary>
     public static JsonObject NoArguments() => new() { ["type"] = "object", ["properties"] = new JsonObject() };
 }

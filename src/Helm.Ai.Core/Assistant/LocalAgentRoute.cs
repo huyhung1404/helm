@@ -1,0 +1,135 @@
+using System.Collections.Concurrent;
+using System.Text.Json;
+using Helm.Core.Mcp;
+
+namespace Helm.Ai.Assistant;
+
+/// <summary>
+/// An agent CLI on this device (Claude Code first) as Ask Helm's brain: Helm runs its own tools in-process for it (no
+/// MCP, so no consent dialog on the PC for a request that came from the user's own phone), the agent only decides.
+/// One chat per conversation, kept until it ends or sits idle; Undo runs here, where the records were made.
+/// </summary>
+public sealed class LocalAgentRoute : IAgentRoute, IDisposable
+{
+    /// <summary>A conversation's chat goes after this long without a turn.</summary>
+    internal static readonly TimeSpan IdleFor = TimeSpan.FromMinutes(5);
+
+    private readonly AiProvider _provider;
+    private readonly IAssistantChatFactory _agent;
+    private readonly IReadOnlyList<IMcpToolProvider> _providers;
+    private readonly Func<string?, bool> _isToolOn;
+    private readonly Func<string?> _unavailable;
+    private readonly TimeProvider _time;
+    private readonly ConcurrentDictionary<string, Conversation> _conversations = new(StringComparer.Ordinal);
+    private readonly Timer _reaper;
+
+    public LocalAgentRoute(string device, AiProvider provider, IAssistantChatFactory agent, IEnumerable<IMcpToolProvider> providers,
+        Func<string?, bool> isToolOn, Func<string?> unavailable, TimeProvider? time = null)
+    {
+        Device = device;
+        _provider = provider;
+        _agent = agent;
+        _providers = [.. providers];
+        _isToolOn = isToolOn;
+        _unavailable = unavailable;
+        _time = time ?? TimeProvider.System;
+        _reaper = new Timer(_ => Reap(), null, TimeSpan.FromMinutes(1), TimeSpan.FromMinutes(1));
+    }
+
+    public string Device { get; }
+
+    public bool Serves(AiProvider provider) => provider == _provider;
+
+    public string? Unavailable() => _unavailable();
+
+    public async Task<AiJobResult> RunAsync(AiJob job, TimeSpan wait, CancellationToken ct)
+    {
+        if (Unavailable() is { } why) throw new AiRouteException(why);
+        var conversation = _conversations.GetOrAdd(job.ConversationId, _ =>
+        {
+            var tools = Tools(job);
+            return new Conversation(_agent.Create("", job.Model, job.Effort, HelmAssistant.Instructions, tools), tools);
+        });
+        await conversation.Gate.WaitAsync(ct);
+        try
+        {
+            using var limit = CancellationTokenSource.CreateLinkedTokenSource(ct);
+            limit.CancelAfter(wait);
+            long input = 0, output = 0, cacheRead = 0, cacheWrite = 0;
+            conversation.Chat.AddUser(job.Text);
+            AssistantLoop.Outcome outcome;
+            try
+            {
+                outcome = await AssistantLoop.RunAsync(conversation.Chat, conversation.Tools, _ => Task.FromResult(false),
+                    u => { input += u.Input; output += u.Output; cacheRead += u.CacheRead; cacheWrite += u.CacheWrite; },
+                    () => null, phoneHere: false, job.Model, limit.Token);
+            }
+            catch (OperationCanceledException) when (!ct.IsCancellationRequested)
+            {
+                End(job.ConversationId);
+                throw new AiRouteException($"{Device} did not answer within {wait.TotalSeconds:0} s.");
+            }
+            conversation.LastTurn = _time.GetUtcNow();
+            if (outcome.Problem is { } problem && outcome.Records.Count == 0 && outcome.ForPhone.Count == 0)
+            {
+                End(job.ConversationId);
+                throw new AiRouteException(problem);
+            }
+            return new AiJobResult(outcome.Problem ?? outcome.Text, outcome.Records, outcome.ForPhone,
+                AiPrices.Usd(job.Model, input, output, cacheRead, cacheWrite));
+        }
+        finally
+        {
+            conversation.Gate.Release();
+        }
+    }
+
+    public async Task UndoAsync(AiJobAction action, CancellationToken ct)
+    {
+        var tool = _providers.SelectMany(p => p.Tools).FirstOrDefault(t => t.Name == action.Tool);
+        if (tool?.Undo is not { } undo) return;
+        await undo(JsonDocument.Parse(action.ResultJson).RootElement.Clone(), ct);
+    }
+
+    public void End(string conversationId)
+    {
+        if (_conversations.TryRemove(conversationId, out var conversation)) (conversation.Chat as IDisposable)?.Dispose();
+    }
+
+    public void Dispose()
+    {
+        _reaper.Dispose();
+        foreach (var id in _conversations.Keys.ToList()) End(id);
+    }
+
+    /// <summary>
+    /// The job's tools that need no yes (a PC cannot ask the phone mid-turn), Helm's own ones run here, and the phone's
+    /// handed back to it.
+    /// </summary>
+    internal IReadOnlyList<AssistantTool> Tools(AiJob job)
+    {
+        var mine = _providers.Where(p => _isToolOn(p.ModuleId)).SelectMany(p => p.Tools)
+            .Where(t => job.Tools.Contains(t.Name) && t.Risk != McpRisk.Remote)
+            .GroupBy(t => t.Name, StringComparer.Ordinal).Select(g => g.First())
+            .Select(t => new AssistantTool(t, HelmAssistant.ModeOf(t)))
+            .Where(t => t.Mode != AssistantToolMode.Confirm);
+        var phone = PhoneToolSpecs.All.Where(s => !s.ReadOnly && job.PhoneTools.Contains(s.Name))
+            .Select(s => new AssistantTool(PhoneToolSpecs.HandedBack(s), AssistantToolMode.Auto));
+        return [.. mine, .. phone];
+    }
+
+    private void Reap()
+    {
+        var now = _time.GetUtcNow();
+        foreach (var (id, conversation) in _conversations)
+            if (now - conversation.LastTurn > IdleFor && conversation.Gate.CurrentCount == 1) End(id);
+    }
+
+    private sealed class Conversation(IAssistantChat chat, IReadOnlyList<AssistantTool> tools)
+    {
+        public IAssistantChat Chat { get; } = chat;
+        public IReadOnlyList<AssistantTool> Tools { get; } = tools;
+        public SemaphoreSlim Gate { get; } = new(1, 1);
+        public DateTimeOffset LastTurn { get; set; } = DateTimeOffset.UtcNow;
+    }
+}

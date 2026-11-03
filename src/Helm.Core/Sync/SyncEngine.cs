@@ -180,6 +180,9 @@ public sealed class SyncEngine : ISyncService, IDisposable
 
     internal SyncDatabase Database => _db;
 
+    /// <summary>This device's id in the replica (what other devices see in a record's author).</summary>
+    public string DeviceId => _db.DeviceId;
+
     internal TimeProvider Time => _time;
 
     internal void Register(SyncCollectionDescriptor descriptor) => _descriptors[descriptor.Name] = descriptor;
