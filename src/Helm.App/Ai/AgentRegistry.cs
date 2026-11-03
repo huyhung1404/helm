@@ -39,15 +39,16 @@ public static class AgentKinds
 {
     public const string Codex = "codex";
     public const string ClaudeCode = "claude-code";
+    public const string Grok = "grok";
 
-    public static IReadOnlyList<(string Id, string Name)> All { get; } = [(Codex, "Codex"), (ClaudeCode, "Claude Code")];
+    public static IReadOnlyList<(string Id, string Name)> All { get; } = [(Codex, "Codex"), (ClaudeCode, "Claude Code"), (Grok, "Grok")];
 
     public static string NameOf(string kind) => All.FirstOrDefault(k => k.Id == kind).Name ?? kind;
 }
 
 /// <summary>
 /// The proxy's agents on this PC: built from <see cref="AiAgentSettings"/>, tried in the user's order, each signed in
-/// to the account the user chose for it (its own CODEX_HOME / CLAUDE_CONFIG_DIR under Helm's data, never the user's own
+/// to the account the user chose for it (its own CODEX_HOME / CLAUDE_CONFIG_DIR / GROK_HOME under Helm's data, never the user's own
 /// Claude Code or Codex login). It is this PC's agent route, for its own features and for the phone's jobs.
 /// </summary>
 internal sealed class AgentRegistry : IAgentRoute, IDisposable
@@ -163,16 +164,23 @@ internal sealed class AgentRegistry : IAgentRoute, IDisposable
 
     /// <summary>
     /// Opens a terminal signed in to nothing but this agent's own folder, running its sign-in (codex login; claude, then
-    /// /login). It starts through Explorer, so it runs with the user's normal rights even when Helm is elevated.
+    /// /login; grok login, which then leaves Helm's marker). It starts through Explorer, so it runs with the user's
+    /// normal rights even when Helm is elevated. npm's codex.cmd, claude.cmd and grok.cmd need <c>call</c>, or the
+    /// script would end with them.
     /// </summary>
     public void SignIn(string id)
     {
         if (Profiles.FirstOrDefault(p => p.Id == id) is not { } profile) return;
         var home = Home(id);
         Directory.CreateDirectory(home);
-        var (variable, steps) = profile.Kind == AgentKinds.ClaudeCode
-            ? (ClaudeCodeAgentFactory.HomeVariable, "echo Sign in for Helm: type /login, sign in with the account Helm should use, then /exit.\r\nclaude")
-            : (CodexAgentFactory.HomeVariable, "echo Sign in for Helm with the ChatGPT account Helm should use.\r\ncodex login");
+        var (variable, steps) = profile.Kind switch
+        {
+            AgentKinds.ClaudeCode => (ClaudeCodeAgentFactory.HomeVariable,
+                "echo Sign in for Helm: type /login, sign in with the account Helm should use, then /exit.\r\ncall claude"),
+            AgentKinds.Grok => (GrokAgentFactory.HomeVariable,
+                $"echo Sign in for Helm with the X / SuperGrok account Helm should use.\r\ncall \"{GrokAgentFactory.FindGrok() ?? "grok"}\" login && echo ok> \"{Path.Combine(home, GrokAgentFactory.SignedInMarker)}\""),
+            _ => (CodexAgentFactory.HomeVariable, "echo Sign in for Helm with the ChatGPT account Helm should use.\r\ncall codex login"),
+        };
         var script = Path.Combine(home, "sign-in.cmd");
         File.WriteAllText(script, $"@echo off\r\ntitle Helm: sign in {profile.Name}\r\nset {variable}={home}\r\ncd /d \"{home}\"\r\n{steps}\r\necho.\r\npause\r\n",
             new UTF8Encoding(false));
@@ -191,12 +199,16 @@ internal sealed class AgentRegistry : IAgentRoute, IDisposable
 
     internal string Home(string id) => Path.Combine(_paths.ModuleDataDirectory("ai"), "agents", id);
 
-    private bool SignedIn(AgentProfile profile) => profile.Kind == AgentKinds.ClaudeCode
-        ? ClaudeCodeAgentFactory.SignedIn(Home(profile.Id))
-        : CodexAgentFactory.SignedIn(Home(profile.Id));
+    private bool SignedIn(AgentProfile profile) => profile.Kind switch
+    {
+        AgentKinds.ClaudeCode => ClaudeCodeAgentFactory.SignedIn(Home(profile.Id)),
+        AgentKinds.Grok => GrokAgentFactory.SignedIn(Home(profile.Id)),
+        _ => CodexAgentFactory.SignedIn(Home(profile.Id)),
+    };
 
     /// <summary>
-    /// A sign-in finishes in its own terminal: the credentials file it writes (auth.json, .credentials.json) turns the
+    /// A sign-in finishes in its own terminal: the credentials file it writes (auth.json, .credentials.json, Grok's
+    /// marker) turns the
     /// agent ready here, and the phone hears of it, without pressing anything.
     /// </summary>
     private void WatchSignIns()
@@ -210,7 +222,7 @@ internal sealed class AgentRegistry : IAgentRoute, IDisposable
             FileSystemEventHandler seen = (_, e) =>
             {
                 var file = Path.GetFileName(e.FullPath);
-                if (file is "auth.json" or ".credentials.json") settle.Change(TimeSpan.FromMilliseconds(500), Timeout.InfiniteTimeSpan);
+                if (file is "auth.json" or ".credentials.json" or GrokAgentFactory.SignedInMarker) settle.Change(TimeSpan.FromMilliseconds(500), Timeout.InfiniteTimeSpan);
             };
             _signIns.Created += seen;
             _signIns.Changed += seen;
@@ -235,6 +247,7 @@ internal sealed class AgentRegistry : IAgentRoute, IDisposable
             {
                 AgentKinds.Codex => new CodexAgentFactory(_launcher, home, logger) is var codex ? (codex, codex.Unavailable) : null,
                 AgentKinds.ClaudeCode => new ClaudeCodeAgentFactory(_launcher, home, logger) is var claude ? (claude, claude.Unavailable) : null,
+                AgentKinds.Grok => new GrokAgentFactory(_launcher, home, logger) is var grok ? (grok, grok.Unavailable) : null,
                 _ => null,
             };
             if (made is not { } m) continue;

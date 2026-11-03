@@ -14,9 +14,9 @@ Format: [Keep a Changelog](https://keepachangelog.com), versions follow [SemVer]
   The model is picked right in the card (Claude Haiku, Sonnet… or Grok, from the keys on the AI page). It uses
   Helm's own tools (Wallet, Tracker, Notes, Habits, Missions, Vocabulary) plus the phone's alarm, timer, calendar
   and clipboard. It needs the microphone once, and Quick Capture turned on.
-- **AI → Proxy: your own agents first, the API last.** Add the agents this PC runs for Helm, **Codex** or **Claude
-  Code**, as many as you like and in the order you want; each signs in to its own account in a terminal Helm opens
-  (apart from the Codex or Claude Code you use yourself) and turns green by itself once signed in. An AI request
+- **AI → Proxy: your own agents first, the API last.** Add the agents this PC runs for Helm, **Codex**, **Claude
+  Code** or **Grok** (Grok Build, on a SuperGrok or X Premium+ plan), as many as you like and in the order you want; each signs in to its own account in a terminal Helm opens
+  (apart from the ones you use yourself) and turns green by itself once signed in. An AI request
   goes to them first (on their plan, no cost per call), also from the phone through Helm Sync, end-to-end
   encrypted; only when no agent takes it within a few seconds does it go to the API with the model picked in the
   card. A turn an agent has taken never runs twice. Helm runs its own tools for the agent (no MCP, so no consent

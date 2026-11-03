@@ -97,15 +97,15 @@ Every Ask Helm turn goes through the **router** (`Helm.Ai.Core/Assistant/AiRoute
 | PC only | Only a Helm PC; nothing is spent on the API |
 | API only | Only the API |
 
-A Grok pick always goes to the API (no agent runs Grok's models). A conversation that started on a PC stays there;
+Agents are tried whatever model is picked; the pick is the API's, when no agent answers. A conversation that started on a PC stays there;
 if the PC stops answering, the API takes over with what was said so far.
 
 **The agents** (AI → Proxy, `Helm.App/Ai/AgentRegistry.cs`) are the user's list, kept per PC in
-`settings/ai-agents.json`: Codex (`CodexAgent.cs`) or Claude Code (`ClaudeCodeAgent.cs`), any number, tried in the
+`settings/ai-agents.json`: Codex (`CodexAgent.cs`), Claude Code (`ClaudeCodeAgent.cs`) or Grok (`GrokAgent.cs`), any number, tried in the
 list's order; a conversation sticks to the agent that took it. Each has its own sign-in folder under
-`ai/agents/<id>` (`CODEX_HOME`, `CLAUDE_CONFIG_DIR`), never the user's own login. **Add** opens the sign-in terminal
+`ai/agents/<id>` (`CODEX_HOME`, `CLAUDE_CONFIG_DIR`, `GROK_HOME`), never the user's own login. **Add** opens the sign-in terminal
 at once (through Explorer, so it runs unelevated); a file watcher on the credentials (`auth.json`,
-`.credentials.json`) turns the agent ready without a click, and the PC's heartbeat goes out at once. The worker
+`.credentials.json`; for Grok, a marker the sign-in script writes once `grok login` succeeded) turns the agent ready without a click, and the PC's heartbeat goes out at once. The worker
 starts with Helm, so after a restart the agents take jobs again as soon as Helm runs.
 
 **How a phone reaches the PC.** Each PC running Helm with a ready agent writes a heartbeat to the synced collection
@@ -116,9 +116,11 @@ to the API, so nothing is saved twice. Undo goes back to the PC that made the re
 end-to-end encrypted like all Helm data.
 
 **On the PC** (`LocalAgentRoute`), the agent runs with its own tools off (Claude Code: no tools, no MCP, no hooks;
-Codex: a read-only sandbox in an empty folder): Helm lists its tools in the first message, the agent answers with the calls it wants as JSON
+Codex: a read-only sandbox in an empty folder; Grok: `grok agent stdio`, the Agent Client Protocol over
+JSON-RPC, with no files, no terminal and every permission refused): Helm lists its tools in the first message, the agent answers with the calls it wants as JSON
 (`CliAgentProtocol`), Helm runs them in-process and sends the results back. Claude Code keeps one process per conversation
-(about 3 s for the first turn, 1–2 s after); Codex runs one per turn and resumes its thread. Calls that would need a yes are not offered there, and phone tools are
+(about 3 s for the first turn, 1–2 s after); Codex runs one per turn and resumes its thread; Grok keeps one ACP session per conversation and reports no usage
+(what it saved is estimated from the text). Calls that would need a yes are not offered there, and phone tools are
 handed back to the phone. An agent that reports its plan's limit takes no job for 30 minutes; the next one in the list does.
 
 **Costs.** Every call goes in the synced collection `ai.usage`: route (`api` or `claude-code`), model, tokens, the

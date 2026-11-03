@@ -129,6 +129,9 @@ internal sealed partial class AiProxyViewModel : ObservableObject
     private void AddClaudeCode() => _agents.Add(AgentKinds.ClaudeCode);
 
     [RelayCommand]
+    private void AddGrok() => _agents.Add(AgentKinds.Grok);
+
+    [RelayCommand]
     private void SignIn(AgentRow? row)
     {
         if (row is not null) _agents.SignIn(row.Id);

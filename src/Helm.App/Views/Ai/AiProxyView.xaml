@@ -35,7 +35,7 @@
 
     <StackPanel>
         <TextBlock Style="{DynamicResource HelmSecondaryText}"
-                   Text="Helm's AI jobs (Ask Helm on your phone) go to these agents first, in this order: they run on their own plans, with no cost per call. The API key on Models &amp; keys is used only when none of them answers in time. Each agent signs in to its own account here, apart from the Claude Code or Codex you use yourself." />
+                   Text="Helm's AI jobs (Ask Helm on your phone) go to these agents first, in this order: they run on their own plans, with no cost per call. The API key on Models &amp; keys is used only when none of them answers in time. Each agent signs in to its own account here, apart from the Codex, Claude Code or Grok you use yourself." />
 
         <!-- The agents of this PC -->
         <core:RowLayout Margin="0,24,0,8">
@@ -47,13 +47,14 @@
                 <ui:Button Content="Check again" Icon="{ui:SymbolIcon ArrowSync24}" Appearance="Transparent" Command="{Binding CheckAgainCommand}" />
                 <ui:Button Content="Add Codex" Icon="{ui:SymbolIcon Add24}" Margin="8,0,0,0" Command="{Binding AddCodexCommand}" />
                 <ui:Button Content="Add Claude Code" Icon="{ui:SymbolIcon Add24}" Margin="8,0,0,0" Command="{Binding AddClaudeCodeCommand}" />
+                <ui:Button Content="Add Grok" Icon="{ui:SymbolIcon Add24}" Margin="8,0,0,0" Command="{Binding AddGrokCommand}" />
             </StackPanel>
         </core:RowLayout>
 
         <Border Style="{DynamicResource HelmSurface}" Margin="0,0,0,8" Padding="16,12"
                 Visibility="{Binding HasAgents, Converter={StaticResource InverseBoolToVisibility}}">
             <TextBlock Style="{DynamicResource HelmSecondaryText}" FontSize="13"
-                       Text="No agent yet: add Codex or Claude Code. Its sign-in opens at once: sign in with the account Helm should use, and the agent turns green by itself. Until then Helm's AI jobs use the API key." />
+                       Text="No agent yet: add Codex, Claude Code or Grok. Its sign-in opens at once: sign in with the account Helm should use, and the agent turns green by itself. Until then Helm's AI jobs use the API key." />
         </Border>
 
         <ItemsControl ItemsSource="{Binding Agents}" AutomationProperties.Name="Agents on this PC">
