@@ -97,7 +97,7 @@
 
         <!-- Ask Helm's route -->
         <TextBlock Text="Ask Helm" Style="{DynamicResource HelmSectionHeader}" />
-        <ui:CardControl Margin="0,0,0,4" Icon="{ui:SymbolIcon ArrowRouting24}">
+        <ui:CardControl Margin="0,0,0,4" Icon="{ui:SymbolIcon ArrowSwap24}">
             <ui:CardControl.Header>
                 <core:CardHeader Title="Where it runs" Description="The model picked in the card is the one the API uses when no agent answers." />
             </ui:CardControl.Header>
