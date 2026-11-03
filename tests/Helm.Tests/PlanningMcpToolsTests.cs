@@ -45,7 +45,7 @@ public sealed class PlanningMcpToolsTests
         var wallet = new WalletStore(new MemorySynced<WalletTransaction>(), new MemorySynced<WalletCategory>(), new MemorySynced<WalletBudget>(), _time);
         var tools = new IMcpToolProvider[]
         {
-            new MissionsMcpTools(_missions), new TrackerMcpTools(_tracker), new NotesMcpTools(notes, links), new WalletMcpTools(new DebtBook(new MemorySynced<WalletDebt>(), wallet, _time)),
+            new MissionsMcpTools(_missions), new TrackerMcpTools(_tracker), new NotesMcpTools(notes, links), new WalletMcpTools(new DebtBook(new MemorySynced<WalletDebt>(), wallet, _time), wallet),
         }.SelectMany(p => p.Tools).ToList();
 
         foreach (var tool in tools)
@@ -54,7 +54,7 @@ public sealed class PlanningMcpToolsTests
             Assert.DoesNotContain("delete", tool.Name);
         }
         var readers = tools.Where(t => t.ReadOnly).Select(t => t.Name).Order().ToList();
-        Assert.Equal(["mission_get", "missions_list", "notes_read", "notes_search", "tracker_lists", "tracker_tasks", "wallet_debts"], readers);
+        Assert.Equal(["mission_get", "missions_list", "notes_read", "notes_search", "tracker_lists", "tracker_tasks", "wallet_debts", "wallet_summary"], readers);
     }
 
     [Fact]

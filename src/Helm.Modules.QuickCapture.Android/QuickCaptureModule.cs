@@ -21,10 +21,12 @@ public sealed class QuickCaptureModule(ILogger<QuickCaptureModule> logger) : And
     /// <summary>Stable component names: Android remembers enabled states and pinned tiles by name.</summary>
     public const string ActivityName = "com.huyhung1404.helm.QuickCaptureActivity";
     public const string TileName = "com.huyhung1404.helm.QuickCaptureTile";
+    public const string AskHelmActivityName = "com.huyhung1404.helm.AskHelmActivity";
+    public const string AskHelmTileName = "com.huyhung1404.helm.AskHelmTile";
 
     public override string Id => ModuleId;
     public override string DisplayName => "Quick Capture";
-    public override string Description => "Save a note, a task or a debt from any app: Share → Save to Helm, or the Quick Settings tile.";
+    public override string Description => "Save a note, a task or a debt from any app: Share → Save to Helm, or the Quick Settings tile. Ask Helm, its second tile, takes it by voice.";
     public override ModuleGroup Group => ModuleGroup.Planning;
     public override Symbol Icon => Symbol.Flash;
 
@@ -62,7 +64,7 @@ public sealed class QuickCaptureModule(ILogger<QuickCaptureModule> logger) : And
         {
             var context = AndroidApp.Context;
             var state = enabled ? ComponentEnabledState.Enabled : ComponentEnabledState.Disabled;
-            foreach (var name in new[] { ActivityName, TileName })
+            foreach (var name in new[] { ActivityName, TileName, AskHelmActivityName, AskHelmTileName })
                 context.PackageManager?.SetComponentEnabledSetting(new ComponentName(context, name), state, ComponentEnableOption.DontKillApp);
         }
         catch (Exception ex)

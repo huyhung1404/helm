@@ -13,7 +13,7 @@ public sealed record AiBalance(DateTimeOffset At, decimal? Usd, string Message);
 
 /// <summary>
 /// Reads the prepaid balance of a provider whose API tells it. It needs a key with more power than an API key (xAI: a
-/// management key), so that key stays on one device (<see cref="AiManagementKeys"/>).
+/// management key), kept in <see cref="AiManagementKeys"/>.
 /// </summary>
 public interface IAiBalanceReader
 {
@@ -66,61 +66,83 @@ public sealed class GrokBalanceReader(HttpClient http, TimeProvider? time = null
     }
 }
 
-/// <summary>
-/// The management keys that read balances. They can do more than read (an xAI one can buy credit with the saved card), so
-/// they stay on this device only, encrypted for this user (DPAPI, Android Keystore), never synced and never shown again.
-/// </summary>
-public sealed class AiManagementKeys(HelmPaths paths, ISecretProtector protector)
+/// <summary>One provider's management key, synced (end-to-end encrypted) like the API keys, so every device reads the balance.</summary>
+public sealed record AiManagementKey
 {
-    private string FilePath(AiProvider provider) => Path.Combine(paths.ModuleDataDirectory("ai"), $"management-{provider.Id}.bin");
+    /// <summary><see cref="AiProvider.Id"/>.</summary>
+    public required string Provider { get; init; }
 
-    private static string Purpose(AiProvider provider) => $"helm.ai.management.{provider.Id}";
+    public required string Secret { get; init; }
 
-    public bool Has(AiProvider provider) => File.Exists(FilePath(provider));
+    public DateTimeOffset SavedAt { get; init; }
+}
 
-    /// <summary>The saved key, or null when there is none or it cannot be read here (another user, another device).</summary>
-    public string? Get(AiProvider provider)
+/// <summary>
+/// The management keys that read balances, one per provider, on Helm Sync like the API keys (the user's choice: every
+/// device shows the balance). They can do more than read (an xAI one can buy credit with the saved card), so they are
+/// never shown again once saved. A key an older Helm kept on this device only (DPAPI) moves to sync on first use.
+/// </summary>
+public sealed class AiManagementKeys
+{
+    public const string Collection = "ai.management";
+
+    private readonly ISyncedCollection<AiManagementKey> _keys;
+    private readonly HelmPaths? _paths;
+    private readonly ISecretProtector? _protector;
+    private readonly TimeProvider _time;
+
+    public AiManagementKeys(ISyncedCollection<AiManagementKey> keys, HelmPaths? paths = null, ISecretProtector? protector = null, TimeProvider? time = null)
     {
-        try
+        _keys = keys;
+        _paths = paths;
+        _protector = protector;
+        _time = time ?? TimeProvider.System;
+        _keys.Changed += (_, _) => Changed?.Invoke(this, EventArgs.Empty);
+        MoveOldKeys();
+    }
+
+    /// <summary>Raised after a local change and after another device's change arrives (then on a thread-pool thread).</summary>
+    public event EventHandler? Changed;
+
+    public bool Has(AiProvider provider) => _keys.Get(provider.Id) is not null;
+
+    /// <summary>The saved key, or null when there is none.</summary>
+    public string? Get(AiProvider provider) => _keys.Get(provider.Id)?.Secret;
+
+    public void Save(AiProvider provider, string key) =>
+        _keys.Upsert(provider.Id, new AiManagementKey { Provider = provider.Id, Secret = key.Trim(), SavedAt = _time.GetUtcNow() });
+
+    public void Delete(AiProvider provider) => _keys.Delete(provider.Id);
+
+    private string OldFile(AiProvider provider) => Path.Combine(_paths!.ModuleDataDirectory("ai"), $"management-{provider.Id}.bin");
+
+    private void MoveOldKeys()
+    {
+        if (_paths is null || _protector is null) return;
+        foreach (var provider in AiProviders.All)
         {
-            var path = FilePath(provider);
-            if (!File.Exists(path)) return null;
-            var bytes = protector.Unprotect(File.ReadAllBytes(path), Purpose(provider));
+            var path = OldFile(provider);
             try
             {
-                return Encoding.UTF8.GetString(bytes);
+                if (!File.Exists(path)) continue;
+                if (!Has(provider))
+                {
+                    var bytes = _protector.Unprotect(File.ReadAllBytes(path), $"helm.ai.management.{provider.Id}");
+                    try
+                    {
+                        Save(provider, Encoding.UTF8.GetString(bytes));
+                    }
+                    finally
+                    {
+                        CryptographicOperations.ZeroMemory(bytes);
+                    }
+                }
+                File.Delete(path);
             }
-            finally
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or CryptographicException)
             {
-                CryptographicOperations.ZeroMemory(bytes);
+                // Unreadable here (another user): it stays; the user adds the key again.
             }
         }
-        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or CryptographicException)
-        {
-            return null;
-        }
-    }
-
-    public void Save(AiProvider provider, string key)
-    {
-        var bytes = Encoding.UTF8.GetBytes(key.Trim());
-        try
-        {
-            var path = FilePath(provider);
-            Directory.CreateDirectory(Path.GetDirectoryName(path)!);
-            var temp = path + ".tmp";
-            File.WriteAllBytes(temp, protector.Protect(bytes, Purpose(provider)));
-            File.Move(temp, path, overwrite: true);
-        }
-        finally
-        {
-            CryptographicOperations.ZeroMemory(bytes);
-        }
-    }
-
-    public void Delete(AiProvider provider)
-    {
-        var path = FilePath(provider);
-        if (File.Exists(path)) File.Delete(path);
     }
 }

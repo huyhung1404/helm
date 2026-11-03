@@ -56,6 +56,12 @@
     <Using Remove="Android.OS.Bundle" />
   </ItemGroup>
 
+  <!-- Ask Helm calls Claude through the Anthropic SDK, which reads its JSON by reflection: keep it whole in trimmed
+       Release builds. -->
+  <ItemGroup>
+    <TrimmerRootAssembly Include="Anthropic" RootMode="All" />
+  </ItemGroup>
+
   <!-- Development: -p:HelmAndroidEnvFile=<file with NAME=value lines>, e.g. HELM_SYNC_SERVER=http://127.0.0.1:8787 -->
   <ItemGroup Condition="'$(HelmAndroidEnvFile)' != ''">
     <AndroidEnvironment Include="$(HelmAndroidEnvFile)" />
@@ -85,6 +91,7 @@
     <ProjectReference Include="..\Helm.Core.Android\Helm.Core.Android.csproj" />
     <ProjectReference Include="..\Helm.Modules.Vault.Android\Helm.Modules.Vault.Android.csproj" />
     <ProjectReference Include="..\Helm.Shell\Helm.Shell.csproj" />
+    <ProjectReference Include="..\Helm.Ai.Core\Helm.Ai.Core.csproj" />
     <ProjectReference Include="..\Helm.Modules.Tracker.Android\Helm.Modules.Tracker.Android.csproj" />
     <ProjectReference Include="..\Helm.Modules.Vocab.Android\Helm.Modules.Vocab.Android.csproj" />
     <ProjectReference Include="..\Helm.Modules.Missions.Android\Helm.Modules.Missions.Android.csproj" />

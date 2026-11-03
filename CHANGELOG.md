@@ -5,6 +5,28 @@ Format: [Keep a Changelog](https://keepachangelog.com), versions follow [SemVer]
 
 ## [Unreleased]
 
+### Added
+- **Ask Helm on the phone (preview).** A new Quick Settings tile, **Ask Helm**, opens a card over whatever app is
+  open and listens at once (Vietnamese): the words show as you speak, and it sends them by itself when you stop (or
+  type instead). Say “trưa nay ăn phở 45 nghìn”, “Nam mượn anh 200k”, “mai 9 giờ nhắc anh gọi khách”, “tháng này
+  anh tiêu bao nhiêu?”, “6 rưỡi sáng mai gọi anh dậy”. What it adds is saved at once and listed with **Hoàn tác**
+  (Undo); only a change Helm cannot take back asks first. A question back (“bao nhiêu tiền?”) listens for the answer.
+  The model is picked right in the card (Claude Haiku, Sonnet… or Grok, from the keys on the AI page). It uses
+  Helm's own tools (Wallet, Tracker, Notes, Habits, Missions, Vocabulary) plus the phone's alarm, timer, calendar
+  and clipboard. It needs the microphone once, and Quick Capture turned on.
+- **AI → Proxy: your own agents first, the API last.** Add the agents this PC runs for Helm, **Codex**, **Claude
+  Code** or **Grok** (Grok Build, on a SuperGrok or X Premium+ plan), as many as you like and in the order you want;
+  each signs in to its own account in a terminal Helm opens (apart from the ones you use yourself) and turns green
+  by itself once signed in. An AI request
+  goes to them first (on their plan, no cost per call), also from the phone through Helm Sync, end-to-end
+  encrypted; only when no agent takes it within a few seconds does it go to the API with the model picked in the
+  card. A turn an agent has taken never runs twice. Helm runs its own tools for the agent (no MCP, so no consent
+  dialog for a request from your own phone). The agents take jobs as soon as Helm starts, with or without the page
+  open. The card says where it ran (“Codex trên PC-… · miễn phí” or “Haiku 5.5 qua API”), and every call goes in a
+  synced cost book with what the agents saved.
+- **Wallet for AI agents:** `wallet_add_transaction` (money spent or in, typed by hand, with its category) and
+  `wallet_summary` (what was spent and received over some days, by category).
+
 ### Changed
 - **Windows: the menu no longer moves under the mouse.** The collapsed menu shows every tool's own icon, with a short
   line between groups; opening it only adds the names (group names where the lines were), so the tool you pointed at
@@ -19,6 +41,14 @@ Format: [Keep a Changelog](https://keepachangelog.com), versions follow [SemVer]
   Hold a tool in the menu to open it in a window of its own (beside Helm in split screen).
 - **Android: a widget or notification opens its page at once.** Tapping Wallet's notification (or a Tracker widget, a
   reminder, a word card…) while Helm was closed no longer shows the last page first and then switches.
+- **Ask Helm answers a recording in one call:** “phở 45k” is saved and listed with Undo without a second call to say
+  so: about half the time (4–5 s on Grok, sooner on Claude Code) and one call fewer on the API.
+- **Ask Helm sends only the tools a request needs:** “phở 45k” carries the Wallet's 4 tools, not all 19 (about 60%
+  fewer tokens a call, on the API and on your agents); a later turn adds only the tools it needs.
+- **The Grok management key now syncs** (end-to-end encrypted, like the API keys), so the phone and every PC show the
+  prepaid balance. A key kept on one PC by v0.78.0 moves to sync when the new Helm starts there.
+- **AI agents' tools that add or tick something can be undone** (a transaction, a debt entry, a task, a note, a
+  habit's day, words to learn): Ask Helm uses it for Undo; the MCP tools themselves behave as before.
 
 ## [0.78.0] - 2026-11-03
 

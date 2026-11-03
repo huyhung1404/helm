@@ -3,6 +3,9 @@
 	<uses-permission android:name="android.permission.INTERNET" />
 	<!-- In-app updater: hands the downloaded APK to the system installer (the user confirms each install). -->
 	<uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
+	<!-- Ask Helm: the card listens to what the user says (asked the first time), and sets alarms in the Clock app. -->
+	<uses-permission android:name="android.permission.RECORD_AUDIO" />
+	<uses-permission android:name="com.android.alarm.permission.SET_ALARM" />
 	<!-- Wallet: on Android 11+ the SMS apps must be visible for Android to name the default one (it shows the banks' SMS). -->
 	<!-- Vault autofill: on Android 11+ an app must be visible for Helm to read who signed it (a login is offered only to
 	     the app it was saved for, never to a fake one that took the same package name). -->
@@ -18,10 +21,14 @@
 		<intent>
 			<action android:name="android.intent.action.TTS_SERVICE" />
 		</intent>
+		<!-- Ask Helm: the phone's speech recognizer is hidden on Android 11+ without this. -->
+		<intent>
+			<action android:name="android.speech.RecognitionService" />
+		</intent>
 	</queries>
 	<application android:label="Helm" android:icon="@drawable/icon" android:allowBackup="false" android:networkSecurityConfig="@xml/network_security_config">
 		<provider android:name="androidx.core.content.FileProvider"
-		          android:authorities="com.huyhung1404.helm.updates"
+		          android:authorities="${applicationId}.updates"
 		          android:exported="false"
 		          android:grantUriPermissions="true">
 			<meta-data android:name="android.support.FILE_PROVIDER_PATHS" android:resource="@xml/update_paths" />

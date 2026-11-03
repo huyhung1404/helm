@@ -92,7 +92,7 @@ public sealed class AiGrokTests : IDisposable
         var records = new MemorySynced<AiKey>();
         var store = new AiKeyStore(records);
         store.Add(AiProviders.Grok, "Helm", Key, new AiKeyCheck(DateTimeOffset.UnixEpoch, AiKeyStatus.Works, "Works.", []) { Account = "team-1" });
-        var management = new AiManagementKeys(new HelmPaths(_dir.Path), new PlainSecretProtector());
+        var management = new AiManagementKeys(new MemorySynced<AiManagementKey>());
         var reader = new Reader();
         var vm = new AiKeysViewModel(store, management, [], [reader], new InlineUi(), new Launcher(), new AcceptDialogs());
         var grok = vm.Sections.Single(s => s.Provider == AiProviders.Grok);
@@ -120,10 +120,35 @@ public sealed class AiGrokTests : IDisposable
     }
 
     [Fact]
+    public void A_management_key_syncs_and_one_an_older_Helm_kept_on_the_PC_moves_to_sync()
+    {
+        var paths = new HelmPaths(_dir.Path);
+        var protector = new PlainSecretProtector();
+        var old = Path.Combine(paths.ModuleDataDirectory("ai"), "management-xai.bin");
+        Directory.CreateDirectory(Path.GetDirectoryName(old)!);
+        File.WriteAllBytes(old, protector.Protect(System.Text.Encoding.UTF8.GetBytes("xai-old"), "helm.ai.management.xai"));
+        var records = new MemorySynced<AiManagementKey>();
+
+        var keys = new AiManagementKeys(records, paths, protector);
+
+        Assert.Equal("xai-old", keys.Get(AiProviders.Grok));
+        Assert.Equal("xai-old", records.Get("xai")!.Secret);
+        Assert.False(File.Exists(old));
+
+        // Another device's key arrives through sync.
+        var changed = 0;
+        keys.Changed += (_, _) => changed++;
+        records.SetRemote("xai", new AiManagementKey { Provider = "xai", Secret = "xai-phone" });
+        Assert.Equal("xai-phone", keys.Get(AiProviders.Grok));
+        Assert.True(changed > 0);
+        Assert.False(keys.Has(AiProviders.Claude));
+    }
+
+    [Fact]
     public async Task Without_a_tested_key_there_is_no_team_to_read()
     {
         var store = new AiKeyStore(new MemorySynced<AiKey>());
-        var vm = new AiKeysViewModel(store, new AiManagementKeys(new HelmPaths(_dir.Path), new PlainSecretProtector()), [], [new Reader()],
+        var vm = new AiKeysViewModel(store, new AiManagementKeys(new MemorySynced<AiManagementKey>()), [], [new Reader()],
             new InlineUi(), new Launcher(), new AcceptDialogs());
         var grok = vm.Sections.Single(s => s.Provider == AiProviders.Grok);
 

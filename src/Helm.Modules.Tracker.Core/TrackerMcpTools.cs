@@ -42,7 +42,10 @@ public sealed class TrackerMcpTools(TrackerStore store) : IMcpToolProvider
                 ("subtasks", McpArgs.List("Titles of subtasks."), false),
                 ("repeat_daily", McpArgs.Flag("A new copy of the task appears every day, starting today."), false),
                 ("repeat_until", McpArgs.Text("With repeat_daily: the last day, e.g. 2026-12-31 (default: no end)."), false)),
-            (args, _) => Task.FromResult<object?>(AddTask(args))),
+            (args, _) => Task.FromResult<object?>(AddTask(args)))
+        {
+            Undo = (result, _) => { store.DeleteItem(result.GetProperty("id").GetString()!); return Task.CompletedTask; },
+        },
         new("tracker_update_task", "Change a task's title, notes, priority or due date, or stop it repeating.",
             McpArgs.Schema(
                 ("id", McpArgs.Text("The task's id."), true),
@@ -58,7 +61,10 @@ public sealed class TrackerMcpTools(TrackerStore store) : IMcpToolProvider
             (args, _) => Task.FromResult<object?>(StartTask(McpArgs.RequiredString(args, "id")))),
         new("tracker_complete_task", "Mark a task or subtask done (its finish time is recorded; a task's subtasks are done too).",
             McpArgs.Schema(("id", McpArgs.Text("The task's id."), true)),
-            (args, _) => Task.FromResult<object?>(SetDone(McpArgs.RequiredString(args, "id"), done: true))),
+            (args, _) => Task.FromResult<object?>(SetDone(McpArgs.RequiredString(args, "id"), done: true)))
+        {
+            Undo = (result, _) => { store.Reopen(result.GetProperty("id").GetString()!); return Task.CompletedTask; },
+        },
         new("tracker_reopen_task", "Open a done task or subtask again.",
             McpArgs.Schema(("id", McpArgs.Text("The task's id."), true)),
             (args, _) => Task.FromResult<object?>(SetDone(McpArgs.RequiredString(args, "id"), done: false))),

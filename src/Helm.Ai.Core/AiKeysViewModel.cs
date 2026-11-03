@@ -133,6 +133,11 @@ public sealed partial class AiKeysViewModel : ObservableObject
             HasManagementKey = _managementKeys.Has(p),
         })];
         _store.Changed += (_, _) => _ui.Post(Refresh);
+        // Another device added or forgot a management key.
+        _managementKeys.Changed += (_, _) => _ui.Post(() =>
+        {
+            foreach (var section in Sections) section.HasManagementKey = _managementKeys.Has(section.Provider);
+        });
         Refresh();
     }
 
@@ -357,7 +362,7 @@ public sealed partial class AiKeysViewModel : ObservableObject
     {
         if (section is null) return;
         var ok = await _dialogs.ConfirmAsync("Forget the management key?",
-            $"Helm stops reading the {section.Provider.Name} balance on this PC. The key itself keeps working: delete it in the console to stop it for good.",
+            $"Helm stops reading the {section.Provider.Name} balance on every device. The key itself keeps working: delete it in the console to stop it for good.",
             "Forget");
         if (!ok) return;
         _managementKeys.Delete(section.Provider);
@@ -384,8 +389,8 @@ public sealed partial class AiKeysViewModel : ObservableObject
         if (section.IsReadingBalance || !_readers.TryGetValue(section.Provider.Id, out var reader)) return;
         if (_managementKeys.Get(section.Provider) is not { } key)
         {
-            section.HasManagementKey = _managementKeys.Has(section.Provider);
-            section.BalanceDetail = section.HasManagementKey ? "The management key cannot be read on this device: add it again." : "";
+            section.HasManagementKey = false;
+            section.BalanceDetail = "";
             return;
         }
         if (Account(section.Provider) is not { } account)

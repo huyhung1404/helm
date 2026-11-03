@@ -1,0 +1,131 @@
+<UserControl
+    x:Class="Helm.App.Views.Ai.AiProxyView"
+    x:ClassModifier="internal"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
+    xmlns:core="clr-namespace:Helm.Core.Ui;assembly=Helm.Core.Windows">
+
+    <!-- The Proxy part of the AI page; its DataContext is an AiProxyViewModel. -->
+    <UserControl.Resources>
+        <Style x:Key="RowAction" TargetType="ui:Button" BasedOn="{StaticResource {x:Type ui:Button}}">
+            <Setter Property="Appearance" Value="Transparent" />
+            <Setter Property="Padding" Value="8" />
+            <Setter Property="Margin" Value="2,0,0,0" />
+            <Setter Property="MinWidth" Value="0" />
+            <Setter Property="VerticalAlignment" Value="Center" />
+        </Style>
+        <!-- Green: takes jobs now; grey: off; amber: on but cannot (not signed in, at its limit) -->
+        <Style x:Key="AgentDot" TargetType="Ellipse">
+            <Setter Property="Width" Value="10" />
+            <Setter Property="Height" Value="10" />
+            <Setter Property="Margin" Value="0,6,12,0" />
+            <Setter Property="VerticalAlignment" Value="Top" />
+            <Setter Property="Fill" Value="{DynamicResource SystemFillColorCautionBrush}" />
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding IsReady}" Value="True">
+                    <Setter Property="Fill" Value="{DynamicResource SystemFillColorSuccessBrush}" />
+                </DataTrigger>
+                <DataTrigger Binding="{Binding IsOff}" Value="True">
+                    <Setter Property="Fill" Value="{DynamicResource ControlStrongFillColorDisabledBrush}" />
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+    </UserControl.Resources>
+
+    <StackPanel>
+        <TextBlock Style="{DynamicResource HelmSecondaryText}"
+                   Text="Helm's AI jobs (Ask Helm on your phone) go to these agents first, in this order: they run on their own plans, with no cost per call. The API key on Models &amp; keys is used only when none of them answers in time. Each agent signs in to its own account here, apart from the Codex, Claude Code or Grok you use yourself." />
+
+        <!-- The agents of this PC -->
+        <core:RowLayout Margin="0,24,0,8">
+            <StackPanel VerticalAlignment="Center">
+                <TextBlock Text="Agents on this PC" FontSize="14" FontWeight="SemiBold" />
+                <TextBlock Style="{DynamicResource HelmSecondaryText}" Text="Your phone reaches them through Helm Sync, end-to-end encrypted." />
+            </StackPanel>
+            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                <ui:Button Content="Check again" Icon="{ui:SymbolIcon ArrowSync24}" Appearance="Transparent" Command="{Binding CheckAgainCommand}" />
+                <ui:Button Content="Add Codex" Icon="{ui:SymbolIcon Add24}" Margin="8,0,0,0" Command="{Binding AddCodexCommand}" />
+                <ui:Button Content="Add Claude Code" Icon="{ui:SymbolIcon Add24}" Margin="8,0,0,0" Command="{Binding AddClaudeCodeCommand}" />
+                <ui:Button Content="Add Grok" Icon="{ui:SymbolIcon Add24}" Margin="8,0,0,0" Command="{Binding AddGrokCommand}" />
+            </StackPanel>
+        </core:RowLayout>
+
+        <Border Style="{DynamicResource HelmSurface}" Margin="0,0,0,8" Padding="16,12"
+                Visibility="{Binding HasAgents, Converter={StaticResource InverseBoolToVisibility}}">
+            <TextBlock Style="{DynamicResource HelmSecondaryText}" FontSize="13"
+                       Text="No agent yet: add Codex, Claude Code or Grok. Its sign-in opens at once: sign in with the account Helm should use, and the agent turns green by itself. Until then Helm's AI jobs use the API key." />
+        </Border>
+
+        <ItemsControl ItemsSource="{Binding Agents}" AutomationProperties.Name="Agents on this PC">
+            <ItemsControl.ItemTemplate>
+                <DataTemplate>
+                    <Border Style="{DynamicResource HelmSurface}" Margin="0,0,0,8">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <Ellipse Style="{StaticResource AgentDot}" ToolTip="{Binding Status}" />
+                            <StackPanel Grid.Column="1">
+                                <TextBlock FontWeight="SemiBold" FontSize="14">
+                                    <Run Text="{Binding Name, Mode=OneWay}" />
+                                    <Run Text="{Binding Kind, Mode=OneWay}" FontWeight="Normal" Foreground="{DynamicResource TextFillColorSecondaryBrush}" FontSize="12" />
+                                </TextBlock>
+                                <TextBlock Text="{Binding Status}" Style="{DynamicResource HelmSecondaryText}" Margin="0,2,0,0" />
+                            </StackPanel>
+                            <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center" Margin="12,0,0,0">
+                                <ui:Button Content="Sign in" Icon="{ui:SymbolIcon Person24}"
+                                           Visibility="{Binding NeedsSignIn, Converter={StaticResource BoolToVisibility}}"
+                                           AutomationProperties.Name="{Binding Name, StringFormat='Sign in {0}'}"
+                                           Command="{Binding DataContext.SignInCommand, RelativeSource={RelativeSource AncestorType=UserControl}}" CommandParameter="{Binding}" />
+                                <ui:ToggleSwitch IsChecked="{Binding IsOn}" Margin="12,0,4,0" AutomationProperties.Name="{Binding Name, StringFormat='{}{0} takes jobs'}" />
+                                <ui:Button Style="{StaticResource RowAction}" Icon="{ui:SymbolIcon ArrowUp24}" ToolTip="Try it earlier"
+                                           IsEnabled="{Binding CanMoveUp}" AutomationProperties.Name="{Binding Name, StringFormat='Move {0} up'}"
+                                           Command="{Binding DataContext.MoveUpCommand, RelativeSource={RelativeSource AncestorType=UserControl}}" CommandParameter="{Binding}" />
+                                <ui:Button Style="{StaticResource RowAction}" Icon="{ui:SymbolIcon ArrowDown24}" ToolTip="Try it later"
+                                           IsEnabled="{Binding CanMoveDown}" AutomationProperties.Name="{Binding Name, StringFormat='Move {0} down'}"
+                                           Command="{Binding DataContext.MoveDownCommand, RelativeSource={RelativeSource AncestorType=UserControl}}" CommandParameter="{Binding}" />
+                                <ui:Button Style="{StaticResource RowAction}" Icon="{ui:SymbolIcon Delete24}" ToolTip="Remove"
+                                           AutomationProperties.Name="{Binding Name, StringFormat='Remove {0}'}"
+                                           Command="{Binding DataContext.RemoveCommand, RelativeSource={RelativeSource AncestorType=UserControl}}" CommandParameter="{Binding}" />
+                            </StackPanel>
+                        </Grid>
+                    </Border>
+                </DataTemplate>
+            </ItemsControl.ItemTemplate>
+        </ItemsControl>
+
+        <!-- Ask Helm's route -->
+        <TextBlock Text="Ask Helm" Style="{DynamicResource HelmSectionHeader}" />
+        <ui:CardControl Margin="0,0,0,4" Icon="{ui:SymbolIcon ArrowSwap24}">
+            <ui:CardControl.Header>
+                <core:CardHeader Title="Where it runs" Description="The model picked in the card is the one the API uses when no agent answers." />
+            </ui:CardControl.Header>
+            <ComboBox ItemsSource="{Binding Routes}" SelectedItem="{Binding Route}" DisplayMemberPath="Label" MinWidth="280"
+                      AutomationProperties.Name="Where Ask Helm runs" />
+        </ui:CardControl>
+        <ui:CardControl Margin="0,0,0,4" Icon="{ui:SymbolIcon Timer24}">
+            <ui:CardControl.Header>
+                <core:CardHeader Title="Wait for a PC" Description="Seconds the phone waits for a PC to take a request before it uses the API. A request a PC has taken is never sent to the API too." />
+            </ui:CardControl.Header>
+            <ui:NumberBox Value="{Binding WaitSeconds, UpdateSourceTrigger=PropertyChanged}" Minimum="2" Maximum="60" SmallChange="1" MinWidth="120"
+                          AutomationProperties.Name="Seconds to wait for a PC" />
+        </ui:CardControl>
+
+        <!-- What it cost -->
+        <TextBlock Text="This month" Style="{DynamicResource HelmSectionHeader}" />
+        <ui:CardControl Margin="0,0,0,4" Icon="{ui:SymbolIcon Money24}">
+            <ui:CardControl.Header>
+                <core:CardHeader Title="Costs" Description="{Binding MonthText}" />
+            </ui:CardControl.Header>
+        </ui:CardControl>
+        <ui:CardControl Margin="0,0,0,4" Icon="{ui:SymbolIcon ShieldLock24}">
+            <ui:CardControl.Header>
+                <core:CardHeader Title="Only your own requests"
+                                 Description="The proxy serves Helm's own features for you alone. Other apps (Cursor, n8n, Open WebUI…) use their own API keys: lending a plan to other apps or people is against the providers' terms." />
+            </ui:CardControl.Header>
+        </ui:CardControl>
+    </StackPanel>
+</UserControl>

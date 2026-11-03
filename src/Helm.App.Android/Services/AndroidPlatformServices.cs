@@ -48,8 +48,11 @@ public sealed class AndroidLauncher(ILogger<AndroidLauncher> logger) : IProcessL
     /// <summary>Files written only to be shared (declared in Resources/xml/update_paths.xml); replaced on each share.</summary>
     public string ShareFolder => Path.Combine(AndroidApp.Context.CacheDir!.AbsolutePath, "share");
 
-    /// <summary>The FileProvider declared in AndroidManifest.xml (update APKs and logs).</summary>
-    public const string FileProviderAuthority = "com.huyhung1404.helm.updates";
+    /// <summary>
+    /// The FileProvider declared in AndroidManifest.xml (update APKs and logs): named after the package, so a test build
+    /// with another package id installs beside the real Helm.
+    /// </summary>
+    public static string FileProviderAuthority => (AndroidApp.Context.PackageName ?? "com.huyhung1404.helm") + ".updates";
 
     public string ExecutablePath => AndroidApp.Context.PackageName ?? "com.huyhung1404.helm";
 
