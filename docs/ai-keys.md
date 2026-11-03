@@ -154,6 +154,22 @@ and Cursor set-up (MCP servers, hooks): 15,000 tokens and 10 s a call. Helm's ag
 (`--disallowed-tools`), turns skills, workflows and the Claude/Cursor compatibility off, and gives it a home folder of
 its own: about 640 tokens of Grok's and 3.5 s a call.
 
+**Grok keeps one session per conversation** (`GrokAcp`, `GrokAgentMode`, `GrokAgent.cs`). A conversation is one
+`grok agent --no-leader -m … stdio` process (Agent Client Protocol: JSON-RPC 2.0 a line on stdin/stdout), so a turn
+pays no process start and no session reload (Grok 1.0.70, “Chào em”: 1.15–1.4 s a turn against 1.3–1.55 s headless,
+about 0.1 s over the model's own time). Agent mode does not read `--disallowed-tools`: with no profile a session has
+26 tools and 13,600 input tokens. Helm passes its own agent profile as the `session/new` `_meta.agentProfile`
+object (`promptMode: full`, `injectDefaultTools: false`, every built-in in `disallowedTools` under its id and the name
+agent mode shows, `mcpInheritance: none`, no skills or AGENTS.md) plus `systemPromptOverride`; then the session lists
+0 tools and a turn takes 1,477 input tokens (1,152 of them cached). `--no-leader` matters: a shared leader's daemon
+route runs the default agent for a profile object. Helm also says it cannot read or write files nor run a terminal,
+cancels every permission Grok asks for, and sets `GROK_MEMORY=0` (agent mode turns Grok's memory on: its notes in the
+prompt, about 300 tokens a turn, and a capture after each one). Grok lists a session's tools right after it opens
+(`available_commands_update`, `_meta.tools`): a session that lists any, or does not say, is refused before any prompt
+is sent, and that agent runs headless (one `grok --prompt-file` a turn, as before) until Helm restarts. A process that
+died, was stopped or failed a turn is started again with the protocol and a recap. Headless runs now count their
+input tokens right (`input_tokens` already leaves the cached part out).
+
 **Costs.** Every call goes in the synced collection `ai.usage`: route (`api` or `agent`, with the agent's name), model, tokens, the
 estimated USD (`AiPrices`), and on an agent what the same call would have cost (`SavedUsd`). The daily cap
 (`DailyCapUsd`, 0.50 USD) only stops the API.
