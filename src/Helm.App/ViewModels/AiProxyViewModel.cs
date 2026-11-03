@@ -32,7 +32,7 @@ internal sealed record RouteOption(AiRoutePolicy Policy, string Label);
 
 /// <summary>
 /// The Proxy part of the AI page: the agents the user added to this PC (each signed in to its own account), in the
-/// order Helm's AI jobs try them; Ask Helm's route; and what this month's calls cost and saved.
+/// order Helm's AI jobs try them; Ask Helm's route; the user's VPS; and what this month's calls cost and saved.
 /// </summary>
 internal sealed partial class AiProxyViewModel : ObservableObject
 {
@@ -47,13 +47,15 @@ internal sealed partial class AiProxyViewModel : ObservableObject
     [ObservableProperty] private double _waitSeconds;
     [ObservableProperty] private string _monthText = "";
 
-    public AiProxyViewModel(AgentRegistry agents, ISyncedSettings<AiFeatureSettings> features, AiUsageBook usage, IUiDispatcher ui, IDialogService dialogs)
+    public AiProxyViewModel(AgentRegistry agents, ISyncedSettings<AiFeatureSettings> features, AiUsageBook usage, IUiDispatcher ui, IDialogService dialogs,
+        VpsWorkerViewModel vps)
     {
         _agents = agents;
         _features = features;
         _usage = usage;
         _ui = ui;
         _dialogs = dialogs;
+        Vps = vps;
         var choice = features.Current.For(AiFeatureIds.AskHelm);
         _route = Routes.First(r => r.Policy == choice.Route);
         _waitSeconds = choice.PcWaitSeconds;
@@ -63,6 +65,9 @@ internal sealed partial class AiProxyViewModel : ObservableObject
     }
 
     public ObservableCollection<AgentRow> Agents { get; } = [];
+
+    /// <summary>The same agents serving the user's own VPS.</summary>
+    public VpsWorkerViewModel Vps { get; }
 
     public bool HasAgents => Agents.Count > 0;
 

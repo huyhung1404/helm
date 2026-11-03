@@ -84,7 +84,14 @@ public partial class App : Application
             // a sign-in or a change of the list tells the phone at once instead of at the next heartbeat.
             var worker = Services.GetRequiredService<Helm.Ai.Assistant.AgentJobWorker>();
             worker.Start();
-            Services.GetRequiredService<Ai.AgentRegistry>().Changed += (_, _) => worker.Beat();
+            // And the user's VPS, when it is set up and on (AI → Proxy → Your VPS); it hears of the ready agents too.
+            var vps = Services.GetRequiredService<Helm.Ai.Vps.VpsWorker>();
+            Services.GetRequiredService<Helm.Ai.Vps.VpsWorkerControl>().Apply();
+            Services.GetRequiredService<Ai.AgentRegistry>().Changed += (_, _) =>
+            {
+                worker.Beat();
+                vps.SendStatus();
+            };
             // The AI agents' tools (a pipe only this user can open; each connection checks the MCP settings).
             Services.GetRequiredService<Core.Mcp.McpPipeHost>().Start();
         }
