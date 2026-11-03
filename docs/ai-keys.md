@@ -174,3 +174,74 @@ A job is **text only**: no Helm tool and no phone tool is offered (the VPS's ser
 its own, ended once answered. Two run at once; one more is declined, so the VPS can send it elsewhere. A job may take
 2 minutes. After a drop the worker connects again after 1 s, waiting twice as long each time up to a minute; jobs
 running on a connection that dropped are cancelled. The token and job contents are never logged.
+
+## Model lists update by themselves
+
+The model choice (Ask Helm's card, and each feature's pick) lists the **chat** models of the provider's default key,
+from that key's last test. A running PC tests each key again by itself once its last test is a day old: soon after
+Helm starts, then every day (an hourly look for keys that are due). A test that gets no answer (no internet) keeps
+the last list and is tried again an hour later; any other answer is saved, synced, so the phone and the other PCs do
+not test it again. For Claude each test is the same tiny request as **Test** (far below a cent a day); for Grok it is
+free.
+
+Only chat models are offered: ids with a part that starts with `imag`, `video`, `embed`, `tts`, `speech`, `audio`,
+`whisper`, `transcri`, `moderat` or `rerank` (`grok-imagine-video`, `grok-2-image-1212`, `text-embedding-3`) are
+dropped, for every provider (`AiModels.IsChat`). When a key's new list no longer has a feature's picked model, the
+feature moves to the provider's default (Claude Haiku 5.5, `grok-4.7`), or, when that is gone too, to the first chat
+model listed; the log says which. The Models & keys view model shows `ModelsUpdatedText` ("Model lists updated today,
+09:12": the oldest of the keys' last tests), for a view to bind.
+
+Code: `AiModelRefresher` (`RefreshDueAsync`, `KeepPicksOffered`), started by `App.xaml.cs` on the PC; `AiModels`.
+
+## Your own prompts (Skill Hub)
+
+Each AI feature's prompt (Ask Helm's instructions today) can be replaced by your own, kept as a saved prompt on your
+Skill Hub, so you change it on the web and Helm uses it from the next fetch, without a new Helm.
+
+**Names.** A saved prompt named `helm-<feature id>` replaces that feature's built-in prompt: `helm-ask-helm` for Ask
+Helm. The feature ids are the `AiFeatureIds` constants (lowercase letters, digits and dashes). The Skill Hub names a
+new prompt after its title, so create it titled `helm-ask-helm` (rename the title afterwards if you like: the name
+stays), or ask Claude Code to `prompt_save` it with `name: "helm-ask-helm"`. **Archive** or delete the prompt to put
+the feature back on Helm's built-in text on every device.
+
+**Rules.** Helm uses your prompt only while all of these hold, else the built-in one (nothing fails):
+
+- it was fetched (confirmed by the hub) within the last 3 days;
+- it is not empty and at most 32,000 characters (a longer one is not kept);
+- it keeps every placeholder of the built-in prompt (`{name}`: a letter after `{`; JSON braces and `{{` are not
+  placeholders). One missing is logged once as a warning, by name, never with the text.
+
+**Fetching.** A running PC fetches every feature's prompt 10 s after Helm starts, every 15 minutes, and when the AI
+page opens (at most once a minute). A failure (no internet, a token refused) keeps the prompts fetched before and is
+logged once until fetching works again. What was fetched syncs (collection `ai.prompts`, end-to-end encrypted), so
+the phone's Ask Helm uses it too, on the API and on a PC's agent; the same text is written again at most every 6
+hours to keep it fresh, so it costs sync nothing between edits. Only reads: Helm never writes to the hub.
+
+**Setting up (PC).** There is no screen for it: open `%LOCALAPPDATA%\Helm\settings\ai-skillhub.json` (create it) and
+type:
+
+```json
+{
+  "version": 1,
+  "url": "https://skill.huyhung1404.com/api/mcp",
+  "token": "<this machine's Skill Hub token: the site → Machines>",
+  "accessClientId": "<Cloudflare Access service token: Client ID>",
+  "accessClientSecret": "<Cloudflare Access service token: Client Secret>"
+}
+```
+
+At the next fetch (within 15 minutes, or open the AI page) Helm moves the three tokens into
+`settings\ai\skillhub.bin`, encrypted for this Windows user (DPAPI), never synced, and empties them in the JSON file.
+They are the same values Claude Code's `skillhub` server has in `~/.claude.json`; a machine of its own on the site
+(say `helm-pc-office`) is better, so it can be revoked alone. Type a token again to replace it; delete `skillhub.bin`
+to forget them. `url` empty turns fetching off; only `https://` (or `http://` to this PC itself, for a hub under test).
+
+**How it asks.** One JSON-RPC `prompts/get` per feature to the hub's MCP endpoint, for the MCP prompt
+`p-helm-<feature id>` (the hub's name for a saved prompt), with `Authorization: Bearer <token>` and the
+`CF-Access-Client-Id` / `CF-Access-Client-Secret` headers. "Unknown prompt" (JSON-RPC error -32602: no such prompt, or
+archived) means none; 401, a Cloudflare redirect or 403, any other status or an unreadable answer is a failure.
+Redirects are not followed; the answer is capped at 1 MB.
+
+**For a new feature.** Add its id to `AiFeatureIds` (it is fetched from then on: the refresher reads the constants) and
+take its prompt through `IAiPrompts.Get(featureId, builtIn)`, passing the template before its placeholders are filled.
+Code: `src/Helm.Ai.Core/Prompts/` (`AiPrompts`, `AiPromptRefresher`, `SkillHubPromptSource`, `SkillHubSettings`).

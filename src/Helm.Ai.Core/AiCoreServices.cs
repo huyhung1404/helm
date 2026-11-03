@@ -1,8 +1,10 @@
 using Helm.Ai.Assistant;
+using Helm.Ai.Prompts;
 using Helm.Core.Mcp;
 using Helm.Core.Settings;
 using Helm.Core.Sync;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 
 namespace Helm.Ai;
 
@@ -10,7 +12,8 @@ public static class AiCoreServices
 {
     /// <summary>
     /// The API keys and what Helm's calls cost (both on Helm Sync), each feature's choice of model, the key checkers,
-    /// the balance readers and Ask Helm's assistant; both apps call it.
+    /// the balance readers, the features' prompts from the Skill Hub, the daily model lists and Ask Helm's assistant;
+    /// both apps call it.
     /// </summary>
     public static IServiceCollection AddHelmAi(this IServiceCollection services)
     {
@@ -20,6 +23,8 @@ public static class AiCoreServices
         // Agent jobs between devices: urgent, so a turn reaches the PC (and its answer the phone) within a moment.
         services.AddSyncedCollection(new SyncedCollectionOptions<AiJobRecord> { Name = AgentJobs.JobsCollection, Urgent = true });
         services.AddSyncedCollection(new SyncedCollectionOptions<AiWorkerRecord> { Name = AgentJobs.WorkersCollection, Urgent = true });
+        // Each feature's prompt as fetched from the user's Skill Hub: a PC fetches, every device uses it.
+        services.AddSyncedCollection(new SyncedCollectionOptions<AiPromptOverride> { Name = AiPrompts.Collection });
         services.AddSyncGroup("ai.", "AI keys and usage");
         services.AddSyncedSettings<AiFeatureSettings>(AiFeatureSettings.StoreId);
         services.AddSingleton(sp => new AiKeyStore(sp.GetRequiredService<ISyncedCollection<AiKey>>()));
@@ -29,6 +34,20 @@ public static class AiCoreServices
         services.AddSingleton<IAiKeyChecker>(_ => new ClaudeKeyChecker());
         services.AddSingleton<IAiKeyChecker>(_ => new GrokKeyChecker(AiHttp.Shared));
         services.AddSingleton<IAiBalanceReader>(_ => new GrokBalanceReader(AiHttp.Shared));
+        services.AddSingleton(sp => new AiModelRefresher(sp.GetRequiredService<AiKeyStore>(), sp.GetServices<IAiKeyChecker>(),
+            sp.GetRequiredService<ISyncedSettings<AiFeatureSettings>>(), sp.GetService<ILoggerFactory>()?.CreateLogger<AiModelRefresher>()));
+        services.AddSingleton(sp => new AiPrompts(sp.GetRequiredService<ISyncedCollection<AiPromptOverride>>(),
+            sp.GetService<ILoggerFactory>()?.CreateLogger<AiPrompts>()));
+        services.AddSingleton<IAiPrompts>(sp => sp.GetRequiredService<AiPrompts>());
+        services.AddSingleton(sp => new SkillHubSecrets(sp.GetRequiredService<HelmPaths>(), sp.GetRequiredService<ISecretProtector>()));
+        services.AddSingleton<IAiPromptSource>(sp =>
+        {
+            var secrets = sp.GetRequiredService<SkillHubSecrets>();
+            var settings = sp.GetRequiredService<ISettingsStoreFactory>().Get<SkillHubSettings>(SkillHubSettings.StoreId);
+            return new SkillHubPromptSource(SkillHubPromptSource.CreateClient(), () => secrets.Connection(settings));
+        });
+        services.AddSingleton(sp => new AiPromptRefresher(sp.GetRequiredService<AiPrompts>(), sp.GetRequiredService<IAiPromptSource>(),
+            logger: sp.GetService<ILoggerFactory>()?.CreateLogger<AiPromptRefresher>()));
         services.AddSingleton(sp =>
         {
             var engine = sp.GetRequiredService<SyncEngine>();
@@ -47,7 +66,7 @@ public static class AiCoreServices
                 || !settings.Get<GeneralSettings>(GeneralSettings.StoreId).Current.EnabledModules.TryGetValue(moduleId, out var on) || on;
             return new HelmAssistant(sp.GetRequiredService<AiKeyStore>(), sp.GetRequiredService<ISyncedSettings<AiFeatureSettings>>(),
                 sp.GetRequiredService<AiUsageBook>(), sp.GetServices<IMcpToolProvider>(), sp.GetServices<IAssistantChatFactory>(), IsOn,
-                new AiRouter(sp.GetServices<IAgentRoute>()));
+                new AiRouter(sp.GetServices<IAgentRoute>()), prompts: sp.GetRequiredService<IAiPrompts>());
         });
         return services;
     }

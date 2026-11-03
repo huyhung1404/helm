@@ -92,6 +92,10 @@ public partial class App : Application
                 worker.Beat();
                 vps.SendStatus();
             };
+            // The keys' model lists are tested again once a day, and the features' prompts come from the user's Skill Hub
+            // (settings/ai-skillhub.json; off until set up); both sync, so the phone uses what this PC found.
+            Services.GetRequiredService<Helm.Ai.AiModelRefresher>().Start();
+            Services.GetRequiredService<Helm.Ai.Prompts.AiPromptRefresher>().Start();
             // The AI agents' tools (a pipe only this user can open; each connection checks the MCP settings).
             Services.GetRequiredService<Core.Mcp.McpPipeHost>().Start();
         }

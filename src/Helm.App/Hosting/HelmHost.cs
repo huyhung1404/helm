@@ -43,7 +43,8 @@ internal static class HelmHost
             bool IsOn(string? moduleId) => moduleId is null
                 || !settings.Get<GeneralSettings>(GeneralSettings.StoreId).Current.EnabledModules.TryGetValue(moduleId, out var on) || on;
             return new Ai.AgentRegistry(settings, paths, sp.GetRequiredService<Core.Processes.IChildProcessLauncher>(),
-                sp.GetServices<Core.Mcp.IMcpToolProvider>(), IsOn, sp.GetRequiredService<ILoggerFactory>());
+                sp.GetServices<Core.Mcp.IMcpToolProvider>(), IsOn, sp.GetRequiredService<ILoggerFactory>(),
+                sp.GetRequiredService<Helm.Ai.Prompts.IAiPrompts>());
         });
         builder.Services.AddSingleton<Helm.Ai.Assistant.IAgentRoute>(sp => sp.GetRequiredService<Ai.AgentRegistry>());
         builder.Services.AddSingleton(sp =>
