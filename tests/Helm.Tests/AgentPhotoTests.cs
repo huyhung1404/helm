@@ -11,7 +11,8 @@ namespace Helm.Tests;
 
 /// <summary>
 /// Ask Helm's photo turns on a PC agent first: the photo travels as a blob of its own (never in the job's record), the
-/// PC's agent gets it, Claude Code and Codex are handed it in their own shapes, Grok declines, and nothing of it is kept.
+/// PC's agent gets it (claimed only once fetched), Claude Code and Codex are handed it in their own shapes, an agent
+/// that reads none declines, and nothing of it is kept.
 /// </summary>
 public sealed class AgentPhotoTests : IDisposable
 {
@@ -68,6 +69,31 @@ public sealed class AgentPhotoTests : IDisposable
         await Until(() => blob.DeletedAt is not null);
         Assert.False(Directory.Exists(Path.Combine(phoneFolder, blob.Id)));
         Assert.False(Directory.Exists(Path.Combine(pcFolder, blob.Id)));
+    }
+
+    [Fact]
+    public async Task A_PC_that_cannot_fetch_the_photo_declines_before_claiming_and_the_phone_goes_on_at_once()
+    {
+        var pc = new PhotoReader(new AiJobResult("never", [], [], null));
+        using var worker = new AgentJobWorker(_jobs, _workers, pc, () => "pc-id", "PC-HUNG", () => ["Codex"], photos: new FailingPhotos());
+        worker.Start();
+        var claims = new List<string>();
+        _jobs.Changed += (_, e) =>
+        {
+            if (_jobs.Get(e.Ids[0]) is { } record) lock (claims) claims.Add(record.State);
+        };
+        var phone = new SyncAgentRoute(_jobs, _workers, () => "phone-id", photos: new MemoryPhotos());
+        var asked = DateTimeOffset.UtcNow;
+
+        // An AiRouteException, not a taken one: the router tries the next way (the API).
+        var declined = await Assert.ThrowsAsync<AiRouteException>(() => phone.RunAsync(Job(Photo), TimeSpan.FromSeconds(20), CancellationToken.None));
+
+        Assert.IsNotType<AiRouteTakenException>(declined);
+        Assert.Contains("could not fetch the photo", declined.Message);
+        Assert.True(DateTimeOffset.UtcNow - asked < TimeSpan.FromSeconds(5));
+        lock (claims) Assert.DoesNotContain(AgentJobs.Claimed, claims);
+        Assert.Empty(pc.Jobs);
+        Assert.Empty(_jobs.All());
     }
 
     [Fact]
@@ -313,6 +339,16 @@ public sealed class AgentPhotoTests : IDisposable
             Stored.Remove(photo.Blob.Id);
             Dropped.Add(photo.Blob.Id);
         }
+    }
+
+    /// <summary>A PC's side of a blob that never arrives.</summary>
+    private sealed class FailingPhotos : IAgentJobPhotos
+    {
+        public Task<AiJobPhoto> PutAsync(AssistantImage image, CancellationToken ct) => throw new NotSupportedException();
+
+        public Task<AssistantImage> ReadAsync(AiJobPhoto photo, CancellationToken ct) => throw new IOException("the blob is not on the server");
+
+        public void Drop(AiJobPhoto photo) { }
     }
 
     /// <summary>A PC whose agent reads photos (or not), keeping the jobs it ran.</summary>

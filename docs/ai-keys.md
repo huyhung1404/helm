@@ -119,11 +119,12 @@ card withdraws the turn: a PC that has not taken it never will, one that has sto
 made the record. Jobs and heartbeats are end-to-end encrypted like all Helm data.
 
 **On the PC** (`LocalAgentRoute`), the agent runs with its own tools off (Claude Code: no tools, no MCP, no hooks; Codex: every one of its own tools disabled, shell included;
-Codex: a read-only sandbox in an empty folder; Grok: headless `grok --prompt-file` with `--tools ""`, no web
+Codex: a read-only sandbox in an empty folder; Grok: `grok agent stdio` with an agent profile of no tools (headless
+`grok --prompt-file` with every built-in disallowed as the fallback), no web
 search, no subagents and Helm's instructions instead of Grok's coding prompt): Helm lists its tools in the first message, the agent answers with the calls it wants as JSON
 (`CliAgentProtocol`), Helm runs them in-process and sends the results back. Claude Code keeps one process per conversation
-(about 3 s for the first turn, 1–2 s after); Codex keeps one `codex app-server` per conversation (one `codex exec` per turn as a fallback); Grok runs one per turn and resumes the session Helm named, and reports no usage
-(what it saved is estimated from the text). Calls that would need a yes are not offered there, and phone tools are
+(about 3 s for the first turn, 1–2 s after); Codex keeps one `codex app-server` per conversation (one `codex exec` per turn as a fallback); Grok keeps one `grok agent stdio` per conversation (one headless run a turn as a fallback);
+all three report their tokens. Calls that would need a yes are not offered there, and phone tools are
 handed back to the phone. An agent that reports its plan's limit takes no job for 30 minutes; the next one in the list does.
 
 **Agent CLIs keep their session and lose nothing** (`CliConversation`, `CodexAppServer`). Codex now keeps one
@@ -132,8 +133,8 @@ stays loaded (in memory only), so a turn no longer pays for a `codex exec` start
 It runs npm's native `codex.exe` (no cmd.exe/node in front) with the same isolation as before plus one line of its own
 instructions instead of its 22 KB coding prompt, skills list and sandbox notes (`codex debug prompt-input`: 60 KB of
 prompt became 22 KB); when CODEX_HOME has a config.toml (the app server cannot ignore it) or the app server does not
-start, the conversation falls back to one `codex exec --ignore-user-config` a turn. Grok stays headless (its stdio
-mode kept its own tools) but skips its update check, telemetry, campaigns, title, turn summary and recap. For all
+start, the conversation falls back to one `codex exec --ignore-user-config` a turn. Grok keeps one agent-mode session
+(below) and skips its update check, telemetry, campaigns, title, turn summary and recap. For all
 three, what waits to be sent (the user's words, tool results) is only cleared once a turn went through, so a failed
 turn sends it again and the model is never left without the results of calls Helm already ran; a process that died
 or was stopped between turns is started again with the whole protocol, every tool so far and a short recap.
@@ -153,6 +154,22 @@ A question still takes two calls (the tools' answer, then the reply).
 and Cursor set-up (MCP servers, hooks): 15,000 tokens and 10 s a call. Helm's agent removes the tools
 (`--disallowed-tools`), turns skills, workflows and the Claude/Cursor compatibility off, and gives it a home folder of
 its own: about 640 tokens of Grok's and 3.5 s a call.
+
+**Grok keeps one session per conversation** (`GrokAcp`, `GrokAgentMode`, `GrokAgent.cs`). A conversation is one
+`grok agent --no-leader -m … stdio` process (Agent Client Protocol: JSON-RPC 2.0 a line on stdin/stdout), so a turn
+pays no process start and no session reload (Grok 1.0.70, “Chào em”: 1.15–1.4 s a turn against 1.3–1.55 s headless,
+about 0.1 s over the model's own time). Agent mode does not read `--disallowed-tools`: with no profile a session has
+26 tools and 13,600 input tokens. Helm passes its own agent profile as the `session/new` `_meta.agentProfile`
+object (`promptMode: full`, `injectDefaultTools: false`, every built-in in `disallowedTools` under its id and the name
+agent mode shows, `mcpInheritance: none`, no skills or AGENTS.md) plus `systemPromptOverride`; then the session lists
+0 tools and a turn takes 1,477 input tokens (1,152 of them cached). `--no-leader` matters: a shared leader's daemon
+route runs the default agent for a profile object. Helm also says it cannot read or write files nor run a terminal,
+cancels every permission Grok asks for, and sets `GROK_MEMORY=0` (agent mode turns Grok's memory on: its notes in the
+prompt, about 300 tokens a turn, and a capture after each one). Grok lists a session's tools right after it opens
+(`available_commands_update`, `_meta.tools`): a session that lists any, or does not say, is refused before any prompt
+is sent, and that agent runs headless (one `grok --prompt-file` a turn, as before) until Helm restarts. A process that
+died, was stopped or failed a turn is started again with the protocol and a recap. Headless runs now count their
+input tokens right (`input_tokens` already leaves the cached part out).
 
 **Costs.** Every call goes in the synced collection `ai.usage`: route (`api` or `agent`, with the agent's name), model, tokens, the
 estimated USD (`AiPrices`), and on an agent what the same call would have cost (`SavedUsd`). The daily cap
@@ -340,18 +357,21 @@ words-only turn on the PC hears what the photo turn said and saved (`PcText`).
   claimed (`AgentJobs.PhotoUpload`) for the upload.
 - **Only to a PC that reads them.** `AiWorkerRecord.ReadsPhotos` is true while one of its agents that read pictures
   is ready; a Helm before this never says so, and gets no photo job. On the PC, `AgentChain` gives a photo to the
-  first agent whose factory says `ReadsImages` (Codex, Claude Code), whatever agent the conversation is on.
+  first agent whose factory says `ReadsImages` (Codex, Claude Code, Grok in agent mode), whatever agent the conversation
+  is on. The PC claims a photo turn only once it has fetched the photo; one it cannot fetch is declined
+  (`AgentJobs.Declined`) and the phone goes on to the API at once (a claimed turn never falls back).
 - **How each agent gets it.** Claude Code: image blocks (base64) in its stream-json user message
   (`CliImages.ClaudeCodeContent`). Codex app server: `{"type":"image","url":"data:…"}` inputs of turn/start (codex
   0.166 schema, `codex app-server generate-json-schema`), nothing on disk; the `codex exec` fallback writes the photo
-  into the agent's empty work folder for that run (`--image <file> -- -`) and deletes it after. Grok's CLI has no image
-  flag (its `--prompt-json` would put the picture on the command line), so a Grok agent declines and the next agent or
-  the API reads it.
+  into the agent's empty work folder for that run (`--image <file> -- -`) and deletes it after. Grok in agent mode: image
+  content blocks of `session/prompt` (initialize says `promptCapabilities.image`; 1.0.70 read a test square in 1.7 s,
+  1,731 tokens). Headless Grok has no way in for a picture, so a Grok whose agent mode was refused declines and the
+  next agent or the API reads it.
 - **Never kept.** The PC reads the blob once and drops it (local chunks at once, server copy to its trash, purged
   there by the nightly clean-up); the phone drops it too when the turn ends, whatever its end, and a withdrawn job's
   record stops naming it. The agent's chat with the photo is disposed after the turn. Claude Code runs with
   `--no-session-persistence` (no transcript on disk); a `codex exec` session that saw a photo has its rollout file
-  deleted when its chat ends. Nothing of the photo is logged.
+  deleted when its chat ends, and so has a Grok session (its folder under GROK_HOME/sessions, which holds the bytes). Nothing of the photo is logged.
 
 ## Text calls of the tools
 
@@ -586,8 +606,7 @@ debt 62 → 33, a bill split among four 378 → 196, a bill paid 133 → 78, a t
 
 - **Warm-up when the card opens.** While you still speak, the phone asks the PC to get its agent ready for the
   conversation (a `warm` job through Helm Sync; no answer is awaited, nothing goes to the model): Claude Code's process
-  starts, Codex's app server starts and opens its thread. The first turn then finds them running. Grok's headless CLI
-  has nothing to start. A warm-up that no turn follows ends when the card closes (or after the agent's 5-minute idle
+  starts, Codex's app server starts and opens its thread. Grok starts `grok agent stdio` and opens its session. The first turn then finds them running. A warm-up that no turn follows ends when the card closes (or after the agent's 5-minute idle
   time). The phone also opens sync's live channel at that moment (for at most 2 minutes, then as before), so the PC's
   claim and answer come back at once. The first turn goes to the PC that got ready, while it can still take it.
 - **The API's answer streams.** On the API, Claude (and Grok) send the answer as they write it, and the card shows it

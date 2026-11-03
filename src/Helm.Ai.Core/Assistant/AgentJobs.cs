@@ -79,6 +79,12 @@ public static class AgentJobs
     public const string Failed = "failed";
     public const string Cancelled = "cancelled";
 
+    /// <summary>
+    /// The worker could not take it and never will (a photo it could not fetch): unlike a failure after a claim, the
+    /// asker goes on to the next way at once (<see cref="AiJobRecord.Error"/> says why).
+    /// </summary>
+    public const string Declined = "declined";
+
     /// <summary>A worker heard from within this is online.</summary>
     public static readonly TimeSpan Online = TimeSpan.FromMinutes(3);
 
@@ -223,6 +229,11 @@ public sealed class SyncAgentRoute : IAgentRoute
             // The card was closed: the PC must not take it after all.
             Cancel(id);
             throw;
+        }
+        if (claimed is { State: AgentJobs.Declined })
+        {
+            jobs.Delete(id);
+            throw new AiRouteException(claimed.Error ?? $"{worker.Value.Device} could not take it.");
         }
         if (claimed is null || claimed.State == AgentJobs.Cancelled)
         {
@@ -550,11 +561,54 @@ public sealed class AgentJobWorker(ISyncedCollection<AiJobRecord> jobs, ISyncedC
             _logger.LogDebug("Agent warm-up taken {Lag:0} ms after the asker wrote it (by its clock)", (_time.GetUtcNow() - job.CreatedAt).TotalMilliseconds);
             return;
         }
+        if (job is { Kind: AgentJobs.Run, Photos.Count: > 0 })
+        {
+            _ = Task.Run(() => FetchThenClaimAsync(id, job));
+            return;
+        }
         jobs.Upsert(id, job with { State = AgentJobs.Claimed });
         _ = Task.Run(() => DoAsync(id, job));
     }
 
-    internal async Task DoAsync(string id, AiJobRecord job)
+    /// <summary>
+    /// A photo turn is claimed only once its photos are here: one that cannot be fetched is declined, and the asker
+    /// takes it elsewhere (a claimed turn never falls back to the API).
+    /// </summary>
+    private async Task FetchThenClaimAsync(string id, AiJobRecord job)
+    {
+        IReadOnlyList<AssistantImage> images;
+        try
+        {
+            using var limit = new CancellationTokenSource(Until(job.ClaimBy));
+            images = await ReadPhotosAsync(job.Photos!, limit.Token);
+        }
+        catch (Exception ex) when (ex is AiRouteException or OperationCanceledException)
+        {
+            _logger.LogWarning("Agent photo turn declined: {Error}", ex.Message);
+            if (jobs.Get(id) is { State: AgentJobs.Queued } still)
+                jobs.Upsert(id, still with { State = AgentJobs.Declined, Photos = null, Error = ex is AiRouteException ? ex.Message : $"Helm on {device} could not fetch the photo in time." });
+            lock (_taken) _taken.Remove(id);
+            return;
+        }
+        // Withdrawn while the photos came, or too late now: the asker has gone on.
+        if (jobs.Get(id) is not { State: AgentJobs.Queued } queued || _time.GetUtcNow() > job.ClaimBy)
+        {
+            lock (_taken) _taken.Remove(id);
+            return;
+        }
+        // Read: the record names them no more, and what it writes back holds none.
+        job = queued with { State = AgentJobs.Claimed, Photos = null };
+        jobs.Upsert(id, job);
+        await DoAsync(id, job, images);
+    }
+
+    private TimeSpan Until(DateTimeOffset at)
+    {
+        var left = at - _time.GetUtcNow();
+        return left > TimeSpan.Zero ? left : TimeSpan.FromMilliseconds(1);
+    }
+
+    internal async Task DoAsync(string id, AiJobRecord job, IReadOnlyList<AssistantImage>? images = null)
     {
         using var stop = new CancellationTokenSource();
         lock (_running) _running[id] = stop;
@@ -564,12 +618,7 @@ public sealed class AgentJobWorker(ISyncedCollection<AiJobRecord> jobs, ISyncedC
             {
                 case AgentJobs.Run when job.Job is { } turn:
                     var claimed = _time.GetTimestamp();
-                    if (job.Photos is { Count: > 0 } sent)
-                    {
-                        turn = turn with { Images = await ReadPhotosAsync(sent, stop.Token) };
-                        // Read: the record names them no more, and what it writes back holds none.
-                        job = job with { Photos = null };
-                    }
+                    if (images is { Count: > 0 }) turn = turn with { Images = images };
                     var result = await local.RunAsync(turn, AgentJobs.AfterClaim - TimeSpan.FromSeconds(10), stop.Token);
                     jobs.Upsert(id, job with { State = AgentJobs.Done, Result = result });
                     // From the phone's write to the claim (clocks may differ a little), then the agent's whole turn.

@@ -1,6 +1,5 @@
 using System.IO;
 using System.Text;
-using System.Text.Json;
 using System.Text.Json.Nodes;
 using Helm.Ai.Assistant;
 using Helm.Core.Processes;
@@ -10,8 +9,9 @@ namespace Helm.App.Ai;
 
 /// <summary>
 /// xAI's Grok CLI (Grok Build, on a SuperGrok or X Premium+ plan, signed in for Helm in its own folder: GROK_HOME) as the
-/// brain of Helm's agent jobs on this PC. Each turn is one headless run with none of Grok's own tools (see
-/// <see cref="GrokChat"/>); Helm lists its tools in the first message and runs the calls Grok asks for.
+/// brain of Helm's agent jobs on this PC. A conversation is one <c>grok agent stdio</c> process with none of Grok's own
+/// tools (see <see cref="GrokChat"/>), else one headless run a turn; Helm lists its tools in the first message and runs
+/// the calls Grok asks for. Photos go only in agent mode.
 /// </summary>
 internal sealed class GrokAgentFactory(IChildProcessLauncher launcher, string home, ILogger logger) : IAssistantChatFactory
 {
@@ -22,9 +22,19 @@ internal sealed class GrokAgentFactory(IChildProcessLauncher launcher, string ho
 
     private string WorkFolder => Path.Combine(home, "work");
 
+    /// <summary>The system prompt in place of Grok's coding one: Helm's own instructions come in the first message.</summary>
+    internal const string SystemPrompt = "You are Helm's assistant. Follow the instructions in the user's first message exactly.";
+
     private DateTimeOffset _limitedUntil;
+    private int _acpRefused;
 
     public Helm.Ai.AiProvider Provider => Helm.Ai.AiProviders.Grok;
+
+    /// <summary>
+    /// Photos go as image blocks of an agent-mode prompt (<see cref="GrokAcp"/>); a headless run has no way in for one,
+    /// so once agent mode was refused here Grok takes no photo job.
+    /// </summary>
+    public bool ReadsImages => !AcpRefused;
 
     /// <summary>Why it takes no job now (not installed, not signed in here, at its limit), or null.</summary>
     public string? Unavailable()
@@ -45,6 +55,58 @@ internal sealed class GrokAgentFactory(IChildProcessLauncher launcher, string ho
         + "wait_tasks,kill_task,lsp,enter_plan_mode,exit_plan_mode,monitor,workflow,image_gen,image_edit,todo_write,search_tool,"
         + "skill,scheduler_list,hashline_read,hashline_grep,hashline_edit,edit_notebook,switch_mode,create_plan,use_tool,"
         + "update_goal,ask_user_question,send_feedback,image_to_video,reference_to_video,Agent";
+
+    /// <summary>
+    /// The agent profile of an agent-mode session (<c>session/new</c> <c>_meta.agentProfile</c>, which a local
+    /// <c>grok agent</c> takes as an object; <c>--disallowed-tools</c> is not read there): Grok's prompt replaced, no
+    /// default tools, the built-ins taken away under both their names (it shows five under another one:
+    /// run_terminal_command, spawn_subagent…), no MCP, skills or AGENTS.md. Grok 1.0.70 then lists 0 tools and a
+    /// "Chào em" turn takes 1,477 input tokens; with no profile it has 26 tools and 13,600 tokens.
+    /// </summary>
+    internal static JsonObject SessionMeta() => new()
+    {
+        ["systemPromptOverride"] = SystemPrompt,
+        ["agentProfile"] = new JsonObject
+        {
+            ["name"] = "helm-assistant",
+            ["description"] = "Helm's assistant, with no tools of its own.",
+            ["promptMode"] = "full",
+            ["injectDefaultTools"] = false,
+            ["tools"] = new JsonArray("helm_none"),
+            ["disallowedTools"] = new JsonArray([.. BuiltInTools.Split(',').Concat(AcpToolNames).Select(t => (JsonNode)t)]),
+            ["mcpInheritance"] = "none",
+            ["agentsMd"] = false,
+            ["discoverSkills"] = false,
+            ["inheritSkills"] = false,
+            ["skills"] = new JsonArray(),
+        },
+    };
+
+    /// <summary>The names agent mode shows for built-ins whose id differs, and the scheduler tools it adds.</summary>
+    private static readonly string[] AcpToolNames =
+    [
+        "run_terminal_command", "kill_command_or_subagent", "get_command_or_subagent_output", "wait_commands_or_subagents",
+        "spawn_subagent", "scheduler_create", "scheduler_delete",
+    ];
+
+    /// <summary>
+    /// <c>grok agent stdio</c> on its own (no shared leader: a leader's daemon route runs the default agent for a
+    /// profile object), never approving a tool by itself.
+    /// </summary>
+    internal static string[] AgentArguments(string model, string effort) =>
+        ["agent", "--no-leader", "-m", Model(model), "--reasoning-effort", Effort(effort), "stdio"];
+
+    /// <summary>A Grok model picked in the card runs as picked; any other pick on the plan's fastest (1.2 s for a short turn).</summary>
+    internal static string Model(string model) => model.StartsWith("grok-", StringComparison.Ordinal) ? model : "grok-4.7-build-fast";
+
+    /// <summary>Grok thinks long by default (20 s for a one-line answer): Helm's jobs are short.</summary>
+    internal static string Effort(string effort) => effort is { Length: > 0 } ? effort : "low";
+
+    /// <summary>The command line for <paramref name="grok"/>: npm's grok.cmd only runs through cmd.exe.</summary>
+    internal static string CommandLineFor(string grok, IEnumerable<string> args) =>
+        grok.EndsWith(".cmd", StringComparison.OrdinalIgnoreCase)
+            ? $"{CommandLine.Quote(Environment.GetEnvironmentVariable("ComSpec") is { Length: > 0 } c ? c : "cmd.exe")} /d /s /c \"{CommandLine.Join([grok, .. args])}\""
+            : CommandLine.Join([grok, .. args]);
 
     /// <summary>The skills Grok bundles (3,300 tokens a call): none is for Helm's jobs.</summary>
     private static readonly string[] BundledSkills =
@@ -79,6 +141,10 @@ internal sealed class GrokAgentFactory(IChildProcessLauncher launcher, string ho
             ["GROK_TITLE_REFRESH"] = "0",
             ["GROK_TURN_SUMMARY"] = "0",
             ["GROK_SESSION_RECAP"] = "0",
+            // Agent mode turns Grok's memory on (its notes in the prompt, 300 tokens a turn, and a capture after
+            // each one); no subagents either way.
+            ["GROK_MEMORY"] = "0",
+            ["GROK_SUBAGENTS"] = "0",
         };
         foreach (var vendor in new[] { "CLAUDE", "CURSOR" })
             foreach (var part in new[] { "AGENTS", "HOOKS", "MCPS", "RULES", "SKILLS" })
@@ -110,6 +176,46 @@ internal sealed class GrokAgentFactory(IChildProcessLauncher launcher, string ho
     {
         _limitedUntil = DateTimeOffset.UtcNow + ClaudeCodeAgentFactory.RestAfterLimit;
         logger.LogWarning("Grok reached its usage limit; agent jobs go elsewhere until {Until}", _limitedUntil);
+    }
+
+    /// <summary>
+    /// What an error of Grok's says about the agent: a plan's limit or a sign-in that no longer works. True for
+    /// either (any other run would fail the same way).
+    /// </summary>
+    internal bool Failed(string error)
+    {
+        var limited = error.Contains("limit", StringComparison.OrdinalIgnoreCase) || error.Contains("quota", StringComparison.OrdinalIgnoreCase);
+        var signedOut = error.Contains("login", StringComparison.OrdinalIgnoreCase) || error.Contains("unauthor", StringComparison.OrdinalIgnoreCase);
+        if (limited) ReachedLimit();
+        if (signedOut) SignedOut();
+        return limited || signedOut;
+    }
+
+    /// <summary>Agent mode could not be used (tools Grok kept, a session it did not open): every turn runs headless from now on.</summary>
+    internal bool AcpRefused => Volatile.Read(ref _acpRefused) != 0;
+
+    internal void RefuseAcp(string why)
+    {
+        if (Interlocked.Exchange(ref _acpRefused, 1) == 0)
+            logger.LogWarning("Grok's agent mode is not used ({Reason}); each turn runs Grok headless", why);
+    }
+
+    /// <summary>
+    /// Deletes what Grok keeps of a session on disk (GROK_HOME/sessions/&lt;work folder&gt;/&lt;id&gt;: its chat history, with a
+    /// photo's bytes), once the conversation that sent the photo ended. One still in use is left; never throws.
+    /// </summary>
+    internal static void ForgetSession(string home, string session)
+    {
+        var sessions = Path.Combine(home, "sessions");
+        try
+        {
+            if (!Directory.Exists(sessions)) return;
+            foreach (var folder in Directory.EnumerateDirectories(sessions, session, SearchOption.AllDirectories).ToList())
+                Directory.Delete(folder, recursive: true);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+        }
     }
 
     /// <summary>A sign-in that no longer works (the token expired or was revoked): Sign in again.</summary>
@@ -151,20 +257,44 @@ internal sealed class GrokAgentFactory(IChildProcessLauncher launcher, string ho
     }
 }
 
+
 /// <summary>
-/// One conversation: each turn is one headless <c>grok --prompt-file</c> run in an empty folder, with none of Grok's own
-/// tools, skills, workflows, web search or subagents, and Helm's instructions instead of Grok's coding prompt; later turns resume
-/// the session Helm named on the first.
+/// One conversation with Grok: one <c>grok agent stdio</c> process whose session stays loaded between turns
+/// (<see cref="GrokAgentMode"/>), with none of Grok's own tools (<see cref="GrokAgentFactory.SessionMeta"/>; a session
+/// that lists any is refused), no file or terminal access for it, and every permission it asks for cancelled. When
+/// agent mode cannot be used, each turn is one headless run (<see cref="GrokHeadless"/>).
 /// </summary>
-internal sealed class GrokChat(GrokAgentFactory factory, IChildProcessLauncher launcher, ILogger logger, string home, string workFolder,
-    string model, string effort, string system, IReadOnlyList<AssistantTool> tools) : IAssistantChat
+internal sealed class GrokChat : IAssistantChat, IDisposable
 {
-    private readonly CliConversation _conversation = new(system, tools);
-    private string _session = Guid.NewGuid().ToString();
-    private bool _started;
+    private readonly GrokAgentFactory _factory;
+    private readonly IChildProcessLauncher _launcher;
+    private readonly ILogger _logger;
+    private readonly string _home, _workFolder, _model, _effort;
+    private readonly CliConversation _conversation;
+    private readonly GrokHeadless _headless;
+    private readonly GrokAgentMode _agent;
     private int _calls;
+    private bool _photoSent;
+
+    public GrokChat(GrokAgentFactory factory, IChildProcessLauncher launcher, ILogger logger, string home, string workFolder,
+        string model, string effort, string system, IReadOnlyList<AssistantTool> tools)
+    {
+        (_factory, _launcher, _logger, _home, _workFolder, _model, _effort) = (factory, launcher, logger, home, workFolder, model, effort);
+        _conversation = new CliConversation(system, tools);
+        _headless = new GrokHeadless(factory, launcher, logger, home, workFolder, model, effort);
+        _agent = new GrokAgentMode(Start, workFolder, GrokAgentFactory.SessionMeta(), factory.Failed);
+    }
 
     public void AddUser(string text) => _conversation.AddUser(text);
+
+    public void AddUser(string text, AssistantImage image)
+    {
+        _conversation.AddUser(text, image);
+        _photoSent = true;
+    }
+
+    /// <summary>Starts Grok and opens its session while the user speaks (<see cref="GrokAgentMode.WarmAsync"/>).</summary>
+    public Task WarmAsync(CancellationToken ct) => _factory.AcpRefused ? Task.CompletedTask : _agent.WarmAsync(ct);
 
     public void AddTools(IReadOnlyList<AssistantTool> added) => _conversation.AddTools(added);
 
@@ -173,128 +303,75 @@ internal sealed class GrokChat(GrokAgentFactory factory, IChildProcessLauncher l
     public async Task<AssistantStep> NextAsync(CancellationToken ct)
     {
         var grok = GrokAgentFactory.FindGrok() ?? throw new AssistantException("Grok CLI is not installed on this PC.");
-        var prompt = Path.Combine(workFolder, _session + ".txt");
-        // What waits is only cleared once Grok answered: a failed turn sends it again (a failed first one, with the preamble).
-        var sent = _conversation.Message(newSession: !_started);
-        await File.WriteAllTextAsync(prompt, sent, new UTF8Encoding(false), ct);
-        try
+        (string Answer, AssistantUsage Usage)? turn = null;
+        if (!_factory.AcpRefused)
         {
-            string[] args =
-            [
-                "--prompt-file", prompt, "--output-format", "json", "--cwd", workFolder,
-                "--disallowed-tools", GrokAgentFactory.BuiltInTools, "--disable-web-search", "--no-subagents", "--no-plan", "--no-alt-screen",
-                "--system-prompt-override", "You are Helm's assistant. Follow the instructions in the user's first message exactly.",
-                // A Grok model picked in the card runs as picked; any other pick on the plan's fastest (1.5 s, 2 s for grok-4.7).
-                "-m", model.StartsWith("grok-", StringComparison.Ordinal) ? model : "grok-4.7-build-fast",
-                // Grok thinks long by default (20 s for a one-line answer): Helm's jobs are short.
-                "--reasoning-effort", effort is { Length: > 0 } ? effort : "low",
-                .. _started ? new[] { "-r", _session } : ["-s", _session],
-            ];
-            var commandLine = grok.EndsWith(".cmd", StringComparison.OrdinalIgnoreCase)
-                ? $"{CommandLine.Quote(Environment.GetEnvironmentVariable("ComSpec") is { Length: > 0 } c ? c : "cmd.exe")} /d /s /c \"{CommandLine.Join([grok, .. args])}\""
-                : CommandLine.Join([grok, .. args]);
-            ChildProcess process;
             try
             {
-                process = launcher.Start(new ChildProcessStartInfo(commandLine, workFolder)
-                {
-                    Environment = GrokAgentFactory.ChildEnvironment(home),
-                });
+                turn = await _agent.TurnAsync(_conversation, ct);
             }
-            catch (ChildProcessException ex)
+            catch (AssistantException ex)
             {
-                throw new AssistantException("Grok could not be started: " + ex.Message, ex);
+                _logger.LogWarning("Grok failed: {Error}", ex.Message);
+                throw;
             }
-            using (process)
-            using (ct.Register(() => { try { process.Kill(); } catch (Exception e) when (e is InvalidOperationException or System.ComponentModel.Win32Exception) { } }))
+            if (turn is null && _agent.Refused is { } why) _factory.RefuseAcp(why);
+        }
+        if (turn is null && _conversation.Images.Count > 0) throw new AssistantImageException("Grok headless cannot read photos.");
+        var (answer, usage) = turn ?? await _headless.TurnAsync(grok, _conversation, ct);
+        _conversation.Answered(answer);
+        return CliAgentProtocol.Parse(answer, usage, ref _calls);
+    }
+
+    public void Dispose()
+    {
+        _agent.Dispose();
+        // A session that saw a photo keeps its bytes on disk: it goes with the conversation.
+        if (_photoSent)
+            foreach (var session in _agent.Sessions) GrokAgentFactory.ForgetSession(_home, session);
+    }
+
+    /// <summary>Starts <c>grok agent stdio</c> in the empty work folder, with the agent's own GROK_HOME and nothing of the user's.</summary>
+    private GrokAgentProcess Start()
+    {
+        var grok = GrokAgentFactory.FindGrok() ?? throw new AssistantException("Grok CLI is not installed on this PC.");
+        ChildProcess process;
+        try
+        {
+            process = _launcher.Start(new ChildProcessStartInfo(GrokAgentFactory.CommandLineFor(grok, GrokAgentFactory.AgentArguments(_model, _effort)), _workFolder)
             {
-                process.StandardInput.Close();
-                var errors = ReadAllAsync(process.StandardError);
-                var output = await ReadAllAsync(process.StandardOutput);
-                await process.Exited;
-                ct.ThrowIfCancellationRequested();
-                var (answer, error, usage) = Read(output);
-                if (answer is null)
+                Environment = GrokAgentFactory.ChildEnvironment(_home),
+            });
+        }
+        catch (ChildProcessException ex)
+        {
+            throw new AssistantException("Grok could not be started: " + ex.Message, ex);
+        }
+        _ = Drain(process.StandardError);
+        _logger.LogInformation("Grok started in agent mode for an agent job ({Model})", GrokAgentFactory.Model(_model));
+        return new GrokAgentProcess(new StreamReader(process.StandardOutput, Encoding.UTF8), new StreamWriter(process.StandardInput, new UTF8Encoding(false)),
+            () => process.HasExited, () =>
+            {
+                try
                 {
-                    error ??= (await errors).Trim() is { Length: > 0 } e ? e : "it stopped without an answer";
-                    if (error.Contains("limit", StringComparison.OrdinalIgnoreCase) || error.Contains("quota", StringComparison.OrdinalIgnoreCase))
-                        factory.ReachedLimit();
-                    if (error.Contains("login", StringComparison.OrdinalIgnoreCase) || error.Contains("unauthor", StringComparison.OrdinalIgnoreCase))
-                        factory.SignedOut();
-                    logger.LogWarning("Grok failed: {Error}", error);
-                    // Grok may have kept the session it was asked to start: the next try names a new one.
-                    if (!_started) _session = Guid.NewGuid().ToString();
-                    throw new AssistantException($"Grok: {error}");
+                    process.Kill();
                 }
-                _started = true;
-                _conversation.Answered(answer);
-                // Without usage in the answer: estimated from the text (about 4 characters a token), for what it saved.
-                return CliAgentProtocol.Parse(answer, usage ?? new AssistantUsage(sent.Length / 4, answer.Length / 4, 0, 0), ref _calls);
-            }
-        }
-        finally
-        {
-            try
-            {
-                File.Delete(prompt);
-            }
-            catch (IOException)
-            {
-            }
-        }
+                catch (Exception ex) when (ex is InvalidOperationException or System.ComponentModel.Win32Exception)
+                {
+                }
+                process.Dispose();
+            });
     }
 
-    /// <summary>
-    /// The answer in Grok's one JSON object (<c>{"text", "stopReason", "sessionId", "usage": {input_tokens,
-    /// cache_read_input_tokens, output_tokens, reasoning_tokens}…}</c>), or its plain text, or the error it reports.
-    /// </summary>
-    internal static (string? Answer, string? Error, AssistantUsage? Usage) Read(string output)
+    private static async Task Drain(Stream errors)
     {
-        var text = output.Trim();
-        var start = text.IndexOf('{');
-        if (start < 0) return (text.Length > 0 ? text : null, null, null);
-        JsonNode? json;
+        using var reader = new StreamReader(errors, Encoding.UTF8);
         try
         {
-            json = JsonNode.Parse(text[start..]);
+            while (await reader.ReadLineAsync() is not null) { }
         }
-        catch (JsonException)
+        catch (Exception ex) when (ex is IOException or ObjectDisposedException)
         {
-            return (text, null, null);
-        }
-        if (json?["is_error"] is JsonValue failed && failed.TryGetValue<bool>(out var isError) && isError
-            || json?["error"] is JsonNode)
-            return (null, Text(json!["error"]) ?? Text(json["text"]) ?? "it stopped with an error", null);
-        AssistantUsage? usage = null;
-        if (json?["usage"] is JsonObject u)
-        {
-            long Count(string name) => u[name] is JsonValue v && v.TryGetValue<long>(out var n) ? n : 0;
-            var cached = Count("cache_read_input_tokens");
-            usage = new AssistantUsage(Math.Max(0, Count("input_tokens") - cached), Count("output_tokens"), cached, Count("cache_creation_input_tokens"));
-        }
-        foreach (var name in new[] { "text", "result", "response", "content", "message", "output" })
-            if (Text(json?[name]) is { } answer) return (answer, null, usage);
-        return (null, "Helm could not read Grok's answer.", null);
-
-        static string? Text(JsonNode? node) => node switch
-        {
-            JsonValue v when v.TryGetValue<string>(out var s) => s,
-            JsonObject o => Text(o["message"]) ?? Text(o["text"]) ?? Text(o["content"]),
-            JsonArray a => string.Concat(a.Select(Text)) is { Length: > 0 } joined ? joined : null,
-            _ => null,
-        };
-    }
-
-    private static async Task<string> ReadAllAsync(Stream stream)
-    {
-        using var reader = new StreamReader(stream, Encoding.UTF8);
-        try
-        {
-            return await reader.ReadToEndAsync();
-        }
-        catch (IOException)
-        {
-            return "";
         }
     }
 }

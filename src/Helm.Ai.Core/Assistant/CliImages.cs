@@ -5,8 +5,8 @@ namespace Helm.Ai.Assistant;
 /// <summary>
 /// How a photo reaches an agent CLI with the words of a turn: Claude Code takes image blocks in its stream-json user
 /// message, Codex's app server image inputs in turn/start (a data URL: nothing on disk), and <c>codex exec</c> image
-/// files (<c>--image</c>), written into the agent's empty work folder for that run only. Grok's CLI has no way in for
-/// a picture (its only rich prompt, <c>--prompt-json</c>, goes on the command line), so a Grok agent takes no photo job.
+/// files (<c>--image</c>), written into the agent's empty work folder for that run only. Grok takes image blocks in agent
+/// mode (<see cref="GrokAcp"/>); headless it has no way in for a picture.
 /// </summary>
 public static class CliImages
 {
