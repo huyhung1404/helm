@@ -127,7 +127,7 @@ public sealed class HelmAssistant(
         return all.FirstOrDefault(o => o.Provider.Id == Choice.Provider && o.Model == Choice.Model)
             ?? all.FirstOrDefault(o => o.Provider.Id == Choice.Provider)
             ?? all.FirstOrDefault()
-            ?? (Router.Agents(Choice, AiProviders.Claude).Count > 0
+            ?? (Router.Agents(Choice).Count > 0
                 ? new AssistantModelOption(AiProviders.Claude, Choice.Provider == AiProviders.Claude.Id ? Choice.Model : ClaudeModels.Haiku, "Claude Code")
                 : null);
     }
@@ -236,7 +236,7 @@ public sealed class AssistantSession
         // Claude Code on a Helm PC first (free), unless the conversation already moved to the API.
         if (_open is null)
         {
-            IReadOnlyList<IAgentRoute> routes = _pc is not null ? [_pc] : _helm.Router.Agents(choice, model.Provider);
+            IReadOnlyList<IAgentRoute> routes = _pc is not null ? [_pc] : _helm.Router.Agents(choice);
             foreach (var route in routes)
             {
                 if (await OnPcAsync(route, first ? $"{_helm.Now()}\n\n{text}" : text, model, choice, ct) is { } onPc)
@@ -247,7 +247,7 @@ public sealed class AssistantSession
                 }
             }
             _pc = null;
-            if (!_helm.Router.MayUseApi(choice, model.Provider)) return new AssistantReply("", [], false, _helm.Router.NoPc());
+            if (!AiRouter.MayUseApi(choice)) return new AssistantReply("", [], false, _helm.Router.NoPc());
             if (!_helm.HasKeyFor(model.Provider))
                 return new AssistantReply("", [], false, $"No Helm PC answered in time, and there is no {model.Provider.Name} API key to fall back on.");
         }
@@ -299,7 +299,7 @@ public sealed class AssistantSession
             }
         }
         var reply = string.Join(" ", new[] { result.Text }.Concat(notes).Where(t => t.Length > 0));
-        return new AssistantReply(reply, done, false, null, route.Device);
+        return new AssistantReply(reply, done, false, null, result.Agent is { } agent ? $"{agent} trên {route.Device}" : route.Device);
     }
 
     private async Task<AssistantReply> OnApiAsync(string text, bool first, Func<IReadOnlyList<PendingAction>, Task<bool>> confirm, CancellationToken ct)

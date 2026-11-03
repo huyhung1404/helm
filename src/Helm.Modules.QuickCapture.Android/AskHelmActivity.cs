@@ -22,7 +22,7 @@ namespace Helm.Modules.QuickCapture;
 /// as they come, sends them to the model picked in its header, then lists what it saved (each with Undo) or answers.
 /// Only a change Helm cannot take back waits for a yes. Native Android views, like Quick Capture: no Helm screen first.
 /// </summary>
-[Activity(Name = QuickCaptureModule.AskHelmActivityName, Label = "Ask Helm", Exported = false, ExcludeFromRecents = true,
+[Activity(Name = QuickCaptureModule.AskHelmActivityName, Label = "Ask Helm", Exported = AskHelmBuild.Exported, ExcludeFromRecents = true,
     TaskAffinity = "", Theme = "@android:style/Theme.Translucent.NoTitleBar", LaunchMode = LaunchMode.SingleTask,
     WindowSoftInputMode = SoftInput.AdjustResize | SoftInput.StateHidden)]
 public sealed class AskHelmActivity : Activity, IRecognitionListener
@@ -530,4 +530,14 @@ public sealed class AskHelmActivity : Activity, IRecognitionListener
             Color.ParseColor("#4CC2FF"), Color.ParseColor("#0B2233"), Color.ParseColor("#3A4048"), Color.ParseColor("#2A2F35"),
             Color.ParseColor("#2C3A47"), Color.ParseColor("#FF99A4"));
     }
+}
+
+/// <summary>Debug builds let adb open the card (`am start`) for testing; release builds only open it from the tile.</summary>
+internal static class AskHelmBuild
+{
+#if DEBUG
+    public const bool Exported = true;
+#else
+    public const bool Exported = false;
+#endif
 }

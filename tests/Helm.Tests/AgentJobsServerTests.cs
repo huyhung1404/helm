@@ -38,7 +38,7 @@ public sealed class AgentJobsServerTests : IDisposable
         await WaitUntil(() => phone.Engine.IsLive && pc.Engine.IsLive, "both live channels connect");
 
         var local = new Local(new AiJobResult("Em ghi rồi nha Anh.", [new AiJobAction("wallet_add_transaction", "Chi 45.000đ · Phở", """{"id":"t1"}""")], [], 0.001m));
-        using var worker = new AgentJobWorker(pc.Jobs, pc.Workers, local, () => pc.Engine.DeviceId, "PC-HUNG", [AiProviders.Claude]);
+        using var worker = new AgentJobWorker(pc.Jobs, pc.Workers, local, () => pc.Engine.DeviceId, "PC-HUNG", () => ["Codex"]);
         worker.Start();
         var route = new SyncAgentRoute(phone.Jobs, phone.Workers, () => phone.Engine.DeviceId, phone.Engine);
         await WaitUntil(() => route.Unavailable() is null, "the phone hears the PC's heartbeat");
@@ -106,7 +106,6 @@ public sealed class AgentJobsServerTests : IDisposable
         public List<AiJob> Jobs { get; } = [];
         public List<AiJobAction> Undone { get; } = [];
         public string Device => "PC-HUNG";
-        public bool Serves(AiProvider provider) => provider == AiProviders.Claude;
         public string? Unavailable() => null;
 
         public Task<AiJobResult> RunAsync(AiJob job, TimeSpan wait, CancellationToken ct)

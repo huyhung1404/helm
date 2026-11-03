@@ -34,25 +34,25 @@ internal static class HelmHost
 
         // The AI models Helm calls with the user's API keys (on Helm Sync).
         Helm.Ai.AiCoreServices.AddHelmAi(builder.Services);
-        // This PC's Claude Code as an agent for Helm's AI jobs (free on the user's plan): for this PC's own features, and
-        // for the phone's, which reach it through Helm Sync (AgentJobWorker). Helm runs its own tools for it.
-        builder.Services.AddSingleton<Ai.ClaudeCodeAgentFactory>();
+        // The proxy: the agents the user added to this PC (Codex, Claude Code…, each signed in to its own account) take
+        // Helm's AI jobs first, for this PC's features and the phone's (through Helm Sync, AgentJobWorker); the API key
+        // only when none answers. Helm runs its own tools for them.
         builder.Services.AddSingleton(sp =>
         {
-            var agent = sp.GetRequiredService<Ai.ClaudeCodeAgentFactory>();
             var settings = sp.GetRequiredService<ISettingsStoreFactory>();
             bool IsOn(string? moduleId) => moduleId is null
                 || !settings.Get<GeneralSettings>(GeneralSettings.StoreId).Current.EnabledModules.TryGetValue(moduleId, out var on) || on;
-            return new Helm.Ai.Assistant.LocalAgentRoute(Environment.MachineName, Helm.Ai.AiProviders.Claude, agent,
-                sp.GetServices<Core.Mcp.IMcpToolProvider>(), IsOn, agent.Unavailable);
+            return new Ai.AgentRegistry(settings, paths, sp.GetRequiredService<Core.Processes.IChildProcessLauncher>(),
+                sp.GetServices<Core.Mcp.IMcpToolProvider>(), IsOn, sp.GetRequiredService<ILoggerFactory>());
         });
-        builder.Services.AddSingleton<Helm.Ai.Assistant.IAgentRoute>(sp => sp.GetRequiredService<Helm.Ai.Assistant.LocalAgentRoute>());
+        builder.Services.AddSingleton<Helm.Ai.Assistant.IAgentRoute>(sp => sp.GetRequiredService<Ai.AgentRegistry>());
         builder.Services.AddSingleton(sp =>
         {
             var engine = sp.GetRequiredService<Core.Sync.SyncEngine>();
+            var agents = sp.GetRequiredService<Ai.AgentRegistry>();
             return new Helm.Ai.Assistant.AgentJobWorker(sp.GetRequiredService<Core.Sync.ISyncedCollection<Helm.Ai.Assistant.AiJobRecord>>(),
-                sp.GetRequiredService<Core.Sync.ISyncedCollection<Helm.Ai.Assistant.AiWorkerRecord>>(), sp.GetRequiredService<Helm.Ai.Assistant.LocalAgentRoute>(),
-                () => engine.DeviceId, sp.GetRequiredService<IDeviceInfo>().DeviceName, [Helm.Ai.AiProviders.Claude],
+                sp.GetRequiredService<Core.Sync.ISyncedCollection<Helm.Ai.Assistant.AiWorkerRecord>>(), agents,
+                () => engine.DeviceId, sp.GetRequiredService<IDeviceInfo>().DeviceName, agents.Ready,
                 logger: sp.GetRequiredService<ILoggerFactory>().CreateLogger<Helm.Ai.Assistant.AgentJobWorker>());
         });
 
@@ -121,6 +121,7 @@ internal static class HelmHost
         builder.Services.AddSingleton<McpPermissionsViewModel>();
         builder.Services.AddSingleton<McpViewModel>();
         builder.Services.AddSingleton<Helm.Ai.AiKeysViewModel>();
+        builder.Services.AddSingleton<AiProxyViewModel>();
         builder.Services.AddSingleton<AiViewModel>();
         builder.Services.AddSingleton<AiPage>();
         builder.Services.AddSingleton<WelcomePage>();

@@ -20,10 +20,14 @@ public sealed record AiJobAction(string Tool, string Summary, string ResultJson)
 /// <summary>A phone tool Claude Code asked for (alarm, calendar…): the phone runs it when the result arrives.</summary>
 public sealed record AiJobPhoneAction(string Tool, string ArgumentsJson, string Summary);
 
-/// <param name="SavedUsd">What the same turn would have cost on the API (Claude Code's own estimate), if known.</param>
-public sealed record AiJobResult(string Text, IReadOnlyList<AiJobAction> Done, IReadOnlyList<AiJobPhoneAction> PhoneActions, decimal? SavedUsd);
+/// <param name="SavedUsd">What the same turn would have cost on the API with the picked model, if known.</param>
+public sealed record AiJobResult(string Text, IReadOnlyList<AiJobAction> Done, IReadOnlyList<AiJobPhoneAction> PhoneActions, decimal? SavedUsd)
+{
+    /// <summary>The agent that ran it ("Codex", "Claude Code").</summary>
+    public string? Agent { get; init; }
+}
 
-/// <summary>Claude Code could not take or finish the job in time; the router tries the next way.</summary>
+/// <summary>The agent could not take or finish the job in time; the router tries the next way.</summary>
 public sealed class AiRouteException(string message, Exception? inner = null) : Exception(message, inner);
 
 /// <summary>
@@ -33,9 +37,6 @@ public sealed class AiRouteException(string message, Exception? inner = null) : 
 /// </summary>
 public interface IAgentRoute
 {
-    /// <summary>Whether it can run this provider's models (Claude Code runs Claude's).</summary>
-    bool Serves(AiProvider provider);
-
     /// <summary>The device that runs the jobs, as the user knows it ("this PC", the PC's name).</summary>
     string Device { get; }
 
@@ -58,18 +59,17 @@ public sealed class AiRouter(IEnumerable<IAgentRoute> routes)
     private readonly IReadOnlyList<IAgentRoute> _routes = [.. routes];
 
     /// <summary>
-    /// The agent ways to try for this choice, best first: those that run the picked provider's models, never for
-    /// <see cref="AiRoutePolicy.ApiOnly"/>, and only those that can take a job now.
+    /// The agent ways to try, best first, whatever model is picked (that one is for the API, when no agent answers):
+    /// none for <see cref="AiRoutePolicy.ApiOnly"/>, and only those that can take a job now.
     /// </summary>
-    public IReadOnlyList<IAgentRoute> Agents(AiFeatureChoice choice, AiProvider provider) =>
+    public IReadOnlyList<IAgentRoute> Agents(AiFeatureChoice choice) =>
         choice.Route == AiRoutePolicy.ApiOnly
             ? []
             // An agent on this device answers sooner than one reached through sync.
-            : [.. _routes.Where(r => r.Serves(provider) && r.Unavailable() is null).OrderBy(r => r is SyncAgentRoute ? 1 : 0)];
+            : [.. _routes.Where(r => r.Unavailable() is null).OrderBy(r => r is SyncAgentRoute ? 1 : 0)];
 
-    /// <summary>Whether the API may be used when no agent answered (a provider no agent runs always may).</summary>
-    public bool MayUseApi(AiFeatureChoice choice, AiProvider provider) =>
-        choice.Route != AiRoutePolicy.PcOnly || !_routes.Any(r => r.Serves(provider));
+    /// <summary>Whether the API may be used when no agent answered.</summary>
+    public static bool MayUseApi(AiFeatureChoice choice) => choice.Route != AiRoutePolicy.PcOnly;
 
     /// <summary>Why a <see cref="AiRoutePolicy.PcOnly"/> call found no PC, said to the user.</summary>
     public string NoPc() => _routes.Count == 0

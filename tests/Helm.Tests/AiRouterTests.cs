@@ -67,7 +67,7 @@ public sealed class AiRouterTests
     }
 
     [Fact]
-    public async Task Api_only_and_a_Grok_pick_never_wait_for_a_PC()
+    public async Task Api_only_never_waits_for_a_PC_and_a_Grok_pick_still_asks_it_first()
     {
         var pc = new Pc(new AiJobResult("PC.", [], [], null));
         var (assistant, _) = Build(pc);
@@ -76,7 +76,10 @@ public sealed class AiRouterTests
         await assistant.Start().SendAsync("chào", _ => Task.FromResult(true), CancellationToken.None);
         Assert.Empty(pc.Jobs);
 
-        Assert.Empty(new AiRouter([pc]).Agents(new AiFeatureChoice(), AiProviders.Grok));
+        // A Grok pick is only the fallback: the PC's agent still answers first.
+        _features.Update(s => s.Features[AiFeatureIds.AskHelm] = new AiFeatureChoice { Provider = "xai", Model = "grok-4.7" });
+        await assistant.Start().SendAsync("chào", _ => Task.FromResult(true), CancellationToken.None);
+        Assert.Single(pc.Jobs);
     }
 
     [Fact]
@@ -146,7 +149,6 @@ public sealed class AiRouterTests
         public List<AiJob> Jobs { get; } = [];
         public List<AiJobAction> Undone { get; } = [];
         public string Device => "PC-HUNG";
-        public bool Serves(AiProvider provider) => provider == AiProviders.Claude;
         public string? Unavailable() => Problem;
 
         public Task<AiJobResult> RunAsync(AiJob job, TimeSpan wait, CancellationToken ct)

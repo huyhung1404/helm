@@ -12,8 +12,8 @@ public sealed record AiWorkerRecord
 {
     public required string Device { get; init; }
 
-    /// <summary>The <see cref="AiProvider.Id"/>s whose models its agents run.</summary>
-    public IReadOnlyList<string> Providers { get; init; } = [];
+    /// <summary>Its agents that take jobs now, best first ("Codex", "Claude Code").</summary>
+    public IReadOnlyList<string> Agents { get; init; } = [];
 
     /// <summary>Why it takes no job now (Claude Code at its limit…); null when it does.</summary>
     public string? Problem { get; init; }
@@ -92,8 +92,6 @@ public sealed class SyncAgentRoute(ISyncedCollection<AiJobRecord> jobs, ISyncedC
     private string? _lastWorker;
 
     public string Device => Best()?.Value.Device ?? "Helm PC";
-
-    public bool Serves(AiProvider provider) => Online().Any(w => w.Value.Providers.Contains(provider.Id));
 
     public string? Unavailable()
     {
@@ -223,7 +221,7 @@ public sealed class SyncAgentRoute(ISyncedCollection<AiJobRecord> jobs, ISyncedC
 /// Helm's tools, and writes back the results. Helm on the PC runs it while Helm Sync is set up.
 /// </summary>
 public sealed class AgentJobWorker(ISyncedCollection<AiJobRecord> jobs, ISyncedCollection<AiWorkerRecord> workers, IAgentRoute local,
-    Func<string> self, string device, IReadOnlyList<AiProvider> serves, TimeProvider? time = null, ILogger? logger = null) : IDisposable
+    Func<string> self, string device, Func<IReadOnlyList<string>> agents, TimeProvider? time = null, ILogger? logger = null) : IDisposable
 {
     private readonly TimeProvider _time = time ?? TimeProvider.System;
     private readonly ILogger _logger = logger ?? NullLogger.Instance;
@@ -247,7 +245,7 @@ public sealed class AgentJobWorker(ISyncedCollection<AiJobRecord> jobs, ISyncedC
             workers.Upsert(self(), new AiWorkerRecord
             {
                 Device = device,
-                Providers = [.. serves.Select(p => p.Id)],
+                Agents = agents(),
                 Problem = local.Unavailable(),
                 SeenAt = _time.GetUtcNow(),
             });

@@ -21,7 +21,7 @@ public sealed class AgentJobsTests
             "claude-haiku-5-5", "low");
 
     private LocalAgentRoute Local(Scripted agent) =>
-        new("PC-HUNG", AiProviders.Claude, agent, [new WalletMcpTools(new DebtBook(new MemorySynced<WalletDebt>(), _wallet), _wallet), new Starter()],
+        new("PC-HUNG", "Codex", agent, [new WalletMcpTools(new DebtBook(new MemorySynced<WalletDebt>(), _wallet), _wallet), new Starter()],
             _ => true, () => null);
 
     [Fact]
@@ -65,15 +65,13 @@ public sealed class AgentJobsTests
     public async Task The_phone_reaches_the_PC_through_sync_and_gets_its_result()
     {
         var pc = new FakeLocal(new AiJobResult("PC đã ghi.", [new AiJobAction("wallet_add_transaction", "Chi 45.000đ", """{"id":"t1"}""")], [], 0.001m));
-        using var worker = new AgentJobWorker(_jobs, _workers, pc, () => "pc-id", "PC-HUNG", [AiProviders.Claude]);
+        using var worker = new AgentJobWorker(_jobs, _workers, pc, () => "pc-id", "PC-HUNG", () => ["Codex"]);
         var phone = new SyncAgentRoute(_jobs, _workers, () => "phone-id");
         Assert.NotNull(phone.Unavailable());
 
         worker.Start();
         Assert.Null(phone.Unavailable());
         Assert.Equal("PC-HUNG", phone.Device);
-        Assert.True(phone.Serves(AiProviders.Claude));
-        Assert.False(phone.Serves(AiProviders.Grok));
 
         var result = await phone.RunAsync(Job(), TimeSpan.FromSeconds(5), CancellationToken.None);
 
@@ -89,13 +87,13 @@ public sealed class AgentJobsTests
     public async Task A_turn_no_PC_claimed_in_time_is_cancelled_and_never_run_later()
     {
         var pc = new FakeLocal(new AiJobResult("late", [], [], null));
-        _workers.Upsert("pc-id", new AiWorkerRecord { Device = "PC-HUNG", Providers = ["anthropic"], SeenAt = DateTimeOffset.UtcNow });
+        _workers.Upsert("pc-id", new AiWorkerRecord { Device = "PC-HUNG", Agents = ["Codex"], SeenAt = DateTimeOffset.UtcNow });
         var phone = new SyncAgentRoute(_jobs, _workers, () => "phone-id");
 
         await Assert.ThrowsAsync<AiRouteException>(() => phone.RunAsync(Job(), TimeSpan.FromMilliseconds(300), CancellationToken.None));
         Assert.Equal(AgentJobs.Cancelled, Assert.Single(_jobs.All()).Value.State);
 
-        using var worker = new AgentJobWorker(_jobs, _workers, pc, () => "pc-id", "PC-HUNG", [AiProviders.Claude]);
+        using var worker = new AgentJobWorker(_jobs, _workers, pc, () => "pc-id", "PC-HUNG", () => ["Codex"]);
         worker.Start();
         await Task.Delay(200);
         Assert.Empty(pc.Jobs);
@@ -104,8 +102,8 @@ public sealed class AgentJobsTests
     [Fact]
     public void A_PC_long_unheard_of_is_offline_and_its_own_record_never_counts()
     {
-        _workers.Upsert("pc-id", new AiWorkerRecord { Device = "PC-HUNG", Providers = ["anthropic"], SeenAt = DateTimeOffset.UtcNow - TimeSpan.FromMinutes(10) });
-        _workers.Upsert("phone-id", new AiWorkerRecord { Device = "Phone", Providers = ["anthropic"], SeenAt = DateTimeOffset.UtcNow });
+        _workers.Upsert("pc-id", new AiWorkerRecord { Device = "PC-HUNG", Agents = ["Codex"], SeenAt = DateTimeOffset.UtcNow - TimeSpan.FromMinutes(10) });
+        _workers.Upsert("phone-id", new AiWorkerRecord { Device = "Phone", Agents = ["Codex"], SeenAt = DateTimeOffset.UtcNow });
 
         Assert.NotNull(new SyncAgentRoute(_jobs, _workers, () => "phone-id").Unavailable());
     }
@@ -164,7 +162,6 @@ public sealed class AgentJobsTests
         public List<AiJob> Jobs { get; } = [];
         public List<AiJobAction> Undone { get; } = [];
         public string Device => "PC-HUNG";
-        public bool Serves(AiProvider provider) => provider == AiProviders.Claude;
         public string? Unavailable() => null;
 
         public Task<AiJobResult> RunAsync(AiJob job, TimeSpan wait, CancellationToken ct)

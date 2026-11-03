@@ -11,12 +11,15 @@ using Microsoft.Extensions.Logging;
 namespace Helm.App.Ai;
 
 /// <summary>
-/// Claude Code (the user's own plan, the official CLI) as the brain of Helm's agent jobs on this PC. It runs with no
-/// tools of its own, no MCP server and no hooks: Helm lists its tools in the conversation, Claude answers with the calls
-/// it wants as JSON, Helm runs them and sends the results back, as on the API.
+/// Claude Code (the official CLI) as the brain of Helm's agent jobs on this PC, signed in to the account the user chose
+/// for it in its own folder (CLAUDE_CONFIG_DIR), never the one their own Claude Code uses. It runs with no tools of its
+/// own, no MCP server and no hooks: Helm lists its tools in the conversation, Claude answers with the calls it wants as
+/// JSON, Helm runs them and sends the results back, as on the API.
 /// </summary>
-internal sealed class ClaudeCodeAgentFactory(IChildProcessLauncher launcher, ILogger<ClaudeCodeAgentFactory> logger) : IAssistantChatFactory
+internal sealed class ClaudeCodeAgentFactory(IChildProcessLauncher launcher, string home, ILogger logger) : IAssistantChatFactory
 {
+    public const string HomeVariable = "CLAUDE_CONFIG_DIR";
+
     /// <summary>After Claude Code says its plan's limit is reached, it gets no job for this long (the API takes over).</summary>
     internal static readonly TimeSpan RestAfterLimit = TimeSpan.FromMinutes(30);
 
@@ -24,10 +27,25 @@ internal sealed class ClaudeCodeAgentFactory(IChildProcessLauncher launcher, ILo
 
     public AiProvider Provider => AiProviders.Claude;
 
-    /// <summary>Why Claude Code takes no job now (not installed, at its limit), or null.</summary>
+    /// <summary>Why it takes no job now (not installed, not signed in here, at its limit), or null.</summary>
     public string? Unavailable() =>
-        ClaudeCodeRunner.AskUnavailable()
-        ?? (DateTimeOffset.UtcNow < _limitedUntil ? $"Claude Code reached its plan's limit; Helm tries it again at {_limitedUntil.ToLocalTime():HH:mm}." : null);
+        McpClientConfig.FindClaude() is null ? "Claude Code is not installed on this PC."
+        : !SignedIn(home) ? "not signed in: press Sign in."
+        : DateTimeOffset.UtcNow < _limitedUntil ? $"reached its plan's limit; Helm tries it again at {_limitedUntil.ToLocalTime():HH:mm}."
+        : null;
+
+    /// <summary>Claude Code keeps its sign-in in .credentials.json in its config folder.</summary>
+    internal static bool SignedIn(string home) => File.Exists(Path.Combine(home, ".credentials.json"));
+
+    /// <summary>The child's environment: Helm's, with this agent's own config folder.</summary>
+    internal static IReadOnlyDictionary<string, string> Environment(string variable, string home)
+    {
+        var env = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        foreach (System.Collections.DictionaryEntry e in System.Environment.GetEnvironmentVariables())
+            if (e.Key is string k && e.Value is string v) env[k] = v;
+        env[variable] = home;
+        return env;
+    }
 
     internal void ReachedLimit()
     {
@@ -36,12 +54,13 @@ internal sealed class ClaudeCodeAgentFactory(IChildProcessLauncher launcher, ILo
     }
 
     public IAssistantChat Create(string apiKey, string model, string effort, string system, IReadOnlyList<AssistantTool> tools) =>
-        new ClaudeCodeChat(this, launcher, logger, model, effort, system, tools);
+        // A Claude model picked for the API runs here too; any other pick (Grok) runs on the plan's Haiku.
+        new ClaudeCodeChat(this, launcher, logger, home, model.StartsWith("claude-", StringComparison.Ordinal) ? model : "haiku", effort, system, tools);
 }
 
 /// <summary>One conversation with one Claude Code process (stream-json in and out: each turn takes about a second).</summary>
-internal sealed class ClaudeCodeChat(ClaudeCodeAgentFactory factory, IChildProcessLauncher launcher, ILogger logger, string model, string effort,
-    string system, IReadOnlyList<AssistantTool> tools) : IAssistantChat, IDisposable
+internal sealed class ClaudeCodeChat(ClaudeCodeAgentFactory factory, IChildProcessLauncher launcher, ILogger logger, string home, string model,
+    string effort, string system, IReadOnlyList<AssistantTool> tools) : IAssistantChat, IDisposable
 {
     private ChildProcess? _process;
     private StreamWriter? _input;
@@ -108,11 +127,15 @@ internal sealed class ClaudeCodeChat(ClaudeCodeAgentFactory factory, IChildProce
             "--settings", """{"disableAllHooks":true}""", "--model", model, .. effort is { Length: > 0 } ? new[] { "--effort", effort } : []];
         var commandLine = claude.EndsWith(".cmd", StringComparison.OrdinalIgnoreCase)
             // npm's claude.cmd only runs through cmd.exe; these arguments hold nothing cmd.exe reads itself.
-            ? $"{CommandLine.Quote(Environment.GetEnvironmentVariable("ComSpec") is { Length: > 0 } c ? c : "cmd.exe")} /d /s /c \"{CommandLine.Join([claude, .. args])}\""
+            ? $"{CommandLine.Quote(System.Environment.GetEnvironmentVariable("ComSpec") is { Length: > 0 } c ? c : "cmd.exe")} /d /s /c \"{CommandLine.Join([claude, .. args])}\""
             : CommandLine.Join([claude, .. args]);
         try
         {
-            _process = launcher.Start(new ChildProcessStartInfo(commandLine, Environment.GetFolderPath(Environment.SpecialFolder.UserProfile)));
+            Directory.CreateDirectory(home);
+            _process = launcher.Start(new ChildProcessStartInfo(commandLine, home)
+            {
+                Environment = ClaudeCodeAgentFactory.Environment(ClaudeCodeAgentFactory.HomeVariable, home),
+            });
         }
         catch (ChildProcessException ex)
         {
