@@ -18,7 +18,12 @@ public sealed class WalletMcpTools(DebtBook book, WalletStore store, FundBook? f
     [
         new("wallet_debts", "The debt book in the user's Wallet: each person's balance in đồng (positive: they owe the user; negative: the user owes them), due date and entries.",
             McpArgs.Schema(("include_settled", McpArgs.Flag("Also people whose balance is back to 0."), false)),
-            (args, _) => Task.FromResult<object?>(Debts(McpArgs.Bool(args, "include_settled") == true))) { ReadOnly = true },
+            (args, _) => Task.FromResult<object?>(Debts(McpArgs.Bool(args, "include_settled") == true)))
+        {
+            ReadOnly = true,
+            Brief = "The debt book: each person's balance in đồng (positive: they owe the user; negative: the user owes them), due date, entries.",
+            BriefResult = McpTool.Drop("currency", "meaning", "balance_after", "from_transaction"),
+        },
         new("wallet_add_debt", "Add an entry to the debt book: someone owes the user, the user owes someone, or a repayment (brings the balance back toward 0).",
             McpArgs.Schema(
                 ("person", McpArgs.Text("The person's name (the same name adds to their balance)."), true),
@@ -29,6 +34,9 @@ public sealed class WalletMcpTools(DebtBook book, WalletStore store, FundBook? f
             (args, _) => Task.FromResult<object?>(AddDebt(args)))
         {
             Undo = (result, _) => { McpTool.Undone(book.Delete(Id(result))); return Task.CompletedTask; },
+            Brief = "Add to the debt book: someone owes the user (owes_me), the user owes someone (i_owe), or a repayment (back toward 0).",
+            BriefArgs = new Dictionary<string, string> { ["amount"] = "đồng: 150000, 150k, 1.5tr", ["due"] = "2026-10-01 or 2026-10-01T18:00" },
+            BriefResult = McpTool.Keep("person", "balance"),
         },
         new("wallet_add_transaction", $"Add a transaction to the Wallet by hand: money spent or money in, paid in cash or by a bank Helm does not read. Categories for spending: {Names(CategoryKind.Expense)}. For money in: {Names(CategoryKind.Income)}.",
             McpArgs.Schema(
@@ -40,6 +48,14 @@ public sealed class WalletMcpTools(DebtBook book, WalletStore store, FundBook? f
             (args, _) => Task.FromResult<object?>(AddTransaction(args)))
         {
             Undo = (result, _) => { McpTool.Undone(store.Delete(Id(result))); return Task.CompletedTask; },
+            Brief = $"Save money spent or received (cash, or a bank Helm does not read). Spending categories: {Names(CategoryKind.Expense)}. Income: {Names(CategoryKind.Income)}.",
+            BriefArgs = new Dictionary<string, string>
+            {
+                ["amount"] = "đồng: 45000, 45k, 1tr2",
+                ["category"] = "one listed; left out: the one this description had before",
+                ["when"] = "local: 2026-10-01 or 2026-10-01T12:30; default now",
+            },
+            BriefResult = McpTool.Keep("id", "amount", "category", "when"),
         },
         new("wallet_update_transaction", "Fill in what a transaction already in the Wallet was: its category and/or its description (after Helm asked the user “what was it?”). Only what is given changes.",
             McpArgs.Schema(
@@ -48,6 +64,8 @@ public sealed class WalletMcpTools(DebtBook book, WalletStore store, FundBook? f
                 ("description", McpArgs.Text("What it was, in the user's words, e.g. Ăn trưa với Nam."), false)),
             (args, _) => Task.FromResult<object?>(UpdateTransaction(args)))
         {
+            Brief = $"Set a Wallet transaction's category and/or description; only what is given changes. Categories: wallet_add_transaction's, or between the user's own accounts: {Names(CategoryKind.Transfer)}.",
+            BriefResult = McpTool.Keep("id", "amount", "description", "category"),
             Undo = (result, _) =>
             {
                 // Results leave nulls out: no category before is no category_id.
@@ -62,7 +80,13 @@ public sealed class WalletMcpTools(DebtBook book, WalletStore store, FundBook? f
             McpArgs.Schema(
                 ("from", McpArgs.Text("The first day, e.g. 2026-11-01. Left out: the first day of this month."), false),
                 ("to", McpArgs.Text("The last day, e.g. 2026-11-30. Left out: today."), false)),
-            (args, _) => Task.FromResult<object?>(Summary(args))) { ReadOnly = true },
+            (args, _) => Task.FromResult<object?>(Summary(args)))
+        {
+            ReadOnly = true,
+            Brief = "Spent and received over some days, in đồng, spending by category (largest first); transfers count as neither.",
+            BriefArgs = new Dictionary<string, string> { ["from"] = "2026-11-01; default the 1st of this month", ["to"] = "default today" },
+            BriefResult = McpTool.Drop("currency"),
+        },
         .. funds is null ? Array.Empty<McpTool>() :
         [
             new("wallet_funds", "This month's funds (money set aside per category): what each held, spent, has left, and whether it runs low, is used up or over.",

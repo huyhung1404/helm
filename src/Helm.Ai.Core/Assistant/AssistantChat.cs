@@ -25,14 +25,12 @@ public sealed class AssistantTool
         Source = source;
         Mode = mode;
         var schema = (JsonObject)source.InputSchema.DeepClone();
+        if (source.Brief is not null) Shorten(schema, source.BriefArgs);
         if (mode != AssistantToolMode.Read)
         {
             var properties = schema["properties"] as JsonObject ?? [];
-            properties[SummaryArgument] = new JsonObject
-            {
-                ["type"] = "string",
-                ["description"] = "One short line in Vietnamese that the user reads about this call, e.g. \"Chi 45.000đ · Phở · Ăn uống · hôm nay\".",
-            };
+            // The instructions say how it reads: every change tool repeating it would cost tokens on every call.
+            properties[SummaryArgument] = new JsonObject { ["type"] = "string", ["description"] = "Vietnamese, for the user" };
             schema["properties"] = properties;
             var required = schema["required"] as JsonArray ?? [];
             required.Add(SummaryArgument);
@@ -44,8 +42,34 @@ public sealed class AssistantTool
     public McpTool Source { get; }
     public AssistantToolMode Mode { get; }
     public string Name => Source.Name;
-    public string Description => Source.Description;
+    /// <summary>The model's description: the tool's short one when it has it (<see cref="McpTool.Brief"/>).</summary>
+    public string Description => Source.Brief ?? Source.Description;
     public JsonObject Schema { get; }
+
+    /// <summary>
+    /// The schema without its descriptions (at any depth), but the hints the tool gives for some arguments: types, enums
+    /// and required say the rest, and the names say what an argument is.
+    /// </summary>
+    private static void Shorten(JsonObject schema, IReadOnlyDictionary<string, string>? hints)
+    {
+        Strip(schema);
+        if (hints is null || schema["properties"] is not JsonObject properties) return;
+        foreach (var (name, hint) in hints)
+            if (properties[name] is JsonObject property) property["description"] = hint;
+    }
+
+    /// <summary>Removes the <c>description</c> keyword of a schema and of the schemas in it (not a property named so).</summary>
+    private static void Strip(JsonNode? node)
+    {
+        if (node is not JsonObject schema) return;
+        schema.Remove("description");
+        if (schema["properties"] is JsonObject properties)
+            foreach (var (_, property) in properties) Strip(property);
+        Strip(schema["items"]);
+        foreach (var key in new[] { "anyOf", "oneOf", "allOf" })
+            if (schema[key] is JsonArray options)
+                foreach (var option in options) Strip(option);
+    }
 }
 
 public sealed record ToolCall(string Id, string Name, JsonElement Input);

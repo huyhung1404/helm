@@ -67,8 +67,31 @@ internal sealed class ClaudeAssistantChat(AnthropicClient client, string model, 
     /// <summary>How often a paused search turn (<c>pause_turn</c>) is sent again to go on.</summary>
     private const int MaxContinuations = 3;
 
+    /// <summary>
+    /// The instructions with a cache breakpoint of their own after the tools (they render first): another card with the
+    /// same tools within 5 minutes reads both from the cache, and the conversation's own breakpoint (the top-level one)
+    /// moves with it. A prefix under the model's minimum (512 tokens on the 5.x models, 4096 on Haiku 4.5) is simply
+    /// not cached: no write premium is paid for it. A text call without instructions sends them as they are (no empty block).
+    /// </summary>
+    private readonly MessageCreateParamsSystem _system = string.IsNullOrWhiteSpace(system)
+        ? system
+        : new List<TextBlockParam> { new() { Text = system, CacheControl = new CacheControlEphemeral() } };
+
+    /// <summary>The conversation as lines, to start it again from a short recap (<see cref="ChatRecap"/>).</summary>
+    private readonly ChatRecap _recap = new();
+
+    /// <summary>
+    /// The tools changed after Claude thought: Claude ties its thinking blocks to the tools they were written under and
+    /// refuses them under others (on accounts it checks), so the next call starts again from a recap instead of the history.
+    /// </summary>
+    private bool _restart;
+
+    /// <summary>The history holds a thinking block.</summary>
+    private bool _thought;
+
     public void AddUser(string text)
     {
+        text = Turn(text);
         if (_results is { } results)
         {
             List<ContentBlockParam> blocks = [.. results, new TextBlockParam { Text = text }];
@@ -84,6 +107,7 @@ internal sealed class ClaudeAssistantChat(AnthropicClient client, string model, 
     /// <summary>The photo first, then the words (Claude reads a picture best before the question about it).</summary>
     public void AddUser(string text, AssistantImage image)
     {
+        text = Turn(text);
         List<ContentBlockParam> blocks =
         [
             .. _results ?? [],
@@ -95,17 +119,45 @@ internal sealed class ClaudeAssistantChat(AnthropicClient client, string model, 
         _imagePending = true;
     }
 
-    public void AddTools(IReadOnlyList<AssistantTool> tools) => _tools.AddRange(tools.Select(ToTool));
+    public void AddTools(IReadOnlyList<AssistantTool> tools)
+    {
+        _tools.AddRange(tools.Select(ToTool));
+        _restart |= tools.Count > 0 && _thought;
+    }
 
     public bool AddWebSearch(int maxUses)
     {
-        if (!_web) _tools.Add(ClaudeWebSearch.Tool(model, maxUses));
+        if (!_web)
+        {
+            _tools.Add(ClaudeWebSearch.Tool(model, maxUses));
+            _restart |= _thought;
+        }
         _web = true;
         return true;
     }
 
+    /// <summary>
+    /// The user's turn as it goes: after a recap of the conversation instead of its history when the tools changed or
+    /// the history grew long (<see cref="ChatRecap.MaxHistory"/>). Only at a turn's start, never in the middle of a
+    /// round of calls; what waits (results of calls already run) is in the recap.
+    /// </summary>
+    private string Turn(string text)
+    {
+        if (!_restart && !_recap.TooLong)
+        {
+            _recap.User(text);
+            return text;
+        }
+        _restart = _thought = false;
+        _messages.Clear();
+        _results = null;
+        return _recap.StartAgain(text);
+    }
+
     public async Task<AssistantStep> NextAsync(CancellationToken ct)
     {
+        // The tools changed in the middle of a round (web search turned on by a call): go on from a recap.
+        if (_restart) _messages.Add(new UserMessageParam { Content = Turn("Go on from here.") });
         if (_results is { } pending)
         {
             _messages.Add(new UserMessageParam { Content = pending });
@@ -129,6 +181,7 @@ internal sealed class ClaudeAssistantChat(AnthropicClient client, string model, 
             cacheWrite += response.Usage.CacheCreationInputTokens ?? 0;
             searches += Searches(response.Usage);
         }
+        _recap.Answer(answer.Text, answer.Calls);
 
         return new AssistantStep(WithSources(answer.Text, answer.Sources), answer.Calls,
             new AssistantUsage(input, output, cacheRead, cacheWrite, searches),
@@ -143,11 +196,11 @@ internal sealed class ClaudeAssistantChat(AnthropicClient client, string model, 
             {
                 Model = model,
                 MaxTokens = 4096,
-                System = system,
+                System = _system,
                 Tools = _tools,
                 Messages = _messages,
                 OutputConfig = new OutputConfig { Effort = ToEffort(effort) },
-                // The tools and the instructions stay the same: later calls read them from the cache.
+                // The conversation so far, for the next call of this turn (most turns that read take two calls).
                 CacheControl = new CacheControlEphemeral(),
             }, ct);
         }
@@ -210,10 +263,12 @@ internal sealed class ClaudeAssistantChat(AnthropicClient client, string model, 
             {
                 // Sent back unchanged, signature and all: Claude rejects edited thinking.
                 echo.Add(new ThinkingBlockParam { Thinking = thinking.Thinking, Signature = thinking.Signature });
+                _thought = true;
             }
             else if (block.TryPickRedactedThinking(out RedactedThinkingBlock? redacted))
             {
                 echo.Add(new RedactedThinkingBlockParam { Data = redacted.Data });
+                _thought = true;
             }
             else if (block.TryPickToolUse(out ToolUseBlock? use))
             {
@@ -266,13 +321,16 @@ internal sealed class ClaudeAssistantChat(AnthropicClient client, string model, 
         return named ? text : $"{text} Nguồn: {hosts}.";
     }
 
-    public void AddResults(IReadOnlyList<ToolOutcome> results) =>
+    public void AddResults(IReadOnlyList<ToolOutcome> results)
+    {
+        _recap.Results(results);
         _results = [.. results.Select(r => (ContentBlockParam)new ToolResultBlockParam
         {
             ToolUseID = r.CallId,
             Content = r.Content,
             IsError = r.IsError,
         })];
+    }
 
     private static ToolUnion ToTool(AssistantTool tool)
     {

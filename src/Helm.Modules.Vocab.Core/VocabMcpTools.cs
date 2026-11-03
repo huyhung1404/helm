@@ -78,7 +78,12 @@ public sealed class VocabMcpTools(VocabStore store, VocabQuiz quiz) : IMcpToolPr
                 ("query", McpArgs.Text("Words to look for in the word, its meaning or the user's note."), false),
                 ("status", McpArgs.OneOf("Which words (default all).", "pending", "analyzed", "all"), false),
                 ("limit", McpArgs.Number($"How many at most (default {DefaultLimit})."), false)),
-            (args, _) => Task.FromResult<object?>(Words(args))) { ReadOnly = true },
+            (args, _) => Task.FromResult<object?>(Words(args)))
+        {
+            ReadOnly = true,
+            Brief = "The user's words, newest first, with their level (CEFR/HSK) and how well they remember each (quiz_level 0-8).",
+            BriefArgs = new Dictionary<string, string> { ["query"] = "in the word, its meaning or the user's note" },
+        },
         new("vocab_get", "One word with its whole tree of parts.",
             McpArgs.Schema(("word", McpArgs.Text("The word's id or the word itself."), true)),
             (args, _) => Task.FromResult<object?>(Get(McpArgs.RequiredString(args, "word")))) { ReadOnly = true },
@@ -88,6 +93,9 @@ public sealed class VocabMcpTools(VocabStore store, VocabQuiz quiz) : IMcpToolPr
                 ("note", McpArgs.Text("Where they come from, for the user (optional)."), false)),
             (args, _) => Task.FromResult<object?>(Add(args)))
         {
+            Brief = "Add words for the user to learn (they wait for an analysis); words they have already stay as they are.",
+            BriefArgs = new Dictionary<string, string> { ["words"] = "English or Chinese words or short phrases" },
+            BriefResult = McpTool.Keep("added", "already_there"),
             // Only the words this call added: words the user had before stay.
             Undo = (result, _) =>
             {

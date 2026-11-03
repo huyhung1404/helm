@@ -27,13 +27,29 @@ public sealed class WalletShareTools(DebtBook book, WalletStore store) : IMcpToo
             (args, _) => Task.FromResult<object?>(Split(args)))
         {
             Undo = (record, _) => { McpTool.Undone(TakeBack(record)); return Task.CompletedTask; },
+            Brief = "Split a bill evenly in one call. The user paid: their share is saved as spending, each of owing gets a debt, each of paid is saved settled. Someone else paid (payer): the user owes them their share.",
+            BriefArgs = new Dictionary<string, string>
+            {
+                ["total"] = "đồng: 1200000, 1tr2",
+                ["people"] = "how many share it, the user included (chia 4: 4); default the people named + 1",
+                ["category"] = "the user's share's, as wallet_add_transaction takes it; default this description's last one",
+                ["when"] = "local: 2026-10-01T19:30; default now",
+            },
+            // The card lists each record with its own summary: the model needs no ids.
+            BriefResult = McpTool.Drop("total", "people", "currency", "kind", "id", "ids"),
         },
         new("wallet_debt_reminder",
             "A polite Vietnamese message reminding someone of what they owe the user, from the debt book: the amount, what for and since when. Show it to the user and offer to share it (phone_share_text); Helm never sends it itself.",
             McpArgs.Schema(
                 ("person", McpArgs.Text("Who, as the user said it."), true),
                 ("amount", McpArgs.Text("The amount to ask for, when not the whole balance: 200k."), false)),
-            (args, _) => Task.FromResult<object?>(Reminder(args))) { ReadOnly = true },
+            (args, _) => Task.FromResult<object?>(Reminder(args)))
+        {
+            ReadOnly = true,
+            Brief = "A polite Vietnamese message reminding someone of what they owe the user. Show it and offer phone_share_text; Helm never sends it.",
+            BriefArgs = new Dictionary<string, string> { ["amount"] = "only when not the whole balance: 200k" },
+            BriefResult = McpTool.Drop("currency"),
+        },
     ];
 
     private object Split(JsonElement args)

@@ -26,7 +26,12 @@ public sealed class TrackerMcpTools(TrackerStore store) : IMcpToolProvider
     public IEnumerable<McpTool> Tools =>
     [
         new("tracker_lists", "The user's Tracker to-do lists, with how many tasks are open. Debts are in Wallet (wallet_debts).",
-            McpTool.NoArguments(), (_, _) => Task.FromResult<object?>(Lists())) { ReadOnly = true },
+            McpTool.NoArguments(), (_, _) => Task.FromResult<object?>(Lists()))
+        {
+            ReadOnly = true,
+            Brief = "The to-do lists, with how many tasks are open.",
+            BriefResult = McpTool.Drop("kind"),
+        },
         new("tracker_tasks", "Tasks from the to-do lists, with their subtasks. By default the open ones of every list.",
             McpArgs.Schema(
                 ("list", McpArgs.Text("A list's id or name (default: every to-do list)."), false),
@@ -34,7 +39,17 @@ public sealed class TrackerMcpTools(TrackerStore store) : IMcpToolProvider
                 ("query", McpArgs.Text("Words to look for in titles and notes."), false),
                 ("due_before", McpArgs.Text("Only tasks due before this day, e.g. 2026-10-01 (overdue and due today: tomorrow's date)."), false),
                 ("limit", McpArgs.Number($"How many at most (default {DefaultLimit})."), false)),
-            (args, _) => Task.FromResult<object?>(Tasks(args))) { ReadOnly = true },
+            (args, _) => Task.FromResult<object?>(Tasks(args)))
+        {
+            ReadOnly = true,
+            Brief = "Tasks with their subtasks; default the open ones of every list.",
+            BriefArgs = new Dictionary<string, string>
+            {
+                ["list"] = "id or name",
+                ["query"] = "words in titles and notes",
+                ["due_before"] = "2026-10-01 (tomorrow: overdue and today)",
+            },
+        },
         new("tracker_add_task",
             "Add a task to a to-do list, optionally with a due date or time, a priority, notes, subtasks, or repeating every day. " +
             "With parent, the task is added as a subtask of that task instead.",
@@ -51,6 +66,15 @@ public sealed class TrackerMcpTools(TrackerStore store) : IMcpToolProvider
             (args, _) => Task.FromResult<object?>(AddTask(args)))
         {
             Undo = (result, _) => { McpTool.Undone(store.DeleteItem(result.GetProperty("id").GetString()!)); return Task.CompletedTask; },
+            Brief = "Add a task (with parent: a subtask of that task), optionally due, with a priority, notes, subtasks or repeating every day.",
+            BriefArgs = new Dictionary<string, string>
+            {
+                ["list"] = "id or name; default the first list",
+                ["parent"] = "a task's id",
+                ["due"] = "local: 2026-10-01 or 2026-10-01T09:30",
+                ["repeat_until"] = "with repeat_daily: the last day",
+            },
+            BriefResult = McpTool.Keep("id", "list", "title", "due", "repeats", "subtasks"),
         },
         new("tracker_add_tasks",
             "Add several tasks in one call, to a list by name (made when the user has none by that name), or as subtasks of one task " +
@@ -78,6 +102,15 @@ public sealed class TrackerMcpTools(TrackerStore store) : IMcpToolProvider
                 ("parent", McpArgs.Text("A task's id: add them as its subtasks instead (in its list)."), false)),
             (args, _) => Task.FromResult<object?>(AddTasks(args)))
         {
+            Brief = "Add several tasks in one call, to a list by name (made when there is none) or as subtasks of parent: a note's action items " +
+                "(notes_read it first; a due date only when it says one) or a big task's steps (first propose 3-8 short steps and ask which to keep).",
+            BriefArgs = new Dictionary<string, string>
+            {
+                ["tasks"] = $"in order, at most {MaxBatch}; title starts with a verb; due as tracker_add_task's",
+                ["list"] = "id or name; a new name makes the list",
+                ["parent"] = "a task's id",
+            },
+            BriefResult = McpTool.Drop("ids", "list_id", "priority"),
             // The tasks this call added, and the list when it made one.
             Undo = (result, _) =>
             {
@@ -100,11 +133,17 @@ public sealed class TrackerMcpTools(TrackerStore store) : IMcpToolProvider
             (args, _) => Task.FromResult<object?>(UpdateTask(args))),
         new("tracker_start_task", "Record that work on a task (or subtask) started now; its time to finish is then counted from here.",
             McpArgs.Schema(("id", McpArgs.Text("The task's id."), true)),
-            (args, _) => Task.FromResult<object?>(StartTask(McpArgs.RequiredString(args, "id")))),
+            (args, _) => Task.FromResult<object?>(StartTask(McpArgs.RequiredString(args, "id"))))
+        {
+            Brief = "Record that work on a task started now.",
+            BriefResult = McpTool.Keep("id", "title", "started"),
+        },
         new("tracker_complete_task", "Mark a task or subtask done (its finish time is recorded; a task's subtasks are done too).",
             McpArgs.Schema(("id", McpArgs.Text("The task's id."), true)),
             (args, _) => Task.FromResult<object?>(SetDone(McpArgs.RequiredString(args, "id"), done: true)))
         {
+            Brief = "Mark a task or subtask done (with its subtasks).",
+            BriefResult = McpTool.Keep("id", "title", "done"),
             // Only a task this call ticked: one that was done before stays done (such a result is "unchanged").
             Undo = (result, _) =>
             {

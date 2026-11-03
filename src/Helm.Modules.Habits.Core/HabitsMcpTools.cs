@@ -23,7 +23,12 @@ public sealed class HabitsMcpTools(HabitsStore store) : IMcpToolProvider
             "streaks and by its share in the rates. A habit with kind \"quit\" is one the user is giving up: each day " +
             "kept clean of it is ticked the day after, so it has cleanYesterday instead of doneToday, its streaks count clean days, and its " +
             "skipped days are slips or days not marked.",
-            McpTool.NoArguments(), (_, _) => Task.FromResult<object?>(List())) { ReadOnly = true },
+            McpTool.NoArguments(), (_, _) => Task.FromResult<object?>(List()))
+        {
+            ReadOnly = true,
+            Brief = "Habits: done today, current and longest streak, rates (30 days, this year), days skipped in a row; a part-done day counts " +
+                "by its percent in rates. kind quit: a habit being given up, each clean day ticked the day after (cleanYesterday).",
+        },
         new("habit_report",
             "One habit's year: the days done (with the percent of the days done only in part), each month's share of days done, and every run " +
             "of missed days with the reason the user gave for it. " +
@@ -32,7 +37,15 @@ public sealed class HabitsMcpTools(HabitsStore store) : IMcpToolProvider
             McpArgs.Schema(
                 ("habit", McpArgs.Text("The habit's id or title."), true),
                 ("year", McpArgs.Number("The year, e.g. 2026. Default: this year."), false)),
-            (args, _) => Task.FromResult<object?>(Report(args))) { ReadOnly = true },
+            (args, _) => Task.FromResult<object?>(Report(args)))
+        {
+            ReadOnly = true,
+            Brief = "One habit's year: monthly rates, part-done days, and each run of missed days with the reason the user gave (a quit habit: " +
+                "what led to a slip). To find what gets in the way and suggest changes.",
+            BriefArgs = new Dictionary<string, string> { ["habit"] = "id or title", ["year"] = "default this year" },
+            // A year of dates says nothing the months do not.
+            BriefResult = McpTool.Drop("daysDoneList"),
+        },
         new("habit_check",
             "Mark a habit as done for a day (today by default), in full or in part. Only days from the habit's start to today count; a day " +
             "done already takes the new percent. For a habit to quit this marks a day clean: only days that are over count, the default is " +
@@ -43,6 +56,15 @@ public sealed class HabitsMcpTools(HabitsStore store) : IMcpToolProvider
                 ("percent", McpArgs.Number($"How much of it was done, {HabitLimits.MinPercent}–100. Default: 100."), false)),
             (args, _) => Task.FromResult<object?>(Check(args)))
         {
+            Brief = "Mark a habit done for a day (default today), in full or a percent. A quit habit: marks a day that is over clean (default " +
+                "yesterday), no percent.",
+            BriefArgs = new Dictionary<string, string>
+            {
+                ["habit"] = "id or title",
+                ["day"] = "2026-10-01",
+                ["percent"] = $"{HabitLimits.MinPercent}-100; default 100",
+            },
+            BriefResult = McpTool.Keep("title", "day", "result", "percent", "currentStreak"),
             // Only a day this call ticked: a day that was done before stays done.
             Undo = (result, _) =>
             {

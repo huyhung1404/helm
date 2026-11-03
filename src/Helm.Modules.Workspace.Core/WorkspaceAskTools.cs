@@ -21,7 +21,11 @@ public sealed class WorkspaceAskTools(ISyncedCollection<WorkspaceHostRecord> hos
     public IEnumerable<McpTool> Tools =>
     [
         new("workspace_sessions", "The Claude Code sessions open on the user's PCs (Workspace Controller): each one's id, title, project folder, VS Code window, PC and state; and the windows a new session can open in.",
-            McpTool.NoArguments(), (_, _) => Task.FromResult<object?>(List())) { ReadOnly = true },
+            McpTool.NoArguments(), (_, _) => Task.FromResult<object?>(List()))
+        {
+            ReadOnly = true,
+            Brief = "Claude Code sessions open on the user's PCs (id, title, project, folder, PC, state), and the windows a new session can open in.",
+        },
         new("workspace_send",
             "Type the user's request into a Claude Code session on their PC (free: it runs on their own plan). Name the session by its project, folder, window or title as the user said it (\"Helm\"), or give its id; when several fit, nothing is sent and the answer lists them: ask the user which one. A window with no session, or new_session, opens a new session there.",
             McpArgs.Schema(
@@ -31,6 +35,10 @@ public sealed class WorkspaceAskTools(ISyncedCollection<WorkspaceHostRecord> hos
             (args, _) => Task.FromResult<object?>(Send(args)))
         {
             Undo = (result, _) => { Withdraw(result); return Task.CompletedTask; },
+            Brief = "Type the user's request into a Claude Code session on their PC (free). to: its project, folder, window or title as the user " +
+                "said it, or its id; when several fit, nothing is sent and the answer lists them: ask which. A window with no session, or new_session, opens one.",
+            BriefArgs = new Dictionary<string, string> { ["text"] = "as the user said it, tidied, never changed in meaning" },
+            BriefResult = McpTool.Keep("sent_to", "new_session"),
         },
     ];
 
