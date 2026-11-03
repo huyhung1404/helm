@@ -174,35 +174,19 @@ internal partial class MainWindow : FluentWindow
         Navigation.MenuItems.Add(NavItem("Home", SymbolRegular.Home24, typeof(HomePage)));
         Navigation.MenuItems.Add(NavItem("General", SymbolRegular.Settings24, typeof(GeneralPage)));
         Navigation.MenuItems.Add(NavItem("AI", SymbolRegular.Sparkle24, typeof(AiPage)));
-        Navigation.MenuItems.Add(new NavigationViewItemSeparator());
-
+        // One flat list: every tool keeps its own icon in the collapsed strip, under a header that is the same height
+        // open or collapsed, so opening the pane never pushes the item under the mouse down.
         foreach (var group in _viewModel.Groups)
         {
-            var groupItem = new NavigationViewItem
-            {
-                Content = group.Group.DisplayName(),
-                Icon = new SymbolIcon(group.Group.Icon()),
-                IsExpanded = group.Modules.Count > 0,
-            };
+            if (group.Modules.Count == 0 && group.ExtraPages.Count == 0) continue;
+            Navigation.MenuItems.Add(new NavGroupHeader(group.Group.DisplayName(), Navigation));
 
             foreach (var module in group.Modules)
                 // Tools with content open it from the menu; their settings are reached from Home → Utilities.
-                groupItem.MenuItems.Add(NavItem(module.DisplayName, ModuleIcon.Create(module, imageSize: 18), (module as IModuleContent)?.ContentPageType ?? module.SettingsPageType));
+                Navigation.MenuItems.Add(NavItem(module.DisplayName, ModuleIcon.Create(module, imageSize: 18), (module as IModuleContent)?.ContentPageType ?? module.SettingsPageType));
 
             foreach (var extra in group.ExtraPages)
-                groupItem.MenuItems.Add(NavItem(extra.Title, new SymbolIcon(extra.Icon), extra.PageType));
-
-            if (groupItem.MenuItems.Count == 0)
-            {
-                groupItem.MenuItems.Add(new NavigationViewItem
-                {
-                    Content = "More tools coming soon",
-                    IsEnabled = false,
-                    Icon = new SymbolIcon(SymbolRegular.Clock24),
-                });
-            }
-
-            Navigation.MenuItems.Add(groupItem);
+                Navigation.MenuItems.Add(NavItem(extra.Title, new SymbolIcon(extra.Icon), extra.PageType));
         }
 
         // "Welcome to Helm" (WelcomePage) is hidden for now; re-add:
@@ -227,12 +211,7 @@ internal partial class MainWindow : FluentWindow
     private void HighlightMenu(Type? page)
     {
         foreach (var item in Navigation.MenuItems.OfType<NavigationViewItem>().Concat(Navigation.FooterMenuItems.OfType<NavigationViewItem>()))
-        {
-            var children = item.MenuItems.OfType<NavigationViewItem>().ToList();
-            foreach (var child in children) child.IsActive = Equals(child.Tag, page);
-            // A group shows as one icon while the menu is collapsed: it lights up for its tools.
-            item.IsActive = Equals(item.Tag, page) || children.Any(c => c.IsActive);
-        }
+            item.IsActive = Equals(item.Tag, page);
     }
 
     private void OnSearchTextChanged(AutoSuggestBox sender, AutoSuggestBoxTextChangedEventArgs args)

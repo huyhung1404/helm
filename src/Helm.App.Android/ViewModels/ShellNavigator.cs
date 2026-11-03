@@ -1,9 +1,11 @@
 using System.Collections.ObjectModel;
+using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Media;
 using CommunityToolkit.Mvvm.ComponentModel;
 using FluentIcons.Common;
 using Helm.App.Android.Services;
+using Helm.Core;
 using Helm.Core.Modules;
 using Helm.Core.Services;
 using Helm.Core.Settings;
@@ -47,16 +49,22 @@ public sealed partial class ShellTab(string key, object page, string title, Symb
 }
 
 /// <summary>
-/// Helm's tabs on the phone. Like a browser, every page opens in a tab of its own and stays as it was while another tab
-/// is shown; there is no tab strip (a phone has no room for one): the app bar's tab button and the drawer open the tab
-/// list. A tool's tab can move to a window of its own (<see cref="ToolWindows"/>), e.g. beside Helm in split screen.
-/// MainView builds each tab's view once (see <see cref="ShellTab.View"/>), so switching tabs keeps every page's state.
+/// The pages Helm keeps open on the phone. There are no visible tabs: the drawer goes to a page, and the page shown
+/// and the ones used just before it (<see cref="KeptPages"/> in all) stay built (see <see cref="ShellTab.View"/>), so
+/// going back to them is instant and they are as they were. Older ones are let go to save memory (all but the shown
+/// one when Android runs low); opened again, they are built afresh and scroll back to where they were. A tool's page
+/// can move to a window of its own (<see cref="ToolWindows"/>), e.g. beside Helm in split screen.
 /// </summary>
 public sealed partial class ShellNavigator(IServiceProvider services, ISettingsStoreFactory settings) : ObservableObject, IShellNavigation
 {
     private readonly ISettingsStore<GeneralSettings> _general = settings.Get<GeneralSettings>(GeneralSettings.StoreId);
+    private readonly Dictionary<string, Vector> _scrollOffsets = [];
     private bool _restored;
 
+    /// <summary>How many pages stay built: the one shown and the ones used just before it.</summary>
+    public const int KeptPages = 3;
+
+    /// <summary>The kept pages, least recently shown first.</summary>
     public ObservableCollection<ShellTab> Tabs { get; } = [];
 
     [ObservableProperty]
@@ -69,8 +77,6 @@ public sealed partial class ShellNavigator(IServiceProvider services, ISettingsS
     public string Title => ActiveTab?.Title ?? "Helm";
 
     public bool IsHome => CurrentPage is HomeViewModel;
-
-    public int TabCount => Tabs.Count;
 
     public void GoHome() => Open(Describe("home")!);
 
@@ -105,43 +111,63 @@ public sealed partial class ShellNavigator(IServiceProvider services, ISettingsS
         }
         if (services.GetRequiredService<ToolWindows>().BringToFront(tab.Key)) return;
         Tabs.Add(tab);
-        OnPropertyChanged(nameof(TabCount));
         Activate(tab);
     }
 
+    /// <summary>Shows the page and lets go of the oldest kept pages beyond <see cref="KeptPages"/>.</summary>
     public void Activate(ShellTab tab)
     {
         if (ActiveTab is { } old) old.IsActive = false;
         tab.IsActive = true;
         ActiveTab = tab;
+        var index = Tabs.IndexOf(tab);
+        if (index >= 0 && index != Tabs.Count - 1) Tabs.Move(index, Tabs.Count - 1);
+        Trim(KeptPages);
     }
 
-    /// <summary>Closes the tab (its page is built afresh next time); Home comes back when the last tab closes.</summary>
+    /// <summary>Lets go of all pages but the shown one (Android is low on memory).</summary>
+    public void TrimToShown() => Trim(1);
+
+    private void Trim(int keep)
+    {
+        while (Tabs.Count > keep && Tabs.FirstOrDefault(t => !ReferenceEquals(t, ActiveTab)) is { } oldest) Close(oldest);
+    }
+
+    /// <summary>
+    /// Closes the page (built afresh next time, at the same scroll position); the page used before it comes back when
+    /// it was shown, Home when no page is left.
+    /// </summary>
     public void Close(ShellTab tab)
     {
         var index = Tabs.IndexOf(tab);
         if (index < 0) return;
+        if (tab.View is ScrollViewer scroller) _scrollOffsets[tab.Key] = scroller.Offset;
         Tabs.RemoveAt(index);
         tab.IsActive = false;
         tab.View = null;
-        OnPropertyChanged(nameof(TabCount));
         if (!ReferenceEquals(ActiveTab, tab)) return;
         if (Tabs.Count == 0) GoHome();
-        else Activate(Tabs[Math.Min(index, Tabs.Count - 1)]);
+        else Activate(Tabs[^1]);
     }
 
-    public void CloseOthers(ShellTab keep)
-    {
-        foreach (var tab in Tabs.Where(t => !ReferenceEquals(t, keep)).ToList()) Close(tab);
-        Activate(keep);
-    }
+    /// <summary>Where a page closed earlier was scrolled to, once; null when it was not.</summary>
+    public Vector? TakeScrollOffset(string key) => _scrollOffsets.Remove(key, out var offset) ? offset : null;
 
-    /// <summary>Moves a tool's tab out to a window of its own (Android puts it beside Helm in split screen).</summary>
+    /// <summary>Moves a tool's page out to a window of its own (Android puts it beside Helm in split screen).</summary>
     public void OpenInWindow(ShellTab tab)
     {
         if (!tab.CanOpenInWindow) return;
         Close(tab);
         services.GetRequiredService<ToolWindows>().Open(tab);
+    }
+
+    /// <summary>The page the drawer opens for the tool, in a window of its own (brought up when it already has one).</summary>
+    public void OpenInWindow(IAndroidModule module)
+    {
+        var key = module is IModuleContent ? ContentKey(module) : SettingsKey(module);
+        var windows = services.GetRequiredService<ToolWindows>();
+        if (Tabs.FirstOrDefault(t => t.Key == key) is { } open) OpenInWindow(open);
+        else if (!windows.BringToFront(key) && Describe(key) is { } tab) windows.Open(tab);
     }
 
     /// <summary>The tab of a page by its key, as <see cref="ShellTab.Key"/> names it; null for an unknown or removed tool.</summary>
@@ -163,7 +189,11 @@ public sealed partial class ShellNavigator(IServiceProvider services, ISettingsS
         };
     }
 
-    /// <summary>Adds the tabs of the last session, once (Home when there were none).</summary>
+    /// <summary>
+    /// Adds the pages of the last session, once (Home when there were none); none is built until it is shown. A page a
+    /// widget or notification asked for (<see cref="ShellIntents.TakeModule"/>) is shown at once, so the last session's
+    /// page is not built first.
+    /// </summary>
     public void Restore()
     {
         if (_restored) return;
@@ -171,9 +201,13 @@ public sealed partial class ShellNavigator(IServiceProvider services, ISettingsS
         var windows = services.GetRequiredService<ToolWindows>();
         foreach (var key in _general.Current.Window.Tabs ?? [])
             if (!windows.IsOpen(key) && Tabs.All(t => t.Key != key) && Describe(key) is { } tab) Tabs.Add(tab);
-        OnPropertyChanged(nameof(TabCount));
+        if (ShellIntents.TakeModule() is { } requested && services.GetRequiredService<IModuleHost<IAndroidModule>>().Find(requested) is { } module)
+        {
+            GoModuleContent(module);
+            return;
+        }
         // A tool window moved back before the main window existed keeps its tab in front.
-        var active = ActiveTab ?? Tabs.FirstOrDefault(t => t.Key == _general.Current.Window.ActiveTab) ?? Tabs.FirstOrDefault();
+        var active = ActiveTab ?? Tabs.FirstOrDefault(t => t.Key == _general.Current.Window.ActiveTab) ?? Tabs.LastOrDefault();
         if (active is not null) Activate(active);
         else GoHome();
     }

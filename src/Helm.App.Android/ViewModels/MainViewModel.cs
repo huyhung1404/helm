@@ -8,21 +8,46 @@ using Helm.App.Android.Services;
 
 namespace Helm.App.Android.ViewModels;
 
-/// <summary>One row of the navigation drawer: a page, or a group header above that group's tools.</summary>
-public sealed record NavEntry(string Title, Symbol Icon, bool IsHeader, Action? Open, IImage? Image = null)
+/// <summary>
+/// One row of the navigation drawer: a page, or a group header above that group's tools. The page's row is marked
+/// while that page (or the tool's settings page) is shown, as in the Windows menu.
+/// </summary>
+public sealed partial class NavEntry(string title, Symbol icon, bool isHeader, Action? open, IImage? image = null,
+    string? pageKey = null, IAndroidModule? module = null) : ObservableObject
 {
+    public string Title { get; } = title;
+
+    public Symbol Icon { get; } = icon;
+
+    public bool IsHeader { get; } = isHeader;
+
     public bool IsPage => !IsHeader;
+
+    public Action? Open { get; } = open;
+
+    public IImage? Image { get; } = image;
+
+    /// <summary>The tool the row opens; null for Home, General and headers.</summary>
+    public IAndroidModule? Module { get; } = module;
+
+    [ObservableProperty]
+    private bool _isActive;
+
+    public bool Shows(ShellTab? tab) => tab is not null && (Module is not null ? ReferenceEquals(tab.Module, Module) : tab.Key == pageKey);
 }
 
-/// <summary>The shell: app bar, navigation drawer (Home, tools by group, General), the tab list and the confirmation overlay.</summary>
+/// <summary>The shell: app bar, navigation drawer (Home, tools by group, General) and the confirmation overlay.</summary>
 public sealed partial class MainViewModel : ObservableObject
 {
     [ObservableProperty]
     private bool _isPaneOpen;
 
-    /// <summary>The list of open tabs (from the app bar's tab button or the drawer), over the page.</summary>
+    /// <summary>The tool whose actions sheet is up (long press on its drawer row); null when none is.</summary>
     [ObservableProperty]
-    private bool _isTabsOpen;
+    [NotifyPropertyChangedFor(nameof(IsSheetOpen))]
+    private NavEntry? _sheetEntry;
+
+    public bool IsSheetOpen => SheetEntry is not null;
 
     /// <summary>The sync button in the app bar.</summary>
     public Helm.Shell.ViewModels.SyncIndicatorViewModel Sync { get; }
@@ -34,16 +59,21 @@ public sealed partial class MainViewModel : ObservableObject
         Sync = sync;
         sync.OpenSettings = navigator.GoGeneral;
 
-        Entries.Add(new NavEntry("Home", Symbol.Home, false, navigator.GoHome));
+        Entries.Add(new NavEntry("Home", Symbol.Home, false, navigator.GoHome, pageKey: "home"));
         foreach (var group in modules.Modules.GroupBy(m => m.Group).OrderBy(g => g.Key))
         {
             Entries.Add(new NavEntry(group.Key.DisplayName(), Symbol.Apps, true, null));
             foreach (var module in group.OrderBy(m => m.DisplayName))
-                Entries.Add(new NavEntry(module.DisplayName, module.Icon, false, () => navigator.GoModuleContent(module), module.IconImage));
+                Entries.Add(new NavEntry(module.DisplayName, module.Icon, false, () => navigator.GoModuleContent(module), module.IconImage, module: module));
         }
-        GeneralEntry = new NavEntry("General", Symbol.Settings, false, navigator.GoGeneral);
+        GeneralEntry = new NavEntry("General", Symbol.Settings, false, navigator.GoGeneral, pageKey: "general");
 
+        navigator.PropertyChanged += (_, e) =>
+        {
+            if (e.PropertyName == nameof(ShellNavigator.ActiveTab)) MarkActive();
+        };
         navigator.Restore();
+        MarkActive();
     }
 
     public ShellNavigator Navigator { get; }
@@ -55,56 +85,43 @@ public sealed partial class MainViewModel : ObservableObject
     /// <summary>Pinned to the bottom of the drawer, like the Windows navigation pane.</summary>
     public NavEntry GeneralEntry { get; }
 
+    private void MarkActive()
+    {
+        foreach (var entry in Entries.Append(GeneralEntry)) entry.IsActive = entry.IsPage && entry.Shows(Navigator.ActiveTab);
+    }
+
     [RelayCommand]
     private void TogglePane() => IsPaneOpen = !IsPaneOpen;
 
     [RelayCommand]
     private void Open(NavEntry? entry)
     {
+        if (IsSheetOpen) return; // the click that ends a long press on the row
         entry?.Open?.Invoke();
         IsPaneOpen = false;
     }
 
-    [RelayCommand]
-    private void ShowTabs()
+    /// <summary>Long press on a tool's drawer row: its actions (a window of its own).</summary>
+    public void ShowSheet(NavEntry entry)
     {
+        if (entry.Module is not null) SheetEntry = entry;
+    }
+
+    [RelayCommand]
+    private void HideSheet() => SheetEntry = null;
+
+    [RelayCommand]
+    private void OpenSheetEntryInWindow()
+    {
+        if (SheetEntry?.Module is not { } module) return;
+        SheetEntry = null;
         IsPaneOpen = false;
-        IsTabsOpen = true;
-    }
-
-    [RelayCommand]
-    private void HideTabs() => IsTabsOpen = false;
-
-    [RelayCommand]
-    private void SelectTab(ShellTab? tab)
-    {
-        if (tab is not null) Navigator.Activate(tab);
-        IsTabsOpen = false;
-    }
-
-    [RelayCommand]
-    private void CloseTab(ShellTab? tab)
-    {
-        if (tab is not null) Navigator.Close(tab);
-    }
-
-    [RelayCommand]
-    private void CloseOtherTabs()
-    {
-        if (Navigator.ActiveTab is { } active) Navigator.CloseOthers(active);
-    }
-
-    [RelayCommand]
-    private void OpenInWindow(ShellTab? tab)
-    {
-        if (tab is null) return;
-        IsTabsOpen = false;
-        Navigator.OpenInWindow(tab);
+        Navigator.OpenInWindow(module);
     }
 
     /// <summary>
-    /// Android back: close the dialog, the drawer or the tab list, then go back inside the tool, then to the Home tab
-    /// (the tool's tab stays open); false lets Android leave the app.
+    /// Android back: close the dialog, the actions sheet or the drawer, then go back inside the tool, then to Home (the
+    /// tool's page stays kept); false lets Android leave the app.
     /// </summary>
     public bool HandleBack()
     {
@@ -113,14 +130,14 @@ public sealed partial class MainViewModel : ObservableObject
             Dialogs.Cancel();
             return true;
         }
+        if (IsSheetOpen)
+        {
+            SheetEntry = null;
+            return true;
+        }
         if (IsPaneOpen)
         {
             IsPaneOpen = false;
-            return true;
-        }
-        if (IsTabsOpen)
-        {
-            IsTabsOpen = false;
             return true;
         }
         if (Navigator.CurrentPage is ModulePage page)

@@ -31,6 +31,27 @@ public static class ShellIntents
 
     private static readonly object s_gate = new();
     private static (string Module, string Item)? s_item;
+    private static string? s_module;
+
+    /// <summary>
+    /// Asks the shell for a tool's page. The activity calls it before the shell starts, so the shell opens that page
+    /// first instead of building the last session's page and only then switching.
+    /// </summary>
+    public static void RequestModule(string module)
+    {
+        lock (s_gate) s_module = module;
+    }
+
+    /// <summary>The tool whose page was asked for, once; null when there is none.</summary>
+    public static string? TakeModule()
+    {
+        lock (s_gate)
+        {
+            var module = s_module;
+            s_module = null;
+            return module;
+        }
+    }
 
     /// <summary>Raised when an item is offered (the tool's page, if shown, takes it at once).</summary>
     public static event EventHandler? ItemOffered;

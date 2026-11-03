@@ -40,6 +40,9 @@ public sealed class MainActivity : AvaloniaMainActivity
     // Tools reach the activity, its results and the app's foreground/background changes through ActivityHost.
     protected override void OnCreate(global::Android.OS.Bundle? savedInstanceState)
     {
+        // Before the shell starts: it opens the page asked for instead of the last session's page. Not when Android
+        // brings the activity back after ending the process: that intent was already handled then.
+        if (savedInstanceState is null) TakeRequestedModule();
         base.OnCreate(savedInstanceState);
         ActivityHost.OnCreated(this);
     }
@@ -86,16 +89,40 @@ public sealed class MainActivity : AvaloniaMainActivity
         }
     }
 
+    /// <summary>
+    /// Android is short of memory: let go of every kept page but the shown one (they are built again when opened). Not
+    /// on a plain trip to the background (UI hidden), which would rebuild pages after every app switch.
+    /// </summary>
+    public override void OnTrimMemory(global::Android.Content.TrimMemory level)
+    {
+        base.OnTrimMemory(level);
+        if (level is not (global::Android.Content.TrimMemory.RunningLow or global::Android.Content.TrimMemory.RunningCritical) && level < global::Android.Content.TrimMemory.Background) return;
+        try
+        {
+            App.Services.GetRequiredService<ShellNavigator>().TrimToShown();
+        }
+        catch (Exception ex)
+        {
+            Serilog.Log.Warning(ex, "Could not let go of kept pages");
+        }
+    }
+
     protected override void OnActivityResult(int requestCode, Result resultCode, global::Android.Content.Intent? data)
     {
         if (!ActivityHost.OnActivityResult(requestCode, resultCode, data)) base.OnActivityResult(requestCode, resultCode, data);
     }
 
-    /// <summary>The activity is already running (e.g. opened again from a widget): take the new intent's extras.</summary>
+    /// <summary>
+    /// The activity is already running (e.g. opened again from a widget): switch to the page asked for now, before the
+    /// window comes back, rather than on resume.
+    /// </summary>
     protected override void OnNewIntent(global::Android.Content.Intent? intent)
     {
         base.OnNewIntent(intent);
-        if (intent is not null) Intent = intent;
+        if (intent is null) return;
+        Intent = intent;
+        TakeRequestedModule();
+        OpenRequestedModule();
     }
 
     protected override void OnResume()
@@ -177,16 +204,26 @@ public sealed class MainActivity : AvaloniaMainActivity
         return system;
     }
 
-    /// <summary>A widget or shortcut can ask for a tool's page with <see cref="ShellIntents.ExtraModule"/>.</summary>
-    private void OpenRequestedModule()
+    /// <summary>
+    /// A widget, notification or shortcut can ask for a tool's page with <see cref="ShellIntents.ExtraModule"/> (and an
+    /// item on it with <see cref="ShellIntents.ExtraItem"/>): moves the request from the intent to the shell.
+    /// </summary>
+    private void TakeRequestedModule()
     {
         if (Intent?.GetStringExtra(ShellIntents.ExtraModule) is not { Length: > 0 } id) return;
-        Intent!.RemoveExtra(ShellIntents.ExtraModule);
+        Intent.RemoveExtra(ShellIntents.ExtraModule);
         if (Intent.GetStringExtra(ShellIntents.ExtraItem) is { Length: > 0 } item)
         {
             Intent.RemoveExtra(ShellIntents.ExtraItem);
             ShellIntents.OfferItem(id, item);
         }
+        ShellIntents.RequestModule(id);
+    }
+
+    /// <summary>Shows the page asked for, when the shell has not opened it already (it does on start).</summary>
+    private static void OpenRequestedModule()
+    {
+        if (ShellIntents.TakeModule() is not { } id) return;
         try
         {
             var services = App.Services;
