@@ -3,7 +3,7 @@
 All notable changes to Helm. The top section is used as the GitHub release body and as the Velopack release notes.
 Format: [Keep a Changelog](https://keepachangelog.com), versions follow [SemVer](https://semver.org).
 
-## [Unreleased]
+## [0.76.0] - 2026-11-03
 
 ### Added
 - **Habits (PC and Android): a streak reminder in the evening.** From 21:00 (Settings → Habits → Streak reminder,
@@ -12,10 +12,6 @@ Format: [Keep a Changelog](https://keepachangelog.com), versions follow [SemVer]
   tries both reminders.
 - **Habits: today at a glance.** The Habits tab opens with “2 of 5 habits done today”, a progress bar and what is
   left; a card whose streak waits for today carries an amber “5 days in a row: do it today to keep the chain”.
-
-### Changed
-- **Helm Keyboard: w on its own is a w.** A w with no vowel before it is no longer turned into ư (“tw” stays “tw”); type
-  uw for ư.
 - **Slack Bot: give Lumi a task.** When you call Lumi yourself (“@lumi làm file pitching, dự án GameStudio”), Lumi works
   in the folders you point at (a full path such as D:\Work\Pitch, quoted when it has spaces, or a project’s name from
   C:\Project; several at once) or else the ones set for that conversation: it reads, creates and edits
@@ -26,6 +22,10 @@ Format: [Keep a Changelog](https://keepachangelog.com), versions follow [SemVer]
   remove one. The folder set the old way is kept.
 - **Slack Bot: Lumi says it is on it.** The moment someone calls Lumi, a line “Lumi đã nhận câu hỏi, đang tìm câu trả
   lời… ⏳” goes into the thread, so everyone sees the question is being handled; it is taken away once the answer is in.
+
+### Changed
+- **Helm Keyboard: w on its own is a w.** A w with no vowel before it is no longer turned into ư (“tw” stays “tw”); type
+  uw for ư.
 
 ### Fixed
 - Slack Bot: “@lumi …” sent from Helm’s reply box got no answer. Slack marks what an app sends as a bot’s message, so
