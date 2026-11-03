@@ -101,7 +101,7 @@
         <TextBlock Text="Ask Helm" Style="{DynamicResource HelmSectionHeader}" />
         <ui:CardControl Margin="0,0,0,4" Icon="{ui:SymbolIcon ArrowSwap24}">
             <ui:CardControl.Header>
-                <core:CardHeader Title="Where it runs" Description="The model picked in the card is the one the API uses when no agent answers." />
+                <core:CardHeader Title="Where it runs" Description="The model picked in the card is the one the API uses when no agent answers. The Features tab has the same choice, with every other AI feature." />
             </ui:CardControl.Header>
             <ComboBox ItemsSource="{Binding Routes}" SelectedItem="{Binding Route}" DisplayMemberPath="Label" MinWidth="280"
                       AutomationProperties.Name="Where Ask Helm runs" />

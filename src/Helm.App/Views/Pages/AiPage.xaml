@@ -26,16 +26,18 @@
     <StackPanel Margin="24,16,24,24">
         <TextBlock Text="AI" FontSize="28" FontWeight="SemiBold" Margin="0,0,0,8" />
         <TextBlock Style="{DynamicResource HelmSecondaryText}" Margin="0,0,0,16"
-                   Text="Your AI providers' API keys (Claude, Grok…), the agents on this PC that take Helm's AI jobs first, and the AI agents that use Helm's tools." />
+                   Text="Your AI providers' API keys (Claude, Grok…), the agents on this PC that take Helm's AI jobs first, the AI agents that use Helm's tools, and each AI feature's settings." />
 
-        <!-- Models & keys, Agents & MCP -->
+        <!-- Models & keys, Proxy, Agents & MCP, Features -->
         <WrapPanel Margin="0,0,0,16">
             <ui:Button Style="{StaticResource Segment}" Margin="0,0,6,0" Tag="{Binding IsKeysTab}" Content="Models &amp; keys" Icon="{ui:SymbolIcon Key24}"
                        Command="{Binding ShowKeysCommand}" AutomationProperties.Name="Models and keys" />
             <ui:Button Style="{StaticResource Segment}" Margin="0,0,6,0" Tag="{Binding IsProxyTab}" Content="Proxy" Icon="{ui:SymbolIcon ArrowSwap24}"
                        Command="{Binding ShowProxyCommand}" AutomationProperties.Name="Proxy" />
-            <ui:Button Style="{StaticResource Segment}" Tag="{Binding IsAgentsTab}" Content="Agents &amp; MCP" Icon="{ui:SymbolIcon PlugConnected24}"
+            <ui:Button Style="{StaticResource Segment}" Margin="0,0,6,0" Tag="{Binding IsAgentsTab}" Content="Agents &amp; MCP" Icon="{ui:SymbolIcon PlugConnected24}"
                        Command="{Binding ShowAgentsCommand}" AutomationProperties.Name="Agents and MCP" />
+            <ui:Button Style="{StaticResource Segment}" Tag="{Binding IsFeaturesTab}" Content="Features" Icon="{ui:SymbolIcon Options24}"
+                       Command="{Binding ShowFeaturesCommand}" AutomationProperties.Name="Features" />
         </WrapPanel>
 
         <aiv:AiKeysView DataContext="{Binding Keys}"
@@ -44,5 +46,7 @@
                          Visibility="{Binding DataContext.IsProxyTab, RelativeSource={RelativeSource AncestorType=Page}, Converter={StaticResource BoolToVisibility}}" />
         <mcp:McpAgentsView DataContext="{Binding Agents}"
                            Visibility="{Binding DataContext.IsAgentsTab, RelativeSource={RelativeSource AncestorType=Page}, Converter={StaticResource BoolToVisibility}}" />
+        <aiv:AiFeaturesView DataContext="{Binding Features}"
+                            Visibility="{Binding DataContext.IsFeaturesTab, RelativeSource={RelativeSource AncestorType=Page}, Converter={StaticResource BoolToVisibility}}" />
     </StackPanel>
 </Page>
