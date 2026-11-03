@@ -66,7 +66,8 @@ public sealed class SlackLumiTests
 
     private sealed class Projects : ISlackProjects
     {
-        public string? Named(string text, string root) => text.Contains("GameStudio", StringComparison.OrdinalIgnoreCase) ? Path.Combine(root, "GameStudio") : null;
+        public IReadOnlyList<string> Mentioned(string text, string root) =>
+            text.Contains("GameStudio", StringComparison.OrdinalIgnoreCase) ? [Path.Combine(root, "GameStudio")] : [];
         public Task<string?> ProgressAsync(string folder, CancellationToken ct) => Task.FromResult<string?>("2026-11-02 Sơn: add shop scene");
     }
 
@@ -211,6 +212,30 @@ public sealed class SlackLumiTests
     [InlineData("GameStudio2 thì sao", "GameStudio", false)]
     [InlineData("MyGameStudio", "GameStudio", false)]
     public void A_project_is_named_as_a_word_of_its_own(string text, string name, bool named) => Assert.Equal(named, SlackProjects.Names(text, name));
+
+    [Theory]
+    [InlineData(@"@lumi mở C:\Work\Pitch rồi tóm tắt", @"C:\Work\Pitch")]
+    [InlineData(@"xem D:/Games/Run, viết README", "D:/Games/Run")]
+    [InlineData("@lumi đọc \"D:\\My Game\\Docs\" giúp anh", @"D:\My Game\Docs")]
+    [InlineData(@"đọc `E:\a b\c` nhé", @"E:\a b\c")]
+    [InlineData(@"file ở C:\Work\Pitch\notes.md.", @"C:\Work\Pitch\notes.md")]
+    public void Paths_written_in_a_call_are_found(string text, string path) => Assert.Equal([path], SlackProjects.Paths(text));
+
+    [Fact]
+    public void A_call_points_at_paths_and_project_names_that_exist()
+    {
+        using var dir = new TempDir();
+        var root = Directory.CreateDirectory(Path.Combine(dir.Path, "Project")).FullName;
+        var game = Directory.CreateDirectory(Path.Combine(root, "GameStudio")).FullName;
+        var docs = Directory.CreateDirectory(Path.Combine(root, "Helm", "docs")).FullName;
+        File.WriteAllText(Path.Combine(docs, "a.md"), "");
+        var projects = new SlackProjects(null!);
+        // A path into one project does not also call another named inside it; a file stands for its folder.
+        Assert.Equal([docs, game], projects.Mentioned($@"@lumi đọc {docs}\a.md và dự án GameStudio", root));
+        Assert.Equal([docs], projects.Mentioned($@"so sánh {docs} với C:\khong-co-thu-muc-nay", root));
+        // A whole drive is never handed over.
+        Assert.Empty(projects.Mentioned(@"quét C:\ giúp anh", root));
+    }
 
     [Fact]
     public void Work_may_edit_the_project_but_never_secrets_or_a_shell()

@@ -17,7 +17,8 @@ Format: [Keep a Changelog](https://keepachangelog.com), versions follow [SemVer]
 - **Helm Keyboard: w on its own is a w.** A w with no vowel before it is no longer turned into ư (“tw” stays “tw”); type
   uw for ư.
 - **Slack Bot: give Lumi a task.** When you call Lumi yourself (“@lumi làm file pitching, dự án GameStudio”), Lumi works
-  in the project you name (a folder of C:\Project) or the ones set for that conversation: it reads, creates and edits
+  in the folders you point at (a full path such as D:\Work\Pitch, quoted when it has spaces, or a project’s name from
+  C:\Project; several at once) or else the ones set for that conversation: it reads, creates and edits
   files there (no commands, never .env or keys), then reports what it did and which files. When others call Lumi, it
   only reads the projects set for that conversation, with their git history (Helm reads git itself), to say how they
   are going.

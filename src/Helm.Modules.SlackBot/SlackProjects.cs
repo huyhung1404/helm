@@ -5,11 +5,14 @@ using Helm.Core.Processes;
 
 namespace Helm.Modules.SlackBot;
 
-/// <summary>The user's project folders, for Lumi: the one a call names, and what happened in it lately (a fake in tests).</summary>
+/// <summary>The user's project folders, for Lumi: the ones a call names, and what happened in them lately (a fake in tests).</summary>
 public interface ISlackProjects
 {
-    /// <summary>The folder under <paramref name="root"/> whose name is a word of <paramref name="text"/> (the longest), or null.</summary>
-    string? Named(string text, string root);
+    /// <summary>
+    /// The folders <paramref name="text"/> points at: full paths written in it (C:\Work\Pitch, "D:\My Game"; a file
+    /// stands for its folder) and folders of <paramref name="root"/> whose name is a word of it. Only existing ones.
+    /// </summary>
+    IReadOnlyList<string> Mentioned(string text, string root);
 
     /// <summary>Recent commits and uncommitted changes of <paramref name="folder"/>, as text; null when it is not a git repository.</summary>
     Task<string?> ProgressAsync(string folder, CancellationToken ct);
@@ -19,24 +22,41 @@ public interface ISlackProjects
 /// Helm reads git itself (log and status, nothing else) and hands the text to Claude, so Claude never needs a shell to
 /// tell how a project is going.
 /// </summary>
-public sealed class SlackProjects(IChildProcessLauncher launcher) : ISlackProjects
+public sealed partial class SlackProjects(IChildProcessLauncher launcher) : ISlackProjects
 {
     /// <summary>Characters of git output Claude reads.</summary>
     internal const int MaxProgress = 6000;
 
-    public string? Named(string text, string root)
+    public IReadOnlyList<string> Mentioned(string text, string root)
     {
-        if (!Directory.Exists(root)) return null;
-        return Directory.EnumerateDirectories(root)
-            .Select(d => (Path: d, Name: Path.GetFileName(d)))
-            .Where(d => d.Name.Length >= 3 && !d.Name.StartsWith('.') && Names(text, d.Name))
-            .OrderByDescending(d => d.Name.Length)
-            .Select(d => d.Path)
-            .FirstOrDefault();
+        var found = new List<string>();
+        foreach (var path in Paths(text))
+        {
+            var folder = Directory.Exists(path) ? path : File.Exists(path) ? Path.GetDirectoryName(path) : null;
+            // A whole drive is too much to hand over.
+            if (folder is not null && Path.GetPathRoot(folder) is { } drive && !Same(folder, drive)) found.Add(Path.TrimEndingDirectorySeparator(folder));
+        }
+        // A project's name inside a path written out is not a second call for it.
+        var words = PathText().Replace(text, " ");
+        if (Directory.Exists(root))
+            found.AddRange(Directory.EnumerateDirectories(root)
+                .Where(d => Path.GetFileName(d) is { Length: >= 3 } name && !name.StartsWith('.') && Names(words, name)));
+        return [.. found.Distinct(StringComparer.OrdinalIgnoreCase)];
     }
+
+    /// <summary>The full paths written in <paramref name="text"/>: quoted ("…", `…`) or up to the next space.</summary>
+    internal static IEnumerable<string> Paths(string text) =>
+        PathText().Matches(text).Select(m => (m.Groups["q"].Success ? m.Groups["q"].Value : m.Value).Trim().TrimEnd('.', ',', ')', ']', ':', ';'))
+            .Where(p => p.Length > 3);
 
     internal static bool Names(string text, string name) =>
         Regex.IsMatch(text, $@"(^|[^\p{{L}}\p{{N}}_]){Regex.Escape(name)}(?![\p{{L}}\p{{N}}_])", RegexOptions.IgnoreCase);
+
+    private static bool Same(string a, string b) =>
+        string.Equals(Path.TrimEndingDirectorySeparator(a), Path.TrimEndingDirectorySeparator(b), StringComparison.OrdinalIgnoreCase);
+
+    [GeneratedRegex("""["`](?<q>[A-Za-z]:[\\/][^"`]*)["`]|(?<![\p{L}\p{N}_])[A-Za-z]:[\\/][^\s"'`<>|*?]*""")]
+    private static partial Regex PathText();
 
     public async Task<string?> ProgressAsync(string folder, CancellationToken ct)
     {

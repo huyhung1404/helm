@@ -116,9 +116,9 @@ public sealed partial class SlackLumi(ISlackApi api, ISlackAgent agent, SlackInb
         var lines = await LinesAsync(context.Where(c => !inbox.IsBotMessage(c.Channel, c.Ts)), ct).ConfigureAwait(false);
         var asker = m.User is { } u ? await api.UserNameAsync(u, ct).ConfigureAwait(false) ?? "someone" : "someone";
         var question = SlackText.Plain(m.Text, _ => null);
-        // The user may name any of their projects; others only get the one set for this conversation.
-        IReadOnlyList<string> folders = (askerIsMe ? projects?.Named(question, settings().ProjectsRoot) : null) is { } named
-            ? [named]
+        // The user may point at any folder (a path, or a project's name); others only get the ones set for this conversation.
+        IReadOnlyList<string> folders = (askerIsMe ? projects?.Mentioned(question, settings().ProjectsRoot) : null) is { Count: > 0 } named
+            ? named
             : settings().ProjectsOf(m.Channel);
         var instructions = Instructions(meName, asker, askerIsMe, question, lines, folders.Count > 0);
         if (folders.Count > 0)
