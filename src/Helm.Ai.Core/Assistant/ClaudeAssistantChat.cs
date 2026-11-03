@@ -5,7 +5,10 @@ using Anthropic.Models.Messages;
 
 namespace Helm.Ai.Assistant;
 
-/// <summary>Claude through the official Anthropic SDK: tools, adaptive thinking at the chosen effort, cached prefix.</summary>
+/// <summary>
+/// Claude through the official Anthropic SDK: tools, adaptive thinking at the chosen effort, cached prefix, and the
+/// server-side web search when a turn needs it (<see cref="WebSearch"/>).
+/// </summary>
 public sealed class ClaudeAssistantChatFactory(HttpClient? http = null) : IAssistantChatFactory
 {
     public AiProvider Provider => AiProviders.Claude;
@@ -15,6 +18,35 @@ public sealed class ClaudeAssistantChatFactory(HttpClient? http = null) : IAssis
         var client = new AnthropicClient { ApiKey = apiKey, MaxRetries = 1, Timeout = TimeSpan.FromSeconds(60) };
         if (http is not null) client = new AnthropicClient { ApiKey = apiKey, MaxRetries = 0, HttpClient = http };
         return new ClaudeAssistantChat(client, model, effort, system, tools);
+    }
+}
+
+/// <summary>
+/// Claude's web search tool for a model: the version with dynamic filtering on the models that take it, the basic one
+/// on the others (Haiku). Results come localized to the user's time zone.
+/// </summary>
+internal static class ClaudeWebSearch
+{
+    /// <summary>The models that take <c>web_search_20260209</c> (dynamic filtering); the others get <c>web_search_20250305</c>.</summary>
+    private static readonly HashSet<string> Filtering = new(StringComparer.Ordinal)
+    {
+        "claude-fable-5-1", "claude-fable-5", "claude-opus-5-5", "claude-opus-5", "claude-opus-4-8", "claude-opus-4-7", "claude-opus-4-6",
+        "claude-sonnet-5-5", "claude-sonnet-5", "claude-sonnet-4-6",
+    };
+
+    public static ToolUnion Tool(string model, int maxUses) => Filtering.Contains(model)
+        ? new ToolUnion(new WebSearchTool20260209 { MaxUses = maxUses, UserLocation = Location() })
+        : new ToolUnion(new WebSearchTool20250305 { MaxUses = maxUses, UserLocation = Location() });
+
+    /// <summary>The user's time zone (an IANA id, as the API takes it), and Vietnam when that is where it is.</summary>
+    private static UserLocation? Location()
+    {
+        var zone = TimeZoneInfo.Local.Id;
+        if (!zone.Contains('/') && TimeZoneInfo.TryConvertWindowsIdToIanaId(zone, out var iana)) zone = iana;
+        if (!zone.Contains('/')) return null;
+        return zone is "Asia/Ho_Chi_Minh" or "Asia/Saigon"
+            ? new UserLocation { Timezone = zone, Country = "VN" }
+            : new UserLocation { Timezone = zone };
     }
 }
 
@@ -28,6 +60,12 @@ internal sealed class ClaudeAssistantChat(AnthropicClient client, string model, 
 
     /// <summary>A photo went with the last user message and Claude has not answered it yet.</summary>
     private bool _imagePending;
+
+    /// <summary>The web search tool is in <see cref="_tools"/>.</summary>
+    private bool _web;
+
+    /// <summary>How often a paused search turn (<c>pause_turn</c>) is sent again to go on.</summary>
+    private const int MaxContinuations = 3;
 
     public void AddUser(string text)
     {
@@ -59,6 +97,13 @@ internal sealed class ClaudeAssistantChat(AnthropicClient client, string model, 
 
     public void AddTools(IReadOnlyList<AssistantTool> tools) => _tools.AddRange(tools.Select(ToTool));
 
+    public bool AddWebSearch(int maxUses)
+    {
+        if (!_web) _tools.Add(ClaudeWebSearch.Tool(model, maxUses));
+        _web = true;
+        return true;
+    }
+
     public async Task<AssistantStep> NextAsync(CancellationToken ct)
     {
         if (_results is { } pending)
@@ -66,10 +111,35 @@ internal sealed class ClaudeAssistantChat(AnthropicClient client, string model, 
             _messages.Add(new UserMessageParam { Content = pending });
             _results = null;
         }
-        Message response;
+        var response = await CreateAsync(ct);
+        _imagePending = false;
+        var answer = Read(response);
+        long input = response.Usage.InputTokens, output = response.Usage.OutputTokens;
+        long cacheRead = response.Usage.CacheReadInputTokens ?? 0, cacheWrite = response.Usage.CacheCreationInputTokens ?? 0;
+        var searches = Searches(response.Usage);
+        // A long search turn pauses: sent back as it is, it goes on where it stopped.
+        for (var more = 0; response.StopReason == "pause_turn" && more < MaxContinuations; more++)
+        {
+            response = await CreateAsync(ct);
+            var next = Read(response);
+            answer = (Join(answer.Text, next.Text), [.. answer.Calls, .. next.Calls], [.. answer.Sources, .. next.Sources]);
+            input += response.Usage.InputTokens;
+            output += response.Usage.OutputTokens;
+            cacheRead += response.Usage.CacheReadInputTokens ?? 0;
+            cacheWrite += response.Usage.CacheCreationInputTokens ?? 0;
+            searches += Searches(response.Usage);
+        }
+
+        return new AssistantStep(WithSources(answer.Text, answer.Sources), answer.Calls,
+            new AssistantUsage(input, output, cacheRead, cacheWrite, searches),
+            Refused: response.StopReason == "refusal");
+    }
+
+    private async Task<Message> CreateAsync(CancellationToken ct)
+    {
         try
         {
-            response = await client.Messages.Create(new MessageCreateParams
+            return await client.Messages.Create(new MessageCreateParams
             {
                 Model = model,
                 MaxTokens = 4096,
@@ -101,6 +171,10 @@ internal sealed class ClaudeAssistantChat(AnthropicClient client, string model, 
         {
             throw new AssistantException("The Claude account has no credit left: add some under Billing in the Console.", ex);
         }
+        catch (AnthropicBadRequestException ex) when (_web && ex.Message.Contains("web search", StringComparison.OrdinalIgnoreCase))
+        {
+            throw new AssistantException("Web search is turned off for this Claude organization: an admin turns it on under Settings › Capabilities in the Console.", ex);
+        }
         catch (AnthropicApiException ex)
         {
             throw new AssistantException($"Claude answered: {ex.Message}", ex);
@@ -109,17 +183,28 @@ internal sealed class ClaudeAssistantChat(AnthropicClient client, string model, 
         {
             throw new AssistantException("Could not reach Claude. Check the internet connection.", ex);
         }
+    }
 
-        _imagePending = false;
+    /// <summary>
+    /// One response: its text, its tool calls and the sites its text cites. The whole content goes back into the
+    /// conversation as it came (thinking with its signature, searches with their encrypted results, citations): Claude
+    /// rejects an edited one. After a search, only the text written after the last result is the answer.
+    /// </summary>
+    private (string Text, IReadOnlyList<ToolCall> Calls, IReadOnlyList<string> Sources) Read(Message response)
+    {
         var texts = new List<string>();
+        var sources = new List<string>();
         var calls = new List<ToolCall>();
         List<ContentBlockParam> echo = [];
+        var searched = false;
         foreach (var block in response.Content)
         {
             if (block.TryPickText(out TextBlock? text))
             {
+                var cited = text.RawData.TryGetValue("citations", out var citations) ? WebSearch.Urls(citations).ToList() : [];
                 texts.Add(text.Text);
-                echo.Add(new TextBlockParam { Text = text.Text });
+                sources.AddRange(cited);
+                echo.Add(cited.Count > 0 ? TextBlockParam.FromRawUnchecked(text.RawData) : new TextBlockParam { Text = text.Text });
             }
             else if (block.TryPickThinking(out ThinkingBlock? thinking))
             {
@@ -135,13 +220,50 @@ internal sealed class ClaudeAssistantChat(AnthropicClient client, string model, 
                 echo.Add(new ToolUseBlockParam { ID = use.ID, Name = use.Name, Input = use.Input });
                 calls.Add(new ToolCall(use.ID, use.Name, JsonSerializer.SerializeToElement(use.Input)));
             }
+            else if (Server(block) is { } server)
+            {
+                // A search Claude ran (and, with dynamic filtering, the code that sifted its results): the text so far
+                // was Claude saying it would look; the answer follows.
+                echo.Add(server);
+                searched = true;
+                texts.Clear();
+                sources.Clear();
+            }
         }
         if (echo.Count > 0) _messages.Add(new AssistantMessageParam { Content = echo });
+        // Cited text comes in pieces (one block per citation): they make one answer.
+        return (string.Join(searched || sources.Count > 0 ? "" : "\n", texts).Trim(), calls, sources);
+    }
 
-        var usage = response.Usage;
-        return new AssistantStep(string.Join("\n", texts).Trim(), calls,
-            new AssistantUsage(usage.InputTokens, usage.OutputTokens, usage.CacheReadInputTokens ?? 0, usage.CacheCreationInputTokens ?? 0),
-            Refused: response.StopReason == "refusal");
+    /// <summary>A block a server tool wrote (a search, its results, the code that filtered them), to send back unchanged.</summary>
+    private static ContentBlockParam? Server(ContentBlock block)
+    {
+        if (block.TryPickServerToolUse(out ServerToolUseBlock? use)) return ServerToolUseBlockParam.FromRawUnchecked(use.RawData);
+        if (block.TryPickWebSearchToolResult(out WebSearchToolResultBlock? search)) return WebSearchToolResultBlockParam.FromRawUnchecked(search.RawData);
+        if (block.TryPickWebFetchToolResult(out WebFetchToolResultBlock? fetch)) return WebFetchToolResultBlockParam.FromRawUnchecked(fetch.RawData);
+        if (block.TryPickCodeExecutionToolResult(out CodeExecutionToolResultBlock? code)) return CodeExecutionToolResultBlockParam.FromRawUnchecked(code.RawData);
+        if (block.TryPickBashCodeExecutionToolResult(out BashCodeExecutionToolResultBlock? bash))
+            return BashCodeExecutionToolResultBlockParam.FromRawUnchecked(bash.RawData);
+        if (block.TryPickTextEditorCodeExecutionToolResult(out TextEditorCodeExecutionToolResultBlock? editor))
+            return TextEditorCodeExecutionToolResultBlockParam.FromRawUnchecked(editor.RawData);
+        if (block.TryPickContainerUpload(out ContainerUploadBlock? upload)) return ContainerUploadBlockParam.FromRawUnchecked(upload.RawData);
+        return null;
+    }
+
+    private static long Searches(Usage usage) => usage.ServerToolUse?.WebSearchRequests ?? 0;
+
+    private static string Join(string first, string second) => first.Length == 0 ? second : second.Length == 0 ? first : $"{first} {second}";
+
+    /// <summary>The sites the answer cites, when it does not name them itself (the card shows the text alone).</summary>
+    private static string WithSources(string text, IReadOnlyList<string> urls)
+    {
+        if (text.Length == 0 || urls.Count == 0) return text;
+        var hosts = WebSearch.Hosts(urls);
+        if (hosts.Length == 0) return text;
+        // "vnexpress.net" is named when the answer says "VnExpress", or lists its sources itself.
+        var named = text.Contains("Nguồn", StringComparison.OrdinalIgnoreCase)
+            || hosts.Split(", ").Any(h => text.Contains(h.Split('.')[0], StringComparison.OrdinalIgnoreCase));
+        return named ? text : $"{text} Nguồn: {hosts}.";
     }
 
     public void AddResults(IReadOnlyList<ToolOutcome> results) =>

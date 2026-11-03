@@ -24,11 +24,12 @@ public sealed class QuickCaptureModule(ILogger<QuickCaptureModule> logger, AskHe
     public const string AskHelmActivityName = Helm.Ai.Assistant.AskHelmContext.ActivityName;
     public const string AskHelmTileName = "com.huyhung1404.helm.AskHelmTile";
 
-    /// <summary>The text selection menu's entries ("Helm", "Helm: Dịch", "Helm: Sửa", "Helm: Viết lại").</summary>
+    /// <summary>The text selection menu's entries ("Helm", "Helm: Dịch", "Helm: Sửa", "Helm: Viết lại", "Helm: Kiểm tra tin").</summary>
     public const string AskHelmSelectionName = "com.huyhung1404.helm.AskHelmSelection";
     public const string AskHelmTranslateName = "com.huyhung1404.helm.AskHelmTranslate";
     public const string AskHelmFixName = "com.huyhung1404.helm.AskHelmFix";
     public const string AskHelmRewriteName = "com.huyhung1404.helm.AskHelmRewrite";
+    public const string AskHelmCheckName = "com.huyhung1404.helm.AskHelmCheck";
 
     /// <summary>The other ways to open Ask Helm (<see cref="AskHelmOpeners"/>): its own launcher icon and its widget.</summary>
     public const string AskHelmLauncherName = "com.huyhung1404.helm.AskHelmLauncher";
@@ -82,7 +83,7 @@ public sealed class QuickCaptureModule(ILogger<QuickCaptureModule> logger, AskHe
             var context = AndroidApp.Context;
             var state = enabled ? ComponentEnabledState.Enabled : ComponentEnabledState.Disabled;
             foreach (var name in new[] { ActivityName, TileName, AskHelmActivityName, AskHelmTileName,
-                AskHelmSelectionName, AskHelmTranslateName, AskHelmFixName, AskHelmRewriteName })
+                AskHelmSelectionName, AskHelmTranslateName, AskHelmFixName, AskHelmRewriteName, AskHelmCheckName })
                 context.PackageManager?.SetComponentEnabledSetting(new ComponentName(context, name), state, ComponentEnableOption.DontKillApp);
         }
         catch (Exception ex)

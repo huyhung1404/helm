@@ -26,6 +26,9 @@ public static class AiFeatureIds
     /// <summary>Tracker: steps proposed for a big task, tasks proposed from a note.</summary>
     public const string TaskProposals = "task-proposals";
 
+    /// <summary>A8/M4: Ask Helm searches the web (weather, rates, gold, news, checking a post). Off until the user turns it on.</summary>
+    public const string WebSearch = "web-search";
+
     // Jobs a Helm PC runs by itself on its agents (Helm.Ai.Auto.AutoJobCatalog): each brief reaches the phone.
 
     /// <summary>P3: the morning brief (today's tasks, habits to do, yesterday's spending).</summary>

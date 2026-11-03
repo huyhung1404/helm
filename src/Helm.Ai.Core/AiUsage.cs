@@ -20,6 +20,9 @@ public sealed record AiUsageEntry
     public long CacheReadTokens { get; init; }
     public long CacheWriteTokens { get; init; }
 
+    /// <summary>Web searches the provider ran for the call (Claude's server-side search), each <see cref="AiPrices.WebSearchUsd"/>.</summary>
+    public long WebSearches { get; init; }
+
     /// <summary>Estimated from <see cref="AiPrices"/>; null for a model whose price Helm does not know. 0 on Claude Code.</summary>
     public decimal? Usd { get; init; }
 
@@ -83,6 +86,9 @@ public static class AiPrices
     private static decimal Cost(Price p, long input, long output, long cacheRead, long cacheWrite) =>
         (input * p.Input + cacheWrite * p.Input * 1.25m + cacheRead * p.CacheRead + output * p.Output) / 1_000_000m;
 
+    /// <summary>One web search on Claude's API: $10 per 1,000, on top of the tokens its results add (a failed one is free).</summary>
+    public const decimal WebSearchUsd = 0.01m;
+
     /// <summary>
     /// The cost of one call. Cache writes cost a quarter more than plain input on Claude. <paramref name="input"/> is
     /// the input not read from the cache.
@@ -109,8 +115,11 @@ public sealed class AiUsageBook(ISyncedLog<AiUsageEntry> log, TimeProvider? time
     private readonly ILogger _logger = logger ?? NullLogger.Instance;
     private readonly HashSet<string> _unpriced = new(StringComparer.Ordinal);
 
-    public AiUsageEntry Record(string feature, AiProvider provider, string model, string? keyId, long input, long output, long cacheRead, long cacheWrite)
+    /// <param name="webSearches">Web searches the call ran: their fee is added to <see cref="AiUsageEntry.Usd"/>.</param>
+    public AiUsageEntry Record(string feature, AiProvider provider, string model, string? keyId, long input, long output, long cacheRead, long cacheWrite,
+        long webSearches = 0)
     {
+        var tokens = AiPrices.Usd(model, input, output, cacheRead, cacheWrite);
         var entry = new AiUsageEntry
         {
             Feature = feature,
@@ -121,7 +130,9 @@ public sealed class AiUsageBook(ISyncedLog<AiUsageEntry> log, TimeProvider? time
             OutputTokens = output,
             CacheReadTokens = cacheRead,
             CacheWriteTokens = cacheWrite,
-            Usd = AiPrices.Usd(model, input, output, cacheRead, cacheWrite),
+            WebSearches = webSearches,
+            // The search fee is known even for a model whose token price is not.
+            Usd = tokens is null && webSearches == 0 ? null : (tokens ?? 0) + webSearches * AiPrices.WebSearchUsd,
             Route = ApiRoute,
             At = _time.GetUtcNow(),
         };
