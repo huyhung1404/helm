@@ -116,10 +116,10 @@ to the API, so nothing is saved twice. Undo goes back to the PC that made the re
 end-to-end encrypted like all Helm data.
 
 **On the PC** (`LocalAgentRoute`), the agent runs with its own tools off (Claude Code: no tools, no MCP, no hooks;
-Codex: a read-only sandbox in an empty folder; Grok: `grok agent stdio`, the Agent Client Protocol over
-JSON-RPC, with no files, no terminal and every permission refused): Helm lists its tools in the first message, the agent answers with the calls it wants as JSON
+Codex: a read-only sandbox in an empty folder; Grok: headless `grok --prompt-file` with `--tools ""`, no web
+search, no subagents and Helm's instructions instead of Grok's coding prompt): Helm lists its tools in the first message, the agent answers with the calls it wants as JSON
 (`CliAgentProtocol`), Helm runs them in-process and sends the results back. Claude Code keeps one process per conversation
-(about 3 s for the first turn, 1–2 s after); Codex runs one per turn and resumes its thread; Grok keeps one ACP session per conversation and reports no usage
+(about 3 s for the first turn, 1–2 s after); Codex runs one per turn and resumes its thread; Grok runs one per turn and resumes the session Helm named, and reports no usage
 (what it saved is estimated from the text). Calls that would need a yes are not offered there, and phone tools are
 handed back to the phone. An agent that reports its plan's limit takes no job for 30 minutes; the next one in the list does.
 
