@@ -5,7 +5,9 @@ namespace Helm.Ai;
 
 /// <summary>One AI feature as the settings list it.</summary>
 /// <param name="Automatic">It runs by itself (not started by the user): on a PC agent only until the user says otherwise.</param>
-public sealed record AiFeatureInfo(string Id, string Name, string Description, bool Automatic);
+/// <param name="OnByDefault">On until the user turns it off; false: off until they turn it on (a paid extra).</param>
+/// <param name="Route">Where it runs until the user says otherwise; null: as Ask Helm does.</param>
+public sealed record AiFeatureInfo(string Id, string Name, string Description, bool Automatic, bool OnByDefault = true, AiRoutePolicy? Route = null);
 
 /// <summary>
 /// Every <see cref="AiFeatureIds"/> feature with a name the user knows: the list AI → Features (PC) and Settings › AI
@@ -20,6 +22,8 @@ public static class AiFeatureCatalog
         new(AiFeatureIds.VocabQuick, "Word analysis", "Roots and meaning for a word added on the phone", false),
         new(AiFeatureIds.SentenceExplain, "Explain sentence", "Novel Reader: hold a sentence", false),
         new(AiFeatureIds.TaskProposals, "Task proposals", "Tracker: steps for a big task, tasks from a note", false),
+        new(AiFeatureIds.WebSearch, "Web search", "Ask Helm: weather, rates, gold, news, checking a post · API, about $0.01 a search", false,
+            OnByDefault: false, Route: AiRoutePolicy.ApiOnly),
         new(AiFeatureIds.WalletReadNotification, "Read a bank notification", "Wallet: one Helm could not read, when you ask", false),
         new(AiFeatureIds.WalletCategorize, "Auto-classify transactions", "Wallet: files a new payment the history cannot", true),
         new(AiFeatureIds.MorningBrief, "Morning brief", "Today's tasks, habits to do, yesterday's spending", true),
@@ -44,9 +48,11 @@ public static class AiFeatureCatalog
         if (settings.Features.TryGetValue(id, out var own)) return own;
         if (id == AiFeatureIds.AskHelm || AutoJobCatalog.Find(id) is not null) return settings.For(id);
         var inherited = settings.For(AiFeatureIds.AskHelm).Copy();
-        inherited.Enabled = true;
+        var info = Find(id);
+        inherited.Enabled = info?.OnByDefault ?? true;
         inherited.At = null;
-        if (Find(id)?.Automatic == true) inherited.Route = AiRoutePolicy.PcOnly;
+        if (info?.Automatic == true) inherited.Route = AiRoutePolicy.PcOnly;
+        if (info?.Route is { } route) inherited.Route = route;
         return inherited;
     }
 

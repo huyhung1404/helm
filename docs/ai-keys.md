@@ -450,3 +450,30 @@ window stays, invisible and passing touches through, to hear when full screen en
 old system UI flags before): nothing polls. It comes back after a reboot or an update of Helm (`AskHelmOpenReceiver`)
 and, while it is on, an hourly alarm that never wakes the phone puts it back after Android stopped Helm. The geometry
 and the touch are `EdgeHandleLayout` and `EdgeHandleGesture`, tested in `AskHelmOpeningTests`.
+
+## Ask Helm on the web (weather, rates, gold, news, checking a post)
+
+**Web search** in AI → Features (PC) or General › AI features (phone) is **off** until you turn it on. On, Ask Helm
+answers what only the web knows now: "thời tiết Đà Lạt ngày mai", "tỷ giá đô hôm nay", "giá vàng SJC", "có tin gì
+mới", and checks a doubtful post: say or type "kiểm tra tin này: …", or select the text in any app and pick
+**Helm: Kiểm tra tin**. The answer says how trustworthy the post is (Đúng, Sai, Gây hiểu lầm, Chưa kiểm chứng được)
+and names its sources by site. With it off, a post to check gets a line saying where to turn it on.
+
+Web turns always go to the **API** with Claude's own web search (agents on a PC keep their web tools off on purpose),
+at most 3 searches a call. A search costs **$0.01** ($10 per 1,000; a failed one is free) plus the tokens its results
+add (a few thousand input tokens: well under a cent on Haiku). Its row has its own model (a Claude one; with a Grok pick the web turn asks
+Claude Haiku and the answer says so) and its own daily cap: from the first search on, the conversation's calls count
+as **Web search** in the costs, search fees included. xAI documents web search only on its Responses API, not on the
+chat completions Helm uses, so Grok does not search here.
+
+Which requests search: words such as thời tiết, tỷ giá, giá vàng, tin tức, kiểm tra tin, "hôm nay ở … thế nào"
+(`WebSearch.Asks`). A request for the web that names none of Helm's tools gets none of them. While the switch is on,
+Claude also gets a small `web_lookup` tool on API turns: when a request turns out to need current facts, it turns the
+search on itself. If an organization admin turned web search off in the Claude Console (Settings › Capabilities), the
+card says so.
+
+For developers: `Helm.Ai.Core/Assistant/WebSearch.cs` (words, the turn's instructions, `web_lookup`),
+`AssistantSession.Web.cs` (the route), `ClaudeWebSearch` in `ClaudeAssistantChat.cs` (`web_search_20260209` with
+dynamic filtering on Opus/Sonnet 4.6+, `web_search_20250305` on Haiku; server blocks go back unchanged, `pause_turn`
+goes on up to 3 times, cited sites are added when the answer does not name them), `AiUsageEntry.WebSearches` and
+`AiPrices.WebSearchUsd`. Tests: `WebSearchTests`.

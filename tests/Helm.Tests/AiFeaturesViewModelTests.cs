@@ -40,7 +40,9 @@ public sealed class AiFeaturesViewModelTests
         var vm = Build();
 
         Assert.All(vm.Groups[1].Rows, r => Assert.Equal(AiRoutePolicy.PcOnly, r.Route.Policy));
-        Assert.All(vm.Groups[0].Rows, r => Assert.Equal(AiRoutePolicy.PreferPc, r.Route.Policy));
+        // Web search is the API's alone (agents on a PC do not search the web).
+        Assert.All(vm.Groups[0].Rows.Where(r => r.Id != AiFeatureIds.WebSearch), r => Assert.Equal(AiRoutePolicy.PreferPc, r.Route.Policy));
+        Assert.Equal(AiRoutePolicy.ApiOnly, Row(vm, AiFeatureIds.WebSearch).Route.Policy);
         var brief = Row(vm, AiFeatureIds.MorningBrief);
         Assert.Equal("Runs on your PC agents · 0đ", brief.CostText);
         Assert.False(brief.HasCostDetail);

@@ -18,6 +18,9 @@ public sealed record AiUsageEntry
     public long CacheReadTokens { get; init; }
     public long CacheWriteTokens { get; init; }
 
+    /// <summary>Web searches the provider ran for the call (Claude's server-side search), each <see cref="AiPrices.WebSearchUsd"/>.</summary>
+    public long WebSearches { get; init; }
+
     /// <summary>Estimated from <see cref="AiPrices"/>; null for a model whose price Helm does not know. 0 on Claude Code.</summary>
     public decimal? Usd { get; init; }
 
@@ -61,6 +64,9 @@ public static class AiPrices
 
     public static Price? For(string model) => Known.GetValueOrDefault(model);
 
+    /// <summary>One web search on Claude's API: $10 per 1,000, on top of the tokens its results add (a failed one is free).</summary>
+    public const decimal WebSearchUsd = 0.01m;
+
     /// <summary>
     /// The cost of one call. Cache writes cost a quarter more than plain input on Claude. <paramref name="input"/> is
     /// the input not read from the cache.
@@ -82,8 +88,11 @@ public sealed class AiUsageBook(ISyncedLog<AiUsageEntry> log, TimeProvider? time
 
     private readonly TimeProvider _time = time ?? TimeProvider.System;
 
-    public AiUsageEntry Record(string feature, AiProvider provider, string model, string? keyId, long input, long output, long cacheRead, long cacheWrite)
+    /// <param name="webSearches">Web searches the call ran: their fee is added to <see cref="AiUsageEntry.Usd"/>.</param>
+    public AiUsageEntry Record(string feature, AiProvider provider, string model, string? keyId, long input, long output, long cacheRead, long cacheWrite,
+        long webSearches = 0)
     {
+        var tokens = AiPrices.Usd(model, input, output, cacheRead, cacheWrite);
         var entry = new AiUsageEntry
         {
             Feature = feature,
@@ -94,7 +103,9 @@ public sealed class AiUsageBook(ISyncedLog<AiUsageEntry> log, TimeProvider? time
             OutputTokens = output,
             CacheReadTokens = cacheRead,
             CacheWriteTokens = cacheWrite,
-            Usd = AiPrices.Usd(model, input, output, cacheRead, cacheWrite),
+            WebSearches = webSearches,
+            // The search fee is known even for a model whose token price is not.
+            Usd = tokens is null && webSearches == 0 ? null : (tokens ?? 0) + webSearches * AiPrices.WebSearchUsd,
             Route = ApiRoute,
             At = _time.GetUtcNow(),
         };

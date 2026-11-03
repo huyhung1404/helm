@@ -53,7 +53,8 @@ public sealed record ToolCall(string Id, string Name, JsonElement Input);
 public sealed record ToolOutcome(string CallId, string Content, bool IsError);
 
 /// <param name="Input">Input tokens not read from the cache.</param>
-public sealed record AssistantUsage(long Input, long Output, long CacheRead, long CacheWrite);
+/// <param name="WebSearches">Searches the provider ran on the web for this answer (each one is paid, <see cref="AiPrices.WebSearchUsd"/>).</param>
+public sealed record AssistantUsage(long Input, long Output, long CacheRead, long CacheWrite, long WebSearches = 0);
 
 /// <summary>One answer of the model: its text, the tools it calls, what it cost.</summary>
 public sealed record AssistantStep(string Text, IReadOnlyList<ToolCall> Calls, AssistantUsage Usage, bool Refused);
@@ -83,6 +84,12 @@ public interface IAssistantChat
     /// (<see cref="ToolScope"/>).
     /// </summary>
     void AddTools(IReadOnlyList<AssistantTool> tools) { }
+
+    /// <summary>
+    /// The provider's own web search from the next call on, at most <paramref name="maxUses"/> searches per call
+    /// (<see cref="WebSearch"/>). False when this provider has none here (the caller asks Claude instead).
+    /// </summary>
+    bool AddWebSearch(int maxUses) => false;
 }
 
 /// <summary>Opens conversations with one provider's models.</summary>

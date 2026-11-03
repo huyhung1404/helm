@@ -207,8 +207,34 @@ public sealed class HelmAssistant(
     /// <summary>The system prompt a call starts with: the user's own when the Skill Hub has a usable one.</summary>
     internal string SystemPrompt() => prompts?.Get(AiFeatureIds.AskHelm, Instructions) ?? Instructions;
 
-    internal void Count(AssistantModelOption model, string keyId, AssistantUsage u) =>
-        usage.Record(AiFeatureIds.AskHelm, model.Provider, model.Model, keyId, u.Input, u.Output, u.CacheRead, u.CacheWrite);
+    /// <param name="feature">Ask Helm's, or <see cref="AiFeatureIds.WebSearch"/>'s for a conversation that searches the web.</param>
+    internal void Count(AssistantModelOption model, string keyId, AssistantUsage u, string feature = AiFeatureIds.AskHelm) =>
+        usage.Record(feature, model.Provider, model.Model, keyId, u.Input, u.Output, u.CacheRead, u.CacheWrite, u.WebSearches);
+
+    /// <summary>Web search's own choice (<see cref="AiFeatureIds.WebSearch"/>): off, on the API, until the user changes it.</summary>
+    internal AiFeatureChoice WebChoice => AiFeatureCatalog.Effective(features.Current, AiFeatureIds.WebSearch);
+
+    /// <summary>Why a turn cannot search the web now (its route, no Claude key, its day's cap), or null.</summary>
+    internal string? WebUnavailable()
+    {
+        var choice = WebChoice;
+        if (choice.Route == AiRoutePolicy.PcOnly)
+            return "Web search runs on the API only (agents on a PC do not search the web): set its route to API in AI → Features.";
+        if (!HasKeyFor(AiProviders.Claude))
+            return "Web search needs a Claude API key (AI → Models & keys on the PC); agents on a PC do not search the web.";
+        return usage.SpentToday(AiFeatureIds.WebSearch) >= choice.DailyCapUsd
+            ? $"Today's limit for web search (${choice.DailyCapUsd.ToString("0.00", CultureInfo.InvariantCulture)}) is reached. It starts again tomorrow, or raise it in AI → Features."
+            : null;
+    }
+
+    /// <summary>The Claude model that searches: web search's own when it is a Claude one, else Haiku (a Grok pick has no web search here).</summary>
+    internal AssistantModelOption WebModel()
+    {
+        var choice = WebChoice;
+        var id = choice.Provider == AiProviders.Claude.Id ? choice.Model : ClaudeModels.Haiku;
+        return Models().FirstOrDefault(m => m.Provider == AiProviders.Claude && m.Model == id)
+            ?? new AssistantModelOption(AiProviders.Claude, id, AiModels.ShortName(id));
+    }
 
     internal string Now()
     {
@@ -257,13 +283,28 @@ public sealed partial class AssistantSession
     {
         if (_helm.Unavailable() is { } problem) return new AssistantReply("", [], false, problem);
         var first = _history.Count == 0;
+        // Weather, rates, gold, news, a post to check: the web answers it, when the user turned web search on.
+        var factCheck = WebSearch.IsFactCheck(text);
+        var web = _helm.WebChoice.Enabled && WebSearch.Asks(text);
+        if (factCheck && !web) return new AssistantReply("", [], false, WebSearch.Off);
         _all ??= _helm.OfferedTools(_phone);
         // Only the tools this turn's request needs (and those of earlier turns): each schema costs tokens on every call.
-        var before = _tools;
-        _tools = ToolScope.Pick(_all, _scope, text);
-        if (_open is { } open && _tools.Where(t => before.All(b => b.Name != t.Name)).ToList() is { Count: > 0 } added) open.Chat.AddTools(added);
+        // A question for the web that names none of Helm's tools needs none of them (a post to check is not a request).
+        if (!web || (!factCheck && ToolScope.GroupsFor(text).Count > 0))
+        {
+            var before = _tools;
+            _tools = ToolScope.Pick(_all, _scope, text);
+            if (_open is { } open && _tools.Where(t => before.All(b => b.Name != t.Name)).ToList() is { Count: > 0 } added) open.Chat.AddTools(added);
+        }
         // The first turn of a card opened about something says what it is about.
         if (first && _context is { } context) text = context.Before(text);
+        if (web)
+        {
+            var onWeb = await OnWebAsync(text, first, factCheck, confirm, ct);
+            _history.Add(("user", text));
+            _history.Add(("assistant", onWeb.Text));
+            return onWeb;
+        }
         var model = Model!;
         var choice = _helm.Choice;
 
@@ -358,8 +399,10 @@ public sealed partial class AssistantSession
         // A conversation that started on a PC goes on here with what was said so far.
         var context = moved ? "Earlier in this conversation:\n" + string.Join("\n", _history.Select(h => $"{h.Role}: {h.Text}")) + "\n\n" : "";
         chat.AddUser(first || moved ? $"{_helm.Now()}\n\n{context}{text}" : text);
-        var outcome = await AssistantLoop.RunAsync(chat, _tools, confirm, u => _helm.Count(model, keyId, u),
-            () => _helm.Unavailable() ?? _helm.OverCap(), phoneHere: true, model.Name, ct);
+        // With web search on, Claude may find that the request needs the web after all (WebSearch.LookupTool).
+        var tools = WithLookup(chat, model);
+        var outcome = await AssistantLoop.RunAsync(chat, tools, confirm, u => _helm.Count(model, keyId, u, CountedAs),
+            () => _helm.Unavailable() ?? _helm.OverCap() ?? (_web ? _helm.WebUnavailable() : null), phoneHere: true, model.Name, ct);
         return new AssistantReply(outcome.Text, outcome.Done, outcome.Declined, outcome.Problem);
     }
 }
