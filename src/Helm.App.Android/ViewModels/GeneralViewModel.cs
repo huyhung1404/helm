@@ -19,6 +19,7 @@ public sealed partial class GeneralViewModel : ObservableObject
     private readonly ThemeService _themes;
     private readonly AndroidLauncher _launcher;
     private readonly IDialogService _dialogs;
+    private readonly ShellNavigator _navigator;
     private readonly ILogger<GeneralViewModel> _logger;
     private readonly bool _loading;
 
@@ -33,6 +34,7 @@ public sealed partial class GeneralViewModel : ObservableObject
         SyncViewModel sync,
         BackgroundActivitiesViewModel background,
         IDialogService dialogs,
+        ShellNavigator navigator,
         ILogger<GeneralViewModel> logger)
     {
         _settings = settings;
@@ -40,6 +42,7 @@ public sealed partial class GeneralViewModel : ObservableObject
         _themes = themes;
         _launcher = launcher;
         _dialogs = dialogs;
+        _navigator = navigator;
         _logger = logger;
         Updates = updates;
         Sync = sync;
@@ -69,6 +72,10 @@ public sealed partial class GeneralViewModel : ObservableObject
         _general.Update(s => s.Theme = value);
         _themes.Apply(value);
     }
+
+    /// <summary>General › AI features: each AI feature's settings, on its own page (the list first).</summary>
+    [RelayCommand]
+    private void OpenAiFeatures() => _navigator.GoAiFeatures();
 
     /// <summary>Shares the newest log file (e.g. to send it to yourself), since Android has no folder to open.</summary>
     [RelayCommand]

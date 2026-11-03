@@ -159,7 +159,7 @@ public sealed class HelmAssistant(
     /// <summary>Why Ask Helm cannot answer now, or null.</summary>
     public string? Unavailable()
     {
-        if (!Choice.Enabled) return "Ask Helm is turned off: AI → Features on the PC.";
+        if (!Choice.Enabled) return "Ask Helm is turned off: AI → Features on the PC, or General › AI features on the phone.";
         if (Current() is null)
             return "No Helm PC with an agent is online, and there is no API key: add an agent on the PC (AI → Proxy) or a Claude or Grok key (AI → Models & keys); keys sync to this phone.";
         return null;

@@ -366,3 +366,27 @@ takes them back (Ask Helm asks first).
 - `AiBriefTools`: `ai_briefs` (reading marks them read), `ai_brief_undo`, `ai_auto_jobs`, `ai_auto_job_set`.
 - Scratch is read through `ScratchDigestTool` (names only, a text that looks like a code is hidden), given to the
   jobs alone, never to the MCP server. Funds come from `wallet_funds`.
+
+## AI settings per feature
+
+**AI → Features** on the PC is one table of every AI feature, grouped **On request** (Ask Helm, translate a
+selection, word analysis, explain a sentence, task proposals, read a bank notification) and **Automatic** (auto-classify
+transactions and the automatic jobs above). Each row has its switch, its route (**Agents → API**, **Agents only**,
+**API only**), its model (the chat models the tested keys offer), its effort (Claude models only; greyed out for Grok),
+its daily cap (what it may spend on the API a day, in USD) and a cost badge: "Runs on your PC agents · 0đ" on the
+agents only, the cap as the worst case where the API may be used. A line on top counts today's runs, on the PC's
+agents and on the API, with what the API ones cost.
+
+On the phone the same settings are in **General › AI features**: the same groups, one row per feature (its state in
+one line and its switch); tap a row for its detail (on, where it runs, model, effort, daily cap and what it may cost).
+
+Every change is saved at once to the feature's choice in the synced `settings.ai-features`, so the other device shows
+it within a moment. It is the same choice the Proxy tab's Ask Helm route and wait, Ask Helm's model picker and
+`ai_auto_job_set` change. Automatic features start on **Agents only** (they never pay for the API unless you change
+that); the others start on **Agents → API**. A feature with no choice of its own runs with Ask Helm's model; once a
+setting is changed in the table, it keeps its own.
+
+For developers: the list is `AiFeatureCatalog` (Helm.Ai.Core: name, description, automatic or not; an `AiFeatureIds`
+constant without an entry still shows, named after its id), and `AiFeatureCatalog.Effective` is the choice a feature
+runs with now. Both apps bind to `AiFeaturesViewModel` / `AiFeatureRow` (registered by `AddHelmAi`); the PC view is
+`Views/Ai/AiFeaturesView.xaml`, the phone's `Helm.App.Android/Views/AiFeaturesView.axaml` (page key `ai-features`).

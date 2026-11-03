@@ -27,7 +27,7 @@ public sealed partial class ShellTab(string key, object page, string title, Symb
 {
     public string Key { get; } = key;
 
-    /// <summary>The page's view model (<see cref="HomeViewModel"/>, <see cref="GeneralViewModel"/>, <see cref="ModulePage"/>).</summary>
+    /// <summary>The page's view model (<see cref="HomeViewModel"/>, <see cref="GeneralViewModel"/>, <see cref="Helm.Ai.AiFeaturesViewModel"/>, <see cref="ModulePage"/>).</summary>
     public object Page { get; } = page;
 
     public string Title { get; } = title;
@@ -81,6 +81,18 @@ public sealed partial class ShellNavigator(IServiceProvider services, ISettingsS
     public void GoHome() => Open(Describe("home")!);
 
     public void GoGeneral() => Open(Describe("general")!);
+
+    /// <summary>The key of General › AI features (each AI feature's settings, the same as AI → Features on the PC).</summary>
+    public const string AiFeaturesKey = "ai-features";
+
+    /// <summary>General › AI features, on its list, with today's runs and the keys' models read again.</summary>
+    public void GoAiFeatures()
+    {
+        var features = services.GetRequiredService<Helm.Ai.AiFeaturesViewModel>();
+        features.Back();
+        features.Refresh();
+        Open(Describe(AiFeaturesKey)!);
+    }
 
     /// <summary>The tool's settings page (Home → Utilities).</summary>
     public void GoModule(IAndroidModule module) => Open(Describe(SettingsKey(module))!);
@@ -175,6 +187,7 @@ public sealed partial class ShellNavigator(IServiceProvider services, ISettingsS
     {
         if (key == "home") return new ShellTab(key, services.GetRequiredService<HomeViewModel>(), "Home", Symbol.Home, null, null);
         if (key == "general") return new ShellTab(key, services.GetRequiredService<GeneralViewModel>(), "General", Symbol.Settings, null, null);
+        if (key == AiFeaturesKey) return new ShellTab(key, services.GetRequiredService<Helm.Ai.AiFeaturesViewModel>(), "AI features", Symbol.Sparkle, null, null);
         var colon = key.IndexOf(':');
         if (colon < 0) return null;
         var id = key[(colon + 1)..];

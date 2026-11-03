@@ -5,7 +5,7 @@ using Helm.Ai.Auto;
 
 namespace Helm.Tests;
 
-/// <summary>AI settings per feature (AI → Features on the PC, Settings › AI features on the phone).</summary>
+/// <summary>AI settings per feature (AI → Features on the PC, General › AI features on the phone).</summary>
 public sealed class AiFeaturesViewModelTests
 {
     private static readonly AssistantModelOption Haiku = new(AiProviders.Claude, ClaudeModels.Haiku, "Claude Haiku 5.5");

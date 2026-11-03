@@ -40,7 +40,7 @@
 
     <StackPanel>
         <TextBlock Style="{DynamicResource HelmSecondaryText}"
-                   Text="Each AI feature: on or off, where it runs, its model, how hard it thinks and what it may spend on the API a day. Changes save at once and sync to your phone (Settings › AI features)." />
+                   Text="Each AI feature: on or off, where it runs, its model, how hard it thinks and what it may spend on the API a day. Changes save at once and sync to your phone (General › AI features)." />
 
         <!-- Today's runs -->
         <Border Style="{DynamicResource HelmSurface}" Margin="0,12,0,0" Padding="16,10">

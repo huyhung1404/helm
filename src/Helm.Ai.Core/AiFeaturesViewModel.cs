@@ -20,7 +20,7 @@ public sealed partial class AiFeatureGroup(string title, IReadOnlyList<AiFeature
 }
 
 /// <summary>
-/// AI settings per feature, shared by both apps: AI → Features on the PC (one table) and Settings › AI features on the
+/// AI settings per feature, shared by both apps: AI → Features on the PC (one table) and General › AI features on the
 /// phone (a list, a detail per feature). Each row is one <see cref="AiFeatureIds"/> feature's synced
 /// <see cref="AiFeatureChoice"/>, saved at once, so a change on one device shows on the other; Ask Helm's route on the
 /// Proxy tab and the automatic jobs' times (Ask Helm sets them) are the same choices.
