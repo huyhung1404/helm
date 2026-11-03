@@ -74,6 +74,7 @@ public partial class NovelReaderContentPage : Page
             if (viewModel.IsSpeaking) viewModel.FollowReadingCommand.Execute(null);
         };
         Unloaded += (_, _) => viewModel.Deactivate();
+        HookHeldSentence();
         PreviewKeyDown += OnPreviewKeyDown;
         AllowDrop = true;
         DragOver += OnDragOver;
@@ -180,6 +181,7 @@ public partial class NovelReaderContentPage : Page
         if (sender is not FrameworkElement { DataContext: ParagraphViewModel paragraph }) return;
         _viewModel.Editor.IsOpen = false;
         _viewModel.HoldSentence(paragraph, e.Index);
+        RememberHeld(sender);
     }
 
     /// <summary>A double-click on a sentence reads aloud from it.</summary>

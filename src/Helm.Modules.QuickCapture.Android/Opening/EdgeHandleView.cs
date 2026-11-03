@@ -7,8 +7,10 @@ namespace Helm.Modules.QuickCapture;
 
 /// <summary>
 /// The edge handle's window content: a 4dp line in Helm's accent, 3dp from the screen's edge, in a 20dp strip that takes
-/// the touches (<see cref="EdgeHandleGesture"/>: 40dp inward or a tap opens Ask Helm). The strip keeps itself from the
-/// Back gesture while it is shown. It also tells when the app in front goes full screen (the status bar hides).
+/// the touches (<see cref="EdgeHandleGesture"/>: 40dp inward or a tap opens Ask Helm). While a finger is down it asks for
+/// the wider drag strip (<see cref="EdgeHandleLayout.DragStripDp"/>), so the line follows it all the way. The strip keeps
+/// itself from the Back gesture while it is shown. It also tells when the app in front goes full screen (the status bar
+/// hides).
 /// </summary>
 internal sealed class EdgeHandleView : View
 {
@@ -17,15 +19,18 @@ internal sealed class EdgeHandleView : View
     private readonly RectF _line = new();
     private readonly Action _open;
     private readonly Action<bool> _fullScreen;
+    private readonly Action<bool> _dragging;
     private EdgeHandleGesture _gesture;
     private bool _hidden;
 
-    public EdgeHandleView(Context context, EdgeSide side, Action open, Action<bool> fullScreen) : base(context)
+    /// <param name="dragging">A finger went down on the line (true) or left it (false): the window widens and narrows.</param>
+    public EdgeHandleView(Context context, EdgeSide side, Action open, Action<bool> fullScreen, Action<bool> dragging) : base(context)
     {
         _density = context.Resources?.DisplayMetrics?.Density ?? 2f;
         _gesture = new EdgeHandleGesture(side, _density);
         _open = open;
         _fullScreen = fullScreen;
+        _dragging = dragging;
         ContentDescription = "Ask Helm: drag inward or tap";
         Clickable = true;
         UpdateColour();
@@ -51,6 +56,7 @@ internal sealed class EdgeHandleView : View
             if (value == _hidden) return;
             _hidden = value;
             _gesture.Cancel();
+            _dragging(false);
             KeepEdge();
             Invalidate();
         }
@@ -69,7 +75,7 @@ internal sealed class EdgeHandleView : View
     {
         base.OnDraw(canvas);
         if (_hidden) return;
-        var width = Dp(EdgeHandleLayout.LineDp + 4 * _gesture.Progress);
+        var width = Dp(EdgeHandleLayout.LineDp + EdgeHandleLayout.LineGrowDp * _gesture.Progress);
         var inset = Dp(EdgeHandleLayout.LineInsetDp);
         // Pulled inward with the finger, as far as the strip allows.
         var pull = Math.Clamp(_gesture.Pull, 0, Math.Max(0, Width - width - 2 * inset));
@@ -87,15 +93,18 @@ internal sealed class EdgeHandleView : View
         {
             case MotionEventActions.Down:
                 _gesture.Down(e.RawX, e.RawY);
+                _dragging(true);
                 break;
             case MotionEventActions.Move:
                 action = _gesture.Move(e.RawX, e.RawY);
                 break;
             case MotionEventActions.Up:
                 action = _gesture.Up(e.RawX, e.RawY);
+                _dragging(false);
                 break;
             case MotionEventActions.Cancel:
                 _gesture.Cancel();
+                _dragging(false);
                 break;
         }
         Invalidate();
