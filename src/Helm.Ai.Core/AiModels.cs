@@ -12,6 +12,18 @@ public static class AiModels
     /// <summary>The model a provider's features fall back on when the one picked is no longer offered.</summary>
     public static string DefaultFor(AiProvider provider) => provider == AiProviders.Grok ? GrokModels.Default : ClaudeModels.Haiku;
 
+    /// <summary>A model as a status line says it: "claude-sonnet-5-5" → "Sonnet 5.5", "grok-4.7" → "Grok 4.7".</summary>
+    public static string ShortName(string id)
+    {
+        var parts = id.Trim().Split('-', StringSplitOptions.RemoveEmptyEntries).ToList();
+        if (parts.Count == 0) return id;
+        if (parts.Count > 1 && parts[0].Equals("claude", StringComparison.OrdinalIgnoreCase)) parts.RemoveAt(0);
+        // A dated snapshot ("…-20250805") reads the same as its model.
+        if (parts.Count > 1 && parts[^1].Length == 8 && parts[^1].All(char.IsAsciiDigit)) parts.RemoveAt(parts.Count - 1);
+        var name = char.ToUpperInvariant(parts[0][0]) + parts[0][1..];
+        return parts.Count == 1 ? name : $"{name} {string.Join('.', parts.Skip(1))}";
+    }
+
     public static bool IsChat(string id) =>
         !id.ToLowerInvariant().Split('-', '_', '.', ':').Any(part => NotChat.Any(p => part.StartsWith(p, StringComparison.Ordinal)));
 

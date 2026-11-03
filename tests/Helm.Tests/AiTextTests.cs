@@ -131,6 +131,19 @@ public sealed class AiTextTests
         Assert.Equal(AiFeatureIds.TaskProposals, Helm.Modules.Tracker.TaskProposals.Feature);
     }
 
+    [Fact]
+    public void Where_a_call_would_run_is_said_short_while_it_waits()
+    {
+        _features.Update(s => s.Features[AiFeatureIds.TaskProposals] = new AiFeatureChoice { Model = "claude-sonnet-5-5" });
+
+        Assert.Null(Build(null, withKey: false).Text.Where(AiFeatureIds.TaskProposals));
+        Assert.Equal("Sonnet 5.5 · agent on PC-HUNG · 0đ", Build(new Pc(null)).Text.Where(AiFeatureIds.TaskProposals));
+        Assert.Equal("Sonnet 5.5 · API", Build(null).Text.Where(AiFeatureIds.TaskProposals));
+        Assert.Equal("Haiku 5.5", AiModels.ShortName(ClaudeModels.Haiku));
+        Assert.Equal("Opus 4.1", AiModels.ShortName("claude-opus-4-1-20250805"));
+        Assert.Equal("Grok 4.7", AiModels.ShortName("grok-4.7"));
+    }
+
     // ---- text actions -----------------------------------------------------------------------------------------
 
     [Theory]
