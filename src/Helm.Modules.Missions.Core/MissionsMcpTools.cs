@@ -27,12 +27,16 @@ public sealed class MissionsMcpTools(MissionsStore store) : IMcpToolProvider
             "Create a mission: a goal split into phases of concrete steps done in order. Write titles and texts in the user's language. " +
             "Each step should take 0.5-3 days, with a doneWhen the user can check; end each phase with a review step; give each phase a small " +
             "reward and the mission a bigger one. The mission is created as not started; the user starts it in Helm (or pass start: true).",
-            CreateSchema(), (args, _) => Task.FromResult<object?>(Create(args))),
+            CreateSchema(), (args, _) => Task.FromResult<object?>(Create(args)))
+        {
+            // Helm's own assistant creates at once and offers Undo: the new mission goes again, steps and all.
+            Undo = (result, _) => { store.Delete(Id(result, "id")); return Task.CompletedTask; },
+        },
         new("mission_complete_step", "Complete the current step of a mission (steps are done in order), with an optional note on what was done.",
             McpArgs.Schema(
                 ("mission", McpArgs.Text("The mission's id or title."), true),
                 ("note", McpArgs.Text("What was done, a result or a link (optional)."), false)),
-            (args, _) => Task.FromResult<object?>(CompleteStep(args, skip: false))),
+            (args, _) => Task.FromResult<object?>(CompleteStep(args, skip: false))) { Undo = ReopenUndo },
         new("mission_replan",
             "Plan the rest of a mission again, e.g. when the user is behind or something changed: every step not done yet (the current one " +
             "too) is replaced by these phases and steps; done steps stay. Read mission_get first to see what is done and how long steps took. " +
@@ -58,7 +62,7 @@ public sealed class MissionsMcpTools(MissionsStore store) : IMcpToolProvider
             McpArgs.Schema(
                 ("mission", McpArgs.Text("The mission's id or title."), true),
                 ("note", McpArgs.Text("Why it was skipped (optional)."), false)),
-            (args, _) => Task.FromResult<object?>(CompleteStep(args, skip: true))),
+            (args, _) => Task.FromResult<object?>(CompleteStep(args, skip: true))) { Undo = ReopenUndo },
         new("mission_reopen_step", "Undo: the most recently completed or skipped step of a mission becomes the current step again.",
             McpArgs.Schema(("mission", McpArgs.Text("The mission's id or title."), true)),
             (args, _) => Task.FromResult<object?>(ReopenStep(args))),
@@ -67,7 +71,17 @@ public sealed class MissionsMcpTools(MissionsStore store) : IMcpToolProvider
                 ("mission", McpArgs.Text("The mission's id or title."), true),
                 ("item", McpArgs.Number("The checklist item's number, from 1, as mission_get lists them."), true),
                 ("done", McpArgs.Flag("True to tick it (default), false to untick it."), false)),
-            (args, _) => Task.FromResult<object?>(CheckItem(args))),
+            (args, _) => Task.FromResult<object?>(CheckItem(args)))
+        {
+            Undo = (result, _) =>
+            {
+                // Ticked back the other way, if the step is still the current one.
+                var mission = Id(result, "mission_id");
+                if (result.TryGetProperty("changed", out var changed) && changed.GetBoolean() && store.CurrentStep(mission)?.Id == Id(result, "id"))
+                    store.ToggleChecklist(mission, result.GetProperty("item").GetInt32() - 1);
+                return Task.CompletedTask;
+            },
+        },
         new("mission_edit_step",
             "Change a step (its id from mission_get): the title, description, doneWhen and estimate of a step not done yet, or the note of any step.",
             McpArgs.Schema(
@@ -79,6 +93,16 @@ public sealed class MissionsMcpTools(MissionsStore store) : IMcpToolProvider
                 ("note", McpArgs.Text("New note (replaces the old one)."), false)),
             (args, _) => Task.FromResult<object?>(EditStep(args))),
     ];
+
+    /// <summary>A step completed or skipped through here is the current one again.</summary>
+    private Task ReopenUndo(JsonElement result, CancellationToken ct)
+    {
+        store.ReopenLast(Id(result, "mission_id"));
+        return Task.CompletedTask;
+    }
+
+    private static string Id(JsonElement result, string name) =>
+        result.TryGetProperty(name, out var id) && id.GetString() is { Length: > 0 } text ? text : throw new McpToolException($"The result has no {name}.");
 
     private object Update(JsonElement args)
     {
@@ -125,8 +149,12 @@ public sealed class MissionsMcpTools(MissionsStore store) : IMcpToolProvider
         var list = current.Value.Checklist;
         if (number < 1 || number > list.Count)
             throw new McpToolException(list.Count == 0 ? $"“{current.Value.Title}” has no checklist." : $"item is 1 to {list.Count}.");
-        if (list[number - 1].IsDone != (McpArgs.Bool(args, "done") ?? true)) store.ToggleChecklist(mission.Id, number - 1);
-        return Step(store.CurrentStep(mission.Id) ?? current, TimeZoneInfo.Local);
+        var changed = list[number - 1].IsDone != (McpArgs.Bool(args, "done") ?? true) && store.ToggleChecklist(mission.Id, number - 1);
+        var node = Step(store.CurrentStep(mission.Id) ?? current, TimeZoneInfo.Local);
+        node["mission_id"] = mission.Id;
+        node["item"] = number;
+        node["changed"] = changed;
+        return node;
     }
 
     private object EditStep(JsonElement args)
@@ -219,6 +247,7 @@ public sealed class MissionsMcpTools(MissionsStore store) : IMcpToolProvider
         var outcome = (skip ? store.Skip(mission.Id, note) : store.Complete(mission.Id, note)) ?? throw new McpToolException("There is no step left to complete.");
         var node = new JsonObject
         {
+            ["mission_id"] = mission.Id,
             [skip ? "skipped" : "completed"] = outcome.StepTitle,
             ["progress"] = $"{outcome.Done}/{outcome.Total}",
             ["phase_completed"] = outcome.PhaseCompleted?.Title,

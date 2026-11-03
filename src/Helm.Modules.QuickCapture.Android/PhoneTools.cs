@@ -3,13 +3,15 @@ using System.Text.Json;
 using Android.App;
 using Android.Content;
 using Android.Provider;
+using Helm.Ai.Assistant;
 using Helm.Core.Mcp;
 
 namespace Helm.Modules.QuickCapture;
 
 /// <summary>
-/// What Ask Helm can do on the phone itself: an alarm, a timer, a calendar event, the text just copied. Each hands
-/// over to the phone's own app (Clock, Calendar) with the details filled in, where the user sees and can change it.
+/// What Ask Helm can do on the phone itself: an alarm, a timer, a calendar event, the text just copied, directions, an
+/// app, a text to share. Each hands over to the phone's own app (Clock, Calendar, Maps, the share sheet) with the
+/// details filled in, where the user sees and can change it.
 /// Made per card: the intents start from its activity.
 /// </summary>
 internal sealed class PhoneTools(Activity activity) : IMcpToolProvider
@@ -38,7 +40,61 @@ internal sealed class PhoneTools(Activity activity) : IMcpToolProvider
         new("phone_clipboard", "The text the user copied last on the phone (to save it somewhere, or to work on it).",
             McpTool.NoArguments(),
             (_, _) => Run(Clipboard)) { ReadOnly = true },
+        PhoneToolSpecs.On(PhoneToolSpecs.Navigate, (args, _) => Run(() => Navigate(args))),
+        PhoneToolSpecs.On(PhoneToolSpecs.OpenApp, (args, _) => Run(() => OpenApp(args))),
+        PhoneToolSpecs.On(PhoneToolSpecs.ShareText, (args, _) => Run(() => Share(args))),
     ];
+
+    private object Navigate(JsonElement args)
+    {
+        var destination = McpArgs.RequiredString(args, "destination").Trim();
+        var mode = McpArgs.String(args, "mode");
+        // Turn by turn in Google Maps when it is there; any maps app (or the browser) takes the web link.
+        if (PhoneMaps.Navigation(destination, mode) is { } navigation)
+        {
+            try
+            {
+                activity.StartActivity(new Intent(Intent.ActionView, Android.Net.Uri.Parse(navigation)).AddFlags(ActivityFlags.NewTask));
+                return new { directions_to = destination };
+            }
+            catch (ActivityNotFoundException)
+            {
+            }
+        }
+        Start(new Intent(Intent.ActionView, Android.Net.Uri.Parse(PhoneMaps.Directions(destination, mode))), "maps app or browser");
+        return new { directions_to = destination };
+    }
+
+    private object OpenApp(JsonElement args)
+    {
+        var wanted = McpArgs.RequiredString(args, "app");
+        var pm = activity.PackageManager ?? throw new McpToolException("The phone's app list cannot be read.");
+        var launcher = new Intent(Intent.ActionMain).AddCategory(Intent.CategoryLauncher);
+        var apps = (pm.QueryIntentActivities(launcher, 0) ?? [])
+            .Select(r => r.ActivityInfo is { } info ? new PhoneApps.App(r.LoadLabel(pm)?.ToString() ?? info.PackageName ?? "", info.PackageName ?? "") : null)
+            .OfType<PhoneApps.App>()
+            .Where(a => a.Package.Length > 0 && a.Package != activity.PackageName);
+        var found = PhoneApps.Match(wanted, apps);
+        switch (found.Count)
+        {
+            case 0:
+                throw new McpToolException($"No app called {wanted} is installed on this phone.");
+            case > 1:
+                throw new McpToolException($"Several apps fit {wanted}: {string.Join(", ", found.Take(6).Select(a => a.Label))}. Ask the user which one.");
+        }
+        var launch = pm.GetLaunchIntentForPackage(found[0].Package) ?? throw new McpToolException($"{found[0].Label} cannot be opened.");
+        Start(launch, found[0].Label);
+        return new { opened = found[0].Label };
+    }
+
+    private object Share(JsonElement args)
+    {
+        var text = McpArgs.RequiredString(args, "text");
+        var send = new Intent(Intent.ActionSend).SetType("text/plain").PutExtra(Intent.ExtraText, text);
+        // Helm never sends it: the user picks the app (Messenger, Zalo…) and sends it there.
+        Start(Intent.CreateChooser(send, McpArgs.String(args, "title") ?? "Gửi tin nhắn")!, "app to share with");
+        return new { shared = true, characters = text.Length };
+    }
 
     private object Alarm(JsonElement args)
     {

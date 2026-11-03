@@ -55,11 +55,22 @@ public sealed class HelmAssistant(
     {
         "wallet_add_transaction", "wallet_add_debt", "wallet_debts", "wallet_summary",
         "wallet_update_transaction",
+        "wallet_split_bill",
+        "wallet_debt_reminder",
+        "bills_list",
+        "bill_add",
+        "bill_pay",
         "tracker_lists", "tracker_tasks", "tracker_add_task", "tracker_complete_task", "tracker_start_task",
         "notes_create", "notes_search", "notes_read",
         "habits_list", "habit_report", "habit_check",
         "missions_list", "mission_get",
+        "mission_create",
+        "mission_complete_step",
+        "mission_skip_step",
+        "mission_check_item",
         "vocab_add_words", "vocab_words",
+        "workspace_sessions",
+        "workspace_send",
     };
 
     /// <summary>Tools the phone itself adds (alarm, calendar, clipboard…) start with this.</summary>
@@ -82,6 +93,10 @@ public sealed class HelmAssistant(
         - Answer in Vietnamese, one or two short sentences, warm and plain, calling the user "Anh" and yourself "em".
           No markdown, no lists: the answer is shown on a small card and may be read aloud.
         - Never ask for or repeat passwords, keys or codes.
+        - A shared bill ("lẩu 1tr2 chia 4, Nam với Tú chưa trả") is one wallet_split_bill call.
+        - A debt reminder: wallet_debt_reminder, then phone_share_text with its message; Helm never sends it.
+        - A goal or an exam with a date is one mission (mission_create, start: true): ordered steps, the exam its last
+          step, the date its deadline.
         - Make all of a request's changes in one reply. A reply that only makes changes ends the turn: Helm shows their
           summaries to the user, so when the request also asks something, call the reading tools in that same reply.
         """;

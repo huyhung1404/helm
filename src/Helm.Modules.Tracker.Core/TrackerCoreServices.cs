@@ -33,10 +33,10 @@ public static class TrackerCoreServices
             sp.GetRequiredService<ISyncedCollection<TrackerWorkspace>>(),
             sp.GetRequiredService<ISyncedCollection<TrackerItem>>(),
             sp.GetRequiredService<ISyncedLog<TrackerEvent>>()));
-        // The reminder also covers debts due in Wallet's debt book, and copies the Tracker's old debt book there.
+        // The reminder also covers debts due in Wallet's debt book and its recurring bills, and copies the Tracker's old debt book there.
         services.AddSingleton(sp => new TrackerReminderService(
             sp.GetRequiredService<TrackerStore>(), sp.GetRequiredService<Helm.Core.Settings.ISettingsStoreFactory>(),
-            debts: sp.GetService<Helm.Modules.Wallet.DebtBook>()));
+            debts: sp.GetService<Helm.Modules.Wallet.DebtBook>(), bills: sp.GetService<Helm.Modules.Wallet.BillBook>()));
         // Quick Capture: "/t buy milk tomorrow 9h".
         services.AddSingleton<Helm.Core.Capture.ICaptureTarget, TaskCaptureTarget>();
         // Other tools hand tasks over (Missions sends a step here).

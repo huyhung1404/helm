@@ -13,7 +13,7 @@ public sealed record TrackerReminder(int Overdue, int DueToday, int DueSoon, str
 /// Decides when to remind about due items and what to say. Platform-free: the Windows module shows the result as a
 /// tray notification, the Android side as a system notification (from its daily alarm, even with the app closed).
 /// At most one reminder per day and device; the day's reminder comes from <see cref="TrackerSettings.ReminderHour"/>.
-/// Debts due in Wallet's debt book are in the same reminder (they were in the Tracker until Helm 0.26).
+/// Debts due in Wallet's debt book are in the same reminder (they were in the Tracker until Helm 0.26), and so are its recurring bills.
 /// </summary>
 public sealed class TrackerReminderService
 {
@@ -21,15 +21,17 @@ public sealed class TrackerReminderService
 
     private readonly TrackerStore _store;
     private readonly DebtBook? _debts;
+    private readonly BillBook? _bills;
     private readonly TrackerDebtHandover? _handover;
     private readonly ISettingsStore<TrackerSettings> _settings;
     private readonly TimeProvider _time;
     private readonly object _gate = new();
 
-    public TrackerReminderService(TrackerStore store, ISettingsStoreFactory settings, TimeProvider? time = null, DebtBook? debts = null)
+    public TrackerReminderService(TrackerStore store, ISettingsStoreFactory settings, TimeProvider? time = null, DebtBook? debts = null, BillBook? bills = null)
     {
         _store = store;
         _debts = debts;
+        _bills = bills;
         _handover = debts is null ? null : new TrackerDebtHandover(store, debts);
         _settings = settings.Get<TrackerSettings>(TrackerIds.ModuleId);
         _time = time ?? TimeProvider.System;
@@ -56,7 +58,7 @@ public sealed class TrackerReminderService
             var today = DateOnly.FromDateTime(local.DateTime);
             if (local.Hour < Math.Clamp(s.ReminderHour, 0, 23) || s.LastReminderDate == today) return null;
 
-            var reminder = Build(_store, today, s.RemindDaysBefore, _debts);
+            var reminder = Build(_store, today, s.RemindDaysBefore, _debts, _bills);
             // Nothing due: keep checking, so an item added later today can still be reminded about.
             if (reminder is null) return null;
             _settings.Update(x => x.LastReminderDate = today);
@@ -87,7 +89,7 @@ public sealed class TrackerReminderService
     public bool RemindNow(TimeZoneInfo? zone = null)
     {
         var today = DateOnly.FromDateTime(TimeZoneInfo.ConvertTime(_time.GetUtcNow(), zone ?? TimeZoneInfo.Local).DateTime);
-        if (Build(_store, today, _settings.Current.RemindDaysBefore, _debts) is not { } reminder) return false;
+        if (Build(_store, today, _settings.Current.RemindDaysBefore, _debts, _bills) is not { } reminder) return false;
         Requested?.Invoke(this, reminder);
         return true;
     }
@@ -104,9 +106,9 @@ public sealed class TrackerReminderService
 
     /// <summary>
     /// What is due: open items of every to-do list with a due date on or before today + <paramref name="daysBefore"/>,
-    /// and the people in the debt book whose balance is due by then.
+    /// the people in the debt book whose balance is due by then, and the Wallet's recurring bills due by then.
     /// </summary>
-    public static TrackerReminder? Build(TrackerStore store, DateOnly today, int daysBefore, DebtBook? debts = null)
+    public static TrackerReminder? Build(TrackerStore store, DateOnly today, int daysBefore, DebtBook? debts = null, BillBook? bills = null)
     {
         var horizon = today.AddDays(Math.Clamp(daysBefore, 0, 30));
         var zone = TimeZoneInfo.Local;
@@ -125,8 +127,10 @@ public sealed class TrackerReminderService
                 var money = WalletFormat.Money(Math.Abs(person.Balance));
                 due.Add((day, person.Balance > 0 ? $"{person.Name} pays back {money}" : $"Pay {person.Name} back {money}"));
             }
-            due = due.OrderBy(d => d.Day).ToList();
         }
+        foreach (var (_, bill, _) in bills?.DueBy(horizon) ?? [])
+            due.Add((bill.NextDue(), bill.Expected is { } amount ? $"Pay {bill.Name} ({(bill.Amount is null ? "about " : "")}{WalletFormat.Money(amount)})" : $"Pay {bill.Name}"));
+        due = due.OrderBy(d => d.Day).ToList();
         if (due.Count == 0) return null;
 
         int overdue = 0, dueToday = 0, soon = 0;

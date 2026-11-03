@@ -83,14 +83,18 @@ internal static class AssistantLoop
                     var json = HelmAssistant.Serialize(await tool.Source.Run(input, ct));
                     if (tool.Mode != AssistantToolMode.Read)
                     {
-                        Func<CancellationToken, Task>? undo = null;
-                        if (tool.Source.Undo is { } takeBack)
+                        // One call may make several records (a bill split among friends): each is a row with its own Undo.
+                        foreach (var (summary, record) in Records(json, Summary(call)))
                         {
-                            var result = JsonDocument.Parse(json).RootElement.Clone();
-                            undo = c => takeBack(result, c);
+                            Func<CancellationToken, Task>? undo = null;
+                            if (tool.Source.Undo is { } takeBack)
+                            {
+                                var result = JsonDocument.Parse(record).RootElement.Clone();
+                                undo = c => takeBack(result, c);
+                            }
+                            done.Add(new AssistantAction(call.Name, summary, undo));
+                            records.Add(new AiJobAction(call.Name, summary, record));
                         }
-                        done.Add(new AssistantAction(call.Name, Summary(call), undo));
-                        records.Add(new AiJobAction(call.Name, Summary(call), json));
                     }
                     results.Add(new ToolOutcome(call.Id, json, false));
                 }
@@ -110,6 +114,29 @@ internal static class AssistantLoop
                 return End(DoneText, null);
         }
         return End("Em dừng lại vì việc này cần quá nhiều bước. Anh nói ngắn hơn giúp em nha.", null);
+    }
+
+    /// <summary>
+    /// What a change call recorded, as the card lists it: each item of the result's <see cref="McpTool.RecordsProperty"/>
+    /// list (with its own summary, and given alone to Undo) when it has one, else the call itself.
+    /// </summary>
+    internal static IEnumerable<(string Summary, string Json)> Records(string json, string summary)
+    {
+        JsonElement root;
+        try
+        {
+            root = JsonDocument.Parse(json).RootElement;
+        }
+        catch (JsonException)
+        {
+            return [(summary, json)];
+        }
+        if (root.ValueKind != JsonValueKind.Object || !root.TryGetProperty(McpTool.RecordsProperty, out var list)
+            || list.ValueKind != JsonValueKind.Array || list.GetArrayLength() == 0)
+            return [(summary, json)];
+        return [.. list.EnumerateArray().Select(r => (
+            r.ValueKind == JsonValueKind.Object && r.TryGetProperty(AssistantTool.SummaryArgument, out var s) && s.GetString() is { Length: > 0 } line ? line : summary,
+            r.GetRawText()))];
     }
 
     internal static string Summary(ToolCall call) =>

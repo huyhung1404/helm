@@ -279,6 +279,13 @@ public static class WorkspaceSync
         return services;
     }
 
+    /// <summary>Ask Helm's tools for the sessions (both apps): a spoken request typed into Claude Code on a PC.</summary>
+    public static IServiceCollection AddWorkspaceAskTools(this IServiceCollection services) =>
+        services.AddSingleton<Helm.Core.Mcp.IMcpToolProvider>(sp => new WorkspaceAskTools(
+            sp.GetRequiredService<ISyncedCollection<WorkspaceHostRecord>>(), sp.GetRequiredService<ISyncedCollection<WorkspaceSessionRecord>>(),
+            sp.GetRequiredService<ISyncedCollection<WorkspaceCommand>>(), sp.GetRequiredService<ISyncedCollection<WorkspaceResultRecord>>(),
+            sp.GetService<ISyncService>()));
+
     /// <summary>The pictures a session record shows (kept on the server while it does).</summary>
     public static IEnumerable<string> ImagesOf(WorkspaceSessionRecord record) => ImagesOf(record.Items);
 
