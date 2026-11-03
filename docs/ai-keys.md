@@ -490,3 +490,66 @@ For developers: `Helm.Ai.Core/Assistant/WebSearch.cs` (words, the turn's instruc
 dynamic filtering on Opus/Sonnet 4.6+, `web_search_20250305` on Haiku; server blocks go back unchanged, `pause_turn`
 goes on up to 3 times, cited sites are added when the answer does not name them), `AiUsageEntry.WebSearches` and
 `AiPrices.WebSearchUsd`. Tests: `WebSearchTests`.
+
+## Tokens per call (Ask Helm)
+
+Every Ask Helm call carries the instructions and the tools of its turn (`ToolScope`) before the user's words: on the
+API as `system` + tool definitions, on a PC's agent in the first message (`CliAgentProtocol.Preamble`). The owner's
+rule is that tokens matter, so these are kept short and measured.
+
+**Measured** by `AskHelmTokensTests` for twelve typical requests: `HELM_TOKENS_OUT=<file>` writes the table, each
+tool's size, the whole photo call and a few results; `Each_call_stays_within_its_budget` fails when a call grows back
+(raise a budget only for a reason). There is no API key here for `count_tokens`, so tokens are estimated: ASCII
+characters ÷ 3.5 + other characters ÷ 1.5 (Vietnamese letters with their marks tokenize about twice as densely). JSON
+is counted as the model reads it (the API decodes `đ` before the model sees it). The API adds its own tool-use
+prompt on top, the same before and after.
+
+| Request | Tools | API chars before → after | API ~tokens | PC chars before → after | PC ~tokens |
+|---|---|---|---|---|---|
+| trưa nay ăn phở 45k | 7 | 7480 → 5153 | 2163 → 1482 | 8442 → 4593 | 2422 → 1324 |
+| Nam mượn anh 200k | 7 | 7480 → 5153 | 2163 → 1482 | 8442 → 4593 | 2422 → 1324 |
+| tháng này tiêu bao nhiêu | 7 | 7480 → 5153 | 2163 → 1482 | 8442 → 4593 | 2422 → 1324 |
+| nhắc anh 9h mai gọi khách | 6 | 6020 → 4150 | 1738 → 1192 | 6424 → 3609 | 1843 → 1039 |
+| ghi chú: … | 4 | 4824 → 3398 | 1399 → 983 | 5585 → 3354 | 1608 → 972 |
+| anh chạy bộ rồi | 3 | 3880 → 2772 | 1118 → 798 | 4519 → 2930 | 1299 → 845 |
+| 6h sáng mai gọi anh dậy | 7 | 5251 → 3962 | 1528 → 1140 | 6085 → 3525 | 1747 → 1017 |
+| đóng tiền điện rồi 450k | 10 | 9054 → 6151 | 2625 → 1771 | 10214 → 5253 | 2931 → 1516 |
+| chia tiền lẩu 1tr2 4 người | 7 | 7480 → 5153 | 2163 → 1482 | 8442 → 4593 | 2422 → 1324 |
+| kiểm tra tin này: … (web, no tools) | 0 | 1934 → 1664 | 559 → 482 | 2017 → 1747 | 582 → 505 |
+| a photo (wallet, tracker, notes) | 17 | 14458 → 9375 | 4184 → 2694 | 15517 → 7364 | 4448 → 2121 |
+| a follow-up ("à mà 50k chứ") | 7 | 7480 → 5153 | 2163 → 1482 | 8442 → 4593 | 2422 → 1324 |
+
+About a third less on the API and half on a PC. Results the model reads (characters): a saved transaction 128 → 93, a
+debt 62 → 33, a bill split among four 378 → 196, a bill paid 133 → 78, a task 94 → 74, a mission of two phases 609 → 129.
+
+**How.**
+
+- *Short texts.* `McpTool.Brief` is the description Helm's own assistant and agents get, `BriefArgs` the few
+  arguments that keep a hint (an amount's or a date's form); with a Brief the schema goes without its descriptions at
+  any depth (types, enums and required stay: the names say the rest). MCP clients (Claude Code, Cursor…) still get
+  the full texts. Every tool in `HelmAssistant.Tools` has one (a test fails for a new tool without). The phone's tools
+  (`PhoneToolSpecs`, now also used for the phone's own alarm, timer, calendar and clipboard) are Ask Helm's alone and
+  short already. The `summary` argument carries a three-word hint; the instructions say how it reads.
+- *On a PC.* Tools are listed as short signatures, `{amount: string (đồng: 45k), direction: "spend"|"income",
+  when?: string}`, instead of JSON Schema (which also escaped every Vietnamese letter as `\u…`, tokens the agent
+  read as such); results come one line each (`c1: {…}`) instead of JSON inside JSON.
+- *Short results.* `McpTool.BriefResult` (`McpTool.Keep`, `McpTool.Drop`) shapes what the model reads of a result: a
+  saved transaction is its id, amount, category and time; a split is each share and the records' summaries; a mission
+  just made is its id, title, status and progress, not every step echoed back. The card's records, Undo (here and on
+  the PC that made them, `AiJobAction.ResultJson`) and MCP clients keep the whole result.
+- *Instructions.* `HelmAssistant.Instructions` is 1663 characters (was 1933) with the same rules. It still has no
+  placeholder, so a Skill Hub prompt (`helm-ask-helm`) replaces it as before.
+- *History* (`ChatRecap`, Claude's chat). Old tool results are not cut in place: Claude ties each thinking block to
+  everything before it (the instructions, the tools, the messages), and accounts created on or after 31 August 2026
+  get a 400 for a history edited before one; the cache would be lost too. Instead the chat starts again from a recap
+  (no tool call or thinking block replayed, so every tool_use/tool_result pair stays valid): when the history passes
+  24,000 characters, at the next user turn (never in the middle of a round of calls), and when a later turn adds tools
+  (or web search) after Claude thought, since the same check refuses thinking sent back under other tools. The recap
+  keeps the latest lines first, each cut at 1,200 characters, 8,000 in all. Grok's chat keeps its history as it is.
+- *Caching.* Claude caches a prefix only from the model's minimum: 512 tokens on the 5.x models (Haiku, Sonnet,
+  Opus 5.5), 4096 on Haiku 4.5. Ask Helm's tools and instructions are about 500–2,700 tokens (plus the API's tool
+  prompt): cached on the 5.x models, not on Haiku 4.5, where the request is simply not cached and no write premium is
+  paid (nothing to check in code). There are two breakpoints: one after the instructions (tools + instructions: a new
+  card with the same tools within 5 minutes reads them) and the top-level one for the conversation. A write costs
+  1.25×, a read 0.1×: a turn that reads takes two calls (1.35× instead of 2×); a turn that only saves takes one and pays
+  a quarter more on its prefix (on Haiku 5.5 about $0.00004).
