@@ -88,6 +88,13 @@ public sealed partial class AiPrompts : IAiPrompts
         return found.Text;
     }
 
+    /// <summary>The names of the Skill Hub prompts in use now (fresh ones; each still checked against its built-in text when used).</summary>
+    public IReadOnlyList<string> InUse()
+    {
+        var now = _time.GetUtcNow();
+        return [.. _cache.All().Select(p => p.Value).Where(p => now - p.CheckedAt <= MaxAge && p.Text.Trim().Length > 0).Select(p => p.Name).Order(StringComparer.Ordinal)];
+    }
+
     /// <summary>
     /// Keeps what the Skill Hub said about <paramref name="featureId"/>'s prompt: its text, or null when it has none (no
     /// such prompt, or it was archived), which puts the feature back on the built-in text on every device.

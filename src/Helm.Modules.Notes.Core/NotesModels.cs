@@ -45,10 +45,16 @@ public sealed record NoteItem
     /// </summary>
     public string Rev { get; init; } = "";
 
+    /// <summary>The lines that became tasks ("Make tasks"): the line's mark shows when its task is done.</summary>
+    public IReadOnlyList<NoteTaskLink> TaskLinks { get; init; } = [];
+
     /// <summary>The title, or else the first line of the text, or else "Untitled".</summary>
     [JsonIgnore]
     public string DisplayTitle => NoteText.DisplayTitle(Title, Body);
 }
+
+/// <summary>A note's line that became a task: the task's id and the line as written, without its "→ Tracker" tag.</summary>
+public sealed record NoteTaskLink(string TaskId, string Line);
 
 /// <summary>Text helpers for notes, shared by the store, the pages and the capture target.</summary>
 public static class NoteText

@@ -28,8 +28,11 @@ public sealed partial class NoteTasksViewModel : ObservableObject
     private readonly INoteTaskMaker _maker;
     private readonly Func<(string Title, string Body)> _note;
     private readonly Action<string> _setBody;
+    private readonly Action<IReadOnlyList<NoteTaskLink>>? _linked;
+    private readonly Action<IReadOnlyList<string>>? _unlinked;
     private NoteTaskBatch? _batch;
     private IReadOnlyList<string> _tagged = [];
+    private IReadOnlyList<NoteTaskLink> _links = [];
     private int _asked;
 
     [ObservableProperty] [NotifyPropertyChangedFor(nameof(IsProposing))] [NotifyPropertyChangedFor(nameof(IsStuck))] private bool _isOpen;
@@ -57,11 +60,16 @@ public sealed partial class NoteTasksViewModel : ObservableObject
     /// <summary>"4 tasks added to Nhà".</summary>
     [ObservableProperty] private string _doneText = "";
 
-    public NoteTasksViewModel(INoteTaskMaker maker, Func<(string Title, string Body)> note, Action<string> setBody)
+    /// <param name="linked">Keeps on the note which line became which task (its tag shows when the task is done).</param>
+    /// <param name="unlinked">Forgets those of tasks taken back.</param>
+    public NoteTasksViewModel(INoteTaskMaker maker, Func<(string Title, string Body)> note, Action<string> setBody,
+        Action<IReadOnlyList<NoteTaskLink>>? linked = null, Action<IReadOnlyList<string>>? unlinked = null)
     {
         _maker = maker;
         _note = note;
         _setBody = setBody;
+        _linked = linked;
+        _unlinked = unlinked;
     }
 
     /// <summary>The tool the tasks go to ("Tracker").</summary>
@@ -161,15 +169,25 @@ public sealed partial class NoteTasksViewModel : ObservableObject
         // The note as it is now (typing may have gone on): the lines found again there get the tag.
         var tag = NoteTaskLines.Tag(_maker.Name);
         var body = _note().Body;
-        var lines = NoteTaskLines.Match(body, Sources(kept), tag).Where(i => i >= 0).ToList();
+        var matched = NoteTaskLines.Match(body, Sources(kept), tag);
+        var lines = matched.Where(i => i >= 0).ToList();
         if (lines.Count > 0)
         {
             var tagged = NoteTaskLines.AddTags(body, lines, tag);
             var split = NoteTaskLines.Split(tagged);
             _tagged = [.. lines.Select(i => split[i])];
             _setBody(tagged);
+            // The tasks come back in the order they were given: the k-th made the k-th matched line's task.
+            _links = [.. matched.Select((line, k) => (Line: line, Task: k))
+                .Where(x => x.Line >= 0 && x.Task < _batch.Ids.Count && split[x.Line].EndsWith(tag, StringComparison.Ordinal))
+                .Select(x => new NoteTaskLink(_batch.Ids[x.Task], split[x.Line][..^tag.Length]))];
+            _linked?.Invoke(_links);
         }
-        else _tagged = [];
+        else
+        {
+            _tagged = [];
+            _links = [];
+        }
         DoneText = kept.Count == 1 ? $"1 task added to {_batch.ListName}" : $"{kept.Count} tasks added to {_batch.ListName}";
         IsDone = true;
     }
@@ -181,7 +199,9 @@ public sealed partial class NoteTasksViewModel : ObservableObject
         if (_batch is { } batch) _maker.Undo(batch);
         _batch = null;
         if (_tagged.Count > 0) _setBody(NoteTaskLines.RemoveTags(_note().Body, _tagged, NoteTaskLines.Tag(_maker.Name)));
+        if (_links.Count > 0) _unlinked?.Invoke([.. _links.Select(l => l.TaskId)]);
         _tagged = [];
+        _links = [];
         IsDone = false;
         Counted();
     }
@@ -196,6 +216,7 @@ public sealed partial class NoteTasksViewModel : ObservableObject
         IsDone = false;
         _batch = null;
         _tagged = [];
+        _links = [];
     }
 
     private static IReadOnlyList<(string Title, string? Line)> Sources(IEnumerable<NoteTaskProposal> tasks) =>

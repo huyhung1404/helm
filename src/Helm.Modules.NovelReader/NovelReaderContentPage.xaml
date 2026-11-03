@@ -641,7 +641,7 @@
                                Visibility="{Binding ShowBackToReading, Converter={StaticResource BoolToVisibility}}" />
 
                     <!-- A word held down: its sentence ("Câu này") explained, said aloud, and its words to Vocabulary (Esc closes) -->
-                    <Border Margin="32,0,28,12" MaxWidth="760" VerticalAlignment="Bottom" Padding="16,10,12,12" CornerRadius="8" BorderThickness="1"
+                    <Border x:Name="HeldPanel" Margin="32,0,28,12" MaxWidth="760" VerticalAlignment="Bottom" Padding="16,10,12,12" CornerRadius="8" BorderThickness="1"
                             Background="{DynamicResource ApplicationBackgroundBrush}" BorderBrush="{DynamicResource SurfaceStrokeColorDefaultBrush}"
                             DataContext="{Binding HeldSentence}" Visibility="{Binding IsShown, Converter={StaticResource BoolToVisibility}}"
                             AutomationProperties.Name="Giải thích câu">

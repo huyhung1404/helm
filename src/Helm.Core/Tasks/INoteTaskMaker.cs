@@ -11,6 +11,7 @@ public sealed record NoteTaskProposal(string Title, string Notes, string? Due, s
 public sealed record NoteTaskAnswer(IReadOnlyList<NoteTaskProposal> Tasks, string? Problem, string? RanOn = null);
 
 /// <summary>What one "Add" did, so it can be taken back.</summary>
+/// <param name="Ids">The tasks made, in the order of the proposals added.</param>
 /// <param name="MadeList">The list made for it (the user had none by that name), removed again by Undo.</param>
 public sealed record NoteTaskBatch(string ListName, IReadOnlyList<string> Ids, string? MadeList);
 
@@ -45,4 +46,10 @@ public interface INoteTaskMaker
 
     /// <summary>Takes a batch back: its tasks, and the list when <see cref="Add"/> made it.</summary>
     void Undo(NoteTaskBatch batch);
+
+    /// <summary>Whether a task <see cref="Add"/> made is done now; null when it is gone.</summary>
+    bool? IsDone(string taskId);
+
+    /// <summary>The tasks changed, here or on another device (any thread): a note's done lines may change their mark.</summary>
+    event EventHandler? TasksChanged;
 }

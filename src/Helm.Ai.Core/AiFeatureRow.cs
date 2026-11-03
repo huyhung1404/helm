@@ -34,6 +34,8 @@ public sealed partial class AiFeatureRow : ObservableObject
         Id = info.Id;
         Name = info.Name;
         IsAutomatic = info.Automatic;
+        Tool = info.Tool;
+        Symbol = info.Symbol;
         _save = save;
     }
 
@@ -42,6 +44,12 @@ public sealed partial class AiFeatureRow : ObservableObject
     public string Name { get; }
 
     public bool IsAutomatic { get; }
+
+    /// <summary>The tool whose icon the row shows (a module id), or null: <see cref="Symbol"/>.</summary>
+    public string? Tool { get; }
+
+    /// <summary>The Fluent symbol without a size, when the tool's icon is not there.</summary>
+    public string Symbol { get; }
 
     public IReadOnlyList<AiRouteOption> Routes => AiRouteOption.All;
 

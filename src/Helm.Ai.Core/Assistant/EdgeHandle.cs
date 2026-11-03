@@ -8,13 +8,26 @@ public readonly record struct EdgeHandleFrame(int Top, int Width, int Height);
 
 /// <summary>
 /// The edge handle's size and place (Ask Helm › Ways to open): a 4dp line, 3dp from the edge, in a 20dp strip that takes
-/// the touches. Platform-free, so it is tested off the phone.
+/// the touches, widened to <see cref="DragStripDp"/> while a finger drags the line. Platform-free, so it is tested off
+/// the phone.
 /// </summary>
 public static class EdgeHandleLayout
 {
     public const int StripDp = 20;
     public const int LineDp = 4;
     public const int LineInsetDp = 3;
+
+    /// <summary>The line grows this much wider as the drag nears opening.</summary>
+    public const int LineGrowDp = 4;
+
+    /// <summary>
+    /// The strip while a finger drags: wide enough for the line, at its widest and its insets on both sides, to follow
+    /// the finger all of <see cref="EdgeHandleGesture.MaxPullDp"/> inward (well inside the 200dp Android leaves an app).
+    /// </summary>
+    public const int DragStripDp = EdgeHandleGesture.MaxPullDp + LineDp + LineGrowDp + 2 * LineInsetDp;
+
+    /// <summary>The strip's width now, in pixels.</summary>
+    public static int StripPx(bool dragging, float density) => Px(dragging ? DragStripDp : StripDp, density);
 
     /// <param name="roomPx">The height the window can use (the screen's).</param>
     /// <param name="density">Pixels per dp.</param>

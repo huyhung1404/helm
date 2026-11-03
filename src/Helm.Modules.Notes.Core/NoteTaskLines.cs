@@ -4,9 +4,9 @@ namespace Helm.Modules.Notes;
 
 /// <summary>
 /// The lines of a note against the tasks AI found in it ("Make tasks"): which line each task came from, the lines it
-/// left out, and the small "→ Tracker" tag put at the end of a line that became a task. The tag is plain text, so
-/// every device and older version shows it, and taking the tasks back removes it again; nothing else of the note is
-/// touched.
+/// left out, and the small "→ Tracker" tag put at the end of a line that became a task, which becomes "→ Tracker ✓"
+/// once that task is done (<see cref="MarkDone"/>). The tag is plain text, so every device and older version shows it,
+/// and taking the tasks back removes it again; nothing else of the note is touched.
 /// </summary>
 public static class NoteTaskLines
 {
@@ -14,8 +14,38 @@ public static class NoteTaskLines
     private const int MaxQuoted = 3;
     private const int MaxQuote = 40;
 
+    /// <summary>What follows the tag once the line's task is done: " → Tracker ✓".</summary>
+    public const string DoneMark = " ✓";
+
     /// <summary>The tag a line gets: " → Tracker".</summary>
     public static string Tag(string toolName) => $" → {toolName}";
+
+    /// <summary>The line ends with the tag, its task done or not.</summary>
+    public static bool IsTagged(string line, string tag)
+    {
+        var end = line.TrimEnd();
+        return end.EndsWith(tag.Trim(), StringComparison.Ordinal) || end.EndsWith(tag.Trim() + DoneMark, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    /// The text with each linked line's tag showing its task: " → Tracker ✓" when done, " → Tracker" when open again.
+    /// A line edited since (or a task that is gone) keeps its tag as it is.
+    /// </summary>
+    public static string MarkDone(string text, IEnumerable<NoteTaskLink> links, string tag, Func<string, bool?> isDone)
+    {
+        var lines = Split(text);
+        var changed = false;
+        foreach (var link in links)
+        {
+            if (isDone(link.TaskId) is not { } done) continue;
+            var open = link.Line + tag;
+            var at = Array.IndexOf(lines, done ? open : open + DoneMark);
+            if (at < 0) continue;
+            lines[at] = done ? open + DoneMark : open;
+            changed = true;
+        }
+        return changed ? string.Join('\n', lines) : text;
+    }
 
     /// <summary>
     /// For each task, the index of the note's line it came from (or -1): the line AI quoted, else one holding the task's
@@ -24,7 +54,7 @@ public static class NoteTaskLines
     public static IReadOnlyList<int> Match(string text, IReadOnlyList<(string Title, string? Line)> tasks, string tag)
     {
         var lines = Split(text);
-        var keys = lines.Select(l => l.EndsWith(tag, StringComparison.Ordinal) ? "" : Key(l)).ToList();
+        var keys = lines.Select(l => IsTagged(l, tag) ? "" : Key(l)).ToList();
         var used = new HashSet<int>();
         var found = new List<int>();
         foreach (var (title, line) in tasks)
@@ -47,7 +77,7 @@ public static class NoteTaskLines
         var used = matched.ToHashSet();
         var left = Split(text)
             .Select((line, i) => (Line: line.Trim(), i))
-            .Where(l => !used.Contains(l.i) && Key(l.Line).Length > 0 && !l.Line.EndsWith(tag.Trim(), StringComparison.Ordinal))
+            .Where(l => !used.Contains(l.i) && Key(l.Line).Length > 0 && !IsTagged(l.Line, tag))
             .Select(l => Quote(Strip(l.Line)))
             .ToList();
         if (left.Count == 0) return "";
@@ -61,21 +91,23 @@ public static class NoteTaskLines
     {
         var lines = Split(text);
         foreach (var i in lineIndexes.Where(i => i >= 0 && i < lines.Length).Distinct())
-            if (!lines[i].EndsWith(tag, StringComparison.Ordinal)) lines[i] = lines[i].TrimEnd() + tag;
+            if (!IsTagged(lines[i], tag)) lines[i] = lines[i].TrimEnd() + tag;
         return string.Join('\n', lines);
     }
 
     /// <summary>
-    /// The text with the tag taken off <paramref name="taggedLines"/> (the lines as <see cref="AddTags"/> left them),
-    /// wherever they are now; lines edited since keep theirs.
+    /// The text with the tag taken off <paramref name="taggedLines"/> (the lines as <see cref="AddTags"/> left them, or
+    /// marked done since), wherever they are now; lines edited since keep theirs.
     /// </summary>
     public static string RemoveTags(string text, IEnumerable<string> taggedLines, string tag)
     {
         var lines = Split(text);
         foreach (var tagged in taggedLines)
         {
+            if (!tagged.EndsWith(tag, StringComparison.Ordinal)) continue;
             var at = Array.IndexOf(lines, tagged);
-            if (at >= 0 && tagged.EndsWith(tag, StringComparison.Ordinal)) lines[at] = tagged[..^tag.Length];
+            if (at < 0) at = Array.IndexOf(lines, tagged + DoneMark);
+            if (at >= 0) lines[at] = tagged[..^tag.Length];
         }
         return string.Join('\n', lines);
     }

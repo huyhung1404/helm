@@ -108,6 +108,17 @@ public sealed class AskHelmOpeningTests : IDisposable
     }
 
     [Fact]
+    public void While_dragging_the_strip_is_wide_enough_for_the_line_to_follow_44dp()
+    {
+        Assert.Equal(EdgeHandleLayout.Px(EdgeHandleLayout.StripDp, Density), EdgeHandleLayout.StripPx(false, Density));
+        // The widest line and its insets on both sides, plus the whole pull.
+        var room = EdgeHandleLayout.DragStripDp - (EdgeHandleLayout.LineDp + EdgeHandleLayout.LineGrowDp) - 2 * EdgeHandleLayout.LineInsetDp;
+        Assert.Equal(EdgeHandleGesture.MaxPullDp, room);
+        Assert.True(EdgeHandleLayout.DragStripDp < 200);
+        Assert.Equal(EdgeHandleLayout.Px(EdgeHandleLayout.DragStripDp, Density), EdgeHandleLayout.StripPx(true, Density));
+    }
+
+    [Fact]
     public void A_stored_height_past_the_back_gesture_limit_is_drawn_at_160dp()
     {
         // Android keeps at most 200dp of an edge from the Back gesture for an app.

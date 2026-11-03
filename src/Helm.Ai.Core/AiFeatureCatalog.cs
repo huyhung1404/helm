@@ -7,7 +7,15 @@ namespace Helm.Ai;
 /// <param name="Automatic">It runs by itself (not started by the user): on a PC agent only until the user says otherwise.</param>
 /// <param name="OnByDefault">On until the user turns it off; false: off until they turn it on (a paid extra).</param>
 /// <param name="Route">Where it runs until the user says otherwise; null: as Ask Helm does.</param>
-public sealed record AiFeatureInfo(string Id, string Name, string Description, bool Automatic, bool OnByDefault = true, AiRoutePolicy? Route = null);
+/// <param name="Tool">The tool it belongs to (a module id): the settings show that tool's icon while it is in the app.</param>
+/// <param name="Symbol">
+/// Its Fluent symbol without a size ("Mic"), drawn when it belongs to no tool or the tool is not there; the PC adds "24".
+/// </param>
+public sealed record AiFeatureInfo(string Id, string Name, string Description, bool Automatic, bool OnByDefault = true,
+    AiRoutePolicy? Route = null, string? Tool = null, string Symbol = AiFeatureInfo.DefaultSymbol)
+{
+    public const string DefaultSymbol = "Sparkle";
+}
 
 /// <summary>
 /// Every <see cref="AiFeatureIds"/> feature with a name the user knows: the list AI → Features (PC) and Settings › AI
@@ -17,22 +25,22 @@ public static class AiFeatureCatalog
 {
     private static readonly AiFeatureInfo[] Known =
     [
-        new(AiFeatureIds.AskHelm, "Ask Helm", "Voice and typed requests from the card", false),
-        new(AiFeatureIds.TextActions, "Translate / rewrite selection", "Selected text in any app, from the phone's text menu", false),
-        new(AiFeatureIds.VocabQuick, "Word analysis", "Roots and meaning for a word added on the phone", false),
-        new(AiFeatureIds.SentenceExplain, "Explain sentence", "Novel Reader: hold a sentence", false),
-        new(AiFeatureIds.TaskProposals, "Task proposals", "Tracker: steps for a big task, tasks from a note", false),
+        new(AiFeatureIds.AskHelm, "Ask Helm", "Voice and typed requests from the card", false, Symbol: "Mic"),
+        new(AiFeatureIds.TextActions, "Translate / rewrite selection", "Selected text in any app, from the phone's text menu", false, Symbol: "Translate"),
+        new(AiFeatureIds.VocabQuick, "Word analysis", "Roots and meaning for a word added on the phone", false, Tool: "vocab", Symbol: "BookLetter"),
+        new(AiFeatureIds.SentenceExplain, "Explain sentence", "Novel Reader: hold a sentence", false, Tool: "novel-reader", Symbol: "BookOpen"),
+        new(AiFeatureIds.TaskProposals, "Task proposals", "Tracker: steps for a big task, tasks from a note", false, Tool: "tracker", Symbol: "TaskListAdd"),
         new(AiFeatureIds.WebSearch, "Web search", "Ask Helm: weather, rates, gold, news, checking a post · API, about $0.01 a search", false,
-            OnByDefault: false, Route: AiRoutePolicy.ApiOnly),
-        new(AiFeatureIds.WalletReadNotification, "Read a bank notification", "Wallet: one Helm could not read, when you ask", false),
-        new(AiFeatureIds.WalletCategorize, "Auto-classify transactions", "Wallet: files a new payment the history cannot", true),
-        new(AiFeatureIds.MorningBrief, "Morning brief", "Today's tasks, habits to do, yesterday's spending", true),
-        new(AiFeatureIds.EveningReview, "Evening review", "What got done, what slips to tomorrow", true),
-        new(AiFeatureIds.SpendingDigest, "Weekly spending", "Where the week's and the month's money went", true),
-        new(AiFeatureIds.HabitCoach, "Habit coach", "Reads skip reasons, suggests a smaller step", true),
-        new(AiFeatureIds.ImportantDays, "Important dates", "Birthdays, giỗ and renewals, a few days before", true),
-        new(AiFeatureIds.NoteTitles, "Note titles", "A title and tags for new notes without one", true),
-        new(AiFeatureIds.ScratchTidy, "Tidy Scratch", "What to keep or drop in Scratch (suggestions only)", true),
+            OnByDefault: false, Route: AiRoutePolicy.ApiOnly, Symbol: "Globe"),
+        new(AiFeatureIds.WalletReadNotification, "Read a bank notification", "Wallet: one Helm could not read, when you ask", false, Tool: "wallet", Symbol: "Wallet"),
+        new(AiFeatureIds.WalletCategorize, "Auto-classify transactions", "Wallet: files a new payment the history cannot", true, Tool: "wallet", Symbol: "Wallet"),
+        new(AiFeatureIds.MorningBrief, "Morning brief", "Today's tasks, habits to do, yesterday's spending", true, Symbol: "WeatherSunny"),
+        new(AiFeatureIds.EveningReview, "Evening review", "What got done, what slips to tomorrow", true, Symbol: "WeatherMoon"),
+        new(AiFeatureIds.SpendingDigest, "Weekly spending", "Where the week's and the month's money went", true, Tool: "wallet", Symbol: "Wallet"),
+        new(AiFeatureIds.HabitCoach, "Habit coach", "Reads skip reasons, suggests a smaller step", true, Tool: "habits", Symbol: "ArrowRepeatAll"),
+        new(AiFeatureIds.ImportantDays, "Important dates", "Birthdays, giỗ and renewals, a few days before", true, Symbol: "CalendarStar"),
+        new(AiFeatureIds.NoteTitles, "Note titles", "A title and tags for new notes without one", true, Tool: "notes", Symbol: "Note"),
+        new(AiFeatureIds.ScratchTidy, "Tidy Scratch", "What to keep or drop in Scratch (suggestions only)", true, Tool: "scratch", Symbol: "Notepad"),
     ];
 
     public static IReadOnlyList<AiFeatureInfo> All { get; } = Build();

@@ -292,6 +292,125 @@
                     </StackPanel>
                 </Border>
 
+                <!-- The bills that come every month: this month paid or not; "Paid" saves the spending (Undo) -->
+                <Border Style="{DynamicResource HelmSurface}" Margin="0,0,0,16" Visibility="{Binding Bills, Converter={StaticResource NotEmptyToVisibility}}">
+                    <StackPanel DataContext="{Binding Bills}">
+                        <DockPanel Margin="0,0,0,8">
+                            <ui:Button DockPanel.Dock="Right" Content="Add bill" Icon="{ui:SymbolIcon Add24}" Command="{Binding BeginAddCommand}" />
+                            <ui:SymbolIcon Symbol="ReceiptMoney24" FontSize="18" Margin="0,0,8,0" VerticalAlignment="Center" />
+                            <TextBlock Text="Bills" Style="{StaticResource CardTitle}" />
+                            <TextBlock Text="{Binding SummaryText}" Style="{DynamicResource HelmSecondaryText}" FontSize="12" VerticalAlignment="Center" Margin="12,0,0,0" />
+                        </DockPanel>
+                        <TextBlock Style="{DynamicResource HelmSecondaryText}" TextWrapping="Wrap" Margin="0,0,0,4"
+                                   Visibility="{Binding HasNoBills, Converter={StaticResource BoolToVisibility}}"
+                                   Text="Electricity, internet, rent: bills that come every month. Helm reminds you before each is due, and “Paid” saves the spending. Ask Helm can add them too (“tiền điện ngày 15”)." />
+
+                        <!-- What the last Paid or Delete did, with Undo -->
+                        <Border Style="{StaticResource Box}" Margin="0,4,0,8" Padding="12,6" Visibility="{Binding HasMessage, Converter={StaticResource BoolToVisibility}}">
+                            <DockPanel>
+                                <ui:Button DockPanel.Dock="Right" Style="{StaticResource RowAction}" Icon="{ui:SymbolIcon Dismiss24}" ToolTip="Dismiss" AutomationProperties.Name="Dismiss"
+                                           Command="{Binding DismissMessageCommand}" />
+                                <ui:Button DockPanel.Dock="Right" Content="Undo" Appearance="Transparent" Command="{Binding UndoCommand}"
+                                           Visibility="{Binding CanUndo, Converter={StaticResource BoolToVisibility}}" />
+                                <TextBlock Text="{Binding Message}" TextWrapping="Wrap" VerticalAlignment="Center" />
+                            </DockPanel>
+                        </Border>
+
+                        <!-- Add or edit: name, the amount (empty: it varies), the day of the month -->
+                        <Border Style="{StaticResource Box}" Margin="0,4,0,8" Visibility="{Binding IsEditing, Converter={StaticResource BoolToVisibility}}">
+                            <StackPanel>
+                                <TextBlock Text="{Binding FormTitle}" FontWeight="SemiBold" Margin="0,0,0,8" />
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="2*" />
+                                        <ColumnDefinition Width="12" />
+                                        <ColumnDefinition Width="1.4*" />
+                                        <ColumnDefinition Width="12" />
+                                        <ColumnDefinition Width="120" />
+                                    </Grid.ColumnDefinitions>
+                                    <StackPanel>
+                                        <TextBlock Text="Name" Style="{StaticResource FieldLabel}" />
+                                        <ui:TextBox Text="{Binding FormName, UpdateSourceTrigger=PropertyChanged}" PlaceholderText="Tiền điện" MaxLength="60" AutomationProperties.Name="Bill name" />
+                                    </StackPanel>
+                                    <StackPanel Grid.Column="2">
+                                        <TextBlock Text="Amount" Style="{StaticResource FieldLabel}" />
+                                        <ui:TextBox Text="{Binding FormAmount, UpdateSourceTrigger=PropertyChanged}" PlaceholderText="Varies" AutomationProperties.Name="Amount every month" />
+                                        <TextBlock Text="{Binding FormAmountHint}" Style="{StaticResource FieldHint}" />
+                                    </StackPanel>
+                                    <StackPanel Grid.Column="4">
+                                        <TextBlock Text="Due day" Style="{StaticResource FieldLabel}" />
+                                        <ui:NumberBox Value="{Binding FormDay}" Minimum="1" Maximum="31" MaxDecimalPlaces="0" SmallChange="1" ClearButtonEnabled="False"
+                                                      AutomationProperties.Name="Day of the month it is due" />
+                                    </StackPanel>
+                                </Grid>
+                                <TextBlock Text="{Binding FormProblem}" Foreground="{DynamicResource SystemFillColorCriticalBrush}" TextWrapping="Wrap" Margin="0,8,0,0"
+                                           Visibility="{Binding HasFormProblem, Converter={StaticResource BoolToVisibility}}" />
+                                <StackPanel Orientation="Horizontal" Margin="0,12,0,0">
+                                    <ui:Button Appearance="Primary" Content="Save" Icon="{ui:SymbolIcon Checkmark24}" Command="{Binding SaveEditCommand}" />
+                                    <ui:Button Content="Cancel" Margin="8,0,0,0" Command="{Binding CancelEditCommand}" />
+                                </StackPanel>
+                            </StackPanel>
+                        </Border>
+
+                        <!-- One row per bill: name, amount or "varies", the due day, this month's state, Paid, edit, delete -->
+                        <ItemsControl ItemsSource="{Binding Rows}" Focusable="False">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate DataType="{x:Type local:BillRow}">
+                                    <Border BorderThickness="0,1,0,0" BorderBrush="{DynamicResource CardStrokeColorDefaultBrush}" Padding="0,8">
+                                        <StackPanel>
+                                            <Grid>
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="*" />
+                                                    <ColumnDefinition Width="Auto" />
+                                                    <ColumnDefinition Width="Auto" />
+                                                </Grid.ColumnDefinitions>
+                                                <StackPanel VerticalAlignment="Center">
+                                                    <TextBlock Text="{Binding Name}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+                                                    <TextBlock Style="{DynamicResource HelmSecondaryText}" FontSize="12" TextTrimming="CharacterEllipsis">
+                                                        <Run Text="{Binding AmountText, Mode=OneWay}" /><Run Text=" · " /><Run Text="{Binding DueText, Mode=OneWay}" />
+                                                    </TextBlock>
+                                                </StackPanel>
+                                                <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center" Margin="12,0,8,0">
+                                                    <ui:SymbolIcon Symbol="CheckmarkCircle24" FontSize="14" Margin="0,0,4,0" Foreground="{DynamicResource SystemFillColorSuccessBrush}"
+                                                                   Visibility="{Binding IsPaid, Converter={StaticResource BoolToVisibility}}" />
+                                                    <TextBlock Text="{Binding StateText}" FontSize="12" VerticalAlignment="Center">
+                                                        <TextBlock.Style>
+                                                            <Style TargetType="TextBlock" BasedOn="{StaticResource HelmSecondaryText}">
+                                                                <Style.Triggers>
+                                                                    <DataTrigger Binding="{Binding IsLate}" Value="True">
+                                                                        <Setter Property="Foreground" Value="{DynamicResource SystemFillColorCriticalBrush}" />
+                                                                    </DataTrigger>
+                                                                </Style.Triggers>
+                                                            </Style>
+                                                        </TextBlock.Style>
+                                                    </TextBlock>
+                                                </StackPanel>
+                                                <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
+                                                    <ui:Button Content="Paid" Icon="{ui:SymbolIcon Checkmark24}" Command="{Binding PayCommand}" Margin="0,0,4,0"
+                                                               Visibility="{Binding CanPay, Converter={StaticResource BoolToVisibility}}"
+                                                               ToolTip="Saves this month's payment in the Wallet and marks the month paid"
+                                                               AutomationProperties.Name="{Binding Name, StringFormat='{}{0}: paid'}" />
+                                                    <ui:Button Style="{StaticResource RowAction}" Icon="{ui:SymbolIcon Edit24}" Command="{Binding EditCommand}" ToolTip="Edit"
+                                                               AutomationProperties.Name="{Binding Name, StringFormat='Edit {0}'}" />
+                                                    <ui:Button Style="{StaticResource RowAction}" Icon="{ui:SymbolIcon Delete24}" Command="{Binding DeleteCommand}" ToolTip="Delete"
+                                                               AutomationProperties.Name="{Binding Name, StringFormat='Delete {0}'}" />
+                                                </StackPanel>
+                                            </Grid>
+                                            <!-- A bill that varies: how much it came to this month -->
+                                            <StackPanel Orientation="Horizontal" Margin="0,8,0,0" Visibility="{Binding IsAskingAmount, Converter={StaticResource BoolToVisibility}}">
+                                                <ui:TextBox Text="{Binding PayAmount, UpdateSourceTrigger=PropertyChanged}" PlaceholderText="How much? 450k" Width="180"
+                                                            AutomationProperties.Name="{Binding Name, StringFormat='How much was {0}'}" />
+                                                <ui:Button Appearance="Primary" Content="Save" Margin="8,0,0,0" Command="{Binding PayCommand}" />
+                                                <ui:Button Content="Cancel" Margin="8,0,0,0" Command="{Binding CancelPayCommand}" />
+                                            </StackPanel>
+                                        </StackPanel>
+                                    </Border>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </StackPanel>
+                </Border>
+
                 <!-- The month's transactions on the left, where the money went on the right -->
                 <Grid>
                     <Grid.ColumnDefinitions>

@@ -185,6 +185,76 @@ public sealed class PlanViewsTests : IDisposable
         Assert.Equal(Note, NoteTaskLines.RemoveTags(tagged, ["- Mua quà sinh nhật mẹ (thứ 7) → Tracker", "- Gọi Nam hỏi trả 200k → Tracker"], tag));
     }
 
+    [Fact]
+    public void A_tagged_line_shows_its_task_done_and_open_again()
+    {
+        const string tag = " → Tracker";
+        var text = "- Mua quà → Tracker\n- Đi chợ → Tracker\nGhi chú";
+        NoteTaskLink[] links = [new("t1", "- Mua quà"), new("t2", "- Đi chợ"), new("gone", "Ghi chú")];
+        var done = new Dictionary<string, bool?> { ["t1"] = true, ["t2"] = false, ["gone"] = null };
+
+        var marked = NoteTaskLines.MarkDone(text, links, tag, id => done[id]);
+
+        Assert.Equal("- Mua quà → Tracker ✓\n- Đi chợ → Tracker\nGhi chú", marked);
+        Assert.True(NoteTaskLines.IsTagged("- Mua quà → Tracker ✓", tag));
+        // A done line is not offered again, nor named as skipped.
+        Assert.Equal([-1], NoteTaskLines.Match(marked, [("Mua quà", "- Mua quà")], tag));
+        Assert.DoesNotContain("Mua quà", NoteTaskLines.Skipped(marked, [], tag));
+        done["t1"] = false;
+        Assert.Equal(text, NoteTaskLines.MarkDone(marked, links, tag, id => done[id]));
+        // Undo of "Make tasks" takes the tag off a line marked done meanwhile too.
+        Assert.Equal("- Mua quà\n- Đi chợ → Tracker\nGhi chú", NoteTaskLines.RemoveTags(marked, ["- Mua quà → Tracker"], tag));
+    }
+
+    [Fact]
+    public async Task A_task_made_from_a_note_line_shows_done_in_the_note_and_Undo_forgets_it()
+    {
+        var home = _tracker.AddWorkspace("Nhà");
+        var id = _notes.Add("Việc cuối tuần", Note);
+        using var vm = NotesWith(new TrackerNoteTasks(_tracker, new ScriptedAiText(NoteAnswer), _time));
+        vm.OpenNote(id);
+        await vm.MakeTasksCommand.ExecuteAsync(null);
+        vm.Tasks!.Choices[2].Keep = false;
+        vm.Tasks.AddCommand.Execute(null);
+        vm.Flush();
+
+        var links = _notes.Get(id)!.TaskLinks;
+        Assert.Equal(["- Mua quà sinh nhật mẹ (thứ 7)", "- Đóng tiền điện tháng 11, 680k"], links.Select(l => l.Line));
+        var gift = _tracker.Items(home).Single(i => i.Value.Title == "Mua quà sinh nhật mẹ").Id;
+        Assert.Equal(gift, links[0].TaskId);
+
+        _tracker.Complete(gift);
+        Assert.Equal("- Mua quà sinh nhật mẹ (thứ 7) → Tracker ✓", NoteTaskLines.Split(vm.EditBody)[0]);
+        Assert.Equal("- Đóng tiền điện tháng 11, 680k → Tracker", NoteTaskLines.Split(vm.EditBody)[1]);
+
+        _tracker.Reopen(gift);
+        Assert.Equal("- Mua quà sinh nhật mẹ (thứ 7) → Tracker", NoteTaskLines.Split(vm.EditBody)[0]);
+
+        // Done again, then the whole "Make tasks" taken back: the tasks, the tags and the links go.
+        _tracker.Complete(gift);
+        vm.Tasks.UndoCommand.Execute(null);
+        Assert.Equal(Note, vm.EditBody);
+        Assert.Empty(_tracker.Items(home));
+        Assert.Empty(_notes.Get(id)!.TaskLinks);
+    }
+
+    [Fact]
+    public void Opening_a_note_marks_the_lines_whose_tasks_were_done_meanwhile()
+    {
+        var list = _tracker.AddWorkspace("Nhà");
+        var task = _tracker.AddItem(list, new TrackerItemDraft("Mua quà"));
+        var id = _notes.Add("Việc", "- Mua quà → Tracker\n- Khác");
+        _notes.AddTaskLinks(id, [new NoteTaskLink(task, "- Mua quà")]);
+        _tracker.Complete(task);
+        using var vm = NotesWith(new TrackerNoteTasks(_tracker, new ScriptedAiText(), _time));
+
+        vm.OpenNote(id);
+        vm.Flush();
+
+        Assert.Equal("- Mua quà → Tracker ✓\n- Khác", _notes.Get(id)!.Body);
+        Assert.Single(_notes.Get(id)!.TaskLinks);
+    }
+
     private NotesViewModel NotesWith(TrackerNoteTasks tasks) =>
         new(_notes, _settings, new InlineUi(), new AcceptDialogs(), new MemoryClipboard(), NullLogger<NotesViewModel>.Instance, taskMaker: tasks);
 

@@ -48,5 +48,7 @@
                            Visibility="{Binding DataContext.IsAgentsTab, RelativeSource={RelativeSource AncestorType=Page}, Converter={StaticResource BoolToVisibility}}" />
         <aiv:AiFeaturesView DataContext="{Binding Features}"
                             Visibility="{Binding DataContext.IsFeaturesTab, RelativeSource={RelativeSource AncestorType=Page}, Converter={StaticResource BoolToVisibility}}" />
+        <aiv:SkillHubView DataContext="{Binding SkillHub}"
+                          Visibility="{Binding DataContext.IsFeaturesTab, RelativeSource={RelativeSource AncestorType=Page}, Converter={StaticResource BoolToVisibility}}" />
     </StackPanel>
 </Page>

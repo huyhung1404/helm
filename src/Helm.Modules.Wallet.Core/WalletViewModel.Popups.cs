@@ -135,7 +135,11 @@ public sealed partial class WalletViewModel
     public bool ShowToCategorizeButton => IsMoneyView && HasToCategorize;
 
     [RelayCommand]
-    private void OpenToCategorize() => ShowPopup(WalletPopup.ToCategorize, stack: false);
+    private void OpenToCategorize()
+    {
+        ShowPopup(WalletPopup.ToCategorize, stack: false);
+        ProposeCategories();
+    }
 
     [RelayCommand]
     private void OpenCharts() => ShowPopup(WalletPopup.Charts, stack: false);

@@ -3,10 +3,13 @@
     x:ClassModifier="internal"
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-    xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml">
+    xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
+    xmlns:aiv="clr-namespace:Helm.App.Views.Ai">
 
     <!-- The Features part of the AI page: one table, every AI feature's settings; its DataContext is an AiFeaturesViewModel. -->
     <UserControl.Resources>
+        <aiv:AiFeatureIconConverter x:Key="AiFeatureIcon" />
+
         <!-- The table's columns, the same in the header and every row (the feature's name takes what is left) -->
         <GridLength x:Key="OnColumn">64</GridLength>
         <GridLength x:Key="RouteColumn">148</GridLength>
@@ -94,11 +97,16 @@
                                                         <ColumnDefinition Width="{StaticResource CapColumn}" />
                                                         <ColumnDefinition Width="{StaticResource CostColumn}" />
                                                     </Grid.ColumnDefinitions>
-                                                    <StackPanel Margin="0,0,8,0" VerticalAlignment="Center" ToolTip="{Binding Description}">
-                                                        <TextBlock Text="{Binding Name}" TextTrimming="CharacterEllipsis" />
-                                                        <TextBlock Text="{Binding Description}" Style="{DynamicResource HelmSecondaryText}"
-                                                                   TextWrapping="NoWrap" TextTrimming="CharacterEllipsis" />
-                                                    </StackPanel>
+                                                    <!-- The feature's tool icon (or its symbol), its name and what it does -->
+                                                    <DockPanel Margin="0,0,8,0" VerticalAlignment="Center" ToolTip="{Binding Description}">
+                                                        <ContentPresenter DockPanel.Dock="Left" Width="20" Height="20" Margin="0,0,12,0" VerticalAlignment="Center"
+                                                                          Content="{Binding Converter={StaticResource AiFeatureIcon}}" Focusable="False" />
+                                                        <StackPanel>
+                                                            <TextBlock Text="{Binding Name}" TextTrimming="CharacterEllipsis" />
+                                                            <TextBlock Text="{Binding Description}" Style="{DynamicResource HelmSecondaryText}"
+                                                                       TextWrapping="NoWrap" TextTrimming="CharacterEllipsis" />
+                                                        </StackPanel>
+                                                    </DockPanel>
                                                     <ui:ToggleSwitch Grid.Column="1" Margin="0,0,8,0" VerticalAlignment="Center" IsChecked="{Binding IsOn}"
                                                                      AutomationProperties.Name="{Binding Name, StringFormat='{}{0}: on'}" />
                                                     <ComboBox Grid.Column="2" Margin="0,0,8,0" VerticalAlignment="Center" ItemsSource="{Binding Routes}" SelectedItem="{Binding Route}"

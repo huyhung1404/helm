@@ -27,6 +27,9 @@ public sealed class AskHelmEdgeHandle(ISettingsStoreFactory settings, ILogger<As
     private TurnWatcher? _turns;
     private bool _fullScreen;
 
+    /// <summary>A finger is on the line: the window is the wider drag strip.</summary>
+    private bool _dragging;
+
     /// <summary>Whether the handle wants a window now (on, the tool on, the permission given).</summary>
     public bool Wanted => EdgeHandleRules.Wanted(_store.Current, QuickCaptureModule.IsModuleEnabled(settings, QuickCaptureModule.ModuleId),
         OverlayPermission.Granted(_context));
@@ -71,7 +74,8 @@ public sealed class AskHelmEdgeHandle(ISettingsStoreFactory settings, ILogger<As
     private void Add(AskHelmOpenSettings s)
     {
         _fullScreen = false;
-        var view = new EdgeHandleView(_context, s.EdgeSide, Open, OnFullScreen);
+        _dragging = false;
+        var view = new EdgeHandleView(_context, s.EdgeSide, Open, OnFullScreen, OnDragging);
         var p = new WindowManagerLayoutParams(0, 0, WindowManagerTypes.ApplicationOverlay,
             WindowManagerFlags.NotFocusable | WindowManagerFlags.NotTouchModal | WindowManagerFlags.LayoutInScreen, Format.Translucent);
         Frame(s, p);
@@ -95,7 +99,7 @@ public sealed class AskHelmEdgeHandle(ISettingsStoreFactory settings, ILogger<As
     {
         var metrics = _context.Resources!.DisplayMetrics!;
         var frame = EdgeHandleLayout.Place(metrics.HeightPixels, metrics.Density, s.EdgeHeightDp, s.EdgePositionPercent);
-        p.Width = frame.Width;
+        p.Width = EdgeHandleLayout.StripPx(_dragging, metrics.Density);
         p.Height = frame.Height;
         p.Gravity = GravityFlags.Top | (s.EdgeSide == EdgeSide.Right ? GravityFlags.Right : GravityFlags.Left);
         p.X = 0;
@@ -111,6 +115,25 @@ public sealed class AskHelmEdgeHandle(ISettingsStoreFactory settings, ILogger<As
         p.Alpha = shown ? 1f : 0f;
         if (shown) p.Flags &= ~WindowManagerFlags.NotTouchable;
         else p.Flags |= WindowManagerFlags.NotTouchable;
+        try
+        {
+            Windows().UpdateViewLayout(_view, p);
+        }
+        catch (Java.Lang.IllegalArgumentException)
+        {
+            // Removed meanwhile.
+        }
+    }
+
+    /// <summary>
+    /// A finger went down on the line or left it: the window widens inward to the drag strip so the line can follow the
+    /// finger up to 44dp (the touch stays with this window as it grows), and narrows again after.
+    /// </summary>
+    private void OnDragging(bool dragging)
+    {
+        if (dragging == _dragging || _view is null || _params is not { } p) return;
+        _dragging = dragging;
+        p.Width = EdgeHandleLayout.StripPx(dragging, _context.Resources!.DisplayMetrics!.Density);
         try
         {
             Windows().UpdateViewLayout(_view, p);

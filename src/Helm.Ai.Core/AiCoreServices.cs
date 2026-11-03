@@ -82,7 +82,7 @@ public static class AiCoreServices
         // AI → Features (PC) and General › AI features (phone): each feature's choice, the models of the tested keys.
         services.AddSingleton(sp => new AiFeaturesViewModel(sp.GetRequiredService<ISyncedSettings<AiFeatureSettings>>(),
             sp.GetRequiredService<AiUsageBook>(), () => sp.GetRequiredService<HelmAssistant>().Models(),
-            sp.GetRequiredService<Helm.Core.Services.IUiDispatcher>()));
+            sp.GetRequiredService<Helm.Core.Services.IUiDispatcher>(), sp.GetRequiredService<ISyncedCollection<AiWorkerRecord>>()));
         // Text-only calls of the tools (translate a selection, analyse a word, file a transaction, read a bank
         // notification…): agents first, the API last.
         services.AddSingleton<Helm.Core.Ai.IAiText>(sp => new AiTextService(sp.GetRequiredService<AiKeyStore>(),

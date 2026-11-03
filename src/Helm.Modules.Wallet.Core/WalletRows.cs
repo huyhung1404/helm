@@ -344,6 +344,14 @@ public sealed partial class TransactionRow : ObservableObject
     /// <summary>One-tap categories (only while it waits for one).</summary>
     public ObservableCollection<CategoryChip> Suggestions { get; } = [];
 
+    /// <summary>A new category AI proposes for it ("Thú cưng"), made only when its "+" chip is clicked; null for none.</summary>
+    public string? ProposedCategory { get; private set; }
+
+    public bool HasProposedCategory => ProposedCategory is not null;
+
+    /// <summary>"+ Thú cưng".</summary>
+    public string ProposedCategoryText => ProposedCategory is { } name ? "+ " + name : "";
+
     /// <summary>Every category for this direction (the picker in the expanded row).</summary>
     public ObservableCollection<CategoryChoice> Choices { get; } = [];
 
@@ -407,6 +415,19 @@ public sealed partial class TransactionRow : ObservableObject
         Suggestions.Clear();
         foreach (var s in suggestions) Suggestions.Add(new CategoryChip(s.Id, s.Name, s.Icon, s.Color, Pick));
     }
+
+    internal void SetProposedCategory(string? name)
+    {
+        if (name == ProposedCategory) return;
+        ProposedCategory = name;
+        OnPropertyChanged(nameof(ProposedCategory));
+        OnPropertyChanged(nameof(HasProposedCategory));
+        OnPropertyChanged(nameof(ProposedCategoryText));
+    }
+
+    /// <summary>The "+ Name" chip: makes the category AI proposed and files this transaction in it.</summary>
+    [RelayCommand]
+    private void AcceptProposedCategory() => _owner.AcceptProposedCategory(this);
 
     private void Pick(string categoryId) => _owner.Categorize(this, categoryId);
 

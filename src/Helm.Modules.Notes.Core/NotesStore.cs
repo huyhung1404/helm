@@ -18,6 +18,9 @@ public sealed class NotesStore
 
     public const string ConflictSuffix = " (conflict copy)";
 
+    /// <summary>Task lines kept per note.</summary>
+    public const int MaxTaskLinks = 200;
+
     private readonly ISyncedCollection<NoteItem> _notes;
     private readonly TimeProvider _time;
     private readonly object _gate = new();
@@ -126,6 +129,21 @@ public sealed class NotesStore
     }
 
     public bool SetPinned(string id, bool pinned) => Change(id, n => n with { Pinned = pinned });
+
+    /// <summary>Lines of the note that became tasks; the newest <see cref="MaxTaskLinks"/> are kept. Not an edit of its text.</summary>
+    public bool AddTaskLinks(string id, IEnumerable<NoteTaskLink> links) => Change(id, n =>
+    {
+        var added = links.ToList();
+        if (added.Count == 0) return n;
+        return n with { TaskLinks = [.. n.TaskLinks.Where(l => added.All(a => a.TaskId != l.TaskId)).Concat(added).TakeLast(MaxTaskLinks)] };
+    });
+
+    /// <summary>Forgets the lines of tasks taken back (Undo of "Make tasks").</summary>
+    public bool RemoveTaskLinks(string id, IEnumerable<string> taskIds)
+    {
+        var gone = taskIds.ToHashSet(StringComparer.Ordinal);
+        return Change(id, n => n.TaskLinks.Any(l => gone.Contains(l.TaskId)) ? n with { TaskLinks = [.. n.TaskLinks.Where(l => !gone.Contains(l.TaskId))] } : n);
+    }
 
     /// <summary>Moves a note to the trash (restorable for <see cref="TrashDays"/> days).</summary>
     public bool MoveToTrash(string id) => Change(id, n => n.Trashed ? n : n with { Trashed = true, TrashedAt = Now, Pinned = false });
