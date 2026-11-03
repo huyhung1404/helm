@@ -122,7 +122,7 @@ made the record. Jobs and heartbeats are end-to-end encrypted like all Helm data
 Codex: a read-only sandbox in an empty folder; Grok: headless `grok --prompt-file` with `--tools ""`, no web
 search, no subagents and Helm's instructions instead of Grok's coding prompt): Helm lists its tools in the first message, the agent answers with the calls it wants as JSON
 (`CliAgentProtocol`), Helm runs them in-process and sends the results back. Claude Code keeps one process per conversation
-(about 3 s for the first turn, 1–2 s after); Codex runs one per turn and resumes its thread; Grok runs one per turn and resumes the session Helm named, and reports no usage
+(about 3 s for the first turn, 1–2 s after); Codex keeps one `codex app-server` per conversation (one `codex exec` per turn as a fallback); Grok runs one per turn and resumes the session Helm named, and reports no usage
 (what it saved is estimated from the text). Calls that would need a yes are not offered there, and phone tools are
 handed back to the phone. An agent that reports its plan's limit takes no job for 30 minutes; the next one in the list does.
 

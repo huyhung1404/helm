@@ -3,7 +3,7 @@
 All notable changes to Helm. The top section is used as the GitHub release body and as the Velopack release notes.
 Format: [Keep a Changelog](https://keepachangelog.com), versions follow [SemVer](https://semver.org).
 
-## [Unreleased]
+## [0.80.0] - 2026-11-03
 
 ### Added
 - **Your PC sends you briefs on its own, on its AI agents at no API cost:** a morning brief (07:00), an evening
@@ -36,13 +36,61 @@ Format: [Keep a Changelog](https://keepachangelog.com), versions follow [SemVer]
   same way the PC does it.
 - **Your own prompts from the Skill Hub:** save a prompt named `helm-ask-helm` and Helm uses it for Ask Helm within
   15 minutes, on the PC and the phone; archive it to go back to the built-in prompt.
+- **Photo to data in Ask Helm:** a camera button beside the mic. Snap or pick a receipt, a transfer screenshot or a
+  whiteboard, add a sentence if you like (“chia đôi với Nam”), and Helm saves the transaction, debt, note or tasks at
+  once, with Undo. Photos are read through the API, are not kept, and go to Sonnet when the picked model cannot read
+  them.
+- **More ways to open Ask Helm** (Android, Quick Capture › Ways to open): a thin handle on the screen's edge (drag it
+  inward or tap it; side, height and position are yours, and it hides over full-screen apps and games), a 4×1
+  home-screen widget (type, photo, speak), and a separate “Ask Helm” app icon that opens the card over whatever is on
+  screen, already listening (RedMagic's Game Space slider can open it).
+- **AI → Features** (new tab on the PC) and **General › AI features** on the phone: every AI feature in one place,
+  On request and Automatic, each with its icon: on or off, where it runs, model, effort (Claude only), daily API cap
+  and what it may cost, with today's runs and the PCs whose agents are online on top. Automatic features start on
+  “Agents only”, so they never spend on the API unless you change that. Your Skill Hub connection (for your own
+  prompts) is set up there too.
+- **Ask Helm can search the web:** weather, exchange rates, gold prices, news. Turn on “Web search” in AI features
+  (off by default, on the API, about $0.01 a search, its own daily cap). “Kiểm tra tin này: …” or **Helm: Kiểm tra
+  tin** in the text selection menu checks a doubtful post and says how trustworthy it is, naming its sources.
+- **Tracker: Split into steps** on a task: AI proposes the steps under it, you edit and untick them, and the ones you
+  keep become its checklist, with due dates spread before the task's own. Undo takes them back.
+- **Notes: Make tasks** in the note's toolbar and menu: AI lists the note's tasks with due dates, you add them to one
+  list, their lines get a “→ Tracker” tag (“→ Tracker ✓” once done), and the panel names the lines it skipped.
+- **Novel Reader: hold a word to have its whole sentence explained** in a sheet: pinyin, meaning, grammar and a
+  natural translation, a speaker that reads the sentence, and the sentence's words to add to Vocabulary in one tap,
+  with Hoàn tác.
+- **Wallet: Bills:** your monthly bills with this month paid or not; add, edit or delete them, and “Paid” saves the
+  payment, with Undo.
+- **Ask Helm's card shows today's brief:** a chip at the top reopens the morning brief or evening review; “Hôm qua”
+  shows yesterday's.
 
 ### Changed
 - **The model choice updates by itself:** each key's models are re-checked daily, only chat models are listed, and a
   model the provider retires is replaced by its default.
+- Wallet's “What was it?” shows **Nói** and the two most likely categories; on the PC, “To categorize” shows the AI's
+  suggestion first, and a new category it suggests is created only when you click “+ Name”.
+- **Codex agent: one Codex process per conversation**, so replies after the first come faster, and each call sends far
+  less of Codex's own prompt. Grok skips its update check, telemetry and its own title and summary calls each turn.
+- AI → Models & keys says when the model lists were last updated.
+- Novel Reader: a long press no longer says the word; use the speaker in the sentence sheet. A tap still opens the
+  word.
 
 ### Fixed
 - Wallet's “went out without a notification” reminder never showed.
+- With two Helm PCs online, an Ask Helm conversation stays on the PC that took its first turn, and Undo goes to the PC
+  that made the record.
+- Undo no longer says “Đã hoàn tác” when the record was already gone or not synced yet; the card says why.
+- Marking a task done that was already done no longer offers an Undo that would reopen it.
+- Ask Helm reaches habits after an earlier money request (“phở 45k”, then “anh đi gym rồi”), and “uống đủ nước rồi”
+  or “ăn sáng rồi” can check a habit; amounts like 1tr2 are understood.
+- A model with no known price now counts against the daily API limit.
+- A Helm PC runs only Ask Helm's own tools for a request from another device.
+- Renaming, reordering or turning on an agent on the PC no longer stops turns in progress.
+- An old Grok management key kept on the PC no longer overwrites a newer one saved on another device.
+- Overlapping waits for the PC no longer close the phone's live sync channel too early.
+- A failed agent turn on the PC no longer loses what you said or the results of tools Helm already ran, and a Claude
+  Code process that closed between turns is restarted with the whole conversation.
+- The VPS's jobs no longer wait behind one another on the PC.
 
 ## [0.79.0] - 2026-11-03
 

@@ -190,7 +190,9 @@ public sealed class VpsWorker : IDisposable
             SetStatus(stop, new VpsWorkerStatus(url.Host, true, JobsToday(), null));
             while (await socket.ReceiveAsync(live.Token) is { } frame)
             {
-                if (VpsProtocol.ReadJob(frame) is { } job) Take(link, job, url.Host, stop);
+                // Off the receive loop: the readiness check can be slow the first time (finding the agents' CLIs), and a
+                // job must never wait behind another's.
+                if (VpsProtocol.ReadJob(frame) is { } job) _ = Task.Run(() => Take(link, job, url.Host, stop));
             }
         }
         finally
