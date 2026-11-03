@@ -15,14 +15,17 @@ public static partial class ToolScope
     private static readonly (string Group, string[] Words)[] Groups =
     [
         ("wallet", ["tien", "nghin", "ngan", "trieu", "chi ", "tieu", "mua", "tra ", "no ", "muon", "vay", "luong", "thu nhap", "nhan ",
-            "an ", "uong", "ca phe", "cafe", "xang", "vi ", "wallet", "spend", "money", "owe", "pho", "com ", "bun"]),
+            "an ", "uong", "ca phe", "cafe", "xang", "vi ", "wallet", "spend", "money", "owe", "pho", "com ", "bun", "chia"]),
+        ("bill", ["hoa don", "tien dien", "tien nuoc", "tien nha", "tien mang", "internet", "wifi", "dong tien", "dinh ky", "hang thang", "bill"]),
         ("tracker", ["nhac", "viec", "todo", "task", "lam ", "deadline", "can ", "phai", "han ", "xong", "danh sach", "list"]),
         ("notes", ["ghi chu", "note", "luu ", "y tuong", "ghi lai", "ghi nho"]),
         ("habit", ["thoi quen", "habit", "tap ", "chay bo", "doc sach", "streak", "diem danh", "thien"]),
-        ("mission", ["muc tieu", "mission", "ke hoach", "buoc", "lo trinh", "aptis", "on thi"]),
+        ("mission", ["muc tieu", "mission", "ke hoach", "buoc", "lo trinh", "aptis", "on thi", "ky thi", "ielts", "toeic", "chung chi"]),
         ("vocab", ["tu vung", "tu moi", "word", "vocab", "nghia", "tieng anh", "english"]),
         ("phone", ["bao thuc", "danh thuc", "goi dau", "goi day", " day", "hen gio", "timer", "lich", "calendar", "su kien", "hop ",
-            "copy", "clipboard", "dan ", "sao chep"]),
+            "copy", "clipboard", "dan ", "sao chep", "duong toi", "duong den", "duong di", "chi duong", "dan duong", "ban do", "map",
+            "mo ", "open", "grab", "youtube", "zalo", "chia se", "share", "nhan tin", "tin nhan", "soan tin"]),
+        ("workspace", ["claude", "workspace", "phien", "session"]),
     ];
 
     /// <summary>The group of a tool: its name's first word, singular ("habits_list" and "habit_check" are "habit").</summary>
@@ -41,6 +44,8 @@ public static partial class ToolScope
             if (words.Any(w => plain.Contains(w, StringComparison.Ordinal))) found.Add(group);
         // An amount ("45k", "200 nghìn", "1tr5", "30.000đ") is money.
         if (Amount().IsMatch(plain)) found.Add("wallet");
+        // "Nhắc Nam trả 200k": a message to someone, shared from the phone.
+        if (RemindSomeone().IsMatch(plain)) found.UnionWith(["wallet", "phone"]);
         return found;
     }
 
@@ -66,4 +71,7 @@ public static partial class ToolScope
 
     [GeneratedRegex(@"\d[\d.,]*\s*(k|tr|d|nghin|ngan|trieu|dong|vnd)\b")]
     private static partial Regex Amount();
+
+    [GeneratedRegex(@"\b(nhac|doi)\s+(?!anh\b|em\b|toi\b|minh\b)\S+(\s+\S+)?\s+(tra|no)\b")]
+    private static partial Regex RemindSomeone();
 }

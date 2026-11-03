@@ -174,3 +174,25 @@ A job is **text only**: no Helm tool and no phone tool is offered (the VPS's ser
 its own, ended once answered. Two run at once; one more is declined, so the VPS can send it elsewhere. A job may take
 2 minutes. After a drop the worker connects again after 1 s, waiting twice as long each time up to a minute; jobs
 running on a connection that dropped are cancelled. The token and job contents are never logged.
+
+## Ask Helm: directions, shared bills, bills, missions, ideas, Claude Code
+
+More of Ask Helm's tools, each reached by saying it (no new screens). Changes run at once and are listed with Undo.
+
+| Say | Tool | What happens |
+|---|---|---|
+| "Đường tới 36 Hoàng Cầu" | `phone_navigate` | Google Maps turn by turn (motorbike unless asked), else the directions web link |
+| "Mở Grab" | `phone_open_app` | The launcher app whose name fits (`PhoneApps.Match`); several fit: nothing opens, the card asks which |
+| "Ăn lẩu 1tr2 chia 4, Nam với Tú chưa trả" | `wallet_split_bill` | The user's share as spending, a debt per person who owes, a settled pair (owed + repaid) per person who paid; someone else paid: the user owes them. One call, one card row per record, each with its own Undo |
+| "Nhắc Nam trả 200k" | `wallet_debt_reminder`, `phone_share_text` | A polite message from the debt book (amount, what for, since when, due), handed to Android's share sheet; Helm never sends it |
+| "Thêm hoá đơn internet 250k ngày 15", "đóng tiền điện rồi 450k" | `bill_add`, `bills_list`, `bill_pay` | Recurring bills (`wallet.bills`, `BillBook`): amount or "varies", due day; paying saves the transaction and marks the month due nearest the payment paid. The Tracker's daily reminder lists bills coming due, like debts |
+| "Đỗ Aptis B1 ngày 15/11" | `mission_create` | One mission with ordered steps, the exam its last step, the date its deadline; `mission_complete_step`, `mission_skip_step` and `mission_check_item` are Ask Helm's too, each with Undo |
+| "Ý tưởng game: …" | `notes_create` `tags` | A note ending in `#idea #game`; the tool's description lists the hashtags in use (`NoteTags`), so the project tag is the user's own |
+| "Ghi chú về lỗi server hôm trước" | `notes_search` `any` | Several alternative words the model expands (synonyms, Vietnamese and English); notes with more of them first, then by how well and how recently (`NoteRecall`, half-life 14 days). No embeddings service |
+| "Gửi cho Claude Code ở Helm: …" | `workspace_sessions`, `workspace_send` | A `WorkspaceCommand` to the session (or a new one in the window) named by project, folder or title, on a PC online; several fit: nothing is sent, the card asks which. Free: Claude Code works on the user's plan. Undo withdraws it until the PC takes it |
+
+**One call, several records.** A tool result with a `records` list (`McpTool.RecordsProperty`), each item with its own
+`summary`, is listed as one row per item; Undo (here or on the PC that made it) gets that item alone.
+
+The phone tools are in `PhoneToolSpecs` (one place for both the phone's `PhoneTools` and the PC, which hands their
+calls back to the phone). `workspace_send` is also offered to other MCP clients on the PC, behind the usual consent.
