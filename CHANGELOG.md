@@ -3,6 +3,47 @@
 All notable changes to Helm. The top section is used as the GitHub release body and as the Velopack release notes.
 Format: [Keep a Changelog](https://keepachangelog.com), versions follow [SemVer](https://semver.org).
 
+## [Unreleased]
+
+### Added
+- **Your PC sends you briefs on its own, on its AI agents at no API cost:** a morning brief (07:00), an evening
+  review (21:30) and a weekly and monthly spending digest. They arrive as a phone notification and a tray balloon,
+  and Ask Helm reads them out (“bản tin sáng nay nói gì?”). Optional jobs, off by default: habit coaching from your
+  skip reasons, reminders of important days (birthdays, lunar giỗ, inspections, renewals) with gift or wish ideas,
+  titles and tags for new untitled notes (undoable), and Scratch tidy-up suggestions. Turn them on or change times
+  through Ask Helm; Ask Helm also remembers a day for you (“nhớ giúp anh giỗ ông ngày 10 tháng 7 âm”), kept in the
+  note “Ngày quan trọng”.
+- **Select text in any app → Helm, Helm: Dịch, Helm: Sửa, Helm: Viết lại** (Android): translate, fix, rewrite
+  politely, summarize, or explain a comment and draft a reply in its language; put the result back in place, copy
+  or share it.
+- **Ask Helm does more:**
+  - “Đường tới …” opens directions in Maps; “mở Grab” opens an app (asks when several fit).
+  - “Ăn lẩu 1tr2 chia 4, Nam với Tú chưa trả” saves your share and each person's debt, each with Undo.
+  - “Nhắc Nam trả 200k” writes a polite reminder from the debt book and opens the share sheet.
+  - Monthly bills (electricity, internet, rent): “đóng tiền điện rồi 450k” saves it and marks the month paid; the
+    Tracker reminder lists bills coming due.
+  - A mission in one sentence (“Đỗ Aptis B1 ngày 15/11”); complete or tick its steps with Undo.
+  - Quick ideas become notes tagged #idea and the project's tag; notes are found by meaning, not only exact words.
+  - “gửi cho Claude Code ở Helm: …” types the request into that session on the PC.
+  - “biến ghi chú … thành task trong list …” and “chia task … thành bước nhỏ” add the tasks or the steps you keep,
+    with Undo; a dictated note gets punctuation, paragraphs and a title.
+- **Wallet files a new payment from your own history without AI;** when unsure, a PC agent suggests one of your
+  categories or a new one, shown first on “What was it?” (a new category is created only when you tap “+ Name”).
+  “What was it?” also has **Say it**: tell Ask Helm what the payment was (“ăn trưa với Nam”) and it fills in the
+  category and description, with Undo. Wallet → Troubleshooting: **Read with AI** on a bank notification Helm could
+  not read finds the transaction in it, checked against the text, with Undo.
+- **Vocabulary (Android): a word you add is analysed at once** on the phone (a PC agent first, else the API), the
+  same way the PC does it.
+- **Your own prompts from the Skill Hub:** save a prompt named `helm-ask-helm` and Helm uses it for Ask Helm within
+  15 minutes, on the PC and the phone; archive it to go back to the built-in prompt.
+
+### Changed
+- **The model choice updates by itself:** each key's models are re-checked daily, only chat models are listed, and a
+  model the provider retires is replaced by its default.
+
+### Fixed
+- Wallet's “went out without a notification” reminder never showed.
+
 ## [0.79.0] - 2026-11-03
 
 ### Added

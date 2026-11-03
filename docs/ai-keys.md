@@ -129,8 +129,8 @@ handed back to the phone. An agent that reports its plan's limit takes no job fo
 **Only the tools a request needs** (`Helm.Ai.Core/Assistant/ToolScope.cs`). Every tool's schema costs tokens on
 every call, so a turn carries only the groups its words ask for (Wallet for “phở 45k”, Tracker for “nhắc anh…”,
 the phone for “báo thức”…), and the groups of the conversation's earlier turns; a request that names no group gets
-them all. A later turn that needs another group adds only that group (`IAssistantChat.AddTools`). For “phở 45k”: 4
-tools instead of 19, 4,800 characters instead of 12,600, on the API and on an agent alike.
+them all. A later turn that needs another group adds only that group (`IAssistantChat.AddTools`). For “phở 45k”: the
+Wallet's tools only (6 of about 30 today), on the API and on an agent alike.
 
 **A turn that only records things needs one call.** When every call of a step is a change Helm can undo (or a phone
 action) and all of them went through, the turn ends there: the card shows their summaries with Undo, instead of a
