@@ -190,9 +190,7 @@ public sealed class VpsWorker : IDisposable
             SetStatus(stop, new VpsWorkerStatus(url.Host, true, JobsToday(), null));
             while (await socket.ReceiveAsync(live.Token) is { } frame)
             {
-                // Off the receive loop: the readiness check can be slow the first time (finding the agents' CLIs), and a
-                // job must never wait behind another's.
-                if (VpsProtocol.ReadJob(frame) is { } job) _ = Task.Run(() => Take(link, job, url.Host, stop));
+                if (VpsProtocol.ReadJob(frame) is { } job) Take(link, job, url.Host, stop);
             }
         }
         finally
@@ -206,11 +204,9 @@ public sealed class VpsWorker : IDisposable
     private void Take(Link link, VpsJob job, string host, CancellationTokenSource stop)
     {
         _logger.LogDebug("VPS job {Id} ({Feature})", job.Id, job.Feature);
-        var why = job.Prompt.Length == 0 ? "The job has no prompt."
-            : _agents.Unavailable() ?? (_ready().Count == 0 ? $"No agent is ready on {_device}." : null);
-        if (why is not null)
+        if (job.Prompt.Length == 0)
         {
-            link.Post(VpsProtocol.Decline(job.Id, why));
+            link.Post(VpsProtocol.Decline(job.Id, "The job has no prompt."));
             return;
         }
         if (!_slots.Wait(0))
@@ -225,6 +221,14 @@ public sealed class VpsWorker : IDisposable
     {
         try
         {
+            // Here, off the receive loop: the readiness check can be slow the first time (finding the agents' CLIs),
+            // and the next job's frame must not wait behind it.
+            var why = _agents.Unavailable() ?? (_ready().Count == 0 ? $"No agent is ready on {_device}." : null);
+            if (why is not null)
+            {
+                await link.SendAsync(VpsProtocol.Decline(job.Id, why));
+                return;
+            }
             await link.SendAsync(VpsProtocol.Claim(job.Id));
             // Text only: no Helm tool, no phone tool; the service's own system prompt.
             var turn = new AiJob(job.Feature, job.Id, job.Prompt, [], [], job.Model, job.Effort) { System = job.System ?? NeutralSystem };
