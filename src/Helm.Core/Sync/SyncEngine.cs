@@ -265,7 +265,7 @@ public sealed class SyncEngine : ISyncService, IDisposable
         InterlockedMax(ref _liveSeq, seq);
         if (_run.CurrentCount == 0) return;
         // Another device just wrote: fetch it now (the pause only gathers this device's own edits).
-        if (seq > _db.GetCursor(MainCursor)) RequestSyncSoon();
+        if (seq > _db.GetCursor(MainCursor)) PullAnnounced();
     }
 
     private static void InterlockedMax(ref long target, long value)
@@ -325,7 +325,14 @@ public sealed class SyncEngine : ISyncService, IDisposable
     }
 
     /// <summary>How soon <see cref="RequestSyncSoon"/> syncs.</summary>
-    internal static readonly TimeSpan SoonDelay = TimeSpan.FromMilliseconds(150);
+    /// <remarks>Short: an urgent record (a phone's request to a PC) waits only for what the same moment writes with it.</remarks>
+    internal static readonly TimeSpan SoonDelay = TimeSpan.FromMilliseconds(50);
+
+    /// <summary>
+    /// How soon another device's announced change is pulled: at once (a pause only gathers this device's own edits,
+    /// and every hop of a phone's request to a PC and of its answer waits on it).
+    /// </summary>
+    internal static readonly TimeSpan AnnouncedDelay = TimeSpan.FromMilliseconds(10);
 
     private readonly object _scheduleGate = new();
     private long _dueTicks;
@@ -337,6 +344,8 @@ public sealed class SyncEngine : ISyncService, IDisposable
     public void RequestSync() => Schedule(_debounce);
 
     public void RequestSyncSoon() => Schedule(_debounce < SoonDelay ? _debounce : SoonDelay);
+
+    private void PullAnnounced() => Schedule(_debounce < AnnouncedDelay ? _debounce : AnnouncedDelay);
 
     private void Schedule(TimeSpan delay)
     {
@@ -447,7 +456,7 @@ public sealed class SyncEngine : ISyncService, IDisposable
             RaiseChanges(run);
             // Something another device announced during the run that the run did not fetch (it came after the pull):
             // go again. Only after a complete run (held deletions aside): an offline or refused run would otherwise loop.
-            if (completed && Interlocked.Read(ref _liveSeq) > _db.GetCursor(MainCursor)) RequestSyncSoon();
+            if (completed && Interlocked.Read(ref _liveSeq) > _db.GetCursor(MainCursor)) PullAnnounced();
         }
     }
 

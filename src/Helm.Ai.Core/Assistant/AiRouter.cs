@@ -68,6 +68,13 @@ public interface IAgentRoute
 
     /// <summary>The conversation is over: the process kept for it may stop.</summary>
     void End(string conversationId);
+
+    /// <summary>
+    /// The user is about to ask in this conversation (the card opened): its agent gets ready (a process started, the
+    /// way to it open) so the first turn answers sooner. <paramref name="job"/> has no text yet: its model and tools.
+    /// Returns at once; a warm-up that no turn follows ends with <see cref="End"/> or after the agent's idle time.
+    /// </summary>
+    void Warm(AiJob job) { }
 }
 
 /// <summary>The ways a feature's call may take, in order: Claude Code first (free) as its policy allows, the API last.</summary>

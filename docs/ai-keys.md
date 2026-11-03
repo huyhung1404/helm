@@ -553,3 +553,27 @@ debt 62 → 33, a bill split among four 378 → 196, a bill paid 133 → 78, a t
   card with the same tools within 5 minutes reads them) and the top-level one for the conversation. A write costs
   1.25×, a read 0.1×: a turn that reads takes two calls (1.35× instead of 2×); a turn that only saves takes one and pays
   a quarter more on its prefix (on Haiku 5.5 about $0.00004).
+
+## How Ask Helm answers sooner
+
+- **Warm-up when the card opens.** While you still speak, the phone asks the PC to get its agent ready for the
+  conversation (a `warm` job through Helm Sync; no answer is awaited, nothing goes to the model): Claude Code's process
+  starts, Codex's app server starts and opens its thread. The first turn then finds them running. Grok's headless CLI
+  has nothing to start. A warm-up that no turn follows ends when the card closes (or after the agent's 5-minute idle
+  time). The phone also opens sync's live channel at that moment (for at most 2 minutes, then as before), so the PC's
+  claim and answer come back at once. The first turn goes to the PC that got ready, while it can still take it.
+- **The API's answer streams.** On the API, Claude (and Grok) send the answer as they write it, and the card shows it
+  in the answer's place; the finished reply (the rows with Undo) replaces it. Text a model writes before calling tools
+  is taken away again: only the last step's text is the answer. Agents on a PC answer whole.
+- **Sync.** An urgent record (a job, its claim, its result) goes out 50 ms after it is written (was 150 ms), and a change
+  another device announced on the live channel is pulled after 10 ms (was 150 ms). A phone waiting on a PC pulls by
+  itself every second while the live channel is down (was every 2 s) and only every 3 s while it is up (it is told of
+  every change anyway).
+- **Where the time goes.** Debug logs: the phone logs each turn sent to a PC (claimed after … ms, result … ms later,
+  live channel up or down); the PC logs when it took the job and each agent turn phase by phase ("queue (warmed)
+  3 ms · model (1 calls) 1840 ms · tools 12 ms · model 950 ms (total …)").
+
+For developers: `IAssistantChat.WarmAsync` / `NextAsync(partial, ct)`, `IAgentRoute.Warm`, `AgentJobs.Warm`
+(`SyncAgentRoute.Warm`, handled in `AgentJobWorker.Take` without a claim), `LocalAgentRoute.Warm`, `AssistantSession.Warm`
+and `OnPartialText`, `GrokStream`, `TurnTimings`, `SyncEngine.SoonDelay` / `AnnouncedDelay`, `AgentJobs.PullWhileLive` /
+`PullWhileDown`. Tests: `AskHelmLatencyTests`.

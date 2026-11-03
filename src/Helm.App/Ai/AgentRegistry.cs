@@ -99,6 +99,8 @@ internal sealed class AgentRegistry : IAgentRoute, IDisposable
 
     public void End(string conversationId) => _chain.End(conversationId);
 
+    public void Warm(AiJob job) => _chain.Warm(job);
+
     /// <summary>"Ready", "Off", or why it takes no job.</summary>
     public string Status(AgentProfile profile)
     {
@@ -276,7 +278,7 @@ internal sealed class AgentRegistry : IAgentRoute, IDisposable
         };
         if (made is not { } m) return null;
         return new Agent(profile, m.Factory, m.Unavailable,
-            new LocalAgentRoute(Environment.MachineName, profile.Name, m.Factory, _tools, _isToolOn, m.Unavailable, prompts: _prompts));
+            new LocalAgentRoute(Environment.MachineName, profile.Name, m.Factory, _tools, _isToolOn, m.Unavailable, prompts: _prompts, logger: _loggers.CreateLogger<LocalAgentRoute>()));
     }
 
     private sealed record Agent(AgentProfile Profile, IAssistantChatFactory Factory, Func<string?> Unavailable, LocalAgentRoute Route);

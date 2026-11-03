@@ -63,7 +63,7 @@ public static class AiCoreServices
         {
             var engine = sp.GetRequiredService<SyncEngine>();
             return new SyncAgentRoute(sp.GetRequiredService<ISyncedCollection<AiJobRecord>>(), sp.GetRequiredService<ISyncedCollection<AiWorkerRecord>>(),
-                () => engine.DeviceId, engine);
+                () => engine.DeviceId, engine, logger: sp.GetService<ILoggerFactory>()?.CreateLogger<SyncAgentRoute>());
         });
         services.AddSingleton<IAgentRoute>(sp => sp.GetRequiredService<SyncAgentRoute>());
         services.AddSingleton<IAssistantChatFactory>(_ => new ClaudeAssistantChatFactory());

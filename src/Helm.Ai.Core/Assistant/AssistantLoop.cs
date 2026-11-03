@@ -26,9 +26,12 @@ internal static class AssistantLoop
 
     /// <param name="stop">Checked before each further step (the day's cap); a reason ends the turn.</param>
     /// <param name="phoneHere">False on a PC: phone tools are not run but handed back in <see cref="Outcome.ForPhone"/>.</param>
+    /// <param name="partial">The answer's text so far while a streaming model writes it (<see cref="IAssistantChat.NextAsync(Action{string}?, CancellationToken)"/>).</param>
+    /// <param name="timings">Marked after each model call and each step's tools, for the Debug log.</param>
     public static async Task<Outcome> RunAsync(IAssistantChat chat, IReadOnlyList<AssistantTool> tools,
         Func<IReadOnlyList<PendingAction>, Task<bool>> confirm, Action<AssistantUsage> count, Func<string?> stop, bool phoneHere,
-        string modelName, CancellationToken ct, List<AiJobAction>? recordsInto = null)
+        string modelName, CancellationToken ct, List<AiJobAction>? recordsInto = null, Action<string>? partial = null,
+        TurnTimings? timings = null)
     {
         var byName = tools.ToDictionary(t => t.Name, StringComparer.Ordinal);
         var done = new List<AssistantAction>();
@@ -44,12 +47,14 @@ internal static class AssistantLoop
             AssistantStep answer;
             try
             {
-                answer = await chat.NextAsync(ct);
+                answer = await chat.NextAsync(partial, ct);
             }
             catch (AssistantException ex)
             {
+                timings?.Mark("model (failed)");
                 return End("", ex.Message);
             }
+            timings?.Mark(answer.Calls.Count == 0 ? "model" : $"model ({answer.Calls.Count} calls)");
             count(answer.Usage);
             if (answer.Refused) return End("", $"{modelName} declined this request.");
             if (answer.Calls.Count == 0) return End(answer.Text, null);
@@ -109,6 +114,7 @@ internal static class AssistantLoop
                     results.Add(new ToolOutcome(call.Id, $"It failed: {ex.Message}", true));
                 }
             }
+            timings?.Mark("tools");
             chat.AddResults(results);
             // A step that only recorded things (no reading, nothing waiting for a yes, nothing failed) needs no second
             // call to say so: the summaries are the answer. Half the time and one call fewer for "phở 45k".

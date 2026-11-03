@@ -2,6 +2,8 @@ using System.Collections.Concurrent;
 using System.Text.Json;
 using Helm.Ai.Prompts;
 using Helm.Core.Mcp;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 
 namespace Helm.Ai.Assistant;
 
@@ -24,10 +26,15 @@ public sealed class LocalAgentRoute : IAgentRoute, IDisposable
     private readonly ConcurrentDictionary<string, Conversation> _conversations = new(StringComparer.Ordinal);
     private readonly Timer _reaper;
 
+    /// <summary>How long a warm-up may take (an agent's process starting) before it is given up.</summary>
+    internal static readonly TimeSpan WarmFor = TimeSpan.FromSeconds(30);
+
+    private readonly ILogger _logger;
+
     /// <param name="agentName">The agent as the user knows it ("Codex", "Claude Code").</param>
     /// <param name="prompts">The user's own prompts (Skill Hub), for a job that brings none of its own.</param>
     public LocalAgentRoute(string device, string agentName, IAssistantChatFactory agent, IEnumerable<IMcpToolProvider> providers,
-        Func<string?, bool> isToolOn, Func<string?> unavailable, TimeProvider? time = null, IAiPrompts? prompts = null)
+        Func<string?, bool> isToolOn, Func<string?> unavailable, TimeProvider? time = null, IAiPrompts? prompts = null, ILogger? logger = null)
     {
         Device = device;
         AgentName = agentName;
@@ -37,6 +44,7 @@ public sealed class LocalAgentRoute : IAgentRoute, IDisposable
         _unavailable = unavailable;
         _time = time ?? TimeProvider.System;
         _prompts = prompts;
+        _logger = logger ?? NullLogger.Instance;
         _reaper = new Timer(_ => Reap(), null, TimeSpan.FromMinutes(1), TimeSpan.FromMinutes(1));
     }
 
@@ -50,13 +58,11 @@ public sealed class LocalAgentRoute : IAgentRoute, IDisposable
     public async Task<AiJobResult> RunAsync(AiJob job, TimeSpan wait, CancellationToken ct)
     {
         if (Unavailable() is { } why) throw new AiRouteException(why);
-        var conversation = _conversations.GetOrAdd(job.ConversationId, _ =>
-        {
-            var tools = Tools(job);
-            var system = job.System ?? _prompts?.Get(job.Feature, HelmAssistant.Instructions) ?? HelmAssistant.Instructions;
-            return new Conversation(_agent.Create("", job.Model, job.Effort, system, tools), tools);
-        });
+        var timings = new TurnTimings();
+        var conversation = Open(job, out var fresh);
+        // A warm-up still starting the agent holds the gate: the turn waits for it rather than start a second one.
         await conversation.Gate.WaitAsync(ct);
+        timings.Mark(fresh ? "queue (cold start)" : conversation.Turns == 0 ? "queue (warmed)" : "queue");
         try
         {
             using var limit = CancellationTokenSource.CreateLinkedTokenSource(ct);
@@ -76,12 +82,15 @@ public sealed class LocalAgentRoute : IAgentRoute, IDisposable
             {
                 outcome = await AssistantLoop.RunAsync(conversation.Chat, conversation.Tools, _ => Task.FromResult(false),
                     u => { input += u.Input; output += u.Output; cacheRead += u.CacheRead; cacheWrite += u.CacheWrite; },
-                    () => null, phoneHere: false, job.Model, limit.Token, records);
+                    () => null, phoneHere: false, job.Model, limit.Token, records, timings: timings);
+                conversation.Turns++;
+                _logger.LogDebug("{Agent} turn: {Timings}", AgentName, timings);
             }
             catch (Exception ex) when (ex is OperationCanceledException or AssistantException or IOException or InvalidOperationException)
             {
                 // Too long, cancelled by the asker, or the agent's process broke: the chat is not reused. What it already
                 // recorded is kept and goes back with Undo, never as a failure that someone might run again.
+                _logger.LogDebug("{Agent} turn stopped ({Error}): {Timings}", AgentName, ex.GetType().Name, timings);
                 End(job.ConversationId);
                 var stopped = ex is OperationCanceledException
                     ? ct.IsCancellationRequested ? "Em dừng giữa chừng." : $"{Device} did not answer within {wait.TotalSeconds:0} s."
@@ -120,6 +129,58 @@ public sealed class LocalAgentRoute : IAgentRoute, IDisposable
         if (_conversations.TryRemove(conversationId, out var conversation)) (conversation.Chat as IDisposable)?.Dispose();
     }
 
+    /// <summary>
+    /// Opens the conversation's chat now and lets the agent get ready (<see cref="IAssistantChat.WarmAsync"/>: its
+    /// process starts) off the caller's thread. The first turn then finds it ready; one that never comes ends with
+    /// <see cref="End"/> or after <see cref="IdleFor"/>.
+    /// </summary>
+    public void Warm(AiJob job)
+    {
+        if (Unavailable() is not null) return;
+        var conversation = Open(job, out var fresh);
+        if (fresh) _ = Task.Run(() => WarmAsync(job.ConversationId, conversation));
+    }
+
+    private async Task WarmAsync(string id, Conversation conversation)
+    {
+        await conversation.Gate.WaitAsync();
+        var started = _time.GetTimestamp();
+        bool Kept() => _conversations.TryGetValue(id, out var now) && ReferenceEquals(now, conversation);
+        try
+        {
+            if (!Kept()) return;
+            using var limit = new CancellationTokenSource(WarmFor);
+            await conversation.Chat.WarmAsync(limit.Token);
+            // Ended while its process started: that process must not outlive it.
+            if (!Kept()) (conversation.Chat as IDisposable)?.Dispose();
+            else _logger.LogDebug("{Agent} ready for a conversation in {Took:0} ms", AgentName, _time.GetElapsedTime(started).TotalMilliseconds);
+        }
+        catch (Exception ex) when (ex is AssistantException or IOException or InvalidOperationException or ObjectDisposedException or OperationCanceledException)
+        {
+            // The first turn starts it again, as without a warm-up.
+            _logger.LogDebug("{Agent} could not get ready ahead of the turn: {Error}", AgentName, ex.Message);
+        }
+        finally
+        {
+            conversation.Gate.Release();
+        }
+    }
+
+    /// <summary>The conversation's chat, opened for this job when it has none (<paramref name="fresh"/>).</summary>
+    private Conversation Open(AiJob job, out bool fresh)
+    {
+        var made = false;
+        var conversation = _conversations.GetOrAdd(job.ConversationId, _ =>
+        {
+            made = true;
+            var tools = Tools(job);
+            var system = job.System ?? _prompts?.Get(job.Feature, HelmAssistant.Instructions) ?? HelmAssistant.Instructions;
+            return new Conversation(_agent.Create("", job.Model, job.Effort, system, tools), tools, _time.GetUtcNow());
+        });
+        fresh = made;
+        return conversation;
+    }
+
     public void Dispose()
     {
         _reaper.Dispose();
@@ -143,19 +204,23 @@ public sealed class LocalAgentRoute : IAgentRoute, IDisposable
         return [.. mine, .. phone];
     }
 
-    private void Reap()
+    internal void Reap()
     {
         var now = _time.GetUtcNow();
         foreach (var (id, conversation) in _conversations)
             if (now - conversation.LastTurn > IdleFor && conversation.Gate.CurrentCount == 1) End(id);
     }
 
-    private sealed class Conversation(IAssistantChat chat, IReadOnlyList<AssistantTool> tools)
+    private sealed class Conversation(IAssistantChat chat, IReadOnlyList<AssistantTool> tools, DateTimeOffset opened)
     {
         public IAssistantChat Chat { get; } = chat;
         public List<AssistantTool> Tools { get; } = [.. tools];
         public SemaphoreSlim Gate { get; } = new(1, 1);
-        public DateTimeOffset LastTurn { get; set; } = DateTimeOffset.UtcNow;
+
+        /// <summary>Its last turn, or when it was opened (a warm-up that no turn followed goes after the same idle time).</summary>
+        public DateTimeOffset LastTurn { get; set; } = opened;
+
+        public int Turns { get; set; }
     }
 }
 
@@ -201,6 +266,14 @@ public sealed class AgentChain(IReadOnlyList<LocalAgentRoute> agents) : IAgentRo
             : agents.FirstOrDefault(a => a.Unavailable() is null) ?? throw new AiRouteException(Unavailable() ?? "No agent can take it.");
         _taken[job.ConversationId] = agent;
         return agent.RunAsync(job, wait, ct);
+    }
+
+    /// <summary>The agent a new conversation would go to gets ready, and keeps the conversation (as its first turn would).</summary>
+    public void Warm(AiJob job)
+    {
+        if (_taken.ContainsKey(job.ConversationId) || _agents.FirstOrDefault(a => a.Unavailable() is null) is not { } agent) return;
+        _taken[job.ConversationId] = agent;
+        agent.Warm(job);
     }
 
     /// <summary>The tools are Helm's own on this PC: whichever agent asked for them, Helm takes the record back.</summary>
