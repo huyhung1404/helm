@@ -490,3 +490,27 @@ For developers: `Helm.Ai.Core/Assistant/WebSearch.cs` (words, the turn's instruc
 dynamic filtering on Opus/Sonnet 4.6+, `web_search_20250305` on Haiku; server blocks go back unchanged, `pause_turn`
 goes on up to 3 times, cited sites are added when the answer does not name them), `AiUsageEntry.WebSearches` and
 `AiPrices.WebSearchUsd`. Tests: `WebSearchTests`.
+
+## How Ask Helm answers sooner
+
+- **Warm-up when the card opens.** While you still speak, the phone asks the PC to get its agent ready for the
+  conversation (a `warm` job through Helm Sync; no answer is awaited, nothing goes to the model): Claude Code's process
+  starts, Codex's app server starts and opens its thread. The first turn then finds them running. Grok's headless CLI
+  has nothing to start. A warm-up that no turn follows ends when the card closes (or after the agent's 5-minute idle
+  time). The phone also opens sync's live channel at that moment (for at most 2 minutes, then as before), so the PC's
+  claim and answer come back at once. The first turn goes to the PC that got ready, while it can still take it.
+- **The API's answer streams.** On the API, Claude (and Grok) send the answer as they write it, and the card shows it
+  in the answer's place; the finished reply (the rows with Undo) replaces it. Text a model writes before calling tools
+  is taken away again: only the last step's text is the answer. Agents on a PC answer whole.
+- **Sync.** An urgent record (a job, its claim, its result) goes out 50 ms after it is written (was 150 ms), and a change
+  another device announced on the live channel is pulled after 10 ms (was 150 ms). A phone waiting on a PC pulls by
+  itself every second while the live channel is down (was every 2 s) and only every 3 s while it is up (it is told of
+  every change anyway).
+- **Where the time goes.** Debug logs: the phone logs each turn sent to a PC (claimed after … ms, result … ms later,
+  live channel up or down); the PC logs when it took the job and each agent turn phase by phase ("queue (warmed)
+  3 ms · model (1 calls) 1840 ms · tools 12 ms · model 950 ms (total …)").
+
+For developers: `IAssistantChat.WarmAsync` / `NextAsync(partial, ct)`, `IAgentRoute.Warm`, `AgentJobs.Warm`
+(`SyncAgentRoute.Warm`, handled in `AgentJobWorker.Take` without a claim), `LocalAgentRoute.Warm`, `AssistantSession.Warm`
+and `OnPartialText`, `GrokStream`, `TurnTimings`, `SyncEngine.SoonDelay` / `AnnouncedDelay`, `AgentJobs.PullWhileLive` /
+`PullWhileDown`. Tests: `AskHelmLatencyTests`.
