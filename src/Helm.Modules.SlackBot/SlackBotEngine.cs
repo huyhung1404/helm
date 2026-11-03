@@ -202,6 +202,13 @@ public sealed class SlackBotEngine : IAsyncDisposable
         _sortGate.Dispose();
     }
 
+    /// <summary>A conversation's model and effort, as the user switched them from Slack.</summary>
+    private void SetAi(string channel, SlackAiChoice choice) => _settings.Update(s =>
+    {
+        if (choice.Model.Length == 0 && choice.Effort.Length == 0) s.ChannelAi.Remove(channel);
+        else s.ChannelAi[channel] = choice;
+    });
+
     private async Task RunAsync(CancellationToken ct)
     {
         if (_tokens.Load() is not { } tokens)
@@ -224,7 +231,7 @@ public sealed class SlackBotEngine : IAsyncDisposable
                 _logger.LogInformation("Slack Bot signed in to {Workspace}", Me.Url);
                 var reader = new SlackReader(api, Me, Inbox, () => _settings.Current);
                 reader.ForYou += (_, _) => SortSoon(ct);
-                var lumi = new SlackLumi(api, _agent, Inbox, reader, () => _settings.Current, Me, MeName, _logger, _projects);
+                var lumi = new SlackLumi(api, _agent, Inbox, reader, () => _settings.Current, Me, MeName, _logger, _projects, SetAi);
                 reader.Called += (_, m) => _ = Task.Run(async () =>
                 {
                     try

@@ -116,12 +116,23 @@ public sealed class SlackBotViewsTests : IDisposable
             new SlackConversation("C2", "fast-core-game", SlackConversationKind.PrivateChannel),
             new SlackConversation("D1", "Tuấn", SlackConversationKind.DirectMessage, "U2"),
         ]);
-        settings.Get<SlackBotSettings>(SlackBotModule.ModuleId).Update(v => v.Channels["C1"] = SlackChannelMode.Reply);
+        settings.Get<SlackBotSettings>(SlackBotModule.ModuleId).Update(v =>
+        {
+            v.Channels["C1"] = SlackChannelMode.Reply;
+            v.ChannelFolders["C1"] = [@"C:\Project\GameStudio", @"D:\Work\Pitch"];
+            v.ChannelAi["C1"] = new SlackAiChoice { Model = "fable", Effort = "high" };
+        });
         var viewModel = new SlackBotViewModel(module, engine, tokens, settings, ui, launcher, new NoServices(), overlay, telegramToken, telegram, phone);
         Assert.False(viewModel.HasTokens);
         Assert.Equal([true, false, true], viewModel.Channels.Select(c => c.CanRead));
         Assert.Equal([true, false, false], viewModel.Channels.Select(c => c.CanWrite));
-        Layout(new SlackBotPage(viewModel), new Size(1000, 1500), "4-settings");
+        Assert.Equal(["AI: Fable · High", "AI: default", "AI: default"], viewModel.Channels.Select(c => c.AiLabel));
+        Assert.Equal(2, viewModel.Channels[0].Projects.Count);
+        var page = new SlackBotPage(viewModel);
+        Layout(page, new Size(1000, 1500), "4-settings");
+        // Opened, each conversation shows its AI button and, where Write is on, its project folders.
+        foreach (var expander in Descendants<Wpf.Ui.Controls.CardExpander>(page)) expander.IsExpanded = true;
+        Layout(page, new Size(1000, 2600), "4b-settings-open");
 
         // Done takes it off the list; replying in the thread takes the mention off too.
         inbox.DoneCommand.Execute(inbox.ToDo[0]);
@@ -168,6 +179,15 @@ public sealed class SlackBotViewsTests : IDisposable
     }
 
     /// <summary>Lets the view model's short refresh delay run.</summary>
+    private static IEnumerable<T> Descendants<T>(DependencyObject root) where T : DependencyObject
+    {
+        foreach (var child in LogicalTreeHelper.GetChildren(root).OfType<DependencyObject>())
+        {
+            if (child is T found) yield return found;
+            foreach (var deeper in Descendants<T>(child)) yield return deeper;
+        }
+    }
+
     private static void Flush()
     {
         var frame = new System.Windows.Threading.DispatcherFrame();

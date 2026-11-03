@@ -88,6 +88,10 @@
                                     <core:RowLayout>
                                         <TextBlock Text="{Binding Name}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
                                         <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                                            <!-- This conversation's own model and effort for Lumi and replies -->
+                                            <ui:Button Margin="0,0,16,0" Padding="8,3" Appearance="Transparent" Content="{Binding AiLabel}" Click="AiMenu_Click"
+                                                       ToolTip="Claude model and effort for Lumi here" Visibility="{Binding CanRead, Converter={StaticResource BoolToVisibility}}"
+                                                       AutomationProperties.Name="{Binding Name, StringFormat=Claude model and effort for {0}}" />
                                             <TextBlock Text="Read" VerticalAlignment="Center" Margin="0,0,8,0" Style="{DynamicResource HelmSecondaryText}" />
                                             <ui:ToggleSwitch IsChecked="{Binding CanRead}" AutomationProperties.Name="{Binding Name, StringFormat=Read {0}}" />
                                             <TextBlock Text="Write" VerticalAlignment="Center" Margin="20,0,8,0" Style="{DynamicResource HelmSecondaryText}" />
@@ -156,10 +160,17 @@
         </ui:CardExpander>
         <ui:CardControl Margin="0,0,0,4" Icon="{ui:SymbolIcon Sparkle24}">
             <ui:CardControl.Header>
-                <core:CardHeader Title="Claude model" Description="Claude Code sorts the messages with no tools: it only reads them and answers Helm." />
+                <core:CardHeader Title="Claude model" Description="Sorts the messages, and answers wherever a conversation has no model of its own (AI button in Channels and DMs)." />
             </ui:CardControl.Header>
             <ComboBox MinWidth="240" ItemsSource="{Binding Models}" DisplayMemberPath="Label" SelectedValuePath="Value" SelectedValue="{Binding Model}"
                       AutomationProperties.Name="Claude model" />
+        </ui:CardControl>
+        <ui:CardControl Margin="0,0,0,4" Icon="{ui:SymbolIcon Gauge24}">
+            <ui:CardControl.Header>
+                <core:CardHeader Title="Effort" Description="How hard Claude thinks: higher answers better, takes longer and uses more of your plan." />
+            </ui:CardControl.Header>
+            <ComboBox MinWidth="240" ItemsSource="{Binding Efforts}" DisplayMemberPath="Label" SelectedValuePath="Value" SelectedValue="{Binding Effort}"
+                      AutomationProperties.Name="Effort" />
         </ui:CardControl>
         <ui:CardControl Margin="0,0,0,4" Icon="{ui:SymbolIcon Timer24}">
             <ui:CardControl.Header>

@@ -3,9 +3,20 @@
 All notable changes to Helm. The top section is used as the GitHub release body and as the Velopack release notes.
 Format: [Keep a Changelog](https://keepachangelog.com), versions follow [SemVer](https://semver.org).
 
-## [Unreleased]
+## [0.77.0] - 2026-11-03
+
+### Added
+- **Slack Bot: a Claude model and effort per conversation.** Settings → Channels and DMs: the **AI** button on a
+  conversation picks its model (Opus, Fable, Sonnet, Haiku) and effort (Low to Max), as Claude Code in VS Code does;
+  Lumi's answers and replies there use them. The defaults sit under Sorting (Claude model, and a new Effort).
+- **Slack Bot: switch Lumi's model from Slack.** Write “@lumi model fable”, “@lumi dùng opus effort cao” or
+  “@lumi model mặc định” and that conversation switches at once; “@lumi đang dùng model gì?” tells. Only your own
+  messages do this.
 
 ### Changed
+- **Slack Bot: Lumi is a real assistant.** General questions (what to eat for lunch, how something works, ideas,
+  small talk) get a real, friendly answer instead of “the conversation does not say”. About you, your work, plans or
+  decisions Lumi still only says what the conversation shows, and never promises anything for you.
 - **Vocabulary (PC) looks like its design.** Every screen was redrawn to the approved canvas: the word page puts the
   word, its traditional form, its reading and Hán Việt on one line; Listen and YouGlish are quiet buttons beside Edit;
   “To remember it” sits in a blue box (also on the Learn card and the pop-up’s Full details); the tree’s lines turn

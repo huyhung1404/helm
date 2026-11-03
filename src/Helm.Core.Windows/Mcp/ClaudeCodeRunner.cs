@@ -55,7 +55,7 @@ public sealed class ClaudeCodeRunner(McpClientConfig mcp, IChildProcessLauncher 
     internal static IEnumerable<string> RunArguments(IReadOnlyList<string> allowedTools, string? model)
     {
         string[] args = ["-p", "--output-format", "stream-json", "--verbose", "--allowedTools", string.Join(",", allowedTools)];
-        return model is { Length: > 0 } ? [.. args, "--model", model] : args;
+        return [.. args, .. Choice(model, null)];
     }
 
     /// <summary>Why <see cref="AskAsync"/> cannot run now, or null when it can (it needs Claude Code only, not Helm's MCP).</summary>
@@ -67,12 +67,13 @@ public sealed class ClaudeCodeRunner(McpClientConfig mcp, IChildProcessLauncher 
     /// For text from other people (Slack messages): whatever that text says, the answer is the only thing it can change.
     /// </summary>
     /// <param name="model">A Claude Code model name (haiku, sonnet), or null for the user's default.</param>
+    /// <param name="effort">Claude Code's effort level (low, medium, high, xhigh, max), or null for its default.</param>
     /// <exception cref="ClaudeCodeException">It could not start, failed, or did not finish within <paramref name="timeout"/>.</exception>
     /// <exception cref="OperationCanceledException"><paramref name="ct"/> stopped it.</exception>
-    public Task<string> AskAsync(string instructions, string? model, TimeSpan timeout, CancellationToken ct)
+    public Task<string> AskAsync(string instructions, string? model, TimeSpan timeout, CancellationToken ct, string? effort = null)
     {
         if (AskUnavailable() is { } problem) throw new ClaudeCodeException(problem);
-        return StartAsync([.. AskArguments(model)], instructions, (_, _) => "", null, timeout, ct);
+        return StartAsync([.. AskArguments(model, effort)], instructions, (_, _) => "", null, timeout, ct);
     }
 
     /// <summary>
@@ -80,11 +81,12 @@ public sealed class ClaudeCodeRunner(McpClientConfig mcp, IChildProcessLauncher 
     /// those: reading elsewhere asks a permission nobody gives) with Read, Grep and Glob: no shell, no edits, no web, no
     /// MCP, no hooks, and never .env files or keys (<see cref="SecretFiles"/>). For looking into projects to answer someone.
     /// </summary>
-    public Task<string> AskInFolderAsync(string instructions, IReadOnlyList<string> folders, string? model, TimeSpan timeout, CancellationToken ct)
+    public Task<string> AskInFolderAsync(string instructions, IReadOnlyList<string> folders, string? model, TimeSpan timeout, CancellationToken ct,
+        string? effort = null)
     {
         if (AskUnavailable() is { } problem) throw new ClaudeCodeException(problem);
         var existing = Existing(folders);
-        return StartAsync([.. FolderArguments(model, existing.Skip(1))], instructions, (_, _) => "", null, timeout, ct, existing[0]);
+        return StartAsync([.. FolderArguments(model, existing.Skip(1), effort)], instructions, (_, _) => "", null, timeout, ct, existing[0]);
     }
 
     /// <summary>
@@ -92,11 +94,12 @@ public sealed class ClaudeCodeRunner(McpClientConfig mcp, IChildProcessLauncher 
     /// (Write, Edit; edits outside them ask a permission nobody gives): still no shell, no web, no MCP, no hooks, and
     /// never .env files or keys. For a task the user gave themself.
     /// </summary>
-    public Task<string> WorkInFolderAsync(string instructions, IReadOnlyList<string> folders, string? model, TimeSpan timeout, CancellationToken ct)
+    public Task<string> WorkInFolderAsync(string instructions, IReadOnlyList<string> folders, string? model, TimeSpan timeout, CancellationToken ct,
+        string? effort = null)
     {
         if (AskUnavailable() is { } problem) throw new ClaudeCodeException(problem);
         var existing = Existing(folders);
-        return StartAsync([.. WorkArguments(model, existing.Skip(1))], instructions, (_, _) => "", null, timeout, ct, existing[0]);
+        return StartAsync([.. WorkArguments(model, existing.Skip(1), effort)], instructions, (_, _) => "", null, timeout, ct, existing[0]);
     }
 
     private static List<string> Existing(IReadOnlyList<string> folders)
@@ -114,7 +117,7 @@ public sealed class ClaudeCodeRunner(McpClientConfig mcp, IChildProcessLauncher 
         "**/google-services.json", "**/GoogleService-Info.plist", "**/*secret*", "**/*credential*", "**/.git/**", "**/.ssh/**",
     ];
 
-    internal static IEnumerable<string> FolderArguments(string? model, IEnumerable<string>? moreFolders = null)
+    internal static IEnumerable<string> FolderArguments(string? model, IEnumerable<string>? moreFolders = null, string? effort = null)
     {
         var settings = System.Text.Json.JsonSerializer.Serialize(new
         {
@@ -123,10 +126,10 @@ public sealed class ClaudeCodeRunner(McpClientConfig mcp, IChildProcessLauncher 
         });
         string[] args = ["-p", "--output-format", "stream-json", "--verbose", "--tools", "Read,Grep,Glob", "--strict-mcp-config",
             "--permission-mode", "default", .. AddDirs(moreFolders), "--settings", settings];
-        return model is { Length: > 0 } ? [.. args, "--model", model] : args;
+        return [.. args, .. Choice(model, effort)];
     }
 
-    internal static IEnumerable<string> WorkArguments(string? model, IEnumerable<string>? moreFolders = null)
+    internal static IEnumerable<string> WorkArguments(string? model, IEnumerable<string>? moreFolders = null, string? effort = null)
     {
         var settings = System.Text.Json.JsonSerializer.Serialize(new
         {
@@ -136,17 +139,21 @@ public sealed class ClaudeCodeRunner(McpClientConfig mcp, IChildProcessLauncher 
         });
         string[] args = ["-p", "--output-format", "stream-json", "--verbose", "--tools", "Read,Grep,Glob,Write,Edit", "--strict-mcp-config",
             "--permission-mode", "acceptEdits", .. AddDirs(moreFolders), "--settings", settings];
-        return model is { Length: > 0 } ? [.. args, "--model", model] : args;
+        return [.. args, .. Choice(model, effort)];
     }
+
+    /// <summary>The model and effort asked for; Claude Code's own defaults when left out.</summary>
+    internal static IEnumerable<string> Choice(string? model, string? effort) =>
+        [.. model is { Length: > 0 } ? new[] { "--model", model } : [], .. effort is { Length: > 0 } ? new[] { "--effort", effort } : []];
 
     /// <summary>The folders besides the one Claude Code runs in.</summary>
     private static IEnumerable<string> AddDirs(IEnumerable<string>? folders) => (folders ?? []).SelectMany(f => new[] { "--add-dir", f });
 
-    internal static IEnumerable<string> AskArguments(string? model)
+    internal static IEnumerable<string> AskArguments(string? model, string? effort = null)
     {
         string[] args = ["-p", "--output-format", "stream-json", "--verbose", "--tools", "", "--strict-mcp-config",
             "--settings", """{"disableAllHooks":true}"""];
-        return model is { Length: > 0 } ? [.. args, "--model", model] : args;
+        return [.. args, .. Choice(model, effort)];
     }
 
     private async Task<string> StartAsync(IReadOnlyList<string> args, string instructions, Func<string, int, string> describe,
