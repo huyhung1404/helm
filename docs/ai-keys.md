@@ -148,3 +148,29 @@ estimated USD (`AiPrices`), and on an agent what the same call would have cost (
 
 Only Helm's own features and your own services use the router. Other apps (Cursor, n8n, Open WebUI…) use their own
 API keys: lending a Claude plan to other apps is against Anthropic's terms.
+
+## Your VPS
+
+The same agents can serve your own VPS (AI → Proxy → **Your VPS**): its services send AI jobs to this PC, and the
+agents answer them on their plans. Type the VPS's worker endpoint (`wss://<vps host>/ai-worker`; `ws://` only to
+`127.0.0.1`, for tests) and the worker token the VPS gave this PC, press **Save**, and turn it on. Address and switch
+are this PC's own (`settings/ai-vps.json`, never synced); the token is kept encrypted for this Windows user
+(`settings/ai/vps-worker-token.bin`, DPAPI), never synced and never shown again. The line under the switch says
+"Connected to <host> · N jobs today" or why it is not connected.
+
+`Helm.Ai.Core/Vps/VpsWorker.cs` keeps one WebSocket open (`Authorization: Bearer <token>`, JSON text frames,
+`VpsProtocol.cs`):
+
+| Frame | Way | When |
+|---|---|---|
+| `{"type":"hello","device","agents","version"}` | PC → VPS | On connect: the ready agents, best first |
+| `{"type":"status","agents"}` | PC → VPS | The ready agents changed (empty: online, takes no job) |
+| `{"type":"job","id","feature","system","prompt","model","effort"}` | VPS → PC | A job |
+| `{"type":"claim","id"}` / `{"type":"decline","id","reason"}` | PC → VPS | At once: an agent is ready, or why not |
+| `{"type":"result","id","text","agent","savedUsd"}` / `{"type":"error","id","message"}` | PC → VPS | The answer |
+
+A job is **text only**: no Helm tool and no phone tool is offered (the VPS's services have their own data), its
+`system` is the system prompt (null: a short neutral one, not Ask Helm's instructions), and it is a conversation of
+its own, ended once answered. Two run at once; one more is declined, so the VPS can send it elsewhere. A job may take
+2 minutes. After a drop the worker connects again after 1 s, waiting twice as long each time up to a minute; jobs
+running on a connection that dropped are cancelled. The token and job contents are never logged.

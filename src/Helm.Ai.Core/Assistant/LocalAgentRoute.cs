@@ -49,7 +49,7 @@ public sealed class LocalAgentRoute : IAgentRoute, IDisposable
         var conversation = _conversations.GetOrAdd(job.ConversationId, _ =>
         {
             var tools = Tools(job);
-            return new Conversation(_agent.Create("", job.Model, job.Effort, HelmAssistant.Instructions, tools), tools);
+            return new Conversation(_agent.Create("", job.Model, job.Effort, job.System ?? HelmAssistant.Instructions, tools), tools);
         });
         await conversation.Gate.WaitAsync(ct);
         try

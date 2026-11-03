@@ -114,6 +114,34 @@
                           AutomationProperties.Name="Seconds to wait for a PC" />
         </ui:CardControl>
 
+        <!-- Your VPS: its services' AI jobs come to these agents too (text only, no Helm tool) -->
+        <TextBlock Text="Your VPS" Style="{DynamicResource HelmSectionHeader}" />
+        <StackPanel DataContext="{Binding Vps}">
+            <ui:CardControl Margin="0,0,0,4" Icon="{ui:SymbolIcon Server24}">
+                <ui:CardControl.Header>
+                    <core:CardHeader Title="Serve my VPS" Description="{Binding StatusText}" />
+                </ui:CardControl.Header>
+                <ui:ToggleSwitch IsChecked="{Binding IsOn}" AutomationProperties.Name="Serve my VPS" />
+            </ui:CardControl>
+            <ui:CardControl Margin="0,0,0,4" Icon="{ui:SymbolIcon PlugConnected24}">
+                <ui:CardControl.Header>
+                    <core:CardHeader Title="Address and token"
+                                     Description="The worker endpoint of your VPS and the token it gave this PC. Kept on this PC only, the token encrypted and never shown again." />
+                </ui:CardControl.Header>
+                <StackPanel Width="280">
+                    <ui:TextBox Text="{Binding Url, UpdateSourceTrigger=PropertyChanged}" PlaceholderText="wss://your-vps/ai-worker"
+                                AutomationProperties.Name="VPS address" />
+                    <ui:PasswordBox Margin="0,8,0,0" Password="{Binding Token, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                    PlaceholderText="Worker token" AutomationProperties.Name="Worker token" />
+                    <TextBlock Style="{DynamicResource HelmSecondaryText}" Margin="0,4,0,0" Text="A token is saved: paste one only to replace it."
+                               Visibility="{Binding HasToken, Converter={StaticResource BoolToVisibility}}" />
+                    <TextBlock Margin="0,4,0,0" TextWrapping="Wrap" Foreground="{DynamicResource SystemFillColorCriticalBrush}"
+                               Text="{Binding Problem}" Visibility="{Binding Problem, Converter={StaticResource NotEmptyToVisibility}}" />
+                    <ui:Button Margin="0,8,0,0" Content="Save" Icon="{ui:SymbolIcon Checkmark24}" Command="{Binding SaveCommand}" />
+                </StackPanel>
+            </ui:CardControl>
+        </StackPanel>
+
         <!-- What it cost -->
         <TextBlock Text="This month" Style="{DynamicResource HelmSectionHeader}" />
         <ui:CardControl Margin="0,0,0,4" Icon="{ui:SymbolIcon Money24}">

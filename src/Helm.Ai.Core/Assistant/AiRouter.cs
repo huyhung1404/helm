@@ -12,7 +12,11 @@ public sealed record AiJob(
     IReadOnlyList<string> Tools,
     IReadOnlyList<string> PhoneTools,
     string Model,
-    string Effort);
+    string Effort)
+{
+    /// <summary>The job's own system prompt (a VPS service's job); null for Ask Helm's instructions.</summary>
+    public string? System { get; init; }
+}
 
 /// <summary>A change Claude Code made with one of Helm's tools on the PC, with the tool's result (for Undo).</summary>
 public sealed record AiJobAction(string Tool, string Summary, string ResultJson);

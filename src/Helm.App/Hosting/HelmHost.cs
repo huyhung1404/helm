@@ -55,6 +55,18 @@ internal static class HelmHost
                 () => engine.DeviceId, sp.GetRequiredService<IDeviceInfo>().DeviceName, agents.Ready,
                 logger: sp.GetRequiredService<ILoggerFactory>().CreateLogger<Helm.Ai.Assistant.AgentJobWorker>());
         });
+        // The same agents serve the user's own VPS too, when set up on AI → Proxy (this PC only: address and token are
+        // never synced).
+        builder.Services.AddSingleton(sp => new Helm.Ai.Vps.VpsWorkerToken(paths, sp.GetRequiredService<Core.Sync.ISecretProtector>()));
+        builder.Services.AddSingleton(sp =>
+        {
+            var agents = sp.GetRequiredService<Ai.AgentRegistry>();
+            return new Helm.Ai.Vps.VpsWorker(() => new Helm.Ai.Vps.VpsWebSocket(), agents, agents.Ready, sp.GetRequiredService<IDeviceInfo>().DeviceName,
+                Shell.Services.AppInfo.Version, sp.GetRequiredService<ILoggerFactory>().CreateLogger<Helm.Ai.Vps.VpsWorker>());
+        });
+        builder.Services.AddSingleton(sp => new Helm.Ai.Vps.VpsWorkerControl(
+            sp.GetRequiredService<ISettingsStoreFactory>().Get<Helm.Ai.Vps.VpsWorkerSettings>(Helm.Ai.Vps.VpsWorkerSettings.StoreId),
+            sp.GetRequiredService<Helm.Ai.Vps.VpsWorkerToken>(), sp.GetRequiredService<Helm.Ai.Vps.VpsWorker>()));
 
         // Modules — each module assembly exposes one registration extension.
         HelmModules.Register(builder.Services);
@@ -121,6 +133,7 @@ internal static class HelmHost
         builder.Services.AddSingleton<McpPermissionsViewModel>();
         builder.Services.AddSingleton<McpViewModel>();
         builder.Services.AddSingleton<Helm.Ai.AiKeysViewModel>();
+        builder.Services.AddSingleton<VpsWorkerViewModel>();
         builder.Services.AddSingleton<AiProxyViewModel>();
         builder.Services.AddSingleton<AiViewModel>();
         builder.Services.AddSingleton<AiPage>();

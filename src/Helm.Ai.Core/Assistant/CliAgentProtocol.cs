@@ -14,6 +14,8 @@ public static class CliAgentProtocol
     /// <summary>The first message's preamble: the assistant's instructions, the tools, and how to call them.</summary>
     public static string Preamble(string system, IReadOnlyList<AssistantTool> tools)
     {
+        // A text-only job (a VPS service's) offers no tool, so it is not told how to call one.
+        if (tools.Count == 0) return system.Trim() + "\n\nYour own tools are turned off. Answer in plain text.";
         var text = new StringBuilder(system.Trim()).Append("\n\n")
             .Append("You work inside Helm, which runs tools for you. Your own tools are turned off; use only these.\n")
             .Append("Tools (name: what it does. input: its JSON Schema):\n");
@@ -28,8 +30,13 @@ public static class CliAgentProtocol
         return text.ToString();
     }
 
-    /// <summary>Tools a later turn adds to the conversation, put before that turn's text.</summary>
-    public static string MoreTools(IReadOnlyList<AssistantTool> tools) => List(new StringBuilder("More tools you may call from now on:\n"), tools).ToString();
+    /// <summary>
+    /// Tools a later turn adds to the conversation, put before that turn's text, with how to call them (a first message
+    /// that offered no tool did not say).
+    /// </summary>
+    public static string MoreTools(IReadOnlyList<AssistantTool> tools) =>
+        List(new StringBuilder("More tools you may call from now on:\n"), tools)
+            .Append("""To call tools, reply with ONLY one JSON object: {"calls":[{"name":"…","input":{…}}]}""").Append('\n').ToString();
 
     private static StringBuilder List(StringBuilder text, IReadOnlyList<AssistantTool> tools)
     {

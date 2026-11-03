@@ -24,6 +24,9 @@ Format: [Keep a Changelog](https://keepachangelog.com), versions follow [SemVer]
   dialog for a request from your own phone). The agents take jobs as soon as Helm starts, with or without the page
   open. The card says where it ran (“Codex trên PC-… · miễn phí” or “Haiku 5.5 qua API”), and every call goes in a
   synced cost book with what the agents saved.
+- **AI → Proxy → Your VPS: your agents serve your own VPS.** Give this PC your VPS's worker address and token and
+  turn it on: the services on your VPS send AI jobs (text only, no Helm tools) to this PC's agents over an encrypted
+  WebSocket, two at a time, and it connects again by itself after a drop. The token stays on this PC, encrypted.
 - **Wallet for AI agents:** `wallet_add_transaction` (money spent or in, typed by hand, with its category) and
   `wallet_summary` (what was spent and received over some days, by category).
 
