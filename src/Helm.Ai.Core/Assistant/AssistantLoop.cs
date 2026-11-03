@@ -28,11 +28,12 @@ internal static class AssistantLoop
     /// <param name="phoneHere">False on a PC: phone tools are not run but handed back in <see cref="Outcome.ForPhone"/>.</param>
     public static async Task<Outcome> RunAsync(IAssistantChat chat, IReadOnlyList<AssistantTool> tools,
         Func<IReadOnlyList<PendingAction>, Task<bool>> confirm, Action<AssistantUsage> count, Func<string?> stop, bool phoneHere,
-        string modelName, CancellationToken ct)
+        string modelName, CancellationToken ct, List<AiJobAction>? recordsInto = null)
     {
         var byName = tools.ToDictionary(t => t.Name, StringComparer.Ordinal);
         var done = new List<AssistantAction>();
-        var records = new List<AiJobAction>();
+        // The caller's list when it gave one: a turn stopped midway (too long, cancelled) still tells what it did.
+        var records = recordsInto ?? [];
         var forPhone = new List<AiJobPhoneAction>();
         var declined = false;
         Outcome End(string text, string? problem) => new(text, done, records, forPhone, declined, problem);

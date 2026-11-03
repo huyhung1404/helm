@@ -20,7 +20,7 @@ public sealed class AgentJobsTests
         new(AiFeatureIds.AskHelm, "conv-1", text, ["wallet_add_transaction", "wallet_summary", "tracker_start_task"], ["phone_set_alarm", "phone_clipboard"],
             "claude-haiku-5-5", "low");
 
-    private LocalAgentRoute Local(Scripted agent) =>
+    private LocalAgentRoute Local(IAssistantChatFactory agent) =>
         new("PC-HUNG", "Codex", agent, [new WalletMcpTools(new DebtBook(new MemorySynced<WalletDebt>(), _wallet), _wallet), new Starter()],
             _ => true, () => null);
 
@@ -101,6 +101,82 @@ public sealed class AgentJobsTests
     }
 
     [Fact]
+    public async Task A_claim_that_comes_back_just_after_the_deadline_still_binds()
+    {
+        _workers.Upsert("pc-id", new AiWorkerRecord { Device = "PC-HUNG", Agents = ["Codex"], SeenAt = DateTimeOffset.UtcNow });
+        var phone = new SyncAgentRoute(_jobs, _workers, () => "phone-id");
+
+        var run = phone.RunAsync(Job(), TimeSpan.FromMilliseconds(200), CancellationToken.None);
+        await Task.Delay(700);
+        // The PC claimed in time by its clock; its claim reaches the phone only now.
+        var sent = Assert.Single(_jobs.All());
+        Assert.Equal(AgentJobs.Queued, sent.Value.State);
+        _jobs.SetRemote(sent.Id, sent.Value with { State = AgentJobs.Claimed });
+        _jobs.SetRemote(sent.Id, sent.Value with { State = AgentJobs.Done, Result = new AiJobResult("Em ghi rồi.", [], [], null) });
+
+        Assert.Equal("Em ghi rồi.", (await run).Text);
+    }
+
+    [Fact]
+    public async Task A_turn_the_PC_took_and_then_failed_says_so_and_is_never_handed_on()
+    {
+        _workers.Upsert("pc-id", new AiWorkerRecord { Device = "PC-HUNG", Agents = ["Codex"], SeenAt = DateTimeOffset.UtcNow });
+        var phone = new SyncAgentRoute(_jobs, _workers, () => "phone-id");
+
+        var run = phone.RunAsync(Job(), TimeSpan.FromSeconds(5), CancellationToken.None);
+        await Task.Delay(100);
+        var sent = Assert.Single(_jobs.All());
+        _jobs.SetRemote(sent.Id, sent.Value with { State = AgentJobs.Claimed });
+        _jobs.SetRemote(sent.Id, sent.Value with { State = AgentJobs.Failed, Error = "Codex stopped." });
+
+        var failed = await Assert.ThrowsAsync<AiRouteTakenException>(() => run);
+        Assert.Equal("Codex stopped.", failed.Message);
+    }
+
+    [Fact]
+    public async Task Closing_the_card_withdraws_the_turn_and_a_PC_running_it_stops()
+    {
+        var pc = new Blocking();
+        using var worker = new AgentJobWorker(_jobs, _workers, pc, () => "pc-id", "PC-HUNG", () => ["Codex"]);
+        worker.Start();
+        var phone = new SyncAgentRoute(_jobs, _workers, () => "phone-id");
+        using var close = new CancellationTokenSource();
+
+        var run = phone.RunAsync(Job(), TimeSpan.FromSeconds(5), close.Token);
+        await pc.Started.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        close.Cancel();
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => run);
+        await pc.Stopped.Task.WaitAsync(TimeSpan.FromSeconds(5));
+    }
+
+    [Fact]
+    public async Task A_turn_not_taken_yet_is_withdrawn_when_the_card_closes()
+    {
+        _workers.Upsert("pc-id", new AiWorkerRecord { Device = "PC-HUNG", Agents = ["Codex"], SeenAt = DateTimeOffset.UtcNow });
+        var phone = new SyncAgentRoute(_jobs, _workers, () => "phone-id");
+        using var close = new CancellationTokenSource(TimeSpan.FromMilliseconds(150));
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => phone.RunAsync(Job(), TimeSpan.FromSeconds(5), close.Token));
+
+        Assert.Equal(AgentJobs.Cancelled, Assert.Single(_jobs.All()).Value.State);
+    }
+
+    [Fact]
+    public async Task What_a_turn_recorded_before_it_ran_out_of_time_comes_back_with_Undo()
+    {
+        using var local = Local(new SlowAfter(Answer(
+            ("wallet_add_transaction", """{"amount":"45k","direction":"spend","description":"Phở","summary":"Chi 45.000đ · Phở"}"""),
+            ("wallet_summary", "{}"))));
+
+        var result = await local.RunAsync(Job(), TimeSpan.FromMilliseconds(500), CancellationToken.None);
+
+        Assert.Equal("Chi 45.000đ · Phở", Assert.Single(result.Done).Summary);
+        Assert.Single(_wallet.Transactions());
+        Assert.Contains("một phần", result.Text);
+    }
+
+    [Fact]
     public void A_PC_long_unheard_of_is_offline_and_its_own_record_never_counts()
     {
         _workers.Upsert("pc-id", new AiWorkerRecord { Device = "PC-HUNG", Agents = ["Codex"], SeenAt = DateTimeOffset.UtcNow - TimeSpan.FromMinutes(10) });
@@ -156,6 +232,58 @@ public sealed class AgentJobsTests
         }
 
         public void AddResults(IReadOnlyList<ToolOutcome> results) { }
+    }
+
+    /// <summary>Answers its first step at once, then takes far too long.</summary>
+    private sealed class SlowAfter(AssistantStep first) : IAssistantChatFactory, IAssistantChat
+    {
+        private bool _answered;
+
+        public AiProvider Provider => AiProviders.Claude;
+
+        public IAssistantChat Create(string apiKey, string model, string effort, string system, IReadOnlyList<AssistantTool> tools) => this;
+
+        public void AddUser(string text) { }
+
+        public async Task<AssistantStep> NextAsync(CancellationToken ct)
+        {
+            if (!_answered)
+            {
+                _answered = true;
+                return first;
+            }
+            await Task.Delay(TimeSpan.FromSeconds(30), ct);
+            return Text("late");
+        }
+
+        public void AddResults(IReadOnlyList<ToolOutcome> results) { }
+    }
+
+    /// <summary>A PC agent that runs until it is stopped.</summary>
+    private sealed class Blocking : IAgentRoute
+    {
+        public TaskCompletionSource Started { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        public TaskCompletionSource Stopped { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        public string Device => "PC-HUNG";
+        public string? Unavailable() => null;
+
+        public async Task<AiJobResult> RunAsync(AiJob job, TimeSpan wait, CancellationToken ct)
+        {
+            Started.TrySetResult();
+            try
+            {
+                await Task.Delay(Timeout.InfiniteTimeSpan, ct);
+            }
+            finally
+            {
+                Stopped.TrySetResult();
+            }
+            return new AiJobResult("never", [], [], null);
+        }
+
+        public Task UndoAsync(AiJobAction action, CancellationToken ct) => Task.CompletedTask;
+
+        public void End(string conversationId) { }
     }
 
     private sealed class FakeLocal(AiJobResult result) : IAgentRoute

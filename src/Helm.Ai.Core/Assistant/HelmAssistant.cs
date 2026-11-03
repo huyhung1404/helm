@@ -277,6 +277,12 @@ public sealed class AssistantSession
         {
             result = await route.RunAsync(job, TimeSpan.FromSeconds(Math.Max(1, choice.PcWaitSeconds)), ct);
         }
+        catch (AiRouteTakenException ex)
+        {
+            // It may have done part of it: running it again on the API could do it twice.
+            _pc = route;
+            return new AssistantReply("", [], false, $"{ex.Message} Em không chạy lại qua API để khỏi làm hai lần.", route.Device);
+        }
         catch (AiRouteException)
         {
             return null;

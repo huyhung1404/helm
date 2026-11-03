@@ -28,7 +28,13 @@ public sealed record AiJobResult(string Text, IReadOnlyList<AiJobAction> Done, I
 }
 
 /// <summary>The agent could not take or finish the job in time; the router tries the next way.</summary>
-public sealed class AiRouteException(string message, Exception? inner = null) : Exception(message, inner);
+public class AiRouteException(string message, Exception? inner = null) : Exception(message, inner);
+
+/// <summary>
+/// An agent took the turn and then failed or ran out of time: it may have done part of it, so the turn must not run
+/// again anywhere else (the API would do it a second time). Said to the user as is.
+/// </summary>
+public sealed class AiRouteTakenException(string message) : AiRouteException(message);
 
 /// <summary>
 /// A way to an AI agent on the user's own plan (Claude Code first; Codex, Gemini CLI or a local model can follow): on

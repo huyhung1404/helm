@@ -77,6 +77,13 @@ public static class AgentJobs
     /// <summary>Once a worker has claimed a turn, how long the asker waits for its result (it never runs it twice elsewhere).</summary>
     public static readonly TimeSpan AfterClaim = TimeSpan.FromSeconds(120);
 
+    /// <summary>
+    /// How long past its deadline the asker still listens for a claim: the PC claims up to the deadline by its own
+    /// clock, and the claim takes a moment (longer when the live channel is down) to come back. A claim seen in this
+    /// time binds, so the turn never runs on the PC and on the API both.
+    /// </summary>
+    public static readonly TimeSpan ClaimGrace = TimeSpan.FromSeconds(4);
+
     /// <summary>Jobs older than this are cleared away.</summary>
     public static readonly TimeSpan KeepFor = TimeSpan.FromHours(1);
 }
@@ -112,20 +119,48 @@ public sealed class SyncAgentRoute(ISyncedCollection<AiJobRecord> jobs, ISyncedC
         });
         using var live = KeepLive();
         Clean();
-        var claimed = await WaitForAsync(id, r => r.State != AgentJobs.Queued, wait, ct);
+        AiJobRecord? claimed;
+        try
+        {
+            claimed = await WaitForAsync(id, r => r.State != AgentJobs.Queued, wait + AgentJobs.ClaimGrace, ct);
+        }
+        catch (OperationCanceledException)
+        {
+            // The card was closed: the PC must not take it after all.
+            Cancel(id);
+            throw;
+        }
         if (claimed is null || claimed.State == AgentJobs.Cancelled)
         {
-            if (jobs.Get(id) is { State: AgentJobs.Queued } still) jobs.Upsert(id, still with { State = AgentJobs.Cancelled });
+            Cancel(id);
             throw new AiRouteException($"{worker.Value.Device} did not take it within {wait.TotalSeconds:0} s.");
         }
-        var finished = await WaitForAsync(id, r => r.State is AgentJobs.Done or AgentJobs.Failed, AgentJobs.AfterClaim, ct);
+        // Taken: from here on the turn is the PC's, whatever happens. It never falls back to the API.
+        AiJobRecord? finished;
+        try
+        {
+            finished = await WaitForAsync(id, r => r.State is AgentJobs.Done or AgentJobs.Failed, AgentJobs.AfterClaim, ct);
+        }
+        catch (OperationCanceledException)
+        {
+            // The card was closed: the PC stops the turn (what it already did stays).
+            Cancel(id);
+            throw;
+        }
         jobs.Delete(id);
         return finished switch
         {
             { State: AgentJobs.Done, Result: { } result } => result,
-            { State: AgentJobs.Failed } failed => throw new AiRouteException(failed.Error ?? $"{worker.Value.Device} could not do it."),
-            _ => throw new AiRouteException($"{worker.Value.Device} took it but did not finish within {AgentJobs.AfterClaim.TotalSeconds:0} s."),
+            { State: AgentJobs.Failed } failed => throw new AiRouteTakenException(failed.Error ?? $"{worker.Value.Device} could not do it."),
+            _ => throw new AiRouteTakenException(
+                $"{worker.Value.Device} took it but did not finish within {AgentJobs.AfterClaim.TotalSeconds:0} s: look on the PC whether it was done."),
         };
+    }
+
+    /// <summary>Withdraws a job not finished yet: a PC that has not taken it never will, one that has stops it.</summary>
+    private void Cancel(string id)
+    {
+        if (jobs.Get(id) is { State: AgentJobs.Queued or AgentJobs.Claimed } open) jobs.Upsert(id, open with { State = AgentJobs.Cancelled });
     }
 
     public async Task UndoAsync(AiJobAction action, CancellationToken ct)
@@ -226,6 +261,7 @@ public sealed class AgentJobWorker(ISyncedCollection<AiJobRecord> jobs, ISyncedC
     private readonly TimeProvider _time = time ?? TimeProvider.System;
     private readonly ILogger _logger = logger ?? NullLogger.Instance;
     private readonly HashSet<string> _taken = new(StringComparer.Ordinal);
+    private readonly Dictionary<string, CancellationTokenSource> _running = new(StringComparer.Ordinal);
     private Timer? _heartbeat;
 
     public void Start()
@@ -273,7 +309,17 @@ public sealed class AgentJobWorker(ISyncedCollection<AiJobRecord> jobs, ISyncedC
     private void OnChanged(object? sender, SyncedChangedEventArgs e)
     {
         foreach (var id in e.Ids)
-            if (jobs.Get(id) is { } job) Take(id, job);
+        {
+            if (jobs.Get(id) is not { } job) continue;
+            if (job.State == AgentJobs.Cancelled)
+            {
+                // The asker withdrew it (the card was closed): stop the run.
+                lock (_running)
+                    if (_running.TryGetValue(id, out var running)) running.Cancel();
+                continue;
+            }
+            Take(id, job);
+        }
     }
 
     private void Take(string id, AiJobRecord job)
@@ -292,12 +338,14 @@ public sealed class AgentJobWorker(ISyncedCollection<AiJobRecord> jobs, ISyncedC
 
     internal async Task DoAsync(string id, AiJobRecord job)
     {
+        using var stop = new CancellationTokenSource();
+        lock (_running) _running[id] = stop;
         try
         {
             switch (job.Kind)
             {
                 case AgentJobs.Run when job.Job is { } turn:
-                    var result = await local.RunAsync(turn, AgentJobs.AfterClaim - TimeSpan.FromSeconds(10), CancellationToken.None);
+                    var result = await local.RunAsync(turn, AgentJobs.AfterClaim - TimeSpan.FromSeconds(10), stop.Token);
                     jobs.Upsert(id, job with { State = AgentJobs.Done, Result = result });
                     break;
                 case AgentJobs.Undo when job.Action is { } action:
@@ -313,6 +361,10 @@ public sealed class AgentJobWorker(ISyncedCollection<AiJobRecord> jobs, ISyncedC
                     break;
             }
         }
+        catch (OperationCanceledException) when (stop.IsCancellationRequested)
+        {
+            _logger.LogInformation("Agent job {Kind} withdrawn by the asker", job.Kind);
+        }
         catch (Exception ex)
         {
             _logger.LogWarning(ex, "Agent job {Kind} failed", job.Kind);
@@ -320,6 +372,7 @@ public sealed class AgentJobWorker(ISyncedCollection<AiJobRecord> jobs, ISyncedC
         }
         finally
         {
+            lock (_running) _running.Remove(id);
             lock (_taken) _taken.Remove(id);
         }
     }

@@ -31,6 +31,17 @@ internal sealed class CodexAgentFactory(IChildProcessLauncher launcher, string h
         return DateTimeOffset.UtcNow < _limitedUntil ? $"reached its plan's limit; Helm tries it again at {_limitedUntil.ToLocalTime():HH:mm}." : null;
     }
 
+    /// <summary>
+    /// Codex's own tools, turned off (codex 0.166 feature names; an unknown one stops codex with an error, so a later
+    /// codex that drops one shows here at once).
+    /// </summary>
+    internal static readonly string[] OwnTools =
+    [
+        "shell_tool", "unified_exec", "web_search_request", "web_search_cached", "standalone_web_search", "view_image",
+        "image_generation", "browser_use", "browser_use_external", "computer_use", "in_app_browser", "apps", "plugins",
+        "request_permissions_tool", "search_tool", "tool_search",
+    ];
+
     /// <summary>codex login writes auth.json to CODEX_HOME.</summary>
     internal static bool SignedIn(string home) => File.Exists(Path.Combine(home, "auth.json"));
 
@@ -84,8 +95,10 @@ internal sealed class CodexChat(CodexAgentFactory factory, IChildProcessLauncher
     public async Task<AssistantStep> NextAsync(CancellationToken ct)
     {
         var codex = CodexAgentFactory.FindCodex() ?? throw new AssistantException("Codex is not installed on this PC.");
-        // Read-only sandbox in an empty folder: Codex has nothing to look at or change; Helm runs the tools.
-        string[] options = ["exec", "--json", "--skip-git-repo-check", "--sandbox", "read-only", "--cd", workFolder];
+        // None of Codex's own tools: read-only only stops writes, its shell could still read the user's files
+        // (~/.claude.json, ~/.ssh, Helm's data). In an empty folder, with Helm running the tools.
+        string[] options = ["exec", "--json", "--skip-git-repo-check", "--sandbox", "read-only", "--ignore-user-config",
+            .. CodexAgentFactory.OwnTools.SelectMany(f => new[] { "--disable", f }), "--cd", workFolder];
         string[] args = _thread is { } thread ? [.. options, "resume", thread, "-"] : [.. options, "-"];
         var commandLine = codex.EndsWith(".cmd", StringComparison.OrdinalIgnoreCase)
             ? $"{CommandLine.Quote(Environment.GetEnvironmentVariable("ComSpec") is { Length: > 0 } c ? c : "cmd.exe")} /d /s /c \"{CommandLine.Join([codex, .. args])}\""

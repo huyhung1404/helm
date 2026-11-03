@@ -66,16 +66,26 @@ public sealed class LocalAgentRoute : IAgentRoute, IDisposable
             }
             conversation.Chat.AddUser(job.Text);
             AssistantLoop.Outcome outcome;
+            var records = new List<AiJobAction>();
             try
             {
                 outcome = await AssistantLoop.RunAsync(conversation.Chat, conversation.Tools, _ => Task.FromResult(false),
                     u => { input += u.Input; output += u.Output; cacheRead += u.CacheRead; cacheWrite += u.CacheWrite; },
-                    () => null, phoneHere: false, job.Model, limit.Token);
+                    () => null, phoneHere: false, job.Model, limit.Token, records);
             }
-            catch (OperationCanceledException) when (!ct.IsCancellationRequested)
+            catch (Exception ex) when (ex is OperationCanceledException or AssistantException or IOException or InvalidOperationException)
             {
+                // Too long, cancelled by the asker, or the agent's process broke: the chat is not reused. What it already
+                // recorded is kept and goes back with Undo, never as a failure that someone might run again.
                 End(job.ConversationId);
-                throw new AiRouteException($"{Device} did not answer within {wait.TotalSeconds:0} s.");
+                var stopped = ex is OperationCanceledException
+                    ? ct.IsCancellationRequested ? "Em dừng giữa chừng." : $"{Device} did not answer within {wait.TotalSeconds:0} s."
+                    : ex.Message;
+                if (records.Count > 0)
+                    return new AiJobResult($"Em làm được một phần thì dừng ({stopped}).", [.. records], [],
+                        AiPrices.Usd(job.Model, input, output, cacheRead, cacheWrite)) { Agent = _agentName };
+                if (ex is OperationCanceledException && ct.IsCancellationRequested) throw;
+                throw new AiRouteException(stopped);
             }
             conversation.LastTurn = _time.GetUtcNow();
             if (outcome.Problem is { } problem && outcome.Records.Count == 0 && outcome.ForPhone.Count == 0)
