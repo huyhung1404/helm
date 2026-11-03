@@ -19,9 +19,8 @@ namespace Helm.Modules.Wallet;
 
 /// <summary>
 /// "−65,000 ₫ · Techcombank — what was it?": after a payment Helm could not file by itself, a quiet notification with
-/// the likeliest categories as buttons (<see cref="WalletCategoryReceiver"/> files it), AI's pick or proposed new
-/// category first once it answered, and a microphone that opens Ask Helm about it; a tap opens Wallet. Runs without
-/// the activity.
+/// "Nói" (opens Ask Helm about it, listening) and the two likeliest categories as buttons (<see cref="WalletCategoryReceiver"/>
+/// files it), AI's pick or proposed new category first once it answered; a tap opens Wallet. Runs without the activity.
 /// </summary>
 internal static class WalletNotifications
 {
@@ -65,9 +64,9 @@ internal static class WalletNotifications
 
             var id = NotificationId(transactionId);
             var title = transaction.Bank.Length > 0 ? $"{WalletFormat.Signed(transaction.Amount)} · {transaction.Bank}" : WalletFormat.Signed(transaction.Amount);
-            // The microphone takes the last button: the user says what it was and Ask Helm fills it in.
+            // "Nói" first (the user says what it was and Ask Helm fills it in), then the two likeliest categories.
             var mic = CanAskHelm(context);
-            var buttons = CategoryButtons.For(suggestions, proposal, category ?? (wanted => suggestions.FirstOrDefault(c => c.Id == wanted)), MaxActions - (mic ? 1 : 0));
+            var buttons = CategoryButtons.ForNotification(suggestions, proposal, category ?? (wanted => suggestions.FirstOrDefault(c => c.Id == wanted)));
             var guess = proposal is null ? null : buttons.FirstOrDefault()?.NewName ?? buttons.FirstOrDefault()?.Label;
             var question = guess is null ? "What was it?" : $"What was it? Maybe {guess}.";
             var text = transaction.Description.Length > 0 ? $"{transaction.Description}\n{question}" : question;
@@ -82,6 +81,8 @@ internal static class WalletNotifications
                 .SetShowWhen(true);
             if (OpenWalletIntent(context, id) is { } open) builder.SetContentIntent(open);
             var icon = Icon.CreateWithResource(context, R.Drawable(context, "wallet_notification"));
+            if (mic && AskHelmIntent(context, transactionId, transaction, id) is { } ask)
+                builder.AddAction(new Notification.Action.Builder(icon, CategoryButtons.SayLabel, ask).Build());
             for (var i = 0; i < buttons.Count; i++)
             {
                 var intent = new Intent(context, Java.Lang.Class.FromType(typeof(WalletCategoryReceiver)))
@@ -92,8 +93,6 @@ internal static class WalletNotifications
                 var pending = PendingIntent.GetBroadcast(context, id * 4 + i, intent, PendingIntentFlags.UpdateCurrent | PendingIntentFlags.Immutable);
                 builder.AddAction(new Notification.Action.Builder(icon, buttons[i].Label, pending).Build());
             }
-            if (mic && AskHelmIntent(context, transactionId, transaction, id) is { } ask)
-                builder.AddAction(new Notification.Action.Builder(icon, "Say it", ask).Build());
             manager.Notify(id, builder.Build());
         }
         catch (Exception ex)

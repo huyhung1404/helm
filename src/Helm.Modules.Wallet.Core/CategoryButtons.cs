@@ -6,6 +6,16 @@ public sealed record CategoryButton(string Label, string? CategoryId, string? Ne
 
 public static class CategoryButtons
 {
+    /// <summary>The voice button of the "What was it?" notification, before the categories: opens Ask Helm listening.</summary>
+    public const string SayLabel = "Nói";
+
+    /// <summary>The categories the notification offers beside <see cref="SayLabel"/>: the two likeliest.</summary>
+    public const int NotificationCount = 2;
+
+    /// <summary>The notification's category buttons: the <see cref="NotificationCount"/> likeliest (<see cref="For"/>).</summary>
+    public static IReadOnlyList<CategoryButton> ForNotification(IReadOnlyList<CategoryInfo> suggestions, CategoryProposal? proposal,
+        Func<string, CategoryInfo?> category) => For(suggestions, proposal, category, NotificationCount);
+
     /// <summary>
     /// AI's proposal first (a new category marked "+", created only if tapped; one of the user's even when the history
     /// did not suggest it), then the history's suggestions, at most <paramref name="count"/>.
