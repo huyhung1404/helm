@@ -44,6 +44,9 @@ public sealed partial class TrackerItemViewModel : ObservableObject
     /// <summary>Phone layout: the row's actions show after a tap on the row.</summary>
     [ObservableProperty] private bool _isExpanded;
 
+    /// <summary>AI's proposed steps while they are open for this task (shown under it); null otherwise.</summary>
+    [ObservableProperty] [NotifyPropertyChangedFor(nameof(CanBreakDown))] private TrackerProposalViewModel? _proposal;
+
     internal TrackerItemViewModel(TrackerViewModel owner, string id, TrackerItem item, TrackerWorkspace workspace, DateOnly today)
     {
         _owner = owner;
@@ -92,6 +95,9 @@ public sealed partial class TrackerItemViewModel : ObservableObject
     public int Completions { get; internal set; }
 
     public bool CanHaveSubtasks => !Item.IsSubtask;
+
+    /// <summary>"Split into steps" is offered: an open task (not a subtask), AI set up, no proposals open for it.</summary>
+    public bool CanBreakDown => _owner.CanBreakDown && !Item.IsSubtask && !Item.IsCompleted && Proposal is null;
 
     public bool HasSubtasks => Subtasks.Count > 0;
 
@@ -199,7 +205,7 @@ public sealed partial class TrackerItemViewModel : ObservableObject
     [RelayCommand]
     private void Start() => _owner.Start(this);
 
-    /// <summary>AI proposes this task's steps (the picker is the page's <see cref="TrackerViewModel.Proposals"/>).</summary>
+    /// <summary>"Split into steps": AI proposes this task's steps (the picker is the page's <see cref="TrackerViewModel.Proposals"/>, shown under the row).</summary>
     [RelayCommand]
     private Task BreakDownAsync() => _owner.BreakDownAsync(this);
 

@@ -44,6 +44,73 @@
             </Setter>
         </Style>
 
+        <!-- "Split into steps": AI's proposed steps under the task; the ones kept become its checklist (subtasks) -->
+        <DataTemplate x:Key="StepsProposal" DataType="{x:Type local:TrackerProposalViewModel}">
+            <Border Style="{DynamicResource HelmSurface}" Margin="32,6,0,8" Padding="12,10">
+                <StackPanel>
+                    <!-- Asking: placeholder lines, and where it runs -->
+                    <StackPanel Visibility="{Binding IsBusy, Converter={StaticResource BoolToVisibility}}" AutomationProperties.Name="Asking AI for steps">
+                        <Border Style="{DynamicResource HelmShimmerLine}" Width="280" />
+                        <Border Style="{DynamicResource HelmShimmerLine}" Width="220" />
+                        <Border Style="{DynamicResource HelmShimmerLine}" Width="250" />
+                        <TextBlock Text="{Binding Status}" Style="{DynamicResource HelmSecondaryText}" />
+                    </StackPanel>
+
+                    <!-- The steps to pick from, each one editable -->
+                    <StackPanel Visibility="{Binding IsProposing, Converter={StaticResource BoolToVisibility}}">
+                        <StackPanel Orientation="Horizontal" Margin="0,0,0,6">
+                            <ui:SymbolIcon Symbol="Sparkle24" FontSize="16" Margin="0,0,6,0" Foreground="{DynamicResource AccentTextFillColorPrimaryBrush}" VerticalAlignment="Center" />
+                            <TextBlock Text="Proposed steps" FontWeight="SemiBold" VerticalAlignment="Center" />
+                            <TextBlock Text="{Binding TickedText}" Style="{DynamicResource HelmSecondaryText}" Margin="10,0,0,0" VerticalAlignment="Center" />
+                        </StackPanel>
+                        <ItemsControl ItemsSource="{Binding Choices}" Focusable="False">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate DataType="{x:Type local:TaskProposalChoice}">
+                                    <DockPanel Margin="0,2">
+                                        <CheckBox DockPanel.Dock="Left" MinWidth="0" VerticalAlignment="Center" IsChecked="{Binding Keep}" AutomationProperties.Name="Keep this step" />
+                                        <Border DockPanel.Dock="Right" CornerRadius="4" Padding="6,1" Margin="8,0,0,0" VerticalAlignment="Center"
+                                                Background="{DynamicResource ControlFillColorSecondaryBrush}" Visibility="{Binding HasDue, Converter={StaticResource BoolToVisibility}}">
+                                            <TextBlock Text="{Binding DueText}" FontSize="12" />
+                                        </Border>
+                                        <ui:TextBox Text="{Binding Title, UpdateSourceTrigger=PropertyChanged}" ClearButtonEnabled="False" AutomationProperties.Name="Step" />
+                                    </DockPanel>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                        <CheckBox Margin="0,8,0,0" Content="{Binding SpreadText}" IsChecked="{Binding SpreadDates}"
+                                  ToolTip="Each step gets a due day, spread evenly from tomorrow until the task is due"
+                                  Visibility="{Binding CanSpread, Converter={StaticResource BoolToVisibility}}" />
+                        <TextBlock Text="{Binding Status}" Style="{DynamicResource HelmSecondaryText}" Margin="0,6,0,0" />
+                        <WrapPanel HorizontalAlignment="Right" Margin="0,8,0,0">
+                            <ui:Button Margin="0,0,8,0" Content="Cancel" Command="{Binding CloseCommand}" />
+                            <ui:Button Margin="0,0,8,0" Content="Try again" Icon="{ui:SymbolIcon ArrowClockwise24}" Command="{Binding RetryCommand}" />
+                            <ui:Button Appearance="Primary" Content="{Binding AddText}" Icon="{ui:SymbolIcon Add24}" Command="{Binding AddCommand}" />
+                        </WrapPanel>
+                    </StackPanel>
+
+                    <!-- A problem, or nothing to propose -->
+                    <DockPanel Visibility="{Binding IsStuck, Converter={StaticResource BoolToVisibility}}">
+                        <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center">
+                            <ui:Button Margin="8,0,0,0" Content="Try again" Icon="{ui:SymbolIcon ArrowClockwise24}" Command="{Binding RetryCommand}" />
+                            <ui:Button Margin="8,0,0,0" Content="Cancel" Command="{Binding CloseCommand}" />
+                        </StackPanel>
+                        <TextBlock Text="{Binding Status}" TextWrapping="Wrap" VerticalAlignment="Center" />
+                    </DockPanel>
+
+                    <!-- Added: the steps are the checklist above; Undo takes them back -->
+                    <DockPanel Visibility="{Binding CanUndo, Converter={StaticResource BoolToVisibility}}">
+                        <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center">
+                            <ui:Button Margin="8,0,0,0" Content="Undo" Icon="{ui:SymbolIcon ArrowUndo24}" Command="{Binding UndoCommand}" />
+                            <ui:Button Margin="8,0,0,0" Content="Done" Command="{Binding CloseCommand}" />
+                        </StackPanel>
+                        <ui:SymbolIcon DockPanel.Dock="Left" Symbol="CheckmarkCircle24" FontSize="16" Margin="0,0,8,0" VerticalAlignment="Center"
+                                       Foreground="{DynamicResource AccentTextFillColorPrimaryBrush}" />
+                        <TextBlock Text="{Binding Status}" TextWrapping="Wrap" VerticalAlignment="Center" />
+                    </DockPanel>
+                </StackPanel>
+            </Border>
+        </DataTemplate>
+
         <DataTemplate x:Key="ItemRow" DataType="{x:Type local:TrackerItemViewModel}">
             <Border BorderThickness="0,0,0,1" BorderBrush="{DynamicResource CardStrokeColorDefaultBrush}">
                 <StackPanel Margin="12,6">
@@ -128,6 +195,9 @@
                                        Visibility="{Binding IsOpen, Converter={StaticResource BoolToVisibility}}" />
                             <ui:Button Style="{StaticResource RowAction}" Icon="{ui:SymbolIcon TaskListAdd24}" ToolTip="Add a subtask" AutomationProperties.Name="Add a subtask"
                                        Command="{Binding ToggleExpandedCommand}" Visibility="{Binding CanHaveSubtasks, Converter={StaticResource BoolToVisibility}}" />
+                            <ui:Button Style="{StaticResource RowAction}" Icon="{ui:SymbolIcon Sparkle24}" ToolTip="Split into steps: AI proposes them, the ones you keep become its checklist"
+                                       AutomationProperties.Name="Split into steps"
+                                       Command="{Binding BreakDownCommand}" Visibility="{Binding CanBreakDown, Converter={StaticResource BoolToVisibility}}" />
                             <ui:Button Style="{StaticResource RowAction}" Icon="{ui:SymbolIcon Link24}" ToolTip="Link a note, or write a new one" AutomationProperties.Name="Link a note"
                                        Command="{Binding Links.StartPickingCommand}" Visibility="{Binding Links, Converter={StaticResource NotEmptyToVisibility}}" />
                             <ui:Button Style="{StaticResource RowAction}" Icon="{ui:SymbolIcon Edit24}" ToolTip="Edit" AutomationProperties.Name="Edit" Command="{Binding BeginEditCommand}" />
@@ -168,6 +238,9 @@
                             </ui:TextBox.InputBindings>
                         </ui:TextBox>
                     </DockPanel>
+
+                    <!-- Split into steps: shown while AI's proposals are open for this task -->
+                    <ContentControl Content="{Binding Proposal}" ContentTemplate="{StaticResource StepsProposal}" Focusable="False" />
 
                     <!-- Inline editor -->
                     <StackPanel Margin="32,8,0,6" Visibility="{Binding IsEditing, Converter={StaticResource BoolToVisibility}}">
