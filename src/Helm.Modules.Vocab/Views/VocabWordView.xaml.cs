@@ -8,6 +8,8 @@ public partial class VocabWordView : UserControl
 {
     public VocabWordView() => InitializeComponent();
 
-    /// <summary>Delete… asks first (the page's confirmation).</summary>
-    private void Delete_Click(object sender, RoutedEventArgs e) => (DataContext as VocabViewModel)?.DeleteWordCommand.Execute(null);
+    /// <summary>Delete… was chosen: the page asks first, in its own dialog.</summary>
+    public event EventHandler? DeleteAsked;
+
+    private void Delete_Click(object sender, RoutedEventArgs e) => DeleteAsked?.Invoke(this, EventArgs.Empty);
 }

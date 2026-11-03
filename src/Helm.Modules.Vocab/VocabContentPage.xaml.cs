@@ -31,6 +31,7 @@ public partial class VocabContentPage : Page
         _viewModel = viewModel;
         _navigation = navigation;
         DataContext = viewModel;
+        VocabPalette.Ensure();
         InitializeComponent();
         // Module and page are both singletons, so the subscriptions live as long as the page.
         module.PropertyChanged += OnModuleChanged;
@@ -41,6 +42,9 @@ public partial class VocabContentPage : Page
         // A new page starts at the top of its list.
         viewModel.List.Pages.Turned += (_, _) => Dispatcher.BeginInvoke(() => WordsView.WordsList.BringIntoView(new Rect(0, 0, 1, 1)));
         viewModel.Roots.Pages.Turned += (_, _) => Dispatcher.BeginInvoke(() => RootsView.RootsPanel.BringIntoView(new Rect(0, 0, 1, 1)));
+        // Delete… asks over the page; the keys come back once it closes.
+        WordView.DeleteAsked += (_, _) => DeleteDialog.Open();
+        DeleteDialog.Closed += (_, _) => Dispatcher.BeginInvoke(RestoreFocus);
         PreviewKeyDown += OnPreviewKeyDown;
         Loaded += (_, _) => FocusLearn();
         WatchDetail(viewModel.Detail);
@@ -178,13 +182,15 @@ public partial class VocabContentPage : Page
     }
 
     private bool IsDialogOpen =>
-        _viewModel.IsAddOpen || _viewModel.IsAgentOpen || _viewModel.Texts.IsOpen || _viewModel.Detail is { Editor.IsOpen: true } or { IsAskingRedo: true };
+        _viewModel.IsAddOpen || _viewModel.IsAgentOpen || _viewModel.Texts.IsOpen || DeleteDialog.IsOpen
+        || _viewModel.Detail is { Editor.IsOpen: true } or { IsAskingRedo: true };
 
     /// <summary>Esc: the dialog in front closes (an edit is dropped, unsaved).</summary>
     private bool CloseDialog()
     {
         var vm = _viewModel;
-        if (vm.Detail is { Editor.IsOpen: true } edited) edited.Editor.CancelCommand.Execute(null);
+        if (DeleteDialog.IsOpen) DeleteDialog.Close();
+        else if (vm.Detail is { Editor.IsOpen: true } edited) edited.Editor.CancelCommand.Execute(null);
         else if (vm.Detail is { IsAskingRedo: true } redo) redo.BeginRedoCommand.Execute(null);
         else if (vm.Texts.IsOpen && vm.Texts.IsDetailOpen) vm.Texts.BackCommand.Execute(null);
         else if (vm.Texts.IsOpen) vm.Texts.CloseCommand.Execute(null);

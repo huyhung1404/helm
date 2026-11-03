@@ -93,8 +93,8 @@ public sealed class VocabViewsTests : IDisposable
         Assert.True(viewModel.Agent.HasLog);
         Assert.True(Shows(page, "Activity"));
         Layout(page, size, "03b-analysis-log");
-        Assert.True(Shows(page, "Waiting for Claude Code"));
-        Assert.True(Shows(page, viewModel.AgentWorkText));
+        Assert.True(Shows(page, "Waiting to be broken down (1)"));
+        Assert.True(Shows(page, "ubiquitous"));
         viewModel.CloseAgentCommand.Execute(null);
 
         // The rich answer: the tree beside examples, collocations, mnemonic, words easy to mix up; Forgot / Remembered below.
@@ -103,7 +103,7 @@ public sealed class VocabViewsTests : IDisposable
         Layout(page, size, "04-learn-revealed");
         Assert.True(Shows(page, "How it's built"));
         // A narrower window: the side panel folds into a line above the card, the tree goes above what helps.
-        Layout(page, new Size(820, 900), "04b-learn-revealed-narrow");
+        Layout(page, new Size(640, 900), "04b-learn-revealed-narrow");
         Assert.Equal(Visibility.Visible, page.LearnView.NarrowBar.Visibility);
         Assert.Equal(Visibility.Collapsed, page.LearnView.SidePanel.Visibility);
         Assert.Equal(1, Grid.GetRow(page.LearnView.InfoPart));
@@ -247,9 +247,14 @@ public sealed class VocabViewsTests : IDisposable
         Assert.True(viewModel.IsLearning);
         Assert.NotNull(viewModel.Detail);
 
-        // Delete asks first, then the word goes.
+        // Delete… asks first, over the page; Delete there, and the word goes.
         viewModel.Open(relative.Id);
-        viewModel.DeleteWordCommand.Execute(null);
+        page.DeleteDialog.Open();
+        Layout(page, size, "12b-delete");
+        Assert.True(Shows(page, "Delete “relative”?"));
+        Descendants(page.DeleteDialog).OfType<Button>().Single(b => Equals(b.Content, "Delete"))
+            .RaiseEvent(new RoutedEventArgs(System.Windows.Controls.Primitives.ButtonBase.ClickEvent));
+        Assert.False(page.DeleteDialog.IsOpen);
         Assert.Null(store.FindWord("relative"));
         Assert.False(viewModel.HasDetail);
 
@@ -311,6 +316,186 @@ public sealed class VocabViewsTests : IDisposable
         Layout(zhWindow, new Size(392, 900), "24-popup-full");
         zhWindow.Close();
     });
+
+    /// <summary>
+    /// The design canvas's states (Main.dc.html at 1280 × 960, the word page also at 1060 and 1010, the width the page
+    /// gets in a 1060 px window, and in the light theme): nothing on the word page is wider than the page.
+    /// </summary>
+    [Fact]
+    public void The_page_lays_out_the_canvas_states_without_clipping() => RunSta(() =>
+    {
+        System.Threading.SynchronizationContext.SetSynchronizationContext(new System.Windows.Threading.DispatcherSynchronizationContext());
+        using var settings = new SettingsStoreFactory(new HelmPaths(_dir.Path));
+        var store = new VocabStore(new MemorySynced<VocabWord>(), new MemorySynced<VocabPart>(), new MemorySyncedLog<VocabReview>());
+        Seed(store);
+        SeedCanvas(store);
+        var quiz = new VocabQuiz(store, new Random(1));
+        var viewModel = VocabKit.ViewModel(store, quiz, settings);
+        var windows = new WindowService(NullLogger<WindowService>.Instance);
+        var popup = new VocabPopup(store, quiz, settings, windows, new UserActivity(), new InlineUi(), new NoServices(), new VocabVoice(null, null), NullLogger<VocabPopup>.Instance);
+        var page = new VocabContentPage(new VocabModule(popup, viewModel.Agent) { IsEnabled = true }, viewModel, new NoNavigation());
+        var size = new Size(1280, 960);
+        var relative = store.FindWord("relative")!;
+        var buJiu = store.FindWord("补救")!;
+
+        // Learn: the front, the answer with a part picked, a pinyin card typed with its tones slipped.
+        viewModel.Card.Show(relative.Id, relative.Value);
+        Layout(page, size, "c01-learn");
+        viewModel.Card.RevealCommand.Execute(null);
+        viewModel.Card.ExplanationTree!.Root.Children[0].Children[1].SelectCommand.Execute(null);
+        Layout(page, size, "c02-revealed");
+        Layout(page, new Size(1060, 960), "c02b-revealed-1060");
+        Assert.Equal(Visibility.Visible, page.LearnView.SidePanel.Visibility);
+        viewModel.Settings.TypePinyin = true;
+        viewModel.Card.Show(buJiu.Id, buJiu.Value);
+        Layout(page, size, "c03a-pinyin-front");
+        Assert.True(Shows(page, "No tones is fine; tones typed are checked."));
+        viewModel.Card.Typed = "bu3jiu2";
+        viewModel.Card.CheckCommand.Execute(null);
+        Layout(page, size, "c03-pinyin");
+        Assert.True(Shows(page, "Pinyin “bu3jiu2”: " + viewModel.Card.PinyinVerdictText));
+
+        // Words, a word's page (at the canvas's width, Anh's window and the page it leaves), the Chinese word's.
+        viewModel.ShowWordsCommand.Execute(null);
+        Layout(page, size, "c04-words");
+        viewModel.Open(relative.Id);
+        viewModel.Detail!.Root.Children[0].Children[1].SelectCommand.Execute(null);
+        foreach (var (width, name) in new[] { (1280.0, "c05-word"), (1060.0, "c05b-word-1060"), (1010.0, "c05c-word-1010") })
+        {
+            Layout(page, new Size(width, 960), name);
+            Assert.True(page.WordView.DetailPanel.ActualWidth <= width - 64, $"{name}: the word page is wider than the page");
+        }
+        Assert.True(Shows(page, "To remember it"));
+        viewModel.Open(buJiu.Id);
+        Layout(page, size, "c06-word-chinese");
+
+        // The dialogs: Edit, Add words, Analysis, Ask for a new analysis, Delete.
+        viewModel.Open(relative.Id);
+        viewModel.Detail!.Editor.BeginCommand.Execute(null);
+        Layout(page, size, "c07-edit");
+        Assert.True(Shows(page, "Aptis"));
+        viewModel.Detail.Editor.CancelCommand.Execute(null);
+        viewModel.OpenAddCommand.Execute(null);
+        viewModel.NewWord = "vulnerable";
+        Layout(page, size, "c08-add");
+        viewModel.CloseAddCommand.Execute(null);
+        viewModel.OpenAgentCommand.Execute(null);
+        Layout(page, size, "c09-agent");
+        viewModel.CloseAgentCommand.Execute(null);
+        viewModel.Detail!.BeginRedoCommand.Execute(null);
+        Layout(page, size, "c10-redo");
+        viewModel.Detail.BeginRedoCommand.Execute(null);
+        page.DeleteDialog.Open();
+        Layout(page, size, "c11-delete");
+        page.DeleteDialog.Close();
+
+        // Roots, a family, a root practised.
+        viewModel.ShowRootsCommand.Execute(null);
+        Layout(page, size, "c12-roots");
+        viewModel.Roots.Roots.First(r => r.Form == "lat").Select.Execute(null);
+        Layout(page, size, "c13-family");
+        viewModel.Roots.CloseSelectedCommand.Execute(null);
+        viewModel.Roots.NextRootCommand.Execute(null);
+        viewModel.Roots.RevealRootCommand.Execute(null);
+        Layout(page, size, "c14-practice");
+        viewModel.Roots.ClosePracticeCommand.Execute(null);
+
+        // The light theme: the palette follows (a page built in it: one off-screen is not told of the change).
+        viewModel.Open(relative.Id);
+        Wpf.Ui.Appearance.ApplicationThemeManager.Apply(Wpf.Ui.Appearance.ApplicationTheme.Light, updateAccent: false);
+        try
+        {
+            VocabPalette.Ensure();
+            Assert.Equal(System.Windows.Media.Color.FromRgb(0xF5, 0xF5, 0xF5), ((System.Windows.Media.SolidColorBrush)Application.Current.FindResource("VocabInset")).Color);
+            var light = new VocabContentPage(new VocabModule(popup, viewModel.Agent) { IsEnabled = true }, viewModel, new NoNavigation());
+            Layout(light, size, "c15-word-light");
+        }
+        finally
+        {
+            Wpf.Ui.Appearance.ApplicationThemeManager.Apply(Wpf.Ui.Appearance.ApplicationTheme.Dark, updateAccent: false);
+            VocabPalette.Ensure();
+        }
+        Assert.Equal(System.Windows.Media.Color.FromRgb(0x32, 0x32, 0x32), ((System.Windows.Media.SolidColorBrush)Application.Current.FindResource("VocabInset")).Color);
+
+        // The pop-up card: the pinyin asked, typed (tones slipped), an English word, Full details.
+        var zh = new VocabCardViewModel(store, quiz, options: () => new VocabCardOptions(VocabCardMode.WordToMeaning, false, TypePinyin: true));
+        zh.Show(buJiu.Id, buJiu.Value);
+        var zhWindow = new VocabPopupWindow(zh, windows, opacity: 1);
+        Layout(zhWindow, new Size(352, 320), "c20-popup-pinyin");
+        zh.Typed = "bu3jiu2";
+        zh.CheckCommand.Execute(null);
+        Layout(zhWindow, new Size(352, 560), "c21-popup-typed");
+        zhWindow.ToggleFull();
+        Layout(zhWindow, new Size(352, 900), "c23-popup-full");
+        Assert.True(Shows(zhWindow, "To remember it"));
+        zhWindow.Close();
+        var card = new VocabCardViewModel(store, quiz);
+        card.Show(relative.Id, relative.Value);
+        var window = new VocabPopupWindow(card, windows, opacity: 1);
+        Layout(window, new Size(352, 240), "c22-popup-word");
+        window.Close();
+    });
+
+    /// <summary>The canvas's own data on top of <see cref="Seed"/>: relative's whole page, 补救's pinyin hook and slips, more words and tags.</summary>
+    private static void SeedCanvas(VocabStore store)
+    {
+        var relative = store.FindWord("relative")!;
+        store.UpdateWord(relative.Id, w => w with
+        {
+            Meaning = "người thân, họ hàng; tương đối",
+            Explanation = "relate (liên quan) + -ive (có tính chất) → “có liên quan”: người có quan hệ ruột thịt với mình, hoặc xét trong tương quan.",
+            Note = "Aptis reading, part 2",
+            PartOfSpeech = "noun, adjective",
+            Topic = "Family",
+            Tags = ["Aptis"],
+            Examples =
+            [
+                new VocabExample { Sentence = "All my relatives came to the wedding.", Translation = "Tất cả họ hàng của tôi đều đến dự đám cưới." },
+                new VocabExample { Sentence = "Prices here are relatively low.", Translation = "Giá ở đây tương đối thấp." },
+            ],
+            Collocations = ["close relative", "distant relative", "relative to"],
+            Mnemonic = "RE + LAT: những người “mang” (lat) chung dòng máu, Tết nào cũng gặp lại (re-).",
+            Confusables = [new VocabConfusable { Word = "relevant", Note = "liên quan đến việc đang bàn, không phải người thân" }],
+            Synonyms = ["kin", "family member"],
+            Antonyms = ["absolute (adj.)"],
+        });
+        for (var i = 0; i < 3; i++) store.Record(relative.Id, remembered: true);
+        var buJiu = store.FindWord("补救")!;
+        store.UpdateWord(buJiu.Id, w => w with
+        {
+            Meaning = "cứu vãn, bù đắp (sai sót)",
+            Level = "HSK6",
+            PartOfSpeech = "verb",
+            Topic = "Work",
+            Examples =
+            [
+                new VocabExample { Sentence = "现在补救还来得及。", Translation = "Bây giờ cứu vãn vẫn còn kịp." },
+                new VocabExample { Sentence = "我们必须采取补救措施。", Translation = "Chúng ta phải có biện pháp khắc phục." },
+            ],
+            Collocations = ["补救措施", "无法补救"],
+            Mnemonic = "补: áo (衤) rách thì vá. 救: cầm gậy (攵) đi cứu.",
+            PinyinMnemonic = "补 mượn âm của 卜 bǔ, 救 mượn vần của 求 qiú → bǔ jiù. Thanh 3 rồi 4: “bủ?” hỏi xuống rồi lên, rồi “cứu!” dứt khoát đi xuống.",
+            Confusables = [new VocabConfusable { Word = "挽回", Note = "lấy lại thứ đã mất (danh dự, khách hàng); 补救 là sửa sai sót" }],
+            Synonyms = ["挽回", "弥补"],
+        });
+        for (var i = 0; i < VocabQuiz.PinyinSlips; i++) store.Record(buJiu.Id, remembered: true, pinyinSlip: true);
+        var (reluctant, _) = store.AddWord("reluctant");
+        store.SaveAnalysis(reluctant, new WordAnalysis
+        {
+            Phonetic = "/rɪˈlʌk.tənt/",
+            Meaning = "miễn cưỡng, ngần ngại",
+            Level = "B2",
+            Examples = [new VocabExample { Sentence = "She was reluctant to admit her mistake.", Translation = "Cô ấy ngần ngại thừa nhận lỗi của mình." }],
+            Parts =
+            [
+                new AnalysisPart { Form = "re-", Kind = VocabPartKind.Prefix, Meaning = "lại, trở lại" },
+                new AnalysisPart { Form = "luct", Kind = VocabPartKind.Root, Meaning = "vật lộn" },
+                new AnalysisPart { Form = "-ant", Kind = VocabPartKind.Suffix, Meaning = "đang…" },
+            ],
+        });
+        for (var i = 0; i < VocabQuiz.HardForgets; i++) store.Record(reluctant, remembered: false);
+        store.AddWord("vulnerable", "Novel, chapter 12");
+    }
 
     private static void Seed(VocabStore store)
     {

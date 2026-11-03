@@ -2,51 +2,97 @@
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     xmlns:sys="clr-namespace:System;assembly=mscorlib"
-    xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml">
+    xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
+    xmlns:pc="clr-namespace:Helm.Modules.Vocab">
 
-    <!-- Vocabulary's small building blocks: tags, key caps, chips, the segmented tabs, the level dots, dialogs. Colours
-         are the theme's, except the pinyin's purple: tone 4's colour (ToneText), readable on both themes. -->
-    <SolidColorBrush x:Key="PinyinBrush" Color="#AB47BC" />
-    <SolidColorBrush x:Key="PinyinFill" Color="#1AAB47BC" />
-    <SolidColorBrush x:Key="PinyinStroke" Color="#66AB47BC" />
+    <!-- Vocabulary's small building blocks, one per class of the design canvas (Main.dc.html): .btn and its kinds,
+         .icon-btn, .tag, .kbd, .pill, .seg, .chip, .card, .part, .hook, .memo, .lbar, the dialogs. Sizes are the
+         canvas's; colours are the theme's where it has them, else the palette's (VocabPaletteDark/Light.xaml). -->
+    <pc:TextFormat x:Key="TextFormat" />
+    <pc:UpperCase x:Key="UpperCase" />
 
-    <!-- A small label next to a word: a level, the kind of card, a flag -->
+    <!-- ===== Text ===== -->
+    <!-- .hint: quieter text, 12 px -->
+    <Style x:Key="Hint" TargetType="TextBlock">
+        <Setter Property="FontSize" Value="12" />
+        <Setter Property="Foreground" Value="{DynamicResource TextFillColorSecondaryBrush}" />
+        <Setter Property="TextWrapping" Value="Wrap" />
+    </Style>
+    <!-- .lbl: a small label ("Also in your words", a field's name) -->
+    <Style x:Key="Lbl" TargetType="TextBlock">
+        <Setter Property="FontSize" Value="12" />
+        <Setter Property="FontWeight" Value="SemiBold" />
+        <Setter Property="Foreground" Value="{DynamicResource TextFillColorSecondaryBrush}" />
+    </Style>
+    <!-- .sh: a section's small title inside a card ("How it's built", "Examples") -->
+    <Style x:Key="SectionTitle" TargetType="TextBlock">
+        <Setter Property="FontSize" Value="13" />
+        <Setter Property="FontWeight" Value="SemiBold" />
+        <Setter Property="Margin" Value="0,0,0,8" />
+        <Setter Property="Foreground" Value="{DynamicResource TextFillColorSecondaryBrush}" />
+    </Style>
+    <!-- .ct: a card's title ("Today", "How it's built" on a word's page) -->
+    <Style x:Key="CardTitle" TargetType="TextBlock">
+        <Setter Property="FontSize" Value="15" />
+        <Setter Property="FontWeight" Value="SemiBold" />
+        <Setter Property="Margin" Value="0,0,0,8" />
+    </Style>
+    <!-- .field > label: a field's name in a dialog, 6 px above its box -->
+    <Style x:Key="FieldLabel" TargetType="TextBlock" BasedOn="{StaticResource Lbl}">
+        <Setter Property="Margin" Value="0,0,0,6" />
+    </Style>
+    <!-- .grp > h3: a group's title in a dialog ("The word", "Waiting to be broken down") -->
+    <Style x:Key="GroupTitle" TargetType="TextBlock">
+        <Setter Property="FontSize" Value="14" />
+        <Setter Property="FontWeight" Value="SemiBold" />
+        <Setter Property="Margin" Value="0,0,0,12" />
+    </Style>
+
+    <!-- ===== Tags, key caps, pills ===== -->
+    <!-- .tag: a small label next to a word (a level, the kind of card, a flag) -->
     <Style x:Key="Tag" TargetType="Border">
         <Setter Property="CornerRadius" Value="4" />
-        <Setter Property="Padding" Value="7,1" />
-        <Setter Property="MinHeight" Value="20" />
+        <Setter Property="Padding" Value="7,0" />
+        <Setter Property="Height" Value="20" />
         <Setter Property="VerticalAlignment" Value="Center" />
-        <Setter Property="Background" Value="{DynamicResource ControlFillColorSecondaryBrush}" />
+        <Setter Property="Background" Value="{DynamicResource VocabTag}" />
         <Setter Property="TextElement.FontSize" Value="11" />
         <Setter Property="TextElement.FontWeight" Value="SemiBold" />
-        <Setter Property="TextElement.Foreground" Value="{DynamicResource TextFillColorPrimaryBrush}" />
+        <Setter Property="TextElement.Foreground" Value="{DynamicResource VocabTagText}" />
+        <Style.Resources>
+            <Style TargetType="TextBlock">
+                <Setter Property="VerticalAlignment" Value="Center" />
+            </Style>
+        </Style.Resources>
     </Style>
     <Style x:Key="AccentTag" TargetType="Border" BasedOn="{StaticResource Tag}">
-        <Setter Property="TextElement.Foreground" Value="{DynamicResource AccentTextFillColorPrimaryBrush}" />
+        <Setter Property="Background" Value="{DynamicResource VocabAccentFill}" />
+        <Setter Property="TextElement.Foreground" Value="{DynamicResource VocabAccentText}" />
     </Style>
     <Style x:Key="WarnTag" TargetType="Border" BasedOn="{StaticResource Tag}">
-        <Setter Property="TextElement.Foreground" Value="{DynamicResource SystemFillColorCautionBrush}" />
+        <Setter Property="Background" Value="{DynamicResource VocabWarnFill}" />
+        <Setter Property="TextElement.Foreground" Value="{DynamicResource VocabWarnText}" />
     </Style>
     <Style x:Key="PinyinTag" TargetType="Border" BasedOn="{StaticResource Tag}">
-        <Setter Property="Background" Value="{StaticResource PinyinFill}" />
-        <Setter Property="TextElement.Foreground" Value="{StaticResource PinyinBrush}" />
+        <Setter Property="Background" Value="{DynamicResource VocabPinyinFill}" />
+        <Setter Property="TextElement.Foreground" Value="{DynamicResource VocabPinyinText}" />
     </Style>
-    <!-- Hidden from the cards: an outline only -->
+    <!-- .tag.mute: hidden from the cards, an outline only -->
     <Style x:Key="MuteTag" TargetType="Border" BasedOn="{StaticResource Tag}">
         <Setter Property="Background" Value="Transparent" />
         <Setter Property="BorderThickness" Value="1" />
-        <Setter Property="BorderBrush" Value="{DynamicResource ControlStrokeColorDefaultBrush}" />
+        <Setter Property="BorderBrush" Value="{DynamicResource VocabMuteStroke}" />
         <Setter Property="TextElement.Foreground" Value="{DynamicResource TextFillColorSecondaryBrush}" />
     </Style>
-    <!-- The user's own tags -->
+    <!-- .tag.user: the user's own tags -->
     <Style x:Key="UserTag" TargetType="Border" BasedOn="{StaticResource Tag}">
         <Setter Property="Background" Value="Transparent" />
         <Setter Property="BorderThickness" Value="1" />
-        <Setter Property="BorderBrush" Value="{DynamicResource AccentTextFillColorPrimaryBrush}" />
-        <Setter Property="TextElement.Foreground" Value="{DynamicResource AccentTextFillColorPrimaryBrush}" />
+        <Setter Property="BorderBrush" Value="{DynamicResource VocabUserStroke}" />
+        <Setter Property="TextElement.Foreground" Value="{DynamicResource VocabAccentText}" />
     </Style>
 
-    <!-- A key cap ("Space", "1"), in the colour of the text around it -->
+    <!-- .kbd: a key cap ("Space", "1") 8 px after the text before it -->
     <Style x:Key="Kbd" TargetType="Border">
         <Setter Property="CornerRadius" Value="3" />
         <Setter Property="BorderThickness" Value="1" />
@@ -54,43 +100,208 @@
         <Setter Property="MinWidth" Value="20" />
         <Setter Property="Height" Value="18" />
         <Setter Property="Margin" Value="8,0,0,0" />
-        <Setter Property="Opacity" Value="0.75" />
         <Setter Property="VerticalAlignment" Value="Center" />
-        <Setter Property="BorderBrush" Value="{Binding (TextElement.Foreground), RelativeSource={RelativeSource Self}}" />
+        <Setter Property="BorderBrush" Value="{DynamicResource VocabKbdStroke}" />
         <Setter Property="TextElement.FontSize" Value="11" />
         <Setter Property="TextElement.FontWeight" Value="SemiBold" />
+        <Setter Property="TextElement.Foreground" Value="{DynamicResource TextFillColorSecondaryBrush}" />
+        <Style.Resources>
+            <Style TargetType="TextBlock">
+                <Setter Property="VerticalAlignment" Value="Center" />
+                <Setter Property="HorizontalAlignment" Value="Center" />
+            </Style>
+        </Style.Resources>
+    </Style>
+    <!-- .btn.primary .kbd: on the accent fill -->
+    <Style x:Key="AccentKbd" TargetType="Border" BasedOn="{StaticResource Kbd}">
+        <Setter Property="BorderBrush" Value="{DynamicResource VocabKbdOnAccentStroke}" />
+        <Setter Property="TextElement.Foreground" Value="{DynamicResource VocabOnAccentSoft}" />
     </Style>
 
-    <!-- A count beside a tab's name; the Learn tab's is filled -->
+    <!-- .pill: a count beside a tab's name, 6 px after it; the Learn tab's is filled -->
     <Style x:Key="Pill" TargetType="Border">
         <Setter Property="CornerRadius" Value="10" />
         <Setter Property="Padding" Value="7,0" />
         <Setter Property="MinWidth" Value="22" />
         <Setter Property="Height" Value="20" />
-        <Setter Property="Margin" Value="8,0,0,0" />
+        <Setter Property="Margin" Value="6,0,0,0" />
         <Setter Property="VerticalAlignment" Value="Center" />
-        <Setter Property="Background" Value="{DynamicResource ControlFillColorSecondaryBrush}" />
+        <Setter Property="Background" Value="{DynamicResource VocabPill}" />
         <Setter Property="TextElement.FontSize" Value="12" />
         <Setter Property="TextElement.FontWeight" Value="SemiBold" />
-        <Setter Property="TextElement.Foreground" Value="{DynamicResource TextFillColorPrimaryBrush}" />
+        <Setter Property="TextElement.Foreground" Value="{DynamicResource VocabTagText}" />
+        <Style.Resources>
+            <Style TargetType="TextBlock">
+                <Setter Property="VerticalAlignment" Value="Center" />
+                <Setter Property="HorizontalAlignment" Value="Center" />
+            </Style>
+        </Style.Resources>
     </Style>
     <Style x:Key="AccentPill" TargetType="Border" BasedOn="{StaticResource Pill}">
         <Setter Property="Background" Value="{DynamicResource AccentFillColorDefaultBrush}" />
         <Setter Property="TextElement.Foreground" Value="{DynamicResource TextOnAccentFillColorPrimaryBrush}" />
     </Style>
 
-    <!-- The frame of a segmented choice (tabs, English / 中文) -->
+    <!-- ===== Buttons ===== -->
+    <!-- .btn: 32 px, a 16 px icon 8 px before its text (pc:ButtonIcon.Symbol) or after it (pc:ButtonIcon.After). The kinds
+         below change only the fill, the hover fill (pc:ButtonIcon.Hover), the stroke and the text. -->
+    <Style x:Key="Btn" TargetType="Button">
+        <Setter Property="Cursor" Value="Hand" />
+        <Setter Property="FocusVisualStyle" Value="{x:Null}" />
+        <Setter Property="Height" Value="32" />
+        <Setter Property="Padding" Value="12,0" />
+        <Setter Property="FontSize" Value="14" />
+        <Setter Property="HorizontalContentAlignment" Value="Center" />
+        <Setter Property="VerticalAlignment" Value="Center" />
+        <Setter Property="Foreground" Value="{DynamicResource TextFillColorPrimaryBrush}" />
+        <Setter Property="Background" Value="{DynamicResource VocabButton}" />
+        <Setter Property="BorderBrush" Value="{DynamicResource VocabButtonStroke}" />
+        <Setter Property="BorderThickness" Value="1" />
+        <Setter Property="pc:ButtonIcon.Hover" Value="{DynamicResource VocabButtonHover}" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="Button">
+                    <Border x:Name="Bd" CornerRadius="4" Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}"
+                            BorderThickness="{TemplateBinding BorderThickness}" Padding="{TemplateBinding Padding}" SnapsToDevicePixels="True">
+                        <StackPanel Orientation="Horizontal" HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}" VerticalAlignment="Center">
+                            <ui:SymbolIcon x:Name="Before" Symbol="{Binding (pc:ButtonIcon.Symbol), RelativeSource={RelativeSource TemplatedParent}}" FontSize="16"
+                                           Margin="0,0,8,0" VerticalAlignment="Center" />
+                            <ContentPresenter VerticalAlignment="Center" RecognizesAccessKey="False" />
+                            <ui:SymbolIcon x:Name="After" Symbol="{Binding (pc:ButtonIcon.After), RelativeSource={RelativeSource TemplatedParent}}" FontSize="16"
+                                           Margin="8,0,0,0" VerticalAlignment="Center" />
+                        </StackPanel>
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="pc:ButtonIcon.Symbol" Value="{x:Static ui:SymbolRegular.Empty}">
+                            <Setter TargetName="Before" Property="Visibility" Value="Collapsed" />
+                        </Trigger>
+                        <Trigger Property="pc:ButtonIcon.After" Value="{x:Static ui:SymbolRegular.Empty}">
+                            <Setter TargetName="After" Property="Visibility" Value="Collapsed" />
+                        </Trigger>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter TargetName="Bd" Property="Background" Value="{Binding (pc:ButtonIcon.Hover), RelativeSource={RelativeSource TemplatedParent}}" />
+                        </Trigger>
+                        <Trigger Property="IsKeyboardFocused" Value="True">
+                            <Setter TargetName="Bd" Property="BorderBrush" Value="{DynamicResource TextFillColorPrimaryBrush}" />
+                        </Trigger>
+                        <Trigger Property="IsEnabled" Value="False">
+                            <Setter TargetName="Bd" Property="Opacity" Value="0.4" />
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+    <!-- .btn.primary -->
+    <Style x:Key="PrimaryBtn" TargetType="Button" BasedOn="{StaticResource Btn}">
+        <Setter Property="FontWeight" Value="SemiBold" />
+        <Setter Property="Foreground" Value="{DynamicResource TextOnAccentFillColorPrimaryBrush}" />
+        <Setter Property="Background" Value="{DynamicResource AccentFillColorDefaultBrush}" />
+        <Setter Property="BorderBrush" Value="Transparent" />
+        <Setter Property="pc:ButtonIcon.Hover" Value="{DynamicResource AccentFillColorSecondaryBrush}" />
+    </Style>
+    <!-- .btn.danger-solid -->
+    <Style x:Key="DangerBtn" TargetType="Button" BasedOn="{StaticResource Btn}">
+        <Setter Property="FontWeight" Value="SemiBold" />
+        <Setter Property="Foreground" Value="White" />
+        <Setter Property="Background" Value="{DynamicResource VocabDanger}" />
+        <Setter Property="BorderBrush" Value="Transparent" />
+        <Setter Property="pc:ButtonIcon.Hover" Value="{DynamicResource VocabDangerHover}" />
+    </Style>
+    <!-- .btn.ghost: no fill, no stroke until pointed at -->
+    <Style x:Key="GhostBtn" TargetType="Button" BasedOn="{StaticResource Btn}">
+        <Setter Property="Background" Value="Transparent" />
+        <Setter Property="BorderBrush" Value="Transparent" />
+        <Setter Property="pc:ButtonIcon.Hover" Value="{DynamicResource VocabGhostHover}" />
+    </Style>
+    <!-- .btn.sm and .btn.ghost.sm: 28 px, 13 px text -->
+    <Style x:Key="SmallBtn" TargetType="Button" BasedOn="{StaticResource Btn}">
+        <Setter Property="Height" Value="28" />
+        <Setter Property="Padding" Value="10,0" />
+        <Setter Property="FontSize" Value="13" />
+    </Style>
+    <Style x:Key="SmallGhostBtn" TargetType="Button" BasedOn="{StaticResource GhostBtn}">
+        <Setter Property="Height" Value="28" />
+        <Setter Property="Padding" Value="10,0" />
+        <Setter Property="FontSize" Value="13" />
+    </Style>
+    <!-- .btn.big: the answer bar's two buttons, 52 px, the verdict over a quieter line -->
+    <Style x:Key="BigBtn" TargetType="Button" BasedOn="{StaticResource Btn}">
+        <Setter Property="Height" Value="52" />
+        <Setter Property="FontSize" Value="15" />
+        <Setter Property="FontWeight" Value="SemiBold" />
+        <Setter Property="HorizontalAlignment" Value="Stretch" />
+    </Style>
+    <Style x:Key="BigPrimaryBtn" TargetType="Button" BasedOn="{StaticResource PrimaryBtn}">
+        <Setter Property="Height" Value="52" />
+        <Setter Property="FontSize" Value="15" />
+        <Setter Property="HorizontalAlignment" Value="Stretch" />
+    </Style>
+    <!-- .btn.primary at 40 px: Show the answer, Next root -->
+    <Style x:Key="TallPrimaryBtn" TargetType="Button" BasedOn="{StaticResource PrimaryBtn}">
+        <Setter Property="Height" Value="40" />
+        <Setter Property="Padding" Value="20,0" />
+    </Style>
+
+    <!-- .icon-btn: 32 px, its symbol alone at the button's font size (18 by default) -->
+    <Style x:Key="IconBtn" TargetType="Button">
+        <Setter Property="Cursor" Value="Hand" />
+        <Setter Property="FocusVisualStyle" Value="{x:Null}" />
+        <Setter Property="Width" Value="32" />
+        <Setter Property="Height" Value="32" />
+        <Setter Property="FontSize" Value="18" />
+        <Setter Property="VerticalAlignment" Value="Center" />
+        <Setter Property="Foreground" Value="{DynamicResource TextFillColorPrimaryBrush}" />
+        <Setter Property="Background" Value="Transparent" />
+        <Setter Property="pc:ButtonIcon.Hover" Value="{DynamicResource VocabIconHover}" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="Button">
+                    <Border x:Name="Bd" CornerRadius="4" Background="{TemplateBinding Background}" BorderThickness="1" BorderBrush="Transparent">
+                        <ui:SymbolIcon Symbol="{Binding (pc:ButtonIcon.Symbol), RelativeSource={RelativeSource TemplatedParent}}" FontSize="{TemplateBinding FontSize}"
+                                       HorizontalAlignment="Center" VerticalAlignment="Center" />
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter TargetName="Bd" Property="Background" Value="{Binding (pc:ButtonIcon.Hover), RelativeSource={RelativeSource TemplatedParent}}" />
+                        </Trigger>
+                        <Trigger Property="IsKeyboardFocused" Value="True">
+                            <Setter TargetName="Bd" Property="BorderBrush" Value="{DynamicResource TextFillColorPrimaryBrush}" />
+                        </Trigger>
+                        <Trigger Property="IsEnabled" Value="False">
+                            <Setter TargetName="Bd" Property="Opacity" Value="0.4" />
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!-- An icon-only WPF-UI button (Add text's dialog keeps these): as .icon-btn -->
+    <Style x:Key="IconButton" TargetType="ui:Button" BasedOn="{StaticResource {x:Type ui:Button}}">
+        <Setter Property="Appearance" Value="Transparent" />
+        <Setter Property="BorderThickness" Value="0" />
+        <Setter Property="Width" Value="32" />
+        <Setter Property="Height" Value="32" />
+        <Setter Property="MinWidth" Value="0" />
+        <Setter Property="Padding" Value="0" />
+        <Setter Property="VerticalAlignment" Value="Center" />
+    </Style>
+
+    <!-- ===== Segmented choices, chips ===== -->
+    <!-- .seg: the frame of a segmented choice (the tabs, English / 中文) -->
     <Style x:Key="SegmentBar" TargetType="Border">
         <Setter Property="Padding" Value="2" />
         <Setter Property="CornerRadius" Value="6" />
         <Setter Property="BorderThickness" Value="1" />
         <Setter Property="HorizontalAlignment" Value="Left" />
         <Setter Property="VerticalAlignment" Value="Center" />
-        <Setter Property="Background" Value="{DynamicResource SolidBackgroundFillColorBaseBrush}" />
-        <Setter Property="BorderBrush" Value="{DynamicResource CardStrokeColorDefaultBrush}" />
+        <Setter Property="Background" Value="{DynamicResource VocabSegment}" />
+        <Setter Property="BorderBrush" Value="{DynamicResource VocabSegmentStroke}" />
     </Style>
 
-    <!-- One choice of a segment bar: filled and underlined while its Tag (bound to "is this one in front") is true -->
+    <!-- .seg button: filled and underlined (2 px, inside) while its Tag (bound to "is this one in front") is true; the
+         icon, text and count 6 px apart -->
     <Style x:Key="SegmentButton" TargetType="Button">
         <Setter Property="Cursor" Value="Hand" />
         <Setter Property="FocusVisualStyle" Value="{x:Null}" />
@@ -102,21 +313,23 @@
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="Button">
-                    <Border x:Name="Bd" Background="Transparent" CornerRadius="4" Padding="{TemplateBinding Padding}" BorderThickness="0,0,0,2" BorderBrush="Transparent">
-                        <ContentPresenter VerticalAlignment="Center" />
-                    </Border>
+                    <Grid>
+                        <Border x:Name="Bd" Background="Transparent" CornerRadius="4" />
+                        <Border x:Name="Line" Height="2" VerticalAlignment="Bottom" Background="Transparent" />
+                        <ContentPresenter Margin="{TemplateBinding Padding}" VerticalAlignment="Center" />
+                    </Grid>
                     <ControlTemplate.Triggers>
                         <Trigger Property="IsMouseOver" Value="True">
-                            <Setter TargetName="Bd" Property="Background" Value="{DynamicResource SubtleFillColorSecondaryBrush}" />
+                            <Setter TargetName="Bd" Property="Background" Value="{DynamicResource VocabSegmentHover}" />
                             <Setter Property="Foreground" Value="{DynamicResource TextFillColorPrimaryBrush}" />
                         </Trigger>
                         <Trigger Property="IsKeyboardFocused" Value="True">
-                            <Setter TargetName="Bd" Property="Background" Value="{DynamicResource SubtleFillColorTertiaryBrush}" />
+                            <Setter TargetName="Bd" Property="Background" Value="{DynamicResource VocabSegmentHover}" />
                         </Trigger>
                         <DataTrigger Binding="{Binding Tag, RelativeSource={RelativeSource Self}}">
                             <DataTrigger.Value><sys:Boolean>True</sys:Boolean></DataTrigger.Value>
-                            <Setter TargetName="Bd" Property="Background" Value="{DynamicResource ControlFillColorDefaultBrush}" />
-                            <Setter TargetName="Bd" Property="BorderBrush" Value="{DynamicResource AccentTextFillColorPrimaryBrush}" />
+                            <Setter TargetName="Bd" Property="Background" Value="{DynamicResource VocabSegmentOn}" />
+                            <Setter TargetName="Line" Property="Background" Value="{DynamicResource AccentFillColorDefaultBrush}" />
                             <Setter Property="Foreground" Value="{DynamicResource TextFillColorPrimaryBrush}" />
                             <Setter Property="FontWeight" Value="SemiBold" />
                         </DataTrigger>
@@ -125,14 +338,14 @@
             </Setter.Value>
         </Setter>
     </Style>
-    <!-- The page's tabs: the same, a size up -->
+    <!-- .seg.tabs button: the page's tabs, a size up -->
     <Style x:Key="TabButton" TargetType="Button" BasedOn="{StaticResource SegmentButton}">
         <Setter Property="Height" Value="34" />
         <Setter Property="Padding" Value="16,0" />
         <Setter Property="FontSize" Value="14" />
     </Style>
 
-    <!-- A filter above the list, as a rounded chip: outlined in the accent colour while on -->
+    <!-- .chip: a filter above the list, 6 px apart; outlined in the accent colour while on -->
     <Style x:Key="ChipButton" TargetType="Button">
         <Setter Property="Cursor" Value="Hand" />
         <Setter Property="FocusVisualStyle" Value="{x:Null}" />
@@ -143,22 +356,21 @@
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="Button">
-                    <Border x:Name="Bd" CornerRadius="15" Padding="12,0" BorderThickness="1" Background="{DynamicResource ControlFillColorDefaultBrush}"
-                            BorderBrush="{DynamicResource ControlStrokeColorDefaultBrush}">
+                    <Border x:Name="Bd" CornerRadius="15" Padding="12,0" BorderThickness="1" Background="{DynamicResource VocabInset}"
+                            BorderBrush="{DynamicResource VocabInsetStroke}">
                         <ContentPresenter VerticalAlignment="Center" />
                     </Border>
                     <ControlTemplate.Triggers>
                         <Trigger Property="IsMouseOver" Value="True">
-                            <Setter TargetName="Bd" Property="Background" Value="{DynamicResource ControlFillColorSecondaryBrush}" />
+                            <Setter TargetName="Bd" Property="Background" Value="{DynamicResource VocabInsetHover}" />
                         </Trigger>
                         <Trigger Property="IsKeyboardFocused" Value="True">
                             <Setter TargetName="Bd" Property="BorderBrush" Value="{DynamicResource TextFillColorPrimaryBrush}" />
                         </Trigger>
                         <DataTrigger Binding="{Binding Tag, RelativeSource={RelativeSource Self}}">
                             <DataTrigger.Value><sys:Boolean>True</sys:Boolean></DataTrigger.Value>
-                            <Setter TargetName="Bd" Property="BorderBrush" Value="{DynamicResource AccentTextFillColorPrimaryBrush}" />
-                            <Setter TargetName="Bd" Property="Background" Value="{DynamicResource SubtleFillColorSecondaryBrush}" />
-                            <Setter Property="FontWeight" Value="SemiBold" />
+                            <Setter TargetName="Bd" Property="BorderBrush" Value="{DynamicResource AccentFillColorDefaultBrush}" />
+                            <Setter TargetName="Bd" Property="Background" Value="{DynamicResource VocabChipOn}" />
                         </DataTrigger>
                     </ControlTemplate.Triggers>
                 </ControlTemplate>
@@ -166,24 +378,13 @@
         </Setter>
     </Style>
 
-    <!-- An icon-only button (⋯, ✕, the gear) -->
-    <Style x:Key="IconButton" TargetType="ui:Button" BasedOn="{StaticResource {x:Type ui:Button}}">
-        <Setter Property="Appearance" Value="Transparent" />
-        <Setter Property="BorderThickness" Value="0" />
-        <Setter Property="Width" Value="32" />
-        <Setter Property="Height" Value="32" />
-        <Setter Property="MinWidth" Value="0" />
-        <Setter Property="Padding" Value="0" />
-        <Setter Property="VerticalAlignment" Value="Center" />
-    </Style>
-
-    <!-- How well a word is known: one dot per level, filled up to the word's -->
+    <!-- ===== Level dots ===== -->
+    <!-- .dots: one 6 px dot per level, 3 px apart, filled up to the word's -->
     <DataTemplate x:Key="Dot" DataType="{x:Type sys:Boolean}">
-        <Ellipse x:Name="D" Width="6" Height="6" Margin="0,0,3,0" Fill="{DynamicResource TextFillColorTertiaryBrush}" Opacity="0.35" />
+        <Ellipse x:Name="D" Width="6" Height="6" Margin="0,0,3,0" Fill="{DynamicResource VocabMuteStroke}" />
         <DataTemplate.Triggers>
             <DataTrigger Binding="{Binding}" Value="True">
-                <Setter TargetName="D" Property="Fill" Value="{DynamicResource AccentTextFillColorPrimaryBrush}" />
-                <Setter TargetName="D" Property="Opacity" Value="1" />
+                <Setter TargetName="D" Property="Fill" Value="{DynamicResource AccentFillColorDefaultBrush}" />
             </DataTrigger>
         </DataTemplate.Triggers>
     </DataTemplate>
@@ -200,72 +401,112 @@
         </Setter>
     </Style>
 
-    <!-- A section's small title inside a card ("How it's built", "Examples") -->
-    <Style x:Key="SectionTitle" TargetType="TextBlock">
-        <Setter Property="FontSize" Value="13" />
-        <Setter Property="FontWeight" Value="SemiBold" />
-        <Setter Property="Margin" Value="0,0,0,6" />
-        <Setter Property="Foreground" Value="{DynamicResource TextFillColorSecondaryBrush}" />
-    </Style>
-    <!-- A card's title ("Today", "Cards") -->
-    <Style x:Key="CardTitle" TargetType="TextBlock">
-        <Setter Property="FontSize" Value="15" />
-        <Setter Property="FontWeight" Value="SemiBold" />
-        <Setter Property="Margin" Value="0,0,0,10" />
-    </Style>
-    <!-- A field's label in a dialog -->
-    <Style x:Key="FieldLabel" TargetType="TextBlock">
-        <Setter Property="FontSize" Value="12" />
-        <Setter Property="FontWeight" Value="SemiBold" />
-        <Setter Property="Margin" Value="0,10,0,4" />
-        <Setter Property="Foreground" Value="{DynamicResource TextFillColorSecondaryBrush}" />
+    <!-- ===== Surfaces ===== -->
+    <!-- .card: #2B2B2B with a faint white hairline, 8 px corners -->
+    <Style x:Key="Card" TargetType="Border">
+        <Setter Property="Background" Value="{DynamicResource CardBackgroundFillColorDefaultBrush}" />
+        <Setter Property="BorderBrush" Value="{DynamicResource VocabCardStroke}" />
+        <Setter Property="BorderThickness" Value="1" />
+        <Setter Property="CornerRadius" Value="8" />
+        <Setter Property="Padding" Value="16" />
     </Style>
 
-    <!-- The box that helps with a Chinese word's reading ("Remembering the pinyin") -->
+    <!-- .hook: the box that helps with a Chinese word's reading ("Remembering the pinyin") -->
     <Style x:Key="PinyinBox" TargetType="Border">
         <Setter Property="CornerRadius" Value="8" />
         <Setter Property="BorderThickness" Value="1" />
         <Setter Property="Padding" Value="12,10" />
-        <Setter Property="Background" Value="{StaticResource PinyinFill}" />
-        <Setter Property="BorderBrush" Value="{StaticResource PinyinStroke}" />
+        <Setter Property="Background" Value="{DynamicResource VocabHookFill}" />
+        <Setter Property="BorderBrush" Value="{DynamicResource VocabHookStroke}" />
+    </Style>
+    <!-- .memo: the box of "To remember it", its title in the accent's light shade -->
+    <Style x:Key="MemoBox" TargetType="Border">
+        <Setter Property="CornerRadius" Value="8" />
+        <Setter Property="BorderThickness" Value="1" />
+        <Setter Property="Padding" Value="12,10" />
+        <Setter Property="Background" Value="{DynamicResource VocabMemoFill}" />
+        <Setter Property="BorderBrush" Value="{DynamicResource VocabMemoStroke}" />
+    </Style>
+    <Style x:Key="MemoTitle" TargetType="TextBlock" BasedOn="{StaticResource SectionTitle}">
+        <Setter Property="Margin" Value="0,0,0,3" />
+        <Setter Property="Foreground" Value="{DynamicResource VocabAccentText}" />
     </Style>
 
-    <!-- The tapped part, or a practised root: a lighter box inside a card -->
+    <!-- .part: the tapped part, or the run in progress: a lighter box inside a card -->
     <Style x:Key="InsetBox" TargetType="Border">
         <Setter Property="CornerRadius" Value="8" />
         <Setter Property="BorderThickness" Value="1" />
         <Setter Property="Padding" Value="16,14" />
-        <Setter Property="Background" Value="{DynamicResource ControlFillColorDefaultBrush}" />
-        <Setter Property="BorderBrush" Value="{DynamicResource CardStrokeColorDefaultBrush}" />
+        <Setter Property="Background" Value="{DynamicResource VocabInset}" />
+        <Setter Property="BorderBrush" Value="{DynamicResource VocabCardStroke}" />
+    </Style>
+    <!-- .stat: a number of Today -->
+    <Style x:Key="StatBox" TargetType="Border">
+        <Setter Property="CornerRadius" Value="6" />
+        <Setter Property="Padding" Value="12,10" />
+        <Setter Property="Background" Value="{DynamicResource VocabInset}" />
     </Style>
 
-    <!-- The bar under a card that keeps its buttons in reach while the card scrolls -->
+    <!-- .lbar: the bar under a card that keeps its buttons in reach while the card scrolls -->
     <Style x:Key="CardBar" TargetType="Border">
         <Setter Property="Padding" Value="20,14" />
         <Setter Property="BorderThickness" Value="0,1,0,0" />
-        <Setter Property="BorderBrush" Value="{DynamicResource CardStrokeColorDefaultBrush}" />
+        <Setter Property="BorderBrush" Value="{DynamicResource VocabCardStroke}" />
         <Setter Property="CornerRadius" Value="0,0,8,8" />
     </Style>
 
-    <!-- ===== Dialogs over the page: a dimmed page, the card in the middle, its title, its body scrolling, its buttons ===== -->
-    <Style x:Key="DialogScrim" TargetType="Grid">
-        <Setter Property="Background" Value="{DynamicResource SmokeFillColorDefaultBrush}" />
+    <!-- .bar: the Learned bar, 6 px, rounded -->
+    <Style x:Key="Bar" TargetType="ProgressBar">
+        <Setter Property="Height" Value="6" />
+        <Setter Property="Minimum" Value="0" />
+        <Setter Property="Maximum" Value="100" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="ProgressBar">
+                    <Border x:Name="PART_Track" CornerRadius="3" Background="{DynamicResource VocabPill}">
+                        <Border x:Name="PART_Indicator" HorizontalAlignment="Left" CornerRadius="3" Background="{DynamicResource AccentFillColorDefaultBrush}" />
+                    </Border>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
     </Style>
+
+    <!-- .input.lg: the big box (Add words' word, a card's pinyin) -->
+    <Style x:Key="LargeInput" TargetType="ui:TextBox" BasedOn="{StaticResource {x:Type ui:TextBox}}">
+        <Setter Property="Height" Value="44" />
+        <Setter Property="FontSize" Value="20" />
+        <Setter Property="VerticalContentAlignment" Value="Center" />
+    </Style>
+
+    <!-- The ⋯ menus (.menu): at least 230 px -->
+    <Style x:Key="Menu" TargetType="ContextMenu" BasedOn="{StaticResource {x:Type ContextMenu}}">
+        <Setter Property="MinWidth" Value="230" />
+    </Style>
+
+    <!-- ===== Dialogs over the page: a dimmed page, the card in the middle, its title, its body scrolling, its buttons ===== -->
+    <!-- .scrim -->
+    <Style x:Key="DialogScrim" TargetType="Grid">
+        <Setter Property="Background" Value="{DynamicResource VocabScrim}" />
+    </Style>
+    <!-- .dlg -->
     <Style x:Key="DialogCard" TargetType="Border">
         <Setter Property="Margin" Value="24" />
-        <Setter Property="MaxWidth" Value="560" />
         <Setter Property="VerticalAlignment" Value="Center" />
         <Setter Property="HorizontalAlignment" Value="Center" />
         <Setter Property="CornerRadius" Value="8" />
         <Setter Property="BorderThickness" Value="1" />
         <Setter Property="Background" Value="{DynamicResource SolidBackgroundFillColorQuarternaryBrush}" />
-        <Setter Property="BorderBrush" Value="{DynamicResource SurfaceStrokeColorDefaultBrush}" />
+        <Setter Property="BorderBrush" Value="{DynamicResource VocabDialogStroke}" />
         <Setter Property="KeyboardNavigation.TabNavigation" Value="Cycle" />
         <Setter Property="Effect">
             <Setter.Value>
-                <DropShadowEffect BlurRadius="32" ShadowDepth="8" Opacity="0.35" Direction="270" />
+                <DropShadowEffect BlurRadius="64" ShadowDepth="32" Opacity="0.45" Direction="270" />
             </Setter.Value>
         </Setter>
+    </Style>
+    <!-- .dlg-h: 20 px title, ✕ on the right -->
+    <Style x:Key="DialogHeader" TargetType="DockPanel">
+        <Setter Property="Margin" Value="24,20,20,4" />
     </Style>
     <Style x:Key="DialogTitle" TargetType="TextBlock">
         <Setter Property="FontSize" Value="20" />
@@ -273,11 +514,22 @@
         <Setter Property="VerticalAlignment" Value="Center" />
         <Setter Property="TextTrimming" Value="CharacterEllipsis" />
     </Style>
+    <!-- .dlg-b: 16 px under the title, 24 px sides and foot -->
+    <Style x:Key="DialogBody" TargetType="StackPanel">
+        <Setter Property="Margin" Value="24,16,24,24" />
+    </Style>
+    <!-- .dlg-f: the buttons, right-aligned 8 px apart, on the page's background -->
     <Style x:Key="DialogFooter" TargetType="Border">
         <Setter Property="Padding" Value="24,16" />
         <Setter Property="BorderThickness" Value="0,1,0,0" />
         <Setter Property="CornerRadius" Value="0,0,8,8" />
-        <Setter Property="Background" Value="{DynamicResource SolidBackgroundFillColorBaseBrush}" />
-        <Setter Property="BorderBrush" Value="{DynamicResource CardStrokeColorDefaultBrush}" />
+        <Setter Property="Background" Value="{DynamicResource ApplicationBackgroundBrush}" />
+        <Setter Property="BorderBrush" Value="{DynamicResource VocabCardStroke}" />
+    </Style>
+    <!-- .lrow: a line of a dialog's list, a hairline above it -->
+    <Style x:Key="ListRow" TargetType="Border">
+        <Setter Property="Padding" Value="0,8" />
+        <Setter Property="BorderThickness" Value="0,1,0,0" />
+        <Setter Property="BorderBrush" Value="{DynamicResource VocabCardStroke}" />
     </Style>
 </ResourceDictionary>

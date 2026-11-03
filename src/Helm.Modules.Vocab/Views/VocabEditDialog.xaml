@@ -2,35 +2,50 @@
     x:Class="Helm.Modules.Vocab.Views.VocabEditDialog"
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-    xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml">
+    xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
+    xmlns:pc="clr-namespace:Helm.Modules.Vocab">
 
     <!-- Edit a word by hand (its page's Edit, or the card's ⋯ → Edit…): the word itself, what helps to remember and use
-         it, its labels; saved as a whole. The tree stays the agent's. DataContext: VocabViewModel; the fields are
-         Detail.Editor's. -->
+         it, its labels (.grp, 16 px apart; their fields 12 px apart); saved as a whole. The tree stays the agent's.
+         DataContext: VocabViewModel; the fields are Detail.Editor's. -->
     <UserControl.Resources>
         <ResourceDictionary>
             <ResourceDictionary.MergedDictionaries>
                 <ResourceDictionary Source="/Helm.Modules.Vocab;component/VocabTemplates.xaml" />
             </ResourceDictionary.MergedDictionaries>
-            <Style x:Key="GroupTitle" TargetType="TextBlock">
-                <Setter Property="FontSize" Value="14" />
-                <Setter Property="FontWeight" Value="SemiBold" />
-                <Setter Property="Margin" Value="0,20,0,0" />
+            <!-- A field of a group: its label 6 px above its box, 12 px under the field before -->
+            <Style x:Key="Field" TargetType="StackPanel">
+                <Setter Property="Margin" Value="0,0,0,12" />
             </Style>
+            <!-- textarea.input: two lines by default -->
             <Style x:Key="Lines" TargetType="ui:TextBox" BasedOn="{StaticResource {x:Type ui:TextBox}}">
                 <Setter Property="AcceptsReturn" Value="True" />
                 <Setter Property="TextWrapping" Value="Wrap" />
-                <Setter Property="MinHeight" Value="56" />
+                <Setter Property="MinHeight" Value="52" />
+            </Style>
+            <Style x:Key="ThreeLines" TargetType="ui:TextBox" BasedOn="{StaticResource Lines}">
+                <Setter Property="MinHeight" Value="72" />
+            </Style>
+            <!-- A tag of the word's as a chip, ✕ to take it off -->
+            <Style x:Key="TagChip" TargetType="Border">
+                <Setter Property="Height" Value="30" />
+                <Setter Property="CornerRadius" Value="15" />
+                <Setter Property="BorderThickness" Value="1" />
+                <Setter Property="Padding" Value="12,0,4,0" />
+                <Setter Property="Margin" Value="0,0,6,6" />
+                <Setter Property="Background" Value="{DynamicResource VocabInset}" />
+                <Setter Property="BorderBrush" Value="{DynamicResource VocabInsetStroke}" />
+                <Setter Property="TextElement.FontSize" Value="13" />
             </Style>
         </ResourceDictionary>
     </UserControl.Resources>
 
     <Grid Style="{StaticResource DialogScrim}" Visibility="{Binding Detail.Editor.IsOpen, Converter={StaticResource BoolToVisibility}, FallbackValue=Collapsed}">
-        <Border Style="{StaticResource DialogCard}" Width="680" MaxWidth="680" VerticalAlignment="Stretch" DataContext="{Binding Detail.Editor}" AutomationProperties.Name="Edit the word">
+        <Border x:Name="EditorCard" Style="{StaticResource DialogCard}" Width="680" VerticalAlignment="Stretch" DataContext="{Binding Detail.Editor}" AutomationProperties.Name="Edit the word">
             <DockPanel>
-                <DockPanel DockPanel.Dock="Top" Margin="24,20,16,4">
-                    <ui:Button DockPanel.Dock="Right" Style="{StaticResource IconButton}" Icon="{ui:SymbolIcon Dismiss24}" ToolTip="Close without saving (Esc)"
-                               AutomationProperties.Name="Close" Command="{Binding CancelCommand}" />
+                <DockPanel DockPanel.Dock="Top" Style="{StaticResource DialogHeader}">
+                    <Button DockPanel.Dock="Right" Style="{StaticResource IconBtn}" Margin="12,0,0,0" pc:ButtonIcon.Symbol="Dismiss24" ToolTip="Close without saving (Esc)"
+                            AutomationProperties.Name="Close" Command="{Binding CancelCommand}" />
                     <TextBlock Style="{StaticResource DialogTitle}">
                         <Run Text="Edit “" /><Run Text="{Binding DataContext.Detail.Word.Text, Mode=OneWay, RelativeSource={RelativeSource AncestorType=UserControl}}" /><Run Text="”" />
                     </TextBlock>
@@ -38,18 +53,18 @@
                 <Border DockPanel.Dock="Bottom" Style="{StaticResource DialogFooter}">
                     <DockPanel>
                         <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
-                            <ui:Button Content="Cancel" MinWidth="80" Command="{Binding CancelCommand}" />
-                            <ui:Button Margin="8,0,0,0" MinWidth="80" Appearance="Primary" Content="Save" Icon="{ui:SymbolIcon Checkmark24}" Command="{Binding SaveCommand}" />
+                            <Button Style="{StaticResource Btn}" Content="Cancel" Command="{Binding CancelCommand}" />
+                            <Button Style="{StaticResource PrimaryBtn}" Margin="8,0,0,0" Content="Save" Command="{Binding SaveCommand}" />
                         </StackPanel>
-                        <TextBlock Text="{Binding Error}" TextWrapping="Wrap" VerticalAlignment="Center" Margin="0,0,12,0" Foreground="{DynamicResource SystemFillColorCriticalBrush}"
+                        <TextBlock Text="{Binding Error}" TextWrapping="Wrap" VerticalAlignment="Center" Margin="0,0,12,0" Foreground="{DynamicResource VocabDangerText}"
                                    Visibility="{Binding HasError, Converter={StaticResource BoolToVisibility}}" />
                     </DockPanel>
                 </Border>
                 <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Focusable="False">
-                    <StackPanel Margin="24,0,24,24">
+                    <StackPanel Style="{StaticResource DialogBody}" Margin="24,16,24,12">
                         <!-- The word -->
-                        <TextBlock Text="The word" Style="{StaticResource GroupTitle}" Margin="0,8,0,0" />
-                        <Grid>
+                        <TextBlock Text="The word" Style="{StaticResource GroupTitle}" />
+                        <Grid Margin="0,0,0,12">
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="*" />
                                 <ColumnDefinition Width="12" />
@@ -70,46 +85,60 @@
                                 <ui:TextBox Text="{Binding Traditional, UpdateSourceTrigger=PropertyChanged}" AutomationProperties.Name="Traditional" />
                             </StackPanel>
                         </Grid>
-                        <TextBlock Text="Meaning" Style="{StaticResource FieldLabel}" />
-                        <ui:TextBox Style="{StaticResource Lines}" Text="{Binding Meaning, UpdateSourceTrigger=PropertyChanged}" AutomationProperties.Name="Meaning" />
-                        <TextBlock Text="Explanation" Style="{StaticResource FieldLabel}" />
-                        <ui:TextBox Style="{StaticResource Lines}" Text="{Binding Explanation, UpdateSourceTrigger=PropertyChanged}" AutomationProperties.Name="Explanation" />
+                        <StackPanel Style="{StaticResource Field}">
+                            <TextBlock Text="Meaning" Style="{StaticResource FieldLabel}" />
+                            <ui:TextBox Style="{StaticResource Lines}" Text="{Binding Meaning, UpdateSourceTrigger=PropertyChanged}" AutomationProperties.Name="Meaning" />
+                        </StackPanel>
+                        <StackPanel Style="{StaticResource Field}">
+                            <TextBlock Text="Explanation" Style="{StaticResource FieldLabel}" />
+                            <ui:TextBox Style="{StaticResource Lines}" Text="{Binding Explanation, UpdateSourceTrigger=PropertyChanged}" AutomationProperties.Name="Explanation" />
+                        </StackPanel>
 
                         <!-- What helps to remember and use it -->
-                        <TextBlock Text="Help to remember and use it" Style="{StaticResource GroupTitle}" />
-                        <TextBlock Text="To remember it" Style="{StaticResource FieldLabel}" />
-                        <ui:TextBox Style="{StaticResource Lines}" Text="{Binding Mnemonic, UpdateSourceTrigger=PropertyChanged}" AutomationProperties.Name="Mnemonic" />
-                        <StackPanel Visibility="{Binding IsChinese, Converter={StaticResource BoolToVisibility}}">
+                        <TextBlock Text="Help to remember and use it" Style="{StaticResource GroupTitle}" Margin="0,4,0,12" />
+                        <StackPanel Style="{StaticResource Field}">
+                            <TextBlock Text="To remember it" Style="{StaticResource FieldLabel}" />
+                            <ui:TextBox Style="{StaticResource Lines}" Text="{Binding Mnemonic, UpdateSourceTrigger=PropertyChanged}" AutomationProperties.Name="Mnemonic" />
+                        </StackPanel>
+                        <StackPanel Style="{StaticResource Field}" Visibility="{Binding IsChinese, Converter={StaticResource BoolToVisibility}}">
                             <TextBlock Text="To remember the pinyin" Style="{StaticResource FieldLabel}" />
                             <ui:TextBox Style="{StaticResource Lines}" Text="{Binding PinyinMnemonic, UpdateSourceTrigger=PropertyChanged}" AutomationProperties.Name="To remember the pinyin" />
                         </StackPanel>
-                        <TextBlock Style="{StaticResource FieldLabel}"><Run Text="Examples" /> <Run Text="· one per line: sentence | translation" FontWeight="Normal" /></TextBlock>
-                        <ui:TextBox Style="{StaticResource Lines}" MinHeight="72" Text="{Binding Examples, UpdateSourceTrigger=PropertyChanged}" AutomationProperties.Name="Examples" />
-                        <TextBlock Style="{StaticResource FieldLabel}"><Run Text="Goes with" /> <Run Text="· separated by commas" FontWeight="Normal" /></TextBlock>
-                        <ui:TextBox Text="{Binding Collocations, UpdateSourceTrigger=PropertyChanged}" AutomationProperties.Name="Collocations" />
-                        <TextBlock Style="{StaticResource FieldLabel}"><Run Text="Word family" /> <Run Text="· one per line: word | part of speech | meaning" FontWeight="Normal" /></TextBlock>
-                        <ui:TextBox Style="{StaticResource Lines}" MinHeight="72" Text="{Binding Forms, UpdateSourceTrigger=PropertyChanged}" AutomationProperties.Name="Word family" />
-                        <Grid>
+                        <StackPanel Style="{StaticResource Field}">
+                            <TextBlock Style="{StaticResource FieldLabel}"><Run Text="Examples" /> <Run Text="· one per line: sentence | translation" FontWeight="Normal" /></TextBlock>
+                            <ui:TextBox Style="{StaticResource ThreeLines}" Text="{Binding Examples, UpdateSourceTrigger=PropertyChanged}" AutomationProperties.Name="Examples" />
+                        </StackPanel>
+                        <StackPanel Style="{StaticResource Field}">
+                            <TextBlock Style="{StaticResource FieldLabel}"><Run Text="Goes with" /> <Run Text="· separated by commas" FontWeight="Normal" /></TextBlock>
+                            <ui:TextBox Text="{Binding Collocations, UpdateSourceTrigger=PropertyChanged}" AutomationProperties.Name="Collocations" />
+                        </StackPanel>
+                        <StackPanel Style="{StaticResource Field}">
+                            <TextBlock Style="{StaticResource FieldLabel}"><Run Text="Word family" /> <Run Text="· one per line: word | part of speech | meaning" FontWeight="Normal" /></TextBlock>
+                            <ui:TextBox Style="{StaticResource ThreeLines}" Text="{Binding Forms, UpdateSourceTrigger=PropertyChanged}" AutomationProperties.Name="Word family" />
+                        </StackPanel>
+                        <Grid Margin="0,0,0,12">
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="*" />
                                 <ColumnDefinition Width="12" />
                                 <ColumnDefinition Width="*" />
                             </Grid.ColumnDefinitions>
                             <StackPanel>
-                                <TextBlock Style="{StaticResource FieldLabel}"><Run Text="Similar" /> <Run Text="· commas" FontWeight="Normal" /></TextBlock>
+                                <TextBlock Text="Similar" Style="{StaticResource FieldLabel}" />
                                 <ui:TextBox Text="{Binding Synonyms, UpdateSourceTrigger=PropertyChanged}" AutomationProperties.Name="Synonyms" />
                             </StackPanel>
                             <StackPanel Grid.Column="2">
-                                <TextBlock Style="{StaticResource FieldLabel}"><Run Text="Opposite" /> <Run Text="· commas" FontWeight="Normal" /></TextBlock>
+                                <TextBlock Text="Opposite" Style="{StaticResource FieldLabel}" />
                                 <ui:TextBox Text="{Binding Antonyms, UpdateSourceTrigger=PropertyChanged}" AutomationProperties.Name="Antonyms" />
                             </StackPanel>
                         </Grid>
-                        <TextBlock Style="{StaticResource FieldLabel}"><Run Text="Easy to mix up with" /> <Run Text="· one per line: word | what tells them apart" FontWeight="Normal" /></TextBlock>
-                        <ui:TextBox Style="{StaticResource Lines}" Text="{Binding Confusables, UpdateSourceTrigger=PropertyChanged}" AutomationProperties.Name="Confusables" />
+                        <StackPanel Style="{StaticResource Field}">
+                            <TextBlock Style="{StaticResource FieldLabel}"><Run Text="Easy to mix up with" /> <Run Text="· one per line: word | what tells them apart" FontWeight="Normal" /></TextBlock>
+                            <ui:TextBox Style="{StaticResource Lines}" Text="{Binding Confusables, UpdateSourceTrigger=PropertyChanged}" AutomationProperties.Name="Confusables" />
+                        </StackPanel>
 
                         <!-- Labels -->
-                        <TextBlock Text="Labels" Style="{StaticResource GroupTitle}" />
-                        <Grid>
+                        <TextBlock Text="Labels" Style="{StaticResource GroupTitle}" Margin="0,4,0,12" />
+                        <Grid Margin="0,0,0,12">
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="*" />
                                 <ColumnDefinition Width="12" />
@@ -130,10 +159,31 @@
                                 <ui:TextBox Text="{Binding Topic, UpdateSourceTrigger=PropertyChanged}" AutomationProperties.Name="Topic" />
                             </StackPanel>
                         </Grid>
-                        <TextBlock Style="{StaticResource FieldLabel}"><Run Text="Your tags" /> <Run Text="· separated by commas (Aptis, Truyện)" FontWeight="Normal" /></TextBlock>
-                        <ui:TextBox Text="{Binding Tags, UpdateSourceTrigger=PropertyChanged}" AutomationProperties.Name="Tags" />
-                        <TextBlock Text="Your note" Style="{StaticResource FieldLabel}" />
-                        <ui:TextBox Text="{Binding Note, UpdateSourceTrigger=PropertyChanged}" AutomationProperties.Name="Your note" AcceptsReturn="True" TextWrapping="Wrap" />
+                        <!-- Your tags: chips with ✕, and a box that adds one on Enter -->
+                        <StackPanel Style="{StaticResource Field}">
+                            <TextBlock Text="Your tags" Style="{StaticResource FieldLabel}" />
+                            <WrapPanel Margin="0,0,0,-6">
+                                <ItemsControl x:Name="TagChips" Focusable="False" ItemsPanel="{StaticResource Wrap}">
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate>
+                                            <Border Style="{StaticResource TagChip}">
+                                                <StackPanel Orientation="Horizontal">
+                                                    <TextBlock Text="{Binding}" VerticalAlignment="Center" />
+                                                    <Button Style="{StaticResource IconBtn}" Width="24" Height="24" FontSize="12" Margin="4,0,0,0" pc:ButtonIcon.Symbol="Dismiss24"
+                                                            Tag="{Binding}" Click="RemoveTag_Click" AutomationProperties.Name="{Binding StringFormat='Remove the tag {0}'}" />
+                                                </StackPanel>
+                                            </Border>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                                <ui:TextBox x:Name="TagBox" Width="180" Margin="0,0,0,6" PlaceholderText="Add a tag, Enter" AutomationProperties.Name="Add a tag"
+                                            KeyDown="TagBox_KeyDown" />
+                            </WrapPanel>
+                        </StackPanel>
+                        <StackPanel Style="{StaticResource Field}">
+                            <TextBlock Text="Your note" Style="{StaticResource FieldLabel}" />
+                            <ui:TextBox Text="{Binding Note, UpdateSourceTrigger=PropertyChanged}" AutomationProperties.Name="Your note" AcceptsReturn="True" TextWrapping="Wrap" />
+                        </StackPanel>
                     </StackPanel>
                 </ScrollViewer>
             </DockPanel>

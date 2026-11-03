@@ -1,3 +1,4 @@
+using System.ComponentModel;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
@@ -8,15 +9,21 @@ namespace Helm.Modules.Vocab.Views;
 public partial class VocabLearnView : UserControl
 {
     /// <summary>Below this the card beside the side panel is too narrow for its answer: the panel folds into a line.</summary>
-    internal const double SidePanelWidth = 1060;
+    internal const double SidePanelWidth = 760;
 
     /// <summary>Below this a tree beside what helps gets cut off: the tree goes above it, across the card.</summary>
-    internal const double SideBySideWidth = 760;
+    internal const double SideBySideWidth = 600;
+
+    private VocabCardViewModel? _card;
 
     public VocabLearnView()
     {
         InitializeComponent();
-        DataContextChanged += (_, _) => ShowFolds();
+        DataContextChanged += (_, _) =>
+        {
+            ShowFolds();
+            WatchCard();
+        };
     }
 
     private VocabViewModel? ViewModel => DataContext as VocabViewModel;
@@ -44,6 +51,39 @@ public partial class VocabLearnView : UserControl
         if (summary is not null) summary.Visibility = folded ? Visibility.Visible : Visibility.Collapsed;
         if (title.Content is DockPanel { Children: [Wpf.Ui.Controls.SymbolIcon chevron, ..] }) chevron.RenderTransform = new RotateTransform(folded ? 0 : 180);
         System.Windows.Automation.AutomationProperties.SetHelpText(title, folded ? "Folded: click to open" : "Click to fold away");
+    }
+
+    private void WatchCard()
+    {
+        if (_card is not null) _card.PropertyChanged -= OnCardChanged;
+        _card = ViewModel?.Card;
+        if (_card is not null) _card.PropertyChanged += OnCardChanged;
+        ShowHint();
+    }
+
+    private void OnCardChanged(object? sender, PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName is nameof(VocabCardViewModel.IsRevealed) or nameof(VocabCardViewModel.Mode) or nameof(VocabCardViewModel.AsksPinyin)
+            or nameof(VocabCardViewModel.IsTyping) or nameof(VocabCardViewModel.FrontHint))
+            ShowHint();
+    }
+
+    /// <summary>
+    /// Under the front, until the answer shows: "Click or press Space to see the meaning" on a word card, "Say the
+    /// missing word, then press Space" on a gap, the card's own words on the others. A pinyin card asking for the word's
+    /// reading says it under its box instead.
+    /// </summary>
+    private void ShowHint()
+    {
+        var card = _card;
+        var shown = card is { IsRevealed: false } ? card.AsksPinyin ? card.Mode == VocabCardMode.WordToMeaning ? null : OwnHint
+            : card.Mode switch
+            {
+                VocabCardMode.WordToMeaning => WordHint,
+                VocabCardMode.FillGap => GapHint,
+                _ => OwnHint,
+            } : null;
+        foreach (var hint in new[] { WordHint, GapHint, OwnHint }) hint.Visibility = hint == shown ? Visibility.Visible : Visibility.Collapsed;
     }
 
     private void LearnPanel_SizeChanged(object sender, SizeChangedEventArgs e)

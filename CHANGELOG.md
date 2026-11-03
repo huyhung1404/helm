@@ -3,6 +3,17 @@
 All notable changes to Helm. The top section is used as the GitHub release body and as the Velopack release notes.
 Format: [Keep a Changelog](https://keepachangelog.com), versions follow [SemVer](https://semver.org).
 
+## [Unreleased]
+
+### Changed
+- **Vocabulary (PC) looks like its design.** Every screen was redrawn to the approved canvas: the word page puts the
+  word, its traditional form, its reading and Hán Việt on one line; Listen and YouGlish are quiet buttons beside Edit;
+  “To remember it” sits in a blue box (also on the Learn card and the pop-up’s Full details); the tree’s lines turn
+  down at their ends; the Words list, Roots, a family, root practice and every dialog take the design’s sizes, colours
+  and wording. The Roots tab shows its count. At 1060 px the Learn card keeps its side panel and the page fits.
+- **Vocabulary: Delete… asks in the page**, with what goes and what stays, instead of a system box.
+- **Vocabulary: your tags are chips in Edit**, ✕ takes one off, Enter adds the one typed.
+
 ## [0.76.0] - 2026-11-03
 
 ### Added
