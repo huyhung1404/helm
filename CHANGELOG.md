@@ -5,9 +5,22 @@ Format: [Keep a Changelog](https://keepachangelog.com), versions follow [SemVer]
 
 ## [Unreleased]
 
+### Added
+- **Habits (PC and Android): a streak reminder in the evening.** From 21:00 (Settings → Habits → Streak reminder,
+  with its own switch and hour), one notification names the habits whose streak of two days or more is not done yet
+  today: “Read: 5-day streak”. Nothing comes once they are done, and a habit to quit is never named. Remind me now
+  tries both reminders.
+- **Habits: today at a glance.** The Habits tab opens with “2 of 5 habits done today”, a progress bar and what is
+  left; a card whose streak waits for today carries an amber “5 days in a row: do it today to keep the chain”.
+
 ### Changed
 - **Helm Keyboard: w on its own is a w.** A w with no vowel before it is no longer turned into ư (“tw” stays “tw”); type
   uw for ư.
+
+### Fixed
+- Habits on the phone: the skipped-habit and streak reminders are separate notifications, so one never replaces the
+  other; the 25 / 50 / 75 / 100 % buttons are full-size touch targets, and “I did it, I just forgot to tick it” has
+  its check mark as on the PC.
 
 ## [0.75.0] - 2026-11-02
 

@@ -20,7 +20,7 @@
             <Setter Property="HorizontalAlignment" Value="Stretch" />
             <Setter Property="HorizontalContentAlignment" Value="Center" />
             <Setter Property="VerticalContentAlignment" Value="Center" />
-            <Setter Property="MinHeight" Value="40" />
+            <Setter Property="MinHeight" Value="44" />
             <Setter Property="Margin" Value="3,0" />
         </Style>
         <Style Selector="TextBlock.big">
@@ -88,8 +88,12 @@
                             <TextBlock Text="Save the reason" VerticalAlignment="Center" />
                         </StackPanel>
                     </Button>
-                    <Button Classes="wide" Content="{Binding PendingLapse.DoneText, FallbackValue=''}" Command="{Binding MarkLapseDoneCommand}"
-                            IsVisible="{Binding PendingLapse.CanMarkDone, FallbackValue=False}" />
+                    <Button Classes="wide" Command="{Binding MarkLapseDoneCommand}" IsVisible="{Binding PendingLapse.CanMarkDone, FallbackValue=False}">
+                        <StackPanel Orientation="Horizontal" Spacing="6">
+                            <ic:SymbolIcon Symbol="Checkmark" FontSize="16" VerticalAlignment="Center" />
+                            <TextBlock Text="{Binding PendingLapse.DoneText, FallbackValue=''}" VerticalAlignment="Center" TextWrapping="Wrap" />
+                        </StackPanel>
+                    </Button>
                     <Button Classes="wide" Content="Cancel" Command="{Binding CancelSlipCommand}" IsVisible="{Binding PendingLapse.IsSlip, FallbackValue=False}" />
                 </StackPanel>
             </Panel>

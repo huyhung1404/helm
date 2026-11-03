@@ -2,18 +2,30 @@ using Helm.Core.Settings;
 
 namespace Helm.Modules.Habits;
 
-/// <summary>A reminder about slipping habits, ready to show as one notification.</summary>
-public sealed record HabitReminder(int Count, string Title, string Message);
+/// <summary>What a reminder is about: habits skipped for days, or streaks still waiting for today.</summary>
+public enum HabitReminderKind
+{
+    Skipped,
+    Streak,
+}
+
+/// <summary>A reminder about habits, ready to show as one notification.</summary>
+public sealed record HabitReminder(int Count, string Title, string Message, HabitReminderKind Kind = HabitReminderKind.Skipped);
 
 /// <summary>
-/// Decides when to remind about habits skipped for <see cref="HabitLapses.MinDays"/> days or more in a row, and what to
-/// say. Platform-free: the Windows module shows the result as a tray notification, the Android side as a system
-/// notification (from its hourly alarm, even with the app closed). At most one reminder per day and device, from
-/// <see cref="HabitsSettings.ReminderHour"/>; a habit already done today is left out.
+/// Decides when to remind about habits, and what to say. Two reminders, each at most once a day and device: habits
+/// skipped for <see cref="HabitLapses.MinDays"/> days or more in a row (from <see cref="HabitsSettings.ReminderHour"/>),
+/// and in the evening habits whose streak of <see cref="MinStreak"/> days or more is not done yet today (from
+/// <see cref="HabitsSettings.StreakReminderHour"/>). A habit already done today is left out of both. Platform-free: the
+/// Windows module shows the result as a tray notification, the Android side as a system notification (from its hourly
+/// alarm, even with the app closed).
 /// </summary>
 public sealed class HabitReminderService
 {
     public const int MaxLines = 4;
+
+    /// <summary>A streak shorter than this is not worth a notification.</summary>
+    public const int MinStreak = 2;
 
     private readonly HabitsStore _store;
     private readonly ISettingsStore<HabitsSettings> _settings;
@@ -39,23 +51,58 @@ public sealed class HabitReminderService
         lock (_gate)
         {
             var s = _settings.Current;
-            if (!s.RemindersEnabled) return null;
             var local = TimeZoneInfo.ConvertTime(_store.Now, _store.Zone);
             var today = DateOnly.FromDateTime(local.DateTime);
-            if (local.Hour < Math.Clamp(s.ReminderHour, 0, 23) || s.LastReminderDate == today) return null;
-            // Nothing slipping: the day is not used up, so a habit missed by tonight still gets its reminder.
-            if (Build(_store) is not { } reminder) return null;
-            _settings.Update(x => x.LastReminderDate = today);
-            return reminder;
+            if (s.RemindersEnabled && local.Hour >= Math.Clamp(s.ReminderHour, 0, 23) && s.LastReminderDate != today
+                // Nothing slipping: the day is not used up, so a habit missed by tonight still gets its reminder.
+                && Build(_store) is { } skipped)
+            {
+                _settings.Update(x => x.LastReminderDate = today);
+                return skipped;
+            }
+            // The evening guard comes after: a habit a streak is built on, still open late in the day.
+            if (s.StreakRemindersEnabled && local.Hour >= Math.Clamp(s.StreakReminderHour, 0, 23) && s.LastStreakReminderDate != today
+                && BuildStreak(_store) is { } streak)
+            {
+                _settings.Update(x => x.LastStreakReminderDate = today);
+                return streak;
+            }
+            return null;
         }
     }
 
-    /// <summary>Shows the reminder right away (to try the notification), whatever the hour; false when nothing slips.</summary>
+    /// <summary>Shows a reminder right away (to try the notification), whatever the hour; false when nothing is due.</summary>
     public bool RemindNow()
     {
-        if (Build(_store) is not { } reminder) return false;
+        if ((Build(_store) ?? BuildStreak(_store)) is not { } reminder) return false;
         Requested?.Invoke(this, reminder);
         return true;
+    }
+
+    /// <summary>
+    /// A habit to build with a streak of <see cref="MinStreak"/> days or more that is not done yet today: the chain breaks
+    /// at midnight. Habits to quit are left out (their day is ticked the day after, and what someone quits is private).
+    /// </summary>
+    public static HabitReminder? BuildStreak(HabitsStore store)
+    {
+        var today = store.Today;
+        var done = store.AllDoneDays();
+        var risky = new List<(string Title, int Streak)>();
+        foreach (var h in store.Habits())
+        {
+            if (h.Value.Kind != HabitKind.Build) continue;
+            var days = done.TryGetValue(h.Id, out var d) ? d : new HashSet<DateOnly>();
+            if (days.Contains(today)) continue;
+            var streak = HabitStats.CurrentStreak(days, today);
+            if (streak >= MinStreak) risky.Add((h.Value.Title, streak));
+        }
+        if (risky.Count == 0) return null;
+        risky.Sort((a, b) => b.Streak.CompareTo(a.Streak));
+        var lines = risky.Take(MaxLines).Select(r => $"{r.Title}: {r.Streak}-day streak").ToList();
+        if (risky.Count > MaxLines) lines.Add($"…and {risky.Count - MaxLines} more");
+        var title = risky.Count == 1 ? "Keep your streak alive" : $"{risky.Count} streaks end tonight";
+        return new HabitReminder(risky.Count, title, string.Join("\n", lines) + "\nDone today keeps the chain going. Even part of it counts.",
+            HabitReminderKind.Streak);
     }
 
     /// <summary>

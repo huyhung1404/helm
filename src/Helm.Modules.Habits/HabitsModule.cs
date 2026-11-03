@@ -10,7 +10,7 @@ namespace Helm.Modules.Habits;
 
 /// <summary>
 /// Habits on Windows. The data lives in Helm Sync and the pages work on <see cref="HabitsStore"/>; the only background
-/// work is the daily reminder about skipped habits (a tray notification) while the tool is on. The menu and Quick
+/// work is the daily reminders (skipped habits, streaks at risk in the evening) as tray notifications while the tool is on. The menu and Quick
 /// access open <see cref="HabitsContentPage"/>; Home → Utilities opens the settings (<see cref="HabitsPage"/>).
 /// </summary>
 public sealed class HabitsModule : HelmModuleBase, IModuleContent, IDisposable

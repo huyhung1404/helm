@@ -91,14 +91,30 @@
                         <ComboBox Width="140" AutomationProperties.Name="Reminder time" ItemsSource="{Binding ReminderHourNames}" SelectedIndex="{Binding ReminderHourIndex}" />
                     </core:RowLayout>
                 </Border>
-                <Border Style="{DynamicResource HelmExpanderRow}">
+            </StackPanel>
+        </ui:CardExpander>
+        <ui:CardExpander Margin="0,0,0,4" Icon="{ui:SymbolIcon Fire24}" IsExpanded="True">
+            <ui:CardExpander.Header>
+                <core:RowLayout>
+                    <core:CardHeader Title="Streak reminder" Description="Once an evening, a notification about the habits whose streak of two days or more is still waiting for today." />
+                    <ui:ToggleSwitch HorizontalAlignment="Right" Margin="0,0,16,0" AutomationProperties.Name="Streak reminder" IsChecked="{Binding StreakRemindersEnabled}" />
+                </core:RowLayout>
+            </ui:CardExpander.Header>
+            <StackPanel IsEnabled="{Binding StreakRemindersEnabled}">
+                <Border Style="{DynamicResource HelmExpanderRow}" BorderThickness="0">
                     <core:RowLayout>
-                        <core:CardHeader Title="Try it" Description="Shows the reminder now, if a habit is slipping." />
-                        <ui:Button Content="Remind me now" Icon="{ui:SymbolIcon Alert24}" Command="{Binding RemindNowCommand}" />
+                        <core:CardHeader Title="Streak reminder time" Description="Comes at this hour, or when Helm starts later. Nothing comes once the habit is done." />
+                        <ComboBox Width="140" AutomationProperties.Name="Streak reminder time" ItemsSource="{Binding ReminderHourNames}" SelectedIndex="{Binding StreakReminderHourIndex}" />
                     </core:RowLayout>
                 </Border>
             </StackPanel>
         </ui:CardExpander>
+        <ui:CardControl Margin="0,0,0,4" Icon="{ui:SymbolIcon Alert24}">
+            <ui:CardControl.Header>
+                <core:CardHeader Title="Try it" Description="Shows a reminder now, if a habit is slipping or a streak is waiting for today." />
+            </ui:CardControl.Header>
+            <ui:Button Content="Remind me now" Command="{Binding RemindNowCommand}" />
+        </ui:CardControl>
         <ui:CardControl Margin="0,0,0,4" Icon="{ui:SymbolIcon NoteEdit24}">
             <ui:CardControl.Header>
                 <core:CardHeader Title="Reasons for skipped days" Description="After two or more days in a row without a habit, Habits asks why before you go on. The reasons are in the report." />

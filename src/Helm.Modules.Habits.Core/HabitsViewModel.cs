@@ -66,6 +66,8 @@ public sealed partial class HabitsViewModel : ObservableObject
     [ObservableProperty] private bool _playCelebrations;
     [ObservableProperty] private bool _remindersEnabled;
     [ObservableProperty] private int _reminderHourIndex;
+    [ObservableProperty] private bool _streakRemindersEnabled;
+    [ObservableProperty] private int _streakReminderHourIndex;
 
     public HabitsViewModel(HabitsStore store, ISettingsStoreFactory settings, IUiDispatcher ui, IDialogService dialogs, HabitReminderService reminders,
         ILogger<HabitsViewModel> logger)
@@ -82,6 +84,8 @@ public sealed partial class HabitsViewModel : ObservableObject
         PlayCelebrations = s.PlayCelebrations;
         RemindersEnabled = s.RemindersEnabled;
         ReminderHourIndex = Math.Clamp(s.ReminderHour, 0, 23);
+        StreakRemindersEnabled = s.StreakRemindersEnabled;
+        StreakReminderHourIndex = Math.Clamp(s.StreakReminderHour, 0, 23);
         _loading = false;
 
         _store.Changed += (_, _) => ScheduleRefresh();
@@ -122,6 +126,17 @@ public sealed partial class HabitsViewModel : ObservableObject
 
     /// <summary>Every habit is done for today.</summary>
     public bool AllDone => ToDo.Count == 0 && DoneToday.Count > 0;
+
+    /// <summary>How much of today's list is done (0–1), for the progress bar on the Habits tab.</summary>
+    public double TodayProgress => DoneToday.Count + ToDo.Count == 0 ? 0 : (double)DoneToday.Count / (DoneToday.Count + ToDo.Count);
+
+    /// <summary>"2 of 5 habits done today".</summary>
+    public string TodayText => $"{DoneToday.Count} of {Plural(DoneToday.Count + ToDo.Count, "habit")} done today";
+
+    /// <summary>One line of encouragement under the progress bar.</summary>
+    public string TodayHint => ToDo.Count == 0 ? "Everything is done for today. See you tomorrow!"
+        : DoneToday.Count == 0 ? "Tap a card to mark it. Showing up is what builds a habit."
+        : ToDo.Count == 1 ? "One more to go." : $"{ToDo.Count} more to go.";
 
     public bool HasMessage => !string.IsNullOrEmpty(Message);
     public bool HasCelebration => Celebration is not null;
@@ -615,13 +630,24 @@ public sealed partial class HabitsViewModel : ObservableObject
         if (!_loading && value >= 0) _settings.Update(s => s.ReminderHour = Math.Clamp(value, 0, 23));
     }
 
-    /// <summary>Shows the reminder right away (to try the notification), whatever the hour.</summary>
+    partial void OnStreakRemindersEnabledChanged(bool value)
+    {
+        if (!_loading) _settings.Update(s => s.StreakRemindersEnabled = value);
+    }
+
+    partial void OnStreakReminderHourIndexChanged(int value)
+    {
+        if (!_loading && value >= 0) _settings.Update(s => s.StreakReminderHour = Math.Clamp(value, 0, 23));
+    }
+
+    /// <summary>Shows a reminder right away (to try the notification), whatever the hour.</summary>
     [RelayCommand]
     private void RemindNow()
     {
         try
         {
-            Message = _reminders.RemindNow() ? null : $"No habit has been skipped for {HabitLapses.MinDays} days or more, so there is nothing to remind you about.";
+            Message = _reminders.RemindNow() ? null
+                : $"Nothing to remind you about: no habit skipped for {HabitLapses.MinDays} days or more, and no streak of {HabitReminderService.MinStreak} days or more waiting for today.";
         }
         catch (Exception ex)
         {
@@ -673,6 +699,9 @@ public sealed partial class HabitsViewModel : ObservableObject
                 card.CanSlip = quit && !answered;
                 var share = summary.DoneToday ? (int)Math.Round(HabitStats.Share(percents, today) * 100) : 100;
                 card.Status = quit ? QuitStatus(habit, summary, answered, today) : share < 100 ? $"Today: {share}% done" : "";
+                card.AtRisk = !quit && !summary.DoneToday && summary.CurrentStreak >= HabitReminderService.MinStreak
+                    ? $"{Plural(summary.CurrentStreak, "day")} in a row: do it today to keep the chain"
+                    : "";
                 card.Grid = HabitYearGrid.Build(id, habit, days, today, today.Year, habitLapses, percents);
                 var color = HabitColors.ForRate(summary.Rate30);
                 card.Color = HabitColors.Hex(color);
@@ -715,6 +744,9 @@ public sealed partial class HabitsViewModel : ObservableObject
             OnPropertyChanged(nameof(HasToDo));
             OnPropertyChanged(nameof(HasDoneToday));
             OnPropertyChanged(nameof(AllDone));
+            OnPropertyChanged(nameof(TodayProgress));
+            OnPropertyChanged(nameof(TodayText));
+            OnPropertyChanged(nameof(TodayHint));
             // A reason written on another device, or the days ticked after all: the question may be answered already.
             if (PendingLapse is not null) CheckLapses();
         }

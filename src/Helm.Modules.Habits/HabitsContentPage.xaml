@@ -81,6 +81,15 @@
                                    Command="{Binding DataContext.SlipCommand, RelativeSource={RelativeSource AncestorType=Page}}" CommandParameter="{Binding}" />
                         <TextBlock Text="{Binding Status}" Style="{DynamicResource HelmSecondaryText}" TextWrapping="Wrap" VerticalAlignment="Center" />
                     </DockPanel>
+                    <!-- A streak waiting for today: a warning pill, so the habit is not forgotten -->
+                    <Border Margin="0,8,0,0" Padding="8,4" HorizontalAlignment="Left" CornerRadius="12" Background="{DynamicResource SystemFillColorCautionBackgroundBrush}"
+                            Visibility="{Binding IsAtRisk, Converter={StaticResource BoolToVisibility}}">
+                        <StackPanel Orientation="Horizontal">
+                            <ui:SymbolIcon Symbol="Fire24" Filled="True" FontSize="16" Margin="0,0,6,0" VerticalAlignment="Center"
+                                           Foreground="{DynamicResource SystemFillColorCautionBrush}" />
+                            <TextBlock Text="{Binding AtRisk}" TextWrapping="Wrap" VerticalAlignment="Center" />
+                        </StackPanel>
+                    </Border>
                     <self:HabitGrid Margin="0,10,0,0" HorizontalAlignment="Left" Grid="{Binding Grid}"
                                     Command="{Binding DataContext.TapDayCommand, RelativeSource={RelativeSource AncestorType=Page}}" />
                 </StackPanel>
@@ -143,10 +152,16 @@
 
                 <!-- The Habits tab -->
                 <StackPanel Visibility="{Binding IsHabitsTab, Converter={StaticResource BoolToVisibility}}">
-                    <ItemsControl ItemsSource="{Binding ToDo}" ItemTemplate="{StaticResource CardTemplate}" Focusable="False" />
+                    <!-- Today at a glance -->
+                    <Border Style="{DynamicResource HelmSurface}" Margin="0,0,0,12" Padding="16,12" Visibility="{Binding HasHabits, Converter={StaticResource BoolToVisibility}}">
+                        <StackPanel>
+                            <TextBlock Text="{Binding TodayText}" FontWeight="SemiBold" />
+                            <ProgressBar Margin="0,8,0,6" Minimum="0" Maximum="1" Height="6" Value="{Binding TodayProgress, Mode=OneWay}" AutomationProperties.Name="Done today" />
+                            <TextBlock Text="{Binding TodayHint}" Style="{DynamicResource HelmSecondaryText}" TextWrapping="Wrap" />
+                        </StackPanel>
+                    </Border>
 
-                    <TextBlock Text="Everything is done for today. See you tomorrow!" Margin="0,0,0,12" Style="{DynamicResource HelmSecondaryText}"
-                               Visibility="{Binding AllDone, Converter={StaticResource BoolToVisibility}}" />
+                    <ItemsControl ItemsSource="{Binding ToDo}" ItemTemplate="{StaticResource CardTemplate}" Focusable="False" />
 
                     <TextBlock Text="Done for today" Style="{DynamicResource HelmSectionHeader}"
                                Visibility="{Binding HasDoneToday, Converter={StaticResource BoolToVisibility}}" />

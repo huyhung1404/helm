@@ -378,6 +378,75 @@ public sealed class HabitsTests : IDisposable
         Assert.Null(HabitReminderService.Build(_store));
     }
 
+    [Fact]
+    public void The_streak_reminder_comes_in_the_evening_for_a_chain_not_done_today_and_never_names_a_habit_to_quit()
+    {
+        var reminders = new HabitReminderService(_store, _settings);
+        var chain = NewHabit("Read", D(10, 1));
+        var fresh = NewHabit("Run", D(10, 1));
+        var porn = NewQuit("Watching porn", D(10, 1));
+        Done(chain, D(10, 27), D(10, 28), D(10, 29));
+        Done(fresh, D(10, 29));
+        Done(porn, D(10, 26));
+
+        // 20:00: past the skipped-habit hour, before the default 21:00 streak hour.
+        _time.Now = T0.AddHours(11);
+        var skipped = reminders.TakeDue();
+        Assert.NotNull(skipped);
+        Assert.Equal(HabitReminderKind.Skipped, skipped.Kind);
+        Assert.Null(reminders.TakeDue());
+
+        _time.Now = T0.AddHours(12);
+        var streak = reminders.TakeDue();
+        Assert.NotNull(streak);
+        Assert.Equal(HabitReminderKind.Streak, streak.Kind);
+        Assert.Equal(1, streak.Count);
+        Assert.Contains("Read: 3-day streak", streak.Message);
+        Assert.DoesNotContain("Run", streak.Message);
+        Assert.DoesNotContain("porn", streak.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.Null(reminders.TakeDue());
+
+        // Done today: the chain is safe.
+        Done(chain, D(10, 30));
+        Assert.Null(HabitReminderService.BuildStreak(_store));
+    }
+
+    [Fact]
+    public void Turned_off_the_streak_reminder_stays_quiet()
+    {
+        _settings.Get<HabitsSettings>(HabitsIds.ModuleId).Update(s => s.StreakRemindersEnabled = false);
+        var reminders = new HabitReminderService(_store, _settings);
+        var chain = NewHabit("Read", D(10, 1));
+        Done(chain, D(10, 28), D(10, 29));
+
+        _time.Now = T0.AddHours(14);
+        Assert.Null(reminders.TakeDue());
+    }
+
+    [Fact]
+    public void A_card_with_a_streak_not_done_today_is_flagged_and_today_shows_the_progress()
+    {
+        var chain = NewHabit("Read", D(10, 20));
+        NewHabit("Run", D(10, 20));
+        Done(chain, D(10, 28), D(10, 29));
+        var vm = ViewModel();
+
+        var read = vm.ToDo.Single(c => c.Title == "Read");
+        Assert.True(read.IsAtRisk);
+        Assert.Equal("2 days in a row: do it today to keep the chain", read.AtRisk);
+        Assert.False(vm.ToDo.Single(c => c.Title == "Run").IsAtRisk);
+        Assert.Equal("0 of 2 habits done today", vm.TodayText);
+        Assert.Equal(0, vm.TodayProgress);
+
+        Done(chain, D(10, 30));
+        vm.Refresh();
+
+        Assert.False(read.IsAtRisk);
+        Assert.Equal("1 of 2 habits done today", vm.TodayText);
+        Assert.Equal(0.5, vm.TodayProgress);
+        Assert.Equal("One more to go.", vm.TodayHint);
+    }
+
     // ---- The view model ------------------------------------------------------------------------------------------
 
     private HabitsViewModel ViewModel(Helm.Shell.Services.IDialogService? dialogs = null) =>

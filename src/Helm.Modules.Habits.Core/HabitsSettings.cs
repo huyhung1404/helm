@@ -23,4 +23,13 @@ public sealed class HabitsSettings : IVersionedSettings
 
     /// <summary>The local date of the last reminder shown on this device (one per day).</summary>
     public DateOnly? LastReminderDate { get; set; }
+
+    /// <summary>An evening notification about habits whose streak is at risk (not done yet today).</summary>
+    public bool StreakRemindersEnabled { get; set; } = true;
+
+    /// <summary>Local hour (0–23) from which the streak reminder may be shown.</summary>
+    public int StreakReminderHour { get; set; } = 21;
+
+    /// <summary>The local date of the last streak reminder shown on this device (one per day).</summary>
+    public DateOnly? LastStreakReminderDate { get; set; }
 }

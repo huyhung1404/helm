@@ -113,16 +113,37 @@
                         </StackPanel>
                     </DockPanel>
                 </Border>
-                <Border Classes="row" IsEnabled="{Binding RemindersEnabled}">
+            </StackPanel>
+        </Border>
+        <Border Classes="card">
+            <StackPanel>
+                <DockPanel>
+                    <ToggleSwitch DockPanel.Dock="Right" IsChecked="{Binding StreakRemindersEnabled}" OnContent="" OffContent="" AutomationProperties.Name="Streak reminder" />
+                    <StackPanel VerticalAlignment="Center">
+                        <TextBlock Text="Streak reminder" Classes="title" />
+                        <TextBlock Text="Once an evening, a notification about the habits whose streak of two days or more is still waiting for today." Classes="secondary" TextWrapping="Wrap" />
+                    </StackPanel>
+                </DockPanel>
+                <Border Classes="row" IsEnabled="{Binding StreakRemindersEnabled}">
                     <DockPanel>
-                        <Button DockPanel.Dock="Right" Content="Remind me now" Command="{Binding RemindNowCommand}" />
+                        <ComboBox DockPanel.Dock="Right" MinWidth="110" ItemsSource="{Binding ReminderHourNames}" SelectedIndex="{Binding StreakReminderHourIndex}"
+                                  AutomationProperties.Name="Streak reminder time" />
                         <StackPanel VerticalAlignment="Center">
-                            <TextBlock Text="Try it" />
-                            <TextBlock Text="Shows the reminder now, if a habit is slipping." Classes="secondary" TextWrapping="Wrap" />
+                            <TextBlock Text="Streak reminder time" />
+                            <TextBlock Text="Comes at this hour or later. Nothing comes once the habit is done." Classes="secondary" TextWrapping="Wrap" />
                         </StackPanel>
                     </DockPanel>
                 </Border>
             </StackPanel>
+        </Border>
+        <Border Classes="card">
+            <DockPanel>
+                <Button DockPanel.Dock="Right" Content="Remind me now" Command="{Binding RemindNowCommand}" />
+                <StackPanel VerticalAlignment="Center">
+                    <TextBlock Text="Try it" Classes="title" />
+                    <TextBlock Text="Shows a reminder now, if a habit is slipping or a streak is waiting for today." Classes="secondary" TextWrapping="Wrap" />
+                </StackPanel>
+            </DockPanel>
         </Border>
         <Border Classes="card">
             <StackPanel>

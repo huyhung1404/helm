@@ -24,6 +24,14 @@ public sealed partial class HabitCard(string id) : ObservableObject
 
     public bool HasStatus => Status.Length > 0;
 
+    /// <summary>
+    /// A habit to build with a streak, not done yet today: "5 days in a row: do it today to keep the chain". Shown as a
+    /// warning pill so the habit stands out. Empty for none.
+    /// </summary>
+    [ObservableProperty] [NotifyPropertyChangedFor(nameof(IsAtRisk))] private string _atRisk = "";
+
+    public bool IsAtRisk => AtRisk.Length > 0;
+
     /// <summary>A habit to quit whose yesterday is not answered yet: it can be marked clean, or as a slip.</summary>
     [ObservableProperty] private bool _canSlip;
 

@@ -20,7 +20,7 @@ using PendingIntentFlags = Android.App.PendingIntentFlags;
 namespace Helm.Modules.Habits;
 
 /// <summary>
-/// The skipped-habit reminder on Android. An inexact hourly alarm (cheap on the battery, kept across reboots by
+/// The habit reminders on Android (skipped habits, streaks at risk). An inexact hourly alarm (cheap on the battery, kept across reboots by
 /// <see cref="HabitReminderReceiver"/>) asks <see cref="HabitReminderService.TakeDue"/>, which decides whether today's
 /// reminder is due; the app also checks whenever Habits is opened. Runs without the activity. The same pattern as
 /// Missions' daily step reminder, with its own alarm, channel and notification.
@@ -70,9 +70,9 @@ internal static class HabitReminders
         try
         {
             if (context.GetSystemService(Context.NotificationService) is not NotificationManager manager) return;
-            manager.CreateNotificationChannel(new NotificationChannel(ChannelId, "Skipped habit reminders", NotificationImportance.Default)
+            manager.CreateNotificationChannel(new NotificationChannel(ChannelId, "Habit reminders", NotificationImportance.Default)
             {
-                Description = "The habits skipped for two days or more in a row, once a day.",
+                Description = "The habits skipped for two days or more in a row, and the streaks still waiting for today: each once a day.",
             });
             var firstLine = reminder.Message.Split('\n')[0];
             var builder = new Notification.Builder(context, ChannelId)
@@ -83,7 +83,8 @@ internal static class HabitReminders
                 .SetAutoCancel(true)
                 .SetNumber(reminder.Count);
             if (OpenHabitsIntent(context, AlarmRequestCode + 1) is { } open) builder.SetContentIntent(open);
-            manager.Notify(NotificationId, builder.Build());
+            // Each kind has its own notification: the evening streak reminder must not replace an unread skipped-habit one.
+            manager.Notify(NotificationId + (int)reminder.Kind, builder.Build());
         }
         catch (Exception ex)
         {
