@@ -2,6 +2,7 @@ using System.Text.Json;
 using System.Text.Json.Nodes;
 using Helm.Ai;
 using Helm.Ai.Assistant;
+using Helm.Core.Ai;
 
 using Helm.Core.Mcp;
 using Helm.Core.Settings;
@@ -175,42 +176,121 @@ public sealed class LanguageToolsTests
         Assert.Null(SentenceExplainer.Parse("""{"meaning": "no translation"}"""));
     }
 
+    /// <summary>The sentence a long press on 补救 lands in, as <see cref="HeldSentence.At"/> gives it.</summary>
+    private static HeldSentence Held(string chinese = "他错过了最后的补救机会.") =>
+        new(0, 0, 3, chinese, "tā cuò guò le", new SentenceWord("补救", "bǔ jiù", "bổ cứu"));
+
     [Fact]
-    public async Task A_held_sentence_is_explained_and_its_kept_words_go_to_Vocabulary()
+    public async Task A_held_sentence_is_explained_and_its_ticked_words_go_to_Vocabulary_with_an_undo()
     {
-        var held = new HeldWordViewModel([new VocabCaptureTarget(_vocab)], new ScriptedAiText(SentenceJson));
-        held.Show("补救", "他错过了最后的补救机会。");
-        Assert.True(held.CanExplainSentence);
+        var held = new HeldSentenceViewModel([new VocabCaptureTarget(_vocab)], new ScriptedAiText(SentenceJson));
 
-        await held.ExplainCommand.ExecuteAsync(null);
+        await held.ShowAsync(Held());
 
+        Assert.True(held.IsShown);
         Assert.True(held.HasExplanation);
-        Assert.Equal(2, held.Words.Count);
-        held.Words[1].Keep = false;
-        held.AddWordsCommand.Execute(null);
-        var word = Assert.Single(_vocab.Words());
-        Assert.Equal("错过", word.Value.Text);
-        Assert.Equal("他错过了最后的补救机会。", word.Value.Note);
+        Assert.Equal("Không còn cách nào sửa sai nữa.", held.Explanation!.Meaning);
+        Assert.StartsWith("• 错过了", held.Grammar, StringComparison.Ordinal);
+        // The held word first, then the explanation's (补救 once); none ticked until the reader picks.
+        Assert.Equal(["补救", "错过"], held.Words.Select(w => w.Word.Word));
+        Assert.Equal("补救 bổ cứu", held.Words[0].Label);
+        Assert.False(held.AddWordsCommand.CanExecute(null));
+        Assert.Equal("API", held.RanOn);
 
-        // Another word held: the old explanation goes.
-        held.Show("机会", "他错过了最后的补救机会。");
+        held.Words[0].Keep = true;
+        held.Words[1].Keep = true;
+        Assert.Equal("Thêm 2 từ", held.AddWordsText);
+        held.Words[0].Keep = false;
+        Assert.Equal("Thêm 1 từ", held.AddWordsText);
+        held.Words[0].Keep = true;
+        held.AddWordsCommand.Execute(null);
+
+        Assert.Equal(["补救", "错过"], _vocab.Words().Select(w => w.Value.Text).Order(StringComparer.Ordinal));
+        Assert.All(_vocab.Words(), w => Assert.Equal("他错过了最后的补救机会.", w.Value.Note));
+        Assert.False(held.IsShown);
+        Assert.Equal("Đã thêm 2 từ vào Vocabulary", held.Toast);
+        Assert.True(held.UndoCommand.CanExecute(null));
+
+        held.UndoCommand.Execute(null);
+        Assert.Empty(_vocab.Words());
+        Assert.Equal("Đã hoàn tác", held.Toast);
+        Assert.False(held.CanUndo);
+
+        // Another sentence held: the old explanation and chips go.
+        held.DismissToastCommand.Execute(null);
+        await held.ShowAsync(Held("他走了."));
         Assert.False(held.HasExplanation);
-        Assert.Empty(held.Words);
+        Assert.Equal(["补救"], held.Words.Select(w => w.Word.Word));
+        Assert.False(held.HasToast);
     }
 
     [Fact]
-    public async Task Without_AI_there_is_no_explaining_and_a_problem_is_said()
+    public async Task Without_AI_the_sheet_says_why_and_the_held_word_still_goes_to_Vocabulary()
     {
-        var none = new HeldWordViewModel([new VocabCaptureTarget(_vocab)]);
-        none.Show("补救", "他错过了最后的补救机会。");
-        Assert.False(none.CanExplainSentence);
-        Assert.False(none.ExplainCommand.CanExecute(null));
+        var none = new HeldSentenceViewModel([new VocabCaptureTarget(_vocab)]);
+        await none.ShowAsync(Held());
+        Assert.True(none.IsShown);
+        Assert.Equal(HeldSentenceViewModel.NoAi, none.Problem);
+        Assert.False(none.HasExplanation);
+        none.Words[0].Keep = true;
+        none.AddWordsCommand.Execute(null);
+        Assert.Equal("补救", Assert.Single(_vocab.Words()).Value.Text);
 
-        var failing = new HeldWordViewModel([new VocabCaptureTarget(_vocab)], new ScriptedAiText { Problem = "No Helm PC answered in time." });
-        failing.Show("补救", "他错过了最后的补救机会。");
-        await failing.ExplainCommand.ExecuteAsync(null);
+        // Already there: nothing to undo, the sheet stays and says so.
+        await none.ShowAsync(Held());
+        none.Words[0].Keep = true;
+        none.AddWordsCommand.Execute(null);
+        Assert.True(none.IsShown);
+        Assert.Contains("already in your words", none.Problem, StringComparison.Ordinal);
+
+        var failing = new HeldSentenceViewModel([new VocabCaptureTarget(_vocab)], new ScriptedAiText { Problem = "No Helm PC answered in time." });
+        await failing.ShowAsync(Held());
         Assert.False(failing.HasExplanation);
-        Assert.Equal("No Helm PC answered in time.", failing.ExplainStatus);
+        Assert.Equal("No Helm PC answered in time.", failing.Problem);
+
+        // No Vocabulary: the explanation, no chips.
+        var alone = new HeldSentenceViewModel([], new ScriptedAiText(SentenceJson));
+        await alone.ShowAsync(Held());
+        Assert.True(alone.HasExplanation);
+        Assert.False(alone.HasWords);
+        Assert.False(alone.AddWordsCommand.CanExecute(null));
+    }
+
+    [Fact]
+    public async Task An_answer_for_a_sentence_closed_meanwhile_is_dropped_and_the_speaker_says_the_sentence()
+    {
+        var gate = new GateAiText();
+        var said = new List<string>();
+        var held = new HeldSentenceViewModel([new VocabCaptureTarget(_vocab)], gate, s =>
+        {
+            said.Add(s);
+            return Task.FromResult<string?>("No Chinese voice.");
+        });
+
+        var explaining = held.ShowAsync(Held());
+        Assert.True(held.IsExplaining);
+        await held.SayCommand.ExecuteAsync(null);
+        Assert.Equal(["他错过了最后的补救机会."], said);
+        Assert.Equal("No Chinese voice.", held.Problem);
+
+        held.DismissCommand.Execute(null);
+        gate.Answer.SetResult(new AiTextAnswer(SentenceJson, null, "Claude Code trên PC-HUNG"));
+        await explaining;
+        Assert.False(held.HasExplanation);
+        Assert.False(held.IsExplaining);
+
+        Assert.Equal("Claude Code trên PC-HUNG · miễn phí", HeldSentenceViewModel.RanOnText(new AiTextAnswer("{}", null, "Claude Code trên PC-HUNG")));
+        Assert.Equal("claude-haiku-4-5 qua API · $0.0012",
+            HeldSentenceViewModel.RanOnText(new AiTextAnswer("{}", null) { Model = "claude-haiku-4-5", Usd = 0.0012m }));
+    }
+
+    private sealed class GateAiText : IAiText
+    {
+        public TaskCompletionSource<AiTextAnswer> Answer { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        public string? Unavailable(string feature) => null;
+
+        public Task<AiTextAnswer> AskAsync(AiTextRequest request, CancellationToken ct) => Answer.Task;
     }
 
     // ---- Tracker: steps and a note's tasks ------------------------------------------------------------------------

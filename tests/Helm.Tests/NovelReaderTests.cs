@@ -698,6 +698,33 @@ public sealed class NovelReaderTests : IDisposable
     }
 
     [Fact]
+    public async Task A_long_press_highlights_its_sentence_in_the_sheet_until_it_closes_or_the_chapter_changes()
+    {
+        var page = NewPage("a");
+        var id = await page.Store.AddBookAsync("Novel", "n.txt", Novel, 3, "PC");
+        await page.ViewModel.OpenBookAsync(id);
+        var paragraph = page.ViewModel.Paragraphs[1];
+        var word = paragraph.Line!.Segments.Select((s, i) => (s, i)).First(p => p.s.IsWord).i;
+
+        page.ViewModel.HoldSentence(paragraph, word);
+
+        var held = page.ViewModel.HeldSentence;
+        Assert.True(held.IsShown);
+        Assert.StartsWith("永和", held.Sentence, StringComparison.Ordinal);
+        Assert.Equal((paragraph.Sentences[0].FirstSegment, paragraph.Sentences[0].SegmentCount), paragraph.HighlightSegments);
+        // No AI in this page: the sheet says so, nothing is asked.
+        Assert.Equal(HeldSentenceViewModel.NoAi, held.Problem);
+
+        held.DismissCommand.Execute(null);
+        Assert.Null(paragraph.HeldSegments);
+
+        page.ViewModel.HoldSentence(paragraph, word);
+        await page.ViewModel.GoToChapterAsync(1);
+        Assert.False(held.IsShown);
+        Assert.Null(paragraph.HeldSegments);
+    }
+
+    [Fact]
     public async Task Reading_further_on_another_device_is_offered_not_forced()
     {
         var page = NewPage("a");

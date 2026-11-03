@@ -39,6 +39,19 @@ public sealed class NovelPronounceTests
     }
 
     [Fact]
+    public async Task A_held_sentence_is_said_with_a_pause_at_each_mark_of_its_punctuation()
+    {
+        var edge = new Engine(EdgeSpeechEngine.EnginePrefix);
+        var pronouncer = new WordPronouncer([edge], new Player());
+
+        // The reader's text has ASCII punctuation; quotes and spaces are not said.
+        Assert.Null(await pronouncer.SaySentenceAsync("他说: “我们必须补救..” 然后走了!"));
+
+        Assert.Equal("他说，我们必须补救。然后走了。", Assert.Single(edge.Requests).Text);
+        Assert.Equal("", WordPronouncer.SpokenSentence(", . “”"));
+    }
+
+    [Fact]
     public async Task Once_the_online_voice_failed_words_go_straight_to_an_offline_Chinese_voice_for_a_while()
     {
         var edge = new Engine(EdgeSpeechEngine.EnginePrefix) { Fails = true };

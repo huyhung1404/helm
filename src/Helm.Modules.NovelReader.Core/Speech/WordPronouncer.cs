@@ -18,12 +18,12 @@ public interface ILanguageVoices
 }
 
 /// <summary>
-/// Says a Chinese word in standard Mandarin (a long press on a word in study mode and on Novel Lens), to learn its
-/// pronunciation: Microsoft's neural voice Xiaoxiao, a little slower than speech, through Edge's read-aloud service — or
-/// an offline Chinese voice of this device when it is not reachable. A voice that failed is passed over for a while
-/// (<see cref="OnlineRest"/>), so a press never waits for it again and again. Words said are kept in memory, so a word
-/// pressed again plays at once. Reading aloud pauses while a word is said and goes on afterwards
-/// (<see cref="QuietReading"/>).
+/// Says a Chinese word in standard Mandarin (a long press on a word on Novel Lens, the held sentence's speaker in Novel
+/// Reader), to learn its pronunciation: Microsoft's neural voice Xiaoxiao, a little slower than speech, through Edge's
+/// read-aloud service — or an offline Chinese voice of this device when it is not reachable. A voice that failed is
+/// passed over for a while (<see cref="OnlineRest"/>), so a press never waits for it again and again. Words said are
+/// kept in memory, so a word pressed again plays at once. Reading aloud pauses while a word is said and goes on
+/// afterwards (<see cref="QuietReading"/>).
 /// </summary>
 public sealed class WordPronouncer(IEnumerable<ISpeechEngine> engines, IClipPlayer player, ILogger<WordPronouncer>? logger = null,
     TimeProvider? time = null)
@@ -84,10 +84,39 @@ public sealed class WordPronouncer(IEnumerable<ISpeechEngine> engines, IClipPlay
     /// Says a word in <paramref name="language"/>: "zh" (only its Chinese characters are said) or "en". Returns why it could
     /// not be said, or null.
     /// </summary>
-    public async Task<string?> SayAsync(string text, string language)
+    public Task<string?> SayAsync(string text, string language)
     {
         var english = language == "en";
-        var chinese = english ? text.Trim() : new string(text.Where(ChineseText.IsHan).ToArray());
+        return SayTextAsync(english ? text.Trim() : new string(text.Where(ChineseText.IsHan).ToArray()), english);
+    }
+
+    /// <summary>
+    /// Says a Chinese sentence (the sentence held in Novel Reader): its characters, with a pause where its punctuation is
+    /// (the reader's text has ASCII punctuation: "," "." become "，" "。"). Returns why it could not be said, or null.
+    /// </summary>
+    public Task<string?> SaySentenceAsync(string sentence) => SayTextAsync(SpokenSentence(sentence), english: false);
+
+    /// <summary>The Chinese of a sentence as the voice says it: Han characters, and a Chinese mark for each pause.</summary>
+    internal static string SpokenSentence(string sentence)
+    {
+        var said = new System.Text.StringBuilder(sentence.Length);
+        foreach (var c in sentence)
+        {
+            var mark = c switch
+            {
+                ',' or '，' or '、' or ';' or '；' or ':' or '：' => '，',
+                '.' or '。' or '!' or '！' or '?' or '？' or '…' => '。',
+                _ => ChineseText.IsHan(c) ? c : '\0',
+            };
+            // A mark only after a character, and one at a time.
+            if (mark == '\0' || mark is '，' or '。' && (said.Length == 0 || said[^1] is '，' or '。')) continue;
+            said.Append(mark);
+        }
+        return said.ToString();
+    }
+
+    private async Task<string?> SayTextAsync(string chinese, bool english)
+    {
         if (chinese.Length == 0) return null;
         var online = english ? OnlineEnglishVoice : OnlineVoice;
         _current?.Cancel();

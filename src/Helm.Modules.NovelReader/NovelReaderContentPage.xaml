@@ -89,23 +89,6 @@
                 </core:RowLayout>
             </Border>
 
-            <!-- A word was held: add it to Vocabulary, with its sentence as the note -->
-            <Border Style="{DynamicResource HelmSurface}" Margin="0,0,0,12" Padding="12,8" DataContext="{Binding HeldWord}"
-                    Visibility="{Binding IsShown, Converter={StaticResource BoolToVisibility}}">
-                <DockPanel>
-                    <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center">
-                        <ui:Button Appearance="Primary" Content="Add to Vocabulary" Icon="{ui:SymbolIcon Add24}" Command="{Binding AddCommand}" />
-                        <ui:Button Style="{StaticResource IconAction}" Icon="{ui:SymbolIcon Dismiss24}" ToolTip="Dismiss" AutomationProperties.Name="Dismiss"
-                                   Command="{Binding DismissCommand}" />
-                    </StackPanel>
-                    <StackPanel VerticalAlignment="Center">
-                        <TextBlock Text="{Binding Word}" FontSize="18" FontWeight="SemiBold" />
-                        <TextBlock Text="{Binding Sentence}" TextWrapping="Wrap" TextTrimming="CharacterEllipsis" MaxHeight="40" Style="{DynamicResource HelmSecondaryText}" />
-                        <TextBlock Text="{Binding Result}" TextWrapping="Wrap" Foreground="{DynamicResource AccentTextFillColorPrimaryBrush}"
-                                   Visibility="{Binding HasResult, Converter={StaticResource BoolToVisibility}}" />
-                    </StackPanel>
-                </DockPanel>
-            </Border>
         </StackPanel>
 
         <!-- Another device read further -->
@@ -560,7 +543,8 @@
                         <ColumnDefinition Width="Auto" />
                     </Grid.ColumnDefinitions>
 
-                    <!-- The chapter: click a word to fix it; double-click a sentence or use a paragraph's ▶ to read from there.
+                    <!-- The chapter: click a word to fix it; double-click a sentence or use a paragraph's ▶ to read from there; hold
+                         the mouse down on a word to have its sentence explained.
                          The text fills the width left beside the names panel, and all of it when the panel is closed. -->
                     <ScrollViewer x:Name="Scroller" VerticalScrollBarVisibility="Auto" ScrollChanged="Scroller_ScrollChanged" Focusable="True"
                                   PreviewMouseWheel="Scroller_UserScroll" PreviewMouseLeftButtonDown="Scroller_MouseDown">
@@ -588,8 +572,8 @@
                                             <StackPanel>
                                                 <TextBlock x:Name="ResumeLabel" Text="Continue reading here" FontSize="12" Margin="0,0,0,2" Visibility="Collapsed"
                                                            Foreground="{DynamicResource AccentTextFillColorPrimaryBrush}" />
-                                                <self:SegmentText x:Name="Text" Line="{Binding Line}" WordClicked="Word_Clicked" ReadFromClicked="Paragraph_ReadFromClicked"
-                                                                  Highlight="{Binding SpeakingSegments}" HighlightBrush="{StaticResource SentenceFill}"
+                                                <self:SegmentText x:Name="Text" Line="{Binding Line}" WordClicked="Word_Clicked" ReadFromClicked="Paragraph_ReadFromClicked" WordHeld="Word_Held"
+                                                                  Highlight="{Binding HighlightSegments}" HighlightBrush="{StaticResource SentenceFill}"
                                                                   Sentences="{Binding Sentences}"
                                                                   HoverHighlight="{Binding DataContext.HoverHighlight, RelativeSource={RelativeSource AncestorType=Page}}"
                                                                   GrammarColors="{Binding DataContext.GrammarColors, RelativeSource={RelativeSource AncestorType=Page}}"
@@ -605,7 +589,7 @@
                                                 <!-- Study mode: each word with its Chinese, pinyin and Hán Việt above the Vietnamese -->
                                                 <self:StudyText x:Name="Study" Visibility="Collapsed" Line="{Binding Line}" Readings="{Binding Readings}"
                                                                 WordClicked="Word_Clicked" ReadFromClicked="Paragraph_ReadFromClicked" WordHeld="Word_Held"
-                                                                Highlight="{Binding SpeakingSegments}" HighlightBrush="{StaticResource SentenceFill}"
+                                                                Highlight="{Binding HighlightSegments}" HighlightBrush="{StaticResource SentenceFill}"
                                                                 Sentences="{Binding Sentences}"
                                                                 TextSize="{Binding DataContext.FontSize, RelativeSource={RelativeSource AncestorType=Page}}"
                                                                 ShowChinese="{Binding DataContext.StudyShowChinese, RelativeSource={RelativeSource AncestorType=Page}}"
@@ -655,6 +639,88 @@
                     <ui:Button Appearance="Primary" HorizontalAlignment="Right" VerticalAlignment="Bottom" Margin="0,0,28,16"
                                Icon="{ui:SymbolIcon Location24}" Content="Back to reading position" Command="{Binding FollowReadingCommand}"
                                Visibility="{Binding ShowBackToReading, Converter={StaticResource BoolToVisibility}}" />
+
+                    <!-- A word held down: its sentence ("Câu này") explained, said aloud, and its words to Vocabulary (Esc closes) -->
+                    <Border Margin="32,0,28,12" MaxWidth="760" VerticalAlignment="Bottom" Padding="16,10,12,12" CornerRadius="8" BorderThickness="1"
+                            Background="{DynamicResource ApplicationBackgroundBrush}" BorderBrush="{DynamicResource SurfaceStrokeColorDefaultBrush}"
+                            DataContext="{Binding HeldSentence}" Visibility="{Binding IsShown, Converter={StaticResource BoolToVisibility}}"
+                            AutomationProperties.Name="Giải thích câu">
+                        <DockPanel>
+                            <DockPanel DockPanel.Dock="Top">
+                                <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
+                                    <ui:Button Style="{StaticResource IconAction}" Icon="{ui:SymbolIcon Speaker224}" ToolTip="Nghe câu" AutomationProperties.Name="Nghe câu"
+                                               Command="{Binding SayCommand}" />
+                                    <ui:Button Style="{StaticResource IconAction}" Icon="{ui:SymbolIcon Dismiss24}" ToolTip="Đóng (Esc)" AutomationProperties.Name="Đóng"
+                                               Command="{Binding DismissCommand}" />
+                                </StackPanel>
+                                <TextBlock Text="Câu này" FontSize="16" FontWeight="SemiBold" VerticalAlignment="Center" />
+                            </DockPanel>
+                            <TextBlock DockPanel.Dock="Top" Text="{Binding Pinyin}" TextWrapping="Wrap" Margin="0,2,0,0" Style="{DynamicResource HelmSecondaryText}"
+                                       Visibility="{Binding HasPinyin, Converter={StaticResource BoolToVisibility}}" />
+                            <!-- Where it ran and what it cost; the ticked words to Vocabulary -->
+                            <DockPanel DockPanel.Dock="Bottom" Margin="0,10,0,0">
+                                <ui:Button DockPanel.Dock="Right" Appearance="Primary" Content="{Binding AddWordsText}" Command="{Binding AddWordsCommand}"
+                                           Visibility="{Binding HasWords, Converter={StaticResource BoolToVisibility}}" />
+                                <TextBlock Text="{Binding RanOn}" FontSize="12" Style="{DynamicResource HelmSecondaryText}" VerticalAlignment="Center"
+                                           TextTrimming="CharacterEllipsis" />
+                            </DockPanel>
+                            <ScrollViewer MaxHeight="340" Margin="0,8,0,0" VerticalScrollBarVisibility="Auto">
+                                <StackPanel>
+                                    <!-- Waiting for the answer -->
+                                    <StackPanel Orientation="Horizontal" Margin="0,4,0,4" Visibility="{Binding IsExplaining, Converter={StaticResource BoolToVisibility}}">
+                                        <ui:ProgressRing IsIndeterminate="True" Width="16" Height="16" Margin="0,0,8,0" />
+                                        <TextBlock Text="Đang giải thích…" Style="{DynamicResource HelmSecondaryText}" VerticalAlignment="Center" />
+                                    </StackPanel>
+                                    <!-- No explanation (or the sentence could not be said): why, and another try -->
+                                    <DockPanel Margin="0,4,0,4" Visibility="{Binding HasProblem, Converter={StaticResource BoolToVisibility}}">
+                                        <ui:Button DockPanel.Dock="Right" Margin="8,0,0,0" VerticalAlignment="Top" Content="Thử lại" Icon="{ui:SymbolIcon ArrowClockwise24}"
+                                                   Command="{Binding ExplainCommand}" Visibility="{Binding HasExplanation, Converter={StaticResource InverseBoolToVisibility}}" />
+                                        <TextBlock Text="{Binding Problem}" TextWrapping="Wrap" VerticalAlignment="Center" Foreground="{DynamicResource SystemFillColorCriticalBrush}" />
+                                    </DockPanel>
+                                    <StackPanel Visibility="{Binding HasExplanation, Converter={StaticResource BoolToVisibility}}">
+                                        <TextBlock Text="Nghĩa" FontSize="12" FontWeight="SemiBold" Style="{DynamicResource HelmSecondaryText}" Margin="0,4,0,2" />
+                                        <TextBlock Text="{Binding Explanation.Meaning}" TextWrapping="Wrap" />
+                                        <StackPanel Visibility="{Binding HasGrammar, Converter={StaticResource BoolToVisibility}}">
+                                            <TextBlock Text="Ngữ pháp" FontSize="12" FontWeight="SemiBold" Style="{DynamicResource HelmSecondaryText}" Margin="0,10,0,2" />
+                                            <TextBlock Text="{Binding Grammar}" TextWrapping="Wrap" />
+                                        </StackPanel>
+                                        <TextBlock Text="Dịch tự nhiên" FontSize="12" FontWeight="SemiBold" Style="{DynamicResource HelmSecondaryText}" Margin="0,10,0,2" />
+                                        <TextBlock Text="{Binding Explanation.Translation}" TextWrapping="Wrap" />
+                                    </StackPanel>
+                                    <!-- The sentence's words: the held one first, then the explanation's; click one to tick it -->
+                                    <StackPanel Visibility="{Binding HasWords, Converter={StaticResource BoolToVisibility}}">
+                                        <TextBlock Text="Thêm từ trong câu" FontSize="12" FontWeight="SemiBold" Style="{DynamicResource HelmSecondaryText}" Margin="0,10,0,4" />
+                                        <ItemsControl ItemsSource="{Binding Words}">
+                                            <ItemsControl.ItemsPanel>
+                                                <ItemsPanelTemplate>
+                                                    <WrapPanel />
+                                                </ItemsPanelTemplate>
+                                            </ItemsControl.ItemsPanel>
+                                            <ItemsControl.ItemTemplate>
+                                                <DataTemplate>
+                                                    <ToggleButton Content="{Binding Label}" IsChecked="{Binding Keep}" ToolTip="{Binding Tip}" Padding="10,4" Margin="0,0,6,6"
+                                                                  AutomationProperties.Name="{Binding Label}" />
+                                                </DataTemplate>
+                                            </ItemsControl.ItemTemplate>
+                                        </ItemsControl>
+                                    </StackPanel>
+                                </StackPanel>
+                            </ScrollViewer>
+                        </DockPanel>
+                    </Border>
+
+                    <!-- Words just sent to Vocabulary, with Hoàn tác for a few seconds -->
+                    <Border Margin="0,0,28,16" VerticalAlignment="Bottom" HorizontalAlignment="Center" Padding="14,4,4,4" CornerRadius="8" BorderThickness="1"
+                            Background="{DynamicResource ApplicationBackgroundBrush}" BorderBrush="{DynamicResource SurfaceStrokeColorDefaultBrush}"
+                            DataContext="{Binding HeldSentence}" Visibility="{Binding HasToast, Converter={StaticResource BoolToVisibility}}">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="{Binding Toast}" VerticalAlignment="Center" />
+                            <ui:Button Margin="12,0,0,0" Appearance="Transparent" Content="Hoàn tác" Icon="{ui:SymbolIcon ArrowUndo24}" Command="{Binding UndoCommand}"
+                                       Visibility="{Binding CanUndo, Converter={StaticResource BoolToVisibility}}" />
+                            <ui:Button Style="{StaticResource IconAction}" Icon="{ui:SymbolIcon Dismiss24}" ToolTip="Dismiss" AutomationProperties.Name="Dismiss"
+                                       Command="{Binding DismissToastCommand}" />
+                        </StackPanel>
+                    </Border>
 
                     <!-- Names panel: this novel's saved names, and names found in it -->
                     <Border Grid.Column="1" Width="340" Margin="8,0,0,24" Style="{DynamicResource HelmSurface}" Padding="12"

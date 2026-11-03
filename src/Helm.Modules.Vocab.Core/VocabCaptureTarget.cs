@@ -54,21 +54,28 @@ public sealed partial class VocabCaptureTarget(VocabStore store) : ICaptureTarge
         var (words, note) = Parse(text);
         if (words.Count == 0) return new(false, "Type a word first.");
         if (words.Count > MaxWords) return new(false, $"At most {MaxWords} words at once.");
-        var added = new List<string>();
+        var added = new List<(string Word, string Id)>();
         try
         {
             foreach (var word in words)
-                if (store.AddWord(word, note).Added) added.Add(word);
+                if (store.AddWord(word, note) is { Added: true } result) added.Add((word, result.Id));
         }
         catch (ArgumentException ex)
         {
             return new(false, ex.Message);
         }
+        var ids = added.Select(a => a.Id).ToList();
+        CaptureResult Saved(string message) => new(true, message)
+        {
+            Count = ids.Count,
+            // Only the words this capture added go (the ones already there stay).
+            Undo = () => ids.ForEach(id => store.DeleteWord(id)),
+        };
         return added.Count switch
         {
             0 => new(false, words.Count == 1 ? $"“{words[0]}” is already in your words." : "These are all in your words already."),
-            1 => new(true, $"Added “{added[0]}” to Vocabulary; it waits for an AI agent to break it down."),
-            _ => new(true, $"Added {added.Count} words to Vocabulary: {string.Join(", ", added)}."),
+            1 => Saved($"Added “{added[0].Word}” to Vocabulary; it waits for an AI agent to break it down."),
+            _ => Saved($"Added {added.Count} words to Vocabulary: {string.Join(", ", added.Select(a => a.Word))}."),
         };
     }
 

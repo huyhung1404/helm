@@ -17,6 +17,12 @@ public sealed record AiTextAnswer(string Text, string? Problem, string? RanOn = 
 {
     public bool Ok => Problem is null;
 
+    /// <summary>The API model that answered (null when an agent did, or nothing answered).</summary>
+    public string? Model { get; init; }
+
+    /// <summary>What the API call cost, estimated; null when an agent answered (free) or the price is unknown.</summary>
+    public decimal? Usd { get; init; }
+
     public static AiTextAnswer Failed(string problem) => new("", problem);
 }
 

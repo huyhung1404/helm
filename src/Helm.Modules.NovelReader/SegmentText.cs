@@ -19,8 +19,9 @@ public sealed class WordClickedEventArgs(RoutedEvent routedEvent, Segment segmen
 }
 
 /// <summary>
-/// One converted paragraph as a text block with a run per word, so a click knows which Chinese it came from. Names
-/// are in the accent colour; the word under the mouse is highlighted, and so is the sentence being read aloud.
+/// One converted paragraph as a text block with a run per word, so a click knows which Chinese it came from, and the
+/// mouse held down on a word holds its sentence (<see cref="StudyText.WordHeldEvent"/>). Names are in the accent colour;
+/// the word under the mouse is highlighted, and so is the sentence being read aloud (or held).
 /// While the mouse is over the paragraph (<see cref="IsHot"/>) it is marked for reading by eye (<see cref="GrammarTagger"/>):
 /// sentences in two alternating shades, what is said in violet, and the subject, verb and object of each clause in
 /// colour. Scene breaks show as a centred "* * *".
@@ -61,6 +62,9 @@ public sealed class SegmentText : TextBlock
         typeof(EventHandler<WordClickedEventArgs>), typeof(SegmentText));
 
     private readonly List<(Run Run, int Index)> _runs = [];
+    private readonly System.Windows.Threading.DispatcherTimer _hold = new() { Interval = StudyText.HoldTime };
+    private (Segment Segment, int Index)? _pressed;
+    private bool _held;
     private bool _doubleClicked;
     private IReadOnlyList<SegmentMark>? _marks;
     private bool _marksHaveRoles;
@@ -70,6 +74,9 @@ public sealed class SegmentText : TextBlock
         TextWrapping = TextWrapping.Wrap;
         MouseLeftButtonUp += OnMouseUp;
         MouseLeftButtonDown += OnMouseDown;
+        MouseLeave += (_, _) => CancelHold();
+        Unloaded += (_, _) => CancelHold();
+        _hold.Tick += (_, _) => OnHeld();
     }
 
     public ConvertedLine? Line
@@ -124,6 +131,13 @@ public sealed class SegmentText : TextBlock
     {
         add => AddHandler(ReadFromClickedEvent, value);
         remove => RemoveHandler(ReadFromClickedEvent, value);
+    }
+
+    /// <summary>A word was held down: the same event as <see cref="StudyText.WordHeld"/>, so the page handles both alike.</summary>
+    public event EventHandler<WordHeldEventArgs> WordHeld
+    {
+        add => AddHandler(StudyText.WordHeldEvent, value);
+        remove => RemoveHandler(StudyText.WordHeldEvent, value);
     }
 
     /// <summary>Where the highlighted sentence starts, from the top of this block (null when nothing is highlighted).</summary>
@@ -248,14 +262,46 @@ public sealed class SegmentText : TextBlock
 
     private void OnMouseDown(object sender, MouseButtonEventArgs e)
     {
+        if (e.ClickCount == 1)
+        {
+            // Held long enough, the word holds its sentence.
+            _held = false;
+            _hold.Stop();
+            _pressed = e.OriginalSource is Run { Tag: Segment { IsWord: true } word } pressed ? (word, IndexOf(pressed)) : null;
+            if (_pressed is not null) _hold.Start();
+            return;
+        }
+        CancelHold();
         if (e.ClickCount != 2 || e.OriginalSource is not Run run || IndexOf(run) is var index && index < 0) return;
         _doubleClicked = true;
         RaiseEvent(new WordClickedEventArgs(ReadFromClickedEvent, (run.Tag as Segment) ?? Line!.Segments[index], index));
         e.Handled = true;
     }
 
+    private void OnHeld()
+    {
+        _hold.Stop();
+        if (_pressed is not { } word || Mouse.LeftButton != MouseButtonState.Pressed || Line is not { } line) return;
+        _held = true;
+        RaiseEvent(new WordHeldEventArgs(StudyText.WordHeldEvent, line.SourceOf(word.Segment), word.Index));
+    }
+
+    private void CancelHold()
+    {
+        _hold.Stop();
+        _pressed = null;
+    }
+
     private void OnMouseUp(object sender, MouseButtonEventArgs e)
     {
+        CancelHold();
+        // Let go after a hold: the sentence is explained, the word popup stays shut.
+        if (_held)
+        {
+            _held = false;
+            e.Handled = true;
+            return;
+        }
         // The second release of a double-click does not open the word popup again.
         if (_doubleClicked)
         {

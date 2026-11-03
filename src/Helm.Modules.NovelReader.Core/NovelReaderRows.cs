@@ -171,7 +171,17 @@ public sealed partial class ParagraphViewModel(int index, string chinese, bool i
             ? (Sentences[SpeakingSentence].FirstSegment, Sentences[SpeakingSentence].SegmentCount)
             : null;
 
-    partial void OnSpeakingSentenceChanged(int value) => OnPropertyChanged(nameof(SpeakingSegments));
+    /// <summary>The sentence held for its explanation (first, count), highlighted while its sheet is open; null: none.</summary>
+    [ObservableProperty] [NotifyPropertyChangedFor(nameof(HighlightSegments))] private (int First, int Count)? _heldSegments;
+
+    /// <summary>What the page highlights: the held sentence, else the one being read aloud.</summary>
+    public (int First, int Count)? HighlightSegments => HeldSegments ?? SpeakingSegments;
+
+    partial void OnSpeakingSentenceChanged(int value)
+    {
+        OnPropertyChanged(nameof(SpeakingSegments));
+        OnPropertyChanged(nameof(HighlightSegments));
+    }
 
     public int Index { get; } = index;
 
@@ -190,6 +200,9 @@ public sealed partial class ParagraphViewModel(int index, string chinese, bool i
         OnPropertyChanged(nameof(Text));
         OnPropertyChanged(nameof(IsSceneBreak));
         OnPropertyChanged(nameof(SpeakingSegments));
+        // Another line (names changed): the held sentence's segments no longer fit it.
+        HeldSegments = null;
+        OnPropertyChanged(nameof(HighlightSegments));
     }
 }
 

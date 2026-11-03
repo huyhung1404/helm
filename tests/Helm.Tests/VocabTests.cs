@@ -437,23 +437,23 @@ public sealed class VocabTests
     }
 
     [Fact]
-    public void A_word_held_in_novel_reader_goes_to_vocabulary_with_its_sentence()
+    public void Words_captured_together_are_counted_and_undone_together_leaving_the_ones_already_there()
     {
         const string paragraph = "他说：“我们必须补救。”然后走了。";
-        var sentence = Helm.Modules.NovelReader.Text.ChineseText.SentenceAround(paragraph, paragraph.IndexOf("补救", StringComparison.Ordinal));
-        Assert.Equal("他说：“我们必须补救。”", sentence);
-        Assert.Equal("然后走了。", Helm.Modules.NovelReader.Text.ChineseText.SentenceAround(paragraph, paragraph.IndexOf("走", StringComparison.Ordinal)));
+        Assert.Equal("他说：“我们必须补救。”", Helm.Modules.NovelReader.Text.ChineseText.SentenceAround(paragraph, paragraph.IndexOf("补救", StringComparison.Ordinal)));
+        var target = new VocabCaptureTarget(_store);
+        _store.AddWord("必须");
 
-        var held = new Helm.Modules.NovelReader.HeldWordViewModel([new VocabCaptureTarget(_store)]);
-        held.Show("补救", sentence);
-        Assert.True(held.IsShown);
-        held.AddCommand.Execute(null);
-        Assert.Equal(sentence, _store.FindWord("补救")!.Value.Note);
-        Assert.Contains("Added", held.Result);
+        var result = target.Capture("补救, 必须, 然后 | 他说：“我们必须补救。”");
 
-        var without = new Helm.Modules.NovelReader.HeldWordViewModel([]);
-        without.Show("补救", sentence);
-        Assert.False(without.IsShown); // no Vocabulary, no bar
+        Assert.True(result.Saved);
+        Assert.Equal(2, result.Count);
+        Assert.Equal("他说：“我们必须补救。”", _store.FindWord("补救")!.Value.Note);
+        result.Undo!();
+        Assert.Null(_store.FindWord("补救"));
+        Assert.Null(_store.FindWord("然后"));
+        Assert.NotNull(_store.FindWord("必须"));
+        Assert.Null(target.Capture("必须").Undo);
     }
 
     private sealed class FakeAgent : IVocabAgent

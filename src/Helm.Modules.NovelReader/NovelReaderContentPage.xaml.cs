@@ -174,11 +174,12 @@ public partial class NovelReaderContentPage : Page
         if (sender is FrameworkElement { DataContext: ParagraphViewModel paragraph }) _viewModel.OpenWord(paragraph, e.Segment);
     }
 
-    /// <summary>The mouse held down on a word in study mode says its Chinese.</summary>
-    private async void Word_Held(object? sender, WordHeldEventArgs e)
+    /// <summary>The mouse held down on a word: its sentence is highlighted and explained in the panel at the bottom.</summary>
+    private void Word_Held(object? sender, WordHeldEventArgs e)
     {
-        _viewModel.HeldWord.Show(e.Chinese, e.Sentence);
-        await _viewModel.PronounceAsync(e.Chinese);
+        if (sender is not FrameworkElement { DataContext: ParagraphViewModel paragraph }) return;
+        _viewModel.Editor.IsOpen = false;
+        _viewModel.HoldSentence(paragraph, e.Index);
     }
 
     /// <summary>A double-click on a sentence reads aloud from it.</summary>
@@ -276,10 +277,16 @@ public partial class NovelReaderContentPage : Page
 
     /// <summary>
     /// Space plays or pauses, Alt+←/→ skip a sentence and Alt+↑/↓ a paragraph, ← → change chapter, [ ] change the
-    /// speed; not while typing. Scrolling keys stop following the voice.
+    /// speed; not while typing. Scrolling keys stop following the voice. Esc closes the sentence panel.
     /// </summary>
     private void OnPreviewKeyDown(object sender, KeyEventArgs e)
     {
+        if (e.Key == Key.Escape && _viewModel.HeldSentence.IsShown && !_viewModel.Editor.IsOpen && _viewModel.Reports?.Editor.IsOpen != true)
+        {
+            _viewModel.HeldSentence.DismissCommand.Execute(null);
+            e.Handled = true;
+            return;
+        }
         if (!_viewModel.IsBookOpen || Keyboard.FocusedElement is TextBox or ComboBox or ComboBoxItem || _viewModel.Editor.IsOpen
             || _viewModel.Reports?.Editor.IsOpen == true) return;
         var alt = e.Key == Key.System;

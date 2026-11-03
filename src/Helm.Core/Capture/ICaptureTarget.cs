@@ -7,7 +7,14 @@ public sealed record CapturePreview(bool CanSave, string Text);
 
 /// <param name="Saved">False when nothing was saved (<paramref name="Message"/> says why).</param>
 /// <param name="Message">E.g. "Added to To-do, due tomorrow 09:00."</param>
-public sealed record CaptureResult(bool Saved, string Message);
+public sealed record CaptureResult(bool Saved, string Message)
+{
+    /// <summary>How many items were added (a few words at once); 0 when the target does not count them.</summary>
+    public int Count { get; init; }
+
+    /// <summary>Takes back what was saved, for an Undo right after it; null when the target cannot.</summary>
+    public Action? Undo { get; init; }
+}
 
 /// <summary>
 /// Somewhere Quick Capture can put a line of text: a note, a task, a debt. Each tool registers its targets in DI; Quick

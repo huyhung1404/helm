@@ -83,10 +83,12 @@ public sealed class AiTextService(
             var chat = factory.Create(key, apiModel, choice.Effort, request.System, []);
             chat.AddUser(request.Prompt);
             var step = await chat.NextAsync(ct);
-            usage.Record(request.Feature, factory.Provider, apiModel, keyId, step.Usage.Input, step.Usage.Output, step.Usage.CacheRead, step.Usage.CacheWrite);
+            var entry = usage.Record(request.Feature, factory.Provider, apiModel, keyId, step.Usage.Input, step.Usage.Output, step.Usage.CacheRead, step.Usage.CacheWrite);
             (chat as IDisposable)?.Dispose();
             if (step.Refused) return AiTextAnswer.Failed($"{apiModel} declined this request.");
-            return step.Text.Trim().Length > 0 ? new AiTextAnswer(step.Text.Trim(), null) : AiTextAnswer.Failed("The model gave no answer. Try again.");
+            return step.Text.Trim().Length > 0
+                ? new AiTextAnswer(step.Text.Trim(), null) { Model = apiModel, Usd = entry.Usd }
+                : AiTextAnswer.Failed("The model gave no answer. Try again.");
         }
         catch (AssistantException ex)
         {

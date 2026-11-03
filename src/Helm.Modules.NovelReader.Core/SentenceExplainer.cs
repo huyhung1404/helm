@@ -45,7 +45,7 @@ public static class SentenceExplainer
         return new AiTextRequest(Feature, SystemPrompt, $"Explain this sentence.\n<<<\n{line}\n>>>{help}");
     }
 
-    /// <summary>The answer as the bar shows it; null when it has no translation.</summary>
+    /// <summary>The answer as the sheet shows it; null when it has no translation.</summary>
     public static SentenceExplanation? Parse(string answer)
     {
         if (AiJson.Object(answer) is not { } json || AiJson.String(json, "translation") is not { } translation) return null;
