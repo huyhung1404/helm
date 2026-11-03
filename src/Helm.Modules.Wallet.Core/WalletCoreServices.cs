@@ -19,7 +19,7 @@ public static class WalletIds
 public static class WalletCoreServices
 {
     /// <summary>
-    /// The platform-neutral part of Wallet: its three synced collections, the store, the notification reader and the
+    /// The platform-neutral part of Wallet: its synced collections, the store, the notification reader and the
     /// page view model. The platform module (Windows or Android) calls this from its own <c>AddWalletModule()</c>.
     /// </summary>
     public static IServiceCollection AddWalletCore(this IServiceCollection services)
@@ -36,6 +36,8 @@ public static class WalletCoreServices
         services.AddSyncedCollection(new SyncedCollectionOptions<WalletDebt> { Name = DebtBook.Collection, GuardDeletions = true });
         // Funds: one small record each (amount, categories, the month's moves); the latest edit wins.
         services.AddSyncedCollection(new SyncedCollectionOptions<WalletFund> { Name = FundBook.Collection, GuardDeletions = true });
+        // Recurring bills: one small record each (amount, due day, the months paid); the latest edit wins.
+        services.AddSyncedCollection(new SyncedCollectionOptions<WalletBill> { Name = BillBook.Collection, GuardDeletions = true });
         services.AddSyncGroup("wallet.", WalletIds.DisplayName);
         services.AddSingleton(sp => new WalletStore(
             sp.GetRequiredService<ISyncedCollection<WalletTransaction>>(),
@@ -43,12 +45,16 @@ public static class WalletCoreServices
             sp.GetRequiredService<ISyncedCollection<WalletBudget>>()));
         services.AddSingleton(sp => new DebtBook(sp.GetRequiredService<ISyncedCollection<WalletDebt>>(), sp.GetRequiredService<WalletStore>()));
         services.AddSingleton(sp => new FundBook(sp.GetRequiredService<ISyncedCollection<WalletFund>>(), sp.GetRequiredService<WalletStore>()));
+        services.AddSingleton(sp => new BillBook(sp.GetRequiredService<ISyncedCollection<WalletBill>>(), sp.GetRequiredService<WalletStore>()));
         services.AddSingleton<WalletCapture>();
         // Quick Capture: "/s 50k coffee" and "/d Nam 200k".
         services.AddSingleton<Helm.Core.Capture.ICaptureTarget, SpendCaptureTarget>();
         services.AddSingleton<Helm.Core.Capture.ICaptureTarget, DebtCaptureTarget>();
         // The AI agents' tools for the debt book (Helm's MCP server, Windows).
         services.AddSingleton<Helm.Core.Mcp.IMcpToolProvider, WalletMcpTools>();
+        // Ask Helm's: a bill split among friends, a debt reminder to share, recurring bills.
+        services.AddSingleton<Helm.Core.Mcp.IMcpToolProvider, WalletShareTools>();
+        services.AddSingleton<Helm.Core.Mcp.IMcpToolProvider, BillMcpTools>();
         services.TryAddSingleton(sp => new DebtsViewModel(
             sp.GetRequiredService<DebtBook>(),
             sp.GetRequiredService<IUiDispatcher>(),
