@@ -39,11 +39,11 @@ public sealed class WalletAiTests : IDisposable
         _dir.Dispose();
     }
 
-    private AiOneShot Ai(params IAgentRoute[] pcs)
+    private AiTextService Ai(params IAgentRoute[] pcs)
     {
         var keys = new AiKeyStore(new MemorySynced<AiKey>());
         keys.Add(AiProviders.Claude, "Helm", ClaudeKey);
-        return new AiOneShot(keys, _features, new AiUsageBook(_usage), [_api], new AiRouter(pcs));
+        return new AiTextService(keys, _features, new AiUsageBook(_usage), [_api], new AiRouter(pcs));
     }
 
     private string Filed(decimal amount, string description, string category, int minutesAgo = 60)

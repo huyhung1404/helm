@@ -2,7 +2,7 @@ using System.Globalization;
 using System.Text;
 using System.Text.Json;
 using Helm.Ai;
-using Helm.Ai.Assistant;
+using Helm.Core.Ai;
 
 namespace Helm.Modules.Wallet;
 
@@ -22,7 +22,7 @@ public sealed record CategoryProposal(string? CategoryId, string? NewName, Categ
 /// the API only if the user chose so) with the user's categories and a few transactions like it. AI answers one of
 /// them, or a new name when none fits.
 /// </summary>
-public sealed class WalletCategoryAi(WalletStore store, AiOneShot ai, TimeZoneInfo? zone = null)
+public sealed class WalletCategoryAi(WalletStore store, IAiText ai, TimeZoneInfo? zone = null)
 {
     /// <summary>Earlier filed transactions shown to AI: enough to see the user's habits, few enough to stay cheap.</summary>
     public const int Examples = 5;
@@ -43,8 +43,9 @@ public sealed class WalletCategoryAi(WalletStore store, AiOneShot ai, TimeZoneIn
     {
         if (store.Get(transactionId) is not { } transaction || transaction.IsCategorized) return null;
         if (store.Guess(transaction, transactionId) is { IsSure: true } sure) return new CategoryProposal(sure.CategoryId, null, Kind(transaction), false);
-        var answer = await ai.AskAsync(new AiOneShotRequest(AiFeatureIds.WalletCategorize, System, Prompt(transaction)), ct);
-        return answer.Text is { } text ? Read(text, transaction) : null;
+        // It runs by itself: a PC agent only, unless the user chose a route for it.
+        var answer = await ai.AskAsync(new AiTextRequest(AiFeatureIds.WalletCategorize, System, Prompt(transaction)) { UserStarted = false }, ct);
+        return answer.Ok ? Read(answer.Text, transaction) : null;
     }
 
     internal string Prompt(WalletTransaction transaction)

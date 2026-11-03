@@ -478,6 +478,8 @@ public partial class AskHelmActivity : Activity, IRecognitionListener
                     _logger?.LogWarning(ex, "Undo failed");
                     undo.Enabled = true;
                     undo.Text = "Hoàn tác lỗi";
+                    // Why (the record is gone, or the PC did not answer): Helm's own words, never a stack.
+                    if (ex is Helm.Core.Mcp.McpToolException or AiRouteException) _status.Text = ex.Message;
                 }
             });
             row.AddView(undo);

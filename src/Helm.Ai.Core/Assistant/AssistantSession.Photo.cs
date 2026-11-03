@@ -23,7 +23,8 @@ public sealed partial class AssistantSession
         var first = _history.Count == 0;
         _all ??= _helm.OfferedTools(_phone);
         _scope.UnionWith(AssistantPhotos.Groups);
-        _tools = ToolScope.Pick(_all, _scope, said);
+        // The photo says what it is about: words naming no group add nothing.
+        _tools = ToolScope.Pick(_all, _scope, said, known: true);
 
         var picked = Model!;
         string? note = null;

@@ -75,14 +75,23 @@ public sealed class AiBriefTools(AiBriefBook briefs, ISyncedSettings<AiFeatureSe
         if (brief.Actions.Count == 0) throw new McpToolException("That brief changed nothing.");
         var all = tools().SelectMany(p => p.Tools).ToList();
         var undone = 0;
+        var missed = new List<string>();
         foreach (var action in brief.Actions)
         {
             if (all.FirstOrDefault(t => t.Name == action.Tool)?.Undo is not { } undo) continue;
-            await undo(JsonDocument.Parse(action.ResultJson).RootElement.Clone(), ct).ConfigureAwait(false);
-            undone++;
+            try
+            {
+                await undo(JsonDocument.Parse(action.ResultJson).RootElement.Clone(), ct).ConfigureAwait(false);
+                undone++;
+            }
+            catch (McpToolException ex)
+            {
+                // Gone already (the user changed it since): the others are still taken back.
+                missed.Add($"{action.Summary}: {ex.Message}");
+            }
         }
         briefs.MarkUndone(id);
-        return new { id, undone };
+        return new { id, undone, notUndone = missed.Count > 0 ? missed : null };
     }
 
     private object Jobs() => AutoJobCatalog.All.Select(j =>

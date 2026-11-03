@@ -42,6 +42,43 @@ public sealed record McpTool(string Name, string Description, JsonObject InputSc
     /// <summary>The list in a result of the records one call made, each taken back alone (see <see cref="Undo"/>).</summary>
     public const string RecordsProperty = "records";
 
+    /// <summary>
+    /// <c>true</c> in a result (or a record of it) that changed nothing (a task that was done already): Helm's assistant
+    /// lists it without Undo, since taking it back would undo what was there before.
+    /// </summary>
+    public const string UnchangedProperty = "unchanged";
+
+    /// <summary>Whether a result says it changed nothing (<see cref="UnchangedProperty"/>).</summary>
+    public static bool ChangedNothing(JsonElement result) =>
+        result.ValueKind == JsonValueKind.Object && result.TryGetProperty(UnchangedProperty, out var unchanged) && unchanged.ValueKind == JsonValueKind.True;
+
+    /// <inheritdoc cref="ChangedNothing(JsonElement)"/>
+    public static bool ChangedNothing(string resultJson)
+    {
+        try
+        {
+            using var doc = JsonDocument.Parse(resultJson);
+            return ChangedNothing(doc.RootElement);
+        }
+        catch (JsonException)
+        {
+            return false;
+        }
+    }
+
+    /// <summary>
+    /// For an <see cref="Undo"/>: stops with a message the user reads when nothing was taken back (the record is gone,
+    /// or has not synced to this device yet), so the card never says it was undone while the record stays.
+    /// </summary>
+    /// <exception cref="McpToolException"><paramref name="undone"/> is false.</exception>
+    public static void Undone(bool undone)
+    {
+        if (!undone) throw new McpToolException(NothingUndone);
+    }
+
+    /// <summary>What <see cref="Undone"/> says.</summary>
+    public const string NothingUndone = "Không hoàn tác được: bản ghi này không còn trên máy (đã xoá, hoặc chưa đồng bộ về).";
+
     /// <summary>A tool that takes no arguments.</summary>
     public static JsonObject NoArguments() => new() { ["type"] = "object", ["properties"] = new JsonObject() };
 }

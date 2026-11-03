@@ -15,7 +15,6 @@ public sealed class LocalAgentRoute : IAgentRoute, IDisposable
     /// <summary>A conversation's chat goes after this long without a turn.</summary>
     internal static readonly TimeSpan IdleFor = TimeSpan.FromMinutes(5);
 
-    private readonly string _agentName;
     private readonly IAssistantChatFactory _agent;
     private readonly IReadOnlyList<IMcpToolProvider> _providers;
     private readonly Func<string?, bool> _isToolOn;
@@ -31,7 +30,7 @@ public sealed class LocalAgentRoute : IAgentRoute, IDisposable
         Func<string?, bool> isToolOn, Func<string?> unavailable, TimeProvider? time = null, IAiPrompts? prompts = null)
     {
         Device = device;
-        _agentName = agentName;
+        AgentName = agentName;
         _agent = agent;
         _providers = [.. providers];
         _isToolOn = isToolOn;
@@ -43,7 +42,8 @@ public sealed class LocalAgentRoute : IAgentRoute, IDisposable
 
     public string Device { get; }
 
-    public string AgentName => _agentName;
+    /// <summary>The agent as the user named it; a rename takes effect at once, without stopping its conversations.</summary>
+    public string AgentName { get; set; }
 
     public string? Unavailable() => _unavailable();
 
@@ -88,7 +88,7 @@ public sealed class LocalAgentRoute : IAgentRoute, IDisposable
                     : ex.Message;
                 if (records.Count > 0)
                     return new AiJobResult($"Em làm được một phần thì dừng ({stopped}).", [.. records], [],
-                        AiPrices.Usd(job.Model, input, output, cacheRead, cacheWrite)) { Agent = _agentName };
+                        AiPrices.Usd(job.Model, input, output, cacheRead, cacheWrite)) { Agent = AgentName };
                 if (ex is OperationCanceledException && ct.IsCancellationRequested) throw;
                 throw new AiRouteException(stopped);
             }
@@ -100,7 +100,7 @@ public sealed class LocalAgentRoute : IAgentRoute, IDisposable
             }
             // What it saved: the same tokens on the API with the model picked for the fallback.
             return new AiJobResult(outcome.Problem ?? outcome.Text, outcome.Records, outcome.ForPhone,
-                AiPrices.Usd(job.Model, input, output, cacheRead, cacheWrite)) { Agent = _agentName };
+                AiPrices.Usd(job.Model, input, output, cacheRead, cacheWrite)) { Agent = AgentName };
         }
         finally
         {
@@ -111,7 +111,7 @@ public sealed class LocalAgentRoute : IAgentRoute, IDisposable
     public async Task UndoAsync(AiJobAction action, CancellationToken ct)
     {
         var tool = _providers.SelectMany(p => p.Tools).FirstOrDefault(t => t.Name == action.Tool);
-        if (tool?.Undo is not { } undo) return;
+        if (tool?.Undo is not { } undo) throw new McpToolException($"Helm on {Device} cannot undo {action.Tool}.");
         await undo(JsonDocument.Parse(action.ResultJson).RootElement.Clone(), ct);
     }
 
@@ -128,12 +128,13 @@ public sealed class LocalAgentRoute : IAgentRoute, IDisposable
 
     /// <summary>
     /// The job's tools that need no yes (a PC cannot ask the phone mid-turn), Helm's own ones run here, and the phone's
-    /// handed back to it.
+    /// handed back to it. Only Ask Helm's own tools (<see cref="HelmAssistant.Tools"/>), whatever names the job brings:
+    /// a device in the sync group cannot ask for Slack, SSH or any tool Ask Helm never offers.
     /// </summary>
     internal IReadOnlyList<AssistantTool> Tools(AiJob job)
     {
         var mine = _providers.Where(p => _isToolOn(p.ModuleId)).SelectMany(p => p.Tools)
-            .Where(t => job.Tools.Contains(t.Name) && t.Risk != McpRisk.Remote)
+            .Where(t => job.Tools.Contains(t.Name) && HelmAssistant.Tools.Contains(t.Name) && t.Risk != McpRisk.Remote)
             .GroupBy(t => t.Name, StringComparer.Ordinal).Select(g => g.First())
             .Select(t => new AssistantTool(t, HelmAssistant.ModeOf(t)))
             .Where(t => t.Mode != AssistantToolMode.Confirm);
@@ -160,25 +161,42 @@ public sealed class LocalAgentRoute : IAgentRoute, IDisposable
 
 /// <summary>
 /// This device's agents in the user's order (Codex, then Claude Code when it is set up): a conversation stays on the
-/// agent that took its first turn; a new one goes to the first that can take it.
+/// agent that took its first turn; a new one goes to the first that can take it. The list can change under it (the
+/// user reorders or turns one off) without stopping the conversations of the agents still in it.
 /// </summary>
 public sealed class AgentChain(IReadOnlyList<LocalAgentRoute> agents) : IAgentRoute
 {
-    private readonly System.Collections.Concurrent.ConcurrentDictionary<string, LocalAgentRoute> _taken = new(StringComparer.Ordinal);
+    private readonly ConcurrentDictionary<string, LocalAgentRoute> _taken = new(StringComparer.Ordinal);
+    private volatile IReadOnlyList<LocalAgentRoute> _agents = agents;
 
-    public string Device => agents.Count > 0 ? agents[0].Device : Environment.MachineName;
+    /// <summary>The agents now, in order.</summary>
+    public IReadOnlyList<LocalAgentRoute> Agents => _agents;
+
+    public string Device => _agents.Count > 0 ? _agents[0].Device : Environment.MachineName;
+
+    /// <summary>Takes the user's new list: a conversation whose agent left it goes to the first that can take it.</summary>
+    public void Use(IReadOnlyList<LocalAgentRoute> agents)
+    {
+        _agents = agents;
+        foreach (var (id, agent) in _taken)
+            if (!agents.Contains(agent)) _taken.TryRemove(id, out _);
+    }
 
     /// <summary>The agents that can take a job now, best first.</summary>
-    public IReadOnlyList<string> Ready() => [.. agents.Where(a => a.Unavailable() is null).Select(a => a.AgentName)];
+    public IReadOnlyList<string> Ready() => [.. _agents.Where(a => a.Unavailable() is null).Select(a => a.AgentName)];
 
-    public string? Unavailable() =>
-        agents.Any(a => a.Unavailable() is null) ? null
-        : agents.Count == 0 ? "No agent is set up on this PC."
-        : string.Join(" ", agents.Select(a => $"{a.AgentName}: {a.Unavailable()}"));
+    public string? Unavailable()
+    {
+        var agents = _agents;
+        return agents.Any(a => a.Unavailable() is null) ? null
+            : agents.Count == 0 ? "No agent is set up on this PC."
+            : string.Join(" ", agents.Select(a => $"{a.AgentName}: {a.Unavailable()}"));
+    }
 
     public Task<AiJobResult> RunAsync(AiJob job, TimeSpan wait, CancellationToken ct)
     {
-        var agent = _taken.TryGetValue(job.ConversationId, out var kept) && kept.Unavailable() is null
+        var agents = _agents;
+        var agent = _taken.TryGetValue(job.ConversationId, out var kept) && agents.Contains(kept) && kept.Unavailable() is null
             ? kept
             : agents.FirstOrDefault(a => a.Unavailable() is null) ?? throw new AiRouteException(Unavailable() ?? "No agent can take it.");
         _taken[job.ConversationId] = agent;
@@ -187,7 +205,7 @@ public sealed class AgentChain(IReadOnlyList<LocalAgentRoute> agents) : IAgentRo
 
     /// <summary>The tools are Helm's own on this PC: whichever agent asked for them, Helm takes the record back.</summary>
     public Task UndoAsync(AiJobAction action, CancellationToken ct) =>
-        agents.Count > 0 ? agents[0].UndoAsync(action, ct) : Task.CompletedTask;
+        _agents is { Count: > 0 } agents ? agents[0].UndoAsync(action, ct) : throw new AiRouteException("No agent is set up on this PC to undo it.");
 
     public void End(string conversationId)
     {

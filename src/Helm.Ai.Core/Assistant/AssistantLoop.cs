@@ -87,7 +87,8 @@ internal static class AssistantLoop
                         foreach (var (summary, record) in Records(json, Summary(call)))
                         {
                             Func<CancellationToken, Task>? undo = null;
-                            if (tool.Source.Undo is { } takeBack)
+                            // A record that changed nothing (a task done already) has nothing to take back.
+                            if (tool.Source.Undo is { } takeBack && !McpTool.ChangedNothing(record))
                             {
                                 var result = JsonDocument.Parse(record).RootElement.Clone();
                                 undo = c => takeBack(result, c);

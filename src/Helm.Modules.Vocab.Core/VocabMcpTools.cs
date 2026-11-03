@@ -91,7 +91,10 @@ public sealed class VocabMcpTools(VocabStore store, VocabQuiz quiz) : IMcpToolPr
             // Only the words this call added: words the user had before stay.
             Undo = (result, _) =>
             {
-                foreach (var id in result.GetProperty("ids").EnumerateArray()) store.DeleteWord(id.GetString()!);
+                var ids = result.GetProperty("ids").EnumerateArray().ToList();
+                var any = false;
+                foreach (var id in ids) any |= store.DeleteWord(id.GetString()!);
+                if (ids.Count > 0) McpTool.Undone(any);
                 return Task.CompletedTask;
             },
         },

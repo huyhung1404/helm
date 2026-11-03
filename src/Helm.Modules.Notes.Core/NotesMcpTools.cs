@@ -41,7 +41,7 @@ public sealed class NotesMcpTools(NotesStore store, LinkHub? links = null) : IMc
             (args, _) => Task.FromResult<object?>(Create(McpArgs.String(args, "title") ?? "", NoteTags.Append(McpArgs.RequiredString(args, "text"), McpArgs.Strings(args, "tags")))))
         {
             // Into the trash, as a note the user deletes: restorable for 30 days.
-            Undo = (result, _) => { store.MoveToTrash(result.GetProperty("id").GetString()!); return Task.CompletedTask; },
+            Undo = (result, _) => { McpTool.Undone(store.MoveToTrash(result.GetProperty("id").GetString()!)); return Task.CompletedTask; },
         },
         new("notes_edit", "Change a note: a new title, new text (replaces all of it), or text to add at the end.",
             McpArgs.Schema(

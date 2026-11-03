@@ -260,7 +260,7 @@ public sealed partial class AssistantSession
         _all ??= _helm.OfferedTools(_phone);
         // Only the tools this turn's request needs (and those of earlier turns): each schema costs tokens on every call.
         var before = _tools;
-        _tools = ToolScope.Pick(_all, _scope, text);
+        _tools = ToolScope.Pick(_all, _scope, text, known: first && _context is not null);
         if (_open is { } open && _tools.Where(t => before.All(b => b.Name != t.Name)).ToList() is { Count: > 0 } added) open.Chat.AddTools(added);
         // The first turn of a card opened about something says what it is about.
         if (first && _context is { } context) text = context.Before(text);
@@ -314,10 +314,13 @@ public sealed partial class AssistantSession
             return null;
         }
         _pc = route;
-        _helm.Usage.RecordAgent(AiFeatureIds.AskHelm, result.Agent ?? "agent", model.Model, route.Device, result.SavedUsd);
+        var device = result.Device ?? route.Device;
+        _helm.Usage.RecordAgent(AiFeatureIds.AskHelm, result.Agent ?? "agent", model.Model, device, result.SavedUsd);
 
-        // Undo goes back to the PC that made the record: it may not have synced here yet.
-        var done = result.Done.Select(a => new AssistantAction(a.Tool, a.Summary, c => route.UndoAsync(a, c))).ToList();
+        // Undo goes back to the PC that made the record: it may not have synced here yet. A record that changed nothing
+        // has nothing to take back.
+        var done = result.Done.Select(a => new AssistantAction(a.Tool, a.Summary,
+            McpTool.ChangedNothing(a.ResultJson) ? null : c => route.UndoAsync(a, c))).ToList();
         var notes = new List<string>();
         // What only the phone can do comes back to be done here.
         var byName = _all!.ToDictionary(t => t.Name, StringComparer.Ordinal);
@@ -339,7 +342,7 @@ public sealed partial class AssistantSession
             }
         }
         var reply = string.Join(" ", new[] { result.Text }.Concat(notes).Where(t => t.Length > 0));
-        return new AssistantReply(reply, done, false, null, result.Agent is { } agent ? $"{agent} trên {route.Device}" : route.Device);
+        return new AssistantReply(reply, done, false, null, result.Agent is { } agent ? $"{agent} trên {device}" : device);
     }
 
     private async Task<AssistantReply> OnApiAsync(string text, bool first, Func<IReadOnlyList<PendingAction>, Task<bool>> confirm, CancellationToken ct)

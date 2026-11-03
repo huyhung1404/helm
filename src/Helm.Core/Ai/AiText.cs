@@ -9,7 +9,15 @@ namespace Helm.Core.Ai;
 /// <param name="Feature">The feature it is for (its choice of model, route and daily cap; AiFeatureIds).</param>
 /// <param name="System">What the model is told it is and how it answers.</param>
 /// <param name="Prompt">The request itself.</param>
-public sealed record AiTextRequest(string Feature, string System, string Prompt);
+public sealed record AiTextRequest(string Feature, string System, string Prompt)
+{
+    /// <summary>
+    /// The user asked for it (a tap, the default): it may go to the API as the feature's route allows. A call that runs
+    /// by itself (false) goes to an agent on a Helm PC only, unless the user chose a route for its feature, and once a PC
+    /// took it, it never goes to the API as well.
+    /// </summary>
+    public bool UserStarted { get; init; } = true;
+}
 
 /// <param name="Problem">Why there is no answer (no agent and no key, the day's cap, the provider failed); null when it worked.</param>
 /// <param name="RanOn">The agent and Helm PC that answered (free, "Claude Code trên PC-HUNG"); null when the API did.</param>
@@ -29,7 +37,8 @@ public sealed record AiTextAnswer(string Text, string? Problem, string? RanOn = 
 /// <summary>
 /// Asks a model for text, the way the user's features may: an agent on a Helm PC first (free on their plan), then the
 /// API with the model picked, within the feature's daily cap (Helm.Ai's router). Tools reach it through this, so they
-/// never reference the AI library. Only for calls the user started: work that runs by itself goes to a PC agent only.
+/// never reference the AI library. Work that runs by itself says so (<see cref="AiTextRequest.UserStarted"/>): it goes
+/// to a PC agent only.
 /// </summary>
 public interface IAiText
 {

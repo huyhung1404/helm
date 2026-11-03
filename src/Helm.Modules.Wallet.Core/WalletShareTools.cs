@@ -26,7 +26,7 @@ public sealed class WalletShareTools(DebtBook book, WalletStore store) : IMcpToo
                 ("when", McpArgs.Text("When, the user's local time: 2026-10-01 or 2026-10-01T19:30. Left out: now."), false)),
             (args, _) => Task.FromResult<object?>(Split(args)))
         {
-            Undo = (record, _) => { TakeBack(record); return Task.CompletedTask; },
+            Undo = (record, _) => { McpTool.Undone(TakeBack(record)); return Task.CompletedTask; },
         },
         new("wallet_debt_reminder",
             "A polite Vietnamese message reminding someone of what they owe the user, from the debt book: the amount, what for and since when. Show it to the user and offer to share it (phone_share_text); Helm never sends it itself.",
@@ -88,16 +88,14 @@ public sealed class WalletShareTools(DebtBook book, WalletStore store) : IMcpToo
         return new { total, people, each, mine, currency = WalletFormat.Currency, records };
     }
 
-    /// <summary>One record of a split: its transaction, or its debt entries.</summary>
-    private void TakeBack(JsonElement record)
+    /// <summary>One record of a split: its transaction, or its debt entries. False when none of it was there.</summary>
+    private bool TakeBack(JsonElement record)
     {
-        if (record.TryGetProperty("kind", out var kind) && kind.GetString() == "transaction")
-        {
-            store.Delete(WalletArgs.Id(record));
-            return;
-        }
+        if (record.TryGetProperty("kind", out var kind) && kind.GetString() == "transaction") return store.Delete(WalletArgs.Id(record));
+        var any = false;
         if (record.TryGetProperty("ids", out var ids) && ids.ValueKind == JsonValueKind.Array)
-            foreach (var id in ids.EnumerateArray().Reverse()) book.Delete(id.GetString()!);
+            foreach (var id in ids.EnumerateArray().Reverse()) any |= book.Delete(id.GetString()!);
+        return any;
     }
 
     private string? Category(JsonElement args, string description, decimal amount)

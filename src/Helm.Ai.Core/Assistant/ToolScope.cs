@@ -21,7 +21,7 @@ public static partial class ToolScope
             "chia nho", "buoc nho", "cac buoc"]),
         ("notes", ["ghi chu", "note", "luu ", "y tuong", "ghi lai", "ghi nho",
             "ngay quan trong", "sinh nhat", "ngay gio", "dam gio", "dang kiem", "bao hiem", "ten mien", "gia han"]),
-        ("habit", ["thoi quen", "habit", "tap ", "chay bo", "doc sach", "streak", "diem danh", "thien"]),
+        ("habit", ["thoi quen", "habit", "tap ", "chay bo", "doc sach", "streak", "diem danh", "thien", "gym"]),
         ("mission", ["muc tieu", "mission", "ke hoach", "buoc", "lo trinh", "aptis", "on thi", "ky thi", "ielts", "toeic", "chung chi"]),
         ("vocab", ["tu vung", "tu moi", "word", "vocab", "nghia", "tieng anh", "english"]),
         ("ai", ["ban tin", "tong ket", "tom tat", "brief", "huan luyen", "tu dong", "don scratch", "dat tieu de", "hoan tac tieu de"]),
@@ -50,7 +50,10 @@ public static partial class ToolScope
         foreach (var (group, words) in Groups)
             if (words.Any(w => plain.Contains(w, StringComparison.Ordinal))) found.Add(group);
         // An amount ("45k", "200 nghìn", "1tr5", "30.000đ") is money.
-        if (Amount().IsMatch(plain)) found.Add("wallet");
+        var amount = Amount().IsMatch(plain);
+        if (amount) found.Add("wallet");
+        // Eating or drinking without an amount ("uống đủ nước rồi", "ăn sáng rồi") is as likely a habit as a spending.
+        if (!amount && FoodWords.Any(w => plain.Contains(w, StringComparison.Ordinal))) found.Add("habit");
         // "Nhắc Nam trả 200k": a message to someone, shared from the phone.
         if (RemindSomeone().IsMatch(plain)) found.UnionWith(["wallet", "phone"]);
         return found;
@@ -58,12 +61,15 @@ public static partial class ToolScope
 
     /// <summary>
     /// The tools for this turn: those of the groups the conversation has needed so far, <paramref name="scope"/>, grown
-    /// by what <paramref name="text"/> asks for; all of them when nothing is known yet.
+    /// by what <paramref name="text"/> asks for; all of them when it names no group (at the start, or a later turn such
+    /// as "anh đi gym rồi" after "phở 45k": the old groups alone might not reach what it needs).
     /// </summary>
-    public static IReadOnlyList<AssistantTool> Pick(IReadOnlyList<AssistantTool> all, ISet<string> scope, string text)
+    /// <param name="known">The scope already says what this turn is about (the first turn of a card opened about a
+    /// transaction): words naming no group add nothing.</param>
+    public static IReadOnlyList<AssistantTool> Pick(IReadOnlyList<AssistantTool> all, ISet<string> scope, string text, bool known = false)
     {
         var asked = GroupsFor(text);
-        scope.UnionWith(asked.Count > 0 || scope.Count > 0 ? asked : all.Select(t => GroupOf(t.Name)));
+        scope.UnionWith(asked.Count > 0 || known ? asked : all.Select(t => GroupOf(t.Name)));
         return [.. all.Where(t => scope.Contains(GroupOf(t.Name)))];
     }
 
@@ -76,7 +82,11 @@ public static partial class ToolScope
         return plain.ToString();
     }
 
-    [GeneratedRegex(@"\d[\d.,]*\s*(k|tr|d|nghin|ngan|trieu|dong|vnd)\b")]
+    /// <summary>Eating and drinking words of the wallet group, which name habits too.</summary>
+    private static readonly string[] FoodWords = [" an ", "uong", "ca phe", "cafe", "pho", "com ", "bun"];
+
+    // No \b after the unit: in "1tr2" a digit follows "tr".
+    [GeneratedRegex(@"\d[\d.,]*\s*(k|tr|d|nghin|ngan|trieu|dong|vnd)(?![a-z])")]
     private static partial Regex Amount();
 
     [GeneratedRegex(@"\b(nhac|doi)\s+(?!anh\b|em\b|toi\b|minh\b)\S+(\s+\S+)?\s+(tra|no)\b")]
