@@ -69,6 +69,16 @@ internal sealed class GrokAgentFactory(IChildProcessLauncher launcher, string ho
             ["USERPROFILE"] = user,
             ["HOME"] = user,
             ["GROK_WORKFLOWS"] = "0",
+            // Work a headless turn does not need, each named in the docs Grok carries (grok.exe): the update check on
+            // launch, telemetry and feedback uploads, remote campaign patches, and the session title, turn summary and
+            // recap it writes with model calls of its own.
+            ["GROK_DISABLE_AUTOUPDATER"] = "1",
+            ["DISABLE_TELEMETRY"] = "1",
+            ["GROK_FEEDBACK_ENABLED"] = "0",
+            ["GROK_CAMPAIGNS"] = "0",
+            ["GROK_TITLE_REFRESH"] = "0",
+            ["GROK_TURN_SUMMARY"] = "0",
+            ["GROK_SESSION_RECAP"] = "0",
         };
         foreach (var vendor in new[] { "CLAUDE", "CURSOR" })
             foreach (var part in new[] { "AGENTS", "HOOKS", "MCPS", "RULES", "SKILLS" })
@@ -149,30 +159,23 @@ internal sealed class GrokAgentFactory(IChildProcessLauncher launcher, string ho
 internal sealed class GrokChat(GrokAgentFactory factory, IChildProcessLauncher launcher, ILogger logger, string home, string workFolder,
     string model, string effort, string system, IReadOnlyList<AssistantTool> tools) : IAssistantChat
 {
-    private readonly string _session = Guid.NewGuid().ToString();
-    private string _pending = "";
-    private string _more = "";
-    private bool _first = true;
+    private readonly CliConversation _conversation = new(system, tools);
+    private string _session = Guid.NewGuid().ToString();
     private bool _started;
     private int _calls;
 
-    public void AddUser(string text)
-    {
-        _pending = _first ? $"{CliAgentProtocol.Preamble(system, tools)}\n\n{text}" : (_pending.Length > 0 ? _pending + "\n\n" : "") + _more + text;
-        _first = false;
-        _more = "";
-    }
+    public void AddUser(string text) => _conversation.AddUser(text);
 
-    public void AddTools(IReadOnlyList<AssistantTool> added) => _more = CliAgentProtocol.MoreTools(added) + "\n";
+    public void AddTools(IReadOnlyList<AssistantTool> added) => _conversation.AddTools(added);
 
-    public void AddResults(IReadOnlyList<ToolOutcome> results) => _pending = CliAgentProtocol.Results(results);
+    public void AddResults(IReadOnlyList<ToolOutcome> results) => _conversation.AddResults(results);
 
     public async Task<AssistantStep> NextAsync(CancellationToken ct)
     {
         var grok = GrokAgentFactory.FindGrok() ?? throw new AssistantException("Grok CLI is not installed on this PC.");
         var prompt = Path.Combine(workFolder, _session + ".txt");
-        var sent = _pending;
-        _pending = "";
+        // What waits is only cleared once Grok answered: a failed turn sends it again (a failed first one, with the preamble).
+        var sent = _conversation.Message(newSession: !_started);
         await File.WriteAllTextAsync(prompt, sent, new UTF8Encoding(false), ct);
         try
         {
@@ -219,9 +222,12 @@ internal sealed class GrokChat(GrokAgentFactory factory, IChildProcessLauncher l
                     if (error.Contains("login", StringComparison.OrdinalIgnoreCase) || error.Contains("unauthor", StringComparison.OrdinalIgnoreCase))
                         factory.SignedOut();
                     logger.LogWarning("Grok failed: {Error}", error);
+                    // Grok may have kept the session it was asked to start: the next try names a new one.
+                    if (!_started) _session = Guid.NewGuid().ToString();
                     throw new AssistantException($"Grok: {error}");
                 }
                 _started = true;
+                _conversation.Answered(answer);
                 // Without usage in the answer: estimated from the text (about 4 characters a token), for what it saved.
                 return CliAgentProtocol.Parse(answer, usage ?? new AssistantUsage(sent.Length / 4, answer.Length / 4, 0, 0), ref _calls);
             }

@@ -126,6 +126,18 @@ search, no subagents and Helm's instructions instead of Grok's coding prompt): H
 (what it saved is estimated from the text). Calls that would need a yes are not offered there, and phone tools are
 handed back to the phone. An agent that reports its plan's limit takes no job for 30 minutes; the next one in the list does.
 
+**Agent CLIs keep their session and lose nothing** (`CliConversation`, `CodexAppServer`). Codex now keeps one
+`codex app-server` (stdio JSON-RPC, codex 0.166) per conversation, as Claude Code keeps its process: the thread
+stays loaded (in memory only), so a turn no longer pays for a `codex exec` start, sign-in check and session reload.
+It runs npm's native `codex.exe` (no cmd.exe/node in front) with the same isolation as before plus one line of its own
+instructions instead of its 22 KB coding prompt, skills list and sandbox notes (`codex debug prompt-input`: 60 KB of
+prompt became 22 KB); when CODEX_HOME has a config.toml (the app server cannot ignore it) or the app server does not
+start, the conversation falls back to one `codex exec --ignore-user-config` a turn. Grok stays headless (its stdio
+mode kept its own tools) but skips its update check, telemetry, campaigns, title, turn summary and recap. For all
+three, what waits to be sent (the user's words, tool results) is only cleared once a turn went through, so a failed
+turn sends it again and the model is never left without the results of calls Helm already ran; a process that died
+or was stopped between turns is started again with the whole protocol, every tool so far and a short recap.
+
 **Only the tools a request needs** (`Helm.Ai.Core/Assistant/ToolScope.cs`). Every tool's schema costs tokens on
 every call, so a turn carries only the groups its words ask for (Wallet for “phở 45k”, Tracker for “nhắc anh…”,
 the phone for “báo thức”…), and the groups of the conversation's earlier turns; a request that names no group gets
