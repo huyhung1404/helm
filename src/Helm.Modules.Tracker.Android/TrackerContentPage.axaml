@@ -92,6 +92,67 @@
     </UserControl.Styles>
 
     <UserControl.DataTemplates>
+        <!-- "Split into steps", inline under the task: AI's proposed steps; the ones kept become its checklist (subtasks) -->
+        <DataTemplate DataType="vm:TrackerProposalViewModel">
+            <Border Classes="card" Margin="0,6,0,6">
+                <StackPanel Spacing="6">
+                    <!-- Asking: placeholder lines, and where it runs -->
+                    <StackPanel IsVisible="{Binding IsBusy}">
+                        <Border Classes="shimmer" Width="240" />
+                        <Border Classes="shimmer" Width="180" />
+                        <Border Classes="shimmer" Width="210" />
+                        <TextBlock Text="{Binding Status}" Classes="secondary" />
+                    </StackPanel>
+
+                    <!-- The steps to pick from, each one editable -->
+                    <StackPanel Spacing="6" IsVisible="{Binding IsProposing}">
+                        <StackPanel Orientation="Horizontal" Spacing="6">
+                            <ic:SymbolIcon Symbol="Sparkle" FontSize="16" Foreground="{DynamicResource SystemAccentColor}" VerticalAlignment="Center" />
+                            <TextBlock Text="Proposed steps" FontWeight="SemiBold" VerticalAlignment="Center" />
+                            <TextBlock Text="{Binding TickedText}" Classes="secondary" VerticalAlignment="Center" />
+                        </StackPanel>
+                        <ItemsControl ItemsSource="{Binding Choices}">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate DataType="vm:TaskProposalChoice">
+                                    <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto" Margin="0,2">
+                                        <CheckBox MinWidth="0" VerticalAlignment="Center" IsChecked="{Binding Keep}" AutomationProperties.Name="Keep this step" />
+                                        <TextBox Grid.Column="1" Text="{Binding Title}" TextWrapping="Wrap" AutomationProperties.Name="Step" />
+                                        <Border Grid.Row="1" Grid.Column="1" Classes="badge" HorizontalAlignment="Left" Margin="0,4,0,2" IsVisible="{Binding HasDue}">
+                                            <TextBlock Text="{Binding DueText}" />
+                                        </Border>
+                                    </Grid>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                        <CheckBox Content="{Binding SpreadText}" IsChecked="{Binding SpreadDates}" IsVisible="{Binding CanSpread}" />
+                        <TextBlock Text="{Binding Status}" Classes="secondary" />
+                        <WrapPanel HorizontalAlignment="Right">
+                            <Button Content="Cancel" Command="{Binding CloseCommand}" Margin="0,0,8,6" />
+                            <Button Content="Try again" Command="{Binding RetryCommand}" Margin="0,0,8,6" />
+                            <Button Classes="accent" Content="{Binding AddText}" Command="{Binding AddCommand}" Margin="0,0,0,6" />
+                        </WrapPanel>
+                    </StackPanel>
+
+                    <!-- A problem, or nothing to propose -->
+                    <StackPanel Spacing="6" IsVisible="{Binding IsStuck}">
+                        <TextBlock Text="{Binding Status}" TextWrapping="Wrap" />
+                        <WrapPanel HorizontalAlignment="Right">
+                            <Button Content="Try again" Command="{Binding RetryCommand}" Margin="0,0,8,0" />
+                            <Button Content="Cancel" Command="{Binding CloseCommand}" />
+                        </WrapPanel>
+                    </StackPanel>
+
+                    <!-- Added: the steps are the checklist above; Undo takes them back -->
+                    <Grid ColumnDefinitions="Auto,*,Auto,Auto" IsVisible="{Binding CanUndo}">
+                        <ic:SymbolIcon Symbol="CheckmarkCircle" FontSize="16" Margin="0,0,8,0" VerticalAlignment="Center" Foreground="{DynamicResource SystemAccentColor}" />
+                        <TextBlock Grid.Column="1" Text="{Binding Status}" TextWrapping="Wrap" VerticalAlignment="Center" />
+                        <Button Grid.Column="2" Classes="flat" Padding="10,6" Content="Undo" Command="{Binding UndoCommand}" />
+                        <Button Grid.Column="3" Classes="flat" Padding="10,6" Content="Done" Command="{Binding CloseCommand}" />
+                    </Grid>
+                </StackPanel>
+            </Border>
+        </DataTemplate>
+
         <DataTemplate DataType="vm:TrackerItemViewModel">
             <Border BorderThickness="0,1,0,0" BorderBrush="{DynamicResource HelmCardStroke}" Padding="0,6">
                 <StackPanel>
@@ -157,6 +218,22 @@
                         </TextBox>
                         <Button Grid.Column="1" Margin="6,0,0,0" Content="Add" Command="{Binding AddSubtaskCommand}" />
                     </Grid>
+
+                    <!-- Split into steps: AI proposes them inline, under the task -->
+                    <Button Classes="flat" HorizontalAlignment="Left" Padding="10,6" Margin="24,0,0,0" Command="{Binding BreakDownCommand}"
+                            AutomationProperties.Name="Split into steps">
+                        <Button.IsVisible>
+                            <MultiBinding Converter="{x:Static BoolConverters.And}">
+                                <Binding Path="IsExpanded" />
+                                <Binding Path="CanBreakDown" />
+                            </MultiBinding>
+                        </Button.IsVisible>
+                        <StackPanel Orientation="Horizontal" Spacing="6">
+                            <ic:SymbolIcon Symbol="Sparkle" FontSize="16" Foreground="{DynamicResource SystemAccentColor}" />
+                            <TextBlock Text="Split into steps" />
+                        </StackPanel>
+                    </Button>
+                    <ContentControl Content="{Binding Proposal}" Margin="24,0,0,0" />
 
                     <!-- Actions -->
                     <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Spacing="2" IsVisible="{Binding IsExpanded}">

@@ -132,6 +132,12 @@ public sealed partial class TrackerViewModel : ObservableObject
         // The calendar shows when debts are due.
         if (_debts is not null) _debts.Changed += (_, _) => ScheduleRefresh();
         if (_links is not null) _links.Changed += (_, _) => ScheduleLinksRefresh();
+        if (Proposals is not null)
+            Proposals.PropertyChanged += (_, e) =>
+            {
+                if (e.PropertyName is nameof(TrackerProposalViewModel.IsOpen) or nameof(TrackerProposalViewModel.TaskId))
+                    foreach (var row in _rows.Values) row.Proposal = ProposalFor(row.Id);
+            };
         Refresh();
     }
 
@@ -404,9 +410,15 @@ public sealed partial class TrackerViewModel : ObservableObject
     /// <summary>AI's proposals to pick from (a task's steps); null without AI.</summary>
     public TrackerProposalViewModel? Proposals { get; }
 
-    /// <summary>"Break into steps": AI proposes the task's steps, the user keeps the ones they want.</summary>
+    /// <summary>AI is set up: tasks offer "Split into steps".</summary>
+    internal bool CanBreakDown => Proposals is { IsAvailable: true };
+
+    /// <summary>"Split into steps": AI proposes the task's steps, the user keeps the ones they want.</summary>
     internal Task BreakDownAsync(TrackerItemViewModel row) =>
         Proposals is { IsAvailable: true } proposals && !row.IsSubtask ? proposals.ForTaskAsync(row.Id) : Task.CompletedTask;
+
+    /// <summary>The proposals a row shows under it: the open ones for its task.</summary>
+    private TrackerProposalViewModel? ProposalFor(string id) => Proposals is { IsOpen: true, TaskId: { } task } p && task == id ? p : null;
 
     internal bool AddSubtask(TrackerItemViewModel parent, string title)
     {
@@ -691,7 +703,7 @@ public sealed partial class TrackerViewModel : ObservableObject
             if (changed) row.NotifyDetails();
             return row;
         }
-        row = new TrackerItemViewModel(this, id, item, ws, today) { Completions = completions };
+        row = new TrackerItemViewModel(this, id, item, ws, today) { Completions = completions, Proposal = ProposalFor(id) };
         _rows[id] = row;
         return row;
     }

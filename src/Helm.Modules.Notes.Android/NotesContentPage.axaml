@@ -142,11 +142,97 @@
                         <Button Classes="icon flat" Command="{Binding TrashCommand}" IsVisible="{Binding !EditTrashed}" AutomationProperties.Name="Move to the trash">
                             <ic:SymbolIcon Symbol="Delete" FontSize="18" />
                         </Button>
+                        <!-- More: AI reads the note and proposes its tasks for the to-do lists -->
+                        <Button Classes="icon flat" IsVisible="{Binding CanMakeTasks}" AutomationProperties.Name="More">
+                            <ic:SymbolIcon Symbol="MoreVertical" FontSize="18" />
+                            <Button.Flyout>
+                                <MenuFlyout>
+                                    <MenuItem Header="Make tasks" Command="{Binding MakeTasksCommand}">
+                                        <MenuItem.Icon>
+                                            <ic:SymbolIcon Symbol="Sparkle" FontSize="16" />
+                                        </MenuItem.Icon>
+                                    </MenuItem>
+                                </MenuFlyout>
+                            </Button.Flyout>
+                        </Button>
                     </StackPanel>
                     <Panel />
                 </DockPanel>
 
                 <TextBlock Text="{Binding EditorInfo}" Classes="secondary" Margin="4,0" />
+
+                <!-- "Make tasks": the note's tasks as AI found them, into one list; the lines they came from get a "→ Tracker" tag -->
+                <Border Classes="card" IsVisible="{Binding Tasks.IsOpen, FallbackValue=False}">
+                    <StackPanel DataContext="{Binding Tasks}" x:DataType="vm:NoteTasksViewModel" Spacing="8">
+                        <Grid ColumnDefinitions="Auto,*,Auto">
+                            <ic:SymbolIcon Symbol="Sparkle" FontSize="16" Margin="0,0,6,0" VerticalAlignment="Center" Foreground="{DynamicResource SystemAccentColor}" />
+                            <TextBlock Grid.Column="1" Text="Tasks from this note" FontWeight="SemiBold" VerticalAlignment="Center" />
+                            <Button Grid.Column="2" Classes="icon flat" Command="{Binding CloseCommand}" AutomationProperties.Name="Close the tasks panel">
+                                <ic:SymbolIcon Symbol="Dismiss" FontSize="16" />
+                            </Button>
+                        </Grid>
+
+                        <!-- Asking: placeholder lines, and where it runs -->
+                        <StackPanel IsVisible="{Binding IsBusy}">
+                            <Border Classes="shimmer" Width="240" />
+                            <Border Classes="shimmer" Width="180" />
+                            <Border Classes="shimmer" Width="210" />
+                            <TextBlock Text="{Binding Status}" Classes="secondary" />
+                        </StackPanel>
+
+                        <!-- The tasks to pick from, all into one list -->
+                        <StackPanel Spacing="8" IsVisible="{Binding IsProposing}">
+                            <Grid ColumnDefinitions="Auto,*">
+                                <TextBlock Text="Add to" VerticalAlignment="Center" Margin="0,0,8,0" />
+                                <ComboBox Grid.Column="1" HorizontalAlignment="Stretch" ItemsSource="{Binding Lists}" SelectedItem="{Binding SelectedList}"
+                                          AutomationProperties.Name="Add to list" />
+                            </Grid>
+                            <ItemsControl ItemsSource="{Binding Choices}">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate DataType="vm:NoteTaskChoice">
+                                        <CheckBox IsChecked="{Binding Keep}" AutomationProperties.Name="{Binding Title}" Margin="0,2">
+                                            <StackPanel>
+                                                <TextBlock Text="{Binding Title}" TextWrapping="Wrap" />
+                                                <Border Background="{DynamicResource HelmSubtleFill}" CornerRadius="4" Padding="6,0" Margin="0,2,0,0"
+                                                        HorizontalAlignment="Left" IsVisible="{Binding HasDue}">
+                                                    <TextBlock Text="{Binding DueText}" FontSize="11" FontWeight="SemiBold" />
+                                                </Border>
+                                            </StackPanel>
+                                        </CheckBox>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                            <TextBlock Text="{Binding SkippedText}" Classes="secondary" IsVisible="{Binding HasSkipped}" />
+                            <TextBlock Text="{Binding Status}" Classes="secondary" IsVisible="{Binding Status, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+                            <Grid ColumnDefinitions="*,8,*">
+                                <Button HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Content="Cancel" Command="{Binding CloseCommand}" />
+                                <Button Grid.Column="2" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Classes="accent"
+                                        Content="{Binding AddText}" Command="{Binding AddCommand}" />
+                            </Grid>
+                        </StackPanel>
+
+                        <!-- A problem, or no task in the note -->
+                        <StackPanel Spacing="8" IsVisible="{Binding IsStuck}">
+                            <TextBlock Text="{Binding Status}" TextWrapping="Wrap" />
+                            <Grid ColumnDefinitions="*,8,*">
+                                <Button HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Content="Try again" Command="{Binding RetryCommand}" />
+                                <Button Grid.Column="2" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Content="Cancel" Command="{Binding CloseCommand}" />
+                            </Grid>
+                        </StackPanel>
+
+                        <!-- Added: Undo takes the tasks and the note's tags back -->
+                        <StackPanel Spacing="8" IsVisible="{Binding IsDone}">
+                            <Grid ColumnDefinitions="Auto,*">
+                                <ic:SymbolIcon Symbol="CheckmarkCircle" FontSize="16" Margin="0,0,8,0" VerticalAlignment="Center" Foreground="{DynamicResource SystemAccentColor}" />
+                                <TextBlock Grid.Column="1" Text="{Binding DoneText}" TextWrapping="Wrap" VerticalAlignment="Center" />
+                            </Grid>
+                            <Grid ColumnDefinitions="*,8,*">
+                                <Button HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Content="Undo" Command="{Binding UndoCommand}" />
+                                <Button Grid.Column="2" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Content="Done" Command="{Binding CloseCommand}" />
+                            </Grid>
+                        </StackPanel>
+                    </StackPanel>
+                </Border>
 
                 <!-- A note in the trash: bring it back or delete it for good -->
                 <Grid ColumnDefinitions="*,8,*" IsVisible="{Binding EditTrashed}">

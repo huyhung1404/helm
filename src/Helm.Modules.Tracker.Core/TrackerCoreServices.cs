@@ -45,6 +45,8 @@ public static class TrackerCoreServices
         services.AddSingleton<Helm.Core.Mcp.IMcpToolProvider, TrackerMcpTools>();
         // AI's proposals to pick from: a task's steps, a note's tasks.
         services.AddSingleton(sp => new TrackerProposalViewModel(sp.GetRequiredService<TrackerStore>(), sp.GetService<Helm.Core.Ai.IAiText>()));
+        // Notes' "Make tasks": a note's tasks, proposed by AI, into one of the lists.
+        services.AddSingleton<Helm.Core.Tasks.INoteTaskMaker>(sp => new TrackerNoteTasks(sp.GetRequiredService<TrackerStore>(), sp.GetService<Helm.Core.Ai.IAiText>()));
         // Windows registers it again through AddHelmModule; one instance either way.
         services.TryAddSingleton<TrackerViewModel>();
         return services;

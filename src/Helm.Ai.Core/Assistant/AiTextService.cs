@@ -42,6 +42,14 @@ public sealed class AiTextService(
             : null;
     }
 
+    public string? Where(string feature)
+    {
+        var choice = ChoiceFor(feature);
+        if (!choice.Enabled) return null;
+        if (router.Agents(choice).FirstOrDefault() is { } agent) return $"{AiModels.ShortName(choice.Model)} · agent on {agent.Device} · 0đ";
+        return AiRouter.MayUseApi(choice) && Api(choice) is { } api ? $"{AiModels.ShortName(api.Model)} · API" : null;
+    }
+
     public async Task<AiTextAnswer> AskAsync(AiTextRequest request, CancellationToken ct)
     {
         var choice = ChoiceFor(request.Feature);

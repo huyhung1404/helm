@@ -38,6 +38,12 @@ public interface IAiText
 
     /// <summary>Never throws for the model's or the network's problems: they come back in <see cref="AiTextAnswer.Problem"/>.</summary>
     Task<AiTextAnswer> AskAsync(AiTextRequest request, CancellationToken ct);
+
+    /// <summary>
+    /// Where a call for <paramref name="feature"/> would run now, said short while it waits ("Sonnet 5.5 · agent on
+    /// HUNG-PC · 0đ", "Haiku 5.5 · API"); null when it cannot ask or does not say.
+    /// </summary>
+    string? Where(string feature) => null;
 }
 
 /// <summary>Reading the JSON object a model was asked to answer with, as models write it (in a code fence, with a word before).</summary>
