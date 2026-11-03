@@ -107,10 +107,13 @@ public sealed partial class NotesViewModel : ObservableObject, IDisposable
         IDialogService dialogs,
         IClipboardService clipboard,
         ILogger<NotesViewModel> logger,
-        LinkHub? links = null)
+        LinkHub? links = null,
+        Helm.Core.Tasks.INoteTaskMaker? taskMaker = null)
     {
         _store = store;
         _links = links;
+        _general = settings.Get<GeneralSettings>(GeneralSettings.StoreId);
+        Tasks = taskMaker is null ? null : new NoteTasksViewModel(taskMaker, () => (EditTitle, EditBody), body => EditBody = body);
         _settings = settings.Get<NotesSettings>(NotesIds.ModuleId);
         _ui = ui;
         _dialogs = dialogs;
@@ -137,6 +140,9 @@ public sealed partial class NotesViewModel : ObservableObject, IDisposable
     {
         if (_editorId == id) return;
         _editorId = id;
+        // "Make tasks" is about the note it was opened on.
+        Tasks?.Close();
+        OnPropertyChanged(nameof(CanMakeTasks));
         var canLink = _links is not null && (_links.Provider(LinkKinds.Task) is not null || _links.Provider(LinkKinds.Person) is not null || _links.Provider(LinkKinds.Mission) is not null);
         EditorLinks = id is null || !canLink ? null
             : new LinksViewModel(_links!, new LinkRef(LinkKinds.Note, id), [LinkKinds.Task, LinkKinds.Person, LinkKinds.Mission], () => EditTitle);
@@ -478,9 +484,14 @@ public sealed partial class NotesViewModel : ObservableObject, IDisposable
     {
         OnPropertyChanged(nameof(IsEditorClosed));
         OnPropertyChanged(nameof(CanEditPin));
+        OnPropertyChanged(nameof(CanMakeTasks));
     }
 
-    partial void OnEditTrashedChanged(bool value) => OnPropertyChanged(nameof(CanEditPin));
+    partial void OnEditTrashedChanged(bool value)
+    {
+        OnPropertyChanged(nameof(CanEditPin));
+        OnPropertyChanged(nameof(CanMakeTasks));
+    }
 
     partial void OnTrashCountChanged(int value)
     {

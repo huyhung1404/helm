@@ -171,6 +171,21 @@
                                             </MenuItem>
                                             <MenuItem Header="Copy" Command="{Binding PlacementTarget.Tag.CopyRowCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
                                                       CommandParameter="{Binding}" />
+                                            <!-- AI reads the note and proposes its tasks for the to-do lists -->
+                                            <MenuItem Header="Make tasks" Icon="{ui:SymbolIcon Sparkle24}"
+                                                      Command="{Binding PlacementTarget.Tag.MakeTasksRowCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
+                                                      CommandParameter="{Binding}">
+                                                <MenuItem.Style>
+                                                    <Style TargetType="MenuItem" BasedOn="{StaticResource {x:Type MenuItem}}">
+                                                        <Setter Property="Visibility" Value="{Binding PlacementTarget.Tag.OffersTasks, RelativeSource={RelativeSource AncestorType=ContextMenu}, Converter={StaticResource BoolToVisibility}}" />
+                                                        <Style.Triggers>
+                                                            <DataTrigger Binding="{Binding Trashed}" Value="True">
+                                                                <Setter Property="Visibility" Value="Collapsed" />
+                                                            </DataTrigger>
+                                                        </Style.Triggers>
+                                                    </Style>
+                                                </MenuItem.Style>
+                                            </MenuItem>
                                             <Separator />
                                             <MenuItem Header="Move to the trash" Command="{Binding PlacementTarget.Tag.TrashRowCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
                                                       CommandParameter="{Binding}" Visibility="{Binding IsLive, Converter={StaticResource BoolToVisibility}}" />
@@ -206,9 +221,24 @@
         <!-- The open note, over the cards: Esc, the close button or a click beside it closes it (it saves as you type) -->
         <Grid x:Name="EditorLayer" Visibility="{Binding IsEditorOpen, Converter={StaticResource BoolToVisibility}}">
             <Border x:Name="Backdrop" Background="#66000000" MouseLeftButtonDown="Backdrop_MouseLeftButtonDown" />
-            <Border MaxWidth="860" Margin="32,24,32,24" CornerRadius="8" BorderThickness="1"
+            <Border Margin="32,24,32,24" CornerRadius="8" BorderThickness="1"
                     Background="{DynamicResource SolidBackgroundFillColorBaseBrush}" BorderBrush="{DynamicResource CardStrokeColorDefaultBrush}">
+                <!-- Wider while the "Make tasks" panel is open beside the note -->
+                <Border.Style>
+                    <Style TargetType="Border">
+                        <Setter Property="MaxWidth" Value="860" />
+                        <Style.Triggers>
+                            <DataTrigger Binding="{Binding Tasks.IsOpen}" Value="True">
+                                <Setter Property="MaxWidth" Value="1200" />
+                            </DataTrigger>
+                        </Style.Triggers>
+                    </Style>
+                </Border.Style>
                 <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto" />
                         <RowDefinition Height="Auto" />
@@ -234,6 +264,9 @@
                                     </Style>
                                 </ui:Button.Style>
                             </ui:Button>
+                            <ui:Button Style="{StaticResource ToolbarAction}" Icon="{ui:SymbolIcon Sparkle24}" Content="Make tasks"
+                                       ToolTip="AI reads the note and proposes its tasks for the to-do lists" AutomationProperties.Name="Make tasks"
+                                       Command="{Binding MakeTasksCommand}" Visibility="{Binding CanMakeTasks, Converter={StaticResource BoolToVisibility}}" />
                             <ui:Button Style="{StaticResource ToolbarAction}" Icon="{ui:SymbolIcon Link24}" ToolTip="Link to a task, a person in the debt book or a mission"
                                        AutomationProperties.Name="Link to a task, person or mission" Command="{Binding EditorLinks.StartPickingCommand}"
                                        Visibility="{Binding EditorLinks, Converter={StaticResource NotEmptyToVisibility}}" />
@@ -260,6 +293,83 @@
                                 ClearButtonEnabled="False" AutomationProperties.Name="Note text" AcceptsReturn="True" AcceptsTab="True"
                                 TextWrapping="Wrap" VerticalContentAlignment="Top" VerticalScrollBarVisibility="Auto" SpellCheck.IsEnabled="False"
                                 IsReadOnly="{Binding EditTrashed}" Text="{Binding EditBody, UpdateSourceTrigger=PropertyChanged}" />
+
+                    <!-- "Make tasks": the note's tasks as AI found them, into one list; the lines they came from get a "→ Tracker" tag -->
+                    <Border Grid.Column="1" Grid.RowSpan="4" Width="340" BorderThickness="1,0,0,0" BorderBrush="{DynamicResource CardStrokeColorDefaultBrush}"
+                            Visibility="{Binding Tasks.IsOpen, Converter={StaticResource BoolToVisibility}, FallbackValue=Collapsed}">
+                        <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Focusable="False">
+                            <StackPanel DataContext="{Binding Tasks}" Margin="16,12,12,16">
+                                <DockPanel Margin="0,0,0,10">
+                                    <ui:Button DockPanel.Dock="Right" Style="{StaticResource ToolbarAction}" Icon="{ui:SymbolIcon Dismiss24}" ToolTip="Close"
+                                               AutomationProperties.Name="Close the tasks panel" Command="{Binding CloseCommand}" />
+                                    <ui:SymbolIcon DockPanel.Dock="Left" Symbol="Sparkle24" FontSize="16" Margin="0,0,6,0" VerticalAlignment="Center"
+                                                   Foreground="{DynamicResource AccentTextFillColorPrimaryBrush}" />
+                                    <TextBlock Text="Tasks from this note" FontWeight="SemiBold" VerticalAlignment="Center" />
+                                </DockPanel>
+
+                                <!-- Asking: placeholder lines, and where it runs -->
+                                <StackPanel Visibility="{Binding IsBusy, Converter={StaticResource BoolToVisibility}}" AutomationProperties.Name="Asking AI for tasks">
+                                    <Border Style="{DynamicResource HelmShimmerLine}" Width="260" />
+                                    <Border Style="{DynamicResource HelmShimmerLine}" Width="200" />
+                                    <Border Style="{DynamicResource HelmShimmerLine}" Width="230" />
+                                    <TextBlock Text="{Binding Status}" Style="{DynamicResource HelmSecondaryText}" />
+                                </StackPanel>
+
+                                <!-- The tasks to pick from, all into one list -->
+                                <StackPanel Visibility="{Binding IsProposing, Converter={StaticResource BoolToVisibility}}">
+                                    <DockPanel Margin="0,0,0,10">
+                                        <TextBlock DockPanel.Dock="Left" Text="Add to" VerticalAlignment="Center" Margin="0,0,8,0" />
+                                        <ComboBox ItemsSource="{Binding Lists}" SelectedItem="{Binding SelectedList}" AutomationProperties.Name="Add to list" />
+                                    </DockPanel>
+                                    <ItemsControl ItemsSource="{Binding Choices}" Focusable="False">
+                                        <ItemsControl.ItemTemplate>
+                                            <DataTemplate DataType="{x:Type local:NoteTaskChoice}">
+                                                <CheckBox Margin="0,2" MinWidth="0" IsChecked="{Binding Keep}" AutomationProperties.Name="{Binding Title}">
+                                                    <StackPanel>
+                                                        <TextBlock Text="{Binding Title}" TextWrapping="Wrap" />
+                                                        <Border CornerRadius="4" Padding="6,1" Margin="0,3,0,0" HorizontalAlignment="Left"
+                                                                Background="{DynamicResource ControlFillColorSecondaryBrush}" Visibility="{Binding HasDue, Converter={StaticResource BoolToVisibility}}">
+                                                            <TextBlock Text="{Binding DueText}" FontSize="12" />
+                                                        </Border>
+                                                    </StackPanel>
+                                                </CheckBox>
+                                            </DataTemplate>
+                                        </ItemsControl.ItemTemplate>
+                                    </ItemsControl>
+                                    <TextBlock Text="{Binding SkippedText}" Style="{DynamicResource HelmSecondaryText}" Margin="0,8,0,0"
+                                               Visibility="{Binding HasSkipped, Converter={StaticResource BoolToVisibility}}" />
+                                    <TextBlock Text="{Binding Status}" Style="{DynamicResource HelmSecondaryText}" Margin="0,4,0,0"
+                                               Visibility="{Binding Status, Converter={StaticResource NotEmptyToVisibility}}" />
+                                    <WrapPanel HorizontalAlignment="Right" Margin="0,12,0,0">
+                                        <ui:Button Margin="0,0,8,0" Content="Cancel" Command="{Binding CloseCommand}" />
+                                        <ui:Button Appearance="Primary" Content="{Binding AddText}" Icon="{ui:SymbolIcon Add24}" Command="{Binding AddCommand}" />
+                                    </WrapPanel>
+                                </StackPanel>
+
+                                <!-- A problem, or no task in the note -->
+                                <StackPanel Visibility="{Binding IsStuck, Converter={StaticResource BoolToVisibility}}">
+                                    <TextBlock Text="{Binding Status}" TextWrapping="Wrap" />
+                                    <WrapPanel HorizontalAlignment="Right" Margin="0,12,0,0">
+                                        <ui:Button Margin="0,0,8,0" Content="Try again" Icon="{ui:SymbolIcon ArrowClockwise24}" Command="{Binding RetryCommand}" />
+                                        <ui:Button Content="Cancel" Command="{Binding CloseCommand}" />
+                                    </WrapPanel>
+                                </StackPanel>
+
+                                <!-- Added: Undo takes the tasks and the note's tags back -->
+                                <StackPanel Visibility="{Binding IsDone, Converter={StaticResource BoolToVisibility}}">
+                                    <DockPanel>
+                                        <ui:SymbolIcon DockPanel.Dock="Left" Symbol="CheckmarkCircle24" FontSize="16" Margin="0,0,8,0" VerticalAlignment="Center"
+                                                       Foreground="{DynamicResource AccentTextFillColorPrimaryBrush}" />
+                                        <TextBlock Text="{Binding DoneText}" TextWrapping="Wrap" VerticalAlignment="Center" />
+                                    </DockPanel>
+                                    <WrapPanel Margin="0,12,0,0">
+                                        <ui:Button Margin="0,0,8,0" Content="Undo" Icon="{ui:SymbolIcon ArrowUndo24}" Command="{Binding UndoCommand}" />
+                                        <ui:Button Content="Done" Command="{Binding CloseCommand}" />
+                                    </WrapPanel>
+                                </StackPanel>
+                            </StackPanel>
+                        </ScrollViewer>
+                    </Border>
                 </Grid>
             </Border>
         </Grid>

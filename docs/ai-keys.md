@@ -315,6 +315,24 @@ subtasks, with one Undo, for "biến ghi chú họp thành task trong list Công
 with "ghi chú" or "note" carries only the notes tools, and `notes_create` asks for a dictated note to be cleaned up:
 punctuation, paragraphs, a title.
 
+## Split into steps and Make tasks (Tracker, Notes)
+
+Both are `task-proposals` text calls, started by the user. While AI works the panel shows placeholder lines and where
+the call runs (`IAiText.Where`: "Sonnet 5.5 · agent on HUNG-PC · 0đ", or "Haiku 5.5 · API").
+
+- **Split into steps**: the ✦ button on a task's row (PC), **Split into steps** after a tap on the task (phone). The
+  proposed steps show inline under the task as ticked check boxes with editable titles. **Spread due dates before …**
+  is on when the task has a due date: the ticked steps get days spread evenly from tomorrow, all before the task's
+  (`TaskProposals.SpreadBefore`). **Add selected (n)** makes them the task's checklist (its subtasks); **Undo** takes
+  them back; **Try again** asks for other steps.
+- **Make tasks**: in the note's toolbar and its card's right-click menu (PC), in the note's ⋮ menu (phone). A panel
+  beside the note (PC) or above it (phone) lists the tasks with their due days, **Add to** one list for all (made when
+  it is new), and names the lines it left out ("Skipped “Tuần sau về quê”: not a task."). **Add n tasks** adds the
+  ticked ones and puts a plain-text ` → Tracker` tag at the end of each line they came from (AI quotes the line, or the
+  line holding the task's title is used), so every device and older version shows it; **Undo** removes the tasks, a
+  list made for them, and the tags (`NoteTaskLines`, `NoteTasksViewModel`). Notes reaches Tracker only through
+  `Helm.Core.Tasks.INoteTaskMaker` (Tracker's `TrackerNoteTasks`), offered while Tracker is on.
+
 ## Automatic jobs (briefs from the PC)
 
 A Helm PC that is on runs a few jobs by itself on its agents (AI → Proxy) and sends the result to the phone as a short
