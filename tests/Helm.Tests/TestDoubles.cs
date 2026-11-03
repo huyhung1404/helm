@@ -5,37 +5,47 @@ using Helm.Shell.Services;
 
 namespace Helm.Tests;
 
-/// <summary>An in-memory synced collection that can also play "another device" (<see cref="SetRemote"/>).</summary>
+/// <summary>
+/// An in-memory synced collection that can also play "another device" (<see cref="SetRemote"/>). Safe across threads
+/// like the real one: an agent job's worker writes from its own task while the asker polls.
+/// </summary>
 internal sealed class MemorySynced<T> : ISyncedCollection<T> where T : class
 {
     private readonly SortedDictionary<string, T> _records = new(StringComparer.Ordinal);
+    private readonly object _gate = new();
     private int _next;
 
     public string Name => typeof(T).Name;
 
     public event EventHandler<SyncedChangedEventArgs>? Changed;
 
-    public T? Get(string id) => _records.GetValueOrDefault(id);
+    public T? Get(string id)
+    {
+        lock (_gate) return _records.GetValueOrDefault(id);
+    }
 
-    public IReadOnlyList<SyncedItem<T>> All() =>
-        _records.Select(r => new SyncedItem<T>(r.Key, r.Value, DateTimeOffset.UnixEpoch)).ToList();
+    public IReadOnlyList<SyncedItem<T>> All()
+    {
+        lock (_gate) return _records.Select(r => new SyncedItem<T>(r.Key, r.Value, DateTimeOffset.UnixEpoch)).ToList();
+    }
 
     public void Upsert(string id, T value)
     {
-        _records[id] = value;
+        lock (_gate) _records[id] = value;
         Changed?.Invoke(this, new SyncedChangedEventArgs([id], SyncChangeOrigin.Local));
     }
 
     public string Add(T value)
     {
-        var id = (++_next).ToString("D6", CultureInfo.InvariantCulture);
+        var id = Interlocked.Increment(ref _next).ToString("D6", CultureInfo.InvariantCulture);
         Upsert(id, value);
         return id;
     }
 
     public bool Delete(string id)
     {
-        if (!_records.Remove(id)) return false;
+        lock (_gate)
+            if (!_records.Remove(id)) return false;
         Changed?.Invoke(this, new SyncedChangedEventArgs([id], SyncChangeOrigin.Local));
         return true;
     }
@@ -43,8 +53,11 @@ internal sealed class MemorySynced<T> : ISyncedCollection<T> where T : class
     /// <summary>A change that arrived from another device (null: deleted there).</summary>
     public void SetRemote(string id, T? value)
     {
-        if (value is null) _records.Remove(id);
-        else _records[id] = value;
+        lock (_gate)
+        {
+            if (value is null) _records.Remove(id);
+            else _records[id] = value;
+        }
         Changed?.Invoke(this, new SyncedChangedEventArgs([id], SyncChangeOrigin.Remote));
     }
 }
