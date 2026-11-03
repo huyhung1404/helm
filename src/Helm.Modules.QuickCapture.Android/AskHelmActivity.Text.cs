@@ -4,6 +4,7 @@ using Android.Content.PM;
 using Android.Views;
 using Android.Widget;
 using Helm.Ai;
+using Helm.Ai.Assistant;
 using Helm.Ai.Text;
 using Helm.Core.Ai;
 using Microsoft.Extensions.DependencyInjection;
@@ -14,7 +15,8 @@ namespace Helm.Modules.QuickCapture;
 /// <summary>
 /// Ask Helm's card on a text selected in another app (Android's text selection menu: "Helm: Dịch", "Helm: Sửa",
 /// "Helm: Viết lại", "Helm"): the chosen action runs at once, or the user picks one or says what to do. The result can
-/// replace the selection (when the app lets it), be copied or shared. Text only: no Helm tool is sent.
+/// replace the selection (when the app lets it), be copied or shared. Text only: no Helm tool is sent. "Helm: Kiểm tra
+/// tin" is Ask Helm itself on the selection: it checks the post on the web (<see cref="WebSearch"/>).
 /// </summary>
 public partial class AskHelmActivity
 {
@@ -28,10 +30,14 @@ public partial class AskHelmActivity
     /// <summary>The action an entry of the selection menu stands for; null: the user picks one ("Helm").</summary>
     protected virtual TextActionKind? SelectionAction => null;
 
+    /// <summary>"Helm: Kiểm tra tin": the selection is a post for Ask Helm to check on the web, not a text to work on.</summary>
+    protected virtual bool ChecksPost => false;
+
     /// <summary>Opened from a text selection: the card works on that text. False: Ask Helm as usual.</summary>
     private bool StartWithSelection(IServiceProvider services)
     {
         if (Intent?.Action != Intent.ActionProcessText) return false;
+        if (ChecksPost) return CheckPost(Intent.GetCharSequenceExtra(Intent.ExtraProcessText)?.Trim() ?? "");
         _selection = Intent.GetCharSequenceExtra(Intent.ExtraProcessText)?.Trim() ?? "";
         // Only an app that asked for a result takes the text back, and only when it did not mark it read-only.
         _writable = CallingActivity is not null && !Intent.GetBooleanExtra(Intent.ExtraProcessTextReadonly, false);
@@ -50,6 +56,27 @@ public partial class AskHelmActivity
         }
         if (SelectionAction is { } action) _ = RunTextAsync(action, null);
         else ChooseAction();
+        return true;
+    }
+
+    /// <summary>The post goes to Ask Helm as "Kiểm tra tin này: …"; what the user says next is a follow-up, as in the card.</summary>
+    private bool CheckPost(string post)
+    {
+        _question.Text = Shorten(post);
+        _question.Visibility = ViewStates.Visible;
+        if (post.Length == 0)
+        {
+            ShowProblem("No text came with the selection.");
+            return true;
+        }
+        if (_assistant!.Unavailable() is { } problem)
+        {
+            ShowProblem(problem);
+            return true;
+        }
+        _session = _assistant.Start([new PhoneTools(this)]);
+        _heard.Text = "Kiểm tra tin này";
+        _ = SendAsync(WebSearch.FactCheckRequest(post));
         return true;
     }
 
@@ -218,6 +245,16 @@ public sealed class AskHelmFixActivity : AskHelmActivity
 public sealed class AskHelmRewriteActivity : AskHelmActivity
 {
     protected override TextActionKind? SelectionAction => TextActionKind.Rewrite;
+}
+
+/// <summary>"Helm: Kiểm tra tin": is this post true? Ask Helm searches the web and names its sources (when Web search is on).</summary>
+[Activity(Name = QuickCaptureModule.AskHelmCheckName, Label = "Helm: Kiểm tra tin", Exported = true, ExcludeFromRecents = true,
+    Theme = "@android:style/Theme.Translucent.NoTitleBar", ConfigurationChanges = AskHelmSelection.Changes,
+    WindowSoftInputMode = SoftInput.AdjustResize | SoftInput.StateHidden)]
+[IntentFilter([Intent.ActionProcessText], Categories = [Intent.CategoryDefault], DataMimeType = "text/plain")]
+public sealed class AskHelmCheckActivity : AskHelmActivity
+{
+    protected override bool ChecksPost => true;
 }
 
 internal static class AskHelmSelection
