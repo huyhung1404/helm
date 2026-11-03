@@ -37,7 +37,7 @@ public static class AiFeatureCatalog
 
     /// <summary>
     /// The choice a feature runs with now: its own, else its default (an automatic job's), else Ask Helm's model, on,
-    /// and on a PC only when it runs by itself (as <see cref="Assistant.AiOneShot"/> and <see cref="Assistant.AiTextService"/> do).
+    /// and on a PC only when it runs by itself (as <see cref="Assistant.AiTextService"/> does).
     /// </summary>
     public static AiFeatureChoice Effective(AiFeatureSettings settings, string id)
     {

@@ -38,9 +38,10 @@ public static class AiCoreServices
         // Ask Helm reads the briefs and sets the jobs; undoing a job's change runs the tool's own Undo.
         services.AddSingleton<IMcpToolProvider>(sp => new Auto.AiBriefTools(sp.GetRequiredService<Auto.AiBriefBook>(),
             sp.GetRequiredService<ISyncedSettings<AiFeatureSettings>>(), () => sp.GetServices<IMcpToolProvider>()));
-        services.AddSingleton(sp => new AiUsageBook(sp.GetRequiredService<ISyncedLog<AiUsageEntry>>()));
+        services.AddSingleton(sp => new AiUsageBook(sp.GetRequiredService<ISyncedLog<AiUsageEntry>>(),
+            logger: sp.GetService<ILoggerFactory>()?.CreateLogger<AiUsageBook>()));
         services.AddSingleton(sp => new AiManagementKeys(sp.GetRequiredService<ISyncedCollection<AiManagementKey>>(),
-            sp.GetRequiredService<HelmPaths>(), sp.GetRequiredService<ISecretProtector>()));
+            sp.GetRequiredService<HelmPaths>(), sp.GetRequiredService<ISecretProtector>(), sync: sp.GetService<ISyncService>()));
         services.AddSingleton<IAiKeyChecker>(_ => new ClaudeKeyChecker());
         services.AddSingleton<IAiKeyChecker>(_ => new GrokKeyChecker(AiHttp.Shared));
         services.AddSingleton<IAiBalanceReader>(_ => new GrokBalanceReader(AiHttp.Shared));
@@ -82,10 +83,8 @@ public static class AiCoreServices
         services.AddSingleton(sp => new AiFeaturesViewModel(sp.GetRequiredService<ISyncedSettings<AiFeatureSettings>>(),
             sp.GetRequiredService<AiUsageBook>(), () => sp.GetRequiredService<HelmAssistant>().Models(),
             sp.GetRequiredService<Helm.Core.Services.IUiDispatcher>()));
-        // One answer, no tools (file a transaction, read a bank notification): agents first, the API last.
-        services.AddSingleton(sp => new AiOneShot(sp.GetRequiredService<AiKeyStore>(), sp.GetRequiredService<ISyncedSettings<AiFeatureSettings>>(),
-            sp.GetRequiredService<AiUsageBook>(), sp.GetServices<IAssistantChatFactory>(), new AiRouter(sp.GetServices<IAgentRoute>())));
-        // Text-only calls of the tools (translate a selection, analyse a word on the phone…), on the same router.
+        // Text-only calls of the tools (translate a selection, analyse a word, file a transaction, read a bank
+        // notification…): agents first, the API last.
         services.AddSingleton<Helm.Core.Ai.IAiText>(sp => new AiTextService(sp.GetRequiredService<AiKeyStore>(),
             sp.GetRequiredService<ISyncedSettings<AiFeatureSettings>>(), sp.GetRequiredService<AiUsageBook>(),
             sp.GetServices<IAssistantChatFactory>(), new AiRouter(sp.GetServices<IAgentRoute>())));

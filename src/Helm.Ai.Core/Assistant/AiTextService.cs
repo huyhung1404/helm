@@ -5,9 +5,11 @@ using Helm.Core.Sync;
 namespace Helm.Ai.Assistant;
 
 /// <summary>
-/// <see cref="IAiText"/> on the router: an agent on a Helm PC first (a text-only job, no tools), then the API with the
-/// feature's model, within its daily cap. A feature with no choice of its own uses Ask Helm's (the model picked in the
-/// card). Nothing a text call does changes data, so a PC that took it and failed is no reason not to try the API.
+/// <see cref="IAiText"/> on the router, for every feature that needs one answer and no tools (translate a selection,
+/// analyse a word, file a transaction, read a bank notification): an agent on a Helm PC first (a text-only job), then
+/// the API with the feature's model, within its daily cap. A feature with no choice of its own uses Ask Helm's (the
+/// model picked in the card), on a PC only when it runs by itself. Nothing a text call does changes data, so a PC that
+/// took a call the user started and failed is no reason not to try the API; one that runs by itself stops there.
 /// </summary>
 public sealed class AiTextService(
     AiKeyStore keys,
@@ -21,13 +23,18 @@ public sealed class AiTextService(
 
     private readonly IReadOnlyList<IAssistantChatFactory> _factories = [.. factories];
 
-    /// <summary>The feature's own choice, else Ask Helm's (on: the feature is on while it has no choice of its own).</summary>
-    public AiFeatureChoice ChoiceFor(string feature)
+    /// <summary>
+    /// The feature's own choice, else Ask Helm's (on: the feature is on while it has no choice of its own), on a PC only
+    /// when it was not started by the user.
+    /// </summary>
+    public AiFeatureChoice ChoiceFor(string feature, bool userStarted = true)
     {
         var all = features.Current;
         if (all.Features.TryGetValue(feature, out var own)) return own;
         var shared = all.For(AiFeatureIds.AskHelm).Copy();
         shared.Enabled = true;
+        // The owner's rule: what runs by itself never spends on the API unless the user said so.
+        if (!userStarted) shared.Route = AiRoutePolicy.PcOnly;
         return shared;
     }
 
@@ -52,7 +59,7 @@ public sealed class AiTextService(
 
     public async Task<AiTextAnswer> AskAsync(AiTextRequest request, CancellationToken ct)
     {
-        var choice = ChoiceFor(request.Feature);
+        var choice = ChoiceFor(request.Feature, request.UserStarted);
         if (!choice.Enabled) return AiTextAnswer.Failed("This AI feature is turned off: AI → Features on the PC, or General › AI features on the phone.");
         var model = choice.Model;
 
@@ -68,6 +75,11 @@ public sealed class AiTextService(
                 usage.RecordAgent(request.Feature, result.Agent ?? "agent", model, route.Device, result.SavedUsd);
                 if (result.Text.Trim().Length > 0)
                     return new AiTextAnswer(result.Text.Trim(), null, result.Agent is { } agent ? $"{agent} trên {route.Device}" : route.Device);
+            }
+            catch (AiRouteTakenException ex) when (!request.UserStarted)
+            {
+                // It took the question: what runs by itself does not pay the API for an answer that may still come.
+                return AiTextAnswer.Failed(ex.Message);
             }
             catch (AiRouteException)
             {

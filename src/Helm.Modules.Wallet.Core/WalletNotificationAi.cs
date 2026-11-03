@@ -1,7 +1,7 @@
 using System.Text.Json;
 using System.Text.RegularExpressions;
 using Helm.Ai;
-using Helm.Ai.Assistant;
+using Helm.Core.Ai;
 
 namespace Helm.Modules.Wallet;
 
@@ -18,7 +18,7 @@ public sealed record NotificationRead(string? TransactionId, WalletTransaction? 
 /// answer is checked against the text (the amount and the balance must be in it, a sign in it must agree) before the
 /// transaction is saved the usual way; <see cref="Undo"/> takes it back and the notification returns to the list.
 /// </summary>
-public sealed partial class WalletNotificationAi(WalletStore store, WalletCapture capture, AiOneShot ai)
+public sealed partial class WalletNotificationAi(WalletStore store, WalletCapture capture, IAiText ai)
 {
     internal const string System = """
         You read one bank notification from a Vietnamese bank and find the transaction in it.
@@ -37,9 +37,9 @@ public sealed partial class WalletNotificationAi(WalletStore store, WalletCaptur
         if (BankNotificationParser.HasOneTimeCode(notification.Title, notification.Text))
             return new NotificationRead(null, null, "This looks like a one-time code: Helm never sends those anywhere.");
         var prompt = $"Bank: {notification.Bank}\nTitle: {notification.Title}\nText: {notification.Text}";
-        var answer = await ai.AskAsync(new AiOneShotRequest(AiFeatureIds.WalletReadNotification, System, prompt) { UserStarted = true }, ct);
-        if (answer.Text is not { } text) return new NotificationRead(null, null, answer.Problem ?? "AI did not answer.");
-        if (Extract(text, notification) is not { } parsed) return new NotificationRead(null, null, "AI found no transaction it could show in this notification.");
+        var answer = await ai.AskAsync(new AiTextRequest(AiFeatureIds.WalletReadNotification, System, prompt), ct);
+        if (!answer.Ok) return new NotificationRead(null, null, answer.Problem ?? "AI did not answer.");
+        if (Extract(answer.Text, notification) is not { } parsed) return new NotificationRead(null, null, "AI found no transaction it could show in this notification.");
         var saved = store.AddCaptured(parsed, capture.Settings.Current.AutoCategorize);
         capture.ForgetUnread(notification);
         return new NotificationRead(saved.Id, saved.Transaction, null, saved.Kind == CaptureKind.Duplicate);

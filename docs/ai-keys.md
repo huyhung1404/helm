@@ -248,9 +248,10 @@ Code: `src/Helm.Ai.Core/Prompts/` (`AiPrompts`, `AiPromptRefresher`, `SkillHubPr
 
 ## Wallet's AI
 
-Wallet uses AI only where the history and the bank parser fall short, through `AiOneShot`
-(`Helm.Ai.Core/Assistant/AiOneShot.cs`: one question, no tools, agents on a Helm PC first, the API last). A feature
-with no choice of its own takes Ask Helm's model; one that runs by itself goes to a PC agent only.
+Wallet uses AI only where the history and the bank parser fall short, through `IAiText`
+(`Helm.Ai.Core/Assistant/AiTextService.cs`: one question, no tools, agents on a Helm PC first, the API last). A feature
+with no choice of its own takes Ask Helm's model; one that runs by itself (`AiTextRequest.UserStarted = false`) goes to
+a PC agent only.
 
 - **Filing a new payment** (`wallet-categorize`, runs by itself: PC agent only). `WalletClassifier` files it from the
   history first, without AI: earlier transactions of the same direction with the same words (or most of them) vote

@@ -1,4 +1,6 @@
 using Helm.Core.Sync;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 
 namespace Helm.Ai;
 
@@ -61,19 +63,42 @@ public static class AiPrices
 
     public static Price? For(string model) => Known.GetValueOrDefault(model);
 
+    /// <summary>The model names of each provider start with this (Claude: "claude-", Grok: "grok-").</summary>
+    private static readonly Dictionary<string, string> Prefixes = new(StringComparer.Ordinal)
+    {
+        [AiProviders.Claude.Id] = "claude-",
+        [AiProviders.Grok.Id] = "grok-",
+    };
+
+    /// <summary>
+    /// The dearest price Helm knows for <paramref name="provider"/>'s models (any provider's when it knows none): what a
+    /// model with no known price is counted at against a daily cap, so a new model never spends past it unseen.
+    /// </summary>
+    public static Price Ceiling(string provider)
+    {
+        var own = Prefixes.TryGetValue(provider, out var prefix) ? Known.Where(k => k.Key.StartsWith(prefix, StringComparison.Ordinal)).Select(k => k.Value).ToList() : [];
+        return (own.Count > 0 ? own : [.. Known.Values]).MaxBy(p => p.Input + p.Output)!;
+    }
+
+    private static decimal Cost(Price p, long input, long output, long cacheRead, long cacheWrite) =>
+        (input * p.Input + cacheWrite * p.Input * 1.25m + cacheRead * p.CacheRead + output * p.Output) / 1_000_000m;
+
     /// <summary>
     /// The cost of one call. Cache writes cost a quarter more than plain input on Claude. <paramref name="input"/> is
     /// the input not read from the cache.
     /// </summary>
     public static decimal? Usd(string model, long input, long output, long cacheRead, long cacheWrite)
     {
-        if (For(model) is not { } p) return null;
-        return (input * p.Input + cacheWrite * p.Input * 1.25m + cacheRead * p.CacheRead + output * p.Output) / 1_000_000m;
+        return For(model) is { } p ? Cost(p, input, output, cacheRead, cacheWrite) : null;
     }
+
+    /// <summary>An API call's cost for a daily cap: its estimate, else the provider's <see cref="Ceiling"/> (never 0).</summary>
+    public static decimal ForCap(AiUsageEntry entry) =>
+        entry.Usd ?? Cost(Ceiling(entry.Provider), entry.InputTokens, entry.OutputTokens, entry.CacheReadTokens, entry.CacheWriteTokens);
 }
 
 /// <summary>What Helm's API calls cost, per feature and per day or month (the user's local days).</summary>
-public sealed class AiUsageBook(ISyncedLog<AiUsageEntry> log, TimeProvider? time = null)
+public sealed class AiUsageBook(ISyncedLog<AiUsageEntry> log, TimeProvider? time = null, ILogger? logger = null)
 {
     public const string Collection = "ai.usage";
     public const string ApiRoute = "api";
@@ -81,6 +106,8 @@ public sealed class AiUsageBook(ISyncedLog<AiUsageEntry> log, TimeProvider? time
     public const string AgentRoute = "agent";
 
     private readonly TimeProvider _time = time ?? TimeProvider.System;
+    private readonly ILogger _logger = logger ?? NullLogger.Instance;
+    private readonly HashSet<string> _unpriced = new(StringComparer.Ordinal);
 
     public AiUsageEntry Record(string feature, AiProvider provider, string model, string? keyId, long input, long output, long cacheRead, long cacheWrite)
     {
@@ -128,10 +155,24 @@ public sealed class AiUsageBook(ISyncedLog<AiUsageEntry> log, TimeProvider? time
             .Sum(e => e.SavedUsd ?? 0);
     }
 
+    /// <summary>
+    /// What today's API calls cost, as a daily cap counts it: a call on a model with no known price counts at the
+    /// dearest price of its provider (<see cref="AiPrices.Ceiling"/>), never as free.
+    /// </summary>
     public decimal SpentToday(string? feature = null)
     {
         var today = Local(_time.GetUtcNow()).Date;
-        return Entries(feature).Where(e => Local(e.At).Date == today).Sum(e => e.Usd ?? 0);
+        return Entries(feature).Where(e => Local(e.At).Date == today).Sum(e => e.Route == AgentRoute ? 0 : Counted(e));
+    }
+
+    private decimal Counted(AiUsageEntry entry)
+    {
+        if (entry.Usd is { } usd) return usd;
+        bool first;
+        lock (_unpriced) first = _unpriced.Add(entry.Model);
+        if (first)
+            _logger.LogWarning("No price is known for the model {Model}: its calls count against the daily cap at {Provider}'s dearest price", entry.Model, entry.Provider);
+        return AiPrices.ForCap(entry);
     }
 
     public decimal SpentThisMonth(string? feature = null)
