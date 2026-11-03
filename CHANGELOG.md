@@ -3,7 +3,7 @@
 All notable changes to Helm. The top section is used as the GitHub release body and as the Velopack release notes.
 Format: [Keep a Changelog](https://keepachangelog.com), versions follow [SemVer](https://semver.org).
 
-## [Unreleased]
+## [0.79.0] - 2026-11-03
 
 ### Added
 - **Ask Helm on the phone (preview).** A new Quick Settings tile, **Ask Helm**, opens a card over whatever app is
