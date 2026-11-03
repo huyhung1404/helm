@@ -1,6 +1,7 @@
 using System.Globalization;
 using System.Text.Json;
 using System.Text.Json.Nodes;
+using Helm.Ai.Prompts;
 using Helm.Core.Mcp;
 using Helm.Core.Sync;
 
@@ -46,7 +47,8 @@ public sealed class HelmAssistant(
     IEnumerable<IAssistantChatFactory> factories,
     Func<string?, bool> isToolOn,
     AiRouter? router = null,
-    TimeProvider? time = null)
+    TimeProvider? time = null,
+    IAiPrompts? prompts = null)
 {
     /// <summary>The tools of Helm's own tools that suit a quick spoken request (no analysis pipelines, no servers).</summary>
     public static readonly IReadOnlySet<string> Tools = new HashSet<string>(StringComparer.Ordinal)
@@ -62,6 +64,7 @@ public sealed class HelmAssistant(
     /// <summary>Tools the phone itself adds (alarm, calendar, clipboard…) start with this.</summary>
     public const string PhoneToolPrefix = "phone_";
 
+    /// <summary>The built-in system prompt; the user's own from the Skill Hub (helm-ask-helm) replaces it (<see cref="IAiPrompts"/>).</summary>
     internal const string Instructions = """
         You are Helm's assistant on the user's phone. The user speaks Vietnamese (sometimes English); their words come
         from speech recognition, so expect small mistakes and read them generously. Do what they ask with Helm's tools:
@@ -104,8 +107,8 @@ public sealed class HelmAssistant(
         foreach (var provider in AiProviders.All)
         {
             if (keys.DefaultFor(provider) is not { } key || !factories.Any(f => f.Provider == provider)) continue;
-            var models = key.Value.LastCheck?.Models.Where(m => IsChatModel(provider, m.Id)).ToList() ?? [];
-            if (models.Count == 0) models = [.. Fallback(provider)];
+            var models = AiModels.Chat(key.Value.LastCheck);
+            if (models.Count == 0) models = AiModels.Fallback(provider);
             options.AddRange(models.Select(m => new AssistantModelOption(provider, m.Id, m.Name)));
         }
         return options;
@@ -177,8 +180,11 @@ public sealed class HelmAssistant(
         var model = Current() ?? throw new AssistantException("No model to ask.");
         var key = keys.DefaultFor(model.Provider) ?? throw new AssistantException($"No {model.Provider.Name} API key.");
         var factory = factories.First(f => f.Provider == model.Provider);
-        return (factory.Create(key.Value.Secret, model.Model, Choice.Effort, Instructions, tools), model, key.Id);
+        return (factory.Create(key.Value.Secret, model.Model, Choice.Effort, SystemPrompt(), tools), model, key.Id);
     }
+
+    /// <summary>The system prompt a call starts with: the user's own when the Skill Hub has a usable one.</summary>
+    internal string SystemPrompt() => prompts?.Get(AiFeatureIds.AskHelm, Instructions) ?? Instructions;
 
     internal void Count(AssistantModelOption model, string keyId, AssistantUsage u) =>
         usage.Record(AiFeatureIds.AskHelm, model.Provider, model.Model, keyId, u.Input, u.Output, u.CacheRead, u.CacheWrite);
@@ -191,13 +197,6 @@ public sealed class HelmAssistant(
     }
 
     internal static string Serialize(object? result) => result as string ?? JsonSerializer.Serialize(result, Output);
-
-    internal static bool IsChatModel(AiProvider provider, string id) =>
-        provider != AiProviders.Grok || !id.Contains("imagine", StringComparison.Ordinal);
-
-    private static IEnumerable<AiModel> Fallback(AiProvider provider) => provider == AiProviders.Grok
-        ? [new AiModel("grok-4.7", "grok-4.7")]
-        : [new AiModel(ClaudeModels.Haiku, "Claude Haiku 5.5"), new AiModel("claude-sonnet-5-5", "Claude Sonnet 5.5")];
 }
 
 /// <summary>

@@ -1,5 +1,6 @@
 using System.Collections.Concurrent;
 using System.Text.Json;
+using Helm.Ai.Prompts;
 using Helm.Core.Mcp;
 
 namespace Helm.Ai.Assistant;
@@ -20,12 +21,14 @@ public sealed class LocalAgentRoute : IAgentRoute, IDisposable
     private readonly Func<string?, bool> _isToolOn;
     private readonly Func<string?> _unavailable;
     private readonly TimeProvider _time;
+    private readonly IAiPrompts? _prompts;
     private readonly ConcurrentDictionary<string, Conversation> _conversations = new(StringComparer.Ordinal);
     private readonly Timer _reaper;
 
     /// <param name="agentName">The agent as the user knows it ("Codex", "Claude Code").</param>
+    /// <param name="prompts">The user's own prompts (Skill Hub), for a job that brings none of its own.</param>
     public LocalAgentRoute(string device, string agentName, IAssistantChatFactory agent, IEnumerable<IMcpToolProvider> providers,
-        Func<string?, bool> isToolOn, Func<string?> unavailable, TimeProvider? time = null)
+        Func<string?, bool> isToolOn, Func<string?> unavailable, TimeProvider? time = null, IAiPrompts? prompts = null)
     {
         Device = device;
         _agentName = agentName;
@@ -34,6 +37,7 @@ public sealed class LocalAgentRoute : IAgentRoute, IDisposable
         _isToolOn = isToolOn;
         _unavailable = unavailable;
         _time = time ?? TimeProvider.System;
+        _prompts = prompts;
         _reaper = new Timer(_ => Reap(), null, TimeSpan.FromMinutes(1), TimeSpan.FromMinutes(1));
     }
 
@@ -49,7 +53,8 @@ public sealed class LocalAgentRoute : IAgentRoute, IDisposable
         var conversation = _conversations.GetOrAdd(job.ConversationId, _ =>
         {
             var tools = Tools(job);
-            return new Conversation(_agent.Create("", job.Model, job.Effort, job.System ?? HelmAssistant.Instructions, tools), tools);
+            var system = job.System ?? _prompts?.Get(job.Feature, HelmAssistant.Instructions) ?? HelmAssistant.Instructions;
+            return new Conversation(_agent.Create("", job.Model, job.Effort, system, tools), tools);
         });
         await conversation.Gate.WaitAsync(ct);
         try

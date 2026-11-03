@@ -59,6 +59,7 @@ internal sealed class AgentRegistry : IAgentRoute, IDisposable
     private readonly IReadOnlyList<IMcpToolProvider> _tools;
     private readonly Func<string?, bool> _isToolOn;
     private readonly ILoggerFactory _loggers;
+    private readonly Helm.Ai.Prompts.IAiPrompts? _prompts;
     private readonly object _gate = new();
     private List<(AgentProfile Profile, IAssistantChatFactory Factory, Func<string?> Unavailable, LocalAgentRoute Route)> _agents = [];
     private AgentChain _chain = new([]);
@@ -66,7 +67,7 @@ internal sealed class AgentRegistry : IAgentRoute, IDisposable
     private Timer? _settle;
 
     public AgentRegistry(ISettingsStoreFactory settings, HelmPaths paths, IChildProcessLauncher launcher, IEnumerable<IMcpToolProvider> tools,
-        Func<string?, bool> isToolOn, ILoggerFactory loggers)
+        Func<string?, bool> isToolOn, ILoggerFactory loggers, Helm.Ai.Prompts.IAiPrompts? prompts = null)
     {
         _store = settings.Get<AiAgentSettings>(AiAgentSettings.StoreId);
         _paths = paths;
@@ -74,6 +75,7 @@ internal sealed class AgentRegistry : IAgentRoute, IDisposable
         _tools = [.. tools];
         _isToolOn = isToolOn;
         _loggers = loggers;
+        _prompts = prompts;
         Build();
         _store.Changed += (_, _) => Build();
         WatchSignIns();
@@ -252,7 +254,7 @@ internal sealed class AgentRegistry : IAgentRoute, IDisposable
             };
             if (made is not { } m) continue;
             agents.Add((profile, m.Factory, m.Unavailable,
-                new LocalAgentRoute(Environment.MachineName, profile.Name, m.Factory, _tools, _isToolOn, m.Unavailable)));
+                new LocalAgentRoute(Environment.MachineName, profile.Name, m.Factory, _tools, _isToolOn, m.Unavailable, prompts: _prompts)));
         }
         List<(AgentProfile Profile, IAssistantChatFactory Factory, Func<string?> Unavailable, LocalAgentRoute Route)> old;
         lock (_gate)

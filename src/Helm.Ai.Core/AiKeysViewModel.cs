@@ -2,6 +2,7 @@ using System.Collections.ObjectModel;
 using System.Globalization;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using Helm.Ai.Prompts;
 using Helm.Core.Services;
 using Helm.Shell.Services;
 
@@ -109,6 +110,7 @@ public sealed partial class AiKeysViewModel : ObservableObject
     private readonly IUiDispatcher _ui;
     private readonly IProcessLauncher _launcher;
     private readonly IDialogService _dialogs;
+    private readonly AiPromptRefresher? _prompts;
 
     [ObservableProperty] private bool _isAdding;
     [ObservableProperty] private AiProvider _newProvider = AiProviders.Claude;
@@ -118,8 +120,13 @@ public sealed partial class AiKeysViewModel : ObservableObject
     [ObservableProperty] private bool _isSaving;
     [ObservableProperty] private string _message = "";
 
+    /// <summary>"Model lists updated today, 09:12": the oldest of the keys' last tests (they run again by themselves daily).</summary>
+    [ObservableProperty] private string _modelsUpdatedText = "";
+
+    /// <param name="prompts">Fetches the features' prompts from the Skill Hub again when the page opens.</param>
     public AiKeysViewModel(AiKeyStore store, AiManagementKeys managementKeys, IEnumerable<IAiKeyChecker> checkers,
-        IEnumerable<IAiBalanceReader> readers, IUiDispatcher ui, IProcessLauncher launcher, IDialogService dialogs)
+        IEnumerable<IAiBalanceReader> readers, IUiDispatcher ui, IProcessLauncher launcher, IDialogService dialogs,
+        AiPromptRefresher? prompts = null)
     {
         _store = store;
         _managementKeys = managementKeys;
@@ -128,6 +135,7 @@ public sealed partial class AiKeysViewModel : ObservableObject
         _ui = ui;
         _launcher = launcher;
         _dialogs = dialogs;
+        _prompts = prompts;
         Sections = [.. AiProviders.All.Select(p => new AiProviderSection(p, _readers.ContainsKey(p.Id))
         {
             HasManagementKey = _managementKeys.Has(p),
@@ -179,11 +187,16 @@ public sealed partial class AiKeysViewModel : ObservableObject
             }
             section.KeysChanged();
         }
+        var tested = keys.Select(k => k.Value.LastCheck?.At).OfType<DateTimeOffset>().ToList();
+        ModelsUpdatedText = tested.Count > 0 ? $"Model lists updated {When(tested.Min())}" : "";
     }
 
-    /// <summary>The page came into view: read the balances that can be read.</summary>
-    public Task OnShownAsync() =>
-        Task.WhenAll(Sections.Where(s => s.ReadsBalance && s.HasManagementKey).Select(ReadBalanceAsync));
+    /// <summary>The page came into view: read the balances that can be read, and the features' prompts again.</summary>
+    public Task OnShownAsync()
+    {
+        _prompts?.RefreshSoon();
+        return Task.WhenAll(Sections.Where(s => s.ReadsBalance && s.HasManagementKey).Select(ReadBalanceAsync));
+    }
 
     [RelayCommand]
     private void StartAdd(AiProvider? provider)
