@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The separate "Ask Helm" launcher icon: Ask Helm's mic in white on Helm's blue. -->
+<adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">
+    <background android:drawable="@color/ask_helm_launcher_background" />
+    <foreground android:drawable="@drawable/ask_helm_launcher_foreground" />
+</adaptive-icon>

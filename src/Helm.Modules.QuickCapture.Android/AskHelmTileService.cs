@@ -16,9 +16,23 @@ public sealed class AskHelmTileService : TileService
     public override void OnStartListening()
     {
         base.OnStartListening();
+        // Only a tile in the panel listens: Ways to open shows it as added (also for tiles added before it asked).
+        AskHelmTileState.Set(this, true);
         if (QsTile is not { } tile) return;
         tile.State = TileState.Inactive;
         tile.UpdateTile();
+    }
+
+    public override void OnTileAdded()
+    {
+        base.OnTileAdded();
+        AskHelmTileState.Set(this, true);
+    }
+
+    public override void OnTileRemoved()
+    {
+        base.OnTileRemoved();
+        AskHelmTileState.Set(this, false);
     }
 
     public override void OnClick()

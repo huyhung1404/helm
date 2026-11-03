@@ -6,7 +6,6 @@ using Android.OS;
 using AndroidSettings = Android.Provider.Settings;
 using AndroidUri = Android.Net.Uri;
 
-[assembly: UsesPermission("android.permission.SYSTEM_ALERT_WINDOW")]
 [assembly: UsesPermission("android.permission.PACKAGE_USAGE_STATS")]
 
 namespace Helm.Modules.Vocab;
@@ -20,7 +19,7 @@ internal static class VocabOverlayPlatform
     /// <summary>How far back to look for the app that came to the front last.</summary>
     private static readonly TimeSpan LookBack = TimeSpan.FromHours(6);
 
-    public static bool CanDraw(Context context) => AndroidSettings.CanDrawOverlays(context);
+    public static bool CanDraw(Context context) => Helm.Core.Platform.OverlayPermission.Granted(context);
 
     /// <summary>Usage access ("Usage data access"), which tells which app is in front.</summary>
     public static bool HasUsageAccess(Context context)
@@ -76,8 +75,7 @@ internal static class VocabOverlayPlatform
         ((context.Resources?.Configuration?.UiMode ?? UiMode.NightNo) & UiMode.NightMask) == UiMode.NightYes;
 
     /// <summary>Opens the phone's "Display over other apps" page for Helm.</summary>
-    public static void OpenDrawSettings(Context context) =>
-        Open(context, new Intent(AndroidSettings.ActionManageOverlayPermission, AndroidUri.Parse("package:" + context.PackageName)));
+    public static void OpenDrawSettings(Context context) => Helm.Core.Platform.OverlayPermission.OpenSettings(context);
 
     /// <summary>Opens the phone's "Usage access" list (Android has no page for one app).</summary>
     public static void OpenUsageSettings(Context context) => Open(context, new Intent(AndroidSettings.ActionUsageAccessSettings));

@@ -1,0 +1,130 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:ic="using:FluentIcons.Avalonia"
+             xmlns:vm="using:Helm.Ai.Assistant"
+             x:Class="Helm.Modules.QuickCapture.AskHelmWaysView"
+             x:DataType="vm:AskHelmWaysViewModel">
+
+    <!-- Quick Capture › Ways to open (the approved demo, A10): the edge handle, the home screen (widget, icon), and the
+         other ways ("Also"). Shown in place of the page's own sections; Back returns to them. -->
+    <StackPanel>
+        <DockPanel Margin="0,0,0,4">
+            <Button DockPanel.Dock="Left" Classes="flat" Width="44" Height="44" Padding="0" HorizontalAlignment="Left"
+                    HorizontalContentAlignment="Center" Click="Back_Click" AutomationProperties.Name="Back">
+                <ic:SymbolIcon Symbol="ArrowLeft" FontSize="18" />
+            </Button>
+            <TextBlock Text="Ways to open" FontSize="18" FontWeight="SemiBold" VerticalAlignment="Center" Margin="4,0,0,0" />
+        </DockPanel>
+
+        <!-- Edge handle -->
+        <TextBlock Text="Edge handle" Classes="section" />
+        <Border Classes="card">
+            <StackPanel>
+                <DockPanel>
+                    <ToggleSwitch DockPanel.Dock="Right" IsChecked="{Binding EdgeHandle}" OnContent="" OffContent="" VerticalAlignment="Center"
+                                  AutomationProperties.Name="Edge handle" />
+                    <StackPanel VerticalAlignment="Center" Spacing="2">
+                        <TextBlock Text="Edge handle" Classes="title" />
+                        <TextBlock Text="Drag inward to open Ask Helm" Classes="secondary" />
+                    </StackPanel>
+                </DockPanel>
+                <StackPanel IsVisible="{Binding EdgeHandle}">
+                    <Border Classes="row">
+                        <DockPanel>
+                            <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" Spacing="8">
+                                <RadioButton GroupName="AskHelmEdgeSide" Content="Left" IsChecked="{Binding IsLeft}" />
+                                <RadioButton GroupName="AskHelmEdgeSide" Content="Right" IsChecked="{Binding IsRight}" />
+                            </StackPanel>
+                            <TextBlock Text="Side" Classes="title" VerticalAlignment="Center" />
+                        </DockPanel>
+                    </Border>
+                    <Border Classes="row">
+                        <StackPanel>
+                            <DockPanel>
+                                <TextBlock DockPanel.Dock="Right" Text="{Binding HeightText}" Classes="secondary" FontSize="14" VerticalAlignment="Center" />
+                                <TextBlock Text="Height" Classes="title" VerticalAlignment="Center" />
+                            </DockPanel>
+                            <Slider Minimum="{Binding MinHeight}" Maximum="{Binding MaxHeight}" TickFrequency="{Binding HeightStep}" IsSnapToTickEnabled="True"
+                                    Value="{Binding HeightDp}" AutomationProperties.Name="Height" />
+                        </StackPanel>
+                    </Border>
+                    <Border Classes="row">
+                        <StackPanel>
+                            <DockPanel>
+                                <TextBlock DockPanel.Dock="Right" Text="{Binding PositionText}" Classes="secondary" FontSize="14" VerticalAlignment="Center" />
+                                <TextBlock Text="Position" Classes="title" VerticalAlignment="Center" />
+                            </DockPanel>
+                            <Slider Minimum="{Binding MinPosition}" Maximum="{Binding MaxPosition}" TickFrequency="1" IsSnapToTickEnabled="True"
+                                    Value="{Binding PositionPercent}" AutomationProperties.Name="Position" />
+                        </StackPanel>
+                    </Border>
+                    <Border Classes="row">
+                        <DockPanel>
+                            <ToggleSwitch DockPanel.Dock="Right" IsChecked="{Binding HideOverFullScreen}" OnContent="" OffContent="" VerticalAlignment="Center"
+                                          AutomationProperties.Name="Hide over full-screen apps" />
+                            <StackPanel VerticalAlignment="Center" Spacing="2">
+                                <TextBlock Text="Hide over full-screen apps" Classes="title" />
+                                <TextBlock Text="Games and videos" Classes="secondary" />
+                            </StackPanel>
+                        </DockPanel>
+                    </Border>
+                    <Border Classes="row">
+                        <StackPanel Spacing="8">
+                            <TextBlock Text="{Binding PermissionText}" Classes="secondary" />
+                            <Button Content="Allow display over other apps" Command="{Binding AllowDrawCommand}" IsVisible="{Binding NeedsPermission}" />
+                        </StackPanel>
+                    </Border>
+                </StackPanel>
+            </StackPanel>
+        </Border>
+
+        <!-- Home screen -->
+        <TextBlock Text="Home screen" Classes="section" />
+        <Border Classes="card">
+            <StackPanel>
+                <Button Classes="flat" Padding="0" Command="{Binding AddWidgetCommand}" AutomationProperties.Name="Add Ask Helm widget">
+                    <DockPanel>
+                        <ic:SymbolIcon DockPanel.Dock="Left" Symbol="Add" FontSize="20" Margin="0,0,16,0" VerticalAlignment="Center" />
+                        <StackPanel VerticalAlignment="Center" Spacing="2">
+                            <TextBlock Text="Add Ask Helm widget" Classes="title" />
+                            <TextBlock Text="{Binding WidgetText}" Classes="secondary" />
+                        </StackPanel>
+                    </DockPanel>
+                </Button>
+                <Border Classes="row">
+                    <DockPanel>
+                        <ToggleSwitch DockPanel.Dock="Right" IsChecked="{Binding LauncherIcon}" OnContent="" OffContent="" VerticalAlignment="Center"
+                                      AutomationProperties.Name="Ask Helm app icon" />
+                        <StackPanel VerticalAlignment="Center" Spacing="2">
+                            <TextBlock Text="“Ask Helm” app icon" Classes="title" />
+                            <TextBlock Text="Separate icon; opens the card over any app" Classes="secondary" />
+                        </StackPanel>
+                    </DockPanel>
+                </Border>
+            </StackPanel>
+        </Border>
+
+        <!-- Also -->
+        <TextBlock Text="Also" Classes="section" />
+        <Border Classes="card">
+            <StackPanel>
+                <DockPanel>
+                    <ic:SymbolIcon DockPanel.Dock="Left" Symbol="Games" FontSize="20" Margin="0,0,16,0" VerticalAlignment="Center" />
+                    <StackPanel VerticalAlignment="Center" Spacing="2">
+                        <TextBlock Text="RedMagic Game Space slider" Classes="title" />
+                        <TextBlock Text="Map “Open app” to Ask Helm" Classes="secondary" />
+                    </StackPanel>
+                </DockPanel>
+                <Border Classes="row">
+                    <DockPanel>
+                        <ic:SymbolIcon DockPanel.Dock="Left" Symbol="Settings" FontSize="20" Margin="0,0,16,0" VerticalAlignment="Center" />
+                        <StackPanel VerticalAlignment="Center" Spacing="2">
+                            <TextBlock Text="Quick Settings tile" Classes="title" />
+                            <TextBlock Text="{Binding TileText}" Classes="secondary" />
+                        </StackPanel>
+                    </DockPanel>
+                </Border>
+            </StackPanel>
+        </Border>
+    </StackPanel>
+</UserControl>

@@ -80,7 +80,7 @@ public partial class AskHelmActivity : Activity, IRecognitionListener
             }
             ReadContext(Intent);
             _session = _assistant.Start([new PhoneTools(this)], _context);
-            Listen();
+            StartOpened(Intent);
         }
         catch (Exception ex)
         {
