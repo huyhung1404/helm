@@ -23,6 +23,8 @@
     <PackageReference Include="Avalonia" Version="12.1.3" />
     <PackageReference Include="FluentIcons.Avalonia" Version="2.1.343" />
     <PackageReference Include="SQLitePCLRaw.bundle_e_sqlite3" Version="2.1.13" />
+    <!-- ONNX Runtime's native library for the search model (the managed API comes with Helm.Embeddings). -->
+    <PackageReference Include="Microsoft.ML.OnnxRuntime" Version="1.30.0" />
   </ItemGroup>
 
   <ItemGroup>

@@ -6,11 +6,12 @@ using Wpf.Ui.Controls;
 namespace Helm.Modules.Notes;
 
 /// <summary>
-/// Notes on Windows. The notes live in Helm Sync and the pages work directly on <see cref="NotesStore"/>; there is no
-/// background work. The menu and Quick access open <see cref="NotesContentPage"/>; Home → Utilities opens the settings
+/// Notes on Windows. The notes live in Helm Sync and the pages work directly on <see cref="NotesStore"/>; the only
+/// background work is indexing them for search by meaning, where the model was downloaded (<see cref="NoteIndexer"/>).
+/// The menu and Quick access open <see cref="NotesContentPage"/>; Home → Utilities opens the settings
 /// (<see cref="NotesPage"/>).
 /// </summary>
-public sealed class NotesModule(NotesViewModel viewModel) : HelmModuleBase, IModuleContent
+public sealed class NotesModule(NotesViewModel viewModel, NoteIndexer indexer) : HelmModuleBase, IModuleContent
 {
     public override string Id => NotesIds.ModuleId;
     public override string DisplayName => NotesIds.DisplayName;
@@ -25,6 +26,7 @@ public sealed class NotesModule(NotesViewModel viewModel) : HelmModuleBase, IMod
     public override Task EnableAsync(CancellationToken ct)
     {
         StatusMessage = null;
+        indexer.Start();
         return Task.CompletedTask;
     }
 
@@ -32,6 +34,7 @@ public sealed class NotesModule(NotesViewModel viewModel) : HelmModuleBase, IMod
     public override Task DisableAsync()
     {
         viewModel.Flush();
+        indexer.Stop();
         return Task.CompletedTask;
     }
 }

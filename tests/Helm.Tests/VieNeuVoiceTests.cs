@@ -1,5 +1,6 @@
 using System.Net;
 using System.Security.Cryptography;
+using Helm.Core.Downloads;
 using Helm.Modules.NovelReader;
 using Helm.Modules.NovelReader.Speech;
 using Helm.Modules.NovelReader.Speech.VieNeu;
@@ -80,7 +81,7 @@ public sealed class VieNeuVoiceTests : IDisposable
 
         await installer.InstallAsync();
 
-        Assert.Equal(VieNeuInstallState.Installed, installer.State);
+        Assert.Equal(PinnedDownloadState.Installed, installer.State);
         Assert.True(files.IsInstalled);
         Assert.Equal(first.Size / 2, server.RangeStarts[first.Url]);
         Assert.All(server.Files.Skip(1), f => Assert.False(server.RangeStarts.ContainsKey(f.Url)));
@@ -98,7 +99,7 @@ public sealed class VieNeuVoiceTests : IDisposable
 
         await installer.InstallAsync();
 
-        Assert.Equal(VieNeuInstallState.Failed, installer.State);
+        Assert.Equal(PinnedDownloadState.Failed, installer.State);
         Assert.Contains("damaged", installer.Error);
         Assert.False(files.IsInstalled);
         Assert.False(File.Exists(files.PathOf(server.Files[1]) + ".part"));
@@ -160,25 +161,25 @@ public sealed class VieNeuVoiceTests : IDisposable
 
         public FakeServer()
         {
-            var files = new List<VieNeuFile>();
+            var files = new List<PinnedFile>();
             foreach (var (path, size) in new[] { ("v3/config.json", 1000), ("v3/model.onnx", 5000), ("sea_g2p.bin", 3000) })
             {
                 var bytes = new byte[size];
                 new Random(size).NextBytes(bytes);
                 var url = "https://example.test/" + path;
                 _contents[url] = bytes;
-                files.Add(new VieNeuFile(path, url, size, Convert.ToHexString(SHA256.HashData(bytes)).ToLowerInvariant()));
+                files.Add(new PinnedFile(path, url, size, Convert.ToHexString(SHA256.HashData(bytes)).ToLowerInvariant()));
             }
             Files = files;
         }
 
-        public IReadOnlyList<VieNeuFile> Files { get; }
+        public IReadOnlyList<PinnedFile> Files { get; }
 
         public string? Damage { get; set; }
 
         public Dictionary<string, long> RangeStarts { get; } = [];
 
-        public byte[] Content(VieNeuFile file) => _contents[file.Url];
+        public byte[] Content(PinnedFile file) => _contents[file.Url];
 
         protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken ct)
         {

@@ -1,6 +1,7 @@
 using System.Text.Json;
 using Helm.Core.Links;
 using Helm.Core.Mcp;
+using Helm.Core.Sync;
 using Helm.Core.Text;
 
 namespace Helm.Modules.Notes;
@@ -8,9 +9,10 @@ namespace Helm.Modules.Notes;
 /// <summary>
 /// Notes for AI agents over MCP: search, read, write, move to the trash (never delete for good), and link a note to a
 /// task, a person in the debt book or a mission. Every change is a normal edit: it syncs, and a note edited meanwhile on another
-/// device is kept as a copy rather than overwritten.
+/// device is kept as a copy rather than overwritten. Search goes by meaning too where the sentence model is on this device
+/// (<paramref name="meaning"/>), else by words.
 /// </summary>
-public sealed class NotesMcpTools(NotesStore store, LinkHub? links = null) : IMcpToolProvider
+public sealed class NotesMcpTools(NotesStore store, LinkHub? links = null, NoteMeaning? meaning = null) : IMcpToolProvider
 {
     private const int DefaultLimit = 20;
     private const int MaxLimit = 50;
@@ -20,17 +22,18 @@ public sealed class NotesMcpTools(NotesStore store, LinkHub? links = null) : IMc
     public IEnumerable<McpTool> Tools =>
     [
         new("notes_search", "Find the user's notes. Without a query, the most recently edited ones. Returns ids, titles and a short preview; read a note with notes_read. " +
-            "To find a note by what it is about, pass any: several words the note may use instead of the user's own, e.g. for \"lỗi server hôm trước\": lỗi server, server error, sập, crash, down, VPS, 500.",
+            "Notes are also found by what they are about, without the words, where Helm has its search model. " +
+            "To find a note by what it is about, pass any as well: several words the note may use instead of the user's own, e.g. for \"lỗi server hôm trước\": lỗi server, server error, sập, crash, down, VPS, 500.",
             McpArgs.Schema(
-                ("query", McpArgs.Text("Words to look for in titles and text, all of them (accents and case do not matter)."), false),
+                ("query", McpArgs.Text("What to look for: words in titles and text, all of them (accents and case do not matter), or what the note is about."), false),
                 ("any", McpArgs.List("Alternatives, any of which may be in the note: synonyms, Vietnamese and English, short phrases. Notes with more of them come first, the newer first among equals."), false),
                 ("limit", McpArgs.Number($"How many at most (default {DefaultLimit}, at most {MaxLimit})."), false),
                 ("trash", McpArgs.Flag("Search the trash instead (notes deleted in the last 30 days)."), false),
                 ("untitled", McpArgs.Flag("Only notes without a title of their own (the list shows their first line)."), false)),
-            (args, _) => Task.FromResult<object?>(Search(args)))
+            async (args, ct) => await SearchAsync(args, ct))
         {
             ReadOnly = true,
-            Brief = "Find notes (without a query: the latest): ids, titles, previews; notes_read reads one. By what it is about: any with words the " +
+            Brief = "Find notes (without a query: the latest; by meaning too): ids, titles, previews; notes_read reads one. Also pass any: words the " +
                 "note may use, Vietnamese and English (\"lỗi server hôm trước\": lỗi server, server error, sập, crash, VPS, 500).",
             BriefArgs = new Dictionary<string, string> { ["query"] = "words that must all be there", ["any"] = "alternatives, any of which may be there" },
             BriefResult = McpTool.Drop("pinned"),
@@ -106,20 +109,29 @@ public sealed class NotesMcpTools(NotesStore store, LinkHub? links = null) : IMc
             (args, _) => Task.FromResult<object?>(Link(args))),
     ];
 
-    private object Search(JsonElement args)
+    private async Task<object> SearchAsync(JsonElement args, CancellationToken ct)
     {
         var limit = Math.Clamp(McpArgs.Int(args, "limit") ?? DefaultLimit, 1, MaxLimit);
-        var terms = TextSearch.Terms(McpArgs.String(args, "query"));
+        var query = McpArgs.String(args, "query") ?? "";
+        var terms = TextSearch.Terms(query);
         var notes = McpArgs.Bool(args, "trash") == true ? store.Trash() : store.Notes();
         if (McpArgs.Bool(args, "untitled") == true) notes = [.. notes.Where(n => n.Value.Title.Trim().Length == 0)];
-        if (terms.Count > 0) notes = [.. notes.Where(n => TextSearch.Score(terms, n.Value.DisplayTitle, n.Value.Body) > 0)];
         var any = McpArgs.Strings(args, "any");
+        // By meaning: the query, else the alternatives together, against the notes' vectors.
+        var about = query.Trim().Length > 0 ? query : string.Join(", ", any);
+        if (meaning is not null && await meaning.SimilaritiesAsync(about, ct) is { } close)
+            return Rows(NoteRecall.Rank(notes, terms, any, close, store.Now).Take(limit));
+        if (terms.Count > 0) notes = [.. notes.Where(n => TextSearch.Score(terms, n.Value.DisplayTitle, n.Value.Body) > 0)];
         var found = any.Count > 0
             ? NoteRecall.Rank(notes, any, store.Now).Take(limit)
             : terms.Count == 0
                 ? notes.Take(limit)
                 : notes.OrderByDescending(n => TextSearch.Score(terms, n.Value.DisplayTitle, n.Value.Body)).Take(limit);
-        return found.Select(n => new
+        return Rows(found);
+    }
+
+    private static List<object> Rows(IEnumerable<SyncedItem<NoteItem>> found) =>
+        found.Select(n => (object)new
         {
             id = n.Id,
             title = n.Value.DisplayTitle,
@@ -127,7 +139,6 @@ public sealed class NotesMcpTools(NotesStore store, LinkHub? links = null) : IMc
             edited = n.Value.EditedAt,
             pinned = n.Value.Pinned,
         }).ToList();
-    }
 
     /// <summary>The hashtags of the user's notes, the most used first, for the model to tag a new note the same way.</summary>
     private string TagsInUse() =>

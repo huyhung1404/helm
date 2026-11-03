@@ -54,6 +54,22 @@
             </StackPanel>
         </Border>
 
+        <!-- Search by meaning: the sentence model, downloaded once -->
+        <TextBlock Text="Search" Classes="section" />
+        <Border Classes="card" IsVisible="{Binding SearchModel, Converter={x:Static ObjectConverters.IsNotNull}}">
+            <StackPanel Spacing="4" DataContext="{Binding SearchModel}" x:DataType="vm:NoteSearchModelViewModel">
+                <TextBlock Text="Search by meaning" Classes="title" />
+                <TextBlock Text="{Binding Status}" Classes="secondary" TextWrapping="Wrap" />
+                <ProgressBar Minimum="0" Maximum="1" Value="{Binding Progress}" IsVisible="{Binding IsDownloading}" />
+                <WrapPanel>
+                    <Button Margin="0,0,8,8" Content="{Binding Size, StringFormat='Download ({0})'}" Command="{Binding DownloadCommand}" IsVisible="{Binding CanDownload}" />
+                    <Button Margin="0,0,8,8" Content="Stop" Command="{Binding CancelCommand}" IsVisible="{Binding IsDownloading}" />
+                    <Button Margin="0,0,8,8" Content="Remove" Command="{Binding RemoveCommand}" IsVisible="{Binding IsInstalled}" />
+                </WrapPanel>
+                <TextBlock Text="A small multilingual model that runs in Helm, offline: &quot;lỗi server hôm trước&quot; finds a note about Nginx answering 502. Each device that searches this way needs it; what it reads in your notes syncs, end-to-end encrypted, so here it reads only the notes no other device has read. Download on Wi-Fi." Classes="secondary" TextWrapping="Wrap" />
+            </StackPanel>
+        </Border>
+
         <!-- Trash -->
         <TextBlock Text="Trash" Classes="section" />
         <Border Classes="card">

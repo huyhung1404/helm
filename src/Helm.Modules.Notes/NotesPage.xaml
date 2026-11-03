@@ -47,6 +47,30 @@
             </StackPanel>
         </ui:CardExpander>
 
+        <!-- Search by meaning: the sentence model, downloaded once -->
+        <TextBlock Text="Search" Style="{DynamicResource HelmSectionHeader}" />
+        <ui:CardExpander Margin="0,0,0,4" Icon="{ui:SymbolIcon Search24}" IsExpanded="True" DataContext="{Binding SearchModel}">
+            <ui:CardExpander.Header>
+                <core:RowLayout>
+                    <core:CardHeader Title="Search by meaning" Description="{Binding Status}" />
+                    <StackPanel Orientation="Horizontal">
+                        <ui:Button Content="{Binding Size, StringFormat=Download ({0})}" Icon="{ui:SymbolIcon ArrowDownload24}" Appearance="Primary"
+                                   Command="{Binding DownloadCommand}" Visibility="{Binding CanDownload, Converter={StaticResource BoolToVisibility}}" />
+                        <ui:Button Content="Stop" Icon="{ui:SymbolIcon Stop24}" Command="{Binding CancelCommand}"
+                                   Visibility="{Binding IsDownloading, Converter={StaticResource BoolToVisibility}}" />
+                        <ui:Button Content="Remove" Icon="{ui:SymbolIcon Delete24}" Command="{Binding RemoveCommand}"
+                                   Visibility="{Binding IsInstalled, Converter={StaticResource BoolToVisibility}}" />
+                    </StackPanel>
+                </core:RowLayout>
+            </ui:CardExpander.Header>
+            <StackPanel>
+                <ProgressBar Margin="0,0,0,8" Minimum="0" Maximum="1" Value="{Binding Progress, Mode=OneWay}"
+                             Visibility="{Binding IsDownloading, Converter={StaticResource BoolToVisibility}}" AutomationProperties.Name="Download progress" />
+                <TextBlock TextWrapping="Wrap" Style="{DynamicResource HelmSecondaryText}"
+                           Text="A small multilingual model that runs in Helm on the processor: &quot;lỗi server hôm trước&quot; finds a note about Nginx answering 502. What it reads in your notes syncs with them, end-to-end encrypted, so a phone with the model has less to read. The search box here, AI agents and Ask Helm use it." />
+            </StackPanel>
+        </ui:CardExpander>
+
         <!-- Trash -->
         <TextBlock Text="Trash" Style="{DynamicResource HelmSectionHeader}" />
         <ui:CardControl Margin="0,0,0,4" Icon="{ui:SymbolIcon Delete24}">

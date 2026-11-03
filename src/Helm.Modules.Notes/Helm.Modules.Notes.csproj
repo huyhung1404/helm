@@ -11,6 +11,11 @@
   </ItemGroup>
 
   <ItemGroup>
+    <!-- ONNX Runtime's native library for the search model (the managed API comes with Helm.Embeddings). -->
+    <PackageReference Include="Microsoft.ML.OnnxRuntime" Version="1.30.0" />
+  </ItemGroup>
+
+  <ItemGroup>
     <InternalsVisibleTo Include="Helm.Tests" />
   </ItemGroup>
 

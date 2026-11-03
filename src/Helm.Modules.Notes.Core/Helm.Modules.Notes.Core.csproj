@@ -13,6 +13,8 @@
     <ProjectReference Include="..\Helm.Core\Helm.Core.csproj" />
     <!-- IDialogService / IClipboardService: the portable seams both apps already implement. -->
     <ProjectReference Include="..\Helm.Shell\Helm.Shell.csproj" />
+    <!-- The sentence model, for finding notes by what they are about. -->
+    <ProjectReference Include="..\Helm.Embeddings\Helm.Embeddings.csproj" />
   </ItemGroup>
 
   <ItemGroup>

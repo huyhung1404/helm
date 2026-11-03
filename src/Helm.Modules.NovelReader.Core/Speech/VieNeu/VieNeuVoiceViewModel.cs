@@ -1,5 +1,6 @@
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using Helm.Core.Downloads;
 using Helm.Core.Services;
 using Helm.Shell.Services;
 
@@ -56,15 +57,15 @@ public sealed partial class VieNeuVoiceViewModel : ObservableObject
 
     private void Update()
     {
-        IsInstalled = _installer.State == VieNeuInstallState.Installed;
-        IsDownloading = _installer.State == VieNeuInstallState.Downloading;
+        IsInstalled = _installer.State == PinnedDownloadState.Installed;
+        IsDownloading = _installer.State == PinnedDownloadState.Downloading;
         var total = _installer.Files.TotalSize;
         Progress = total == 0 ? 0 : (double)_installer.Downloaded / total;
         Status = _installer.State switch
         {
-            VieNeuInstallState.Installed => $"On this device ({Size}). It reads offline; nothing leaves the device.",
-            VieNeuInstallState.Downloading => $"Downloading… {Progress:P0} ({Megabytes(_installer.Downloaded)} of {Size})",
-            VieNeuInstallState.Failed => $"The download stopped: {_installer.Error} Press Download to go on from where it stopped.",
+            PinnedDownloadState.Installed => $"On this device ({Size}). It reads offline; nothing leaves the device.",
+            PinnedDownloadState.Downloading => $"Downloading… {Progress:P0} ({Megabytes(_installer.Downloaded)} of {Size})",
+            PinnedDownloadState.Failed => $"The download stopped: {_installer.Error} Press Download to go on from where it stopped.",
             _ when _installer.Downloaded > 0 => $"Partly downloaded ({Megabytes(_installer.Downloaded)} of {Size}). Press Download to go on.",
             _ => $"Not on this device. Download it once ({Size}); then it reads offline.",
         };
