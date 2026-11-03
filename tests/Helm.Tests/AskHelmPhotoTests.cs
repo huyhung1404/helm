@@ -167,7 +167,33 @@ public sealed class AskHelmPhotoTests
     }
 
     [Fact]
-    public async Task A_photo_never_goes_to_a_PC_agent()
+    public async Task A_photo_goes_to_a_PC_agent_that_reads_it_first_in_a_turn_of_its_own()
+    {
+        var claude = new Recording(AiProviders.Claude, reads: true);
+        var pc = new Pc(reads: true);
+        var keys = new AiKeyStore(_keys);
+        keys.Add(AiProviders.Claude, "Helm", ClaudeKey);
+        var assistant = new HelmAssistant(keys, _features, new AiUsageBook(_usage), [], [claude], _ => true, new AiRouter([pc]));
+        var session = assistant.Start();
+
+        var reply = await session.SendPhotoAsync(Photo, "chia đôi", _ => Task.FromResult(true), CancellationToken.None);
+
+        Assert.Equal("Dạ.", reply.Text);
+        Assert.Equal("Codex trên PC-HUNG", reply.RanOn);
+        Assert.Empty(claude.Images);
+        var job = Assert.Single(pc.Sent);
+        Assert.Same(Photo, Assert.Single(job.Images));
+        Assert.Contains("chia đôi", job.Text);
+        // Its own conversation: the photo's chat is not the one later words go to.
+        await session.SendAsync("cảm ơn", _ => Task.FromResult(true), CancellationToken.None);
+        Assert.Equal(2, pc.Sent.Count);
+        Assert.NotEqual(job.ConversationId, pc.Sent[1].ConversationId);
+        Assert.Empty(pc.Sent[1].Images);
+        Assert.Contains("(sent a photo) chia đôi", pc.Sent[1].Text);
+    }
+
+    [Fact]
+    public async Task A_photo_skips_a_PC_whose_agents_read_none()
     {
         var claude = new Recording(AiProviders.Claude, reads: true);
         var pc = new Pc();
@@ -319,19 +345,23 @@ public sealed class AskHelmPhotoTests
         }
     }
 
-    /// <summary>A PC agent that would take any job: a photo turn must never reach it.</summary>
-    private sealed class Pc : IAgentRoute
+    /// <summary>A PC agent that takes any job; a photo only when it reads photos.</summary>
+    private sealed class Pc(bool reads = false) : IAgentRoute
     {
-        public int Jobs { get; private set; }
+        public int Jobs => Sent.Count;
+
+        public List<AiJob> Sent { get; } = [];
 
         public string Device => "PC-HUNG";
+
+        public bool ReadsPhotos => reads;
 
         public string? Unavailable() => null;
 
         public Task<AiJobResult> RunAsync(AiJob job, TimeSpan wait, CancellationToken ct)
         {
-            Jobs++;
-            return Task.FromResult(new AiJobResult("Dạ.", [], [], null));
+            Sent.Add(job);
+            return Task.FromResult(new AiJobResult("Dạ.", [], [], null) { Agent = "Codex" });
         }
 
         public Task UndoAsync(AiJobAction action, CancellationToken ct) => Task.CompletedTask;

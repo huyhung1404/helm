@@ -27,6 +27,9 @@ internal sealed class ClaudeCodeAgentFactory(IChildProcessLauncher launcher, str
 
     public AiProvider Provider => AiProviders.Claude;
 
+    /// <summary>Photos go as image blocks of its stream-json user message (<see cref="CliImages.ClaudeCodeContent"/>).</summary>
+    public bool ReadsImages => true;
+
     /// <summary>Why it takes no job now (not installed, not signed in here, at its limit), or null.</summary>
     public string? Unavailable() =>
         McpClientConfig.FindClaude() is null ? "Claude Code is not installed on this PC."
@@ -72,6 +75,8 @@ internal sealed class ClaudeCodeChat(ClaudeCodeAgentFactory factory, IChildProce
     private int _calls;
 
     public void AddUser(string text) => _conversation.AddUser(text);
+
+    public void AddUser(string text, AssistantImage image) => _conversation.AddUser(text, image);
 
     public void AddTools(IReadOnlyList<AssistantTool> added) => _conversation.AddTools(added);
 
@@ -129,7 +134,7 @@ internal sealed class ClaudeCodeChat(ClaudeCodeAgentFactory factory, IChildProce
             var line = new JsonObject
             {
                 ["type"] = "user",
-                ["message"] = new JsonObject { ["role"] = "user", ["content"] = _conversation.Message(fresh) },
+                ["message"] = new JsonObject { ["role"] = "user", ["content"] = CliImages.ClaudeCodeContent(_conversation.Message(fresh), _conversation.Images) },
             };
             try
             {
@@ -162,7 +167,9 @@ internal sealed class ClaudeCodeChat(ClaudeCodeAgentFactory factory, IChildProce
     private void Start()
     {
         var claude = McpClientConfig.FindClaude() ?? throw new AssistantException("Claude Code is not installed on this PC.");
+        // No session file: Helm keeps the conversation itself (a new process gets a recap), and a photo never lands on disk.
         string[] args = ["-p", "--input-format", "stream-json", "--output-format", "stream-json", "--verbose", "--tools", "", "--strict-mcp-config",
+            "--no-session-persistence",
             "--settings", """{"disableAllHooks":true}""", "--model", model, .. effort is { Length: > 0 } ? new[] { "--effort", effort } : []];
         var commandLine = claude.EndsWith(".cmd", StringComparison.OrdinalIgnoreCase)
             // npm's claude.cmd only runs through cmd.exe; these arguments hold nothing cmd.exe reads itself.

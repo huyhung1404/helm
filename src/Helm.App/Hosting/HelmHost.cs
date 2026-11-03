@@ -54,7 +54,9 @@ internal static class HelmHost
             return new Helm.Ai.Assistant.AgentJobWorker(sp.GetRequiredService<Core.Sync.ISyncedCollection<Helm.Ai.Assistant.AiJobRecord>>(),
                 sp.GetRequiredService<Core.Sync.ISyncedCollection<Helm.Ai.Assistant.AiWorkerRecord>>(), agents,
                 () => engine.DeviceId, sp.GetRequiredService<IDeviceInfo>().DeviceName, agents.Ready,
-                logger: sp.GetRequiredService<ILoggerFactory>().CreateLogger<Helm.Ai.Assistant.AgentJobWorker>());
+                logger: sp.GetRequiredService<ILoggerFactory>().CreateLogger<Helm.Ai.Assistant.AgentJobWorker>(),
+                photos: new Helm.Ai.Assistant.BlobJobPhotos(sp.GetRequiredService<Core.Sync.BlobStore>(),
+                    sp.GetRequiredService<ILoggerFactory>().CreateLogger<Helm.Ai.Assistant.BlobJobPhotos>()));
         });
         // The jobs this PC runs by itself on the same agents (the morning brief, the evening review…): Helm's own read
         // tools in-process, plus what Scratch holds (never on the MCP server); never while a Vault is unlocked.

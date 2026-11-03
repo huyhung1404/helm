@@ -314,7 +314,7 @@ public sealed partial class AssistantSession
             IReadOnlyList<IAgentRoute> routes = _pc is not null ? [_pc] : _helm.Router.Agents(choice);
             foreach (var route in routes)
             {
-                if (await OnPcAsync(route, first ? $"{_helm.Now()}\n\n{text}" : text, model, choice, ct) is { } onPc)
+                if (await OnPcAsync(route, PcText(text, first), model, choice, ct) is { } onPc)
                 {
                     _history.Add(("user", text));
                     _history.Add(("assistant", onPc.Text));
@@ -333,12 +333,14 @@ public sealed partial class AssistantSession
         return onApi;
     }
 
-    private async Task<AssistantReply?> OnPcAsync(IAgentRoute route, string text, AssistantModelOption model, AiFeatureChoice choice, CancellationToken ct)
+    /// <param name="conversationId">A turn's own conversation (a photo's); null for this conversation's.</param>
+    private async Task<AssistantReply?> OnPcAsync(IAgentRoute route, string text, AssistantModelOption model, AiFeatureChoice choice, CancellationToken ct,
+        string? conversationId = null, IReadOnlyList<AssistantImage>? images = null)
     {
         static bool IsPhone(AssistantTool t) => t.Name.StartsWith(HelmAssistant.PhoneToolPrefix, StringComparison.Ordinal);
-        var job = new AiJob(AiFeatureIds.AskHelm, _conversationId, text,
+        var job = new AiJob(AiFeatureIds.AskHelm, conversationId ?? _conversationId, text,
             [.. _tools.Where(t => !IsPhone(t)).Select(t => t.Name)], [.. _tools.Where(IsPhone).Select(t => t.Name)],
-            model.Model, choice.Effort);
+            model.Model, choice.Effort) { Images = images ?? [] };
         AiJobResult result;
         try
         {

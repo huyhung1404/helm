@@ -99,6 +99,8 @@ internal sealed class AgentRegistry : IAgentRoute, IDisposable
 
     public void End(string conversationId) => _chain.End(conversationId);
 
+    public bool ReadsPhotos => _chain.ReadsPhotos;
+
     /// <summary>"Ready", "Off", or why it takes no job.</summary>
     public string Status(AgentProfile profile)
     {

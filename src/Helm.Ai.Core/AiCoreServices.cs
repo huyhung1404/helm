@@ -21,7 +21,8 @@ public static class AiCoreServices
         services.AddSyncedCollection(new SyncedCollectionOptions<AiManagementKey> { Name = AiManagementKeys.Collection, GuardDeletions = true });
         services.AddSyncedLog<AiUsageEntry>(AiUsageBook.Collection);
         // Agent jobs between devices: urgent, so a turn reaches the PC (and its answer the phone) within a moment.
-        services.AddSyncedCollection(new SyncedCollectionOptions<AiJobRecord> { Name = AgentJobs.JobsCollection, Urgent = true });
+        // A job's photos are blobs of their own: its record syncs once they are on the server.
+        services.AddSyncedCollection(new SyncedCollectionOptions<AiJobRecord> { Name = AgentJobs.JobsCollection, Urgent = true, BlobReferences = AgentJobs.PhotosOf });
         services.AddSyncedCollection(new SyncedCollectionOptions<AiWorkerRecord> { Name = AgentJobs.WorkersCollection, Urgent = true });
         // Each feature's prompt as fetched from the user's Skill Hub: a PC fetches, every device uses it.
         services.AddSyncedCollection(new SyncedCollectionOptions<AiPromptOverride> { Name = AiPrompts.Collection });
@@ -63,7 +64,9 @@ public static class AiCoreServices
         {
             var engine = sp.GetRequiredService<SyncEngine>();
             return new SyncAgentRoute(sp.GetRequiredService<ISyncedCollection<AiJobRecord>>(), sp.GetRequiredService<ISyncedCollection<AiWorkerRecord>>(),
-                () => engine.DeviceId, engine);
+                () => engine.DeviceId, engine, photos: sp.GetService<BlobStore>() is { } blobs
+                    ? new BlobJobPhotos(blobs, sp.GetService<ILoggerFactory>()?.CreateLogger<BlobJobPhotos>())
+                    : null);
         });
         services.AddSingleton<IAgentRoute>(sp => sp.GetRequiredService<SyncAgentRoute>());
         services.AddSingleton<IAssistantChatFactory>(_ => new ClaudeAssistantChatFactory());

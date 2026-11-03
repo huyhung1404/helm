@@ -16,6 +16,14 @@ public sealed record AiJob(
 {
     /// <summary>The job's own system prompt (a VPS service's job); null for Ask Helm's instructions.</summary>
     public string? System { get; init; }
+
+    /// <summary>
+    /// The photos the user sent with the words (a receipt, a whiteboard), for an agent that reads pictures
+    /// (<see cref="IAgentRoute.ReadsPhotos"/>). Never written into a synced record: between devices each one travels as a
+    /// blob of its own (<see cref="AiJobRecord.Photos"/>), gone once the turn is over.
+    /// </summary>
+    [System.Text.Json.Serialization.JsonIgnore]
+    public IReadOnlyList<AssistantImage> Images { get; init; } = [];
 }
 
 /// <summary>A change Claude Code made with one of Helm's tools on the PC, with the tool's result (for Undo).</summary>
@@ -68,6 +76,9 @@ public interface IAgentRoute
 
     /// <summary>The conversation is over: the process kept for it may stop.</summary>
     void End(string conversationId);
+
+    /// <summary>It can take a job with photos (<see cref="AiJob.Images"/>) now: an agent that reads pictures is ready.</summary>
+    bool ReadsPhotos => false;
 }
 
 /// <summary>The ways a feature's call may take, in order: Claude Code first (free) as its policy allows, the API last.</summary>

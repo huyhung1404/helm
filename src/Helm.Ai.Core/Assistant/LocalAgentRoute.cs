@@ -47,9 +47,12 @@ public sealed class LocalAgentRoute : IAgentRoute, IDisposable
 
     public string? Unavailable() => _unavailable();
 
+    public bool ReadsPhotos => _agent.ReadsImages && Unavailable() is null;
+
     public async Task<AiJobResult> RunAsync(AiJob job, TimeSpan wait, CancellationToken ct)
     {
         if (Unavailable() is { } why) throw new AiRouteException(why);
+        if (job.Images.Count > 0 && !_agent.ReadsImages) throw new AiRouteException($"{AgentName} cannot read photos.");
         var conversation = _conversations.GetOrAdd(job.ConversationId, _ =>
         {
             var tools = Tools(job);
@@ -69,16 +72,16 @@ public sealed class LocalAgentRoute : IAgentRoute, IDisposable
                 conversation.Chat.AddTools(added);
                 conversation.Tools.AddRange(added);
             }
-            conversation.Chat.AddUser(job.Text);
             AssistantLoop.Outcome outcome;
             var records = new List<AiJobAction>();
             try
             {
+                AddUser(conversation.Chat, job);
                 outcome = await AssistantLoop.RunAsync(conversation.Chat, conversation.Tools, _ => Task.FromResult(false),
                     u => { input += u.Input; output += u.Output; cacheRead += u.CacheRead; cacheWrite += u.CacheWrite; },
                     () => null, phoneHere: false, job.Model, limit.Token, records);
             }
-            catch (Exception ex) when (ex is OperationCanceledException or AssistantException or IOException or InvalidOperationException)
+            catch (Exception ex) when (ex is OperationCanceledException or AssistantException or AssistantImageException or IOException or InvalidOperationException)
             {
                 // Too long, cancelled by the asker, or the agent's process broke: the chat is not reused. What it already
                 // recorded is kept and goes back with Undo, never as a failure that someone might run again.
@@ -105,7 +108,20 @@ public sealed class LocalAgentRoute : IAgentRoute, IDisposable
         finally
         {
             conversation.Gate.Release();
+            // A photo is never kept after its turn: the chat (and the agent's process) that saw it goes.
+            if (job.Images.Count > 0) End(job.ConversationId);
         }
+    }
+
+    /// <summary>The job's words, with its photos when it has some (the words go with the first).</summary>
+    private static void AddUser(IAssistantChat chat, AiJob job)
+    {
+        if (job.Images.Count == 0)
+        {
+            chat.AddUser(job.Text);
+            return;
+        }
+        for (var i = 0; i < job.Images.Count; i++) chat.AddUser(i == 0 ? job.Text : "", job.Images[i]);
     }
 
     public async Task UndoAsync(AiJobAction action, CancellationToken ct)
@@ -185,6 +201,8 @@ public sealed class AgentChain(IReadOnlyList<LocalAgentRoute> agents) : IAgentRo
     /// <summary>The agents that can take a job now, best first.</summary>
     public IReadOnlyList<string> Ready() => [.. _agents.Where(a => a.Unavailable() is null).Select(a => a.AgentName)];
 
+    public bool ReadsPhotos => _agents.Any(a => a.ReadsPhotos);
+
     public string? Unavailable()
     {
         var agents = _agents;
@@ -196,6 +214,10 @@ public sealed class AgentChain(IReadOnlyList<LocalAgentRoute> agents) : IAgentRo
     public Task<AiJobResult> RunAsync(AiJob job, TimeSpan wait, CancellationToken ct)
     {
         var agents = _agents;
+        // A photo goes to the first agent that reads pictures (Grok's CLI takes none): each photo turn is a chat of its own.
+        if (job.Images.Count > 0)
+            return (agents.FirstOrDefault(a => a.ReadsPhotos) ?? throw new AiRouteException("No agent on this PC that reads photos can take it now."))
+                .RunAsync(job, wait, ct);
         var agent = _taken.TryGetValue(job.ConversationId, out var kept) && agents.Contains(kept) && kept.Unavailable() is null
             ? kept
             : agents.FirstOrDefault(a => a.Unavailable() is null) ?? throw new AiRouteException(Unavailable() ?? "No agent can take it.");

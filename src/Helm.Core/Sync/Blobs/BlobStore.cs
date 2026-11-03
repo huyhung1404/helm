@@ -307,6 +307,24 @@ public sealed class BlobStore : IBlobSync
         _db.DeleteBlob(id);
     }
 
+    /// <summary>
+    /// Deletes a blob that was only ever meant to live a moment (an agent job's photo) at once: here
+    /// (<see cref="Discard"/>) and on the server, which keeps it in its trash until it purges it. Nothing is waited for
+    /// beyond the request; an id the server does not know (never uploaded) is not an error.
+    /// </summary>
+    public async Task DeleteAsync(string id, CancellationToken ct)
+    {
+        Discard(id);
+        if (!_transport.IsConfigured) return;
+        try
+        {
+            await _transport.DeleteAsync(id, ct).ConfigureAwait(false);
+        }
+        catch (SyncRequestException ex) when (ex.Status == System.Net.HttpStatusCode.NotFound)
+        {
+        }
+    }
+
     /// <summary>How many bytes of the blob's (encrypted) chunks are on this device.</summary>
     public long CachedBytes(BlobRef blob) =>
         Enumerable.Range(0, blob.ChunkCount).Select(i => new FileInfo(ChunkPath(blob.Id, i))).Where(f => f.Exists).Sum(f => f.Length);
