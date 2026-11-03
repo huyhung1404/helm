@@ -34,8 +34,13 @@ public sealed record McpTool(string Name, string Description, JsonObject InputSc
     /// <summary>
     /// Takes back what one call did, given that call's result (as JSON): a tool that only adds or ticks something can
     /// offer it, so Helm's own assistant saves at once and shows Undo instead of asking first. Null: not undoable.
+    /// When the result has a <see cref="RecordsProperty"/> list (one call that made several records, each with its own
+    /// <c>summary</c>), Undo gets one of its items at a time, and the assistant lists each record with its own Undo.
     /// </summary>
     public Func<JsonElement, CancellationToken, Task>? Undo { get; init; }
+
+    /// <summary>The list in a result of the records one call made, each taken back alone (see <see cref="Undo"/>).</summary>
+    public const string RecordsProperty = "records";
 
     /// <summary>A tool that takes no arguments.</summary>
     public static JsonObject NoArguments() => new() { ["type"] = "object", ["properties"] = new JsonObject() };
