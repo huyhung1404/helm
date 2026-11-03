@@ -208,7 +208,9 @@ public sealed class AssistantSession
     private readonly IReadOnlyList<IMcpToolProvider> _phone;
     private readonly string _conversationId = Guid.NewGuid().ToString("N");
     private readonly List<(string Role, string Text)> _history = [];
-    private IReadOnlyList<AssistantTool>? _tools;
+    private IReadOnlyList<AssistantTool>? _all;
+    private readonly HashSet<string> _scope = new(StringComparer.Ordinal);
+    private IReadOnlyList<AssistantTool> _tools = [];
     private (IAssistantChat Chat, AssistantModelOption Model, string KeyId)? _open;
     private IAgentRoute? _pc;
 
@@ -229,7 +231,11 @@ public sealed class AssistantSession
     {
         if (_helm.Unavailable() is { } problem) return new AssistantReply("", [], false, problem);
         var first = _history.Count == 0;
-        _tools ??= _helm.OfferedTools(_phone);
+        _all ??= _helm.OfferedTools(_phone);
+        // Only the tools this turn's request needs (and those of earlier turns): each schema costs tokens on every call.
+        var before = _tools;
+        _tools = ToolScope.Pick(_all, _scope, text);
+        if (_open is { } open && _tools.Where(t => before.All(b => b.Name != t.Name)).ToList() is { Count: > 0 } added) open.Chat.AddTools(added);
         var model = Model!;
         var choice = _helm.Choice;
 
@@ -262,7 +268,7 @@ public sealed class AssistantSession
     {
         static bool IsPhone(AssistantTool t) => t.Name.StartsWith(HelmAssistant.PhoneToolPrefix, StringComparison.Ordinal);
         var job = new AiJob(AiFeatureIds.AskHelm, _conversationId, text,
-            [.. _tools!.Where(t => !IsPhone(t)).Select(t => t.Name)], [.. _tools!.Where(IsPhone).Select(t => t.Name)],
+            [.. _tools.Where(t => !IsPhone(t)).Select(t => t.Name)], [.. _tools.Where(IsPhone).Select(t => t.Name)],
             model.Model, choice.Effort);
         AiJobResult result;
         try
@@ -280,7 +286,7 @@ public sealed class AssistantSession
         var done = result.Done.Select(a => new AssistantAction(a.Tool, a.Summary, c => route.UndoAsync(a, c))).ToList();
         var notes = new List<string>();
         // What only the phone can do comes back to be done here.
-        var byName = _tools!.ToDictionary(t => t.Name, StringComparer.Ordinal);
+        var byName = _all!.ToDictionary(t => t.Name, StringComparer.Ordinal);
         foreach (var action in result.PhoneActions)
         {
             if (!byName.TryGetValue(action.Tool, out var tool))
@@ -308,7 +314,7 @@ public sealed class AssistantSession
         var moved = _open is null && _history.Count > 0;
         try
         {
-            _open ??= _helm.Open(_tools!);
+            _open ??= _helm.Open(_tools);
         }
         catch (AssistantException ex)
         {
@@ -318,7 +324,7 @@ public sealed class AssistantSession
         // A conversation that started on a PC goes on here with what was said so far.
         var context = moved ? "Earlier in this conversation:\n" + string.Join("\n", _history.Select(h => $"{h.Role}: {h.Text}")) + "\n\n" : "";
         chat.AddUser(first || moved ? $"{_helm.Now()}\n\n{context}{text}" : text);
-        var outcome = await AssistantLoop.RunAsync(chat, _tools!, confirm, u => _helm.Count(model, keyId, u),
+        var outcome = await AssistantLoop.RunAsync(chat, _tools, confirm, u => _helm.Count(model, keyId, u),
             () => _helm.Unavailable() ?? _helm.OverCap(), phoneHere: true, model.Name, ct);
         return new AssistantReply(outcome.Text, outcome.Done, outcome.Declined, outcome.Problem);
     }

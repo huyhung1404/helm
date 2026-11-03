@@ -17,8 +17,7 @@ public static class CliAgentProtocol
         var text = new StringBuilder(system.Trim()).Append("\n\n")
             .Append("You work inside Helm, which runs tools for you. Your own tools are turned off; use only these.\n")
             .Append("Tools (name: what it does. input: its JSON Schema):\n");
-        foreach (var tool in tools)
-            text.Append("- ").Append(tool.Name).Append(": ").Append(tool.Description).Append("\n  input: ").Append(tool.Schema.ToJsonString()).Append('\n');
+        List(text, tools);
         text.Append("""
 
             To call tools, reply with ONLY one JSON object and nothing else, for example:
@@ -27,6 +26,16 @@ public static class CliAgentProtocol
             When you are done, answer the user in plain text (never JSON).
             """);
         return text.ToString();
+    }
+
+    /// <summary>Tools a later turn adds to the conversation, put before that turn's text.</summary>
+    public static string MoreTools(IReadOnlyList<AssistantTool> tools) => List(new StringBuilder("More tools you may call from now on:\n"), tools).ToString();
+
+    private static StringBuilder List(StringBuilder text, IReadOnlyList<AssistantTool> tools)
+    {
+        foreach (var tool in tools)
+            text.Append("- ").Append(tool.Name).Append(": ").Append(tool.Description).Append("\n  input: ").Append(tool.Schema.ToJsonString()).Append('\n');
+        return text;
     }
 
     /// <summary>The message that carries the results of the calls of the last answer.</summary>

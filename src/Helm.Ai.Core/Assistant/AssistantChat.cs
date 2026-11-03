@@ -71,6 +71,12 @@ public interface IAssistantChat
 
     /// <summary>The results of the calls of the last step, one per call.</summary>
     void AddResults(IReadOnlyList<ToolOutcome> results);
+
+    /// <summary>
+    /// More tools from the next call on: a later turn asked for a group the conversation did not need before
+    /// (<see cref="ToolScope"/>).
+    /// </summary>
+    void AddTools(IReadOnlyList<AssistantTool> tools) { }
 }
 
 /// <summary>Opens conversations with one provider's models.</summary>

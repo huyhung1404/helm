@@ -91,7 +91,8 @@ public sealed class AskHelmTests
         Assert.Contains("\"spent\":30000", factory.Chats[0].Results[0][0].Content);
         var offered = factory.Chats[0].Tools.Select(t => t.Name).ToList();
         Assert.Contains("wallet_summary", offered);
-        Assert.Contains("tracker_start_task", offered);
+        // A money question carries the Wallet's tools only (ToolScope).
+        Assert.DoesNotContain("tracker_start_task", offered);
         Assert.DoesNotContain("phone_remote", offered);
         Assert.Contains("summary", factory.Chats[0].Tools.Single(t => t.Name == "wallet_add_transaction").Schema["required"]!.ToJsonString());
         Assert.StartsWith("Now: ", factory.Chats[0].Users[0]);

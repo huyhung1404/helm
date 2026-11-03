@@ -30,6 +30,11 @@ internal sealed class GrokAssistantChat : IAssistantChat
         _key = key;
         _model = model;
         _messages.Add(new JsonObject { ["role"] = "system", ["content"] = system });
+        AddTools(tools);
+    }
+
+    public void AddTools(IReadOnlyList<AssistantTool> tools)
+    {
         foreach (var tool in tools)
         {
             _tools.Add(new JsonObject

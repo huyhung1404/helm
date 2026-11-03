@@ -65,15 +65,19 @@ internal sealed class CodexChat(CodexAgentFactory factory, IChildProcessLauncher
     string system, IReadOnlyList<AssistantTool> tools) : IAssistantChat
 {
     private string _pending = "";
+    private string _more = "";
     private bool _first = true;
     private string? _thread;
     private int _calls;
 
     public void AddUser(string text)
     {
-        _pending = _first ? $"{CliAgentProtocol.Preamble(system, tools)}\n\n{text}" : text;
+        _pending = _first ? $"{CliAgentProtocol.Preamble(system, tools)}\n\n{text}" : _more + text;
         _first = false;
+        _more = "";
     }
+
+    public void AddTools(IReadOnlyList<AssistantTool> added) => _more = CliAgentProtocol.MoreTools(added) + "\n";
 
     public void AddResults(IReadOnlyList<ToolOutcome> results) => _pending = CliAgentProtocol.Results(results);
 

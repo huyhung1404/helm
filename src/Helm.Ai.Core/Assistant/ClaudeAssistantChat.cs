@@ -25,6 +25,8 @@ internal sealed class ClaudeAssistantChat(AnthropicClient client, string model, 
 
     public void AddUser(string text) => _messages.Add(new UserMessageParam { Content = text });
 
+    public void AddTools(IReadOnlyList<AssistantTool> tools) => _tools.AddRange(tools.Select(ToTool));
+
     public async Task<AssistantStep> NextAsync(CancellationToken ct)
     {
         Message response;

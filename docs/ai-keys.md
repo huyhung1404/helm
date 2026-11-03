@@ -123,6 +123,17 @@ search, no subagents and Helm's instructions instead of Grok's coding prompt): H
 (what it saved is estimated from the text). Calls that would need a yes are not offered there, and phone tools are
 handed back to the phone. An agent that reports its plan's limit takes no job for 30 minutes; the next one in the list does.
 
+**Only the tools a request needs** (`Helm.Ai.Core/Assistant/ToolScope.cs`). Every tool's schema costs tokens on
+every call, so a turn carries only the groups its words ask for (Wallet for “phở 45k”, Tracker for “nhắc anh…”,
+the phone for “báo thức”…), and the groups of the conversation's earlier turns; a request that names no group gets
+them all. A later turn that needs another group adds only that group (`IAssistantChat.AddTools`). For “phở 45k”: 4
+tools instead of 19, 4,800 characters instead of 12,600, on the API and on an agent alike.
+
+**Grok carries nothing of its own.** Grok CLI brings 24 built-in tools, 19 skills, workflows and the user's Claude
+and Cursor set-up (MCP servers, hooks): 15,000 tokens and 10 s a call. Helm's agent removes the tools
+(`--disallowed-tools`), turns skills, workflows and the Claude/Cursor compatibility off, and gives it a home folder of
+its own: about 640 tokens of Grok's and 3.5 s a call.
+
 **Costs.** Every call goes in the synced collection `ai.usage`: route (`api` or `agent`, with the agent's name), model, tokens, the
 estimated USD (`AiPrices`), and on an agent what the same call would have cost (`SavedUsd`). The daily cap
 (`DailyCapUsd`, 0.50 USD) only stops the API.

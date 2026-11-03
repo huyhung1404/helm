@@ -27,6 +27,8 @@ Format: [Keep a Changelog](https://keepachangelog.com), versions follow [SemVer]
   `wallet_summary` (what was spent and received over some days, by category).
 
 ### Changed
+- **Ask Helm sends only the tools a request needs:** “phở 45k” carries the Wallet's 4 tools, not all 19 (about 60%
+  fewer tokens a call, on the API and on your agents); a later turn adds only the tools it needs.
 - **The Grok management key now syncs** (end-to-end encrypted, like the API keys), so the phone and every PC show the
   prepaid balance. A key kept on one PC by v0.78.0 moves to sync when the new Helm starts there.
 - **AI agents' tools that add or tick something can be undone** (a transaction, a debt entry, a task, a note, a

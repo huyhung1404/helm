@@ -57,6 +57,13 @@ public sealed class LocalAgentRoute : IAgentRoute, IDisposable
             using var limit = CancellationTokenSource.CreateLinkedTokenSource(ct);
             limit.CancelAfter(wait);
             long input = 0, output = 0, cacheRead = 0, cacheWrite = 0;
+            // A later turn may need a group of tools the conversation did not: only those are added.
+            var added = Tools(job).Where(t => conversation.Tools.All(h => h.Name != t.Name)).ToList();
+            if (added.Count > 0)
+            {
+                conversation.Chat.AddTools(added);
+                conversation.Tools.AddRange(added);
+            }
             conversation.Chat.AddUser(job.Text);
             AssistantLoop.Outcome outcome;
             try
@@ -130,7 +137,7 @@ public sealed class LocalAgentRoute : IAgentRoute, IDisposable
     private sealed class Conversation(IAssistantChat chat, IReadOnlyList<AssistantTool> tools)
     {
         public IAssistantChat Chat { get; } = chat;
-        public IReadOnlyList<AssistantTool> Tools { get; } = tools;
+        public List<AssistantTool> Tools { get; } = [.. tools];
         public SemaphoreSlim Gate { get; } = new(1, 1);
         public DateTimeOffset LastTurn { get; set; } = DateTimeOffset.UtcNow;
     }
