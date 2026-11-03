@@ -20,9 +20,9 @@ Format: [Keep a Changelog](https://keepachangelog.com), versions follow [SemVer]
   lời… ⏳” goes into the thread, so everyone sees the question is being handled; it is taken away once the answer is in.
 
 ### Fixed
-- Slack Bot: when you call Lumi yourself, you always get a word back. Before, a question the conversation could not
-  answer got silence (Claude said there was nothing to answer), with nothing in the log; every call’s outcome is now
-  logged.
+- Slack Bot: “@lumi …” sent from Helm’s reply box got no answer. Slack marks what an app sends as a bot’s message, so
+  Lumi took your call for one; now only Slack Bot’s own posts are left out. When you call Lumi yourself you always get
+  a word back (never silence), and every call’s outcome is logged.
 - Habits on the phone: the skipped-habit and streak reminders are separate notifications, so one never replaces the
   other; the 25 / 50 / 75 / 100 % buttons are full-size touch targets, and “I did it, I just forgot to tick it” has
   its check mark as on the PC.

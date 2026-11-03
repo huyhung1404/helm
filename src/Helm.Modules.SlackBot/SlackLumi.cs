@@ -37,9 +37,12 @@ public sealed partial class SlackLumi(ISlackApi api, ISlackAgent agent, SlackInb
     /// </summary>
     public static bool IsCall(string text) => Call().IsMatch(text);
 
-    /// <summary>May Lumi answer this message? The user anywhere; others where writing is allowed.</summary>
+    /// <summary>
+    /// May Lumi answer this message? The user anywhere; others where writing is allowed. What the user sends from
+    /// Helm's overlay comes back from Slack marked as an app's (bot_id), so only Slack Bot's own posts are left out.
+    /// </summary>
     internal bool Allowed(SlackMessage m) =>
-        !m.FromBot && !inbox.IsBotMessage(m.Channel, m.Ts) && settings().AnswerCalls
+        (!m.FromBot || m.User == me.UserId) && !inbox.IsBotMessage(m.Channel, m.Ts) && settings().AnswerCalls
         && (m.User == me.UserId || reader.ModeOf(m.Channel) == SlackChannelMode.Reply);
 
     /// <summary>

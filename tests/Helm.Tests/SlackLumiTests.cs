@@ -152,6 +152,15 @@ public sealed class SlackLumiTests
     }
 
     [Fact]
+    public async Task A_call_the_user_sent_from_helms_overlay_is_answered()
+    {
+        // Slack marks what the overlay sends with the app's bot_id.
+        var (lumi, slack, _, _, _) = Rig();
+        Assert.True(await lumi.AnswerAsync(new SlackMessage("C2", "9450.0", null, "ME", "@lumi trả lời câu hỏi này", true), Now, default));
+        Assert.Equal(2, slack.Posted.Count);
+    }
+
+    [Fact]
     public async Task The_user_calling_always_gets_a_word_back()
     {
         var (lumi, slack, agent, _, _) = Rig(answer: "NO_REPLY");
