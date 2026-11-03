@@ -14,8 +14,9 @@ public static class CliAgentProtocol
     /// <summary>The first message's preamble: the assistant's instructions, the tools, and how to call them.</summary>
     public static string Preamble(string system, IReadOnlyList<AssistantTool> tools)
     {
-        // A text-only job (a VPS service's) offers no tool, so it is not told how to call one.
-        if (tools.Count == 0) return system.Trim() + "\n\nYour own tools are turned off. Answer in plain text.";
+        // A text-only job (a VPS service's, a tool's text call) offers no tool, so it is not told how to call one; the
+        // answer keeps the form its instructions ask for (a tool's text call wants JSON).
+        if (tools.Count == 0) return system.Trim() + "\n\nYour own tools are turned off. Answer with text only, in the form asked for above.";
         var text = new StringBuilder(system.Trim()).Append("\n\n")
             .Append("You work inside Helm, which runs tools for you. Your own tools are turned off; use only these.\n")
             .Append("Tools (name: what it does. input: its JSON Schema):\n");
