@@ -1,0 +1,26 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- The AI models Helm itself can call (Claude first, more providers later): the API keys (on Helm Sync, end-to-end
+       encrypted, so the phone gets them too) and checking that a key works. No WPF, Avalonia or platform APIs here. -->
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <SupportedOSPlatformVersion></SupportedOSPlatformVersion>
+    <PlatformTarget>AnyCPU</PlatformTarget>
+    <RootNamespace>Helm.Ai</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Helm.Core\Helm.Core.csproj" />
+    <!-- IDialogService: the portable seam both apps already implement. -->
+    <ProjectReference Include="..\Helm.Shell\Helm.Shell.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="Helm.Tests" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Anthropic" Version="13.4.0" />
+  </ItemGroup>
+
+</Project>

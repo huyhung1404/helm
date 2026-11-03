@@ -1,16 +1,15 @@
-<Page
-    x:Class="Helm.App.Views.Pages.McpPage"
+<UserControl
+    x:Class="Helm.App.Views.Mcp.McpAgentsView"
     x:ClassModifier="internal"
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
     xmlns:core="clr-namespace:Helm.Core.Ui;assembly=Helm.Core.Windows"
-    xmlns:mcp="clr-namespace:Helm.App.Views.Mcp"
-    Title="AI &amp; MCP">
+    xmlns:mcp="clr-namespace:Helm.App.Views.Mcp">
 
-    <StackPanel Margin="24,16,24,24">
-        <TextBlock Text="AI &amp; MCP" FontSize="28" FontWeight="SemiBold" Margin="0,0,0,8" />
-        <TextBlock Text="Connect an AI agent (Claude Code, VS Code, Claude Desktop, Cursor or any MCP client) to Helm, see who is connected, and switch it off." TextWrapping="Wrap" Style="{DynamicResource HelmSecondaryText}" Margin="0,0,0,8" />
+    <!-- The Agents & MCP part of the AI page: AI agents (Claude Code, VS Code, any MCP client) using Helm's tools. -->
+    <StackPanel>
+        <TextBlock Text="Let an AI agent (Claude Code, VS Code, Claude Desktop, Cursor or any MCP client) use Helm's tools, see who is connected, and switch it off." TextWrapping="Wrap" Style="{DynamicResource HelmSecondaryText}" />
 
         <!-- Status: the two switches and what AI agents can reach because of them -->
         <TextBlock Text="Status" Style="{DynamicResource HelmSectionHeader}" />
@@ -202,7 +201,7 @@
                             <DockPanel Margin="0,4">
                                 <ui:Button DockPanel.Dock="Right" VerticalAlignment="Center" Content="Disconnect" Icon="{ui:SymbolIcon PlugDisconnected24}"
                                            AutomationProperties.Name="{Binding Name, StringFormat='Disconnect {0}'}"
-                                           Command="{Binding DataContext.DisconnectCommand, RelativeSource={RelativeSource AncestorType=Page}}"
+                                           Command="{Binding DataContext.DisconnectCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
                                            CommandParameter="{Binding}" />
                                 <StackPanel>
                                     <TextBlock Text="{Binding Name}" FontWeight="SemiBold" />
@@ -220,4 +219,4 @@
             <mcp:McpPermissionsPanel DataContext="{Binding Permissions}" />
         </Border>
     </StackPanel>
-</Page>
+</UserControl>

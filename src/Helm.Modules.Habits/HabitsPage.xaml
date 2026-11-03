@@ -125,7 +125,7 @@
         <TextBlock Text="AI agents" Style="{DynamicResource HelmSectionHeader}" />
         <ui:CardControl Margin="0,0,0,4" Icon="{ui:SymbolIcon Chat24}">
             <ui:CardControl.Header>
-                <core:CardHeader Title="Ask an AI agent" Description="With Helm tools for AI agents on (AI &amp; MCP page), an agent such as Claude Code can read your habits and the reasons you skipped them: try &quot;why do I keep skipping my reading habit?&quot;." />
+                <core:CardHeader Title="Ask an AI agent" Description="With Helm tools for AI agents on (AI page → Agents &amp; MCP), an agent such as Claude Code can read your habits and the reasons you skipped them: try &quot;why do I keep skipping my reading habit?&quot;." />
             </ui:CardControl.Header>
         </ui:CardControl>
     </StackPanel>

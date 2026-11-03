@@ -1,11 +1,11 @@
-# AI & MCP
+# Agents & MCP
 
 Helm can give AI agents its own tools through the [Model Context Protocol](https://modelcontextprotocol.io) (MCP):
 Claude Code in a terminal or in the VS Code extension, VS Code's own agent mode, Claude Desktop, and any other MCP
 client (Cursor, Windsurf, Gemini CLI…) can then find,
 read and (when you allow it) change your notes, to-do lists, debt book, missions and habits, and find the character names of
 your novels. Everything is set up on the
-**AI & MCP** page, right after General. Windows only: the server runs inside Helm on the PC.
+**AI** page, right after General, under **Agents & MCP**. Windows only: the server runs inside Helm on the PC.
 
 - [What AI agents get](#what-ai-agents-get)
 - [Connect a client](#connect-a-client)

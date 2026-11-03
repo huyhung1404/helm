@@ -250,7 +250,7 @@ public static class McpBridge
         {
             var offline = new McpServer([], version,
                 "Helm is not running (or its tools for AI agents are turned off), so there are no Helm tools right now. " +
-                "Ask the user to start Helm and to check Helm → AI & MCP.");
+                "Ask the user to start Helm and to check Helm → AI → Agents & MCP.");
             await offline.RunAsync(stdin, stdout, CancellationToken.None).ConfigureAwait(false);
             return 0;
         }

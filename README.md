@@ -25,7 +25,8 @@ Notes, tasks, a password vault, a shortcut guide and tools for Claude Code in on
 - **Local-first, end-to-end encrypted sync.** Every device keeps a full copy of your data; the sync server only ever sees encrypted records.
 - **Updates itself.** New versions download in the background from GitHub Releases and install when you choose.
 - **Keyboard-first.** Hold Ctrl, Alt or Win to see the shortcuts of the app in front, Win+Alt+N to capture a note or task from any app.
-- **Helm tools for AI agents (MCP).** Claude Code, VS Code, Claude Desktop, Cursor or any MCP client can read and write your notes, Tracker and Missions through Helm's MCP server (`Helm.exe --mcp`); turn it on in **AI & MCP**.
+- **Helm tools for AI agents (MCP).** Claude Code, VS Code, Claude Desktop, Cursor or any MCP client can read and write your notes, Tracker and Missions through Helm's MCP server (`Helm.exe --mcp`); turn it on in **AI → Agents & MCP**.
+- **Your AI keys in one place.** Claude and Grok API keys in **AI → Models & keys**: Helm tests each one, shows what it can reach (and Grok's prepaid balance), and syncs them end-to-end encrypted to your phone, so Helm's tools can call AI models on every device ([docs/ai-keys.md](docs/ai-keys.md)).
 
 ## Tools
 

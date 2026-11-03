@@ -5,6 +5,16 @@ Format: [Keep a Changelog](https://keepachangelog.com), versions follow [SemVer]
 
 ## [Unreleased]
 
+### Added
+- **AI page: your AI providers' keys in one place.** The AI & MCP page is now **AI**, with two parts. **Models &
+  keys** lists each provider Helm knows, Claude and Grok for now, with its keys. **Test and save** asks the provider
+  about a key before keeping it (a rejected key is not saved); each key then shows a coloured dot and its state in
+  words, the models it may use and, for Grok, its name in the xAI Console. Test again, rename, star the default or
+  remove any key. Keys sync end-to-end encrypted, so the phone gets them too, and are never shown again. Grok also
+  shows the team's **prepaid balance** once you add a management key, which stays on that PC only (it can buy
+  credit). Claude's API tells no balance, so the page shows none. Step-by-step **How to get a Claude / Grok API key**
+  sit on the page ([docs/ai-keys.md](docs/ai-keys.md)). **Agents & MCP** is the former page, unchanged.
+
 ### Changed
 - **Vocabulary: see how far the analysis got.** While Claude Code works, the Analysis chip counts its steps
   (“Analyzing · step 7”, the step it is on as its tooltip), and a pasted text waiting for its words shows the run’s

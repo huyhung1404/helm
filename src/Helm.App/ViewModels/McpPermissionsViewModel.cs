@@ -7,7 +7,7 @@ using Helm.Core.Settings;
 
 namespace Helm.App.ViewModels;
 
-/// <summary>What AI agents may do without asking, and what they have asked (the Permissions card of the AI &amp; MCP page).</summary>
+/// <summary>What AI agents may do without asking, and what they have asked (the Permissions card of the AI page, Agents &amp; MCP).</summary>
 internal sealed partial class McpPermissionsViewModel : ObservableObject
 {
     /// <summary>The activity list shows this many of the newest entries (the file keeps <see cref="McpActivityLog.MaxEntries"/>).</summary>

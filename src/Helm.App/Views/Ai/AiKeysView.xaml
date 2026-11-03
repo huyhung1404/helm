@@ -1,0 +1,436 @@
+<UserControl
+    x:Class="Helm.App.Views.Ai.AiKeysView"
+    x:ClassModifier="internal"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
+    xmlns:core="clr-namespace:Helm.Core.Ui;assembly=Helm.Core.Windows"
+    xmlns:ai="clr-namespace:Helm.Ai;assembly=Helm.Ai.Core">
+
+    <!-- The Models & keys part of the AI page; its DataContext is an AiKeysViewModel. -->
+    <UserControl.Resources>
+        <!-- Small icon-only action on a key's card -->
+        <Style x:Key="RowAction" TargetType="ui:Button" BasedOn="{StaticResource {x:Type ui:Button}}">
+            <Setter Property="Appearance" Value="Transparent" />
+            <Setter Property="Padding" Value="8" />
+            <Setter Property="Margin" Value="2,0,0,0" />
+            <Setter Property="MinWidth" Value="0" />
+            <Setter Property="VerticalAlignment" Value="Center" />
+        </Style>
+
+        <!-- The key's state, also said in words next to it: green works, amber blocked (no credit…), red rejected -->
+        <Style x:Key="StatusDot" TargetType="Ellipse">
+            <Setter Property="Width" Value="10" />
+            <Setter Property="Height" Value="10" />
+            <Setter Property="Margin" Value="0,6,12,0" />
+            <Setter Property="VerticalAlignment" Value="Top" />
+            <Setter Property="Fill" Value="{DynamicResource ControlStrongFillColorDisabledBrush}" />
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding Works}" Value="True">
+                    <Setter Property="Fill" Value="{DynamicResource SystemFillColorSuccessBrush}" />
+                </DataTrigger>
+                <DataTrigger Binding="{Binding IsBlocked}" Value="True">
+                    <Setter Property="Fill" Value="{DynamicResource SystemFillColorCautionBrush}" />
+                </DataTrigger>
+                <DataTrigger Binding="{Binding IsRejected}" Value="True">
+                    <Setter Property="Fill" Value="{DynamicResource SystemFillColorCriticalBrush}" />
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+
+        <!-- The balance figure: amber when it runs low -->
+        <Style x:Key="BalanceFigure" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="20" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="VerticalAlignment" Value="Center" />
+            <Setter Property="Foreground" Value="{DynamicResource TextFillColorPrimaryBrush}" />
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding IsLowBalance}" Value="True">
+                    <Setter Property="Foreground" Value="{DynamicResource SystemFillColorCautionBrush}" />
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+
+        <!-- One step of a "How to get a key" list: its number, what to do, and the console page that does it -->
+        <Style x:Key="StepNumber" TargetType="Border">
+            <Setter Property="Width" Value="24" />
+            <Setter Property="Height" Value="24" />
+            <Setter Property="CornerRadius" Value="12" />
+            <Setter Property="Margin" Value="0,0,12,0" />
+            <Setter Property="VerticalAlignment" Value="Top" />
+            <Setter Property="Background" Value="{DynamicResource AccentFillColorDefaultBrush}" />
+        </Style>
+        <Style x:Key="StepNumberText" TargetType="TextBlock">
+            <Setter Property="HorizontalAlignment" Value="Center" />
+            <Setter Property="VerticalAlignment" Value="Center" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="FontSize" Value="12" />
+            <Setter Property="Foreground" Value="{DynamicResource TextOnAccentFillColorPrimaryBrush}" />
+        </Style>
+    </UserControl.Resources>
+
+    <StackPanel>
+        <TextBlock Style="{DynamicResource HelmSecondaryText}"
+                   Text="Keep the API keys of every AI provider you use (Claude, Grok…) in one place, see whether each still works and what it can reach. Keys sync end-to-end encrypted to your phone; you pay each provider directly." />
+
+        <!-- What the last action did -->
+        <Border Style="{DynamicResource HelmSurface}" Margin="0,12,0,0" Padding="12,8"
+                Visibility="{Binding HasMessage, Converter={StaticResource BoolToVisibility}}">
+            <core:RowLayout>
+                <TextBlock Text="{Binding Message}" TextWrapping="Wrap" VerticalAlignment="Center" />
+                <ui:Button Style="{StaticResource RowAction}" Icon="{ui:SymbolIcon Dismiss24}" ToolTip="Dismiss" AutomationProperties.Name="Dismiss"
+                           Command="{Binding DismissMessageCommand}" />
+            </core:RowLayout>
+        </Border>
+
+        <!-- Add a key: test it first, save only what the provider does not reject -->
+        <Border Style="{DynamicResource HelmSurface}" Margin="0,16,0,0" Padding="20"
+                Visibility="{Binding IsAdding, Converter={StaticResource BoolToVisibility}}">
+            <StackPanel MaxWidth="560" HorizontalAlignment="Left">
+                <TextBlock Text="Add an API key" FontSize="16" FontWeight="SemiBold" Margin="0,0,0,12" />
+
+                <TextBlock Text="Provider" Margin="0,0,0,4" />
+                <ComboBox ItemsSource="{Binding Providers}" SelectedItem="{Binding NewProvider}" DisplayMemberPath="Name"
+                          HorizontalAlignment="Left" MinWidth="200" AutomationProperties.Name="Provider" />
+
+                <TextBlock Text="Name" Margin="0,12,0,4" />
+                <ui:TextBox Text="{Binding NewLabel, UpdateSourceTrigger=PropertyChanged}" PlaceholderText="Helm" MaxLength="40"
+                            AutomationProperties.Name="Name" />
+                <TextBlock Style="{DynamicResource HelmSecondaryText}" Margin="0,4,0,0"
+                           Text="Your name for it, e.g. the workspace or project it bills to. Left empty: the key's name in the console, where the provider tells it." />
+
+                <TextBlock Text="API key" Margin="0,12,0,4" />
+                <ui:PasswordBox PlaceholderText="{Binding NewProvider.KeyPrefix, StringFormat='{}{0}…'}"
+                                Password="{Binding NewSecret, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                AutomationProperties.Name="API key" AutomationProperties.HelpText="{Binding NewProblem}" />
+                <TextBlock Margin="0,4,0,0" TextWrapping="Wrap" Foreground="{DynamicResource SystemFillColorCriticalBrush}"
+                           Text="{Binding NewProblem}" Visibility="{Binding NewProblem, Converter={StaticResource NotEmptyToVisibility}}" />
+                <TextBlock Style="{DynamicResource HelmSecondaryText}" Margin="0,4,0,0"
+                           Visibility="{Binding NewProblem, Converter={StaticResource EmptyToVisibility}}"
+                           Text="Consoles show a new key only once, right after you create it: copy it from there." />
+
+                <StackPanel Orientation="Horizontal" Margin="0,16,0,0">
+                    <ui:Button Appearance="Primary" Content="Test and save" Icon="{ui:SymbolIcon Checkmark24}" IsDefault="True"
+                               Command="{Binding SaveNewCommand}" IsEnabled="{Binding IsSaving, Converter={StaticResource InverseBool}}" />
+                    <ui:Button Content="Cancel" Margin="8,0,0,0" IsCancel="True" Command="{Binding CancelAddCommand}" />
+                    <ui:ProgressRing IsIndeterminate="True" Width="20" Height="20" Margin="12,0,0,0"
+                                     Visibility="{Binding IsSaving, Converter={StaticResource BoolToVisibility}}" />
+                </StackPanel>
+                <TextBlock Style="{DynamicResource HelmSecondaryText}" Margin="0,8,0,0"
+                           Text="Helm asks the provider about the key before saving it. For Claude that includes one tiny request to the cheapest model (far below a cent), the only way to see whether the account still has credit." />
+            </StackPanel>
+        </Border>
+
+        <!-- One section per provider: its keys, and its balance where its API tells it -->
+        <ItemsControl ItemsSource="{Binding Sections}" AutomationProperties.Name="Providers">
+            <ItemsControl.ItemTemplate>
+                <DataTemplate DataType="{x:Type ai:AiProviderSection}">
+                    <StackPanel>
+                        <core:RowLayout Margin="0,24,0,8">
+                            <StackPanel VerticalAlignment="Center">
+                                <TextBlock Text="{Binding Title}" FontSize="14" FontWeight="SemiBold" />
+                                <TextBlock Text="{Binding Subtitle}" Style="{DynamicResource HelmSecondaryText}" />
+                            </StackPanel>
+                            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                <ui:Button Content="Open console" Icon="{ui:SymbolIcon Open24}" Appearance="Transparent"
+                                           Command="{Binding DataContext.OpenUrlCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                           CommandParameter="{Binding Provider.ConsoleUrl}" />
+                                <ui:Button Content="Add key" Icon="{ui:SymbolIcon Add24}" Margin="8,0,0,0"
+                                           AutomationProperties.Name="{Binding Title, StringFormat='Add a {0} key'}"
+                                           Command="{Binding DataContext.StartAddCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                           CommandParameter="{Binding Provider}" />
+                            </StackPanel>
+                        </core:RowLayout>
+
+                        <!-- No key of this provider yet -->
+                        <Border Style="{DynamicResource HelmSurface}" Margin="0,0,0,8" Padding="16,12"
+                                Visibility="{Binding HasKeys, Converter={StaticResource InverseBoolToVisibility}}">
+                            <DockPanel>
+                                <ui:SymbolIcon Symbol="Key24" FontSize="20" Margin="0,0,12,0" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+                                <TextBlock Text="{Binding EmptyText}" VerticalAlignment="Center" Style="{DynamicResource HelmSecondaryText}" FontSize="13" />
+                            </DockPanel>
+                        </Border>
+
+                        <ItemsControl ItemsSource="{Binding Keys}">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate DataType="{x:Type ai:AiKeyRow}">
+                                    <Border Style="{DynamicResource HelmSurface}" Margin="0,0,0,8">
+                                        <Grid>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="Auto" />
+                                                <ColumnDefinition Width="*" />
+                                                <ColumnDefinition Width="Auto" />
+                                            </Grid.ColumnDefinitions>
+
+                                            <Ellipse Style="{StaticResource StatusDot}" ToolTip="{Binding StatusText}" />
+
+                                            <StackPanel Grid.Column="1">
+                                                <!-- Name and Default, or the rename box -->
+                                                <StackPanel Orientation="Horizontal"
+                                                            Visibility="{Binding IsRenaming, Converter={StaticResource InverseBoolToVisibility}}">
+                                                    <TextBlock Text="{Binding Label}" FontWeight="SemiBold" FontSize="14" VerticalAlignment="Center" />
+                                                    <Border Margin="8,0,0,0" Padding="6,1" CornerRadius="4" VerticalAlignment="Center"
+                                                            Background="{DynamicResource AccentFillColorDefaultBrush}"
+                                                            Visibility="{Binding IsDefault, Converter={StaticResource BoolToVisibility}}"
+                                                            ToolTip="Tools use this key when they do not name one.">
+                                                        <TextBlock Text="Default" FontSize="11" FontWeight="SemiBold"
+                                                                   Foreground="{DynamicResource TextOnAccentFillColorPrimaryBrush}" />
+                                                    </Border>
+                                                </StackPanel>
+                                                <StackPanel Orientation="Horizontal"
+                                                            Visibility="{Binding IsRenaming, Converter={StaticResource BoolToVisibility}}">
+                                                    <ui:TextBox Text="{Binding RenameText, UpdateSourceTrigger=PropertyChanged}" MinWidth="220" MaxLength="40"
+                                                                AutomationProperties.Name="New name" />
+                                                    <ui:Button Content="Save" Appearance="Primary" Margin="8,0,0,0"
+                                                               Command="{Binding DataContext.SaveRenameCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                               CommandParameter="{Binding}" />
+                                                    <ui:Button Content="Cancel" Margin="8,0,0,0"
+                                                               Command="{Binding DataContext.CancelRenameCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                               CommandParameter="{Binding}" />
+                                                </StackPanel>
+
+                                                <TextBlock Margin="0,2,0,0" Style="{DynamicResource HelmSecondaryText}">
+                                                    <Run Text="{Binding Masked, Mode=OneWay}" FontFamily="Consolas" />
+                                                    <Run Text="{Binding RemoteName, Mode=OneWay}" />
+                                                </TextBlock>
+                                                <TextBlock Margin="0,6,0,0" Style="{DynamicResource HelmSecondaryText}">
+                                                    <Run Text="{Binding StatusText, Mode=OneWay}" Foreground="{DynamicResource TextFillColorPrimaryBrush}" />
+                                                    <Run Text="{Binding CheckedText, Mode=OneWay}" />
+                                                </TextBlock>
+
+                                                <!-- The models this key may use, from its last test -->
+                                                <ItemsControl ItemsSource="{Binding Models}" Margin="0,4,0,0" AutomationProperties.Name="{Binding ModelsText}"
+                                                              Visibility="{Binding HasModels, Converter={StaticResource BoolToVisibility}}">
+                                                    <ItemsControl.ItemsPanel>
+                                                        <ItemsPanelTemplate>
+                                                            <WrapPanel />
+                                                        </ItemsPanelTemplate>
+                                                    </ItemsControl.ItemsPanel>
+                                                    <ItemsControl.ItemTemplate>
+                                                        <DataTemplate DataType="{x:Type ai:AiModel}">
+                                                            <Border Margin="0,4,6,0" Padding="8,2" CornerRadius="4"
+                                                                    Background="{DynamicResource ControlFillColorDefaultBrush}" ToolTip="{Binding Id}">
+                                                                <TextBlock Text="{Binding Name}" FontSize="12" />
+                                                            </Border>
+                                                        </DataTemplate>
+                                                    </ItemsControl.ItemTemplate>
+                                                </ItemsControl>
+                                            </StackPanel>
+
+                                            <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Top" Margin="12,0,0,0">
+                                                <ui:ProgressRing IsIndeterminate="True" Width="18" Height="18" Margin="0,0,8,0"
+                                                                 Visibility="{Binding IsTesting, Converter={StaticResource BoolToVisibility}}" />
+                                                <ui:Button Content="Test" Icon="{ui:SymbolIcon ArrowSync24}"
+                                                           IsEnabled="{Binding IsTesting, Converter={StaticResource InverseBool}}"
+                                                           AutomationProperties.Name="{Binding Label, StringFormat='Test {0}'}"
+                                                           Command="{Binding DataContext.TestCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                           CommandParameter="{Binding}" />
+                                                <ui:Button Style="{StaticResource RowAction}" Icon="{ui:SymbolIcon Star24}" Margin="8,0,0,0"
+                                                           ToolTip="Make default" AutomationProperties.Name="{Binding Label, StringFormat='Make {0} the default'}"
+                                                           Visibility="{Binding IsDefault, Converter={StaticResource InverseBoolToVisibility}}"
+                                                           Command="{Binding DataContext.MakeDefaultCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                           CommandParameter="{Binding}" />
+                                                <ui:Button Style="{StaticResource RowAction}" Icon="{ui:SymbolIcon Edit24}"
+                                                           ToolTip="Rename" AutomationProperties.Name="{Binding Label, StringFormat='Rename {0}'}"
+                                                           Command="{Binding DataContext.StartRenameCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                           CommandParameter="{Binding}" />
+                                                <ui:Button Style="{StaticResource RowAction}" Icon="{ui:SymbolIcon Delete24}"
+                                                           ToolTip="Remove" AutomationProperties.Name="{Binding Label, StringFormat='Remove {0}'}"
+                                                           Command="{Binding DataContext.DeleteCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                           CommandParameter="{Binding}" />
+                                            </StackPanel>
+                                        </Grid>
+                                    </Border>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+
+                        <!-- Prepaid balance, where the provider's API tells it (needs a management key on this PC) -->
+                        <Border Style="{DynamicResource HelmSurface}" Margin="0,0,0,8"
+                                Visibility="{Binding ReadsBalance, Converter={StaticResource BoolToVisibility}}">
+                            <StackPanel>
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <ui:SymbolIcon Symbol="Wallet24" FontSize="20" Margin="0,2,12,0" VerticalAlignment="Top" />
+                                    <StackPanel Grid.Column="1">
+                                        <TextBlock Text="Prepaid balance" FontWeight="SemiBold" />
+                                        <TextBlock Style="{DynamicResource HelmSecondaryText}" Margin="0,2,0,0"
+                                                   Visibility="{Binding HasManagementKey, Converter={StaticResource InverseBoolToVisibility}}"
+                                                   Text="{Binding Title, StringFormat='{}{0} tells the credit left to a management key (an API key cannot read it). Helm keeps that key on this PC only, encrypted, never synced: it can do more than read.'}" />
+                                        <TextBlock Style="{DynamicResource HelmSecondaryText}" Margin="0,2,0,0" Text="{Binding BalanceDetail}"
+                                                   Visibility="{Binding HasManagementKey, Converter={StaticResource BoolToVisibility}}" />
+                                    </StackPanel>
+                                    <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center" Margin="12,0,0,0">
+                                        <ui:ProgressRing IsIndeterminate="True" Width="18" Height="18" Margin="0,0,8,0"
+                                                         Visibility="{Binding IsReadingBalance, Converter={StaticResource BoolToVisibility}}" />
+                                        <TextBlock Text="{Binding BalanceText}" Style="{StaticResource BalanceFigure}" Margin="0,0,12,0"
+                                                   Visibility="{Binding HasManagementKey, Converter={StaticResource BoolToVisibility}}" />
+                                        <ui:Button Style="{StaticResource RowAction}" Icon="{ui:SymbolIcon ArrowSync24}" ToolTip="Read again"
+                                                   AutomationProperties.Name="Read the balance again"
+                                                   Visibility="{Binding HasManagementKey, Converter={StaticResource BoolToVisibility}}"
+                                                   Command="{Binding DataContext.RefreshBalanceCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                   CommandParameter="{Binding}" />
+                                        <ui:Button Style="{StaticResource RowAction}" Icon="{ui:SymbolIcon Delete24}" ToolTip="Forget the management key"
+                                                   AutomationProperties.Name="Forget the management key"
+                                                   Visibility="{Binding HasManagementKey, Converter={StaticResource BoolToVisibility}}"
+                                                   Command="{Binding DataContext.RemoveManagementKeyCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                   CommandParameter="{Binding}" />
+                                        <ui:Button Content="Add management key" Icon="{ui:SymbolIcon Add24}"
+                                                   Visibility="{Binding CanAddManagementKey, Converter={StaticResource BoolToVisibility}}"
+                                                   Command="{Binding DataContext.StartManagementKeyCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                   CommandParameter="{Binding}" />
+                                    </StackPanel>
+                                </Grid>
+
+                                <!-- Paste the management key: read the balance with it first, keep it only if that works -->
+                                <StackPanel Margin="32,12,0,0" MaxWidth="560" HorizontalAlignment="Left"
+                                            Visibility="{Binding IsAddingManagementKey, Converter={StaticResource BoolToVisibility}}">
+                                    <ui:PasswordBox PlaceholderText="Management key" AutomationProperties.Name="Management key"
+                                                    Password="{Binding NewManagementKey, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                                    <TextBlock Margin="0,4,0,0" TextWrapping="Wrap" Foreground="{DynamicResource SystemFillColorCriticalBrush}"
+                                               Text="{Binding ManagementProblem}" Visibility="{Binding ManagementProblem, Converter={StaticResource NotEmptyToVisibility}}" />
+                                    <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
+                                        <ui:Button Appearance="Primary" Content="Read and save" Icon="{ui:SymbolIcon Checkmark24}"
+                                                   IsEnabled="{Binding IsReadingBalance, Converter={StaticResource InverseBool}}"
+                                                   Command="{Binding DataContext.SaveManagementKeyCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                   CommandParameter="{Binding}" />
+                                        <ui:Button Content="Cancel" Margin="8,0,0,0"
+                                                   Command="{Binding DataContext.CancelManagementKeyCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                   CommandParameter="{Binding}" />
+                                    </StackPanel>
+                                </StackPanel>
+                            </StackPanel>
+                        </Border>
+                    </StackPanel>
+                </DataTemplate>
+            </ItemsControl.ItemTemplate>
+        </ItemsControl>
+
+        <!-- Help -->
+        <TextBlock Text="Help" Style="{DynamicResource HelmSectionHeader}" />
+        <ui:CardExpander Margin="0,0,0,4" Icon="{ui:SymbolIcon QuestionCircle24}">
+            <ui:CardExpander.Header>
+                <core:CardHeader Title="How to get a Claude API key"
+                                 Description="A few minutes in the Claude Console. A workspace of its own keeps Helm's spending apart from everything else on the account." />
+            </ui:CardExpander.Header>
+            <StackPanel>
+                <Border Style="{DynamicResource HelmExpanderRow}" BorderThickness="0">
+                    <core:RowLayout>
+                        <DockPanel>
+                            <Border Style="{StaticResource StepNumber}"><TextBlock Text="1" Style="{StaticResource StepNumberText}" /></Border>
+                            <core:CardHeader Title="Sign in to the Claude Console" Description="With the account that pays for Claude (platform.claude.com)." />
+                        </DockPanel>
+                        <ui:Button Content="Open" Icon="{ui:SymbolIcon Open24}" Command="{Binding OpenUrlCommand}" CommandParameter="https://platform.claude.com" />
+                    </core:RowLayout>
+                </Border>
+                <Border Style="{DynamicResource HelmExpanderRow}">
+                    <core:RowLayout>
+                        <DockPanel>
+                            <Border Style="{StaticResource StepNumber}"><TextBlock Text="2" Style="{StaticResource StepNumberText}" /></Border>
+                            <core:CardHeader Title="Create a workspace named Helm" Description="Settings → Workspaces → Create. Usage and Cost then show what Helm spends on its own, never mixed with your other work." />
+                        </DockPanel>
+                        <ui:Button Content="Workspaces" Icon="{ui:SymbolIcon Open24}" Command="{Binding OpenUrlCommand}" CommandParameter="https://platform.claude.com/settings/workspaces" />
+                    </core:RowLayout>
+                </Border>
+                <Border Style="{DynamicResource HelmExpanderRow}">
+                    <core:RowLayout>
+                        <DockPanel>
+                            <Border Style="{StaticResource StepNumber}"><TextBlock Text="3" Style="{StaticResource StepNumberText}" /></Border>
+                            <core:CardHeader Title="Give the workspace a spend limit" Description="In the Helm workspace, set a monthly limit (5 USD is plenty to start): a mistake can never cost more." />
+                        </DockPanel>
+                        <ui:Button Content="Limits" Icon="{ui:SymbolIcon Open24}" Command="{Binding OpenUrlCommand}" CommandParameter="https://platform.claude.com/settings/limits" />
+                    </core:RowLayout>
+                </Border>
+                <Border Style="{DynamicResource HelmExpanderRow}">
+                    <core:RowLayout>
+                        <DockPanel>
+                            <Border Style="{StaticResource StepNumber}"><TextBlock Text="4" Style="{StaticResource StepNumberText}" /></Border>
+                            <core:CardHeader Title="Create a key in that workspace" Description="API keys → Create key → workspace Helm, then copy it (it starts with sk-ant-). The Console shows it only once." />
+                        </DockPanel>
+                        <ui:Button Content="API keys" Icon="{ui:SymbolIcon Open24}" Command="{Binding OpenUrlCommand}" CommandParameter="https://platform.claude.com/settings/keys" />
+                    </core:RowLayout>
+                </Border>
+                <Border Style="{DynamicResource HelmExpanderRow}">
+                    <core:RowLayout>
+                        <DockPanel>
+                            <Border Style="{StaticResource StepNumber}"><TextBlock Text="5" Style="{StaticResource StepNumberText}" /></Border>
+                            <core:CardHeader Title="Make sure there is credit" Description="Billing → buy credit if the balance is empty. Prepaid credit expires a year after you buy it, so add a little at a time. Claude's API does not tell the balance: see it in the Console." />
+                        </DockPanel>
+                        <ui:Button Content="Billing" Icon="{ui:SymbolIcon Open24}" Command="{Binding OpenUrlCommand}" CommandParameter="https://platform.claude.com/settings/billing" />
+                    </core:RowLayout>
+                </Border>
+                <Border Style="{DynamicResource HelmExpanderRow}">
+                    <core:RowLayout>
+                        <DockPanel>
+                            <Border Style="{StaticResource StepNumber}"><TextBlock Text="6" Style="{StaticResource StepNumberText}" /></Border>
+                            <core:CardHeader Title="Paste it here" Description="Claude → Add key, paste the key, press Test and save. Your phone gets it with the next sync." />
+                        </DockPanel>
+                        <ui:Button Content="Add a Claude key" Icon="{ui:SymbolIcon Add24}" Appearance="Primary"
+                                   Command="{Binding StartAddCommand}" CommandParameter="{x:Static ai:AiProviders.Claude}" />
+                    </core:RowLayout>
+                </Border>
+            </StackPanel>
+        </ui:CardExpander>
+        <ui:CardExpander Margin="0,0,0,4" Icon="{ui:SymbolIcon QuestionCircle24}">
+            <ui:CardExpander.Header>
+                <core:CardHeader Title="How to get a Grok API key"
+                                 Description="A few minutes in the xAI Console. Grok answers only while the team has prepaid credit." />
+            </ui:CardExpander.Header>
+            <StackPanel>
+                <Border Style="{DynamicResource HelmExpanderRow}" BorderThickness="0">
+                    <core:RowLayout>
+                        <DockPanel>
+                            <Border Style="{StaticResource StepNumber}"><TextBlock Text="1" Style="{StaticResource StepNumberText}" /></Border>
+                            <core:CardHeader Title="Sign in to the xAI Console" Description="console.x.ai, with the account that pays." />
+                        </DockPanel>
+                        <ui:Button Content="Open" Icon="{ui:SymbolIcon Open24}" Command="{Binding OpenUrlCommand}" CommandParameter="https://console.x.ai" />
+                    </core:RowLayout>
+                </Border>
+                <Border Style="{DynamicResource HelmExpanderRow}">
+                    <core:RowLayout>
+                        <DockPanel>
+                            <Border Style="{StaticResource StepNumber}"><TextBlock Text="2" Style="{StaticResource StepNumberText}" /></Border>
+                            <core:CardHeader Title="Buy prepaid credit" Description="Billing → buy credits. Monthly invoicing is off by default, so requests stop when the credit runs out: nothing can cost more than you put in." />
+                        </DockPanel>
+                    </core:RowLayout>
+                </Border>
+                <Border Style="{DynamicResource HelmExpanderRow}">
+                    <core:RowLayout>
+                        <DockPanel>
+                            <Border Style="{StaticResource StepNumber}"><TextBlock Text="3" Style="{StaticResource StepNumberText}" /></Border>
+                            <core:CardHeader Title="Create an API key" Description="API Keys → Create API key, name it Helm, then copy it (it starts with xai-)." />
+                        </DockPanel>
+                    </core:RowLayout>
+                </Border>
+                <Border Style="{DynamicResource HelmExpanderRow}">
+                    <core:RowLayout>
+                        <DockPanel>
+                            <Border Style="{StaticResource StepNumber}"><TextBlock Text="4" Style="{StaticResource StepNumberText}" /></Border>
+                            <core:CardHeader Title="Paste it here" Description="Grok → Add key, paste the key, press Test and save." />
+                        </DockPanel>
+                        <ui:Button Content="Add a Grok key" Icon="{ui:SymbolIcon Add24}" Appearance="Primary"
+                                   Command="{Binding StartAddCommand}" CommandParameter="{x:Static ai:AiProviders.Grok}" />
+                    </core:RowLayout>
+                </Border>
+                <Border Style="{DynamicResource HelmExpanderRow}">
+                    <core:RowLayout>
+                        <DockPanel>
+                            <Border Style="{StaticResource StepNumber}"><TextBlock Text="5" Style="{StaticResource StepNumberText}" /></Border>
+                            <core:CardHeader Title="Optional: see the balance" Description="Management Keys → create one, then Prepaid balance → Add management key. It stays on this PC; Helm only reads the balance with it." />
+                        </DockPanel>
+                    </core:RowLayout>
+                </Border>
+            </StackPanel>
+        </ui:CardExpander>
+        <ui:CardControl Margin="0,0,0,4" Icon="{ui:SymbolIcon ShieldLock24}">
+            <ui:CardControl.Header>
+                <core:CardHeader Title="Where your keys are kept"
+                                 Description="API keys: in Helm Sync, end-to-end encrypted (the sync server cannot read them) and in the encrypted copy of your data on each device. Management keys: on this PC only, encrypted for your Windows user, never synced. Helm never shows a key again after you add it; to stop one for good, remove it here and delete it in the provider's console." />
+            </ui:CardControl.Header>
+        </ui:CardControl>
+    </StackPanel>
+</UserControl>
