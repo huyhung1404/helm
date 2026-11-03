@@ -73,6 +73,6 @@ public sealed class AiRouter(IEnumerable<IAgentRoute> routes)
 
     /// <summary>Why a <see cref="AiRoutePolicy.PcOnly"/> call found no PC, said to the user.</summary>
     public string NoPc() => _routes.Count == 0
-        ? "No Helm PC with Claude Code is set up for this."
-        : $"No Helm PC with Claude Code can take it now ({string.Join("; ", _routes.Select(r => $"{r.Device}: {r.Unavailable() ?? "busy"}"))}).";
+        ? "No Helm PC has an agent for this (AI → Proxy on the PC)."
+        : $"No Helm PC agent can take it now ({string.Join("; ", _routes.Select(r => $"{r.Device}: {r.Unavailable() ?? "busy"}"))}).";
 }

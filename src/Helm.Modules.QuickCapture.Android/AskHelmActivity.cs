@@ -168,6 +168,9 @@ public sealed class AskHelmActivity : Activity, IRecognitionListener
         _input.SetSingleLine(true);
         _input.SetTextColor(_colors.Text);
         _input.SetHintTextColor(_colors.Secondary);
+        // The card's own field, not the system's (white with an orange focus line on some phones).
+        _input.Background = Rounded(_colors.Row, 16);
+        _input.SetPadding(Dp(14), Dp(10), Dp(14), Dp(10));
         _input.EditorAction += (_, e) => { if (e.ActionId == ImeAction.Send) { SendTyped(); e.Handled = true; } };
         _typing.AddView(_input, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WrapContent, 1));
         var send = Pill("Gửi", SendTyped, primary: true);
@@ -191,7 +194,11 @@ public sealed class AskHelmActivity : Activity, IRecognitionListener
     {
         if (_assistant is null || _busy) return;
         var options = _assistant.Models();
-        if (options.Count == 0) return;
+        if (options.Count == 0)
+        {
+            Toast.MakeText(this, "No model yet: add a Claude or Grok key on the PC (AI → Models & keys), or an agent (AI → Proxy).", ToastLength.Long)?.Show();
+            return;
+        }
         var menu = new PopupMenu(this, _model);
         for (var i = 0; i < options.Count; i++) menu.Menu!.Add(0, i, i, options[i].Name);
         menu.MenuItemClick += (_, e) =>
@@ -371,7 +378,7 @@ public sealed class AskHelmActivity : Activity, IRecognitionListener
             _answer.Visibility = ViewStates.Visible;
         }
         // Where it ran: Claude Code on a Helm PC (free) or the API (counted in the AI page's costs).
-        var ranOn = reply.RanOn is { } pc ? $"Claude Code trên {pc} · miễn phí" : $"{Short(_session?.Model?.Name ?? "")} qua API";
+        var ranOn = reply.RanOn is { } pc ? $"{pc} · miễn phí" : $"{Short(_session?.Model?.Name ?? "")} qua API";
         _status.Text = reply.Done.Count > 0 ? $"Đã lưu · {ranOn} · tự đóng sau vài giây" : ranOn;
         Buttons(("Nói tiếp", Listen, true), ("Xong", Finish, false));
         if (reply.Done.Count > 0) StartAutoClose();

@@ -29,7 +29,7 @@ public sealed class AssistantAction(string tool, string summary, Func<Cancellati
 }
 
 /// <param name="Problem">Why nothing could be asked (no key, the day's cap, the provider failed); null when it worked.</param>
-/// <param name="RanOn">The Helm PC whose Claude Code answered (free); null when the API did.</param>
+/// <param name="RanOn">The agent and Helm PC that answered (free, "Codex trên PC-HUNG"); null when the API did.</param>
 public sealed record AssistantReply(string Text, IReadOnlyList<AssistantAction> Done, bool Declined, string? Problem, string? RanOn = null);
 
 /// <summary>
@@ -94,7 +94,7 @@ public sealed class HelmAssistant(
 
     public AiUsageBook Usage => usage;
 
-    /// <summary>Claude Code on Helm PCs first, the API last (<see cref="AiFeatureChoice.Route"/>).</summary>
+    /// <summary>The agents on Helm PCs first, the API last (<see cref="AiFeatureChoice.Route"/>).</summary>
     public AiRouter Router { get; } = router ?? new AiRouter([]);
 
     /// <summary>Every model the user can pick: the chat models of each provider they have a tested key for.</summary>
@@ -130,7 +130,7 @@ public sealed class HelmAssistant(
             ?? all.FirstOrDefault(o => o.Provider.Id == Choice.Provider)
             ?? all.FirstOrDefault()
             ?? (Router.Agents(Choice).Count > 0
-                ? new AssistantModelOption(AiProviders.Claude, Choice.Provider == AiProviders.Claude.Id ? Choice.Model : ClaudeModels.Haiku, "Claude Code")
+                ? new AssistantModelOption(AiProviders.Claude, Choice.Provider == AiProviders.Claude.Id ? Choice.Model : ClaudeModels.Haiku, "Agent on a PC")
                 : null);
     }
 
@@ -139,7 +139,7 @@ public sealed class HelmAssistant(
     {
         if (!Choice.Enabled) return "Ask Helm is turned off: AI → Features on the PC.";
         if (Current() is null)
-            return "No Helm PC with Claude Code is online, and there is no API key: add a Claude or Grok key on the PC (AI → Models & keys), it syncs to this phone.";
+            return "No Helm PC with an agent is online, and there is no API key: add an agent on the PC (AI → Proxy) or a Claude or Grok key (AI → Models & keys); keys sync to this phone.";
         return null;
     }
 

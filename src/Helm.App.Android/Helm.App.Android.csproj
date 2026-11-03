@@ -59,7 +59,7 @@
   <!-- Ask Helm calls Claude through the Anthropic SDK, which reads its JSON by reflection: keep it whole in trimmed
        Release builds. -->
   <ItemGroup>
-    <TrimmerRootAssembly Include="Anthropic" />
+    <TrimmerRootAssembly Include="Anthropic" RootMode="All" />
   </ItemGroup>
 
   <!-- Development: -p:HelmAndroidEnvFile=<file with NAME=value lines>, e.g. HELM_SYNC_SERVER=http://127.0.0.1:8787 -->
