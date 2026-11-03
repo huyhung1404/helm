@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Ask Helm widget and icon colours (light); values-night has the dark ones. The same surfaces as the app's cards. -->
+<resources>
+    <color name="ask_helm_widget_background">#FBFBFB</color>
+    <color name="ask_helm_widget_stroke">#E5E5E5</color>
+    <color name="ask_helm_widget_button">#EEF1F4</color>
+    <color name="ask_helm_widget_text">#1A1A1A</color>
+    <color name="ask_helm_widget_accent">#0067C0</color>
+    <color name="ask_helm_widget_on_accent">#FFFFFF</color>
+    <color name="ask_helm_launcher_background">#0067C0</color>
+    <string name="ask_helm_widget_description">Ask Helm from the home screen: type, take a photo or speak.</string>
+</resources>

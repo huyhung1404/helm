@@ -366,3 +366,22 @@ takes them back (Ask Helm asks first).
 - `AiBriefTools`: `ai_briefs` (reading marks them read), `ai_brief_undo`, `ai_auto_jobs`, `ai_auto_job_set`.
 - Scratch is read through `ScratchDigestTool` (names only, a text that looks like a code is hidden), given to the
   jobs alone, never to the MCP server. Funds come from `wallet_funds`.
+
+## Other ways to open Ask Helm (phone)
+
+Besides its Quick Settings tile, Ask Helm's card opens from Quick Capture › **Ways to open**:
+
+| Way | What it does |
+|---|---|
+| Edge handle | A thin line on the screen's edge over the other apps (`AskHelmEdgeHandle`, needs "Display over other apps"). Drag it 40dp inward, or tap it: the card opens listening. Side, height (48–160dp: Android leaves an app at most 200dp of an edge from the Back gesture, which the handle takes with `setSystemGestureExclusionRects`), position, and hidden over full-screen apps (the status bar hidden). Off until turned on; defaults: right, 96dp, 45% down, hidden over full screen |
+| Widget | A 4×1 bar: Aa (typing), camera, mic (listening). Ways to open asks the launcher to place it where it can |
+| "Ask Helm" icon | A launcher entry of its own (`AskHelmLauncherActivity`) that opens the card over the current app, listening; RedMagic's Game Space slider can open it. A switch hides it |
+
+How the card starts is the intent extra `AskHelmOpen.ExtraOpen` (`listen`, `type`, `camera`; missing: listen). The camera
+is the card's own: `AskHelmActivity.OpenCamera` is a partial method the camera fills in; without it the card listens.
+
+The settings are per phone (`settings/ask-helm-open.json`, `AskHelmOpenSettings`). Over a full-screen app the handle's
+window stays, invisible and passing touches through, to hear when full screen ends (window insets on Android 11+, the
+old system UI flags before): nothing polls. It comes back after a reboot or an update of Helm (`AskHelmOpenReceiver`)
+and, while it is on, an hourly alarm that never wakes the phone puts it back after Android stopped Helm. The geometry
+and the touch are `EdgeHandleLayout` and `EdgeHandleGesture`, tested in `AskHelmOpeningTests`.

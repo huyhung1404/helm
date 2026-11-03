@@ -1,0 +1,66 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The Ask Helm widget: "Ask Helm", then Aa (type), the camera and the mic (listen, in the accent). A pill centred in
+     its cell; a tap on the bar itself listens too. -->
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent">
+
+    <LinearLayout
+        android:id="@+id/ask_helm_widget_root"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_gravity="center_vertical"
+        android:background="@drawable/ask_helm_widget_background"
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        android:paddingStart="16dp"
+        android:paddingTop="6dp"
+        android:paddingEnd="6dp"
+        android:paddingBottom="6dp">
+
+        <TextView
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:fontFamily="sans-serif-medium"
+            android:singleLine="true"
+            android:ellipsize="end"
+            android:text="Ask Helm"
+            android:textColor="@color/ask_helm_widget_text"
+            android:textSize="15sp" />
+
+        <TextView
+            android:id="@+id/ask_helm_widget_type"
+            android:layout_width="40dp"
+            android:layout_height="40dp"
+            android:background="@drawable/ask_helm_widget_button"
+            android:contentDescription="Gõ chữ"
+            android:gravity="center"
+            android:text="Aa"
+            android:textColor="@color/ask_helm_widget_text"
+            android:textSize="14sp"
+            android:textStyle="bold" />
+
+        <ImageView
+            android:id="@+id/ask_helm_widget_camera"
+            android:layout_width="40dp"
+            android:layout_height="40dp"
+            android:layout_marginStart="6dp"
+            android:background="@drawable/ask_helm_widget_button"
+            android:contentDescription="Ảnh"
+            android:padding="10dp"
+            android:src="@drawable/ask_helm_camera"
+            android:tint="@color/ask_helm_widget_text" />
+
+        <ImageView
+            android:id="@+id/ask_helm_widget_mic"
+            android:layout_width="40dp"
+            android:layout_height="40dp"
+            android:layout_marginStart="6dp"
+            android:background="@drawable/ask_helm_widget_mic"
+            android:contentDescription="Nói"
+            android:padding="10dp"
+            android:src="@drawable/ask_helm_tile"
+            android:tint="@color/ask_helm_widget_on_accent" />
+    </LinearLayout>
+</FrameLayout>

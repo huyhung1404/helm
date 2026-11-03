@@ -14,7 +14,7 @@ namespace Helm.Modules.QuickCapture;
 /// <see cref="QuickCaptureActivity"/>, a small dialog over the current app. While the tool is off, both are hidden
 /// (their components are disabled), so Helm does not show up in the share sheet.
 /// </summary>
-public sealed class QuickCaptureModule(ILogger<QuickCaptureModule> logger) : AndroidModuleBase
+public sealed class QuickCaptureModule(ILogger<QuickCaptureModule> logger, AskHelmOpeners openers) : AndroidModuleBase, Helm.Core.Platform.IBackHandler
 {
     public const string ModuleId = "quick-capture";
 
@@ -30,6 +30,10 @@ public sealed class QuickCaptureModule(ILogger<QuickCaptureModule> logger) : And
     public const string AskHelmFixName = "com.huyhung1404.helm.AskHelmFix";
     public const string AskHelmRewriteName = "com.huyhung1404.helm.AskHelmRewrite";
 
+    /// <summary>The other ways to open Ask Helm (<see cref="AskHelmOpeners"/>): its own launcher icon and its widget.</summary>
+    public const string AskHelmLauncherName = "com.huyhung1404.helm.AskHelmLauncher";
+    public const string AskHelmWidgetName = "com.huyhung1404.helm.AskHelmWidget";
+
     public override string Id => ModuleId;
     public override string DisplayName => "Quick Capture";
     public override string Description => "Save a note, a task or a debt from any app: Share → Save to Helm, or the Quick Settings tile. Ask Helm, its second tile, takes it by voice.";
@@ -40,16 +44,23 @@ public sealed class QuickCaptureModule(ILogger<QuickCaptureModule> logger) : And
     public override Avalonia.Media.IImage? IconImage => QuickCaptureIcon.Image;
     public override Type PageType => typeof(QuickCapturePage);
 
+    /// <summary>The shown page's own back (Ways to open goes back to the page); set while the page is on screen.</summary>
+    internal Func<bool>? PageBack { get; set; }
+
+    public bool HandleBack() => PageBack?.Invoke() == true;
+
     public override Task EnableAsync(CancellationToken ct)
     {
         StatusMessage = null;
         SetComponents(true);
+        openers.Start();
         return Task.CompletedTask;
     }
 
     public override Task DisableAsync()
     {
         SetComponents(false);
+        openers.Stop();
         return Task.CompletedTask;
     }
 

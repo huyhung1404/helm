@@ -27,6 +27,37 @@ public partial class QuickCapturePage : ModulePageBase
         InitializeComponent();
         // Android 13+ can place the tile on request; older versions only through the panel's edit mode.
         AddTileButton.IsVisible = OperatingSystem.IsAndroidVersionAtLeast(33);
+        WaysView.BackRequested += Ways_Back;
+    }
+
+    protected override void OnAttachedToVisualTree(Avalonia.VisualTreeAttachmentEventArgs e)
+    {
+        base.OnAttachedToVisualTree(e);
+        _viewModel.Module.PageBack = CloseWays;
+    }
+
+    protected override void OnDetachedFromVisualTree(Avalonia.VisualTreeAttachmentEventArgs e)
+    {
+        if (_viewModel.Module.PageBack == CloseWays) _viewModel.Module.PageBack = null;
+        base.OnDetachedFromVisualTree(e);
+    }
+
+    private void Ways_Click(object? sender, RoutedEventArgs e) => ShowWays(true);
+
+    private void Ways_Back(object? sender, EventArgs e) => ShowWays(false);
+
+    /// <summary>Android back while Ways to open is shown: back to the page's sections.</summary>
+    private bool CloseWays()
+    {
+        if (!WaysView.IsVisible) return false;
+        ShowWays(false);
+        return true;
+    }
+
+    private void ShowWays(bool show)
+    {
+        WaysView.IsVisible = show;
+        MainPanel.IsVisible = !show;
     }
 
     private void AddTile_Click(object? sender, RoutedEventArgs e)

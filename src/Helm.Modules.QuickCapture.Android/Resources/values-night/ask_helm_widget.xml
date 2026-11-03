@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="ask_helm_widget_background">#2B2B2B</color>
+    <color name="ask_helm_widget_stroke">#1D1D1D</color>
+    <color name="ask_helm_widget_button">#3A4048</color>
+    <color name="ask_helm_widget_text">#FFFFFF</color>
+    <color name="ask_helm_widget_accent">#4CC2FF</color>
+    <color name="ask_helm_widget_on_accent">#0B2233</color>
+</resources>
