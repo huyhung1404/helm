@@ -216,7 +216,7 @@ public static class Telex
             if (targets.TrueForAll(i => _letters[i].Mark == MarkFor(_letters[i].Key)))
             {
                 if (!Repeats(key)) return Outcome.NotApplicable;
-                // The same w again takes the marks off and types the w: "uww" → "uw", "ww" → "w".
+                // The same w again takes the marks off and types the w: "uww" → "uw".
                 foreach (var i in targets)
                 {
                     var letter = _letters[i];

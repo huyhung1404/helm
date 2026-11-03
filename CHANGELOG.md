@@ -3,6 +3,12 @@
 All notable changes to Helm. The top section is used as the GitHub release body and as the Velopack release notes.
 Format: [Keep a Changelog](https://keepachangelog.com), versions follow [SemVer](https://semver.org).
 
+## [Unreleased]
+
+### Changed
+- **Helm Keyboard: w on its own is a w.** A w with no vowel before it is no longer turned into ư (“tw” stays “tw”); type
+  uw for ư.
+
 ## [0.75.0] - 2026-11-02
 
 ### Added

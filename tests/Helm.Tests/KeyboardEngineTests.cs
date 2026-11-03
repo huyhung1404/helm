@@ -41,6 +41,8 @@ public sealed class KeyboardEngineTests
     [InlineData("tw", "tw")]
     [InlineData("w", "w")]
     [InlineData("wa", "wa")]
+    [InlineData("ww", "ww")]
+    [InlineData("waa", "waa")]
     [InlineData("nhuw", "như")]
     public void Types_vietnamese_words(string keys, string expected) => Assert.Equal(expected, Type(keys));
 
