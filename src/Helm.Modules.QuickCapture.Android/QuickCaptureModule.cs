@@ -21,7 +21,7 @@ public sealed class QuickCaptureModule(ILogger<QuickCaptureModule> logger) : And
     /// <summary>Stable component names: Android remembers enabled states and pinned tiles by name.</summary>
     public const string ActivityName = "com.huyhung1404.helm.QuickCaptureActivity";
     public const string TileName = "com.huyhung1404.helm.QuickCaptureTile";
-    public const string AskHelmActivityName = "com.huyhung1404.helm.AskHelmActivity";
+    public const string AskHelmActivityName = Helm.Ai.Assistant.AskHelmContext.ActivityName;
     public const string AskHelmTileName = "com.huyhung1404.helm.AskHelmTile";
 
     public override string Id => ModuleId;

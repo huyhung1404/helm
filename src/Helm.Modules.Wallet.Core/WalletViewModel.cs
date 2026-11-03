@@ -32,6 +32,7 @@ public sealed partial class WalletViewModel : ObservableObject
     private readonly ILogger<WalletViewModel> _logger;
     private readonly DebtsViewModel? _debts;
     private readonly TimeZoneInfo _zone;
+    private readonly UnreadReading _reading;
     private readonly Dictionary<string, TransactionRow> _rows = new(StringComparer.Ordinal);
     private readonly Dictionary<string, CategoryEditRow> _categoryRows = new(StringComparer.Ordinal);
     private int _refreshQueued;
@@ -138,7 +139,8 @@ public sealed partial class WalletViewModel : ObservableObject
         ILogger<WalletViewModel> logger)
         // The phone's notification access and widget; none on Windows.
         : this(store, capture, settings, ui, dialogs, clipboard, services.GetService(typeof(IWalletPlatform)) as IWalletPlatform, logger, TimeZoneInfo.Local,
-            services.GetService(typeof(DebtsViewModel)) as DebtsViewModel, services.GetService(typeof(FundBook)) as FundBook)
+            services.GetService(typeof(DebtsViewModel)) as DebtsViewModel, services.GetService(typeof(FundBook)) as FundBook,
+            services.GetService(typeof(WalletNotificationAi)) as WalletNotificationAi)
     {
     }
 
@@ -153,7 +155,8 @@ public sealed partial class WalletViewModel : ObservableObject
         ILogger<WalletViewModel> logger,
         TimeZoneInfo zone,
         DebtsViewModel? debts = null,
-        FundBook? funds = null)
+        FundBook? funds = null,
+        WalletNotificationAi? notificationAi = null)
     {
         _store = store;
         _capture = capture;
@@ -165,6 +168,7 @@ public sealed partial class WalletViewModel : ObservableObject
         _logger = logger;
         _zone = zone;
         _debts = debts;
+        _reading = new UnreadReading(notificationAi, text => _ui.Post(() => Message = text), () => _ui.Post(() => { RefreshUnread(); Refresh(); }));
         _month = WalletFormat.MonthOf(store.Now, zone);
         TransactionPager = new ListPager(() => RefreshDays(Categories()), _settings.Current.TransactionsShown);
 
@@ -1232,9 +1236,8 @@ public sealed partial class WalletViewModel : ObservableObject
     private void RefreshUnread()
     {
         var today = WalletFormat.LocalDay(_store.Now, _zone);
-        var rows = _settings.Current.Unread
-            .Select(u => new UnreadRow(u, $"{WalletFormat.Day(WalletFormat.LocalDay(u.At, _zone), today)} {WalletFormat.Time(u.At, _zone)}", Copy))
-            .ToList();
+        var rows = _reading.Rows(_settings.Current.Unread,
+            u => $"{WalletFormat.Day(WalletFormat.LocalDay(u.At, _zone), today)} {WalletFormat.Time(u.At, _zone)}", Copy);
         Unread.Clear();
         foreach (var r in rows) Unread.Add(r);
         OnPropertyChanged(nameof(HasUnread));

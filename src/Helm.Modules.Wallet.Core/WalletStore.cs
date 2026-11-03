@@ -211,6 +211,34 @@ public sealed class WalletStore
         }
     }
 
+    /// <summary>
+    /// Fills in what a transaction was (Ask Helm, from what the user said): its category and/or description, each
+    /// only when given. Returns the transaction as it was, for Undo (<see cref="Restore"/>); null when it is gone.
+    /// </summary>
+    public WalletTransaction? Describe(string id, string? categoryId, string? description)
+    {
+        lock (_gate)
+        {
+            if (_transactions.Get(id) is not { } t) return null;
+            var updated = t;
+            if (categoryId is not null) updated = updated with { CategoryId = categoryId, AutoCategorized = false };
+            if (description is { Length: > 0 }) updated = updated with { Description = WalletLimits.Clip(description, WalletLimits.Description) };
+            _transactions.Upsert(id, updated);
+            return t;
+        }
+    }
+
+    /// <summary>Puts back a transaction's category and description as <see cref="Describe"/> found them.</summary>
+    public bool Restore(string id, string? categoryId, bool autoCategorized, string description)
+    {
+        lock (_gate)
+        {
+            if (_transactions.Get(id) is not { } t) return false;
+            _transactions.Upsert(id, t with { CategoryId = categoryId, AutoCategorized = autoCategorized, Description = description });
+            return true;
+        }
+    }
+
     /// <summary>Changes what the user can edit: amount, description, date, note.</summary>
     public bool Update(string id, decimal amount, string description, DateTimeOffset occurredAt, string note)
     {
@@ -250,7 +278,8 @@ public sealed class WalletStore
         var categories = Categories().Where(c => c.Fits(transaction.Amount)).ToList();
         if (categories.Count == 0 || count <= 0) return [];
         var words = WalletText.Words(transaction.Description);
-        var since = transaction.OccurredAt.AddDays(-120);
+        // A transaction not saved yet may have no time (the phone's "went out without a notification" asks this way).
+        var since = (transaction.OccurredAt == default ? Now : transaction.OccurredAt).AddDays(-120);
         var scores = new Dictionary<string, double>(StringComparer.Ordinal);
         foreach (var t in _transactions.All())
         {
@@ -269,23 +298,32 @@ public sealed class WalletStore
     }
 
     /// <summary>
-    /// The category of earlier transactions with the same description (the same words), when there were at least two
-    /// and all of them went in one category; null otherwise.
+    /// The category the history is sure of for a transaction with this description and amount (see
+    /// <see cref="WalletClassifier"/>: at least two earlier ones alike, nearly all in that category); null otherwise.
     /// </summary>
-    internal string? SureCategory(string description, decimal amount)
+    internal string? SureCategory(string description, decimal amount) =>
+        Guess(new WalletTransaction { Amount = amount, Description = description }) is { IsSure: true } guess ? guess.CategoryId : null;
+
+    /// <summary>What the history says about a transaction's category (sure or not); null when nothing is like it.</summary>
+    /// <param name="id">The transaction's own id, when it is saved (it does not vote for itself).</param>
+    public CategoryGuess? Guess(WalletTransaction transaction, string? id = null)
     {
-        var words = WalletText.Words(description);
-        if (words.Count == 0) return null;
-        string? found = null;
-        var count = 0;
-        foreach (var t in _transactions.All())
-        {
-            if (t.Value.CategoryId is not { } c || Math.Sign(t.Value.Amount) != Math.Sign(amount) || !words.SetEquals(WalletText.Words(t.Value.Description))) continue;
-            if (found is not null && found != c) return null;
-            found = c;
-            count++;
-        }
-        return count >= 2 && found is not null && Category(found) is { Hidden: false } info && info.Fits(amount) ? found : null;
+        // The categories are read once: the classifier looks one up per earlier transaction.
+        var categories = Categories(includeHidden: true).ToDictionary(c => c.Id, StringComparer.Ordinal);
+        return WalletClassifier.Guess(transaction, _transactions.All(), c => categories.GetValueOrDefault(c), id);
+    }
+
+    /// <summary>A few earlier filed transactions most like this one (for AI to see how the user files them), best first.</summary>
+    public IReadOnlyList<WalletTransaction> SimilarFiled(WalletTransaction transaction, int count)
+    {
+        var words = WalletText.Words(transaction.Description);
+        if (words.Count == 0) return [];
+        return _transactions.All().Select(t => t.Value)
+            .Where(t => t.CategoryId is not null && !ReferenceEquals(t, transaction) && Math.Sign(t.Amount) == Math.Sign(transaction.Amount))
+            .Select(t => (t, Score: WalletText.Similarity(words, WalletText.Words(t.Description))))
+            .Where(x => x.Score > 0)
+            .OrderByDescending(x => x.Score).ThenByDescending(x => x.t.OccurredAt)
+            .Take(count).Select(x => x.t).ToList();
     }
 
     /// <summary>Transactions still to categorize whose description is like this one's (for "the same for similar ones").</summary>

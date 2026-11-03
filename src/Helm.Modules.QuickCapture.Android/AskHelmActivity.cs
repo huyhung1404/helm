@@ -21,6 +21,8 @@ namespace Helm.Modules.QuickCapture;
 /// Ask Helm's card over whatever app is open, opened by its Quick Settings tile: it listens at once and shows the words
 /// as they come, sends them to the model picked in its header, then lists what it saved (each with Undo) or answers.
 /// Only a change Helm cannot take back waits for a yes. Native Android views, like Quick Capture: no Helm screen first.
+/// A tool may open it about one thing (<see cref="AskHelmContext"/>: Wallet's "what was it?"): the card shows that
+/// question, and the first turn carries it.
 /// </summary>
 [Activity(Name = QuickCaptureModule.AskHelmActivityName, Label = "Ask Helm", Exported = AskHelmBuild.Exported, ExcludeFromRecents = true,
     TaskAffinity = "", Theme = "@android:style/Theme.Translucent.NoTitleBar", LaunchMode = LaunchMode.SingleTask,
@@ -44,6 +46,8 @@ public sealed class AskHelmActivity : Activity, IRecognitionListener
     private Java.Lang.Runnable? _autoClose;
     private bool _listening;
     private bool _busy;
+    private AskHelmContext? _context;
+    private int _contextNotification;
 
     private TextView _model = null!;
     private TextView _question = null!;
@@ -73,7 +77,8 @@ public sealed class AskHelmActivity : Activity, IRecognitionListener
                 ShowProblem(problem);
                 return;
             }
-            _session = _assistant.Start([new PhoneTools(this)]);
+            ReadContext(Intent);
+            _session = _assistant.Start([new PhoneTools(this)], _context);
             Listen();
         }
         catch (Exception ex)
@@ -82,6 +87,35 @@ public sealed class AskHelmActivity : Activity, IRecognitionListener
             Toast.MakeText(this, $"Could not open Ask Helm: {ex.Message}", ToastLength.Long)?.Show();
             Finish();
         }
+    }
+
+    /// <summary>Opened again about something else while the card is up: a new conversation about that.</summary>
+    protected override void OnNewIntent(Intent? intent)
+    {
+        base.OnNewIntent(intent);
+        if (_assistant is null || _busy || intent?.GetStringExtra(AskHelmContext.ExtraPrompt) is not { Length: > 0 }) return;
+        _session?.End();
+        ReadContext(intent);
+        _session = _assistant.Start([new PhoneTools(this)], _context);
+        Listen();
+    }
+
+    /// <summary>What the card was opened about, if anything (<see cref="AskHelmContext"/>'s extras).</summary>
+    private void ReadContext(Intent? intent)
+    {
+        var prompt = intent?.GetStringExtra(AskHelmContext.ExtraPrompt);
+        _context = string.IsNullOrWhiteSpace(prompt) ? null
+            : new AskHelmContext(intent!.GetStringExtra(AskHelmContext.ExtraTitle) ?? "", prompt,
+                (intent.GetStringExtra(AskHelmContext.ExtraGroups) ?? "").Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries));
+        _contextNotification = intent?.GetIntExtra(AskHelmContext.ExtraNotification, 0) ?? 0;
+    }
+
+    /// <summary>The question the card was opened with, above what the user says (until they answer it).</summary>
+    private void ShowContext()
+    {
+        if (_context is not { Title.Length: > 0 } context) return;
+        _question.Text = context.Title;
+        _question.Visibility = ViewStates.Visible;
     }
 
     protected override void OnDestroy()
@@ -241,6 +275,7 @@ public sealed class AskHelmActivity : Activity, IRecognitionListener
             .PutExtra(RecognizerIntent.ExtraLanguage, "vi-VN")
             .PutExtra(RecognizerIntent.ExtraPartialResults, true);
         ClearResult();
+        ShowContext();
         _heard.Text = "";
         _heard.Hint = "Anh cứ nói…";
         _heard.SetHintTextColor(_colors.Secondary);
@@ -346,6 +381,13 @@ public sealed class AskHelmActivity : Activity, IRecognitionListener
         }
         if (IsFinishing || IsDestroyed) return;
         _mic.Visibility = ViewStates.Visible;
+        // The context was for the first turn; once the answer saved something, its notification has been answered too.
+        if (reply.Done.Count > 0 && _contextNotification != 0)
+        {
+            ((NotificationManager?)GetSystemService(NotificationService))?.Cancel(_contextNotification);
+            _contextNotification = 0;
+        }
+        _context = null;
         if (reply.Problem is { } problem) ShowProblem(problem, reply.Done);
         else ShowReply(reply);
     }

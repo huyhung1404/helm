@@ -107,13 +107,18 @@ public sealed class WalletCapture
 
     private void KeepUnread(BankSource bank, string? title, string? text, DateTimeOffset at)
     {
-        var entry = new UnreadNotification
+        KeepUnread(new UnreadNotification
         {
             At = at,
             Bank = bank.Name,
             Title = WalletLimits.Clip(title, 200),
             Text = WalletLimits.Clip(text, WalletLimits.Original),
-        };
+        });
+    }
+
+    /// <summary>Keeps a notification in the unread list (again: Undo of one read by AI puts it back).</summary>
+    internal void KeepUnread(UnreadNotification entry)
+    {
         _settings.Update(s =>
         {
             // The same notification shown again is kept once.
@@ -124,6 +129,10 @@ public sealed class WalletCapture
     }
 
     public void ClearUnread() => _settings.Update(s => s.Unread.Clear());
+
+    /// <summary>Takes one notification off the unread list (it was read after all).</summary>
+    public void ForgetUnread(UnreadNotification entry) =>
+        _settings.Update(s => s.Unread.RemoveAll(u => u.Text == entry.Text && u.Title == entry.Title && u.Bank == entry.Bank));
 
     /// <summary>"Try a notification" on the settings page: what Helm reads in a pasted text, in a few lines.</summary>
     public static (bool Ok, string Text) Try(BankSource bank, string text, DateTimeOffset now, TimeZoneInfo zone)
