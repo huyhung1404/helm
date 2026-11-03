@@ -63,6 +63,7 @@ public sealed class HelmAssistant(
         "tracker_lists", "tracker_tasks", "tracker_add_task", "tracker_complete_task", "tracker_start_task",
         "tracker_add_tasks",
         "notes_create", "notes_search", "notes_read",
+        "notes_add_important_day",
         "habits_list", "habit_report", "habit_check",
         "missions_list", "mission_get",
         "mission_create",
@@ -72,6 +73,7 @@ public sealed class HelmAssistant(
         "vocab_add_words", "vocab_words",
         "workspace_sessions",
         "workspace_send",
+        "ai_briefs", "ai_brief_undo", "ai_auto_jobs", "ai_auto_job_set",
     };
 
     /// <summary>Tools the phone itself adds (alarm, calendar, clipboard…) start with this.</summary>

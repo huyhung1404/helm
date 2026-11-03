@@ -85,6 +85,8 @@ public partial class App : Avalonia.Application
             // Started from a widget or a bank notification, Helm is in the background: the phone's slow poll.
             sync.Start(ActivityHost.Current is null ? SyncEngine.PhoneBackgroundPollInterval : SyncEngine.ForegroundPollInterval);
             services.GetRequiredService<AndroidUpdateService>().StartBackgroundChecks();
+            // A notification for each brief a Helm PC wrote by itself, as sync brings it (the morning brief…).
+            Helm.Modules.QuickCapture.AiBriefNotifications.Start(services, global::Android.App.Application.Context);
         }
         catch (Exception ex)
         {

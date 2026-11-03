@@ -25,7 +25,8 @@ public sealed class NotesMcpTools(NotesStore store, LinkHub? links = null) : IMc
                 ("query", McpArgs.Text("Words to look for in titles and text, all of them (accents and case do not matter)."), false),
                 ("any", McpArgs.List("Alternatives, any of which may be in the note: synonyms, Vietnamese and English, short phrases. Notes with more of them come first, the newer first among equals."), false),
                 ("limit", McpArgs.Number($"How many at most (default {DefaultLimit}, at most {MaxLimit})."), false),
-                ("trash", McpArgs.Flag("Search the trash instead (notes deleted in the last 30 days)."), false)),
+                ("trash", McpArgs.Flag("Search the trash instead (notes deleted in the last 30 days)."), false),
+                ("untitled", McpArgs.Flag("Only notes without a title of their own (the list shows their first line)."), false)),
             (args, _) => Task.FromResult<object?>(Search(args))) { ReadOnly = true },
         new("notes_read", "The full text of a note, with the tasks and people it is linked to.",
             McpArgs.Schema(("id", McpArgs.Text("The note's id (from notes_search)."), true)),
@@ -52,6 +53,26 @@ public sealed class NotesMcpTools(NotesStore store, LinkHub? links = null) : IMc
         new("notes_trash", "Move a note to the trash (the user can restore it for 30 days).",
             McpArgs.Schema(("id", McpArgs.Text("The note's id."), true)),
             (args, _) => Task.FromResult<object?>(Trash(McpArgs.RequiredString(args, "id")))),
+        new("notes_add_important_day",
+            $"Remember a day in the note “{ImportantDays.NoteTitle}”: every year (a birthday; a giỗ, often a lunar day) or one day only " +
+            "(a car inspection, an insurance or domain renewal, with its year). Helm reminds the user a few days before.",
+            McpArgs.Schema(
+                ("label", McpArgs.Text("What the day is, in the user's words, e.g. Sinh nhật mẹ, Giỗ ông nội, Đăng kiểm xe."), true),
+                ("date", McpArgs.Text("The day: 15/03 every year; 15/03/2027 or 2027-03-15 for that day only. A lunar day: its lunar day and month."), true),
+                ("lunar", McpArgs.Flag("The date is a lunar one (âm lịch), every year."), false)),
+            (args, _) => Task.FromResult<object?>(AddImportantDay(args)))
+        {
+            Undo = (result, _) => { RemoveImportantDay(result); return Task.CompletedTask; },
+        },
+        new("notes_retitle", "Give a note that has no title of its own a title and a few tags (#words on a last line of its text).",
+            McpArgs.Schema(
+                ("id", McpArgs.Text("The note's id."), true),
+                ("title", McpArgs.Text("The title, short, in the note's language."), true),
+                ("tags", McpArgs.List("A few tags, one or two words each, without #."), false)),
+            (args, _) => Task.FromResult<object?>(Retitle(args)))
+        {
+            Undo = (result, _) => { UndoRetitle(result); return Task.CompletedTask; },
+        },
         new("notes_link", "Link a note to a task (task_id from tracker_tasks), a person in the debt book (their name) or a mission (mission_id from missions_list). The link shows on both sides.",
             McpArgs.Schema(
                 ("id", McpArgs.Text("The note's id."), true),
@@ -67,6 +88,7 @@ public sealed class NotesMcpTools(NotesStore store, LinkHub? links = null) : IMc
         var limit = Math.Clamp(McpArgs.Int(args, "limit") ?? DefaultLimit, 1, MaxLimit);
         var terms = TextSearch.Terms(McpArgs.String(args, "query"));
         var notes = McpArgs.Bool(args, "trash") == true ? store.Trash() : store.Notes();
+        if (McpArgs.Bool(args, "untitled") == true) notes = [.. notes.Where(n => n.Value.Title.Trim().Length == 0)];
         if (terms.Count > 0) notes = [.. notes.Where(n => TextSearch.Score(terms, n.Value.DisplayTitle, n.Value.Body) > 0)];
         var any = McpArgs.Strings(args, "any");
         var found = any.Count > 0
@@ -141,6 +163,73 @@ public sealed class NotesMcpTools(NotesStore store, LinkHub? links = null) : IMc
         store.MoveToTrash(id);
         return new { id, trashed = true, restorable_days = NotesStore.TrashDays };
     }
+
+    private object AddImportantDay(JsonElement args)
+    {
+        var label = McpArgs.RequiredString(args, "label").Replace('\n', ' ').Trim();
+        if (label.Length == 0) throw new McpToolException("label is required.");
+        var date = McpArgs.RequiredString(args, "date");
+        var (day, month, year) = ImportantDays.ParseDate(date) ?? throw new McpToolException($"{date} is not a day like 15/03, 15/03/2027 or 2027-03-15.");
+        var lunar = McpArgs.Bool(args, "lunar") == true;
+        var line = new ImportantDay(day, month, lunar ? null : year, lunar, label).Line();
+        var existing = store.Notes().FirstOrDefault(n => string.Equals(n.Value.Title.Trim(), ImportantDays.NoteTitle, StringComparison.CurrentCultureIgnoreCase));
+        if (existing is null) return new { id = store.Add(ImportantDays.NoteTitle, line), line, created = true };
+        var note = existing.Value;
+        if (note.Body.Split('\n').Any(l => l.Trim() == line)) return new { id = existing.Id, line, created = false, already = true };
+        var body = note.Body.Trim().Length == 0 ? line : note.Body.TrimEnd('\n') + "\n" + line;
+        if (note.Title.Length + body.Length > NoteItem.MaxLength) throw new McpToolException($"A note holds at most {NoteItem.MaxLength} characters.");
+        store.Save(existing.Id, note.Title, body, note.Rev);
+        return new { id = existing.Id, line, created = false };
+    }
+
+    /// <summary>Takes the day's line out again (a note made for it goes to the trash).</summary>
+    private void RemoveImportantDay(JsonElement result)
+    {
+        if (result.TryGetProperty("already", out var already) && already.ValueKind == JsonValueKind.True) return;
+        var id = result.GetProperty("id").GetString()!;
+        var line = result.GetProperty("line").GetString()!;
+        if (store.Get(id) is not { Trashed: false } note) return;
+        var lines = note.Body.Split('\n').ToList();
+        var at = lines.FindLastIndex(l => l.Trim() == line);
+        if (at < 0) return;
+        lines.RemoveAt(at);
+        var body = string.Join("\n", lines);
+        if (result.TryGetProperty("created", out var created) && created.ValueKind == JsonValueKind.True && body.Trim().Length == 0) store.MoveToTrash(id);
+        else store.Save(id, note.Title, body, note.Rev);
+    }
+
+    private object Retitle(JsonElement args)
+    {
+        var id = McpArgs.RequiredString(args, "id");
+        var note = store.Get(id) ?? throw new McpToolException($"There is no note {id}.");
+        if (note.Trashed) throw new McpToolException("The note is in the trash.");
+        if (note.Title.Trim().Length > 0) throw new McpToolException($"The note has a title already: {note.Title}.");
+        var title = NoteText.Shorten(McpArgs.RequiredString(args, "title").Replace('\n', ' ').Trim(), 80);
+        if (title.Length == 0) throw new McpToolException("title is required.");
+        var tags = McpArgs.Strings(args, "tags").Select(Tag).Where(t => t.Length > 1).Distinct(StringComparer.Ordinal).Take(5).ToList();
+        var tagLine = string.Join(" ", tags);
+        var body = tagLine.Length == 0 ? note.Body : note.Body.TrimEnd('\n') + "\n" + tagLine;
+        if (title.Length + body.Length > NoteItem.MaxLength) throw new McpToolException($"A note holds at most {NoteItem.MaxLength} characters.");
+        var saved = store.Save(id, title, body, note.Rev);
+        if (saved.Outcome != NoteSaveOutcome.Saved) throw new McpToolException("The note changed meanwhile; it was left as it is.");
+        return new { id, title, tags = tagLine };
+    }
+
+    /// <summary>The title goes, and the tag line with it, unless the user has given the note another title since.</summary>
+    private void UndoRetitle(JsonElement result)
+    {
+        var id = result.GetProperty("id").GetString()!;
+        var title = result.GetProperty("title").GetString()!;
+        var tags = result.TryGetProperty("tags", out var t) ? t.GetString() ?? "" : "";
+        if (store.Get(id) is not { Trashed: false } note || note.Title != title) return;
+        var lines = note.Body.Split('\n').ToList();
+        if (tags.Length > 0 && lines.Count > 0 && lines[^1].Trim() == tags) lines.RemoveAt(lines.Count - 1);
+        store.Save(id, "", string.Join("\n", lines), note.Rev);
+    }
+
+    /// <summary>"Công việc" → "#công-việc".</summary>
+    private static string Tag(string text) =>
+        "#" + string.Join("-", text.Trim().ToLowerInvariant().Split([' ', '\t', '#', ','], StringSplitOptions.RemoveEmptyEntries));
 
     private object Link(JsonElement args)
     {

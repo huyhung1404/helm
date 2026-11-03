@@ -104,7 +104,8 @@ public sealed class VocabQuickAnalyzer(VocabStore store, IAiText ai)
             The save call's arguments (JSON Schema), with "id" the word itself:
             {VocabMcpTools.SaveSchema().ToJsonString()}{parts}
             """;
-        return new AiTextRequest(Feature, SystemPrompt, prompt);
+        // The source file may have CRLF line ends (eol=crlf on checkout): the prompt always has plain ones.
+        return new AiTextRequest(Feature, SystemPrompt, prompt.ReplaceLineEndings("\n"));
     }
 
     /// <summary>The answer as an analysis.</summary>

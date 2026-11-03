@@ -25,6 +25,29 @@ public static class AiFeatureIds
 
     /// <summary>Tracker: steps proposed for a big task, tasks proposed from a note.</summary>
     public const string TaskProposals = "task-proposals";
+
+    // Jobs a Helm PC runs by itself on its agents (Helm.Ai.Auto.AutoJobCatalog): each brief reaches the phone.
+
+    /// <summary>P3: the morning brief (today's tasks, habits to do, yesterday's spending).</summary>
+    public const string MorningBrief = "morning-brief";
+
+    /// <summary>P4: the evening review (done, slipping to tomorrow, one suggestion).</summary>
+    public const string EveningReview = "evening-review";
+
+    /// <summary>P5: habit coaching from the reasons given for skipped days.</summary>
+    public const string HabitCoach = "habit-coach";
+
+    /// <summary>W3: the week's and the month's spending.</summary>
+    public const string SpendingDigest = "spending-digest";
+
+    /// <summary>D2: birthdays, giỗ and renewals, a few days before.</summary>
+    public const string ImportantDays = "important-days";
+
+    /// <summary>O2: a title and tags for new notes without a title.</summary>
+    public const string NoteTitles = "note-titles";
+
+    /// <summary>O5: what to keep or drop in Scratch (suggestions only).</summary>
+    public const string ScratchTidy = "scratch-tidy";
 }
 
 /// <summary>Where a feature's calls may run: Claude Code on a Helm PC (the user's plan, no cost per call) or the API.</summary>
@@ -61,6 +84,9 @@ public sealed class AiFeatureChoice
     /// <summary>The feature stops for the day once the API calls it made today cost this much (USD, estimated).</summary>
     public decimal DailyCapUsd { get; set; } = 0.5m;
 
+    /// <summary>A job that runs by itself: its local time of day, "07:00" (null: the job's own default).</summary>
+    public string? At { get; set; }
+
     public AiFeatureChoice Copy() => (AiFeatureChoice)MemberwiseClone();
 }
 
@@ -76,7 +102,7 @@ public sealed class AiFeatureSettings : IVersionedSettings
     public Dictionary<string, AiFeatureChoice> Features { get; set; } = [];
 
     /// <summary>The choice for <paramref name="feature"/>, or its default when none was made yet.</summary>
-    public AiFeatureChoice For(string feature) => Features.TryGetValue(feature, out var choice) ? choice : new AiFeatureChoice();
+    public AiFeatureChoice For(string feature) => Features.TryGetValue(feature, out var choice) ? choice : Auto.AutoJobCatalog.DefaultChoice(feature);
 }
 
 public static class ClaudeModels

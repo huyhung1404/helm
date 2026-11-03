@@ -9,7 +9,8 @@ namespace Helm.Modules.Wallet;
 /// transaction was (its category and description, after Helm asked). Nothing is
 /// ever deleted through here. Dates are the user's local ones: "2026-10-01" or "2026-10-01T18:00".
 /// </summary>
-public sealed class WalletMcpTools(DebtBook book, WalletStore store) : IMcpToolProvider
+/// <param name="funds">The funds, for <c>wallet_funds</c> (left out: no such tool).</param>
+public sealed class WalletMcpTools(DebtBook book, WalletStore store, FundBook? funds = null) : IMcpToolProvider
 {
     public string? ModuleId => WalletIds.ModuleId;
 
@@ -62,7 +63,27 @@ public sealed class WalletMcpTools(DebtBook book, WalletStore store) : IMcpToolP
                 ("from", McpArgs.Text("The first day, e.g. 2026-11-01. Left out: the first day of this month."), false),
                 ("to", McpArgs.Text("The last day, e.g. 2026-11-30. Left out: today."), false)),
             (args, _) => Task.FromResult<object?>(Summary(args))) { ReadOnly = true },
+        .. funds is null ? Array.Empty<McpTool>() :
+        [
+            new("wallet_funds", "This month's funds (money set aside per category): what each held, spent, has left, and whether it runs low, is used up or over.",
+                McpTool.NoArguments(), (_, _) => Task.FromResult<object?>(Funds(funds))) { ReadOnly = true },
+        ],
     ];
+
+    private object Funds(FundBook book)
+    {
+        var zone = TimeZoneInfo.Local;
+        var month = WalletFormat.MonthOf(store.Now, zone);
+        return book.States(store.Transactions(), month, store.Now, zone).Select(s => new
+        {
+            fund = s.Fund.Name,
+            held = s.Budget,
+            spent = s.Spent,
+            left = s.Left,
+            status = s.Status switch { FundStatus.Low => "low", FundStatus.UsedUp => "used up", FundStatus.Over => "over", _ => "on track" },
+            runsOutOn = s.RunsOutOn?.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture),
+        }).ToList();
+    }
 
     private object Summary(JsonElement args)
     {
