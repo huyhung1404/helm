@@ -1,3 +1,5 @@
+using System.Collections.Concurrent;
+using Helm.Core.Mcp;
 using Helm.Core.Sync;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -91,12 +93,18 @@ public static class AgentJobs
 /// <summary>
 /// An agent on another Helm device (the user's PC), reached through Helm Sync. A turn waits only <c>wait</c> for the
 /// PC to claim it; once claimed it waits for the result and never falls back to the API, so nothing is done twice.
+/// With two PCs online, a conversation stays on the PC that took its first turn (its chat is there), and Undo goes to
+/// the PC that made the record (<see cref="AiJobAction.Worker"/>).
 /// </summary>
 public sealed class SyncAgentRoute(ISyncedCollection<AiJobRecord> jobs, ISyncedCollection<AiWorkerRecord> workers, Func<string> self,
     SyncEngine? engine = null, TimeProvider? time = null) : IAgentRoute
 {
     private readonly TimeProvider _time = time ?? TimeProvider.System;
-    private string? _lastWorker;
+
+    /// <summary>The worker (device id) each conversation's turns go to, from the first turn a PC took.</summary>
+    private readonly ConcurrentDictionary<string, string> _workers = new(StringComparer.Ordinal);
+
+    private readonly LiveLease _live = engine is { } e ? new LiveLease(() => e.IsLive, e.SetLive, e.RequestSyncSoon) : LiveLease.None;
 
     public string Device => Best()?.Value.Device ?? "Helm PC";
 
@@ -109,15 +117,14 @@ public sealed class SyncAgentRoute(ISyncedCollection<AiJobRecord> jobs, ISyncedC
 
     public async Task<AiJobResult> RunAsync(AiJob job, TimeSpan wait, CancellationToken ct)
     {
-        var worker = Best() ?? throw new AiRouteException(Unavailable() ?? "No Helm PC online.");
-        _lastWorker = worker.Id;
+        var worker = WorkerFor(job.ConversationId);
         var now = _time.GetUtcNow();
         var id = jobs.Add(new AiJobRecord
         {
             To = worker.Id, From = self(), Job = job, ConversationId = job.ConversationId,
             ClaimBy = now + wait, CreatedAt = now,
         });
-        using var live = KeepLive();
+        using var live = _live.Hold();
         Clean();
         AiJobRecord? claimed;
         try
@@ -135,6 +142,8 @@ public sealed class SyncAgentRoute(ISyncedCollection<AiJobRecord> jobs, ISyncedC
             Cancel(id);
             throw new AiRouteException($"{worker.Value.Device} did not take it within {wait.TotalSeconds:0} s.");
         }
+        // Its chat is on that PC now: the conversation's next turns, and its end, go there.
+        _workers[job.ConversationId] = worker.Id;
         // Taken: from here on the turn is the PC's, whatever happens. It never falls back to the API.
         AiJobRecord? finished;
         try
@@ -150,7 +159,11 @@ public sealed class SyncAgentRoute(ISyncedCollection<AiJobRecord> jobs, ISyncedC
         jobs.Delete(id);
         return finished switch
         {
-            { State: AgentJobs.Done, Result: { } result } => result,
+            { State: AgentJobs.Done, Result: { } result } => result with
+            {
+                Done = [.. result.Done.Select(a => a with { Worker = worker.Id })],
+                Device = worker.Value.Device,
+            },
             { State: AgentJobs.Failed } failed => throw new AiRouteTakenException(failed.Error ?? $"{worker.Value.Device} could not do it."),
             _ => throw new AiRouteTakenException(
                 $"{worker.Value.Device} took it but did not finish within {AgentJobs.AfterClaim.TotalSeconds:0} s: look on the PC whether it was done."),
@@ -163,12 +176,25 @@ public sealed class SyncAgentRoute(ISyncedCollection<AiJobRecord> jobs, ISyncedC
         if (jobs.Get(id) is { State: AgentJobs.Queued or AgentJobs.Claimed } open) jobs.Upsert(id, open with { State = AgentJobs.Cancelled });
     }
 
+    /// <summary>
+    /// The PC a turn goes to: the one that has the conversation, else the best online. A conversation whose PC is gone
+    /// or busy now gives way (the API carries on with what was said), rather than start over on another PC.
+    /// </summary>
+    private SyncedItem<AiWorkerRecord> WorkerFor(string conversationId)
+    {
+        if (!_workers.TryGetValue(conversationId, out var kept))
+            return Best() ?? throw new AiRouteException(Unavailable() ?? "No Helm PC online.");
+        return Online().FirstOrDefault(w => w.Id == kept && w.Value.Problem is null)
+            ?? throw new AiRouteException("The Helm PC that has this conversation cannot take it now.");
+    }
+
     public async Task UndoAsync(AiJobAction action, CancellationToken ct)
     {
-        var to = _lastWorker ?? Best()?.Id ?? throw new AiRouteException("No Helm PC online to undo it.");
+        // Where the record was made: it may not have synced anywhere else yet.
+        var to = action.Worker ?? Best()?.Id ?? throw new AiRouteException("No Helm PC online to undo it.");
         var now = _time.GetUtcNow();
         var id = jobs.Add(new AiJobRecord { Kind = AgentJobs.Undo, To = to, From = self(), Action = action, ClaimBy = now + TimeSpan.FromSeconds(30), CreatedAt = now });
-        using var live = KeepLive();
+        using var live = _live.Hold();
         var done = await WaitForAsync(id, r => r.State is AgentJobs.Done or AgentJobs.Failed, TimeSpan.FromSeconds(30), ct);
         jobs.Delete(id);
         if (done?.State != AgentJobs.Done) throw new AiRouteException(done?.Error ?? "The PC did not undo it in time.");
@@ -176,7 +202,7 @@ public sealed class SyncAgentRoute(ISyncedCollection<AiJobRecord> jobs, ISyncedC
 
     public void End(string conversationId)
     {
-        if (_lastWorker is not { } to) return;
+        if (!_workers.TryRemove(conversationId, out var to)) return;
         var now = _time.GetUtcNow();
         jobs.Add(new AiJobRecord { Kind = AgentJobs.End, To = to, From = self(), ConversationId = conversationId, ClaimBy = now + TimeSpan.FromMinutes(5), CreatedAt = now });
     }
@@ -222,16 +248,6 @@ public sealed class SyncAgentRoute(ISyncedCollection<AiJobRecord> jobs, ISyncedC
         }
     }
 
-    /// <summary>A phone keeps sync's live channel open while it waits, so the answer arrives within a moment.</summary>
-    private IDisposable KeepLive()
-    {
-        if (engine is null) return new Nothing();
-        var was = engine.IsLive;
-        engine.SetLive(true);
-        engine.RequestSyncSoon();
-        return new Restore(() => { if (!was) engine.SetLive(false); });
-    }
-
     /// <summary>The asker clears away its own old jobs.</summary>
     private void Clean()
     {
@@ -239,15 +255,48 @@ public sealed class SyncAgentRoute(ISyncedCollection<AiJobRecord> jobs, ISyncedC
         var me = self();
         foreach (var old in jobs.All().Where(j => j.Value.From == me && now - j.Value.CreatedAt > AgentJobs.KeepFor).ToList()) jobs.Delete(old.Id);
     }
+}
 
-    private sealed class Nothing : IDisposable
+/// <summary>
+/// A phone keeps sync's live channel open while it waits for a PC, so the answer arrives within a moment. Waits may
+/// overlap (a turn and an Undo): the channel goes back to how it was only when the last of them ends.
+/// </summary>
+internal sealed class LiveLease(Func<bool> isLive, Action<bool> setLive, Action syncSoon)
+{
+    public static readonly LiveLease None = new(() => true, _ => { }, () => { });
+
+    private readonly object _gate = new();
+    private int _holders;
+    private bool _was;
+
+    public IDisposable Hold()
     {
-        public void Dispose() { }
+        lock (_gate)
+        {
+            if (_holders++ == 0)
+            {
+                _was = isLive();
+                if (!_was) setLive(true);
+            }
+        }
+        syncSoon();
+        return new Release(this);
     }
 
-    private sealed class Restore(Action action) : IDisposable
+    private void Leave()
     {
-        public void Dispose() => action();
+        lock (_gate)
+            if (--_holders == 0 && !_was) setLive(false);
+    }
+
+    private sealed class Release(LiveLease lease) : IDisposable
+    {
+        private int _done;
+
+        public void Dispose()
+        {
+            if (Interlocked.Exchange(ref _done, 1) == 0) lease.Leave();
+        }
     }
 }
 
@@ -368,7 +417,7 @@ public sealed class AgentJobWorker(ISyncedCollection<AiJobRecord> jobs, ISyncedC
         catch (Exception ex)
         {
             _logger.LogWarning(ex, "Agent job {Kind} failed", job.Kind);
-            jobs.Upsert(id, job with { State = AgentJobs.Failed, Error = ex is AiRouteException ? ex.Message : $"It failed on {device}: {ex.Message}" });
+            jobs.Upsert(id, job with { State = AgentJobs.Failed, Error = ex is AiRouteException or McpToolException ? ex.Message : $"It failed on {device}: {ex.Message}" });
         }
         finally
         {

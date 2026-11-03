@@ -61,8 +61,8 @@ internal sealed class AgentRegistry : IAgentRoute, IDisposable
     private readonly ILoggerFactory _loggers;
     private readonly Helm.Ai.Prompts.IAiPrompts? _prompts;
     private readonly object _gate = new();
-    private List<(AgentProfile Profile, IAssistantChatFactory Factory, Func<string?> Unavailable, LocalAgentRoute Route)> _agents = [];
-    private AgentChain _chain = new([]);
+    private IReadOnlyList<Agent> _agents = [];
+    private readonly AgentChain _chain = new([]);
     private FileSystemWatcher? _signIns;
     private Timer? _settle;
 
@@ -106,7 +106,7 @@ internal sealed class AgentRegistry : IAgentRoute, IDisposable
         lock (_gate)
         {
             var agent = _agents.FirstOrDefault(a => a.Profile.Id == profile.Id);
-            return agent.Unavailable?.Invoke() is { } why ? why : agent.Factory is null ? "Off" : "Ready";
+            return agent?.Unavailable() is { } why ? why : agent is null ? "Off" : "Ready";
         }
     }
 
@@ -238,32 +238,46 @@ internal sealed class AgentRegistry : IAgentRoute, IDisposable
         }
     }
 
+    /// <summary>
+    /// Follows the user's list (<see cref="AgentRoster"/>): an agent whose profile (id and kind) is still on keeps its
+    /// route, its conversations and its limits; a rename only renames it, a new order only reorders.
+    /// </summary>
     private void Build()
     {
-        List<(AgentProfile, IAssistantChatFactory, Func<string?>, LocalAgentRoute)> agents = [];
-        foreach (var profile in _store.Current.Agents.Where(p => p.Enabled))
-        {
-            var home = Home(profile.Id);
-            var logger = _loggers.CreateLogger("Helm.App.Ai." + profile.Kind);
-            (IAssistantChatFactory Factory, Func<string?> Unavailable)? made = profile.Kind switch
-            {
-                AgentKinds.Codex => new CodexAgentFactory(_launcher, home, logger) is var codex ? (codex, codex.Unavailable) : null,
-                AgentKinds.ClaudeCode => new ClaudeCodeAgentFactory(_launcher, home, logger) is var claude ? (claude, claude.Unavailable) : null,
-                AgentKinds.Grok => new GrokAgentFactory(_launcher, home, logger) is var grok ? (grok, grok.Unavailable) : null,
-                _ => null,
-            };
-            if (made is not { } m) continue;
-            agents.Add((profile, m.Factory, m.Unavailable,
-                new LocalAgentRoute(Environment.MachineName, profile.Name, m.Factory, _tools, _isToolOn, m.Unavailable, prompts: _prompts)));
-        }
-        List<(AgentProfile Profile, IAssistantChatFactory Factory, Func<string?> Unavailable, LocalAgentRoute Route)> old;
+        IReadOnlyList<Agent> gone;
         lock (_gate)
         {
-            old = _agents;
-            _agents = agents;
-            _chain = new AgentChain([.. agents.Select(a => a.Item4)]);
+            var (now, left) = AgentRoster.Follow(_agents, _store.Current.Agents.Where(p => p.Enabled),
+                (a, p) => a.Profile.Id == p.Id && a.Profile.Kind == p.Kind,
+                (a, p) =>
+                {
+                    a.Route.AgentName = p.Name;
+                    return a with { Profile = p };
+                },
+                Make);
+            _agents = now;
+            _chain.Use([.. now.Select(a => a.Route)]);
+            gone = left;
         }
-        foreach (var agent in old) agent.Route.Dispose();
+        foreach (var agent in gone) agent.Route.Dispose();
         Changed?.Invoke(this, EventArgs.Empty);
     }
+
+    private Agent? Make(AgentProfile profile)
+    {
+        var home = Home(profile.Id);
+        var logger = _loggers.CreateLogger("Helm.App.Ai." + profile.Kind);
+        (IAssistantChatFactory Factory, Func<string?> Unavailable)? made = profile.Kind switch
+        {
+            AgentKinds.Codex => new CodexAgentFactory(_launcher, home, logger) is var codex ? (codex, codex.Unavailable) : null,
+            AgentKinds.ClaudeCode => new ClaudeCodeAgentFactory(_launcher, home, logger) is var claude ? (claude, claude.Unavailable) : null,
+            AgentKinds.Grok => new GrokAgentFactory(_launcher, home, logger) is var grok ? (grok, grok.Unavailable) : null,
+            _ => null,
+        };
+        if (made is not { } m) return null;
+        return new Agent(profile, m.Factory, m.Unavailable,
+            new LocalAgentRoute(Environment.MachineName, profile.Name, m.Factory, _tools, _isToolOn, m.Unavailable, prompts: _prompts));
+    }
+
+    private sealed record Agent(AgentProfile Profile, IAssistantChatFactory Factory, Func<string?> Unavailable, LocalAgentRoute Route);
 }

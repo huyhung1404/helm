@@ -19,7 +19,11 @@ public sealed record AiJob(
 }
 
 /// <summary>A change Claude Code made with one of Helm's tools on the PC, with the tool's result (for Undo).</summary>
-public sealed record AiJobAction(string Tool, string Summary, string ResultJson);
+public sealed record AiJobAction(string Tool, string Summary, string ResultJson)
+{
+    /// <summary>The Helm PC (its sync device id) that made it, where its Undo goes; null when it was made on this device.</summary>
+    public string? Worker { get; init; }
+}
 
 /// <summary>A phone tool Claude Code asked for (alarm, calendar…): the phone runs it when the result arrives.</summary>
 public sealed record AiJobPhoneAction(string Tool, string ArgumentsJson, string Summary);
@@ -29,6 +33,9 @@ public sealed record AiJobResult(string Text, IReadOnlyList<AiJobAction> Done, I
 {
     /// <summary>The agent that ran it ("Codex", "Claude Code").</summary>
     public string? Agent { get; init; }
+
+    /// <summary>The Helm PC that ran it, as the user knows it, when it ran through sync (one of several PCs).</summary>
+    public string? Device { get; init; }
 }
 
 /// <summary>The agent could not take or finish the job in time; the router tries the next way.</summary>
