@@ -36,6 +36,13 @@ public partial class VocabContentPage : UserControl, IFullPage
         InitializeComponent();
         // Holding a part of a word's outline offers to make that part one of the words.
         TreeNodeHold.Attach(this);
+        LearnBar.PropertyChanged += OnBarChanged;
+        PracticeBar.PropertyChanged += OnBarChanged;
+    }
+
+    private void OnBarChanged(object? sender, AvaloniaPropertyChangedEventArgs e)
+    {
+        if (e.Property == IsVisibleProperty) UpdateBodyMargin();
     }
 
     // Pages are transient and the module is a singleton: listen only while shown.
@@ -155,6 +162,18 @@ public partial class VocabContentPage : UserControl, IFullPage
         HomeBar.IsVisible = Tabs.IsVisible = !word && !family;
         WordBar.IsVisible = word;
         FamilyBar.IsVisible = family;
+        UpdateBodyMargin();
+    }
+
+    /// <summary>
+    /// The design's padding around the content: 6 16 24 under the tabs, 12 on top of a word's or a family's page; over
+    /// an answer bar the design pads 104 under a bar 83 high, so 21 here, where the bar takes its own room.
+    /// </summary>
+    private void UpdateBodyMargin()
+    {
+        var page = WordBar.IsVisible || FamilyBar.IsVisible;
+        var bar = LearnBar.IsVisible || PracticeBar.IsVisible;
+        Body.Margin = new Thickness(16, page ? 12 : 6, 16, bar ? 21 : 24);
     }
 
     private void ScrollToTop() => Dispatcher.UIThread.Post(() => MainScroll.Offset = default);

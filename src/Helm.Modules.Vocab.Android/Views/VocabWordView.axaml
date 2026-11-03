@@ -1,6 +1,5 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-             xmlns:ic="using:FluentIcons.Avalonia"
              xmlns:sys="using:System"
              xmlns:vm="using:Helm.Modules.Vocab"
              xmlns:local="using:Helm.Modules.Vocab"
@@ -8,30 +7,33 @@
              x:DataType="vm:VocabWordDetailViewModel">
 
     <!-- A word's own page (it takes the whole tab; the app bar has back, Previous, Next and ⋯): the word with its
-         reading, meaning, how well it is known and its labels, Listen / YouGlish / Edit, then the collapsible sections. -->
+         reading, meaning, how well it is known and its labels, Listen / YouGlish / Edit, then the collapsible sections.
+         12 between the two cards. -->
     <StackPanel Spacing="12">
+        <!-- Padding 16, 6 between its lines -->
         <Border Classes="card" Padding="16">
             <StackPanel Spacing="6">
                 <WrapPanel>
-                    <TextBlock Text="{Binding Word.Text}" FontSize="34" FontWeight="SemiBold" Margin="0,0,10,0" />
-                    <TextBlock Text="{Binding Word.Traditional}" FontSize="20" Foreground="{DynamicResource HelmSecondaryText}" VerticalAlignment="Bottom" Margin="0,0,0,4"
+                    <TextBlock Text="{Binding Word.Text}" FontSize="34" FontWeight="SemiBold" LineHeight="37.4" VerticalAlignment="Bottom" />
+                    <TextBlock Text="{Binding Word.Traditional}" FontSize="20" Foreground="{DynamicResource HelmSecondaryText}" VerticalAlignment="Bottom" Margin="10,0,0,1"
                                IsVisible="{Binding ShowTraditional}" />
                 </WrapPanel>
                 <WrapPanel>
-                    <TextBlock local:ToneText.Text="{Binding Word.Phonetic}" FontSize="17" Margin="0,0,10,0" VerticalAlignment="Center" />
-                    <TextBlock Text="{Binding Word.HanViet}" Foreground="{DynamicResource HelmSecondaryText}" FontWeight="SemiBold" VerticalAlignment="Center"
+                    <TextBlock local:ToneText.Text="{Binding Word.Phonetic}" FontSize="17" VerticalAlignment="Center" />
+                    <TextBlock Text="{Binding Word.HanViet}" Foreground="{DynamicResource HelmSecondaryText}" FontWeight="SemiBold" VerticalAlignment="Center" Margin="10,0,0,0"
                                IsVisible="{Binding HasHanViet}" />
                 </WrapPanel>
                 <TextBlock Text="{Binding Word.Meaning}" FontSize="18" TextWrapping="Wrap" Margin="0,2,0,0" />
                 <TextBlock Text="{Binding Word.Explanation}" Classes="hint" FontSize="14" IsVisible="{Binding HasExplanation}" />
                 <TextBlock Text="{Binding Word.Note, StringFormat='Your note: {0}'}" Classes="hint" FontStyle="Italic" IsVisible="{Binding HasNote}" />
+                <!-- Not in the design: the sentence of a pasted text it came from -->
                 <TextBlock Text="{Binding Word.SourceSentence, StringFormat='From the text: {0}'}" Classes="hint" FontStyle="Italic" TextWrapping="Wrap" IsVisible="{Binding HasSourceSentence}" />
 
                 <StackPanel Orientation="Horizontal" Spacing="8" Margin="0,4,0,0" IsVisible="{Binding !IsPending}">
                     <ItemsControl ItemsSource="{Binding Dots}" VerticalAlignment="Center">
                         <ItemsControl.ItemsPanel>
                             <ItemsPanelTemplate>
-                                <StackPanel Orientation="Horizontal" />
+                                <StackPanel Orientation="Horizontal" Spacing="3" />
                             </ItemsPanelTemplate>
                         </ItemsControl.ItemsPanel>
                         <ItemsControl.ItemTemplate>
@@ -43,7 +45,7 @@
                     <TextBlock Text="{Binding LevelText}" Classes="hint" FontSize="12" VerticalAlignment="Center" />
                 </StackPanel>
 
-                <!-- Its labels, the user's tags, and what Helm noticed -->
+                <!-- Its labels, the user's tags, and what Helm noticed: 6 apart -->
                 <WrapPanel>
                     <Border Classes="tag" Margin="0,0,6,6" IsVisible="{Binding Word.Level, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
                         <TextBlock Text="{Binding Word.Level}" />
@@ -81,30 +83,31 @@
                         <TextBlock Text="Waiting for analysis" />
                     </Border>
                 </WrapPanel>
-                <TextBlock Classes="hint" FontSize="12" IsVisible="{Binding IsHard}"
+                <TextBlock Classes="hint" FontSize="12" Margin="0,-6,0,0" IsVisible="{Binding IsHard}"
                            Text="You keep forgetting it: Claude Code on your PC writes a new way to remember it." />
                 <Border Classes="infobar" IsVisible="{Binding IsPending}" Margin="0,2,0,0">
                     <TextBlock Text="{Binding PendingText}" TextWrapping="Wrap" />
                 </Border>
 
-                <UniformGrid Rows="1" Margin="-4,8,-4,0" Classes="sm">
-                    <Button Classes="tall" HorizontalAlignment="Stretch" Margin="4,0" Command="{Binding SayWordCommand}" IsVisible="{Binding CanSay}"
+                <!-- Listen · YouGlish · Edit: .btn.sm in three equal columns, 8 apart, 8 below the labels -->
+                <UniformGrid Rows="1" Margin="-4,2,-4,0" Classes="sm">
+                    <Button Classes="tall sm" HorizontalAlignment="Stretch" Margin="4,0" Command="{Binding SayWordCommand}" IsVisible="{Binding CanSay}"
                             AutomationProperties.Name="Listen">
-                        <StackPanel Orientation="Horizontal" Spacing="6">
-                            <ic:SymbolIcon Symbol="Speaker2" FontSize="18" />
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                            <local:LineIcon Kind="Speaker" Size="18" VerticalAlignment="Center" />
                             <TextBlock Text="Listen" VerticalAlignment="Center" />
                         </StackPanel>
                     </Button>
-                    <Button Classes="tall" HorizontalAlignment="Stretch" Margin="4,0" Command="{Binding YouGlishCommand}" IsVisible="{Binding ShowYouGlish}"
+                    <Button Classes="tall sm" HorizontalAlignment="Stretch" Margin="4,0" Command="{Binding YouGlishCommand}" IsVisible="{Binding ShowYouGlish}"
                             AutomationProperties.Name="YouGlish">
-                        <StackPanel Orientation="Horizontal" Spacing="6">
-                            <ic:SymbolIcon Symbol="VideoClip" FontSize="18" />
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                            <local:LineIcon Kind="Video" Size="18" VerticalAlignment="Center" />
                             <TextBlock Text="YouGlish" VerticalAlignment="Center" />
                         </StackPanel>
                     </Button>
-                    <Button Classes="tall" HorizontalAlignment="Stretch" Margin="4,0" Command="{Binding Editor.BeginCommand}" AutomationProperties.Name="Edit the word">
-                        <StackPanel Orientation="Horizontal" Spacing="6">
-                            <ic:SymbolIcon Symbol="Edit" FontSize="18" />
+                    <Button Classes="tall sm" HorizontalAlignment="Stretch" Margin="4,0" Command="{Binding Editor.BeginCommand}" AutomationProperties.Name="Edit the word">
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                            <local:LineIcon Kind="Edit" Size="18" VerticalAlignment="Center" />
                             <TextBlock Text="Edit" VerticalAlignment="Center" />
                         </StackPanel>
                     </Button>
@@ -112,25 +115,27 @@
             </StackPanel>
         </Border>
 
-        <!-- The sections; the first one's hairline hides under the card's edge -->
+        <!-- The sections (padding 0 16 4); the first one's hairline is clipped away, as the design leaves it out -->
         <Border Classes="card" Padding="16,0,16,4">
-            <StackPanel Margin="0,-1,0,0">
-                <local:VocabSection Classes="py" Title="Remembering the pinyin" Key="word.pinyin" IsVisible="{Binding Info.HasPinyinMnemonic}">
-                    <TextBlock Text="{Binding Info.PinyinMnemonic}" TextWrapping="Wrap" />
-                </local:VocabSection>
-                <local:VocabSection Title="How it's built" Key="word.tree" IsVisible="{Binding HasTree}">
-                    <local:VocabOutlineView />
-                </local:VocabSection>
-                <local:VocabInfoView DataContext="{Binding Info}" />
-                <TextBlock Classes="hint" Margin="0,14" Text="Nothing more about this word yet.">
-                    <TextBlock.IsVisible>
-                        <MultiBinding Converter="{x:Static BoolConverters.And}">
-                            <Binding Path="!HasTree" />
-                            <Binding Path="!Info.HasAny" />
-                        </MultiBinding>
-                    </TextBlock.IsVisible>
-                </TextBlock>
-            </StackPanel>
+            <Panel ClipToBounds="True">
+                <StackPanel Margin="0,-1,0,0">
+                    <local:VocabSection Classes="py" Title="Remembering the pinyin" Key="word.pinyin" IsVisible="{Binding Info.HasPinyinMnemonic}">
+                        <TextBlock Text="{Binding Info.PinyinMnemonic}" TextWrapping="Wrap" />
+                    </local:VocabSection>
+                    <local:VocabSection Title="How it’s built" Key="word.tree" IsVisible="{Binding HasTree}">
+                        <local:VocabOutlineView />
+                    </local:VocabSection>
+                    <local:VocabInfoView DataContext="{Binding Info}" />
+                    <TextBlock Classes="hint" Margin="0,14" Text="Nothing more about this word yet.">
+                        <TextBlock.IsVisible>
+                            <MultiBinding Converter="{x:Static BoolConverters.And}">
+                                <Binding Path="!HasTree" />
+                                <Binding Path="!Info.HasAny" />
+                            </MultiBinding>
+                        </TextBlock.IsVisible>
+                    </TextBlock>
+                </StackPanel>
+            </Panel>
         </Border>
     </StackPanel>
 </UserControl>

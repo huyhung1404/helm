@@ -1,6 +1,5 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-             xmlns:ic="using:FluentIcons.Avalonia"
              xmlns:sys="using:System"
              xmlns:vm="using:Helm.Modules.Vocab"
              xmlns:local="using:Helm.Modules.Vocab"
@@ -8,12 +7,13 @@
              x:DataType="vm:VocabWordListViewModel">
 
     <!-- The Words tab's list: search, the language, the order (a sheet), filter chips with their counts, then the
-         words of one page in groups. A tap opens the word's own page. -->
+         words of one page in groups; 10 between them. A tap opens the word's own page. -->
     <StackPanel Spacing="10">
-        <TextBox PlaceholderText="Search words and meanings" Text="{Binding SearchText}" FontSize="16" MinHeight="44" VerticalContentAlignment="Center"
+        <!-- .search: the icon 12 in, 8 before the text -->
+        <TextBox PlaceholderText="Search words and meanings" Text="{Binding SearchText}" Padding="8,0,12,0"
                  IsVisible="{Binding HasWords}" AutomationProperties.Name="Search words and meanings">
             <TextBox.InnerLeftContent>
-                <ic:SymbolIcon Symbol="Search" FontSize="18" Margin="10,0,0,0" Foreground="{DynamicResource HelmSecondaryText}" />
+                <local:LineIcon Kind="Search" Size="18" Margin="12,0,0,0" VerticalAlignment="Center" Foreground="{DynamicResource HelmSecondaryText}" />
             </TextBox.InnerLeftContent>
         </TextBox>
 
@@ -21,25 +21,26 @@
             <Border Classes="seg">
                 <Grid ColumnDefinitions="*,2,*">
                     <Button Classes="seg" Classes.on="{Binding IsEnglish}" Command="{Binding ShowEnglishCommand}" AutomationProperties.Name="English words">
-                        <TextBlock><Run Text="English " /><Run Text="{Binding EnglishCount}" Foreground="{DynamicResource HelmSecondaryText}" FontWeight="Normal" /></TextBlock>
+                        <TextBlock><Run Text="English " /><Run Text="{Binding EnglishCount}" FontSize="13" Foreground="{DynamicResource HelmSecondaryText}" /></TextBlock>
                     </Button>
                     <Button Grid.Column="2" Classes="seg" Classes.on="{Binding IsChinese}" Command="{Binding ShowChineseCommand}" AutomationProperties.Name="Chinese words">
-                        <TextBlock><Run Text="中文 " /><Run Text="{Binding ChineseCount}" Foreground="{DynamicResource HelmSecondaryText}" FontWeight="Normal" /></TextBlock>
+                        <TextBlock><Run Text="中文 " /><Run Text="{Binding ChineseCount}" FontSize="13" Foreground="{DynamicResource HelmSecondaryText}" /></TextBlock>
                     </Button>
                 </Grid>
             </Border>
-            <Button Grid.Column="2" Classes="tall" Padding="12,0" Click="Order_Click" IsVisible="{Binding HasWords}"
+            <!-- .btn.sm, 44 high -->
+            <Button Grid.Column="2" Classes="tall sm" MinHeight="44" Click="Order_Click" IsVisible="{Binding HasWords}"
                     AutomationProperties.Name="{Binding SortIndex, Converter={x:Static local:VocabConverters.SortName}, StringFormat='Order: {0}'}">
-                <StackPanel Orientation="Horizontal" Spacing="6">
-                    <ic:SymbolIcon Symbol="ArrowSortDownLines" FontSize="18" />
+                <StackPanel Orientation="Horizontal" Spacing="8">
+                    <local:LineIcon Kind="Sort" Size="18" VerticalAlignment="Center" />
                     <TextBlock Text="{Binding SortIndex, Converter={x:Static local:VocabConverters.SortName}}" VerticalAlignment="Center" />
                 </StackPanel>
             </Button>
         </Grid>
 
-        <!-- Show only: sideways, edge to edge -->
+        <!-- Show only: sideways, edge to edge (margin 0 -16, padding 0 16 2) -->
         <ScrollViewer HorizontalScrollBarVisibility="Hidden" VerticalScrollBarVisibility="Disabled" Margin="-16,0" IsVisible="{Binding HasWords}">
-            <ItemsControl ItemsSource="{Binding Chips}" Margin="16,0">
+            <ItemsControl ItemsSource="{Binding Chips}" Margin="16,0,16,2">
                 <ItemsControl.ItemsPanel>
                     <ItemsPanelTemplate>
                         <StackPanel Orientation="Horizontal" Spacing="6" />
@@ -50,7 +51,7 @@
                         <Button Classes="chip" Classes.on="{Binding IsOn}" Command="{Binding Pick}" AutomationProperties.Name="{Binding Name}">
                             <StackPanel Orientation="Horizontal" Spacing="6">
                                 <TextBlock Text="{Binding Name, Converter={x:Static local:VocabConverters.ChipName}}" VerticalAlignment="Center" />
-                                <TextBlock Text="{Binding Count}" Classes="hint" FontSize="12" VerticalAlignment="Center" />
+                                <TextBlock Text="{Binding Count}" Foreground="{DynamicResource HelmSecondaryText}" FontSize="12" VerticalAlignment="Center" />
                             </StackPanel>
                         </Button>
                     </DataTemplate>
@@ -63,23 +64,23 @@
                 <TextBlock Margin="16,20" Classes="hint" FontSize="14" IsVisible="{Binding HasNoWords}"
                            Text="Words show up here once an AI agent has broken them down. Add the words you meet with +, one at a time: learning them as they come is what makes them stick." />
                 <TextBlock Margin="16,20" Text="No word matches." Classes="hint" FontSize="14" IsVisible="{Binding HasNoMatches}" />
-                <!-- The first row's hairline hides under the card's edge -->
-                <ItemsControl ItemsSource="{Binding Words}" Margin="0,-1,0,0">
+                <ItemsControl ItemsSource="{Binding Words}">
                     <ItemsControl.ItemTemplate>
                         <DataTemplate x:DataType="vm:VocabWordRow">
                             <StackPanel>
                                 <TextBlock Text="{Binding Header}" Classes="group" IsVisible="{Binding HasHeader}" />
+                                <!-- .prow: the word and its reading over its meaning; its flag and level over its dots -->
                                 <Button Classes="prow" Command="{Binding Open}" AutomationProperties.Name="{Binding Text}">
                                     <Grid ColumnDefinitions="*,Auto">
                                         <StackPanel Spacing="2" VerticalAlignment="Center">
                                             <Grid ColumnDefinitions="Auto,*">
-                                                <TextBlock Text="{Binding Text}" FontSize="17" FontWeight="SemiBold" Margin="0,0,8,0" VerticalAlignment="Center" />
-                                                <TextBlock Grid.Column="1" local:ToneText.Text="{Binding Phonetic}" FontSize="13" TextTrimming="CharacterEllipsis" VerticalAlignment="Center"
-                                                           IsVisible="{Binding HasPhonetic}" />
+                                                <TextBlock Text="{Binding Text}" FontSize="17" FontWeight="SemiBold" VerticalAlignment="Bottom" />
+                                                <TextBlock Grid.Column="1" local:ToneText.Text="{Binding Phonetic}" FontSize="13" TextTrimming="CharacterEllipsis" Margin="8,0,0,1"
+                                                           VerticalAlignment="Bottom" IsVisible="{Binding HasPhonetic}" />
                                             </Grid>
-                                            <TextBlock Text="{Binding Meaning}" FontSize="14" TextTrimming="CharacterEllipsis" Opacity="0.85" />
+                                            <TextBlock Text="{Binding Meaning}" FontSize="14" TextTrimming="CharacterEllipsis" Foreground="{DynamicResource VocabText2}" />
                                         </StackPanel>
-                                        <StackPanel Grid.Column="1" Spacing="6" Margin="10,0,0,0" VerticalAlignment="Center">
+                                        <StackPanel Grid.Column="1" Spacing="6" Margin="12,0,0,0" VerticalAlignment="Center">
                                             <StackPanel Orientation="Horizontal" Spacing="4" HorizontalAlignment="Right">
                                                 <Border Classes="tag" Classes.acc="{Binding IsNew}" Classes.py="{Binding IsSlipping}" Classes.warn="{Binding IsHard}"
                                                         Classes.mute="{Binding IsHidden}" IsVisible="{Binding HasFlag}">
@@ -92,7 +93,7 @@
                                             <ItemsControl ItemsSource="{Binding Dots}" HorizontalAlignment="Right" AutomationProperties.Name="{Binding LevelText}">
                                                 <ItemsControl.ItemsPanel>
                                                     <ItemsPanelTemplate>
-                                                        <StackPanel Orientation="Horizontal" />
+                                                        <StackPanel Orientation="Horizontal" Spacing="3" />
                                                     </ItemsPanelTemplate>
                                                 </ItemsControl.ItemsPanel>
                                                 <ItemsControl.ItemTemplate>
@@ -109,18 +110,18 @@
                     </ItemsControl.ItemTemplate>
                 </ItemsControl>
 
-                <!-- A page at a time: the phone draws every row it is given -->
-                <Border BorderBrush="{DynamicResource VocabLine}" BorderThickness="0,1,0,0" Padding="4,6" IsVisible="{Binding Pages.HasPages}">
+                <!-- A page at a time (padding 6 4, a hairline above): the phone draws every row it is given -->
+                <Border BorderBrush="{DynamicResource VocabLine06}" BorderThickness="0,1,0,0" Padding="4,6" IsVisible="{Binding Pages.HasPages}">
                     <Grid ColumnDefinitions="Auto,*,Auto">
                         <Button Classes="icon" Command="{Binding Pages.PreviousPageCommand}" AutomationProperties.Name="Previous page">
-                            <ic:SymbolIcon Symbol="ChevronLeft" FontSize="20" />
+                            <local:LineIcon Kind="Left" Size="20" />
                         </Button>
                         <StackPanel Grid.Column="1" HorizontalAlignment="Center" VerticalAlignment="Center">
                             <TextBlock Text="{Binding Pages.PageText}" FontSize="14" HorizontalAlignment="Center" />
                             <TextBlock Text="{Binding Pages.RangeText}" Classes="hint" FontSize="12" HorizontalAlignment="Center" />
                         </StackPanel>
                         <Button Grid.Column="2" Classes="icon" Command="{Binding Pages.NextPageCommand}" AutomationProperties.Name="Next page">
-                            <ic:SymbolIcon Symbol="ChevronRight" FontSize="20" />
+                            <local:LineIcon Kind="Right" Size="20" />
                         </Button>
                     </Grid>
                 </Border>

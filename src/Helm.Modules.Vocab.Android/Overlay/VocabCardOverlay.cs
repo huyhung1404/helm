@@ -17,7 +17,8 @@ namespace Helm.Modules.Vocab;
 /// small overlay window grows into a larger opaque one). Its header: the icon, "Do you remember this word?", what the
 /// card asks and ✕. Then the word, centred; a Chinese word asks for its pinyin first (the "Chinese: type the pinyin"
 /// setting), checked like on the Learn tab, and says the verdict under it. Once shown, the answer (reading, meaning,
-/// parts, the agent's way to remember the reading; Full details adds everything else known) scrolls between the word
+/// parts, the agent's way to remember the reading in a purple box; Full details adds everything else known, "To
+/// remember it" first in a blue box) scrolls between the word
 /// and one fixed row of icons: Listen, YouGlish, Full details, Open in Helm, then ✗ and ✓. On a pinyin card those two
 /// answer for the meaning only (a slipped pinyin is noted apart), which a caption above them says. The card is
 /// see-through at rest (the "Card opacity" setting), so the app below stays readable, and solid while it is touched,
@@ -90,10 +91,12 @@ internal sealed partial class VocabCardOverlay
         var questionParams = new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WrapContent, 1);
         questionParams.SetMargins(Dp(8), 0, Dp(8), 0);
         header.AddView(question, questionParams);
-        _kind = Text("", 11, _c.AccentText, bold: true, maxLines: 1);
-        _kind.Background = Round(_c.AccentFill, 4, null);
-        _kind.SetPadding(Dp(7), Dp(2), Dp(7), Dp(2));
-        header.AddView(_kind);
+        // .tag: 20 high, padding 0 7, the accent at .14.
+        _kind = Text("", 11, _c.AccentText, bold: true, maxLines: 1, leading: false);
+        _kind.Background = Round(_c.TagFill, 4, null);
+        _kind.Gravity = GravityFlags.CenterVertical;
+        _kind.SetPadding(Dp(7), 0, Dp(7), 0);
+        header.AddView(_kind, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WrapContent, Dp(20)));
         header.AddView(new IconButton(context, CardIcon.Close, IconStyle.Plain, _c, "Close", () => _close(), iconDp: 18), new LinearLayout.LayoutParams(Dp(44), Dp(44)));
 
         // The front: the word, centred; a tap shows the answer, or on a pinyin card opens the box.
@@ -145,10 +148,11 @@ internal sealed partial class VocabCardOverlay
         checkParams.SetMargins(Dp(8), 0, 0, 0);
         _typeRow.AddView(check, checkParams);
         _front.AddView(_typeRow, Gap(8, ViewGroup.LayoutParams.MatchParent));
+        // .link: padding 8, 8 under the box.
         _skip = Text("Show meaning", 14, _c.Accent);
-        _skip.SetPadding(Dp(8), Dp(8), Dp(8), Dp(8));
+        Leading(_skip, 14, 1.4f, Dp(8), Dp(8), Dp(8), Dp(8));
         _skip.Click += (_, _) => Reveal();
-        _front.AddView(_skip, Gap(0));
+        _front.AddView(_skip, Gap(8));
         // The typed pinyin's verdict, and what the buttons now ask about.
         _verdict = Text("", 14, _c.Ink, bold: true);
         _verdict.Gravity = GravityFlags.CenterHorizontal;
@@ -185,7 +189,7 @@ internal sealed partial class VocabCardOverlay
         _bar.SetPadding(Dp(8), Dp(4), Dp(8), Dp(8));
         _answersCaption = Text("", 12, _c.Sub);
         _answersCaption.Gravity = GravityFlags.End;
-        _answersCaption.SetPadding(Dp(6), Dp(4), Dp(6), 0);
+        Leading(_answersCaption, 12, 1.4f, Dp(6), Dp(4), Dp(6), 0);
         var caption = new SpannableStringBuilder("✗ / ✓ answer for the ");
         var meaning = caption.Length();
         caption.Append("meaning");
@@ -344,8 +348,9 @@ internal sealed partial class VocabCardOverlay
         var pinyin = _card.AsksPinyin;
         _kind.Text = _card.KindText;
         _word.Text = _card.Text;
-        // A pinyin card's word sits a little higher and larger, the box under it.
+        // A pinyin card's word sits a little higher and larger, the box under it (line-height 1.15).
         _word.SetTextSize(Android.Util.ComplexUnitType.Sp, pinyin ? 42 : 38);
+        Leading(_word, pinyin ? 42 : 38, 1.15f);
         _front.SetPadding(Dp(16), Dp(pinyin ? 6 : 12), Dp(16), Dp(pinyin ? 12 : 18));
         _front.Clickable = !revealed;
         _hint.Visibility = !revealed && !typing ? ViewStates.Visible : ViewStates.Gone;
@@ -401,43 +406,77 @@ internal sealed partial class VocabCardOverlay
         return text;
     }
 
-    /// <summary>Everything Helm knows about the word (<see cref="VocabCardDetails"/>), built once per word.</summary>
+    /// <summary>
+    /// Everything Helm knows about the word (<see cref="VocabCardDetails"/>), built once per word, as the design's Full
+    /// details: "To remember it" in a blue box first, then Examples, Goes with and Easy to mix up with (amber), 10
+    /// apart; the rest Helm knows (word family, similar, opposite, the tree, the labels) follow the same way. The
+    /// pinyin hook is left out here: its purple box is already above.
+    /// </summary>
     private void FillDetails()
     {
         var key = _card.WordId ?? "";
         if (_detailsFor == key) return;
         _detailsFor = key;
         _details.RemoveAllViews();
+        var sections = _card.Details().Where(s => s.Title != "Remembering the pinyin").ToList();
+        // The design's order: the mnemonic, examples, collocations, words easy to mix up, then the others as they come.
+        string[] order = ["To remember it", "Examples", "Goes with", "Easy to mix up"];
+        foreach (var section in sections.OrderBy(s => Array.IndexOf(order, s.Title) is var i and >= 0 ? i : order.Length))
+            _details.AddView(Section(section), Gap(_details.ChildCount == 0 ? 0 : 10, ViewGroup.LayoutParams.MatchParent));
         if (_card.Info is { HasLabels: true } info)
         {
-            var labels = Text(info.Labels, 12, _c.Ink);
-            labels.Background = Round(_c.Btn, 10, null);
-            labels.SetPadding(Dp(9), Dp(2), Dp(9), Dp(2));
-            var p = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WrapContent, ViewGroup.LayoutParams.WrapContent);
-            p.SetMargins(0, Dp(10), 0, 0);
+            var labels = Text(info.Labels, 11, _c.Ink, bold: true, leading: false);
+            labels.Background = Round(_c.Btn, 4, null);
+            labels.Gravity = GravityFlags.CenterVertical;
+            labels.SetPadding(Dp(7), 0, Dp(7), 0);
+            var p = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WrapContent, Dp(20));
+            p.SetMargins(0, Dp(_details.ChildCount == 0 ? 0 : 10), 0, 0);
             _details.AddView(labels, p);
         }
-        foreach (var section in _card.Details())
+    }
+
+    /// <summary>One block of Full details: its title (.sh, 12 semibold) over its lines, or the mnemonic's .memo box.</summary>
+    private LinearLayout Section(VocabDetailSection section)
+    {
+        var memo = section.Title == "To remember it";
+        var block = new LinearLayout(_context) { Orientation = Orientation.Vertical };
+        if (memo)
         {
-            var warn = section.Title.StartsWith("Easy to mix up", StringComparison.Ordinal);
-            var title = Text(section.Title, 12, warn ? _c.Close : _c.Sub, bold: true);
-            _details.AddView(title, Gap(10));
-            foreach (var item in section.Items)
-            {
-                var line = Text(item.Text, section.IsTree ? 13 : 14, section.IsTree ? _c.Sub : _c.Ink, maxLines: 20);
-                if (!item.HasNote)
-                {
-                    _details.AddView(line);
-                    continue;
-                }
-                // A sentence and its translation, a bar beside them.
-                var block = new LinearLayout(_context) { Orientation = Orientation.Vertical, Background = LeftBar() };
-                block.SetPadding(Dp(8), 0, 0, 0);
-                block.AddView(line);
-                block.AddView(Text(item.Note, 13, _c.Sub, maxLines: 20));
-                _details.AddView(block, Gap(2, ViewGroup.LayoutParams.MatchParent));
-            }
+            // .memo: padding 10 12, radius 8, the accent at .08 with an edge at .3, its title in the accent's light blue.
+            block.Background = Round(_c.MemoFill, 8, _c.MemoStroke);
+            block.SetPadding(Dp(12), Dp(10), Dp(12), Dp(10));
         }
+        var title = section.Title == "Easy to mix up" ? "Easy to mix up with" : section.Title;
+        block.AddView(Text(title, 12, memo ? _c.AccentText : title.StartsWith("Easy to mix up", StringComparison.Ordinal) ? _c.Close : _c.Sub, bold: true));
+        switch (section.Title)
+        {
+            case "To remember it":
+                var mnemonic = Text(string.Join(" ", section.Items.Select(i => i.Text)), 14, _c.Ink, maxLines: 20);
+                mnemonic.SetTypeface(mnemonic.Typeface, TypefaceStyle.Italic);
+                block.AddView(mnemonic, Gap(3));
+                break;
+            case "Examples":
+                foreach (var item in section.Items)
+                {
+                    // .ex: a sentence and its translation, a bar beside them.
+                    var example = new LinearLayout(_context) { Orientation = Orientation.Vertical, Background = LeftBar() };
+                    example.SetPadding(Dp(8), 0, 0, 0);
+                    example.AddView(Text(item.Text, 14, _c.Ink, maxLines: 20));
+                    if (item.HasNote) example.AddView(Text(item.Note, 13, _c.Sub, maxLines: 20));
+                    block.AddView(example, Gap(0, ViewGroup.LayoutParams.MatchParent));
+                }
+                break;
+            case "Goes with" or "Synonyms" or "Antonyms":
+                block.AddView(Text(string.Join(" · ", section.Items.Select(i => i.Text)), 14, _c.Ink, maxLines: 20));
+                break;
+            default:
+                // Easy to mix up ("挽回: lấy lại…"), the word family ("relation (noun) · mối quan hệ"), the tree's lines.
+                var separator = section.Title == "Easy to mix up" ? ": " : " · ";
+                foreach (var item in section.Items)
+                    block.AddView(Text(item.HasNote ? item.Text + separator + item.Note : item.Text, section.IsTree ? 13 : 14, section.IsTree ? _c.Sub : _c.Ink, maxLines: 20));
+                break;
+        }
+        return block;
     }
 
     private static void Show(TextView view, string text)
@@ -446,7 +485,8 @@ internal sealed partial class VocabCardOverlay
         view.Visibility = string.IsNullOrWhiteSpace(text) ? ViewStates.Gone : ViewStates.Visible;
     }
 
-    private TextView Text(string text, float sp, AndroidColor color, bool bold = false, int maxLines = 8)
+    /// <param name="leading">Lines 1.4 times the text's size, as in the design (not for fixed-height labels).</param>
+    private TextView Text(string text, float sp, AndroidColor color, bool bold = false, int maxLines = 8, bool leading = true)
     {
         var view = new TextView(_context) { Text = text };
         view.SetTextSize(Android.Util.ComplexUnitType.Sp, sp);
@@ -454,7 +494,22 @@ internal sealed partial class VocabCardOverlay
         if (bold) view.SetTypeface(view.Typeface, TypefaceStyle.Bold);
         view.SetMaxLines(maxLines);
         view.Ellipsize = TextUtils.TruncateAt.End;
+        view.SetIncludeFontPadding(false);
+        if (leading) Leading(view, sp, 1.4f);
         return view;
+    }
+
+    /// <summary>
+    /// The design's line-height: each line <paramref name="ratio"/> times the text's size, the extra split above and
+    /// below the text as CSS does, on top of the given padding.
+    /// </summary>
+    private void Leading(TextView view, float sp, float ratio, int left = 0, int top = 0, int right = 0, int bottom = 0)
+    {
+        view.SetIncludeFontPadding(false);
+        var line = Android.Util.TypedValue.ApplyDimension(Android.Util.ComplexUnitType.Sp, sp * ratio, _context.Resources!.DisplayMetrics);
+        var extra = Math.Max(0, (int)Math.Round(line - view.Paint!.GetFontMetricsInt(null)));
+        view.SetLineSpacing(extra, 1);
+        view.SetPadding(left, top + extra / 2, right, bottom + extra - extra / 2);
     }
 
     private Button Button(string text, Action click)

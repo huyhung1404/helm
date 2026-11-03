@@ -20,10 +20,15 @@ internal sealed partial class VocabCardOverlay
         public AndroidColor Bar { get; } = dark ? AndroidColor.Argb(0x1F, 0xFF, 0xFF, 0xFF) : AndroidColor.Argb(0x24, 0, 0, 0);
         public AndroidColor Btn { get; } = dark ? AndroidColor.Rgb(0x3A, 0x3A, 0x3A) : AndroidColor.Rgb(0xEB, 0xEB, 0xEB);
         public AndroidColor Field { get; } = dark ? AndroidColor.Rgb(0x1A, 0x1A, 0x1A) : AndroidColor.White;
-        public AndroidColor Accent { get; } = dark ? AndroidColor.Rgb(0x4C, 0xC2, 0xFF) : AndroidColor.Rgb(0x00, 0x67, 0xC0);
+        public AndroidColor Accent { get; } = dark ? AndroidColor.Rgb(0x60, 0xCD, 0xFF) : AndroidColor.Rgb(0x00, 0x67, 0xC0);
         public AndroidColor OnAccent { get; } = dark ? AndroidColor.Black : AndroidColor.White;
-        public AndroidColor AccentFill { get; } = dark ? AndroidColor.Argb(0x29, 0x60, 0xCD, 0xFF) : AndroidColor.Argb(0x1F, 0x00, 0x67, 0xC0);
+        // .rb.on (Full details open): the accent at .16; .tag: at .14.
+        public AndroidColor AccentFill { get; } = dark ? AndroidColor.Argb(0x29, 0x60, 0xCD, 0xFF) : AndroidColor.Argb(0x24, 0x00, 0x67, 0xC0);
+        public AndroidColor TagFill { get; } = dark ? AndroidColor.Argb(0x24, 0x60, 0xCD, 0xFF) : AndroidColor.Argb(0x1F, 0x00, 0x67, 0xC0);
         public AndroidColor AccentText { get; } = dark ? AndroidColor.Rgb(0x8A, 0xD9, 0xFF) : AndroidColor.Rgb(0x00, 0x5A, 0x9E);
+        // "To remember it" (.memo): the accent at .08, an edge at .3.
+        public AndroidColor MemoFill { get; } = dark ? AndroidColor.Argb(0x14, 0x60, 0xCD, 0xFF) : AndroidColor.Argb(0x0F, 0x00, 0x67, 0xC0);
+        public AndroidColor MemoStroke { get; } = dark ? AndroidColor.Argb(0x4D, 0x60, 0xCD, 0xFF) : AndroidColor.Argb(0x4D, 0x00, 0x67, 0xC0);
         public AndroidColor Ok { get; } = dark ? AndroidColor.Rgb(0x6F, 0xD0, 0x8C) : AndroidColor.Rgb(0x0F, 0x7B, 0x0F);
         public AndroidColor OnOk { get; } = dark ? AndroidColor.Rgb(0x0B, 0x2A, 0x14) : AndroidColor.White;
         public AndroidColor Close { get; } = dark ? AndroidColor.Rgb(0xFF, 0xC9, 0x83) : AndroidColor.Rgb(0x9A, 0x67, 0x00);
