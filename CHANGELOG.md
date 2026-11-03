@@ -16,8 +16,13 @@ Format: [Keep a Changelog](https://keepachangelog.com), versions follow [SemVer]
 ### Changed
 - **Helm Keyboard: w on its own is a w.** A w with no vowel before it is no longer turned into ư (“tw” stays “tw”); type
   uw for ư.
+- **Slack Bot: Lumi says it is on it.** The moment someone calls Lumi, a line “Lumi đã nhận câu hỏi, đang tìm câu trả
+  lời… ⏳” goes into the thread, so everyone sees the question is being handled; it is taken away once the answer is in.
 
 ### Fixed
+- Slack Bot: when you call Lumi yourself, you always get a word back. Before, a question the conversation could not
+  answer got silence (Claude said there was nothing to answer), with nothing in the log; every call’s outcome is now
+  logged.
 - Habits on the phone: the skipped-habit and streak reminders are separate notifications, so one never replaces the
   other; the 25 / 50 / 75 / 100 % buttons are full-size touch targets, and “I did it, I just forgot to tick it” has
   its check mark as on the PC.

@@ -48,6 +48,7 @@ public sealed class SlackProjectReadTests : IDisposable
             Posted.Add(text);
             return Task.FromResult<string?>("9999.0");
         }
+        public Task DeleteMessageAsync(string channel, string ts, CancellationToken ct) => Task.CompletedTask;
     }
 
     private (SlackReplier Replier, SlackLumi Lumi, Slack Slack, Agent Agent, SlackInbox Inbox, SlackReader Reader) Rig(string answer)
@@ -100,7 +101,8 @@ public sealed class SlackProjectReadTests : IDisposable
         Assert.Contains("Lumi đã nhận được", slack.Posted.Single());
 
         Assert.True(await lumi.AnswerAsync(new SlackMessage("C1", "9950.0", "9000.0", "U2", "lumi key là gì?", false), Now, default));
-        Assert.DoesNotContain("AIza", slack.Posted[1]);
+        Assert.Equal(3, slack.Posted.Count);
+        Assert.All(slack.Posted, p => Assert.DoesNotContain("AIza", p));
     }
 
     [Theory]

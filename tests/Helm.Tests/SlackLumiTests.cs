@@ -14,6 +14,7 @@ public sealed class SlackLumiTests
     {
         public List<string> Read { get; } = [];
         public List<(string Channel, string Text, string? Blocks, string? Thread)> Posted { get; } = [];
+        public List<(string Channel, string Ts)> Deleted { get; } = [];
         public Task<SlackIdentity> AuthTestAsync(CancellationToken ct) => throw new NotSupportedException();
         public Task<IReadOnlyList<SlackConversation>> ConversationsAsync(CancellationToken ct) => throw new NotSupportedException();
         public Task<IReadOnlyList<SlackMessage>> HistoryAsync(string channel, string oldest, int max, CancellationToken ct)
@@ -36,7 +37,12 @@ public sealed class SlackLumiTests
         public Task<string?> PostMessageAsync(string channel, string text, string? blocks, string? threadTs, CancellationToken ct)
         {
             Posted.Add((channel, text, blocks, threadTs));
-            return Task.FromResult<string?>("9999.0");
+            return Task.FromResult<string?>($"{9990 + Posted.Count}.0");
+        }
+        public Task DeleteMessageAsync(string channel, string ts, CancellationToken ct)
+        {
+            Deleted.Add((channel, ts));
+            return Task.CompletedTask;
         }
     }
 
@@ -85,14 +91,20 @@ public sealed class SlackLumiTests
         var call = new SlackMessage("C1", "9002.0", "9000.0", "U2", "Lumi ơi, lỗi shop fix chưa?", false);
         Assert.True(await lumi.AnswerAsync(call, Now, default));
         Assert.Equal(["replies:C1:9000.0"], slack.Read);
-        var post = Assert.Single(slack.Posted);
+        // "On it" first, in the thread, the asker tagged; taken away once the answer is in.
+        Assert.Equal(2, slack.Posted.Count);
+        Assert.Equal(("C1", "9000.0"), (slack.Posted[0].Channel, slack.Posted[0].Thread));
+        Assert.Equal($"Lumi · trợ lý AI của Hùng: <@U2> {SlackLumi.Received}", slack.Posted[0].Text);
+        Assert.Equal([("C1", "9991.0")], slack.Deleted);
+        var post = slack.Posted[1];
         Assert.Equal(("C1", "9000.0"), (post.Channel, post.Thread));
         Assert.Contains(":robot_face: Lumi · trợ lý AI của Hùng", post.Blocks);
         // The one who asked is tagged.
         Assert.StartsWith("Lumi · trợ lý AI của Hùng: <@U2> Đã fix rồi", post.Text);
         Assert.Contains("Đã fix ở commit abc", agent.Asked[0]);
         Assert.Contains("Never promise", agent.Asked[0]);
-        Assert.True(inbox.IsBotMessage("C1", "9999.0"));
+        Assert.True(inbox.IsBotMessage("C1", "9991.0"));
+        Assert.True(inbox.IsBotMessage("C1", "9992.0"));
 
         // Once per call.
         Assert.False(await lumi.AnswerAsync(call, Now, default));
@@ -109,8 +121,8 @@ public sealed class SlackLumiTests
         Assert.True(await lumi.AnswerAsync(new SlackMessage("C2", "9102.0", null, "ME", "Lumi ơi release khi nào?", false), Now, default));
         Assert.Equal(["history:C2"], slack.Read);
         // Not in a thread: the answer starts one under the call. The user asked: nobody is tagged.
-        Assert.Equal("9102.0", slack.Posted.Single().Thread);
-        Assert.DoesNotContain("<@", slack.Posted.Single().Text);
+        Assert.All(slack.Posted, p => Assert.Equal("9102.0", p.Thread));
+        Assert.All(slack.Posted, p => Assert.DoesNotContain("<@", p.Text));
         Assert.DoesNotContain("Never promise", agent.Asked[0]);
     }
 
@@ -134,7 +146,21 @@ public sealed class SlackLumiTests
         Assert.False(await lumi.AnswerAsync(new SlackMessage("C1", "9300.0", null, "U2", "Lumi trả lời rồi đó", false), Now, default));
         Assert.Single(agent.Asked);
         Assert.Contains("only mentions Lumi", agent.Asked[0]);
-        Assert.Empty(slack.Posted);
+        // The "on it" line went, and went away again.
+        Assert.Equal(SlackLumi.Received, Assert.Single(slack.Posted).Text.Split("> ")[1]);
+        Assert.Equal([("C1", "9991.0")], slack.Deleted);
+    }
+
+    [Fact]
+    public async Task The_user_calling_always_gets_a_word_back()
+    {
+        var (lumi, slack, agent, _, _) = Rig(answer: "NO_REPLY");
+        Assert.True(await lumi.AnswerAsync(new SlackMessage("C2", "9400.0", null, "ME", "@lumi trả lời câu hỏi này", false), Now, default));
+        Assert.Contains("always answer something", agent.Asked[0]);
+        Assert.DoesNotContain("only mentions Lumi", agent.Asked[0]);
+        Assert.Equal(["Lumi · trợ lý AI của Hùng: " + SlackLumi.Received, "Lumi · trợ lý AI của Hùng: " + SlackLumi.CouldNot("Hùng")],
+            slack.Posted.Select(p => p.Text));
+        Assert.Equal([("C2", "9991.0")], slack.Deleted);
     }
 
     [Fact]
