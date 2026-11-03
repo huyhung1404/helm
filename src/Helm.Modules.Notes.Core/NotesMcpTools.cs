@@ -19,20 +19,23 @@ public sealed class NotesMcpTools(NotesStore store, LinkHub? links = null) : IMc
 
     public IEnumerable<McpTool> Tools =>
     [
-        new("notes_search", "Find the user's notes. Without a query, the most recently edited ones. Returns ids, titles and a short preview; read a note with notes_read.",
+        new("notes_search", "Find the user's notes. Without a query, the most recently edited ones. Returns ids, titles and a short preview; read a note with notes_read. " +
+            "To find a note by what it is about, pass any: several words the note may use instead of the user's own, e.g. for \"lỗi server hôm trước\": lỗi server, server error, sập, crash, down, VPS, 500.",
             McpArgs.Schema(
-                ("query", McpArgs.Text("Words to look for in titles and text (accents and case do not matter)."), false),
+                ("query", McpArgs.Text("Words to look for in titles and text, all of them (accents and case do not matter)."), false),
+                ("any", McpArgs.List("Alternatives, any of which may be in the note: synonyms, Vietnamese and English, short phrases. Notes with more of them come first, the newer first among equals."), false),
                 ("limit", McpArgs.Number($"How many at most (default {DefaultLimit}, at most {MaxLimit})."), false),
                 ("trash", McpArgs.Flag("Search the trash instead (notes deleted in the last 30 days)."), false)),
             (args, _) => Task.FromResult<object?>(Search(args))) { ReadOnly = true },
         new("notes_read", "The full text of a note, with the tasks and people it is linked to.",
             McpArgs.Schema(("id", McpArgs.Text("The note's id (from notes_search)."), true)),
             (args, _) => Task.FromResult<object?>(Read(McpArgs.RequiredString(args, "id")))) { ReadOnly = true },
-        new("notes_create", "Write a new note. The first line of the text is its title when no title is given.",
+        new("notes_create", $"Write a new note. The first line of the text is its title when no title is given. Tags in use: {TagsInUse()}.",
             McpArgs.Schema(
                 ("title", McpArgs.Text("The title (optional)."), false),
-                ("text", McpArgs.Text("The text of the note."), true)),
-            (args, _) => Task.FromResult<object?>(Create(McpArgs.String(args, "title") ?? "", McpArgs.RequiredString(args, "text"))))
+                ("text", McpArgs.Text("The text of the note."), true),
+                ("tags", McpArgs.List("Tags added as a last line of hashtags, without '#': idea, and the project's tag from the tags in use when one fits."), false)),
+            (args, _) => Task.FromResult<object?>(Create(McpArgs.String(args, "title") ?? "", NoteTags.Append(McpArgs.RequiredString(args, "text"), McpArgs.Strings(args, "tags")))))
         {
             // Into the trash, as a note the user deletes: restorable for 30 days.
             Undo = (result, _) => { store.MoveToTrash(result.GetProperty("id").GetString()!); return Task.CompletedTask; },
@@ -62,10 +65,13 @@ public sealed class NotesMcpTools(NotesStore store, LinkHub? links = null) : IMc
         var limit = Math.Clamp(McpArgs.Int(args, "limit") ?? DefaultLimit, 1, MaxLimit);
         var terms = TextSearch.Terms(McpArgs.String(args, "query"));
         var notes = McpArgs.Bool(args, "trash") == true ? store.Trash() : store.Notes();
-        var found = terms.Count == 0
-            ? notes.Take(limit)
-            : notes.Select(n => (n, score: TextSearch.Score(terms, n.Value.DisplayTitle, n.Value.Body)))
-                .Where(x => x.score > 0).OrderByDescending(x => x.score).Take(limit).Select(x => x.n);
+        if (terms.Count > 0) notes = [.. notes.Where(n => TextSearch.Score(terms, n.Value.DisplayTitle, n.Value.Body) > 0)];
+        var any = McpArgs.Strings(args, "any");
+        var found = any.Count > 0
+            ? NoteRecall.Rank(notes, any, store.Now).Take(limit)
+            : terms.Count == 0
+                ? notes.Take(limit)
+                : notes.OrderByDescending(n => TextSearch.Score(terms, n.Value.DisplayTitle, n.Value.Body)).Take(limit);
         return found.Select(n => new
         {
             id = n.Id,
@@ -75,6 +81,10 @@ public sealed class NotesMcpTools(NotesStore store, LinkHub? links = null) : IMc
             pinned = n.Value.Pinned,
         }).ToList();
     }
+
+    /// <summary>The hashtags of the user's notes, the most used first, for the model to tag a new note the same way.</summary>
+    private string TagsInUse() =>
+        NoteTags.InUse(store.Notes().Select(n => n.Value), 25) is { Count: > 0 } tags ? string.Join(", ", tags.Select(t => $"#{t.Tag} ({t.Notes})")) : "none yet";
 
     private object Read(string id)
     {
