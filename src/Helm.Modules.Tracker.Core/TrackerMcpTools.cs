@@ -1,5 +1,6 @@
 using System.Globalization;
 using System.Text.Json;
+using System.Text.Json.Nodes;
 using Helm.Core.Mcp;
 using Helm.Core.Text;
 
@@ -14,6 +15,9 @@ public sealed class TrackerMcpTools(TrackerStore store) : IMcpToolProvider
     private const int DefaultLimit = 50;
     private const int MaxLimit = 200;
     private static readonly string[] Priorities = ["low", "normal", "high", "urgent"];
+
+    /// <summary>At most this many tasks in one tracker_add_tasks call.</summary>
+    internal const int MaxBatch = 30;
 
     public string? ModuleId => TrackerIds.ModuleId;
 
@@ -45,6 +49,40 @@ public sealed class TrackerMcpTools(TrackerStore store) : IMcpToolProvider
             (args, _) => Task.FromResult<object?>(AddTask(args)))
         {
             Undo = (result, _) => { store.DeleteItem(result.GetProperty("id").GetString()!); return Task.CompletedTask; },
+        },
+        new("tracker_add_tasks",
+            "Add several tasks in one call, to a list by name (made when the user has none by that name), or as subtasks of one task " +
+            "(parent): the action items of a note (read it with notes_read first; only what is to be done, with a due date only when " +
+            "the note says one), or the steps of a big task. To break a task into steps, first propose 3-8 short steps in your " +
+            "answer and ask which to keep; add only the ones the user keeps.",
+            McpArgs.Schema(
+                ("tasks", new JsonObject
+                {
+                    ["type"] = "array",
+                    ["items"] = new JsonObject
+                    {
+                        ["type"] = "object",
+                        ["properties"] = new JsonObject
+                        {
+                            ["title"] = McpArgs.Text("What to do, short, starting with a verb."),
+                            ["notes"] = McpArgs.Text("Details (who, where), optional."),
+                            ["due"] = McpArgs.Text("Due day or time, optional: 2026-10-01 or 2026-10-01T09:30."),
+                        },
+                        ["required"] = new JsonArray("title"),
+                    },
+                    ["description"] = $"The tasks, in order (at most {MaxBatch}).",
+                }, true),
+                ("list", McpArgs.Text("A list's id or name; a name the user has no list for makes that list (default: the first to-do list)."), false),
+                ("parent", McpArgs.Text("A task's id: add them as its subtasks instead (in its list)."), false)),
+            (args, _) => Task.FromResult<object?>(AddTasks(args)))
+        {
+            // The tasks this call added, and the list when it made one.
+            Undo = (result, _) =>
+            {
+                foreach (var id in result.GetProperty("ids").EnumerateArray()) store.DeleteItem(id.GetString()!);
+                if (result.TryGetProperty("created_list", out var made) && made.GetBoolean()) store.DeleteWorkspace(result.GetProperty("list_id").GetString()!);
+                return Task.CompletedTask;
+            },
         },
         new("tracker_update_task", "Change a task's title, notes, priority or due date, or stop it repeating.",
             McpArgs.Schema(
@@ -157,6 +195,38 @@ public sealed class TrackerMcpTools(TrackerStore store) : IMcpToolProvider
         return Describe(id, store.GetItem(id)!, list.Value.Name);
     }
 
+    private object AddTasks(JsonElement args)
+    {
+        if (!args.TryGetProperty("tasks", out var list) || list.ValueKind != JsonValueKind.Array)
+            throw new McpToolException("tasks must be a list of { title, notes, due }.");
+        var tasks = list.EnumerateArray().Where(t => t.ValueKind == JsonValueKind.Object)
+            .Select(t => new ProposedTask(McpArgs.String(t, "title")?.Trim() ?? "", McpArgs.String(t, "notes")?.Trim() ?? "", McpArgs.String(t, "due")))
+            .Where(t => t.Title.Length > 0)
+            .ToList();
+        if (tasks.Count == 0) throw new McpToolException("Give at least one task with a title.");
+        if (tasks.Count > MaxBatch) throw new McpToolException($"At most {MaxBatch} tasks in one call.");
+        foreach (var due in tasks.Select(t => t.Due).OfType<string>()) ParseDue(due);
+
+        var parentId = McpArgs.String(args, "parent");
+        var parent = parentId is null ? null : RequireTask(parentId);
+        if (parent is { IsSubtask: true }) throw new McpToolException("A subtask cannot have subtasks; add them to its task instead.");
+        string listId;
+        var created = false;
+        if (parent is not null) listId = parent.WorkspaceId;
+        else if (McpArgs.String(args, "list") is { } name && name.Trim().Length > 0 && !TaskListExists(name))
+        {
+            listId = store.AddWorkspace(name.Trim());
+            created = true;
+        }
+        else listId = TaskLists(McpArgs.String(args, "list")).FirstOrDefault()?.Id ?? throw new McpToolException("There is no to-do list yet; name one.");
+        var ids = TaskProposals.AddAll(store, listId, parentId, tasks);
+        var listName = store.GetWorkspace(listId)?.Name ?? "";
+        return new { ids, list_id = listId, list = listName, created_list = created, tasks = ids.Select(id => Describe(id, store.GetItem(id)!, listName)).ToList() };
+    }
+
+    private bool TaskListExists(string list) => store.Workspaces().Any(w => w.Value.Kind == WorkspaceKind.Tasks
+        && (w.Id == list || string.Equals(w.Value.Name.Trim(), list.Trim(), StringComparison.CurrentCultureIgnoreCase)));
+
     private object UpdateTask(JsonElement args)
     {
         var id = McpArgs.RequiredString(args, "id");
@@ -219,7 +289,7 @@ public sealed class TrackerMcpTools(TrackerStore store) : IMcpToolProvider
             ? day : throw new McpToolException($"{text} is not a day like 2026-10-01.");
 
     /// <summary>"2026-10-01" (due that day) or "2026-10-01T09:30" (at that local time).</summary>
-    private static (DateOnly? Day, DateTimeOffset? At) ParseDue(string text)
+    internal static (DateOnly? Day, DateTimeOffset? At) ParseDue(string text)
     {
         text = text.Trim();
         if (text.Length == 10) return (ParseDay(text), null);

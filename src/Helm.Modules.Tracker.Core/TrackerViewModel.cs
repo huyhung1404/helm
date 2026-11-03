@@ -97,9 +97,11 @@ public sealed partial class TrackerViewModel : ObservableObject
         TrackerReminderService reminders,
         ILogger<TrackerViewModel> logger,
         LinkHub? links = null,
-        DebtBook? debts = null)
+        DebtBook? debts = null,
+        TrackerProposalViewModel? proposals = null)
     {
         _store = store;
+        Proposals = proposals;
         _links = links;
         _debts = debts;
         _settings = settings.Get<TrackerSettings>(TrackerIds.ModuleId);
@@ -398,6 +400,13 @@ public sealed partial class TrackerViewModel : ObservableObject
         Try(() => { if (row.IsCompleted) _store.Reopen(row.Id); else _store.Complete(row.Id); });
 
     internal void Start(TrackerItemViewModel row) => Try(() => _store.Start(row.Id));
+
+    /// <summary>AI's proposals to pick from (a task's steps); null without AI.</summary>
+    public TrackerProposalViewModel? Proposals { get; }
+
+    /// <summary>"Break into steps": AI proposes the task's steps, the user keeps the ones they want.</summary>
+    internal Task BreakDownAsync(TrackerItemViewModel row) =>
+        Proposals is { IsAvailable: true } proposals && !row.IsSubtask ? proposals.ForTaskAsync(row.Id) : Task.CompletedTask;
 
     internal bool AddSubtask(TrackerItemViewModel parent, string title)
     {

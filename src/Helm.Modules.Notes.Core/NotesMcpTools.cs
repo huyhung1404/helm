@@ -28,7 +28,9 @@ public sealed class NotesMcpTools(NotesStore store, LinkHub? links = null) : IMc
         new("notes_read", "The full text of a note, with the tasks and people it is linked to.",
             McpArgs.Schema(("id", McpArgs.Text("The note's id (from notes_search)."), true)),
             (args, _) => Task.FromResult<object?>(Read(McpArgs.RequiredString(args, "id")))) { ReadOnly = true },
-        new("notes_create", "Write a new note. The first line of the text is its title when no title is given.",
+        new("notes_create", "Write a new note. The first line of the text is its title when no title is given. A note the user " +
+            "dictated (speech recognition, \"ghi chú: …\"): fix its punctuation and capitals, split it into paragraphs and give it a " +
+            "short title; keep their words.",
             McpArgs.Schema(
                 ("title", McpArgs.Text("The title (optional)."), false),
                 ("text", McpArgs.Text("The text of the note."), true)),

@@ -53,6 +53,7 @@ public sealed class HelmAssistant(
     {
         "wallet_add_transaction", "wallet_add_debt", "wallet_debts", "wallet_summary",
         "tracker_lists", "tracker_tasks", "tracker_add_task", "tracker_complete_task", "tracker_start_task",
+        "tracker_add_tasks",
         "notes_create", "notes_search", "notes_read",
         "habits_list", "habit_report", "habit_check",
         "missions_list", "mission_get",
