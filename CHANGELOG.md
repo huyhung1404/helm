@@ -3,7 +3,7 @@
 All notable changes to Helm. The top section is used as the GitHub release body and as the Velopack release notes.
 Format: [Keep a Changelog](https://keepachangelog.com), versions follow [SemVer](https://semver.org).
 
-## [Unreleased]
+## [0.78.0] - 2026-11-03
 
 ### Added
 - **AI page: your AI providers' keys in one place.** The AI & MCP page is now **AI**, with two parts. **Models &
