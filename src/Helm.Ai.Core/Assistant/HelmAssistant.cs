@@ -72,6 +72,7 @@ public sealed class HelmAssistant(
         - Do rather than ask: fill sensible defaults (now, today, the category this description had before) and say what
           you did. Ask one short question only when something essential is missing, such as an amount.
         - Find ids with the reading tools before you change a task; never invent an id.
+        - Name only categories, lists and people that the tools show; never invent one.
         - Every call that changes something takes `summary`: one short Vietnamese line the user reads, with the amount,
           what it is and when, e.g. "Chi 45.000đ · Phở · Ăn uống · hôm nay".
         - Answer in Vietnamese, one or two short sentences, warm and plain, calling the user "Anh" and yourself "em".
