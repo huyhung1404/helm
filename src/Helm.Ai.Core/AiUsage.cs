@@ -140,6 +140,15 @@ public sealed class AiUsageBook(ISyncedLog<AiUsageEntry> log, TimeProvider? time
         return Entries(feature).Where(e => Local(e.At) is var at && at.Year == now.Year && at.Month == now.Month).Sum(e => e.Usd ?? 0);
     }
 
+    /// <summary>Today's calls of every feature: how many an agent ran, how many the API, and what the API ones cost.</summary>
+    public (int Agent, int Api, decimal ApiUsd) Today()
+    {
+        var today = Local(_time.GetUtcNow()).Date;
+        var calls = Entries(null).Where(e => Local(e.At).Date == today).ToList();
+        var agent = calls.Count(e => e.Route == AgentRoute);
+        return (agent, calls.Count - agent, calls.Where(e => e.Route != AgentRoute).Sum(e => e.Usd ?? 0));
+    }
+
     /// <summary>This month's calls per feature: how many, and their estimated cost.</summary>
     public IReadOnlyList<(string Feature, int Calls, decimal Usd)> ThisMonth()
     {

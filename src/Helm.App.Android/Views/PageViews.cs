@@ -18,6 +18,7 @@ internal static class PageViews
         {
             HomeViewModel => new HomeView(),
             GeneralViewModel => new GeneralView(),
+            Helm.Ai.AiFeaturesViewModel => new AiFeaturesView(),
             ModulePage module => new ModulePageTemplate().Build(module)!,
             _ => new TextBlock { Text = tab.Title },
         };

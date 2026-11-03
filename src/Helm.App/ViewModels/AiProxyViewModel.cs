@@ -27,9 +27,6 @@ internal sealed partial class AgentRow(AgentProfile profile, string status, bool
     [ObservableProperty] private bool _isOn = profile.Enabled;
 }
 
-/// <summary>A route policy as the Ask Helm card's choice lists it.</summary>
-internal sealed record RouteOption(AiRoutePolicy Policy, string Label);
-
 /// <summary>
 /// The Proxy part of the AI page: the agents the user added to this PC (each signed in to its own account), in the
 /// order Helm's AI jobs try them; Ask Helm's route; the user's VPS; and what this month's calls cost and saved.
@@ -43,7 +40,7 @@ internal sealed partial class AiProxyViewModel : ObservableObject
     private readonly IDialogService _dialogs;
     private bool _loading;
 
-    [ObservableProperty] private RouteOption _route;
+    [ObservableProperty] private AiRouteOption _route;
     [ObservableProperty] private double _waitSeconds;
     [ObservableProperty] private string _monthText = "";
 
@@ -57,7 +54,7 @@ internal sealed partial class AiProxyViewModel : ObservableObject
         _dialogs = dialogs;
         Vps = vps;
         var choice = features.Current.For(AiFeatureIds.AskHelm);
-        _route = Routes.First(r => r.Policy == choice.Route);
+        _route = AiRouteOption.For(choice.Route);
         _waitSeconds = choice.PcWaitSeconds;
         _agents.Changed += (_, _) => _ui.Post(Refresh);
         _features.Changed += (_, _) => _ui.Post(LoadChoice);
@@ -71,12 +68,8 @@ internal sealed partial class AiProxyViewModel : ObservableObject
 
     public bool HasAgents => Agents.Count > 0;
 
-    public IReadOnlyList<RouteOption> Routes { get; } =
-    [
-        new(AiRoutePolicy.PreferPc, "Agents on a PC first, then the API"),
-        new(AiRoutePolicy.PcOnly, "Agents on a PC only (never the API)"),
-        new(AiRoutePolicy.ApiOnly, "The API only"),
-    ];
+    /// <summary>The same routes as the Features tab, which shows Ask Helm's choice too.</summary>
+    public IReadOnlyList<AiRouteOption> Routes => AiRouteOption.All;
 
     /// <summary>The page came into view: sign-ins may have happened in their terminals meanwhile.</summary>
     public void Refresh()
@@ -103,7 +96,7 @@ internal sealed partial class AiProxyViewModel : ObservableObject
             : $"{calls} calls this month: {Usd(spent)} on the API, {Usd(saved)} saved by agents (what the API would have cost).";
     }
 
-    partial void OnRouteChanged(RouteOption value) => Save();
+    partial void OnRouteChanged(AiRouteOption value) => Save();
 
     partial void OnWaitSecondsChanged(double value) => Save();
 
@@ -111,7 +104,7 @@ internal sealed partial class AiProxyViewModel : ObservableObject
     {
         _loading = true;
         var choice = _features.Current.For(AiFeatureIds.AskHelm);
-        Route = Routes.First(r => r.Policy == choice.Route);
+        Route = AiRouteOption.For(choice.Route);
         WaitSeconds = choice.PcWaitSeconds;
         _loading = false;
     }

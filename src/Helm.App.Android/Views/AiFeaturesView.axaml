@@ -1,0 +1,197 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:ic="using:FluentIcons.Avalonia"
+             xmlns:ai="using:Helm.Ai"
+             xmlns:assistant="using:Helm.Ai.Assistant"
+             x:Class="Helm.App.Android.Views.AiFeaturesView"
+             x:DataType="ai:AiFeaturesViewModel">
+
+    <!-- General › AI features: the AI features grouped as on the PC's AI → Features table; tap one for its settings.
+         The same shared view model as the PC, so a change shows on both. -->
+    <UserControl.Styles>
+        <!-- A group's title above its card -->
+        <Style Selector="TextBlock.group">
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="Margin" Value="4,20,0,8" />
+        </Style>
+        <!-- Choice lists (where it runs, model): rows 48 dp tall, the page scrolls them, not the list -->
+        <Style Selector="ListBox.choices">
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="ScrollViewer.VerticalScrollBarVisibility" Value="Disabled" />
+            <Setter Property="ScrollViewer.HorizontalScrollBarVisibility" Value="Disabled" />
+        </Style>
+        <Style Selector="ListBox.choices ListBoxItem">
+            <Setter Property="MinHeight" Value="48" />
+            <Setter Property="Padding" Value="8,6" />
+            <Setter Property="CornerRadius" Value="6" />
+        </Style>
+        <!-- The cost note: green on the PC's agents, amber where every call is paid -->
+        <Style Selector="Border.badge">
+            <Setter Property="CornerRadius" Value="10" />
+            <Setter Property="Padding" Value="10,3" />
+            <Setter Property="Margin" Value="0,0,6,6" />
+            <Setter Property="Background" Value="{DynamicResource HelmSubtleFill}" />
+        </Style>
+        <Style Selector="Border.badge.free TextBlock">
+            <Setter Property="Foreground" Value="{DynamicResource HelmSuccess}" />
+        </Style>
+        <Style Selector="Border.badge.warning">
+            <Setter Property="Background" Value="{DynamicResource HelmWarningBackground}" />
+        </Style>
+        <Style Selector="Button.step">
+            <Setter Property="Width" Value="48" />
+            <Setter Property="Height" Value="48" />
+            <Setter Property="Padding" Value="0" />
+            <Setter Property="HorizontalContentAlignment" Value="Center" />
+            <Setter Property="VerticalContentAlignment" Value="Center" />
+        </Style>
+    </UserControl.Styles>
+
+    <Panel>
+        <!-- The list: one row per feature, its state in one line, and its switch -->
+        <StackPanel IsVisible="{Binding IsList}">
+            <TextBlock Text="{Binding SummaryText}" Classes="secondary" Margin="4,0,0,0" />
+            <TextBlock Text="Synced with your PC: a change on one shows on the other." Classes="secondary" Margin="4,2,0,0" />
+            <ItemsControl ItemsSource="{Binding Groups}">
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate x:DataType="ai:AiFeatureGroup">
+                        <StackPanel>
+                            <WrapPanel>
+                                <TextBlock Text="{Binding Title}" Classes="group" />
+                                <TextBlock Text="{Binding Note}" Classes="secondary" Margin="8,20,0,8" VerticalAlignment="Center" />
+                            </WrapPanel>
+                            <Border Classes="card" Padding="4">
+                                <ItemsControl ItemsSource="{Binding Rows}">
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate x:DataType="ai:AiFeatureRow">
+                                            <DockPanel MinHeight="56">
+                                                <ToggleSwitch DockPanel.Dock="Right" IsChecked="{Binding IsOn}" OnContent="" OffContent="" Margin="8,0,8,0"
+                                                              VerticalAlignment="Center" AutomationProperties.Name="{Binding Name}" />
+                                                <Button Classes="flat" VerticalAlignment="Stretch" VerticalContentAlignment="Center"
+                                                        Command="{Binding $parent[UserControl].((ai:AiFeaturesViewModel)DataContext).OpenCommand}"
+                                                        CommandParameter="{Binding}" AutomationProperties.Name="{Binding Name}">
+                                                    <StackPanel Spacing="2">
+                                                        <TextBlock Text="{Binding Name}" TextWrapping="Wrap" />
+                                                        <TextBlock Text="{Binding StateText}" Classes="secondary" />
+                                                    </StackPanel>
+                                                </Button>
+                                            </DockPanel>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                            </Border>
+                        </StackPanel>
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+        </StackPanel>
+
+        <!-- One feature: on, where it runs, model, effort, daily cap, what it may cost -->
+        <ContentControl IsVisible="{Binding IsDetail}" Content="{Binding Selected}">
+            <ContentControl.ContentTemplate>
+                <DataTemplate x:DataType="ai:AiFeatureRow">
+                    <StackPanel>
+                        <Button Classes="flat" HorizontalAlignment="Left" Padding="4,8" AutomationProperties.Name="Back to AI features"
+                                Command="{Binding $parent[UserControl].((ai:AiFeaturesViewModel)DataContext).CloseCommand}">
+                            <StackPanel Orientation="Horizontal" Spacing="12">
+                                <ic:SymbolIcon Symbol="ArrowLeft" FontSize="20" VerticalAlignment="Center" />
+                                <TextBlock Text="{Binding Name}" FontSize="18" FontWeight="SemiBold" VerticalAlignment="Center" TextWrapping="Wrap" />
+                            </StackPanel>
+                        </Button>
+
+                        <Border Classes="card" Margin="0,8,0,4">
+                            <DockPanel>
+                                <ToggleSwitch DockPanel.Dock="Right" IsChecked="{Binding IsOn}" OnContent="" OffContent="" VerticalAlignment="Center"
+                                              AutomationProperties.Name="On" />
+                                <StackPanel VerticalAlignment="Center" Spacing="2" Margin="0,0,12,0">
+                                    <TextBlock Text="On" />
+                                    <TextBlock Text="{Binding Description}" Classes="secondary" />
+                                </StackPanel>
+                            </DockPanel>
+                        </Border>
+
+                        <TextBlock Text="Where it runs" Classes="group" />
+                        <Border Classes="card" Padding="4">
+                            <ListBox Classes="choices" ItemsSource="{Binding Routes}" SelectedItem="{Binding Route}" AutomationProperties.Name="Where it runs">
+                                <ListBox.ItemTemplate>
+                                    <DataTemplate x:DataType="ai:AiRouteOption">
+                                        <DockPanel>
+                                            <RadioButton DockPanel.Dock="Left" IsHitTestVisible="False" Focusable="False" VerticalAlignment="Center"
+                                                         IsChecked="{Binding $parent[ListBoxItem].IsSelected, Mode=OneWay}" />
+                                            <StackPanel VerticalAlignment="Center" Spacing="2">
+                                                <TextBlock Text="{Binding Label}" />
+                                                <TextBlock Text="{Binding Detail}" Classes="secondary" />
+                                            </StackPanel>
+                                        </DockPanel>
+                                    </DataTemplate>
+                                </ListBox.ItemTemplate>
+                            </ListBox>
+                        </Border>
+
+                        <TextBlock Text="Model" Classes="group" />
+                        <Border Classes="card" Padding="4">
+                            <ListBox Classes="choices" ItemsSource="{Binding Models}" SelectedItem="{Binding Model}" AutomationProperties.Name="Model">
+                                <ListBox.ItemTemplate>
+                                    <DataTemplate x:DataType="assistant:AssistantModelOption">
+                                        <DockPanel>
+                                            <RadioButton DockPanel.Dock="Left" IsHitTestVisible="False" Focusable="False" VerticalAlignment="Center"
+                                                         IsChecked="{Binding $parent[ListBoxItem].IsSelected, Mode=OneWay}" />
+                                            <TextBlock Text="{Binding Name}" VerticalAlignment="Center" TextWrapping="Wrap" />
+                                        </DockPanel>
+                                    </DataTemplate>
+                                </ListBox.ItemTemplate>
+                            </ListBox>
+                        </Border>
+
+                        <WrapPanel>
+                            <TextBlock Text="Effort" Classes="group" />
+                            <TextBlock Text="· Claude only" Classes="secondary" Margin="6,20,0,8" VerticalAlignment="Center" IsVisible="{Binding !CanChooseEffort}" />
+                        </WrapPanel>
+                        <Border Classes="card">
+                            <ListBox ItemsSource="{Binding Efforts}" SelectedItem="{Binding Effort}" IsEnabled="{Binding CanChooseEffort}" Background="Transparent"
+                                     ScrollViewer.HorizontalScrollBarVisibility="Disabled" ScrollViewer.VerticalScrollBarVisibility="Disabled" AutomationProperties.Name="Effort">
+                                <ListBox.ItemsPanel>
+                                    <ItemsPanelTemplate>
+                                        <UniformGrid Rows="1" />
+                                    </ItemsPanelTemplate>
+                                </ListBox.ItemsPanel>
+                                <ListBox.ItemTemplate>
+                                    <DataTemplate x:DataType="ai:AiEffortOption">
+                                        <TextBlock Text="{Binding Label}" HorizontalAlignment="Center" />
+                                    </DataTemplate>
+                                </ListBox.ItemTemplate>
+                            </ListBox>
+                        </Border>
+
+                        <TextBlock Text="Daily cap" Classes="group" />
+                        <Border Classes="card">
+                            <StackPanel Spacing="8">
+                                <StackPanel Orientation="Horizontal" Spacing="12" IsEnabled="{Binding CanReachApi}">
+                                    <Button Classes="step" Command="{Binding LessCapCommand}" AutomationProperties.Name="Less">
+                                        <ic:SymbolIcon Symbol="Subtract" FontSize="18" />
+                                    </Button>
+                                    <TextBlock Text="{Binding CapText}" VerticalAlignment="Center" TextWrapping="Wrap" />
+                                    <Button Classes="step" Command="{Binding MoreCapCommand}" AutomationProperties.Name="More">
+                                        <ic:SymbolIcon Symbol="Add" FontSize="18" />
+                                    </Button>
+                                </StackPanel>
+                                <TextBlock Classes="secondary"
+                                           Text="Once today's API calls cost this much, the feature pauses until tomorrow. Agents on your PC never count." />
+                            </StackPanel>
+                        </Border>
+
+                        <WrapPanel Margin="0,12,0,0">
+                            <Border Classes="badge" Classes.free="{Binding IsFree}" Classes.warning="{Binding IsCostWarning}">
+                                <TextBlock Text="{Binding CostText}" FontSize="12" />
+                            </Border>
+                            <Border Classes="badge" IsVisible="{Binding HasCostDetail}">
+                                <TextBlock Text="{Binding CostDetail}" FontSize="12" />
+                            </Border>
+                        </WrapPanel>
+                        <TextBlock Text="{Binding Route.Detail}" Classes="secondary" Margin="4,0,0,0" />
+                    </StackPanel>
+                </DataTemplate>
+            </ContentControl.ContentTemplate>
+        </ContentControl>
+    </Panel>
+</UserControl>

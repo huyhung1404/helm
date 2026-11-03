@@ -34,7 +34,7 @@ public sealed class AiTextService(
     public string? Unavailable(string feature)
     {
         var choice = ChoiceFor(feature);
-        if (!choice.Enabled) return "This AI feature is turned off: AI → Features on the PC.";
+        if (!choice.Enabled) return "This AI feature is turned off: AI → Features on the PC, or General › AI features on the phone.";
         if (router.Agents(choice).Count > 0) return null;
         if (!AiRouter.MayUseApi(choice)) return router.NoPc();
         return Api(choice) is null
@@ -45,7 +45,7 @@ public sealed class AiTextService(
     public async Task<AiTextAnswer> AskAsync(AiTextRequest request, CancellationToken ct)
     {
         var choice = ChoiceFor(request.Feature);
-        if (!choice.Enabled) return AiTextAnswer.Failed("This AI feature is turned off: AI → Features on the PC.");
+        if (!choice.Enabled) return AiTextAnswer.Failed("This AI feature is turned off: AI → Features on the PC, or General › AI features on the phone.");
         var model = choice.Model;
 
         foreach (var route in router.Agents(choice))

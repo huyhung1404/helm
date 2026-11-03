@@ -94,6 +94,21 @@
             </DockPanel>
         </Border>
 
+        <!-- AI: each AI feature's settings, on a page of its own (the PC's AI → Features) -->
+        <TextBlock Text="AI" Classes="section" />
+        <Border Classes="card" Padding="4">
+            <Button Classes="flat" Command="{Binding OpenAiFeaturesCommand}" AutomationProperties.Name="AI features">
+                <DockPanel>
+                    <ic:SymbolIcon DockPanel.Dock="Left" Symbol="Sparkle" FontSize="22" Margin="0,0,16,0" VerticalAlignment="Center" />
+                    <ic:SymbolIcon DockPanel.Dock="Right" Symbol="ChevronRight" FontSize="16" Margin="8,0,0,0" VerticalAlignment="Center" />
+                    <StackPanel VerticalAlignment="Center" Spacing="2">
+                        <TextBlock Text="AI features" />
+                        <TextBlock Text="On or off, where each one runs, its model and daily cap. The same settings as on the PC." Classes="secondary" />
+                    </StackPanel>
+                </DockPanel>
+            </Button>
+        </Border>
+
         <!-- Running in background: tools that keep something running, each with Stop -->
         <TextBlock Text="Running in background" Classes="section" />
         <Border Classes="card" DataContext="{Binding Background}" x:DataType="shell:BackgroundActivitiesViewModel">

@@ -1,0 +1,140 @@
+<UserControl
+    x:Class="Helm.App.Views.Ai.AiFeaturesView"
+    x:ClassModifier="internal"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml">
+
+    <!-- The Features part of the AI page: one table, every AI feature's settings; its DataContext is an AiFeaturesViewModel. -->
+    <UserControl.Resources>
+        <!-- The table's columns, the same in the header and every row (the feature's name takes what is left) -->
+        <GridLength x:Key="OnColumn">64</GridLength>
+        <GridLength x:Key="RouteColumn">148</GridLength>
+        <GridLength x:Key="ModelColumn">176</GridLength>
+        <GridLength x:Key="EffortColumn">104</GridLength>
+        <GridLength x:Key="CapColumn">96</GridLength>
+        <GridLength x:Key="CostColumn">210</GridLength>
+
+        <Style x:Key="HeaderCell" TargetType="TextBlock" BasedOn="{StaticResource HelmSecondaryText}">
+            <Setter Property="Margin" Value="0,0,8,0" />
+            <Setter Property="VerticalAlignment" Value="Center" />
+        </Style>
+
+        <!-- The cost badge: green on the PC's agents (0đ), amber where every call is paid -->
+        <Style x:Key="CostBadge" TargetType="Border">
+            <Setter Property="CornerRadius" Value="10" />
+            <Setter Property="Padding" Value="8,2" />
+            <Setter Property="Margin" Value="0,1,4,1" />
+            <Setter Property="HorizontalAlignment" Value="Left" />
+            <Setter Property="Background" Value="{DynamicResource SubtleFillColorSecondaryBrush}" />
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding IsFree}" Value="True">
+                    <Setter Property="Background" Value="{DynamicResource SystemFillColorSuccessBackgroundBrush}" />
+                </DataTrigger>
+                <DataTrigger Binding="{Binding IsCostWarning}" Value="True">
+                    <Setter Property="Background" Value="{DynamicResource SystemFillColorCautionBackgroundBrush}" />
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+    </UserControl.Resources>
+
+    <StackPanel>
+        <TextBlock Style="{DynamicResource HelmSecondaryText}"
+                   Text="Each AI feature: on or off, where it runs, its model, how hard it thinks and what it may spend on the API a day. Changes save at once and sync to your phone (General › AI features)." />
+
+        <!-- Today's runs -->
+        <Border Style="{DynamicResource HelmSurface}" Margin="0,12,0,0" Padding="16,10">
+            <TextBlock Text="{Binding SummaryText}" TextWrapping="Wrap" />
+        </Border>
+
+        <Border Style="{DynamicResource HelmSurface}" Margin="0,8,0,0" Padding="0,0,0,4">
+            <StackPanel>
+                <Grid Margin="16,10,8,8">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" MinWidth="160" />
+                        <ColumnDefinition Width="{StaticResource OnColumn}" />
+                        <ColumnDefinition Width="{StaticResource RouteColumn}" />
+                        <ColumnDefinition Width="{StaticResource ModelColumn}" />
+                        <ColumnDefinition Width="{StaticResource EffortColumn}" />
+                        <ColumnDefinition Width="{StaticResource CapColumn}" />
+                        <ColumnDefinition Width="{StaticResource CostColumn}" />
+                    </Grid.ColumnDefinitions>
+                    <TextBlock Style="{StaticResource HeaderCell}" Text="Feature" />
+                    <TextBlock Grid.Column="1" Style="{StaticResource HeaderCell}" Text="On" />
+                    <TextBlock Grid.Column="2" Style="{StaticResource HeaderCell}" Text="Route" />
+                    <TextBlock Grid.Column="3" Style="{StaticResource HeaderCell}" Text="Model" />
+                    <TextBlock Grid.Column="4" Style="{StaticResource HeaderCell}" Text="Effort" />
+                    <TextBlock Grid.Column="5" Style="{StaticResource HeaderCell}" Text="Cap/day ($)" />
+                    <TextBlock Grid.Column="6" Style="{StaticResource HeaderCell}" Text="Cost" />
+                </Grid>
+
+                <ItemsControl ItemsSource="{Binding Groups}" Focusable="False">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate>
+                            <StackPanel>
+                                <!-- "On request" / "Automatic" -->
+                                <Border Background="{DynamicResource SubtleFillColorSecondaryBrush}" Padding="16,6" BorderThickness="0,1,0,0"
+                                        BorderBrush="{DynamicResource CardStrokeColorDefaultBrush}">
+                                    <WrapPanel>
+                                        <TextBlock Text="{Binding Title}" FontWeight="SemiBold" Margin="0,0,12,0" />
+                                        <TextBlock Text="{Binding Note}" Style="{DynamicResource HelmSecondaryText}" VerticalAlignment="Center" />
+                                    </WrapPanel>
+                                </Border>
+                                <ItemsControl ItemsSource="{Binding Rows}" Focusable="False">
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate>
+                                            <Border Padding="16,6,8,6" BorderThickness="0,1,0,0" BorderBrush="{DynamicResource CardStrokeColorDefaultBrush}">
+                                                <Grid>
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="*" MinWidth="160" />
+                                                        <ColumnDefinition Width="{StaticResource OnColumn}" />
+                                                        <ColumnDefinition Width="{StaticResource RouteColumn}" />
+                                                        <ColumnDefinition Width="{StaticResource ModelColumn}" />
+                                                        <ColumnDefinition Width="{StaticResource EffortColumn}" />
+                                                        <ColumnDefinition Width="{StaticResource CapColumn}" />
+                                                        <ColumnDefinition Width="{StaticResource CostColumn}" />
+                                                    </Grid.ColumnDefinitions>
+                                                    <StackPanel Margin="0,0,8,0" VerticalAlignment="Center" ToolTip="{Binding Description}">
+                                                        <TextBlock Text="{Binding Name}" TextTrimming="CharacterEllipsis" />
+                                                        <TextBlock Text="{Binding Description}" Style="{DynamicResource HelmSecondaryText}"
+                                                                   TextWrapping="NoWrap" TextTrimming="CharacterEllipsis" />
+                                                    </StackPanel>
+                                                    <ui:ToggleSwitch Grid.Column="1" Margin="0,0,8,0" VerticalAlignment="Center" IsChecked="{Binding IsOn}"
+                                                                     AutomationProperties.Name="{Binding Name, StringFormat='{}{0}: on'}" />
+                                                    <ComboBox Grid.Column="2" Margin="0,0,8,0" VerticalAlignment="Center" ItemsSource="{Binding Routes}" SelectedItem="{Binding Route}"
+                                                              DisplayMemberPath="Label" ToolTip="{Binding Route.Detail}" IsEnabled="{Binding IsOn}"
+                                                              AutomationProperties.Name="{Binding Name, StringFormat='{}{0}: route'}" />
+                                                    <ComboBox Grid.Column="3" Margin="0,0,8,0" VerticalAlignment="Center" ItemsSource="{Binding Models}" SelectedItem="{Binding Model}"
+                                                              DisplayMemberPath="Name" IsEnabled="{Binding IsOn}"
+                                                              AutomationProperties.Name="{Binding Name, StringFormat='{}{0}: model'}" />
+                                                    <ComboBox Grid.Column="4" Margin="0,0,8,0" VerticalAlignment="Center" ItemsSource="{Binding Efforts}" SelectedItem="{Binding Effort}"
+                                                              DisplayMemberPath="Label" IsEnabled="{Binding CanChooseEffort}" ToolTip="Claude models only"
+                                                              ToolTipService.ShowOnDisabled="True"
+                                                              AutomationProperties.Name="{Binding Name, StringFormat='{}{0}: effort'}" />
+                                                    <ui:NumberBox Grid.Column="5" Margin="0,0,8,0" VerticalAlignment="Center" Value="{Binding Cap}" Minimum="0" Maximum="20"
+                                                                  SmallChange="0.05" LargeChange="0.5" MaxDecimalPlaces="2" ClearButtonEnabled="False"
+                                                                  SpinButtonPlacementMode="Hidden" IsEnabled="{Binding CanReachApi}"
+                                                                  ToolTip="What it may spend on the API a day (USD); it pauses until tomorrow once reached."
+                                                                  AutomationProperties.Name="{Binding Name, StringFormat='{}{0}: daily cap in dollars'}" />
+                                                    <WrapPanel Grid.Column="6" VerticalAlignment="Center">
+                                                        <Border Style="{StaticResource CostBadge}">
+                                                            <TextBlock Text="{Binding CostText}" FontSize="12" />
+                                                        </Border>
+                                                        <Border Style="{StaticResource CostBadge}" Background="{DynamicResource SubtleFillColorSecondaryBrush}"
+                                                                Visibility="{Binding HasCostDetail, Converter={StaticResource BoolToVisibility}}">
+                                                            <TextBlock Text="{Binding CostDetail}" FontSize="12" />
+                                                        </Border>
+                                                    </WrapPanel>
+                                                </Grid>
+                                            </Border>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                            </StackPanel>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+            </StackPanel>
+        </Border>
+    </StackPanel>
+</UserControl>
