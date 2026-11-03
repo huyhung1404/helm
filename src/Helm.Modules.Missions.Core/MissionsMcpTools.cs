@@ -19,10 +19,19 @@ public sealed class MissionsMcpTools(MissionsStore store) : IMcpToolProvider
     public IEnumerable<McpTool> Tools =>
     [
         new("missions_list", "The user's missions (goals reached through ordered steps): status, progress, the current step, pace and deadline.",
-            McpTool.NoArguments(), (_, _) => Task.FromResult<object?>(List())) { ReadOnly = true },
+            McpTool.NoArguments(), (_, _) => Task.FromResult<object?>(List()))
+        {
+            ReadOnly = true,
+            Brief = "Missions (goals reached through ordered steps): status, progress, current step, pace, deadline.",
+        },
         new("mission_get", "One mission with its phases and every step: what to do, how to check it is done, dates, notes; plus its pace.",
             McpArgs.Schema(("mission", McpArgs.Text("The mission's id or title."), true)),
-            (args, _) => Task.FromResult<object?>(Get(McpArgs.RequiredString(args, "mission")))) { ReadOnly = true },
+            (args, _) => Task.FromResult<object?>(Get(McpArgs.RequiredString(args, "mission"))))
+        {
+            ReadOnly = true,
+            Brief = "One mission with its phases and steps (checklists, dates, notes) and pace.",
+            BriefArgs = MissionArg,
+        },
         new("mission_create",
             "Create a mission: a goal split into phases of concrete steps done in order. Write titles and texts in the user's language. " +
             "Each step should take 0.5-3 days, with a doneWhen the user can check; end each phase with a review step; give each phase a small " +
@@ -31,12 +40,23 @@ public sealed class MissionsMcpTools(MissionsStore store) : IMcpToolProvider
         {
             // Helm's own assistant creates at once and offers Undo: the new mission goes again, steps and all.
             Undo = (result, _) => { McpTool.Undone(store.Delete(Id(result, "id"))); return Task.CompletedTask; },
+            Brief = "Create a mission: a goal in phases of steps done in order, in the user's language. Steps of 0.5-3 days, each with a doneWhen " +
+                "the user can check; each phase ends with a review step and has a small reward, the mission a bigger one. Resource links only real ones. " +
+                "Not started unless start: true.",
+            // Every step it made, echoed back, would cost more than the plan itself.
+            BriefResult = McpTool.Keep("id", "title", "status", "progress", "current_step", "deadline", "warnings"),
         },
         new("mission_complete_step", "Complete the current step of a mission (steps are done in order), with an optional note on what was done.",
             McpArgs.Schema(
                 ("mission", McpArgs.Text("The mission's id or title."), true),
                 ("note", McpArgs.Text("What was done, a result or a link (optional)."), false)),
-            (args, _) => Task.FromResult<object?>(CompleteStep(args, skip: false))) { Undo = ReopenUndo },
+            (args, _) => Task.FromResult<object?>(CompleteStep(args, skip: false)))
+        {
+            Undo = ReopenUndo,
+            Brief = "Complete a mission's current step (steps go in order), with an optional note on what was done.",
+            BriefArgs = MissionArg,
+            BriefResult = McpTool.Drop("mission_id"),
+        },
         new("mission_replan",
             "Plan the rest of a mission again, e.g. when the user is behind or something changed: every step not done yet (the current one " +
             "too) is replaced by these phases and steps; done steps stay. Read mission_get first to see what is done and how long steps took. " +
@@ -62,7 +82,13 @@ public sealed class MissionsMcpTools(MissionsStore store) : IMcpToolProvider
             McpArgs.Schema(
                 ("mission", McpArgs.Text("The mission's id or title."), true),
                 ("note", McpArgs.Text("Why it was skipped (optional)."), false)),
-            (args, _) => Task.FromResult<object?>(CompleteStep(args, skip: true))) { Undo = ReopenUndo },
+            (args, _) => Task.FromResult<object?>(CompleteStep(args, skip: true)))
+        {
+            Undo = ReopenUndo,
+            Brief = "Skip a mission's current step (it counts as passed), with an optional note on why.",
+            BriefArgs = MissionArg,
+            BriefResult = McpTool.Drop("mission_id"),
+        },
         new("mission_reopen_step", "Undo: the most recently completed or skipped step of a mission becomes the current step again.",
             McpArgs.Schema(("mission", McpArgs.Text("The mission's id or title."), true)),
             (args, _) => Task.FromResult<object?>(ReopenStep(args))),
@@ -73,6 +99,9 @@ public sealed class MissionsMcpTools(MissionsStore store) : IMcpToolProvider
                 ("done", McpArgs.Flag("True to tick it (default), false to untick it."), false)),
             (args, _) => Task.FromResult<object?>(CheckItem(args)))
         {
+            Brief = "Tick or untick an item of the current step's checklist.",
+            BriefArgs = new Dictionary<string, string> { ["mission"] = "id or title", ["item"] = "its number from 1, as mission_get lists them", ["done"] = "false: untick" },
+            BriefResult = McpTool.Keep("title", "checklist", "item", "changed"),
             Undo = (result, _) =>
             {
                 // Ticked back the other way, if the step is still the current one.
@@ -93,6 +122,9 @@ public sealed class MissionsMcpTools(MissionsStore store) : IMcpToolProvider
                 ("note", McpArgs.Text("New note (replaces the old one)."), false)),
             (args, _) => Task.FromResult<object?>(EditStep(args))),
     ];
+
+    /// <summary>The hint Helm's own assistant gets for a <c>mission</c> argument.</summary>
+    private static readonly IReadOnlyDictionary<string, string> MissionArg = new Dictionary<string, string> { ["mission"] = "id or title" };
 
     /// <summary>A step completed or skipped through here is the current one again.</summary>
     private Task ReopenUndo(JsonElement result, CancellationToken ct)

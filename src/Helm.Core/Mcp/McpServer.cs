@@ -43,6 +43,59 @@ public sealed record McpTool(string Name, string Description, JsonObject InputSc
     public const string RecordsProperty = "records";
 
     /// <summary>
+    /// What Helm's own assistant (Ask Helm, the agents on a PC) tells its model instead of <see cref="Description"/>:
+    /// shorter, since every call pays for it in tokens. With it, the schema goes without its descriptions but those of
+    /// <see cref="BriefArgs"/> (types, enums and required stay). Null: the full texts. MCP clients always get the full ones.
+    /// </summary>
+    public string? Brief { get; init; }
+
+    /// <summary>With <see cref="Brief"/>: the arguments that keep a hint (name → a few words: an amount's or a date's form).</summary>
+    public IReadOnlyDictionary<string, string>? BriefArgs { get; init; }
+
+    /// <summary>
+    /// What Helm's own assistant sends its model of a result: only what it needs to answer (<see cref="Keep"/>,
+    /// <see cref="Drop"/>). Undo, the card's records and MCP clients still get the whole result. Null: all of it.
+    /// </summary>
+    public Func<JsonNode, JsonNode?>? BriefResult { get; init; }
+
+    /// <summary>
+    /// A <see cref="BriefResult"/> with only these properties of the result (of each item, for a list), and
+    /// <see cref="UnchangedProperty"/> when it is there.
+    /// </summary>
+    public static Func<JsonNode, JsonNode?> Keep(params string[] names) => result => Kept(result, names);
+
+    /// <summary>A <see cref="BriefResult"/> without these properties, at any depth.</summary>
+    public static Func<JsonNode, JsonNode?> Drop(params string[] names) => result =>
+    {
+        Dropped(result, names);
+        return result;
+    };
+
+    private static JsonNode? Kept(JsonNode node, string[] names)
+    {
+        if (node is JsonArray list) return new JsonArray([.. list.Select(item => item is null ? null : Kept(item, names))]);
+        if (node is not JsonObject full) return node;
+        var kept = new JsonObject();
+        foreach (var (name, value) in full.ToList())
+        {
+            if (!names.Contains(name) && name != UnchangedProperty) continue;
+            full.Remove(name);
+            kept[name] = value;
+        }
+        return kept;
+    }
+
+    private static void Dropped(JsonNode? node, string[] names)
+    {
+        if (node is JsonArray list)
+            foreach (var item in list) Dropped(item, names);
+        else if (node is JsonObject item)
+            foreach (var (name, value) in item.ToList())
+                if (names.Contains(name)) item.Remove(name);
+                else Dropped(value, names);
+    }
+
+    /// <summary>
     /// <c>true</c> in a result (or a record of it) that changed nothing (a task that was done already): Helm's assistant
     /// lists it without Undo, since taking it back would undo what was there before.
     /// </summary>

@@ -25,12 +25,27 @@ public sealed class AiBriefTools(AiBriefBook briefs, ISyncedSettings<AiFeatureSe
             McpArgs.Schema(
                 ("kind", McpArgs.OneOf("Only one job's briefs.", [.. AutoJobCatalog.All.Select(j => j.Feature)]), false),
                 ("limit", McpArgs.Number($"How many (default {DefaultLimit})."), false)),
-            (args, _) => Task.FromResult<object?>(Read(args))) { ReadOnly = true },
+            (args, _) => Task.FromResult<object?>(Read(args)))
+        {
+            ReadOnly = true,
+            Brief = "Briefs Helm's PC wrote by itself, newest first (morning brief, evening review, habit coaching, spending digest, important " +
+                "days, note titles, Scratch); reading marks them read.",
+            BriefArgs = new Dictionary<string, string> { ["limit"] = $"default {DefaultLimit}" },
+            BriefResult = McpTool.Drop("wasRead"),
+        },
         new("ai_brief_undo", "Take back what an automatic job changed, as its brief lists it (the titles and tags it gave notes).",
             McpArgs.Schema(("id", McpArgs.Text("The brief's id (from ai_briefs)."), true)),
-            (args, ct) => Undo(McpArgs.RequiredString(args, "id"), ct)),
+            (args, ct) => Undo(McpArgs.RequiredString(args, "id"), ct))
+        {
+            Brief = "Take back what an automatic job changed, as its brief lists it.",
+            BriefArgs = new Dictionary<string, string> { ["id"] = "the brief's, from ai_briefs" },
+        },
         new("ai_auto_jobs", "The jobs Helm's PC runs by itself on its AI agents: each one's id, name, whether it is on, its time and when it runs.",
-            McpTool.NoArguments(), (_, _) => Task.FromResult<object?>(Jobs())) { ReadOnly = true },
+            McpTool.NoArguments(), (_, _) => Task.FromResult<object?>(Jobs()))
+        {
+            ReadOnly = true,
+            Brief = "The jobs Helm's PC runs by itself on its AI agents: id, name, on or off, time, when it runs.",
+        },
         new("ai_auto_job_set", "Turn an automatic job on or off, or change its time of day.",
             McpArgs.Schema(
                 ("job", McpArgs.OneOf("The job's id.", [.. AutoJobCatalog.All.Select(j => j.Feature)]), true),
@@ -38,6 +53,9 @@ public sealed class AiBriefTools(AiBriefBook briefs, ISyncedSettings<AiFeatureSe
                 ("at", McpArgs.Text("Its time of day, 24 h: 07:00 or 21:30."), false)),
             (args, _) => Task.FromResult<object?>(Set(args)))
         {
+            Brief = "Turn an automatic job on or off, or change its time of day.",
+            BriefArgs = new Dictionary<string, string> { ["at"] = "24 h: 07:00" },
+            BriefResult = McpTool.Drop("before"),
             Undo = (result, _) =>
             {
                 var job = result.GetProperty("job").GetString()!;

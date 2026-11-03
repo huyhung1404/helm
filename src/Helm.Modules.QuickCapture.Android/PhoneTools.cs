@@ -20,26 +20,11 @@ internal sealed class PhoneTools(Activity activity) : IMcpToolProvider
 
     public IEnumerable<McpTool> Tools =>
     [
-        new("phone_set_alarm", "Set an alarm in the phone's Clock app.",
-            McpArgs.Schema(
-                ("time", McpArgs.Text("The time, 24-hour: 06:30 or 21:00."), true),
-                ("label", McpArgs.Text("What it is for, shown when it rings (optional)."), false)),
-            (args, _) => Run(() => Alarm(args))),
-        new("phone_set_timer", "Start a countdown timer in the phone's Clock app.",
-            McpArgs.Schema(
-                ("seconds", McpArgs.Number("How long, in seconds (600 for 10 minutes)."), true),
-                ("label", McpArgs.Text("What it is for (optional)."), false)),
-            (args, _) => Run(() => Timer(args))),
-        new("phone_add_calendar_event", "Open the phone's calendar on a new event with these details filled in; the user saves it there.",
-            McpArgs.Schema(
-                ("title", McpArgs.Text("The event's title."), true),
-                ("start", McpArgs.Text("When it starts, the user's local time: 2026-11-06T15:00."), true),
-                ("end", McpArgs.Text("When it ends (default: an hour after the start)."), false),
-                ("location", McpArgs.Text("Where (optional)."), false)),
-            (args, _) => Run(() => Calendar(args))),
-        new("phone_clipboard", "The text the user copied last on the phone (to save it somewhere, or to work on it).",
-            McpTool.NoArguments(),
-            (_, _) => Run(Clipboard)) { ReadOnly = true },
+        // The texts are PhoneToolSpecs', the same a PC's agent is offered.
+        PhoneToolSpecs.On(PhoneToolSpecs.Alarm, (args, _) => Run(() => Alarm(args))),
+        PhoneToolSpecs.On(PhoneToolSpecs.Timer, (args, _) => Run(() => Timer(args))),
+        PhoneToolSpecs.On(PhoneToolSpecs.CalendarEvent, (args, _) => Run(() => Calendar(args))),
+        PhoneToolSpecs.On(PhoneToolSpecs.Clipboard, (_, _) => Run(Clipboard)),
         PhoneToolSpecs.On(PhoneToolSpecs.Navigate, (args, _) => Run(() => Navigate(args))),
         PhoneToolSpecs.On(PhoneToolSpecs.OpenApp, (args, _) => Run(() => OpenApp(args))),
         PhoneToolSpecs.On(PhoneToolSpecs.ShareText, (args, _) => Run(() => Share(args))),

@@ -15,7 +15,12 @@ public sealed class BillMcpTools(BillBook bills, WalletStore store) : IMcpToolPr
     public IEnumerable<McpTool> Tools =>
     [
         new("bills_list", "The user's recurring bills (electricity, water, internet, rent…): the amount or what it came to last time, the day of the month it is due, the next unpaid due day, and whether this month is paid.",
-            McpTool.NoArguments(), (_, _) => Task.FromResult<object?>(List())) { ReadOnly = true },
+            McpTool.NoArguments(), (_, _) => Task.FromResult<object?>(List()))
+        {
+            ReadOnly = true,
+            Brief = "Recurring bills: amount (or last time's), due day of the month, next unpaid due day, paid this month.",
+            BriefResult = McpTool.Drop("currency", "varies", "last_paid"),
+        },
         new("bill_add", "Add a bill that comes every month; Helm reminds the user before it is due.",
             McpArgs.Schema(
                 ("name", McpArgs.Text("What it is: Tiền điện, Internet, Tiền nhà."), true),
@@ -25,6 +30,9 @@ public sealed class BillMcpTools(BillBook bills, WalletStore store) : IMcpToolPr
             (args, _) => Task.FromResult<object?>(Add(args)))
         {
             Undo = (result, _) => { McpTool.Undone(bills.Delete(WalletArgs.Id(result))); return Task.CompletedTask; },
+            Brief = "Add a monthly bill; Helm reminds the user before it is due.",
+            BriefArgs = new Dictionary<string, string> { ["due_day"] = "1-31", ["amount"] = "the same every month, đồng; left out: it varies" },
+            BriefResult = McpTool.Keep("name", "amount", "next_due"),
         },
         new("bill_pay", "The user paid a bill (\"đóng tiền điện rồi 450k\"): saves the spending in the Wallet and marks that month paid.",
             McpArgs.Schema(
@@ -33,6 +41,14 @@ public sealed class BillMcpTools(BillBook bills, WalletStore store) : IMcpToolPr
                 ("when", McpArgs.Text("When it was paid, the user's local time: 2026-11-03 or 2026-11-03T09:00. Left out: now."), false)),
             (args, _) => Task.FromResult<object?>(Pay(args)))
         {
+            Brief = "The user paid a bill (\"đóng tiền điện rồi 450k\"): saves the spending and marks the month paid.",
+            BriefArgs = new Dictionary<string, string>
+            {
+                ["bill"] = "its name or id",
+                ["amount"] = "đồng; default the bill's fixed amount",
+                ["when"] = "local: 2026-11-03T09:00; default now",
+            },
+            BriefResult = McpTool.Keep("name", "amount", "month", "next_due"),
             Undo = (result, _) =>
             {
                 var payment = new BillPayment(WalletArgs.Id(result, "transaction_id"), DateOnly.ParseExact(WalletArgs.Id(result, "month") + "-01", "yyyy-MM-dd", CultureInfo.InvariantCulture),

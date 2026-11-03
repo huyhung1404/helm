@@ -97,7 +97,8 @@ internal static class AssistantLoop
                             records.Add(new AiJobAction(call.Name, summary, record));
                         }
                     }
-                    results.Add(new ToolOutcome(call.Id, json, false));
+                    // The records and Undo keep the whole result; the model reads only what it needs.
+                    results.Add(new ToolOutcome(call.Id, ForModel(tool.Source, json), false));
                 }
                 catch (McpToolException ex)
                 {
@@ -138,6 +139,20 @@ internal static class AssistantLoop
         return [.. list.EnumerateArray().Select(r => (
             r.ValueKind == JsonValueKind.Object && r.TryGetProperty(AssistantTool.SummaryArgument, out var s) && s.GetString() is { Length: > 0 } line ? line : summary,
             r.GetRawText()))];
+    }
+
+    /// <summary>A result as the model gets it: shaped by the tool's <see cref="McpTool.BriefResult"/> when it has one.</summary>
+    internal static string ForModel(McpTool tool, string json)
+    {
+        if (tool.BriefResult is not { } brief) return json;
+        try
+        {
+            return JsonNode.Parse(json) is { } node ? HelmAssistant.Serialize(brief(node)) : json;
+        }
+        catch (JsonException)
+        {
+            return json;
+        }
     }
 
     internal static string Summary(ToolCall call) =>

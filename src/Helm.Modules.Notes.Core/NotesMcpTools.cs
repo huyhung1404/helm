@@ -27,10 +27,22 @@ public sealed class NotesMcpTools(NotesStore store, LinkHub? links = null) : IMc
                 ("limit", McpArgs.Number($"How many at most (default {DefaultLimit}, at most {MaxLimit})."), false),
                 ("trash", McpArgs.Flag("Search the trash instead (notes deleted in the last 30 days)."), false),
                 ("untitled", McpArgs.Flag("Only notes without a title of their own (the list shows their first line)."), false)),
-            (args, _) => Task.FromResult<object?>(Search(args))) { ReadOnly = true },
+            (args, _) => Task.FromResult<object?>(Search(args)))
+        {
+            ReadOnly = true,
+            Brief = "Find notes (without a query: the latest): ids, titles, previews; notes_read reads one. By what it is about: any with words the " +
+                "note may use, Vietnamese and English (\"lỗi server hôm trước\": lỗi server, server error, sập, crash, VPS, 500).",
+            BriefArgs = new Dictionary<string, string> { ["query"] = "words that must all be there", ["any"] = "alternatives, any of which may be there" },
+            BriefResult = McpTool.Drop("pinned"),
+        },
         new("notes_read", "The full text of a note, with the tasks and people it is linked to.",
             McpArgs.Schema(("id", McpArgs.Text("The note's id (from notes_search)."), true)),
-            (args, _) => Task.FromResult<object?>(Read(McpArgs.RequiredString(args, "id")))) { ReadOnly = true },
+            (args, _) => Task.FromResult<object?>(Read(McpArgs.RequiredString(args, "id"))))
+        {
+            ReadOnly = true,
+            Brief = "A note's full text, with the tasks and people it is linked to.",
+            BriefResult = McpTool.Drop("created", "pinned", "trashed"),
+        },
         new("notes_create", "Write a new note. The first line of the text is its title when no title is given. A note the user " +
             "dictated (speech recognition, \"ghi chú: …\"): fix its punctuation and capitals, split it into paragraphs and give it a " +
             $"short title; keep their words. Tags in use: {TagsInUse()}.",
@@ -42,6 +54,9 @@ public sealed class NotesMcpTools(NotesStore store, LinkHub? links = null) : IMc
         {
             // Into the trash, as a note the user deletes: restorable for 30 days.
             Undo = (result, _) => { McpTool.Undone(store.MoveToTrash(result.GetProperty("id").GetString()!)); return Task.CompletedTask; },
+            Brief = "Write a note (no title: its first line is). A dictated one (\"ghi chú: …\"): fix punctuation and capitals, split paragraphs, " +
+                $"give a short title, keep their words. Tags in use: {TagsInUse()}.",
+            BriefArgs = new Dictionary<string, string> { ["tags"] = "without #: idea, and a fitting tag in use" },
         },
         new("notes_edit", "Change a note: a new title, new text (replaces all of it), or text to add at the end.",
             McpArgs.Schema(
@@ -63,6 +78,14 @@ public sealed class NotesMcpTools(NotesStore store, LinkHub? links = null) : IMc
             (args, _) => Task.FromResult<object?>(AddImportantDay(args)))
         {
             Undo = (result, _) => { RemoveImportantDay(result); return Task.CompletedTask; },
+            Brief = $"Remember a day in the note “{ImportantDays.NoteTitle}”, every year (a birthday; a giỗ, often lunar) or once (a car inspection, " +
+                "a renewal, with its year); Helm reminds the user a few days before.",
+            BriefArgs = new Dictionary<string, string>
+            {
+                ["label"] = "in the user's words: Sinh nhật mẹ",
+                ["date"] = "15/03 every year; 15/03/2027 once; a lunar day as its lunar day/month",
+            },
+            BriefResult = McpTool.Keep("line", "already"),
         },
         new("notes_retitle", "Give a note that has no title of its own a title and a few tags (#words on a last line of its text).",
             McpArgs.Schema(
