@@ -49,6 +49,9 @@ public static class AiCoreServices
                 sp.GetRequiredService<AiUsageBook>(), sp.GetServices<IMcpToolProvider>(), sp.GetServices<IAssistantChatFactory>(), IsOn,
                 new AiRouter(sp.GetServices<IAgentRoute>()));
         });
+        // One answer, no tools (file a transaction, read a bank notification): agents first, the API last.
+        services.AddSingleton(sp => new AiOneShot(sp.GetRequiredService<AiKeyStore>(), sp.GetRequiredService<ISyncedSettings<AiFeatureSettings>>(),
+            sp.GetRequiredService<AiUsageBook>(), sp.GetServices<IAssistantChatFactory>(), new AiRouter(sp.GetServices<IAgentRoute>())));
         return services;
     }
 }
