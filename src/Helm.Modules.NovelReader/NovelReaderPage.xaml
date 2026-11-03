@@ -161,7 +161,7 @@
                 </Border>
                 <Border Style="{DynamicResource HelmExpanderRow}">
                     <TextBlock TextWrapping="Wrap" Style="{DynamicResource HelmSecondaryText}"
-                               Text="It needs Claude Code installed and Helm added to it (AI &amp; MCP page → Add for me). The scan runs Claude Code without a window and lets it use only Novel Reader's tools; the possible names and the sentences around them go to Claude with your plan, the novel itself does not. You can also ask Claude Code yourself, e.g. “find the character names of my novel … in Helm”. The names it finds sync to your phone." />
+                               Text="It needs Claude Code installed and Helm added to it (AI page → Agents &amp; MCP → Add for me). The scan runs Claude Code without a window and lets it use only Novel Reader's tools; the possible names and the sentences around them go to Claude with your plan, the novel itself does not. You can also ask Claude Code yourself, e.g. “find the character names of my novel … in Helm”. The names it finds sync to your phone." />
                 </Border>
             </StackPanel>
         </ui:CardExpander>

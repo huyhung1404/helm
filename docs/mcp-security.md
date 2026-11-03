@@ -136,7 +136,7 @@ A question asked too often stops meaning anything. So:
 - Helm's own log records tool names and answers, never arguments.
 - The Vault is never offered over MCP.
 
-## The Permissions card (AI & MCP page)
+## The Permissions card (AI page → Agents & MCP)
 
 - **Ask before every change**: asks before changes to Helm's data even when Helm is not elevated.
 - The elevation state: whether Helm runs as Administrator, and so whether changes are asked.

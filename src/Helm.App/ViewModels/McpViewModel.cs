@@ -43,7 +43,7 @@ internal sealed partial class McpClientRow(McpClientKind kind, string title, str
     }
 }
 
-/// <summary>The AI &amp; MCP page: how AI agents (Claude Code, VS Code, any MCP client) reach Helm's tools, and what they may do.</summary>
+/// <summary>The Agents &amp; MCP part of the AI page: how AI agents (Claude Code, VS Code, any MCP client) reach Helm's tools, and what they may do.</summary>
 internal sealed partial class McpViewModel : ObservableObject
 {
     private readonly ISettingsStore<McpSettings> _store;

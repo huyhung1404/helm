@@ -17,7 +17,7 @@ namespace Helm.App.Services;
 internal sealed record TabLook(string Title, Func<IconElement> Icon)
 {
     /// <summary>
-    /// The icon at tab size. A glyph (Home, General, AI &amp; MCP) takes the theme's text colour: left to inherit, it came
+    /// The icon at tab size. A glyph (Home, General, AI) takes the theme's text colour: left to inherit, it came
     /// out dim and sank into the strip beside the tools' coloured pictures.
     /// </summary>
     public IconElement CreateIcon()
@@ -233,7 +233,7 @@ internal sealed class TabManager(IServiceProvider services, MainWindowViewModel 
             yield return (Describe(page), page);
         }
         yield return (Describe(typeof(GeneralPage)), typeof(GeneralPage));
-        yield return (Describe(typeof(McpPage)), typeof(McpPage));
+        yield return (Describe(typeof(AiPage)), typeof(AiPage));
     }
 
     internal void Register(TabHost host)
@@ -266,7 +266,7 @@ internal sealed class TabManager(IServiceProvider services, MainWindowViewModel 
     {
         if (pageType == typeof(HomePage)) return new("Home", () => new SymbolIcon(SymbolRegular.Home24));
         if (pageType == typeof(GeneralPage)) return new("General", () => new SymbolIcon(SymbolRegular.Settings24));
-        if (pageType == typeof(McpPage)) return new("AI & MCP", () => new SymbolIcon(SymbolRegular.PlugConnected24));
+        if (pageType == typeof(AiPage)) return new("AI", () => new SymbolIcon(SymbolRegular.Sparkle24));
         if (pageType == typeof(WhatsNewPage)) return new("What's new", () => new SymbolIcon(SymbolRegular.Megaphone24));
         if (pageType == typeof(WelcomePage)) return new("Welcome", () => new SymbolIcon(SymbolRegular.HandWave24));
         if (pageType == typeof(DiagnosticsPage)) return new("Diagnostics", () => new SymbolIcon(SymbolRegular.Bug24));
@@ -289,9 +289,13 @@ internal sealed class TabManager(IServiceProvider services, MainWindowViewModel 
         return new Point(p.X, p.Y);
     }
 
+    /// <summary>The AI page was the AI &amp; MCP page before: a tab saved then opens the AI page.</summary>
+    private const string LegacyMcpPage = "Helm.App.Views.Pages.McpPage";
+
     private Type? Resolve(string? name)
     {
         if (string.IsNullOrEmpty(name)) return null;
+        if (name == LegacyMcpPage) return typeof(AiPage);
         return Launchable().Select(l => l.PageType)
             .Concat(catalog.Groups.SelectMany(g => g.Modules).Select(m => m.SettingsPageType))
             .Concat([typeof(WhatsNewPage)])

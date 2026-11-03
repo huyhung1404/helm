@@ -32,6 +32,9 @@ internal static class HelmHost
         // Core infrastructure (settings, hooks, hotkeys, window/monitor services, module registry)
         builder.Services.AddHelmCore(paths);
 
+        // The AI models Helm calls with the user's API keys (on Helm Sync).
+        Helm.Ai.AiCoreServices.AddHelmAi(builder.Services);
+
         // Modules — each module assembly exposes one registration extension.
         HelmModules.Register(builder.Services);
 
@@ -96,7 +99,9 @@ internal static class HelmHost
         builder.Services.AddSingleton<GeneralPage>();
         builder.Services.AddSingleton<McpPermissionsViewModel>();
         builder.Services.AddSingleton<McpViewModel>();
-        builder.Services.AddSingleton<McpPage>();
+        builder.Services.AddSingleton<Helm.Ai.AiKeysViewModel>();
+        builder.Services.AddSingleton<AiViewModel>();
+        builder.Services.AddSingleton<AiPage>();
         builder.Services.AddSingleton<WelcomePage>();
         builder.Services.AddSingleton<WhatsNewPage>();
         builder.Services.AddSingleton<DiagnosticsViewModel>();

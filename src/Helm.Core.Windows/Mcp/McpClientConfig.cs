@@ -4,7 +4,7 @@ using Helm.Core.Settings;
 
 namespace Helm.Core.Mcp;
 
-/// <summary>The clients the AI &amp; MCP page knows how to connect (any other client uses the plain command).</summary>
+/// <summary>The clients the AI page (Agents &amp; MCP) knows how to connect (any other client uses the plain command).</summary>
 public enum McpClientKind
 {
     /// <summary>Claude Code in a terminal and in the VS Code extension (both read the user-scope <c>~/.claude.json</c>).</summary>

@@ -3,13 +3,17 @@ using Helm.App.ViewModels;
 
 namespace Helm.App.Views.Pages;
 
-internal partial class McpPage : Page
+internal partial class AiPage : Page
 {
-    public McpPage(McpViewModel viewModel)
+    public AiPage(AiViewModel viewModel)
     {
         DataContext = viewModel;
         InitializeComponent();
         // The clients' config files and the modules may have changed while the page was away.
-        Loaded += (_, _) => viewModel.Refresh();
+        Loaded += async (_, _) =>
+        {
+            viewModel.Agents.Refresh();
+            await viewModel.Keys.OnShownAsync();
+        };
     }
 }

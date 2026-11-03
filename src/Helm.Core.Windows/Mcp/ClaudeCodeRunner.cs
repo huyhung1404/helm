@@ -25,14 +25,14 @@ public sealed class ClaudeCodeRunner(McpClientConfig mcp, IChildProcessLauncher 
     /// <summary>Why Claude Code cannot run now, or null when it can.</summary>
     public string? Unavailable()
     {
-        if (!mcp.Enabled) return "Helm's AI & MCP is turned off; turn it on on the AI & MCP page.";
+        if (!mcp.Enabled) return "Helm's tools for AI agents are off; turn them on in AI → Agents & MCP.";
         if (McpClientConfig.FindClaude() is null) return "Claude Code is not installed on this PC.";
         return mcp.Status(McpClientKind.ClaudeCode).State switch
         {
             McpClientState.Added => null,
-            McpClientState.AddedElsewhere => "Claude Code starts another Helm.exe; press Add for me on the AI & MCP page.",
+            McpClientState.AddedElsewhere => "Claude Code starts another Helm.exe; press Add for me in AI → Agents & MCP.",
             McpClientState.Unreadable => "Claude Code's settings file cannot be read.",
-            _ => "Helm is not added to Claude Code yet; press Add for me on the AI & MCP page.",
+            _ => "Helm is not added to Claude Code yet; press Add for me in AI → Agents & MCP.",
         };
     }
 
