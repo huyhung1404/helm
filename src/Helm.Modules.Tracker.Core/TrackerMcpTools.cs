@@ -16,6 +16,8 @@ public sealed class TrackerMcpTools(TrackerStore store) : IMcpToolProvider
     private const int MaxLimit = 200;
     private static readonly string[] Priorities = ["low", "normal", "high", "urgent"];
 
+    private static readonly JsonSerializerOptions Unchanged = new() { DefaultIgnoreCondition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull };
+
     /// <summary>At most this many tasks in one tracker_add_tasks call.</summary>
     internal const int MaxBatch = 30;
 
@@ -48,7 +50,7 @@ public sealed class TrackerMcpTools(TrackerStore store) : IMcpToolProvider
                 ("repeat_until", McpArgs.Text("With repeat_daily: the last day, e.g. 2026-12-31 (default: no end)."), false)),
             (args, _) => Task.FromResult<object?>(AddTask(args)))
         {
-            Undo = (result, _) => { store.DeleteItem(result.GetProperty("id").GetString()!); return Task.CompletedTask; },
+            Undo = (result, _) => { McpTool.Undone(store.DeleteItem(result.GetProperty("id").GetString()!)); return Task.CompletedTask; },
         },
         new("tracker_add_tasks",
             "Add several tasks in one call, to a list by name (made when the user has none by that name), or as subtasks of one task " +
@@ -79,8 +81,10 @@ public sealed class TrackerMcpTools(TrackerStore store) : IMcpToolProvider
             // The tasks this call added, and the list when it made one.
             Undo = (result, _) =>
             {
-                foreach (var id in result.GetProperty("ids").EnumerateArray()) store.DeleteItem(id.GetString()!);
-                if (result.TryGetProperty("created_list", out var made) && made.GetBoolean()) store.DeleteWorkspace(result.GetProperty("list_id").GetString()!);
+                var any = false;
+                foreach (var id in result.GetProperty("ids").EnumerateArray()) any |= store.DeleteItem(id.GetString()!);
+                if (result.TryGetProperty("created_list", out var made) && made.GetBoolean()) any |= store.DeleteWorkspace(result.GetProperty("list_id").GetString()!);
+                McpTool.Undone(any);
                 return Task.CompletedTask;
             },
         },
@@ -101,7 +105,12 @@ public sealed class TrackerMcpTools(TrackerStore store) : IMcpToolProvider
             McpArgs.Schema(("id", McpArgs.Text("The task's id."), true)),
             (args, _) => Task.FromResult<object?>(SetDone(McpArgs.RequiredString(args, "id"), done: true)))
         {
-            Undo = (result, _) => { store.Reopen(result.GetProperty("id").GetString()!); return Task.CompletedTask; },
+            // Only a task this call ticked: one that was done before stays done (such a result is "unchanged").
+            Undo = (result, _) =>
+            {
+                if (!McpTool.ChangedNothing(result)) McpTool.Undone(store.Reopen(result.GetProperty("id").GetString()!));
+                return Task.CompletedTask;
+            },
         },
         new("tracker_reopen_task", "Open a done task or subtask again.",
             McpArgs.Schema(("id", McpArgs.Text("The task's id."), true)),
@@ -249,15 +258,21 @@ public sealed class TrackerMcpTools(TrackerStore store) : IMcpToolProvider
         return Describe(id, store.GetItem(id)!, store.GetWorkspace(item.WorkspaceId)?.Name ?? "");
     }
 
+    /// <summary>The task as it is now; with <c>unchanged: true</c> when it already was so (nothing for Undo to take back).</summary>
     private object SetDone(string id, bool done)
     {
         var item = RequireTask(id);
-        if (item.IsCompleted != done)
+        var changed = item.IsCompleted != done;
+        if (changed)
         {
             if (done) store.Complete(id);
             else store.Reopen(id);
         }
-        return Describe(id, store.GetItem(id)!, store.GetWorkspace(item.WorkspaceId)?.Name ?? "");
+        var task = Describe(id, store.GetItem(id)!, store.GetWorkspace(item.WorkspaceId)?.Name ?? "");
+        if (changed) return task;
+        var node = JsonSerializer.SerializeToNode(task, Unchanged)!.AsObject();
+        node[McpTool.UnchangedProperty] = true;
+        return node;
     }
 
     // ---- helpers ------------------------------------------------------------------------------------------------

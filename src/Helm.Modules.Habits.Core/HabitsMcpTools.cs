@@ -47,7 +47,7 @@ public sealed class HabitsMcpTools(HabitsStore store) : IMcpToolProvider
             Undo = (result, _) =>
             {
                 if (result.TryGetProperty("checked_now", out var now) && now.ValueKind == JsonValueKind.True)
-                    store.Uncheck(result.GetProperty("id").GetString()!, DateOnly.ParseExact(result.GetProperty("day").GetString()!, "yyyy-MM-dd", CultureInfo.InvariantCulture));
+                    McpTool.Undone(store.Uncheck(result.GetProperty("id").GetString()!, DateOnly.ParseExact(result.GetProperty("day").GetString()!, "yyyy-MM-dd", CultureInfo.InvariantCulture)));
                 return Task.CompletedTask;
             },
         },

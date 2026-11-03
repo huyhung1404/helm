@@ -24,7 +24,7 @@ public sealed class BillMcpTools(BillBook bills, WalletStore store) : IMcpToolPr
                 ("category", McpArgs.Text("Its spending category (optional)."), false)),
             (args, _) => Task.FromResult<object?>(Add(args)))
         {
-            Undo = (result, _) => { bills.Delete(WalletArgs.Id(result)); return Task.CompletedTask; },
+            Undo = (result, _) => { McpTool.Undone(bills.Delete(WalletArgs.Id(result))); return Task.CompletedTask; },
         },
         new("bill_pay", "The user paid a bill (\"đóng tiền điện rồi 450k\"): saves the spending in the Wallet and marks that month paid.",
             McpArgs.Schema(

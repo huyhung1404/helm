@@ -28,7 +28,7 @@ public sealed class WalletMcpTools(DebtBook book, WalletStore store, FundBook? f
                 ("due", McpArgs.Text("When it should be paid back: 2026-10-01 or 2026-10-01T18:00."), false)),
             (args, _) => Task.FromResult<object?>(AddDebt(args)))
         {
-            Undo = (result, _) => { book.Delete(Id(result)); return Task.CompletedTask; },
+            Undo = (result, _) => { McpTool.Undone(book.Delete(Id(result))); return Task.CompletedTask; },
         },
         new("wallet_add_transaction", $"Add a transaction to the Wallet by hand: money spent or money in, paid in cash or by a bank Helm does not read. Categories for spending: {Names(CategoryKind.Expense)}. For money in: {Names(CategoryKind.Income)}.",
             McpArgs.Schema(
@@ -39,7 +39,7 @@ public sealed class WalletMcpTools(DebtBook book, WalletStore store, FundBook? f
                 ("when", McpArgs.Text("When it happened, the user's local time: 2026-10-01 or 2026-10-01T12:30. Left out: now."), false)),
             (args, _) => Task.FromResult<object?>(AddTransaction(args)))
         {
-            Undo = (result, _) => { store.Delete(Id(result)); return Task.CompletedTask; },
+            Undo = (result, _) => { McpTool.Undone(store.Delete(Id(result))); return Task.CompletedTask; },
         },
         new("wallet_update_transaction", "Fill in what a transaction already in the Wallet was: its category and/or its description (after Helm asked the user “what was it?”). Only what is given changes.",
             McpArgs.Schema(
@@ -52,9 +52,9 @@ public sealed class WalletMcpTools(DebtBook book, WalletStore store, FundBook? f
             {
                 // Results leave nulls out: no category before is no category_id.
                 var before = result.GetProperty("before");
-                store.Restore(Id(result), before.TryGetProperty("category_id", out var c) ? c.GetString() : null,
+                McpTool.Undone(store.Restore(Id(result), before.TryGetProperty("category_id", out var c) ? c.GetString() : null,
                     before.TryGetProperty("auto", out var auto) && auto.GetBoolean(),
-                    before.TryGetProperty("description", out var d) ? d.GetString() ?? "" : "");
+                    before.TryGetProperty("description", out var d) ? d.GetString() ?? "" : ""));
                 return Task.CompletedTask;
             },
         },

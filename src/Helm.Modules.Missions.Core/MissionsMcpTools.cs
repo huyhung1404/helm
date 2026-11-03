@@ -30,7 +30,7 @@ public sealed class MissionsMcpTools(MissionsStore store) : IMcpToolProvider
             CreateSchema(), (args, _) => Task.FromResult<object?>(Create(args)))
         {
             // Helm's own assistant creates at once and offers Undo: the new mission goes again, steps and all.
-            Undo = (result, _) => { store.Delete(Id(result, "id")); return Task.CompletedTask; },
+            Undo = (result, _) => { McpTool.Undone(store.Delete(Id(result, "id"))); return Task.CompletedTask; },
         },
         new("mission_complete_step", "Complete the current step of a mission (steps are done in order), with an optional note on what was done.",
             McpArgs.Schema(
