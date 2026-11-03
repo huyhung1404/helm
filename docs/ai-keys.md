@@ -263,7 +263,7 @@ with no choice of its own takes Ask Helm's model; one that runs by itself goes t
   AI, which answers the amount, direction, counterpart, description and balance as JSON. `WalletNotificationAi`
   checks it against the text (the amount and the balance must be written in it, a sign in it must agree) and saves
   the transaction the usual way; the row then says what was saved, with **Undo**.
-- **Say it** on "What was it?" opens Ask Helm about that transaction (`AskHelmContext`, `WalletAskContext`): "ăn trưa
+- **Nói** on "What was it?" (before the two likeliest categories, `CategoryButtons.ForNotification`) opens Ask Helm about that transaction (`AskHelmContext`, `WalletAskContext`): "ăn trưa
   với Nam" fills in its category and description with `wallet_update_transaction` (Undo in the card), and the
   notification goes away.
 
@@ -288,6 +288,29 @@ More of Ask Helm's tools, each reached by saying it (no new screens). Changes ru
 
 The phone tools are in `PhoneToolSpecs` (one place for both the phone's `PhoneTools` and the PC, which hands their
 calls back to the phone). `workspace_send` is also offered to other MCP clients on the PC, behind the usual consent.
+
+## Ask Helm's card: photo to data, the brief chip
+
+- **Photo to data.** The card's three round buttons are Aa · mic · camera. The camera offers *Chụp ảnh* (the camera
+  app, writing into Helm's cache through the FileProvider, `ask-camera/`: no camera permission) or *Thư viện*
+  (Android's photo picker: no storage permission). The photo is made upright and small on the phone
+  (`AssistantPhotos`: at most 1568 px on its longer side, JPEG 85) and the camera's file is deleted once read. *Gửi
+  ảnh* sends it alone; the mic or Aa adds a sentence first ("chia đôi với Nam"). `AssistantSession.SendPhotoAsync`
+  sends it with the Wallet, Tracker and Notes tools: a receipt becomes a transaction (a split or a debt when the user
+  names who shared it), a transfer screenshot a transaction or a debt, a whiteboard a note and tasks; saved at once
+  with Undo, like words. `IAssistantChat.AddUser(text, image)`: Claude gets an image block before the text, Grok an
+  `image_url` data URI.
+- Photos always go through the **API** (within Ask Helm's daily cap), never to a PC agent: a job reaches a PC over
+  sync as words. With the route set to *PC only*, the card says photos need the API.
+- A model that cannot read pictures (`AssistantPhotos.Reads`: Grok's text-only lines) hands the photo to Claude
+  Sonnet at once; one that turns the photo down (`AssistantImageException`) is retried once with Sonnet. The answer
+  says so ("Haiku 5.5 không đọc được ảnh nên em nhờ Sonnet 5.5.").
+- **The photo is not kept.** Its chat is dropped when the turn ends; the conversation goes on from the words and the
+  summaries of what was saved. The card keeps the photo only while the turn is unfinished: it failed before saving
+  anything (*Thử lại* sends it again) or em asked something back (the answer goes with it).
+- **Brief chip.** When the morning brief or the evening review came today or yesterday, a chip tops the card
+  ("Bản tin sáng · 06:45 ▾", `AiBriefChip`); a tap opens its title and lines and marks it read, and "‹ Hôm qua" shows
+  yesterday's last one when the latest is today's. Nothing older.
 
 ## Text calls of the tools
 

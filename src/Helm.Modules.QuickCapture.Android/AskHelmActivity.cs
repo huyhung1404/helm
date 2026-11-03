@@ -162,12 +162,14 @@ public partial class AskHelmActivity : Activity, IRecognitionListener
         close.Click += (_, _) => Finish();
         header.AddView(close);
         card.AddView(header);
+        card.AddView(BuildBriefChip(), Margins(0, 12, 0, 0));
 
         _question = Text("", 15, _colors.Text);
         _question.SetPadding(Dp(14), Dp(10), Dp(14), Dp(10));
         _question.Background = Rounded(_colors.Bubble, 16);
         _question.Visibility = ViewStates.Gone;
         card.AddView(_question, Margins(0, 14, 0, 0));
+        card.AddView(BuildPhoto(), Margins(0, 12, 0, 0));
 
         _heard = Text("", 22, _colors.Text);
         _heard.SetMinHeight(Dp(64));
@@ -192,15 +194,18 @@ public partial class AskHelmActivity : Activity, IRecognitionListener
         _mic.Background = Rounded(_colors.Accent, 40);
         _mic.ContentDescription = "Speak";
         _mic.Click += (_, _) => { if (_listening) _recognizer?.StopListening(); else Listen(); };
+        // Aa · mic · camera.
         var micRow = new LinearLayout(this) { Orientation = Orientation.Horizontal };
         micRow.SetGravity(GravityFlags.Center);
-        micRow.AddView(_mic, new LinearLayout.LayoutParams(Dp(76), Dp(76)));
         var keyboard = Text("Aa", 15, _colors.Secondary, bold: true);
         keyboard.Gravity = GravityFlags.Center;
         keyboard.Background = Outline(_colors.Line, 24);
         keyboard.ContentDescription = "Type instead";
         keyboard.Click += (_, _) => ShowTyping(null);
-        micRow.AddView(keyboard, new LinearLayout.LayoutParams(Dp(48), Dp(48)) { LeftMargin = Dp(20) });
+        micRow.AddView(keyboard, new LinearLayout.LayoutParams(Dp(48), Dp(48)) { RightMargin = Dp(20) });
+        micRow.AddView(_mic, new LinearLayout.LayoutParams(Dp(76), Dp(76)));
+        micRow.AddView(CameraButton(), new LinearLayout.LayoutParams(Dp(48), Dp(48)) { LeftMargin = Dp(20) });
+        _controls = micRow;
         card.AddView(micRow, Margins(0, 12, 0, 0));
 
         _typing = new LinearLayout(this) { Orientation = Orientation.Horizontal, Visibility = ViewStates.Gone };
@@ -356,7 +361,7 @@ public partial class AskHelmActivity : Activity, IRecognitionListener
 
     private async Task SendAsync(string text)
     {
-        if (SendToSelection(text) || _session is null || _busy) return;
+        if (SendToSelection(text) || SendWithPhoto(text) || _session is null || _busy) return;
         _busy = true;
         ClearResult();
         _status.Text = $"{Short(_session.Model?.Name ?? "")} đang hiểu câu của Anh…";

@@ -195,9 +195,10 @@ public sealed class HelmAssistant(
 
     internal bool HasKeyFor(AiProvider provider) => keys.DefaultFor(provider) is not null;
 
-    internal (IAssistantChat Chat, AssistantModelOption Model, string KeyId) Open(IReadOnlyList<AssistantTool> tools)
+    /// <param name="pick">Another model than the card's for this chat (a photo the picked one cannot read).</param>
+    internal (IAssistantChat Chat, AssistantModelOption Model, string KeyId) Open(IReadOnlyList<AssistantTool> tools, AssistantModelOption? pick = null)
     {
-        var model = Current() ?? throw new AssistantException("No model to ask.");
+        var model = pick ?? Current() ?? throw new AssistantException("No model to ask.");
         var key = keys.DefaultFor(model.Provider) ?? throw new AssistantException($"No {model.Provider.Name} API key.");
         var factory = factories.First(f => f.Provider == model.Provider);
         return (factory.Create(key.Value.Secret, model.Model, Choice.Effort, SystemPrompt(), tools), model, key.Id);
@@ -223,7 +224,7 @@ public sealed class HelmAssistant(
 /// One conversation in the card: the user's turns and follow-ups. It goes to Claude Code on a Helm PC when the
 /// feature's route allows and one answers in time (and stays there), else to the API on the picked model.
 /// </summary>
-public sealed class AssistantSession
+public sealed partial class AssistantSession
 {
     private readonly HelmAssistant _helm;
     private readonly IReadOnlyList<IMcpToolProvider> _phone;

@@ -26,6 +26,9 @@ internal sealed class ClaudeAssistantChat(AnthropicClient client, string model, 
     /// <summary>Tool results not sent yet: a turn that ended on its changes sends them with the next turn's text.</summary>
     private List<ContentBlockParam>? _results;
 
+    /// <summary>A photo went with the last user message and Claude has not answered it yet.</summary>
+    private bool _imagePending;
+
     public void AddUser(string text)
     {
         if (_results is { } results)
@@ -38,6 +41,20 @@ internal sealed class ClaudeAssistantChat(AnthropicClient client, string model, 
         {
             _messages.Add(new UserMessageParam { Content = text });
         }
+    }
+
+    /// <summary>The photo first, then the words (Claude reads a picture best before the question about it).</summary>
+    public void AddUser(string text, AssistantImage image)
+    {
+        List<ContentBlockParam> blocks =
+        [
+            .. _results ?? [],
+            new ImageBlockParam { Source = new Base64ImageSource { Data = Convert.ToBase64String(image.Data), MediaType = ToMediaType(image.MediaType) } },
+            new TextBlockParam { Text = text },
+        ];
+        _results = null;
+        _messages.Add(new UserMessageParam { Content = blocks });
+        _imagePending = true;
     }
 
     public void AddTools(IReadOnlyList<AssistantTool> tools) => _tools.AddRange(tools.Select(ToTool));
@@ -76,6 +93,10 @@ internal sealed class ClaudeAssistantChat(AnthropicClient client, string model, 
         {
             throw new AssistantException("Claude's servers had a problem. Try again later.", ex);
         }
+        catch (AnthropicBadRequestException ex) when (_imagePending && ex.Message.Contains("image", StringComparison.OrdinalIgnoreCase))
+        {
+            throw new AssistantImageException($"{model} does not take this photo.", ex);
+        }
         catch (AnthropicBadRequestException ex) when (ex.Message.Contains("credit balance", StringComparison.OrdinalIgnoreCase))
         {
             throw new AssistantException("The Claude account has no credit left: add some under Billing in the Console.", ex);
@@ -89,6 +110,7 @@ internal sealed class ClaudeAssistantChat(AnthropicClient client, string model, 
             throw new AssistantException("Could not reach Claude. Check the internet connection.", ex);
         }
 
+        _imagePending = false;
         var texts = new List<string>();
         var calls = new List<ToolCall>();
         List<ContentBlockParam> echo = [];
@@ -145,6 +167,14 @@ internal sealed class ClaudeAssistantChat(AnthropicClient client, string model, 
             InputSchema = new() { Properties = properties, Required = required },
         };
     }
+
+    private static MediaType ToMediaType(string type) => type switch
+    {
+        "image/png" => MediaType.ImagePng,
+        "image/gif" => MediaType.ImageGif,
+        "image/webp" => MediaType.ImageWebP,
+        _ => MediaType.ImageJpeg,
+    };
 
     private static Effort ToEffort(string effort) => effort switch
     {

@@ -24,6 +24,9 @@ internal sealed class GrokAssistantChat : IAssistantChat
     private readonly JsonArray _messages = [];
     private readonly JsonArray _tools = [];
 
+    /// <summary>A photo went with the last user message and xAI has not answered it yet.</summary>
+    private bool _imagePending;
+
     public GrokAssistantChat(HttpClient http, string key, string model, string system, IReadOnlyList<AssistantTool> tools)
     {
         _http = http;
@@ -51,6 +54,25 @@ internal sealed class GrokAssistantChat : IAssistantChat
     }
 
     public void AddUser(string text) => _messages.Add(new JsonObject { ["role"] = "user", ["content"] = text });
+
+    /// <summary>The photo as a data URI (xAI takes no upload for chat), then the words.</summary>
+    public void AddUser(string text, AssistantImage image)
+    {
+        _messages.Add(new JsonObject
+        {
+            ["role"] = "user",
+            ["content"] = new JsonArray
+            {
+                new JsonObject
+                {
+                    ["type"] = "image_url",
+                    ["image_url"] = new JsonObject { ["url"] = $"data:{image.MediaType};base64,{Convert.ToBase64String(image.Data)}", ["detail"] = "high" },
+                },
+                new JsonObject { ["type"] = "text", ["text"] = text },
+            },
+        });
+        _imagePending = true;
+    }
 
     public async Task<AssistantStep> NextAsync(CancellationToken ct)
     {
@@ -92,12 +114,16 @@ internal sealed class GrokAssistantChat : IAssistantChat
             throw new AssistantException("xAI answered something Helm could not read.", ex);
         }
 
+        if (_imagePending && status is >= 400 and < 500 and not (401 or 403 or 429)
+            && (json?["error"]?.ToJsonString() ?? json?.ToJsonString() ?? "").Contains("image", StringComparison.OrdinalIgnoreCase))
+            throw new AssistantImageException($"{_model} does not take this photo.");
         if (status is 401 or 403) throw new AssistantException("xAI does not accept the API key, or the team has no credit left. Test it on the AI page.");
         if (status == 429) throw new AssistantException("Too many requests right now, or the team has no credit left.");
         if (status >= 500) throw new AssistantException("xAI's servers had a problem. Try again later.");
         if (status != 200 || json?["choices"]?[0]?["message"] is not JsonObject message)
             throw new AssistantException($"xAI answered {status}: {json?["error"]?.ToString() ?? "no answer"}");
 
+        _imagePending = false;
         // The answer goes back as it came, so the next call sees the tool calls it answers.
         _messages.Add(message.DeepClone());
         var calls = new List<ToolCall>();

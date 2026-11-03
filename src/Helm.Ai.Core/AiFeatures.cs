@@ -109,4 +109,7 @@ public static class ClaudeModels
 {
     /// <summary>The cheapest and fastest current model: Ask Helm's default.</summary>
     public const string Haiku = "claude-haiku-5-5";
+
+    /// <summary>The current Sonnet: what reads a photo when the model picked cannot.</summary>
+    public const string Sonnet = "claude-sonnet-5-5";
 }
