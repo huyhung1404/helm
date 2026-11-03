@@ -51,12 +51,19 @@ public sealed class SegmentText : TextBlock
 
     private readonly List<(Run Run, int Index, int Start, bool IsWord)> _runs = [];
     private IDisposable? _tapWait;
+    private IDisposable? _holdWait;
+    private Point _pressedAt;
+    private bool _held;
 
     public SegmentText()
     {
         TextWrapping = TextWrapping.Wrap;
         Tapped += OnTapped;
         DoubleTapped += OnDoubleTapped;
+        PointerPressed += OnPressed;
+        PointerMoved += OnMoved;
+        PointerReleased += (_, _) => CancelHold();
+        PointerCaptureLost += (_, _) => CancelHold();
         ActualThemeVariantChanged += (_, _) => Rebuild();
     }
 
@@ -90,6 +97,13 @@ public sealed class SegmentText : TextBlock
     {
         add => AddHandler(WordDoubleTappedEvent, value);
         remove => RemoveHandler(WordDoubleTappedEvent, value);
+    }
+
+    /// <summary>A word pressed long: the same event as <see cref="StudyText.WordHeld"/>, so the page handles both alike.</summary>
+    public event EventHandler<WordHeldEventArgs>? WordHeld
+    {
+        add => AddHandler(StudyText.WordHeldEvent, value);
+        remove => RemoveHandler(StudyText.WordHeldEvent, value);
     }
 
     /// <summary>Where the highlighted sentence starts, from the top of this block (null when nothing is highlighted).</summary>
@@ -181,10 +195,46 @@ public sealed class SegmentText : TextBlock
         return null;
     }
 
+    /// <summary>A finger down on a word: held if it stays there. Not handled, so scrolling still works.</summary>
+    private void OnPressed(object? sender, PointerPressedEventArgs e)
+    {
+        CancelHold();
+        _held = false;
+        _pressedAt = e.GetPosition(this);
+        if (WordAt(_pressedAt) is not { } word || Line is not { } line) return;
+        _holdWait = DispatcherTimer.RunOnce(() =>
+        {
+            _holdWait = null;
+            _held = true;
+            _tapWait?.Dispose();
+            _tapWait = null;
+            RaiseEvent(new WordHeldEventArgs(StudyText.WordHeldEvent, line.SourceOf(word.Segment), word.Index));
+        }, StudyText.HoldTime);
+    }
+
+    private void OnMoved(object? sender, PointerEventArgs e)
+    {
+        if (_holdWait is null) return;
+        var moved = e.GetPosition(this) - _pressedAt;
+        if (Math.Abs(moved.X) > StudyText.HoldSlop || Math.Abs(moved.Y) > StudyText.HoldSlop) CancelHold();
+    }
+
+    private void CancelHold()
+    {
+        _holdWait?.Dispose();
+        _holdWait = null;
+    }
+
     private void OnTapped(object? sender, TappedEventArgs e)
     {
         if (WordAt(e.GetPosition(this)) is not { } word) return;
         e.Handled = true;
+        if (_held)
+        {
+            // The word was held: lifting the finger opens nothing.
+            _held = false;
+            return;
+        }
         _tapWait?.Dispose();
         _tapWait = DispatcherTimer.RunOnce(() => RaiseEvent(new WordTappedEventArgs(WordTappedEvent, word.Segment, word.Index)), DoubleTapWait);
     }
@@ -193,6 +243,7 @@ public sealed class SegmentText : TextBlock
     {
         _tapWait?.Dispose();
         _tapWait = null;
+        if (_held) return;
         var point = e.GetPosition(this);
         var word = WordAt(point);
         if (word is null && Line is { IsSceneBreak: false } line && line.Segments.Count > 0)

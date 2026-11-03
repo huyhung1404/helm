@@ -7,7 +7,6 @@ using System.Windows.Threading;
 using Helm.Modules.NovelReader.Conversion;
 using Helm.Modules.NovelReader.Grammar;
 using Helm.Modules.NovelReader.Speech;
-using Helm.Modules.NovelReader.Text;
 
 namespace Helm.Modules.NovelReader;
 
@@ -15,8 +14,8 @@ namespace Helm.Modules.NovelReader;
 /// A paragraph in study mode: one block per word, wrapping like text, with the word's Chinese, pinyin, Hán Việt and
 /// Vietnamese on four centred rows (each row can be hidden). Punctuation joins the Vietnamese of the word before it. A
 /// click opens the word popup and a double click reads aloud from there, as on <see cref="SegmentText"/>; holding the
-/// mouse down on a word says its Chinese (<see cref="WordHeldEvent"/>), with no popup when it is let go. The sentence
-/// being read is highlighted, and under the mouse the sentences and grammar are marked on the Vietnamese row. Each block
+/// mouse down on a word holds its sentence for an explanation (<see cref="WordHeldEvent"/>), with no popup when it is
+/// let go. The sentence being read (or held) is highlighted, and under the mouse the sentences and grammar are marked on the Vietnamese row. Each block
 /// is a single text block, so a long chapter stays light.
 /// </summary>
 public sealed class StudyText : WrapPanel
@@ -58,10 +57,10 @@ public sealed class StudyText : WrapPanel
     public static readonly DependencyProperty GrammarColorsProperty = DependencyProperty.Register(nameof(GrammarColors), typeof(bool),
         typeof(StudyText), new PropertyMetadata(false, (d, _) => ((StudyText)d).Apply()));
 
-    /// <summary>The mouse held down on a word this long says its Chinese.</summary>
+    /// <summary>The mouse held down on a word this long holds its sentence.</summary>
     public static readonly TimeSpan HoldTime = TimeSpan.FromMilliseconds(450);
 
-    /// <summary>A word was held: say its Chinese.</summary>
+    /// <summary>A word was held (here or on <see cref="SegmentText"/>): its sentence is explained.</summary>
     public static readonly RoutedEvent WordHeldEvent = EventManager.RegisterRoutedEvent(nameof(WordHeld), RoutingStrategy.Bubble,
         typeof(EventHandler<WordHeldEventArgs>), typeof(StudyText));
 
@@ -269,7 +268,7 @@ public sealed class StudyText : WrapPanel
         e.Handled = true;
     }
 
-    /// <summary>The mouse stayed down on the word: say it, and flash the word so the press is seen to have worked.</summary>
+    /// <summary>The mouse stayed down on the word: hold it, and flash the word so the press is seen to have worked.</summary>
     private void OnHeld()
     {
         _hold.Stop();
@@ -283,7 +282,7 @@ public sealed class StudyText : WrapPanel
             Apply();
         };
         flash.Start();
-        RaiseEvent(new WordHeldEventArgs(WordHeldEvent, word.Chinese, Line is { } line ? ChineseText.SentenceAround(line.Source, word.Segment.Start) : ""));
+        RaiseEvent(new WordHeldEventArgs(WordHeldEvent, word.Chinese, word.Index));
     }
 
     private void CancelHold()
@@ -297,7 +296,7 @@ public sealed class StudyText : WrapPanel
         CancelHold();
         if (_held)
         {
-            // The word was said: letting go opens nothing.
+            // The word was held: letting go opens nothing.
             _held = false;
             e.Handled = true;
             return;
@@ -314,11 +313,10 @@ public sealed class StudyText : WrapPanel
     }
 }
 
-/// <summary>A word held down in study mode, with the Chinese to say.</summary>
-public sealed class WordHeldEventArgs(RoutedEvent routedEvent, string chinese, string sentence = "") : RoutedEventArgs(routedEvent)
+/// <summary>A word held down, with its Chinese and its segment's place in the line (where its sentence is found).</summary>
+public sealed class WordHeldEventArgs(RoutedEvent routedEvent, string chinese, int index) : RoutedEventArgs(routedEvent)
 {
     public string Chinese { get; } = chinese;
 
-    /// <summary>The Chinese sentence the word is in (a note for Vocabulary).</summary>
-    public string Sentence { get; } = sentence;
+    public int Index { get; } = index;
 }

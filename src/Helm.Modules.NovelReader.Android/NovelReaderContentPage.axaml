@@ -8,10 +8,10 @@
              x:DataType="vm:NovelReaderViewModel">
 
     <!-- Novel Reader itself (drawer and Quick access): the library of synced novels, and the open novel with the
-         converted text (tap a word to fix it, double-tap to read aloud from there), the player at the bottom, and
-         sheets for the chapters, the reading options, the names and the tapped word. While a novel is open the page is
-         exactly as tall as the screen, so the text scrolls on its own and the player stays put. Options live on
-         NovelReaderPage (Home → Utilities). -->
+         converted text (tap a word to fix it, double-tap to read aloud from there, press and hold to explain its
+         sentence), the player at the bottom, and sheets for the chapters, the reading options, the names, the tapped
+         word and the held sentence. While a novel is open the page is exactly as tall as the screen, so the text
+         scrolls on its own and the player stays put. Options live on NovelReaderPage (Home → Utilities). -->
     <UserControl.Resources>
         <SolidColorBrush x:Key="ParagraphFill" Color="{DynamicResource SystemAccentColor}" Opacity="0.14" />
         <SolidColorBrush x:Key="AccentText" Color="{DynamicResource SystemAccentColor}" />
@@ -40,7 +40,7 @@
             <Setter Property="HorizontalContentAlignment" Value="Center" />
             <Setter Property="VerticalContentAlignment" Value="Center" />
         </Style>
-        <Style Selector="Button.chip">
+        <Style Selector="Button.chip, ToggleButton.chip">
             <Setter Property="Margin" Value="0,0,6,6" />
             <Setter Property="Padding" Value="10,6" />
         </Style>
@@ -71,6 +71,12 @@
         <Style Selector="TextBlock.heading">
             <Setter Property="FontWeight" Value="SemiBold" />
         </Style>
+        <Style Selector="TextBlock.section">
+            <Setter Property="FontSize" Value="12" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="Foreground" Value="{DynamicResource HelmSecondaryText}" />
+            <Setter Property="Margin" Value="0,6,0,0" />
+        </Style>
         <!-- A sheet sliding up from the bottom -->
         <Style Selector="Border.sheet">
             <Setter Property="Background" Value="{DynamicResource HelmCardBackground}" />
@@ -100,21 +106,6 @@
                         </Button>
                         <TextBlock Text="{Binding Message}" TextWrapping="Wrap" VerticalAlignment="Center" />
                     </DockPanel>
-                </Border>
-
-                <!-- A word was held: add it to Vocabulary, with its sentence as the note -->
-                <Border Classes="infobar" DataContext="{Binding HeldWord}" x:DataType="vm:HeldWordViewModel" IsVisible="{Binding IsShown}">
-                    <StackPanel Spacing="6">
-                        <DockPanel>
-                            <Button DockPanel.Dock="Right" Classes="icon" Command="{Binding DismissCommand}" AutomationProperties.Name="Dismiss">
-                                <ic:SymbolIcon Symbol="Dismiss" FontSize="16" />
-                            </Button>
-                            <TextBlock Text="{Binding Word}" FontSize="18" FontWeight="SemiBold" VerticalAlignment="Center" />
-                        </DockPanel>
-                        <TextBlock Text="{Binding Sentence}" TextWrapping="Wrap" MaxLines="2" TextTrimming="CharacterEllipsis" Classes="secondary" />
-                        <Button Classes="accent" Content="Add to Vocabulary" Command="{Binding AddCommand}" />
-                        <TextBlock Text="{Binding Result}" TextWrapping="Wrap" IsVisible="{Binding HasResult}" />
-                    </StackPanel>
                 </Border>
 
                 <!-- Another device read further -->
@@ -337,7 +328,8 @@
                     </Border>
 
                     <Panel>
-                        <!-- The chapter: tap a word to fix it; double-tap to read aloud from its sentence -->
+                        <!-- The chapter: tap a word to fix it; double-tap to read aloud from its sentence; press and hold to have
+                             its sentence explained -->
                         <ScrollViewer x:Name="Scroller" HorizontalScrollBarVisibility="Disabled">
                             <ItemsControl x:Name="ParagraphList" ItemsSource="{Binding Paragraphs}" Padding="0,0,0,48">
                                 <ItemsControl.ItemTemplate>
@@ -353,12 +345,12 @@
                                                         </MultiBinding>
                                                     </TextBlock.IsVisible>
                                                 </TextBlock>
-                                                <vm:SegmentText Line="{Binding Line}" Highlight="{Binding SpeakingSegments}" Classes.heading="{Binding IsHeading}"
+                                                <vm:SegmentText Line="{Binding Line}" Highlight="{Binding HighlightSegments}" Classes.heading="{Binding IsHeading}"
                                                                 IsVisible="{Binding !$parent[ItemsControl].((vm:NovelReaderViewModel)DataContext).IsStudyMode}"
                                                                 FontSize="{Binding $parent[ItemsControl].((vm:NovelReaderViewModel)DataContext).FontSize}"
                                                                 RelativeLineHeight="{Binding $parent[ItemsControl].((vm:NovelReaderViewModel)DataContext).LineSpacing}" />
                                                 <!-- Study mode: each word with its Chinese, pinyin and Hán Việt above the Vietnamese -->
-                                                <vm:StudyText Line="{Binding Line}" Readings="{Binding Readings}" Highlight="{Binding SpeakingSegments}"
+                                                <vm:StudyText Line="{Binding Line}" Readings="{Binding Readings}" Highlight="{Binding HighlightSegments}"
                                                               IsVisible="{Binding $parent[ItemsControl].((vm:NovelReaderViewModel)DataContext).IsStudyMode}"
                                                               TextSize="{Binding $parent[ItemsControl].((vm:NovelReaderViewModel)DataContext).FontSize}"
                                                               ShowChinese="{Binding $parent[ItemsControl].((vm:NovelReaderViewModel)DataContext).StudyShowChinese}"
@@ -381,6 +373,20 @@
                                 <TextBlock Text="Back to reading position" />
                             </StackPanel>
                         </Button>
+
+                        <!-- Words just sent to Vocabulary, with Hoàn tác for a few seconds -->
+                        <Border Classes="card" HorizontalAlignment="Center" VerticalAlignment="Bottom" Margin="8,0,8,8" Padding="14,2,2,2"
+                                BoxShadow="0 2 12 0 #40000000" DataContext="{Binding HeldSentence}" x:DataType="vm:HeldSentenceViewModel" IsVisible="{Binding HasToast}">
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Text="{Binding Toast}" VerticalAlignment="Center" TextWrapping="Wrap" MaxWidth="240" />
+                                <Button Margin="8,0,0,0" Background="Transparent" BorderThickness="0" Command="{Binding UndoCommand}" IsVisible="{Binding CanUndo}">
+                                    <TextBlock Text="Hoàn tác" FontWeight="SemiBold" Foreground="{DynamicResource AccentText}" />
+                                </Button>
+                                <Button Classes="icon" Command="{Binding DismissToastCommand}" AutomationProperties.Name="Dismiss">
+                                    <ic:SymbolIcon Symbol="Dismiss" FontSize="16" />
+                                </Button>
+                            </StackPanel>
+                        </Border>
                     </Panel>
                 </DockPanel>
             </Panel>
@@ -449,6 +455,63 @@
                                 </Button>
                             </StackPanel>
                         </ScrollViewer>
+
+                        <!-- The held sentence ("Câu này"): said aloud, explained, and its words to Vocabulary -->
+                        <DockPanel x:Name="SentenceSheet" DataContext="{Binding HeldSentence}" x:DataType="vm:HeldSentenceViewModel">
+                            <DockPanel DockPanel.Dock="Top">
+                                <Button DockPanel.Dock="Right" Classes="icon" Command="{Binding DismissCommand}" AutomationProperties.Name="Đóng">
+                                    <ic:SymbolIcon Symbol="Dismiss" FontSize="18" />
+                                </Button>
+                                <Button DockPanel.Dock="Right" Classes="icon" Command="{Binding SayCommand}" AutomationProperties.Name="Nghe câu">
+                                    <ic:SymbolIcon Symbol="Speaker2" FontSize="20" />
+                                </Button>
+                                <TextBlock Text="Câu này" Classes="title" VerticalAlignment="Center" />
+                            </DockPanel>
+                            <TextBlock DockPanel.Dock="Top" Text="{Binding Pinyin}" Classes="secondary" FontSize="14" IsVisible="{Binding HasPinyin}" />
+                            <!-- Where it ran and what it cost; the ticked words to Vocabulary -->
+                            <DockPanel DockPanel.Dock="Bottom" Margin="0,10,0,0">
+                                <Button DockPanel.Dock="Right" Classes="accent" Content="{Binding AddWordsText}" Command="{Binding AddWordsCommand}" IsVisible="{Binding HasWords}" />
+                                <TextBlock Text="{Binding RanOn}" Classes="secondary" VerticalAlignment="Center" TextWrapping="NoWrap" TextTrimming="CharacterEllipsis" />
+                            </DockPanel>
+                            <ScrollViewer Margin="0,6,0,0" HorizontalScrollBarVisibility="Disabled">
+                                <StackPanel Spacing="2">
+                                    <!-- Waiting for the answer -->
+                                    <StackPanel Spacing="6" Margin="0,6" IsVisible="{Binding IsExplaining}">
+                                        <TextBlock Text="Đang giải thích…" Classes="secondary" />
+                                        <ProgressBar IsIndeterminate="True" />
+                                    </StackPanel>
+                                    <!-- No explanation (or the sentence could not be said): why, and another try -->
+                                    <StackPanel Spacing="6" Margin="0,6" IsVisible="{Binding HasProblem}">
+                                        <TextBlock Text="{Binding Problem}" Foreground="{DynamicResource HelmDanger}" TextWrapping="Wrap" />
+                                        <Button Content="Thử lại" Command="{Binding ExplainCommand}" IsVisible="{Binding !HasExplanation}" />
+                                    </StackPanel>
+                                    <StackPanel Spacing="2" IsVisible="{Binding HasExplanation}">
+                                        <TextBlock Text="Nghĩa" Classes="section" />
+                                        <TextBlock Text="{Binding Explanation.Meaning}" TextWrapping="Wrap" />
+                                        <TextBlock Text="Ngữ pháp" Classes="section" Margin="0,10,0,0" IsVisible="{Binding HasGrammar}" />
+                                        <TextBlock Text="{Binding Grammar}" TextWrapping="Wrap" IsVisible="{Binding HasGrammar}" />
+                                        <TextBlock Text="Dịch tự nhiên" Classes="section" Margin="0,10,0,0" />
+                                        <TextBlock Text="{Binding Explanation.Translation}" TextWrapping="Wrap" />
+                                    </StackPanel>
+                                    <!-- The sentence's words: the held one first, then the explanation's; tap one to tick it -->
+                                    <StackPanel Spacing="4" IsVisible="{Binding HasWords}">
+                                        <TextBlock Text="Thêm từ trong câu" Classes="section" Margin="0,10,0,0" />
+                                        <ItemsControl ItemsSource="{Binding Words}">
+                                            <ItemsControl.ItemsPanel>
+                                                <ItemsPanelTemplate>
+                                                    <WrapPanel />
+                                                </ItemsPanelTemplate>
+                                            </ItemsControl.ItemsPanel>
+                                            <ItemsControl.ItemTemplate>
+                                                <DataTemplate x:DataType="vm:SentenceWordChoice">
+                                                    <ToggleButton Classes="chip" Content="{Binding Label}" IsChecked="{Binding Keep}" AutomationProperties.Name="{Binding Label}" />
+                                                </DataTemplate>
+                                            </ItemsControl.ItemTemplate>
+                                        </ItemsControl>
+                                    </StackPanel>
+                                </StackPanel>
+                            </ScrollViewer>
+                        </DockPanel>
 
                         <!-- Chapters -->
                         <DockPanel x:Name="ChapterSheet">

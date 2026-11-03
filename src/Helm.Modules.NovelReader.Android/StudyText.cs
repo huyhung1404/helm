@@ -7,7 +7,6 @@ using Avalonia.Media;
 using Avalonia.Styling;
 using Avalonia.Threading;
 using Helm.Modules.NovelReader.Conversion;
-using Helm.Modules.NovelReader.Text;
 
 namespace Helm.Modules.NovelReader;
 
@@ -15,8 +14,9 @@ namespace Helm.Modules.NovelReader;
 /// A paragraph in study mode (the Avalonia counterpart of the Windows StudyText): one block per word, wrapping like text,
 /// with the word's Chinese, pinyin, Hán Việt and Vietnamese on four centred rows (each row can be hidden). Punctuation
 /// joins the Vietnamese of the word before it. A tap opens the word and a double tap reads aloud from there, through
-/// <see cref="SegmentText"/>'s events; a long press says the word's Chinese (<see cref="WordHeldEvent"/>), and opens
-/// nothing when the finger lifts. The sentence being read is highlighted. Each block is one text block.
+/// <see cref="SegmentText"/>'s events; a long press holds the word (<see cref="WordHeldEvent"/>: Novel Reader explains its
+/// sentence, Novel Lens says it), and opens nothing when the finger lifts. The sentence being read (or held) is
+/// highlighted. Each block is one text block.
 /// </summary>
 public sealed class StudyText : WrapPanel
 {
@@ -37,16 +37,16 @@ public sealed class StudyText : WrapPanel
     public static readonly StyledProperty<(int First, int Count)?> HighlightProperty =
         AvaloniaProperty.Register<StudyText, (int First, int Count)?>(nameof(Highlight));
 
-    /// <summary>A word was pressed long: say its Chinese.</summary>
+    /// <summary>A word was pressed long (here or on <see cref="SegmentText"/>).</summary>
     public static readonly RoutedEvent<WordHeldEventArgs> WordHeldEvent =
         RoutedEvent.Register<StudyText, WordHeldEventArgs>(nameof(WordHeld), RoutingStrategies.Bubble);
 
     private static readonly TimeSpan DoubleTapWait = TimeSpan.FromMilliseconds(230);
 
-    /// <summary>A finger kept down this long on a word says it; moving further than <see cref="HoldSlop"/> is a scroll.</summary>
-    private static readonly TimeSpan HoldTime = TimeSpan.FromMilliseconds(450);
+    /// <summary>A finger kept down this long on a word holds it; moving further than <see cref="HoldSlop"/> is a scroll.</summary>
+    internal static readonly TimeSpan HoldTime = TimeSpan.FromMilliseconds(450);
 
-    private const double HoldSlop = 10;
+    internal const double HoldSlop = 10;
 
     private readonly List<(TextBlock Block, int Index, Segment Segment, string Chinese)> _words = [];
     private IDisposable? _tapWait;
@@ -175,15 +175,14 @@ public sealed class StudyText : WrapPanel
     private (TextBlock Block, int Index, Segment Segment, string Chinese)? WordOf(object? sender) =>
         sender is TextBlock { Tag: int index } ? _words.FirstOrDefault(w => w.Index == index) : null;
 
-    /// <summary>A finger (or the mouse) down on a word: said if it stays there. Not handled, so scrolling still works.</summary>
+    /// <summary>A finger (or the mouse) down on a word: held if it stays there. Not handled, so scrolling still works.</summary>
     private void OnPressed(object? sender, PointerPressedEventArgs e)
     {
         CancelHold();
         _held = false;
         if (WordOf(sender) is not { } word) return;
         _pressedAt = e.GetPosition(this);
-        var sentence = Line is { } line ? ChineseText.SentenceAround(line.Source, word.Segment.Start) : "";
-        _holdWait = DispatcherTimer.RunOnce(() => OnHeld(word.Block, word.Chinese, sentence), HoldTime);
+        _holdWait = DispatcherTimer.RunOnce(() => OnHeld(word.Block, word.Chinese, word.Index), HoldTime);
     }
 
     private void OnMoved(object? sender, PointerEventArgs e)
@@ -193,8 +192,8 @@ public sealed class StudyText : WrapPanel
         if (Math.Abs(moved.X) > HoldSlop || Math.Abs(moved.Y) > HoldSlop) CancelHold();
     }
 
-    /// <summary>Says the word, and flashes it so the press is seen to have worked.</summary>
-    private void OnHeld(TextBlock block, string chinese, string sentence)
+    /// <summary>Holds the word, and flashes it so the press is seen to have worked.</summary>
+    private void OnHeld(TextBlock block, string chinese, int index)
     {
         _holdWait = null;
         _held = true;
@@ -202,7 +201,7 @@ public sealed class StudyText : WrapPanel
         _tapWait = null;
         block.Background = new SolidColorBrush(Accent("SystemAccentColor"), 0.38);
         DispatcherTimer.RunOnce(ApplyHighlight, TimeSpan.FromMilliseconds(500));
-        RaiseEvent(new WordHeldEventArgs(WordHeldEvent, chinese, sentence));
+        RaiseEvent(new WordHeldEventArgs(WordHeldEvent, chinese, index));
     }
 
     private void CancelHold()
@@ -217,7 +216,7 @@ public sealed class StudyText : WrapPanel
         e.Handled = true;
         if (_held)
         {
-            // The word was said: lifting the finger opens nothing.
+            // The word was held: lifting the finger opens nothing.
             _held = false;
             return;
         }
@@ -236,11 +235,10 @@ public sealed class StudyText : WrapPanel
     }
 }
 
-/// <summary>A word pressed long in study mode, with the Chinese to say.</summary>
-public sealed class WordHeldEventArgs(RoutedEvent routedEvent, string chinese, string sentence = "") : RoutedEventArgs(routedEvent)
+/// <summary>A word pressed long, with its Chinese (to say) and its segment's place in the line (where its sentence is found).</summary>
+public sealed class WordHeldEventArgs(RoutedEvent routedEvent, string chinese, int index) : RoutedEventArgs(routedEvent)
 {
     public string Chinese { get; } = chinese;
 
-    /// <summary>The Chinese sentence the word is in (a note for Vocabulary).</summary>
-    public string Sentence { get; } = sentence;
+    public int Index { get; } = index;
 }

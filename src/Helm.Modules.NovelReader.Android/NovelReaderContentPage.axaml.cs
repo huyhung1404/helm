@@ -31,6 +31,7 @@ public partial class NovelReaderContentPage : UserControl
     {
         None,
         Word,
+        Sentence,
         Chapters,
         Options,
         Names,
@@ -99,6 +100,7 @@ public partial class NovelReaderContentPage : UserControl
         _module.PageBack = HandleBack;
         _viewModel.PropertyChanged += OnViewModelChanged;
         _viewModel.Editor.PropertyChanged += OnEditorChanged;
+        _viewModel.HeldSentence.PropertyChanged += OnHeldSentenceChanged;
         if (_viewModel.Reports is { } reports) reports.Editor.PropertyChanged += OnReportEditorChanged;
         _viewModel.ScrollRequested += OnScrollRequested;
         _viewModel.FollowRequested += OnFollowRequested;
@@ -120,6 +122,7 @@ public partial class NovelReaderContentPage : UserControl
         if (_module.PageBack == HandleBack) _module.PageBack = null;
         _viewModel.PropertyChanged -= OnViewModelChanged;
         _viewModel.Editor.PropertyChanged -= OnEditorChanged;
+        _viewModel.HeldSentence.PropertyChanged -= OnHeldSentenceChanged;
         if (_viewModel.Reports is { } reports) reports.Editor.PropertyChanged -= OnReportEditorChanged;
         _viewModel.ScrollRequested -= OnScrollRequested;
         _viewModel.FollowRequested -= OnFollowRequested;
@@ -211,6 +214,13 @@ public partial class NovelReaderContentPage : UserControl
         else if (_sheet == Sheet.Word) ShowSheet(Sheet.None);
     }
 
+    private void OnHeldSentenceChanged(object? sender, PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName != nameof(HeldSentenceViewModel.IsShown)) return;
+        if (_viewModel.HeldSentence.IsShown) ShowSheet(Sheet.Sentence);
+        else if (_sheet == Sheet.Sentence) ShowSheet(Sheet.None);
+    }
+
     private void OnReportEditorChanged(object? sender, PropertyChangedEventArgs e)
     {
         if (e.PropertyName != nameof(ReportEditorViewModel.IsOpen) || _viewModel.Reports is not { } reports) return;
@@ -286,11 +296,12 @@ public partial class NovelReaderContentPage : UserControl
         _viewModel.ReadFromSegment(paragraph, e.Index);
     }
 
-    /// <summary>A long press on a word in study mode says its Chinese.</summary>
-    private async void OnWordHeld(object? sender, WordHeldEventArgs e)
+    /// <summary>A long press on a word: its sentence is highlighted and explained in a sheet.</summary>
+    private void OnWordHeld(object? sender, WordHeldEventArgs e)
     {
-        _viewModel.HeldWord.Show(e.Chinese, e.Sentence);
-        await _viewModel.PronounceAsync(e.Chinese);
+        if ((e.Source as Control)?.DataContext is not ParagraphViewModel paragraph) return;
+        _viewModel.Editor.CloseCommand.Execute(null);
+        _viewModel.HoldSentence(paragraph, e.Index);
     }
 
     private void EndTouch()
@@ -392,8 +403,12 @@ public partial class NovelReaderContentPage : UserControl
 
     private void ShowSheet(Sheet sheet)
     {
+        // Another sheet over the sentence's (a word opened from it): the sentence is let go.
+        var leavingSentence = _sheet == Sheet.Sentence && sheet != Sheet.Sentence;
         _sheet = sheet;
+        if (leavingSentence) _viewModel.HeldSentence.DismissCommand.Execute(null);
         WordSheet.IsVisible = sheet == Sheet.Word;
+        SentenceSheet.IsVisible = sheet == Sheet.Sentence;
         ChapterSheet.IsVisible = sheet == Sheet.Chapters;
         OptionsSheet.IsVisible = sheet == Sheet.Options;
         NamesSheet.IsVisible = sheet == Sheet.Names;
@@ -417,6 +432,7 @@ public partial class NovelReaderContentPage : UserControl
     private void CloseSheet()
     {
         if (_sheet == Sheet.Word) _viewModel.Editor.CloseCommand.Execute(null);
+        if (_sheet == Sheet.Sentence) _viewModel.HeldSentence.DismissCommand.Execute(null);
         if (_sheet == Sheet.Report)
         {
             // Back (or a tap outside) leaves the form without saving, like Cancel.

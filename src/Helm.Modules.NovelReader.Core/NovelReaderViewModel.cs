@@ -42,7 +42,6 @@ public sealed partial class NovelReaderViewModel : ObservableObject, IReadAloudH
     private readonly SpeechCatalog _catalog;
     private readonly ReadAloudController _reader;
     private readonly INameScanAgent? _nameAgent;
-    private readonly WordPronouncer? _pronouncer;
     private CancellationTokenSource? _scanCancel;
     private bool _entriesQueued;
     private readonly IProcessLauncher _launcher;
@@ -55,6 +54,7 @@ public sealed partial class NovelReaderViewModel : ObservableObject, IReadAloudH
     private int _currentParagraph;
     private int _currentSentence;
     private ParagraphViewModel? _speakingParagraph;
+    private ParagraphViewModel? _heldParagraph;
     private bool _readerOpensChapter;
     private bool _progressDirty;
     private bool _progressScheduled;
@@ -149,8 +149,12 @@ public sealed partial class NovelReaderViewModel : ObservableObject, IReadAloudH
         _device = device;
         _catalog = catalog;
         _nameAgent = nameAgent;
-        _pronouncer = pronouncer;
-        HeldWord = new HeldWordViewModel(captureTargets, ai);
+        HeldSentence = new HeldSentenceViewModel(captureTargets, ai, pronouncer is null ? null : pronouncer.SaySentenceAsync);
+        HeldSentence.PropertyChanged += (_, e) =>
+        {
+            // The sheet closed: the sentence is no longer marked.
+            if (e.PropertyName == nameof(HeldSentenceViewModel.IsShown) && !HeldSentence.IsShown) ClearHeldSentence();
+        };
         if (vieneu is not null)
         {
             VieNeu = new VieNeuVoiceViewModel(vieneu, ui, dialogs);
@@ -666,6 +670,8 @@ public sealed partial class NovelReaderViewModel : ObservableObject, IReadAloudH
             return list;
         });
         if (version != _loadVersion) return;
+        // A sentence of the chapter left behind is not explained any more.
+        HeldSentence.DismissCommand.Execute(null);
         Paragraphs.Clear();
         for (var i = 0; i < lines.Count; i++)
         {
@@ -770,14 +776,27 @@ public sealed partial class NovelReaderViewModel : ObservableObject, IReadAloudH
     /// <summary>The reading-aloud engine; the page's player bar drives it through the commands below.</summary>
     public ReadAloudController Reader => _reader;
 
-    /// <summary>After a long press on a word: the bar that offers to add it to Vocabulary.</summary>
-    public HeldWordViewModel HeldWord { get; }
+    /// <summary>After a long press on the text: the sheet that explains the sentence and sends its words to Vocabulary.</summary>
+    public HeldSentenceViewModel HeldSentence { get; }
 
-    /// <summary>A long press on a word in study mode: says its Chinese in standard Mandarin, to learn how it sounds.</summary>
-    public async Task PronounceAsync(string chinese)
+    /// <summary>
+    /// A long press on a word (any view): its whole sentence is highlighted and explained in the sheet. A tap still opens
+    /// the word itself, and the sheet's speaker says the sentence (a long press used to say the word).
+    /// </summary>
+    public void HoldSentence(ParagraphViewModel paragraph, int segment)
     {
-        if (_pronouncer is null) return;
-        if (await _pronouncer.SayAsync(chinese) is { } problem) Message = problem;
+        if (paragraph.Line is not { } line
+            || NovelReader.HeldSentence.At(paragraph.Index, line, paragraph.Sentences, segment, _dictionaries.Current.Pinyin) is not { } held) return;
+        ClearHeldSentence();
+        paragraph.HeldSegments = (held.FirstSegment, held.SegmentCount);
+        _heldParagraph = paragraph;
+        _ = HeldSentence.ShowAsync(held);
+    }
+
+    private void ClearHeldSentence()
+    {
+        if (_heldParagraph is not null) _heldParagraph.HeldSegments = null;
+        _heldParagraph = null;
     }
 
     /// <summary>▶/⏸: plays from where reading stopped (or the top of the page), pauses, resumes.</summary>

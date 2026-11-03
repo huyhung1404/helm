@@ -58,6 +58,9 @@ public sealed class AiTextTests
 
         Assert.Equal("API answered.", answer.Text);
         Assert.Null(answer.RanOn);
+        // Where it ran and what it cost, for the line under an answer.
+        Assert.False(string.IsNullOrEmpty(answer.Model));
+        Assert.Equal(Assert.Single(_usage.All()).Value.Usd, answer.Usd);
         Assert.Equal(1, api.Calls);
         Assert.Empty(api.Tools);
         Assert.Equal("You translate.", api.System);
