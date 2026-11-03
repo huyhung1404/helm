@@ -38,8 +38,9 @@ public sealed class KeyboardEngineTests
     [InlineData("huyts", "huýt")]
     [InlineData("caf phee", "cà phê")]
     [InlineData("ddi ddaau", "đi đâu")]
-    [InlineData("tw", "tư")]
-    [InlineData("w", "ư")]
+    [InlineData("tw", "tw")]
+    [InlineData("w", "w")]
+    [InlineData("wa", "wa")]
     [InlineData("nhuw", "như")]
     public void Types_vietnamese_words(string keys, string expected) => Assert.Equal(expected, Type(keys));
 
@@ -78,14 +79,13 @@ public sealed class KeyboardEngineTests
     [InlineData("DDaij", "Đại")]
     [InlineData("Dda", "Đa")]
     [InlineData("NGUOWIF", "NGƯỜI")]
-    [InlineData("TW", "TƯ")]
+    [InlineData("TUW", "TƯ")]
     public void Keeps_upper_case(string keys, string expected) => Assert.Equal(expected, Type(keys));
 
     [Theory]
     [InlineData("ass", "as")]
     [InlineData("aaa", "aa")]
     [InlineData("ddd", "dd")]
-    [InlineData("ww", "w")]
     [InlineData("uww", "uw")]
     [InlineData("asz", "a")]
     [InlineData("asf", "à")]

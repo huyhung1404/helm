@@ -68,14 +68,12 @@ public static class Telex
         _ => 'j',
     };
 
-    private struct Letter(char key, Mark mark = Mark.None, bool fromW = false)
+    private struct Letter(char key, Mark mark = Mark.None)
     {
         /// <summary>Lowercase a-z.</summary>
         public char Key = char.ToLowerInvariant(key);
         public readonly bool Upper = char.IsUpper(key);
         public Mark Mark = mark;
-        /// <summary>An ư typed as a lone "w"; a second w turns it back into a "w".</summary>
-        public readonly bool FromW = fromW;
 
         public readonly bool IsVowel => VietnameseLetters.IsVowel(Key);
     }
@@ -211,33 +209,21 @@ public static class Telex
         private Outcome AddHornOrBreve(char key)
         {
             var (start, end) = Cluster();
-            if (start == end)
-            {
-                // A lone w is ư (tw → tư), but only where no vowel has been typed yet.
-                if (_letters.Exists(l => l.IsVowel)) return Outcome.NotApplicable;
-                _letters.Add(new Letter(char.IsUpper(key) ? 'U' : 'u', Mark.Horn, fromW: true));
-                return Outcome.Applied;
-            }
+            // A w with no vowel to mark stays a plain w (never ư on its own).
+            if (start == end) return Outcome.NotApplicable;
             var targets = HornTargets(start, end);
             if (targets.Count == 0) return Outcome.NotApplicable;
             if (targets.TrueForAll(i => _letters[i].Mark == MarkFor(_letters[i].Key)))
             {
                 if (!Repeats(key)) return Outcome.NotApplicable;
                 // The same w again takes the marks off and types the w: "uww" → "uw", "ww" → "w".
-                var typeW = true;
                 foreach (var i in targets)
                 {
                     var letter = _letters[i];
-                    if (letter.FromW)
-                    {
-                        _letters[i] = new Letter(letter.Upper ? 'W' : 'w');
-                        typeW = false;
-                        continue;
-                    }
                     letter.Mark = Mark.None;
                     _letters[i] = letter;
                 }
-                if (typeW) _letters.Add(new Letter(key));
+                _letters.Add(new Letter(key));
                 return Outcome.Undone;
             }
             foreach (var i in targets)
