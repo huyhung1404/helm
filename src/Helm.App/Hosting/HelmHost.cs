@@ -154,6 +154,11 @@ internal static class HelmHost
         builder.Services.AddSingleton<McpPermissionsViewModel>();
         builder.Services.AddSingleton<McpViewModel>();
         builder.Services.AddSingleton<Helm.Ai.AiKeysViewModel>();
+        // AI → Features: the Skill Hub the features' own prompts come from (this PC's tokens, encrypted).
+        builder.Services.AddSingleton(sp => new Helm.Ai.Prompts.SkillHubViewModel(
+            sp.GetRequiredService<Helm.Core.Settings.ISettingsStoreFactory>().Get<Helm.Ai.Prompts.SkillHubSettings>(Helm.Ai.Prompts.SkillHubSettings.StoreId),
+            sp.GetRequiredService<Helm.Ai.Prompts.SkillHubSecrets>(), sp.GetRequiredService<Helm.Ai.Prompts.AiPromptRefresher>(),
+            sp.GetRequiredService<Helm.Ai.Prompts.AiPrompts>(), sp.GetRequiredService<Helm.Core.Services.IUiDispatcher>()));
         builder.Services.AddSingleton<VpsWorkerViewModel>();
         builder.Services.AddSingleton<AiProxyViewModel>();
         builder.Services.AddSingleton<AiViewModel>();

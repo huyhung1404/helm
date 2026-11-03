@@ -7,9 +7,10 @@ namespace Helm.App.ViewModels;
 /// <summary>
 /// The AI page: the models Helm calls with the user's API keys (Models &amp; keys), the agents on this PC that take
 /// Helm's AI jobs first (Proxy), the AI agents that use Helm's tools over MCP (Agents &amp; MCP), and each AI feature's
-/// settings (Features).
+/// settings with the Skill Hub their own prompts come from (Features).
 /// </summary>
-internal sealed partial class AiViewModel(AiKeysViewModel keys, AiProxyViewModel proxy, McpViewModel agents, AiFeaturesViewModel features)
+internal sealed partial class AiViewModel(AiKeysViewModel keys, AiProxyViewModel proxy, McpViewModel agents, AiFeaturesViewModel features,
+    Helm.Ai.Prompts.SkillHubViewModel skillHub)
     : ObservableObject
 {
     internal enum AiTab
@@ -28,6 +29,7 @@ internal sealed partial class AiViewModel(AiKeysViewModel keys, AiProxyViewModel
     public AiProxyViewModel Proxy { get; } = proxy;
     public McpViewModel Agents { get; } = agents;
     public AiFeaturesViewModel Features { get; } = features;
+    public Helm.Ai.Prompts.SkillHubViewModel SkillHub { get; } = skillHub;
 
     public bool IsKeysTab => Tab == AiTab.Keys;
     public bool IsProxyTab => Tab == AiTab.Proxy;
@@ -52,5 +54,6 @@ internal sealed partial class AiViewModel(AiKeysViewModel keys, AiProxyViewModel
     {
         Tab = AiTab.Features;
         Features.Refresh();
+        SkillHub.Load();
     }
 }

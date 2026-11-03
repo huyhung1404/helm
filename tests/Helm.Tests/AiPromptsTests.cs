@@ -252,6 +252,52 @@ public sealed class AiPromptsTests : IDisposable
         Assert.NotNull(secrets.Connection(store));
     }
 
+    [Fact]
+    public async Task The_AI_pages_Skill_Hub_card_saves_the_tokens_encrypted_and_fetches_at_once()
+    {
+        var paths = new HelmPaths(_dir.Path);
+        using var factory = new SettingsStoreFactory(paths);
+        var store = factory.Get<SkillHubSettings>(SkillHubSettings.StoreId);
+        var secrets = new SkillHubSecrets(paths, new PlainSecretProtector());
+        var prompts = Prompts();
+        _source.Texts["helm-novel"] = "Mine for {book}.";
+        var vm = new SkillHubViewModel(store, secrets, Refresher(prompts), prompts, new InlineUi());
+        Assert.Equal("Not connected: Helm uses its built-in prompts.", vm.StatusText);
+        Assert.False(vm.HasToken);
+
+        vm.Url = "http://hub.example/api/mcp";
+        vm.Token = "machine";
+        await vm.SaveCommand.ExecuteAsync(null);
+        Assert.Equal("Use https: the tokens travel with every request.", vm.Problem);
+        Assert.False(vm.HasToken);
+
+        vm.Url = "https://hub.example/api/mcp";
+        vm.AccessClientId = "cf-id";
+        await vm.SaveCommand.ExecuteAsync(null);
+        Assert.Contains("two parts", vm.Problem);
+
+        vm.AccessClientSecret = "cf-secret";
+        await vm.SaveCommand.ExecuteAsync(null);
+
+        Assert.Equal("", vm.Problem);
+        Assert.True(vm.HasToken);
+        Assert.True(vm.HasAccess);
+        // The boxes are emptied; the tokens are only in the encrypted file, never in the settings file.
+        Assert.Equal(("", "", ""), (vm.Token, vm.AccessClientId, vm.AccessClientSecret));
+        Assert.DoesNotContain("machine", File.ReadAllText(store.FilePath));
+        Assert.Equal(new SkillHubConnection(new Uri("https://hub.example/api/mcp"), "machine", "cf-id", "cf-secret"), secrets.Connection(store));
+        Assert.StartsWith("Fetched ", vm.StatusText);
+        Assert.EndsWith("1 prompt in use: helm-novel", vm.StatusText);
+        Assert.True(vm.IsOk);
+
+        // An empty token box keeps the saved token; a failing hub says why and keeps the prompts.
+        _source.Fails = true;
+        await vm.SaveCommand.ExecuteAsync(null);
+        Assert.Equal("machine", secrets.Connection(store)!.Token);
+        Assert.Equal("Could not reach the Skill Hub · Helm keeps the prompts it has (1 prompt in use: helm-novel).", vm.StatusText);
+        Assert.False(vm.IsOk);
+    }
+
     private sealed class FakeSource : IAiPromptSource
     {
         public Dictionary<string, string> Texts { get; } = [];

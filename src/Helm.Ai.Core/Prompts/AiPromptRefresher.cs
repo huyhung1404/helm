@@ -42,6 +42,15 @@ public sealed class AiPromptRefresher : IDisposable
 
     public void Dispose() => _timer?.Dispose();
 
+    /// <summary>When every prompt was last fetched; null before the first fetch that worked.</summary>
+    public DateTimeOffset? LastFetched { get; private set; }
+
+    /// <summary>Why the last fetch failed ("The Skill Hub does not accept this machine's token."); null when it worked.</summary>
+    public string? Problem { get; private set; }
+
+    /// <summary>A fetch ended (any thread): <see cref="LastFetched"/> or <see cref="Problem"/> may have changed.</summary>
+    public event EventHandler? Fetched;
+
     /// <summary>Fetches now in the background, unless the last fetch was within <see cref="Soonest"/>.</summary>
     public void RefreshSoon()
     {
@@ -57,7 +66,11 @@ public sealed class AiPromptRefresher : IDisposable
         if (Interlocked.Exchange(ref _running, 1) == 1) return;
         try
         {
-            if (!_source.IsSetUp) return;
+            if (!_source.IsSetUp)
+            {
+                Problem = null;
+                return;
+            }
             _last = _time.GetUtcNow();
             foreach (var feature in _features)
             {
@@ -72,16 +85,20 @@ public sealed class AiPromptRefresher : IDisposable
                     if (!_failing) _logger.LogWarning("Skill Hub prompts not fetched: {Problem} Helm keeps the ones it has", ex.Message);
                     else _logger.LogDebug("Skill Hub prompts still not fetched: {Problem}", ex.Message);
                     _failing = true;
+                    Problem = ex.Message;
                     return;
                 }
                 _prompts.Save(feature, text);
             }
             if (_failing) _logger.LogInformation("Skill Hub prompts fetched again");
             _failing = false;
+            LastFetched = _last;
+            Problem = null;
         }
         finally
         {
             Volatile.Write(ref _running, 0);
+            Fetched?.Invoke(this, EventArgs.Empty);
         }
     }
 

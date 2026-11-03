@@ -63,13 +63,41 @@ public sealed class SkillHubSecrets(HelmPaths paths, ISecretProtector protector)
             });
             settings.Flush();
         }
-        if (saved is not { Token.Length: > 0 } || !Uri.TryCreate(file.Url.Trim(), UriKind.Absolute, out var url)) return null;
-        // The tokens travel with every request: never over plain http, except to this PC itself (a hub under test).
-        if (url.Scheme != Uri.UriSchemeHttps && !(url.Scheme == Uri.UriSchemeHttp && url.IsLoopback)) return null;
-        return new SkillHubConnection(url, saved.Token, NullIfEmpty(saved.AccessClientId), NullIfEmpty(saved.AccessClientSecret));
+        if (saved is not { Token.Length: > 0 } || UrlProblem(file.Url) is not null) return null;
+        return new SkillHubConnection(new Uri(file.Url.Trim()), saved.Token, NullIfEmpty(saved.AccessClientId), NullIfEmpty(saved.AccessClientSecret));
 
         static string Pick(string typed, string? kept) => typed.Trim().Length > 0 ? typed.Trim() : kept ?? "";
         static string? NullIfEmpty(string s) => s.Length > 0 ? s : null;
+    }
+
+    /// <summary>Why the hub's address cannot be used; null when it can.</summary>
+    public static string? UrlProblem(string url)
+    {
+        if (!Uri.TryCreate(url.Trim(), UriKind.Absolute, out var uri) || uri.Scheme != Uri.UriSchemeHttps && uri.Scheme != Uri.UriSchemeHttp)
+            return "Type the hub's MCP address, like https://skill.example.com/api/mcp.";
+        // The tokens travel with every request: never over plain http, except to this PC itself (a hub under test).
+        return uri.Scheme == Uri.UriSchemeHttp && !uri.IsLoopback ? "Use https: the tokens travel with every request." : null;
+    }
+
+    /// <summary>Which tokens are saved on this device (never their values): the machine token, the Access service token.</summary>
+    public (bool Token, bool Access) Saved()
+    {
+        var saved = Read();
+        return (saved is { Token.Length: > 0 }, saved is { AccessClientId.Length: > 0, AccessClientSecret.Length: > 0 });
+    }
+
+    /// <summary>
+    /// Saves the tokens typed on the AI page, encrypted, never in the settings file. An empty one keeps what was saved;
+    /// <paramref name="clearAccess"/> drops the Access service token (a hub without Cloudflare Access in front).
+    /// </summary>
+    public void Save(string token, string accessClientId, string accessClientSecret, bool clearAccess = false)
+    {
+        var saved = Read();
+        var id = clearAccess ? "" : Pick(accessClientId, saved?.AccessClientId);
+        var secret = clearAccess ? "" : Pick(accessClientSecret, saved?.AccessClientSecret);
+        Write(new Stored(Pick(token, saved?.Token), id, secret));
+
+        static string Pick(string typed, string? kept) => typed.Trim().Length > 0 ? typed.Trim() : kept ?? "";
     }
 
     private Stored? Read()
