@@ -56,6 +56,13 @@ public partial class AskHelmActivity
     }
 
     /// <summary>"Chụp ảnh" or "Thư viện".</summary>
+    /// <summary>The widget's camera button opens the card straight on the photo choice.</summary>
+    partial void OpenCamera(ref bool opened)
+    {
+        ChoosePhoto();
+        opened = true;
+    }
+
     private void ChoosePhoto()
     {
         StopAutoClose();
