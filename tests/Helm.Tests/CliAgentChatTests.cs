@@ -169,6 +169,28 @@ public sealed class CliAgentChatTests
     }
 
     [Fact]
+    public async Task A_turn_with_a_photo_sends_it_after_the_words_as_an_image_input()
+    {
+        var codex = new FakeCodex();
+        var server = new CodexAppServer(codex.Output, codex.Input);
+        await server.StartAsync("work", "1", CancellationToken.None);
+        codex.OnTurn = (id, _) =>
+        [
+            Reply(id, new JsonObject()),
+            Note("item/completed", new JsonObject { ["item"] = new JsonObject { ["type"] = "agentMessage", ["id"] = "m", ["text"] = "ok" } }),
+            Note("turn/completed", new JsonObject { ["turn"] = new JsonObject { ["id"] = "t", ["status"] = "completed" } }),
+        ];
+
+        var (answer, _) = await server.TurnAsync("Read the photo.", [new AssistantImage([1, 2, 3])], CancellationToken.None);
+
+        Assert.Equal("ok", answer);
+        var input = codex.Sent.Last(m => (string?)m["method"] == "turn/start")["params"]!["input"]!;
+        Assert.Equal("Read the photo.", (string)input[0]!["text"]!);
+        Assert.Equal("image", (string)input[1]!["type"]!);
+        Assert.Equal("data:image/jpeg;base64,AQID", (string)input[1]!["url"]!);
+    }
+
+    [Fact]
     public async Task Codexs_own_requests_are_turned_down_and_the_turn_goes_on()
     {
         var codex = new FakeCodex();

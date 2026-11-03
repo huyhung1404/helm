@@ -25,6 +25,9 @@ internal sealed class CodexAgentFactory(IChildProcessLauncher launcher, string h
 
     public Helm.Ai.AiProvider Provider => Helm.Ai.AiProviders.Claude;
 
+    /// <summary>Photos go as image inputs of the app server's turn, or as <c>--image</c> files of a <c>codex exec</c> run.</summary>
+    public bool ReadsImages => true;
+
     /// <summary>Why it takes no job now (not installed, not signed in here, at its limit), or null.</summary>
     public string? Unavailable()
     {
@@ -98,6 +101,23 @@ internal sealed class CodexAgentFactory(IChildProcessLauncher launcher, string h
         return thread is { } id ? [.. options, "resume", id, "-"] : [.. options, "-"];
     }
 
+    /// <summary>
+    /// Deletes what <c>codex exec</c> saved of a session (CODEX_HOME/sessions/…/rollout-…-&lt;thread&gt;.jsonl): one that
+    /// saw a photo keeps it there, base64, until then. Never throws.
+    /// </summary>
+    internal static void ForgetSession(string home, string thread)
+    {
+        var sessions = Path.Combine(home, "sessions");
+        try
+        {
+            if (!Directory.Exists(sessions)) return;
+            foreach (var file in Directory.EnumerateFiles(sessions, $"*{thread}*.jsonl", SearchOption.AllDirectories)) File.Delete(file);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+        }
+    }
+
     /// <summary>The command line for <paramref name="codex"/>: npm's codex.cmd only runs through cmd.exe.</summary>
     internal static string CommandLineFor(string codex, IEnumerable<string> args) =>
         codex.EndsWith(".cmd", StringComparison.OrdinalIgnoreCase)
@@ -169,12 +189,15 @@ internal sealed class CodexChat(CodexAgentFactory factory, IChildProcessLauncher
     private CodexAppServer? _server;
     private bool _execOnly = !CodexAgentFactory.AppServerAllowed(home);
     private string? _thread;
+    private bool _photoInSession;
     private int _calls;
 
     /// <summary>The app server's thread got its first message (the preamble); one started ahead of the turn has not yet.</summary>
     private bool _greeted;
 
     public void AddUser(string text) => _conversation.AddUser(text);
+
+    public void AddUser(string text, AssistantImage image) => _conversation.AddUser(text, image);
 
     public void AddTools(IReadOnlyList<AssistantTool> added) => _conversation.AddTools(added);
 
@@ -200,7 +223,12 @@ internal sealed class CodexChat(CodexAgentFactory factory, IChildProcessLauncher
         if (_server is null) await StartServerAsync(codex, ct);
     }
 
-    public void Dispose() => Kill();
+    public void Dispose()
+    {
+        Kill();
+        // The app server's thread lives in memory only; a codex exec session that saw a photo is on disk.
+        if (_photoInSession && _thread is { } thread) CodexAgentFactory.ForgetSession(home, thread);
+    }
 
     /// <summary>The turn on the app server (started when there is none or it ended), or null when it cannot start.</summary>
     private async Task<(string Answer, AssistantUsage Usage)?> ServerTurnAsync(string codex, CancellationToken ct)
@@ -213,7 +241,7 @@ internal sealed class CodexChat(CodexAgentFactory factory, IChildProcessLauncher
         {
             var message = _conversation.Message(fresh);
             _greeted = true;
-            return await _server!.TurnAsync(message, ct);
+            return await _server!.TurnAsync(message, _conversation.Images, ct);
         }
         catch (AssistantException ex)
         {
@@ -266,10 +294,25 @@ internal sealed class CodexChat(CodexAgentFactory factory, IChildProcessLauncher
     private async Task<(string Answer, AssistantUsage Usage)> ExecAsync(string codex, CancellationToken ct)
     {
         var fresh = _thread is null;
+        // Photos as files in the empty work folder, for this run only.
+        var photos = CliImages.Save(workFolder, _conversation.Images);
+        if (photos.Count > 0) _photoInSession = true;
+        try
+        {
+            return await ExecAsync(codex, CliImages.WithCodexImages(CodexAgentFactory.ExecArguments(workFolder, _thread), photos), fresh, ct);
+        }
+        finally
+        {
+            CliImages.Delete(photos);
+        }
+    }
+
+    private async Task<(string Answer, AssistantUsage Usage)> ExecAsync(string codex, string[] args, bool fresh, CancellationToken ct)
+    {
         ChildProcess process;
         try
         {
-            process = launcher.Start(new ChildProcessStartInfo(CodexAgentFactory.CommandLineFor(codex, CodexAgentFactory.ExecArguments(workFolder, _thread)), workFolder)
+            process = launcher.Start(new ChildProcessStartInfo(CodexAgentFactory.CommandLineFor(codex, args), workFolder)
             {
                 Environment = factory.ChildEnvironment(codex),
             });
@@ -331,6 +374,8 @@ internal sealed class CodexChat(CodexAgentFactory factory, IChildProcessLauncher
             {
                 if (error.Contains("limit", StringComparison.OrdinalIgnoreCase)) factory.ReachedLimit();
                 logger.LogWarning("Codex failed: {Error}", error);
+                // A failed first turn's session is not kept: nor is a photo it saw.
+                if (fresh && thread is not null && _photoInSession) CodexAgentFactory.ForgetSession(home, thread);
                 throw new AssistantException($"Codex: {error}");
             }
             // The session is kept once a turn went through: a failed first turn starts over with the preamble.

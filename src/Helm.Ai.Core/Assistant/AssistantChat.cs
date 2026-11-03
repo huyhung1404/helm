@@ -134,6 +134,13 @@ public interface IAssistantChatFactory
 {
     AiProvider Provider { get; }
 
+    /// <summary>
+    /// An agent CLI's chats take photos (<see cref="IAssistantChat.AddUser(string, AssistantImage)"/>): one that cannot
+    /// gets no photo job, and the next agent or the API reads it. The API's chats are checked per model instead
+    /// (<see cref="AssistantPhotos.Reads"/>).
+    /// </summary>
+    bool ReadsImages => false;
+
     IAssistantChat Create(string apiKey, string model, string effort, string system, IReadOnlyList<AssistantTool> tools);
 }
 

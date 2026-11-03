@@ -248,9 +248,9 @@ public partial class AskHelmActivity
             return;
         }
         ShowReply(reply);
-        // A question back listens for the answer (it goes with the photo); else say which model read it.
+        // A question back listens for the answer (it goes with the photo); else say who read it (a PC's agent, or the API's model).
         if (_listening) return;
-        var ranOn = $"{Short(_session.PhotoModel?.Name ?? _session.Model?.Name ?? "")} qua API";
+        var ranOn = reply.RanOn is { } pc ? $"{pc} · miễn phí" : $"{Short(_session.PhotoModel?.Name ?? _session.Model?.Name ?? "")} qua API";
         _status.Text = reply.Done.Count > 0 ? $"Đã lưu · {ranOn} · tự đóng sau vài giây" : ranOn;
     }
 

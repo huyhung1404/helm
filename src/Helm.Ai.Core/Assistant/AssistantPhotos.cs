@@ -2,8 +2,8 @@ namespace Helm.Ai.Assistant;
 
 /// <summary>
 /// Ask Helm's "photo to data": how big a photo is sent, which models read one, the tool groups a photo needs and what
-/// the model is asked to do with it. A photo is read through the API on the phone (user-started and quick), never on a
-/// PC agent: a job reaches a PC over sync as words, not pictures.
+/// the model is asked to do with it. A photo is read by a Helm PC's agent that reads pictures when one answers (it
+/// travels as a blob of its own, <see cref="IAgentJobPhotos"/>), else through the API on the picked model.
 /// </summary>
 public static class AssistantPhotos
 {

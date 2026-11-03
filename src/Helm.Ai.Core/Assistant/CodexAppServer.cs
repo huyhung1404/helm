@@ -41,13 +41,16 @@ public sealed class CodexAppServer(TextReader output, TextWriter input)
     /// <summary>One turn: sends <paramref name="text"/>, returns Codex's last message and the tokens the turn took.</summary>
     /// <exception cref="AssistantException">The turn failed (its message says why: a plan's limit, for one).</exception>
     /// <exception cref="IOException">It stopped before the turn ended.</exception>
-    public async Task<(string Answer, AssistantUsage Usage)> TurnAsync(string text, CancellationToken ct)
+    public Task<(string Answer, AssistantUsage Usage)> TurnAsync(string text, CancellationToken ct) => TurnAsync(text, [], ct);
+
+    /// <summary>One turn with photos (<see cref="CliImages.CodexInput"/>): they go as data URLs, never as files.</summary>
+    public async Task<(string Answer, AssistantUsage Usage)> TurnAsync(string text, IReadOnlyList<AssistantImage> images, CancellationToken ct)
     {
         var thread = _thread ?? throw new InvalidOperationException("The conversation is not open.");
         var id = await SendAsync("turn/start", new JsonObject
         {
             ["threadId"] = thread,
-            ["input"] = new JsonArray(new JsonObject { ["type"] = "text", ["text"] = text }),
+            ["input"] = CliImages.CodexInput(text, images),
         }, ct);
         string? answer = null, error = null;
         var before = _total;

@@ -20,6 +20,9 @@ public sealed record AiWorkerRecord
     /// <summary>Why it takes no job now (Claude Code at its limit…); null when it does.</summary>
     public string? Problem { get; init; }
 
+    /// <summary>One of its agents that read pictures takes jobs now (a Helm before 0.81 never says so: no photos for it).</summary>
+    public bool ReadsPhotos { get; init; }
+
     public DateTimeOffset SeenAt { get; init; }
 }
 
@@ -38,6 +41,9 @@ public sealed record AiJobRecord
     public required string From { get; init; }
 
     public AiJob? Job { get; init; }
+
+    /// <summary>The job's photos, each a blob of its own (<see cref="IAgentJobPhotos"/>); taken out once the PC read them.</summary>
+    public IReadOnlyList<AiJobPhoto>? Photos { get; init; }
 
     public AiJobAction? Action { get; init; }
 
@@ -103,6 +109,15 @@ public static class AgentJobs
     /// safety net for a socket that died quietly), every second while it is down (connecting, or refused).
     /// </summary>
     public static readonly TimeSpan PullWhileLive = TimeSpan.FromSeconds(3), PullWhileDown = TimeSpan.FromSeconds(1);
+
+    /// <summary>
+    /// More time for a PC to claim a job with photos: its record syncs only once the photos are on the server, and a
+    /// phone uploads half a megabyte in a few seconds.
+    /// </summary>
+    public static readonly TimeSpan PhotoUpload = TimeSpan.FromSeconds(12);
+
+    /// <summary>The blobs a job's record names (<see cref="SyncedCollectionOptions{T}.BlobReferences"/>): it syncs after them.</summary>
+    public static IEnumerable<string> PhotosOf(AiJobRecord record) => record.Photos?.Select(p => p.Blob.Id) ?? [];
 }
 
 /// <summary>What an asker needs of sync while it waits for a PC: whether the live channel is up, opening it, a pull soon.</summary>
@@ -122,6 +137,7 @@ public sealed class SyncAgentRoute : IAgentRoute
     private readonly ISyncedCollection<AiJobRecord> jobs;
     private readonly ISyncedCollection<AiWorkerRecord> workers;
     private readonly Func<string> self;
+    private readonly IAgentJobPhotos? photos;
     private readonly AgentJobSync? _sync;
     private readonly TimeProvider _time;
     private readonly ILogger _logger;
@@ -135,18 +151,20 @@ public sealed class SyncAgentRoute : IAgentRoute
 
     private readonly LiveLease _live;
 
+    /// <param name="photos">Where a job's photos travel; null where they cannot (no photo job goes then).</param>
     public SyncAgentRoute(ISyncedCollection<AiJobRecord> jobs, ISyncedCollection<AiWorkerRecord> workers, Func<string> self,
-        SyncEngine? engine = null, TimeProvider? time = null, ILogger? logger = null)
-        : this(jobs, workers, self, engine is null ? null : AgentJobSync.Of(engine), time, logger)
+        SyncEngine? engine = null, TimeProvider? time = null, ILogger? logger = null, IAgentJobPhotos? photos = null)
+        : this(jobs, workers, self, engine is null ? null : AgentJobSync.Of(engine), time, logger, photos)
     {
     }
 
     internal SyncAgentRoute(ISyncedCollection<AiJobRecord> jobs, ISyncedCollection<AiWorkerRecord> workers, Func<string> self,
-        AgentJobSync? sync, TimeProvider? time, ILogger? logger)
+        AgentJobSync? sync, TimeProvider? time, ILogger? logger, IAgentJobPhotos? photos = null)
     {
         this.jobs = jobs;
         this.workers = workers;
         this.self = self;
+        this.photos = photos;
         _sync = sync;
         _time = time ?? TimeProvider.System;
         _logger = logger ?? NullLogger.Instance;
@@ -162,18 +180,39 @@ public sealed class SyncAgentRoute : IAgentRoute
         return online.All(w => w.Value.Problem is not null) ? online[0].Value.Problem : null;
     }
 
+    public bool ReadsPhotos => photos is not null && Online().Any(w => w.Value.Problem is null && w.Value.ReadsPhotos);
+
     public async Task<AiJobResult> RunAsync(AiJob job, TimeSpan wait, CancellationToken ct)
     {
-        var worker = WorkerFor(job.ConversationId);
+        if (job.Images.Count == 0) return await RunAsync(job, wait, [], ct);
+        if (photos is null || !ReadsPhotos) throw new AiRouteException("No Helm PC online has an agent that reads photos.");
+        var sent = new List<AiJobPhoto>();
+        try
+        {
+            foreach (var image in job.Images) sent.Add(await photos.PutAsync(image, ct));
+            return await RunAsync(job, wait + AgentJobs.PhotoUpload, sent, ct);
+        }
+        finally
+        {
+            // Never kept after the turn, whatever its end: the PC has read them, or never will.
+            foreach (var photo in sent) photos.Drop(photo);
+        }
+    }
+
+    private async Task<AiJobResult> RunAsync(AiJob job, TimeSpan wait, IReadOnlyList<AiJobPhoto> sent, CancellationToken ct)
+    {
+        var worker = WorkerFor(job.ConversationId, sent.Count > 0);
         var now = _time.GetUtcNow();
         var id = jobs.Add(new AiJobRecord
         {
-            To = worker.Id, From = self(), Job = job, ConversationId = job.ConversationId,
+            // The photos as blobs only, never in the record itself.
+            To = worker.Id, From = self(), Job = job with { Images = [] }, ConversationId = job.ConversationId,
+            Photos = sent.Count > 0 ? sent : null,
             ClaimBy = now + wait, CreatedAt = now,
         });
         using var live = _live.Hold();
         Clean();
-        var sent = _time.GetTimestamp();
+        var askedAt = _time.GetTimestamp();
         AiJobRecord? claimed;
         try
         {
@@ -190,8 +229,8 @@ public sealed class SyncAgentRoute : IAgentRoute
             Cancel(id);
             throw new AiRouteException($"{worker.Value.Device} did not take it within {wait.TotalSeconds:0} s.");
         }
-        // Its chat is on that PC now: the conversation's next turns, and its end, go there.
-        _workers[job.ConversationId] = worker.Id;
+        // Its chat is on that PC now: the conversation's next turns, and its end, go there (a photo's ends with its turn).
+        if (sent.Count == 0) _workers[job.ConversationId] = worker.Id;
         var claimedAt = _time.GetTimestamp();
         // Taken: from here on the turn is the PC's, whatever happens. It never falls back to the API.
         AiJobRecord? finished;
@@ -208,7 +247,7 @@ public sealed class SyncAgentRoute : IAgentRoute
         jobs.Delete(id);
         // Where the time went (sync each way, or the PC's agent): the PC logs its own part.
         _logger.LogDebug("Agent turn on {Device}: claimed after {Claim:0} ms, its result came {Result:0} ms later (live channel {Live})",
-            worker.Value.Device, _time.GetElapsedTime(sent, claimedAt).TotalMilliseconds, _time.GetElapsedTime(claimedAt).TotalMilliseconds,
+            worker.Value.Device, _time.GetElapsedTime(askedAt, claimedAt).TotalMilliseconds, _time.GetElapsedTime(claimedAt).TotalMilliseconds,
             _sync?.IsLive() == true ? "up" : "down");
         return finished switch
         {
@@ -226,15 +265,20 @@ public sealed class SyncAgentRoute : IAgentRoute
     /// <summary>Withdraws a job not finished yet: a PC that has not taken it never will, one that has stops it.</summary>
     private void Cancel(string id)
     {
-        if (jobs.Get(id) is { State: AgentJobs.Queued or AgentJobs.Claimed } open) jobs.Upsert(id, open with { State = AgentJobs.Cancelled });
+        // Its photos go with it, so the record names them no more.
+        if (jobs.Get(id) is { State: AgentJobs.Queued or AgentJobs.Claimed } open) jobs.Upsert(id, open with { State = AgentJobs.Cancelled, Photos = null });
     }
 
     /// <summary>
     /// The PC a turn goes to: the one that has the conversation, else the best online. A conversation whose PC is gone
     /// or busy now gives way (the API carries on with what was said), rather than start over on another PC.
     /// </summary>
-    private SyncedItem<AiWorkerRecord> WorkerFor(string conversationId)
+    private SyncedItem<AiWorkerRecord> WorkerFor(string conversationId, bool withPhotos = false)
     {
+        // Photos go to a PC whose agent reads them (each photo turn is a conversation of its own).
+        if (withPhotos)
+            return Online().FirstOrDefault(w => w.Value.Problem is null && w.Value.ReadsPhotos)
+                ?? throw new AiRouteException("No Helm PC online has an agent that reads photos.");
         if (!_workers.TryGetValue(conversationId, out var kept))
         {
             // The PC the card's warm-up went to has its agent ready, while it can still take the turn.
@@ -417,8 +461,10 @@ internal sealed class LiveLease(Func<bool> isLive, Action<bool> setLive, Action 
 /// The PC side: says it is there every minute, takes the jobs sent to it, runs them on its own agent (Claude Code) with
 /// Helm's tools, and writes back the results. Helm on the PC runs it while Helm Sync is set up.
 /// </summary>
+/// <param name="photos">Where the phone's photos come from; null: this PC says it reads none.</param>
 public sealed class AgentJobWorker(ISyncedCollection<AiJobRecord> jobs, ISyncedCollection<AiWorkerRecord> workers, IAgentRoute local,
-    Func<string> self, string device, Func<IReadOnlyList<string>> agents, TimeProvider? time = null, ILogger? logger = null) : IDisposable
+    Func<string> self, string device, Func<IReadOnlyList<string>> agents, TimeProvider? time = null, ILogger? logger = null,
+    IAgentJobPhotos? photos = null) : IDisposable
 {
     private readonly TimeProvider _time = time ?? TimeProvider.System;
     private readonly ILogger _logger = logger ?? NullLogger.Instance;
@@ -445,6 +491,7 @@ public sealed class AgentJobWorker(ISyncedCollection<AiJobRecord> jobs, ISyncedC
                 Device = device,
                 Agents = agents(),
                 Problem = local.Unavailable(),
+                ReadsPhotos = photos is not null && local.ReadsPhotos,
                 SeenAt = _time.GetUtcNow(),
             });
         }
@@ -517,6 +564,12 @@ public sealed class AgentJobWorker(ISyncedCollection<AiJobRecord> jobs, ISyncedC
             {
                 case AgentJobs.Run when job.Job is { } turn:
                     var claimed = _time.GetTimestamp();
+                    if (job.Photos is { Count: > 0 } sent)
+                    {
+                        turn = turn with { Images = await ReadPhotosAsync(sent, stop.Token) };
+                        // Read: the record names them no more, and what it writes back holds none.
+                        job = job with { Photos = null };
+                    }
                     var result = await local.RunAsync(turn, AgentJobs.AfterClaim - TimeSpan.FromSeconds(10), stop.Token);
                     jobs.Upsert(id, job with { State = AgentJobs.Done, Result = result });
                     // From the phone's write to the claim (clocks may differ a little), then the agent's whole turn.
@@ -550,5 +603,25 @@ public sealed class AgentJobWorker(ISyncedCollection<AiJobRecord> jobs, ISyncedC
             lock (_running) _running.Remove(id);
             lock (_taken) _taken.Remove(id);
         }
+    }
+
+    /// <summary>The job's photos, each fetched once and dropped on the server at once (the asker drops them too).</summary>
+    private async Task<IReadOnlyList<AssistantImage>> ReadPhotosAsync(IReadOnlyList<AiJobPhoto> sent, CancellationToken ct)
+    {
+        if (photos is null) throw new AiRouteException($"Helm on {device} cannot read photos.");
+        var images = new List<AssistantImage>();
+        try
+        {
+            foreach (var photo in sent) images.Add(await photos.ReadAsync(photo, ct));
+        }
+        catch (Exception ex) when (ex is BlobUnavailableException or System.Security.Cryptography.CryptographicException or HttpRequestException or IOException)
+        {
+            throw new AiRouteException($"Helm on {device} could not fetch the photo: {ex.Message}");
+        }
+        finally
+        {
+            foreach (var photo in sent) photos.Drop(photo);
+        }
+        return images;
     }
 }

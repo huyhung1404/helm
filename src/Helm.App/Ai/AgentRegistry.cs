@@ -101,6 +101,8 @@ internal sealed class AgentRegistry : IAgentRoute, IDisposable
 
     public void Warm(AiJob job) => _chain.Warm(job);
 
+    public bool ReadsPhotos => _chain.ReadsPhotos;
+
     /// <summary>"Ready", "Off", or why it takes no job.</summary>
     public string Status(AgentProfile profile)
     {

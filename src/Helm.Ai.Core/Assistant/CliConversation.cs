@@ -17,12 +17,25 @@ public sealed class CliConversation(string system, IReadOnlyList<AssistantTool> 
     private readonly List<AssistantTool> _tools = [.. tools];
     private readonly List<string> _said = [];
     private readonly StringBuilder _pending = new();
+    private readonly List<AssistantImage> _images = [];
     private string _more = "";
 
     /// <summary>Something waits to be sent.</summary>
-    public bool HasPending => _pending.Length > 0;
+    public bool HasPending => _pending.Length > 0 || _images.Count > 0;
+
+    /// <summary>
+    /// The photos that go with the next message (<see cref="CliImages"/>), kept like the words until a turn went
+    /// through. A recap never has them: a restarted agent only hears that a photo was sent.
+    /// </summary>
+    public IReadOnlyList<AssistantImage> Images => _images;
 
     public void AddUser(string text) => Append(text);
+
+    public void AddUser(string text, AssistantImage image)
+    {
+        if (text.Length > 0) Append(text);
+        _images.Add(image);
+    }
 
     public void AddResults(IReadOnlyList<ToolOutcome> results) => Append(CliAgentProtocol.Results(results));
 
@@ -48,9 +61,10 @@ public sealed class CliConversation(string system, IReadOnlyList<AssistantTool> 
     /// <summary>The turn went through with this answer: what was sent is said, nothing waits.</summary>
     public void Answered(string answer)
     {
-        if (_pending.Length > 0) _said.Add(_pending.ToString());
+        if (_pending.Length > 0 || _images.Count > 0) _said.Add((_images.Count > 0 ? "(the user sent a photo) " : "") + _pending);
         _said.Add("You: " + answer.Trim());
         _pending.Clear();
+        _images.Clear();
         _more = "";
     }
 
