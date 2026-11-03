@@ -1,0 +1,26 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- Sentence embeddings that run in Helm, offline: text in, a vector that says what it is about out, so things can be
+       found by meaning. paraphrase-multilingual-MiniLM-L12-v2 (Apache-2.0, int8 ONNX), downloaded on demand; its
+       SentencePiece tokenizer is ported here. No platform APIs, so Windows and Android share it. -->
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <SupportedOSPlatformVersion></SupportedOSPlatformVersion>
+    <PlatformTarget>AnyCPU</PlatformTarget>
+    <RootNamespace>Helm.Embeddings</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Helm.Core\Helm.Core.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="Helm.Tests" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Only the managed API here: each app adds the native runtime for its platform (Microsoft.ML.OnnxRuntime). -->
+    <PackageReference Include="Microsoft.ML.OnnxRuntime.Managed" Version="1.30.0" />
+  </ItemGroup>
+
+</Project>
