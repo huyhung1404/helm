@@ -3,6 +3,33 @@
 All notable changes to Helm. The top section is used as the GitHub release body and as the Velopack release notes.
 Format: [Keep a Changelog](https://keepachangelog.com), versions follow [SemVer](https://semver.org).
 
+## [0.81.0] - 2026-11-03
+
+### Added
+- **Notes: find a note by what it is about,** not only by its words (“lỗi server hôm trước” finds the note about the
+  VPS going down). Download the search model once (130 MB) in Notes' settings → Search by meaning; it runs on your
+  PC and your phone, offline, and nothing of your notes leaves the device for it.
+- Notes: AI agents and Ask Helm find notes by meaning too, where the search model is downloaded.
+- **Ask Helm: a photo (receipt, transfer, whiteboard) is now read by an agent on your Helm PC first, for free**
+  (Codex, Claude Code or Grok); the API reads it only when no PC agent can. The card says where it ran.
+- The photo goes to the PC end-to-end encrypted and is deleted from your phone, the PC (the agent's session too)
+  and the sync server once the turn is over. A PC that cannot fetch the photo hands the turn back at once.
+
+### Changed
+- Ask Helm sends about a third fewer tokens per call on the API and half on a PC's agent: shorter tool texts and
+  instructions, and only what the model needs of each result.
+- Ask Helm gets the PC's agent ready as soon as the card opens, so the first answer comes sooner (Claude Code,
+  Codex, Grok).
+- Ask Helm shows the answer as it is written when it runs on the API key (Claude, Grok).
+- Requests between the phone and the PC go through Helm Sync faster.
+- Grok agent jobs keep one Grok session per conversation instead of starting Grok for every call: about 0.3–0.4 s
+  faster per call, still with none of Grok's own tools.
+
+### Fixed
+- Ask Helm on Claude no longer fails when a later question needs other tools; long conversations carry a short
+  recap instead of their whole history.
+- Grok agent calls run headless recorded 0 input tokens in AI usage.
+
 ## [0.80.0] - 2026-11-03
 
 ### Added
