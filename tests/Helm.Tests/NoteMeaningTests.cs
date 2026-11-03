@@ -192,6 +192,19 @@ public sealed class NoteMeaningTests : IDisposable
         Assert.True(perNote < 200 && perQuery < 200, $"{perNote:0} ms a note, {perQuery:0} ms a search");
     }
 
+    [Fact]
+    public void Notes_settings_offer_the_model_to_download_with_its_size()
+    {
+        using var dir = new TempDir();
+        var installer = new SentenceModelInstaller(new SentenceModelFiles(dir.Path), NullLogger<SentenceModelInstaller>.Instance);
+        var row = new NoteSearchModelViewModel(installer, _indexer, new InlineUi(), new AcceptDialogs());
+
+        Assert.False(row.IsInstalled);
+        Assert.True(row.CanDownload);
+        Assert.Equal("129 MB", row.Size);
+        Assert.StartsWith("Not on this device: notes are found by their words.", row.Status);
+    }
+
     private async Task<List<string?>> Search(string args)
     {
         var search = new NotesMcpTools(_notes, meaning: _meaning).Tools.Single(t => t.Name == "notes_search");
