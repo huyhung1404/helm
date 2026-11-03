@@ -123,8 +123,8 @@ JSON-RPC, with no files, no terminal and every permission refused): Helm lists i
 (what it saved is estimated from the text). Calls that would need a yes are not offered there, and phone tools are
 handed back to the phone. An agent that reports its plan's limit takes no job for 30 minutes; the next one in the list does.
 
-**Costs.** Every call goes in the synced collection `ai.usage`: route (`api` or `claude-code`), model, tokens, the
-estimated USD (`AiPrices`), and on Claude Code what the same call would have cost (`SavedUsd`). The daily cap
+**Costs.** Every call goes in the synced collection `ai.usage`: route (`api` or `agent`, with the agent's name), model, tokens, the
+estimated USD (`AiPrices`), and on an agent what the same call would have cost (`SavedUsd`). The daily cap
 (`DailyCapUsd`, 0.50 USD) only stops the API.
 
 Only Helm's own features and your own services use the router. Other apps (Cursor, n8n, Open WebUI…) use their own

@@ -42,7 +42,7 @@ public sealed class AiRouterTests
         Assert.Contains("wallet_add_transaction", job.Tools);
         Assert.StartsWith("Now: ", job.Text);
         var entry = Assert.Single(_usage.All()).Value;
-        Assert.Equal(AiUsageBook.ClaudeCodeRoute, entry.Route);
+        Assert.Equal(AiUsageBook.AgentRoute, entry.Route);
         Assert.Equal(0m, entry.Usd);
         Assert.Equal(0.002m, entry.SavedUsd);
 

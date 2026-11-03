@@ -10,7 +10,7 @@ using Helm.Core.Sync;
 namespace Helm.App.ViewModels;
 
 /// <summary>One agent of this PC's proxy, as the Proxy part lists it.</summary>
-internal sealed partial class AgentRow(AgentProfile profile, string status, bool ready, bool first, bool last) : ObservableObject
+internal sealed partial class AgentRow(AgentProfile profile, string status, bool ready, bool signedIn, bool first, bool last) : ObservableObject
 {
     public string Id { get; } = profile.Id;
     public string Name { get; } = profile.Name;
@@ -18,6 +18,9 @@ internal sealed partial class AgentRow(AgentProfile profile, string status, bool
     public string Status { get; } = ready ? "Ready: takes jobs" : status;
     public bool IsReady { get; } = ready;
     public bool IsOff { get; } = !profile.Enabled;
+
+    /// <summary>Sign in shows only until it is signed in: another account is Remove, then Add again.</summary>
+    public bool NeedsSignIn { get; } = !signedIn;
     public bool CanMoveUp { get; } = !first;
     public bool CanMoveDown { get; } = !last;
 
@@ -79,7 +82,7 @@ internal sealed partial class AiProxyViewModel : ObservableObject
         {
             var p = profiles[i];
             var status = _agents.Status(p);
-            var row = new AgentRow(p, status, status == "Ready", i == 0, i == profiles.Count - 1);
+            var row = new AgentRow(p, status, status == "Ready", _agents.SignedIn(p), i == 0, i == profiles.Count - 1);
             row.PropertyChanged += (_, e) =>
             {
                 if (e.PropertyName == nameof(AgentRow.IsOn)) _agents.SetEnabled(row.Id, row.IsOn);

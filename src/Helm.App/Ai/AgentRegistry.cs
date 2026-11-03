@@ -199,7 +199,7 @@ internal sealed class AgentRegistry : IAgentRoute, IDisposable
 
     internal string Home(string id) => Path.Combine(_paths.ModuleDataDirectory("ai"), "agents", id);
 
-    private bool SignedIn(AgentProfile profile) => profile.Kind switch
+    public bool SignedIn(AgentProfile profile) => profile.Kind switch
     {
         AgentKinds.ClaudeCode => ClaudeCodeAgentFactory.SignedIn(Home(profile.Id)),
         AgentKinds.Grok => GrokAgentFactory.SignedIn(Home(profile.Id)),

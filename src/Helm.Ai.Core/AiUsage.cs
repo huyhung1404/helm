@@ -21,7 +21,7 @@ public sealed record AiUsageEntry
     /// <summary>Estimated from <see cref="AiPrices"/>; null for a model whose price Helm does not know. 0 on Claude Code.</summary>
     public decimal? Usd { get; init; }
 
-    /// <summary><see cref="AiUsageBook.ApiRoute"/> or <see cref="AiUsageBook.ClaudeCodeRoute"/> (older entries: none, the API).</summary>
+    /// <summary><see cref="AiUsageBook.ApiRoute"/> or <see cref="AiUsageBook.AgentRoute"/> (older entries: none, the API).</summary>
     public string? Route { get; init; }
 
     /// <summary>On Claude Code: what the same call would have cost on the API (Claude Code's own estimate).</summary>
@@ -77,7 +77,8 @@ public sealed class AiUsageBook(ISyncedLog<AiUsageEntry> log, TimeProvider? time
 {
     public const string Collection = "ai.usage";
     public const string ApiRoute = "api";
-    public const string ClaudeCodeRoute = "claude-code";
+    /// <summary>An agent on a Helm PC ran it (Codex, Claude Code, Grok…: <see cref="AiUsageEntry.Provider"/> names it).</summary>
+    public const string AgentRoute = "agent";
 
     private readonly TimeProvider _time = time ?? TimeProvider.System;
 
@@ -101,16 +102,16 @@ public sealed class AiUsageBook(ISyncedLog<AiUsageEntry> log, TimeProvider? time
         return entry;
     }
 
-    /// <summary>A call Claude Code ran on a Helm PC: free for the user, worth <paramref name="savedUsd"/> on the API.</summary>
-    public AiUsageEntry RecordClaudeCode(string feature, string model, string device, decimal? savedUsd)
+    /// <summary>A call an agent ran on a Helm PC: free for the user, worth <paramref name="savedUsd"/> on the API.</summary>
+    public AiUsageEntry RecordAgent(string feature, string agent, string model, string device, decimal? savedUsd)
     {
         var entry = new AiUsageEntry
         {
             Feature = feature,
-            Provider = AiProviders.Claude.Id,
+            Provider = agent,
             Model = model,
             Usd = 0,
-            Route = ClaudeCodeRoute,
+            Route = AgentRoute,
             SavedUsd = savedUsd,
             Device = device,
             At = _time.GetUtcNow(),
@@ -123,7 +124,7 @@ public sealed class AiUsageBook(ISyncedLog<AiUsageEntry> log, TimeProvider? time
     public decimal SavedThisMonth()
     {
         var now = Local(_time.GetUtcNow());
-        return Entries(null).Where(e => e.Route == ClaudeCodeRoute && Local(e.At) is var at && at.Year == now.Year && at.Month == now.Month)
+        return Entries(null).Where(e => e.Route == AgentRoute && Local(e.At) is var at && at.Year == now.Year && at.Month == now.Month)
             .Sum(e => e.SavedUsd ?? 0);
     }
 

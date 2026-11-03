@@ -274,7 +274,7 @@ public sealed class AssistantSession
             return null;
         }
         _pc = route;
-        _helm.Usage.RecordClaudeCode(AiFeatureIds.AskHelm, model.Model, route.Device, result.SavedUsd);
+        _helm.Usage.RecordAgent(AiFeatureIds.AskHelm, result.Agent ?? "agent", model.Model, route.Device, result.SavedUsd);
 
         // Undo goes back to the PC that made the record: it may not have synced here yet.
         var done = result.Done.Select(a => new AssistantAction(a.Tool, a.Summary, c => route.UndoAsync(a, c))).ToList();
