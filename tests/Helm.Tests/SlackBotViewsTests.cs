@@ -105,7 +105,8 @@ public sealed class SlackBotViewsTests : IDisposable
         Layout(folded, new Size(200, 80), "2-overlay-folded");
 
         inbox.OpenCommand.Execute(inbox.ToDo[0]);
-        Assert.Equal("https://team.slack.com/archives/D1/p1700000000000100", Assert.Single(launcher.Opened));
+        // Open goes to the newest message of the card.
+        Assert.Equal("https://team.slack.com/archives/D1/p1700000150000100", Assert.Single(launcher.Opened));
 
         var content = new SlackBotContentPage(module, inbox);
         Layout(content, new Size(1000, 1300), "3-content");
@@ -134,12 +135,12 @@ public sealed class SlackBotViewsTests : IDisposable
         foreach (var expander in Descendants<Wpf.Ui.Controls.CardExpander>(page)) expander.IsExpanded = true;
         Layout(page, new Size(1000, 2600), "4b-settings-open");
 
-        // Done takes it off the list; replying in the thread takes the mention off too.
+        // Done takes the card off the list (both of the DM's messages); replying in the thread takes the mention off too.
         inbox.DoneCommand.Execute(inbox.ToDo[0]);
         engine.Inbox.Mine(new SlackMessage("C1", "1700000300.000100", "1700000200.000100", "ME", "đang xem", false), SlackConversationKind.Channel);
         Flush();
         Assert.Empty(inbox.ToDo);
-        Assert.Equal(3, inbox.Handled.Count);
+        Assert.Equal(4, inbox.Handled.Count);
     });
 
     private static void Seed(SlackInbox inbox)
@@ -150,6 +151,12 @@ public sealed class SlackBotViewsTests : IDisposable
             Channel = "D1", Ts = "1700000000.000100", Kind = SlackConversationKind.DirectMessage, Where = "DM", From = "Tuấn", Direct = true,
             Text = "Anh ơi build Android bản 2.3 lỗi khi mở shop, anh xem giúp em trước 3h chiều được không ạ?",
             Level = InboxLevel.Act, Summary = "Tuấn nhờ anh xem lỗi build Android 2.3 (mở shop) trước 15:00",
+        });
+        // A second message in the same DM: the same card.
+        inbox.Add(new InboxItem
+        {
+            Channel = "D1", Ts = "1700000150.000100", Kind = SlackConversationKind.DirectMessage, Where = "DM", From = "Tuấn", Direct = true,
+            Text = "Log em gửi trong drive rồi ạ", Level = InboxLevel.Act, Summary = "Tuấn đã gửi log lên drive",
         });
         inbox.Add(new InboxItem
         {

@@ -3,6 +3,14 @@
 All notable changes to Helm. The top section is used as the GitHub release body and as the Velopack release notes.
 Format: [Keep a Changelog](https://keepachangelog.com), versions follow [SemVer](https://semver.org).
 
+## [Unreleased]
+
+### Changed
+- **Slack Bot: one card per thread.** Messages still to do in the same thread (or the same DM) share one card on the
+  overlay and the Slack Bot page: Claude's line for the newest, “3 messages in this thread”, and the messages under
+  it (with who wrote each when several did). Done, Only know and Needs me act on the whole card; Open goes to the
+  newest message; a new message in the thread still alerts you.
+
 ## [0.77.0] - 2026-11-03
 
 ### Added

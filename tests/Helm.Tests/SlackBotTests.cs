@@ -723,6 +723,36 @@ public sealed class SlackListSyncTests
         Assert.Equal(["C1:4.0", "C1:3.0", "C1:1.0"], list.Select(r => r.Id));
         Assert.Equal("tóm tắt", list[2].Headline);
     }
+
+    private static InboxItem Msg(string channel, string ts, string? thread, string from, SlackConversationKind kind = SlackConversationKind.Channel) =>
+        new() { Channel = channel, Ts = ts, ThreadTs = thread, From = from, Text = "m" + ts, Kind = kind, Direct = true, Level = InboxLevel.Act };
+
+    [Fact]
+    public void One_card_per_thread()
+    {
+        var cards = SlackBotInboxViewModel.Cards(
+        [
+            Msg("D1", "1700000000.000100", null, "Sơn", SlackConversationKind.DirectMessage),
+            Msg("C1", "1700000050.000100", null, "Tùng"),
+            Msg("D1", "1700000100.000100", null, "Sơn", SlackConversationKind.DirectMessage),
+            Msg("C1", "1700000200.000100", "1700000050.000100", "NIL"),
+            Msg("C1", "1700000300.000100", null, "Linh"),
+        ], "https://team.slack.com/", DateTimeOffset.FromUnixTimeSeconds(1_700_000_400));
+
+        // The DM's two messages, the channel message with its reply, the other channel message on its own.
+        Assert.Equal([2, 2, 1], cards.Select(c => c.Count));
+        Assert.Equal("D1:1700000000.000100", cards[0].Id);
+        Assert.Equal(["D1:1700000000.000100", "D1:1700000100.000100"], cards[0].Ids);
+        Assert.Equal("2 messages", cards[0].CountText);
+        Assert.Equal("• m1700000000.000100\n• m1700000100.000100", cards[0].Text);
+        // A thread with several writers names them; the card links to its newest message.
+        Assert.Equal("2 messages in this thread", cards[1].CountText);
+        Assert.Equal("Tùng: m1700000050.000100\nNIL: m1700000200.000100", cards[1].Text);
+        Assert.Equal("NIL", cards[1].From);
+        Assert.Contains("p1700000200000100", cards[1].Link);
+        Assert.False(cards[2].HasCount);
+        Assert.True(cards[1].ShowText);
+    }
 }
 
 public sealed class SlackRemindTests
