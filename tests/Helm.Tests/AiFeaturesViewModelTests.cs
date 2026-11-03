@@ -177,7 +177,7 @@ public sealed class AiFeaturesViewModelTests
     {
         var usage = new AiUsageBook(_usage);
         var vm = Build();
-        Assert.Equal("No AI run today yet.", vm.SummaryText);
+        Assert.Equal("No AI run today yet", vm.SummaryText);
 
         usage.RecordAgent(AiFeatureIds.AskHelm, "Claude Code", ClaudeModels.Haiku, "PC-HUNG", 0.01m);
         usage.RecordAgent(AiFeatureIds.MorningBrief, "Claude Code", ClaudeModels.Haiku, "PC-HUNG", 0.01m);
@@ -185,6 +185,38 @@ public sealed class AiFeaturesViewModelTests
         vm.Refresh();
 
         Assert.Equal("Today 3 runs · 2 on PC agents · 0đ · 1 on API · $3.00", vm.SummaryText);
+    }
+
+    [Fact]
+    public void The_summary_names_the_PCs_whose_agents_are_online()
+    {
+        var now = new DateTimeOffset(2026, 11, 3, 9, 0, 0, TimeSpan.Zero);
+        var time = new ManualTime(now);
+        var workers = new MemorySynced<AiWorkerRecord>();
+        var vm = new AiFeaturesViewModel(_features, new AiUsageBook(_usage), () => [Haiku], new InlineUi(), workers, time);
+        Assert.Equal("No AI run today yet · No agent online", vm.SummaryText);
+
+        workers.Upsert("pc1", new AiWorkerRecord { Device = "HUNG-PC", Agents = ["Claude Code"], SeenAt = now.AddMinutes(-1) });
+        workers.Upsert("pc2", new AiWorkerRecord { Device = "OLD-PC", SeenAt = now.AddHours(-2) });
+        Assert.Equal("No AI run today yet · Agents online: HUNG-PC", vm.SummaryText);
+
+        workers.Upsert("pc1", new AiWorkerRecord { Device = "HUNG-PC", Problem = "Claude Code is at its limit.", SeenAt = now });
+        Assert.Equal("No AI run today yet · No agent ready · HUNG-PC: Claude Code is at its limit", vm.SummaryText);
+    }
+
+    [Fact]
+    public void Every_feature_has_an_icon_the_PC_can_draw()
+    {
+        var vm = Build();
+
+        Assert.All(vm.Rows, r =>
+        {
+            Assert.True(Enum.TryParse<Wpf.Ui.Controls.SymbolRegular>(r.Symbol + "24", out var symbol), r.Symbol);
+            Assert.True((int)symbol <= 0xFFFF, r.Symbol);
+        });
+        Assert.Equal("wallet", Row(vm, AiFeatureIds.WalletCategorize).Tool);
+        Assert.Null(Row(vm, AiFeatureIds.AskHelm).Tool);
+        Assert.Equal("Mic", Row(vm, AiFeatureIds.AskHelm).Symbol);
     }
 
     [Fact]

@@ -3,18 +3,24 @@
              xmlns:ic="using:FluentIcons.Avalonia"
              xmlns:ai="using:Helm.Ai"
              xmlns:assistant="using:Helm.Ai.Assistant"
+             xmlns:views="using:Helm.App.Android.Views"
              x:Class="Helm.App.Android.Views.AiFeaturesView"
              x:DataType="ai:AiFeaturesViewModel">
 
     <!-- General › AI features: the AI features grouped as on the PC's AI → Features table; tap one for its settings.
          The same shared view model as the PC, so a change shows on both. -->
+    <UserControl.Resources>
+        <views:AiFeatureIconConverter x:Key="AiFeatureIcon" />
+    </UserControl.Resources>
+
     <UserControl.Styles>
         <!-- A group's title above its card -->
         <Style Selector="TextBlock.group">
             <Setter Property="FontWeight" Value="SemiBold" />
             <Setter Property="Margin" Value="4,20,0,8" />
         </Style>
-        <!-- Choice lists (where it runs, model): rows 48 dp tall, the page scrolls them, not the list -->
+        <!-- Choice lists (where it runs, model): rows 48 dp tall, the page scrolls them, not the list. They never scroll
+             the page to their picked row (AutoScrollToSelectedItem off): the detail opens at its top. -->
         <Style Selector="ListBox.choices">
             <Setter Property="Background" Value="Transparent" />
             <Setter Property="ScrollViewer.VerticalScrollBarVisibility" Value="Disabled" />
@@ -70,10 +76,15 @@
                                                 <Button Classes="flat" VerticalAlignment="Stretch" VerticalContentAlignment="Center"
                                                         Command="{Binding $parent[UserControl].((ai:AiFeaturesViewModel)DataContext).OpenCommand}"
                                                         CommandParameter="{Binding}" AutomationProperties.Name="{Binding Name}">
-                                                    <StackPanel Spacing="2">
-                                                        <TextBlock Text="{Binding Name}" TextWrapping="Wrap" />
-                                                        <TextBlock Text="{Binding StateText}" Classes="secondary" />
-                                                    </StackPanel>
+                                                    <!-- The feature's tool icon (or its symbol), its name and where it runs -->
+                                                    <DockPanel>
+                                                        <ContentControl DockPanel.Dock="Left" Width="24" Height="24" Margin="0,0,14,0" VerticalAlignment="Center"
+                                                                        Content="{Binding Converter={StaticResource AiFeatureIcon}}" />
+                                                        <StackPanel Spacing="2" VerticalAlignment="Center">
+                                                            <TextBlock Text="{Binding Name}" TextWrapping="Wrap" />
+                                                            <TextBlock Text="{Binding StateText}" Classes="secondary" />
+                                                        </StackPanel>
+                                                    </DockPanel>
                                                 </Button>
                                             </DockPanel>
                                         </DataTemplate>
@@ -112,7 +123,7 @@
 
                         <TextBlock Text="Where it runs" Classes="group" />
                         <Border Classes="card" Padding="4">
-                            <ListBox Classes="choices" ItemsSource="{Binding Routes}" SelectedItem="{Binding Route}" AutomationProperties.Name="Where it runs">
+                            <ListBox Classes="choices" AutoScrollToSelectedItem="False" ItemsSource="{Binding Routes}" SelectedItem="{Binding Route}" AutomationProperties.Name="Where it runs">
                                 <ListBox.ItemTemplate>
                                     <DataTemplate x:DataType="ai:AiRouteOption">
                                         <DockPanel>
@@ -130,7 +141,7 @@
 
                         <TextBlock Text="Model" Classes="group" />
                         <Border Classes="card" Padding="4">
-                            <ListBox Classes="choices" ItemsSource="{Binding Models}" SelectedItem="{Binding Model}" AutomationProperties.Name="Model">
+                            <ListBox Classes="choices" AutoScrollToSelectedItem="False" ItemsSource="{Binding Models}" SelectedItem="{Binding Model}" AutomationProperties.Name="Model">
                                 <ListBox.ItemTemplate>
                                     <DataTemplate x:DataType="assistant:AssistantModelOption">
                                         <DockPanel>
@@ -148,7 +159,7 @@
                             <TextBlock Text="· Claude only" Classes="secondary" Margin="6,20,0,8" VerticalAlignment="Center" IsVisible="{Binding !CanChooseEffort}" />
                         </WrapPanel>
                         <Border Classes="card">
-                            <ListBox ItemsSource="{Binding Efforts}" SelectedItem="{Binding Effort}" IsEnabled="{Binding CanChooseEffort}" Background="Transparent"
+                            <ListBox AutoScrollToSelectedItem="False" ItemsSource="{Binding Efforts}" SelectedItem="{Binding Effort}" IsEnabled="{Binding CanChooseEffort}" Background="Transparent"
                                      ScrollViewer.HorizontalScrollBarVisibility="Disabled" ScrollViewer.VerticalScrollBarVisibility="Disabled" AutomationProperties.Name="Effort">
                                 <ListBox.ItemsPanel>
                                     <ItemsPanelTemplate>

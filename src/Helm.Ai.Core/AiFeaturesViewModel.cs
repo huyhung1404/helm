@@ -30,7 +30,10 @@ public sealed partial class AiFeaturesViewModel : ObservableObject
     private readonly ISyncedSettings<AiFeatureSettings> _features;
     private readonly AiUsageBook _usage;
     private readonly Func<IReadOnlyList<AssistantModelOption>> _models;
+    private readonly ISyncedCollection<AiWorkerRecord>? _workers;
+    private readonly TimeProvider _time;
     private IReadOnlyList<AssistantModelOption> _offered = [];
+    private string _runs = "";
 
     [ObservableProperty] private string _summaryText = "";
 
@@ -40,12 +43,15 @@ public sealed partial class AiFeaturesViewModel : ObservableObject
     private AiFeatureRow? _selected;
 
     /// <param name="models">The models the user can pick (<see cref="HelmAssistant.Models"/>: the tested keys' chat models).</param>
+    /// <param name="workers">The PCs' agent heartbeats, for "Agents online: HUNG-PC" in the summary.</param>
     public AiFeaturesViewModel(ISyncedSettings<AiFeatureSettings> features, AiUsageBook usage, Func<IReadOnlyList<AssistantModelOption>> models,
-        IUiDispatcher ui)
+        IUiDispatcher ui, ISyncedCollection<AiWorkerRecord>? workers = null, TimeProvider? time = null)
     {
         _features = features;
         _usage = usage;
         _models = models;
+        _workers = workers;
+        _time = time ?? TimeProvider.System;
         Rows = [.. AiFeatureCatalog.All.Select(f => new AiFeatureRow(f, Save))];
         Groups =
         [
@@ -53,6 +59,8 @@ public sealed partial class AiFeaturesViewModel : ObservableObject
             new AiFeatureGroup("Automatic", [.. Rows.Where(r => r.IsAutomatic)]),
         ];
         features.Changed += (_, _) => ui.Post(Load);
+        // A PC's heartbeat (every minute) or its going quiet changes who is online.
+        if (workers is not null) workers.Changed += (_, _) => ui.Post(Summarize);
         Refresh();
     }
 
@@ -70,11 +78,17 @@ public sealed partial class AiFeaturesViewModel : ObservableObject
         _offered = Offered();
         var (agent, api, usd) = _usage.Today();
         var runs = agent + api;
-        SummaryText = runs == 0
-            ? "No AI run today yet."
+        _runs = runs == 0
+            ? "No AI run today yet"
             : $"Today {runs} {(runs == 1 ? "run" : "runs")} · {agent} on PC agents · 0đ · {api} on API · {AiFeatureRow.Usd((double)usd)}";
+        Summarize();
         Load();
     }
+
+    /// <summary>Today's runs, then the agents online ("Agents online: HUNG-PC").</summary>
+    private void Summarize() => SummaryText = _workers is null
+        ? _runs
+        : $"{_runs} · {AiAgentsOnline.Text(_workers.All().Select(w => w.Value), _time.GetUtcNow())}";
 
     /// <summary>Phone back: from a feature's detail to the list; false on the list.</summary>
     public bool Back()
