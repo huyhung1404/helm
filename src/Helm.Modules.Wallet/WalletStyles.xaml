@@ -330,12 +330,22 @@
         </Button>
     </DataTemplate>
 
-    <!-- A transaction to categorize: its row, then one-click categories and "Lent, borrowed…" -->
+    <!-- A transaction to categorize: its row, then one-click categories (AI's pick first, or the new one it proposes,
+         made only when clicked) and "Lent, borrowed…" -->
     <DataTemplate x:Key="ToCategorizeRow" DataType="{x:Type local:TransactionRow}">
         <Border BorderThickness="0,1,0,0" BorderBrush="{DynamicResource CardStrokeColorDefaultBrush}">
             <StackPanel>
                 <ContentPresenter Content="{Binding}" ContentTemplate="{StaticResource TransactionRow}" />
                 <WrapPanel Margin="64,0,16,10">
+                    <Button Style="{StaticResource ChipDashed}" Padding="8,3,12,3" Command="{Binding AcceptProposedCategoryCommand}"
+                            Visibility="{Binding HasProposedCategory, Converter={StaticResource BoolToVisibility}}"
+                            ToolTip="AI proposes this new category: a click makes it and files the transaction in it"
+                            AutomationProperties.Name="{Binding ProposedCategoryText}">
+                        <StackPanel Orientation="Horizontal">
+                            <ui:SymbolIcon Symbol="Sparkle24" FontSize="14" Margin="0,0,6,0" Foreground="{DynamicResource AccentTextFillColorPrimaryBrush}" />
+                            <TextBlock Text="{Binding ProposedCategoryText}" VerticalAlignment="Center" Foreground="{DynamicResource TextFillColorPrimaryBrush}" />
+                        </StackPanel>
+                    </Button>
                     <ItemsControl ItemsSource="{Binding Suggestions}" ItemTemplate="{StaticResource SuggestionChip}" ItemsPanel="{StaticResource Wrap}" Focusable="False" />
                     <Button Style="{StaticResource ChipDashed}" Command="{Binding OpenDebtFormCommand}" Visibility="{Binding CanBeDebt, Converter={StaticResource BoolToVisibility}}"
                             ToolTip="Put this money in the debt book: it then counts neither as spending nor as income">

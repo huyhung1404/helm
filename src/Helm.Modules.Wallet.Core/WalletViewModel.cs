@@ -140,7 +140,8 @@ public sealed partial class WalletViewModel : ObservableObject
         // The phone's notification access and widget; none on Windows.
         : this(store, capture, settings, ui, dialogs, clipboard, services.GetService(typeof(IWalletPlatform)) as IWalletPlatform, logger, TimeZoneInfo.Local,
             services.GetService(typeof(DebtsViewModel)) as DebtsViewModel, services.GetService(typeof(FundBook)) as FundBook,
-            services.GetService(typeof(WalletNotificationAi)) as WalletNotificationAi)
+            services.GetService(typeof(WalletNotificationAi)) as WalletNotificationAi, services.GetService(typeof(BillBook)) as BillBook,
+            services.GetService(typeof(WalletCategoryAi)) as WalletCategoryAi)
     {
     }
 
@@ -156,7 +157,9 @@ public sealed partial class WalletViewModel : ObservableObject
         TimeZoneInfo zone,
         DebtsViewModel? debts = null,
         FundBook? funds = null,
-        WalletNotificationAi? notificationAi = null)
+        WalletNotificationAi? notificationAi = null,
+        BillBook? bills = null,
+        WalletCategoryAi? categoryAi = null)
     {
         _store = store;
         _capture = capture;
@@ -185,6 +188,8 @@ public sealed partial class WalletViewModel : ObservableObject
             Funds = new FundsViewModel(funds, this, dialogs, zone);
             funds.Changed += (_, _) => ScheduleRefresh();
         }
+        if (bills is not null) Bills = new BillsViewModel(bills, ui, zone);
+        _categoryAi = categoryAi;
         // Unread notifications arrive from the listener; toggles may change on the other page.
         _settings.Changed += (_, _) => _ui.Post(() =>
         {
@@ -739,6 +744,8 @@ public sealed partial class WalletViewModel : ObservableObject
             }.Where(s => s.Length > 0));
             RefreshBudget(summary, now);
             Funds?.Update(transactions, categories, _month, now);
+            // A new day may make a bill due or late.
+            Bills?.Refresh();
             OnPropertyChanged(nameof(ShowBudgetCard));
             CashFlow = WalletCharts.CashFlow(summary);
             SpendingDonut = WalletCharts.Spending(summary, categories);
@@ -835,7 +842,7 @@ public sealed partial class WalletViewModel : ObservableObject
         foreach (var t in waiting.Take(ToCategorizeShown))
         {
             var row = RowFor(t.Id, t.Value, categories);
-            row.SetSuggestions(_store.Suggest(t.Value, SuggestionCount));
+            row.SetSuggestions(WithProposal(row, _store.Suggest(t.Value, SuggestionCount)));
             rows.Add(row);
         }
         Fill(ToCategorize, rows);

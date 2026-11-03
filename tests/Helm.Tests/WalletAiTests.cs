@@ -280,6 +280,54 @@ public sealed class WalletAiTests : IDisposable
         Assert.Equal(0, _api.Calls);
     }
 
+    // ---- The PC's "to categorize" list ---------------------------------------------------------------------------
+
+    private WalletViewModel Page(string answer) =>
+        new(_store, new WalletCapture(_store, _settings), _settings, new InlineUi(), new AcceptDialogs(), new MemoryClipboard(), null,
+            Microsoft.Extensions.Logging.Abstractions.NullLogger<WalletViewModel>.Instance, Ict,
+            categoryAi: new WalletCategoryAi(_store, Ai(new Pc(answer)), Ict));
+
+    private static async Task Until(Func<bool> done)
+    {
+        for (var i = 0; i < 200 && !done(); i++) await Task.Delay(20);
+        Assert.True(done());
+    }
+
+    [Fact]
+    public async Task To_categorize_puts_AIs_pick_first_when_the_list_opens()
+    {
+        var id = New(-65_000, "SOMETHING NEW");
+        var vm = Page("""{"category":"Shopping"}""");
+        var row = Assert.Single(vm.ToCategorize);
+        Assert.NotEqual(WalletCategories.Shopping, row.Suggestions.FirstOrDefault()?.Id);
+
+        vm.OpenToCategorizeCommand.Execute(null);
+
+        await Until(() => vm.ToCategorize.Single().Suggestions.FirstOrDefault()?.Id == WalletCategories.Shopping);
+        Assert.False(vm.ToCategorize.Single().HasProposedCategory);
+        // Only proposed: nothing filed until the chip is clicked.
+        Assert.Null(_store.Get(id)!.CategoryId);
+    }
+
+    [Fact]
+    public async Task To_categorize_offers_AIs_new_category_and_makes_it_only_when_clicked()
+    {
+        var id = New(-45_000, "PET SHOP MEO MUOP");
+        var vm = Page("""{"new_category":"Thú cưng"}""");
+
+        vm.OpenToCategorizeCommand.Execute(null);
+        await Until(() => vm.ToCategorize.Single().HasProposedCategory);
+
+        var row = vm.ToCategorize.Single();
+        Assert.Equal("+ Thú cưng", row.ProposedCategoryText);
+        Assert.DoesNotContain(_store.Categories(), c => c.Name == "Thú cưng");
+
+        row.AcceptProposedCategoryCommand.Execute(null);
+
+        Assert.Equal("Thú cưng", _store.Category(_store.Get(id)!.CategoryId!)!.Name);
+        Assert.Empty(vm.ToCategorize);
+    }
+
     [Fact]
     public async Task The_settings_list_reads_one_and_offers_Undo_in_its_place()
     {

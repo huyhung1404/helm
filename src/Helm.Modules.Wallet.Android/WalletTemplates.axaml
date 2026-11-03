@@ -58,12 +58,20 @@
         </Button>
     </DataTemplate>
 
-    <!-- A transaction to categorize: its row, then one-tap categories and "Lent, borrowed…" -->
+    <!-- A transaction to categorize: its row, then one-tap categories (AI's pick first, or the new one it proposes, made
+         only when tapped) and "Lent, borrowed…" -->
     <DataTemplate x:Key="ToCategorizeRow" x:DataType="vm:TransactionRow">
         <Border BorderThickness="0,1,0,0" BorderBrush="{DynamicResource HelmCardStroke}" Padding="0,0,0,10">
             <StackPanel>
                 <ContentControl Content="{Binding}" ContentTemplate="{StaticResource TransactionRow}" />
                 <WrapPanel Margin="12,0">
+                    <Button Classes="chip dashed" Command="{Binding AcceptProposedCategoryCommand}" IsVisible="{Binding HasProposedCategory}"
+                            AutomationProperties.Name="{Binding ProposedCategoryText}">
+                        <StackPanel Orientation="Horizontal" Spacing="6">
+                            <ic:SymbolIcon Symbol="Sparkle" FontSize="16" Margin="6,0,0,0" Foreground="{DynamicResource AccentButtonBackground}" />
+                            <TextBlock Text="{Binding ProposedCategoryText}" VerticalAlignment="Center" />
+                        </StackPanel>
+                    </Button>
                     <ItemsControl ItemsSource="{Binding Suggestions}" ItemTemplate="{StaticResource SuggestionChip}">
                         <ItemsControl.ItemsPanel>
                             <ItemsPanelTemplate>

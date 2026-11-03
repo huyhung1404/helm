@@ -169,6 +169,98 @@
                 </Panel>
                 </Panel>
 
+                <!-- The bills that come every month: this month paid or not; "Paid" saves the spending (Undo) -->
+                <!-- As with the funds: the panel's DataContext binding is read as the page's, what is inside it as the bills'. -->
+                <Panel IsVisible="{Binding Bills, Converter={x:Static ObjectConverters.IsNotNull}}">
+                <Panel DataContext="{Binding Bills}">
+                <Border Classes="card" Margin="0" x:DataType="vm:BillsViewModel">
+                    <StackPanel Spacing="8">
+                        <Grid ColumnDefinitions="*,Auto">
+                            <StackPanel Orientation="Horizontal" Spacing="8">
+                                <TextBlock Text="Bills" Classes="cardTitle" />
+                                <TextBlock Text="{Binding SummaryText}" Classes="secondary" VerticalAlignment="Center" />
+                            </StackPanel>
+                            <Button Grid.Column="1" Classes="flat" Padding="8,6" Command="{Binding BeginAddCommand}" AutomationProperties.Name="Add a bill">
+                                <StackPanel Orientation="Horizontal" Spacing="6">
+                                    <ic:SymbolIcon Symbol="Add" FontSize="16" Foreground="{DynamicResource AccentButtonBackground}" />
+                                    <TextBlock Text="Add bill" Foreground="{DynamicResource AccentButtonBackground}" />
+                                </StackPanel>
+                            </Button>
+                        </Grid>
+                        <TextBlock Classes="secondary" TextWrapping="Wrap" IsVisible="{Binding HasNoBills}"
+                                   Text="Electricity, internet, rent: bills that come every month. Helm reminds you before each is due, and “Paid” saves the spending." />
+
+                        <!-- What the last Paid or Delete did, with Undo -->
+                        <Border Classes="box" IsVisible="{Binding HasMessage}">
+                            <Grid ColumnDefinitions="*,Auto,Auto">
+                                <TextBlock Text="{Binding Message}" TextWrapping="Wrap" VerticalAlignment="Center" />
+                                <Button Grid.Column="1" Classes="flat" Content="Undo" Command="{Binding UndoCommand}" IsVisible="{Binding CanUndo}" />
+                                <Button Grid.Column="2" Classes="icon flat" Command="{Binding DismissMessageCommand}" AutomationProperties.Name="Dismiss">
+                                    <ic:SymbolIcon Symbol="Dismiss" FontSize="16" />
+                                </Button>
+                            </Grid>
+                        </Border>
+
+                        <!-- Add or edit: name, the amount (empty: it varies), the day of the month -->
+                        <Border Classes="box" IsVisible="{Binding IsEditing}">
+                            <StackPanel Spacing="8">
+                                <TextBlock Text="{Binding FormTitle}" FontWeight="SemiBold" />
+                                <TextBox Text="{Binding FormName}" PlaceholderText="Name: Tiền điện" MaxLength="60" AutomationProperties.Name="Bill name" />
+                                <Grid ColumnDefinitions="*,8,96">
+                                    <TextBox Text="{Binding FormAmount}" PlaceholderText="Amount (empty: varies)" AutomationProperties.Name="Amount every month" />
+                                    <TextBox Grid.Column="2" Text="{Binding FormDayText}" PlaceholderText="Day" MaxLength="2" AutomationProperties.Name="Day of the month it is due" />
+                                </Grid>
+                                <TextBlock Text="{Binding FormAmountHint}" Classes="secondary" TextWrapping="Wrap" />
+                                <TextBlock Text="{Binding FormProblem}" Classes="danger" TextWrapping="Wrap" IsVisible="{Binding HasFormProblem}" />
+                                <Grid ColumnDefinitions="*,8,*">
+                                    <Button Classes="wide" Content="Cancel" Command="{Binding CancelEditCommand}" />
+                                    <Button Grid.Column="2" Classes="accent wide" Content="Save" Command="{Binding SaveEditCommand}" />
+                                </Grid>
+                            </StackPanel>
+                        </Border>
+
+                        <!-- One row per bill: name, amount or "varies" and its day, this month's state, Paid, edit, delete -->
+                        <ItemsControl ItemsSource="{Binding Rows}">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate x:DataType="vm:BillRow">
+                                    <Border BorderThickness="0,1,0,0" BorderBrush="{DynamicResource HelmCardStroke}" Padding="0,6">
+                                        <StackPanel Spacing="6">
+                                            <Grid ColumnDefinitions="*,Auto,Auto,Auto">
+                                                <StackPanel VerticalAlignment="Center" Spacing="2">
+                                                    <TextBlock Text="{Binding Name}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+                                                    <TextBlock Classes="secondary" TextTrimming="CharacterEllipsis">
+                                                        <Run Text="{Binding AmountText}" /><Run Text=" · " /><Run Text="{Binding StateText}" />
+                                                    </TextBlock>
+                                                </StackPanel>
+                                                <Button Grid.Column="1" Classes="chip plain" Margin="6,0,0,0" Command="{Binding PayCommand}" IsVisible="{Binding CanPay}"
+                                                        AutomationProperties.Name="{Binding Name, StringFormat='{}{0}: paid'}">
+                                                    <TextBlock Text="Paid" />
+                                                </Button>
+                                                <ic:SymbolIcon Grid.Column="1" Symbol="CheckmarkCircle" FontSize="18" Margin="6,0" Foreground="{DynamicResource HelmSuccess}"
+                                                               IsVisible="{Binding IsPaid}" VerticalAlignment="Center" />
+                                                <Button Grid.Column="2" Classes="icon flat" Command="{Binding EditCommand}" AutomationProperties.Name="{Binding Name, StringFormat='Edit {0}'}">
+                                                    <ic:SymbolIcon Symbol="Edit" FontSize="18" />
+                                                </Button>
+                                                <Button Grid.Column="3" Classes="icon flat" Command="{Binding DeleteCommand}" AutomationProperties.Name="{Binding Name, StringFormat='Delete {0}'}">
+                                                    <ic:SymbolIcon Symbol="Delete" FontSize="18" />
+                                                </Button>
+                                            </Grid>
+                                            <!-- A bill that varies: how much it came to this month -->
+                                            <Grid ColumnDefinitions="*,8,Auto,8,Auto" IsVisible="{Binding IsAskingAmount}">
+                                                <TextBox Text="{Binding PayAmount}" PlaceholderText="How much? 450k" AutomationProperties.Name="{Binding Name, StringFormat='How much was {0}'}" />
+                                                <Button Grid.Column="2" Classes="flat" Content="Cancel" Command="{Binding CancelPayCommand}" />
+                                                <Button Grid.Column="4" Classes="accent" Content="Save" Command="{Binding PayCommand}" />
+                                            </Grid>
+                                        </StackPanel>
+                                    </Border>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </StackPanel>
+                </Border>
+                </Panel>
+                </Panel>
+
                 <!-- Where the money went: one bar, the slices named; every chart in a sheet -->
                 <Border Classes="card" Margin="0">
                     <StackPanel Spacing="8">

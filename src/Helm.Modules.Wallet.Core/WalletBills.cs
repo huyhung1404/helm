@@ -75,6 +75,13 @@ public sealed class BillBook
 
     public DateTimeOffset Now => _time.GetUtcNow();
 
+    /// <summary>A bill was added, changed, paid or deleted, here or on another device (any thread).</summary>
+    public event EventHandler<SyncedChangedEventArgs>? Changed
+    {
+        add => _bills.Changed += value;
+        remove => _bills.Changed -= value;
+    }
+
     public WalletBill? Get(string id) => _bills.Get(id);
 
     /// <summary>Every bill, the one due soonest first.</summary>
@@ -113,14 +120,33 @@ public sealed class BillBook
         }
     }
 
+    /// <summary>Changes a bill's name, amount (null: it varies) or due day; its paid months stay.</summary>
+    public void Update(string id, string name, decimal? amount, int dueDay)
+    {
+        name = DebtLedger.Clean(name);
+        if (name.Length == 0) throw new ArgumentException("Name the bill.", nameof(name));
+        if (dueDay is < 1 or > 31) throw new ArgumentException("The due day is 1 to 31.", nameof(dueDay));
+        if (amount is { } a && (a <= 0 || a > WalletLimits.MaxAmount)) throw new ArgumentException("That amount is not a bill's.", nameof(amount));
+        lock (_gate)
+        {
+            var bill = _bills.Get(id) ?? throw new InvalidOperationException("That bill no longer exists.");
+            if (_bills.All().Any(b => b.Id != id && TextSearch.Fold(b.Value.Name) == TextSearch.Fold(name)))
+                throw new InvalidOperationException($"There is already a bill {name}.");
+            _bills.Upsert(id, bill with { Name = WalletLimits.Clip(name, WalletLimits.Note), Amount = amount, DueDay = dueDay });
+        }
+    }
+
     public bool Delete(string id) => _bills.Delete(id);
+
+    /// <summary>Puts a deleted bill back as it was (Undo).</summary>
+    public void Restore(string id, WalletBill bill) => _bills.Upsert(id, bill);
 
     /// <summary>
     /// Saves a payment: a spending transaction, and the month it pays marked paid. That month is the unpaid one due
     /// nearest to <paramref name="when"/> (last month, this one or next), so paying a few days late or early counts
-    /// for the right month.
+    /// for the right month. The Wallet page's "Paid" names the month (<paramref name="month"/>: this one).
     /// </summary>
-    public BillPayment Pay(string id, decimal? amount, DateTimeOffset? when = null)
+    public BillPayment Pay(string id, decimal? amount, DateTimeOffset? when = null, DateOnly? month = null)
     {
         lock (_gate)
         {
@@ -129,18 +155,19 @@ public sealed class BillBook
             var at = when ?? Now;
             var day = WalletFormat.LocalDay(at, TimeZoneInfo.Local);
             var here = new DateOnly(day.Year, day.Month, 1);
-            var month = new[] { here.AddMonths(-1), here, here.AddMonths(1) }
+            var paidFor = month is { } named ? new DateOnly(named.Year, named.Month, 1) : new[] { here.AddMonths(-1), here, here.AddMonths(1) }
                 .Where(m => !bill.PaidMonths.Contains(m))
                 .OrderBy(m => Math.Abs(bill.DueIn(m).DayNumber - day.DayNumber)).ThenBy(m => m)
                 .First();
+            if (bill.PaidMonths.Contains(paidFor)) throw new InvalidOperationException($"{bill.Name} is already paid for {paidFor:MMMM}.");
             var transaction = _wallet.AddManual(-paid, bill.Name, at, bill.CategoryId ?? _wallet.SureCategory(bill.Name, -paid));
             _bills.Upsert(id, bill with
             {
-                PaidMonths = [.. bill.PaidMonths.Append(month).Order().TakeLast(KeepMonths)],
+                PaidMonths = [.. bill.PaidMonths.Append(paidFor).Order().TakeLast(KeepMonths)],
                 LastAmount = paid,
                 LastPaidAt = at,
             });
-            return new BillPayment(transaction, month, paid, bill.LastAmount, bill.LastPaidAt);
+            return new BillPayment(transaction, paidFor, paid, bill.LastAmount, bill.LastPaidAt);
         }
     }
 
