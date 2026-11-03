@@ -74,7 +74,10 @@ internal sealed class GrokAssistantChat : IAssistantChat
         _imagePending = true;
     }
 
-    public async Task<AssistantStep> NextAsync(CancellationToken ct)
+    public Task<AssistantStep> NextAsync(CancellationToken ct) => NextAsync(null, ct);
+
+    /// <summary>Streams (server-sent events) when <paramref name="partial"/> watches, else one plain call.</summary>
+    public async Task<AssistantStep> NextAsync(Action<string>? partial, CancellationToken ct)
     {
         var body = new JsonObject
         {
@@ -87,6 +90,11 @@ internal sealed class GrokAssistantChat : IAssistantChat
             body["tools"] = _tools.DeepClone();
             body["tool_choice"] = "auto";
         }
+        if (partial is not null)
+        {
+            body["stream"] = true;
+            body["stream_options"] = new JsonObject { ["include_usage"] = true };
+        }
         using var request = new HttpRequestMessage(HttpMethod.Post, Url)
         {
             Content = new StringContent(body.ToJsonString(), Encoding.UTF8, "application/json"),
@@ -96,10 +104,17 @@ internal sealed class GrokAssistantChat : IAssistantChat
         int status;
         try
         {
-            using var response = await _http.SendAsync(request, ct);
+            using var response = await _http.SendAsync(request, partial is null ? HttpCompletionOption.ResponseContentRead : HttpCompletionOption.ResponseHeadersRead, ct);
             status = (int)response.StatusCode;
-            var text = await response.Content.ReadAsStringAsync(ct);
-            json = text.Length > 0 && text[0] == '{' ? JsonNode.Parse(text) : null;
+            if (partial is not null && status == 200)
+            {
+                json = await GrokStream.ReadAsync(response, partial, ct);
+            }
+            else
+            {
+                var text = await response.Content.ReadAsStringAsync(ct);
+                json = text.Length > 0 && text[0] == '{' ? JsonNode.Parse(text) : null;
+            }
         }
         catch (HttpRequestException ex)
         {

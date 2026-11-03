@@ -64,6 +64,9 @@ public static class AgentJobs
     public const string Undo = "undo";
     public const string End = "end";
 
+    /// <summary>The card opened: the PC gets its agent ready for the conversation's first turn (no result comes back).</summary>
+    public const string Warm = "warm";
+
     public const string Queued = "queued";
     public const string Claimed = "claimed";
     public const string Done = "done";
@@ -88,6 +91,24 @@ public static class AgentJobs
 
     /// <summary>Jobs older than this are cleared away.</summary>
     public static readonly TimeSpan KeepFor = TimeSpan.FromHours(1);
+
+    /// <summary>A warm-up a PC sees later than this is left: the user has asked, or closed the card, by then.</summary>
+    public static readonly TimeSpan WarmClaim = TimeSpan.FromSeconds(30);
+
+    /// <summary>How long a warm-up keeps the phone's live channel open for the turn that should follow it.</summary>
+    public static readonly TimeSpan WarmLive = TimeSpan.FromMinutes(2);
+
+    /// <summary>
+    /// How often an asker waiting for a PC pulls by itself: seldom while the live channel announces every change (a
+    /// safety net for a socket that died quietly), every second while it is down (connecting, or refused).
+    /// </summary>
+    public static readonly TimeSpan PullWhileLive = TimeSpan.FromSeconds(3), PullWhileDown = TimeSpan.FromSeconds(1);
+}
+
+/// <summary>What an asker needs of sync while it waits for a PC: whether the live channel is up, opening it, a pull soon.</summary>
+internal sealed record AgentJobSync(Func<bool> IsLive, Action<bool> SetLive, Action PullSoon)
+{
+    public static AgentJobSync Of(SyncEngine engine) => new(() => engine.IsLive, engine.SetLive, engine.RequestSyncSoon);
 }
 
 /// <summary>
@@ -96,15 +117,41 @@ public static class AgentJobs
 /// With two PCs online, a conversation stays on the PC that took its first turn (its chat is there), and Undo goes to
 /// the PC that made the record (<see cref="AiJobAction.Worker"/>).
 /// </summary>
-public sealed class SyncAgentRoute(ISyncedCollection<AiJobRecord> jobs, ISyncedCollection<AiWorkerRecord> workers, Func<string> self,
-    SyncEngine? engine = null, TimeProvider? time = null) : IAgentRoute
+public sealed class SyncAgentRoute : IAgentRoute
 {
-    private readonly TimeProvider _time = time ?? TimeProvider.System;
+    private readonly ISyncedCollection<AiJobRecord> jobs;
+    private readonly ISyncedCollection<AiWorkerRecord> workers;
+    private readonly Func<string> self;
+    private readonly AgentJobSync? _sync;
+    private readonly TimeProvider _time;
+    private readonly ILogger _logger;
 
     /// <summary>The worker (device id) each conversation's turns go to, from the first turn a PC took.</summary>
     private readonly ConcurrentDictionary<string, string> _workers = new(StringComparer.Ordinal);
 
-    private readonly LiveLease _live = engine is { } e ? new LiveLease(() => e.IsLive, e.SetLive, e.RequestSyncSoon) : LiveLease.None;
+    /// <summary>The worker each card's warm-up went to (its agent is ready there), and the live channel it keeps open.</summary>
+    private readonly ConcurrentDictionary<string, string> _warmed = new(StringComparer.Ordinal);
+    private readonly ConcurrentDictionary<string, (IDisposable Live, ITimer Expiry)> _warmLive = new(StringComparer.Ordinal);
+
+    private readonly LiveLease _live;
+
+    public SyncAgentRoute(ISyncedCollection<AiJobRecord> jobs, ISyncedCollection<AiWorkerRecord> workers, Func<string> self,
+        SyncEngine? engine = null, TimeProvider? time = null, ILogger? logger = null)
+        : this(jobs, workers, self, engine is null ? null : AgentJobSync.Of(engine), time, logger)
+    {
+    }
+
+    internal SyncAgentRoute(ISyncedCollection<AiJobRecord> jobs, ISyncedCollection<AiWorkerRecord> workers, Func<string> self,
+        AgentJobSync? sync, TimeProvider? time, ILogger? logger)
+    {
+        this.jobs = jobs;
+        this.workers = workers;
+        this.self = self;
+        _sync = sync;
+        _time = time ?? TimeProvider.System;
+        _logger = logger ?? NullLogger.Instance;
+        _live = sync is { } s ? new LiveLease(s.IsLive, s.SetLive, s.PullSoon) : LiveLease.None;
+    }
 
     public string Device => Best()?.Value.Device ?? "Helm PC";
 
@@ -126,6 +173,7 @@ public sealed class SyncAgentRoute(ISyncedCollection<AiJobRecord> jobs, ISyncedC
         });
         using var live = _live.Hold();
         Clean();
+        var sent = _time.GetTimestamp();
         AiJobRecord? claimed;
         try
         {
@@ -144,6 +192,7 @@ public sealed class SyncAgentRoute(ISyncedCollection<AiJobRecord> jobs, ISyncedC
         }
         // Its chat is on that PC now: the conversation's next turns, and its end, go there.
         _workers[job.ConversationId] = worker.Id;
+        var claimedAt = _time.GetTimestamp();
         // Taken: from here on the turn is the PC's, whatever happens. It never falls back to the API.
         AiJobRecord? finished;
         try
@@ -157,6 +206,10 @@ public sealed class SyncAgentRoute(ISyncedCollection<AiJobRecord> jobs, ISyncedC
             throw;
         }
         jobs.Delete(id);
+        // Where the time went (sync each way, or the PC's agent): the PC logs its own part.
+        _logger.LogDebug("Agent turn on {Device}: claimed after {Claim:0} ms, its result came {Result:0} ms later (live channel {Live})",
+            worker.Value.Device, _time.GetElapsedTime(sent, claimedAt).TotalMilliseconds, _time.GetElapsedTime(claimedAt).TotalMilliseconds,
+            _sync?.IsLive() == true ? "up" : "down");
         return finished switch
         {
             { State: AgentJobs.Done, Result: { } result } => result with
@@ -183,7 +236,12 @@ public sealed class SyncAgentRoute(ISyncedCollection<AiJobRecord> jobs, ISyncedC
     private SyncedItem<AiWorkerRecord> WorkerFor(string conversationId)
     {
         if (!_workers.TryGetValue(conversationId, out var kept))
+        {
+            // The PC the card's warm-up went to has its agent ready, while it can still take the turn.
+            if (_warmed.TryGetValue(conversationId, out var warm) && Online().FirstOrDefault(w => w.Id == warm && w.Value.Problem is null) is { } ready)
+                return ready;
             return Best() ?? throw new AiRouteException(Unavailable() ?? "No Helm PC online.");
+        }
         return Online().FirstOrDefault(w => w.Id == kept && w.Value.Problem is null)
             ?? throw new AiRouteException("The Helm PC that has this conversation cannot take it now.");
     }
@@ -202,9 +260,47 @@ public sealed class SyncAgentRoute(ISyncedCollection<AiJobRecord> jobs, ISyncedC
 
     public void End(string conversationId)
     {
-        if (!_workers.TryRemove(conversationId, out var to)) return;
+        ReleaseLive(conversationId);
+        // The PC that had its turns, and the one its warm-up went to when that was another.
+        var to = new HashSet<string>(StringComparer.Ordinal);
+        if (_workers.TryRemove(conversationId, out var worker)) to.Add(worker);
+        if (_warmed.TryRemove(conversationId, out var warmed)) to.Add(warmed);
         var now = _time.GetUtcNow();
-        jobs.Add(new AiJobRecord { Kind = AgentJobs.End, To = to, From = self(), ConversationId = conversationId, ClaimBy = now + TimeSpan.FromMinutes(5), CreatedAt = now });
+        foreach (var pc in to)
+            jobs.Add(new AiJobRecord { Kind = AgentJobs.End, To = pc, From = self(), ConversationId = conversationId, ClaimBy = now + TimeSpan.FromMinutes(5), CreatedAt = now });
+    }
+
+    /// <summary>
+    /// The card opened: the best PC gets its agent ready for this conversation (no answer is awaited), and the live
+    /// channel opens now rather than at the first words, so the PC's claim and result come back at once. The channel
+    /// goes back to how it was when the conversation ends, or after <see cref="AgentJobs.WarmLive"/>.
+    /// </summary>
+    public void Warm(AiJob job)
+    {
+        var conversation = job.ConversationId;
+        if (_workers.ContainsKey(conversation) || Online().FirstOrDefault(w => w.Value.Problem is null) is not { } worker) return;
+        if (!_warmed.TryAdd(conversation, worker.Id)) return;
+        var live = _live.Hold();
+        var expiry = _time.CreateTimer(_ => ReleaseLive(conversation), null, AgentJobs.WarmLive, Timeout.InfiniteTimeSpan);
+        if (!_warmLive.TryAdd(conversation, (live, expiry)))
+        {
+            expiry.Dispose();
+            live.Dispose();
+        }
+        var now = _time.GetUtcNow();
+        jobs.Add(new AiJobRecord
+        {
+            Kind = AgentJobs.Warm, To = worker.Id, From = self(), Job = job, ConversationId = conversation,
+            ClaimBy = now + AgentJobs.WarmClaim, CreatedAt = now,
+        });
+        _logger.LogDebug("Asked {Device} to get its agent ready for a conversation", worker.Value.Device);
+    }
+
+    private void ReleaseLive(string conversationId)
+    {
+        if (!_warmLive.TryRemove(conversationId, out var held)) return;
+        held.Expiry.Dispose();
+        held.Live.Dispose();
     }
 
     private IEnumerable<SyncedItem<AiWorkerRecord>> Online()
@@ -216,14 +312,17 @@ public sealed class SyncAgentRoute(ISyncedCollection<AiJobRecord> jobs, ISyncedC
 
     private SyncedItem<AiWorkerRecord>? Best() => Online().FirstOrDefault(w => w.Value.Problem is null) ?? Online().FirstOrDefault();
 
-    /// <summary>Polls the record (and asks sync to pull now and then, in case the live channel is down).</summary>
+    /// <summary>
+    /// Waits for the record: at once when sync brings a change of it, and asks sync to pull now and then by itself
+    /// (<see cref="AgentJobs.PullWhileLive"/>, more often while the live channel is down).
+    /// </summary>
     private async Task<AiJobRecord?> WaitForAsync(string id, Func<AiJobRecord, bool> done, TimeSpan within, CancellationToken ct)
     {
         var until = _time.GetUtcNow() + within;
-        var signal = new SemaphoreSlim(0);
+        var changed = NewSignal();
         void OnChanged(object? _, SyncedChangedEventArgs e)
         {
-            if (e.Ids.Contains(id)) signal.Release();
+            if (e.Ids.Contains(id)) Volatile.Read(ref changed).TrySetResult();
         }
         jobs.Changed += OnChanged;
         try
@@ -231,15 +330,25 @@ public sealed class SyncAgentRoute(ISyncedCollection<AiJobRecord> jobs, ISyncedC
             var lastPull = _time.GetUtcNow();
             while (true)
             {
+                // Taken before the look: a change between the two wakes the wait below at once.
+                var wake = Volatile.Read(ref changed).Task;
                 if (jobs.Get(id) is { } record && done(record)) return record;
-                var left = until - _time.GetUtcNow();
-                if (left <= TimeSpan.Zero) return null;
-                if (_time.GetUtcNow() - lastPull > TimeSpan.FromSeconds(2))
+                var now = _time.GetUtcNow();
+                if (until - now <= TimeSpan.Zero) return null;
+                var every = _sync?.IsLive() == true ? AgentJobs.PullWhileLive : AgentJobs.PullWhileDown;
+                if (now - lastPull >= every)
                 {
-                    engine?.RequestSyncSoon();
-                    lastPull = _time.GetUtcNow();
+                    _sync?.PullSoon();
+                    lastPull = now;
                 }
-                await signal.WaitAsync(left < TimeSpan.FromMilliseconds(500) ? left : TimeSpan.FromMilliseconds(500), ct);
+                var nap = Min(until - now, lastPull + every - now);
+                using (var napping = CancellationTokenSource.CreateLinkedTokenSource(ct))
+                {
+                    await Task.WhenAny(wake, Task.Delay(nap, _time, napping.Token));
+                    napping.Cancel();
+                }
+                ct.ThrowIfCancellationRequested();
+                if (wake.IsCompleted) Volatile.Write(ref changed, NewSignal());
             }
         }
         finally
@@ -247,6 +356,10 @@ public sealed class SyncAgentRoute(ISyncedCollection<AiJobRecord> jobs, ISyncedC
             jobs.Changed -= OnChanged;
         }
     }
+
+    private static TaskCompletionSource NewSignal() => new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+    private static TimeSpan Min(TimeSpan a, TimeSpan b) => a < b ? a : b;
 
     /// <summary>The asker clears away its own old jobs.</summary>
     private void Clean()
@@ -381,6 +494,15 @@ public sealed class AgentJobWorker(ISyncedCollection<AiJobRecord> jobs, ISyncedC
             jobs.Upsert(id, job with { State = AgentJobs.Cancelled });
             return;
         }
+        if (job.Kind == AgentJobs.Warm)
+        {
+            // Nobody waits for a warm-up: no claim goes back, the record just goes once the agent is on its way.
+            if (job.Job is { } warm) local.Warm(warm);
+            jobs.Delete(id);
+            lock (_taken) _taken.Remove(id);
+            _logger.LogDebug("Agent warm-up taken {Lag:0} ms after the asker wrote it (by its clock)", (_time.GetUtcNow() - job.CreatedAt).TotalMilliseconds);
+            return;
+        }
         jobs.Upsert(id, job with { State = AgentJobs.Claimed });
         _ = Task.Run(() => DoAsync(id, job));
     }
@@ -394,8 +516,12 @@ public sealed class AgentJobWorker(ISyncedCollection<AiJobRecord> jobs, ISyncedC
             switch (job.Kind)
             {
                 case AgentJobs.Run when job.Job is { } turn:
+                    var claimed = _time.GetTimestamp();
                     var result = await local.RunAsync(turn, AgentJobs.AfterClaim - TimeSpan.FromSeconds(10), stop.Token);
                     jobs.Upsert(id, job with { State = AgentJobs.Done, Result = result });
+                    // From the phone's write to the claim (clocks may differ a little), then the agent's whole turn.
+                    _logger.LogDebug("Agent turn claimed {Lag:0} ms after the asker wrote it; answered in {Took:0} ms",
+                        (_time.GetUtcNow() - job.CreatedAt - _time.GetElapsedTime(claimed)).TotalMilliseconds, _time.GetElapsedTime(claimed).TotalMilliseconds);
                     break;
                 case AgentJobs.Undo when job.Action is { } action:
                     await local.UndoAsync(action, CancellationToken.None);

@@ -76,6 +76,19 @@ public interface IAssistantChat
     /// <summary>Sends the conversation; the model's answer is added to it.</summary>
     Task<AssistantStep> NextAsync(CancellationToken ct);
 
+    /// <summary>
+    /// As <see cref="NextAsync(CancellationToken)"/>, telling <paramref name="partial"/> the answer's text so far while it
+    /// arrives, for a card that shows it at once. A provider that streams says it as it comes (and "" again when the
+    /// step turns out to call tools: only the last step's text is the answer); the others say nothing.
+    /// </summary>
+    Task<AssistantStep> NextAsync(Action<string>? partial, CancellationToken ct) => NextAsync(ct);
+
+    /// <summary>
+    /// The user is about to ask (the card just opened): get ready for the first turn without sending anything to the
+    /// model, e.g. start the agent's process. Nothing for an API, or an agent with nothing to start.
+    /// </summary>
+    Task WarmAsync(CancellationToken ct) => Task.CompletedTask;
+
     /// <summary>The results of the calls of the last step, one per call.</summary>
     void AddResults(IReadOnlyList<ToolOutcome> results);
 

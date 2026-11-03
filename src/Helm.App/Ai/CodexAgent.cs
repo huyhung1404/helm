@@ -171,6 +171,9 @@ internal sealed class CodexChat(CodexAgentFactory factory, IChildProcessLauncher
     private string? _thread;
     private int _calls;
 
+    /// <summary>The app server's thread got its first message (the preamble); one started ahead of the turn has not yet.</summary>
+    private bool _greeted;
+
     public void AddUser(string text) => _conversation.AddUser(text);
 
     public void AddTools(IReadOnlyList<AssistantTool> added) => _conversation.AddTools(added);
@@ -185,6 +188,18 @@ internal sealed class CodexChat(CodexAgentFactory factory, IChildProcessLauncher
         return CliAgentProtocol.Parse(answer, usage, ref _calls);
     }
 
+    /// <summary>
+    /// Starts the app server and opens its thread ahead of the first turn (the card opened): the start, the sign-in
+    /// check and thread/start happen while the user speaks. Nothing goes to the model.
+    /// </summary>
+    public async Task WarmAsync(CancellationToken ct)
+    {
+        if (_execOnly || CodexAgentFactory.FindCodex() is not { } codex) return;
+        using var stop = ct.Register(Kill);
+        if (_process is { HasExited: true }) Kill();
+        if (_server is null) await StartServerAsync(codex, ct);
+    }
+
     public void Dispose() => Kill();
 
     /// <summary>The turn on the app server (started when there is none or it ended), or null when it cannot start.</summary>
@@ -192,11 +207,13 @@ internal sealed class CodexChat(CodexAgentFactory factory, IChildProcessLauncher
     {
         using var stop = ct.Register(Kill);
         if (_process is { HasExited: true }) Kill();
-        var fresh = _server is null;
-        if (fresh && !await StartServerAsync(codex, ct)) return null;
+        if (_server is null && !await StartServerAsync(codex, ct)) return null;
+        var fresh = !_greeted;
         try
         {
-            return await _server!.TurnAsync(_conversation.Message(fresh), ct);
+            var message = _conversation.Message(fresh);
+            _greeted = true;
+            return await _server!.TurnAsync(message, ct);
         }
         catch (AssistantException ex)
         {
@@ -325,6 +342,7 @@ internal sealed class CodexChat(CodexAgentFactory factory, IChildProcessLauncher
     private void Kill()
     {
         _server = null;
+        _greeted = false;
         var process = Interlocked.Exchange(ref _process, null);
         if (process is null) return;
         try

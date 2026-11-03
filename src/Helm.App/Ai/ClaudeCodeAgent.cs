@@ -71,6 +71,9 @@ internal sealed class ClaudeCodeChat(ClaudeCodeAgentFactory factory, IChildProce
     private StreamReader? _output;
     private int _calls;
 
+    /// <summary>The running process got its first message (the preamble); one started ahead of the turn has not yet.</summary>
+    private bool _greeted;
+
     public void AddUser(string text) => _conversation.AddUser(text);
 
     public void AddTools(IReadOnlyList<AssistantTool> added) => _conversation.AddTools(added);
@@ -113,6 +116,17 @@ internal sealed class ClaudeCodeChat(ClaudeCodeAgentFactory factory, IChildProce
         throw new AssistantException("Claude Code stopped before it answered.");
     }
 
+    /// <summary>
+    /// Starts the process ahead of the first turn (the card opened): Claude Code loads while the user speaks. Nothing
+    /// is sent: stream-json has no message that does not call the model, so the preamble goes with the first turn.
+    /// </summary>
+    public Task WarmAsync(CancellationToken ct)
+    {
+        if (_process is { HasExited: true }) Kill();
+        if (_process is null) Start();
+        return Task.CompletedTask;
+    }
+
     public void Dispose() => Kill();
 
     /// <summary>
@@ -124,8 +138,8 @@ internal sealed class ClaudeCodeChat(ClaudeCodeAgentFactory factory, IChildProce
         for (var attempt = 0; ; attempt++)
         {
             if (_process is { HasExited: true }) Kill();
-            var fresh = _process is null;
-            if (fresh) Start();
+            if (_process is null) Start();
+            var fresh = !_greeted;
             var line = new JsonObject
             {
                 ["type"] = "user",
@@ -135,6 +149,7 @@ internal sealed class ClaudeCodeChat(ClaudeCodeAgentFactory factory, IChildProce
             {
                 await _input!.WriteLineAsync(line.ToJsonString().AsMemory(), ct);
                 await _input.FlushAsync(ct);
+                _greeted = true;
                 return;
             }
             catch (Exception ex) when (ex is IOException or ObjectDisposedException && !ct.IsCancellationRequested)
@@ -200,6 +215,7 @@ internal sealed class ClaudeCodeChat(ClaudeCodeAgentFactory factory, IChildProce
 
     private void Kill()
     {
+        _greeted = false;
         var process = Interlocked.Exchange(ref _process, null);
         if (process is null) return;
         try

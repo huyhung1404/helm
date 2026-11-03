@@ -1,6 +1,8 @@
+using System.Text;
 using System.Text.Json;
 using Anthropic;
 using Anthropic.Exceptions;
+using Anthropic.Helpers;
 using Anthropic.Models.Messages;
 
 namespace Helm.Ai.Assistant;
@@ -104,14 +106,17 @@ internal sealed class ClaudeAssistantChat(AnthropicClient client, string model, 
         return true;
     }
 
-    public async Task<AssistantStep> NextAsync(CancellationToken ct)
+    public Task<AssistantStep> NextAsync(CancellationToken ct) => NextAsync(null, ct);
+
+    /// <summary>Streams when <paramref name="partial"/> watches (the card shows the answer as Claude writes it), else one plain call.</summary>
+    public async Task<AssistantStep> NextAsync(Action<string>? partial, CancellationToken ct)
     {
         if (_results is { } pending)
         {
             _messages.Add(new UserMessageParam { Content = pending });
             _results = null;
         }
-        var response = await CreateAsync(ct);
+        var response = await CreateAsync(partial, ct);
         _imagePending = false;
         var answer = Read(response);
         long input = response.Usage.InputTokens, output = response.Usage.OutputTokens;
@@ -120,7 +125,7 @@ internal sealed class ClaudeAssistantChat(AnthropicClient client, string model, 
         // A long search turn pauses: sent back as it is, it goes on where it stopped.
         for (var more = 0; response.StopReason == "pause_turn" && more < MaxContinuations; more++)
         {
-            response = await CreateAsync(ct);
+            response = await CreateAsync(partial, ct);
             var next = Read(response);
             answer = (Join(answer.Text, next.Text), [.. answer.Calls, .. next.Calls], [.. answer.Sources, .. next.Sources]);
             input += response.Usage.InputTokens;
@@ -135,21 +140,22 @@ internal sealed class ClaudeAssistantChat(AnthropicClient client, string model, 
             Refused: response.StopReason == "refusal");
     }
 
-    private async Task<Message> CreateAsync(CancellationToken ct)
+    private async Task<Message> CreateAsync(Action<string>? partial, CancellationToken ct)
     {
+        var parameters = new MessageCreateParams
+        {
+            Model = model,
+            MaxTokens = 4096,
+            System = system,
+            Tools = _tools,
+            Messages = _messages,
+            OutputConfig = new OutputConfig { Effort = ToEffort(effort) },
+            // The tools and the instructions stay the same: later calls read them from the cache.
+            CacheControl = new CacheControlEphemeral(),
+        };
         try
         {
-            return await client.Messages.Create(new MessageCreateParams
-            {
-                Model = model,
-                MaxTokens = 4096,
-                System = system,
-                Tools = _tools,
-                Messages = _messages,
-                OutputConfig = new OutputConfig { Effort = ToEffort(effort) },
-                // The tools and the instructions stay the same: later calls read them from the cache.
-                CacheControl = new CacheControlEphemeral(),
-            }, ct);
+            return partial is null ? await client.Messages.Create(parameters, ct) : await StreamAsync(parameters, partial, ct);
         }
         catch (AnthropicUnauthorizedException ex)
         {
@@ -183,6 +189,32 @@ internal sealed class ClaudeAssistantChat(AnthropicClient client, string model, 
         {
             throw new AssistantException("Could not reach Claude. Check the internet connection.", ex);
         }
+    }
+
+    /// <summary>
+    /// The same call as a stream: the SDK's aggregator builds the whole message (thinking, tool calls, citations, as
+    /// a plain call returns it), and <paramref name="partial"/> hears the text so far after each piece. A tool call or
+    /// a search that starts after some text makes that text a preamble, not the answer: the card is told "" again.
+    /// </summary>
+    private async Task<Message> StreamAsync(MessageCreateParams parameters, Action<string> partial, CancellationToken ct)
+    {
+        var message = new MessageContentAggregator();
+        var text = new StringBuilder();
+        await foreach (var ev in message.CollectAsync(client.Messages.CreateStreaming(parameters, ct)).WithCancellation(ct))
+        {
+            if (ev.TryPickContentBlockDelta(out var delta) && delta.Delta.TryPickText(out var piece) && piece.Text.Length > 0)
+            {
+                text.Append(piece.Text);
+                partial(text.ToString());
+            }
+            else if (ev.TryPickContentBlockStart(out var start) && text.Length > 0
+                && !start.ContentBlock.TryPickText(out _) && !start.ContentBlock.TryPickThinking(out _) && !start.ContentBlock.TryPickRedactedThinking(out _))
+            {
+                text.Clear();
+                partial("");
+            }
+        }
+        return message.Message();
     }
 
     /// <summary>

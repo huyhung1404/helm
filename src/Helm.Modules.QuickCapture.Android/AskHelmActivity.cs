@@ -80,6 +80,8 @@ public partial class AskHelmActivity : Activity, IRecognitionListener
             }
             ReadContext(Intent);
             _session = _assistant.Start([new PhoneTools(this)], _context);
+            // The PC's agent gets ready (and sync's live channel opens) while Anh still speaks.
+            _session.Warm();
             StartOpened(Intent);
         }
         catch (Exception ex)
@@ -98,6 +100,7 @@ public partial class AskHelmActivity : Activity, IRecognitionListener
         _session?.End();
         ReadContext(intent);
         _session = _assistant.Start([new PhoneTools(this)], _context);
+        _session.Warm();
         Listen();
     }
 
@@ -253,6 +256,7 @@ public partial class AskHelmActivity : Activity, IRecognitionListener
             // Another model is another conversation.
             _session?.End();
             _session = _assistant.Start([new PhoneTools(this)]);
+            _session.Warm();
             ShowModel();
         };
         menu.Show();
@@ -370,6 +374,7 @@ public partial class AskHelmActivity : Activity, IRecognitionListener
         try
         {
             var session = _session;
+            session.OnPartialText = ShowPartial;
             reply = await Task.Run(() => session.SendAsync(text, ConfirmAsync, _cancel.Token));
         }
         catch (System.OperationCanceledException)
@@ -397,6 +402,17 @@ public partial class AskHelmActivity : Activity, IRecognitionListener
         if (reply.Problem is { } problem) ShowProblem(problem, reply.Done);
         else ShowReply(reply);
     }
+
+    /// <summary>
+    /// The answer as the API's model writes it, in the answer's own place; the whole reply (rows, Undo) replaces it at
+    /// the end. Text that turned out to come before tool calls is taken away again ("").
+    /// </summary>
+    private void ShowPartial(string text) => RunOnUiThread(() =>
+    {
+        if (!_busy || IsFinishing || IsDestroyed) return;
+        _answer.Text = text;
+        _answer.Visibility = text.Length > 0 ? ViewStates.Visible : ViewStates.Gone;
+    });
 
     /// <summary>Shown for the calls that wait for a yes; the assistant's thread waits for the answer.</summary>
     private Task<bool> ConfirmAsync(IReadOnlyList<PendingAction> pending)

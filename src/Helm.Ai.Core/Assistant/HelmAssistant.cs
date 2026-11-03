@@ -276,7 +276,33 @@ public sealed partial class AssistantSession
     public AssistantModelOption? Model => _open?.Model ?? _helm.Current();
 
     /// <summary>The conversation is over: a Claude Code process kept for it may stop.</summary>
-    public void End() => _pc?.End(_conversationId);
+    public void End() => (_pc ?? _warmed)?.End(_conversationId);
+
+    /// <summary>
+    /// The answer's text so far while the API's model writes it (Claude streams it), for a card that shows it at once;
+    /// "" again when that text came before tool calls. Called on the turn's thread. Agents on a PC answer whole.
+    /// </summary>
+    public Action<string>? OnPartialText { get; set; }
+
+    private IAgentRoute? _warmed;
+
+    /// <summary>
+    /// The card opened: the PC agent the first turn would go to gets ready now (its process started, sync's live
+    /// channel open) while the user still speaks. Nothing when the route is the API only, or no agent is online.
+    /// </summary>
+    public void Warm()
+    {
+        if (_warmed is not null || _history.Count > 0 || _helm.Unavailable() is not null || Model is not { } model) return;
+        var choice = _helm.Choice;
+        if (_helm.Router.Agents(choice) is not [var route, ..]) return;
+        _all ??= _helm.OfferedTools(_phone);
+        // Only what a context already names; the first words bring the rest.
+        var tools = _all.Where(t => _scope.Contains(ToolScope.GroupOf(t.Name))).ToList();
+        static bool IsPhone(AssistantTool t) => t.Name.StartsWith(HelmAssistant.PhoneToolPrefix, StringComparison.Ordinal);
+        _warmed = route;
+        route.Warm(new AiJob(AiFeatureIds.AskHelm, _conversationId, "", [.. tools.Where(t => !IsPhone(t)).Select(t => t.Name)],
+            [.. tools.Where(IsPhone).Select(t => t.Name)], model.Model, choice.Effort));
+    }
 
     /// <param name="confirm">Asked once per step for the calls that wait for a yes; false: none of them runs.</param>
     public async Task<AssistantReply> SendAsync(string text, Func<IReadOnlyList<PendingAction>, Task<bool>> confirm, CancellationToken ct)
@@ -405,7 +431,8 @@ public sealed partial class AssistantSession
         // With web search on, Claude may find that the request needs the web after all (WebSearch.LookupTool).
         var tools = WithLookup(chat, model);
         var outcome = await AssistantLoop.RunAsync(chat, tools, confirm, u => _helm.Count(model, keyId, u, CountedAs),
-            () => _helm.Unavailable() ?? _helm.OverCap() ?? (_web ? _helm.WebUnavailable() : null), phoneHere: true, model.Name, ct);
+            () => _helm.Unavailable() ?? _helm.OverCap() ?? (_web ? _helm.WebUnavailable() : null), phoneHere: true, model.Name, ct,
+            partial: OnPartialText);
         return new AssistantReply(outcome.Text, outcome.Done, outcome.Declined, outcome.Problem);
     }
 }
