@@ -174,3 +174,55 @@ A job is **text only**: no Helm tool and no phone tool is offered (the VPS's ser
 its own, ended once answered. Two run at once; one more is declined, so the VPS can send it elsewhere. A job may take
 2 minutes. After a drop the worker connects again after 1 s, waiting twice as long each time up to a minute; jobs
 running on a connection that dropped are cancelled. The token and job contents are never logged.
+
+## Automatic jobs (briefs from the PC)
+
+A Helm PC that is on runs a few jobs by itself on its agents (AI → Proxy) and sends the result to the phone as a short
+**brief**: a notification there, a tray balloon on the PC, and Ask Helm reads them out ("bản tin sáng nay nói gì?").
+They cost nothing on the API: they run only on a PC agent, never on the paid API, unless that feature's route is set
+to allow it (`AiFeatureChoice.Route`, `PcOnly` for these by default).
+
+| Job (`AiFeatureIds`) | When (default) | On by default | What |
+|---|---|---|---|
+| Bản tin buổi sáng (`morning-brief`) | every day 07:00 | yes | today's and overdue tasks, habits to do, yesterday's spending |
+| Tổng kết buổi tối (`evening-review`) | every day 21:30 | yes | tasks done today, those slipping to tomorrow, one suggestion |
+| Huấn luyện thói quen (`habit-coach`) | Sundays 19:00, and the evening a habit is skipped a 2nd day in a row | no | suggestions from the reasons given for skipped days |
+| Tóm tắt chi tiêu (`spending-digest`) | Sundays 20:00 (the week) and the 1st (the month before) | yes | top categories, against the period before, funds running low |
+| Ngày quan trọng (`important-days`) | every day 08:00 | no | 3 days before and on the day: a gift idea or a wish |
+| Tự đặt tiêu đề và tag (`note-titles`) | every hour | no | a title and tags for new notes without one (undoable) |
+| Dọn Scratch (`scratch-tidy`) | Saturdays 10:00 | no | what to keep as a note, make a task of, or let go (suggests only) |
+
+On/off and the time are each feature's choice in the synced `settings.ai-features` (`Enabled`, `At` = "HH:mm"); Ask
+Helm changes them (`ai_auto_jobs`, `ai_auto_job_set`, with Undo).
+
+**Days to remember** live in the note **Ngày quan trọng**, one per line, which the user may also write by hand:
+`15/03 · Sinh nhật mẹ` (every year), `10/07 âm · Giỗ ông nội` (a lunar day, every year), `20/05/2027 · Đăng kiểm xe`
+(that day only). Ask Helm adds one with `notes_add_important_day` ("nhớ giúp anh giỗ ông ngày 10 tháng 7 âm").
+Lunar days are turned into solar ones by `Helm.Core.Text.LunarCalendar` (Hồ Ngọc Đức's algorithm, UTC+7).
+
+**Note titles** are a normal edit of the note (`notes_retitle`); the brief keeps each change, and `ai_brief_undo`
+takes them back (Ask Helm asks first).
+
+### For developers
+
+`src/Helm.Ai.Core/Auto`:
+
+- `AutoJobScheduler` ticks every minute (the user's local time). A job's slot (`AutoSlot`: hourly, daily, a weekday, a
+  day of the month) may run from its time for 4 hours. Each slot runs once per period, kept in the synced
+  `ai.autoruns` (`AutoJobRuns`): done stays done after a restart; a failure is tried again after 15 minutes, 3 times
+  at most; a run left "running" by a PC that closed is taken again after 20 minutes. With two PCs, the one that runs
+  them is, of the PCs whose heartbeat (`ai.workers`) says an agent is ready (this one counts when its own are), the
+  one with the lowest device id. No agent ready: nothing is claimed and it is tried again next minute. Nothing runs
+  while a Vault is unlocked (`IVaultSecrets.IsUnlocked`); no job reads Vault.
+- `IAutoJob` (one class per job in `Auto/Jobs`) reads with Helm's own read tools in-process (`AutoJobTools`: no MCP,
+  only read tools, and changes only through tools with Undo), asks with a short prompt, and returns an `AutoBrief`;
+  null when there is nothing to say (then no call is made at all).
+- `AutoJobAsker`: a text-only `AiJob` (no tools, the briefs' own system prompt, Vietnamese) on this PC's agents
+  (`AgentRegistry`); the API only as above, within the feature's daily cap. Every call is in `ai.usage`.
+- `AiBriefBook`: the synced `ai.briefs` (`{Kind, Title, Text, CreatedAt, ReadAt, Device, Actions, UndoneAt}`,
+  urgent, kept 30 days). `AiBriefAlerts` tells of each new brief once per device (`settings/ai-brief-alerts.json`),
+  not one already read nor one older than 12 hours; Android posts it (`QuickCapture.Android/AiBriefNotifications`),
+  the PC shows a tray balloon.
+- `AiBriefTools`: `ai_briefs` (reading marks them read), `ai_brief_undo`, `ai_auto_jobs`, `ai_auto_job_set`.
+- Scratch is read through `ScratchDigestTool` (names only, a text that looks like a code is hidden), given to the
+  jobs alone, never to the MCP server. Funds come from `wallet_funds`.
