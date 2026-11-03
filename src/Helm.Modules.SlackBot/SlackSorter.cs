@@ -22,6 +22,15 @@ public interface ISlackAgent
     /// <exception cref="ClaudeCodeException">It failed or was too slow.</exception>
     Task<string> WorkInFolderAsync(string instructions, IReadOnlyList<string> folders, string? model, CancellationToken ct) =>
         AskInFolderAsync(instructions, folders, model, ct);
+
+    /// <summary>The same three with a model and an effort (null: Claude Code's defaults); fakes need only the ones above.</summary>
+    Task<string> AskAsync(string instructions, (string? Model, string? Effort) ai, CancellationToken ct) => AskAsync(instructions, ai.Model, ct);
+
+    Task<string> AskInFolderAsync(string instructions, IReadOnlyList<string> folders, (string? Model, string? Effort) ai, CancellationToken ct) =>
+        AskInFolderAsync(instructions, folders, ai.Model, ct);
+
+    Task<string> WorkInFolderAsync(string instructions, IReadOnlyList<string> folders, (string? Model, string? Effort) ai, CancellationToken ct) =>
+        WorkInFolderAsync(instructions, folders, ai.Model, ct);
 }
 
 /// <summary>Claude Code with no tools, no MCP and no hooks (<see cref="ClaudeCodeRunner.AskAsync"/>).</summary>
@@ -44,6 +53,15 @@ public sealed class ClaudeCodeSlackAgent(ClaudeCodeRunner claude) : ISlackAgent
 
     public Task<string> WorkInFolderAsync(string instructions, IReadOnlyList<string> folders, string? model, CancellationToken ct) =>
         claude.WorkInFolderAsync(instructions, folders, model, WorkTimeout, ct);
+
+    public Task<string> AskAsync(string instructions, (string? Model, string? Effort) ai, CancellationToken ct) =>
+        claude.AskAsync(instructions, ai.Model, Timeout, ct, ai.Effort);
+
+    public Task<string> AskInFolderAsync(string instructions, IReadOnlyList<string> folders, (string? Model, string? Effort) ai, CancellationToken ct) =>
+        claude.AskInFolderAsync(instructions, folders, ai.Model, FolderTimeout, ct, ai.Effort);
+
+    public Task<string> WorkInFolderAsync(string instructions, IReadOnlyList<string> folders, (string? Model, string? Effort) ai, CancellationToken ct) =>
+        claude.WorkInFolderAsync(instructions, folders, ai.Model, WorkTimeout, ct, ai.Effort);
 }
 
 /// <summary>
@@ -69,7 +87,7 @@ public sealed class SlackSorter(ISlackAgent agent)
         if (batch.Count == 0) return 0;
         var ids = batch.Select((item, i) => (Short: (i + 1).ToString(CultureInfo.InvariantCulture), item.Id)).ToDictionary(p => p.Short, p => p.Id);
         var answer = await agent.AskAsync(Instructions(batch, me, settings.AboutMe, inbox.Corrections()),
-            settings.Model is { Length: > 0 } m ? m : null, ct).ConfigureAwait(false);
+            (settings.Model is { Length: > 0 } m ? m : null, settings.Effort is { Length: > 0 } e ? e : null), ct).ConfigureAwait(false);
         var levels = Parse(answer)
             .Where(p => ids.ContainsKey(p.Key))
             .ToDictionary(p => ids[p.Key], p => p.Value);

@@ -35,6 +35,7 @@ public sealed partial class SlackBotViewModel : ObservableObject
     [ObservableProperty] private bool _catchUpQuietDms;
     [ObservableProperty] private string _aboutMe = "";
     [ObservableProperty] private string _model = "";
+    [ObservableProperty] private string _effort = "";
     [ObservableProperty] private bool _playSound;
     [ObservableProperty] private int _remindEveryMinutes;
     [ObservableProperty] private bool _answerCalls;
@@ -99,12 +100,9 @@ public sealed partial class SlackBotViewModel : ObservableObject
         new(240, "Every 4 hours"),
     ];
 
-    public IReadOnlyList<SlackBotChoice<string>> Models { get; } =
-    [
-        new("", "Claude Code's default"),
-        new("haiku", "Haiku (fast, light on your plan)"),
-        new("sonnet", "Sonnet"),
-    ];
+    public IReadOnlyList<SlackBotChoice<string>> Models => SlackAiOptions.Models;
+
+    public IReadOnlyList<SlackBotChoice<string>> Efforts => SlackAiOptions.Efforts;
 
     /// <summary>Saves new tokens and connects with them; false (with <see cref="TokenProblem"/>) when they cannot be right.</summary>
     public async Task<bool> ConnectAsync(string userToken, string appToken)
@@ -162,6 +160,7 @@ public sealed partial class SlackBotViewModel : ObservableObject
     partial void OnAboutMeChanged(string value) => Save(s => s.AboutMe = value);
 
     partial void OnModelChanged(string value) => Save(s => s.Model = value);
+    partial void OnEffortChanged(string value) => Save(s => s.Effort = value);
 
     partial void OnPlaySoundChanged(bool value) => Save(s => s.PlaySound = value);
 
@@ -303,6 +302,7 @@ public sealed partial class SlackBotViewModel : ObservableObject
             CatchUpQuietDms = s.CatchUpQuietDms;
             AboutMe = s.AboutMe;
             Model = s.Model;
+            Effort = s.Effort;
             PlaySound = s.PlaySound;
             RemindEveryMinutes = s.RemindEveryMinutes;
             AnswerCalls = s.AnswerCalls;
@@ -346,10 +346,16 @@ public sealed partial class SlackBotViewModel : ObservableObject
         }
         var settings = _store.Current;
         _allChannels = conversations.Select(c => new SlackChannelRow(c, settings.ModeOf(c.Id, c.Kind), SetMode,
-            settings.FoldersOf(c.Id), SetProjects)).ToList();
+            settings.FoldersOf(c.Id), SetProjects, settings.ChannelAi.GetValueOrDefault(c.Id), SetAi)).ToList();
         FilterChannels();
         UpdatePreview();
     }
+
+    private void SetAi(string id, SlackAiChoice choice) => _store.Update(s =>
+    {
+        if (choice.Model.Length == 0 && choice.Effort.Length == 0) s.ChannelAi.Remove(id);
+        else s.ChannelAi[id] = new SlackAiChoice { Model = choice.Model, Effort = choice.Effort };
+    });
 
     private void SetProjects(string id, IReadOnlyList<string> folders) => _store.Update(s =>
     {

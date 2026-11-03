@@ -78,8 +78,23 @@ public sealed class SlackBotSettings : IVersionedSettings
     /// <summary>What matters to the user, in their own words: given to Claude with every batch.</summary>
     public string AboutMe { get; set; } = "";
 
-    /// <summary>Claude Code model for sorting ("" = the user's default, "haiku", "sonnet").</summary>
+    /// <summary>Claude Code model for sorting, and for answers where a conversation has none of its own ("" = the user's default).</summary>
     public string Model { get; set; } = "";
+
+    /// <summary>Claude Code's effort, like <see cref="Model"/> ("" = its default; low, medium, high, xhigh, max).</summary>
+    public string Effort { get; set; } = "";
+
+    /// <summary>A conversation's own model and effort for Lumi's answers and replies there; what is left "" follows the defaults.</summary>
+    public Dictionary<string, SlackAiChoice> ChannelAi { get; set; } = [];
+
+    /// <summary>The model and effort Claude Code runs with for <paramref name="channel"/> (null: Claude Code's own default).</summary>
+    public (string? Model, string? Effort) AiFor(string channel)
+    {
+        var own = ChannelAi.GetValueOrDefault(channel);
+        return (Pick(own?.Model, Model), Pick(own?.Effort, Effort));
+    }
+
+    private static string? Pick(string? own, string fallback) => own is { Length: > 0 } ? own : fallback.Length > 0 ? fallback : null;
 
     /// <summary>The AI signature under every message Slack Bot posts; {me} is the user's name. It always says AI.</summary>
     public string Signature { get; set; } = DefaultSignature;
@@ -144,4 +159,12 @@ public sealed class SlackBotSettings : IVersionedSettings
 
     public static SlackChannelMode DefaultMode(SlackConversationKind kind) =>
         kind is SlackConversationKind.DirectMessage or SlackConversationKind.GroupMessage ? SlackChannelMode.Read : SlackChannelMode.Off;
+}
+
+/// <summary>A conversation's Claude model and effort ("" = the defaults on the settings page).</summary>
+public sealed class SlackAiChoice
+{
+    public string Model { get; set; } = "";
+
+    public string Effort { get; set; } = "";
 }

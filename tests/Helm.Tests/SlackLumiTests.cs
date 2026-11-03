@@ -238,6 +238,64 @@ public sealed class SlackLumiTests
     }
 
     [Fact]
+    public void A_conversation_may_have_its_own_model_and_effort()
+    {
+        var settings = new SlackBotSettings { Model = "sonnet", ChannelAi = { ["C1"] = new SlackAiChoice { Model = "fable", Effort = "high" }, ["C2"] = new SlackAiChoice { Effort = "low" } } };
+        Assert.Equal(("fable", "high"), settings.AiFor("C1"));
+        // What a conversation leaves out follows the defaults; no default at all is Claude Code's own.
+        Assert.Equal(("sonnet", "low"), settings.AiFor("C2"));
+        Assert.Equal(("sonnet", (string?)null), settings.AiFor("C3"));
+        Assert.Equal(["--model", "fable", "--effort", "high"], Helm.Core.Mcp.ClaudeCodeRunner.AskArguments("fable", "high").TakeLast(4));
+        Assert.DoesNotContain("--effort", Helm.Core.Mcp.ClaudeCodeRunner.AskArguments(null));
+    }
+
+    [Theory]
+    [InlineData("@lumi model fable", "fable", null)]
+    [InlineData("@lumi dùng opus effort cao", "opus", "high")]
+    [InlineData("@lumi /model: sonnet", "sonnet", null)]
+    [InlineData("lumi effort rất cao", null, "xhigh")]
+    [InlineData("@lumi model mặc định", "", null)]
+    [InlineData("@lumi switch to haiku, effort max", "haiku", "max")]
+    public void The_user_switches_the_model_in_a_message(string text, string? model, string? effort)
+    {
+        var command = SlackAiCommand.Parse(text);
+        Assert.NotNull(command);
+        Assert.Equal((model, effort, false), (command.Model, command.Effort, command.Ask));
+    }
+
+    [Theory]
+    [InlineData("@lumi opus nghĩa là gì?")]
+    [InlineData("@lumi trưa nay ăn gì")]
+    [InlineData("@lumi viết bài về sonnet của Shakespeare")]
+    public void Naming_a_model_in_a_question_switches_nothing(string text) => Assert.Null(SlackAiCommand.Parse(text));
+
+    [Fact]
+    public async Task Only_the_user_switches_lumis_model_from_slack()
+    {
+        var (_, slack, agent, settings, inbox) = Rig();
+        var lumi = new SlackLumi(slack, agent, inbox, Reader(slack, inbox, settings), () => settings, Me, "Hùng", NullLogger.Instance, null,
+            (channel, choice) => settings.ChannelAi[channel] = choice);
+        Assert.True(await lumi.AnswerAsync(new SlackMessage("C1", "9480.0", null, "ME", "@lumi model fable effort high", false), Now, default));
+        Assert.Equal(("fable", "high"), settings.AiFor("C1"));
+        Assert.Empty(agent.Asked);
+        Assert.Contains("Fable", Assert.Single(slack.Posted).Text);
+
+        // Someone else asking for it gets an answer from Claude, and nothing changes.
+        Assert.True(await lumi.AnswerAsync(new SlackMessage("C1", "9481.0", null, "U2", "@lumi dùng model haiku để rep đi", false), Now, default));
+        Assert.Equal(("fable", "high"), settings.AiFor("C1"));
+        Assert.Single(agent.Asked);
+    }
+
+    [Fact]
+    public void Lumi_answers_general_questions_but_never_makes_up_the_users_work()
+    {
+        var text = SlackLumi.Instructions("Hùng", "NIL", false, "thế trưa nay ăn gì?", []);
+        Assert.Contains("answer it from what you know", text);
+        Assert.Contains("use only what the conversation shows", text);
+        Assert.Contains("Never promise", text);
+    }
+
+    [Fact]
     public void Work_may_edit_the_project_but_never_secrets_or_a_shell()
     {
         var args = Helm.Core.Mcp.ClaudeCodeRunner.WorkArguments(null).ToList();

@@ -12,13 +12,20 @@ public sealed partial class SlackChannelRow : ObservableObject
 {
     private readonly Action<string, SlackChannelMode> _changed;
     private readonly Action<string, IReadOnlyList<string>>? _projectsChanged;
+    private readonly Action<string, SlackAiChoice>? _aiChanged;
     private SlackChannelMode _mode;
+    private string _model;
+    private string _effort;
 
     public SlackChannelRow(SlackConversation conversation, SlackChannelMode mode, Action<string, SlackChannelMode> changed,
-        IEnumerable<string>? projects = null, Action<string, IReadOnlyList<string>>? projectsChanged = null)
+        IEnumerable<string>? projects = null, Action<string, IReadOnlyList<string>>? projectsChanged = null,
+        SlackAiChoice? ai = null, Action<string, SlackAiChoice>? aiChanged = null)
     {
         Projects = new ObservableCollection<string>(projects ?? []);
         _projectsChanged = projectsChanged;
+        _model = ai?.Model ?? "";
+        _effort = ai?.Effort ?? "";
+        _aiChanged = aiChanged;
         Id = conversation.Id;
         Name = conversation.Kind switch
         {
@@ -54,6 +61,35 @@ public sealed partial class SlackChannelRow : ObservableObject
     {
         get => _mode != SlackChannelMode.Off;
         set => Mode = value ? (_mode == SlackChannelMode.Off ? SlackChannelMode.Read : _mode) : SlackChannelMode.Off;
+    }
+
+    /// <summary>This conversation's own Claude model ("" = the default on the settings page).</summary>
+    public string Model
+    {
+        get => _model;
+        set => SetAi(value, _effort);
+    }
+
+    /// <summary>This conversation's own effort ("" = the default on the settings page).</summary>
+    public string Effort
+    {
+        get => _effort;
+        set => SetAi(_model, value);
+    }
+
+    /// <summary>"Default", or what is set: "Fable · High".</summary>
+    public string AiLabel => _model.Length == 0 && _effort.Length == 0
+        ? "AI: default"
+        : $"AI: {SlackAiOptions.Short(_model, "default model")} · {SlackAiOptions.Short(_effort, "default effort")}";
+
+    private void SetAi(string model, string effort)
+    {
+        if (_model == model && _effort == effort) return;
+        (_model, _effort) = (model, effort);
+        OnPropertyChanged(nameof(Model));
+        OnPropertyChanged(nameof(Effort));
+        OnPropertyChanged(nameof(AiLabel));
+        _aiChanged?.Invoke(Id, new SlackAiChoice { Model = model, Effort = effort });
     }
 
     /// <summary>The project folders Lumi may read before answering here (none: the chat only).</summary>

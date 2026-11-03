@@ -40,6 +40,28 @@ public partial class SlackBotPage : ModulePageBase
         foreach (var folder in dialog.FolderNames) row.AddProject(folder);
     }
 
+    /// <summary>A conversation's model and effort, picked from a menu like Claude Code's in VS Code.</summary>
+    private void AiMenu_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is not FrameworkElement { DataContext: SlackChannelRow row } button) return;
+        var menu = new System.Windows.Controls.ContextMenu { PlacementTarget = button, Placement = System.Windows.Controls.Primitives.PlacementMode.Bottom };
+        Add("Model", SlackAiOptions.Models, row.Model, value => row.Model = value);
+        menu.Items.Add(new System.Windows.Controls.Separator());
+        Add("Effort", SlackAiOptions.Efforts, row.Effort, value => row.Effort = value);
+        menu.IsOpen = true;
+
+        void Add(string title, IReadOnlyList<SlackBotChoice<string>> choices, string current, Action<string> pick)
+        {
+            menu.Items.Add(new System.Windows.Controls.MenuItem { Header = title, IsEnabled = false });
+            foreach (var choice in choices)
+            {
+                var item = new System.Windows.Controls.MenuItem { Header = choice.Label, IsCheckable = true, IsChecked = choice.Value == current };
+                item.Click += (_, _) => pick(choice.Value);
+                menu.Items.Add(item);
+            }
+        }
+    }
+
     private void RemoveProject_Click(object sender, RoutedEventArgs e)
     {
         if (sender is FrameworkElement { DataContext: string folder, Tag: SlackChannelRow row }) row.RemoveProject(folder);
