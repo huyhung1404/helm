@@ -11,6 +11,10 @@ Format: [Keep a Changelog](https://keepachangelog.com), versions follow [SemVer]
   “To remember it” sits in a blue box (also on the Learn card and the pop-up’s Full details); the tree’s lines turn
   down at their ends; the Words list, Roots, a family, root practice and every dialog take the design’s sizes, colours
   and wording. The Roots tab shows its count. At 1060 px the Learn card keeps its side panel and the page fits.
+- **Vocabulary on the phone looks like its design too.** The pages, sheets, settings and the card over other apps were
+  redrawn from the approved canvas, with its own line icons, sizes and colours.
+- **Vocabulary: "To remember it" stands out.** The story that ties a word's parts to its meaning sits in a highlighted
+  box on the card's answer, on the word's page and in the pop-up's Full details, like the pinyin hook.
 - **Vocabulary: Delete… asks in the page**, with what goes and what stays, instead of a system box.
 - **Vocabulary: your tags are chips in Edit**, ✕ takes one off, Enter adds the one typed.
 
