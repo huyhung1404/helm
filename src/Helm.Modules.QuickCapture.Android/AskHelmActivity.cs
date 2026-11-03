@@ -24,6 +24,9 @@ namespace Helm.Modules.QuickCapture;
 /// </summary>
 [Activity(Name = QuickCaptureModule.AskHelmActivityName, Label = "Ask Helm", Exported = AskHelmBuild.Exported, ExcludeFromRecents = true,
     TaskAffinity = "", Theme = "@android:style/Theme.Translucent.NoTitleBar", LaunchMode = LaunchMode.SingleTask,
+    // Turning the phone or switching dark mode must not close the card mid-turn (and lose its Undo list).
+    ConfigurationChanges = ConfigChanges.Orientation | ConfigChanges.ScreenSize | ConfigChanges.ScreenLayout | ConfigChanges.SmallestScreenSize
+        | ConfigChanges.UiMode | ConfigChanges.Keyboard | ConfigChanges.KeyboardHidden,
     WindowSoftInputMode = SoftInput.AdjustResize | SoftInput.StateHidden)]
 public sealed class AskHelmActivity : Activity, IRecognitionListener
 {
@@ -34,6 +37,7 @@ public sealed class AskHelmActivity : Activity, IRecognitionListener
     private AssistantSession? _session;
     private SpeechRecognizer? _recognizer;
     private CancellationTokenSource _cancel = new();
+    private TaskCompletionSource<bool>? _confirm;
     private ILogger? _logger;
     private AskColors _colors = AskColors.Dark;
     private readonly Handler _handler = new(Looper.MainLooper!);
@@ -82,7 +86,9 @@ public sealed class AskHelmActivity : Activity, IRecognitionListener
 
     protected override void OnDestroy()
     {
+        // Closing the card withdraws the turn (a PC that took it stops), and a question waiting for a yes is a no.
         _cancel.Cancel();
+        _confirm?.TrySetResult(false);
         StopAutoClose();
         _session?.End();
         _recognizer?.Destroy();
@@ -347,7 +353,8 @@ public sealed class AskHelmActivity : Activity, IRecognitionListener
     /// <summary>Shown for the calls that wait for a yes; the assistant's thread waits for the answer.</summary>
     private Task<bool> ConfirmAsync(IReadOnlyList<PendingAction> pending)
     {
-        var answer = new TaskCompletionSource<bool>();
+        var answer = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+        _confirm = answer;
         RunOnUiThread(() =>
         {
             ClearResult();

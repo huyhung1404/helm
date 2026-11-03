@@ -110,12 +110,15 @@ starts with Helm, so after a restart the agents take jobs again as soon as Helm 
 
 **How a phone reaches the PC.** Each PC running Helm with a ready agent writes a heartbeat to the synced collection
 `ai.workers` every minute. The phone writes the turn to `ai.jobs` (urgent, so it syncs at once) and keeps sync's
-live channel open while it waits. The PC claims it, runs it, and writes the result back. The phone waits only
-`PcWaitSeconds` for the claim; once claimed it waits for the result (up to 2 minutes) and never sends the same turn
-to the API, so nothing is saved twice. Undo goes back to the PC that made the record. Jobs and heartbeats are
-end-to-end encrypted like all Helm data.
+live channel open while it waits. The PC claims it, runs it, and writes the result back. The PC claims only up to
+`PcWaitSeconds` after the turn was sent (by its own clock); the phone listens 4 s longer (`AgentJobs.ClaimGrace`), so a
+claim that comes back late still binds. Once claimed, the turn is the PC's: it waits for the result (up to 2
+minutes), and when the PC fails or runs out of time the card says so (`AiRouteTakenException`) instead of sending the
+turn to the API, so nothing is saved twice; what the PC recorded before it stopped comes back with Undo. Closing the
+card withdraws the turn: a PC that has not taken it never will, one that has stops. Undo goes back to the PC that
+made the record. Jobs and heartbeats are end-to-end encrypted like all Helm data.
 
-**On the PC** (`LocalAgentRoute`), the agent runs with its own tools off (Claude Code: no tools, no MCP, no hooks;
+**On the PC** (`LocalAgentRoute`), the agent runs with its own tools off (Claude Code: no tools, no MCP, no hooks; Codex: every one of its own tools disabled, shell included;
 Codex: a read-only sandbox in an empty folder; Grok: headless `grok --prompt-file` with `--tools ""`, no web
 search, no subagents and Helm's instructions instead of Grok's coding prompt): Helm lists its tools in the first message, the agent answers with the calls it wants as JSON
 (`CliAgentProtocol`), Helm runs them in-process and sends the results back. Claude Code keeps one process per conversation

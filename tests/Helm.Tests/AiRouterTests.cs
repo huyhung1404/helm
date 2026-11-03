@@ -140,12 +140,28 @@ public sealed class AiRouterTests
         Assert.DoesNotContain("phone_set_alarm", pc.Jobs[0].Tools);
     }
 
+    [Fact]
+    public async Task A_turn_a_PC_took_and_then_failed_is_never_run_again_on_the_API()
+    {
+        var pc = new Pc(null) { Taken = true };
+        var (assistant, api) = Build(pc);
+
+        var reply = await assistant.Start().SendAsync("phở 45k", _ => Task.FromResult(true), CancellationToken.None);
+
+        Assert.Equal(0, api.Calls);
+        Assert.Contains("không chạy lại qua API", reply.Problem);
+        Assert.Empty(_wallet.Transactions());
+    }
+
     // ---- doubles ----------------------------------------------------------------------------------------------
 
     private sealed class Pc(AiJobResult? next) : IAgentRoute
     {
         public AiJobResult? Next { get; set; } = next;
         public string? Problem { get; init; }
+
+        /// <summary>Took the turn, then failed.</summary>
+        public bool Taken { get; init; }
         public List<AiJob> Jobs { get; } = [];
         public List<AiJobAction> Undone { get; } = [];
         public string Device => "PC-HUNG";
@@ -154,6 +170,7 @@ public sealed class AiRouterTests
         public Task<AiJobResult> RunAsync(AiJob job, TimeSpan wait, CancellationToken ct)
         {
             Jobs.Add(job);
+            if (Taken) throw new AiRouteTakenException("PC-HUNG took it but did not finish.");
             return Next is { } result ? Task.FromResult(result) : throw new AiRouteException("timed out");
         }
 
