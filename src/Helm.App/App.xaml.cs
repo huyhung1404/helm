@@ -80,8 +80,11 @@ public partial class App : Application
             var engine = Services.GetRequiredService<Core.Sync.SyncEngine>();
             engine.Start();
             engine.SetLive(true);
-            // Claude Code on this PC takes the phone's AI jobs (Ask Helm) through Helm Sync.
-            Services.GetRequiredService<Helm.Ai.Assistant.AgentJobWorker>().Start();
+            // The agents on this PC (AI → Proxy) take the phone's AI jobs (Ask Helm) through Helm Sync, from launch on;
+            // a sign-in or a change of the list tells the phone at once instead of at the next heartbeat.
+            var worker = Services.GetRequiredService<Helm.Ai.Assistant.AgentJobWorker>();
+            worker.Start();
+            Services.GetRequiredService<Ai.AgentRegistry>().Changed += (_, _) => worker.Beat();
             // The AI agents' tools (a pipe only this user can open; each connection checks the MCP settings).
             Services.GetRequiredService<Core.Mcp.McpPipeHost>().Start();
         }

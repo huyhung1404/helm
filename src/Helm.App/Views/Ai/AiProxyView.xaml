@@ -53,7 +53,7 @@
         <Border Style="{DynamicResource HelmSurface}" Margin="0,0,0,8" Padding="16,12"
                 Visibility="{Binding HasAgents, Converter={StaticResource InverseBoolToVisibility}}">
             <TextBlock Style="{DynamicResource HelmSecondaryText}" FontSize="13"
-                       Text="No agent yet: add Codex or Claude Code, then press Sign in on it and sign in with the account Helm should use. Until then Helm's AI jobs use the API key." />
+                       Text="No agent yet: add Codex or Claude Code. Its sign-in opens at once: sign in with the account Helm should use, and the agent turns green by itself. Until then Helm's AI jobs use the API key." />
         </Border>
 
         <ItemsControl ItemsSource="{Binding Agents}" AutomationProperties.Name="Agents on this PC">

@@ -245,7 +245,7 @@
                             </ItemsControl.ItemTemplate>
                         </ItemsControl>
 
-                        <!-- Prepaid balance, where the provider's API tells it (needs a management key on this PC) -->
+                        <!-- Prepaid balance, where the provider's API tells it (needs a management key, synced like the API keys) -->
                         <Border Style="{DynamicResource HelmSurface}" Margin="0,0,0,8"
                                 Visibility="{Binding ReadsBalance, Converter={StaticResource BoolToVisibility}}">
                             <StackPanel>
@@ -260,7 +260,7 @@
                                         <TextBlock Text="Prepaid balance" FontWeight="SemiBold" />
                                         <TextBlock Style="{DynamicResource HelmSecondaryText}" Margin="0,2,0,0"
                                                    Visibility="{Binding HasManagementKey, Converter={StaticResource InverseBoolToVisibility}}"
-                                                   Text="{Binding Title, StringFormat='{}{0} tells the credit left to a management key (an API key cannot read it). Helm keeps that key on this PC only, encrypted, never synced: it can do more than read.'}" />
+                                                   Text="{Binding Title, StringFormat='{}{0} tells the credit left to a management key (an API key cannot read it). Helm syncs that key end-to-end encrypted like the API keys, so every device shows the balance, and never shows it again.'}" />
                                         <TextBlock Style="{DynamicResource HelmSecondaryText}" Margin="0,2,0,0" Text="{Binding BalanceDetail}"
                                                    Visibility="{Binding HasManagementKey, Converter={StaticResource BoolToVisibility}}" />
                                     </StackPanel>
@@ -420,7 +420,7 @@
                     <core:RowLayout>
                         <DockPanel>
                             <Border Style="{StaticResource StepNumber}"><TextBlock Text="5" Style="{StaticResource StepNumberText}" /></Border>
-                            <core:CardHeader Title="Optional: see the balance" Description="Management Keys → create one, then Prepaid balance → Add management key. It stays on this PC; Helm only reads the balance with it." />
+                            <core:CardHeader Title="Optional: see the balance" Description="Management Keys → create one, then Prepaid balance → Add management key. It syncs end-to-end encrypted; Helm only reads the balance with it." />
                         </DockPanel>
                     </core:RowLayout>
                 </Border>
@@ -429,7 +429,7 @@
         <ui:CardControl Margin="0,0,0,4" Icon="{ui:SymbolIcon ShieldLock24}">
             <ui:CardControl.Header>
                 <core:CardHeader Title="Where your keys are kept"
-                                 Description="API keys: in Helm Sync, end-to-end encrypted (the sync server cannot read them) and in the encrypted copy of your data on each device. Management keys: on this PC only, encrypted for your Windows user, never synced. Helm never shows a key again after you add it; to stop one for good, remove it here and delete it in the provider's console." />
+                                 Description="API keys: in Helm Sync, end-to-end encrypted (the sync server cannot read them) and in the encrypted copy of your data on each device. Management keys: the same way. Helm never shows a key again after you add it; to stop one for good, remove it here and delete it in the provider's console." />
             </ui:CardControl.Header>
         </ui:CardControl>
     </StackPanel>

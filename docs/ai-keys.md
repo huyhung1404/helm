@@ -59,8 +59,9 @@ API keys are records of the synced collection `ai.keys`: end-to-end encrypted on
 and in the encrypted local copy on each device, like the rest of your data. General → Sync → *What syncs on this
 device* can keep them off a device (**AI keys**).
 
-A management key can do more than read (an xAI one can buy credit with the saved card), so it never syncs: it stays
-in a file on that PC, encrypted for the Windows user (DPAPI; the Android Keystore on a phone).
+Management keys are records of `ai.management`, synced the same way, so every device shows the balance. A management
+key can do more than read (an xAI one can buy credit with the saved card): keep it to the devices you trust with the
+API keys. A key an older Helm kept in a file on one PC (DPAPI) moves to sync the first time the new Helm starts there.
 
 Helm never shows a key again after you add it, only its prefix and last four characters. Removing a key in Helm
 removes it from every device; to stop the key itself, delete it in the provider's console too.
@@ -75,7 +76,7 @@ removes it from every device; to stop the key itself, delete it in the provider'
   (`GET https://api.x.ai/v1/api-key` and `/v1/models`).
 - `IAiBalanceReader`: `GrokBalanceReader` (`GET https://management-api.x.ai/v1/billing/teams/{team}/prepaid/balance`;
   the ledger is in USD cents, purchases negative, so what is left is minus the total). `AiManagementKeys` keeps the
-  management keys on the device.
+  management keys (synced, one per provider).
 - `AiKeysViewModel`: the page's view model; the WPF view is `Helm.App/Views/Ai/AiKeysView.xaml`.
 
 A new provider is an `AiProviders` entry plus an `IAiKeyChecker` (and an `IAiBalanceReader` if its API tells the
@@ -92,25 +93,33 @@ Every Ask Helm turn goes through the **router** (`Helm.Ai.Core/Assistant/AiRoute
 
 | Policy | What happens |
 |---|---|
-| Prefer PC (default) | Claude Code on a Helm PC if one takes the turn within `PcWaitSeconds` (8 s), else the API |
+| Prefer PC (default) | An agent on a Helm PC if one takes the turn within `PcWaitSeconds` (8 s), else the API |
 | PC only | Only a Helm PC; nothing is spent on the API |
 | API only | Only the API |
 
 A Grok pick always goes to the API (no agent runs Grok's models). A conversation that started on a PC stays there;
 if the PC stops answering, the API takes over with what was said so far.
 
-**How a phone reaches the PC.** Each PC running Helm with Claude Code writes a heartbeat to the synced collection
+**The agents** (AI → Proxy, `Helm.App/Ai/AgentRegistry.cs`) are the user's list, kept per PC in
+`settings/ai-agents.json`: Codex (`CodexAgent.cs`) or Claude Code (`ClaudeCodeAgent.cs`), any number, tried in the
+list's order; a conversation sticks to the agent that took it. Each has its own sign-in folder under
+`ai/agents/<id>` (`CODEX_HOME`, `CLAUDE_CONFIG_DIR`), never the user's own login. **Add** opens the sign-in terminal
+at once (through Explorer, so it runs unelevated); a file watcher on the credentials (`auth.json`,
+`.credentials.json`) turns the agent ready without a click, and the PC's heartbeat goes out at once. The worker
+starts with Helm, so after a restart the agents take jobs again as soon as Helm runs.
+
+**How a phone reaches the PC.** Each PC running Helm with a ready agent writes a heartbeat to the synced collection
 `ai.workers` every minute. The phone writes the turn to `ai.jobs` (urgent, so it syncs at once) and keeps sync's
 live channel open while it waits. The PC claims it, runs it, and writes the result back. The phone waits only
 `PcWaitSeconds` for the claim; once claimed it waits for the result (up to 2 minutes) and never sends the same turn
 to the API, so nothing is saved twice. Undo goes back to the PC that made the record. Jobs and heartbeats are
 end-to-end encrypted like all Helm data.
 
-**On the PC** (`Helm.App/Ai/ClaudeCodeAgent.cs`, `LocalAgentRoute`), Claude Code runs with its own tools off, no MCP
-server and no hooks: Helm lists its tools in the first message, Claude answers with the calls it wants as JSON
-(`CliAgentProtocol`), Helm runs them in-process and sends the results back. One Claude Code process per conversation
-(about 3 s for the first turn, 1–2 s after). Calls that would need a yes are not offered there, and phone tools are
-handed back to the phone. When Claude Code reports its plan's limit, the PC takes no job for 30 minutes.
+**On the PC** (`LocalAgentRoute`), the agent runs with its own tools off (Claude Code: no tools, no MCP, no hooks;
+Codex: a read-only sandbox in an empty folder): Helm lists its tools in the first message, the agent answers with the calls it wants as JSON
+(`CliAgentProtocol`), Helm runs them in-process and sends the results back. Claude Code keeps one process per conversation
+(about 3 s for the first turn, 1–2 s after); Codex runs one per turn and resumes its thread. Calls that would need a yes are not offered there, and phone tools are
+handed back to the phone. An agent that reports its plan's limit takes no job for 30 minutes; the next one in the list does.
 
 **Costs.** Every call goes in the synced collection `ai.usage`: route (`api` or `claude-code`), model, tokens, the
 estimated USD (`AiPrices`), and on Claude Code what the same call would have cost (`SavedUsd`). The daily cap

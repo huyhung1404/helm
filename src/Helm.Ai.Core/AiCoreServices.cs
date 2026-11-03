@@ -15,6 +15,7 @@ public static class AiCoreServices
     public static IServiceCollection AddHelmAi(this IServiceCollection services)
     {
         services.AddSyncedCollection(new SyncedCollectionOptions<AiKey> { Name = AiKeyStore.Collection, GuardDeletions = true });
+        services.AddSyncedCollection(new SyncedCollectionOptions<AiManagementKey> { Name = AiManagementKeys.Collection, GuardDeletions = true });
         services.AddSyncedLog<AiUsageEntry>(AiUsageBook.Collection);
         // Agent jobs between devices: urgent, so a turn reaches the PC (and its answer the phone) within a moment.
         services.AddSyncedCollection(new SyncedCollectionOptions<AiJobRecord> { Name = AgentJobs.JobsCollection, Urgent = true });
@@ -23,7 +24,8 @@ public static class AiCoreServices
         services.AddSyncedSettings<AiFeatureSettings>(AiFeatureSettings.StoreId);
         services.AddSingleton(sp => new AiKeyStore(sp.GetRequiredService<ISyncedCollection<AiKey>>()));
         services.AddSingleton(sp => new AiUsageBook(sp.GetRequiredService<ISyncedLog<AiUsageEntry>>()));
-        services.AddSingleton(sp => new AiManagementKeys(sp.GetRequiredService<HelmPaths>(), sp.GetRequiredService<ISecretProtector>()));
+        services.AddSingleton(sp => new AiManagementKeys(sp.GetRequiredService<ISyncedCollection<AiManagementKey>>(),
+            sp.GetRequiredService<HelmPaths>(), sp.GetRequiredService<ISecretProtector>()));
         services.AddSingleton<IAiKeyChecker>(_ => new ClaudeKeyChecker());
         services.AddSingleton<IAiKeyChecker>(_ => new GrokKeyChecker(AiHttp.Shared));
         services.AddSingleton<IAiBalanceReader>(_ => new GrokBalanceReader(AiHttp.Shared));

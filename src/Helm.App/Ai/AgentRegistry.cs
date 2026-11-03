@@ -61,6 +61,8 @@ internal sealed class AgentRegistry : IAgentRoute, IDisposable
     private readonly object _gate = new();
     private List<(AgentProfile Profile, IAssistantChatFactory Factory, Func<string?> Unavailable, LocalAgentRoute Route)> _agents = [];
     private AgentChain _chain = new([]);
+    private FileSystemWatcher? _signIns;
+    private Timer? _settle;
 
     public AgentRegistry(ISettingsStoreFactory settings, HelmPaths paths, IChildProcessLauncher launcher, IEnumerable<IMcpToolProvider> tools,
         Func<string?, bool> isToolOn, ILoggerFactory loggers)
@@ -73,6 +75,7 @@ internal sealed class AgentRegistry : IAgentRoute, IDisposable
         _loggers = loggers;
         Build();
         _store.Changed += (_, _) => Build();
+        WatchSignIns();
     }
 
     /// <summary>Raised after the list or a sign-in changed.</summary>
@@ -106,11 +109,23 @@ internal sealed class AgentRegistry : IAgentRoute, IDisposable
 
     public bool IsReady(AgentProfile profile) => Status(profile) == "Ready";
 
+    /// <summary>
+    /// Adds an agent of <paramref name="kind"/> and opens its sign-in at once. While one of that kind still waits for its
+    /// sign-in, that one signs in instead: pressing Add again never leaves a second, empty agent.
+    /// </summary>
     public void Add(string kind)
     {
+        var waiting = Profiles.FirstOrDefault(p => p.Kind == kind && !SignedIn(p));
+        if (waiting is not null)
+        {
+            SignIn(waiting.Id);
+            return;
+        }
         var name = AgentKinds.NameOf(kind);
         var count = Profiles.Count(p => p.Kind == kind);
-        _store.Update(s => s.Agents.Add(new AgentProfile { Kind = kind, Name = count == 0 ? name : $"{name} {count + 1}" }));
+        var profile = new AgentProfile { Kind = kind, Name = count == 0 ? name : $"{name} {count + 1}" };
+        _store.Update(s => s.Agents.Add(profile));
+        SignIn(profile.Id);
     }
 
     public void Remove(string id)
@@ -168,11 +183,46 @@ internal sealed class AgentRegistry : IAgentRoute, IDisposable
 
     public void Dispose()
     {
+        _signIns?.Dispose();
+        _settle?.Dispose();
         lock (_gate)
             foreach (var agent in _agents) agent.Route.Dispose();
     }
 
     internal string Home(string id) => Path.Combine(_paths.ModuleDataDirectory("ai"), "agents", id);
+
+    private bool SignedIn(AgentProfile profile) => profile.Kind == AgentKinds.ClaudeCode
+        ? ClaudeCodeAgentFactory.SignedIn(Home(profile.Id))
+        : CodexAgentFactory.SignedIn(Home(profile.Id));
+
+    /// <summary>
+    /// A sign-in finishes in its own terminal: the credentials file it writes (auth.json, .credentials.json) turns the
+    /// agent ready here, and the phone hears of it, without pressing anything.
+    /// </summary>
+    private void WatchSignIns()
+    {
+        var root = Path.Combine(_paths.ModuleDataDirectory("ai"), "agents");
+        try
+        {
+            Directory.CreateDirectory(root);
+            var settle = _settle = new Timer(_ => Changed?.Invoke(this, EventArgs.Empty));
+            _signIns = new FileSystemWatcher(root) { IncludeSubdirectories = true, NotifyFilter = NotifyFilters.FileName | NotifyFilters.LastWrite };
+            FileSystemEventHandler seen = (_, e) =>
+            {
+                var file = Path.GetFileName(e.FullPath);
+                if (file is "auth.json" or ".credentials.json") settle.Change(TimeSpan.FromMilliseconds(500), Timeout.InfiniteTimeSpan);
+            };
+            _signIns.Created += seen;
+            _signIns.Changed += seen;
+            _signIns.Deleted += seen;
+            _signIns.Renamed += (sender, e) => seen(sender, e);
+            _signIns.EnableRaisingEvents = true;
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException)
+        {
+            _loggers.CreateLogger<AgentRegistry>().LogWarning(ex, "Cannot watch the agents' sign-ins in {Root}", root);
+        }
+    }
 
     private void Build()
     {

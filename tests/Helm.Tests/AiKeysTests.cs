@@ -161,7 +161,7 @@ public sealed class AiKeysTests : IDisposable
     private AiKeysViewModel ViewModel(IAiKeyChecker checker, out AiKeyStore store, IAiBalanceReader? reader = null)
     {
         store = new AiKeyStore(_records);
-        return new AiKeysViewModel(store, new AiManagementKeys(new Helm.Core.Settings.HelmPaths(_dir.Path), new Helm.Core.Sync.PlainSecretProtector()),
+        return new AiKeysViewModel(store, new AiManagementKeys(new MemorySynced<AiManagementKey>()),
             [checker], reader is null ? [] : [reader], new InlineUi(), new NullLauncher(), new AcceptDialogs());
     }
 
