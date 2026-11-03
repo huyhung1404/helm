@@ -346,15 +346,17 @@ public sealed partial class SlackBotViewModel : ObservableObject
         }
         var settings = _store.Current;
         _allChannels = conversations.Select(c => new SlackChannelRow(c, settings.ModeOf(c.Id, c.Kind), SetMode,
-            settings.ChannelProjects.GetValueOrDefault(c.Id), SetProject)).ToList();
+            settings.FoldersOf(c.Id), SetProjects)).ToList();
         FilterChannels();
         UpdatePreview();
     }
 
-    private void SetProject(string id, string? folder) => _store.Update(s =>
+    private void SetProjects(string id, IReadOnlyList<string> folders) => _store.Update(s =>
     {
-        if (folder is null) s.ChannelProjects.Remove(id);
-        else s.ChannelProjects[id] = folder;
+        // The list now holds the old single folder too.
+        s.ChannelProjects.Remove(id);
+        if (folders.Count == 0) s.ChannelFolders.Remove(id);
+        else s.ChannelFolders[id] = [.. folders];
     });
 
     private void SetMode(string id, SlackChannelMode mode)

@@ -51,6 +51,7 @@ public sealed class SlackBotEngine : IAsyncDisposable
     private readonly SlackTokens _tokens;
     private readonly SlackSorter _sorter;
     private readonly ISlackAgent _agent;
+    private readonly ISlackProjects? _projects;
     private readonly ISettingsStore<SlackBotSettings> _settings;
     private readonly ILogger<SlackBotEngine> _logger;
     private readonly SemaphoreSlim _sortGate = new(1, 1);
@@ -62,9 +63,10 @@ public sealed class SlackBotEngine : IAsyncDisposable
     private bool _caughtUp;
 
     public SlackBotEngine(SlackTokens tokens, SlackInboxFile inbox, SlackSorter sorter, ISlackAgent agent, ISettingsStoreFactory settings,
-        ILogger<SlackBotEngine> logger)
+        ILogger<SlackBotEngine> logger, ISlackProjects? projects = null)
     {
         _agent = agent;
+        _projects = projects;
         _tokens = tokens;
         Inbox = inbox.Inbox;
         _sorter = sorter;
@@ -222,7 +224,7 @@ public sealed class SlackBotEngine : IAsyncDisposable
                 _logger.LogInformation("Slack Bot signed in to {Workspace}", Me.Url);
                 var reader = new SlackReader(api, Me, Inbox, () => _settings.Current);
                 reader.ForYou += (_, _) => SortSoon(ct);
-                var lumi = new SlackLumi(api, _agent, Inbox, reader, () => _settings.Current, Me, MeName, _logger);
+                var lumi = new SlackLumi(api, _agent, Inbox, reader, () => _settings.Current, Me, MeName, _logger, _projects);
                 reader.Called += (_, m) => _ = Task.Run(async () =>
                 {
                     try

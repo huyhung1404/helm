@@ -24,9 +24,9 @@ public sealed class SlackProjectReadTests : IDisposable
             Asked.Add((instructions, null));
             return Task.FromResult(answer);
         }
-        public Task<string> AskInFolderAsync(string instructions, string folder, string? model, CancellationToken ct)
+        public Task<string> AskInFolderAsync(string instructions, IReadOnlyList<string> folders, string? model, CancellationToken ct)
         {
-            Asked.Add((instructions, folder));
+            Asked.Add((instructions, string.Join("|", folders)));
             return Task.FromResult(answer);
         }
     }
@@ -126,5 +126,42 @@ public sealed class SlackProjectReadTests : IDisposable
         Assert.Contains("Read(**/.env*)", settings);
         Assert.Contains("Read(**/*.keystore)", settings);
         Assert.DoesNotContain("Bash", string.Join(" ", args));
+        Assert.DoesNotContain("--add-dir", args);
+    }
+
+    [Fact]
+    public void More_project_folders_are_added_as_extra_folders()
+    {
+        var args = ClaudeCodeRunner.FolderArguments(null, [@"C:\Project\B", @"C:\Project\C"]).ToList();
+        Assert.Equal([@"C:\Project\B", @"C:\Project\C"], args.Select((a, i) => (a, i)).Where(p => p.a == "--add-dir").Select(p => args[p.i + 1]));
+    }
+
+    [Fact]
+    public void A_conversation_keeps_several_projects_and_the_old_single_one()
+    {
+        var a = Directory.CreateDirectory(Path.Combine(_dir.Path, "a")).FullName;
+        var b = Directory.CreateDirectory(Path.Combine(_dir.Path, "b")).FullName;
+        var settings = new SlackBotSettings
+        {
+            ChannelProjects = { ["C1"] = a },
+            ChannelFolders = { ["C1"] = [b, a, Path.Combine(_dir.Path, "gone")] },
+        };
+        Assert.Equal([b, a, Path.Combine(_dir.Path, "gone")], settings.FoldersOf("C1"));
+        Assert.Equal([b, a], settings.ProjectsOf("C1"));
+        Assert.Empty(settings.ProjectsOf("C2"));
+    }
+
+    [Fact]
+    public void The_settings_row_adds_and_removes_project_folders()
+    {
+        IReadOnlyList<string>? saved = null;
+        var row = new SlackChannelRow(new SlackConversation("C1", "game", SlackConversationKind.Channel), SlackChannelMode.Reply, (_, _) => { },
+            [@"C:\Project\A"], (_, folders) => saved = folders);
+        row.AddProject("\"C:\\Project\\B\"");
+        row.AddProject(@"c:\project\a");
+        Assert.Equal([@"C:\Project\A", @"C:\Project\B"], saved);
+        row.RemoveProject(@"C:\Project\A");
+        Assert.Equal([@"C:\Project\B"], saved);
+        Assert.True(row.HasProjects);
     }
 }

@@ -76,15 +76,35 @@ public sealed class ClaudeCodeRunner(McpClientConfig mcp, IChildProcessLauncher 
     }
 
     /// <summary>
-    /// Like <see cref="AskAsync"/>, but Claude Code may read <paramref name="folder"/> (and only it: reading elsewhere
-    /// asks a permission nobody gives) with Read, Grep and Glob: no shell, no edits, no web, no MCP, no hooks, and never
-    /// .env files or keys (<see cref="SecretFiles"/>). For looking into a project to answer someone.
+    /// Like <see cref="AskAsync"/>, but Claude Code may read <paramref name="folders"/> (the first is where it runs; only
+    /// those: reading elsewhere asks a permission nobody gives) with Read, Grep and Glob: no shell, no edits, no web, no
+    /// MCP, no hooks, and never .env files or keys (<see cref="SecretFiles"/>). For looking into projects to answer someone.
     /// </summary>
-    public Task<string> AskInFolderAsync(string instructions, string folder, string? model, TimeSpan timeout, CancellationToken ct)
+    public Task<string> AskInFolderAsync(string instructions, IReadOnlyList<string> folders, string? model, TimeSpan timeout, CancellationToken ct)
     {
         if (AskUnavailable() is { } problem) throw new ClaudeCodeException(problem);
-        if (!Directory.Exists(folder)) throw new ClaudeCodeException($"The project folder {folder} does not exist.");
-        return StartAsync([.. FolderArguments(model)], instructions, (_, _) => "", null, timeout, ct, folder);
+        var existing = Existing(folders);
+        return StartAsync([.. FolderArguments(model, existing.Skip(1))], instructions, (_, _) => "", null, timeout, ct, existing[0]);
+    }
+
+    /// <summary>
+    /// Like <see cref="AskInFolderAsync"/>, but Claude Code may also create and edit files in <paramref name="folders"/>
+    /// (Write, Edit; edits outside them ask a permission nobody gives): still no shell, no web, no MCP, no hooks, and
+    /// never .env files or keys. For a task the user gave themself.
+    /// </summary>
+    public Task<string> WorkInFolderAsync(string instructions, IReadOnlyList<string> folders, string? model, TimeSpan timeout, CancellationToken ct)
+    {
+        if (AskUnavailable() is { } problem) throw new ClaudeCodeException(problem);
+        var existing = Existing(folders);
+        return StartAsync([.. WorkArguments(model, existing.Skip(1))], instructions, (_, _) => "", null, timeout, ct, existing[0]);
+    }
+
+    private static List<string> Existing(IReadOnlyList<string> folders)
+    {
+        var existing = folders.Where(Directory.Exists).ToList();
+        return existing.Count > 0
+            ? existing
+            : throw new ClaudeCodeException($"The project folder {folders.FirstOrDefault()} does not exist.");
     }
 
     /// <summary>Files Claude Code never reads in a project, whatever it is asked.</summary>
@@ -94,7 +114,7 @@ public sealed class ClaudeCodeRunner(McpClientConfig mcp, IChildProcessLauncher 
         "**/google-services.json", "**/GoogleService-Info.plist", "**/*secret*", "**/*credential*", "**/.git/**", "**/.ssh/**",
     ];
 
-    internal static IEnumerable<string> FolderArguments(string? model)
+    internal static IEnumerable<string> FolderArguments(string? model, IEnumerable<string>? moreFolders = null)
     {
         var settings = System.Text.Json.JsonSerializer.Serialize(new
         {
@@ -102,9 +122,25 @@ public sealed class ClaudeCodeRunner(McpClientConfig mcp, IChildProcessLauncher 
             permissions = new { deny = SecretFiles.Select(f => $"Read({f})").ToArray() },
         });
         string[] args = ["-p", "--output-format", "stream-json", "--verbose", "--tools", "Read,Grep,Glob", "--strict-mcp-config",
-            "--permission-mode", "default", "--settings", settings];
+            "--permission-mode", "default", .. AddDirs(moreFolders), "--settings", settings];
         return model is { Length: > 0 } ? [.. args, "--model", model] : args;
     }
+
+    internal static IEnumerable<string> WorkArguments(string? model, IEnumerable<string>? moreFolders = null)
+    {
+        var settings = System.Text.Json.JsonSerializer.Serialize(new
+        {
+            disableAllHooks = true,
+            // Edit rules cover every file-editing tool, Write included.
+            permissions = new { deny = SecretFiles.SelectMany(f => new[] { $"Read({f})", $"Edit({f})" }).ToArray() },
+        });
+        string[] args = ["-p", "--output-format", "stream-json", "--verbose", "--tools", "Read,Grep,Glob,Write,Edit", "--strict-mcp-config",
+            "--permission-mode", "acceptEdits", .. AddDirs(moreFolders), "--settings", settings];
+        return model is { Length: > 0 } ? [.. args, "--model", model] : args;
+    }
+
+    /// <summary>The folders besides the one Claude Code runs in.</summary>
+    private static IEnumerable<string> AddDirs(IEnumerable<string>? folders) => (folders ?? []).SelectMany(f => new[] { "--add-dir", f });
 
     internal static IEnumerable<string> AskArguments(string? model)
     {

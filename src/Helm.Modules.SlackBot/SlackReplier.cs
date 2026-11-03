@@ -37,8 +37,9 @@ public sealed partial class SlackReplier(ISlackApi api, ISlackAgent agent, Slack
     /// <summary>What Claude may do in the project folder (the answer is still checked for secrets).</summary>
     internal static string ProjectRules(string me) =>
         $"""
-        The current folder is the project this conversation is about. Before answering, look into the problem it raises
-        there with Read, Grep and Glob (you cannot run, change or build anything). If you find a likely cause or the
+        The current folder (and any other folder you were given) holds the project this conversation is about. Before
+        answering, look into the problem it raises there with Read, Grep and Glob (you cannot run, change or build
+        anything). If you find a likely cause or the
         answer, say it briefly as what Lumi found (file and line, at most a few lines of code), as a possibility {me}
         will confirm. If you cannot find it, say Lumi could not find it and {me} will answer soon. Never quote keys,
         tokens, passwords, connection strings or any secret, and never content from outside this project.
@@ -101,11 +102,11 @@ public sealed partial class SlackReplier(ISlackApi api, ISlackAgent agent, Slack
             try
             {
                 var model = s.Model is { Length: > 0 } m ? m : null;
-                var project = s.ProjectOf(item.Channel);
-                var answer = project is null
+                var projects = s.ProjectsOf(item.Channel);
+                var answer = projects.Count == 0
                     ? await agent.AskAsync(Instructions(item, me, s.ReplyStyle), model, ct).ConfigureAwait(false)
-                    : await agent.AskInFolderAsync(Instructions(item, me, s.ReplyStyle, project: true), project, model, ct).ConfigureAwait(false);
-                reply = Clean(answer, project is null ? MaxLength : MaxProjectLength);
+                    : await agent.AskInFolderAsync(Instructions(item, me, s.ReplyStyle, project: true), projects, model, ct).ConfigureAwait(false);
+                reply = Clean(answer, projects.Count == 0 ? MaxLength : MaxProjectLength);
                 // Something from the project that looks secret never goes out: the plain answer instead.
                 if (reply is not null && SlackSecrets.LooksSecret(reply))
                 {

@@ -94,13 +94,33 @@
                                             <ui:ToggleSwitch IsChecked="{Binding CanWrite}" AutomationProperties.Name="{Binding Name, StringFormat=Write in {0}}" />
                                         </StackPanel>
                                     </core:RowLayout>
-                                    <!-- Where Write is on: the project Lumi may read before answering -->
-                                    <DockPanel Margin="0,6,0,0" Visibility="{Binding CanWrite, Converter={StaticResource BoolToVisibility}}">
-                                        <ui:Button DockPanel.Dock="Right" Margin="6,0,0,0" Content="Browse…" Click="BrowseProject_Click" />
-                                        <TextBlock DockPanel.Dock="Left" Margin="0,0,8,0" VerticalAlignment="Center" Text="Project Lumi may read" Style="{DynamicResource HelmSecondaryText}" />
-                                        <ui:TextBox PlaceholderText="None: Lumi answers from the chat only" Text="{Binding Project, UpdateSourceTrigger=LostFocus}"
-                                                    AutomationProperties.Name="{Binding Name, StringFormat=Project folder for {0}}" />
-                                    </DockPanel>
+                                    <!-- Where Write is on: the projects Lumi may read before answering -->
+                                    <StackPanel Margin="0,6,0,0" Visibility="{Binding CanWrite, Converter={StaticResource BoolToVisibility}}">
+                                        <DockPanel>
+                                            <ui:Button DockPanel.Dock="Right" Margin="6,0,0,0" Content="Add folder…" Icon="{ui:SymbolIcon FolderAdd16}" Click="BrowseProject_Click"
+                                                       AutomationProperties.Name="{Binding Name, StringFormat=Add a project folder for {0}}" />
+                                            <Grid VerticalAlignment="Center">
+                                                <TextBlock Text="Projects Lumi may read" Style="{DynamicResource HelmSecondaryText}"
+                                                           Visibility="{Binding HasProjects, Converter={StaticResource BoolToVisibility}}" />
+                                                <TextBlock Text="No project: Lumi answers from the chat only" Style="{DynamicResource HelmSecondaryText}" TextWrapping="Wrap"
+                                                           Visibility="{Binding HasProjects, Converter={StaticResource InverseBoolToVisibility}}" />
+                                            </Grid>
+                                        </DockPanel>
+                                        <ItemsControl ItemsSource="{Binding Projects}" Margin="0,2,0,0">
+                                            <ItemsControl.ItemTemplate>
+                                                <DataTemplate>
+                                                    <DockPanel Margin="0,2,0,0">
+                                                        <ui:Button DockPanel.Dock="Right" Appearance="Transparent" Padding="4" MinWidth="0" BorderThickness="0"
+                                                                   Icon="{ui:SymbolIcon Dismiss16}" ToolTip="Remove this folder" Click="RemoveProject_Click"
+                                                                   Tag="{Binding DataContext, RelativeSource={RelativeSource AncestorType=ItemsControl}}"
+                                                                   AutomationProperties.Name="{Binding StringFormat=Remove {0}}" />
+                                                        <ui:SymbolIcon Symbol="Folder16" Margin="0,0,6,0" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+                                                        <TextBlock Text="{Binding}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" ToolTip="{Binding}" />
+                                                    </DockPanel>
+                                                </DataTemplate>
+                                            </ItemsControl.ItemTemplate>
+                                        </ItemsControl>
+                                    </StackPanel>
                                     </StackPanel>
                                 </Border>
                             </DataTemplate>

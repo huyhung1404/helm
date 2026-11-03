@@ -30,13 +30,19 @@ public partial class SlackBotPage : ModulePageBase
         }
     }
 
-    /// <summary>Picks the project folder of a conversation.</summary>
+    /// <summary>Adds project folders to a conversation (several may be picked at once).</summary>
     private void BrowseProject_Click(object sender, RoutedEventArgs e)
     {
         if ((sender as FrameworkElement)?.DataContext is not SlackChannelRow row) return;
-        var dialog = new Microsoft.Win32.OpenFolderDialog { Title = $"Project Lumi may read for {row.Name}" };
-        if (row.Project.Length > 0 && System.IO.Directory.Exists(row.Project)) dialog.InitialDirectory = row.Project;
-        if (dialog.ShowDialog(Window.GetWindow(this)) == true) row.Project = dialog.FolderName;
+        var dialog = new Microsoft.Win32.OpenFolderDialog { Title = $"Projects Lumi may read for {row.Name}", Multiselect = true };
+        if (row.Projects.LastOrDefault(System.IO.Directory.Exists) is { } last) dialog.InitialDirectory = System.IO.Path.GetDirectoryName(last);
+        if (dialog.ShowDialog(Window.GetWindow(this)) != true) return;
+        foreach (var folder in dialog.FolderNames) row.AddProject(folder);
+    }
+
+    private void RemoveProject_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is FrameworkElement { DataContext: string folder, Tag: SlackChannelRow row }) row.RemoveProject(folder);
     }
 
     private void CopyManifest_Click(object sender, RoutedEventArgs e)

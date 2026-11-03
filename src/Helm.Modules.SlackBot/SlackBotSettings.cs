@@ -31,15 +31,29 @@ public sealed class SlackBotSettings : IVersionedSettings
     /// </summary>
     public Dictionary<string, SlackChannelMode> Channels { get; set; } = [];
 
-    /// <summary>
-    /// The project folder of a conversation (where Write is on): Lumi may read it, and only it, to look into a question
-    /// before answering.
-    /// </summary>
+    /// <summary>One project folder per conversation, as Helm 0.73–0.75 kept it; read still, <see cref="ChannelFolders"/> replaces it.</summary>
     public Dictionary<string, string> ChannelProjects { get; set; } = [];
 
-    /// <summary>The project folder Lumi may read for <paramref name="channel"/>, or null (none set, or it is gone).</summary>
-    public string? ProjectOf(string channel) =>
-        ChannelProjects.TryGetValue(channel, out var folder) && System.IO.Directory.Exists(folder) ? folder : null;
+    /// <summary>
+    /// The project folders of a conversation (where Write is on): Lumi may read them, and only them, to look into a
+    /// question before answering.
+    /// </summary>
+    public Dictionary<string, List<string>> ChannelFolders { get; set; } = [];
+
+    /// <summary>Every project folder set for <paramref name="channel"/>, as set (old and new way).</summary>
+    public IReadOnlyList<string> FoldersOf(string channel) =>
+        [.. (ChannelFolders.GetValueOrDefault(channel) ?? [])
+            .Concat(ChannelProjects.TryGetValue(channel, out var old) ? [old] : [])
+            .Distinct(StringComparer.OrdinalIgnoreCase)];
+
+    /// <summary>The project folders Lumi may read for <paramref name="channel"/> that still exist (empty: none).</summary>
+    public IReadOnlyList<string> ProjectsOf(string channel) => [.. FoldersOf(channel).Where(System.IO.Directory.Exists)];
+
+    /// <summary>
+    /// Where the user's projects live: when the user calls Lumi naming one of its folders ("dự án GameStudio"), Lumi
+    /// works there. Others never pick a project by name.
+    /// </summary>
+    public string ProjectsRoot { get; set; } = @"C:\Project";
 
     /// <summary>Times of day (HH:mm) when the worth-knowing messages show up on screen.</summary>
     public List<string> ReportTimes { get; set; } = [.. DefaultReportTimes];

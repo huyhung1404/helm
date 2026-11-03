@@ -16,6 +16,13 @@ Format: [Keep a Changelog](https://keepachangelog.com), versions follow [SemVer]
 ### Changed
 - **Helm Keyboard: w on its own is a w.** A w with no vowel before it is no longer turned into ư (“tw” stays “tw”); type
   uw for ư.
+- **Slack Bot: give Lumi a task.** When you call Lumi yourself (“@lumi làm file pitching, dự án GameStudio”), Lumi works
+  in the project you name (a folder of C:\Project) or the ones set for that conversation: it reads, creates and edits
+  files there (no commands, never .env or keys), then reports what it did and which files. When others call Lumi, it
+  only reads the projects set for that conversation, with their git history (Helm reads git itself), to say how they
+  are going.
+- **Slack Bot: several projects per conversation.** Settings → Channels and DMs: Add folder… (several at once), ✕ to
+  remove one. The folder set the old way is kept.
 - **Slack Bot: Lumi says it is on it.** The moment someone calls Lumi, a line “Lumi đã nhận câu hỏi, đang tìm câu trả
   lời… ⏳” goes into the thread, so everyone sees the question is being handled; it is taken away once the answer is in.
 

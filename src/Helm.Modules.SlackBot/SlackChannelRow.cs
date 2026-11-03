@@ -1,3 +1,4 @@
+using System.Collections.ObjectModel;
 using CommunityToolkit.Mvvm.ComponentModel;
 
 namespace Helm.Modules.SlackBot;
@@ -10,15 +11,14 @@ namespace Helm.Modules.SlackBot;
 public sealed partial class SlackChannelRow : ObservableObject
 {
     private readonly Action<string, SlackChannelMode> _changed;
-    private readonly Action<string, string?>? _projectChanged;
+    private readonly Action<string, IReadOnlyList<string>>? _projectsChanged;
     private SlackChannelMode _mode;
-    private string _project;
 
     public SlackChannelRow(SlackConversation conversation, SlackChannelMode mode, Action<string, SlackChannelMode> changed,
-        string? project = null, Action<string, string?>? projectChanged = null)
+        IEnumerable<string>? projects = null, Action<string, IReadOnlyList<string>>? projectsChanged = null)
     {
-        _project = project ?? "";
-        _projectChanged = projectChanged;
+        Projects = new ObservableCollection<string>(projects ?? []);
+        _projectsChanged = projectsChanged;
         Id = conversation.Id;
         Name = conversation.Kind switch
         {
@@ -56,18 +56,28 @@ public sealed partial class SlackChannelRow : ObservableObject
         set => Mode = value ? (_mode == SlackChannelMode.Off ? SlackChannelMode.Read : _mode) : SlackChannelMode.Off;
     }
 
-    /// <summary>The project folder Lumi may read before answering here ("" = none).</summary>
-    public string Project
+    /// <summary>The project folders Lumi may read before answering here (none: the chat only).</summary>
+    public ObservableCollection<string> Projects { get; }
+
+    public bool HasProjects => Projects.Count > 0;
+
+    public void AddProject(string folder)
     {
-        get => _project;
-        set
-        {
-            value = value.Trim().Trim('"');
-            if (_project == value) return;
-            _project = value;
-            OnPropertyChanged();
-            _projectChanged?.Invoke(Id, value.Length > 0 ? value : null);
-        }
+        folder = folder.Trim().Trim('"');
+        if (folder.Length == 0 || Projects.Contains(folder, StringComparer.OrdinalIgnoreCase)) return;
+        Projects.Add(folder);
+        ProjectsChanged();
+    }
+
+    public void RemoveProject(string folder)
+    {
+        if (Projects.Remove(folder)) ProjectsChanged();
+    }
+
+    private void ProjectsChanged()
+    {
+        OnPropertyChanged(nameof(HasProjects));
+        _projectsChanged?.Invoke(Id, [.. Projects]);
     }
 
     /// <summary>Slack Bot may also write there: its replies, and AI agents' reports.</summary>

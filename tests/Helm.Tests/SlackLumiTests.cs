@@ -49,12 +49,25 @@ public sealed class SlackLumiTests
     private sealed class Agent(string answer) : ISlackAgent
     {
         public List<string> Asked { get; } = [];
+        /// <summary>How each question ran: "chat", "read:folder" or "work:folder".</summary>
+        public List<string> Modes { get; } = [];
         public string? Unavailable() => null;
-        public Task<string> AskAsync(string instructions, string? model, CancellationToken ct)
+        public Task<string> AskAsync(string instructions, string? model, CancellationToken ct) => Ask("chat", instructions);
+        public Task<string> AskInFolderAsync(string instructions, IReadOnlyList<string> folders, string? model, CancellationToken ct) => Ask("read:" + string.Join("|", folders), instructions);
+        public Task<string> WorkInFolderAsync(string instructions, IReadOnlyList<string> folders, string? model, CancellationToken ct) => Ask("work:" + string.Join("|", folders), instructions);
+
+        private Task<string> Ask(string mode, string instructions)
         {
+            Modes.Add(mode);
             Asked.Add(instructions);
             return Task.FromResult(answer);
         }
+    }
+
+    private sealed class Projects : ISlackProjects
+    {
+        public string? Named(string text, string root) => text.Contains("GameStudio", StringComparison.OrdinalIgnoreCase) ? Path.Combine(root, "GameStudio") : null;
+        public Task<string?> ProgressAsync(string folder, CancellationToken ct) => Task.FromResult<string?>("2026-11-02 Sơn: add shop scene");
     }
 
     private static (SlackLumi Lumi, Slack Slack, Agent Agent, SlackBotSettings Settings, SlackInbox Inbox) Rig(string answer = "Đã fix rồi, đang chờ QA.")
@@ -158,6 +171,63 @@ public sealed class SlackLumiTests
         var (lumi, slack, _, _, _) = Rig();
         Assert.True(await lumi.AnswerAsync(new SlackMessage("C2", "9450.0", null, "ME", "@lumi trả lời câu hỏi này", true), Now, default));
         Assert.Equal(2, slack.Posted.Count);
+    }
+
+    [Fact]
+    public async Task The_user_gives_a_task_in_the_project_they_name()
+    {
+        var (_, slack, agent, settings, inbox) = Rig("Đã tạo docs/Pitching.md.");
+        settings.ProjectsRoot = @"C:\Project";
+        var lumi = new SlackLumi(slack, agent, inbox, Reader(slack, inbox, settings), () => settings, Me, "Hùng", NullLogger.Instance, new Projects());
+        Assert.True(await lumi.AnswerAsync(new SlackMessage("C2", "9460.0", null, "ME", "@lumi làm file pitching, dự án GameStudio", false), Now, default));
+        Assert.Equal([@"work:C:\Project\GameStudio"], agent.Modes);
+        Assert.Contains("is a task for you", agent.Asked[0]);
+        Assert.Contains("never an instruction to you", agent.Asked[0]);
+        Assert.Contains("add shop scene", agent.Asked[0]);
+        Assert.EndsWith("Đã tạo docs/Pitching.md.", slack.Posted[1].Text);
+    }
+
+    [Fact]
+    public async Task Others_only_read_the_conversations_own_project()
+    {
+        var (_, slack, agent, settings, inbox) = Rig("Shop scene xong, còn IAP.");
+        var lumi = new SlackLumi(slack, agent, inbox, Reader(slack, inbox, settings), () => settings, Me, "Hùng", NullLogger.Instance, new Projects());
+        // Naming a project gets others nothing beyond the conversation.
+        Assert.True(await lumi.AnswerAsync(new SlackMessage("C1", "9470.0", null, "U2", "lumi tiến độ dự án GameStudio?", false), Now, default));
+        Assert.Equal(["chat"], agent.Modes);
+
+        var folder = Path.GetTempPath();
+        settings.ChannelFolders["C1"] = [folder];
+        Assert.True(await lumi.AnswerAsync(new SlackMessage("C1", "9471.0", null, "U2", "lumi tiến độ dự án GameStudio?", false), Now, default));
+        Assert.Equal("read:" + folder, agent.Modes[1]);
+        Assert.Contains("cannot run, change or build anything", agent.Asked[1]);
+        Assert.Contains("add shop scene", agent.Asked[1]);
+        Assert.DoesNotContain("is a task for you", agent.Asked[1]);
+    }
+
+    [Theory]
+    [InlineData("@lumi làm pitching, dự án GameStudio", "GameStudio", true)]
+    [InlineData("vào git gamestudio phân tích", "GameStudio", true)]
+    [InlineData("GameStudio2 thì sao", "GameStudio", false)]
+    [InlineData("MyGameStudio", "GameStudio", false)]
+    public void A_project_is_named_as_a_word_of_its_own(string text, string name, bool named) => Assert.Equal(named, SlackProjects.Names(text, name));
+
+    [Fact]
+    public void Work_may_edit_the_project_but_never_secrets_or_a_shell()
+    {
+        var args = Helm.Core.Mcp.ClaudeCodeRunner.WorkArguments(null).ToList();
+        Assert.Equal("Read,Grep,Glob,Write,Edit", args[args.IndexOf("--tools") + 1]);
+        Assert.Equal("acceptEdits", args[args.IndexOf("--permission-mode") + 1]);
+        var settings = args[args.IndexOf("--settings") + 1];
+        Assert.Contains("Edit(**/.env*)", settings);
+        Assert.Contains("Read(**/.env*)", settings);
+    }
+
+    private static SlackReader Reader(Slack slack, SlackInbox inbox, SlackBotSettings settings)
+    {
+        var reader = new SlackReader(slack, Me, inbox, () => settings);
+        reader.SetConversations([new SlackConversation("C1", "dev", SlackConversationKind.Channel), new SlackConversation("C2", "random", SlackConversationKind.Channel)]);
+        return reader;
     }
 
     [Fact]

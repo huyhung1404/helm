@@ -14,9 +14,14 @@ public interface ISlackAgent
     /// <exception cref="ClaudeCodeException">It failed or was too slow.</exception>
     Task<string> AskAsync(string instructions, string? model, CancellationToken ct);
 
-    /// <summary>The same, allowed to read <paramref name="folder"/> (a project) and nothing else.</summary>
+    /// <summary>The same, allowed to read <paramref name="folders"/> (projects; the first is where it runs) and nothing else.</summary>
     /// <exception cref="ClaudeCodeException">It failed or was too slow.</exception>
-    Task<string> AskInFolderAsync(string instructions, string folder, string? model, CancellationToken ct) => AskAsync(instructions, model, ct);
+    Task<string> AskInFolderAsync(string instructions, IReadOnlyList<string> folders, string? model, CancellationToken ct) => AskAsync(instructions, model, ct);
+
+    /// <summary>Does a task the user gave: may also create and edit files in <paramref name="folders"/>, nowhere else.</summary>
+    /// <exception cref="ClaudeCodeException">It failed or was too slow.</exception>
+    Task<string> WorkInFolderAsync(string instructions, IReadOnlyList<string> folders, string? model, CancellationToken ct) =>
+        AskInFolderAsync(instructions, folders, model, ct);
 }
 
 /// <summary>Claude Code with no tools, no MCP and no hooks (<see cref="ClaudeCodeRunner.AskAsync"/>).</summary>
@@ -31,8 +36,14 @@ public sealed class ClaudeCodeSlackAgent(ClaudeCodeRunner claude) : ISlackAgent
     /// <summary>Looking into a project takes longer.</summary>
     public static readonly TimeSpan FolderTimeout = TimeSpan.FromMinutes(10);
 
-    public Task<string> AskInFolderAsync(string instructions, string folder, string? model, CancellationToken ct) =>
-        claude.AskInFolderAsync(instructions, folder, model, FolderTimeout, ct);
+    public Task<string> AskInFolderAsync(string instructions, IReadOnlyList<string> folders, string? model, CancellationToken ct) =>
+        claude.AskInFolderAsync(instructions, folders, model, FolderTimeout, ct);
+
+    /// <summary>A task (a document, a change) takes longer still.</summary>
+    public static readonly TimeSpan WorkTimeout = TimeSpan.FromMinutes(20);
+
+    public Task<string> WorkInFolderAsync(string instructions, IReadOnlyList<string> folders, string? model, CancellationToken ct) =>
+        claude.WorkInFolderAsync(instructions, folders, model, WorkTimeout, ct);
 }
 
 /// <summary>
