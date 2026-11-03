@@ -9,11 +9,29 @@
              Background="{DynamicResource HelmBarBackground}">
 
     <UserControl.Styles>
-        <Style Selector="Border.tabrow.active">
+        <!-- Drawer rows, as in the Windows menu: icon column, name; the shown page's row has a fill and an accent mark.
+             48 dp tall for the finger. -->
+        <Style Selector="Button.navrow">
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="Padding" Value="0" />
+            <Setter Property="Height" Value="48" />
+            <Setter Property="HorizontalAlignment" Value="Stretch" />
+            <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+            <Setter Property="VerticalContentAlignment" Value="Center" />
+            <Setter Property="CornerRadius" Value="6" />
+        </Style>
+        <Style Selector="Button.navrow.active">
             <Setter Property="Background" Value="{DynamicResource HelmSubtleFill}" />
         </Style>
-        <Style Selector="Border.tabrow.active TextBlock.tabtitle">
-            <Setter Property="FontWeight" Value="SemiBold" />
+        <Style Selector="Border.navmark">
+            <Setter Property="Width" Value="3" />
+            <Setter Property="Height" Value="16" />
+            <Setter Property="CornerRadius" Value="2" />
+            <Setter Property="HorizontalAlignment" Value="Left" />
+            <Setter Property="VerticalAlignment" Value="Center" />
+            <Setter Property="IsHitTestVisible" Value="False" />
+            <Setter Property="Background" Value="{DynamicResource SystemAccentColor}" />
         </Style>
         <Style Selector="ic|SymbolIcon.syncglyph.muted">
             <Setter Property="Opacity" Value="0.45" />
@@ -42,33 +60,16 @@
     <Grid>
         <DockPanel>
             <!-- App bar: drawer button + page title (the Windows title bar + nav pane toggle) -->
-            <Grid x:Name="AppBar" DockPanel.Dock="Top" ColumnDefinitions="Auto,*,Auto,Auto" Height="56" Background="{DynamicResource HelmBarBackground}">
+            <Grid x:Name="AppBar" DockPanel.Dock="Top" ColumnDefinitions="Auto,*,Auto" Height="56" Background="{DynamicResource HelmBarBackground}">
                 <Button Classes="flat" Width="48" Height="48" Margin="4,0,0,0" Padding="0" HorizontalContentAlignment="Center"
                         Command="{Binding TogglePaneCommand}" ToolTip.Tip="Navigation" AutomationProperties.Name="Open navigation">
                     <ic:SymbolIcon Symbol="Navigation" FontSize="22" />
                 </Button>
                 <TextBlock Grid.Column="1" Text="{Binding Navigator.Title}" FontSize="20" FontWeight="SemiBold" VerticalAlignment="Center" Margin="8,0,8,0"
                            TextTrimming="CharacterEllipsis" />
-                <!-- Tabs: no strip (a phone has no room for one), only the number of open tabs, as in a phone browser; tap for
-                     the list. -->
-                <Button Grid.Column="2" Width="48" Height="48" Padding="0" Background="Transparent" Command="{Binding ShowTabsCommand}"
-                        ToolTip.Tip="Open tabs" AutomationProperties.Name="Open tabs">
-                    <Button.Template>
-                        <ControlTemplate>
-                            <Panel Background="{TemplateBinding Background}">
-                                <ContentPresenter Name="PART_ContentPresenter" Content="{TemplateBinding Content}"
-                                                  HorizontalAlignment="Center" VerticalAlignment="Center" />
-                            </Panel>
-                        </ControlTemplate>
-                    </Button.Template>
-                    <Border Width="22" Height="22" BorderThickness="2" CornerRadius="5" BorderBrush="{Binding #TabCountText.Foreground}">
-                        <TextBlock x:Name="TabCountText" Text="{Binding Navigator.TabCount}" FontSize="12" FontWeight="Bold"
-                                   HorizontalAlignment="Center" VerticalAlignment="Center" />
-                    </Border>
-                </Button>
                 <!-- Sync: its state on every page; tap to sync now (or to set it up). Just the icon, without a button look (no
                      press fill), over a 48 dp touch target. -->
-                <Button Grid.Column="3" Width="48" Height="48" Margin="0,0,4,0" Padding="0" Background="Transparent"
+                <Button Grid.Column="2" Width="48" Height="48" Margin="0,0,4,0" Padding="0" Background="Transparent"
                         DataContext="{Binding Sync}" Command="{Binding SyncNowCommand}" ToolTip.Tip="{Binding ToolTip}" AutomationProperties.Name="Sync now">
                     <Button.Template>
                         <ControlTemplate>
@@ -91,94 +92,81 @@
                 </Button>
             </Grid>
 
-            <SplitView IsPaneOpen="{Binding IsPaneOpen}" DisplayMode="Overlay" OpenPaneLength="296" PaneBackground="{DynamicResource HelmBarBackground}">
-                <SplitView.Pane>
+            <Panel>
+                <!-- The shown page; MainView keeps the last few pages' views (PageViews), so going back to one is instant. -->
+                <Border x:Name="PageArea" Background="{DynamicResource HelmPageBackground}" CornerRadius="8,8,0,0" ClipToBounds="True" />
+
+                <!-- Navigation drawer: slides in over the dimmed page (MainView animates it); tap the page to close it.
+                     Long press a tool to open it in a window of its own. -->
+                <Border x:Name="DrawerScrim" Background="{DynamicResource HelmScrim}" Opacity="0" IsHitTestVisible="{Binding IsPaneOpen}" />
+                <Border x:Name="Drawer" Width="296" HorizontalAlignment="Left" IsVisible="False"
+                        Background="{DynamicResource HelmBarBackground}" BoxShadow="0 0 24 0 #59000000">
+                    <Border.RenderTransform>
+                        <TranslateTransform X="-320" />
+                    </Border.RenderTransform>
                     <DockPanel Margin="8">
-                        <!-- The open tabs, also for a full page (no app bar, so no tab button): its menu button opens this drawer. -->
-                        <Button DockPanel.Dock="Top" Classes="flat" Command="{Binding ShowTabsCommand}" Margin="0,0,0,4">
-                            <Grid ColumnDefinitions="Auto,*,Auto">
-                                <ic:SymbolIcon Symbol="TabDesktopMultiple" FontSize="20" />
-                                <TextBlock Grid.Column="1" Text="Open tabs" VerticalAlignment="Center" Margin="16,0,0,0" />
-                                <TextBlock Grid.Column="2" Text="{Binding Navigator.TabCount}" Classes="secondary" VerticalAlignment="Center" />
-                            </Grid>
-                        </Button>
-                        <Button DockPanel.Dock="Bottom" Classes="flat" Command="{Binding OpenCommand}" CommandParameter="{Binding GeneralEntry}">
-                            <StackPanel Orientation="Horizontal" Spacing="16">
-                                <ic:SymbolIcon Symbol="Settings" FontSize="20" />
-                                <TextBlock Text="General" VerticalAlignment="Center" />
-                            </StackPanel>
-                        </Button>
+                        <StackPanel DockPanel.Dock="Bottom">
+                            <Border Height="1" Margin="4,4,4,4" Background="{DynamicResource HelmSecondaryText}" Opacity="0.2" />
+                            <Panel>
+                                <Button Classes="navrow" Classes.active="{Binding GeneralEntry.IsActive}" Command="{Binding OpenCommand}"
+                                        CommandParameter="{Binding GeneralEntry}" AutomationProperties.Name="General">
+                                    <Grid ColumnDefinitions="40,*">
+                                        <ic:SymbolIcon Symbol="Settings" FontSize="20" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                        <TextBlock Grid.Column="1" Text="General" VerticalAlignment="Center" />
+                                    </Grid>
+                                </Button>
+                                <Border Classes="navmark" IsVisible="{Binding GeneralEntry.IsActive}" />
+                            </Panel>
+                        </StackPanel>
                         <ScrollViewer>
                             <ItemsControl ItemsSource="{Binding Entries}">
                                 <ItemsControl.ItemTemplate>
                                     <DataTemplate DataType="vm:NavEntry">
                                         <Panel>
-                                            <TextBlock Text="{Binding Title}" IsVisible="{Binding IsHeader}" Classes="secondary" FontWeight="SemiBold" Margin="12,16,12,4" />
-                                            <Button Classes="flat" IsVisible="{Binding IsPage}" CommandParameter="{Binding}"
-                                                    Command="{Binding $parent[ItemsControl].((vm:MainViewModel)DataContext).OpenCommand}">
-                                                <StackPanel Orientation="Horizontal" Spacing="16">
-                                                    <ui:ModuleIcon Symbol="{Binding Icon}" Image="{Binding Image}" Size="20" />
-                                                    <TextBlock Text="{Binding Title}" VerticalAlignment="Center" />
-                                                </StackPanel>
-                                            </Button>
+                                            <!-- A group's name: the same small caption as the Windows menu. -->
+                                            <Panel Height="28" IsVisible="{Binding IsHeader}">
+                                                <TextBlock Text="{Binding Title}" FontSize="12" FontWeight="SemiBold" Foreground="{DynamicResource HelmSecondaryText}"
+                                                           Opacity="0.75" Margin="12,0,12,4" VerticalAlignment="Bottom" />
+                                            </Panel>
+                                            <Panel IsVisible="{Binding IsPage}">
+                                                <Button Classes="navrow" Classes.active="{Binding IsActive}" CommandParameter="{Binding}"
+                                                        Command="{Binding $parent[ItemsControl].((vm:MainViewModel)DataContext).OpenCommand}"
+                                                        AutomationProperties.Name="{Binding Title}">
+                                                    <Grid ColumnDefinitions="40,*">
+                                                        <ui:ModuleIcon Symbol="{Binding Icon}" Image="{Binding Image}" Size="20" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                                        <TextBlock Grid.Column="1" Text="{Binding Title}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
+                                                    </Grid>
+                                                </Button>
+                                                <Border Classes="navmark" IsVisible="{Binding IsActive}" />
+                                            </Panel>
                                         </Panel>
                                     </DataTemplate>
                                 </ItemsControl.ItemTemplate>
                             </ItemsControl>
                         </ScrollViewer>
                     </DockPanel>
-                </SplitView.Pane>
-
-                <!-- The shown tab's page; MainView keeps every open tab's view (PageViews), so a page keeps its state. -->
-                <Border x:Name="PageArea" Background="{DynamicResource HelmPageBackground}" CornerRadius="8,8,0,0" ClipToBounds="True" />
-            </SplitView>
+                </Border>
+            </Panel>
         </DockPanel>
 
-        <!-- Open tabs: tap one to show it; each tool's tab can move to a window of its own (split screen) or close. -->
-        <Panel IsVisible="{Binding IsTabsOpen}">
-            <Border x:Name="TabsScrim" Background="{DynamicResource HelmScrim}" />
-            <Border Classes="card" VerticalAlignment="Top" Margin="12,8,12,24" Padding="8,8,8,12" BoxShadow="0 8 32 0 #40000000">
-                <DockPanel>
-                    <Grid DockPanel.Dock="Top" ColumnDefinitions="*,Auto,Auto" Margin="8,0,0,4">
-                        <TextBlock Text="Open tabs" FontSize="18" Classes="title" VerticalAlignment="Center" />
-                        <Button Grid.Column="1" Classes="flat" Content="Close others" HorizontalAlignment="Right" Command="{Binding CloseOtherTabsCommand}" />
-                        <Button Grid.Column="2" Classes="flat" Width="44" Height="44" Padding="0" HorizontalContentAlignment="Center"
-                                Command="{Binding HideTabsCommand}" ToolTip.Tip="Close the list" AutomationProperties.Name="Close the list">
-                            <ic:SymbolIcon Symbol="ChevronUp" FontSize="20" />
-                        </Button>
-                    </Grid>
-                    <ScrollViewer MaxHeight="520">
-                        <ItemsControl ItemsSource="{Binding Navigator.Tabs}">
-                            <ItemsControl.ItemTemplate>
-                                <DataTemplate DataType="vm:ShellTab">
-                                    <Border Classes="tabrow" Classes.active="{Binding IsActive}" CornerRadius="8" Margin="0,2">
-                                        <Grid ColumnDefinitions="*,Auto,Auto">
-                                            <Button Classes="flat" CommandParameter="{Binding}"
-                                                    Command="{Binding $parent[ItemsControl].((vm:MainViewModel)DataContext).SelectTabCommand}">
-                                                <StackPanel Orientation="Horizontal" Spacing="16">
-                                                    <ui:ModuleIcon Symbol="{Binding Icon}" Image="{Binding Image}" Size="20" />
-                                                    <TextBlock Classes="tabtitle" Text="{Binding Title}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
-                                                </StackPanel>
-                                            </Button>
-                                            <Button Grid.Column="1" Classes="flat" Width="44" Height="44" Padding="0" HorizontalContentAlignment="Center"
-                                                    IsVisible="{Binding CanOpenInWindow}" CommandParameter="{Binding}"
-                                                    Command="{Binding $parent[ItemsControl].((vm:MainViewModel)DataContext).OpenInWindowCommand}"
-                                                    ToolTip.Tip="Open in new window" AutomationProperties.Name="Open in new window">
-                                                <ic:SymbolIcon Symbol="WindowNew" FontSize="20" />
-                                            </Button>
-                                            <Button Grid.Column="2" Classes="flat" Width="44" Height="44" Padding="0" HorizontalContentAlignment="Center"
-                                                    CommandParameter="{Binding}"
-                                                    Command="{Binding $parent[ItemsControl].((vm:MainViewModel)DataContext).CloseTabCommand}"
-                                                    ToolTip.Tip="Close tab" AutomationProperties.Name="Close tab">
-                                                <ic:SymbolIcon Symbol="Dismiss" FontSize="20" />
-                                            </Button>
-                                        </Grid>
-                                    </Border>
-                                </DataTemplate>
-                            </ItemsControl.ItemTemplate>
-                        </ItemsControl>
-                    </ScrollViewer>
-                </DockPanel>
+        <!-- A tool's actions (long press on its drawer row): a window of its own, e.g. beside Helm in split screen. -->
+        <Panel IsVisible="{Binding IsSheetOpen}">
+            <Border x:Name="SheetScrim" Background="{DynamicResource HelmScrim}" />
+            <Border Classes="card" VerticalAlignment="Bottom" Margin="0" CornerRadius="16,16,0,0" BorderThickness="0" Padding="8,8,8,16"
+                    BoxShadow="0 -8 32 0 #40000000">
+                <StackPanel>
+                    <TextBlock Text="{Binding SheetEntry.Title, FallbackValue=''}" FontSize="13" FontWeight="SemiBold" Foreground="{DynamicResource HelmSecondaryText}"
+                               Margin="12,8,12,6" />
+                    <Button Classes="navrow" Command="{Binding OpenSheetEntryInWindowCommand}" AutomationProperties.Name="Open in its own window">
+                        <Grid ColumnDefinitions="40,*">
+                            <ic:SymbolIcon Symbol="WindowNew" FontSize="20" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                            <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                <TextBlock Text="Open in its own window" />
+                                <TextBlock Text="Beside Helm when the screen is split" Classes="secondary" />
+                            </StackPanel>
+                        </Grid>
+                    </Button>
+                </StackPanel>
             </Border>
         </Panel>
 

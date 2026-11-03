@@ -3,6 +3,23 @@
 All notable changes to Helm. The top section is used as the GitHub release body and as the Velopack release notes.
 Format: [Keep a Changelog](https://keepachangelog.com), versions follow [SemVer](https://semver.org).
 
+## [Unreleased]
+
+### Changed
+- **Windows: the menu no longer moves under the mouse.** The collapsed menu shows every tool's own icon, with a short
+  line between groups; opening it only adds the names (group names where the lines were), so the tool you pointed at
+  stays under the mouse. The background and shadow now close with the menu instead of vanishing first, it opens fast
+  and settles, and the narrow strip has no scroll bar (the wheel still scrolls; the bottom fades while more is below).
+  Groups no longer fold.
+- **Android: the menu looks like the Windows one.** Same small group names, 48 dp rows, and a mark on the page you
+  are on. It slides in whole over a dimmed page; tap the page to close it.
+- **Android: no more tabs.** The tab count button and the Open tabs list are gone, since the menu already goes
+  straight to a page that is open. Helm keeps the page you are on and the two before it ready, and lets go of older
+  ones (all but the shown one when the phone is low on memory); opened again, a page scrolls back to where it was.
+  Hold a tool in the menu to open it in a window of its own (beside Helm in split screen).
+- **Android: a widget or notification opens its page at once.** Tapping Wallet's notification (or a Tracker widget, a
+  reminder, a word card…) while Helm was closed no longer shows the last page first and then switches.
+
 ## [0.78.0] - 2026-11-03
 
 ### Added

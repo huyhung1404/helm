@@ -15,21 +15,29 @@ public partial class MainView : UserControl
     private TopLevel? _topLevel;
 
     private ShellNavigator? _navigator;
+    private MainViewModel? _viewModel;
+    private readonly DrawerController _drawer;
 
     public MainView()
     {
         InitializeComponent();
-        TabsScrim.PointerPressed += (_, _) =>
-        {
-            if (DataContext is MainViewModel vm) vm.IsTabsOpen = false;
-        };
+        _drawer = new DrawerController(Drawer, (TranslateTransform)Drawer.RenderTransform!, DrawerScrim, () => _viewModel);
+        SheetScrim.PointerPressed += (_, _) => _viewModel?.HideSheetCommand.Execute(null);
         DataContextChanged += (_, _) =>
         {
             if (_navigator is not null) _navigator.PropertyChanged -= OnNavigatorChanged;
-            _navigator = (DataContext as MainViewModel)?.Navigator;
+            if (_viewModel is not null) _viewModel.PropertyChanged -= OnViewModelChanged;
+            _viewModel = DataContext as MainViewModel;
+            _navigator = _viewModel?.Navigator;
             if (_navigator is not null) _navigator.PropertyChanged += OnNavigatorChanged;
+            if (_viewModel is not null) _viewModel.PropertyChanged += OnViewModelChanged;
             ShowActiveTab();
         };
+    }
+
+    private void OnViewModelChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName == nameof(MainViewModel.IsPaneOpen) && _viewModel is { } vm) _drawer.Show(vm.IsPaneOpen);
     }
 
     private void OnNavigatorChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
@@ -38,9 +46,10 @@ public partial class MainView : UserControl
     }
 
     /// <summary>
-    /// Shows the active tab's view, built the first time and kept while the tab is open, so a page keeps its state
-    /// (scroll position, an open item) while other tabs are shown. Only the shown page is in the visual tree: a hidden
-    /// tab's timers and live updates pause as they did when a page was left.
+    /// Shows the active page's view, built the first time and kept while the page is kept (<see cref="ShellNavigator"/>),
+    /// so it keeps its state (scroll position, an open item) while other pages are shown. Only the shown page is in the
+    /// visual tree: a hidden page's timers and live updates pause as they did when a page was left. A page built again
+    /// after it was let go scrolls back to where it was.
     /// </summary>
     private void ShowActiveTab()
     {
@@ -49,7 +58,12 @@ public partial class MainView : UserControl
             PageArea.Child = null;
             return;
         }
-        tab.View ??= PageViews.Build(tab);
+        if (tab.View is null)
+        {
+            tab.View = PageViews.Build(tab);
+            if (tab.View is ScrollViewer scroller && _navigator.TakeScrollOffset(tab.Key) is { } offset)
+                Avalonia.Threading.Dispatcher.UIThread.Post(() => scroller.Offset = offset, Avalonia.Threading.DispatcherPriority.Loaded);
+        }
         if (ReferenceEquals(PageArea.Child, tab.View)) return;
         PageArea.Child = null;
         // A view outlives its window when Android makes the activity again (the tabs are the app's, not the window's).
@@ -72,7 +86,7 @@ public partial class MainView : UserControl
             _insets.DisplayEdgeToEdgePreference = true;
             UpdateSystemBarColor();
         }
-        // A full page's own menu button opens the drawer (which also lists the open tabs).
+        // A full page (no app bar) has its own menu button; it opens the drawer.
         Helm.Core.Ui.ShellChrome.SetNavigation(_topLevel, _ =>
         {
             if (DataContext is MainViewModel vm) vm.IsPaneOpen = true;

@@ -3,6 +3,7 @@ using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
 using System.Windows.Input;
 using System.Windows.Media;
+using System.Windows.Media.Animation;
 using System.Windows.Media.Effects;
 using System.Windows.Threading;
 using Helm.Core.Settings;
@@ -20,6 +21,11 @@ namespace Helm.App.Views;
 /// How: NavigationView's template is a 2-column grid (pane | content). The content border is made to span both
 /// columns with a left margin equal to the reserved pane width, so expanding the pane never reflows the page.
 /// Hover is tracked by polling the cursor position (template-internal elements raise noisy Enter/Leave pairs).
+///
+/// The pane's width is animated here rather than by the template (which eases both ways the same): it opens fast then
+/// slows down and closes slow then fast, and its background and shadow stay until it has finished closing, so the
+/// labels never slide over the page without a background. The collapsed strip hides its scroll bar (the wheel still
+/// scrolls); a fade at the bottom says more items are below.
 /// </summary>
 internal sealed class NavPaneController
 {
@@ -29,6 +35,9 @@ internal sealed class NavPaneController
     private const double PaneGridHorizontalMargin = 8; // PaneGrid has Margin="4,0,4,0" in the WPF-UI template
     private static readonly TimeSpan OpenAfter = TimeSpan.FromMilliseconds(150);
     private static readonly TimeSpan CloseAfter = TimeSpan.FromMilliseconds(400);
+    private static readonly Duration OpenDuration = TimeSpan.FromMilliseconds(200);
+    private static readonly Duration CloseDuration = TimeSpan.FromMilliseconds(160);
+    private const double FadeHeight = 36;
 
     private readonly NavigationView _nav;
     private readonly Grid _host;
@@ -40,8 +49,10 @@ internal sealed class NavPaneController
     private readonly SymbolIcon _pinIcon = new();
     private Grid? _paneGrid;
     private FrameworkElement? _content;
+    private ScrollViewer? _scroller;
     private bool _pinned;
     private bool _expanded;
+    private bool _closing; // collapsing: the background stays until the width animation ends
     private double _width;
     private DateTime _hoverSince = DateTime.MinValue;
     private DateTime _awaySince = DateTime.MinValue;
@@ -95,6 +106,8 @@ internal sealed class NavPaneController
         if (_paneGrid is not null) return;
         _nav.ApplyTemplate();
         _paneGrid = _nav.Template?.FindName("PaneGrid", _nav) as Grid;
+        _scroller = _nav.Template?.FindName("PART_ScrollViewer", _nav) as ScrollViewer;
+        if (_scroller is not null) _scroller.ScrollChanged += (_, _) => UpdateFade();
         var root = VisualTreeHelper.GetChildrenCount(_nav) > 0 ? VisualTreeHelper.GetChild(_nav, 0) as Grid : null;
         _content = root?.Children.OfType<FrameworkElement>().FirstOrDefault(e => Grid.GetColumn(e) == 1);
         if (_paneGrid is null || _content is null)
@@ -157,15 +170,31 @@ internal sealed class NavPaneController
 
     private void SetExpanded(bool expanded)
     {
+        var changed = expanded != _expanded;
         _expanded = expanded;
-        _nav.IsPaneOpen = expanded;
-        if (expanded)
-        {
-            // Compact mode collapses groups; show their children again when the pane opens.
-            foreach (var item in _nav.MenuItems.OfType<NavigationViewItem>().Where(i => i.MenuItems.Count > 0))
-                item.IsExpanded = true;
-        }
+        _nav.IsPaneOpen = expanded; // starts the template's own width animation, replaced right below
+        if (changed) AnimateWidth(expanded);
         UpdateLayout();
+    }
+
+    /// <summary>Open: fast, then slowing down; close: slow, then fast (and shorter). The open width then follows the
+    /// pane length again (resizing), the closed one holds the strip width.</summary>
+    private void AnimateWidth(bool open)
+    {
+        if (_paneGrid is null) return;
+        _closing = !open && !_pinned;
+        var animation = new DoubleAnimation(open ? _width : CompactWidth - PaneGridHorizontalMargin, open ? OpenDuration : CloseDuration)
+        {
+            EasingFunction = new CubicEase { EasingMode = open ? EasingMode.EaseOut : EasingMode.EaseIn },
+            FillBehavior = open ? FillBehavior.Stop : FillBehavior.HoldEnd,
+        };
+        animation.Completed += (_, _) =>
+        {
+            if (_expanded != open) return; // turned around halfway: the newer animation finishes the job
+            _closing = false;
+            UpdateLayout();
+        };
+        _paneGrid.BeginAnimation(FrameworkElement.WidthProperty, animation, HandoffBehavior.SnapshotAndReplace);
     }
 
     private void OnResizeDelta(object sender, DragDeltaEventArgs e)
@@ -187,7 +216,7 @@ internal sealed class NavPaneController
         var reserved = _pinned ? expandedWidth : CompactWidth; // compact PaneGrid is CompactPaneLength - 8 wide, incl. margins = 48
         _content.Margin = new Thickness(reserved, 0, 0, 0);
 
-        if (_expanded && !_pinned)
+        if ((_expanded || _closing) && !_pinned)
         {
             _paneGrid.SetResourceReference(Panel.BackgroundProperty, "ApplicationBackgroundBrush");
             _paneGrid.Effect = new DropShadowEffect { BlurRadius = 18, ShadowDepth = 0, Opacity = 0.35, Color = Colors.Black };
@@ -201,5 +230,25 @@ internal sealed class NavPaneController
         _resizer.Visibility = _expanded ? Visibility.Visible : Visibility.Collapsed;
         _resizer.Margin = new Thickness(expandedWidth - _resizer.Width / 2, 0, 0, 0);
 
+        // The icon strip is too narrow for a scroll bar; the wheel still scrolls it.
+        if (_scroller is not null)
+            _scroller.VerticalScrollBarVisibility = _expanded ? ScrollBarVisibility.Auto : ScrollBarVisibility.Hidden;
+        UpdateFade();
+    }
+
+    /// <summary>Fades the bottom of the item list while more items are below it.</summary>
+    private void UpdateFade()
+    {
+        if (_scroller is null) return;
+        var more = _scroller.VerticalOffset + _scroller.ViewportHeight < _scroller.ExtentHeight - 0.5;
+        if (!more || _scroller.ActualHeight <= FadeHeight)
+        {
+            _scroller.OpacityMask = null;
+            return;
+        }
+        var start = 1 - FadeHeight / _scroller.ActualHeight;
+        _scroller.OpacityMask = new LinearGradientBrush(
+            new GradientStopCollection { new(Colors.Black, 0), new(Colors.Black, start), new(Colors.Transparent, 1) },
+            new Point(0, 0), new Point(0, 1));
     }
 }
