@@ -313,8 +313,8 @@ calls back to the phone). `workspace_send` is also offered to other MCP clients 
   names who shared it), a transfer screenshot a transaction or a debt, a whiteboard a note and tasks; saved at once
   with Undo, like words. `IAssistantChat.AddUser(text, image)`: Claude gets an image block before the text, Grok an
   `image_url` data URI.
-- Photos always go through the **API** (within Ask Helm's daily cap), never to a PC agent: a job reaches a PC over
-  sync as words. With the route set to *PC only*, the card says photos need the API.
+- Photos go to a **PC agent that reads pictures first** (free), the API last (within Ask Helm's daily cap): see
+  "Photos on a PC agent" below. With the route set to *PC only* and no such agent, the card says so.
 - A model that cannot read pictures (`AssistantPhotos.Reads`: Grok's text-only lines) hands the photo to Claude
   Sonnet at once; one that turns the photo down (`AssistantImageException`) is retried once with Sonnet. The answer
   says so ("Haiku 5.5 không đọc được ảnh nên em nhờ Sonnet 5.5.").
@@ -324,6 +324,34 @@ calls back to the phone). `workspace_send` is also offered to other MCP clients 
 - **Brief chip.** When the morning brief or the evening review came today or yesterday, a chip tops the card
   ("Bản tin sáng · 06:45 ▾", `AiBriefChip`); a tap opens its title and lines and marks it read, and "‹ Hôm qua" shows
   yesterday's last one when the latest is today's. Nothing older.
+
+## Photos on a PC agent
+
+A photo turn goes agent-first like words: `SendPhotoAsync` tries each route with `IAgentRoute.ReadsPhotos`, in a
+conversation of its own (`<id>-photo-<guid>`) whose chat ends with the turn, then the API with the Sonnet retry as
+before. The card's status line says where it ran ("Claude Code trên PC-HUNG · miễn phí" or "… qua API"). The next
+words-only turn on the PC hears what the photo turn said and saved (`PcText`).
+
+- **Across sync the photo is a blob, never in the record.** A record holds at most 1 MiB once encrypted and sent as
+  base64 (live messages 64 KiB), and a 1568 px JPEG is 150-700 KB that grows by about 1.8 on the way. So
+  `SyncAgentRoute` imports each photo into the blob store (`BlobJobPhotos`: AES-GCM with a key of its own, kept only
+  in the job's record), and `AiJobRecord.Photos` names it; `ai.jobs` declares its blob references, so the engine pushes
+  the record only once the blob is on the server. `AiJob.Images` is `[JsonIgnore]`. A photo job gets 12 s more to be
+  claimed (`AgentJobs.PhotoUpload`) for the upload.
+- **Only to a PC that reads them.** `AiWorkerRecord.ReadsPhotos` is true while one of its agents that read pictures
+  is ready; a Helm before this never says so, and gets no photo job. On the PC, `AgentChain` gives a photo to the
+  first agent whose factory says `ReadsImages` (Codex, Claude Code), whatever agent the conversation is on.
+- **How each agent gets it.** Claude Code: image blocks (base64) in its stream-json user message
+  (`CliImages.ClaudeCodeContent`). Codex app server: `{"type":"image","url":"data:…"}` inputs of turn/start (codex
+  0.166 schema, `codex app-server generate-json-schema`), nothing on disk; the `codex exec` fallback writes the photo
+  into the agent's empty work folder for that run (`--image <file> -- -`) and deletes it after. Grok's CLI has no image
+  flag (its `--prompt-json` would put the picture on the command line), so a Grok agent declines and the next agent or
+  the API reads it.
+- **Never kept.** The PC reads the blob once and drops it (local chunks at once, server copy to its trash, purged
+  there by the nightly clean-up); the phone drops it too when the turn ends, whatever its end, and a withdrawn job's
+  record stops naming it. The agent's chat with the photo is disposed after the turn. Claude Code runs with
+  `--no-session-persistence` (no transcript on disk); a `codex exec` session that saw a photo has its rollout file
+  deleted when its chat ends. Nothing of the photo is logged.
 
 ## Text calls of the tools
 
