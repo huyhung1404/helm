@@ -48,8 +48,11 @@ public sealed partial class VocabRootsViewModel : ObservableObject
     [ObservableProperty] private VocabRootRow? _selected;
 
     /// <summary>How many parts each language has (the phone's English · 中文 switch shows them).</summary>
-    [ObservableProperty] private int _englishCount;
-    [ObservableProperty] private int _chineseCount;
+    [ObservableProperty] [NotifyPropertyChangedFor(nameof(TotalCount))] private int _englishCount;
+    [ObservableProperty] [NotifyPropertyChangedFor(nameof(TotalCount))] private int _chineseCount;
+
+    /// <summary>Parts in both languages: the PC's Roots tab shows it.</summary>
+    public int TotalCount => EnglishCount + ChineseCount;
 
     // The practice card.
     [ObservableProperty] private VocabRootRow? _practice;

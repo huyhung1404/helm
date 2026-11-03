@@ -52,6 +52,7 @@ public partial class VocabPopupWindow : Window
         _anchor = anchor;
         _moved = moved;
         DataContext = card;
+        VocabPalette.Ensure();
         InitializeComponent();
         SetRestOpacity(opacity);
         SourceInitialized += (_, _) =>
@@ -117,8 +118,8 @@ public partial class VocabPopupWindow : Window
         PartsBox.Visibility = _card.HasParts ? Visibility.Visible : Visibility.Collapsed;
         PinyinHook.Visibility = _card.HasPinyinMnemonic ? Visibility.Visible : Visibility.Collapsed;
         DetailsPanel.Visibility = _full ? Visibility.Visible : Visibility.Collapsed;
-        FullButton.Appearance = _full ? ControlAppearance.Secondary : ControlAppearance.Transparent;
-        FullButton.Icon = new SymbolIcon(_full ? SymbolRegular.ArrowMinimize24 : SymbolRegular.ArrowMaximize24);
+        FullButton.Tag = _full ? "On" : null;
+        ButtonIcon.SetSymbol(FullButton, _full ? SymbolRegular.ArrowMinimize24 : SymbolRegular.ArrowMaximize24);
         FullButton.ToolTip = _full ? "Less" : "Full details";
         System.Windows.Automation.AutomationProperties.SetName(FullButton, _full ? "Less" : "Full details");
         Ring(RememberedButton, _card.SuggestsRemembered);
@@ -126,12 +127,16 @@ public partial class VocabPopupWindow : Window
     }
 
     /// <summary>The verdict the typed answer suggests gets a ring; the user still chooses. Forgot keeps its red outline.</summary>
-    private void Ring(Wpf.Ui.Controls.Button button, bool on)
+    private void Ring(System.Windows.Controls.Button button, bool on)
     {
-        var outlined = button == ForgotButton;
-        button.BorderThickness = new Thickness(on ? 2.5 : outlined ? 1.5 : 0);
-        button.BorderBrush = on ? TryFindResource("AccentTextFillColorPrimaryBrush") as Brush ?? Brushes.DodgerBlue
-            : outlined ? TryFindResource("SystemFillColorCriticalBrush") as Brush : null;
+        if (!on)
+        {
+            button.ClearValue(BorderThicknessProperty);
+            button.ClearValue(BorderBrushProperty);
+            return;
+        }
+        button.BorderThickness = new Thickness(2.5);
+        button.SetResourceReference(BorderBrushProperty, "AccentFillColorDefaultBrush");
     }
 
     /// <summary>
@@ -251,15 +256,34 @@ public partial class VocabPopupWindow : Window
     }
 
     /// <summary>
-    /// Everything else known about the word, under the parts: how the parts make the meaning first, then the sections;
-    /// the pinyin hook is already above.
+    /// Everything else known about the word, under the parts: "To remember it" first (in its box), how the parts make the
+    /// meaning, then the sections under the PC card's names; the pinyin hook is already above.
     /// </summary>
     private List<VocabDetailSection> FullDetails()
     {
-        var sections = _card.Details().Where(s => s.Title != "Remembering the pinyin").ToList();
+        var sections = _card.Details().Where(s => s.Title != "Remembering the pinyin")
+            .Select(s => PcTitles.TryGetValue(s.Title, out var title) ? s with { Title = title } : s)
+            // Plain words ("Goes with", "Similar") on one line, as the card's: 补救措施 · 无法补救
+            .Select(s => s is { IsTree: false, Items.Count: > 1 } && s.Items.All(i => !i.HasNote)
+                ? s with { Items = [new VocabDetailItem(string.Join(" · ", s.Items.Select(i => i.Text)))] } : s)
+            .ToList();
         if (_card.Explanation.Length > 0) sections.Insert(0, new VocabDetailSection("How the parts make it", [new VocabDetailItem(_card.Explanation)]));
+        if (sections.FindIndex(s => s.Title == "To remember it") is var memo and > 0)
+        {
+            var section = sections[memo];
+            sections.RemoveAt(memo);
+            sections.Insert(0, section);
+        }
         return sections;
     }
+
+    // The phone's section names, as the PC card says them.
+    private static readonly Dictionary<string, string> PcTitles = new()
+    {
+        ["Easy to mix up"] = "Easy to mix up with",
+        ["Synonyms"] = "Similar",
+        ["Antonyms"] = "Opposite",
+    };
 
     private void Close_Click(object sender, RoutedEventArgs e) => Close();
 

@@ -3,29 +3,38 @@
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
+    xmlns:local="clr-namespace:Helm.Modules.Vocab;assembly=Helm.Modules.Vocab.Core"
     xmlns:pc="clr-namespace:Helm.Modules.Vocab">
 
     <!-- Learn: the card on the left, its buttons kept at its foot while the answer scrolls; today's numbers, the kind of
-         card and the keys on the right. DataContext: VocabViewModel. -->
+         card and the keys on the right, 280 px, 20 px apart. DataContext: VocabViewModel. -->
     <UserControl.Resources>
         <ResourceDictionary>
             <ResourceDictionary.MergedDictionaries>
                 <ResourceDictionary Source="/Helm.Modules.Vocab;component/VocabTemplates.xaml" />
             </ResourceDictionary.MergedDictionaries>
-            <!-- The front fills the card until it is answered or typed into -->
+            <!-- .front: 220 px at least, answered or not; a pinyin card's word sits over its box instead -->
             <Style x:Key="Front" TargetType="Button" BasedOn="{StaticResource FlatButton}">
-                <Setter Property="MinHeight" Value="200" />
-                <Setter Property="Margin" Value="12,4,12,0" />
+                <Setter Property="MinHeight" Value="220" />
                 <Setter Property="Padding" Value="24" />
                 <Setter Property="VerticalContentAlignment" Value="Center" />
                 <Style.Triggers>
-                    <DataTrigger Binding="{Binding IsRevealed}" Value="True">
-                        <Setter Property="MinHeight" Value="0" />
-                    </DataTrigger>
+                    <!-- A pinyin card: the word over its box (28 px above, 14 px apart) -->
                     <DataTrigger Binding="{Binding IsTyping}" Value="True">
                         <Setter Property="MinHeight" Value="0" />
+                        <Setter Property="Padding" Value="24,28,24,0" />
+                    </DataTrigger>
+                    <DataTrigger Binding="{Binding AsksPinyin}" Value="True">
+                        <Setter Property="MinHeight" Value="0" />
+                        <Setter Property="Padding" Value="24,28,24,0" />
                     </DataTrigger>
                 </Style.Triggers>
+            </Style>
+            <!-- The front's hint (one of three, see the code) -->
+            <Style x:Key="FrontHint" TargetType="TextBlock" BasedOn="{StaticResource Hint}">
+                <Setter Property="Margin" Value="0,10,0,0" />
+                <Setter Property="HorizontalAlignment" Value="Center" />
+                <Setter Property="TextAlignment" Value="Center" />
             </Style>
             <!-- The tree beside what helps; either alone takes the whole width -->
             <Style x:Key="TreeColumn" TargetType="StackPanel">
@@ -35,10 +44,31 @@
                     </DataTrigger>
                 </Style.Triggers>
             </Style>
-            <!-- A side section's title: a click folds the section away or opens it (remembered on this device) -->
-            <Style x:Key="Fold" TargetType="Button" BasedOn="{StaticResource FlatButton}">
-                <Setter Property="Margin" Value="-6,-4" />
-                <Setter Property="Padding" Value="6,4" />
+            <!-- .fold: a side section's title; a click folds the section away or opens it (remembered on this device) -->
+            <Style x:Key="Fold" TargetType="Button">
+                <Setter Property="Cursor" Value="Hand" />
+                <Setter Property="FocusVisualStyle" Value="{x:Null}" />
+                <Setter Property="Margin" Value="0,-4" />
+                <Setter Property="Padding" Value="0,4" />
+                <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+                <Setter Property="Foreground" Value="{DynamicResource TextFillColorPrimaryBrush}" />
+                <Setter Property="Template">
+                    <Setter.Value>
+                        <ControlTemplate TargetType="Button">
+                            <Border x:Name="Bd" Background="Transparent" Padding="{TemplateBinding Padding}" BorderThickness="0,0,0,1" BorderBrush="Transparent">
+                                <ContentPresenter />
+                            </Border>
+                            <ControlTemplate.Triggers>
+                                <Trigger Property="IsMouseOver" Value="True">
+                                    <Setter Property="Foreground" Value="{DynamicResource VocabAccentText}" />
+                                </Trigger>
+                                <Trigger Property="IsKeyboardFocused" Value="True">
+                                    <Setter TargetName="Bd" Property="BorderBrush" Value="{DynamicResource TextFillColorPrimaryBrush}" />
+                                </Trigger>
+                            </ControlTemplate.Triggers>
+                        </ControlTemplate>
+                    </Setter.Value>
+                </Setter>
             </Style>
             <Style x:Key="InfoColumn" TargetType="ContentControl">
                 <Setter Property="Grid.Column" Value="2" />
@@ -49,11 +79,23 @@
                     </DataTrigger>
                 </Style.Triggers>
             </Style>
+            <!-- A pinyin verdict's colour and icon: right, the tones slipped, not quite -->
+            <Style x:Key="Verdict" TargetType="StackPanel">
+                <Setter Property="TextElement.Foreground" Value="{DynamicResource VocabDangerText}" />
+                <Style.Triggers>
+                    <DataTrigger Binding="{Binding AnswerIsCorrect}" Value="True">
+                        <Setter Property="TextElement.Foreground" Value="{DynamicResource VocabSuccessText}" />
+                    </DataTrigger>
+                    <DataTrigger Binding="{Binding AnswerIsClose}" Value="True">
+                        <Setter Property="TextElement.Foreground" Value="{DynamicResource VocabWarnText}" />
+                    </DataTrigger>
+                </Style.Triggers>
+            </Style>
         </ResourceDictionary>
     </UserControl.Resources>
 
     <!-- Narrower than the card and its side panel need (see the code), the panel folds into one line above the card -->
-    <Grid x:Name="LearnPanel" MaxWidth="1240" Focusable="True" FocusVisualStyle="{x:Null}" SizeChanged="LearnPanel_SizeChanged">
+    <Grid x:Name="LearnPanel" Focusable="True" FocusVisualStyle="{x:Null}" SizeChanged="LearnPanel_SizeChanged">
         <Grid.ColumnDefinitions>
             <ColumnDefinition Width="*" />
             <ColumnDefinition x:Name="GapColumn" Width="20" />
@@ -65,14 +107,14 @@
         </Grid.RowDefinitions>
 
         <!-- ===== Narrow: today's numbers, the kind of card and the pinyin switch in one line ===== -->
-        <Border x:Name="NarrowBar" Style="{DynamicResource HelmSurface}" Padding="16,8" Margin="0,0,0,12" Visibility="Collapsed">
+        <Border x:Name="NarrowBar" Style="{StaticResource Card}" Padding="16,8" Margin="0,0,0,12" Visibility="Collapsed">
             <DockPanel>
                 <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
                     <ComboBox Width="170" AutomationProperties.Name="Kind of card" ItemsSource="{Binding Settings.CardModes}" SelectedIndex="{Binding Settings.CardModeIndex}" />
                     <TextBlock Margin="14,0,8,0" Text="Pinyin first" FontSize="13" VerticalAlignment="Center" />
                     <ui:ToggleSwitch AutomationProperties.Name="Chinese cards ask for the pinyin first" IsChecked="{Binding Settings.TypePinyin}" />
                 </StackPanel>
-                <TextBlock VerticalAlignment="Center" TextTrimming="CharacterEllipsis" Margin="0,0,12,0">
+                <TextBlock VerticalAlignment="Center" TextTrimming="CharacterEllipsis" Margin="0,0,12,0" FontSize="13">
                     <Run Text="{Binding Today.Due, Mode=OneWay}" FontWeight="SemiBold" /><Run Text=" due · " /><Run Text="{Binding Today.New, Mode=OneWay}" FontWeight="SemiBold" /><Run Text=" new · " /><Run Text="{Binding Today.Learned, Mode=OneWay}" FontWeight="SemiBold" /><Run Text=" of " /><Run Text="{Binding Today.Total, Mode=OneWay}" /><Run Text=" learned" />
                     <Run Text="  ·  " Foreground="{DynamicResource TextFillColorSecondaryBrush}" /><Run Text="{Binding Card.RoundText, Mode=OneWay}" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
                 </TextBlock>
@@ -80,55 +122,55 @@
         </Border>
 
         <!-- ===== The card ===== -->
-        <Border Grid.Row="1" Style="{DynamicResource HelmSurface}" Padding="0" VerticalAlignment="Top" DataContext="{Binding Card}" AutomationProperties.Name="Card">
+        <Border Grid.Row="1" Style="{StaticResource Card}" Padding="0" VerticalAlignment="Top" DataContext="{Binding Card}" AutomationProperties.Name="Card">
             <Grid>
                 <!-- Nothing to learn yet -->
-                <StackPanel Margin="24,56" HorizontalAlignment="Center" Visibility="{Binding HasWord, Converter={StaticResource InverseBoolToVisibility}}">
-                    <ui:SymbolIcon Symbol="BookLetter24" FontSize="40" HorizontalAlignment="Center" Foreground="{DynamicResource AccentTextFillColorPrimaryBrush}" />
-                    <TextBlock Margin="0,10,0,0" Text="No word to learn yet" FontSize="20" FontWeight="SemiBold" HorizontalAlignment="Center" />
-                    <TextBlock Margin="0,6,0,14" TextWrapping="Wrap" TextAlignment="Center" MaxWidth="420" FontSize="14" Style="{DynamicResource HelmSecondaryText}"
+                <StackPanel Margin="24,64" HorizontalAlignment="Center" Visibility="{Binding HasWord, Converter={StaticResource InverseBoolToVisibility}}">
+                    <ui:SymbolIcon Symbol="BookLetter24" FontSize="44" HorizontalAlignment="Center" Foreground="{DynamicResource AccentFillColorDefaultBrush}" />
+                    <TextBlock Margin="0,10,0,0" Text="No word to learn yet" FontSize="22" FontWeight="SemiBold" HorizontalAlignment="Center" />
+                    <TextBlock Margin="0,10,0,0" TextAlignment="Center" MaxWidth="420" FontSize="14" Style="{StaticResource Hint}"
                                Text="Add the words you meet. Once Claude Code breaks them down, they come here one at a time." />
-                    <ui:Button HorizontalAlignment="Center" Appearance="Primary" Content="Add words" Icon="{ui:SymbolIcon Add24}"
-                               Command="{Binding DataContext.OpenAddCommand, RelativeSource={RelativeSource AncestorType=UserControl}}" />
+                    <Button Margin="0,18,0,0" HorizontalAlignment="Center" Style="{StaticResource PrimaryBtn}" Content="Add words" pc:ButtonIcon.Symbol="Add24"
+                            Command="{Binding DataContext.OpenAddCommand, RelativeSource={RelativeSource AncestorType=UserControl}}" />
                 </StackPanel>
 
                 <DockPanel Visibility="{Binding HasWord, Converter={StaticResource BoolToVisibility}}">
-                    <!-- What the card asks, how well the word is known, its flags; listen and more -->
-                    <DockPanel DockPanel.Dock="Top" Margin="20,14,12,0">
+                    <!-- What the card asks, how well the word is known, its flags (8 px apart); listen and more -->
+                    <DockPanel DockPanel.Dock="Top" Margin="20,14,16,0">
                         <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
-                            <ui:Button Style="{StaticResource IconButton}" Icon="{ui:SymbolIcon Speaker224}" ToolTip="Listen (L)" AutomationProperties.Name="Listen"
-                                       Command="{Binding SayCommand}" Visibility="{Binding CanSay, Converter={StaticResource BoolToVisibility}}" />
-                            <ui:Button Style="{StaticResource IconButton}" Icon="{ui:SymbolIcon MoreHorizontal24}" ToolTip="More for this word"
-                                       AutomationProperties.Name="More for this word" pc:MoreMenu.OpensOnClick="True">
-                                <ui:Button.ContextMenu>
-                                    <ContextMenu>
+                            <Button Style="{StaticResource IconBtn}" pc:ButtonIcon.Symbol="Speaker224" ToolTip="Listen (L)" AutomationProperties.Name="Listen"
+                                    Command="{Binding SayCommand}" Visibility="{Binding CanSay, Converter={StaticResource BoolToVisibility}}" />
+                            <Button Style="{StaticResource IconBtn}" pc:ButtonIcon.Symbol="MoreHorizontal24" ToolTip="More for this word"
+                                    AutomationProperties.Name="More for this word" pc:MoreMenu.OpensOnClick="True">
+                                <Button.ContextMenu>
+                                    <ContextMenu Style="{StaticResource Menu}">
                                         <MenuItem Header="I know it" InputGestureText="K" Command="{Binding KnowCommand}" ToolTip="Known already: it comes back in a month">
-                                            <MenuItem.Icon><ui:SymbolIcon Symbol="CheckmarkStarburst24" /></MenuItem.Icon>
+                                            <MenuItem.Icon><ui:SymbolIcon Symbol="Star24" FontSize="18" /></MenuItem.Icon>
                                         </MenuItem>
                                         <MenuItem Header="Hide from the cards" Command="{Binding HideCommand}" ToolTip="Leave it out of the cards and the pop-up (Words → Hidden shows it again)">
-                                            <MenuItem.Icon><ui:SymbolIcon Symbol="EyeOff24" /></MenuItem.Icon>
+                                            <MenuItem.Icon><ui:SymbolIcon Symbol="EyeOff24" FontSize="18" /></MenuItem.Icon>
                                         </MenuItem>
                                         <Separator />
                                         <MenuItem Header="Open its page" Click="OpenWord_Click">
-                                            <MenuItem.Icon><ui:SymbolIcon Symbol="Open24" /></MenuItem.Icon>
+                                            <MenuItem.Icon><ui:SymbolIcon Symbol="Open24" FontSize="18" /></MenuItem.Icon>
                                         </MenuItem>
                                         <MenuItem Header="Edit…" Click="EditWord_Click">
-                                            <MenuItem.Icon><ui:SymbolIcon Symbol="Edit24" /></MenuItem.Icon>
+                                            <MenuItem.Icon><ui:SymbolIcon Symbol="Edit24" FontSize="18" /></MenuItem.Icon>
                                         </MenuItem>
                                     </ContextMenu>
-                                </ui:Button.ContextMenu>
-                            </ui:Button>
+                                </Button.ContextMenu>
+                            </Button>
                         </StackPanel>
                         <WrapPanel VerticalAlignment="Center">
                             <Border Style="{StaticResource AccentTag}" Margin="0,0,8,0">
                                 <TextBlock Text="{Binding KindText}" />
                             </Border>
-                            <TextBlock Text="{Binding LevelText}" Margin="0,0,8,0" VerticalAlignment="Center" Style="{DynamicResource HelmSecondaryText}" />
-                            <Border Style="{StaticResource WarnTag}" Margin="0,0,6,0" Visibility="{Binding IsHard, Converter={StaticResource BoolToVisibility}}"
+                            <TextBlock Text="{Binding LevelText}" Margin="0,0,8,0" VerticalAlignment="Center" Style="{StaticResource Hint}" />
+                            <Border Style="{StaticResource WarnTag}" Margin="0,0,8,0" Visibility="{Binding IsHard, Converter={StaticResource BoolToVisibility}}"
                                     ToolTip="You forgot it several times: Claude Code writes a new way to remember it">
                                 <TextBlock Text="Often forgotten" />
                             </Border>
-                            <Border Style="{StaticResource PinyinTag}" Margin="0,0,6,0" Visibility="{Binding IsSlipping, Converter={StaticResource BoolToVisibility}}"
+                            <Border Style="{StaticResource PinyinTag}" Margin="0,0,8,0" Visibility="{Binding IsSlipping, Converter={StaticResource BoolToVisibility}}"
                                     ToolTip="Its pinyin keeps slipping while you know the meaning: Claude Code writes a way to remember the reading">
                                 <TextBlock Text="Pinyin slips" />
                             </Border>
@@ -138,24 +180,27 @@
                         </WrapPanel>
                     </DockPanel>
 
-                    <!-- The answer bar: stays in reach while the answer scrolls -->
+                    <!-- .lbar: the answer bar, in reach while the answer scrolls -->
                     <Border DockPanel.Dock="Bottom" Style="{StaticResource CardBar}">
                         <Grid>
                             <DockPanel Visibility="{Binding IsRevealed, Converter={StaticResource InverseBoolToVisibility}}">
-                                <ui:Button DockPanel.Dock="Left" Appearance="Transparent" Icon="{ui:SymbolIcon Next24}" Command="{Binding SkipCommand}"
-                                           ToolTip="Another word, without answering this one (S)" AutomationProperties.Name="Skip">
+                                <Button DockPanel.Dock="Left" Style="{StaticResource GhostBtn}" pc:ButtonIcon.Symbol="Next24" Command="{Binding SkipCommand}"
+                                        ToolTip="Another word, without answering this one (S)" AutomationProperties.Name="Skip">
                                     <StackPanel Orientation="Horizontal">
                                         <TextBlock Text="Skip" VerticalAlignment="Center" />
-                                        <Border Style="{StaticResource Kbd}"><TextBlock Text="S" HorizontalAlignment="Center" /></Border>
+                                        <Border Style="{StaticResource Kbd}"><TextBlock Text="S" /></Border>
                                     </StackPanel>
-                                </ui:Button>
-                                <ui:Button DockPanel.Dock="Right" HorizontalAlignment="Right" Appearance="Primary" Height="40" Padding="20,0" FontWeight="SemiBold"
-                                           Command="{Binding RevealCommand}" AutomationProperties.Name="Show the answer">
+                                </Button>
+                                <!-- A pinyin card is answered by its box (Check, or Show the answer under it) -->
+                                <Button DockPanel.Dock="Right" HorizontalAlignment="Right" Style="{StaticResource TallPrimaryBtn}"
+                                        Command="{Binding RevealCommand}" AutomationProperties.Name="Show the answer"
+                                        Visibility="{Binding AsksPinyin, Converter={StaticResource InverseBoolToVisibility}}">
                                     <StackPanel Orientation="Horizontal">
                                         <TextBlock Text="Show the answer" VerticalAlignment="Center" />
-                                        <Border Style="{StaticResource Kbd}"><TextBlock Text="Space" HorizontalAlignment="Center" /></Border>
+                                        <Border Style="{StaticResource AccentKbd}"><TextBlock Text="Space" /></Border>
                                     </StackPanel>
-                                </ui:Button>
+                                </Button>
+                                <Border />
                             </DockPanel>
                             <Grid Visibility="{Binding IsRevealed, Converter={StaticResource BoolToVisibility}}">
                                 <Grid.ColumnDefinitions>
@@ -163,28 +208,27 @@
                                     <ColumnDefinition Width="12" />
                                     <ColumnDefinition Width="*" />
                                 </Grid.ColumnDefinitions>
-                                <ui:Button HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Height="56" Command="{Binding ForgotCommand}"
-                                           AutomationProperties.Name="{Binding ForgotText}" ToolTip="{Binding ForgotHint}">
+                                <Button Style="{StaticResource BigBtn}" Command="{Binding ForgotCommand}" AutomationProperties.Name="{Binding ForgotText}" ToolTip="{Binding ForgotHint}">
                                     <StackPanel>
                                         <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
-                                            <ui:SymbolIcon Symbol="DismissCircle24" FontSize="18" Margin="0,0,8,0" Foreground="{DynamicResource SystemFillColorCriticalBrush}" />
-                                            <TextBlock Text="{Binding ForgotText}" FontSize="15" FontWeight="SemiBold" VerticalAlignment="Center" />
-                                            <Border Style="{StaticResource Kbd}"><TextBlock Text="1" HorizontalAlignment="Center" /></Border>
+                                            <ui:SymbolIcon Symbol="DismissCircle24" FontSize="18" Margin="0,0,8,0" Foreground="{DynamicResource VocabDangerText}" />
+                                            <TextBlock Text="{Binding ForgotText}" VerticalAlignment="Center" />
+                                            <Border Style="{StaticResource Kbd}"><TextBlock Text="1" /></Border>
                                         </StackPanel>
-                                        <TextBlock Text="{Binding ForgotHint}" FontSize="12" Opacity="0.8" HorizontalAlignment="Center" />
+                                        <TextBlock Text="{Binding ForgotHint}" FontSize="12" FontWeight="Normal" Opacity="0.8" HorizontalAlignment="Center" />
                                     </StackPanel>
-                                </ui:Button>
-                                <ui:Button Grid.Column="2" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Height="56" Appearance="Primary"
-                                           Command="{Binding RememberedCommand}" AutomationProperties.Name="{Binding RememberedText}" ToolTip="{Binding RememberedHint}">
+                                </Button>
+                                <Button Grid.Column="2" Style="{StaticResource BigPrimaryBtn}" Command="{Binding RememberedCommand}"
+                                        AutomationProperties.Name="{Binding RememberedText}" ToolTip="{Binding RememberedHint}">
                                     <StackPanel>
                                         <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
                                             <ui:SymbolIcon Symbol="CheckmarkCircle24" FontSize="18" Margin="0,0,8,0" />
-                                            <TextBlock Text="{Binding RememberedText}" FontSize="15" FontWeight="SemiBold" VerticalAlignment="Center" />
-                                            <Border Style="{StaticResource Kbd}"><TextBlock Text="2" HorizontalAlignment="Center" /></Border>
+                                            <TextBlock Text="{Binding RememberedText}" VerticalAlignment="Center" />
+                                            <Border Style="{StaticResource AccentKbd}"><TextBlock Text="2" /></Border>
                                         </StackPanel>
-                                        <TextBlock Text="{Binding RememberedHint}" FontSize="12" Opacity="0.8" HorizontalAlignment="Center" />
+                                        <TextBlock Text="{Binding RememberedHint}" FontSize="12" FontWeight="Normal" Opacity="0.8" HorizontalAlignment="Center" />
                                     </StackPanel>
-                                </ui:Button>
+                                </Button>
                             </Grid>
                         </Grid>
                     </Border>
@@ -194,98 +238,121 @@
                             <!-- The front: a click (or Space) shows the answer -->
                             <Button Style="{StaticResource Front}" Command="{Binding RevealCommand}" AutomationProperties.Name="Show the answer">
                                 <StackPanel HorizontalAlignment="Center">
-                                    <TextBlock Text="{Binding FrontText}" FontSize="56" FontWeight="SemiBold" HorizontalAlignment="Center" TextWrapping="Wrap" TextAlignment="Center"
+                                    <TextBlock Text="{Binding FrontText}" FontSize="56" FontWeight="SemiBold" LineHeight="62" LineStackingStrategy="BlockLineHeight"
+                                               HorizontalAlignment="Center" TextWrapping="Wrap" TextAlignment="Center"
                                                Visibility="{Binding FrontIsWord, Converter={StaticResource BoolToVisibility}}" />
-                                    <TextBlock Text="{Binding FrontText}" FontSize="26" HorizontalAlignment="Center" TextWrapping="Wrap" TextAlignment="Center" MaxWidth="640"
+                                    <TextBlock Text="{Binding FrontText}" FontSize="26" LineHeight="39" LineStackingStrategy="BlockLineHeight" HorizontalAlignment="Center"
+                                               TextWrapping="Wrap" TextAlignment="Center" MaxWidth="640"
                                                Visibility="{Binding FrontIsText, Converter={StaticResource BoolToVisibility}}" />
-                                    <ui:Button HorizontalAlignment="Center" Appearance="Primary" Padding="20,12" FontSize="16" Content="Play" Icon="{ui:SymbolIcon Speaker224}"
-                                               Command="{Binding SayCommand}" Visibility="{Binding FrontIsListen, Converter={StaticResource BoolToVisibility}}" />
-                                    <TextBlock Margin="0,8,0,0" Text="{Binding FrontNote}" FontSize="14" HorizontalAlignment="Center" TextAlignment="Center" MaxWidth="640"
-                                               Style="{DynamicResource HelmSecondaryText}" Visibility="{Binding HasFrontNote, Converter={StaticResource BoolToVisibility}}" />
-                                    <TextBlock Margin="0,10,0,0" Text="{Binding FrontHint}" HorizontalAlignment="Center" TextAlignment="Center" Style="{DynamicResource HelmSecondaryText}"
-                                               Visibility="{Binding IsRevealed, Converter={StaticResource InverseBoolToVisibility}}" />
+                                    <Button HorizontalAlignment="Center" Style="{StaticResource TallPrimaryBtn}" Content="Play" pc:ButtonIcon.Symbol="Speaker224"
+                                            Command="{Binding SayCommand}" Visibility="{Binding FrontIsListen, Converter={StaticResource BoolToVisibility}}" />
+                                    <TextBlock Margin="0,10,0,0" Text="{Binding FrontNote}" FontSize="14" HorizontalAlignment="Center" TextAlignment="Center" MaxWidth="640"
+                                               Style="{StaticResource Hint}" Visibility="{Binding HasFrontNote, Converter={StaticResource BoolToVisibility}}" />
+                                    <!-- "Click or press Space to see the meaning", "Say the missing word, then press Space", or the card's own -->
+                                    <TextBlock x:Name="WordHint" Style="{StaticResource FrontHint}">
+                                        <Run Text="Click or press" /><InlineUIContainer BaselineAlignment="Center"><Border Style="{StaticResource Kbd}" Margin="4,0"><TextBlock Text="Space" /></Border></InlineUIContainer><Run Text="to see the meaning" />
+                                    </TextBlock>
+                                    <TextBlock x:Name="GapHint" Style="{StaticResource FrontHint}">
+                                        <Run Text="Say the missing word, then press" /><InlineUIContainer BaselineAlignment="Center"><Border Style="{StaticResource Kbd}" Margin="4,0,0,0"><TextBlock Text="Space" /></Border></InlineUIContainer>
+                                    </TextBlock>
+                                    <TextBlock x:Name="OwnHint" Text="{Binding FrontHint}" Style="{StaticResource FrontHint}" />
                                 </StackPanel>
                             </Button>
 
-                            <!-- Type cards and Chinese cards asking the pinyin: typed here, checked on Enter -->
-                            <Grid Margin="24,4,24,16" MaxWidth="440" Visibility="{Binding IsTyping, Converter={StaticResource BoolToVisibility}}">
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="*" />
-                                    <ColumnDefinition Width="8" />
-                                    <ColumnDefinition Width="Auto" />
-                                </Grid.ColumnDefinitions>
-                                <ui:TextBox x:Name="TypeBox" FontSize="20" PlaceholderText="{Binding TypePrompt}" AutomationProperties.Name="{Binding TypePrompt}"
-                                            Text="{Binding Typed, UpdateSourceTrigger=PropertyChanged}">
-                                    <ui:TextBox.InputBindings>
-                                        <KeyBinding Key="Enter" Command="{Binding CheckCommand}" />
-                                    </ui:TextBox.InputBindings>
-                                </ui:TextBox>
-                                <ui:Button Grid.Column="2" Appearance="Primary" Height="44" Content="Check" Command="{Binding CheckCommand}" />
-                            </Grid>
+                            <!-- Type cards and Chinese cards asking the pinyin: typed here (440 px at most), checked on Enter -->
+                            <StackPanel Margin="24,14,24,24" Visibility="{Binding IsTyping, Converter={StaticResource BoolToVisibility}}">
+                                <Grid MaxWidth="440">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="8" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <ui:TextBox x:Name="TypeBox" Style="{StaticResource LargeInput}" PlaceholderText="{Binding TypePrompt}" AutomationProperties.Name="{Binding TypePrompt}"
+                                                Text="{Binding Typed, UpdateSourceTrigger=PropertyChanged}">
+                                        <ui:TextBox.InputBindings>
+                                            <KeyBinding Key="Enter" Command="{Binding CheckCommand}" />
+                                        </ui:TextBox.InputBindings>
+                                    </ui:TextBox>
+                                    <Button Grid.Column="2" Style="{StaticResource PrimaryBtn}" Height="44" Content="Check" Command="{Binding CheckCommand}" />
+                                </Grid>
+                                <TextBlock Margin="0,14,0,0" HorizontalAlignment="Center" Style="{StaticResource Hint}" Visibility="{Binding AsksPinyin, Converter={StaticResource BoolToVisibility}}">
+                                    <Run Text="No tones is fine; tones typed are checked." />
+                                    <Hyperlink Command="{Binding RevealCommand}" Foreground="{DynamicResource AccentFillColorDefaultBrush}" TextDecorations="{x:Null}">Show the answer</Hyperlink>
+                                </TextBlock>
+                            </StackPanel>
 
-                            <!-- What was typed, letter by letter against the word; on a pinyin card, what the buttons now mean -->
-                            <StackPanel HorizontalAlignment="Center" Margin="24,0,24,16" MaxWidth="560" Visibility="{Binding HasAnswer, Converter={StaticResource BoolToVisibility}}">
-                                <ItemsControl ItemsSource="{Binding AnswerPieces}" ItemTemplate="{StaticResource AnswerPiece}" Focusable="False" HorizontalAlignment="Center">
+                            <!-- What was typed, letter by letter against the word; on a pinyin card, its verdict and what the buttons now mean -->
+                            <StackPanel HorizontalAlignment="Center" Margin="24,14,24,24" MaxWidth="560" Visibility="{Binding HasAnswer, Converter={StaticResource BoolToVisibility}}">
+                                <ItemsControl ItemsSource="{Binding AnswerPieces}" ItemTemplate="{StaticResource AnswerPiece}" Focusable="False" HorizontalAlignment="Center"
+                                              Visibility="{Binding AsksPinyin, Converter={StaticResource InverseBoolToVisibility}}">
                                     <ItemsControl.ItemsPanel>
                                         <ItemsPanelTemplate>
                                             <StackPanel Orientation="Horizontal" />
                                         </ItemsPanelTemplate>
                                     </ItemsControl.ItemsPanel>
                                 </ItemsControl>
-                                <TextBlock Text="{Binding AnswerMessage}" FontSize="15" HorizontalAlignment="Center" FontWeight="SemiBold" TextWrapping="Wrap" TextAlignment="Center">
-                                    <TextBlock.Style>
-                                        <Style TargetType="TextBlock">
-                                            <Setter Property="Foreground" Value="{DynamicResource SystemFillColorCriticalBrush}" />
-                                            <Style.Triggers>
-                                                <DataTrigger Binding="{Binding AnswerIsCorrect}" Value="True">
-                                                    <Setter Property="Foreground" Value="{DynamicResource SystemFillColorSuccessBrush}" />
-                                                </DataTrigger>
-                                                <DataTrigger Binding="{Binding AnswerIsClose}" Value="True">
-                                                    <Setter Property="Foreground" Value="{DynamicResource SystemFillColorCautionBrush}" />
-                                                </DataTrigger>
-                                            </Style.Triggers>
-                                        </Style>
-                                    </TextBlock.Style>
-                                </TextBlock>
-                                <TextBlock Margin="0,4,0,0" Text="{Binding VerdictHint}" HorizontalAlignment="Center" TextAlignment="Center" Style="{DynamicResource HelmSecondaryText}"
+                                <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Style="{StaticResource Verdict}">
+                                    <ui:SymbolIcon FontSize="20" Margin="0,0,8,0" Visibility="{Binding AsksPinyin, Converter={StaticResource BoolToVisibility}}">
+                                        <ui:SymbolIcon.Style>
+                                            <Style TargetType="ui:SymbolIcon">
+                                                <Setter Property="Symbol" Value="DismissCircle24" />
+                                                <Style.Triggers>
+                                                    <DataTrigger Binding="{Binding AnswerIsWrong}" Value="False">
+                                                        <Setter Property="Symbol" Value="CheckmarkCircle24" />
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </ui:SymbolIcon.Style>
+                                    </ui:SymbolIcon>
+                                    <TextBlock FontSize="15" FontWeight="SemiBold" TextWrapping="Wrap" TextAlignment="Center" VerticalAlignment="Center"
+                                               Visibility="{Binding AsksPinyin, Converter={StaticResource BoolToVisibility}}">
+                                        <Run Text="Pinyin “" /><Run Text="{Binding Typed, Mode=OneWay}" /><Run Text="”: " /><Run Text="{Binding PinyinVerdictText, Mode=OneWay}" />
+                                    </TextBlock>
+                                    <TextBlock Text="{Binding AnswerMessage}" FontSize="15" FontWeight="SemiBold" TextWrapping="Wrap" TextAlignment="Center" VerticalAlignment="Center"
+                                               Visibility="{Binding AsksPinyin, Converter={StaticResource InverseBoolToVisibility}}" />
+                                </StackPanel>
+                                <TextBlock Margin="0,4,0,0" Text="{Binding VerdictHint}" MaxWidth="520" HorizontalAlignment="Center" TextAlignment="Center" Style="{StaticResource Hint}"
                                            Visibility="{Binding HasVerdictHint, Converter={StaticResource BoolToVisibility}}" />
                             </StackPanel>
 
-                            <!-- The answer: the word and its reading, the pinyin hook, the meaning; then how it is built beside what helps to use it -->
-                            <Border Margin="20,0" Padding="0,20,0,24" BorderThickness="0,1,0,0" BorderBrush="{DynamicResource CardStrokeColorDefaultBrush}"
+                            <!-- The answer: the word and its reading, the pinyin hook, the meaning (6 px apart, centred); 18 px under them
+                                 how it is built beside what helps to use it -->
+                            <Border Margin="20,0" Padding="0,20,0,24" BorderThickness="0,1,0,0" BorderBrush="{DynamicResource VocabHairline}"
                                     Visibility="{Binding IsRevealed, Converter={StaticResource BoolToVisibility}}">
                                 <StackPanel>
-                                    <TextBlock Text="{Binding Text}" FontSize="40" FontWeight="SemiBold" HorizontalAlignment="Center" TextWrapping="Wrap"
+                                    <TextBlock Text="{Binding Text}" FontSize="40" FontWeight="SemiBold" LineHeight="44" LineStackingStrategy="BlockLineHeight"
+                                               HorizontalAlignment="Center" TextWrapping="Wrap" Margin="0,0,0,6"
                                                Visibility="{Binding ShowsWordOnReveal, Converter={StaticResource BoolToVisibility}}" />
-                                    <WrapPanel HorizontalAlignment="Center" Margin="0,4,0,0">
+                                    <!-- The reading, Hán Việt, traditional form, Listen, YouGlish: 12 px apart -->
+                                    <WrapPanel HorizontalAlignment="Center">
                                         <TextBlock pc:ToneText.Text="{Binding Phonetic}" FontSize="18" Margin="0,0,12,0" VerticalAlignment="Center" />
                                         <TextBlock Text="{Binding HanViet}" FontSize="16" FontWeight="SemiBold" Margin="0,0,12,0" VerticalAlignment="Center"
                                                    Foreground="{DynamicResource TextFillColorSecondaryBrush}" Visibility="{Binding HanViet, Converter={StaticResource NotEmptyToVisibility}}" />
                                         <TextBlock Text="{Binding Traditional}" FontSize="16" Margin="0,0,12,0" VerticalAlignment="Center"
                                                    Foreground="{DynamicResource TextFillColorSecondaryBrush}" Visibility="{Binding Traditional, Converter={StaticResource NotEmptyToVisibility}}" />
-                                        <ui:Button Appearance="Transparent" Padding="8,4" Content="Listen" Icon="{ui:SymbolIcon Speaker224}" Command="{Binding SayCommand}"
-                                                   ToolTip="Say the word (L)" Visibility="{Binding CanSay, Converter={StaticResource BoolToVisibility}}" />
-                                        <ui:Button Appearance="Transparent" Padding="8,4" Margin="4,0,0,0" Content="YouGlish" Icon="{ui:SymbolIcon Video24}" Command="{Binding YouGlishCommand}"
-                                                   ToolTip="Hear real people say it in YouTube videos (opens your browser)"
-                                                   Visibility="{Binding ShowYouGlish, Converter={StaticResource BoolToVisibility}}" />
+                                        <Button Style="{StaticResource SmallGhostBtn}" Content="Listen" pc:ButtonIcon.Symbol="Speaker224" Command="{Binding SayCommand}" Margin="0,0,12,0"
+                                                ToolTip="Say the word (L)" Visibility="{Binding CanSay, Converter={StaticResource BoolToVisibility}}" />
+                                        <Button Style="{StaticResource SmallGhostBtn}" Content="YouGlish" pc:ButtonIcon.Symbol="Video24" Command="{Binding YouGlishCommand}"
+                                                ToolTip="Hear real people say it in YouTube videos (opens your browser)"
+                                                Visibility="{Binding ShowYouGlish, Converter={StaticResource BoolToVisibility}}" />
                                     </WrapPanel>
-                                    <!-- Chinese: how to remember the reading (written by Claude Code once the pinyin keeps slipping) -->
-                                    <Border Margin="0,10,0,0" MaxWidth="640" HorizontalAlignment="Center" Style="{StaticResource PinyinBox}"
+                                    <!-- .hook: how to remember a Chinese word's reading (written by Claude Code once the pinyin keeps slipping) -->
+                                    <Border Margin="0,6,0,0" MaxWidth="640" HorizontalAlignment="Center" Style="{StaticResource PinyinBox}"
                                             Visibility="{Binding HasPinyinMnemonic, Converter={StaticResource BoolToVisibility}}">
                                         <DockPanel>
-                                            <ui:SymbolIcon DockPanel.Dock="Left" Symbol="Speaker224" FontSize="18" Margin="0,1,10,0" VerticalAlignment="Top" Foreground="{StaticResource PinyinBrush}" />
+                                            <ui:SymbolIcon DockPanel.Dock="Left" Symbol="Speaker224" FontSize="18" Margin="0,2,10,0" VerticalAlignment="Top" Foreground="{DynamicResource VocabPinyinText}" />
                                             <StackPanel>
-                                                <TextBlock Text="Remembering the pinyin" FontSize="12" FontWeight="SemiBold" Foreground="{StaticResource PinyinBrush}" />
+                                                <TextBlock Text="Remembering the pinyin" Style="{StaticResource Lbl}" Foreground="{DynamicResource VocabPinyinText}" />
                                                 <TextBlock Margin="0,2,0,0" Text="{Binding PinyinMnemonic}" TextWrapping="Wrap" />
                                             </StackPanel>
                                         </DockPanel>
                                     </Border>
                                     <TextBlock Margin="0,10,0,0" Text="{Binding Meaning}" FontSize="22" MaxWidth="640" TextWrapping="Wrap" TextAlignment="Center" HorizontalAlignment="Center" />
                                     <TextBlock Margin="0,6,0,0" Text="{Binding Explanation}" FontSize="14" MaxWidth="640" TextAlignment="Center" HorizontalAlignment="Center"
-                                               Style="{DynamicResource HelmSecondaryText}" Visibility="{Binding Explanation, Converter={StaticResource NotEmptyToVisibility}}" />
+                                               Style="{StaticResource Hint}" Visibility="{Binding Explanation, Converter={StaticResource NotEmptyToVisibility}}" />
 
                                     <!-- Side by side when the card is wide enough for the tree; else the tree above what helps (see the code) -->
-                                    <Grid x:Name="AnswerGrid" Margin="0,20,0,0" SizeChanged="AnswerGrid_SizeChanged">
+                                    <Grid x:Name="AnswerGrid" Margin="0,18,0,0" SizeChanged="AnswerGrid_SizeChanged">
                                         <Grid.ColumnDefinitions>
                                             <ColumnDefinition Width="1.25*" />
                                             <ColumnDefinition Width="20" />
@@ -309,116 +376,119 @@
             </Grid>
         </Border>
 
-        <!-- ===== Today, the kind of card, the keys ===== -->
+        <!-- ===== Today, the kind of card, the keys: 12 px apart ===== -->
         <ScrollViewer x:Name="SidePanel" Grid.Row="1" Grid.Column="2" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Focusable="False">
             <StackPanel>
-                <Border Style="{DynamicResource HelmSurface}" Margin="0,0,0,12">
+                <Border Style="{StaticResource Card}" Margin="0,0,0,12">
                     <StackPanel>
                         <Button x:Name="TodayFold" Style="{StaticResource Fold}" Click="Fold_Click" Tag="today" AutomationProperties.Name="Today">
                             <DockPanel>
-                                <ui:SymbolIcon DockPanel.Dock="Right" Symbol="ChevronDown16" FontSize="14" RenderTransformOrigin="0.5,0.5" />
-                                <TextBlock Text="Today" FontSize="15" FontWeight="SemiBold" Margin="0,0,10,0" />
+                                <ui:SymbolIcon DockPanel.Dock="Right" Symbol="ChevronDown16" FontSize="16" RenderTransformOrigin="0.5,0.5" />
+                                <TextBlock Text="Today" FontSize="15" FontWeight="SemiBold" Margin="0,0,8,0" />
                                 <!-- Folded: the day in a few words -->
-                                <TextBlock x:Name="TodayLine" VerticalAlignment="Center" Style="{DynamicResource HelmSecondaryText}">
+                                <TextBlock x:Name="TodayLine" VerticalAlignment="Center" Style="{StaticResource Hint}">
                                     <Run Text="{Binding Today.Due, Mode=OneWay}" /><Run Text=" due · " /><Run Text="{Binding Today.New, Mode=OneWay}" /><Run Text=" new" />
                                 </TextBlock>
                             </DockPanel>
                         </Button>
-                        <StackPanel x:Name="TodayBody" Margin="0,10,0,0">
-                        <Grid>
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="*" />
-                                <ColumnDefinition Width="8" />
-                                <ColumnDefinition Width="*" />
-                            </Grid.ColumnDefinitions>
-                            <Border CornerRadius="6" Padding="12,10" Background="{DynamicResource ControlFillColorDefaultBrush}">
-                                <StackPanel>
-                                    <TextBlock Text="Due now" Style="{DynamicResource HelmSecondaryText}" />
-                                    <TextBlock Text="{Binding Today.Due}" FontSize="22" FontWeight="SemiBold" />
-                                </StackPanel>
-                            </Border>
-                            <Border Grid.Column="2" CornerRadius="6" Padding="12,10" Background="{DynamicResource ControlFillColorDefaultBrush}">
-                                <StackPanel>
-                                    <TextBlock Text="New" Style="{DynamicResource HelmSecondaryText}" />
-                                    <TextBlock Text="{Binding Today.New}" FontSize="22" FontWeight="SemiBold" />
-                                </StackPanel>
-                            </Border>
-                        </Grid>
-                        <DockPanel Margin="0,12,0,6">
-                            <TextBlock DockPanel.Dock="Right" FontSize="13" FontWeight="SemiBold">
-                                <Run Text="{Binding Today.Learned, Mode=OneWay}" /><Run Text=" of " /><Run Text="{Binding Today.Total, Mode=OneWay}" />
+                        <StackPanel x:Name="TodayBody" Margin="0,12,0,0">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="8" />
+                                    <ColumnDefinition Width="*" />
+                                </Grid.ColumnDefinitions>
+                                <Border Style="{StaticResource StatBox}">
+                                    <StackPanel>
+                                        <TextBlock Text="Due now" Style="{StaticResource Hint}" />
+                                        <TextBlock Margin="0,2,0,0" Text="{Binding Today.Due}" FontSize="22" FontWeight="SemiBold" LineHeight="24" LineStackingStrategy="BlockLineHeight" />
+                                    </StackPanel>
+                                </Border>
+                                <Border Grid.Column="2" Style="{StaticResource StatBox}">
+                                    <StackPanel>
+                                        <TextBlock Text="New" Style="{StaticResource Hint}" />
+                                        <TextBlock Margin="0,2,0,0" Text="{Binding Today.New}" FontSize="22" FontWeight="SemiBold" LineHeight="24" LineStackingStrategy="BlockLineHeight" />
+                                    </StackPanel>
+                                </Border>
+                            </Grid>
+                            <DockPanel Margin="0,12,0,6">
+                                <TextBlock DockPanel.Dock="Right" FontSize="13" FontWeight="SemiBold">
+                                    <Run Text="{Binding Today.Learned, Mode=OneWay}" /><Run Text=" of " /><Run Text="{Binding Today.Total, Mode=OneWay}" />
+                                </TextBlock>
+                                <TextBlock Text="Learned" Style="{StaticResource Hint}" />
+                            </DockPanel>
+                            <ProgressBar Style="{StaticResource Bar}" Value="{Binding LearnedPercent, Mode=OneWay}" AutomationProperties.Name="Learned" />
+                            <TextBlock Margin="0,12,0,0" Style="{StaticResource Hint}">
+                                <Run Text="This round:" /> <Run Text="{Binding Card.RoundText, Mode=OneWay}" />
                             </TextBlock>
-                            <TextBlock Text="Learned" Style="{DynamicResource HelmSecondaryText}" />
-                        </DockPanel>
-                        <ProgressBar Height="6" Minimum="0" Maximum="100" Value="{Binding LearnedPercent, Mode=OneWay}" AutomationProperties.Name="Learned" />
-                        <TextBlock Margin="0,10,0,0" Style="{DynamicResource HelmSecondaryText}">
-                            <Run Text="This round:" /> <Run Text="{Binding Card.RoundText, Mode=OneWay}" />
-                        </TextBlock>
-                        <TextBlock Margin="0,8,0,0" TextWrapping="Wrap" FontSize="12" Foreground="{DynamicResource SystemFillColorSuccessBrush}"
-                                   Text="All caught up: nothing is due now. These cards are extra rounds; come back when words fall due."
-                                   Visibility="{Binding IsCaughtUp, Converter={StaticResource BoolToVisibility}}" />
+                            <TextBlock Margin="0,8,0,0" FontSize="12" Foreground="{DynamicResource VocabSuccessText}" TextWrapping="Wrap"
+                                       Text="All caught up: nothing is due now. These cards are extra rounds; come back when words fall due."
+                                       Visibility="{Binding IsCaughtUp, Converter={StaticResource BoolToVisibility}}" />
                         </StackPanel>
                     </StackPanel>
                 </Border>
 
-                <Border Style="{DynamicResource HelmSurface}" Margin="0,0,0,12">
+                <Border Style="{StaticResource Card}" Margin="0,0,0,12">
                     <StackPanel>
                         <Button x:Name="CardsFold" Style="{StaticResource Fold}" Click="Fold_Click" Tag="cards" AutomationProperties.Name="Cards">
                             <DockPanel>
-                                <ui:SymbolIcon DockPanel.Dock="Right" Symbol="ChevronDown16" FontSize="14" RenderTransformOrigin="0.5,0.5" />
-                                <TextBlock Text="Cards" FontSize="15" FontWeight="SemiBold" Margin="0,0,10,0" />
-                                <TextBlock x:Name="CardsLine" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" Style="{DynamicResource HelmSecondaryText}"
+                                <ui:SymbolIcon DockPanel.Dock="Right" Symbol="ChevronDown16" FontSize="16" RenderTransformOrigin="0.5,0.5" />
+                                <TextBlock Text="Cards" FontSize="15" FontWeight="SemiBold" Margin="0,0,8,0" />
+                                <TextBlock x:Name="CardsLine" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" TextWrapping="NoWrap" Style="{StaticResource Hint}"
                                            Text="{Binding Card.KindText}" />
                             </DockPanel>
                         </Button>
-                        <StackPanel x:Name="CardsBody" Margin="0,10,0,0">
-                        <TextBlock Text="Kind of card" Style="{StaticResource FieldLabel}" Margin="0,0,0,4" />
-                        <ComboBox AutomationProperties.Name="Kind of card" ItemsSource="{Binding Settings.CardModes}" SelectedIndex="{Binding Settings.CardModeIndex}" />
-                        <DockPanel Margin="0,12,0,0">
-                            <ui:ToggleSwitch DockPanel.Dock="Right" AutomationProperties.Name="Chinese cards ask for the pinyin first" IsChecked="{Binding Settings.TypePinyin}" />
-                            <TextBlock Text="Chinese cards ask for the pinyin first" FontSize="13" TextWrapping="Wrap" VerticalAlignment="Center" Margin="0,0,10,0" />
-                        </DockPanel>
+                        <StackPanel x:Name="CardsBody" Margin="0,12,0,0">
+                            <TextBlock Text="Kind of card" Style="{StaticResource FieldLabel}" />
+                            <ComboBox AutomationProperties.Name="Kind of card" ItemsSource="{Binding Settings.CardModes}" SelectedIndex="{Binding Settings.CardModeIndex}" />
+                            <DockPanel Margin="0,12,0,0">
+                                <ui:ToggleSwitch DockPanel.Dock="Right" AutomationProperties.Name="Chinese cards ask for the pinyin first" IsChecked="{Binding Settings.TypePinyin}" />
+                                <TextBlock Text="Chinese cards ask for the pinyin first" FontSize="13" TextWrapping="Wrap" VerticalAlignment="Center" Margin="0,0,12,0" />
+                            </DockPanel>
                         </StackPanel>
                     </StackPanel>
                 </Border>
 
-                <Border Style="{DynamicResource HelmSurface}">
+                <Border Style="{StaticResource Card}">
                     <StackPanel>
                         <Button x:Name="KeysFold" Style="{StaticResource Fold}" Click="Fold_Click" Tag="keys" AutomationProperties.Name="Keys">
                             <DockPanel>
-                                <ui:SymbolIcon DockPanel.Dock="Right" Symbol="ChevronDown16" FontSize="14" RenderTransformOrigin="0.5,0.5" />
+                                <ui:SymbolIcon DockPanel.Dock="Right" Symbol="ChevronDown16" FontSize="16" RenderTransformOrigin="0.5,0.5" />
                                 <TextBlock Text="Keys" FontSize="15" FontWeight="SemiBold" />
                             </DockPanel>
                         </Button>
-                            <Grid x:Name="KeysBody" Margin="0,10,0,0">
-                                <Grid.Resources>
-                                    <Style TargetType="Border" BasedOn="{StaticResource Kbd}">
-                                        <Setter Property="Margin" Value="0,0,10,6" />
-                                        <Setter Property="HorizontalAlignment" Value="Left" />
-                                    </Style>
-                                </Grid.Resources>
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="Auto" />
-                                    <ColumnDefinition Width="*" />
-                                </Grid.ColumnDefinitions>
-                                <Grid.RowDefinitions>
-                                    <RowDefinition /><RowDefinition /><RowDefinition /><RowDefinition /><RowDefinition /><RowDefinition /><RowDefinition />
-                                </Grid.RowDefinitions>
-                                <Border Grid.Row="0"><TextBlock Text="Space" HorizontalAlignment="Center" /></Border>
-                                <TextBlock Grid.Row="0" Grid.Column="1" Text="Show the answer" FontSize="13" />
-                                <Border Grid.Row="1"><TextBlock Text="1" HorizontalAlignment="Center" /></Border>
-                                <TextBlock Grid.Row="1" Grid.Column="1" Text="Forgot" FontSize="13" />
-                                <Border Grid.Row="2"><TextBlock Text="2" HorizontalAlignment="Center" /></Border>
-                                <TextBlock Grid.Row="2" Grid.Column="1" Text="Remembered" FontSize="13" />
-                                <Border Grid.Row="3"><TextBlock Text="L" HorizontalAlignment="Center" /></Border>
-                                <TextBlock Grid.Row="3" Grid.Column="1" Text="Listen" FontSize="13" />
-                                <Border Grid.Row="4"><TextBlock Text="S" HorizontalAlignment="Center" /></Border>
-                                <TextBlock Grid.Row="4" Grid.Column="1" Text="Skip" FontSize="13" />
-                                <Border Grid.Row="5"><TextBlock Text="K" HorizontalAlignment="Center" /></Border>
-                                <TextBlock Grid.Row="5" Grid.Column="1" Text="I know it" FontSize="13" />
-                                <Border Grid.Row="6"><TextBlock Text="Ctrl+N" HorizontalAlignment="Center" /></Border>
-                                <TextBlock Grid.Row="6" Grid.Column="1" Text="Add words" FontSize="13" />
-                            </Grid>
+                        <Grid x:Name="KeysBody" Margin="0,8,0,-6">
+                            <Grid.Resources>
+                                <Style TargetType="Border" BasedOn="{StaticResource Kbd}">
+                                    <Setter Property="Margin" Value="0,0,10,6" />
+                                    <Setter Property="HorizontalAlignment" Value="Left" />
+                                </Style>
+                                <Style TargetType="TextBlock">
+                                    <Setter Property="FontSize" Value="13" />
+                                    <Setter Property="VerticalAlignment" Value="Center" />
+                                    <Setter Property="Margin" Value="0,0,0,6" />
+                                </Style>
+                            </Grid.Resources>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+                            <Grid.RowDefinitions>
+                                <RowDefinition /><RowDefinition /><RowDefinition /><RowDefinition /><RowDefinition /><RowDefinition />
+                            </Grid.RowDefinitions>
+                            <Border Grid.Row="0"><TextBlock Text="Space" FontSize="11" Margin="0" /></Border>
+                            <TextBlock Grid.Row="0" Grid.Column="1" Text="Show the answer" />
+                            <Border Grid.Row="1"><TextBlock Text="1" FontSize="11" Margin="0" /></Border>
+                            <TextBlock Grid.Row="1" Grid.Column="1" Text="Forgot" />
+                            <Border Grid.Row="2"><TextBlock Text="2" FontSize="11" Margin="0" /></Border>
+                            <TextBlock Grid.Row="2" Grid.Column="1" Text="Remembered" />
+                            <Border Grid.Row="3"><TextBlock Text="L" FontSize="11" Margin="0" /></Border>
+                            <TextBlock Grid.Row="3" Grid.Column="1" Text="Listen" />
+                            <Border Grid.Row="4"><TextBlock Text="S" FontSize="11" Margin="0" /></Border>
+                            <TextBlock Grid.Row="4" Grid.Column="1" Text="Skip" />
+                            <Border Grid.Row="5"><TextBlock Text="K" FontSize="11" Margin="0" /></Border>
+                            <TextBlock Grid.Row="5" Grid.Column="1" Text="I know it" />
+                        </Grid>
                     </StackPanel>
                 </Border>
             </StackPanel>

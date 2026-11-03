@@ -1,0 +1,34 @@
+<UserControl
+    x:Class="Helm.Modules.Vocab.Views.VocabDeleteDialog"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    Visibility="Collapsed">
+
+    <!-- Delete… (a word's ⋯ menu) asks first: what goes with the word and what stays, Cancel or Delete.
+         DataContext: VocabViewModel. -->
+    <UserControl.Resources>
+        <ResourceDictionary Source="/Helm.Modules.Vocab;component/VocabTemplates.xaml" />
+    </UserControl.Resources>
+
+    <Grid Style="{StaticResource DialogScrim}">
+        <Border Style="{StaticResource DialogCard}" Width="460" AutomationProperties.Name="Delete the word">
+            <DockPanel>
+                <DockPanel DockPanel.Dock="Top" Style="{StaticResource DialogHeader}">
+                    <TextBlock Style="{StaticResource DialogTitle}">
+                        <Run Text="Delete “" /><Run Text="{Binding Detail.Word.Text, Mode=OneWay}" /><Run Text="”?" />
+                    </TextBlock>
+                </DockPanel>
+                <Border DockPanel.Dock="Bottom" Style="{StaticResource DialogFooter}">
+                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                        <Button x:Name="CancelButton" Style="{StaticResource Btn}" Content="Cancel" Click="Cancel_Click" />
+                        <Button Style="{StaticResource DangerBtn}" Margin="8,0,0,0" Content="Delete" Click="Delete_Click" />
+                    </StackPanel>
+                </Border>
+                <StackPanel Style="{StaticResource DialogBody}">
+                    <TextBlock TextWrapping="Wrap"
+                               Text="Its reviews go with it. Its parts stay for your other words. To keep it but stop seeing it, hide it instead." />
+                </StackPanel>
+            </DockPanel>
+        </Border>
+    </Grid>
+</UserControl>

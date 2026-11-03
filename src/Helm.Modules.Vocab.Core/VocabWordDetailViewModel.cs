@@ -114,6 +114,9 @@ public sealed partial class VocabWordDetailViewModel : ObservableObject
 
     public bool ShowTraditional { get; }
 
+    /// <summary>The traditional form where it is shown, else empty (the PC page sets it on the word's line).</summary>
+    public string ShownTraditional => ShowTraditional ? Word.Traditional : "";
+
     public bool HasNote => Word.Note.Length > 0;
 
     /// <summary>The line of a pasted text (Add text) the word was picked from.</summary>

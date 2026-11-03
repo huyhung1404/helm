@@ -35,24 +35,34 @@
     </UserControl.Resources>
 
     <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Focusable="False">
-        <StackPanel x:Name="RootsPanel" MaxWidth="1100" Margin="0,0,0,24" Focusable="True" FocusVisualStyle="{x:Null}">
+        <!-- At most 1100 px wide, flush left -->
+        <Grid>
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" MaxWidth="1100" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+        <StackPanel x:Name="RootsPanel" Margin="0,0,0,32" Focusable="True" FocusVisualStyle="{x:Null}">
 
             <!-- ===== The families ===== -->
             <StackPanel Style="{StaticResource Home}">
                 <DockPanel Margin="0,0,0,12">
-                    <ui:Button DockPanel.Dock="Right" Content="Practise roots" Icon="{ui:SymbolIcon HatGraduation24}" Command="{Binding NextRootCommand}"
-                               ToolTip="A root alone: say its meaning, then see its family" />
+                    <Button DockPanel.Dock="Right" Style="{StaticResource Btn}" Margin="12,0,0,0" Content="Practise roots" pc:ButtonIcon.Symbol="HatGraduation24"
+                            Command="{Binding NextRootCommand}" ToolTip="A root alone: say its meaning, then see its family" />
                     <Border DockPanel.Dock="Left" Style="{StaticResource SegmentBar}" Margin="0,0,12,0">
                         <StackPanel Orientation="Horizontal">
-                            <Button Style="{StaticResource SegmentButton}" Tag="{Binding IsEnglish}" Content="English" Command="{Binding ShowEnglishCommand}"
-                                    AutomationProperties.Name="English roots" />
-                            <Button Style="{StaticResource SegmentButton}" Tag="{Binding IsChinese}" Content="中文" Command="{Binding ShowChineseCommand}"
-                                    AutomationProperties.Name="Chinese roots" />
+                            <Button Style="{StaticResource SegmentButton}" Tag="{Binding IsEnglish}" Command="{Binding ShowEnglishCommand}" AutomationProperties.Name="English roots">
+                                <TextBlock><Run Text="English" /><Run Text="&#x2002;" FontSize="12" /><Run Text="{Binding EnglishCount, Mode=OneWay}" FontWeight="Normal" FontSize="12"
+                                    Foreground="{DynamicResource TextFillColorSecondaryBrush}" /></TextBlock>
+                            </Button>
+                            <Button Style="{StaticResource SegmentButton}" Tag="{Binding IsChinese}" Command="{Binding ShowChineseCommand}" AutomationProperties.Name="Chinese roots">
+                                <TextBlock><Run Text="中文" /><Run Text="&#x2002;" FontSize="12" /><Run Text="{Binding ChineseCount, Mode=OneWay}" FontWeight="Normal" FontSize="12"
+                                    Foreground="{DynamicResource TextFillColorSecondaryBrush}" /></TextBlock>
+                            </Button>
                         </StackPanel>
                     </Border>
-                    <TextBlock Text="A part shared by several of your words makes a family." VerticalAlignment="Center" Style="{DynamicResource HelmSecondaryText}" />
+                    <TextBlock Text="A part shared by several of your words makes a family." VerticalAlignment="Center" Style="{StaticResource Hint}" />
                 </DockPanel>
-                <TextBlock Margin="0,8" FontSize="14" Style="{DynamicResource HelmSecondaryText}" Visibility="{Binding HasNoRoots, Converter={StaticResource BoolToVisibility}}"
+                <TextBlock Margin="0,8" FontSize="14" Style="{StaticResource Hint}" Visibility="{Binding HasNoRoots, Converter={StaticResource BoolToVisibility}}"
                            Text="The parts of your words show up here once they are broken down; a part shared by several words makes a family." />
                 <ItemsControl x:Name="RootsList" ItemsSource="{Binding Source={StaticResource Families}}" ItemTemplate="{StaticResource FamilyCard}" Focusable="False"
                               Margin="0,0,-10,0">
@@ -80,67 +90,70 @@
                             </GroupStyle.ContainerStyle>
                             <GroupStyle.HeaderTemplate>
                                 <DataTemplate>
-                                    <TextBlock Text="{Binding Name}" Style="{StaticResource SectionTitle}" Margin="0,8,0,8" />
+                                    <TextBlock Text="{Binding Name}" Style="{StaticResource SectionTitle}" Margin="0,8,0,12" />
                                 </DataTemplate>
                             </GroupStyle.HeaderTemplate>
                         </GroupStyle>
                     </ItemsControl.GroupStyle>
                 </ItemsControl>
                 <DockPanel Margin="0,4,0,0" Visibility="{Binding Pages.HasPages, Converter={StaticResource BoolToVisibility}}">
-                    <ui:Button DockPanel.Dock="Left" Appearance="Transparent" Content="Previous" Icon="{ui:SymbolIcon ChevronLeft24}"
-                               Command="{Binding Pages.PreviousPageCommand}" AutomationProperties.Name="Previous page" />
-                    <ui:Button DockPanel.Dock="Right" Appearance="Transparent" Content="Next" Icon="{ui:SymbolIcon ChevronRight24}"
-                               Command="{Binding Pages.NextPageCommand}" AutomationProperties.Name="Next page" />
+                    <Button DockPanel.Dock="Left" Style="{StaticResource SmallGhostBtn}" Content="Previous" pc:ButtonIcon.Symbol="ChevronLeft24"
+                            Command="{Binding Pages.PreviousPageCommand}" AutomationProperties.Name="Previous page" />
+                    <Button DockPanel.Dock="Right" Style="{StaticResource SmallGhostBtn}" Content="Next" pc:ButtonIcon.After="ChevronRight24"
+                            Command="{Binding Pages.NextPageCommand}" AutomationProperties.Name="Next page" />
                     <TextBlock HorizontalAlignment="Center" VerticalAlignment="Center" FontSize="13">
-                        <Run Text="{Binding Pages.PageText, Mode=OneWay}" /> <Run Text="·" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
-                        <Run Text="{Binding Pages.RangeText, Mode=OneWay}" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+                        <Run Text="{Binding Pages.PageText, Mode=OneWay}" /> <Run Text="·" Foreground="{DynamicResource TextFillColorSecondaryBrush}" FontSize="12" />
+                        <Run Text="{Binding Pages.RangeText, Mode=OneWay}" Foreground="{DynamicResource TextFillColorSecondaryBrush}" FontSize="12" />
                     </TextBlock>
                 </DockPanel>
             </StackPanel>
 
-            <!-- ===== Practising a root: the part alone, then its meaning and family ===== -->
-            <Border Style="{DynamicResource HelmSurface}" Padding="0" MaxWidth="760" Visibility="{Binding HasPractice, Converter={StaticResource BoolToVisibility}}">
+            <!-- ===== Practising a root: the part alone, then its meaning and family (760 px at most, centred) ===== -->
+            <Border Style="{StaticResource Card}" Padding="0" MaxWidth="760" Visibility="{Binding HasPractice, Converter={StaticResource BoolToVisibility}}">
                 <DockPanel>
-                    <DockPanel DockPanel.Dock="Top" Margin="20,14,12,0">
-                        <ui:Button DockPanel.Dock="Right" Style="{StaticResource IconButton}" Icon="{ui:SymbolIcon Dismiss24}" Command="{Binding ClosePracticeCommand}"
-                                   ToolTip="Stop practising (Esc)" AutomationProperties.Name="Stop practising" />
+                    <DockPanel DockPanel.Dock="Top" Margin="20,14,16,0">
+                        <Button DockPanel.Dock="Right" Style="{StaticResource IconBtn}" pc:ButtonIcon.Symbol="Dismiss24" Command="{Binding ClosePracticeCommand}"
+                                ToolTip="Stop practising (Esc)" AutomationProperties.Name="Stop practising" />
                         <Border Style="{StaticResource AccentTag}" HorizontalAlignment="Left">
                             <TextBlock Text="Root practice" />
                         </Border>
                     </DockPanel>
                     <Border DockPanel.Dock="Bottom" Style="{StaticResource CardBar}">
                         <DockPanel>
-                            <ui:Button DockPanel.Dock="Left" Appearance="Transparent" Content="Stop" Command="{Binding ClosePracticeCommand}" />
-                            <ui:Button DockPanel.Dock="Right" HorizontalAlignment="Right" Appearance="Primary" Height="40" Padding="20,0" FontWeight="SemiBold"
-                                       Command="{Binding RevealRootCommand}" AutomationProperties.Name="Show the meaning"
-                                       Visibility="{Binding IsPracticeRevealed, Converter={StaticResource InverseBoolToVisibility}}">
+                            <Button DockPanel.Dock="Left" Style="{StaticResource GhostBtn}" Content="Stop" Command="{Binding ClosePracticeCommand}" />
+                            <Button DockPanel.Dock="Right" HorizontalAlignment="Right" Style="{StaticResource TallPrimaryBtn}"
+                                    Command="{Binding RevealRootCommand}" AutomationProperties.Name="Show the meaning"
+                                    Visibility="{Binding IsPracticeRevealed, Converter={StaticResource InverseBoolToVisibility}}">
                                 <StackPanel Orientation="Horizontal">
                                     <TextBlock Text="Show the meaning" VerticalAlignment="Center" />
-                                    <Border Style="{StaticResource Kbd}"><TextBlock Text="Space" HorizontalAlignment="Center" /></Border>
+                                    <Border Style="{StaticResource AccentKbd}"><TextBlock Text="Space" /></Border>
                                 </StackPanel>
-                            </ui:Button>
-                            <ui:Button DockPanel.Dock="Right" HorizontalAlignment="Right" Appearance="Primary" Height="40" Padding="20,0" FontWeight="SemiBold"
-                                       Content="Next root" Icon="{ui:SymbolIcon ArrowNext24}" Command="{Binding NextRootCommand}"
-                                       Visibility="{Binding IsPracticeRevealed, Converter={StaticResource BoolToVisibility}}" />
+                            </Button>
+                            <Button DockPanel.Dock="Right" HorizontalAlignment="Right" Style="{StaticResource TallPrimaryBtn}"
+                                    Content="Next root" pc:ButtonIcon.After="ChevronRight24" Command="{Binding NextRootCommand}"
+                                    Visibility="{Binding IsPracticeRevealed, Converter={StaticResource BoolToVisibility}}" />
+                            <Border />
                         </DockPanel>
                     </Border>
                     <StackPanel>
-                        <Button Style="{StaticResource FlatButton}" Margin="12,4,12,0" Padding="24,28" Command="{Binding RevealRootCommand}" AutomationProperties.Name="Show the meaning">
+                        <Button Style="{StaticResource FlatButton}" MinHeight="220" Padding="24" VerticalContentAlignment="Center" Command="{Binding RevealRootCommand}"
+                                AutomationProperties.Name="Show the meaning">
                             <StackPanel HorizontalAlignment="Center">
-                                <TextBlock Text="What does this part mean?" FontSize="14" HorizontalAlignment="Center" Style="{DynamicResource HelmSecondaryText}" />
-                                <TextBlock Text="{Binding Practice.Form}" FontSize="56" FontWeight="SemiBold" HorizontalAlignment="Center" />
-                                <TextBlock Text="{Binding Practice.Kind}" HorizontalAlignment="Center" Style="{DynamicResource HelmSecondaryText}" />
+                                <TextBlock Text="What does this part mean?" FontSize="14" HorizontalAlignment="Center" Style="{StaticResource Hint}" />
+                                <TextBlock Margin="0,10,0,0" Text="{Binding Practice.Form}" FontSize="56" FontWeight="SemiBold" LineHeight="62" LineStackingStrategy="BlockLineHeight"
+                                           HorizontalAlignment="Center" />
+                                <TextBlock Margin="0,10,0,0" Text="{Binding Practice.Kind}" HorizontalAlignment="Center" Style="{StaticResource Hint}" />
                             </StackPanel>
                         </Button>
-                        <Border Margin="20,0" Padding="0,20" BorderThickness="0,1,0,0" BorderBrush="{DynamicResource CardStrokeColorDefaultBrush}"
+                        <Border Margin="20,0" Padding="0,20" BorderThickness="0,1,0,0" BorderBrush="{DynamicResource VocabHairline}"
                                 Visibility="{Binding IsPracticeRevealed, Converter={StaticResource BoolToVisibility}}">
                             <StackPanel HorizontalAlignment="Center">
                                 <TextBlock Text="{Binding Practice.Meaning}" FontSize="22" HorizontalAlignment="Center" TextWrapping="Wrap" TextAlignment="Center" />
-                                <TextBlock Margin="0,4,0,0" Text="{Binding Practice.Origin}" FontSize="14" HorizontalAlignment="Center" TextAlignment="Center"
-                                           Style="{DynamicResource HelmSecondaryText}" Visibility="{Binding Practice.HasOrigin, Converter={StaticResource BoolToVisibility}}" />
-                                <TextBlock Margin="0,14,0,6" Text="Its family in your words" HorizontalAlignment="Center" Style="{StaticResource SectionTitle}" />
+                                <TextBlock Margin="0,8,0,0" Text="{Binding Practice.Origin}" FontSize="14" HorizontalAlignment="Center" TextAlignment="Center"
+                                           Style="{StaticResource Hint}" Visibility="{Binding Practice.HasOrigin, Converter={StaticResource BoolToVisibility}}" />
+                                <TextBlock Margin="0,18,0,8" Text="Its family in your words" HorizontalAlignment="Center" Style="{StaticResource Lbl}" />
                                 <ItemsControl ItemsSource="{Binding Practice.Words}" Focusable="False" HorizontalAlignment="Center" ItemTemplate="{StaticResource WordLink}"
-                                              ItemsPanel="{StaticResource Wrap}" />
+                                              ItemsPanel="{StaticResource Wrap}" Margin="0,0,-6,-6" />
                             </StackPanel>
                         </Border>
                     </StackPanel>
@@ -150,58 +163,59 @@
             <!-- ===== A family: back to the list, the families before and after it ===== -->
             <StackPanel Visibility="{Binding HasSelected, Converter={StaticResource BoolToVisibility}}">
                 <DockPanel Margin="0,0,0,12">
-                    <ui:Button DockPanel.Dock="Left" Appearance="Transparent" Content="All roots" Icon="{ui:SymbolIcon ArrowLeft24}" ToolTip="Back to the list (Esc)"
-                               AutomationProperties.Name="Back to the roots" Command="{Binding CloseSelectedCommand}" />
+                    <Button DockPanel.Dock="Left" Style="{StaticResource GhostBtn}" Content="All roots" pc:ButtonIcon.Symbol="ArrowLeft24" ToolTip="Back to the list (Esc)"
+                            AutomationProperties.Name="Back to the roots" Command="{Binding CloseSelectedCommand}" />
                     <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
-                        <TextBlock Text="{Binding RootPosition}" VerticalAlignment="Center" Margin="0,0,10,0" Style="{DynamicResource HelmSecondaryText}" />
-                        <ui:Button Appearance="Transparent" Content="Previous" Icon="{ui:SymbolIcon ChevronLeft24}" ToolTip="The family before this one (←)"
-                                   Command="{Binding PreviousFamilyCommand}" IsEnabled="{Binding HasPreviousRoot}" />
-                        <ui:Button Margin="4,0,0,0" Appearance="Transparent" Content="Next" Icon="{ui:SymbolIcon ChevronRight24}" ToolTip="The family after this one (→)"
-                                   Command="{Binding NextFamilyCommand}" IsEnabled="{Binding HasNextRoot}" />
+                        <TextBlock Text="{Binding RootPosition}" VerticalAlignment="Center" Margin="0,0,12,0" Style="{StaticResource Hint}" />
+                        <Button Style="{StaticResource SmallGhostBtn}" Content="Previous" pc:ButtonIcon.Symbol="ChevronLeft24" ToolTip="The family before this one (←)"
+                                Command="{Binding PreviousFamilyCommand}" IsEnabled="{Binding HasPreviousRoot}" />
+                        <Button Style="{StaticResource SmallGhostBtn}" Margin="4,0,0,0" Content="Next" pc:ButtonIcon.After="ChevronRight24" ToolTip="The family after this one (→)"
+                                Command="{Binding NextFamilyCommand}" IsEnabled="{Binding HasNextRoot}" />
                     </StackPanel>
                     <Border />
                 </DockPanel>
 
-                <!-- The part, and more of its family from the agent -->
-                <Border Style="{DynamicResource HelmSurface}" Padding="24,20" Margin="0,0,0,12">
+                <!-- The part and its kind on one baseline, its meaning and origin; more of its family from the agent -->
+                <Border Style="{StaticResource Card}" Padding="24,20" Margin="0,0,0,12">
                     <DockPanel>
-                        <ui:Button DockPanel.Dock="Right" VerticalAlignment="Top" Content="Suggest 3 more words" Icon="{ui:SymbolIcon Sparkle24}" Command="{Binding SuggestCommand}"
-                                   ToolTip="Claude Code adds and breaks down a few useful words of this family"
-                                   Visibility="{Binding Agent.CanRun, Converter={StaticResource BoolToVisibility}}" />
+                        <Button DockPanel.Dock="Right" Style="{StaticResource Btn}" Margin="24,0,0,0" VerticalAlignment="Top" Content="Suggest 3 more words"
+                                pc:ButtonIcon.Symbol="Sparkle24" Command="{Binding SuggestCommand}" ToolTip="Claude Code adds and breaks down a few useful words of this family"
+                                Visibility="{Binding Agent.CanRun, Converter={StaticResource BoolToVisibility}}" />
                         <StackPanel>
                             <WrapPanel>
-                                <TextBlock Text="{Binding Selected.Form}" FontSize="38" FontWeight="SemiBold" Margin="0,0,12,0" />
+                                <TextBlock Text="{Binding Selected.Form}" FontSize="38" FontWeight="SemiBold" LineHeight="42" LineStackingStrategy="BlockLineHeight" Margin="0,0,12,0" />
                                 <Border Style="{StaticResource Tag}" Margin="0,0,0,6" VerticalAlignment="Bottom">
                                     <TextBlock Text="{Binding Selected.Kind}" />
                                 </Border>
                             </WrapPanel>
-                            <TextBlock Margin="0,4,0,0" Text="{Binding Selected.Meaning}" FontSize="19" TextWrapping="Wrap" />
-                            <TextBlock Margin="0,4,0,0" Text="{Binding Selected.Origin}" FontSize="14" Style="{DynamicResource HelmSecondaryText}"
+                            <TextBlock Margin="0,8,0,0" Text="{Binding Selected.Meaning}" FontSize="19" TextWrapping="Wrap" />
+                            <TextBlock Margin="0,6,0,0" Text="{Binding Selected.Origin}" FontSize="14" Style="{StaticResource Hint}"
                                        Visibility="{Binding Selected.HasOrigin, Converter={StaticResource BoolToVisibility}}" />
-                            <TextBlock Margin="0,8,0,0" Text="{Binding Agent.Status}" Style="{DynamicResource HelmSecondaryText}"
+                            <TextBlock Margin="0,8,0,0" Text="{Binding Agent.Status}" Style="{StaticResource Hint}"
                                        Visibility="{Binding Agent.HasStatus, Converter={StaticResource BoolToVisibility}}" />
                         </StackPanel>
                     </DockPanel>
                 </Border>
 
-                <!-- Its words: the part marked inside each -->
-                <Border Style="{DynamicResource HelmSurface}" Padding="0">
+                <!-- Its words: the part marked inside each, the meaning, how well it is known -->
+                <Border Style="{StaticResource Card}" Padding="0">
                     <StackPanel>
                         <TextBlock Margin="16,14,16,8" Style="{StaticResource CardTitle}">
-                            <Run Text="Your words with it" /> <Run Text="{Binding Selected.Words.Count, Mode=OneWay, StringFormat=({0})}" FontWeight="Normal"
+                            <Run Text="Your words with it" /> <Run Text="{Binding Selected.Words.Count, Mode=OneWay, StringFormat=({0})}" FontWeight="Normal" FontSize="12"
                                 Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
                         </TextBlock>
                         <ItemsControl ItemsSource="{Binding Selected.Words}" Focusable="False">
                             <ItemsControl.ItemTemplate>
                                 <DataTemplate DataType="{x:Type local:VocabWordLink}">
                                     <Button Style="{StaticResource RowButton}" Command="{Binding Open}" AutomationProperties.Name="{Binding Text}" ToolTip="Open the word">
-                                        <Grid pc:GridColumns.Widths="1.15*,16,1.6*,16,20">
+                                        <Grid pc:GridColumns.Widths="1.15*,16,1.6*,16,150,16,20">
                                             <TextBlock FontSize="16" FontWeight="SemiBold" VerticalAlignment="Center" TextTrimming="CharacterEllipsis">
                                                 <Run Text="{Binding Split.Before, Mode=OneWay}" /><Run Text="{Binding Split.Match, Mode=OneWay}" FontWeight="Bold" TextDecorations="Underline"
-                                                    Foreground="{DynamicResource AccentTextFillColorPrimaryBrush}" /><Run Text="{Binding Split.After, Mode=OneWay}" />
+                                                    Foreground="{DynamicResource AccentFillColorDefaultBrush}" /><Run Text="{Binding Split.After, Mode=OneWay}" />
                                             </TextBlock>
-                                            <TextBlock Grid.Column="2" Text="{Binding Meaning}" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
-                                            <ui:SymbolIcon Grid.Column="4" Symbol="ChevronRight24" FontSize="16" VerticalAlignment="Center" Foreground="{DynamicResource TextFillColorTertiaryBrush}" />
+                                            <TextBlock Grid.Column="2" Text="{Binding Meaning}" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" Foreground="{DynamicResource VocabMeaningText}" />
+                                            <ItemsControl Grid.Column="4" Style="{StaticResource Dots}" ItemsSource="{Binding Dots}" HorizontalAlignment="Left" />
+                                            <ui:SymbolIcon Grid.Column="6" Symbol="ChevronRight24" FontSize="16" VerticalAlignment="Center" Foreground="{DynamicResource VocabFaintText}" />
                                         </Grid>
                                     </Button>
                                 </DataTemplate>
@@ -211,5 +225,6 @@
                 </Border>
             </StackPanel>
         </StackPanel>
+        </Grid>
     </ScrollViewer>
 </UserControl>

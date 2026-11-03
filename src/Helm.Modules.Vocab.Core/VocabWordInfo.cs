@@ -28,6 +28,9 @@ public sealed class VocabWordInfo(VocabWord word)
     /// <summary>"affect: động từ, tác động lên…".</summary>
     public IReadOnlyList<string> Confusables => word.Confusables.Select(c => c.Note.Length > 0 ? $"{c.Word}: {c.Note}" : c.Word).ToList();
 
+    /// <summary>The same, word and note apart (the PC page sets the word in bold).</summary>
+    public IReadOnlyList<VocabConfusable> ConfusableItems => word.Confusables;
+
     public bool HasConfusables => word.Confusables.Count > 0;
 
     /// <summary>The other words of its family, each with its part of speech and meaning.</summary>
