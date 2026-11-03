@@ -16,9 +16,6 @@ public sealed class SentenceEmbedder : ITextEmbedder, IDisposable
     /// <summary>Parts of a long text that get a vector; the rest of a very long note is found by its words only.</summary>
     public const int MaxParts = 32;
 
-    /// <summary>Texts the model reads in one run.</summary>
-    private const int Batch = 8;
-
     private static readonly int Threads = Math.Clamp(Environment.ProcessorCount / 2, 1, 4);
 
     private readonly SentenceModelInstaller _installer;
@@ -98,10 +95,12 @@ public sealed class SentenceEmbedder : ITextEmbedder, IDisposable
                 if (Load() is not var (tokenizer, model)) return (IReadOnlyList<float[]>)[];
                 var texts = encode(tokenizer);
                 var vectors = new List<float[]>(texts.Count);
-                foreach (var batch in texts.Chunk(Batch))
+                // One text per run: the int8 model scales each run's numbers together, so padding a shorter text to
+                // a longer one beside it would change its vector.
+                foreach (var one in texts)
                 {
                     ct.ThrowIfCancellationRequested();
-                    vectors.AddRange(model.Embed(batch));
+                    vectors.AddRange(model.Embed([one]));
                 }
                 return vectors;
             }, ct).ConfigureAwait(false);

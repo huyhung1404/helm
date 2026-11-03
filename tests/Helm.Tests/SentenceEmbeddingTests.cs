@@ -28,7 +28,7 @@ public sealed class SentenceEmbeddingTests(ITestOutputHelper output)
     private static JsonElement Reference => JsonDocument.Parse(File.ReadAllText(Path.Combine(Fixtures, "reference.json"))).RootElement;
 
     /// <summary>The model's files: HELM_SENTENCE_MODEL, else where they were downloaded by hand. CI has neither.</summary>
-    private static string? ModelFolder()
+    internal static string? ModelFolder()
     {
         foreach (var folder in new[] { Environment.GetEnvironmentVariable("HELM_SENTENCE_MODEL"), @"C:\tmp\sentence-model" })
             if (!string.IsNullOrEmpty(folder) && File.Exists(Path.Combine(folder, "model_quantized.onnx")) && File.Exists(Path.Combine(folder, "tokenizer.json")))
@@ -142,11 +142,8 @@ public sealed class SentenceEmbeddingTests(ITestOutputHelper output)
     [Fact]
     public async Task The_real_model_gives_the_vectors_of_the_reference_and_finds_by_meaning()
     {
-        if (ModelFolder() is not { } folder) return;
-        var installer = new SentenceModelInstaller(new SentenceModelFiles(folder, [.. SentenceModelFiles.All]), NullLogger<SentenceModelInstaller>.Instance);
-        // The files were put there by hand: mark them checked as the download does.
-        foreach (var file in installer.Files.Files) await File.WriteAllTextAsync(installer.Files.CheckedMarkOf(file), file.Sha256);
-        using var embedder = new SentenceEmbedder(installer, NullLogger<SentenceEmbedder>.Instance);
+        if (RealEmbedder() is not { } embedder) return;
+        using var _ = embedder;
 
         var watch = Stopwatch.StartNew();
         await embedder.EmbedAsync("xin chào");
@@ -176,6 +173,16 @@ public sealed class SentenceEmbeddingTests(ITestOutputHelper output)
         var scores = vectors.Select(v => EmbeddingVector.Cosine(query, v)).ToList();
         output.WriteLine(string.Join(", ", scores.Select(s => s.ToString("0.000"))));
         Assert.Equal(0, scores.IndexOf(scores.Max()));
+    }
+
+    /// <summary>The sentence model where it is on this PC (<see cref="ModelFolder"/>), else null.</summary>
+    internal static SentenceEmbedder? RealEmbedder()
+    {
+        if (ModelFolder() is not { } folder) return null;
+        var files = new SentenceModelFiles(folder);
+        // The files were put there by hand: mark them checked as the download does.
+        foreach (var file in files.Files) File.WriteAllText(files.CheckedMarkOf(file), file.Sha256);
+        return new SentenceEmbedder(new SentenceModelInstaller(files, NullLogger<SentenceModelInstaller>.Instance), NullLogger<SentenceEmbedder>.Instance);
     }
 
     private static (string Text, List<int> Ids) TokenSample(int index)

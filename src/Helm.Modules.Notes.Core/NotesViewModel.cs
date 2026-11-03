@@ -70,6 +70,11 @@ public sealed partial class NotesViewModel : ObservableObject, IDisposable
     private readonly LinkHub? _links;
     private readonly Dictionary<string, NoteRowViewModel> _rows = new(StringComparer.Ordinal);
     private readonly Timer _autosave;
+    private readonly NoteMeaning? _meaning;
+    private CancellationTokenSource? _meaningSearch;
+
+    // The search that was last looked up by meaning, and how close each note is to it.
+    private (string Search, IReadOnlyDictionary<string, double> Notes)? _close;
     private int _refreshQueued;
     private bool _loading;
     private bool _saving;
@@ -108,10 +113,14 @@ public sealed partial class NotesViewModel : ObservableObject, IDisposable
         IClipboardService clipboard,
         ILogger<NotesViewModel> logger,
         LinkHub? links = null,
-        Helm.Core.Tasks.INoteTaskMaker? taskMaker = null)
+        Helm.Core.Tasks.INoteTaskMaker? taskMaker = null,
+        NoteMeaning? meaning = null,
+        NoteSearchModelViewModel? searchModel = null)
     {
         _store = store;
         _links = links;
+        _meaning = meaning;
+        SearchModel = searchModel;
         _general = settings.Get<GeneralSettings>(GeneralSettings.StoreId);
         _taskMaker = taskMaker;
         Tasks = taskMaker is null ? null : new NoteTasksViewModel(taskMaker, () => (EditTitle, EditBody), body => EditBody = body,
@@ -153,6 +162,9 @@ public sealed partial class NotesViewModel : ObservableObject, IDisposable
             : new LinksViewModel(_links!, new LinkRef(LinkKinds.Note, id), [LinkKinds.Task, LinkKinds.Person, LinkKinds.Mission], () => EditTitle);
     }
 
+    /// <summary>"Search by meaning" in the settings: the sentence model on this device; null where Notes runs without it.</summary>
+    public NoteSearchModelViewModel? SearchModel { get; }
+
     /// <summary>The notes shown: search results, or the trash.</summary>
     public ObservableCollection<NoteRowViewModel> Notes { get; } = [];
 
@@ -193,6 +205,44 @@ public sealed partial class NotesViewModel : ObservableObject, IDisposable
     {
         RefreshList();
         OnPropertyChanged(nameof(EmptyListText));
+        SearchByMeaning();
+    }
+
+    /// <summary>A pause in typing before a search is looked up by meaning too.</summary>
+    public static readonly TimeSpan MeaningDelay = TimeSpan.FromMilliseconds(300);
+
+    /// <summary>
+    /// With the sentence model on this device: a moment after typing stops, the notes close in meaning to the search
+    /// join the list, after the notes holding its words.
+    /// </summary>
+    private void SearchByMeaning()
+    {
+        _meaningSearch?.Cancel();
+        _meaningSearch = null;
+        var search = Search.Trim();
+        if (_meaning is not { IsAvailable: true } meaning || search.Length < 3) return;
+        var cancel = _meaningSearch = new CancellationTokenSource();
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                await Task.Delay(MeaningDelay, cancel.Token).ConfigureAwait(false);
+                if (await meaning.SimilaritiesAsync(search, cancel.Token).ConfigureAwait(false) is not { } close) return;
+                _ui.Post(() =>
+                {
+                    if (cancel.IsCancellationRequested || Search.Trim() != search) return;
+                    _close = (search, close);
+                    RefreshList();
+                });
+            }
+            catch (OperationCanceledException)
+            {
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Notes search by meaning failed");
+            }
+        });
     }
 
     partial void OnShowingTrashChanged(bool value)
@@ -567,7 +617,11 @@ public sealed partial class NotesViewModel : ObservableObject, IDisposable
         Message = $"Could not save the notes: {ex.Message}";
     }
 
-    public void Dispose() => _autosave.Dispose();
+    public void Dispose()
+    {
+        _meaningSearch?.Cancel();
+        _autosave.Dispose();
+    }
 
     // ---- Refresh -------------------------------------------------------------------------------------------------
 
@@ -604,6 +658,13 @@ public sealed partial class NotesViewModel : ObservableObject, IDisposable
         var source = ShowingTrash ? _store.Trash() : _store.Notes((NotesSortOrder)Math.Clamp(SortOrderIndex, 0, SortOrderNames.Count - 1));
         var terms = TextSearch.Terms(Search);
         var found = terms.Count == 0 ? source : source.Where(n => TextSearch.Score(terms, n.Value.DisplayTitle, n.Value.Body) > 0).ToList();
+        if (terms.Count > 0 && _close is { } close && close.Search == Search.Trim())
+        {
+            // After the notes with the words: the notes about the same thing, the closest first.
+            var listed = found.Select(n => n.Id).ToHashSet(StringComparer.Ordinal);
+            var byMeaning = NoteRecall.FoundByMeaning(source.Select(n => n.Id), close.Notes);
+            found = [.. found, .. source.Where(n => !listed.Contains(n.Id) && byMeaning(n.Id)).OrderByDescending(n => close.Notes[n.Id])];
+        }
         var shown = Pager.Take(found, (ShowingTrash, Search.Trim(), SortOrderIndex));
 
         var live = new HashSet<string>(StringComparer.Ordinal);

@@ -35,7 +35,11 @@ public sealed class SentenceModel : IDisposable
         _hasTokenTypes = inputs.Contains("token_type_ids");
     }
 
-    /// <summary>The vectors of several texts' ids (each at most <see cref="MaxTokens"/>), in one run.</summary>
+    /// <summary>
+    /// The vectors of several texts' ids (each at most <see cref="MaxTokens"/>), in one run. The int8 model scales a
+    /// run's numbers together, so a text's vector depends a little on the texts beside it: one text per run gives the
+    /// reference's vectors.
+    /// </summary>
     public float[][] Embed(IReadOnlyList<IReadOnlyList<int>> texts)
     {
         if (texts.Count == 0) return [];
