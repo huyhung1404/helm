@@ -66,6 +66,12 @@ public interface IAssistantChat
 {
     void AddUser(string text);
 
+    /// <summary>
+    /// The user's words with a photo (<see cref="AssistantImage"/>), for a model that reads pictures. The next
+    /// <see cref="NextAsync"/> throws <see cref="AssistantImageException"/> when the model turns the picture down.
+    /// </summary>
+    void AddUser(string text, AssistantImage image) => throw new AssistantImageException("This model cannot read photos.");
+
     /// <summary>Sends the conversation; the model's answer is added to it.</summary>
     Task<AssistantStep> NextAsync(CancellationToken ct);
 
@@ -86,6 +92,15 @@ public interface IAssistantChatFactory
 
     IAssistantChat Create(string apiKey, string model, string effort, string system, IReadOnlyList<AssistantTool> tools);
 }
+
+/// <summary>A photo for the model: the bytes as sent (a JPEG made small on the phone) and their media type.</summary>
+public sealed record AssistantImage(byte[] Data, string MediaType = "image/jpeg");
+
+/// <summary>
+/// The model does not take pictures (the provider said so for the photo just added): the caller may ask another model.
+/// Not an <see cref="AssistantException"/>, so it leaves <see cref="AssistantLoop"/> instead of ending the turn there.
+/// </summary>
+public sealed class AssistantImageException(string message, Exception? inner = null) : Exception(message, inner);
 
 /// <summary>The provider could not be used for this call (key rejected, no credit, no internet…): said to the user as is.</summary>
 public sealed class AssistantException(string message, Exception? inner = null) : Exception(message, inner);
