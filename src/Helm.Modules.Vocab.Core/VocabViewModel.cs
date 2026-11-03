@@ -83,7 +83,8 @@ public sealed partial class VocabViewModel : ObservableObject
         settings.Changed += (_, name) => OnSettingChanged(name);
         agent.PropertyChanged += (_, e) =>
         {
-            if (e.PropertyName is nameof(VocabAgentViewModel.IsBusy) or nameof(VocabAgentViewModel.ExternalBusy)) OnAgentWorkChanged();
+            if (e.PropertyName is nameof(VocabAgentViewModel.IsBusy) or nameof(VocabAgentViewModel.ExternalBusy)
+                or nameof(VocabAgentViewModel.Steps) or nameof(VocabAgentViewModel.Status)) OnAgentWorkChanged();
         };
 
         _store.Changed += (_, _) => ScheduleRefresh();
@@ -147,13 +148,16 @@ public sealed partial class VocabViewModel : ObservableObject
     /// <summary>Something for the agent: words to break down, often forgotten, whose pinyin slips, lacking details.</summary>
     public bool HasAgentWork => PendingCount + HardCount + SlipCount + LackingCount + TextCount > 0;
 
-    /// <summary>The Analysis chip in the page's header: "Analyzing…", "3 waiting for analysis", "All words analyzed".</summary>
-    public string AgentChipText => Agent.IsBusy ? "Analyzing…" : Agent.ExternalBusy ? "AI agent working…" : PendingCount switch
+    /// <summary>The Analysis chip in the page's header: "Analyzing · step 7", "3 waiting for analysis", "All words analyzed".</summary>
+    public string AgentChipText => Agent.IsBusy ? (Agent.Steps > 0 ? $"Analyzing · step {Agent.Steps}" : "Analyzing…") : Agent.ExternalBusy ? "AI agent working…" : PendingCount switch
     {
         0 => "All words analyzed",
         1 => "1 waiting for analysis",
         _ => $"{PendingCount} waiting for analysis",
     };
+
+    /// <summary>The chip's tooltip: the step the agent is on while it works.</summary>
+    public string AgentChipToolTip => Agent.IsBusy && Agent.HasStatus ? Agent.Status : "What waits for Claude Code, and the analysis now";
 
     /// <summary>The chip's look: the agent at work, words waiting, or all done.</summary>
     public bool IsAgentBusy => Agent.IsBusy || Agent.ExternalBusy;
@@ -247,6 +251,7 @@ public sealed partial class VocabViewModel : ObservableObject
         OnPropertyChanged(nameof(HasAgentWork));
         OnPropertyChanged(nameof(AgentWorkText));
         OnPropertyChanged(nameof(AgentChipText));
+        OnPropertyChanged(nameof(AgentChipToolTip));
         OnPropertyChanged(nameof(IsAgentBusy));
         OnPropertyChanged(nameof(IsExternalAgentBusy));
         OnPropertyChanged(nameof(IsAgentWaiting));
@@ -303,6 +308,8 @@ public sealed partial class VocabViewModel : ObservableObject
     private void OpenAgent()
     {
         IsAddOpen = false;
+        // From a text waiting on the agent (See all steps): the Activity log, not under the text.
+        Texts.CloseCommand.Execute(null);
         IsAgentOpen = true;
     }
 

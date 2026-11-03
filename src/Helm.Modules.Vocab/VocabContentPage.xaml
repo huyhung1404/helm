@@ -72,7 +72,7 @@
             <DockPanel>
                 <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center">
                     <StackPanel x:Name="HeaderActions" Orientation="Horizontal">
-                        <Button Style="{StaticResource AgentChip}" Command="{Binding OpenAgentCommand}" ToolTip="What waits for Claude Code, and the analysis now"
+                        <Button Style="{StaticResource AgentChip}" Command="{Binding OpenAgentCommand}" ToolTip="{Binding AgentChipToolTip}"
                                 AutomationProperties.Name="{Binding AgentChipText, StringFormat='Analysis: {0}'}">
                             <StackPanel Orientation="Horizontal">
                                 <ui:ProgressRing IsIndeterminate="True" Width="16" Height="16" Margin="0,0,6,0" Foreground="{DynamicResource AccentFillColorDefaultBrush}"

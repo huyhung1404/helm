@@ -759,6 +759,8 @@ public sealed class VocabPracticeTests
         Assert.Equal(1, vm.Steps);
         Assert.StartsWith("Done in 0 s · 1 steps.", vm.Log[^1].Text);
         Assert.Contains("✓ 1 saved", vm.LogText);
+        // A text waiting on the agent shows the last few lines.
+        Assert.Equal(vm.Log.Skip(1).Select(l => l.Text), vm.RecentLog.Select(l => l.Text));
 
         // A new run starts a new log.
         await vm.AnalyzeCommand.ExecuteAsync(null);

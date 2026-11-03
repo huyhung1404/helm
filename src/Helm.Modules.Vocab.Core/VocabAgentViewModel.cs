@@ -97,6 +97,8 @@ public sealed partial class VocabAgentViewModel : ObservableObject, IDisposable
     /// <summary>How many tool calls the run in progress (or the last one) made.</summary>
     [ObservableProperty] private int _steps;
 
+    private const int RecentLines = 4;
+
     public VocabAgentViewModel(IVocabAgent? agent, VocabStore store, VocabQuiz quiz, VocabSettingsViewModel settings, IUiDispatcher ui)
     {
         _agent = agent;
@@ -105,7 +107,11 @@ public sealed partial class VocabAgentViewModel : ObservableObject, IDisposable
         _settings = settings;
         _ui = ui;
         _timer = new Timer(_ => _ui.Post(RunIfWaiting), null, Timeout.Infinite, Timeout.Infinite);
-        Log.CollectionChanged += (_, _) => OnPropertyChanged(nameof(HasLog));
+        Log.CollectionChanged += (_, _) =>
+        {
+            OnPropertyChanged(nameof(HasLog));
+            OnPropertyChanged(nameof(RecentLog));
+        };
         _store.Changed += (_, _) =>
         {
             // The store may raise this off the UI thread.
@@ -127,6 +133,9 @@ public sealed partial class VocabAgentViewModel : ObservableObject, IDisposable
     public ObservableCollection<VocabAgentLogLine> Log { get; } = [];
 
     public bool HasLog => Log.Count > 0;
+
+    /// <summary>The log's last few lines, for where the user waits on the agent (a text's proposed words).</summary>
+    public IReadOnlyList<VocabAgentLogLine> RecentLog => Log.Skip(Math.Max(0, Log.Count - RecentLines)).ToList();
 
     /// <summary>The log as text, for Copy log.</summary>
     public string LogText => string.Join(Environment.NewLine, Log.Select(l => $"{l.Time}  {l.Text}"));

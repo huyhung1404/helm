@@ -3,6 +3,13 @@
 All notable changes to Helm. The top section is used as the GitHub release body and as the Velopack release notes.
 Format: [Keep a Changelog](https://keepachangelog.com), versions follow [SemVer](https://semver.org).
 
+## [Unreleased]
+
+### Changed
+- **Vocabulary: see how far the analysis got.** While Claude Code works, the Analysis chip counts its steps
+  (“Analyzing · step 7”, the step it is on as its tooltip), and a pasted text waiting for its words shows the run’s
+  step and its last few lines instead of “Waiting for Claude Code”, with **See all steps** opening the Activity log.
+
 ## [0.77.0] - 2026-11-03
 
 ### Added

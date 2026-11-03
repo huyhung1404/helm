@@ -91,11 +91,64 @@
                         <StackPanel Visibility="{Binding IsDetailOpen, Converter={StaticResource BoolToVisibility}}">
                             <Border Style="{StaticResource InsetBox}" Padding="12,8" Margin="0,0,0,12"
                                     Visibility="{Binding IsDetailWaiting, Converter={StaticResource BoolToVisibility}}">
-                                <DockPanel>
-                                    <ui:ProgressRing DockPanel.Dock="Left" IsIndeterminate="True" Width="18" Height="18" Margin="0,0,10,0" />
-                                    <TextBlock VerticalAlignment="Center" TextWrapping="Wrap"
-                                               Text="Waiting for Claude Code to pick the words. It starts by itself, or press Analyze now in the Analysis chip." />
-                                </DockPanel>
+                                <StackPanel>
+                                    <DockPanel>
+                                        <ui:ProgressRing DockPanel.Dock="Left" IsIndeterminate="True" Width="18" Height="18" Margin="0,0,10,0"
+                                                         Foreground="{DynamicResource AccentFillColorDefaultBrush}" />
+                                        <Grid VerticalAlignment="Center">
+                                            <!-- Not started yet -->
+                                            <TextBlock TextWrapping="Wrap"
+                                                       Text="Waiting for Claude Code to pick the words. It starts by itself, or press Analyze now in the Analysis chip."
+                                                       Visibility="{Binding DataContext.IsAgentBusy, RelativeSource={RelativeSource AncestorType=UserControl}, Converter={StaticResource InverseBoolToVisibility}}" />
+                                            <!-- Helm's agent at work: how far it got, and the whole log one click away -->
+                                            <DockPanel Visibility="{Binding DataContext.Agent.IsBusy, RelativeSource={RelativeSource AncestorType=UserControl}, Converter={StaticResource BoolToVisibility}}">
+                                                <Button DockPanel.Dock="Right" Style="{StaticResource SmallGhostBtn}" Margin="10,0,0,0" Content="See all steps"
+                                                        Command="{Binding DataContext.OpenAgentCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                        ToolTip="The Analysis dialog's Activity: every step, with Stop and Copy log" />
+                                                <TextBlock VerticalAlignment="Center">
+                                                    <Run Text="Claude Code is at work" /><Run Text=" · step " Foreground="{DynamicResource TextFillColorSecondaryBrush}" /><Run
+                                                        Text="{Binding DataContext.Agent.Steps, RelativeSource={RelativeSource AncestorType=UserControl}, Mode=OneWay}"
+                                                        Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+                                                </TextBlock>
+                                            </DockPanel>
+                                            <!-- Another AI agent (over MCP) took the text -->
+                                            <TextBlock TextWrapping="Wrap" Text="{Binding DataContext.Agent.ExternalStatus, RelativeSource={RelativeSource AncestorType=UserControl}, Mode=OneWay}"
+                                                       Visibility="{Binding DataContext.Agent.ExternalBusy, RelativeSource={RelativeSource AncestorType=UserControl}, Converter={StaticResource BoolToVisibility}}" />
+                                        </Grid>
+                                    </DockPanel>
+                                    <!-- The last few steps, the newest at the bottom -->
+                                    <ItemsControl Margin="28,8,0,0" Focusable="False" AutomationProperties.Name="Latest steps"
+                                                  ItemsSource="{Binding DataContext.Agent.RecentLog, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                  Visibility="{Binding DataContext.Agent.IsBusy, RelativeSource={RelativeSource AncestorType=UserControl}, Converter={StaticResource BoolToVisibility}}">
+                                        <ItemsControl.ItemTemplate>
+                                            <DataTemplate>
+                                                <Grid Margin="0,2">
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="64" />
+                                                        <ColumnDefinition Width="*" />
+                                                    </Grid.ColumnDefinitions>
+                                                    <TextBlock Text="{Binding Time}" FontFamily="Consolas" FontSize="12" Margin="0,1,0,0" Style="{StaticResource Hint}" />
+                                                    <TextBlock x:Name="Line" Grid.Column="1" Text="{Binding Text}" TextWrapping="Wrap" FontSize="13" />
+                                                </Grid>
+                                                <DataTemplate.Triggers>
+                                                    <DataTrigger Binding="{Binding IsResult}" Value="True">
+                                                        <Setter TargetName="Line" Property="Foreground" Value="{DynamicResource VocabSuccessText}" />
+                                                    </DataTrigger>
+                                                    <DataTrigger Binding="{Binding IsProblem}" Value="True">
+                                                        <Setter TargetName="Line" Property="Foreground" Value="{DynamicResource VocabDangerText}" />
+                                                    </DataTrigger>
+                                                    <DataTrigger Binding="{Binding IsNote}" Value="True">
+                                                        <Setter TargetName="Line" Property="Foreground" Value="{DynamicResource TextFillColorSecondaryBrush}" />
+                                                        <Setter TargetName="Line" Property="FontStyle" Value="Italic" />
+                                                    </DataTrigger>
+                                                    <DataTrigger Binding="{Binding IsEdge}" Value="True">
+                                                        <Setter TargetName="Line" Property="FontWeight" Value="SemiBold" />
+                                                    </DataTrigger>
+                                                </DataTemplate.Triggers>
+                                            </DataTemplate>
+                                        </ItemsControl.ItemTemplate>
+                                    </ItemsControl>
+                                </StackPanel>
                             </Border>
 
                             <DockPanel Margin="0,0,0,6" Visibility="{Binding HasProposals, Converter={StaticResource BoolToVisibility}}">

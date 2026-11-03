@@ -23,7 +23,7 @@ public sealed class VocabViewsTests : IDisposable
     {
         System.Threading.SynchronizationContext.SetSynchronizationContext(new System.Windows.Threading.DispatcherSynchronizationContext());
         using var settings = new SettingsStoreFactory(new HelmPaths(_dir.Path));
-        var store = new VocabStore(new MemorySynced<VocabWord>(), new MemorySynced<VocabPart>(), new MemorySyncedLog<VocabReview>());
+        var store = new VocabStore(new MemorySynced<VocabWord>(), new MemorySynced<VocabPart>(), new MemorySyncedLog<VocabReview>(), sources: new MemorySynced<VocabSource>());
         Seed(store);
         var quiz = new VocabQuiz(store, new Random(1));
         var viewModel = VocabKit.ViewModel(store, quiz, settings);
@@ -96,6 +96,27 @@ public sealed class VocabViewsTests : IDisposable
         Assert.True(Shows(page, "Waiting to be broken down (1)"));
         Assert.True(Shows(page, "ubiquitous"));
         viewModel.CloseAgentCommand.Execute(null);
+
+        // While the agent works: the chip counts its steps, and a text waiting on it shows how far it got.
+        viewModel.Agent.IsBusy = true;
+        viewModel.Agent.Steps = 4;
+        viewModel.Agent.Status = "Saving 3 analyses: relative, 补救, reluctant";
+        Assert.Equal("Analyzing · step 4", viewModel.AgentChipText);
+        Assert.Equal("Saving 3 analyses: relative, 补救, reluctant", viewModel.AgentChipToolTip);
+        viewModel.Texts.OpenCommand.Execute(null);
+        viewModel.Texts.NewBody = "回首人间";
+        viewModel.Texts.AddTextCommand.Execute(null);
+        Assert.True(viewModel.Texts.IsDetailWaiting);
+        Layout(page, size, "03c-text-analyzing");
+        Assert.True(Shows(page, "Claude Code is at work · step 4"));
+        Assert.True(Shows(page, "Done in 1 min 12 s · 4 steps. Broke down 3 words."));
+        Assert.False(Shows(page, "Waiting for Claude Code to pick the words. It starts by itself, or press Analyze now in the Analysis chip."));
+        viewModel.OpenAgentCommand.Execute(null); // See all steps
+        Assert.False(viewModel.Texts.IsOpen);
+        Assert.True(viewModel.IsAgentOpen);
+        viewModel.CloseAgentCommand.Execute(null);
+        viewModel.Agent.IsBusy = false;
+        Assert.Equal("1 waiting for analysis", viewModel.AgentChipText);
 
         // The rich answer: the tree beside examples, collocations, mnemonic, words easy to mix up; Forgot / Remembered below.
         viewModel.Card.RevealCommand.Execute(null);
