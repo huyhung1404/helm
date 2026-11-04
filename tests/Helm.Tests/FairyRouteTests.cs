@@ -143,6 +143,62 @@ public sealed class FairyRouteTests
         await Assert.ThrowsAsync<AiRouteTakenException>(() => run);
     }
 
+    [Fact]
+    public async Task ACallThatWaitsForTheUsersYesIsNeitherDoneNorRecorded()
+    {
+        var asked = 0;
+        var gated = new McpTool("notes_trash", "Moves a note to the trash.", McpTool.NoArguments(), (_, _) =>
+        {
+            asked++;
+            return Task.FromResult<object?>(new { status = McpTool.NeedsConfirmation, summary = "Move the note “Old” to the trash." });
+        }) { Destructive = true, ConfirmsItself = true };
+        var chat = new TwoSteps("""{"summary":"Xoá ghi chú Old"}""", "Em sẽ xoá ghi chú “Old”, Anh xác nhận nhé?");
+        using var route = new LocalAgentRoute("fairy", "Fake", chat, [new Gated([gated])], _ => true, () => null, offers: _ => true);
+
+        var result = await route.RunAsync(Job() with { Tools = ["notes_trash"] }, TimeSpan.FromSeconds(5), default);
+
+        Assert.Equal(1, asked);
+        Assert.Empty(result.Done);
+        // A second step lets the model ask in its own words, instead of "done".
+        Assert.Equal("Em sẽ xoá ghi chú “Old”, Anh xác nhận nhé?", result.Text);
+        Assert.Contains("notes_trash", chat.Offered);
+    }
+
+    private sealed class Gated(IEnumerable<McpTool> tools) : IMcpToolProvider
+    {
+        public string? ModuleId => null;
+
+        public IEnumerable<McpTool> Tools => tools;
+    }
+
+    /// <summary>Calls notes_trash, then answers with the text it was given.</summary>
+    private sealed class TwoSteps(string arguments, string answer) : IAssistantChatFactory, IAssistantChat
+    {
+        private int _step;
+
+        public List<string> Offered { get; } = [];
+
+        public AiProvider Provider => AiProviders.Claude;
+
+        public IAssistantChat Create(string apiKey, string model, string effort, string system, IReadOnlyList<AssistantTool> tools)
+        {
+            Offered.AddRange(tools.Select(t => t.Name));
+            return this;
+        }
+
+        public void AddUser(string text)
+        {
+        }
+
+        public void AddResults(IReadOnlyList<ToolOutcome> results)
+        {
+        }
+
+        public Task<AssistantStep> NextAsync(CancellationToken ct) => Task.FromResult(_step++ == 0
+            ? new AssistantStep("", [new ToolCall("c1", "notes_trash", JsonDocument.Parse(arguments).RootElement.Clone())], new AssistantUsage(10, 5, 0, 0), false)
+            : new AssistantStep(answer, [], new AssistantUsage(10, 5, 0, 0), false));
+    }
+
     private static async Task<JsonObject> Rpc(McpServer server, string method, JsonObject? parameters)
     {
         var request = new JsonObject { ["jsonrpc"] = "2.0", ["id"] = 1, ["method"] = method, ["params"] = parameters };

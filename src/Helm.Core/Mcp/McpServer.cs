@@ -152,6 +152,25 @@ public sealed record McpTool(string Name, string Description, JsonObject InputSc
     /// <summary>What <see cref="Undone"/> says.</summary>
     public const string NothingUndone = "Không hoàn tác được: bản ghi này không còn trên máy (đã xoá, hoặc chưa đồng bộ về).";
 
+    /// <summary>The <c>status</c> of a result that did nothing yet: it waits for the user's yes (the connector's gate).</summary>
+    public const string NeedsConfirmation = "needs_confirmation";
+
+    /// <summary>Whether a result says it waits for the user's yes (<see cref="NeedsConfirmation"/>): nothing was done.</summary>
+    public static bool WaitsForUser(string resultJson)
+    {
+        if (!resultJson.Contains(NeedsConfirmation, StringComparison.Ordinal)) return false;
+        try
+        {
+            using var doc = JsonDocument.Parse(resultJson);
+            return doc.RootElement.ValueKind == JsonValueKind.Object && doc.RootElement.TryGetProperty("status", out var status)
+                && status.ValueKind == JsonValueKind.String && status.GetString() == NeedsConfirmation;
+        }
+        catch (JsonException)
+        {
+            return false;
+        }
+    }
+
     /// <summary>A tool that takes no arguments.</summary>
     public static JsonObject NoArguments() => new() { ["type"] = "object", ["properties"] = new JsonObject() };
 }
