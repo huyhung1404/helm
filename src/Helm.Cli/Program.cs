@@ -1,11 +1,12 @@
 using System.Runtime.InteropServices;
 using Helm.Cli;
 
-// Ctrl+C and systemd's SIGTERM end a running command (helm serve) cleanly instead of killing the process.
+// Ctrl+C and systemd's SIGTERM end a running command (helm serve) cleanly instead of killing the process; a second
+// one, while it is still stopping, kills it.
 using var stop = new CancellationTokenSource();
 void Stop(PosixSignalContext context)
 {
-    context.Cancel = true;
+    context.Cancel = !stop.IsCancellationRequested;
     stop.Cancel();
 }
 using var interrupt = PosixSignalRegistration.Create(PosixSignal.SIGINT, Stop);
