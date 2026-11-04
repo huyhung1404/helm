@@ -44,7 +44,8 @@ public partial class WalletOverlay : UserControl
         {
             WalletPopup.ToCategorize => 680,
             WalletPopup.Fund or WalletPopup.FundForm or WalletPopup.Person => 620,
-            WalletPopup.Debt or WalletPopup.Cover => 520,
+            WalletPopup.Debt or WalletPopup.Cover or WalletPopup.GoalTakeOut => 520,
+            WalletPopup.Goal or WalletPopup.GoalForm or WalletPopup.GoalBought => 600,
             _ => 580,
         };
         IsHitTestVisible = _viewModel.HasPopup;
@@ -59,6 +60,10 @@ public partial class WalletOverlay : UserControl
             WalletPopup.Edit => EditAmountBox,
             WalletPopup.FundForm => FundNameBox,
             WalletPopup.AddDebt => PersonBox,
+            WalletPopup.Goal => PutAmountBox,
+            WalletPopup.GoalForm when _viewModel.Goals?.FormIsNew == true => GoalNameBox,
+            WalletPopup.GoalTakeOut => TakeAmountBox,
+            WalletPopup.GoalBought => BoughtAmountBox,
             _ => null,
         };
         if (target is UIElement { IsVisible: true } element) element.Focus();
@@ -68,7 +73,7 @@ public partial class WalletOverlay : UserControl
     private void Scrim_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
     {
         // Forms keep what was typed; only a dialog without one closes from beside it.
-        if (_viewModel.Popup is WalletPopup.Details or WalletPopup.Fund or WalletPopup.Person or WalletPopup.ToCategorize)
+        if (_viewModel.Popup is WalletPopup.Details or WalletPopup.Fund or WalletPopup.Person or WalletPopup.ToCategorize or WalletPopup.Goal)
             _viewModel.DismissPopupCommand.Execute(null);
     }
 

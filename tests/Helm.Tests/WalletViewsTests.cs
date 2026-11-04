@@ -77,6 +77,76 @@ public sealed class WalletViewsTests : IDisposable
         vm.ClosePopupCommand.Execute(null);
     });
 
+    [Fact]
+    public void The_goals_page_and_its_popups_load() => WpfHost.Run(() =>
+    {
+        System.Threading.SynchronizationContext.SetSynchronizationContext(new System.Windows.Threading.DispatcherSynchronizationContext());
+        using var settings = new SettingsStoreFactory(new HelmPaths(_dir.Path));
+        var time = new ManualTime(T0);
+        var wallet = new WalletStore(new MemorySynced<WalletTransaction>(), new MemorySynced<WalletCategory>(), new MemorySynced<WalletBudget>(), time);
+        wallet.AddManual(20_000_000, "Lương", T0.AddDays(-20), WalletCategories.Salary);
+        wallet.AddManual(-1_580_000, "Đi chợ", T0.AddDays(-2), WalletCategories.Groceries);
+        var goals = new GoalBook(new MemorySynced<WalletGoal>(), wallet);
+        var pc = goals.Add("Mini PC", 12_990_000, new DateOnly(2027, 1, 31), 2_000_000, Ict);
+        goals.Put(pc, 2_350_000, Ict);
+        var keyboard = goals.Add("Bàn phím cơ", 1_850_000, null, 1_850_000, Ict);
+        goals.Add("Tai nghe", 2_400_000, null, 300_000, Ict);
+        var trip = goals.Add("Đà Lạt", 3_000_000, null, 500_000, Ict);
+        goals.GiveUp(trip);
+        var vm = new WalletViewModel(wallet, new WalletCapture(wallet, settings), settings, new InlineUi(), new AcceptDialogs(), new MemoryClipboard(), null,
+            NullLogger<WalletViewModel>.Instance, Ict, goals: goals);
+        var page = new WalletContentPage(new WalletModule { IsEnabled = true }, vm);
+        var overlay = new WalletOverlay(vm);
+        var popupSize = new Size(1280, 960);
+
+        vm.ShowGoalsCommand.Execute(null);
+        var photo = Photo();
+        vm.Goals!.Rows.First(r => r.Id == pc).Photo = photo;
+        vm.Goals.Rows.First(r => r.Id == keyboard).Photo = photo;
+        Assert.Equal(3, vm.Goals.Rows.Count);
+        Layout(page, new Size(1280, 900), "20-goals");
+
+        vm.ShowGoal(pc);
+        vm.Goals.PutAmount = "200k";
+        Show(overlay, popupSize, "21-goal");
+        vm.Goals.OpenTakeOutCommand.Execute(null);
+        Show(overlay, popupSize, "22-take-out");
+        vm.ClosePopupCommand.Execute(null);
+        vm.ShowGoal(keyboard);
+        Show(overlay, popupSize, "23-goal-ready");
+        vm.Goals.OpenBoughtCommand.Execute(null);
+        Show(overlay, popupSize, "24-bought");
+        vm.ClosePopupCommand.Execute(null);
+        vm.Goals.OpenAddCommand.Execute(null);
+        vm.Goals.FormName = "Màn hình";
+        vm.Goals.FormPrice = "4.500.000";
+        vm.Goals.FormDue = new DateTime(2027, 3, 1);
+        vm.Goals.FormPhoto = photo;
+        Show(overlay, popupSize, "25-goal-form");
+        vm.ClosePopupCommand.Execute(null);
+    });
+
+    /// <summary>A stand-in product photo: a box on a warm background, as a JPEG.</summary>
+    private static byte[] Photo()
+    {
+        var visual = new System.Windows.Media.DrawingVisual();
+        using (var dc = visual.RenderOpen())
+        {
+            dc.DrawRectangle(new System.Windows.Media.LinearGradientBrush(System.Windows.Media.Color.FromRgb(0xFF, 0xB3, 0x7A), System.Windows.Media.Color.FromRgb(0xE8, 0x6A, 0x9A), 45),
+                null, new Rect(0, 0, 400, 300));
+            dc.DrawRoundedRectangle(new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(0x3A, 0x46, 0x58)), null, new Rect(110, 90, 180, 130), 18, 18);
+            dc.DrawEllipse(new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(0x39, 0xE6, 0xFF)), null, new Point(140, 190), 8, 8);
+            dc.DrawRectangle(new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(0xFF, 0x7A, 0x3D)), null, new Rect(110, 205, 180, 8));
+        }
+        var bitmap = new System.Windows.Media.Imaging.RenderTargetBitmap(400, 300, 96, 96, System.Windows.Media.PixelFormats.Pbgra32);
+        bitmap.Render(visual);
+        var encoder = new System.Windows.Media.Imaging.JpegBitmapEncoder();
+        encoder.Frames.Add(System.Windows.Media.Imaging.BitmapFrame.Create(bitmap));
+        using var output = new MemoryStream();
+        encoder.Save(output);
+        return output.ToArray();
+    }
+
     private static void Seed(WalletStore wallet, DebtBook book, FundBook funds)
     {
         var october = new DateOnly(2026, 10, 1);
