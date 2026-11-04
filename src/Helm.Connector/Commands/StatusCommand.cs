@@ -1,10 +1,10 @@
 using System.Text.Json;
 using Helm.Ai.Agents;
-using Helm.Cli.Hosting;
-using Helm.Cli.Status;
+using Helm.Connector.Hosting;
+using Helm.Connector.Status;
 using Helm.Core.Settings;
 
-namespace Helm.Cli.Commands;
+namespace Helm.Connector.Commands;
 
 /// <summary><c>helm status [--json]</c>: the data folder, sync, the agents and the workers, without changing anything.</summary>
 internal sealed class StatusCommand : ICliCommand
@@ -19,14 +19,14 @@ internal sealed class StatusCommand : ICliCommand
         if (args.Any(a => a != "--json"))
         {
             context.Console.Error.WriteLine("Usage: helm status [--json]");
-            return Task.FromResult(CliApp.Usage);
+            return Task.FromResult(ConnectorApp.Usage);
         }
         var paths = new HelmPaths(context.DataDirectory);
-        var secrets = CliSecrets.For(paths, context.Console.Environment);
+        var secrets = ConnectorSecrets.For(paths, context.Console.Environment);
         var report = new StatusProbe(paths, secrets, secrets.KeySource, AgentCommands.Of, Environment.MachineName).Probe();
         if (json) context.Console.Out.WriteLine(JsonSerializer.Serialize(report, Json));
         else StatusPrinter.Write(report, context.Console.Out, DateTimeOffset.UtcNow);
-        return Task.FromResult(CliApp.Ok);
+        return Task.FromResult(ConnectorApp.Ok);
     }
 
     private static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web) { WriteIndented = true };

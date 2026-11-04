@@ -1,13 +1,13 @@
 using Helm.Ai.Agents;
 using Helm.Ai.Assistant;
-using Helm.Cli.Hosting;
+using Helm.Connector.Hosting;
 using Helm.Core.Settings;
 using Helm.Core.Sync;
 using Helm.Shell.Services;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
 
-namespace Helm.Cli.Status;
+namespace Helm.Connector.Status;
 
 /// <summary>
 /// Looks at this box's Helm without changing it: the data folder, the sync files, the agents' CLIs and sign-ins, and
@@ -71,7 +71,7 @@ internal sealed class StatusProbe(HelmPaths paths, ISecretProtector secrets, str
 
     private (string DeviceId, IReadOnlyList<WorkerReport> Workers) ReadReplica()
     {
-        using var services = CliHost.Build(paths, secrets, NullLoggerFactory.Instance);
+        using var services = ConnectorHost.Build(paths, secrets, NullLoggerFactory.Instance);
         var self = services.GetRequiredService<SyncEngine>().DeviceId;
         var now = _time.GetUtcNow();
         var workers = services.GetRequiredService<ISyncedCollection<AiWorkerRecord>>().All()

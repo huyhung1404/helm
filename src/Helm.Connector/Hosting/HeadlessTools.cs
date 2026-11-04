@@ -8,7 +8,7 @@ using Helm.Modules.Wallet;
 using Helm.Shell.Services;
 using Microsoft.Extensions.DependencyInjection;
 
-namespace Helm.Cli.Hosting;
+namespace Helm.Connector.Hosting;
 
 /// <summary>
 /// The tools whose data the phone's agent jobs read and change here: each tool's platform-neutral part, as the apps

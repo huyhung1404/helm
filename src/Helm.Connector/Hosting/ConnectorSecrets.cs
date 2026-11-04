@@ -1,14 +1,14 @@
 using Helm.Core.Settings;
 using Helm.Core.Sync;
 
-namespace Helm.Cli.Hosting;
+namespace Helm.Connector.Hosting;
 
 /// <summary>
 /// This box's <see cref="ISecretProtector"/>: the host key under &lt;data&gt;/secrets (<see cref="FileKeySecretProtector"/>).
 /// <c>HELM_SEAL_KEY=tpm2</c> (or <c>host</c>, <c>auto</c>: systemd-creds' <c>--with-key</c>) seals a new key; a service
 /// started with <c>LoadCredentialEncrypted=helm-host-key:…</c> gets it from systemd's $CREDENTIALS_DIRECTORY.
 /// </summary>
-internal static class CliSecrets
+internal static class ConnectorSecrets
 {
     public const string SealVariable = "HELM_SEAL_KEY";
 

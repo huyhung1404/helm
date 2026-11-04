@@ -1,4 +1,4 @@
-namespace Helm.Cli.Status;
+namespace Helm.Connector.Status;
 
 /// <summary>What <c>helm status</c> found (also its <c>--json</c> output).</summary>
 internal sealed record StatusReport

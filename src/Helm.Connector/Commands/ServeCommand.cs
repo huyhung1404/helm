@@ -1,13 +1,13 @@
 using Helm.Ai.Agents;
 using Helm.Ai.Assistant;
-using Helm.Cli.Hosting;
+using Helm.Connector.Hosting;
 using Helm.Core.Linux;
 using Helm.Core.Settings;
 using Helm.Core.Sync;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
-namespace Helm.Cli.Commands;
+namespace Helm.Connector.Commands;
 
 /// <summary>
 /// <c>helm serve</c>: what Helm on the PC does in the background for the phone, without a screen, until stopped
@@ -25,14 +25,14 @@ internal sealed class ServeCommand : ICliCommand
         if (args.Count > 0)
         {
             context.Console.Error.WriteLine("Usage: helm serve");
-            return CliApp.Usage;
+            return ConnectorApp.Usage;
         }
         var paths = new HelmPaths(context.DataDirectory);
         PrivateFiles.CreateDirectory(paths.Root);
-        var secrets = CliSecrets.For(paths, context.Console.Environment);
+        var secrets = ConnectorSecrets.For(paths, context.Console.Environment);
         using var loggers = new JournalLoggerFactory(context.Console.Error, JournalLoggerFactory.LevelFrom(context.Console.Environment("HELM_LOG_LEVEL")));
         var log = loggers.CreateLogger("helm");
-        await using var services = CliHost.Build(paths, secrets, loggers, s =>
+        await using var services = ConnectorHost.Build(paths, secrets, loggers, s =>
         {
             s.AddAgentProxy(paths, _ => new TerminalAgentSignIn(context.Console.Out));
             HeadlessTools.Add(s);
@@ -41,7 +41,7 @@ internal sealed class ServeCommand : ICliCommand
         if (services.GetRequiredService<SyncSetupService>().Stage != SyncSetupStage.Ready)
         {
             context.Console.Error.WriteLine("helm serve: Helm Sync is not set up on this box (connected and unlocked). See helm status.");
-            return CliApp.Failed;
+            return ConnectorApp.Failed;
         }
         var engine = services.GetRequiredService<SyncEngine>();
         engine.Start();
@@ -80,6 +80,6 @@ internal sealed class ServeCommand : ICliCommand
         {
             log.LogDebug(ex, "The last sync before stopping did not finish");
         }
-        return CliApp.Ok;
+        return ConnectorApp.Ok;
     }
 }

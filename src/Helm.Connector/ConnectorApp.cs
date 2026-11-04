@@ -1,7 +1,7 @@
-using Helm.Cli.Commands;
+using Helm.Connector.Commands;
 using Helm.Shell.Services;
 
-namespace Helm.Cli;
+namespace Helm.Connector;
 
 /// <summary>Where a command writes and what it reads of its environment (the real console, or a test's).</summary>
 internal sealed record CliConsole(TextWriter Out, TextWriter Error, Func<string, string?> Environment)
@@ -28,7 +28,7 @@ internal sealed record CliContext(CliConsole Console, string DataDirectory);
 /// helm's command line: <c>helm [--data-dir PATH] &lt;command&gt; [its options]</c>, <c>helm --version</c>,
 /// <c>helm --help</c>. A new command is one <see cref="ICliCommand"/> added to <see cref="Commands"/>.
 /// </summary>
-internal static class CliApp
+internal static class ConnectorApp
 {
     public const int Ok = 0, Failed = 1, Usage = 2;
 

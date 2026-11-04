@@ -1,15 +1,15 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <!-- helm: Helm without a screen, for a Linux box (see docs/development.md, "helm on Linux"). The same sync engine, stores and agents as
-       the apps; no WPF, WinForms or Avalonia. Publish: dotnet publish src/Helm.Cli -r linux-x64 -c Release
+       the apps; no WPF, WinForms or Avalonia. Publish: dotnet publish src/Helm.Connector -r linux-x64 -c Release
        (one self-contained file, bin/Release/net8.0/linux-x64/publish/helm). -->
   <PropertyGroup>
     <OutputType>Exe</OutputType>
     <TargetFramework>net8.0</TargetFramework>
     <SupportedOSPlatformVersion></SupportedOSPlatformVersion>
     <PlatformTarget>AnyCPU</PlatformTarget>
-    <AssemblyName>helm</AssemblyName>
-    <RootNamespace>Helm.Cli</RootNamespace>
+    <AssemblyName>helm-connector</AssemblyName>
+    <RootNamespace>Helm.Connector</RootNamespace>
     <!-- Its jobs run in the background: no tiered start-up penalty to save, and less memory on a small box. -->
     <ServerGarbageCollection>false</ServerGarbageCollection>
   </PropertyGroup>

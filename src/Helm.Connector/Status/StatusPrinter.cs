@@ -1,4 +1,4 @@
-namespace Helm.Cli.Status;
+namespace Helm.Connector.Status;
 
 /// <summary><c>helm status</c> as text: one fact a line, and the next command to run where something is missing.</summary>
 internal static class StatusPrinter

@@ -1,4 +1,4 @@
-namespace Helm.Cli;
+namespace Helm.Connector;
 
 /// <summary>
 /// Where helm keeps Helm's data (settings, the sync replica, the agents' sign-ins, the host key): <c>--data-dir</c>,
