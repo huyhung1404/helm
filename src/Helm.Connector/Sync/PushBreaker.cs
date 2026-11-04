@@ -5,18 +5,21 @@ namespace Helm.Connector.Sync;
 /// <summary>
 /// The connector's sync transport: the HTTPS one, with a breaker on pushes. The box runs alone all day, so a bug that
 /// writes in a loop must not hammer the server or flood the other devices: more than <see cref="MaxPushesPerMinute"/>
-/// pushes within a minute trips it, and from then on the transport says it is not configured, so the engine stops
-/// syncing (pulls, pushes, files, the live channel's runs) until the process restarts.
+/// pushes within a minute, or <see cref="MaxPushesPerTenMinutes"/> within ten, trips it, and from then on the transport
+/// says it is not configured, so the engine stops syncing (pulls, pushes, files, the live channel's runs) until the
+/// process restarts.
 /// </summary>
 /// <remarks>
-/// The box normally pushes about once a minute (an agent's tool call, debounced by the engine). A push is one request
-/// of up to 100 records, so a minute's allowance carries 2,000 records: room for what piled up while it was offline.
-/// A loop that writes every second makes about 30 runs a minute and trips it.
+/// The box normally pushes about once a minute (a heartbeat, a tool call); a quick talk with Ask Helm through Fairy Core
+/// adds about three per turn (the claim, the answer, the warm-up). A push is one request of up to 100 records, so a
+/// minute carries 4,000 records: room for what piled up while it was offline. A runaway loop pushes far more than 40 a
+/// minute (urgent records go out within 50 ms); one that writes every second (about 30 runs a minute) trips the
+/// ten-minute limit within five.
 /// </remarks>
 internal sealed class PushBreaker(ISyncTransport inner, TimeProvider? time = null) : ISyncTransport, IBlobTransport, ISyncLiveTransport
 {
-    public const int MaxPushesPerMinute = 20;
-    private static readonly TimeSpan Window = TimeSpan.FromMinutes(1);
+    public const int MaxPushesPerMinute = 40, MaxPushesPerTenMinutes = 150;
+    private static readonly TimeSpan Minute = TimeSpan.FromMinutes(1), TenMinutes = TimeSpan.FromMinutes(10);
 
     private readonly TimeProvider _time = time ?? TimeProvider.System;
     private readonly Queue<DateTimeOffset> _pushes = new();
@@ -39,12 +42,13 @@ internal sealed class PushBreaker(ISyncTransport inner, TimeProvider? time = nul
         {
             if (_reason is not null) throw new SyncPushBreakerException(_reason);
             var now = _time.GetUtcNow();
-            while (_pushes.Count > 0 && now - _pushes.Peek() >= Window) _pushes.Dequeue();
-            if (_pushes.Count >= MaxPushesPerMinute)
+            while (_pushes.Count > 0 && now - _pushes.Peek() >= TenMinutes) _pushes.Dequeue();
+            var lastMinute = _pushes.Count(p => now - p < Minute);
+            if (lastMinute >= MaxPushesPerMinute || _pushes.Count >= MaxPushesPerTenMinutes)
             {
                 var collections = string.Join(", ", items.Select(i => i.Collection).Distinct().Take(5));
-                tripped = _reason = $"more than {MaxPushesPerMinute} pushes within a minute (the last one: {items.Count} records of {collections}); "
-                    + "sync is stopped until helm-connector restarts";
+                var limit = lastMinute >= MaxPushesPerMinute ? $"{MaxPushesPerMinute} pushes within a minute" : $"{MaxPushesPerTenMinutes} pushes within ten minutes";
+                tripped = _reason = $"more than {limit} (the last one: {items.Count} records of {collections}); sync is stopped until helm-connector restarts";
                 TrippedAt = now;
             }
             else _pushes.Enqueue(now);

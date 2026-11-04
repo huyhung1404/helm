@@ -1,3 +1,4 @@
+using System.Text.Json.Nodes;
 using Helm.Connector.Hosting;
 using Helm.Core.Mcp;
 using Helm.Shell.Services;
@@ -26,8 +27,13 @@ internal static class ConnectorMcp
     public static IReadOnlyList<McpTool> Tools(IEnumerable<IMcpToolProvider> providers, ConfirmationGate gate) =>
         [.. providers.SelectMany(p => p.Tools).Select(t => t.Destructive ? gate.Guard(t) : t)];
 
-    public static McpServer Server(IEnumerable<IMcpToolProvider> providers, ConfirmationGate gate, ILogger logger) =>
-        new(Tools(providers, gate), AppInfo.Version, Instructions, logger, consent: null) { Methods = gate.Methods };
+    /// <param name="methods">More host methods beside the gate's (Fairy Core's jobs, <see cref="Fairy.FairyRoute.Methods"/>).</param>
+    public static McpServer Server(IEnumerable<IMcpToolProvider> providers, ConfirmationGate gate, ILogger logger,
+        IEnumerable<KeyValuePair<string, Func<JsonObject?, CancellationToken, Task<JsonNode?>>>>? methods = null) =>
+        new(Tools(providers, gate), AppInfo.Version, Instructions, logger, consent: null)
+        {
+            Methods = new Dictionary<string, Func<JsonObject?, CancellationToken, Task<JsonNode?>>>([.. gate.Methods, .. methods ?? []]),
+        };
 }
 
 /// <summary>The MCP socket as a part of serve (see <see cref="IServePart"/>).</summary>
