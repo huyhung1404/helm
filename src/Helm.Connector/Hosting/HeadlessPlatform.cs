@@ -3,7 +3,7 @@ using Helm.Ai.Agents;
 using Helm.Core.Services;
 using Helm.Shell.Services;
 
-namespace Helm.Cli.Hosting;
+namespace Helm.Connector.Hosting;
 
 /// <summary>The box's host name, as the phone lists this worker ("fairy").</summary>
 internal sealed class MachineDeviceInfo : IDeviceInfo

@@ -1,6 +1,6 @@
 using Microsoft.Extensions.Logging;
 
-namespace Helm.Cli.Hosting;
+namespace Helm.Connector.Hosting;
 
 /// <summary>
 /// Logs as one line each on stderr, with the syslog priority prefix (<c>&lt;6&gt;</c>…) that systemd's journal reads as

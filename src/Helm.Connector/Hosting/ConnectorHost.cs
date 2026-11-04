@@ -7,14 +7,14 @@ using Helm.Shell.Services;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
-namespace Helm.Cli.Hosting;
+namespace Helm.Connector.Hosting;
 
 /// <summary>
 /// helm's services: Helm.Core's settings and sync and Helm.Ai.Core's keys and assistant, exactly as the apps register
 /// them, on this box's host key instead of DPAPI or the Android Keystore. A command adds what it needs on top
 /// (<c>helm serve</c>: the agents and the tools' stores).
 /// </summary>
-internal static class CliHost
+internal static class ConnectorHost
 {
     public static ServiceProvider Build(HelmPaths paths, ISecretProtector secrets, ILoggerFactory loggers, Action<IServiceCollection>? add = null)
     {

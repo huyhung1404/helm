@@ -1,5 +1,5 @@
 using System.Runtime.InteropServices;
-using Helm.Cli;
+using Helm.Connector;
 
 // Ctrl+C and systemd's SIGTERM end a running command (helm serve) cleanly instead of killing the process; a second
 // one, while it is still stopping, kills it.
@@ -12,4 +12,4 @@ void Stop(PosixSignalContext context)
 using var interrupt = PosixSignalRegistration.Create(PosixSignal.SIGINT, Stop);
 using var terminate = PosixSignalRegistration.Create(PosixSignal.SIGTERM, Stop);
 
-return await CliApp.RunAsync(args, CliConsole.System, stop.Token);
+return await ConnectorApp.RunAsync(args, CliConsole.System, stop.Token);

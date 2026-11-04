@@ -89,7 +89,7 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Helm.Embeddings", "src\Helm
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Helm.Core.Linux", "src\Helm.Core.Linux\Helm.Core.Linux.csproj", "{E8EE214F-5B08-4A62-ACA2-4BE1781188A2}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Helm.Cli", "src\Helm.Cli\Helm.Cli.csproj", "{C65175FA-C863-4564-9264-E2026E9DE06F}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Helm.Connector", "src\Helm.Connector\Helm.Connector.csproj", "{C65175FA-C863-4564-9264-E2026E9DE06F}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution

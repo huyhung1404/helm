@@ -1,9 +1,9 @@
 using System.Text.Json;
 using Helm.Ai.Agents;
 using Helm.Ai.Assistant;
-using Helm.Cli;
-using Helm.Cli.Hosting;
-using Helm.Cli.Status;
+using Helm.Connector;
+using Helm.Connector.Hosting;
+using Helm.Connector.Status;
 using Helm.Core.Mcp;
 using Helm.Core.Processes;
 using Helm.Core.Settings;
@@ -15,7 +15,7 @@ using Microsoft.Extensions.Logging.Abstractions;
 namespace Helm.Tests;
 
 /// <summary>helm, the headless Helm for a Linux box: its command line, <c>helm status</c> and what <c>helm serve</c> hosts.</summary>
-public sealed class HelmCliTests : IDisposable
+public sealed class ConnectorTests : IDisposable
 {
     private static readonly DateTimeOffset Now = new(2026, 11, 4, 9, 0, 0, TimeSpan.Zero);
     private readonly TempDir _dir = new();
@@ -39,9 +39,9 @@ public sealed class HelmCliTests : IDisposable
         var (none, help, _) = await RunAsync();
         var (unknown, _, error) = await RunAsync("deploy");
 
-        Assert.Equal(CliApp.Usage, none);
+        Assert.Equal(ConnectorApp.Usage, none);
         Assert.Contains("status", help, StringComparison.Ordinal);
-        Assert.Equal(CliApp.Usage, unknown);
+        Assert.Equal(ConnectorApp.Usage, unknown);
         Assert.Contains("'deploy' is not a command", error, StringComparison.Ordinal);
     }
 
@@ -75,11 +75,11 @@ public sealed class HelmCliTests : IDisposable
     public async Task StatusShowsSyncTheAgentsAndTheWorkers()
     {
         var paths = new HelmPaths(Data);
-        var secrets = CliSecrets.For(paths, _ => null);
+        var secrets = ConnectorSecrets.For(paths, _ => null);
         new ProtectedSyncCredentialStore(paths.SyncCredentialsFile, secrets).Save(new SyncCredentials(new Uri("https://sync.invalid/"), Token()));
         new ProtectedMasterKeyStore(paths.SyncKeyFile, secrets).Save(new byte[32]);
         string self;
-        await using (var services = CliHost.Build(paths, secrets, NullLoggerFactory.Instance))
+        await using (var services = ConnectorHost.Build(paths, secrets, NullLoggerFactory.Instance))
         {
             self = services.GetRequiredService<SyncEngine>().DeviceId;
             var workers = services.GetRequiredService<ISyncedCollection<AiWorkerRecord>>();
@@ -122,14 +122,14 @@ public sealed class HelmCliTests : IDisposable
         // Written with another key (here: none at all), as after copying the data folder from another box.
         new ProtectedSyncCredentialStore(paths.SyncCredentialsFile, new PlainSecretProtector())
             .Save(new SyncCredentials(new Uri("https://sync.invalid/"), Token()));
-        var secrets = CliSecrets.For(paths, _ => null);
+        var secrets = ConnectorSecrets.For(paths, _ => null);
 
         var report = new StatusProbe(paths, secrets, secrets.KeySource, _ => null, "fairy").Probe();
 
         Assert.False(report.Sync.Connected);
         Assert.Equal("the sync token cannot be read with this box's host key", report.Sync.Problem);
         Assert.False(File.Exists(paths.SyncDatabaseFile));
-        Assert.False(Directory.Exists(CliSecrets.Directory(paths)));
+        Assert.False(Directory.Exists(ConnectorSecrets.Directory(paths)));
     }
 
     [Fact]
@@ -137,7 +137,7 @@ public sealed class HelmCliTests : IDisposable
     {
         var (exit, _, error) = await RunAsync("--data-dir", Data, "serve");
 
-        Assert.Equal(CliApp.Failed, exit);
+        Assert.Equal(ConnectorApp.Failed, exit);
         Assert.Contains("Helm Sync is not set up on this box", error, StringComparison.Ordinal);
     }
 
@@ -145,7 +145,7 @@ public sealed class HelmCliTests : IDisposable
     public async Task ServeHostsTheAgentsAndTheToolsStores()
     {
         var paths = new HelmPaths(Data);
-        await using var services = CliHost.Build(paths, new PlainSecretProtector(), NullLoggerFactory.Instance, s =>
+        await using var services = ConnectorHost.Build(paths, new PlainSecretProtector(), NullLoggerFactory.Instance, s =>
         {
             s.AddAgentProxy(paths, _ => new TerminalAgentSignIn(TextWriter.Null));
             HeadlessTools.Add(s);
@@ -163,7 +163,7 @@ public sealed class HelmCliTests : IDisposable
     private async Task<(int Exit, string Output, string Error)> RunAsync(params string[] args)
     {
         var (output, error) = (new StringWriter(), new StringWriter());
-        var exit = await CliApp.RunAsync(args, new CliConsole(output, error, _ => null));
+        var exit = await ConnectorApp.RunAsync(args, new CliConsole(output, error, _ => null));
         return (exit, output.ToString(), error.ToString());
     }
 
