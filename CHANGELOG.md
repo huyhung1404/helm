@@ -3,7 +3,7 @@
 All notable changes to Helm. The top section is used as the GitHub release body and as the Velopack release notes.
 Format: [Keep a Changelog](https://keepachangelog.com), versions follow [SemVer](https://semver.org).
 
-## [Unreleased]
+## [0.83.0] - 2026-11-04
 
 ### Added
 - **Wallet: savings goals.** Add something you want to buy (a mini PC), its price and a photo, and set small amounts
