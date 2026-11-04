@@ -8,10 +8,10 @@ Format: [Keep a Changelog](https://keepachangelog.com), versions follow [SemVer]
 ### Added
 - **helm-connector for Linux** (preview): Helm's data on your own home server. It keeps the tools you choose in sync
   (by default AI, Wallet, Tracker and Habits; Notes, Missions and Vocabulary on request, Vault never) and offers
-  their tools over MCP to the server's own assistant. Deleting or replacing your data from there is refused: you do
-  that on the phone. It stops syncing by itself if it ever pushes far more than usual, never decides held mass
-  deletions, and can alert a Healthchecks URL for both. Built with `dotnet publish src/Helm.Connector -r linux-x64
-  -c Release`.
+  their tools over MCP to the server's own assistant. Deleting or replacing your data from there (a note to the
+  trash, a mission replanned) only happens after you say yes to what the assistant tells you it will do. It stops
+  syncing by itself if it ever pushes far more than usual, never decides held mass deletions, and can alert a
+  Healthchecks URL for both. Built with `dotnet publish src/Helm.Connector -r linux-x64 -c Release`.
 - MCP clients see which of Helm's tools delete or replace data (moving a note to the trash, replanning a mission).
 
 ## [0.84.0] - 2026-11-19

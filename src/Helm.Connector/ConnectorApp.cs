@@ -67,7 +67,7 @@ internal static class ConnectorApp
     public const string Name = "helm-connector";
     public const int Ok = 0, Failed = 1, Usage = 2;
 
-    public static IReadOnlyList<ICliCommand> Commands { get; } = [new StatusCommand(), new SyncCommand(), new ServeCommand(), new McpCommand()];
+    public static IReadOnlyList<ICliCommand> Commands { get; } = [new StatusCommand(), new SyncCommand(), new ServeCommand(), new McpCommand(), .. GateCommand.All()];
 
     public static async Task<int> RunAsync(IReadOnlyList<string> args, CliConsole console, CancellationToken ct = default)
     {

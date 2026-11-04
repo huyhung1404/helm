@@ -144,10 +144,26 @@ helm-connector status                             # sync, what is synced, holds,
 - **Unattended**: more than 20 pushes within a minute (the box normally does about one) stops sync until the
   process restarts. Held mass deletions are never decided on the box. Both are logged and, with `$HELM_HC_URL` (a
   Healthchecks ping URL), pinged to `<url>/fail`.
-- **MCP**: tool calls run without a question; tools marked `McpTool.Destructive` (notes_trash, mission_replan) answer
-  with an error that says to do it on the phone; tools that reach other machines are refused. Only `serve` opens the
-  replica: `mcp` relays to its socket, `$HELM_MCP_SOCKET` (e.g. /run/helm-connector/mcp.sock, with a group Fairy
-  Core's user is in) or <data>/run/mcp.sock (mode 0660).
+- **MCP**: tool calls run without a question, except tools marked `McpTool.Destructive` (notes_trash,
+  mission_replan, any bulk deletion later), which run only after the user's yes (below). Tools that reach other
+  machines are refused. Only `serve` opens the replica: `mcp` relays everything (custom methods too) to its socket,
+  `$HELM_MCP_SOCKET` (e.g. /run/helm-connector/mcp.sock, with a group Fairy Core's user is in) or
+  <data>/run/mcp.sock (mode 0660).
+- **Confirming a deletion** (`ConfirmationGate`, in serve's memory only):
+  1. `tools/call` of a destructive tool changes nothing. Its result is a normal one whose text the model reads,
+     `{"status":"needs_confirmation","tool":…,"summary":"Move the note “…” to the trash…","message":…}`, and whose
+     `_meta` carries `{"helm/confirmation":{"confirmationId":"<32 hex>","expiresAt":"<ISO 8601>"}}`. **Fairy Core
+     must strip `_meta` before the result reaches the model.**
+  2. Fairy Core shows the summary; on the user's yes it sends `{"jsonrpc":"2.0","id":…,"method":"helm/confirm",
+     "params":{"confirmationId":…, "name":…, "arguments":…}}` (name and arguments optional; when given they must be
+     the original call's). The reply's `result` is the tool's real `tools/call` result. On no: `helm/cancel`
+     `{"confirmationId":…}` → `{"cancelled":true,"tool":…}`. `helm/pending` lists what waits.
+  3. An id is random, single-use (confirmed or cancelled, even when the call then fails), valid 5 minutes, bound to
+     the tool and a hash of its arguments (keys sorted). Unknown, used, expired or mismatched: a JSON-RPC error
+     (-32602) with the reason, and nothing runs.
+
+  These methods are not tools, so a model (which only issues `tools/call`) cannot confirm for the user even if it
+  saw an id. From a terminal: `helm-connector pending`, `confirm ID`, `cancel ID`.
 - **Secrets**: AES-GCM under a 32-byte host key, secrets/host.key (0600, folder 0700). With `HELM_SEAL_KEY=tpm2` a
   new key is sealed by `systemd-creds` instead (secrets/host.key.cred); a service started with
   `LoadCredentialEncrypted=helm-host-key:<data>/secrets/host.key.cred` gets it unsealed from systemd.
