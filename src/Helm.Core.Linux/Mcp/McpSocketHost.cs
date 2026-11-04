@@ -24,10 +24,15 @@ public sealed class McpSocketHost(string path, Func<McpServer> serverFactory, IL
 
     public int Connections => _connections.Count;
 
-    /// <exception cref="InvalidOperationException">Another process serves this socket already.</exception>
+    /// <summary>The longest socket path Linux takes (sun_path, with its final zero).</summary>
+    public const int MaxPathLength = 107;
+
+    /// <exception cref="InvalidOperationException">Another process serves this socket already, or its path is too long.</exception>
     public void Start()
     {
         if (_listener is not null) return;
+        if (System.Text.Encoding.UTF8.GetByteCount(Path) > MaxPathLength)
+            throw new InvalidOperationException($"The MCP socket path is longer than {MaxPathLength} bytes ({Path}): set HELM_MCP_SOCKET to a shorter one.");
         Linux.PrivateFiles.CreateDirectory(System.IO.Path.GetDirectoryName(Path)!);
         if (File.Exists(Path))
         {
