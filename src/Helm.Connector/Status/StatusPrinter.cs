@@ -24,7 +24,7 @@ internal static class StatusPrinter
             if (serve.LastError is { } error) output.WriteLine($"Last error {error}");
             output.WriteLine(serve.Breaker is { } reason
                 ? $"Throttle   TRIPPED {Ago(now - serve.BreakerAt.GetValueOrDefault(now))}: {reason}. Restart the service once the cause is fixed."
-                : $"Throttle   ok (stops sync above {serve.MaxPushesPerMinute} pushes a minute)");
+                : $"Throttle   ok (stops sync above {serve.MaxPushesPerMinute} pushes a minute or {Helm.Connector.Sync.PushBreaker.MaxPushesPerTenMinutes} in ten)");
             if (serve.McpSocket is { } socket) output.WriteLine($"MCP        {socket}");
         }
 

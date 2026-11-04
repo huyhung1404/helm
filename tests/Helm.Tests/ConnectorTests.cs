@@ -236,7 +236,7 @@ public sealed class ConnectorTests : IDisposable
         Assert.Equal(SyncRunOutcome.Failed, (await engine.SyncNowAsync()).Outcome);
 
         var reason = Assert.Single(trips);
-        Assert.Contains("more than 20 pushes within a minute", reason, StringComparison.Ordinal);
+        Assert.Contains($"more than {PushBreaker.MaxPushesPerMinute} pushes within a minute", reason, StringComparison.Ordinal);
         Assert.Equal(reason, breaker.TrippedReason);
         Assert.False(breaker.IsConfigured);
         // Stopped for good, not for a minute: nothing more reaches the server until a restart.
@@ -247,6 +247,27 @@ public sealed class ConnectorTests : IDisposable
         Assert.Equal(pushed, server.Records.Count);
         await Assert.ThrowsAsync<SyncPushBreakerException>(() => breaker.PullAsync(0, 10, SyncPullFilter.None, default));
         Assert.Single(trips);
+    }
+
+    [Fact]
+    public async Task TheBreakerAlsoStopsALoopSlowerThanItsMinuteLimit()
+    {
+        var time = new ManualTime(Now);
+        var breaker = new PushBreaker(new FakeSyncServer().Connect(), time);
+        PushItem[] items = [new("wallet.items", "x", 0, false, [1])];
+
+        // About thirty a minute (a write every second, debounced): under the minute's limit, over ten minutes' one.
+        var pushes = 0;
+        while (breaker.TrippedReason is null && pushes < 1000)
+        {
+            try { await breaker.PushAsync(items, default); }
+            catch (SyncPushBreakerException) { }
+            pushes++;
+            time.Advance(TimeSpan.FromSeconds(2));
+        }
+
+        Assert.Contains($"{PushBreaker.MaxPushesPerTenMinutes} pushes within ten minutes", breaker.TrippedReason, StringComparison.Ordinal);
+        Assert.InRange(pushes, PushBreaker.MaxPushesPerTenMinutes, PushBreaker.MaxPushesPerTenMinutes + 1);
     }
 
     [Fact]

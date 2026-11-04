@@ -141,7 +141,8 @@ helm-connector status                             # sync, what is synced, holds,
   notes, missions and vocab can be added, vault never. It is the sync engine's allowlist (`SyncEngine.SetIncluded`):
   nothing else is downloaded or uploaded, and only these tools' stores and agent tools are registered. A tool added
   later is downloaded in full at the next sync.
-- **Unattended**: more than 20 pushes within a minute (the box normally does about one) stops sync until the
+- **Unattended**: more than 40 pushes within a minute, or 150 within ten (the box normally does about one a minute,
+  a few more per Ask Helm turn), stops sync until the
   process restarts. Held mass deletions are never decided on the box. Both are logged and, with `$HELM_HC_URL` (a
   Healthchecks ping URL), pinged to `<url>/fail`.
 - **MCP**: tool calls run without a question, except tools marked `McpTool.Destructive` (notes_trash,
@@ -164,6 +165,14 @@ helm-connector status                             # sync, what is synced, holds,
 
   These methods are not tools, so a model (which only issues `tools/call`) cannot confirm for the user even if it
   saw an id. From a terminal: `helm-connector pending`, `confirm ID`, `cancel ID`.
+- **Fairy Core** (the box's AI, a separate private app) is the connector's MCP client: `tools/list`, `tools/call`
+  (Undo-able tools carry `_meta: {"helm/undoable": true}`; `helm/undo {tool, result}` takes a call back). With AI
+  synced, the phone's agent jobs go to it: the connector runs `AgentJobWorker` (ai.jobs, ai.workers, exactly as a
+  PC) on a `FairyRoute`, up only while Core keeps asking. Core sends `helm/jobs/hello {agents: [AiWorkerAgent],
+  readsPhotos}` (the phone's picker lists those agents), long-polls `helm/jobs/next {wait ≤ 25}` →
+  `{job: null | {id, kind: run|end|warm, conversationId, job: AiJob, images: [{mediaType, data}]}}`, and answers a
+  run with `helm/jobs/result {id, result: AiJobResult | error}`. Undo runs on the connector. Nothing is kept across
+  restarts: an unanswered job fails at its wait, as with a PC that stopped mid-turn.
 - **Secrets**: AES-GCM under a 32-byte host key, secrets/host.key (0600, folder 0700). With `HELM_SEAL_KEY=tpm2` a
   new key is sealed by `systemd-creds` instead (secrets/host.key.cred); a service started with
   `LoadCredentialEncrypted=helm-host-key:<data>/secrets/host.key.cred` gets it unsealed from systemd.
