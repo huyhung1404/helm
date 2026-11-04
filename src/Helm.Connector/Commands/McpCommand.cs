@@ -22,6 +22,11 @@ internal sealed class McpCommand : ICliCommand
             return ConnectorApp.Usage;
         }
         var path = ConnectorPaths.McpSocket(new HelmPaths(context.DataDirectory), context.Console.Environment);
+        if (System.Text.Encoding.UTF8.GetByteCount(path) > Helm.Core.Mcp.McpSocketHost.MaxPathLength)
+        {
+            context.Console.Error.WriteLine($"{ConnectorApp.Name} mcp: the socket path is too long ({path}): set {ConnectorPaths.SocketVariable} to a shorter one.");
+            return ConnectorApp.Failed;
+        }
         var socket = new Socket(AddressFamily.Unix, SocketType.Stream, ProtocolType.Unspecified);
         try
         {

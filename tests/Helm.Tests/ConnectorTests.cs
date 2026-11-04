@@ -336,6 +336,11 @@ public sealed class ConnectorTests : IDisposable
         var (none, _, error) = await RunAsync(["--data-dir", Data, "mcp"], new() { ["HELM_MCP_SOCKET"] = socket });
         Assert.Equal(ConnectorApp.Failed, none);
         Assert.Contains("serve is not running", error, StringComparison.Ordinal);
+        var tooLong = Path.Combine(_dir.Path, new string('s', 120));
+        var (longPath, _, longError) = await RunAsync(["--data-dir", Data, "mcp"], new() { ["HELM_MCP_SOCKET"] = tooLong });
+        Assert.Equal(ConnectorApp.Failed, longPath);
+        Assert.Contains("too long", longError, StringComparison.Ordinal);
+        Assert.Throws<InvalidOperationException>(() => new McpSocketHost(tooLong, () => throw new InvalidOperationException(), NullLogger.Instance).Start());
 
         await using var services = Tools(SyncSelection.Resolve(null, Data));
         using var host = new McpSocketHost(socket, () => ConnectorMcp.Server(services.GetServices<IMcpToolProvider>(), NullLogger.Instance),
