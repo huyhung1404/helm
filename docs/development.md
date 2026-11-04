@@ -6,6 +6,7 @@ Everything needed to build, run, extend and release Helm. For what Helm is and h
 - [Where things live](#where-things-live)
 - [Solution layout](#solution-layout)
 - [Adding a module](#adding-a-module)
+- [helm on Linux](#helm-on-linux)
 - [Updates](#updates)
 - [Release process](#release-process)
 
@@ -72,6 +73,9 @@ src/
   Helm.Modules.Vault/        Windows: vault window and page, Windows Hello, protected clipboard
   Helm.Modules.Vault.Android/ Android: vault page, fingerprint unlock, FLAG_SECURE, SAF backups (not in Helm.sln)
   Helm.VaultRestore/         helm-vault-restore: opens a vault backup without Helm
+  Helm.Core.Linux/           net8.0, Linux for helm: secrets under a host key (0600, optionally sealed by systemd-creds),
+                             plain child processes; namespaces stay Helm.Core.*
+  Helm.Cli/                  helm: Helm without a screen on a Linux box (Helm Sync and the agent worker for the phone)
 tests/Helm.Tests/            xUnit: settings, sync (+ end-to-end against a local worker), updates, hotkeys, MCP, Tracker, Missions, Habits, Wallet, Vault
 ```
 
@@ -113,6 +117,31 @@ Key infrastructure in `Helm.Core`:
 The nav tree, Home tiles, tray toggles, search and enable persistence all come from the registration. No other shell changes are needed.
 
 A tool you work in (lists, a chat, a vault) also has a **content page**: implement `IModuleContent` and the menu and the Quick access tile open it, while Home → Utilities and search open the settings page. See "Content page and settings page" in [new-tool-prompt.md](new-tool-prompt.md).
+
+## helm on Linux
+
+`helm` (src/Helm.Cli) runs what Helm on the PC does in the background, without a screen: Helm Sync, and the agents
+(Claude Code, Codex, Grok) that take the phone's agent jobs with the tools' own stores (Wallet, Tracker, Habits,
+Notes, Missions, Vocabulary). The agents are the PC's own code (src/Helm.Ai.Core/Agents); only the platform pieces
+differ: `PlainChildProcessLauncher` instead of the job-object launcher, `FileKeySecretProtector` instead of DPAPI, a
+terminal sign-in instead of a console window.
+
+```bash
+dotnet publish src/Helm.Cli -r linux-x64 -c Release   # one self-contained file: bin/Release/net8.0/linux-x64/publish/helm
+helm --version
+helm status            # data folder, host key, sync, agent CLIs and sign-ins, workers online (changes nothing)
+helm serve             # sync + the agent worker in the foreground, until Ctrl+C or SIGTERM
+```
+
+- **Data folder**: `--data-dir`, else `$HELM_DATA_DIR` (a service sets it, e.g. /srv/fairy/helm), else
+  `$XDG_DATA_HOME/helm`, else `~/.local/share/helm`. Same layout as on Windows (settings/, sync/, logs/), plus
+  secrets/.
+- **Secrets**: AES-GCM under a 32-byte host key, secrets/host.key (0600, folder 0700). With `HELM_SEAL_KEY=tpm2` a
+  new key is sealed by `systemd-creds` instead (secrets/host.key.cred); a service started with
+  `LoadCredentialEncrypted=helm-host-key:<data>/secrets/host.key.cred` gets it unsealed from systemd.
+- **Logs**: stderr with syslog priorities, for the journal; `HELM_LOG_LEVEL=Debug` for more.
+- The box needs the agent CLIs on its PATH (or in ~/.local/bin, ~/.npm-global/bin, ~/.grok/bin) and ICU (libicu,
+  present on Ubuntu).
 
 ## Updates
 

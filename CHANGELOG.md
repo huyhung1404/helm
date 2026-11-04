@@ -3,6 +3,14 @@
 All notable changes to Helm. The top section is used as the GitHub release body and as the Velopack release notes.
 Format: [Keep a Changelog](https://keepachangelog.com), versions follow [SemVer](https://semver.org).
 
+## [Unreleased]
+
+### Added
+- **helm for Linux** (preview): Helm without a screen for a home server. `helm status` shows the data folder, Helm
+  Sync, the agent CLIs and their sign-ins, and which devices take the phone's agent jobs; `helm serve` keeps Helm Sync
+  live and runs the same agent worker as the PC, so a Linux box can answer Ask Helm while the PC is off. Built with
+  `dotnet publish src/Helm.Cli -r linux-x64 -c Release`.
+
 ## [0.83.0] - 2026-11-04
 
 ### Added
