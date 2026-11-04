@@ -47,8 +47,10 @@ internal sealed class ServeCommand : ICliCommand
         var breaker = services.GetRequiredService<PushBreaker>();
         engine.SetIncluded(selection.Prefixes);
 
+        // One gate for every connection: the yes may come on another one (helm-connector confirm) than the call.
+        var gate = new ConfirmationGate(logger: loggers.CreateLogger<ConfirmationGate>());
         var mcp = new McpPart(new McpSocketHost(ConnectorPaths.McpSocket(paths, env),
-            () => ConnectorMcp.Server(services.GetServices<IMcpToolProvider>(), loggers.CreateLogger<McpServer>()), loggers.CreateLogger<McpSocketHost>()));
+            () => ConnectorMcp.Server(services.GetServices<IMcpToolProvider>(), gate, loggers.CreateLogger<McpServer>()), loggers.CreateLogger<McpSocketHost>()));
         // Parts registered in the container join them (later: the phone's agent jobs, forwarded to Fairy Core).
         IServePart[] parts = [new HoldWatcher(engine, health, loggers.CreateLogger<HoldWatcher>()), mcp, .. services.GetServices<IServePart>()];
         var started = DateTimeOffset.UtcNow;

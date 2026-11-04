@@ -300,7 +300,7 @@ public sealed class ConnectorTests : IDisposable
     public async Task ByDefaultItServesWalletTrackerHabitsAndAiButNeverVault()
     {
         await using var services = Tools(SyncSelection.Resolve(null, Data));
-        var tools = ConnectorMcp.Tools(services.GetServices<IMcpToolProvider>()).Select(t => t.Name).ToHashSet();
+        var tools = ConnectorMcp.Tools(services.GetServices<IMcpToolProvider>(), new ConfirmationGate()).Select(t => t.Name).ToHashSet();
 
         foreach (var tool in new[] { "tracker_add_task", "wallet_add_debt", "wallet_summary", "habit_check", "ai_briefs" }) Assert.Contains(tool, tools);
         Assert.DoesNotContain(tools, t => t.StartsWith("notes_", StringComparison.Ordinal) || t.StartsWith("mission", StringComparison.Ordinal)
@@ -311,22 +311,96 @@ public sealed class ConnectorTests : IDisposable
     }
 
     [Fact]
-    public async Task DeletingOrReplacingIsRefusedAndTheRestRunsWithoutAQuestion()
+    public async Task ADeletionOnlyDescribesItselfUntilTheUserConfirmsIt()
     {
         await using var services = Tools(SyncSelection.Resolve("ai,wallet,tracker,habits,notes,missions,vocab", Data));
-        var server = ConnectorMcp.Server(services.GetServices<IMcpToolProvider>(), NullLogger.Instance);
+        var gate = new ConfirmationGate();
+        var server = ConnectorMcp.Server(services.GetServices<IMcpToolProvider>(), gate, NullLogger.Instance);
+        var notes = services.GetRequiredService<Helm.Modules.Notes.NotesStore>();
         Assert.Contains("vocab_add_words", server.ToolNames);
-
-        var created = await CallAsync(server, "notes_create", new JsonObject { ["title"] = "Box", ["text"] = "from Fairy Core" });
-        Assert.False(created["isError"]!.GetValue<bool>());
-        var id = JsonNode.Parse(created["content"]![0]!["text"]!.GetValue<string>())!["id"]!.GetValue<string>();
-
-        var trashed = await CallAsync(server, "notes_trash", new JsonObject { ["id"] = id });
-        Assert.True(trashed["isError"]!.GetValue<bool>());
-        Assert.Contains("on their phone", trashed["content"]![0]!["text"]!.GetValue<string>(), StringComparison.Ordinal);
-        Assert.Empty(services.GetRequiredService<Helm.Modules.Notes.NotesStore>().Trash());
         Assert.Equal(["mission_replan", "notes_trash"],
             services.GetServices<IMcpToolProvider>().SelectMany(p => p.Tools).Where(t => t.Destructive).Select(t => t.Name).Order());
+        var id = await CreateNoteAsync(server, "Shopping list");
+
+        var asked = await CallAsync(server, "notes_trash", new JsonObject { ["id"] = id });
+
+        // Nothing happened; the model reads what would, and not the id that makes it happen.
+        Assert.False(asked["isError"]!.GetValue<bool>());
+        Assert.Empty(notes.Trash());
+        var text = asked["content"]![0]!["text"]!.GetValue<string>();
+        var shown = JsonNode.Parse(text)!;
+        Assert.Equal("needs_confirmation", shown["status"]!.GetValue<string>());
+        Assert.Contains("“Shopping list”", shown["summary"]!.GetValue<string>(), StringComparison.Ordinal);
+        var confirmation = ConfirmationId(asked);
+        Assert.DoesNotContain(confirmation, text, StringComparison.Ordinal);
+        Assert.DoesNotContain("confirmationId", text, StringComparison.Ordinal);
+
+        var done = await RpcAsync(server, ConfirmationGate.Confirm, new JsonObject { ["confirmationId"] = confirmation });
+        Assert.False(done["result"]!["isError"]!.GetValue<bool>());
+        Assert.Contains("\"trashed\":true", done["result"]!["content"]![0]!["text"]!.GetValue<string>(), StringComparison.Ordinal);
+        Assert.Single(notes.Trash());
+
+        var again = await RpcAsync(server, ConfirmationGate.Confirm, new JsonObject { ["confirmationId"] = confirmation });
+        Assert.Contains("already used", again["error"]!["message"]!.GetValue<string>(), StringComparison.Ordinal);
+        var unknown = await CallAsync(server, "notes_trash", new JsonObject { ["id"] = "no-such-note" });
+        Assert.True(unknown["isError"]!.GetValue<bool>());
+    }
+
+    [Fact]
+    public async Task AConfirmationRunsOnceOnlyForTheSameCallWithinFiveMinutes()
+    {
+        var time = new ManualTime(Now);
+        var gate = new ConfirmationGate(time);
+        var runs = new List<string>();
+        var bulk = new McpTool("wallet_delete_month", "Deletes a month of transactions.", McpTool.NoArguments(), (args, _) =>
+        {
+            runs.Add(args.GetProperty("month").GetString()!);
+            return Task.FromResult<object?>(new { deleted = 42 });
+        }) { Destructive = true };
+        var server = ConnectorMcp.Server([new Provider([bulk])], gate, NullLogger.Instance);
+        async Task<string> Ask(string month) => ConfirmationId(await CallAsync(server, bulk.Name, new JsonObject { ["month"] = month }));
+
+        // Expired: nothing runs.
+        var late = await Ask("2026-10");
+        time.Advance(TimeSpan.FromMinutes(5) + TimeSpan.FromSeconds(1));
+        var expired = await RpcAsync(server, ConfirmationGate.Confirm, new JsonObject { ["confirmationId"] = late });
+        Assert.Contains("expired", expired["error"]!["message"]!.GetValue<string>(), StringComparison.Ordinal);
+
+        // Other arguments than the ones the user saw: nothing runs, and the id is spent.
+        var tampered = await Ask("2026-10");
+        var other = await RpcAsync(server, ConfirmationGate.Confirm,
+            new JsonObject { ["confirmationId"] = tampered, ["name"] = bulk.Name, ["arguments"] = new JsonObject { ["month"] = "2026-09" } });
+        Assert.Contains("does not match", other["error"]!["message"]!.GetValue<string>(), StringComparison.Ordinal);
+        Assert.Contains("already used", (await RpcAsync(server, ConfirmationGate.Confirm, new JsonObject { ["confirmationId"] = tampered }))["error"]!["message"]!.GetValue<string>(), StringComparison.Ordinal);
+
+        // Cancelled: nothing runs.
+        var declined = await Ask("2026-10");
+        var cancelled = await RpcAsync(server, ConfirmationGate.Cancel, new JsonObject { ["confirmationId"] = declined });
+        Assert.True(cancelled["result"]!["cancelled"]!.GetValue<bool>());
+        Assert.NotNull((await RpcAsync(server, ConfirmationGate.Confirm, new JsonObject { ["confirmationId"] = declined }))["error"]);
+        Assert.Empty(runs);
+
+        // The same call, keys in another order: it runs, once.
+        var yes = await Ask("2026-10");
+        var pending = await RpcAsync(server, ConfirmationGate.List, null);
+        Assert.Equal(yes, pending["result"]!["pending"]![0]!["confirmationId"]!.GetValue<string>());
+        var ran = await RpcAsync(server, ConfirmationGate.Confirm,
+            new JsonObject { ["confirmationId"] = yes, ["name"] = bulk.Name, ["arguments"] = new JsonObject { ["month"] = "2026-10" } });
+        Assert.Contains("42", ran["result"]!["content"]![0]!["text"]!.GetValue<string>(), StringComparison.Ordinal);
+        await RpcAsync(server, ConfirmationGate.Confirm, new JsonObject { ["confirmationId"] = yes });
+        Assert.Equal(["2026-10"], runs);
+    }
+
+    [Fact]
+    public async Task TheConfirmMethodsAreNoTools()
+    {
+        var server = ConnectorMcp.Server([], new ConfirmationGate(), NullLogger.Instance);
+
+        var list = await RpcAsync(server, "tools/list", null);
+        var call = await RpcAsync(server, "tools/call", new JsonObject { ["name"] = ConfirmationGate.Confirm, ["arguments"] = new JsonObject() });
+
+        Assert.DoesNotContain("helm/", list.ToJsonString(), StringComparison.Ordinal);
+        Assert.Contains("Unknown tool", call["error"]!["message"]!.GetValue<string>(), StringComparison.Ordinal);
     }
 
     [Fact]
@@ -342,27 +416,72 @@ public sealed class ConnectorTests : IDisposable
         Assert.Contains("too long", longError, StringComparison.Ordinal);
         Assert.Throws<InvalidOperationException>(() => new McpSocketHost(tooLong, () => throw new InvalidOperationException(), NullLogger.Instance).Start());
 
-        await using var services = Tools(SyncSelection.Resolve(null, Data));
-        using var host = new McpSocketHost(socket, () => ConnectorMcp.Server(services.GetServices<IMcpToolProvider>(), NullLogger.Instance),
+        await using var services = Tools(SyncSelection.Resolve("notes", Data));
+        var gate = new ConfirmationGate();
+        using var host = new McpSocketHost(socket, () => ConnectorMcp.Server(services.GetServices<IMcpToolProvider>(), gate, NullLogger.Instance),
             NullLogger.Instance);
         host.Start();
         Assert.Throws<InvalidOperationException>(() => new McpSocketHost(socket, () => throw new InvalidOperationException(), NullLogger.Instance).Start());
 
         var input = new MemoryStream(Encoding.UTF8.GetBytes(
             """{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-06-18","clientInfo":{"name":"fairy-core"}}}""" + "\n"
-            + """{"jsonrpc":"2.0","id":2,"method":"tools/list"}""" + "\n"));
+            + """{"jsonrpc":"2.0","id":2,"method":"tools/list"}""" + "\n"
+            // The host's own methods go through the relay too.
+            + """{"jsonrpc":"2.0","id":3,"method":"helm/pending"}""" + "\n"));
         var output = new MemoryStream();
         var (exit, _, _) = await RunAsync(["--data-dir", Data, "mcp"], new() { ["HELM_MCP_SOCKET"] = socket }, input, output);
 
         Assert.Equal(0, exit);
         var replies = Encoding.UTF8.GetString(output.ToArray()).Split('\n', StringSplitOptions.RemoveEmptyEntries).Select(l => JsonNode.Parse(l)!).ToList();
-        Assert.Equal(2, replies.Count);
+        Assert.Equal(3, replies.Count);
+        Assert.Empty(replies[2]["result"]!["pending"]!.AsArray());
         Assert.Equal("helm", replies[0]["result"]!["serverInfo"]!["name"]!.GetValue<string>());
-        Assert.Contains(replies[1]["result"]!["tools"]!.AsArray(), t => t!["name"]!.GetValue<string>() == "wallet_add_transaction");
+        Assert.Contains(replies[1]["result"]!["tools"]!.AsArray(), t => t!["name"]!.GetValue<string>() == "notes_create");
+
+        // The user's answer from a terminal, to a deletion asked for on another connection.
+        var other = ConnectorMcp.Server(services.GetServices<IMcpToolProvider>(), gate, NullLogger.Instance);
+        var note = await CreateNoteAsync(other, "Old ideas");
+        var waiting = ConfirmationId(await CallAsync(other, "notes_trash", new JsonObject { ["id"] = note }));
+        var env = new Dictionary<string, string> { ["HELM_MCP_SOCKET"] = socket };
+        var (listed, list, _) = await RunAsync(["--data-dir", Data, "pending"], env);
+        Assert.Equal(0, listed);
+        Assert.Contains(waiting, list, StringComparison.Ordinal);
+        Assert.Contains("“Old ideas”", list, StringComparison.Ordinal);
+        var (confirmed, result, _) = await RunAsync(["--data-dir", Data, "confirm", waiting], env);
+        Assert.Equal(0, confirmed);
+        Assert.Contains("\"trashed\":true", result, StringComparison.Ordinal);
+        var (twice, _, error2) = await RunAsync(["--data-dir", Data, "confirm", waiting], env);
+        Assert.Equal(ConnectorApp.Failed, twice);
+        Assert.Contains("already used", error2, StringComparison.Ordinal);
+        var (cancelUnknown, _, _) = await RunAsync(["--data-dir", Data, "cancel", "nope"], env);
+        Assert.Equal(ConnectorApp.Failed, cancelUnknown);
     }
 
     private ServiceProvider Tools(SyncSelection selection) =>
         ConnectorHost.Build(new HelmPaths(Data), new PlainSecretProtector(), NullLoggerFactory.Instance, selection);
+
+    private static async Task<string> CreateNoteAsync(McpServer server, string title)
+    {
+        var created = await CallAsync(server, "notes_create", new JsonObject { ["title"] = title, ["text"] = "from Fairy Core" });
+        return JsonNode.Parse(created["content"]![0]!["text"]!.GetValue<string>())!["id"]!.GetValue<string>();
+    }
+
+    /// <summary>The id the host reads in the result's _meta (never in its text).</summary>
+    private static string ConfirmationId(JsonObject result) =>
+        result["_meta"]![ConfirmationGate.MetaKey]!["confirmationId"]!.GetValue<string>();
+
+    private static async Task<JsonObject> RpcAsync(McpServer server, string method, JsonObject? parameters)
+    {
+        var request = new JsonObject { ["jsonrpc"] = "2.0", ["id"] = 7, ["method"] = method, ["params"] = parameters };
+        return (await server.HandleAsync(request.ToJsonString(), default))!;
+    }
+
+    private sealed class Provider(IEnumerable<McpTool> tools) : IMcpToolProvider
+    {
+        public string? ModuleId => null;
+
+        public IEnumerable<McpTool> Tools => tools;
+    }
 
     private static async Task<JsonObject> CallAsync(McpServer server, string tool, JsonObject arguments)
     {

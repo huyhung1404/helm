@@ -7,10 +7,10 @@ namespace Helm.Connector.Mcp;
 
 /// <summary>
 /// Helm's tools for Fairy Core, over MCP, from the same tool providers Ask Helm and Helm's own MCP server use. Nobody
-/// is at the box to ask, so every call runs without a question, except what <see cref="McpTool.Destructive"/> marks (a
-/// note to the trash, a mission's plan replaced): those are refused with a word to do it on the phone. Tools that
-/// reach another machine are refused by <see cref="McpServer"/> itself, having no consent to ask. Vault's tools are
-/// never registered here.
+/// is at the box to ask, so a call runs without a question, except what <see cref="McpTool.Destructive"/> marks (a note
+/// to the trash, a mission replanned, any bulk deletion): those go through the <see cref="ConfirmationGate"/> and run
+/// only after the user's yes, confirmed by the host over <c>helm/confirm</c>. Tools that reach another machine are
+/// refused by <see cref="McpServer"/> itself, having no consent to ask. Vault's tools are never registered here.
 /// </summary>
 internal static class ConnectorMcp
 {
@@ -18,21 +18,16 @@ internal static class ConnectorMcp
         "Helm is the user's own toolkit; this is its connector on the user's home server. These tools read and change the user's " +
         "Wallet (spending, debts, bills, goals), their Tracker (to-do lists), their Habits and, when the connector syncs them, their " +
         "Notes, Missions and Vocabulary, plus the briefs of Helm's automatic jobs. Changes sync to the user's phone and PC within " +
-        "seconds. Dates and times are the user's local ones. Nothing here deletes or replaces the user's data: such tools answer with " +
-        "an error, and the user does it on their phone. Ask before changing many things at once.";
-
-    public static string Refusal(string tool) =>
-        $"{tool} deletes or replaces the user's data, which the connector never does: there is nobody here to confirm it. " +
-        "Ask the user to do it in Helm on their phone or PC.";
+        "seconds. Dates and times are the user's local ones. A tool that deletes or replaces data answers \"needs_confirmation\" " +
+        "with a summary and changes nothing: tell the user what will happen; it runs only once they say yes. Ask before changing " +
+        "many things at once.";
 
     /// <summary>The tools as the connector serves them.</summary>
-    public static IReadOnlyList<McpTool> Tools(IEnumerable<IMcpToolProvider> providers) =>
-        [.. providers.SelectMany(p => p.Tools).Select(t => t.Destructive
-            ? t with { Run = (_, _) => throw new McpToolException(Refusal(t.Name)), Undo = null }
-            : t)];
+    public static IReadOnlyList<McpTool> Tools(IEnumerable<IMcpToolProvider> providers, ConfirmationGate gate) =>
+        [.. providers.SelectMany(p => p.Tools).Select(t => t.Destructive ? gate.Guard(t) : t)];
 
-    public static McpServer Server(IEnumerable<IMcpToolProvider> providers, ILogger logger) =>
-        new(Tools(providers), AppInfo.Version, Instructions, logger, consent: null);
+    public static McpServer Server(IEnumerable<IMcpToolProvider> providers, ConfirmationGate gate, ILogger logger) =>
+        new(Tools(providers, gate), AppInfo.Version, Instructions, logger, consent: null) { Methods = gate.Methods };
 }
 
 /// <summary>The MCP socket as a part of serve (see <see cref="IServePart"/>).</summary>
