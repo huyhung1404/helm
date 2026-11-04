@@ -59,7 +59,7 @@ internal sealed class ConfirmationGate(TimeProvider? time = null, ILogger? logge
         return new McpToolResult(
             new
             {
-                status = "needs_confirmation",
+                status = McpTool.NeedsConfirmation,
                 tool = tool.Name,
                 summary,
                 message = "Nothing was changed. Helm asks the user to confirm this first: tell them what will happen and wait for their answer.",

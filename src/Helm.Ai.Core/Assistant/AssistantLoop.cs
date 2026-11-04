@@ -64,6 +64,7 @@ internal static class AssistantLoop
             if (!approved) declined = true;
 
             var results = new List<ToolOutcome>();
+            var asksUser = false;
             foreach (var call in answer.Calls)
             {
                 if (!byName.TryGetValue(call.Name, out var tool))
@@ -86,7 +87,10 @@ internal static class AssistantLoop
                 try
                 {
                     var json = HelmAssistant.Serialize(await tool.Source.Run(input, ct));
-                    if (tool.Mode != AssistantToolMode.Read)
+                    // Nothing was done yet: the tool asks the user first (the connector's confirmation gate).
+                    var waits = McpTool.WaitsForUser(json);
+                    asksUser |= waits;
+                    if (tool.Mode != AssistantToolMode.Read && !waits)
                     {
                         // One call may make several records (a bill split among friends): each is a row with its own Undo.
                         foreach (var (summary, record) in Records(json, Summary(call)))
@@ -118,7 +122,7 @@ internal static class AssistantLoop
             chat.AddResults(results);
             // A step that only recorded things (no reading, nothing waiting for a yes, nothing failed) needs no second
             // call to say so: the summaries are the answer. Half the time and one call fewer for "phở 45k".
-            if (answer.Calls.All(c => byName.TryGetValue(c.Name, out var t) && t.Mode == AssistantToolMode.Auto) && results.All(r => !r.IsError))
+            if (!asksUser && answer.Calls.All(c => byName.TryGetValue(c.Name, out var t) && t.Mode == AssistantToolMode.Auto) && results.All(r => !r.IsError))
                 return End(DoneText, null);
         }
         return End("Em dừng lại vì việc này cần quá nhiều bước. Anh nói ngắn hơn giúp em nha.", null);
