@@ -60,6 +60,7 @@ public sealed class AgentRegistry : IAgentRoute, IDisposable
     private readonly ILoggerFactory _loggers;
     private readonly Prompts.IAiPrompts? _prompts;
     private readonly AiKeyStore? _keys;
+    private readonly Func<McpTool, bool>? _offers;
     private readonly object _gate = new();
     private IReadOnlyList<Agent> _agents = [];
     private readonly AgentChain _chain = new([]);
@@ -68,11 +69,13 @@ public sealed class AgentRegistry : IAgentRoute, IDisposable
 
     /// <param name="signIn">Shows an agent's sign-in to the user (a console window on Windows, the terminal on Linux).</param>
     /// <param name="keys">The API keys whose last test lists the models an agent of their provider can be asked for.</param>
+    /// <param name="offers">The tools its agents may offer a job at all; null: Ask Helm's own.</param>
     public AgentRegistry(ISettingsStoreFactory settings, HelmPaths paths, IChildProcessLauncher launcher, IAgentSignIn signIn,
         IEnumerable<IMcpToolProvider> tools, Func<string?, bool> isToolOn, ILoggerFactory loggers, Prompts.IAiPrompts? prompts = null,
-        AiKeyStore? keys = null)
+        AiKeyStore? keys = null, Func<McpTool, bool>? offers = null)
     {
         _keys = keys;
+        _offers = offers;
         _store = settings.Get<AiAgentSettings>(AiAgentSettings.StoreId);
         _paths = paths;
         _launcher = launcher;
@@ -295,7 +298,7 @@ public sealed class AgentRegistry : IAgentRoute, IDisposable
         if (made is not { } m) return null;
         return new Agent(profile, m.Factory, m.Unavailable,
             new LocalAgentRoute(Environment.MachineName, profile.Name, m.Factory, _tools, _isToolOn, m.Unavailable, prompts: _prompts,
-                logger: _loggers.CreateLogger<LocalAgentRoute>(), kind: profile.Kind, models: () => ModelsOf(profile.Kind)));
+                logger: _loggers.CreateLogger<LocalAgentRoute>(), kind: profile.Kind, models: () => ModelsOf(profile.Kind), offers: _offers));
     }
 
     /// <summary>
