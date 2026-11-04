@@ -6,10 +6,13 @@ Format: [Keep a Changelog](https://keepachangelog.com), versions follow [SemVer]
 ## [Unreleased]
 
 ### Added
-- **helm for Linux** (preview): Helm without a screen for a home server. `helm status` shows the data folder, Helm
-  Sync, the agent CLIs and their sign-ins, and which devices take the phone's agent jobs; `helm serve` keeps Helm Sync
-  live and runs the same agent worker as the PC, so a Linux box can answer Ask Helm while the PC is off. Built with
-  `dotnet publish src/Helm.Cli -r linux-x64 -c Release`.
+- **helm-connector for Linux** (preview): Helm's data on your own home server. It keeps the tools you choose in sync
+  (by default AI, Wallet, Tracker and Habits; Notes, Missions and Vocabulary on request, Vault never) and offers
+  their tools over MCP to the server's own assistant. Deleting or replacing your data from there is refused: you do
+  that on the phone. It stops syncing by itself if it ever pushes far more than usual, never decides held mass
+  deletions, and can alert a Healthchecks URL for both. Built with `dotnet publish src/Helm.Connector -r linux-x64
+  -c Release`.
+- MCP clients see which of Helm's tools delete or replace data (moving a note to the trash, replanning a mission).
 
 ## [0.83.0] - 2026-11-04
 
