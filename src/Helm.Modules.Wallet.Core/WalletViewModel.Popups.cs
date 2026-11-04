@@ -26,6 +26,15 @@ public enum WalletPopup
 
     AddDebt,
     Person,
+
+    /// <summary>A savings goal: its photo, setting money aside, its history.</summary>
+    Goal,
+
+    GoalForm,
+    GoalTakeOut,
+
+    /// <summary>The goal was bought: what it cost and its category.</summary>
+    GoalBought,
 }
 
 /// <summary>
@@ -65,6 +74,14 @@ public sealed partial class WalletViewModel
 
     public bool ShowPersonPopup => Popup == WalletPopup.Person;
 
+    public bool ShowGoalPopup => Popup == WalletPopup.Goal;
+
+    public bool ShowGoalFormPopup => Popup == WalletPopup.GoalForm;
+
+    public bool ShowGoalTakeOutPopup => Popup == WalletPopup.GoalTakeOut;
+
+    public bool ShowGoalBoughtPopup => Popup == WalletPopup.GoalBought;
+
     /// <summary>The add and edit forms share one layout; this is its title.</summary>
     public string FormTitle => Popup == WalletPopup.Edit ? "Edit transaction" : "Add transaction";
 
@@ -72,7 +89,8 @@ public sealed partial class WalletViewModel
     {
         foreach (var name in (string[])[nameof(HasPopup), nameof(ShowAddPopup), nameof(ShowDetailsPopup), nameof(ShowEditPopup), nameof(ShowDebtPopup),
             nameof(ShowToCategorizePopup), nameof(ShowFundPopup), nameof(ShowFundFormPopup), nameof(ShowCoverPopup), nameof(ShowChartsPopup),
-            nameof(ShowAddDebtPopup), nameof(ShowPersonPopup), nameof(FormTitle)])
+            nameof(ShowAddDebtPopup), nameof(ShowPersonPopup), nameof(ShowGoalPopup), nameof(ShowGoalFormPopup), nameof(ShowGoalTakeOutPopup),
+            nameof(ShowGoalBoughtPopup), nameof(FormTitle)])
             OnPropertyChanged(name);
         if (value == WalletPopup.None) _popupBack.Clear();
     }

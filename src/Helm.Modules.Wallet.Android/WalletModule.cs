@@ -22,7 +22,7 @@ public sealed class WalletModule : AndroidModuleBase, IModuleContent, IBackHandl
     private readonly ILogger<WalletModule> _logger;
     private readonly Timer _widgetTimer;
 
-    public WalletModule(WalletViewModel viewModel, WalletStore store, FundBook funds, ISettingsStoreFactory settings, ILogger<WalletModule> logger)
+    public WalletModule(WalletViewModel viewModel, WalletStore store, FundBook funds, GoalBook goals, ISettingsStoreFactory settings, ILogger<WalletModule> logger)
     {
         _viewModel = viewModel;
         _store = store;
@@ -33,6 +33,8 @@ public sealed class WalletModule : AndroidModuleBase, IModuleContent, IBackHandl
         // A sync can change many records in a row: redraw the widgets and check the funds once it has settled.
         store.Changed += (_, _) => _widgetTimer.Change(TimeSpan.FromMilliseconds(400), Timeout.InfiniteTimeSpan);
         funds.Changed += (_, _) => _widgetTimer.Change(TimeSpan.FromMilliseconds(400), Timeout.InfiniteTimeSpan);
+        // Money set aside moves the balance and lights the Goal widget's photo.
+        goals.Changed += (_, _) => _widgetTimer.Change(TimeSpan.FromMilliseconds(400), Timeout.InfiniteTimeSpan);
     }
 
     public void Dispose() => _widgetTimer.Dispose();
