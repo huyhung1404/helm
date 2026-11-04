@@ -7,7 +7,7 @@ using Helm.Ai.Assistant;
 using Helm.Core.Processes;
 using Microsoft.Extensions.Logging;
 
-namespace Helm.App.Ai;
+namespace Helm.Ai.Agents;
 
 /// <summary>
 /// OpenAI's Codex CLI (a ChatGPT plan, signed in for Helm in its own folder: CODEX_HOME) as the brain of Helm's agent
@@ -141,10 +141,12 @@ internal sealed class CodexAgentFactory(IChildProcessLauncher launcher, string h
 
     /// <summary>
     /// codex on the PATH: npm's native codex.exe when npm installed it (npm's codex.cmd starts cmd.exe and node only to
-    /// start that exe: 70-100 ms a run), else codex.cmd, or a codex.exe of its own.
+    /// start that exe: 70-100 ms a run), else codex.cmd, or a codex.exe of its own. On Linux: <c>codex</c> on PATH (npm's
+    /// launcher, which starts its native binary), else in the user's own bin folders.
     /// </summary>
     internal static string? FindCodex()
     {
+        if (!OperatingSystem.IsWindows()) return AgentCommands.Find("codex");
         var folders = (Environment.GetEnvironmentVariable("PATH") ?? "").Split(Path.PathSeparator, StringSplitOptions.RemoveEmptyEntries)
             .Append(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "npm"));
         foreach (var folder in folders.Select(f => f.Trim('"')))

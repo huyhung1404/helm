@@ -2,13 +2,11 @@ using System.IO;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Nodes;
-using Helm.Ai;
 using Helm.Ai.Assistant;
-using Helm.Core.Mcp;
 using Helm.Core.Processes;
 using Microsoft.Extensions.Logging;
 
-namespace Helm.App.Ai;
+namespace Helm.Ai.Agents;
 
 /// <summary>
 /// Claude Code (the official CLI) as the brain of Helm's agent jobs on this PC, signed in to the account the user chose
@@ -32,7 +30,7 @@ internal sealed class ClaudeCodeAgentFactory(IChildProcessLauncher launcher, str
 
     /// <summary>Why it takes no job now (not installed, not signed in here, at its limit), or null.</summary>
     public string? Unavailable() =>
-        McpClientConfig.FindClaude() is null ? "Claude Code is not installed on this PC."
+        CommandFinder.FindClaude() is null ? "Claude Code is not installed on this PC."
         : !SignedIn(home) ? "not signed in: press Sign in."
         : DateTimeOffset.UtcNow < _limitedUntil ? $"reached its plan's limit; Helm tries it again at {_limitedUntil.ToLocalTime():HH:mm}."
         : null;
@@ -181,7 +179,7 @@ internal sealed class ClaudeCodeChat(ClaudeCodeAgentFactory factory, IChildProce
 
     private void Start()
     {
-        var claude = McpClientConfig.FindClaude() ?? throw new AssistantException("Claude Code is not installed on this PC.");
+        var claude = CommandFinder.FindClaude() ?? throw new AssistantException("Claude Code is not installed on this PC.");
         // No session file: Helm keeps the conversation itself (a new process gets a recap), and a photo never lands on disk.
         string[] args = ["-p", "--input-format", "stream-json", "--output-format", "stream-json", "--verbose", "--tools", "", "--strict-mcp-config",
             "--no-session-persistence",

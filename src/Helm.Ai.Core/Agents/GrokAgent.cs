@@ -5,7 +5,7 @@ using Helm.Ai.Assistant;
 using Helm.Core.Processes;
 using Microsoft.Extensions.Logging;
 
-namespace Helm.App.Ai;
+namespace Helm.Ai.Agents;
 
 /// <summary>
 /// xAI's Grok CLI (Grok Build, on a SuperGrok or X Premium+ plan, signed in for Helm in its own folder: GROK_HOME) as the
@@ -239,10 +239,14 @@ internal sealed class GrokAgentFactory(IChildProcessLauncher launcher, string ho
 
     /// <summary>
     /// The native grok.exe (its installer and npm's first run put it in ~/.grok/bin), else npm's grok.cmd. Helm runs the
-    /// native one with its own GROK_HOME, so npm's launcher does not unpack another copy into every agent's folder.
+    /// native one with its own GROK_HOME, so npm's launcher does not unpack another copy into every agent's folder. On
+    /// Linux: the native ~/.grok/bin/grok, else <c>grok</c> on PATH.
     /// </summary>
     internal static string? FindGrok()
     {
+        if (!OperatingSystem.IsWindows())
+            return CommandFinder.FirstExecutable(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".grok", "bin", "grok"))
+                ?? AgentCommands.Find("grok");
         var native = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".grok", "bin", "grok.exe");
         if (File.Exists(native)) return native;
         var folders = (Environment.GetEnvironmentVariable("PATH") ?? "").Split(Path.PathSeparator, StringSplitOptions.RemoveEmptyEntries)

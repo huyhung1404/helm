@@ -4,7 +4,7 @@ using Helm.Ai.Assistant;
 using Helm.Core.Processes;
 using Microsoft.Extensions.Logging;
 
-namespace Helm.App.Ai;
+namespace Helm.Ai.Agents;
 
 /// <summary>
 /// A conversation's turns as headless <c>grok --prompt-file</c> runs in an empty folder, with none of Grok's own tools,

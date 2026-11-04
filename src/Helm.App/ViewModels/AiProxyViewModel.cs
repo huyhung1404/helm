@@ -3,7 +3,7 @@ using System.Globalization;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Helm.Ai;
-using Helm.App.Ai;
+using Helm.Ai.Agents;
 using Helm.Core.Services;
 using Helm.Core.Sync;
 
