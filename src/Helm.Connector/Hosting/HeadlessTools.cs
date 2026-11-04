@@ -11,23 +11,23 @@ using Microsoft.Extensions.DependencyInjection;
 namespace Helm.Connector.Hosting;
 
 /// <summary>
-/// The tools whose data the phone's agent jobs read and change here: each tool's platform-neutral part, as the apps
-/// register it (its synced collections, its store and its tools for the agents), and its links (a note linked to a
-/// task). There are no pages: a link is never opened here.
+/// The tools in the <see cref="SyncSelection"/>: each one's platform-neutral part, as the apps register it (its synced
+/// collections, its store and its tools for agents), and its links (a note linked to a task). There are no pages: a
+/// link is never opened here. Vault is never registered.
 /// </summary>
 internal static class HeadlessTools
 {
-    public static IServiceCollection Add(IServiceCollection services)
+    public static IServiceCollection Add(IServiceCollection services, SyncSelection selection)
     {
         services.AddSingleton<IShellNavigation, NoPages>();
         services.AddSingleton<IDialogService, NoPages>();
         var page = typeof(NoPages);
-        services.AddTrackerCore().AddTrackerLinks(page);
-        services.AddWalletCore().AddWalletLinks(page);
-        services.AddHabitsCore();
-        services.AddNotesCore().AddNoteLinks(page);
-        services.AddMissionsCore().AddMissionLinks(page);
-        services.AddVocabCore();
+        if (selection.Has("tracker.")) services.AddTrackerCore().AddTrackerLinks(page);
+        if (selection.Has("wallet.")) services.AddWalletCore().AddWalletLinks(page);
+        if (selection.Has("habits.")) services.AddHabitsCore();
+        if (selection.Has("notes.")) services.AddNotesCore().AddNoteLinks(page);
+        if (selection.Has("missions.")) services.AddMissionsCore().AddMissionLinks(page);
+        if (selection.Has("vocab.")) services.AddVocabCore();
         return services;
     }
 

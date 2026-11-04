@@ -1,7 +1,8 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
-  <!-- Linux infrastructure on top of Helm.Core, for helm (src/Helm.Connector) on a headless box: secrets at rest under the
-       data folder (a 0600 host key, optionally sealed by systemd-creds), plain child processes, the data folder.
+  <!-- Linux infrastructure on top of Helm.Core, for helm-connector (src/Helm.Connector) on a headless box: secrets at rest
+       under the data folder (a 0600 host key, optionally sealed by systemd-creds), plain child processes, private files,
+       Helm's MCP server on a Unix socket.
        Namespaces stay Helm.Core.* like Helm.Core.Windows. No UI. -->
   <PropertyGroup>
     <TargetFramework>net8.0</TargetFramework>
