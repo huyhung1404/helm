@@ -44,6 +44,9 @@ public sealed partial class WalletViewModel : ObservableObject
     /// <summary>The debt book is shown instead of the month.</summary>
     [ObservableProperty] private bool _isDebtsView;
 
+    /// <summary>The savings goals are shown instead of the month.</summary>
+    [ObservableProperty] private bool _isGoalsView;
+
     [ObservableProperty] private string _monthTitle = "";
     [ObservableProperty] private bool _canGoNext;
     [ObservableProperty] private bool _isCurrentMonth;
@@ -141,7 +144,8 @@ public sealed partial class WalletViewModel : ObservableObject
         : this(store, capture, settings, ui, dialogs, clipboard, services.GetService(typeof(IWalletPlatform)) as IWalletPlatform, logger, TimeZoneInfo.Local,
             services.GetService(typeof(DebtsViewModel)) as DebtsViewModel, services.GetService(typeof(FundBook)) as FundBook,
             services.GetService(typeof(WalletNotificationAi)) as WalletNotificationAi, services.GetService(typeof(BillBook)) as BillBook,
-            services.GetService(typeof(WalletCategoryAi)) as WalletCategoryAi)
+            services.GetService(typeof(WalletCategoryAi)) as WalletCategoryAi, services.GetService(typeof(GoalBook)) as GoalBook,
+            services.GetService(typeof(IGoalPhotos)) as IGoalPhotos)
     {
     }
 
@@ -159,7 +163,9 @@ public sealed partial class WalletViewModel : ObservableObject
         FundBook? funds = null,
         WalletNotificationAi? notificationAi = null,
         BillBook? bills = null,
-        WalletCategoryAi? categoryAi = null)
+        WalletCategoryAi? categoryAi = null,
+        GoalBook? goals = null,
+        IGoalPhotos? photos = null)
     {
         _store = store;
         _capture = capture;
@@ -189,6 +195,11 @@ public sealed partial class WalletViewModel : ObservableObject
             funds.Changed += (_, _) => ScheduleRefresh();
         }
         if (bills is not null) Bills = new BillsViewModel(bills, ui, zone);
+        if (goals is not null)
+        {
+            Goals = new GoalsViewModel(goals, this, dialogs, photos, _settings, ui, zone, hasWidget: platform is not null);
+            goals.Changed += (_, _) => ScheduleRefresh();
+        }
         _categoryAi = categoryAi;
         // Unread notifications arrive from the listener; toggles may change on the other page.
         _settings.Changed += (_, _) => _ui.Post(() =>
@@ -319,20 +330,52 @@ public sealed partial class WalletViewModel : ObservableObject
 
     public bool HasDebts => _debts is not null;
 
-    public bool IsMoneyView => !IsDebtsView;
+    public bool IsMoneyView => !IsDebtsView && !IsGoalsView;
+
+    /// <summary>The savings goals; null where the app has none (tests).</summary>
+    public GoalsViewModel? Goals { get; }
+
+    public bool HasGoals => Goals is not null;
+
+    /// <summary>More than the money to show: the Money / Debts / Goals switch is shown.</summary>
+    public bool HasViews => HasDebts || HasGoals;
 
     partial void OnIsDebtsViewChanged(bool value)
     {
+        if (value) IsGoalsView = false;
         OnPropertyChanged(nameof(IsMoneyView));
         OnPropertyChanged(nameof(ShowToCategorizeButton));
         if (value) _debts?.Refresh();
     }
 
+    partial void OnIsGoalsViewChanged(bool value)
+    {
+        if (value) IsDebtsView = false;
+        OnPropertyChanged(nameof(IsMoneyView));
+        OnPropertyChanged(nameof(ShowToCategorizeButton));
+        if (value) Goals?.Update();
+    }
+
     [RelayCommand]
-    private void ShowMoney() => IsDebtsView = false;
+    private void ShowMoney()
+    {
+        IsDebtsView = false;
+        IsGoalsView = false;
+    }
 
     [RelayCommand]
     private void ShowDebts() => IsDebtsView = _debts is not null;
+
+    [RelayCommand]
+    private void ShowGoals() => IsGoalsView = Goals is not null;
+
+    /// <summary>Opens a savings goal (the Goal widget): the goals are shown and its pop-up opens.</summary>
+    public void ShowGoal(string id)
+    {
+        if (Goals is null) return;
+        IsGoalsView = true;
+        if (!Goals.Open(id)) ClosePopup();
+    }
 
     /// <summary>Opens the debt book on a person (a linked note, the Tracker's calendar, a transaction).</summary>
     public void ShowPerson(string key)
@@ -746,6 +789,7 @@ public sealed partial class WalletViewModel : ObservableObject
             Funds?.Update(transactions, categories, _month, now);
             // A new day may make a bill due or late.
             Bills?.Refresh();
+            Goals?.Update();
             OnPropertyChanged(nameof(ShowBudgetCard));
             CashFlow = WalletCharts.CashFlow(summary);
             SpendingDonut = WalletCharts.Spending(summary, categories);
