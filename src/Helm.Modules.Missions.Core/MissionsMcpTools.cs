@@ -65,6 +65,7 @@ public sealed class MissionsMcpTools(MissionsStore store) : IMcpToolProvider
         {
             // The steps it replaces are gone: no Undo brings the old plan back.
             Destructive = true,
+            Preview = (args, _) => Task.FromResult(ReplanPreview(args)),
         },
         new("mission_update", "Change a mission's title, goal, reward or deadline (its steps and progress stay).",
             McpArgs.Schema(
@@ -229,6 +230,16 @@ public sealed class MissionsMcpTools(MissionsStore store) : IMcpToolProvider
     private static DateOnly ParseDay(string text) =>
         DateOnly.TryParseExact(text.Trim(), "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out var day)
             ? day : throw new McpToolException($"{text} is not a day like 2027-03-01.");
+
+    private string ReplanPreview(JsonElement args)
+    {
+        var mission = Require(McpArgs.RequiredString(args, "mission"));
+        var result = MissionImport.Read(args, requireTitle: false);
+        if (!result.Ok) throw new McpToolException(string.Join(" ", result.Errors));
+        var left = store.Steps(mission.Id).Count(s => !s.Value.IsDone);
+        var planned = result.Draft!.Phases.Sum(p => p.Steps.Count);
+        return $"Replan the mission “{mission.Value.Title}”: its {left} steps not done yet are replaced by {planned} new steps; done steps stay.";
+    }
 
     private object Replan(JsonElement args)
     {

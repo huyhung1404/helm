@@ -73,6 +73,7 @@ public sealed class NotesMcpTools(NotesStore store, LinkHub? links = null, NoteM
             (args, _) => Task.FromResult<object?>(Trash(McpArgs.RequiredString(args, "id"))))
         {
             Destructive = true,
+            Preview = (args, _) => Task.FromResult(TrashPreview(McpArgs.RequiredString(args, "id"))),
         },
         new("notes_add_important_day",
             $"Remember a day in the note “{ImportantDays.NoteTitle}”: every year (a birthday; a giỗ, often a lunar day) or one day only " +
@@ -193,6 +194,11 @@ public sealed class NotesMcpTools(NotesStore store, LinkHub? links = null, NoteM
             },
         };
     }
+
+    private string TrashPreview(string id) =>
+        store.Get(id) is { } note
+            ? $"Move the note “{note.DisplayTitle}” to the trash (it can be restored for {NotesStore.TrashDays} days)."
+            : throw new McpToolException($"There is no note {id}.");
 
     private object Trash(string id)
     {

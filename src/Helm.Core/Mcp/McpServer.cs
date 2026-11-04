@@ -25,6 +25,13 @@ public sealed record McpTool(string Name, string Description, JsonObject InputSc
     /// </summary>
     public bool Destructive { get; init; }
 
+    /// <summary>
+    /// For a <see cref="Destructive"/> tool: what this exact call would delete or replace, in the user's words (the note's
+    /// title, the mission and how many steps go), for a host that asks the user before running it. Null: the tool's
+    /// name and arguments.
+    /// </summary>
+    public Func<JsonElement, CancellationToken, Task<string>>? Preview { get; init; }
+
     /// <summary>What a call can do; when not set, <see cref="McpRisk.Read"/> for a <see cref="ReadOnly"/> tool, else <see cref="McpRisk.Change"/>.</summary>
     public McpRisk Risk
     {
@@ -146,6 +153,13 @@ public sealed record McpTool(string Name, string Description, JsonObject InputSc
 /// <summary>A tool call that cannot be done as asked (unknown id, invalid date…): the agent sees the message.</summary>
 public sealed class McpToolException(string message) : Exception(message);
 
+/// <summary>
+/// What a tool returns when its result carries data for the client rather than the model: <see cref="Content"/> becomes
+/// the text the model reads, as any result; <see cref="Meta"/> goes in the result's <c>_meta</c>, which hosts keep from
+/// the model.
+/// </summary>
+public sealed record McpToolResult(object? Content, JsonObject? Meta = null);
+
 /// <summary>Tools a Helm module offers over MCP (registered as <c>IMcpToolProvider</c> singletons).</summary>
 public interface IMcpToolProvider
 {
@@ -206,6 +220,13 @@ public sealed class McpServer
     /// <summary>The longest message this connection reads, in characters.</summary>
     public int MaxMessageLength { get; init; } = DefaultMaxMessageLength;
 
+    /// <summary>
+    /// JSON-RPC methods of the host's own beside MCP's (the connector's <c>helm/confirm</c>): never listed as tools, so a
+    /// model, which can only call tools, cannot reach them. A handler gets the params; an <see cref="McpToolException"/>
+    /// becomes a JSON-RPC error with its message.
+    /// </summary>
+    public IReadOnlyDictionary<string, Func<JsonObject?, CancellationToken, Task<JsonNode?>>>? Methods { get; init; }
+
     /// <summary>What the transport learnt about the caller's process (the pipe reads its token).</summary>
     public void SetCallerElevated(bool? elevated) => Client = Client with { Elevated = elevated };
 
@@ -252,6 +273,19 @@ public sealed class McpServer
         var isNotification = !request.ContainsKey("id");
         try
         {
+            if (Methods is { } methods && methods.TryGetValue(method, out var own))
+            {
+                JsonNode? answer;
+                try
+                {
+                    answer = await own(request["params"] as JsonObject, ct).ConfigureAwait(false);
+                }
+                catch (McpToolException ex)
+                {
+                    throw new JsonRpcException(-32602, ex.Message);
+                }
+                return isNotification ? null : new JsonObject { ["jsonrpc"] = "2.0", ["id"] = id, ["result"] = answer ?? new JsonObject() };
+            }
             JsonNode? result = method switch
             {
                 "initialize" => Initialize(request["params"] as JsonObject),
@@ -319,13 +353,13 @@ public sealed class McpServer
                 return ToolResult(refused, isError: true);
             }
             allowed = asked;
-            var result = await tool.Run(arguments.RootElement, ct).ConfigureAwait(false);
-            ok = true;
-            return ToolResult(result as string ?? JsonSerializer.Serialize(result, Output), isError: false);
+            var (reply, succeeded) = await RunToolAsync(tool, arguments.RootElement, _logger, ct).ConfigureAwait(false);
+            ok = succeeded;
+            return reply;
         }
         catch (Exception ex) when (ex is McpToolException or ArgumentException or FormatException or InvalidOperationException or KeyNotFoundException)
         {
-            // What was wrong with the call: the agent reads it and can try again.
+            // The question for this call could not be built (an unknown id): the agent reads why.
             _logger.LogInformation("MCP tool {Tool} refused: {Message}", name, ex.Message);
             return ToolResult(ex.Message, isError: true);
         }
@@ -385,6 +419,31 @@ public sealed class McpServer
     private static bool IsSecret(McpTool tool, string name) =>
         (tool.InputSchema["properties"]?[name]?["writeOnly"] is JsonValue flag && flag.TryGetValue<bool>(out var writeOnly) && writeOnly)
         || SecretNames.Any(s => name.Contains(s, StringComparison.OrdinalIgnoreCase));
+
+    /// <summary>
+    /// Runs one tool call and returns its <c>tools/call</c> result: the result as text (an <see cref="McpToolResult"/>'s
+    /// <c>_meta</c> beside it), or, for a call that cannot be done as asked, its message with <c>isError</c>.
+    /// </summary>
+    public static async Task<(JsonObject Result, bool Ok)> RunToolAsync(McpTool tool, JsonElement arguments, ILogger? logger, CancellationToken ct)
+    {
+        try
+        {
+            var result = await tool.Run(arguments, ct).ConfigureAwait(false);
+            if (result is McpToolResult { } withMeta)
+            {
+                var reply = ToolResult(withMeta.Content as string ?? JsonSerializer.Serialize(withMeta.Content, Output), isError: false);
+                if (withMeta.Meta is { } meta) reply["_meta"] = meta.DeepClone();
+                return (reply, true);
+            }
+            return (ToolResult(result as string ?? JsonSerializer.Serialize(result, Output), isError: false), true);
+        }
+        catch (Exception ex) when (ex is McpToolException or ArgumentException or FormatException or InvalidOperationException or KeyNotFoundException)
+        {
+            // What was wrong with the call: the agent reads it and can try again.
+            logger?.LogInformation("MCP tool {Tool} refused: {Message}", tool.Name, ex.Message);
+            return (ToolResult(ex.Message, isError: true), false);
+        }
+    }
 
     private static JsonObject ToolResult(string text, bool isError) =>
         new() { ["content"] = new JsonArray(new JsonObject { ["type"] = "text", ["text"] = text }), ["isError"] = isError };
