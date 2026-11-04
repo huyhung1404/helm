@@ -6,7 +6,7 @@ Everything needed to build, run, extend and release Helm. For what Helm is and h
 - [Where things live](#where-things-live)
 - [Solution layout](#solution-layout)
 - [Adding a module](#adding-a-module)
-- [helm on Linux](#helm-on-linux)
+- [The Linux connector](#the-linux-connector)
 - [Updates](#updates)
 - [Release process](#release-process)
 
@@ -73,9 +73,9 @@ src/
   Helm.Modules.Vault/        Windows: vault window and page, Windows Hello, protected clipboard
   Helm.Modules.Vault.Android/ Android: vault page, fingerprint unlock, FLAG_SECURE, SAF backups (not in Helm.sln)
   Helm.VaultRestore/         helm-vault-restore: opens a vault backup without Helm
-  Helm.Core.Linux/           net8.0, Linux for helm: secrets under a host key (0600, optionally sealed by systemd-creds),
-                             plain child processes; namespaces stay Helm.Core.*
-  Helm.Cli/                  helm: Helm without a screen on a Linux box (Helm Sync and the agent worker for the phone)
+  Helm.Core.Linux/           net8.0, Linux for the connector: secrets under a host key (0600, optionally sealed by
+                             systemd-creds), MCP on a Unix socket, plain child processes; namespaces stay Helm.Core.*
+  Helm.Connector/            helm-connector: Helm's data on a Linux home server, in sync, with Helm's tools over MCP
 tests/Helm.Tests/            xUnit: settings, sync (+ end-to-end against a local worker), updates, hotkeys, MCP, Tracker, Missions, Habits, Wallet, Vault
 ```
 
@@ -118,30 +118,41 @@ The nav tree, Home tiles, tray toggles, search and enable persistence all come f
 
 A tool you work in (lists, a chat, a vault) also has a **content page**: implement `IModuleContent` and the menu and the Quick access tile open it, while Home → Utilities and search open the settings page. See "Content page and settings page" in [new-tool-prompt.md](new-tool-prompt.md).
 
-## helm on Linux
+## The Linux connector
 
-`helm` (src/Helm.Cli) runs what Helm on the PC does in the background, without a screen: Helm Sync, and the agents
-(Claude Code, Codex, Grok) that take the phone's agent jobs with the tools' own stores (Wallet, Tracker, Habits,
-Notes, Missions, Vocabulary). The agents are the PC's own code (src/Helm.Ai.Core/Agents); only the platform pieces
-differ: `PlainChildProcessLauncher` instead of the job-object launcher, `FileKeySecretProtector` instead of DPAPI, a
-terminal sign-in instead of a console window.
+`helm-connector` (src/Helm.Connector) keeps Helm's data on a Linux home server in sync and offers Helm's tools over
+MCP to Fairy Core, the box's own AI (a separate app). It runs no agent. It uses the apps' own code: the sync engine,
+and each synced tool's store and agent tools from its *.Core project. Only the platform parts are its own:
+`FileKeySecretProtector` instead of DPAPI, and a Unix socket for MCP instead of the named pipe.
 
 ```bash
-dotnet publish src/Helm.Cli -r linux-x64 -c Release   # one self-contained file: bin/Release/net8.0/linux-x64/publish/helm
-helm --version
-helm status            # data folder, host key, sync, agent CLIs and sign-ins, workers online (changes nothing)
-helm serve             # sync + the agent worker in the foreground, until Ctrl+C or SIGTERM
+dotnet publish src/Helm.Connector -r linux-x64 -c Release   # one self-contained file: .../linux-x64/publish/helm-connector
+helm-connector sync connect --token helm_pat_…    # or --invite helm_inv_… --account NAME [--device NAME]
+helm-connector sync unlock                        # asks for the passphrase (or --recovery-key KEY), then a first sync
+helm-connector serve                              # sync (live) + the MCP socket, until Ctrl+C or SIGTERM
+helm-connector mcp                                # MCP on stdio for Fairy Core: relays to the running serve
+helm-connector status                             # sync, what is synced, holds, the running serve (changes nothing)
 ```
 
-- **Data folder**: `--data-dir`, else `$HELM_DATA_DIR` (a service sets it, e.g. /srv/fairy/helm), else
-  `$XDG_DATA_HOME/helm`, else `~/.local/share/helm`. Same layout as on Windows (settings/, sync/, logs/), plus
-  secrets/.
+- **Data folder**: `--data-dir`, else `$HELM_DATA_DIR` (the box: /srv/fairy/connectors/helm, its own Linux user),
+  else `$XDG_DATA_HOME/helm`, else `~/.local/share/helm`. Same layout as on Windows (settings/, sync/), plus
+  secrets/ and run/ (serve.json, mcp.sock).
+- **What it syncs**: `--sync ai,wallet,tracker,habits` (the default), or `"sync": [...]` in <data>/connector.json;
+  notes, missions and vocab can be added, vault never. It is the sync engine's allowlist (`SyncEngine.SetIncluded`):
+  nothing else is downloaded or uploaded, and only these tools' stores and agent tools are registered. A tool added
+  later is downloaded in full at the next sync.
+- **Unattended**: more than 20 pushes within a minute (the box normally does about one) stops sync until the
+  process restarts. Held mass deletions are never decided on the box. Both are logged and, with `$HELM_HC_URL` (a
+  Healthchecks ping URL), pinged to `<url>/fail`.
+- **MCP**: tool calls run without a question; tools marked `McpTool.Destructive` (notes_trash, mission_replan) answer
+  with an error that says to do it on the phone; tools that reach other machines are refused. Only `serve` opens the
+  replica: `mcp` relays to its socket, `$HELM_MCP_SOCKET` (e.g. /run/helm-connector/mcp.sock, with a group Fairy
+  Core's user is in) or <data>/run/mcp.sock (mode 0660).
 - **Secrets**: AES-GCM under a 32-byte host key, secrets/host.key (0600, folder 0700). With `HELM_SEAL_KEY=tpm2` a
   new key is sealed by `systemd-creds` instead (secrets/host.key.cred); a service started with
   `LoadCredentialEncrypted=helm-host-key:<data>/secrets/host.key.cred` gets it unsealed from systemd.
-- **Logs**: stderr with syslog priorities, for the journal; `HELM_LOG_LEVEL=Debug` for more.
-- The box needs the agent CLIs on its PATH (or in ~/.local/bin, ~/.npm-global/bin, ~/.grok/bin) and ICU (libicu,
-  present on Ubuntu).
+- **Logs**: stderr with syslog priorities, for the journal; `HELM_LOG_LEVEL=Debug` for more. The box needs ICU
+  (libicu, present on Ubuntu).
 
 ## Updates
 
