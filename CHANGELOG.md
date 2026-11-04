@@ -3,6 +3,12 @@
 All notable changes to Helm. The top section is used as the GitHub release body and as the Velopack release notes.
 Format: [Keep a Changelog](https://keepachangelog.com), versions follow [SemVer](https://semver.org).
 
+## [Unreleased]
+
+### Fixed
+- Android: scrolling the menu no longer shows a tool's "Open in its own window" sheet; only holding a row still
+  does.
+
 ## [0.81.0] - 2026-11-03
 
 ### Added
