@@ -10,6 +10,7 @@ public static class WalletServices
             .AddWalletCore()
             .AddWalletLinks(typeof(WalletContentPage))
             .AddSingleton<IWalletPlatform, AndroidWalletPlatform>()
+            .AddSingleton<IGoalPhotos, AndroidGoalPhotos>()
             .AddAndroidModule<WalletModule, WalletPage>()
             .AddTransient<WalletContentPage>();
 }

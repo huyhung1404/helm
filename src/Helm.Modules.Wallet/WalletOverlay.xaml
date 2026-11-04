@@ -591,6 +591,289 @@
                         </ScrollViewer>
                     </DockPanel>
 
+                    <!-- ============ A savings goal: its photo, setting money aside, its history ============ -->
+                    <DockPanel Visibility="{Binding ShowGoalPopup, Converter={StaticResource BoolToVisibility}}">
+                        <DockPanel DockPanel.Dock="Top" Margin="24,20,16,4" DataContext="{Binding Goals.Selected}">
+                            <ui:Button DockPanel.Dock="Right" Style="{StaticResource Close}" />
+                            <StackPanel>
+                                <TextBlock Text="{Binding Name}" Style="{StaticResource DialogTitle}" />
+                                <TextBlock Style="{DynamicResource HelmSecondaryText}" TextWrapping="Wrap" Margin="0,2,0,0">
+                                    <Run Text="Costs" /><Run Text=" " /><Run Text="{Binding PriceText, Mode=OneWay}" />
+                                </TextBlock>
+                            </StackPanel>
+                        </DockPanel>
+                        <Border Style="{StaticResource Footer}">
+                            <DockPanel DataContext="{Binding Goals}">
+                                <StackPanel DockPanel.Dock="Left" Orientation="Horizontal" Visibility="{Binding Selected.IsSaving, Converter={StaticResource BoolToVisibility}, FallbackValue=Collapsed}">
+                                    <ui:Button Content="Give up" Icon="{ui:SymbolIcon DismissCircle24}" Command="{Binding GiveUpSelectedCommand}"
+                                               Foreground="{DynamicResource SystemFillColorCriticalBrush}" ToolTip="Everything set aside goes back to your balance" />
+                                    <ui:Button Style="{StaticResource FooterButton}" Content="Take out" Icon="{ui:SymbolIcon ArrowUndo24}" Command="{Binding OpenTakeOutCommand}"
+                                               Visibility="{Binding Selected.HasSaved, Converter={StaticResource BoolToVisibility}, FallbackValue=Collapsed}" ToolTip="Take some back into your balance" />
+                                    <ui:Button Style="{StaticResource FooterButton}" Content="Edit" Icon="{ui:SymbolIcon Edit24}" Command="{Binding EditSelectedCommand}" />
+                                </StackPanel>
+                                <ui:Button DockPanel.Dock="Left" Content="Delete" Icon="{ui:SymbolIcon Delete24}" Command="{Binding DeleteFinishedCommand}"
+                                           Foreground="{DynamicResource SystemFillColorCriticalBrush}"
+                                           Visibility="{Binding Selected.IsSaving, Converter={StaticResource InverseBoolToVisibility}, FallbackValue=Collapsed}" />
+                                <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                                    <ui:Button Style="{StaticResource FooterButton}" Content="Close"
+                                               Command="{Binding DataContext.ClosePopupCommand, RelativeSource={RelativeSource AncestorType=UserControl}}" />
+                                    <ui:Button Style="{StaticResource FooterButton}" Appearance="Primary" Content="Set aside" Icon="{ui:SymbolIcon Savings24}" Command="{Binding SavePutCommand}"
+                                               Visibility="{Binding Selected.CanPut, Converter={StaticResource BoolToVisibility}, FallbackValue=Collapsed}" />
+                                    <ui:Button Style="{StaticResource FooterButton}" Appearance="Caution" Content="I bought it" Icon="{ui:SymbolIcon ShoppingBag24}" Command="{Binding OpenBoughtCommand}"
+                                               Visibility="{Binding Selected.ShowBuy, Converter={StaticResource BoolToVisibility}, FallbackValue=Collapsed}" />
+                                </StackPanel>
+                            </DockPanel>
+                        </Border>
+                        <ContentControl DockPanel.Dock="Bottom" Template="{StaticResource ErrorBand}" Focusable="False" />
+                        <ScrollViewer VerticalScrollBarVisibility="Auto">
+                            <StackPanel Margin="24,12,24,20" DataContext="{Binding Goals}">
+                                <DockPanel Margin="0,0,0,16" DataContext="{Binding Selected}">
+                                    <Grid DockPanel.Dock="Left" Width="200" Height="150" Margin="0,0,20,0">
+                                        <self:GoalPicture Photo="{Binding Photo}" Share="{Binding Share}" Color="{Binding Color}" Initial="{Binding Initial}" CornerRadius="8" />
+                                        <TextBlock Text="{Binding PercentText}" Foreground="White" FontSize="26" FontWeight="Bold" Margin="12,0,0,8" HorizontalAlignment="Left" VerticalAlignment="Bottom">
+                                            <TextBlock.Effect>
+                                                <DropShadowEffect BlurRadius="8" ShadowDepth="0" Opacity="0.8" />
+                                            </TextBlock.Effect>
+                                        </TextBlock>
+                                    </Grid>
+                                    <StackPanel VerticalAlignment="Center">
+                                        <TextBlock>
+                                            <Run Text="{Binding SavedText, Mode=OneWay}" FontSize="28" FontWeight="SemiBold" />
+                                            <Run Text="saved" FontSize="14" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+                                        </TextBlock>
+                                        <TextBlock Text="{Binding LeftText}" FontSize="14" Margin="0,2,0,0" Visibility="{Binding IsSaving, Converter={StaticResource BoolToVisibility}}" />
+                                        <TextBlock Text="{Binding PaceText}" Style="{DynamicResource HelmSecondaryText}" TextWrapping="Wrap" Margin="0,2,0,0"
+                                                   Visibility="{Binding HasPace, Converter={StaticResource BoolToVisibility}}" />
+                                        <TextBlock Text="{Binding EndedText}" Style="{DynamicResource HelmSecondaryText}" TextWrapping="Wrap" Margin="0,2,0,0"
+                                                   Visibility="{Binding IsSaving, Converter={StaticResource InverseBoolToVisibility}}" />
+                                    </StackPanel>
+                                </DockPanel>
+
+                                <!-- Set money aside: the bar shows where it would be -->
+                                <StackPanel Style="{StaticResource Field}" Visibility="{Binding Selected.CanPut, Converter={StaticResource BoolToVisibility}, FallbackValue=Collapsed}">
+                                    <TextBlock Text="Set aside" Style="{StaticResource FieldLabel}" />
+                                    <Grid Margin="0,0,0,8">
+                                        <ProgressBar Height="6" Minimum="0" Maximum="100" Value="{Binding PutPreviewPercent, Mode=OneWay}" Opacity="0.4" />
+                                        <ProgressBar Height="6" Minimum="0" Maximum="100" Value="{Binding SelectedPercent, Mode=OneWay}" Background="Transparent" BorderThickness="0" />
+                                    </Grid>
+                                    <Grid>
+                                        <ui:TextBox x:Name="PutAmountBox" FontSize="18" FontWeight="SemiBold" Padding="10,6,32,6" AutomationProperties.Name="Amount to set aside" ClearButtonEnabled="False"
+                                                    PlaceholderText="200k" Text="{Binding PutAmount, UpdateSourceTrigger=PropertyChanged}" TextChanged="OnAmountTextChanged">
+                                            <ui:TextBox.InputBindings>
+                                                <KeyBinding Key="Enter" Command="{Binding SavePutCommand}" />
+                                            </ui:TextBox.InputBindings>
+                                        </ui:TextBox>
+                                        <TextBlock Text="₫" HorizontalAlignment="Right" VerticalAlignment="Center" Margin="0,0,12,0" FontSize="16" Style="{DynamicResource HelmSecondaryText}" />
+                                    </Grid>
+                                    <WrapPanel Margin="0,8,0,0">
+                                        <Button Style="{StaticResource Chip}" Padding="12,3" Content="+50K" Command="{Binding AddQuickCommand}" CommandParameter="50000" />
+                                        <Button Style="{StaticResource Chip}" Padding="12,3" Content="+100K" Command="{Binding AddQuickCommand}" CommandParameter="100000" />
+                                        <Button Style="{StaticResource Chip}" Padding="12,3" Content="+200K" Command="{Binding AddQuickCommand}" CommandParameter="200000" />
+                                        <Button Style="{StaticResource Chip}" Padding="12,3" Content="+500K" Command="{Binding AddQuickCommand}" CommandParameter="500000" />
+                                        <Button Style="{StaticResource Chip}" Padding="12,3" Content="{Binding RestText}" Command="{Binding PutRestCommand}"
+                                                Visibility="{Binding HasRest, Converter={StaticResource BoolToVisibility}}" />
+                                    </WrapPanel>
+                                    <TextBlock Text="{Binding PutHint}">
+                                        <TextBlock.Style>
+                                            <Style TargetType="TextBlock" BasedOn="{StaticResource FieldHint}">
+                                                <Style.Triggers>
+                                                    <DataTrigger Binding="{Binding PutTooMuch}" Value="True">
+                                                        <Setter Property="Foreground" Value="{DynamicResource SystemFillColorCriticalBrush}" />
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </TextBlock.Style>
+                                    </TextBlock>
+                                    <TextBlock Style="{StaticResource FieldHint}" TextWrapping="Wrap"
+                                               Text="It leaves your balance now but is not spending. Give up any time and it all comes back." />
+                                </StackPanel>
+
+                                <!-- Enough saved -->
+                                <Border Style="{StaticResource Box}" Margin="0,0,0,16" BorderBrush="{DynamicResource SystemFillColorCautionBrush}"
+                                        Visibility="{Binding Selected.ShowBuy, Converter={StaticResource BoolToVisibility}, FallbackValue=Collapsed}">
+                                    <DockPanel>
+                                        <ui:SymbolIcon Symbol="Trophy24" FontSize="20" Margin="0,0,10,0" Foreground="{DynamicResource SystemFillColorCautionBrush}" VerticalAlignment="Center" />
+                                        <TextBlock TextWrapping="Wrap" VerticalAlignment="Center"
+                                                   Text="Enough saved. Once you have bought it, tap “I bought it”: Helm writes the purchase as one spending and lets the money set aside go." />
+                                    </DockPanel>
+                                </Border>
+
+                                <TextBlock Text="History" Style="{StaticResource FieldLabel}" Visibility="{Binding Selected.HasEntries, Converter={StaticResource BoolToVisibility}, FallbackValue=Collapsed}" />
+                                <ItemsControl ItemsSource="{Binding Selected.Entries}" Focusable="False">
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate DataType="{x:Type local:GoalEntryRow}">
+                                            <Border BorderThickness="0,1,0,0" BorderBrush="{DynamicResource CardStrokeColorDefaultBrush}" Padding="0,6">
+                                                <DockPanel>
+                                                    <TextBlock DockPanel.Dock="Right" Text="{Binding AmountText}" FontWeight="SemiBold">
+                                                        <TextBlock.Style>
+                                                            <Style TargetType="TextBlock">
+                                                                <Style.Triggers>
+                                                                    <DataTrigger Binding="{Binding IsOut}" Value="True">
+                                                                        <Setter Property="Foreground" Value="{DynamicResource TextFillColorSecondaryBrush}" />
+                                                                    </DataTrigger>
+                                                                </Style.Triggers>
+                                                            </Style>
+                                                        </TextBlock.Style>
+                                                    </TextBlock>
+                                                    <StackPanel Orientation="Horizontal">
+                                                        <TextBlock Text="{Binding DayText}" />
+                                                        <TextBlock Text=" · taken out" Style="{DynamicResource HelmSecondaryText}"
+                                                                   Visibility="{Binding IsOut, Converter={StaticResource BoolToVisibility}}" />
+                                                    </StackPanel>
+                                                </DockPanel>
+                                            </Border>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                            </StackPanel>
+                        </ScrollViewer>
+                    </DockPanel>
+
+                    <!-- ============ A new goal, or editing one ============ -->
+                    <DockPanel Visibility="{Binding ShowGoalFormPopup, Converter={StaticResource BoolToVisibility}}">
+                        <DockPanel DockPanel.Dock="Top" Margin="24,20,16,4">
+                            <ui:Button DockPanel.Dock="Right" Style="{StaticResource Close}" />
+                            <TextBlock Text="{Binding Goals.FormTitle}" Style="{StaticResource DialogTitle}" />
+                        </DockPanel>
+                        <Border Style="{StaticResource Footer}">
+                            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                                <ui:Button Style="{StaticResource FooterButton}" Content="Cancel" Command="{Binding DismissPopupCommand}" />
+                                <ui:Button Style="{StaticResource FooterButton}" Appearance="Primary" Content="{Binding Goals.FormSaveText}" Icon="{ui:SymbolIcon Checkmark24}"
+                                           Command="{Binding Goals.SaveFormCommand}" />
+                            </StackPanel>
+                        </Border>
+                        <ContentControl DockPanel.Dock="Bottom" Template="{StaticResource ErrorBand}" Focusable="False" />
+                        <ScrollViewer VerticalScrollBarVisibility="Auto">
+                            <StackPanel Margin="24,12,24,8" DataContext="{Binding Goals}">
+                                <StackPanel Style="{StaticResource Field}">
+                                    <TextBlock Text="What do you want to buy?" Style="{StaticResource FieldLabel}" />
+                                    <ui:TextBox x:Name="GoalNameBox" Text="{Binding FormName, UpdateSourceTrigger=PropertyChanged}" PlaceholderText="Mini PC" MaxLength="40"
+                                                AutomationProperties.Name="What you are saving for" />
+                                </StackPanel>
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="16" />
+                                        <ColumnDefinition Width="*" />
+                                    </Grid.ColumnDefinitions>
+                                    <StackPanel Style="{StaticResource Field}">
+                                        <TextBlock Text="Price" Style="{StaticResource FieldLabel}" />
+                                        <Grid>
+                                            <ui:TextBox Text="{Binding FormPrice, UpdateSourceTrigger=PropertyChanged}" Padding="10,6,32,6" PlaceholderText="12tr" ClearButtonEnabled="False"
+                                                        AutomationProperties.Name="Price" TextChanged="OnAmountTextChanged" />
+                                            <TextBlock Text="₫" HorizontalAlignment="Right" VerticalAlignment="Center" Margin="0,0,12,0" Style="{DynamicResource HelmSecondaryText}" />
+                                        </Grid>
+                                        <TextBlock Text="{Binding FormPriceHint}" Style="{StaticResource FieldHint}" />
+                                    </StackPanel>
+                                    <StackPanel Grid.Column="2" Style="{StaticResource Field}">
+                                        <TextBlock Text="By (optional)" Style="{StaticResource FieldLabel}" />
+                                        <DatePicker SelectedDate="{Binding FormDue}" AutomationProperties.Name="The date you want it by" />
+                                        <TextBlock Text="{Binding FormPaceHint}" Style="{StaticResource FieldHint}" TextWrapping="Wrap"
+                                                   Visibility="{Binding HasFormPaceHint, Converter={StaticResource BoolToVisibility}}" />
+                                    </StackPanel>
+                                </Grid>
+                                <StackPanel Style="{StaticResource Field}" Visibility="{Binding FormIsNew, Converter={StaticResource BoolToVisibility}}">
+                                    <TextBlock Text="Already saved (optional)" Style="{StaticResource FieldLabel}" />
+                                    <Grid>
+                                        <ui:TextBox Text="{Binding FormStart, UpdateSourceTrigger=PropertyChanged}" Padding="10,6,32,6" PlaceholderText="0" ClearButtonEnabled="False"
+                                                    AutomationProperties.Name="Money already saved for it" TextChanged="OnAmountTextChanged" />
+                                        <TextBlock Text="₫" HorizontalAlignment="Right" VerticalAlignment="Center" Margin="0,0,12,0" Style="{DynamicResource HelmSecondaryText}" />
+                                    </Grid>
+                                    <TextBlock Text="{Binding FormStartHint}" Style="{StaticResource FieldHint}" TextWrapping="Wrap" />
+                                </StackPanel>
+                                <StackPanel Style="{StaticResource Field}" Visibility="{Binding CanHavePhotos, Converter={StaticResource BoolToVisibility}}">
+                                    <TextBlock Text="Photo" Style="{StaticResource FieldLabel}" />
+                                    <DockPanel>
+                                        <self:GoalPicture DockPanel.Dock="Left" Width="120" Height="90" CornerRadius="6" Margin="0,0,16,0" Photo="{Binding FormPhoto}" Share="1"
+                                                          Initial="?" Visibility="{Binding HasFormPhoto, Converter={StaticResource BoolToVisibility}}" />
+                                        <StackPanel VerticalAlignment="Center">
+                                            <StackPanel Orientation="Horizontal">
+                                                <ui:Button Content="Choose photo…" Icon="{ui:SymbolIcon Image24}" Command="{Binding PickPhotoCommand}" />
+                                                <ui:Button Content="Remove" Margin="8,0,0,0" Command="{Binding RemoveFormPhotoCommand}"
+                                                           Visibility="{Binding HasFormPhoto, Converter={StaticResource BoolToVisibility}}" />
+                                            </StackPanel>
+                                            <TextBlock Style="{StaticResource FieldHint}" TextWrapping="Wrap" Text="It lights up from the bottom as you save: fully at 100%." />
+                                        </StackPanel>
+                                    </DockPanel>
+                                </StackPanel>
+                            </StackPanel>
+                        </ScrollViewer>
+                    </DockPanel>
+
+                    <!-- ============ Taking money out of a goal ============ -->
+                    <DockPanel Visibility="{Binding ShowGoalTakeOutPopup, Converter={StaticResource BoolToVisibility}}">
+                        <DockPanel DockPanel.Dock="Top" Margin="24,20,16,4">
+                            <ui:Button DockPanel.Dock="Right" Style="{StaticResource Close}" />
+                            <TextBlock Style="{StaticResource DialogTitle}">
+                                <Run Text="Take money out of" />
+                                <Run Text="{Binding Goals.Selected.Name, Mode=OneWay}" />
+                            </TextBlock>
+                        </DockPanel>
+                        <Border Style="{StaticResource Footer}">
+                            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                                <ui:Button Style="{StaticResource FooterButton}" Content="Cancel" Command="{Binding DismissPopupCommand}" />
+                                <ui:Button Style="{StaticResource FooterButton}" Appearance="Primary" Content="Take out" Icon="{ui:SymbolIcon ArrowUndo24}" Command="{Binding Goals.SaveTakeCommand}" />
+                            </StackPanel>
+                        </Border>
+                        <ContentControl DockPanel.Dock="Bottom" Template="{StaticResource ErrorBand}" Focusable="False" />
+                        <StackPanel Margin="24,12,24,8" DataContext="{Binding Goals}">
+                            <StackPanel Style="{StaticResource Field}">
+                                <TextBlock Text="Amount" Style="{StaticResource FieldLabel}" />
+                                <Grid>
+                                    <ui:TextBox x:Name="TakeAmountBox" FontSize="18" FontWeight="SemiBold" Padding="10,6,32,6" AutomationProperties.Name="Amount to take out" ClearButtonEnabled="False"
+                                                Text="{Binding TakeAmount, UpdateSourceTrigger=PropertyChanged}" TextChanged="OnAmountTextChanged">
+                                        <ui:TextBox.InputBindings>
+                                            <KeyBinding Key="Enter" Command="{Binding SaveTakeCommand}" />
+                                        </ui:TextBox.InputBindings>
+                                    </ui:TextBox>
+                                    <TextBlock Text="₫" HorizontalAlignment="Right" VerticalAlignment="Center" Margin="0,0,12,0" FontSize="16" Style="{DynamicResource HelmSecondaryText}" />
+                                </Grid>
+                                <TextBlock Text="{Binding TakeHint}" Style="{StaticResource FieldHint}" />
+                            </StackPanel>
+                        </StackPanel>
+                    </DockPanel>
+
+                    <!-- ============ The goal was bought ============ -->
+                    <DockPanel Visibility="{Binding ShowGoalBoughtPopup, Converter={StaticResource BoolToVisibility}}">
+                        <DockPanel DockPanel.Dock="Top" Margin="24,20,16,4">
+                            <ui:Button DockPanel.Dock="Right" Style="{StaticResource Close}" />
+                            <TextBlock Style="{StaticResource DialogTitle}">
+                                <Run Text="You bought" />
+                                <Run Text="{Binding Goals.Selected.Name, Mode=OneWay}" />
+                            </TextBlock>
+                        </DockPanel>
+                        <Border Style="{StaticResource Footer}">
+                            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                                <ui:Button Style="{StaticResource FooterButton}" Content="Not yet" Command="{Binding DismissPopupCommand}" />
+                                <ui:Button Style="{StaticResource FooterButton}" Appearance="Primary" Content="Record purchase" Icon="{ui:SymbolIcon Checkmark24}" Command="{Binding Goals.SaveBoughtCommand}" />
+                            </StackPanel>
+                        </Border>
+                        <ContentControl DockPanel.Dock="Bottom" Template="{StaticResource ErrorBand}" Focusable="False" />
+                        <ScrollViewer VerticalScrollBarVisibility="Auto">
+                            <StackPanel Margin="24,12,24,8" DataContext="{Binding Goals}">
+                                <StackPanel Style="{StaticResource Field}">
+                                    <TextBlock Text="What it cost" Style="{StaticResource FieldLabel}" />
+                                    <Grid>
+                                        <ui:TextBox x:Name="BoughtAmountBox" FontSize="18" FontWeight="SemiBold" Padding="10,6,32,6" AutomationProperties.Name="What it cost" ClearButtonEnabled="False"
+                                                    Text="{Binding BoughtAmount, UpdateSourceTrigger=PropertyChanged}" TextChanged="OnAmountTextChanged">
+                                            <ui:TextBox.InputBindings>
+                                                <KeyBinding Key="Enter" Command="{Binding SaveBoughtCommand}" />
+                                            </ui:TextBox.InputBindings>
+                                        </ui:TextBox>
+                                        <TextBlock Text="₫" HorizontalAlignment="Right" VerticalAlignment="Center" Margin="0,0,12,0" FontSize="16" Style="{DynamicResource HelmSecondaryText}" />
+                                    </Grid>
+                                </StackPanel>
+                                <StackPanel Style="{StaticResource Field}">
+                                    <TextBlock Text="Category" Style="{StaticResource FieldLabel}" />
+                                    <ItemsControl ItemsSource="{Binding BoughtPicks}" ItemTemplate="{StaticResource PickChip}" ItemsPanel="{StaticResource Wrap}" Focusable="False" />
+                                </StackPanel>
+                                <Border Style="{StaticResource Box}">
+                                    <TextBlock Text="{Binding BoughtHint}" TextWrapping="Wrap" />
+                                </Border>
+                            </StackPanel>
+                        </ScrollViewer>
+                    </DockPanel>
+
                     <!-- ============ Move money into a fund ============ -->
                     <DockPanel Visibility="{Binding ShowCoverPopup, Converter={StaticResource BoolToVisibility}}">
                         <DockPanel DockPanel.Dock="Top" Margin="24,20,16,4">

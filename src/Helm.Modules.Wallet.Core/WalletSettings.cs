@@ -63,6 +63,9 @@ public sealed class WalletSettings : IVersionedSettings
     /// </summary>
     public Dictionary<string, FundStatus> FundWarnings { get; set; } = [];
 
+    /// <summary>The savings goal the Goal widget shows; null: the first goal being saved for.</summary>
+    public string? WidgetGoalId { get; set; }
+
     public WidgetLook WidgetLook => new(WidgetBackground, WidgetOpacity, WidgetText);
 
     public bool IsBankEnabled(string bankId) => !DisabledBanks.Contains(bankId, StringComparer.Ordinal);

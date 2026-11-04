@@ -10,5 +10,6 @@ public static class WalletServices
             .AddWalletCore()
             .AddWalletLinks(typeof(WalletContentPage))
             .AddHelmModule<WalletModule, WalletPage, WalletViewModel>()
-            .AddSingleton<WalletContentPage>();
+            .AddSingleton<WalletContentPage>()
+            .AddSingleton<IGoalPhotos, WalletGoalPhotos>();
 }

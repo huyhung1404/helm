@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The Goal home-screen widget: a savings goal's photo, lit up as money is set aside. About 2 x 2 shows the photo and the
+     percentage; 4 x 2 and wider adds the money and "+ Set aside" (GoalWidgets picks by width). -->
+<appwidget-provider xmlns:android="http://schemas.android.com/apk/res/android"
+    android:minWidth="110dp"
+    android:minHeight="110dp"
+    android:minResizeWidth="110dp"
+    android:minResizeHeight="110dp"
+    android:targetCellWidth="2"
+    android:targetCellHeight="2"
+    android:resizeMode="horizontal|vertical"
+    android:widgetCategory="home_screen"
+    android:updatePeriodMillis="3600000"
+    android:initialLayout="@layout/goal_widget"
+    android:previewLayout="@layout/goal_widget"
+    android:description="@string/goal_widget_description" />

@@ -38,6 +38,8 @@ public static class WalletCoreServices
         services.AddSyncedCollection(new SyncedCollectionOptions<WalletFund> { Name = FundBook.Collection, GuardDeletions = true });
         // Recurring bills: one small record each (amount, due day, the months paid); the latest edit wins.
         services.AddSyncedCollection(new SyncedCollectionOptions<WalletBill> { Name = BillBook.Collection, GuardDeletions = true });
+        // Savings goals: one record each (price, the money set aside); its photo is a blob, synced first.
+        services.AddSyncedCollection(new SyncedCollectionOptions<WalletGoal> { Name = GoalBook.Collection, GuardDeletions = true, BlobReferences = GoalBook.PhotosOf });
         services.AddSyncGroup("wallet.", WalletIds.DisplayName);
         services.AddSingleton(sp => new WalletStore(
             sp.GetRequiredService<ISyncedCollection<WalletTransaction>>(),
@@ -45,6 +47,7 @@ public static class WalletCoreServices
             sp.GetRequiredService<ISyncedCollection<WalletBudget>>()));
         services.AddSingleton(sp => new DebtBook(sp.GetRequiredService<ISyncedCollection<WalletDebt>>(), sp.GetRequiredService<WalletStore>()));
         services.AddSingleton(sp => new FundBook(sp.GetRequiredService<ISyncedCollection<WalletFund>>(), sp.GetRequiredService<WalletStore>()));
+        services.AddSingleton(sp => new GoalBook(sp.GetRequiredService<ISyncedCollection<WalletGoal>>(), sp.GetRequiredService<WalletStore>(), sp.GetService<BlobStore>()));
         services.AddSingleton(sp => new BillBook(sp.GetRequiredService<ISyncedCollection<WalletBill>>(), sp.GetRequiredService<WalletStore>()));
         services.AddSingleton<WalletCapture>();
         // AI where the history and the parser fall short (IAiText comes from AddHelmAi, which both apps call).
@@ -59,6 +62,7 @@ public static class WalletCoreServices
         // Ask Helm's: a bill split among friends, a debt reminder to share, recurring bills.
         services.AddSingleton<Helm.Core.Mcp.IMcpToolProvider, WalletShareTools>();
         services.AddSingleton<Helm.Core.Mcp.IMcpToolProvider, BillMcpTools>();
+        services.AddSingleton<Helm.Core.Mcp.IMcpToolProvider, GoalMcpTools>();
         services.TryAddSingleton(sp => new DebtsViewModel(
             sp.GetRequiredService<DebtBook>(),
             sp.GetRequiredService<IUiDispatcher>(),

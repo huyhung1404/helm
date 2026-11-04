@@ -355,4 +355,69 @@
     <Style Selector="Button.fund.dashed">
         <Setter Property="Background" Value="Transparent" />
     </Style>
+
+    <!-- A savings goal's card: its photo on top; gold edge once there is enough -->
+    <Style Selector="Button.goal">
+        <Setter Property="HorizontalAlignment" Value="Stretch" />
+        <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+        <Setter Property="Padding" Value="0" />
+        <Setter Property="Margin" Value="0,0,0,12" />
+        <Setter Property="CornerRadius" Value="10" />
+        <Setter Property="BorderThickness" Value="1" />
+        <Setter Property="BorderBrush" Value="{DynamicResource WalletCardStroke}" />
+        <Setter Property="Background" Value="{DynamicResource HelmCardBackground}" />
+    </Style>
+    <Style Selector="Button.goal.ready /template/ ContentPresenter#PART_ContentPresenter">
+        <Setter Property="BorderBrush" Value="#FFC83D" />
+        <Setter Property="BorderThickness" Value="2" />
+    </Style>
+    <Style Selector="Button.goal.ready">
+        <Setter Property="BorderBrush" Value="#FFC83D" />
+        <Setter Property="BorderThickness" Value="2" />
+    </Style>
+    <Style Selector="ProgressBar.goal">
+        <Setter Property="MinHeight" Value="5" />
+        <Setter Property="Height" Value="5" />
+        <Setter Property="Minimum" Value="0" />
+        <Setter Property="Maximum" Value="100" />
+        <Setter Property="CornerRadius" Value="3" />
+    </Style>
+    <Style Selector="ProgressBar.goal.ready">
+        <Setter Property="Foreground" Value="#E0A800" />
+    </Style>
+    <!-- A big figure on a photo: white with a shadow, readable on any picture -->
+    <Style Selector="TextBlock.onPhoto">
+        <Setter Property="Foreground" Value="White" />
+        <Setter Property="FontWeight" Value="Bold" />
+        <Setter Property="Effect">
+            <DropShadowEffect BlurRadius="8" OffsetX="0" OffsetY="0" Opacity="0.8" Color="Black" />
+        </Setter>
+    </Style>
+    <Style Selector="Border.readyTag">
+        <Setter Property="Background" Value="#FFC83D" />
+        <Setter Property="CornerRadius" Value="10" />
+        <Setter Property="Padding" Value="8,2" />
+        <Setter Property="Margin" Value="0,8,8,0" />
+        <Setter Property="HorizontalAlignment" Value="Right" />
+        <Setter Property="VerticalAlignment" Value="Top" />
+    </Style>
+    <!-- A goal bought or given up, in the list under the cards -->
+    <Style Selector="Button.goalRow">
+        <Setter Property="HorizontalAlignment" Value="Stretch" />
+        <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+        <Setter Property="Background" Value="Transparent" />
+        <Setter Property="BorderThickness" Value="0,1,0,0" />
+        <Setter Property="BorderBrush" Value="{DynamicResource HelmCardStroke}" />
+        <Setter Property="CornerRadius" Value="0" />
+        <Setter Property="MinHeight" Value="56" />
+        <Setter Property="Padding" Value="0,8" />
+    </Style>
+    <Style Selector="Border.state">
+        <Setter Property="Background" Value="{DynamicResource HelmBarBackground}" />
+        <Setter Property="BorderBrush" Value="{DynamicResource WalletLine}" />
+        <Setter Property="BorderThickness" Value="1" />
+        <Setter Property="CornerRadius" Value="10" />
+        <Setter Property="Padding" Value="8,2" />
+        <Setter Property="VerticalAlignment" Value="Center" />
+    </Style>
 </Styles>

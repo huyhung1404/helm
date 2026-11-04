@@ -38,8 +38,9 @@ public sealed record WalletWidgetSlice(string Name, decimal Amount, double Share
 /// is tested here; the Android side only draws it.
 /// </summary>
 /// <param name="Balance">
-/// The money there is now: everything received minus everything spent. Not a bank's balance: cash taken out stays the
-/// user's money, and spending from the bank is read as a transaction and subtracted anyway.
+/// The money there is now: everything received minus everything spent, minus what is set aside for goals. Not a bank's
+/// balance: cash taken out stays the user's money, and spending from the bank is read as a transaction and subtracted
+/// anyway.
 /// </param>
 public sealed record WalletWidgetModel(
     WalletWidgetPeriod Period,
@@ -143,13 +144,15 @@ public sealed record WalletWidgetModel(
         _ => WalletPalette.Color(color, dark),
     };
 
-    public static WalletWidgetModel Build(WalletStore store, WalletWidgetPeriod period, WalletWidgetChart chart, DateTimeOffset now, TimeZoneInfo zone)
+    /// <param name="setAside">Money set aside for goals (<see cref="GoalBook.SetAside"/>): off the balance, not spending.</param>
+    public static WalletWidgetModel Build(WalletStore store, WalletWidgetPeriod period, WalletWidgetChart chart, DateTimeOffset now, TimeZoneInfo zone,
+        decimal setAside = 0)
     {
         var transactions = store.Transactions();
         var categories = store.Categories(includeHidden: true);
         var (from, to) = Range(period, WalletFormat.LocalDay(now, zone));
         var summary = WalletStats.Period(transactions, categories, from, to, zone);
-        var balance = Net(transactions, categories, to, zone);
+        var balance = Net(transactions, categories, to, zone) - setAside;
         var toCategorize = transactions.Count(t => !t.Value.IsCategorized);
 
         IReadOnlyList<WalletWidgetSlice> slices;
@@ -185,6 +188,8 @@ public sealed record WalletWidgetModel(
     }
 
     /// <summary>All money in minus all money out until <paramref name="to"/> (transfers between own accounts are neither).</summary>
+    internal static decimal Net(WalletStore store, DateOnly to, TimeZoneInfo zone) => Net(store.Transactions(), store.Categories(includeHidden: true), to, zone);
+
     private static decimal Net(IReadOnlyList<Helm.Core.Sync.SyncedItem<WalletTransaction>> transactions, IReadOnlyList<CategoryInfo> categories,
         DateOnly to, TimeZoneInfo zone)
     {
