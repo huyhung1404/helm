@@ -70,7 +70,10 @@ public sealed class NotesMcpTools(NotesStore store, LinkHub? links = null, NoteM
             (args, _) => Task.FromResult<object?>(Edit(args))),
         new("notes_trash", "Move a note to the trash (the user can restore it for 30 days).",
             McpArgs.Schema(("id", McpArgs.Text("The note's id."), true)),
-            (args, _) => Task.FromResult<object?>(Trash(McpArgs.RequiredString(args, "id")))),
+            (args, _) => Task.FromResult<object?>(Trash(McpArgs.RequiredString(args, "id"))))
+        {
+            Destructive = true,
+        },
         new("notes_add_important_day",
             $"Remember a day in the note “{ImportantDays.NoteTitle}”: every year (a birthday; a giỗ, often a lunar day) or one day only " +
             "(a car inspection, an insurance or domain renewal, with its year). Helm reminds the user a few days before.",

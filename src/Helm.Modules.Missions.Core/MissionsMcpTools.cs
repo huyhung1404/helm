@@ -61,7 +61,11 @@ public sealed class MissionsMcpTools(MissionsStore store) : IMcpToolProvider
             "Plan the rest of a mission again, e.g. when the user is behind or something changed: every step not done yet (the current one " +
             "too) is replaced by these phases and steps; done steps stay. Read mission_get first to see what is done and how long steps took. " +
             "Keep a phase's exact title to go on with it. Ask the user before replacing their plan.",
-            ReplanSchema(), (args, _) => Task.FromResult<object?>(Replan(args))),
+            ReplanSchema(), (args, _) => Task.FromResult<object?>(Replan(args)))
+        {
+            // The steps it replaces are gone: no Undo brings the old plan back.
+            Destructive = true,
+        },
         new("mission_update", "Change a mission's title, goal, reward or deadline (its steps and progress stay).",
             McpArgs.Schema(
                 ("mission", McpArgs.Text("The mission's id or title."), true),

@@ -207,7 +207,8 @@ public sealed class SyncEngine : ISyncService, IDisposable
         || ExcludedPrefixes.Any(p => SyncPullFilter.Covers(p, collection));
 
     /// <summary>
-    /// Syncs only the collections under <paramref name="prefixes"/> on this device (null: all of them, as the apps do),
+    /// Syncs only the collections under <paramref name="prefixes"/> on this device (null: all of them, as the apps do;
+    /// an entry without the final "." is one collection, e.g. "settings.ai-features"),
     /// before <see cref="Start"/>. The list is kept in the replica: a prefix that was not on the last one is downloaded
     /// in full at the next run (records skipped meanwhile included); going back to null downloads everything again.
     /// Local data outside the list stays as it is and is neither uploaded nor dropped.
@@ -215,8 +216,8 @@ public sealed class SyncEngine : ISyncService, IDisposable
     public void SetIncluded(IReadOnlyList<string>? prefixes)
     {
         if (prefixes is { Count: 0 }) throw new ArgumentException("An allowlist needs at least one prefix.", nameof(prefixes));
-        if (prefixes?.FirstOrDefault(p => !p.EndsWith('.') || !SyncIds.IsValidCollection(p)) is { } bad)
-            throw new ArgumentException($"'{bad}' is not a prefix: a collection name ending in '.'.", nameof(prefixes));
+        if (prefixes?.FirstOrDefault(p => !SyncIds.IsValidCollection(p)) is { } bad)
+            throw new ArgumentException($"'{bad}' is neither a prefix (a collection name ending in '.') nor a collection.", nameof(prefixes));
         var list = prefixes?.Distinct(StringComparer.Ordinal).Order(StringComparer.Ordinal).ToArray();
         List<string> added;
         lock (_selectionGate)

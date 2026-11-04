@@ -18,6 +18,13 @@ public sealed record McpTool(string Name, string Description, JsonObject InputSc
     /// <summary>Only reads (the agent may call it without asking); a tool that writes says so to the client.</summary>
     public bool ReadOnly { get; init; }
 
+    /// <summary>
+    /// Deletes the user's data or replaces it beyond a plain edit (a note to the trash, a mission's plan replaced). The
+    /// apps run it like any change, after their consent; a host with nobody to ask (the Linux connector) refuses it, so
+    /// it is done where the user is.
+    /// </summary>
+    public bool Destructive { get; init; }
+
     /// <summary>What a call can do; when not set, <see cref="McpRisk.Read"/> for a <see cref="ReadOnly"/> tool, else <see cref="McpRisk.Change"/>.</summary>
     public McpRisk Risk
     {
@@ -289,7 +296,7 @@ public sealed class McpServer
             ["annotations"] = new JsonObject
             {
                 ["readOnlyHint"] = t.Risk == McpRisk.Read,
-                ["destructiveHint"] = t.Risk == McpRisk.Remote,
+                ["destructiveHint"] = t.Risk == McpRisk.Remote || t.Destructive,
                 ["openWorldHint"] = t.Risk == McpRisk.Remote,
             },
         }).ToArray()),
