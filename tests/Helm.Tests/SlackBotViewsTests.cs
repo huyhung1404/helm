@@ -138,7 +138,7 @@ public sealed class SlackBotViewsTests : IDisposable
         // Done takes the card off the list (both of the DM's messages); replying in the thread takes the mention off too.
         inbox.DoneCommand.Execute(inbox.ToDo[0]);
         engine.Inbox.Mine(new SlackMessage("C1", "1700000300.000100", "1700000200.000100", "ME", "đang xem", false), SlackConversationKind.Channel);
-        Flush();
+        Flush(() => inbox.ToDo.Count == 0);
         Assert.Empty(inbox.ToDo);
         Assert.Equal(4, inbox.Handled.Count);
     });
@@ -195,12 +195,16 @@ public sealed class SlackBotViewsTests : IDisposable
         }
     }
 
-    private static void Flush()
+    /// <summary>Runs the dispatcher until <paramref name="done"/> holds (the lists refresh 300 ms after a change; a slow
+    /// CI runner takes longer), at most 5 s.</summary>
+    private static void Flush(Func<bool> done)
     {
         var frame = new System.Windows.Threading.DispatcherFrame();
-        var timer = new System.Windows.Threading.DispatcherTimer { Interval = TimeSpan.FromMilliseconds(600) };
+        var until = DateTime.UtcNow.AddSeconds(5);
+        var timer = new System.Windows.Threading.DispatcherTimer { Interval = TimeSpan.FromMilliseconds(50) };
         timer.Tick += (_, _) =>
         {
+            if (!done() && DateTime.UtcNow < until) return;
             timer.Stop();
             frame.Continue = false;
         };
