@@ -3,6 +3,21 @@
 All notable changes to Helm. The top section is used as the GitHub release body and as the Velopack release notes.
 Format: [Keep a Changelog](https://keepachangelog.com), versions follow [SemVer](https://semver.org).
 
+## [Unreleased]
+
+### Added
+- **Wallet: savings goals.** Add something you want to buy (a mini PC), its price and a photo, and set small amounts
+  aside whenever you can. The money leaves your balance at once but is not spending: it is in no spending figure and
+  no fund, and Give up brings it all back (with Undo). The photo lights up from the bottom as you save; at 100% it is
+  fully lit, and “I bought it” writes the purchase as one spending at its real price (a cheaper one leaves the rest
+  in your balance). On the PC and the phone: Wallet → Goals.
+- A **Goal** home-screen widget on the phone: the goal's photo lit up to how far you are; wider, the money and
+  “+ Set aside” too. A tap opens the goal to set money aside.
+- Ask Helm and AI agents see your goals and set money aside for you (“để dành 200k cho Mini PC”).
+
+### Changed
+- The Wallet widget's balance leaves out what is set aside for goals.
+
 ## [0.81.0] - 2026-11-03
 
 ### Added
