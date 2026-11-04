@@ -29,6 +29,7 @@ internal sealed class DrawerController
     private readonly Func<MainViewModel?> _viewModel;
     private readonly DispatcherTimer _hold = new() { Interval = HoldTime };
     private NavEntry? _held;
+    private Button? _heldRow;
     private Point _holdStart;
     private int _motion; // the latest open/close, so an earlier close does not hide a drawer opened again since
 
@@ -47,7 +48,9 @@ internal sealed class DrawerController
         drawer.AddHandler(InputElement.PointerPressedEvent, OnPressed, RoutingStrategies.Tunnel, handledEventsToo: true);
         drawer.AddHandler(InputElement.PointerMovedEvent, OnMoved, RoutingStrategies.Tunnel, handledEventsToo: true);
         drawer.AddHandler(InputElement.PointerReleasedEvent, (_, _) => CancelHold(), RoutingStrategies.Tunnel, handledEventsToo: true);
-        drawer.AddHandler(InputElement.PointerCaptureLostEvent, (_, _) => CancelHold(), RoutingStrategies.Bubble, handledEventsToo: true);
+        // Once the list's scroll gesture takes the finger, moves and the lift no longer reach the drawer: the gesture
+        // itself (and the row losing the pointer, a direct event) ends the hold, or every swipe would show the sheet.
+        drawer.AddHandler(InputElement.ScrollGestureEvent, (_, _) => CancelHold(), RoutingStrategies.Bubble, handledEventsToo: true);
     }
 
     private double ClosedX => -(_drawer.Width + 24); // the shadow too
@@ -78,9 +81,13 @@ internal sealed class DrawerController
         if (e.Source is not Visual source || source.FindAncestorOfType<Button>(includeSelf: true) is not { } row) return;
         if (row.DataContext is not NavEntry { Module: not null } entry) return;
         _held = entry;
+        _heldRow = row;
+        row.PointerCaptureLost += OnRowCaptureLost;
         _holdStart = e.GetPosition(_drawer);
         _hold.Start();
     }
+
+    private void OnRowCaptureLost(object? sender, PointerCaptureLostEventArgs e) => CancelHold();
 
     private void OnMoved(object? sender, PointerEventArgs e)
     {
@@ -101,5 +108,7 @@ internal sealed class DrawerController
     {
         _hold.Stop();
         _held = null;
+        if (_heldRow is not null) _heldRow.PointerCaptureLost -= OnRowCaptureLost;
+        _heldRow = null;
     }
 }
