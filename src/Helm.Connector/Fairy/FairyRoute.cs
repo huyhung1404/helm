@@ -25,6 +25,12 @@ internal sealed class FairyRoute(Func<IEnumerable<IMcpToolProvider>> providers, 
     /// <summary>The longest a <c>helm/jobs/next</c> waits for a job.</summary>
     public static readonly TimeSpan LongestPoll = TimeSpan.FromSeconds(25);
 
+    /// <summary>
+    /// A run handed out is taken once Core says it received it (its next poll's <c>received</c>, or its answer). One
+    /// not acknowledged within this went to a poll whose Core had gone (killed while it waited): the next poll gets it.
+    /// </summary>
+    public static readonly TimeSpan AckWithin = TimeSpan.FromSeconds(5);
+
     public const string Hello = "helm/jobs/hello", Next = "helm/jobs/next", Result = "helm/jobs/result", Undo = "helm/undo";
 
     private readonly TimeProvider _time = time ?? TimeProvider.System;
@@ -76,12 +82,12 @@ internal sealed class FairyRoute(Func<IEnumerable<IMcpToolProvider>> providers, 
         {
             var answer = await handoff.Answer!.Task.WaitAsync(wait, ct);
             if (answer?["error"]?.GetValue<string>() is { } error)
-                throw handoff.Delivered ? new AiRouteTakenException(error) : new AiRouteException(error);
+                throw handoff.Taken ? new AiRouteTakenException(error) : new AiRouteException(error);
             return answer?["result"]?.Deserialize<AiJobResult>(HelmJson.Options) ?? throw new AiRouteTakenException("Fairy Core answered nothing.");
         }
         catch (TimeoutException)
         {
-            throw handoff.Delivered ? new AiRouteTakenException($"Fairy Core did not answer within {wait.TotalSeconds:0} s.")
+            throw handoff.Taken ? new AiRouteTakenException($"Fairy Core did not answer within {wait.TotalSeconds:0} s.")
                 : new AiRouteException("Fairy Core did not take the job in time.");
         }
         finally
@@ -123,14 +129,18 @@ internal sealed class FairyRoute(Func<IEnumerable<IMcpToolProvider>> providers, 
     }
 
     /// <summary>
-    /// <c>helm/jobs/next {wait}</c>: the next job, or <c>{"job": null}</c> after at most <paramref name="parameters"/>'
-    /// wait (25 s). Each call also says Fairy Core is here.
+    /// <c>helm/jobs/next {wait, received}</c>: the next job, or <c>{"job": null}</c> after at most <paramref name="parameters"/>'
+    /// wait (25 s). <c>received</c> lists the ids of the runs Core got since its last poll. Each call also says Fairy
+    /// Core is here.
     /// </summary>
     private async Task<JsonNode?> NextAsync(JsonObject? parameters, CancellationToken ct)
     {
         var wasHere = Connected;
         Seen();
         if (!wasHere) Changed?.Invoke();
+        foreach (var id in (parameters?["received"] as JsonArray ?? []).Select(r => r?.GetValue<string>()))
+            if (id is not null && _sent.TryGetValue(id, out var received)) received.Taken = true;
+        Requeue();
         var wait = parameters?["wait"]?.GetValue<double>() is { } seconds ? TimeSpan.FromSeconds(Math.Clamp(seconds, 0, LongestPoll.TotalSeconds)) : LongestPoll;
         try
         {
@@ -144,6 +154,7 @@ internal sealed class FairyRoute(Func<IEnumerable<IMcpToolProvider>> providers, 
                 // Its asker has gone on (the wait is over): Fairy Core never sees it.
                 if (taken.Over || taken.Answer?.Task.IsCompleted == true) continue;
                 taken.Delivered = true;
+                taken.DeliveredAt = _time.GetTimestamp();
                 if (taken.Answer is not null) _sent[taken.Id] = taken;
                 return new JsonObject { ["job"] = Envelope(taken) };
             }
@@ -166,12 +177,24 @@ internal sealed class FairyRoute(Func<IEnumerable<IMcpToolProvider>> providers, 
             : null,
     };
 
+    /// <summary>Runs handed to a poll that never said it got them go back in the queue, for this poll.</summary>
+    private void Requeue()
+    {
+        foreach (var handoff in _sent.Values)
+        {
+            if (handoff.Taken || handoff.Over || _time.GetElapsedTime(handoff.DeliveredAt) < AckWithin || !_sent.TryRemove(handoff.Id, out _)) continue;
+            handoff.Delivered = false;
+            _queue.Add(handoff);
+        }
+    }
+
     /// <summary><c>helm/jobs/result {id, result | error}</c>: the answer to a handed-off run.</summary>
     private JsonNode Complete(JsonObject? answer)
     {
         Seen();
         var id = answer?["id"]?.GetValue<string>() ?? throw new McpToolException("id is missing.");
         if (!_sent.TryRemove(id, out var handoff)) throw new McpToolException("No job waits for that answer (it ran out of time).");
+        handoff.Taken = true;
         handoff.Answer!.TrySetResult(answer.DeepClone());
         return new JsonObject();
     }
@@ -206,5 +229,12 @@ internal sealed class FairyRoute(Func<IEnumerable<IMcpToolProvider>> providers, 
         public bool Delivered { get => _delivered; set => _delivered = value; }
 
         public bool Over { get => _over; set => _over = value; }
+
+        private volatile bool _taken;
+
+        /// <summary>Core said it got it: from now on it may have done part of it, so it is never run elsewhere.</summary>
+        public bool Taken { get => _taken; set => _taken = value; }
+
+        public long DeliveredAt { get; set; }
     }
 }

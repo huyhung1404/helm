@@ -169,10 +169,12 @@ helm-connector status                             # sync, what is synced, holds,
   (Undo-able tools carry `_meta: {"helm/undoable": true}`; `helm/undo {tool, result}` takes a call back). With AI
   synced, the phone's agent jobs go to it: the connector runs `AgentJobWorker` (ai.jobs, ai.workers, exactly as a
   PC) on a `FairyRoute`, up only while Core keeps asking. Core sends `helm/jobs/hello {agents: [AiWorkerAgent],
-  readsPhotos}` (the phone's picker lists those agents), long-polls `helm/jobs/next {wait ≤ 25}` →
+  readsPhotos}` (the phone's picker lists those agents), long-polls `helm/jobs/next {wait ≤ 25, received: [ids]}` →
   `{job: null | {id, kind: run|end|warm, conversationId, job: AiJob, images: [{mediaType, data}]}}`, and answers a
-  run with `helm/jobs/result {id, result: AiJobResult | error}`. Undo runs on the connector. Nothing is kept across
-  restarts: an unanswered job fails at its wait, as with a PC that stopped mid-turn.
+  run with `helm/jobs/result {id, result: AiJobResult | error}`. A run Core does not say it received (in its next
+  poll's `received`) within 5 s goes to the next poll: a Core killed mid-poll loses nothing. Undo runs on the
+  connector. Nothing is kept across connector restarts: an unanswered job fails at its wait, as with a PC that
+  stopped mid-turn.
 - **Secrets**: AES-GCM under a 32-byte host key, secrets/host.key (0600, folder 0700). With `HELM_SEAL_KEY=tpm2` a
   new key is sealed by `systemd-creds` instead (secrets/host.key.cred); a service started with
   `LoadCredentialEncrypted=helm-host-key:<data>/secrets/host.key.cred` gets it unsealed from systemd.
