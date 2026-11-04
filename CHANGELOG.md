@@ -3,7 +3,7 @@
 All notable changes to Helm. The top section is used as the GitHub release body and as the Velopack release notes.
 Format: [Keep a Changelog](https://keepachangelog.com), versions follow [SemVer](https://semver.org).
 
-## [Unreleased]
+## [0.82.0] - 2026-11-04
 
 ### Added
 - Ask Helm (phone): a new model sheet. **Auto** tries the agents on your PCs in their order (free), then the API.
@@ -17,6 +17,7 @@ Format: [Keep a Changelog](https://keepachangelog.com), versions follow [SemVer]
 - Ask Helm: a Claude model picked on the phone could be answered by Grok on the PC (the first agent ready took
   every turn, on its own model). An agent picked by name now takes the turn or says why it cannot; it never hands it
   to another agent or to the API. An API model picked skips the PC.
+- A test of Slack Bot's to-do list no longer fails on a slow CI runner.
 
 ## [0.81.0] - 2026-11-03
 
