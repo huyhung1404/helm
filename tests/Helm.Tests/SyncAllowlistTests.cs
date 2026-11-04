@@ -99,15 +99,17 @@ public sealed class SyncAllowlistTests : IDisposable
     }
 
     [Fact]
-    public void A_list_holds_prefixes_only()
+    public void A_list_holds_prefixes_and_single_collections()
     {
         var box = NewDevice("box");
 
-        Assert.Throws<ArgumentException>(() => box.Engine.SetIncluded(["wallet"]));
+        Assert.Throws<ArgumentException>(() => box.Engine.SetIncluded(["Wallet items"]));
         Assert.Throws<ArgumentException>(() => box.Engine.SetIncluded([]));
-        box.Engine.SetIncluded(["wallet.", "ai."]);
-        Assert.Equal(["ai.", "wallet."], box.Engine.IncludedPrefixes);
+        box.Engine.SetIncluded(["wallet.", "ai.", "settings.ai-features"]);
+        Assert.Equal(["ai.", "settings.ai-features", "wallet."], box.Engine.IncludedPrefixes);
         Assert.True(box.Engine.IsExcluded("notes.items"));
+        Assert.True(box.Engine.IsExcluded("settings.vocab"));
+        Assert.False(box.Engine.IsExcluded("settings.ai-features"));
         Assert.False(box.Engine.IsExcluded("wallet.transactions"));
     }
 
