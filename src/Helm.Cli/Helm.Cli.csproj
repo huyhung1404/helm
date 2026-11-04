@@ -1,0 +1,51 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- helm: Helm without a screen, for a Linux box (see docs/development.md, "helm on Linux"). The same sync engine, stores and agents as
+       the apps; no WPF, WinForms or Avalonia. Publish: dotnet publish src/Helm.Cli -r linux-x64 -c Release
+       (one self-contained file, bin/Release/net8.0/linux-x64/publish/helm). -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <SupportedOSPlatformVersion></SupportedOSPlatformVersion>
+    <PlatformTarget>AnyCPU</PlatformTarget>
+    <AssemblyName>helm</AssemblyName>
+    <RootNamespace>Helm.Cli</RootNamespace>
+    <!-- Its jobs run in the background: no tiered start-up penalty to save, and less memory on a small box. -->
+    <ServerGarbageCollection>false</ServerGarbageCollection>
+  </PropertyGroup>
+
+  <!-- A runtime identifier (publish -r linux-x64) makes one self-contained file: nothing to install on the box. Not
+       trimmed: settings, records and DI are read by reflection. -->
+  <PropertyGroup Condition="'$(RuntimeIdentifier)' != ''">
+    <SelfContained>true</SelfContained>
+    <PublishSingleFile>true</PublishSingleFile>
+    <IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
+    <EnableCompressionInSingleFile>true</EnableCompressionInSingleFile>
+    <DebugType>embedded</DebugType>
+    <!-- The libraries' .pdb files stay out of the publish folder: one file to copy to the box. -->
+    <AllowedReferenceRelatedFileExtensions>.none</AllowedReferenceRelatedFileExtensions>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Helm.Core\Helm.Core.csproj" />
+    <ProjectReference Include="..\Helm.Core.Linux\Helm.Core.Linux.csproj" />
+    <ProjectReference Include="..\Helm.Shell\Helm.Shell.csproj" />
+    <ProjectReference Include="..\Helm.Ai.Core\Helm.Ai.Core.csproj" />
+    <!-- The tools the phone's agent jobs use here (their stores and agent tools; no pages). -->
+    <ProjectReference Include="..\Helm.Modules.Tracker.Core\Helm.Modules.Tracker.Core.csproj" />
+    <ProjectReference Include="..\Helm.Modules.Wallet.Core\Helm.Modules.Wallet.Core.csproj" />
+    <ProjectReference Include="..\Helm.Modules.Habits.Core\Helm.Modules.Habits.Core.csproj" />
+    <ProjectReference Include="..\Helm.Modules.Notes.Core\Helm.Modules.Notes.Core.csproj" />
+    <ProjectReference Include="..\Helm.Modules.Missions.Core\Helm.Modules.Missions.Core.csproj" />
+    <ProjectReference Include="..\Helm.Modules.Vocab.Core\Helm.Modules.Vocab.Core.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="8.0.1" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="Helm.Tests" />
+  </ItemGroup>
+
+</Project>
