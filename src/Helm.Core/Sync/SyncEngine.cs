@@ -98,6 +98,8 @@ public sealed class SyncEngine : ISyncService, IDisposable
     // Selective sync (device-local): prefixes this device does not sync, and re-enabled ones still to download again.
     private const string ExcludeMeta = "sync_exclude";
     private const string CatchUpMeta = "sync_catchup";
+    // The allowlist this replica last synced with (absent: every collection), to catch up on prefixes added later.
+    private const string OnlyMeta = "sync_only";
     // Set when the server cleaned up deletions this device may have missed: the next run pulls everything from 0.
     private const string ResyncMeta = "sync_resync";
     private const string TombstoneGcMeta = "tombstone_gc_at";
@@ -125,6 +127,7 @@ public sealed class SyncEngine : ISyncService, IDisposable
     private readonly IBlobSync? _blobs;
     private readonly object _selectionGate = new();
     private string[] _excluded = [];
+    private string[]? _only;
     private readonly object _liveGate = new();
     private SyncLiveChannel? _live;
     // Seqs of this device's own accepted pushes (their live announcements are not news), and the highest seq
@@ -193,7 +196,48 @@ public sealed class SyncEngine : ISyncService, IDisposable
     /// </summary>
     public IReadOnlyList<string> ExcludedPrefixes => Volatile.Read(ref _excluded);
 
-    public bool IsExcluded(string collection) => ExcludedPrefixes.Any(p => SyncPullFilter.Covers(p, collection));
+    /// <summary>
+    /// When set, the only collection prefixes this device syncs (a headless connector): nothing else is downloaded or
+    /// uploaded, and <see cref="ExcludedPrefixes"/> still applies within them. Null (the apps): every collection.
+    /// </summary>
+    public IReadOnlyList<string>? IncludedPrefixes => Volatile.Read(ref _only);
+
+    public bool IsExcluded(string collection) =>
+        Volatile.Read(ref _only) is { } only && !only.Any(p => SyncPullFilter.Covers(p, collection))
+        || ExcludedPrefixes.Any(p => SyncPullFilter.Covers(p, collection));
+
+    /// <summary>
+    /// Syncs only the collections under <paramref name="prefixes"/> on this device (null: all of them, as the apps do),
+    /// before <see cref="Start"/>. The list is kept in the replica: a prefix that was not on the last one is downloaded
+    /// in full at the next run (records skipped meanwhile included); going back to null downloads everything again.
+    /// Local data outside the list stays as it is and is neither uploaded nor dropped.
+    /// </summary>
+    public void SetIncluded(IReadOnlyList<string>? prefixes)
+    {
+        if (prefixes is { Count: 0 }) throw new ArgumentException("An allowlist needs at least one prefix.", nameof(prefixes));
+        if (prefixes?.FirstOrDefault(p => !p.EndsWith('.') || !SyncIds.IsValidCollection(p)) is { } bad)
+            throw new ArgumentException($"'{bad}' is not a prefix: a collection name ending in '.'.", nameof(prefixes));
+        var list = prefixes?.Distinct(StringComparer.Ordinal).Order(StringComparer.Ordinal).ToArray();
+        List<string> added;
+        lock (_selectionGate)
+        {
+            var before = _db.GetMetaValue(OnlyMeta) is { } saved ? ParseList(saved) : null;
+            added = list is null || before is null ? [] : [.. list.Where(p => !before.Any(b => SyncPullFilter.Covers(b, p)))];
+            var catchUp = ParseList(_db.GetMetaValue(CatchUpMeta)).ToList();
+            catchUp.AddRange(added.Where(p => !catchUp.Contains(p)));
+            _db.InTransaction(() =>
+            {
+                _db.SetMetaValue(OnlyMeta, list is null ? null : string.Join(',', list));
+                _db.SetMetaValue(CatchUpMeta, catchUp.Count == 0 ? null : string.Join(',', catchUp));
+                // From a list back to everything: what was left out meanwhile comes down again in full.
+                if (list is null && before is not null) _db.SetMetaValue(ResyncMeta, "1");
+            });
+            Volatile.Write(ref _only, list);
+            Interlocked.Increment(ref _selectionVersion);
+        }
+        if (added.Count > 0) _logger.LogInformation("Sync now includes {Prefixes}; downloading them in full", string.Join(", ", added));
+        RequestSync();
+    }
 
     /// <summary>
     /// Stops or resumes syncing every collection under <paramref name="prefix"/> ("tool." with the dot) on this device.
@@ -531,7 +575,7 @@ public sealed class SyncEngine : ISyncService, IDisposable
         {
             // Records whose files are still only on this device wait for the next run, and so do the collections this
             // device does not sync.
-            var dirty = _db.GetDirty(PushBatchSize * 10, ExcludedPrefixes).Where(CanPush).Take(PushBatchSize).ToList();
+            var dirty = _db.GetDirty(PushBatchSize * 10, ExcludedPrefixes, IncludedPrefixes).Where(CanPush).Take(PushBatchSize).ToList();
             if (dirty.Count == 0) return;
 
             var items = dirty.Select(row => new PushItem(row.Collection, row.Id, row.Version, row.Deleted,
@@ -595,7 +639,9 @@ public sealed class SyncEngine : ISyncService, IDisposable
     /// </summary>
     private async Task PullMainAsync(SyncKeyring keyring, RunState run, CancellationToken ct)
     {
-        var filter = new SyncPullFilter(Exclude: ExcludedPrefixes.Count == 0 ? null : ExcludedPrefixes);
+        // With an allowlist the server sends only it (what is excluded within it is left out here, in Apply).
+        var filter = IncludedPrefixes is { } only ? new SyncPullFilter(Only: only)
+            : new SyncPullFilter(Exclude: ExcludedPrefixes.Count == 0 ? null : ExcludedPrefixes);
         if (_db.GetMetaValue(ResyncMeta) is null)
         {
             try
@@ -853,6 +899,12 @@ public sealed class SyncEngine : ISyncService, IDisposable
             if (ExcludedPrefixes.Count > 0)
             {
                 _logger.LogInformation("Blob clean-up skipped: this device does not sync {Prefixes}", string.Join(", ", ExcludedPrefixes));
+                return;
+            }
+            // An allowlist: the records of everything else, and the blobs they use, are never seen here.
+            if (IncludedPrefixes is not null)
+            {
+                _logger.LogInformation("Blob clean-up skipped: this device syncs only {Prefixes}", string.Join(", ", IncludedPrefixes));
                 return;
             }
             var referenced = new HashSet<string>(StringComparer.Ordinal);

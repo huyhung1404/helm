@@ -157,18 +157,28 @@ public sealed class SyncDatabase : IDisposable
 
     /// <param name="excludedPrefixes">Collections this device does not sync (prefixes ending in "."): left out in the
     /// query itself, so a pile of their edits never hides the others' behind the limit.</param>
-    internal List<SyncRow> GetDirty(int limit, IReadOnlyList<string>? excludedPrefixes = null)
+    /// <param name="onlyPrefixes">When set, only collections under these prefixes (the device's allowlist), likewise in
+    /// the query.</param>
+    internal List<SyncRow> GetDirty(int limit, IReadOnlyList<string>? excludedPrefixes = null, IReadOnlyList<string>? onlyPrefixes = null)
     {
         lock (_gate)
         {
             var exclude = excludedPrefixes ?? [];
             var where = string.Concat(exclude.Select((_, i) => $" AND substr(collection, 1, $l{i}) <> $p{i}"));
+            if (onlyPrefixes is not null)
+                where += onlyPrefixes.Count == 0 ? " AND 0"
+                    : " AND (" + string.Join(" OR ", onlyPrefixes.Select((_, i) => $"substr(collection, 1, $ol{i}) = $op{i}")) + ")";
             using var cmd = Command($"SELECT {Columns} FROM records WHERE dirty = 1{where} ORDER BY updated_at LIMIT $n");
             cmd.Parameters.AddWithValue("$n", limit);
             for (var i = 0; i < exclude.Count; i++)
             {
                 cmd.Parameters.AddWithValue($"$l{i}", exclude[i].Length);
                 cmd.Parameters.AddWithValue($"$p{i}", exclude[i]);
+            }
+            for (var i = 0; i < (onlyPrefixes?.Count ?? 0); i++)
+            {
+                cmd.Parameters.AddWithValue($"$ol{i}", onlyPrefixes![i].Length);
+                cmd.Parameters.AddWithValue($"$op{i}", onlyPrefixes[i]);
             }
             return ReadRows(cmd);
         }
