@@ -1,41 +1,41 @@
 namespace Helm.Connector.Status;
 
-/// <summary><c>helm status</c> as text: one fact a line, and the next command to run where something is missing.</summary>
+/// <summary><c>helm-connector status</c> as text: one fact a line, and the next command to run where something is missing.</summary>
 internal static class StatusPrinter
 {
     public static void Write(StatusReport report, TextWriter output, DateTimeOffset now)
     {
-        output.WriteLine($"helm {report.Version} on {report.Device}");
+        output.WriteLine($"{ConnectorApp.Name} {report.Version} on {report.Device}");
         output.WriteLine($"Data       {report.DataDirectory}{(report.DataDirectoryExists ? "" : " (not created yet)")}");
         output.WriteLine($"Host key   {report.HostKey}");
         output.WriteLine($"Sync       {Sync(report.Sync)}");
         if (report.Sync.DeviceId is { } id) output.WriteLine($"Device id  {id}");
+        output.WriteLine($"Syncs      {string.Join(", ", report.Groups.Select(g => $"{g.Name} ({g.Prefix})"))}");
         if (report.Sync.Problem is { } problem) output.WriteLine($"Problem    {problem}");
 
-        output.WriteLine();
-        output.WriteLine("Agent CLIs");
-        foreach (var cli in report.Clis) output.WriteLine($"  {cli.Name,-12} {cli.Path ?? "not found"}");
-
-        output.WriteLine();
-        output.WriteLine("Agents on this box (in the order they take jobs)");
-        if (report.Agents.Count == 0) output.WriteLine("  none yet");
-        foreach (var agent in report.Agents) output.WriteLine($"  {agent.Name,-12} {agent.Kind,-12} {agent.State}");
-
-        output.WriteLine();
-        output.WriteLine("Workers (devices that take the phone's agent jobs)");
-        if (report.Workers.Count == 0) output.WriteLine(report.Sync.Unlocked ? "  none heard of yet" : "  unknown until sync is set up");
-        foreach (var worker in report.Workers)
+        if (report.Serve is not { } serve)
         {
-            var name = worker.ThisDevice ? $"{worker.Device} (this box)" : worker.Device;
-            var state = worker.Online ? "online" : "offline";
-            var agents = worker.Problem ?? (worker.Agents.Count > 0 ? string.Join(", ", worker.Agents) : "no agent ready");
-            output.WriteLine($"  {name,-24} {state}, seen {Ago(now - worker.SeenAt)}: {agents}");
+            output.WriteLine("Serve      not running");
         }
+        else
+        {
+            var synced = serve.LastSyncedAt is { } at ? $", last sync {Ago(now - at)}" : "";
+            output.WriteLine($"Serve      running since {serve.Started.ToLocalTime():yyyy-MM-dd HH:mm} (pid {serve.Pid}): {serve.State}{(serve.Live ? ", live" : "")}{synced}");
+            if (serve.LastError is { } error) output.WriteLine($"Last error {error}");
+            output.WriteLine(serve.Breaker is { } reason
+                ? $"Throttle   TRIPPED {Ago(now - serve.BreakerAt.GetValueOrDefault(now))}: {reason}. Restart the service once the cause is fixed."
+                : $"Throttle   ok (stops sync above {serve.MaxPushesPerMinute} pushes a minute)");
+            if (serve.McpSocket is { } socket) output.WriteLine($"MCP        {socket}");
+        }
+
+        output.WriteLine(report.Holds.Count == 0 ? "Holds      none" : "Holds      (approve or keep them on the phone or the PC)");
+        foreach (var hold in report.Holds)
+            output.WriteLine($"  {hold.Collection,-24} {hold.Deletions} deletions from another device wait ({hold.LiveRecords} records here)");
     }
 
     private static string Sync(SyncReport sync) =>
-        !sync.Connected ? "not connected"
-        : !sync.Unlocked ? $"connected to {sync.Server}, locked (no account key here)"
+        !sync.Connected ? $"not connected ({ConnectorApp.Name} sync connect)"
+        : !sync.Unlocked ? $"connected to {sync.Server}, locked ({ConnectorApp.Name} sync unlock)"
         : $"connected to {sync.Server}, unlocked";
 
     internal static string Ago(TimeSpan span) =>

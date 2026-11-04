@@ -1,6 +1,5 @@
-using Helm.Ai.Agents;
-using Helm.Ai.Assistant;
 using Helm.Connector.Hosting;
+using Helm.Connector.Sync;
 using Helm.Core.Settings;
 using Helm.Core.Sync;
 using Helm.Shell.Services;
@@ -10,15 +9,12 @@ using Microsoft.Extensions.Logging.Abstractions;
 namespace Helm.Connector.Status;
 
 /// <summary>
-/// Looks at this box's Helm without changing it: the data folder, the sync files, the agents' CLIs and sign-ins, and
-/// the workers the replica last heard of. Nothing is created (the replica is opened only once sync is set up here).
+/// Looks at this box's connector without changing it: the data folder, the sync files, what it syncs, the holds in the
+/// replica, and what a running serve says of itself (its sync state and push breaker). Nothing is created: the replica
+/// is opened only once sync is set up here.
 /// </summary>
-/// <param name="findCli">Where an agent kind's CLI is installed (<see cref="AgentCommands.Of"/>), or null.</param>
-internal sealed class StatusProbe(HelmPaths paths, ISecretProtector secrets, string hostKey, Func<string, string?> findCli, string device,
-    TimeProvider? time = null)
+internal sealed class StatusProbe(HelmPaths paths, ISecretProtector secrets, string hostKey, SyncSelection selection, string device)
 {
-    private readonly TimeProvider _time = time ?? TimeProvider.System;
-
     public StatusReport Probe()
     {
         var credentials = new ProtectedSyncCredentialStore(paths.SyncCredentialsFile, secrets).Load();
@@ -29,12 +25,15 @@ internal sealed class StatusProbe(HelmPaths paths, ISecretProtector secrets, str
 
         // The replica only once the token opened with this key: a key that does not fit would make a new, empty one.
         string? deviceId = null;
-        IReadOnlyList<WorkerReport> workers = [];
+        IReadOnlyList<HoldReport> holds = [];
         if (credentials is not null && File.Exists(paths.SyncDatabaseFile))
         {
             try
             {
-                (deviceId, workers) = ReadReplica();
+                using var services = ConnectorHost.Build(paths, secrets, NullLoggerFactory.Instance, selection);
+                var engine = services.GetRequiredService<SyncEngine>();
+                deviceId = engine.DeviceId;
+                holds = [.. engine.Holds.Select(h => new HoldReport(h.Collection, h.Records.Count, h.LiveRecords))];
             }
             catch (Exception ex)
             {
@@ -42,7 +41,6 @@ internal sealed class StatusProbe(HelmPaths paths, ISecretProtector secrets, str
             }
         }
 
-        var clis = AgentKinds.All.Select(k => new CliReport(k.Id, k.Name, findCli(k.Id))).ToList();
         return new StatusReport
         {
             Version = AppInfo.Version,
@@ -51,33 +49,12 @@ internal sealed class StatusProbe(HelmPaths paths, ISecretProtector secrets, str
             DataDirectoryExists = Directory.Exists(paths.Root),
             HostKey = hostKey,
             Sync = new SyncReport(credentials is not null, unlocked, credentials?.Server.ToString(), deviceId, problem),
-            Clis = clis,
-            Agents = Agents(clis),
-            Workers = workers,
+            Groups = [.. selection.Groups.Select(g => new GroupReport(g, SyncSelection.Known[g]))],
+            Serve = ServeState.Read(paths) is { } state
+                ? new ServeReport(state.Pid, state.Started, state.SyncState, state.LastSyncedAt, state.LastError, state.Live, state.Breaker,
+                    state.BreakerAt, PushBreaker.MaxPushesPerMinute, state.McpSocket)
+                : null,
+            Holds = holds,
         };
-    }
-
-    private IReadOnlyList<AgentReport> Agents(IReadOnlyList<CliReport> clis)
-    {
-        using var store = new SettingsStore<AiAgentSettings>(paths.SettingsFile(AiAgentSettings.StoreId));
-        return [.. store.Current.Agents.Select(p =>
-        {
-            var signedIn = AgentRegistry.IsSignedIn(paths, p);
-            var installed = clis.FirstOrDefault(c => c.Kind == p.Kind)?.Path is not null;
-            var state = !p.Enabled ? "off" : !installed ? "not installed" : !signedIn ? "not signed in" : "ready";
-            return new AgentReport(p.Name, p.Kind, p.Enabled, signedIn, installed, state);
-        })];
-    }
-
-    private (string DeviceId, IReadOnlyList<WorkerReport> Workers) ReadReplica()
-    {
-        using var services = ConnectorHost.Build(paths, secrets, NullLoggerFactory.Instance);
-        var self = services.GetRequiredService<SyncEngine>().DeviceId;
-        var now = _time.GetUtcNow();
-        var workers = services.GetRequiredService<ISyncedCollection<AiWorkerRecord>>().All()
-            .Select(w => new WorkerReport(w.Value.Device, w.Id == self, now - w.Value.SeenAt < AgentJobs.Online, w.Value.SeenAt, w.Value.Agents, w.Value.Problem))
-            .OrderByDescending(w => w.ThisDevice).ThenByDescending(w => w.SeenAt)
-            .ToList();
-        return (self, workers);
     }
 }

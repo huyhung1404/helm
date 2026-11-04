@@ -1,8 +1,9 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
-  <!-- helm: Helm without a screen, for a Linux box (see docs/development.md, "helm on Linux"). The same sync engine, stores and agents as
-       the apps; no WPF, WinForms or Avalonia. Publish: dotnet publish src/Helm.Connector -r linux-x64 -c Release
-       (one self-contained file, bin/Release/net8.0/linux-x64/publish/helm). -->
+  <!-- helm-connector: Helm's data on a Linux home server, in sync, with Helm's tools over MCP for Fairy Core (see
+       docs/development.md, "The Linux connector"). The same sync engine, stores and tools as the apps; no agents, no WPF,
+       WinForms or Avalonia. Publish: dotnet publish src/Helm.Connector -r linux-x64 -c Release
+       (one self-contained file, bin/Release/net8.0/linux-x64/publish/helm-connector). -->
   <PropertyGroup>
     <OutputType>Exe</OutputType>
     <TargetFramework>net8.0</TargetFramework>
