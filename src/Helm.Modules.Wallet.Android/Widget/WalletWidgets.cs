@@ -74,10 +74,11 @@ internal static class WalletWidgets
 
     private static readonly WalletWidgetPeriod[] s_periods = Enum.GetValues<WalletWidgetPeriod>();
 
-    /// <summary>Redraws every Wallet widget, and the Funds widgets with them (the same data changed).</summary>
+    /// <summary>Redraws every Wallet widget, and the Funds and Goal widgets with them (the same data changed).</summary>
     public static void RefreshAll(Context context)
     {
         FundsWidgets.RefreshAll(context);
+        GoalWidgets.RefreshAll(context);
         var manager = AppWidgetManager.GetInstance(context);
         if (manager is null) return;
         var ids = manager.GetAppWidgetIds(new ComponentName(context, Java.Lang.Class.FromType(typeof(WalletWidgetProvider))));
@@ -416,7 +417,9 @@ internal static class WalletWidgets
             var store = services.GetRequiredService<WalletStore>();
             var capture = services.GetRequiredService<WalletCapture>();
             settings = capture.Settings.Current;
-            return (WalletWidgetModel.Build(store, period, settings.WidgetChart, store.Now, TimeZoneInfo.Local), settings, capture.IsToolEnabled);
+            // Money set aside for savings goals is off the balance.
+            var setAside = services.GetService<GoalBook>()?.SetAside() ?? 0;
+            return (WalletWidgetModel.Build(store, period, settings.WidgetChart, store.Now, TimeZoneInfo.Local, setAside), settings, capture.IsToolEnabled);
         }
         catch (Exception ex)
         {

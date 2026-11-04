@@ -30,7 +30,7 @@ public partial class WalletSheet : UserControl
         Sheet.PointerPressed += (_, e) => e.Handled = true;
         Scrim.PointerPressed += (_, _) =>
         {
-            if (_viewModel.Popup is WalletPopup.Details or WalletPopup.Fund or WalletPopup.Person or WalletPopup.ToCategorize or WalletPopup.Charts)
+            if (_viewModel.Popup is WalletPopup.Details or WalletPopup.Fund or WalletPopup.Person or WalletPopup.ToCategorize or WalletPopup.Charts or WalletPopup.Goal)
                 _viewModel.DismissPopupCommand.Execute(null);
         };
     }
@@ -49,6 +49,8 @@ public partial class WalletSheet : UserControl
                 WalletPopup.Add => NewAmountBox,
                 WalletPopup.FundForm when _viewModel.Funds?.FormId is null => FundNameBox,
                 WalletPopup.AddDebt when _viewModel.Debts?.NewPerson.Length == 0 => PersonBox,
+                WalletPopup.GoalForm when _viewModel.Goals?.FormIsNew == true => GoalNameBox,
+                WalletPopup.GoalTakeOut => TakeAmountBox,
                 _ => null,
             };
             target?.Focus(NavigationMethod.Tab);
@@ -60,6 +62,7 @@ public partial class WalletSheet : UserControl
     {
         AddButton.IsEnabled = on;
         AddDebtButton.IsEnabled = on;
+        AddGoalButton.IsEnabled = on;
         ToCategorizeButton.IsEnabled = on;
     }
 }

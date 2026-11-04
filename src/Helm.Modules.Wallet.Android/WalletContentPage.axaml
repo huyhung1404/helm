@@ -22,18 +22,26 @@
     <!-- Room at the bottom for the floating buttons -->
     <StackPanel Spacing="12" Margin="0,0,0,88">
         <!-- Money (the month) or Debts (who owes whom) -->
-        <Border Classes="seg" IsVisible="{Binding HasDebts}">
-            <Grid ColumnDefinitions="*,3,*">
+        <Border Classes="seg" IsVisible="{Binding HasViews}">
+            <Grid ColumnDefinitions="*,3,*,3,*">
                 <Button Classes="seg" Classes.on="{Binding IsMoneyView}" Command="{Binding ShowMoneyCommand}" AutomationProperties.Name="Show the money">
                     <StackPanel Orientation="Horizontal" Spacing="6">
                         <ic:SymbolIcon Symbol="Wallet" FontSize="18" />
                         <TextBlock Text="Money" VerticalAlignment="Center" />
                     </StackPanel>
                 </Button>
-                <Button Grid.Column="2" Classes="seg" Classes.on="{Binding IsDebtsView}" Command="{Binding ShowDebtsCommand}" AutomationProperties.Name="Show the debts">
+                <Button Grid.Column="2" Classes="seg" Classes.on="{Binding IsDebtsView}" Command="{Binding ShowDebtsCommand}" AutomationProperties.Name="Show the debts"
+                        IsVisible="{Binding HasDebts}">
                     <StackPanel Orientation="Horizontal" Spacing="6">
                         <ic:SymbolIcon Symbol="People" FontSize="18" />
                         <TextBlock Text="Debts" VerticalAlignment="Center" />
+                    </StackPanel>
+                </Button>
+                <Button Grid.Column="4" Classes="seg" Classes.on="{Binding IsGoalsView}" Command="{Binding ShowGoalsCommand}" AutomationProperties.Name="Show the savings goals"
+                        IsVisible="{Binding HasGoals}">
+                    <StackPanel Orientation="Horizontal" Spacing="6">
+                        <ic:SymbolIcon Symbol="Target" FontSize="18" />
+                        <TextBlock Text="Goals" VerticalAlignment="Center" />
                     </StackPanel>
                 </Button>
             </Grid>
@@ -387,6 +395,61 @@
 
                         <TextBlock Classes="secondary" Margin="4,0"
                                    Text="Lent or borrowed by bank transfer? Open that transaction in Money and tap Lent, borrowed, paid back. It then counts neither as spending nor as income." />
+                    </StackPanel>
+                </Panel>
+            </Panel>
+
+            <!-- ============================== Goals ============================== -->
+            <!-- Money set aside for things to buy: off the balance but not spending; Give up brings it all back.
+                 The inner panel's DataContext binding is read as the page's; what is inside it, as the goals'. -->
+            <Panel IsVisible="{Binding IsGoalsView}">
+                <Panel DataContext="{Binding Goals}">
+                    <StackPanel x:DataType="vm:GoalsViewModel" Spacing="12">
+                        <!-- The balance after what the goals hold -->
+                        <Border Classes="card" Padding="14,12" Margin="0">
+                            <StackPanel Spacing="2">
+                                <TextBlock Text="Balance you can spend" Classes="lbl" />
+                                <TextBlock Text="{Binding AvailableText}" FontSize="24" FontWeight="SemiBold" Classes.danger="{Binding IsAvailableNegative}" />
+                                <StackPanel Orientation="Horizontal" Spacing="6" IsVisible="{Binding HasSetAside}">
+                                    <ic:SymbolIcon Symbol="Savings" FontSize="16" Foreground="{DynamicResource AccentButtonBackground}" VerticalAlignment="Center" />
+                                    <TextBlock Text="{Binding SetAsideText}" TextWrapping="Wrap" VerticalAlignment="Center" FontSize="13" />
+                                </StackPanel>
+                            </StackPanel>
+                        </Border>
+
+                        <!-- What the last set-aside, purchase or give-up did, with Undo -->
+                        <Border Classes="infobar" IsVisible="{Binding HasUndo}">
+                            <Grid ColumnDefinitions="*,Auto,Auto">
+                                <TextBlock Text="{Binding UndoText}" TextWrapping="Wrap" VerticalAlignment="Center" />
+                                <Button Grid.Column="1" Classes="flat" Content="Undo" Command="{Binding UndoCommand}" FontWeight="SemiBold" />
+                                <Button Grid.Column="2" Classes="icon flat" Command="{Binding DismissUndoCommand}" AutomationProperties.Name="Dismiss">
+                                    <ic:SymbolIcon Symbol="Dismiss" FontSize="16" />
+                                </Button>
+                            </Grid>
+                        </Border>
+
+                        <Border Classes="card" Margin="0" IsVisible="{Binding HasNoGoals}">
+                            <StackPanel Spacing="8">
+                                <TextBlock Text="Saving up for something?" Classes="cardTitle" />
+                                <TextBlock TextWrapping="Wrap" Classes="secondary" FontSize="13"
+                                           Text="Add what you want (a mini PC, a trip), its price and a photo. Set small amounts aside whenever you can: they leave your balance at once but are not spending, and they all come back if you give it up. The photo lights up as you go, fully at 100%." />
+                                <Button Classes="accent wide" Command="{Binding OpenAddCommand}">
+                                    <StackPanel Orientation="Horizontal" Spacing="6">
+                                        <ic:SymbolIcon Symbol="Add" FontSize="16" />
+                                        <TextBlock Text="New goal" />
+                                    </StackPanel>
+                                </Button>
+                            </StackPanel>
+                        </Border>
+
+                        <ItemsControl ItemsSource="{Binding Rows}" ItemTemplate="{StaticResource GoalTile}" />
+
+                        <Border Classes="card" Margin="0" Padding="14,10,14,4" IsVisible="{Binding HasFinished}">
+                            <StackPanel>
+                                <TextBlock Text="Bought and given up" Classes="cardTitle" Margin="0,0,0,8" />
+                                <ItemsControl ItemsSource="{Binding Finished}" ItemTemplate="{StaticResource FinishedGoalRow}" />
+                            </StackPanel>
+                        </Border>
                     </StackPanel>
                 </Panel>
             </Panel>

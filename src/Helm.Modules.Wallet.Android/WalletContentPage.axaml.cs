@@ -68,22 +68,41 @@ public partial class WalletContentPage : UserControl
         _module.PropertyChanged += OnModuleChanged;
         _viewModel.PropertyChanged += OnViewModelChanged;
         ActivityHost.Resumed += OnResumed;
+        ShellIntents.ItemOffered += OnItemOffered;
+        if (_viewModel.Goals is { } goals) goals.WidgetChanged += OnGoalWidgetChanged;
         ShowSheet();
         ApplyEnabled();
         // Transactions saved from notifications while the page was away, and "today" after midnight.
         _viewModel.TransactionPager.Reset();
         _viewModel.Refresh();
         _module.PageShown();
+        OpenOfferedGoal();
     }
 
     protected override void OnDetachedFromVisualTree(VisualTreeAttachmentEventArgs e)
     {
         HideSheet();
         ActivityHost.Resumed -= OnResumed;
+        ShellIntents.ItemOffered -= OnItemOffered;
+        if (_viewModel.Goals is { } goals) goals.WidgetChanged -= OnGoalWidgetChanged;
         _module.PropertyChanged -= OnModuleChanged;
         _viewModel.PropertyChanged -= OnViewModelChanged;
         base.OnDetachedFromVisualTree(e);
     }
+
+    private void OnItemOffered(object? sender, EventArgs e) => Dispatcher.UIThread.Post(OpenOfferedGoal);
+
+    /// <summary>A tap on the Goal widget: that goal's sheet, or the goals when there is none yet.</summary>
+    private void OpenOfferedGoal()
+    {
+        if (ShellIntents.TakeItem(WalletIds.ModuleId) is not { } item || !item.StartsWith(GoalWidgets.ItemPrefix, StringComparison.Ordinal)) return;
+        var id = item[GoalWidgets.ItemPrefix.Length..];
+        if (id.Length > 0) _viewModel.ShowGoal(id);
+        else _viewModel.ShowGoalsCommand.Execute(null);
+    }
+
+    /// <summary>Money set aside, or another goal put on the widget: the home-screen widgets follow at once.</summary>
+    private void OnGoalWidgetChanged(object? sender, EventArgs e) => WalletWidgets.RefreshAll(Android.App.Application.Context);
 
     /// <summary>Back from Android's settings (notification access) or from the bank's app.</summary>
     private void OnResumed(object? sender, EventArgs e) => Dispatcher.UIThread.Post(() =>

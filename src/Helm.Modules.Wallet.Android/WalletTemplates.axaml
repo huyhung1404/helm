@@ -159,4 +159,48 @@
             </StackPanel>
         </Grid>
     </DataTemplate>
+
+    <!-- A savings goal: its photo lit up to what is saved, the money under it; a tap opens its sheet -->
+    <DataTemplate x:Key="GoalTile" x:DataType="vm:GoalRow">
+        <Button Classes="goal" Classes.ready="{Binding IsReady}" Command="{Binding OpenCommand}" AutomationProperties.Name="{Binding Name}" AutomationProperties.HelpText="{Binding LeftText}">
+            <StackPanel>
+                <Panel Height="168">
+                    <vm:GoalPicture Photo="{Binding Photo}" Share="{Binding Share}" Color="{Binding Color}" Initial="{Binding Initial}" CornerRadius="9" />
+                    <TextBlock Text="{Binding PercentText}" Classes="onPhoto" FontSize="26" Margin="12,0,0,8" HorizontalAlignment="Left" VerticalAlignment="Bottom" />
+                    <Border Classes="readyTag" IsVisible="{Binding IsReady}">
+                        <TextBlock Text="Ready" FontSize="11" FontWeight="SemiBold" Foreground="#2A1C00" />
+                    </Border>
+                </Panel>
+                <StackPanel Margin="14,10,14,12" Spacing="2">
+                    <Grid ColumnDefinitions="*,Auto">
+                        <TextBlock Text="{Binding Name}" FontSize="16" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+                        <TextBlock Grid.Column="1" Text="{Binding PriceShort}" Classes="secondary" VerticalAlignment="Center" Margin="8,0,0,0" />
+                    </Grid>
+                    <TextBlock>
+                        <Run Text="{Binding SavedText}" FontWeight="SemiBold" />
+                        <Run Text="saved" Foreground="{DynamicResource HelmSecondaryText}" />
+                    </TextBlock>
+                    <ProgressBar Classes="goal" Classes.ready="{Binding IsReady}" Value="{Binding Percent}" Margin="0,6,0,4" />
+                    <TextBlock Text="{Binding LeftText}" Classes="secondary" FontSize="13" />
+                    <TextBlock Text="{Binding PaceText}" Classes="secondary" FontSize="13" IsVisible="{Binding HasPace}" />
+                </StackPanel>
+            </StackPanel>
+        </Button>
+    </DataTemplate>
+
+    <!-- A goal bought or given up: a small photo, what happened -->
+    <DataTemplate x:Key="FinishedGoalRow" x:DataType="vm:GoalRow">
+        <Button Classes="goalRow" Command="{Binding OpenCommand}" AutomationProperties.Name="{Binding Name}" AutomationProperties.HelpText="{Binding EndedText}">
+            <Grid ColumnDefinitions="Auto,*,Auto">
+                <vm:GoalPicture Width="56" Height="42" CornerRadius="5" Margin="0,0,12,0" Photo="{Binding Photo}" Share="{Binding Share}" Color="{Binding Color}" Initial="{Binding Initial}" />
+                <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                    <TextBlock Text="{Binding Name}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+                    <TextBlock Text="{Binding EndedText}" Classes="secondary" FontSize="12" TextWrapping="Wrap" />
+                </StackPanel>
+                <Border Grid.Column="2" Classes="state" Margin="8,0,0,0">
+                    <TextBlock Text="{Binding StateText}" FontSize="11" FontWeight="SemiBold" />
+                </Border>
+            </Grid>
+        </Button>
+    </DataTemplate>
 </ResourceDictionary>

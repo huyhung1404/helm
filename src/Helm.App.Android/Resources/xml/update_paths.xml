@@ -10,6 +10,8 @@
   <cache-path name="workspace-camera" path="workspace-camera/" />
   <!-- Photos taken in Ask Helm's card: the camera app writes here; deleted as soon as the photo is read. -->
   <cache-path name="ask-camera" path="ask-camera/" />
+  <!-- Photos of savings goals taken in Wallet: the camera app writes here; deleted as soon as the photo is read. -->
+  <cache-path name="wallet-camera" path="wallet-camera/" />
   <!-- Files shared from a tool, e.g. the Tracker calendar as .ics (replaced on each share). -->
   <cache-path name="share" path="share/" />
   <!-- Log files shared from General → Logs. -->
