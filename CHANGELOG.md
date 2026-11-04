@@ -3,6 +3,21 @@
 All notable changes to Helm. The top section is used as the GitHub release body and as the Velopack release notes.
 Format: [Keep a Changelog](https://keepachangelog.com), versions follow [SemVer](https://semver.org).
 
+## [Unreleased]
+
+### Added
+- Ask Helm (phone): a new model sheet. **Auto** tries the agents on your PCs in their order (free), then the API.
+  Or pick one agent on a PC and one of its models ("PC · Grok 5"), or one API model ("API · Opus 4.8"). Each agent
+  and each family of models (Claude Opus, Sonnet, Haiku, Fable, Grok) opens to its versions, with a rough price per
+  question on the API. The card says who answered: the agent and its model on which PC, or the API model.
+- An effort slider in the sheet, like VS Code's: Low, Medium, High, XHigh, Max. Levels a model does not take are
+  dimmed, and the knob stops at the nearest one it takes. AI → Features on the PC offers the same five levels.
+
+### Fixed
+- Ask Helm: a Claude model picked on the phone could be answered by Grok on the PC (the first agent ready took
+  every turn, on its own model). An agent picked by name now takes the turn or says why it cannot; it never hands it
+  to another agent or to the API. An API model picked skips the PC.
+
 ## [0.81.0] - 2026-11-03
 
 ### Added

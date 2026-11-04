@@ -125,7 +125,8 @@ public sealed partial class AiFeatureRow : ObservableObject
         if (value is null) return;
         OnPropertyChanged(nameof(CanReachApi));
         Badges();
-        Save(c => c.Route = value.Policy);
+        // A route set here is for any agent: one picked by name in the phone's card no longer holds.
+        Save(c => (c.Route, c.Agent) = (value.Policy, null));
     }
 
     partial void OnModelChanged(AssistantModelOption? value)

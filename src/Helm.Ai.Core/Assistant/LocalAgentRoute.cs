@@ -30,12 +30,19 @@ public sealed class LocalAgentRoute : IAgentRoute, IDisposable
     internal static readonly TimeSpan WarmFor = TimeSpan.FromSeconds(30);
 
     private readonly ILogger _logger;
+    private readonly string _kind;
+    private readonly Func<IReadOnlyList<string>> _models;
 
     /// <param name="agentName">The agent as the user knows it ("Codex", "Claude Code").</param>
     /// <param name="prompts">The user's own prompts (Skill Hub), for a job that brings none of its own.</param>
+    /// <param name="kind">"codex", "claude-code" or "grok", for the phone's picker.</param>
+    /// <param name="models">The models it runs, the one for a job whose model is not of its kind first; empty: its own only.</param>
     public LocalAgentRoute(string device, string agentName, IAssistantChatFactory agent, IEnumerable<IMcpToolProvider> providers,
-        Func<string?, bool> isToolOn, Func<string?> unavailable, TimeProvider? time = null, IAiPrompts? prompts = null, ILogger? logger = null)
+        Func<string?, bool> isToolOn, Func<string?> unavailable, TimeProvider? time = null, IAiPrompts? prompts = null, ILogger? logger = null,
+        string kind = "", Func<IReadOnlyList<string>>? models = null)
     {
+        _kind = kind;
+        _models = models ?? (() => []);
         Device = device;
         AgentName = agentName;
         _agent = agent;
@@ -56,6 +63,23 @@ public sealed class LocalAgentRoute : IAgentRoute, IDisposable
     public string? Unavailable() => _unavailable();
 
     public bool ReadsPhotos => _agent.ReadsImages && Unavailable() is null;
+
+    /// <summary>What the phone's picker shows of it.</summary>
+    public AiWorkerAgent Offer() => new() { Name = AgentName, Kind = _kind, Models = _models(), Problem = Unavailable(), ReadsPhotos = _agent.ReadsImages };
+
+    public IReadOnlyList<AiAgentOffer> Offers => [new(Device, Offer())];
+
+    /// <summary>
+    /// The model it runs for a job: the job's when it is of its kind (a Claude model for Claude Code), else the first
+    /// of its own; null for an agent that runs only its own (Codex).
+    /// </summary>
+    internal string? ModelFor(string requested)
+    {
+        var models = _models();
+        if (models.Count == 0) return null;
+        var prefix = _kind switch { "claude-code" => "claude-", "grok" => "grok-", _ => null };
+        return models.Contains(requested) || (prefix is not null && requested.StartsWith(prefix, StringComparison.Ordinal)) ? requested : models[0];
+    }
 
     public async Task<AiJobResult> RunAsync(AiJob job, TimeSpan wait, CancellationToken ct)
     {
@@ -100,7 +124,7 @@ public sealed class LocalAgentRoute : IAgentRoute, IDisposable
                     : ex.Message;
                 if (records.Count > 0)
                     return new AiJobResult($"Em làm được một phần thì dừng ({stopped}).", [.. records], [],
-                        AiPrices.Usd(job.Model, input, output, cacheRead, cacheWrite)) { Agent = AgentName };
+                        AiPrices.Usd(job.Model, input, output, cacheRead, cacheWrite)) { Agent = AgentName, Model = ModelFor(job.Model) };
                 if (ex is OperationCanceledException && ct.IsCancellationRequested) throw;
                 throw new AiRouteException(stopped);
             }
@@ -112,7 +136,7 @@ public sealed class LocalAgentRoute : IAgentRoute, IDisposable
             }
             // What it saved: the same tokens on the API with the model picked for the fallback.
             return new AiJobResult(outcome.Problem ?? outcome.Text, outcome.Records, outcome.ForPhone,
-                AiPrices.Usd(job.Model, input, output, cacheRead, cacheWrite)) { Agent = AgentName };
+                AiPrices.Usd(job.Model, input, output, cacheRead, cacheWrite)) { Agent = AgentName, Model = ModelFor(job.Model) };
         }
         finally
         {
@@ -191,7 +215,7 @@ public sealed class LocalAgentRoute : IAgentRoute, IDisposable
             made = true;
             var tools = Tools(job);
             var system = job.System ?? _prompts?.Get(job.Feature, HelmAssistant.Instructions) ?? HelmAssistant.Instructions;
-            return new Conversation(_agent.Create("", job.Model, job.Effort, system, tools), tools, _time.GetUtcNow());
+            return new Conversation(_agent.Create("", ModelFor(job.Model) ?? job.Model, job.Effort, system, tools), tools, _time.GetUtcNow());
         });
         fresh = made;
         return conversation;
@@ -268,6 +292,14 @@ public sealed class AgentChain(IReadOnlyList<LocalAgentRoute> agents) : IAgentRo
 
     public bool ReadsPhotos => _agents.Any(a => a.ReadsPhotos);
 
+    public IReadOnlyList<AiAgentOffer> Offers => [.. _agents.SelectMany(a => a.Offers)];
+
+    public string? UnavailableFor(string agent) =>
+        Named(agent) is { } named ? named.Unavailable() is { } why ? $"{agent}: {why}" : null : $"{agent} is not set up on {Device}.";
+
+    private LocalAgentRoute? Named(string agent) =>
+        _agents.FirstOrDefault(a => string.Equals(a.AgentName, agent, StringComparison.CurrentCultureIgnoreCase));
+
     public string? Unavailable()
     {
         var agents = _agents;
@@ -278,6 +310,14 @@ public sealed class AgentChain(IReadOnlyList<LocalAgentRoute> agents) : IAgentRo
 
     public Task<AiJobResult> RunAsync(AiJob job, TimeSpan wait, CancellationToken ct)
     {
+        // The one the user picked, or none: never another agent in its place.
+        if (job.Agent is { } picked)
+        {
+            if (UnavailableFor(picked) is { } why) throw new AiRouteException(why);
+            var named = Named(picked)!;
+            if (job.Images.Count == 0) _taken[job.ConversationId] = named;
+            return named.RunAsync(job, wait, ct);
+        }
         var agents = _agents;
         // A photo goes to the first agent that reads pictures (Grok's CLI takes none): each photo turn is a chat of its own.
         if (job.Images.Count > 0)
@@ -293,7 +333,9 @@ public sealed class AgentChain(IReadOnlyList<LocalAgentRoute> agents) : IAgentRo
     /// <summary>The agent a new conversation would go to gets ready, and keeps the conversation (as its first turn would).</summary>
     public void Warm(AiJob job)
     {
-        if (_taken.ContainsKey(job.ConversationId) || _agents.FirstOrDefault(a => a.Unavailable() is null) is not { } agent) return;
+        var ready = job.Agent is { } picked ? Named(picked) is { } named && named.Unavailable() is null ? named : null
+            : _agents.FirstOrDefault(a => a.Unavailable() is null);
+        if (_taken.ContainsKey(job.ConversationId) || ready is not { } agent) return;
         _taken[job.ConversationId] = agent;
         agent.Warm(job);
     }

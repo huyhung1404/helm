@@ -16,7 +16,8 @@ public sealed record AiRouteOption(AiRoutePolicy Policy, string Label, string De
 /// <summary>How hard a Claude model thinks (<see cref="AiFeatureChoice.Effort"/>).</summary>
 public sealed record AiEffortOption(string Id, string Label)
 {
-    public static IReadOnlyList<AiEffortOption> All { get; } = [new("low", "Low"), new("medium", "Medium"), new("high", "High")];
+    /// <summary>The card's slider levels (<see cref="AiEfforts.Levels"/>); a model that takes fewer gets the nearest it takes.</summary>
+    public static IReadOnlyList<AiEffortOption> All { get; } = [.. AiEfforts.Levels.Select(l => new AiEffortOption(l, AiEfforts.Name(l)))];
 
     public static AiEffortOption For(string? id) => All.FirstOrDefault(e => e.Id == id) ?? All[0];
 }

@@ -488,6 +488,19 @@ it within a moment. It is the same choice the Proxy tab's Ask Helm route and wai
 that); the others start on **Agents → API**. A feature with no choice of its own runs with Ask Helm's model; once a
 setting is changed in the table, it keeps its own.
 
+**Ask Helm's model sheet (phone).** The chip in the card's header opens a sheet with three kinds of pick:
+**Auto** (`Route = PreferPc`, no agent: every agent on the PCs in their order, each on the picked model when it is
+of its kind, else its own first model; then the API on the picked model), one **agent on a PC** on one of its models
+(`Route = PcOnly`, `Agent` = its name: only that agent takes the turn, never another one or the API; the card says
+why when it cannot), or one **API model** (`Route = ApiOnly`). The PCs' heartbeats list each agent with the models it
+runs (`AiWorkerRecord.Offers`): Claude Code any Claude model (those the Claude key's last test listed, else Opus,
+Sonnet and Haiku 5.5), Grok any Grok model (likewise), Codex its own. Prices in the sheet are a rough cost of one
+question (3,000 tokens in, 300 out, at 26,000đ a dollar). The effort slider has five levels; what answers takes the
+nearest it supports (`AiEfforts`): current Claude models all five, Opus and Sonnet 4.6 up to High, Haiku 4.5 none, a
+Grok agent Low and High, the Grok API and Codex none. Setting a route in AI → Features clears an agent picked on the
+phone. A Debug build shows a sample sheet with `am start -n com.huyhung1404.helm/.AskHelmActivity --ez demo_picker true`.
+Code: `Helm.Ai.Core/Assistant/AssistantPicker.cs`, `Helm.Modules.QuickCapture.Android/AskHelmActivity.Models.cs`.
+
 For developers: the list is `AiFeatureCatalog` (Helm.Ai.Core: name, description, automatic or not; an `AiFeatureIds`
 constant without an entry still shows, named after its id), and `AiFeatureCatalog.Effective` is the choice a feature
 runs with now. Both apps bind to `AiFeaturesViewModel` / `AiFeatureRow` (registered by `AddHelmAi`); the PC view is

@@ -31,7 +31,11 @@ public sealed class AssistantAction(string tool, string summary, Func<Cancellati
 
 /// <param name="Problem">Why nothing could be asked (no key, the day's cap, the provider failed); null when it worked.</param>
 /// <param name="RanOn">The agent and Helm PC that answered (free, "Codex trên PC-HUNG"); null when the API did.</param>
-public sealed record AssistantReply(string Text, IReadOnlyList<AssistantAction> Done, bool Declined, string? Problem, string? RanOn = null);
+public sealed record AssistantReply(string Text, IReadOnlyList<AssistantAction> Done, bool Declined, string? Problem, string? RanOn = null)
+{
+    /// <summary>Why Auto passed over the PC before the API answered ("Grok: signed out"); null when nothing was.</summary>
+    public string? Skipped { get; init; }
+}
 
 /// <summary>
 /// Ask Helm's brain: the user's words go to Claude Code on a Helm PC when the feature's route allows and one answers in
@@ -139,12 +143,35 @@ public sealed class HelmAssistant(
         s.Features[AiFeatureIds.AskHelm] = choice;
     });
 
+    /// <summary>The card's model sheet: Auto's steps, each PC agent and API family with its versions, the pick, the effort.</summary>
+    public AssistantPicker Picker() => AssistantPicks.Build(Choice, Router.Offers(), Models());
+
+    /// <summary>Auto (null), one PC agent on one of its models, or one API model; synced, so the PC's AI page shows it too.</summary>
+    public void Choose(AssistantPick? pick) => features.Update(s =>
+    {
+        var choice = s.For(AiFeatureIds.AskHelm).Copy();
+        AssistantPicks.Apply(choice, pick);
+        s.Features[AiFeatureIds.AskHelm] = choice;
+    });
+
+    /// <summary>The slider's level (<see cref="AiEfforts.Levels"/>); what answers takes the nearest level it has.</summary>
+    public void ChooseEffort(string effort) => features.Update(s =>
+    {
+        var choice = s.For(AiFeatureIds.AskHelm).Copy();
+        choice.Effort = effort;
+        s.Features[AiFeatureIds.AskHelm] = choice;
+    });
+
     /// <summary>
     /// The model the card shows: the one chosen, else the first the user can pick. Without any key, the chosen Claude
     /// model still runs on a Helm PC's Claude Code.
     /// </summary>
     public AssistantModelOption? Current()
     {
+        // One agent picked on a PC runs the model picked for it, with or without a key.
+        if (AiRouter.PickedAgent(Choice) is { } agent)
+            return new AssistantModelOption(Choice.Model.StartsWith("grok-", StringComparison.Ordinal) ? AiProviders.Grok : AiProviders.Claude, Choice.Model,
+                Choice.Model.Length > 0 ? $"{agent} · {AssistantPicks.Name(Choice.Model)}" : agent);
         var all = Models();
         return all.FirstOrDefault(o => o.Provider.Id == Choice.Provider && o.Model == Choice.Model)
             ?? all.FirstOrDefault(o => o.Provider.Id == Choice.Provider)
@@ -299,7 +326,7 @@ public sealed partial class AssistantSession
         static bool IsPhone(AssistantTool t) => t.Name.StartsWith(HelmAssistant.PhoneToolPrefix, StringComparison.Ordinal);
         _warmed = route;
         route.Warm(new AiJob(AiFeatureIds.AskHelm, _conversationId, "", [.. tools.Where(t => !IsPhone(t)).Select(t => t.Name)],
-            [.. tools.Where(IsPhone).Select(t => t.Name)], model.Model, choice.Effort));
+            [.. tools.Where(IsPhone).Select(t => t.Name)], model.Model, choice.Effort) { Agent = AiRouter.PickedAgent(choice) });
     }
 
     /// <param name="confirm">Asked once per step for the calls that wait for a yes; false: none of them runs.</param>
@@ -332,13 +359,14 @@ public sealed partial class AssistantSession
         var model = Model!;
         var choice = _helm.Choice;
 
-        // Claude Code on a Helm PC first (free), unless the conversation already moved to the API.
+        // An agent on a Helm PC first (free), unless the conversation already moved to the API.
+        string? skipped = null;
         if (_open is null)
         {
             IReadOnlyList<IAgentRoute> routes = _pc is not null ? [_pc] : _helm.Router.Agents(choice);
             foreach (var route in routes)
             {
-                if (await OnPcAsync(route, PcText(text, first), model, choice, ct) is { } onPc)
+                if (await OnPcAsync(route, PcText(text, first), model, choice, ct, failed: why => skipped ??= why) is { } onPc)
                 {
                     _history.Add(("user", text));
                     _history.Add(("assistant", onPc.Text));
@@ -346,7 +374,9 @@ public sealed partial class AssistantSession
                 }
             }
             _pc = null;
-            if (!AiRouter.MayUseApi(choice)) return new AssistantReply("", [], false, _helm.Router.NoPc());
+            if (!AiRouter.MayUseApi(choice)) return new AssistantReply("", [], false, _helm.Router.NoPc(choice));
+            // Auto with no agent online at all: the API answers, and the card says why no PC did.
+            if (routes.Count == 0 && choice.Route == AiRoutePolicy.PreferPc && _helm.Router.Offers().Count > 0) skipped ??= _helm.Router.NoPc();
             if (!_helm.HasKeyFor(model.Provider))
                 return new AssistantReply("", [], false, $"No Helm PC answered in time, and there is no {model.Provider.Name} API key to fall back on.");
         }
@@ -354,17 +384,18 @@ public sealed partial class AssistantSession
         var onApi = await OnApiAsync(text, first, confirm, ct);
         _history.Add(("user", text));
         _history.Add(("assistant", onApi.Text));
-        return onApi;
+        return skipped is not null && onApi.Problem is null ? onApi with { Skipped = skipped } : onApi;
     }
 
     /// <param name="conversationId">A turn's own conversation (a photo's); null for this conversation's.</param>
+    /// <param name="failed">Told why the PC did not take it, when it did not.</param>
     private async Task<AssistantReply?> OnPcAsync(IAgentRoute route, string text, AssistantModelOption model, AiFeatureChoice choice, CancellationToken ct,
-        string? conversationId = null, IReadOnlyList<AssistantImage>? images = null)
+        string? conversationId = null, IReadOnlyList<AssistantImage>? images = null, Action<string>? failed = null)
     {
         static bool IsPhone(AssistantTool t) => t.Name.StartsWith(HelmAssistant.PhoneToolPrefix, StringComparison.Ordinal);
         var job = new AiJob(AiFeatureIds.AskHelm, conversationId ?? _conversationId, text,
             [.. _tools.Where(t => !IsPhone(t)).Select(t => t.Name)], [.. _tools.Where(IsPhone).Select(t => t.Name)],
-            model.Model, choice.Effort) { Images = images ?? [] };
+            model.Model, choice.Effort) { Images = images ?? [], Agent = AiRouter.PickedAgent(choice) };
         AiJobResult result;
         try
         {
@@ -376,8 +407,9 @@ public sealed partial class AssistantSession
             _pc = route;
             return new AssistantReply("", [], false, $"{ex.Message} Em không chạy lại qua API để khỏi làm hai lần.", route.Device);
         }
-        catch (AiRouteException)
+        catch (AiRouteException ex)
         {
+            failed?.Invoke(ex.Message);
             return null;
         }
         _pc = route;
@@ -409,7 +441,8 @@ public sealed partial class AssistantSession
             }
         }
         var reply = string.Join(" ", new[] { result.Text }.Concat(notes).Where(t => t.Length > 0));
-        return new AssistantReply(reply, done, false, null, result.Agent is { } agent ? $"{agent} trên {device}" : device);
+        var ran = result.Agent is { } agent ? result.Model is { Length: > 0 } run ? $"{agent} · {AssistantPicks.Name(run)}" : agent : null;
+        return new AssistantReply(reply, done, false, null, ran is null ? device : $"{ran} trên {device}");
     }
 
     private async Task<AssistantReply> OnApiAsync(string text, bool first, Func<IReadOnlyList<PendingAction>, Task<bool>> confirm, CancellationToken ct)

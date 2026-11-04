@@ -99,8 +99,8 @@ internal sealed class GrokAgentFactory(IChildProcessLauncher launcher, string ho
     /// <summary>A Grok model picked in the card runs as picked; any other pick on the plan's fastest (1.2 s for a short turn).</summary>
     internal static string Model(string model) => model.StartsWith("grok-", StringComparison.Ordinal) ? model : "grok-4.7-build-fast";
 
-    /// <summary>Grok thinks long by default (20 s for a one-line answer): Helm's jobs are short.</summary>
-    internal static string Effort(string effort) => effort is { Length: > 0 } ? effort : "low";
+    /// <summary>Grok thinks long by default (20 s for a one-line answer): Helm's jobs are short. It takes low and high.</summary>
+    internal static string Effort(string effort) => Helm.Ai.AiEfforts.Nearest(effort is { Length: > 0 } ? effort : "low", Helm.Ai.AiEfforts.For("grok-", "grok"));
 
     /// <summary>The command line for <paramref name="grok"/>: npm's grok.cmd only runs through cmd.exe.</summary>
     internal static string CommandLineFor(string grok, IEnumerable<string> args) =>

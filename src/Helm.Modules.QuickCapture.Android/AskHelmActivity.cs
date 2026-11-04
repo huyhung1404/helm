@@ -71,6 +71,7 @@ public partial class AskHelmActivity : Activity, IRecognitionListener
             _colors = IsDark(settings.Get<GeneralSettings>(GeneralSettings.StoreId).Current.Theme) ? AskColors.Dark : AskColors.Light;
             _assistant = services.GetRequiredService<HelmAssistant>();
             SetContentView(Build());
+            ReadDemo(Intent);
             ShowModel();
             if (StartWithSelection(services)) return;
             if (_assistant.Unavailable() is { } problem)
@@ -231,35 +232,6 @@ public partial class AskHelmActivity : Activity, IRecognitionListener
 
         root.AddView(card, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MatchParent, ViewGroup.LayoutParams.WrapContent, GravityFlags.Bottom));
         return root;
-    }
-
-    private void ShowModel()
-    {
-        var current = _assistant?.Current();
-        _model.Text = current is null ? "No model ▾" : $"{Short(current.Name)} ▾";
-    }
-
-    private void PickModel()
-    {
-        if (_assistant is null || _busy) return;
-        var options = _assistant.Models();
-        if (options.Count == 0)
-        {
-            Toast.MakeText(this, "No model yet: add a Claude or Grok key on the PC (AI → Models & keys), or an agent (AI → Proxy).", ToastLength.Long)?.Show();
-            return;
-        }
-        var menu = new PopupMenu(this, _model);
-        for (var i = 0; i < options.Count; i++) menu.Menu!.Add(0, i, i, options[i].Name);
-        menu.MenuItemClick += (_, e) =>
-        {
-            _assistant.Choose(options[e.Item!.ItemId]);
-            // Another model is another conversation.
-            _session?.End();
-            _session = _assistant.Start([new PhoneTools(this)]);
-            _session.Warm();
-            ShowModel();
-        };
-        menu.Show();
     }
 
     // ---- listening ------------------------------------------------------------------------------------------
@@ -448,8 +420,10 @@ public partial class AskHelmActivity : Activity, IRecognitionListener
             _answer.Text = reply.Text;
             _answer.Visibility = ViewStates.Visible;
         }
-        // Where it ran: Claude Code on a Helm PC (free) or the API (counted in the AI page's costs).
-        var ranOn = reply.RanOn is { } pc ? $"{pc} · miễn phí" : $"{Short(_session?.Model?.Name ?? "")} qua API";
+        // Who answered: an agent on a Helm PC (free) or a model on the API (counted in the AI page's costs), and what Auto
+        // passed over on the way.
+        var ranOn = reply.RanOn is { } pc ? $"{pc} · PC · miễn phí" : $"{Short(_session?.Model?.Name ?? "")} · API";
+        if (reply.Skipped is { } skipped) ranOn += $"\nBỏ qua PC: {skipped.TrimEnd('.')}";
         _status.Text = reply.Done.Count > 0 ? $"Đã lưu · {ranOn} · tự đóng sau vài giây" : ranOn;
         Buttons(("Nói tiếp", Listen, true), ("Xong", Finish, false));
         if (reply.Done.Count > 0) StartAutoClose();
@@ -600,15 +574,17 @@ public partial class AskHelmActivity : Activity, IRecognitionListener
     };
 
     /// <summary>The card in Helm's colours (the Fluent accent of the Android app), light and dark.</summary>
-    private sealed record AskColors(Color Card, Color Text, Color Secondary, Color Accent, Color OnAccent, Color Line, Color Row, Color Bubble, Color Danger)
+    /// <param name="Pc">What runs on a Helm PC (free) in the model sheet and the chip; <paramref name="Api"/> what the API runs.</param>
+    private sealed record AskColors(Color Card, Color Text, Color Secondary, Color Accent, Color OnAccent, Color Line, Color Row, Color Bubble, Color Danger,
+        Color Pc, Color Api)
     {
         public static readonly AskColors Light = new(Color.ParseColor("#FBFBFB"), Color.ParseColor("#1A1A1A"), Color.ParseColor("#5F5F5F"),
             Color.ParseColor("#0067C0"), Color.White, Color.ParseColor("#D5D9DE"), Color.ParseColor("#EEF1F4"), Color.ParseColor("#E2EEF8"),
-            Color.ParseColor("#C42B1C"));
+            Color.ParseColor("#C42B1C"), Color.ParseColor("#0F7A5E"), Color.ParseColor("#A34A06"));
 
         public static readonly AskColors Dark = new(Color.ParseColor("#202428"), Color.White, Color.ParseColor("#C5C9CE"),
             Color.ParseColor("#4CC2FF"), Color.ParseColor("#0B2233"), Color.ParseColor("#3A4048"), Color.ParseColor("#2A2F35"),
-            Color.ParseColor("#2C3A47"), Color.ParseColor("#FF99A4"));
+            Color.ParseColor("#2C3A47"), Color.ParseColor("#FF99A4"), Color.ParseColor("#3CCF9F"), Color.ParseColor("#F2A54A"));
     }
 }
 

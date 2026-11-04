@@ -23,7 +23,28 @@ public sealed record AiWorkerRecord
     /// <summary>One of its agents that read pictures takes jobs now (a Helm before 0.81 never says so: no photos for it).</summary>
     public bool ReadsPhotos { get; init; }
 
+    /// <summary>Each of its agents, ready or not, with the models it runs (a Helm before 0.82 sends none: <see cref="Agents"/> only).</summary>
+    public IReadOnlyList<AiWorkerAgent>? Offers { get; init; }
+
     public DateTimeOffset SeenAt { get; init; }
+}
+
+/// <summary>One agent on a Helm PC, as its heartbeat tells the phone's picker.</summary>
+public sealed record AiWorkerAgent
+{
+    /// <summary>As the user named it on the PC ("Grok", "Claude Code").</summary>
+    public required string Name { get; init; }
+
+    /// <summary>"codex", "claude-code" or "grok".</summary>
+    public string Kind { get; init; } = "";
+
+    /// <summary>The models it runs, the one it runs for a job whose model is not one of these first; empty: only its own.</summary>
+    public IReadOnlyList<string> Models { get; init; } = [];
+
+    /// <summary>Why it takes no job now (signed out, at its limit); null when it does.</summary>
+    public string? Problem { get; init; }
+
+    public bool ReadsPhotos { get; init; }
 }
 
 /// <summary>
@@ -188,10 +209,40 @@ public sealed class SyncAgentRoute : IAgentRoute
 
     public bool ReadsPhotos => photos is not null && Online().Any(w => w.Value.Problem is null && w.Value.ReadsPhotos);
 
+    public string? UnavailableFor(string agent)
+    {
+        var online = Online().ToList();
+        if (online.Count == 0) return "No Helm PC with an agent has been online in the last few minutes.";
+        if (online.Any(w => Has(w.Value, agent))) return null;
+        return online.SelectMany(w => w.Value.Offers ?? []).FirstOrDefault(o => Same(o.Name, agent))?.Problem ?? $"No Helm PC online has {agent}.";
+    }
+
+    public IReadOnlyList<AiAgentOffer> Offers =>
+    [
+        .. Online().SelectMany(w => (w.Value.Offers ?? [.. w.Value.Agents.Select(a => new AiWorkerAgent { Name = a, Problem = w.Value.Problem })])
+            .Select(o => new AiAgentOffer(w.Value.Device, o))),
+    ];
+
+    private static bool Same(string a, string b) => string.Equals(a, b, StringComparison.CurrentCultureIgnoreCase);
+
+    /// <summary>The PC runs <paramref name="agent"/> now (a Helm before 0.82 names only its ready agents).</summary>
+    private static bool Has(AiWorkerRecord worker, string agent) => worker.Offers is { } offers
+        ? offers.Any(o => Same(o.Name, agent) && o.Problem is null)
+        : worker.Problem is null && worker.Agents.Any(a => Same(a, agent));
+
+    /// <summary>The PC takes a job for <paramref name="agent"/> (any of its agents when null), with photos when asked.</summary>
+    private static bool Fits(AiWorkerRecord worker, string? agent, bool withPhotos = false)
+    {
+        if (agent is null) return worker.Problem is null && (!withPhotos || worker.ReadsPhotos);
+        if (!Has(worker, agent)) return false;
+        return !withPhotos || (worker.Offers?.FirstOrDefault(o => Same(o.Name, agent))?.ReadsPhotos ?? worker.ReadsPhotos);
+    }
+
     public async Task<AiJobResult> RunAsync(AiJob job, TimeSpan wait, CancellationToken ct)
     {
         if (job.Images.Count == 0) return await RunAsync(job, wait, [], ct);
-        if (photos is null || !ReadsPhotos) throw new AiRouteException("No Helm PC online has an agent that reads photos.");
+        if (photos is null || !Online().Any(w => Fits(w.Value, job.Agent, withPhotos: true)))
+            throw new AiRouteException(job.Agent is { } agent ? $"{agent} cannot read photos on any Helm PC online." : "No Helm PC online has an agent that reads photos.");
         var sent = new List<AiJobPhoto>();
         try
         {
@@ -207,7 +258,7 @@ public sealed class SyncAgentRoute : IAgentRoute
 
     private async Task<AiJobResult> RunAsync(AiJob job, TimeSpan wait, IReadOnlyList<AiJobPhoto> sent, CancellationToken ct)
     {
-        var worker = WorkerFor(job.ConversationId, sent.Count > 0);
+        var worker = WorkerFor(job.ConversationId, sent.Count > 0, job.Agent);
         var now = _time.GetUtcNow();
         var id = jobs.Add(new AiJobRecord
         {
@@ -284,20 +335,23 @@ public sealed class SyncAgentRoute : IAgentRoute
     /// The PC a turn goes to: the one that has the conversation, else the best online. A conversation whose PC is gone
     /// or busy now gives way (the API carries on with what was said), rather than start over on another PC.
     /// </summary>
-    private SyncedItem<AiWorkerRecord> WorkerFor(string conversationId, bool withPhotos = false)
+    /// <param name="agent">The one agent the user picked; null for any.</param>
+    private SyncedItem<AiWorkerRecord> WorkerFor(string conversationId, bool withPhotos = false, string? agent = null)
     {
         // Photos go to a PC whose agent reads them (each photo turn is a conversation of its own).
         if (withPhotos)
-            return Online().FirstOrDefault(w => w.Value.Problem is null && w.Value.ReadsPhotos)
+            return Online().FirstOrDefault(w => Fits(w.Value, agent, withPhotos: true))
                 ?? throw new AiRouteException("No Helm PC online has an agent that reads photos.");
         if (!_workers.TryGetValue(conversationId, out var kept))
         {
             // The PC the card's warm-up went to has its agent ready, while it can still take the turn.
-            if (_warmed.TryGetValue(conversationId, out var warm) && Online().FirstOrDefault(w => w.Id == warm && w.Value.Problem is null) is { } ready)
+            if (_warmed.TryGetValue(conversationId, out var warm) && Online().FirstOrDefault(w => w.Id == warm && Fits(w.Value, agent)) is { } ready)
                 return ready;
+            if (agent is not null)
+                return Online().FirstOrDefault(w => Fits(w.Value, agent)) ?? throw new AiRouteException(UnavailableFor(agent) ?? $"No Helm PC online has {agent}.");
             return Best() ?? throw new AiRouteException(Unavailable() ?? "No Helm PC online.");
         }
-        return Online().FirstOrDefault(w => w.Id == kept && w.Value.Problem is null)
+        return Online().FirstOrDefault(w => w.Id == kept && Fits(w.Value, agent))
             ?? throw new AiRouteException("The Helm PC that has this conversation cannot take it now.");
     }
 
@@ -333,7 +387,7 @@ public sealed class SyncAgentRoute : IAgentRoute
     public void Warm(AiJob job)
     {
         var conversation = job.ConversationId;
-        if (_workers.ContainsKey(conversation) || Online().FirstOrDefault(w => w.Value.Problem is null) is not { } worker) return;
+        if (_workers.ContainsKey(conversation) || Online().FirstOrDefault(w => Fits(w.Value, job.Agent)) is not { } worker) return;
         if (!_warmed.TryAdd(conversation, worker.Id)) return;
         var live = _live.Hold();
         var expiry = _time.CreateTimer(_ => ReleaseLive(conversation), null, AgentJobs.WarmLive, Timeout.InfiniteTimeSpan);
@@ -503,6 +557,7 @@ public sealed class AgentJobWorker(ISyncedCollection<AiJobRecord> jobs, ISyncedC
                 Agents = agents(),
                 Problem = local.Unavailable(),
                 ReadsPhotos = photos is not null && local.ReadsPhotos,
+                Offers = [.. local.Offers.Select(o => o.Agent with { ReadsPhotos = photos is not null && o.Agent.ReadsPhotos })],
                 SeenAt = _time.GetUtcNow(),
             });
         }

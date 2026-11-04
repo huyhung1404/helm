@@ -185,7 +185,7 @@ internal sealed class ClaudeCodeChat(ClaudeCodeAgentFactory factory, IChildProce
         // No session file: Helm keeps the conversation itself (a new process gets a recap), and a photo never lands on disk.
         string[] args = ["-p", "--input-format", "stream-json", "--output-format", "stream-json", "--verbose", "--tools", "", "--strict-mcp-config",
             "--no-session-persistence",
-            "--settings", """{"disableAllHooks":true}""", "--model", model, .. effort is { Length: > 0 } ? new[] { "--effort", effort } : []];
+            "--settings", """{"disableAllHooks":true}""", "--model", model, .. Helm.Ai.AiEfforts.Nearest(effort, Helm.Ai.AiEfforts.For(model, "claude-code")) is { Length: > 0 } level ? new[] { "--effort", level } : []];
         var commandLine = claude.EndsWith(".cmd", StringComparison.OrdinalIgnoreCase)
             // npm's claude.cmd only runs through cmd.exe; these arguments hold nothing cmd.exe reads itself.
             ? $"{CommandLine.Quote(System.Environment.GetEnvironmentVariable("ComSpec") is { Length: > 0 } c ? c : "cmd.exe")} /d /s /c \"{CommandLine.Join([claude, .. args])}\""

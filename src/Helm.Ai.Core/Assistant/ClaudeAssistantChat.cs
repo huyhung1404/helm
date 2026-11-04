@@ -202,7 +202,8 @@ internal sealed class ClaudeAssistantChat(AnthropicClient client, string model, 
             System = _system,
             Tools = _tools,
             Messages = _messages,
-            OutputConfig = new OutputConfig { Effort = ToEffort(effort) },
+            // A model that takes no effort (Haiku 4.5) answers a 400 to one.
+            OutputConfig = AiEfforts.Nearest(effort, AiEfforts.For(model)) is { Length: > 0 } level ? new OutputConfig { Effort = ToEffort(level) } : null,
             // The conversation so far, for the next call of this turn (most turns that read take two calls).
             CacheControl = new CacheControlEphemeral(),
         };
@@ -392,6 +393,8 @@ internal sealed class ClaudeAssistantChat(AnthropicClient client, string model, 
     {
         "medium" => Effort.Medium,
         "high" => Effort.High,
+        "xhigh" => Effort.Xhigh,
+        "max" => Effort.Max,
         _ => Effort.Low,
     };
 }

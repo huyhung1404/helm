@@ -81,7 +81,14 @@ public sealed class AiFeatureChoice
 
     public string Model { get; set; } = ClaudeModels.Haiku;
 
-    /// <summary>"low", "medium" or "high" (models that take an effort).</summary>
+    /// <summary>
+    /// The agent on a Helm PC the user picked by name ("Grok", "Claude Code"), running <see cref="Model"/>; only with
+    /// <see cref="AiRoutePolicy.PcOnly"/>, where no other agent and never the API take the turn. Null: any agent, in the
+    /// PC's order, each on its own model when <see cref="Model"/> is not one of its.
+    /// </summary>
+    public string? Agent { get; set; }
+
+    /// <summary>One of <see cref="AiEfforts.Levels"/> ("low" … "max"); a model that takes fewer gets the nearest it takes.</summary>
     public string Effort { get; set; } = "low";
 
     /// <summary>The feature stops for the day once the API calls it made today cost this much (USD, estimated).</summary>

@@ -43,8 +43,9 @@ public sealed partial class AssistantSession
             }
         }
         if (!AiRouter.MayUseApi(choice))
-            return new AssistantReply("", [], false,
-                "No Helm PC agent that reads photos can take it now (Codex or Claude Code: Grok's CLI takes none), and Ask Helm is set to run on a PC only.");
+            return new AssistantReply("", [], false, AiRouter.PickedAgent(choice) is { } agent
+                ? $"{agent} trên PC không đọc được ảnh lúc này. Chọn Auto hoặc một model API."
+                : "No Helm PC agent that reads photos can take it now, and Ask Helm is set to run on a PC only.");
         if (_helm.OverCap() is { } cap) return new AssistantReply("", [], false, cap);
 
         var picked = Model!;

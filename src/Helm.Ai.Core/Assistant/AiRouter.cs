@@ -18,6 +18,12 @@ public sealed record AiJob(
     public string? System { get; init; }
 
     /// <summary>
+    /// The only agent that may run it, by the name the user gave it on the PC (<see cref="AiFeatureChoice.Agent"/>);
+    /// null: any, in the PC's order. A Helm before 0.82 does not read it and runs the job on its first agent.
+    /// </summary>
+    public string? Agent { get; init; }
+
+    /// <summary>
     /// The photos the user sent with the words (a receipt, a whiteboard), for an agent that reads pictures
     /// (<see cref="IAgentRoute.ReadsPhotos"/>). Never written into a synced record: between devices each one travels as a
     /// blob of its own (<see cref="AiJobRecord.Photos"/>), gone once the turn is over.
@@ -41,6 +47,9 @@ public sealed record AiJobResult(string Text, IReadOnlyList<AiJobAction> Done, I
 {
     /// <summary>The agent that ran it ("Codex", "Claude Code").</summary>
     public string? Agent { get; init; }
+
+    /// <summary>The model the agent ran (its own when the job's model was not one of its); null from a Helm before 0.82.</summary>
+    public string? Model { get; init; }
 
     /// <summary>The Helm PC that ran it, as the user knows it, when it ran through sync (one of several PCs).</summary>
     public string? Device { get; init; }
@@ -67,6 +76,12 @@ public interface IAgentRoute
 
     /// <summary>Why it cannot take a job now (not installed, offline, busy at its limit), or null when it can.</summary>
     string? Unavailable();
+
+    /// <summary>Why <paramref name="agent"/> (a name from <see cref="Offers"/>) cannot take a job here now, or null when it can.</summary>
+    string? UnavailableFor(string agent) => Unavailable();
+
+    /// <summary>Each agent it reaches, ready or not, best first: what the card's picker lists under "Proxy".</summary>
+    IReadOnlyList<AiAgentOffer> Offers => [];
 
     /// <exception cref="AiRouteException">No answer within <paramref name="wait"/>, or it failed.</exception>
     Task<AiJobResult> RunAsync(AiJob job, TimeSpan wait, CancellationToken ct);
@@ -101,13 +116,35 @@ public sealed class AiRouter(IEnumerable<IAgentRoute> routes)
         choice.Route == AiRoutePolicy.ApiOnly
             ? []
             // An agent on this device answers sooner than one reached through sync.
-            : [.. _routes.Where(r => r.Unavailable() is null).OrderBy(r => r is SyncAgentRoute ? 1 : 0)];
+            : [.. _routes.Where(r => (PickedAgent(choice) is { } agent ? r.UnavailableFor(agent) : r.Unavailable()) is null).OrderBy(r => r is SyncAgentRoute ? 1 : 0)];
+
+    /// <summary>The one agent the user picked (<see cref="AiFeatureChoice.Agent"/>, with <see cref="AiRoutePolicy.PcOnly"/>), or null for any.</summary>
+    public static string? PickedAgent(AiFeatureChoice choice) => choice.Route == AiRoutePolicy.PcOnly && choice.Agent is { Length: > 0 } agent ? agent : null;
+
+    /// <summary>Every agent the routes reach, ready ones first, each once (by name) with the first PC that has it.</summary>
+    public IReadOnlyList<AiAgentOffer> Offers() =>
+    [
+        .. _routes.SelectMany(r => r.Offers)
+            .GroupBy(o => o.Agent.Name, StringComparer.CurrentCultureIgnoreCase)
+            .Select(g => g.FirstOrDefault(o => o.Agent.Problem is null) ?? g.First()),
+    ];
 
     /// <summary>Whether the API may be used when no agent answered.</summary>
     public static bool MayUseApi(AiFeatureChoice choice) => choice.Route != AiRoutePolicy.PcOnly;
 
     /// <summary>Why a <see cref="AiRoutePolicy.PcOnly"/> call found no PC, said to the user.</summary>
-    public string NoPc() => _routes.Count == 0
-        ? "No Helm PC has an agent for this (AI → Proxy on the PC)."
-        : $"No Helm PC agent can take it now ({string.Join("; ", _routes.Select(r => $"{r.Device}: {r.Unavailable() ?? "busy"}"))}).";
+    public string NoPc(AiFeatureChoice? choice = null)
+    {
+        if (choice is not null && PickedAgent(choice) is { } agent)
+        {
+            var why = _routes.Select(r => r.UnavailableFor(agent)).FirstOrDefault(w => w is not null) ?? "it did not answer in time";
+            return $"{agent} trên PC không trả lời được: {why.TrimEnd('.')}. Chọn Auto hoặc một model API.";
+        }
+        return _routes.Count == 0
+            ? "No Helm PC has an agent for this (AI → Proxy on the PC)."
+            : $"No Helm PC agent can take it now ({string.Join("; ", _routes.Select(r => $"{r.Device}: {r.Unavailable() ?? "busy"}"))}).";
+    }
 }
+
+/// <summary>An agent a route reaches, as the card's picker lists it: the PC it runs on, and what it offers.</summary>
+public sealed record AiAgentOffer(string Device, AiWorkerAgent Agent);

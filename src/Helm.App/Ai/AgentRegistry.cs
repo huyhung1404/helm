@@ -60,15 +60,18 @@ internal sealed class AgentRegistry : IAgentRoute, IDisposable
     private readonly Func<string?, bool> _isToolOn;
     private readonly ILoggerFactory _loggers;
     private readonly Helm.Ai.Prompts.IAiPrompts? _prompts;
+    private readonly Helm.Ai.AiKeyStore? _keys;
     private readonly object _gate = new();
     private IReadOnlyList<Agent> _agents = [];
     private readonly AgentChain _chain = new([]);
     private FileSystemWatcher? _signIns;
     private Timer? _settle;
 
+    /// <param name="keys">The API keys whose last test lists the models an agent of their provider can be asked for.</param>
     public AgentRegistry(ISettingsStoreFactory settings, HelmPaths paths, IChildProcessLauncher launcher, IEnumerable<IMcpToolProvider> tools,
-        Func<string?, bool> isToolOn, ILoggerFactory loggers, Helm.Ai.Prompts.IAiPrompts? prompts = null)
+        Func<string?, bool> isToolOn, ILoggerFactory loggers, Helm.Ai.Prompts.IAiPrompts? prompts = null, Helm.Ai.AiKeyStore? keys = null)
     {
+        _keys = keys;
         _store = settings.Get<AiAgentSettings>(AiAgentSettings.StoreId);
         _paths = paths;
         _launcher = launcher;
@@ -100,6 +103,10 @@ internal sealed class AgentRegistry : IAgentRoute, IDisposable
     public void End(string conversationId) => _chain.End(conversationId);
 
     public void Warm(AiJob job) => _chain.Warm(job);
+
+    public IReadOnlyList<AiAgentOffer> Offers => _chain.Offers;
+
+    public string? UnavailableFor(string agent) => _chain.UnavailableFor(agent);
 
     public bool ReadsPhotos => _chain.ReadsPhotos;
 
@@ -280,7 +287,26 @@ internal sealed class AgentRegistry : IAgentRoute, IDisposable
         };
         if (made is not { } m) return null;
         return new Agent(profile, m.Factory, m.Unavailable,
-            new LocalAgentRoute(Environment.MachineName, profile.Name, m.Factory, _tools, _isToolOn, m.Unavailable, prompts: _prompts, logger: _loggers.CreateLogger<LocalAgentRoute>()));
+            new LocalAgentRoute(Environment.MachineName, profile.Name, m.Factory, _tools, _isToolOn, m.Unavailable, prompts: _prompts,
+                logger: _loggers.CreateLogger<LocalAgentRoute>(), kind: profile.Kind, models: () => ModelsOf(profile.Kind)));
+    }
+
+    /// <summary>
+    /// What an agent can be asked to run, the one it runs for a job of another kind first: Claude Code any Claude model
+    /// (those the Claude key's last test listed, else the current three), Grok any Grok model (likewise). Codex runs its
+    /// own only.
+    /// </summary>
+    internal IReadOnlyList<string> ModelsOf(string kind)
+    {
+        var (provider, first, known) = kind switch
+        {
+            AgentKinds.ClaudeCode => (Helm.Ai.AiProviders.Claude, Helm.Ai.ClaudeModels.Haiku, new[] { "claude-opus-5-5", "claude-sonnet-5-5", Helm.Ai.ClaudeModels.Haiku }),
+            AgentKinds.Grok => (Helm.Ai.AiProviders.Grok, GrokAgentFactory.Model(""), new[] { Helm.Ai.GrokModels.Default }),
+            _ => (null, "", []),
+        };
+        if (provider is null) return [];
+        var listed = _keys?.DefaultFor(provider) is { } key ? Helm.Ai.AiModels.Chat(key.Value.LastCheck).Select(m => m.Id) : [];
+        return [.. new[] { first }.Concat(listed).Concat(known).Distinct(StringComparer.Ordinal)];
     }
 
     private sealed record Agent(AgentProfile Profile, IAssistantChatFactory Factory, Func<string?> Unavailable, LocalAgentRoute Route);
