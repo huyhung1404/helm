@@ -32,15 +32,18 @@ public sealed class LocalAgentRoute : IAgentRoute, IDisposable
     private readonly ILogger _logger;
     private readonly string _kind;
     private readonly Func<IReadOnlyList<string>> _models;
+    private readonly Func<McpTool, bool> _offers;
 
     /// <param name="agentName">The agent as the user knows it ("Codex", "Claude Code").</param>
     /// <param name="prompts">The user's own prompts (Skill Hub), for a job that brings none of its own.</param>
     /// <param name="kind">"codex", "claude-code" or "grok", for the phone's picker.</param>
     /// <param name="models">The models it runs, the one for a job whose model is not of its kind first; empty: its own only.</param>
+    /// <param name="offers">The tools it may offer a job at all; null: Ask Helm's own (<see cref="HelmAssistant.Tools"/>).</param>
     public LocalAgentRoute(string device, string agentName, IAssistantChatFactory agent, IEnumerable<IMcpToolProvider> providers,
         Func<string?, bool> isToolOn, Func<string?> unavailable, TimeProvider? time = null, IAiPrompts? prompts = null, ILogger? logger = null,
-        string kind = "", Func<IReadOnlyList<string>>? models = null)
+        string kind = "", Func<IReadOnlyList<string>>? models = null, Func<McpTool, bool>? offers = null)
     {
+        _offers = offers ?? (t => HelmAssistant.Tools.Contains(t.Name));
         _kind = kind;
         _models = models ?? (() => []);
         Device = device;
@@ -235,7 +238,7 @@ public sealed class LocalAgentRoute : IAgentRoute, IDisposable
     internal IReadOnlyList<AssistantTool> Tools(AiJob job)
     {
         var mine = _providers.Where(p => _isToolOn(p.ModuleId)).SelectMany(p => p.Tools)
-            .Where(t => job.Tools.Contains(t.Name) && HelmAssistant.Tools.Contains(t.Name) && t.Risk != McpRisk.Remote)
+            .Where(t => job.Tools.Contains(t.Name) && _offers(t) && t.Risk != McpRisk.Remote)
             .GroupBy(t => t.Name, StringComparer.Ordinal).Select(g => g.First())
             .Select(t => new AssistantTool(t, HelmAssistant.ModeOf(t)))
             .Where(t => t.Mode != AssistantToolMode.Confirm);

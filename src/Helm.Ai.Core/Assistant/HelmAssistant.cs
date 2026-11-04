@@ -215,7 +215,7 @@ public sealed class HelmAssistant(
     /// </summary>
     internal static AssistantToolMode ModeOf(McpTool tool) =>
         tool.ReadOnly ? AssistantToolMode.Read
-        : tool.Undo is not null || tool.Name.StartsWith(PhoneToolPrefix, StringComparison.Ordinal) ? AssistantToolMode.Auto
+        : tool.Undo is not null || tool.ConfirmsItself || tool.Name.StartsWith(PhoneToolPrefix, StringComparison.Ordinal) ? AssistantToolMode.Auto
         : AssistantToolMode.Confirm;
 
     internal bool HasKeyFor(AiProvider provider) => keys.DefaultFor(provider) is not null;

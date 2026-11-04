@@ -32,6 +32,12 @@ public sealed record McpTool(string Name, string Description, JsonObject InputSc
     /// </summary>
     public Func<JsonElement, CancellationToken, Task<string>>? Preview { get; init; }
 
+    /// <summary>
+    /// The tool asks the user itself before it changes anything (a destructive tool behind the connector's
+    /// confirmation gate answers "needs_confirmation" first): an assistant may call it without a question of its own.
+    /// </summary>
+    public bool ConfirmsItself { get; init; }
+
     /// <summary>What a call can do; when not set, <see cref="McpRisk.Read"/> for a <see cref="ReadOnly"/> tool, else <see cref="McpRisk.Change"/>.</summary>
     public McpRisk Risk
     {
@@ -208,6 +214,9 @@ public sealed class McpServer
 
     public IReadOnlyCollection<string> ToolNames => _tools.Keys.ToList();
 
+    /// <summary>A tool's <c>_meta</c> key in <c>tools/list</c>: true when a call of it can be taken back.</summary>
+    public const string UndoableMeta = "helm/undoable";
+
     /// <summary>This connection, with the name the client gave in <c>initialize</c>.</summary>
     public McpClientInfo Client { get; private set; }
 
@@ -321,18 +330,24 @@ public sealed class McpServer
 
     private JsonObject ListTools() => new()
     {
-        ["tools"] = new JsonArray(_tools.Values.OrderBy(t => t.Name, StringComparer.Ordinal).Select(t => (JsonNode)new JsonObject
+        ["tools"] = new JsonArray(_tools.Values.OrderBy(t => t.Name, StringComparer.Ordinal).Select(t =>
         {
-            ["name"] = t.Name,
-            ["description"] = t.Description,
-            ["inputSchema"] = t.InputSchema.DeepClone(),
-            // A tool that reaches another machine says so: the client may then ask too.
-            ["annotations"] = new JsonObject
+            var listed = new JsonObject
             {
-                ["readOnlyHint"] = t.Risk == McpRisk.Read,
-                ["destructiveHint"] = t.Risk == McpRisk.Remote || t.Destructive,
-                ["openWorldHint"] = t.Risk == McpRisk.Remote,
-            },
+                ["name"] = t.Name,
+                ["description"] = t.Description,
+                ["inputSchema"] = t.InputSchema.DeepClone(),
+                // A tool that reaches another machine says so: the client may then ask too.
+                ["annotations"] = new JsonObject
+                {
+                    ["readOnlyHint"] = t.Risk == McpRisk.Read,
+                    ["destructiveHint"] = t.Risk == McpRisk.Remote || t.Destructive,
+                    ["openWorldHint"] = t.Risk == McpRisk.Remote,
+                },
+            };
+            // What only Helm's own clients read: a call of it can be taken back (the connector's helm/undo).
+            if (t.Undo is not null) listed["_meta"] = new JsonObject { [UndoableMeta] = true };
+            return (JsonNode)listed;
         }).ToArray()),
     };
 

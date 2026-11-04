@@ -53,7 +53,17 @@ public sealed record AiJobResult(string Text, IReadOnlyList<AiJobAction> Done, I
 
     /// <summary>The Helm PC that ran it, as the user knows it, when it ran through sync (one of several PCs).</summary>
     public string? Device { get; init; }
+
+    /// <summary>
+    /// Something that deletes or replaces the user's data waits for their yes (Fairy Core): the next turn's clear "có" /
+    /// "không" decides, and a phone that knows this field may show the two as buttons. Older phones ignore it and show the
+    /// text, which asks the same.
+    /// </summary>
+    public AiJobConfirm? Confirm { get; init; }
 }
+
+/// <summary>What waits for the user's yes: what would be deleted or replaced, and until when the question stands.</summary>
+public sealed record AiJobConfirm(string Summary, DateTimeOffset ExpiresAt);
 
 /// <summary>The agent could not take or finish the job in time; the router tries the next way.</summary>
 public class AiRouteException(string message, Exception? inner = null) : Exception(message, inner);
