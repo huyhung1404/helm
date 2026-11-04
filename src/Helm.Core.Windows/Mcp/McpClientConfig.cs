@@ -182,31 +182,8 @@ public sealed class McpClientConfig(HelmPaths paths, ISettingsStoreFactory setti
     /// The Claude Code CLI typing <c>claude</c> in a terminal runs: the first claude.exe or claude.cmd on PATH, else the
     /// native installer's <c>~\.local\bin\claude.exe</c>. Null when Claude Code is not installed.
     /// </summary>
-    public static string? FindClaude(string? pathVariable = null, string? userProfile = null)
-    {
-        var dirs = (pathVariable ?? Environment.GetEnvironmentVariable("PATH") ?? "")
-            .Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
-            .Select(d => d.Trim('"'));
-        foreach (var dir in dirs)
-        {
-            foreach (var name in (string[])["claude.exe", "claude.cmd"])
-            {
-                string candidate;
-                try
-                {
-                    candidate = Path.Combine(dir, name);
-                }
-                catch (ArgumentException)
-                {
-                    continue; // malformed PATH entry
-                }
-                if (Path.IsPathFullyQualified(candidate) && File.Exists(candidate)) return candidate;
-            }
-        }
-        userProfile ??= Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
-        var native = Path.Combine(userProfile, ".local", "bin", "claude.exe");
-        return File.Exists(native) ? native : null;
-    }
+    public static string? FindClaude(string? pathVariable = null, string? userProfile = null) =>
+        Processes.CommandFinder.FindClaude(pathVariable, userProfile);
 
     private static bool SamePath(string? a, string b)
     {

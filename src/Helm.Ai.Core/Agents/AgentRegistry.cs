@@ -1,15 +1,12 @@
-using System.Diagnostics;
-using System.IO;
-using System.Text;
 using Helm.Ai.Assistant;
 using Helm.Core.Mcp;
 using Helm.Core.Processes;
 using Helm.Core.Settings;
 using Microsoft.Extensions.Logging;
 
-namespace Helm.App.Ai;
+namespace Helm.Ai.Agents;
 
-/// <summary>One agent the user added to this PC's proxy, with its own sign-in folder.</summary>
+/// <summary>One agent the user added to this machine's proxy, with its own sign-in folder.</summary>
 public sealed class AgentProfile
 {
     public string Id { get; set; } = Guid.NewGuid().ToString("N");
@@ -49,32 +46,37 @@ public static class AgentKinds
 /// <summary>
 /// The proxy's agents on this PC: built from <see cref="AiAgentSettings"/>, tried in the user's order, each signed in
 /// to the account the user chose for it (its own CODEX_HOME / CLAUDE_CONFIG_DIR / GROK_HOME under Helm's data, never the user's own
-/// Claude Code or Codex login). It is this PC's agent route, for its own features and for the phone's jobs.
+/// Claude Code or Codex login). It is this PC's agent route, for its own features and for the phone's jobs; the same
+/// on a Linux box that runs <c>helm serve</c>.
 /// </summary>
-internal sealed class AgentRegistry : IAgentRoute, IDisposable
+public sealed class AgentRegistry : IAgentRoute, IDisposable
 {
     private readonly ISettingsStore<AiAgentSettings> _store;
     private readonly HelmPaths _paths;
     private readonly IChildProcessLauncher _launcher;
+    private readonly IAgentSignIn _signIn;
     private readonly IReadOnlyList<IMcpToolProvider> _tools;
     private readonly Func<string?, bool> _isToolOn;
     private readonly ILoggerFactory _loggers;
-    private readonly Helm.Ai.Prompts.IAiPrompts? _prompts;
-    private readonly Helm.Ai.AiKeyStore? _keys;
+    private readonly Prompts.IAiPrompts? _prompts;
+    private readonly AiKeyStore? _keys;
     private readonly object _gate = new();
     private IReadOnlyList<Agent> _agents = [];
     private readonly AgentChain _chain = new([]);
     private FileSystemWatcher? _signIns;
     private Timer? _settle;
 
+    /// <param name="signIn">Shows an agent's sign-in to the user (a console window on Windows, the terminal on Linux).</param>
     /// <param name="keys">The API keys whose last test lists the models an agent of their provider can be asked for.</param>
-    public AgentRegistry(ISettingsStoreFactory settings, HelmPaths paths, IChildProcessLauncher launcher, IEnumerable<IMcpToolProvider> tools,
-        Func<string?, bool> isToolOn, ILoggerFactory loggers, Helm.Ai.Prompts.IAiPrompts? prompts = null, Helm.Ai.AiKeyStore? keys = null)
+    public AgentRegistry(ISettingsStoreFactory settings, HelmPaths paths, IChildProcessLauncher launcher, IAgentSignIn signIn,
+        IEnumerable<IMcpToolProvider> tools, Func<string?, bool> isToolOn, ILoggerFactory loggers, Prompts.IAiPrompts? prompts = null,
+        AiKeyStore? keys = null)
     {
         _keys = keys;
         _store = settings.Get<AiAgentSettings>(AiAgentSettings.StoreId);
         _paths = paths;
         _launcher = launcher;
+        _signIn = signIn;
         _tools = [.. tools];
         _isToolOn = isToolOn;
         _loggers = loggers;
@@ -177,28 +179,27 @@ internal sealed class AgentRegistry : IAgentRoute, IDisposable
 
     /// <summary>
     /// Opens a terminal signed in to nothing but this agent's own folder, running its sign-in (codex login; claude, then
-    /// /login; grok login, which then leaves Helm's marker). It starts through Explorer, so it runs with the user's
-    /// normal rights even when Helm is elevated. npm's codex.cmd, claude.cmd and grok.cmd need <c>call</c>, or the
-    /// script would end with them.
+    /// /login; grok login, which then leaves Helm's marker). How the terminal opens is the platform's
+    /// (<see cref="IAgentSignIn"/>).
     /// </summary>
     public void SignIn(string id)
     {
         if (Profiles.FirstOrDefault(p => p.Id == id) is not { } profile) return;
         var home = Home(id);
         Directory.CreateDirectory(home);
-        var (variable, steps) = profile.Kind switch
-        {
-            AgentKinds.ClaudeCode => (ClaudeCodeAgentFactory.HomeVariable,
-                "echo Sign in for Helm: type /login, sign in with the account Helm should use, then /exit.\r\ncall claude"),
-            AgentKinds.Grok => (GrokAgentFactory.HomeVariable,
-                $"echo Sign in for Helm with the X / SuperGrok account Helm should use.\r\ncall \"{GrokAgentFactory.FindGrok() ?? "grok"}\" login && echo ok> \"{Path.Combine(home, GrokAgentFactory.SignedInMarker)}\""),
-            _ => (CodexAgentFactory.HomeVariable, "echo Sign in for Helm with the ChatGPT account Helm should use.\r\ncall codex login"),
-        };
-        var script = Path.Combine(home, "sign-in.cmd");
-        File.WriteAllText(script, $"@echo off\r\ntitle Helm: sign in {profile.Name}\r\nset {variable}={home}\r\ncd /d \"{home}\"\r\n{steps}\r\necho.\r\npause\r\n",
-            new UTF8Encoding(false));
-        Process.Start(new ProcessStartInfo("explorer.exe", $"\"{script}\"") { UseShellExecute = false });
+        _signIn.Open(SignInFor(profile, home));
     }
+
+    /// <summary>What signing <paramref name="profile"/> in runs, with <paramref name="home"/> as its CLI's own folder.</summary>
+    internal static AgentSignIn SignInFor(AgentProfile profile, string home) => profile.Kind switch
+    {
+        AgentKinds.ClaudeCode => new(profile.Name, home, ClaudeCodeAgentFactory.HomeVariable,
+            "Sign in for Helm: type /login, sign in with the account Helm should use, then /exit.", ["claude"], null),
+        AgentKinds.Grok => new(profile.Name, home, GrokAgentFactory.HomeVariable,
+            "Sign in for Helm with the X / SuperGrok account Helm should use.", [GrokAgentFactory.FindGrok() ?? "grok", "login"],
+            Path.Combine(home, GrokAgentFactory.SignedInMarker)),
+        _ => new(profile.Name, home, CodexAgentFactory.HomeVariable, "Sign in for Helm with the ChatGPT account Helm should use.", ["codex", "login"], null),
+    };
 
     public void Refresh() => Changed?.Invoke(this, EventArgs.Empty);
 
@@ -210,13 +211,19 @@ internal sealed class AgentRegistry : IAgentRoute, IDisposable
             foreach (var agent in _agents) agent.Route.Dispose();
     }
 
-    internal string Home(string id) => Path.Combine(_paths.ModuleDataDirectory("ai"), "agents", id);
+    internal string Home(string id) => HomeOf(_paths, id);
 
-    public bool SignedIn(AgentProfile profile) => profile.Kind switch
+    public bool SignedIn(AgentProfile profile) => IsSignedIn(_paths, profile);
+
+    /// <summary>The agent's own folder (its CLI's CODEX_HOME / CLAUDE_CONFIG_DIR / GROK_HOME) under Helm's data.</summary>
+    public static string HomeOf(HelmPaths paths, string id) => Path.Combine(paths.ModuleDataDirectory("ai"), "agents", id);
+
+    /// <summary>The agent's CLI is signed in in its own folder (it may still be at its plan's limit).</summary>
+    public static bool IsSignedIn(HelmPaths paths, AgentProfile profile) => profile.Kind switch
     {
-        AgentKinds.ClaudeCode => ClaudeCodeAgentFactory.SignedIn(Home(profile.Id)),
-        AgentKinds.Grok => GrokAgentFactory.SignedIn(Home(profile.Id)),
-        _ => CodexAgentFactory.SignedIn(Home(profile.Id)),
+        AgentKinds.ClaudeCode => ClaudeCodeAgentFactory.SignedIn(HomeOf(paths, profile.Id)),
+        AgentKinds.Grok => GrokAgentFactory.SignedIn(HomeOf(paths, profile.Id)),
+        _ => CodexAgentFactory.SignedIn(HomeOf(paths, profile.Id)),
     };
 
     /// <summary>
@@ -277,7 +284,7 @@ internal sealed class AgentRegistry : IAgentRoute, IDisposable
     private Agent? Make(AgentProfile profile)
     {
         var home = Home(profile.Id);
-        var logger = _loggers.CreateLogger("Helm.App.Ai." + profile.Kind);
+        var logger = _loggers.CreateLogger("Helm.Ai.Agents." + profile.Kind);
         (IAssistantChatFactory Factory, Func<string?> Unavailable)? made = profile.Kind switch
         {
             AgentKinds.Codex => new CodexAgentFactory(_launcher, home, logger) is var codex ? (codex, codex.Unavailable) : null,
@@ -300,12 +307,12 @@ internal sealed class AgentRegistry : IAgentRoute, IDisposable
     {
         var (provider, first, known) = kind switch
         {
-            AgentKinds.ClaudeCode => (Helm.Ai.AiProviders.Claude, Helm.Ai.ClaudeModels.Haiku, new[] { "claude-opus-5-5", "claude-sonnet-5-5", Helm.Ai.ClaudeModels.Haiku }),
-            AgentKinds.Grok => (Helm.Ai.AiProviders.Grok, GrokAgentFactory.Model(""), new[] { Helm.Ai.GrokModels.Default }),
+            AgentKinds.ClaudeCode => (AiProviders.Claude, ClaudeModels.Haiku, new[] { "claude-opus-5-5", "claude-sonnet-5-5", ClaudeModels.Haiku }),
+            AgentKinds.Grok => (AiProviders.Grok, GrokAgentFactory.Model(""), new[] { GrokModels.Default }),
             _ => (null, "", []),
         };
         if (provider is null) return [];
-        var listed = _keys?.DefaultFor(provider) is { } key ? Helm.Ai.AiModels.Chat(key.Value.LastCheck).Select(m => m.Id) : [];
+        var listed = _keys?.DefaultFor(provider) is { } key ? AiModels.Chat(key.Value.LastCheck).Select(m => m.Id) : [];
         return [.. new[] { first }.Concat(listed).Concat(known).Distinct(StringComparer.Ordinal)];
     }
 

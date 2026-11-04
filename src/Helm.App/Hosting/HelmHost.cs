@@ -1,3 +1,4 @@
+using Helm.Ai.Agents;
 using Helm.App.Services;
 using Helm.App.ViewModels;
 using Helm.App.Views;
@@ -36,28 +37,9 @@ internal static class HelmHost
         Helm.Ai.AiCoreServices.AddHelmAi(builder.Services);
         // The proxy: the agents the user added to this PC (Codex, Claude Code…, each signed in to its own account) take
         // Helm's AI jobs first, for this PC's features and the phone's (through Helm Sync, AgentJobWorker); the API key
-        // only when none answers. Helm runs its own tools for them.
-        builder.Services.AddSingleton(sp =>
-        {
-            var settings = sp.GetRequiredService<ISettingsStoreFactory>();
-            bool IsOn(string? moduleId) => moduleId is null
-                || !settings.Get<GeneralSettings>(GeneralSettings.StoreId).Current.EnabledModules.TryGetValue(moduleId, out var on) || on;
-            return new Ai.AgentRegistry(settings, paths, sp.GetRequiredService<Core.Processes.IChildProcessLauncher>(),
-                sp.GetServices<Core.Mcp.IMcpToolProvider>(), IsOn, sp.GetRequiredService<ILoggerFactory>(),
-                sp.GetRequiredService<Helm.Ai.Prompts.IAiPrompts>(), sp.GetRequiredService<Helm.Ai.AiKeyStore>());
-        });
-        builder.Services.AddSingleton<Helm.Ai.Assistant.IAgentRoute>(sp => sp.GetRequiredService<Ai.AgentRegistry>());
-        builder.Services.AddSingleton(sp =>
-        {
-            var engine = sp.GetRequiredService<Core.Sync.SyncEngine>();
-            var agents = sp.GetRequiredService<Ai.AgentRegistry>();
-            return new Helm.Ai.Assistant.AgentJobWorker(sp.GetRequiredService<Core.Sync.ISyncedCollection<Helm.Ai.Assistant.AiJobRecord>>(),
-                sp.GetRequiredService<Core.Sync.ISyncedCollection<Helm.Ai.Assistant.AiWorkerRecord>>(), agents,
-                () => engine.DeviceId, sp.GetRequiredService<IDeviceInfo>().DeviceName, agents.Ready,
-                logger: sp.GetRequiredService<ILoggerFactory>().CreateLogger<Helm.Ai.Assistant.AgentJobWorker>(),
-                photos: new Helm.Ai.Assistant.BlobJobPhotos(sp.GetRequiredService<Core.Sync.BlobStore>(),
-                    sp.GetRequiredService<ILoggerFactory>().CreateLogger<Helm.Ai.Assistant.BlobJobPhotos>()));
-        });
+        // only when none answers. Helm runs its own tools for them. The same agents serve the user's own VPS too, when
+        // set up on AI → Proxy (this PC only: address and token are never synced). helm serve on Linux shares it.
+        builder.Services.AddAgentProxy(paths, _ => new Ai.WindowsAgentSignIn());
         // The jobs this PC runs by itself on the same agents (the morning brief, the evening review…): Helm's own read
         // tools in-process, plus what Scratch holds (never on the MCP server); never while a Vault is unlocked.
         builder.Services.AddSingleton(sp =>
@@ -69,7 +51,7 @@ internal static class HelmHost
             var loggers = sp.GetRequiredService<ILoggerFactory>();
             var tools = new Helm.Ai.Auto.AutoJobTools(
                 [.. sp.GetServices<Core.Mcp.IMcpToolProvider>(), new Modules.Scratch.ScratchDigestTool(sp.GetRequiredService<Modules.Scratch.ScratchStore>())], IsOn);
-            var asker = new Helm.Ai.Auto.AutoJobAsker(sp.GetRequiredService<Ai.AgentRegistry>(), sp.GetRequiredService<Helm.Ai.AiKeyStore>(),
+            var asker = new Helm.Ai.Auto.AutoJobAsker(sp.GetRequiredService<Helm.Ai.Agents.AgentRegistry>(), sp.GetRequiredService<Helm.Ai.AiKeyStore>(),
                 sp.GetServices<Helm.Ai.Assistant.IAssistantChatFactory>(), sp.GetRequiredService<Helm.Ai.AiUsageBook>(),
                 loggers.CreateLogger<Helm.Ai.Auto.AutoJobAsker>());
             return new Helm.Ai.Auto.AutoJobScheduler(Helm.Ai.Auto.Jobs.AutoJobs.All(),
@@ -78,18 +60,6 @@ internal static class HelmHost
                 sp.GetRequiredService<Helm.Ai.Auto.AiBriefBook>(), () => engine.DeviceId, sp.GetRequiredService<IDeviceInfo>().DeviceName,
                 () => sp.GetService<Core.Secrets.IVaultSecrets>()?.IsUnlocked == true, logger: loggers.CreateLogger<Helm.Ai.Auto.AutoJobScheduler>());
         });
-        // The same agents serve the user's own VPS too, when set up on AI → Proxy (this PC only: address and token are
-        // never synced).
-        builder.Services.AddSingleton(sp => new Helm.Ai.Vps.VpsWorkerToken(paths, sp.GetRequiredService<Core.Sync.ISecretProtector>()));
-        builder.Services.AddSingleton(sp =>
-        {
-            var agents = sp.GetRequiredService<Ai.AgentRegistry>();
-            return new Helm.Ai.Vps.VpsWorker(() => new Helm.Ai.Vps.VpsWebSocket(), agents, agents.Ready, sp.GetRequiredService<IDeviceInfo>().DeviceName,
-                Shell.Services.AppInfo.Version, sp.GetRequiredService<ILoggerFactory>().CreateLogger<Helm.Ai.Vps.VpsWorker>());
-        });
-        builder.Services.AddSingleton(sp => new Helm.Ai.Vps.VpsWorkerControl(
-            sp.GetRequiredService<ISettingsStoreFactory>().Get<Helm.Ai.Vps.VpsWorkerSettings>(Helm.Ai.Vps.VpsWorkerSettings.StoreId),
-            sp.GetRequiredService<Helm.Ai.Vps.VpsWorkerToken>(), sp.GetRequiredService<Helm.Ai.Vps.VpsWorker>()));
 
         // Modules — each module assembly exposes one registration extension.
         HelmModules.Register(builder.Services);

@@ -87,7 +87,7 @@ public partial class App : Application
             // And the user's VPS, when it is set up and on (AI → Proxy → Your VPS); it hears of the ready agents too.
             var vps = Services.GetRequiredService<Helm.Ai.Vps.VpsWorker>();
             Services.GetRequiredService<Helm.Ai.Vps.VpsWorkerControl>().Apply();
-            Services.GetRequiredService<Ai.AgentRegistry>().Changed += (_, _) =>
+            Services.GetRequiredService<Helm.Ai.Agents.AgentRegistry>().Changed += (_, _) =>
             {
                 worker.Beat();
                 vps.SendStatus();

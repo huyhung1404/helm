@@ -12,25 +12,10 @@ using Windows.Win32.System.Threading;
 
 namespace Helm.Core.Processes;
 
-/// <summary>What to start: a full command line (already quoted, see <see cref="CommandLine"/>) and its environment.</summary>
-public sealed record ChildProcessStartInfo(string CommandLine, string WorkingDirectory)
-{
-    /// <summary>The complete environment of the child. Null inherits Helm's own environment.</summary>
-    public IReadOnlyDictionary<string, string>? Environment { get; init; }
-}
-
-public interface IChildProcessLauncher
-{
-    /// <summary>
-    /// Starts a hidden child process with redirected stdin/stdout/stderr inside a kill-on-close job object.
-    /// When Helm is elevated the child runs with the desktop shell's (unelevated) token, never as administrator.
-    /// </summary>
-    /// <exception cref="ChildProcessException">The process could not be started.</exception>
-    ChildProcess Start(ChildProcessStartInfo startInfo);
-}
-
-public sealed class ChildProcessException(string message, Exception? inner = null) : Exception(message, inner);
-
+/// <summary>
+/// The Windows <see cref="IChildProcessLauncher"/>: a hidden child inside a kill-on-close job object, started with the
+/// desktop shell's (unelevated) token when Helm is elevated, never as administrator.
+/// </summary>
 public sealed class ChildProcessLauncher(ILogger<ChildProcessLauncher> logger) : IChildProcessLauncher
 {
     public ChildProcess Start(ChildProcessStartInfo startInfo)
@@ -44,8 +29,8 @@ public sealed class ChildProcessLauncher(ILogger<ChildProcessLauncher> logger) :
     }
 }
 
-/// <summary>A running child process started by <see cref="ChildProcessLauncher"/>. Disposing kills it and its whole process tree.</summary>
-public sealed class ChildProcess : IDisposable
+/// <summary>A child started by <see cref="ChildProcessLauncher"/>. Disposing kills it and its whole process tree (the job).</summary>
+internal sealed class WindowsChildProcess : ChildProcess
 {
     private readonly SafeProcessHandle _process;
     private readonly SafeFileHandle? _job;
@@ -54,7 +39,7 @@ public sealed class ChildProcess : IDisposable
     private readonly ProcessWaitHandle _waitHandle;
     private int _disposed;
 
-    internal ChildProcess(int id, SafeProcessHandle process, SafeFileHandle? job, Stream stdin, Stream stdout, Stream stderr)
+    internal WindowsChildProcess(int id, SafeProcessHandle process, SafeFileHandle? job, Stream stdin, Stream stdout, Stream stderr)
     {
         Id = id;
         _process = process;
@@ -66,28 +51,25 @@ public sealed class ChildProcess : IDisposable
         _waitRegistration = ThreadPool.RegisterWaitForSingleObject(_waitHandle, (_, _) => _exited.TrySetResult(ReadExitCode()), null, Timeout.Infinite, executeOnlyOnce: true);
     }
 
-    public int Id { get; }
+    public override int Id { get; }
 
-    public Stream StandardInput { get; }
-    public Stream StandardOutput { get; }
-    public Stream StandardError { get; }
+    public override Stream StandardInput { get; }
+    public override Stream StandardOutput { get; }
+    public override Stream StandardError { get; }
 
     /// <summary>False when the job object could not be set up; then only the direct child is killed on dispose.</summary>
-    public bool KillsProcessTree => _job is not null;
+    public override bool KillsProcessTree => _job is not null;
 
-    /// <summary>Completes with the exit code when the process ends.</summary>
-    public Task<int> Exited => _exited.Task;
+    public override Task<int> Exited => _exited.Task;
 
-    public bool HasExited => _exited.Task.IsCompleted;
-
-    public void Kill()
+    public override void Kill()
     {
         if (HasExited) return;
         if (_job is not null) PInvoke.TerminateJobObject((HANDLE)_job.DangerousGetHandle(), 1);
         else PInvoke.TerminateProcess((HANDLE)_process.DangerousGetHandle(), 1);
     }
 
-    public void Dispose()
+    public override void Dispose()
     {
         if (Interlocked.Exchange(ref _disposed, 1) != 0) return;
         try { Kill(); } catch { /* already gone */ }
@@ -110,34 +92,6 @@ public sealed class ChildProcess : IDisposable
     private sealed class ProcessWaitHandle : WaitHandle
     {
         public ProcessWaitHandle(SafeProcessHandle process) => SafeWaitHandle = new SafeWaitHandle(process.DangerousGetHandle(), ownsHandle: false);
-    }
-}
-
-/// <summary>Builds Windows command lines with the quoting rules of CommandLineToArgvW / the MSVC runtime.</summary>
-public static class CommandLine
-{
-    public static string Join(IEnumerable<string> args) => string.Join(' ', args.Select(Quote));
-
-    public static string Quote(string arg)
-    {
-        if (arg.Length > 0 && arg.IndexOfAny([' ', '\t', '\n', '\v', '"']) < 0) return arg;
-
-        var sb = new StringBuilder("\"");
-        var backslashes = 0;
-        foreach (var c in arg)
-        {
-            if (c == '\\')
-            {
-                backslashes++;
-                continue;
-            }
-            // Backslashes are literal unless they precede a quote; then each must be doubled.
-            sb.Append('\\', c == '"' ? backslashes * 2 + 1 : backslashes);
-            backslashes = 0;
-            sb.Append(c);
-        }
-        sb.Append('\\', backslashes * 2).Append('"');
-        return sb.ToString();
     }
 }
 
@@ -184,7 +138,7 @@ internal static unsafe class NativeChild
                 foreach (var h in childEnds) h.Dispose();
                 childEnds.Clear();
 
-                return new ChildProcess(
+                return new WindowsChildProcess(
                     (int)pi.dwProcessId,
                     process,
                     job,
