@@ -175,6 +175,14 @@ helm-connector status                             # sync, what is synced, holds,
   poll's `received`) within 5 s goes to the next poll: a Core killed mid-poll loses nothing. Undo runs on the
   connector. Nothing is kept across connector restarts: an unanswered job fails at its wait, as with a PC that
   stopped mid-turn.
+- **Proxy agents for a live voice** (Fairy Core running `AgentRegistry` from Helm.Ai.Core itself): set
+  `KeepSpares = true` (each agent keeps one process started for the next conversation, beside one per
+  conversation). On the screen opening, `AiRouter.Warm(job, apiReady)`; on a question, `AiRouter.Choose(conversationId,
+  agent, apiReady)` decides at once (a picked agent and no other; Auto: the conversation's own agent, then one with a
+  process up, then one that must start, the faster first; the API only when none is ready) and the turn runs with
+  `choice.Route.RunAsync(choice.For(job), wait, partial, ct)`: `partial` gets the answer's text so far (all of it each
+  time; "" takes back a step that turned into tool calls). Claude Code, Codex's app server and Grok's agent mode
+  stream; `codex exec` and headless Grok say it whole at the end.
 - **Secrets**: AES-GCM under a 32-byte host key, secrets/host.key (0600, folder 0700). With `HELM_SEAL_KEY=tpm2` a
   new key is sealed by `systemd-creds` instead (secrets/host.key.cred); a service started with
   `LoadCredentialEncrypted=helm-host-key:<data>/secrets/host.key.cred` gets it unsealed from systemd.

@@ -4,8 +4,10 @@ namespace Helm.Ai.Assistant;
 
 /// <summary>
 /// This device's agents in the user's order (Codex, then Claude Code when it is set up): a conversation stays on the
-/// agent that took its first turn; a new one goes to the first that can take it. The list can change under it (the
-/// user reorders or turns one off) without stopping the conversations of the agents still in it.
+/// agent that took its first turn while it can take the next one at once; a new one goes to the first that has a
+/// process up for it, else the first that can take it (<see cref="AgentPicker"/>, decided before the turn starts).
+/// The list can change under it (the user reorders or turns one off) without stopping the conversations of the agents
+/// still in it.
 /// </summary>
 public sealed class AgentChain(IReadOnlyList<LocalAgentRoute> agents) : IAgentRoute
 {
@@ -63,18 +65,26 @@ public sealed class AgentChain(IReadOnlyList<LocalAgentRoute> agents) : IAgentRo
         if (job.Images.Count > 0)
             return (agents.FirstOrDefault(a => a.ReadsPhotos) ?? throw new AiRouteException("No agent on this PC that reads photos can take it now."))
                 .RunAsync(job, wait, partial, ct);
-        var agent = _taken.TryGetValue(job.ConversationId, out var kept) && agents.Contains(kept) && kept.Unavailable() is null
-            ? kept
-            : agents.FirstOrDefault(a => a.Unavailable() is null) ?? throw new AiRouteException(Unavailable() ?? "No agent can take it.");
+        var agent = Auto(agents, job.ConversationId) ?? throw new AiRouteException(Unavailable() ?? "No agent can take it.");
         _taken[job.ConversationId] = agent;
         return agent.RunAsync(job, wait, partial, ct);
     }
+
+    /// <summary>The agent Auto gives the conversation's next turn, in the user's order among those equally ready.</summary>
+    private static LocalAgentRoute? Auto(IReadOnlyList<LocalAgentRoute> agents, string conversationId)
+    {
+        var known = agents.Select(a => a.ReadinessFor(conversationId)).ToList();
+        var pick = AgentPicker.Choose(known, null, apiReady: false, byLatency: false);
+        return pick.Chosen is { } chosen ? agents[known.IndexOf(chosen)] : null;
+    }
+
+    public IReadOnlyList<AgentReadiness> Readiness(string conversationId) => [.. _agents.Select(a => a.ReadinessFor(conversationId))];
 
     /// <summary>The agent a new conversation would go to gets ready, and keeps the conversation (as its first turn would).</summary>
     public void Warm(AiJob job)
     {
         var ready = job.Agent is { } picked ? Named(picked) is { } named && named.Unavailable() is null ? named : null
-            : _agents.FirstOrDefault(a => a.Unavailable() is null);
+            : Auto(_agents, job.ConversationId);
         if (_taken.ContainsKey(job.ConversationId) || ready is not { } agent) return;
         _taken[job.ConversationId] = agent;
         agent.Warm(job);
@@ -84,8 +94,10 @@ public sealed class AgentChain(IReadOnlyList<LocalAgentRoute> agents) : IAgentRo
     public Task UndoAsync(AiJobAction action, CancellationToken ct) =>
         _agents is { Count: > 0 } agents ? agents[0].UndoAsync(action, ct) : throw new AiRouteException("No agent is set up on this PC to undo it.");
 
+    /// <summary>Every agent that had the conversation lets it go (Auto may have moved it off one busy with a turn).</summary>
     public void End(string conversationId)
     {
-        if (_taken.TryRemove(conversationId, out var agent)) agent.End(conversationId);
+        _taken.TryRemove(conversationId, out _);
+        foreach (var agent in _agents) agent.End(conversationId);
     }
 }

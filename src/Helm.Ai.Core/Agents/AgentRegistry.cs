@@ -66,6 +66,7 @@ public sealed class AgentRegistry : IAgentRoute, IDisposable
     private readonly AgentChain _chain = new([]);
     private FileSystemWatcher? _signIns;
     private Timer? _settle;
+    private bool _keepSpares;
 
     /// <param name="signIn">Shows an agent's sign-in to the user (a console window on Windows, the terminal on Linux).</param>
     /// <param name="keys">The API keys whose last test lists the models an agent of their provider can be asked for.</param>
@@ -116,6 +117,25 @@ public sealed class AgentRegistry : IAgentRoute, IDisposable
     public string? UnavailableFor(string agent) => _chain.UnavailableFor(agent);
 
     public bool ReadsPhotos => _chain.ReadsPhotos;
+
+    public IReadOnlyList<AgentReadiness> Readiness(string conversationId) => _chain.Readiness(conversationId);
+
+    /// <summary>
+    /// Each agent keeps a spare process started for the next conversation (<see cref="LocalAgentRoute.KeepSpare"/>):
+    /// for a box that answers by voice (Fairy), where no card opening warms an agent ahead. Off on a Helm PC.
+    /// </summary>
+    public bool KeepSpares
+    {
+        get => _keepSpares;
+        set
+        {
+            lock (_gate)
+            {
+                _keepSpares = value;
+                foreach (var agent in _agents) agent.Route.KeepSpare = value;
+            }
+        }
+    }
 
     /// <summary>"Ready", "Off", or why it takes no job.</summary>
     public string Status(AgentProfile profile)
@@ -300,7 +320,10 @@ public sealed class AgentRegistry : IAgentRoute, IDisposable
         if (made is not { } m) return null;
         return new Agent(profile, m.Factory, m.Unavailable,
             new LocalAgentRoute(Environment.MachineName, profile.Name, m.Factory, _tools, _isToolOn, m.Unavailable, prompts: _prompts,
-                logger: _loggers.CreateLogger<LocalAgentRoute>(), kind: profile.Kind, models: () => ModelsOf(profile.Kind), offers: _offers));
+                logger: _loggers.CreateLogger<LocalAgentRoute>(), kind: profile.Kind, models: () => ModelsOf(profile.Kind), offers: _offers)
+            {
+                KeepSpare = _keepSpares,
+            });
     }
 
     /// <summary>

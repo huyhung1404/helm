@@ -118,6 +118,15 @@ public interface IAgentRoute
 
     /// <summary>It can take a job with photos (<see cref="AiJob.Images"/>) now: an agent that reads pictures is ready.</summary>
     bool ReadsPhotos => false;
+
+    /// <summary>
+    /// How ready each agent it reaches is for <paramref name="conversationId"/>'s next turn, for Auto
+    /// (<see cref="AgentPicker"/>). A route that knows no more than its offers says only which are ready.
+    /// </summary>
+    IReadOnlyList<AgentReadiness> Readiness(string conversationId) =>
+        Offers is { Count: > 0 } offers ? [.. offers.Select(o => new AgentReadiness(o.Agent.Name, o.Device, o.Agent.Problem is null))]
+        : Unavailable() is null ? [new AgentReadiness("", Device, true)]
+        : [];
 }
 
 /// <summary>The ways a feature's call may take, in order: Claude Code first (free) as its policy allows, the API last.</summary>
@@ -146,6 +155,32 @@ public sealed class AiRouter(IEnumerable<IAgentRoute> routes)
             .Select(g => g.FirstOrDefault(o => o.Agent.Problem is null) ?? g.First()),
     ];
 
+    /// <summary>
+    /// Where <paramref name="conversationId"/>'s next turn goes, decided now (<see cref="AgentPicker"/>): the agent the
+    /// user picked (<paramref name="agent"/>) and no other, or for Auto a free agent that can start it now, the API
+    /// (when <paramref name="apiReady"/>) only when none can. The caller runs it there with <see cref="AiRouteChoice.For"/>:
+    /// nothing tries one way and falls through to the next.
+    /// </summary>
+    public AiRouteChoice Choose(string conversationId, string? agent, bool apiReady)
+    {
+        // An agent on this device answers sooner than one reached through sync.
+        var known = _routes.OrderBy(r => r is SyncAgentRoute ? 1 : 0).SelectMany(r => r.Readiness(conversationId).Select(a => (Route: r, Agent: a))).ToList();
+        var pick = AgentPicker.Choose([.. known.Select(k => k.Agent)], agent, apiReady);
+        var route = pick.Chosen is { } chosen ? known.First(k => ReferenceEquals(k.Agent, chosen)).Route : null;
+        return new AiRouteChoice(route, pick.Chosen is { Agent.Length: > 0 } named ? named.Agent : null, pick.Api, pick.Problem);
+    }
+
+    /// <summary>
+    /// The card opened (or Fairy's screen): the agent <see cref="Choose"/> picks for the conversation gets ready, so the
+    /// first turn finds its process up. Returns the choice, for the turn that follows to go the same way.
+    /// </summary>
+    public AiRouteChoice Warm(AiJob job, bool apiReady)
+    {
+        var choice = Choose(job.ConversationId, job.Agent, apiReady);
+        choice.Route?.Warm(choice.For(job));
+        return choice;
+    }
+
     /// <summary>Whether the API may be used when no agent answered.</summary>
     public static bool MayUseApi(AiFeatureChoice choice) => choice.Route != AiRoutePolicy.PcOnly;
 
@@ -161,6 +196,16 @@ public sealed class AiRouter(IEnumerable<IAgentRoute> routes)
             ? "No Helm PC has an agent for this (AI → Proxy on the PC)."
             : $"No Helm PC agent can take it now ({string.Join("; ", _routes.Select(r => $"{r.Device}: {r.Unavailable() ?? "busy"}"))}).";
     }
+}
+
+/// <summary>
+/// Where a turn goes (<see cref="AiRouter.Choose"/>): <see cref="Route"/> with <see cref="Agent"/>, the API, or nowhere
+/// (<see cref="Problem"/>, said to the user).
+/// </summary>
+public sealed record AiRouteChoice(IAgentRoute? Route, string? Agent, bool Api, string? Problem)
+{
+    /// <summary>The job as the chosen route must run it: on that agent and no other.</summary>
+    public AiJob For(AiJob job) => Agent is { } agent ? job with { Agent = agent } : job;
 }
 
 /// <summary>An agent a route reaches, as the card's picker lists it: the PC it runs on, and what it offers.</summary>
