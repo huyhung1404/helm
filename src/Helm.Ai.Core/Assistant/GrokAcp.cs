@@ -62,7 +62,12 @@ public sealed class GrokAcp(TextReader output, TextWriter input)
     /// </summary>
     /// <exception cref="AssistantException">The turn failed (its message says why: a plan's limit, a sign-in, for one).</exception>
     /// <exception cref="IOException">It stopped before the turn ended.</exception>
-    public async Task<(string Answer, AssistantUsage Usage)> TurnAsync(string text, IReadOnlyList<AssistantImage> images, CancellationToken ct)
+    public Task<(string Answer, AssistantUsage Usage)> TurnAsync(string text, IReadOnlyList<AssistantImage> images, CancellationToken ct) =>
+        TurnAsync(text, images, null, ct);
+
+    /// <summary>One turn, telling <paramref name="soFar"/> the answer so far after each of Grok's chunks (<c>agent_message_chunk</c>).</summary>
+    public async Task<(string Answer, AssistantUsage Usage)> TurnAsync(string text, IReadOnlyList<AssistantImage> images, Action<string>? soFar,
+        CancellationToken ct)
     {
         var session = _session ?? throw new InvalidOperationException("The session is not open.");
         var prompt = new JsonArray(new JsonObject { ["type"] = "text", ["text"] = text });
@@ -91,6 +96,7 @@ public sealed class GrokAcp(TextReader output, TextWriter input)
             {
                 case "agent_message_chunk":
                     answer.Append(Text((update["content"] as JsonObject)?["text"]));
+                    soFar?.Invoke(answer.ToString());
                     break;
                 case "available_commands_update":
                     Check(update);

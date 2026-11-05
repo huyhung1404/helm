@@ -97,6 +97,27 @@ public sealed class GrokAcpTests
     }
 
     [Fact]
+    public async Task A_turn_tells_the_answer_so_far_after_each_chunk_but_not_the_thoughts()
+    {
+        var grok = new FakeGrok();
+        var acp = new GrokAcp(grok.Output, grok.Input);
+        await acp.StartAsync("work", Meta, CancellationToken.None);
+        grok.OnPrompt = (id, _) =>
+        [
+            Update(new JsonObject { ["sessionUpdate"] = "agent_thought_chunk", ["content"] = new JsonObject { ["type"] = "text", ["text"] = "thinking" } }),
+            Chunk("Chào "),
+            Chunk("Anh"),
+            Done(id),
+        ];
+        var heard = new List<string>();
+
+        var (answer, _) = await acp.TurnAsync("Chào em", [], heard.Add, CancellationToken.None);
+
+        Assert.Equal("Chào Anh", answer);
+        Assert.Equal(["Chào ", "Chào Anh"], heard);
+    }
+
+    [Fact]
     public async Task A_permission_is_cancelled_and_a_file_request_turned_down_and_the_turn_goes_on()
     {
         var grok = new FakeGrok();

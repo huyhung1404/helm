@@ -44,7 +44,15 @@ public sealed class CodexAppServer(TextReader output, TextWriter input)
     public Task<(string Answer, AssistantUsage Usage)> TurnAsync(string text, CancellationToken ct) => TurnAsync(text, [], ct);
 
     /// <summary>One turn with photos (<see cref="CliImages.CodexInput"/>): they go as data URLs, never as files.</summary>
-    public async Task<(string Answer, AssistantUsage Usage)> TurnAsync(string text, IReadOnlyList<AssistantImage> images, CancellationToken ct)
+    public Task<(string Answer, AssistantUsage Usage)> TurnAsync(string text, IReadOnlyList<AssistantImage> images, CancellationToken ct) =>
+        TurnAsync(text, images, null, ct);
+
+    /// <summary>
+    /// One turn, telling <paramref name="soFar"/> the text of the message Codex is writing after each piece
+    /// (<c>item/agentMessage/delta</c>; a new message starts it again).
+    /// </summary>
+    public async Task<(string Answer, AssistantUsage Usage)> TurnAsync(string text, IReadOnlyList<AssistantImage> images, Action<string>? soFar,
+        CancellationToken ct)
     {
         var thread = _thread ?? throw new InvalidOperationException("The conversation is not open.");
         var id = await SendAsync("turn/start", new JsonObject
@@ -52,7 +60,8 @@ public sealed class CodexAppServer(TextReader output, TextWriter input)
             ["threadId"] = thread,
             ["input"] = CliImages.CodexInput(text, images),
         }, ct);
-        string? answer = null, error = null;
+        string? answer = null, error = null, writing = null;
+        var written = new System.Text.StringBuilder();
         var before = _total;
         while (true)
         {
@@ -65,6 +74,15 @@ public sealed class CodexAppServer(TextReader output, TextWriter input)
             var parameters = message["params"] as JsonObject ?? [];
             switch (message["method"]?.GetValue<string>())
             {
+                case "item/agentMessage/delta" when soFar is not null:
+                    if (Text(parameters["itemId"]) != writing)
+                    {
+                        writing = Text(parameters["itemId"]);
+                        written.Clear();
+                    }
+                    written.Append(Text(parameters["delta"]));
+                    soFar(written.ToString());
+                    break;
                 case "item/completed":
                     if (parameters["item"] is { } item && Text(item["type"]) == "agentMessage") answer = Text(item["text"]) ?? answer;
                     break;

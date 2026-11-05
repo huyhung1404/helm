@@ -96,6 +96,13 @@ public interface IAgentRoute
     /// <exception cref="AiRouteException">No answer within <paramref name="wait"/>, or it failed.</exception>
     Task<AiJobResult> RunAsync(AiJob job, TimeSpan wait, CancellationToken ct);
 
+    /// <summary>
+    /// As <see cref="RunAsync(AiJob, TimeSpan, CancellationToken)"/>, telling <paramref name="partial"/> the answer's text
+    /// so far while the agent writes it (each call has all of it, not a piece; "" takes back what a step said that turned
+    /// out to call tools). A route that cannot stream (another PC through sync) runs it whole and says nothing.
+    /// </summary>
+    Task<AiJobResult> RunAsync(AiJob job, TimeSpan wait, Action<string>? partial, CancellationToken ct) => RunAsync(job, wait, ct);
+
     /// <summary>Takes back an action it did (Undo runs where the record was made, so it never misses one not synced yet).</summary>
     Task UndoAsync(AiJobAction action, CancellationToken ct);
 

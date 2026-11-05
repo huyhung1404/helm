@@ -304,15 +304,22 @@ internal sealed class GrokChat : IAssistantChat, IDisposable
 
     public void AddResults(IReadOnlyList<ToolOutcome> results) => _conversation.AddResults(results);
 
-    public async Task<AssistantStep> NextAsync(CancellationToken ct)
+    public Task<AssistantStep> NextAsync(CancellationToken ct) => NextAsync(null, ct);
+
+    /// <summary>
+    /// The turn; <paramref name="partial"/> hears the answer as Grok writes it in agent mode, and whole at the end of a
+    /// headless run (its JSON output is read once the run ended).
+    /// </summary>
+    public async Task<AssistantStep> NextAsync(Action<string>? partial, CancellationToken ct)
     {
         var grok = GrokAgentFactory.FindGrok() ?? throw new AssistantException("Grok CLI is not installed on this PC.");
+        var shown = new CliPartial(partial);
         (string Answer, AssistantUsage Usage)? turn = null;
         if (!_factory.AcpRefused)
         {
             try
             {
-                turn = await _agent.TurnAsync(_conversation, ct);
+                turn = await _agent.TurnAsync(_conversation, partial is null ? null : shown.Show, ct);
             }
             catch (AssistantException ex)
             {
@@ -324,7 +331,9 @@ internal sealed class GrokChat : IAssistantChat, IDisposable
         if (turn is null && _conversation.Images.Count > 0) throw new AssistantImageException("Grok headless cannot read photos.");
         var (answer, usage) = turn ?? await _headless.TurnAsync(grok, _conversation, ct);
         _conversation.Answered(answer);
-        return CliAgentProtocol.Parse(answer, usage, ref _calls);
+        var step = CliAgentProtocol.Parse(answer, usage, ref _calls);
+        shown.Done(step);
+        return step;
     }
 
     public void Dispose()

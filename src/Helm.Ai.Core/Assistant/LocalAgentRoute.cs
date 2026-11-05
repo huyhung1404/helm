@@ -84,7 +84,10 @@ public sealed class LocalAgentRoute : IAgentRoute, IDisposable
         return models.Contains(requested) || (prefix is not null && requested.StartsWith(prefix, StringComparison.Ordinal)) ? requested : models[0];
     }
 
-    public async Task<AiJobResult> RunAsync(AiJob job, TimeSpan wait, CancellationToken ct)
+    public Task<AiJobResult> RunAsync(AiJob job, TimeSpan wait, CancellationToken ct) => RunAsync(job, wait, null, ct);
+
+    /// <summary>The turn, the answer's text so far told to <paramref name="partial"/> as the agent writes it.</summary>
+    public async Task<AiJobResult> RunAsync(AiJob job, TimeSpan wait, Action<string>? partial, CancellationToken ct)
     {
         if (Unavailable() is { } why) throw new AiRouteException(why);
         if (job.Images.Count > 0 && !_agent.ReadsImages) throw new AiRouteException($"{AgentName} cannot read photos.");
@@ -112,7 +115,7 @@ public sealed class LocalAgentRoute : IAgentRoute, IDisposable
                 AddUser(conversation.Chat, job);
                 outcome = await AssistantLoop.RunAsync(conversation.Chat, conversation.Tools, _ => Task.FromResult(false),
                     u => { input += u.Input; output += u.Output; cacheRead += u.CacheRead; cacheWrite += u.CacheWrite; },
-                    () => null, phoneHere: false, job.Model, limit.Token, records, timings: timings);
+                    () => null, phoneHere: false, job.Model, limit.Token, records, partial, timings);
                 conversation.Turns++;
                 _logger.LogDebug("{Agent} turn: {Timings}", AgentName, timings);
             }
@@ -311,7 +314,9 @@ public sealed class AgentChain(IReadOnlyList<LocalAgentRoute> agents) : IAgentRo
             : string.Join(" ", agents.Select(a => $"{a.AgentName}: {a.Unavailable()}"));
     }
 
-    public Task<AiJobResult> RunAsync(AiJob job, TimeSpan wait, CancellationToken ct)
+    public Task<AiJobResult> RunAsync(AiJob job, TimeSpan wait, CancellationToken ct) => RunAsync(job, wait, null, ct);
+
+    public Task<AiJobResult> RunAsync(AiJob job, TimeSpan wait, Action<string>? partial, CancellationToken ct)
     {
         // The one the user picked, or none: never another agent in its place.
         if (job.Agent is { } picked)
@@ -319,18 +324,18 @@ public sealed class AgentChain(IReadOnlyList<LocalAgentRoute> agents) : IAgentRo
             if (UnavailableFor(picked) is { } why) throw new AiRouteException(why);
             var named = Named(picked)!;
             if (job.Images.Count == 0) _taken[job.ConversationId] = named;
-            return named.RunAsync(job, wait, ct);
+            return named.RunAsync(job, wait, partial, ct);
         }
         var agents = _agents;
         // A photo goes to the first agent that reads pictures (Grok's CLI takes none): each photo turn is a chat of its own.
         if (job.Images.Count > 0)
             return (agents.FirstOrDefault(a => a.ReadsPhotos) ?? throw new AiRouteException("No agent on this PC that reads photos can take it now."))
-                .RunAsync(job, wait, ct);
+                .RunAsync(job, wait, partial, ct);
         var agent = _taken.TryGetValue(job.ConversationId, out var kept) && agents.Contains(kept) && kept.Unavailable() is null
             ? kept
             : agents.FirstOrDefault(a => a.Unavailable() is null) ?? throw new AiRouteException(Unavailable() ?? "No agent can take it.");
         _taken[job.ConversationId] = agent;
-        return agent.RunAsync(job, wait, ct);
+        return agent.RunAsync(job, wait, partial, ct);
     }
 
     /// <summary>The agent a new conversation would go to gets ready, and keeps the conversation (as its first turn would).</summary>

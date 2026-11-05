@@ -205,12 +205,21 @@ internal sealed class CodexChat(CodexAgentFactory factory, IChildProcessLauncher
 
     public void AddResults(IReadOnlyList<ToolOutcome> results) => _conversation.AddResults(results);
 
-    public async Task<AssistantStep> NextAsync(CancellationToken ct)
+    public Task<AssistantStep> NextAsync(CancellationToken ct) => NextAsync(null, ct);
+
+    /// <summary>
+    /// The turn; <paramref name="partial"/> hears the answer as Codex writes it on the app server, and whole at the end
+    /// of a <c>codex exec</c> run (its JSON events carry only whole messages).
+    /// </summary>
+    public async Task<AssistantStep> NextAsync(Action<string>? partial, CancellationToken ct)
     {
         var codex = CodexAgentFactory.FindCodex() ?? throw new AssistantException("Codex is not installed on this PC.");
-        var (answer, usage) = (_execOnly ? null : await ServerTurnAsync(codex, ct)) ?? await ExecAsync(codex, ct);
+        var shown = new CliPartial(partial);
+        var (answer, usage) = (_execOnly ? null : await ServerTurnAsync(codex, partial is null ? null : shown.Show, ct)) ?? await ExecAsync(codex, ct);
         _conversation.Answered(answer);
-        return CliAgentProtocol.Parse(answer, usage, ref _calls);
+        var step = CliAgentProtocol.Parse(answer, usage, ref _calls);
+        shown.Done(step);
+        return step;
     }
 
     /// <summary>
@@ -233,7 +242,7 @@ internal sealed class CodexChat(CodexAgentFactory factory, IChildProcessLauncher
     }
 
     /// <summary>The turn on the app server (started when there is none or it ended), or null when it cannot start.</summary>
-    private async Task<(string Answer, AssistantUsage Usage)?> ServerTurnAsync(string codex, CancellationToken ct)
+    private async Task<(string Answer, AssistantUsage Usage)?> ServerTurnAsync(string codex, Action<string>? soFar, CancellationToken ct)
     {
         using var stop = ct.Register(Kill);
         if (_process is { HasExited: true }) Kill();
@@ -243,7 +252,7 @@ internal sealed class CodexChat(CodexAgentFactory factory, IChildProcessLauncher
         {
             var message = _conversation.Message(fresh);
             _greeted = true;
-            return await _server!.TurnAsync(message, _conversation.Images, ct);
+            return await _server!.TurnAsync(message, _conversation.Images, soFar, ct);
         }
         catch (AssistantException ex)
         {

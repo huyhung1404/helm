@@ -103,6 +103,8 @@ public sealed class AgentRegistry : IAgentRoute, IDisposable
 
     public Task<AiJobResult> RunAsync(AiJob job, TimeSpan wait, CancellationToken ct) => _chain.RunAsync(job, wait, ct);
 
+    public Task<AiJobResult> RunAsync(AiJob job, TimeSpan wait, Action<string>? partial, CancellationToken ct) => _chain.RunAsync(job, wait, partial, ct);
+
     public Task UndoAsync(AiJobAction action, CancellationToken ct) => _chain.UndoAsync(action, ct);
 
     public void End(string conversationId) => _chain.End(conversationId);

@@ -1,6 +1,5 @@
 using System.IO;
 using System.Text;
-using System.Text.Json;
 using System.Text.Json.Nodes;
 using Helm.Ai.Assistant;
 using Helm.Core.Processes;
@@ -83,35 +82,26 @@ internal sealed class ClaudeCodeChat(ClaudeCodeAgentFactory factory, IChildProce
 
     public void AddResults(IReadOnlyList<ToolOutcome> results) => _conversation.AddResults(results);
 
-    public async Task<AssistantStep> NextAsync(CancellationToken ct)
+    public Task<AssistantStep> NextAsync(CancellationToken ct) => NextAsync(null, ct);
+
+    /// <summary>The turn; <paramref name="partial"/> hears the answer as Claude writes it (its partial messages).</summary>
+    public async Task<AssistantStep> NextAsync(Action<string>? partial, CancellationToken ct)
     {
         using var stop = ct.Register(Kill);
         await SendAsync(ct);
         var output = _output!;
-        while (await ReadLineAsync(output, ct) is { } text)
+        var shown = new CliPartial(partial);
+        if (await ClaudeCodeStream.ReadTurnAsync(c => ReadLineAsync(output, c), partial is null ? null : shown.Show, ct) is { } result)
         {
-            if (text.Length == 0 || text[0] != '{') continue;
-            JsonNode? ev;
-            try
+            if (result.IsError)
             {
-                ev = JsonNode.Parse(text);
+                if (result.Answer.Contains("limit", StringComparison.OrdinalIgnoreCase)) factory.ReachedLimit();
+                throw new AssistantException($"Claude Code: {(result.Answer.Length > 0 ? result.Answer : "it stopped with an error")}");
             }
-            catch (JsonException)
-            {
-                continue;
-            }
-            if (ev?["type"]?.GetValue<string>() != "result") continue;
-            var answer = ev["result"]?.GetValue<string>() ?? "";
-            var usage = ev["usage"];
-            long Read(string name) => usage?[name] is JsonValue v && v.TryGetValue<long>(out var n) ? n : 0;
-            var step = new AssistantUsage(Read("input_tokens"), Read("output_tokens"), Read("cache_read_input_tokens"), Read("cache_creation_input_tokens"));
-            if (ev["is_error"] is JsonValue e && e.TryGetValue<bool>(out var failed) && failed)
-            {
-                if (answer.Contains("limit", StringComparison.OrdinalIgnoreCase)) factory.ReachedLimit();
-                throw new AssistantException($"Claude Code: {(answer.Length > 0 ? answer : "it stopped with an error")}");
-            }
-            _conversation.Answered(answer);
-            return CliAgentProtocol.Parse(answer, step, ref _calls);
+            _conversation.Answered(result.Answer);
+            var step = CliAgentProtocol.Parse(result.Answer, result.Usage, ref _calls);
+            shown.Done(step);
+            return step;
         }
         ct.ThrowIfCancellationRequested();
         // It died mid-turn: what was sent waits for the next turn, which starts a new process.
@@ -181,7 +171,9 @@ internal sealed class ClaudeCodeChat(ClaudeCodeAgentFactory factory, IChildProce
     {
         var claude = CommandFinder.FindClaude() ?? throw new AssistantException("Claude Code is not installed on this PC.");
         // No session file: Helm keeps the conversation itself (a new process gets a recap), and a photo never lands on disk.
-        string[] args = ["-p", "--input-format", "stream-json", "--output-format", "stream-json", "--verbose", "--tools", "", "--strict-mcp-config",
+        string[] args = ["-p", "--input-format", "stream-json", "--output-format", "stream-json", "--verbose",
+            // The answer's text as Claude writes it (stream events), for a caller that shows or speaks it at once.
+            "--include-partial-messages", "--tools", "", "--strict-mcp-config",
             "--no-session-persistence",
             "--settings", """{"disableAllHooks":true}""", "--model", model, .. Helm.Ai.AiEfforts.Nearest(effort, Helm.Ai.AiEfforts.For(model, "claude-code")) is { Length: > 0 } level ? new[] { "--effort", level } : []];
         var commandLine = claude.EndsWith(".cmd", StringComparison.OrdinalIgnoreCase)

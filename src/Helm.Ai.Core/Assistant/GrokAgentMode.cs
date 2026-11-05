@@ -58,7 +58,10 @@ public sealed class GrokAgentMode(Func<GrokAgentProcess> start, string folder, J
 
     /// <summary>The turn with what waits in <paramref name="conversation"/>, or null when agent mode cannot be used.</summary>
     /// <exception cref="AssistantException">Grok could not be started, or the turn failed (it says why).</exception>
-    public async Task<(string Answer, AssistantUsage Usage)?> TurnAsync(CliConversation conversation, CancellationToken ct)
+    public Task<(string Answer, AssistantUsage Usage)?> TurnAsync(CliConversation conversation, CancellationToken ct) => TurnAsync(conversation, null, ct);
+
+    /// <summary>As <see cref="TurnAsync(CliConversation, CancellationToken)"/>, telling <paramref name="soFar"/> the answer as Grok writes it.</summary>
+    public async Task<(string Answer, AssistantUsage Usage)?> TurnAsync(CliConversation conversation, Action<string>? soFar, CancellationToken ct)
     {
         if (Refused is not null) return null;
         using var stop = ct.Register(Kill);
@@ -68,7 +71,7 @@ public sealed class GrokAgentMode(Func<GrokAgentProcess> start, string folder, J
             if (_acp is null && !await StartAsync(ct)) return null;
             var message = conversation.Message(!_greeted);
             _greeted = true;
-            return await _acp!.TurnAsync(message, conversation.Images, ct);
+            return await _acp!.TurnAsync(message, conversation.Images, soFar, ct);
         }
         catch (GrokToolsOfferedException ex)
         {

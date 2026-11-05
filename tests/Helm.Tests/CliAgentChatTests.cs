@@ -169,6 +169,31 @@ public sealed class CliAgentChatTests
     }
 
     [Fact]
+    public async Task A_turn_tells_the_message_being_written_piece_by_piece()
+    {
+        var codex = new FakeCodex();
+        var server = new CodexAppServer(codex.Output, codex.Input);
+        await server.StartAsync("work", "1", CancellationToken.None);
+        static JsonObject Delta(string item, string piece) =>
+            Note("item/agentMessage/delta", new JsonObject { ["threadId"] = "thread-1", ["turnId"] = "t1", ["itemId"] = item, ["delta"] = piece });
+        codex.OnTurn = (id, _) =>
+        [
+            Reply(id, new JsonObject { ["turn"] = new JsonObject { ["id"] = "t1", ["items"] = new JsonArray(), ["status"] = "inProgress" } }),
+            Delta("m1", "Đang "), Delta("m1", "xem"),
+            // A second message starts over: only the last one is the answer.
+            Delta("m2", "Dạ, "), Delta("m2", "xong rồi."),
+            Note("item/completed", new JsonObject { ["item"] = new JsonObject { ["type"] = "agentMessage", ["id"] = "m2", ["text"] = "Dạ, xong rồi." } }),
+            Note("turn/completed", new JsonObject { ["turn"] = new JsonObject { ["id"] = "t1", ["status"] = "completed" } }),
+        ];
+        var heard = new List<string>();
+
+        var (answer, _) = await server.TurnAsync("phở 45k", [], heard.Add, CancellationToken.None);
+
+        Assert.Equal("Dạ, xong rồi.", answer);
+        Assert.Equal(["Đang ", "Đang xem", "Dạ, ", "Dạ, xong rồi."], heard);
+    }
+
+    [Fact]
     public async Task A_turn_with_a_photo_sends_it_after_the_words_as_an_image_input()
     {
         var codex = new FakeCodex();
