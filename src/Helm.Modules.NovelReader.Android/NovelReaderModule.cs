@@ -53,6 +53,7 @@ public sealed class NovelReaderModule : AndroidModuleBase, IModuleContent, IBack
         StatusMessage = null;
         ActivityHost.Paused -= OnAppPaused;
         ActivityHost.Paused += OnAppPaused;
+        KeepLensOn();
         return Task.CompletedTask;
     }
 
@@ -65,6 +66,28 @@ public sealed class NovelReaderModule : AndroidModuleBase, IModuleContent, IBack
     }
 
     public bool HandleBack() => PageBack?.Invoke() ?? false;
+
+    /// <summary>
+    /// Novel Lens ships hidden (<see cref="Lens.LensComponent"/>). Someone who had it switched on before that keeps it:
+    /// Android still has it in the switched-on list, so it is listed again. Once only: later, that list may still name
+    /// a lens the user hid in Helm, and it must stay hidden.
+    /// </summary>
+    private static void KeepLensOn()
+    {
+        try
+        {
+            var context = global::Android.App.Application.Context;
+            using var prefs = context.GetSharedPreferences("helm-novel-lens", global::Android.Content.FileCreationMode.Private)!;
+            if (prefs.GetBoolean("hidden-by-default", false)) return;
+            if (Lens.LensComponent.IsSwitchedOn(context)) Lens.LensComponent.SetShown(context, true);
+            using var edit = prefs.Edit()!;
+            edit.PutBoolean("hidden-by-default", true)!.Apply();
+        }
+        catch (Exception)
+        {
+            // Only the lens is at stake; Helm starts anyway.
+        }
+    }
 
     /// <summary>Helm went to the background (another app, the screen off): save where reading is now.</summary>
     private void OnAppPaused(object? sender, EventArgs e) => _viewModel.FlushProgress();

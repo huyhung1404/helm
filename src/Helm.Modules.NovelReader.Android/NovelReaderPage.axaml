@@ -27,7 +27,10 @@
                 <TextBlock Text="Read Fanqie's pages in study form" Classes="title" />
                 <TextBlock Text="While the Fanqie app (番茄小说) is open, a 译 button floats over it. Press it: Helm reads the page shown (recognised on the phone, offline) and covers the screen with it, each word with its Chinese, pinyin, Hán Việt and Vietnamese. Next turns Fanqie's page and reads the new one. Nothing of the pages is saved." Classes="secondary" />
                 <TextBlock x:Name="LensState" Classes="secondary" />
-                <Button x:Name="LensButton" Content="Accessibility settings" Click="LensSettings_Click" />
+                <StackPanel Orientation="Horizontal" Spacing="8">
+                    <Button x:Name="LensButton" Classes="accent" Content="Turn on Novel Lens" Click="LensSettings_Click" />
+                    <Button x:Name="LensOffButton" Content="Turn off Novel Lens" Click="LensOff_Click" IsVisible="False" />
+                </StackPanel>
                 <Border Classes="row">
                     <StackPanel Spacing="4">
                         <TextBlock Text="Names from" />

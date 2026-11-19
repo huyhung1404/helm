@@ -44,8 +44,6 @@ public partial class NovelReaderPage : ModulePageBase
 
     // ---- Novel Lens ------------------------------------------------------------------------------------------------
 
-    private const string LensServiceName = "com.huyhung1404.helm/com.huyhung1404.helm.novel.LensService";
-
     private Lens.LensTranslator? _lens;
     private List<string?> _lensBookIds = [];
     private bool _showingLens;
@@ -66,13 +64,16 @@ public partial class NovelReaderPage : ModulePageBase
             }
             else
             {
-                var enabled = global::Android.Provider.Settings.Secure.GetString(context.ContentResolver,
-                    global::Android.Provider.Settings.Secure.EnabledAccessibilityServices) ?? "";
-                var on = enabled.Split(':').Any(s => s.Equals(LensServiceName, StringComparison.OrdinalIgnoreCase));
-                LensState.Text = on
-                    ? "On. Open Fanqie and press the 译 button."
-                    : "Off. Turn on \"Helm Novel Lens\" in Accessibility settings (under Downloaded or Installed apps).";
-                LensButton.Content = on ? "Accessibility settings" : "Turn on Novel Lens";
+                // Hidden: not listed as an accessibility service at all, so banking apps do not warn about Helm.
+                var shown = Lens.LensComponent.IsShown(context);
+                var on = shown && Lens.LensComponent.IsSwitchedOn(context);
+                LensState.Text = !shown
+                    ? "Hidden. Banking apps can't see it. Turn it on to read Fanqie, and off again when you're done."
+                    : on
+                        ? "On. Open Fanqie and press the 译 button. Turn it off before you open a banking app: they warn about apps that have an accessibility service."
+                        : "Almost: turn on \"Helm Novel Lens\" in Accessibility settings (under Downloaded or Installed apps).";
+                LensButton.Content = shown ? "Accessibility settings" : "Turn on Novel Lens";
+                LensOffButton.IsVisible = shown;
             }
 
             var books = _lens.Books();
@@ -90,11 +91,20 @@ public partial class NovelReaderPage : ModulePageBase
 
     private void ShowLensTap() => LensTapLabel.Text = $"Next taps at {LensTap.Value:P0} of the width";
 
+    /// <summary>Lists Novel Lens again (if hidden) and opens Accessibility settings to switch it on.</summary>
     private void LensSettings_Click(object? sender, RoutedEventArgs e)
     {
+        Lens.LensComponent.SetShown(global::Android.App.Application.Context, true);
         var intent = new global::Android.Content.Intent(global::Android.Provider.Settings.ActionAccessibilitySettings);
         intent.AddFlags(global::Android.Content.ActivityFlags.NewTask);
         global::Android.App.Application.Context.StartActivity(intent);
+    }
+
+    /// <summary>Hides Novel Lens: Android stops it and it leaves Accessibility settings (and banking apps' scans).</summary>
+    private void LensOff_Click(object? sender, RoutedEventArgs e)
+    {
+        Lens.LensComponent.SetShown(global::Android.App.Application.Context, false);
+        ShowLens();
     }
 
     /// <summary>A novel with just the typed title, chosen for the lens (the names fixed on the lens go to it).</summary>

@@ -3,6 +3,15 @@
 All notable changes to Helm. The top section is used as the GitHub release body and as the Velopack release notes.
 Format: [Keep a Changelog](https://keepachangelog.com), versions follow [SemVer](https://semver.org).
 
+## [0.84.0] - 2026-11-19
+
+### Fixed
+- **Android: Novel Lens is hidden until you use it, so banking apps stop warning that Helm “may carry malware”**
+  (Techcombank did, even with every permission off). They flag sideloaded apps that have an accessibility service
+  at all, switched on or not. Novel Reader settings → Novel Lens → *Turn on Novel Lens* lists it again in
+  Accessibility settings; *Turn off Novel Lens* hides it again (do that before opening a banking app). If Novel Lens
+  was switched on before this update, it stays on.
+
 ## [0.83.0] - 2026-11-04
 
 ### Added

@@ -17,8 +17,10 @@ namespace Helm.Modules.NovelReader.Lens;
 /// grants a single permission. The page's text stays in memory for the page shown only.
 /// </summary>
 // A fixed name: Android remembers the enabled accessibility services by it, so it must never change between versions.
-[Service(Name = "com.huyhung1404.helm.novel.LensService", Label = "Helm Novel Lens",
-    Permission = "android.permission.BIND_ACCESSIBILITY_SERVICE", Exported = true)]
+// Disabled until the user turns Novel Lens on in Helm (LensComponent): banking apps (Techcombank) warn that Helm "may
+// carry malware" when a sideloaded app merely lists an accessibility service, even switched off.
+[Service(Name = LensComponent.ServiceClass, Label = "Helm Novel Lens",
+    Permission = "android.permission.BIND_ACCESSIBILITY_SERVICE", Exported = true, Enabled = false)]
 [IntentFilter(["android.accessibilityservice.AccessibilityService"])]
 [MetaData("android.accessibilityservice", Resource = "@xml/helm_novel_lens_service")]
 // Screenshots from an accessibility service came with Android 11.
