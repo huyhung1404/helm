@@ -28,9 +28,10 @@ export interface Env {
   R2_ACCESS_KEY_ID?: string;
   R2_SECRET_ACCESS_KEY?: string;
   R2_BLOBS_BUCKET?: string;
-  /** Per-IP limits for invite redemption and failed admin sign-ins (Workers rate limiting). */
+  /** Per-IP limits for invite redemption, pairing offers and failed admin sign-ins (Workers rate limiting). */
   REDEEM_LIMITER?: RateLimit;
   ADMIN_LIMITER?: RateLimit;
+  PAIR_LIMITER?: RateLimit;
 }
 
 export interface Result {
@@ -41,7 +42,7 @@ export interface Result {
 export type ApiOp =
   | "me" | "push" | "pull" | "getKeyring" | "putKeyring" | "listTokens" | "createToken" | "revokeToken"
   | "reserveBlob" | "authorizeChunk" | "recordChunk" | "commitBlob" | "getBlob" | "listBlobs" | "readChunk"
-  | "deleteBlob" | "restoreBlob" | "authorizeChunks" | "readChunks" | "recordChunks";
+  | "deleteBlob" | "restoreBlob" | "authorizeChunks" | "readChunks" | "recordChunks" | "pairAuth";
 export type AccountAdminOp =
   | "init" | "info" | "setQuota" | "createToken" | "listTokens" | "revokeToken" | "revokeAll" | "export" | "import"
   | "blobsDue" | "blobsPurged" | "purgeTombstones";
@@ -81,6 +82,8 @@ const REQUIRED_SCOPE: Record<ApiOp, Scope> = {
   authorizeChunks: "sync:write",
   recordChunks: "sync:write",
   readChunks: "sync:read",
+  // Reading and sealing a pairing adds a device: only a device that may add devices can do it.
+  pairAuth: "tokens:manage",
 };
 
 /** Live connections per account; a new one beyond this closes the oldest (a device that vanished without closing). */
@@ -228,6 +231,8 @@ export class AccountObject extends DurableObject<Env> {
           return { status: 200, body: this.store.blobs.remove(input.blobId) };
         case "restoreBlob":
           return { status: 200, body: this.store.blobs.restore(input.blobId) };
+        case "pairAuth":
+          return { status: 200, body: { tokenId: token.id } };
       }
     });
   }
@@ -330,6 +335,28 @@ export class RegistryObject extends DurableObject<Env> {
 
   async redeem(codeHash: string, accountId: string, name: string): Promise<Result> {
     return run(async () => ({ status: 200, body: this.store.redeem(codeHash, accountId, name) }));
+  }
+
+  async offerPairing(id: string, input: { publicKey: string; deviceName: string; pickupHash: string }): Promise<Result> {
+    return run(async () => ({ status: 201, body: this.store.offerPairing(id, input) }));
+  }
+
+  async readPairing(id: string): Promise<Result> {
+    return run(async () => ({ status: 200, body: this.store.readPairing(id) }));
+  }
+
+  async sealPairing(id: string, accountId: string, sealed: string): Promise<Result> {
+    return run(async () => {
+      this.store.sealPairing(id, accountId, sealed);
+      return { status: 200, body: { sealed: true } };
+    });
+  }
+
+  async pickUpPairing(id: string, pickupHash: string): Promise<Result> {
+    return run(async () => {
+      const picked = this.store.pickUpPairing(id, pickupHash);
+      return picked ? { status: 200, body: picked } : { status: 202, body: { waiting: true } };
+    });
   }
 }
 

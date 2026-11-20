@@ -101,6 +101,33 @@ Nothing else travels on it: the data still comes through `pull`. The client send
 
 The account's devices. `POST { name, expiresInDays?, scopes? }` returns the plaintext token only in that response. Without `scopes`, the new token gets the caller's scopes.
 
+### Pairing (`/v1/pair`)
+
+A new device joins by an 18-digit code typed into Helm on a device where sync is unlocked, so nobody types the
+passphrase on it (`SyncPairing` in `src/Helm.Core/Sync`, `helm-connector sync pair`, General → Sync → Devices → Add a
+device with a code). Every pairing lives 5 minutes and is used once; the server only relays a public key and a sealed
+package it cannot open.
+
+1. The new device makes a P-256 key pair (memory only). The code is the first 64 bits of `SHA-256("helm-pair/v1/code|"
+   ‖ public key DER)` modulo 10^18, shown as six groups of three digits; its id is `SHA-256("helm-pair/v1/id|" ‖
+   code)` in lowercase hex. `POST /v1/pair { id, publicKey, deviceName, pickup }` (no token; `PAIR_LIMITER`, 10 per
+   minute per IP) → `201 { expiresAt }`; `409 pairing_exists` if that id is live. `pickup` is 32 random bytes in
+   base64 that only this device knows; the server keeps its SHA-256.
+2. The signed-in device (scope `tokens:manage`) types the code: `GET /v1/pair/:id` → `{ publicKey, deviceName,
+   expiresAt }`. It **checks that the public key gives that code**: a server that put its own key behind the id
+   would need another key with the same 60 bits within the 5 minutes. The user confirms the device name.
+3. It creates the new device's token (`sync:read`, `sync:write`; never `tokens:manage`) and seals
+   `{ v: 1, token, keys }` (`keys`: the account's key set, every epoch) to the public key: ECDH P-256 with a fresh
+   key, `HKDF-SHA256(SHA-256(shared secret), salt = fresh public key ‖ new device's public key, info
+   "helm-pair/v1/seal")`, AES-256-GCM with AAD `"helm-pair/v1|<id>"`. Wire format, base64: `[0x01][key length,
+   uint16 BE][fresh public key DER][nonce 12][tag 16][ciphertext]`. `PUT /v1/pair/:id { sealed }` (≤ 64 KiB);
+   `409 pairing_sealed` if another device was first. If sealing or the PUT fails, it revokes the token it created.
+4. The new device asks `POST /v1/pair/:id/pickup { pickup }` every 2 seconds: `202 { waiting: true }`, then
+   `200 { sealed, accountId }` once, and the pairing is deleted. It opens the package, connects with the token,
+   keeps the keys, and syncs.
+
+Unknown, expired, used, and wrong-pickup requests all answer `404 pairing_not_found`.
+
 ### Storage quota
 
 Each account has a quota (256 MB by default, or what the invite set). A push that would grow the stored payloads beyond it is rejected as a whole with `413 quota_exceeded`, and Helm shows "Storage is full". Pushes that shrink the account (deletes, smaller edits) are always accepted. `/v1/me` reports `usedBytes` and `quotaBytes`.

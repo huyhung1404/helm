@@ -28,6 +28,12 @@
 //   Invites (no Authorization)
 //     POST   /v1/redeem                   { invite, accountName, deviceName } -> new account + its first token
 //
+//   Pairing a device by a code (5 minutes, once; see docs/sync-protocol.md "Pairing")
+//     POST   /v1/pair                     { id, publicKey, deviceName, pickup } the new device (no Authorization)
+//     GET    /v1/pair/:id                 -> { publicKey, deviceName, expiresAt }      (scope tokens:manage)
+//     PUT    /v1/pair/:id                 { sealed } the package for the new device    (scope tokens:manage)
+//     POST   /v1/pair/:id/pickup          { pickup } -> 202 waiting | 200 { sealed, accountId } (no Authorization)
+//
 //   Admin page: GET /admin (sign in with ADMIN_TOKEN in the browser)
 //
 //   Admin API (Authorization: Bearer <ADMIN_TOKEN secret>)
@@ -48,7 +54,7 @@
 //     POST   /admin/blobs/gc                         { now? } purge due blobs now (also nightly)
 //     POST   /admin/tombstones/gc                    { now? } remove deletions older than TOMBSTONE_DAYS now (also nightly)
 //
-//   Rate limits (per client IP): /v1/redeem, and failed admin sign-ins.
+//   Rate limits (per client IP): /v1/redeem, POST /v1/pair, and failed admin sign-ins.
 //
 // See docs/sync-protocol.md. There is no open sign-up: an account needs an invite or the admin.
 
@@ -59,7 +65,7 @@ import {
   deleteBlob, downloadUrls, getChunk, putChunk, recordUploaded, requireBlobs, runBlobGc, runTombstoneGc, uploadUrls,
 } from "./blobs.ts";
 import type { AccountAdminOp, ApiInput, ApiOp, Env, Result } from "./objects.ts";
-import { INVITE_LIMITS } from "./registry-store.ts";
+import { INVITE_LIMITS, PAIRING_LIMITS } from "./registry-store.ts";
 import { HttpError } from "./sql.ts";
 import {
   createInviteCode, hashToken, isAccountId, isInviteCode, newAccountId, parseToken, randomBase62, secretsEqual,
@@ -71,12 +77,16 @@ const MAX_BODY_BYTES = 8 * 1024 * 1024;
 const MAX_NAME_LENGTH = 100;
 // /v1/blobs, /v1/blobs/:id, /v1/blobs/:id/commit|restore, /v1/blobs/:id/chunks/:index
 const BLOB_ROUTE = /^\/v1\/blobs(?:\/([^/]+)(?:\/(commit|restore|upload-urls|uploaded|download-urls|chunks\/([^/]+)))?)?$/;
+// /v1/pair, /v1/pair/:id, /v1/pair/:id/pickup; the id is SHA-256 of the code, in lowercase hex
+const PAIR_ROUTE = /^\/v1\/pair(?:\/([0-9a-f]{64})(\/pickup)?)?$/;
+const BASE64 = /^[A-Za-z0-9+/]+={0,2}$/;
 
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
     try {
       const url = new URL(request.url);
       if (url.pathname === "/v1/redeem") return respond(await handleRedeem(request, env));
+      if (url.pathname === "/v1/pair" || url.pathname.startsWith("/v1/pair/")) return respond(await handlePair(request, env, url));
       if (url.pathname.startsWith("/v1/")) {
         const result = await handleApi(request, env, url);
         return result instanceof Response ? result : respond(result);
@@ -215,6 +225,57 @@ async function handleRedeem(request: Request, env: Env): Promise<Result> {
   const token = await rpc(target.admin("createToken", { name: deviceName }));
   if (token.status !== 201) return token;
   return { status: 201, body: { account: created.body, token: token.body } };
+}
+
+async function handlePair(request: Request, env: Env, url: URL): Promise<Result> {
+  const route = PAIR_ROUTE.exec(url.pathname);
+  if (!route) throw new HttpError(404, "not_found");
+  const [, id, pickup] = route;
+  const registry = registryObject(env);
+  const method = request.method;
+
+  if (id === undefined) {
+    if (method !== "POST") throw new HttpError(405, "method_not_allowed");
+    await enforceLimit(env.PAIR_LIMITER, request, "Too many pairing attempts. Wait a minute.");
+    const body = await readJson(request);
+    if (!isRecord(body)) throw new HttpError(400, "invalid_body");
+    const offerId = typeof body.id === "string" ? body.id : "";
+    if (!/^[0-9a-f]{64}$/.test(offerId)) throw new HttpError(400, "invalid_id");
+    const publicKey = typeof body.publicKey === "string" ? body.publicKey : "";
+    if (publicKey.length === 0 || publicKey.length > PAIRING_LIMITS.maxPublicKeyChars || !BASE64.test(publicKey)) {
+      throw new HttpError(400, "invalid_publicKey");
+    }
+    const secret = requirePickup(body.pickup);
+    const deviceName = requireName(body.deviceName, "deviceName");
+    return rpc(registry.offerPairing(offerId, { publicKey, deviceName, pickupHash: await hashToken(secret) }));
+  }
+
+  if (pickup !== undefined) {
+    if (method !== "POST") throw new HttpError(405, "method_not_allowed");
+    const body = await readJson(request);
+    return rpc(registry.pickUpPairing(id, await hashToken(requirePickup(isRecord(body) ? body.pickup : undefined))));
+  }
+
+  if (method !== "GET" && method !== "PUT") throw new HttpError(405, "method_not_allowed");
+  const token = bearer(request);
+  const parsed = token ? parseToken(token) : null;
+  if (!token || !parsed) throw new HttpError(401, "invalid_token");
+  const allowed = await rpc(account(env, parsed.accountId).api(await hashToken(token), "pairAuth", {}));
+  if (allowed.status !== 200) return allowed;
+  if (method === "GET") return rpc(registry.readPairing(id));
+  const body = await readJson(request);
+  const sealed = isRecord(body) && typeof body.sealed === "string" ? body.sealed : "";
+  if (sealed.length === 0 || sealed.length > PAIRING_LIMITS.maxSealedChars || !BASE64.test(sealed)) {
+    throw new HttpError(400, "invalid_sealed");
+  }
+  return rpc(registry.sealPairing(id, parsed.accountId, sealed));
+}
+
+/** The new device's pickup secret: 32 random bytes in base64 (or anything as long and as plain). */
+function requirePickup(value: unknown): string {
+  const secret = typeof value === "string" ? value : "";
+  if (secret.length < 40 || secret.length > 100 || !BASE64.test(secret)) throw new HttpError(400, "invalid_pickup");
+  return secret;
 }
 
 async function handleAdmin(request: Request, env: Env, url: URL): Promise<Result> {

@@ -379,7 +379,14 @@
                                     </StackPanel>
                                 </StackPanel>
                             </Border>
-                            <TextBlock Text="Add a device" FontWeight="SemiBold" Margin="0,8,0,8" />
+                            <TextBlock Text="Add a device with a code" FontWeight="SemiBold" Margin="0,8,0,4" />
+                            <TextBlock TextWrapping="Wrap" Style="{DynamicResource HelmSecondaryText}" Margin="0,0,0,8"
+                                       Text="For a device that shows an 18-digit pairing code (such as helm-connector sync pair). It gets its own token and the account key, so nobody types the passphrase on it." />
+                            <StackPanel Orientation="Horizontal">
+                                <ui:TextBox AutomationProperties.Name="Pairing code" PlaceholderText="18-digit code" Text="{Binding PairingCode, UpdateSourceTrigger=PropertyChanged}" FontFamily="Consolas" MinWidth="260" Margin="0,0,8,0" />
+                                <ui:Button Content="Add device" Command="{Binding PairDeviceCommand}" />
+                            </StackPanel>
+                            <TextBlock Text="Add a device with a token" FontWeight="SemiBold" Margin="0,16,0,8" />
                             <StackPanel Orientation="Horizontal">
                                 <ui:TextBox AutomationProperties.Name="New device name" PlaceholderText="Device name, e.g. Laptop" Text="{Binding NewDeviceName, UpdateSourceTrigger=PropertyChanged}" MinWidth="220" Margin="0,0,8,0" />
                                 <ui:TextBox AutomationProperties.Name="New device expiry in days" PlaceholderText="Expires in days (optional)" Text="{Binding NewDeviceDays, UpdateSourceTrigger=PropertyChanged}" MinWidth="200" Margin="0,0,8,0" />

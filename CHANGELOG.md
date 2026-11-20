@@ -12,6 +12,14 @@ Format: [Keep a Changelog](https://keepachangelog.com), versions follow [SemVer]
   trash, a mission replanned) only happens after you say yes to what the assistant tells you it will do. It stops
   syncing by itself if it ever pushes far more than usual, never decides held mass deletions, and can alert a
   Healthchecks URL for both. Built with `dotnet publish src/Helm.Connector -r linux-x64 -c Release`.
+- **Add a device with a code** (General → Sync → Devices): a new device that shows an 18-digit pairing code (such as
+  `helm-connector sync pair`) joins your sync account when you type that code on a PC where sync is unlocked and
+  approve its name. Nobody types the passphrase on the new device; the sync server only passes on a sealed package
+  it cannot open, and the code works once, for 5 minutes. The new device cannot add or remove devices.
+
+### Fixed
+- helm-connector: the first sync after `sync unlock` brought down every tool's data before the box's allowlist took
+  effect. It now syncs the chosen tools only, from the first sync on.
 - MCP clients see which of Helm's tools delete or replace data (moving a note to the trash, replanning a mission).
 
 ## [0.84.0] - 2026-11-19

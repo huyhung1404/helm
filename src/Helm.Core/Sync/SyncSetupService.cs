@@ -167,6 +167,130 @@ public sealed class SyncSetupService
     public Task<(SyncDeviceToken Device, string Token)> AddDeviceAsync(string name, int? expiresInDays = null, CancellationToken ct = default) =>
         _api.CreateTokenAsync(RequireCredentials(), name, expiresInDays, ct: ct);
 
+    /// <summary>
+    /// New device: offers a pairing (<see cref="SyncPairing"/>) and returns it with the code to show. Then call
+    /// <see cref="CompletePairingAsync"/>, which waits until a signed-in device typed the code and approved.
+    /// </summary>
+    public async Task<SyncPairingOffer> OfferPairingAsync(string deviceName, Uri? server = null, CancellationToken ct = default)
+    {
+        var offer = SyncPairingOffer.Create(server ?? SyncDefaults.Server, deviceName.Trim());
+        try
+        {
+            offer.ExpiresAt = await _api.OfferPairingAsync(offer.Server, offer.Id, Convert.ToBase64String(offer.PublicKey), offer.DeviceName,
+                offer.Pickup, ct).ConfigureAwait(false);
+            return offer;
+        }
+        catch
+        {
+            offer.Dispose();
+            throw;
+        }
+    }
+
+    /// <summary>
+    /// New device: waits for the package a signed-in device sealed to <paramref name="offer"/>, then connects with the
+    /// token in it and keeps the account keys, as if unlocked with the passphrase.
+    /// </summary>
+    /// <exception cref="SyncKeyException">The code expired or was used, or the package could not be opened.</exception>
+    public async Task<SyncAccountInfo> CompletePairingAsync(SyncPairingOffer offer, TimeSpan? pollEvery = null, CancellationToken ct = default)
+    {
+        string? sealedPackage;
+        while (true)
+        {
+            try
+            {
+                sealedPackage = await _api.PickUpPairingAsync(offer.Server, offer.Id, offer.Pickup, ct).ConfigureAwait(false);
+            }
+            catch (SyncRequestException e) when (e.Status == System.Net.HttpStatusCode.NotFound)
+            {
+                throw new SyncKeyException("The code expired or was already used. Start pairing again.");
+            }
+            if (sealedPackage is not null) break;
+            if (DateTimeOffset.UtcNow >= offer.ExpiresAt) throw new SyncKeyException("The code expired. Start pairing again.");
+            await Task.Delay(pollEvery ?? TimeSpan.FromSeconds(2), ct).ConfigureAwait(false);
+        }
+        var package = SyncPairing.Open(offer, sealedPackage);
+        try
+        {
+            using var keys = SyncKeySet.TryParse(package.Keys) ?? throw new SyncKeyException("The other device sent no usable account key.");
+            var credentials = new SyncCredentials(offer.Server, package.Token);
+            var account = await _api.GetAccountAsync(credentials, ct).ConfigureAwait(false);
+            Bind(account, credentials);
+            SaveKeys(keys);
+            await OnKeyReadyAsync().ConfigureAwait(false);
+            _logger.LogInformation("Paired as device {Device} of account {Account}", account.TokenName, account.AccountName);
+            return account;
+        }
+        finally
+        {
+            System.Security.Cryptography.CryptographicOperations.ZeroMemory(package.Keys);
+        }
+    }
+
+    /// <summary>
+    /// Signed-in device: looks up a pairing code typed in and checks that the device behind it holds the key the code
+    /// names. Nothing is sent yet: show <see cref="SyncPairingRequest.DeviceName"/> and approve with
+    /// <see cref="ApprovePairingAsync"/>.
+    /// </summary>
+    /// <exception cref="SyncKeyException">Not 18 digits, or the key does not match the code (nothing is sent).</exception>
+    /// <exception cref="SyncRequestException">404 pairing_not_found: unknown, used or expired code.</exception>
+    public async Task<SyncPairingRequest> ReadPairingAsync(string typedCode, CancellationToken ct = default)
+    {
+        var code = SyncPairing.Normalize(typedCode) ?? throw new SyncKeyException($"A pairing code is {SyncPairing.CodeDigits} digits.");
+        var id = SyncPairing.IdOf(code);
+        var (publicKey, deviceName, expiresAt) = await _api.ReadPairingAsync(RequireCredentials(), id, ct).ConfigureAwait(false);
+        byte[] key;
+        try
+        {
+            key = Convert.FromBase64String(publicKey);
+        }
+        catch (FormatException)
+        {
+            throw new SyncKeyException("The new device's key is damaged. Start pairing again on it.");
+        }
+        if (!SyncPairing.Matches(code, key))
+            throw new SyncKeyException("This code does not match the device that offered it, so nothing was sent. Start pairing again on the new device.");
+        return new SyncPairingRequest(id, code, key, deviceName, expiresAt);
+    }
+
+    /// <summary>
+    /// Signed-in device, once the user approved the name: adds the new device (sync read and write only, it cannot add
+    /// or remove devices) and sends it its token and the account keys, sealed to its key.
+    /// </summary>
+    /// <exception cref="SyncKeyException">This device is not unlocked.</exception>
+    public async Task<SyncDeviceToken> ApprovePairingAsync(SyncPairingRequest request, CancellationToken ct = default)
+    {
+        var credentials = RequireCredentials();
+        using var keys = LoadKeys() ?? throw new SyncKeyException("Unlock sync on this device first.");
+        var (device, token) = await _api.CreateTokenAsync(credentials, request.DeviceName, scopes: [SyncScopes.Read, SyncScopes.Write], ct: ct)
+            .ConfigureAwait(false);
+        var keyData = keys.Serialize();
+        try
+        {
+            var sealedPackage = SyncPairing.Seal(request.PublicKey, request.Id, new SyncPairingPackage(token, keyData));
+            await _api.SealPairingAsync(credentials, request.Id, sealedPackage, ct).ConfigureAwait(false);
+        }
+        catch
+        {
+            // The new device never got its token: take it back rather than leave an unused device behind.
+            try
+            {
+                await _api.RevokeTokenAsync(credentials, device.Id, CancellationToken.None).ConfigureAwait(false);
+            }
+            catch (Exception ex) when (ex is HttpRequestException or SyncAuthException or SyncRequestException or TaskCanceledException)
+            {
+                _logger.LogWarning(ex, "Pairing failed and the unused device token {Token} could not be revoked", device.Id);
+            }
+            throw;
+        }
+        finally
+        {
+            System.Security.Cryptography.CryptographicOperations.ZeroMemory(keyData);
+        }
+        _logger.LogInformation("Paired a new device: {Device}", device.Name);
+        return device;
+    }
+
     /// <summary>Stops a device from syncing. It keeps what it already downloaded; see <see cref="RemoveDeviceAndRotateKeyAsync"/>.</summary>
     public Task RevokeDeviceAsync(string tokenId, CancellationToken ct = default) => _api.RevokeTokenAsync(RequireCredentials(), tokenId, ct);
 

@@ -473,6 +473,169 @@ public sealed class SyncServerTests : IDisposable
         Assert.All(statuses, s => Assert.True(s is 400 or 429, $"unexpected {s}"));
     }
 
+    [ServerFact]
+    public async Task A_device_pairs_by_a_code_typed_on_a_signed_in_one_without_the_passphrase()
+    {
+        var a = NewSetupDevice("a");
+        await a.Setup.RedeemInviteAsync(await CreateInviteAsync(), "Minh", "PC", ServerUrl);
+        await a.Setup.CreatePassphraseAsync("minh's long passphrase");
+        var id = a.Notes.Add(new Note("Plan", "from A"));
+        Assert.Equal(SyncRunOutcome.Completed, (await a.Engine.SyncNowAsync()).Outcome);
+
+        // The new device shows a code; it is waiting meanwhile.
+        var box = NewSetupDevice("box");
+        using var offer = await box.Setup.OfferPairingAsync("fairy-box", ServerUrl);
+        Assert.True(offer.ExpiresAt > DateTimeOffset.UtcNow.AddMinutes(4));
+        var waiting = box.Setup.CompletePairingAsync(offer, TimeSpan.FromMilliseconds(100));
+
+        // The signed-in device types it (spaced as shown), sees the device's name, approves.
+        await Assert.ThrowsAsync<SyncKeyException>(() => a.Setup.ReadPairingAsync("123"));
+        await Assert.ThrowsAsync<SyncRequestException>(() => a.Setup.ReadPairingAsync("000 000 000 000 000 000"));
+        var request = await a.Setup.ReadPairingAsync(SyncPairing.FormatCode(offer.Code));
+        Assert.Equal("fairy-box", request.DeviceName);
+        var device = await a.Setup.ApprovePairingAsync(request);
+
+        var account = await waiting;
+        Assert.Equal(("Minh", "fairy-box"), (account.AccountName, account.TokenName));
+        Assert.Equal([SyncScopes.Read, SyncScopes.Write], account.Scopes.Order());
+        Assert.False(account.CanManageTokens);
+        Assert.Equal(SyncSetupStage.Ready, box.Setup.Stage);
+        Assert.Equal(new Note("Plan", "from A"), box.Notes.Get(id));
+        Assert.Contains(await a.Setup.ListDevicesAsync(), d => d.Id == device.Id && d.Name == "fairy-box");
+
+        // Used once: the code is gone for everyone.
+        await Assert.ThrowsAsync<SyncRequestException>(() => a.Setup.ReadPairingAsync(offer.Code));
+    }
+
+    [ServerFact]
+    public async Task The_connector_pairs_by_a_code_and_brings_down_only_what_it_syncs()
+    {
+        var a = NewSetupDevice("a");
+        await a.Setup.RedeemInviteAsync(await CreateInviteAsync(), "Minh", "PC", ServerUrl);
+        await a.Setup.CreatePassphraseAsync("minh's long passphrase");
+        a.Notes.Add(new Note("Plan", "notes stay off the box"));
+        Assert.Equal(SyncRunOutcome.Completed, (await a.Engine.SyncNowAsync()).Outcome);
+
+        var data = Path.Combine(_dir, "box");
+        var sink = new StringWriter();
+        var output = TextWriter.Synchronized(sink);
+        string Printed() { lock (output) return sink.ToString(); }
+        var error = new StringWriter();
+        Helm.Connector.Commands.SyncCommand.PairPollEvery = TimeSpan.FromMilliseconds(100);
+        // On the thread pool, as in the real process (no synchronization context to share with the test).
+        var run = Task.Run(() => Helm.Connector.ConnectorApp.RunAsync(
+            ["--data-dir", data, "sync", "pair", "--device", "fairy-box", "--server", ServerUrl!.ToString()],
+            new Helm.Connector.CliConsole(output, error, _ => null) { ReadSecret = _ => null }));
+
+        var code = "";
+        var deadline = DateTime.UtcNow.AddSeconds(30);
+        while (!run.IsCompleted
+            && (code = System.Text.RegularExpressions.Regex.Match(Printed(), @"\d{3}( \d{3}){5}").Value).Length == 0)
+        {
+            Assert.True(DateTime.UtcNow < deadline, "no code shown: " + Printed() + error);
+            await Task.Delay(100);
+        }
+        if (run.IsCompleted) Assert.Fail($"sync pair ended early ({await run}): {error}{Printed()}");
+        var request = await a.Setup.ReadPairingAsync(code);
+        Assert.Equal("fairy-box", request.DeviceName);
+        await a.Setup.ApprovePairingAsync(request);
+
+        Assert.True(await run == 0, error.ToString());
+        Assert.Contains("Paired: account Minh, as device fairy-box", Printed());
+
+        // The box holds the selected tools only (ai, wallet, tracker, habits): the PC's note never came down.
+        using var db = new Microsoft.Data.Sqlite.SqliteConnection(
+            $"Data Source={Path.Combine(data, "sync", "helm-sync.db")};Mode=ReadOnly;Pooling=False");
+        db.Open();
+        using var count = db.CreateCommand();
+        count.CommandText = "SELECT COUNT(*) FROM records WHERE collection = 'notes'";
+        Assert.Equal(0L, (long)count.ExecuteScalar()!);
+    }
+
+    [ServerFact]
+    public async Task The_sync_page_adds_a_device_by_its_code_only_after_the_user_approves_its_name()
+    {
+        var a = NewSetupDevice("a");
+        await a.Setup.RedeemInviteAsync(await CreateInviteAsync(), "Minh", "PC", ServerUrl);
+        await a.Setup.CreatePassphraseAsync("minh's long passphrase");
+        var dialogs = new AnswerDialogs { Answer = false };
+        var page = new Helm.Shell.ViewModels.SyncViewModel(a.Setup, a.Engine, new InlineUi(), dialogs, new NoClipboard(), new NamedDevice(),
+            Microsoft.Extensions.Logging.Abstractions.NullLogger<Helm.Shell.ViewModels.SyncViewModel>.Instance);
+
+        var box = NewSetupDevice("box");
+        using var offer = await box.Setup.OfferPairingAsync("fairy-box", ServerUrl);
+        var devices = (await a.Setup.ListDevicesAsync()).Count;
+
+        // Refused: nothing is created or sent, the code still waits for its device.
+        page.PairingCode = SyncPairing.FormatCode(offer.Code);
+        await page.PairDeviceCommand.ExecuteAsync(null);
+        Assert.Equal("Add “fairy-box”?", dialogs.LastTitle);
+        Assert.Null(page.ErrorMessage);
+        Assert.Equal(devices, (await a.Setup.ListDevicesAsync()).Count);
+        Assert.Equal("fairy-box", (await a.Setup.ReadPairingAsync(offer.Code)).DeviceName);
+
+        // Approved: the device is added and the box completes.
+        dialogs.Answer = true;
+        await page.PairDeviceCommand.ExecuteAsync(null);
+        Assert.Null(page.ErrorMessage);
+        Assert.Equal("", page.PairingCode);
+        Assert.Equal("fairy-box", (await box.Setup.CompletePairingAsync(offer, TimeSpan.FromMilliseconds(100))).TokenName);
+
+        // A wrong code says why, in the page.
+        page.PairingCode = "12 34";
+        await page.PairDeviceCommand.ExecuteAsync(null);
+        Assert.Contains("18 digits", page.ErrorMessage);
+    }
+
+    private sealed class AnswerDialogs : Helm.Shell.Services.IDialogService
+    {
+        public bool Answer { get; set; }
+        public string? LastTitle { get; private set; }
+
+        public Task<bool> ConfirmAsync(string title, string message, string confirmText)
+        {
+            LastTitle = title;
+            return Task.FromResult(Answer);
+        }
+    }
+
+    private sealed class NoClipboard : Helm.Shell.Services.IClipboardService
+    {
+        public void SetText(string text) { }
+    }
+
+    private sealed class NamedDevice : Helm.Shell.Services.IDeviceInfo
+    {
+        public string DeviceName => "PC";
+    }
+
+    [ServerFact]
+    public async Task A_signed_in_device_sends_nothing_when_the_key_behind_a_code_was_swapped()
+    {
+        var a = NewSetupDevice("a");
+        await a.Setup.RedeemInviteAsync(await CreateInviteAsync(), "Minh", "PC", ServerUrl);
+        await a.Setup.CreatePassphraseAsync("minh's long passphrase");
+        var devicesBefore = (await a.Setup.ListDevicesAsync()).Count;
+
+        // What a server in the middle would do: keep the code's id, put its own public key behind it.
+        using var real = SyncPairingOffer.Create(ServerUrl!, "fairy-box");
+        using var attacker = SyncPairingOffer.Create(ServerUrl!, "fairy-box");
+        using (var client = new HttpClient())
+        {
+            var posted = await client.PostAsJsonAsync(new Uri(ServerUrl!, "v1/pair"), new
+            {
+                id = real.Id,
+                publicKey = Convert.ToBase64String(attacker.PublicKey),
+                deviceName = "fairy-box",
+                pickup = Convert.ToBase64String(System.Security.Cryptography.RandomNumberGenerator.GetBytes(32)),
+            });
+            Assert.Equal(System.Net.HttpStatusCode.Created, posted.StatusCode);
+        }
+
+        await Assert.ThrowsAsync<SyncKeyException>(() => a.Setup.ReadPairingAsync(real.Code));
+        Assert.Equal(devicesBefore, (await a.Setup.ListDevicesAsync()).Count);
+    }
+
     private sealed record Note(string Title, string Body);
 
     private sealed record Device(SyncEngine Engine, SyncedCollection<Note> Notes);

@@ -127,6 +127,8 @@ and each synced tool's store and agent tools from its *.Core project. Only the p
 
 ```bash
 dotnet publish src/Helm.Connector -r linux-x64 -c Release   # one self-contained file: .../linux-x64/publish/helm-connector
+helm-connector sync pair [--device NAME]          # shows an 18-digit code: type it into Helm on a PC (General → Sync
+                                                  # → Devices → Add a device with a code); no passphrase on the box
 helm-connector sync connect --token helm_pat_…    # or --invite helm_inv_… --account NAME [--device NAME]
 helm-connector sync unlock                        # asks for the passphrase (or --recovery-key KEY), then a first sync
 helm-connector serve                              # sync (live) + the MCP socket, until Ctrl+C or SIGTERM

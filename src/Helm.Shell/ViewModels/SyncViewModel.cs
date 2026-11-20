@@ -116,6 +116,7 @@ public sealed partial class SyncViewModel : ObservableObject
     [ObservableProperty] private bool _canManageDevices;
     [ObservableProperty] private string _newDeviceName = "";
     [ObservableProperty] private string _newDeviceDays = "";
+    [ObservableProperty] private string _pairingCode = "";
 
     [ObservableProperty, NotifyPropertyChangedFor(nameof(HasNewDeviceToken))]
     private string? _newDeviceToken;
@@ -293,6 +294,21 @@ public sealed partial class SyncViewModel : ObservableObject
 
     [RelayCommand]
     private void DismissNewDeviceToken() => NewDeviceToken = null;
+
+    /// <summary>The 18-digit code a new device shows (<see cref="SyncPairing"/>): checked, the device's name confirmed, then paired.</summary>
+    [RelayCommand]
+    private Task PairDeviceAsync() => RunAsync(async () =>
+    {
+        var request = await _setup.ReadPairingAsync(PairingCode).ConfigureAwait(true);
+        var confirmed = await _dialogs.ConfirmAsync($"Add “{request.DeviceName}”?",
+            $"“{request.DeviceName}” joins Helm Sync on this account and gets the account key, so it can read and change what it syncs. " +
+            "It cannot add or remove devices. Only approve a device you are setting up yourself right now.",
+            "Add device").ConfigureAwait(true);
+        if (!confirmed) return;
+        await _setup.ApprovePairingAsync(request).ConfigureAwait(true);
+        PairingCode = "";
+        await LoadDevicesAsync().ConfigureAwait(true);
+    });
 
     /// <summary>Opens the removal panel: remove and change the key (recommended), or remove only.</summary>
     [RelayCommand]

@@ -46,3 +46,49 @@ test("expired, revoked and unknown invites fail the same way and create nothing"
   assert.throws(() => store.redeem("nope", "CCCCCCCCCCCCCCCC", "x"), invalid);
   assert.equal(store.list().length, 0);
 });
+
+const gone = (e: unknown) => e instanceof HttpError && e.status === 404 && e.code === "pairing_not_found";
+const offer = { publicKey: "QUJD", deviceName: "fairy-box", pickupHash: "pickup-hash" };
+
+test("a pairing goes offer, read, seal, pick up, and is then gone", () => {
+  const { store } = setup();
+  const { expiresAt } = store.offerPairing("id-1", offer);
+  assert.equal(expiresAt, 1_800_000_000_000 + 5 * 60_000);
+  assert.deepEqual(store.readPairing("id-1"), { publicKey: "QUJD", deviceName: "fairy-box", expiresAt });
+  assert.equal(store.pickUpPairing("id-1", "pickup-hash"), null, "nothing sealed yet: the new device keeps waiting");
+
+  store.sealPairing("id-1", "AAAAAAAAAAAAAAAA", "c2VhbGVk");
+  assert.throws(() => store.readPairing("id-1"), gone, "a sealed pairing is no longer offered");
+  assert.throws(() => store.sealPairing("id-1", "BBBBBBBBBBBBBBBB", "b3RoZXI="),
+    (e: unknown) => e instanceof HttpError && e.status === 409, "the first seal wins");
+
+  assert.deepEqual(store.pickUpPairing("id-1", "pickup-hash"), { sealed: "c2VhbGVk", accountId: "AAAAAAAAAAAAAAAA" });
+  assert.throws(() => store.pickUpPairing("id-1", "pickup-hash"), gone, "picked up once");
+});
+
+test("only the pickup secret picks a pairing up", () => {
+  const { store } = setup();
+  store.offerPairing("id-1", offer);
+  store.sealPairing("id-1", "AAAAAAAAAAAAAAAA", "c2VhbGVk");
+  assert.throws(() => store.pickUpPairing("id-1", "someone-else"), gone);
+  assert.deepEqual(store.pickUpPairing("id-1", "pickup-hash"), { sealed: "c2VhbGVk", accountId: "AAAAAAAAAAAAAAAA" });
+});
+
+test("a pairing lives five minutes and its code cannot be offered twice meanwhile", () => {
+  const { store, advance } = setup();
+  store.offerPairing("id-1", offer);
+  assert.throws(() => store.offerPairing("id-1", offer), (e: unknown) => e instanceof HttpError && e.status === 409);
+  advance(5 * 60_000);
+  assert.throws(() => store.readPairing("id-1"), gone);
+  assert.throws(() => store.sealPairing("id-1", "AAAAAAAAAAAAAAAA", "c2VhbGVk"), gone);
+  assert.throws(() => store.pickUpPairing("id-1", "pickup-hash"), gone);
+  store.offerPairing("id-1", offer); // expired rows are cleared, so the id is free again
+  assert.equal(store.readPairing("id-1").deviceName, "fairy-box");
+});
+
+test("unknown pairings fail the same way", () => {
+  const { store } = setup();
+  assert.throws(() => store.readPairing("nope"), gone);
+  assert.throws(() => store.sealPairing("nope", "AAAAAAAAAAAAAAAA", "c2VhbGVk"), gone);
+  assert.throws(() => store.pickUpPairing("nope", "pickup-hash"), gone);
+});

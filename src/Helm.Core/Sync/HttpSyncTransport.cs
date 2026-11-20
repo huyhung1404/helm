@@ -198,6 +198,39 @@ public sealed class SyncApiClient : IDisposable
     public Task RevokeTokenAsync(SyncCredentials credentials, string tokenId, CancellationToken ct = default) =>
         SendAsync<JsonElement>(credentials, HttpMethod.Delete, $"v1/tokens/{Uri.EscapeDataString(tokenId)}", null, ct);
 
+    /// <summary>Pairing, new device: offers its public key under the code's id (no token yet). See <see cref="SyncPairing"/>.</summary>
+    public async Task<DateTimeOffset> OfferPairingAsync(Uri server, string id, string publicKey, string deviceName, string pickup,
+        CancellationToken ct = default)
+    {
+        var offered = await SendAsync<PairOfferResponse>(new SyncCredentials(server, ""), HttpMethod.Post, "v1/pair",
+            new PairOfferRequest(id, publicKey, deviceName.Trim(), pickup), ct, authenticate: false).ConfigureAwait(false);
+        return DateTimeOffset.FromUnixTimeMilliseconds(offered.ExpiresAt);
+    }
+
+    /// <summary>Pairing, new device: its sealed package once a signed-in device left it, else null (keep waiting).</summary>
+    /// <exception cref="SyncRequestException">404 pairing_not_found: the code expired or was used.</exception>
+    public async Task<string?> PickUpPairingAsync(Uri server, string id, string pickup, CancellationToken ct = default)
+    {
+        var picked = await SendAsync<PairPickupResponse>(new SyncCredentials(server, ""), HttpMethod.Post, PairPath(id) + "/pickup",
+            new PairPickupRequest(pickup), ct, authenticate: false).ConfigureAwait(false);
+        return picked.Sealed;
+    }
+
+    /// <summary>Pairing, signed-in device (tokens:manage): the new device's public key and name.</summary>
+    /// <exception cref="SyncRequestException">404 pairing_not_found: unknown, used or expired code.</exception>
+    public async Task<(string PublicKey, string DeviceName, DateTimeOffset ExpiresAt)> ReadPairingAsync(SyncCredentials credentials, string id,
+        CancellationToken ct = default)
+    {
+        var offer = await SendAsync<PairReadResponse>(credentials, HttpMethod.Get, PairPath(id), null, ct).ConfigureAwait(false);
+        return (offer.PublicKey, offer.DeviceName, DateTimeOffset.FromUnixTimeMilliseconds(offer.ExpiresAt));
+    }
+
+    /// <summary>Pairing, signed-in device (tokens:manage): leaves the sealed package; the first one wins.</summary>
+    public Task SealPairingAsync(SyncCredentials credentials, string id, string sealedPackage, CancellationToken ct = default) =>
+        SendAsync<JsonElement>(credentials, HttpMethod.Put, PairPath(id), new PairSealRequest(sealedPackage), ct);
+
+    private static string PairPath(string id) => "v1/pair/" + Uri.EscapeDataString(id);
+
     /// <summary>The server's effective limits; a server from before blobs reports none, and the defaults apply.</summary>
     public async Task<SyncLimits> GetLimitsAsync(SyncCredentials credentials, CancellationToken ct = default)
     {
@@ -376,6 +409,12 @@ public sealed class SyncApiClient : IDisposable
     private sealed record UploadedRequest(IReadOnlyList<int> Indexes);
     private sealed record UrlJson(int Index, string Url);
     private sealed record UrlsResponse(IReadOnlyList<UrlJson> Urls, long ExpiresAt);
+    private sealed record PairOfferRequest(string Id, string PublicKey, string DeviceName, string Pickup);
+    private sealed record PairOfferResponse(long ExpiresAt);
+    private sealed record PairPickupRequest(string Pickup);
+    private sealed record PairPickupResponse(string? Sealed, string? AccountId, bool? Waiting);
+    private sealed record PairReadResponse(string PublicKey, string DeviceName, long ExpiresAt);
+    private sealed record PairSealRequest(string Sealed);
 }
 
 /// <summary>
