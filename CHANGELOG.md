@@ -3,6 +3,13 @@
 All notable changes to Helm. The top section is used as the GitHub release body and as the Velopack release notes.
 Format: [Keep a Changelog](https://keepachangelog.com), versions follow [SemVer](https://semver.org).
 
+## [Unreleased]
+
+### Fixed
+- **Tracker**: tasks no longer show an empty "Proposed steps" box under every one of them, looking as if it were
+  loading forever, with Cancel, Try again, Undo and Done at once. The box shows only under the task you asked to
+  split into steps.
+
 ## [0.85.0] - 2026-11-20
 
 ### Added

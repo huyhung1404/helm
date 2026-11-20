@@ -2,6 +2,7 @@ using Helm.Core.Ai;
 using Helm.Core.Settings;
 using Helm.Modules.Notes;
 using Helm.Modules.Tracker;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
 
 namespace Helm.Tests;
@@ -39,6 +40,67 @@ public sealed class PlanViewsTests : IDisposable
         """;
 
     // ---- Split into steps -----------------------------------------------------------------------------------------
+
+    [Fact]
+    public void The_steps_panel_shows_only_under_the_task_whose_steps_are_open() => WpfHost.Run(() =>
+    {
+        System.Threading.SynchronizationContext.SetSynchronizationContext(new System.Windows.Threading.DispatcherSynchronizationContext());
+        var list = _tracker.AddWorkspace("TODO");
+        var first = _tracker.AddItem(list, new TrackerItemDraft("Đổi mật khẩu WeChat"));
+        _tracker.AddItem(list, new TrackerItemDraft("Đòi 3 khoản tiền"));
+        var proposals = new TrackerProposalViewModel(_tracker, new ScriptedAiText(FiveSteps), _time);
+        var reminders = new TrackerReminderService(_tracker, _settings, _time);
+        var vm = new TrackerViewModel(_tracker, _settings, new InlineUi(), new AcceptDialogs(), new MemoryClipboard(), reminders,
+            NullLogger<TrackerViewModel>.Instance, proposals: proposals);
+        using var module = new TrackerModule(reminders, new ServiceCollection().BuildServiceProvider(), NullLogger<TrackerModule>.Instance);
+        var page = new TrackerContentPage(module, vm);
+
+        LayOut(page);
+        Assert.Equal(2, vm.OpenItems.Count);
+        // No task has its steps open: no panel at all (it once showed under every task, every part at once, as if loading).
+        Assert.Empty(StepsPanels(page));
+
+        var asked = proposals.ForTaskAsync(first);
+        var frame = new System.Windows.Threading.DispatcherFrame();
+        asked.ContinueWith(_ => frame.Continue = false, TaskScheduler.Default);
+        System.Windows.Threading.Dispatcher.PushFrame(frame);
+        asked.GetAwaiter().GetResult();
+        LayOut(page);
+
+        var shown = Assert.Single(StepsPanels(page));
+        Assert.Same(proposals, shown.DataContext);
+    });
+
+    /// <summary>The "Proposed steps" headings a user would see: every element up to the page is visible.</summary>
+    private static List<System.Windows.Controls.TextBlock> StepsPanels(System.Windows.DependencyObject root)
+    {
+        var found = new List<System.Windows.Controls.TextBlock>();
+        void Walk(System.Windows.DependencyObject node)
+        {
+            if (node is System.Windows.Controls.TextBlock { Text: "Proposed steps" } heading && Shown(heading)) found.Add(heading);
+            for (var i = 0; i < System.Windows.Media.VisualTreeHelper.GetChildrenCount(node); i++) Walk(System.Windows.Media.VisualTreeHelper.GetChild(node, i));
+        }
+        Walk(root);
+        return found;
+    }
+
+    private static bool Shown(System.Windows.DependencyObject node)
+    {
+        for (var d = node; d is not null; d = System.Windows.Media.VisualTreeHelper.GetParent(d))
+            if (d is System.Windows.UIElement { Visibility: not System.Windows.Visibility.Visible }) return false;
+        return true;
+    }
+
+    private static void LayOut(System.Windows.FrameworkElement page)
+    {
+        page.Measure(new System.Windows.Size(1280, 1500));
+        page.Arrange(new System.Windows.Rect(0, 0, 1280, 1500));
+        page.UpdateLayout();
+        var idle = new System.Windows.Threading.DispatcherFrame();
+        System.Windows.Threading.Dispatcher.CurrentDispatcher.BeginInvoke(System.Windows.Threading.DispatcherPriority.ApplicationIdle, () => idle.Continue = false);
+        System.Windows.Threading.Dispatcher.PushFrame(idle);
+        page.UpdateLayout();
+    }
 
     [Fact]
     public void Steps_are_spread_evenly_before_the_task_and_never_on_or_after_it()

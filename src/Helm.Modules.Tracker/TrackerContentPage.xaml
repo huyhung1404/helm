@@ -239,8 +239,10 @@
                         </ui:TextBox>
                     </DockPanel>
 
-                    <!-- Split into steps: shown while AI's proposals are open for this task -->
-                    <ContentControl Content="{Binding Proposal}" ContentTemplate="{StaticResource StepsProposal}" Focusable="False" />
+                    <!-- Split into steps: shown while AI's proposals are open for this task. WPF draws a ContentTemplate even
+                         for null content (every binding failing, every part visible), so it is hidden without proposals. -->
+                    <ContentControl Content="{Binding Proposal}" ContentTemplate="{StaticResource StepsProposal}" Focusable="False"
+                                    Visibility="{Binding Proposal, Converter={StaticResource NotEmptyToVisibility}}" />
 
                     <!-- Inline editor -->
                     <StackPanel Margin="32,8,0,6" Visibility="{Binding IsEditing, Converter={StaticResource BoolToVisibility}}">
