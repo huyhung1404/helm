@@ -177,13 +177,24 @@ jobs:
           dotnet publish src/Helm.VaultRestore -c Release -r win-x64 --self-contained -p:PublishSingleFile=true
           -p:Version=${{ steps.meta.outputs.version }} -o artifacts/vault-restore
 
-      - name: Friendly installer name, Android APK, restore tool, release notes from CHANGELOG, publish
+      # helm-connector for Linux (the Fairy box updates itself from it): one self-contained file, and its SHA-256,
+      # which the box checks before it installs the file (docs/development.md, "helm-connector").
+      - name: Publish helm-connector (linux-x64)
+        shell: pwsh
+        run: |
+          dotnet publish src/Helm.Connector -c Release -r linux-x64 -p:Version=${{ steps.meta.outputs.version }} -o artifacts/connector
+          if ($LASTEXITCODE -ne 0) { throw 'dotnet publish helm-connector failed' }
+          Copy-Item 'artifacts/connector/helm-connector' 'releases/helm-connector-linux-x64'
+          $hash = (Get-FileHash 'releases/helm-connector-linux-x64' -Algorithm SHA256).Hash.ToLowerInvariant()
+          [IO.File]::WriteAllText("$PWD/releases/helm-connector-linux-x64.sha256", "$hash  helm-connector-linux-x64`n")
+
+      - name: Friendly installer name, Android APK, restore tool, connector, release notes from CHANGELOG, publish
         shell: pwsh
         run: |
           $channel = '${{ steps.meta.outputs.channel }}'
           Copy-Item "releases/HelmApp-$channel-Setup.exe" 'releases/Helm-win-Setup.exe'
           Copy-Item 'artifacts/vault-restore/helm-vault-restore.exe' 'releases/helm-vault-restore-win-x64.exe'
-          gh release upload $env:TAG 'releases/Helm-win-Setup.exe' 'releases/Helm-android.apk' 'releases/Helm-android-x64.apk' 'releases/helm-vault-restore-win-x64.exe' --clobber
+          gh release upload $env:TAG 'releases/Helm-win-Setup.exe' 'releases/Helm-android.apk' 'releases/Helm-android-x64.apk' 'releases/helm-vault-restore-win-x64.exe' 'releases/helm-connector-linux-x64' 'releases/helm-connector-linux-x64.sha256' --clobber
           if ($LASTEXITCODE -ne 0) { throw 'gh release upload failed' }
           $notes = 'artifacts/notes-${{ steps.meta.outputs.version }}.md'
           $flags = @('--notes-file', $notes, '--draft=false')

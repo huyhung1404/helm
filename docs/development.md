@@ -136,6 +136,8 @@ helm-connector mcp                                # MCP on stdio for Fairy Core:
 helm-connector status                             # sync, what is synced, holds, the running serve (changes nothing)
 ```
 
+- **Releases**: every Helm release carries `helm-connector-linux-x64` and `helm-connector-linux-x64.sha256` (the
+  Release workflow publishes them); the Fairy box installs a newer one by itself, after checking the hash.
 - **Data folder**: `--data-dir`, else `$HELM_DATA_DIR` (the box: /srv/fairy/connectors/helm, its own Linux user),
   else `$XDG_DATA_HOME/helm`, else `~/.local/share/helm`. Same layout as on Windows (settings/, sync/), plus
   secrets/ and run/ (serve.json, mcp.sock).
