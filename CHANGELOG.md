@@ -3,7 +3,7 @@
 All notable changes to Helm. The top section is used as the GitHub release body and as the Velopack release notes.
 Format: [Keep a Changelog](https://keepachangelog.com), versions follow [SemVer](https://semver.org).
 
-## [Unreleased]
+## [0.85.2] - 2026-11-20
 
 ### Added
 - **helm-connector in every release**: `helm-connector-linux-x64` and its SHA-256 are attached to each release, so a
