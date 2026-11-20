@@ -3,7 +3,7 @@
 All notable changes to Helm. The top section is used as the GitHub release body and as the Velopack release notes.
 Format: [Keep a Changelog](https://keepachangelog.com), versions follow [SemVer](https://semver.org).
 
-## [Unreleased]
+## [0.85.1] - 2026-11-20
 
 ### Fixed
 - **Tracker**: tasks no longer show an empty "Proposed steps" box under every one of them, looking as if it were
