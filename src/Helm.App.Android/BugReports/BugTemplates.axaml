@@ -1,0 +1,33 @@
+<ResourceDictionary xmlns="https://github.com/avaloniaui"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                    xmlns:ic="using:FluentIcons.Avalonia"
+                    xmlns:b="using:Helm.App.Android.BugReports"
+                    xmlns:bugs="using:Helm.Shell.BugReports">
+
+    <!-- Shared by the report page and the Bug reports page. -->
+
+    <!-- One event of a black box: "-37.9 s", its kind, what happened, and an error's stack on demand. -->
+    <DataTemplate x:Key="BlackBoxEvent" x:DataType="bugs:BlackBoxEventItem">
+        <Grid ColumnDefinitions="52,24,*" Margin="0,3">
+            <TextBlock Text="{Binding Time}" FontFamily="monospace" FontSize="11" HorizontalAlignment="Right" Margin="0,2,4,0" Classes="secondary" />
+            <ic:SymbolIcon Grid.Column="1" Symbol="{Binding Kind, Converter={x:Static b:BugLook.Icon}}" FontSize="14" VerticalAlignment="Top" Margin="0,2,0,0"
+                           Foreground="{Binding Kind, Converter={x:Static b:BugLook.Brush}}" />
+            <StackPanel Grid.Column="2">
+                <TextBlock Text="{Binding Text}" TextWrapping="Wrap" FontSize="13" Classes.error="{Binding IsError}" />
+                <TextBlock Text="{Binding Source}" Classes="secondary" FontSize="11"
+                           IsVisible="{Binding Source, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+                <Button Classes="flat" Padding="0,4" HorizontalAlignment="Left" Command="{Binding ToggleDetailCommand}" IsVisible="{Binding HasDetail}">
+                    <TextBlock Text="Show or hide the stack" FontSize="12" Foreground="{DynamicResource SystemAccentColor}" />
+                </Button>
+                <SelectableTextBlock Text="{Binding Detail}" FontFamily="monospace" FontSize="11" TextWrapping="Wrap" IsVisible="{Binding ShowDetail}" Margin="0,2,0,4" />
+            </StackPanel>
+        </Grid>
+    </DataTemplate>
+
+    <!-- A saved picture (tap to see it big) -->
+    <DataTemplate x:Key="BugThumb" x:DataType="bugs:BugImageItem">
+        <Border Width="96" Height="96" Margin="0,0,8,8" CornerRadius="6" ClipToBounds="True" Background="{DynamicResource HelmSubtleFill}">
+            <Image b:BugImageLoader.Item="{Binding}" Stretch="UniformToFill" />
+        </Border>
+    </DataTemplate>
+</ResourceDictionary>

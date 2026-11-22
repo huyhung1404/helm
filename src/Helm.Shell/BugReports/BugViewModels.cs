@@ -214,6 +214,8 @@ public sealed partial class BugReportFormViewModel : ObservableObject
     /// <summary>"The last 60 s, frozen at 14:31:52 · 214 events" (errors and freezes are tags beside it).</summary>
     public string BlackBoxText => $"The last {(int)BlackBox.Window.TotalSeconds} s, frozen at {FrozenAt} · {Snapshot.Events.Count} events";
 
+    public bool HasErrors => ErrorCount > 0;
+
     public string ErrorText => ErrorCount == 1 ? "1 error" : $"{ErrorCount} errors";
 
     public int ErrorCount => Snapshot.ErrorCount;
@@ -229,7 +231,14 @@ public sealed partial class BugReportFormViewModel : ObservableObject
     private string _text = "";
 
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(IsBlocking), nameof(IsAnnoying), nameof(IsMinor))]
     private BugSeverity _severity = BugSeverity.Annoying;
+
+    public bool IsBlocking => Severity == BugSeverity.Blocking;
+
+    public bool IsAnnoying => Severity == BugSeverity.Annoying;
+
+    public bool IsMinor => Severity == BugSeverity.Minor;
 
     [ObservableProperty]
     private string _tool;
@@ -458,7 +467,11 @@ public sealed partial class BugDetailViewModel : ObservableObject
     private IReadOnlyList<string> _steps = [];
 
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(EnvironmentLines))]
     private IReadOnlyList<KeyValuePair<string, string>> _environment = [];
+
+    /// <summary>"Helm: 0.85.2" lines (the phone shows them as text).</summary>
+    public IReadOnlyList<string> EnvironmentLines => [.. Environment.Select(kv => $"{kv.Key}: {kv.Value}")];
 
     [ObservableProperty]
     private BlackBoxFilter _eventFilter;
@@ -740,6 +753,10 @@ public sealed partial class BugReportsViewModel : ObservableObject
 
     [RelayCommand]
     private void SetFilter(BugFilter filter) => Filter = filter;
+
+    /// <summary>Opens a bug from the list (the phone's rows are buttons).</summary>
+    [RelayCommand]
+    private void Select(BugRowViewModel row) => SelectedRow = row;
 
     /// <summary>Opens a bug by its id (from a notification, the report window, a link).</summary>
     public void Open(string id)

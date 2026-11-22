@@ -1,0 +1,142 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:ic="using:FluentIcons.Avalonia"
+             xmlns:b="using:Helm.App.Android.BugReports"
+             xmlns:bugs="using:Helm.Shell.BugReports"
+             x:Class="Helm.App.Android.BugReports.BugReportView"
+             x:DataType="bugs:BugReportFormViewModel">
+
+    <!-- The report page (the app bar's bug button, a shake, the Quick Settings tile): the black box froze as it opened. -->
+    <UserControl.Styles>
+        <Style Selector="Button.choice">
+            <Setter Property="MinHeight" Value="44" />
+            <Setter Property="HorizontalAlignment" Value="Stretch" />
+            <Setter Property="HorizontalContentAlignment" Value="Center" />
+            <Setter Property="VerticalContentAlignment" Value="Center" />
+        </Style>
+        <Style Selector="Button.wide">
+            <Setter Property="MinHeight" Value="44" />
+            <Setter Property="HorizontalAlignment" Value="Stretch" />
+            <Setter Property="HorizontalContentAlignment" Value="Center" />
+            <Setter Property="VerticalContentAlignment" Value="Center" />
+        </Style>
+        <Style Selector="TextBlock.error">
+            <Setter Property="Foreground" Value="{DynamicResource HelmDanger}" />
+        </Style>
+    </UserControl.Styles>
+    <UserControl.Resources>
+        <ResourceDictionary>
+            <ResourceDictionary.MergedDictionaries>
+                <ResourceInclude Source="avares://Helm.Android/BugReports/BugTemplates.axaml" />
+            </ResourceDictionary.MergedDictionaries>
+        </ResourceDictionary>
+    </UserControl.Resources>
+
+    <Panel>
+        <!-- The form -->
+        <StackPanel IsVisible="{Binding !IsDone}">
+            <Border Classes="infobar warning" IsVisible="{Binding FromCrash}">
+                <TextBlock Text="Reported from the crash Helm had last time: its black box is attached." TextWrapping="Wrap" />
+            </Border>
+
+            <TextBlock Text="What happened?" Classes="title" Margin="4,0,0,6" />
+            <TextBox AcceptsReturn="True" TextWrapping="Wrap" MinHeight="120" AutomationProperties.Name="What happened"
+                     PlaceholderText="What you did, what you expected, what you saw" Text="{Binding Text}" />
+
+            <TextBlock Text="How bad" Classes="section" />
+            <Grid ColumnDefinitions="*,8,*,8,*">
+                <Button Classes="choice" Classes.accent="{Binding IsBlocking}" Content="Blocks me" Command="{Binding SetSeverityCommand}"
+                        CommandParameter="{x:Static bugs:BugSeverity.Blocking}" />
+                <Button Grid.Column="2" Classes="choice" Classes.accent="{Binding IsAnnoying}" Content="Annoying" Command="{Binding SetSeverityCommand}"
+                        CommandParameter="{x:Static bugs:BugSeverity.Annoying}" />
+                <Button Grid.Column="4" Classes="choice" Classes.accent="{Binding IsMinor}" Content="Minor" Command="{Binding SetSeverityCommand}"
+                        CommandParameter="{x:Static bugs:BugSeverity.Minor}" />
+            </Grid>
+
+            <TextBlock Text="Tool" Classes="section" />
+            <ComboBox ItemsSource="{Binding Tools}" SelectedItem="{Binding Tool}" HorizontalAlignment="Stretch" MinHeight="44" AutomationProperties.Name="Tool" />
+
+            <TextBlock Text="Pictures" Classes="section" />
+            <TextBlock Text="Screenshots you take yourself, a photo, or a picture you copied. Helm never takes screenshots." Classes="secondary" Margin="4,0,0,8" />
+            <ItemsControl ItemsSource="{Binding Images}" IsVisible="{Binding HasImages}">
+                <ItemsControl.ItemsPanel>
+                    <ItemsPanelTemplate><WrapPanel /></ItemsPanelTemplate>
+                </ItemsControl.ItemsPanel>
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate x:DataType="bugs:BugImageItem">
+                        <Panel Width="96" Height="96" Margin="0,0,8,8">
+                            <Border CornerRadius="6" ClipToBounds="True" Background="{DynamicResource HelmSubtleFill}">
+                                <Image b:BugImageLoader.Item="{Binding}" Stretch="UniformToFill" />
+                            </Border>
+                            <Button HorizontalAlignment="Right" VerticalAlignment="Top" Width="32" Height="32" Padding="0" Margin="2"
+                                    HorizontalContentAlignment="Center" VerticalContentAlignment="Center" Background="#99000000"
+                                    Command="{Binding $parent[ItemsControl].((bugs:BugReportFormViewModel)DataContext).RemoveImageCommand}" CommandParameter="{Binding}"
+                                    AutomationProperties.Name="Remove picture">
+                                <ic:SymbolIcon Symbol="Dismiss" FontSize="14" Foreground="White" />
+                            </Button>
+                        </Panel>
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+            <Button Classes="wide" AutomationProperties.Name="Add a picture">
+                <StackPanel Orientation="Horizontal" Spacing="8">
+                    <ic:SymbolIcon Symbol="ImageAdd" FontSize="18" />
+                    <TextBlock Text="Add a picture" VerticalAlignment="Center" />
+                </StackPanel>
+                <Button.Flyout>
+                    <MenuFlyout Placement="Bottom">
+                        <MenuItem Header="Choose from the gallery" Click="Gallery_Click" />
+                        <MenuItem Header="Take a photo" Click="Camera_Click" />
+                        <MenuItem Header="Paste a copied picture" Click="Paste_Click" />
+                    </MenuFlyout>
+                </Button.Flyout>
+            </Button>
+
+            <TextBlock Text="Black box" Classes="section" />
+            <Border Classes="card" Padding="0">
+                <Expander HorizontalAlignment="Stretch" Padding="8,4,8,8">
+                    <Expander.Header>
+                        <StackPanel>
+                            <TextBlock Text="What happened before" />
+                            <WrapPanel>
+                                <TextBlock Text="{Binding BlackBoxText}" Classes="secondary" Margin="0,0,8,0" />
+                                <TextBlock Text="{Binding ErrorText}" FontSize="12" FontWeight="SemiBold" Foreground="{DynamicResource HelmDanger}" Margin="0,0,8,0"
+                                           IsVisible="{Binding HasErrors}" />
+                                <TextBlock Text="{Binding FreezeText}" FontSize="12" FontWeight="SemiBold" IsVisible="{Binding FreezeText, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+                            </WrapPanel>
+                        </StackPanel>
+                    </Expander.Header>
+                    <ItemsControl ItemsSource="{Binding Events}" ItemTemplate="{StaticResource BlackBoxEvent}" />
+                </Expander>
+            </Border>
+            <TextBlock Text="Nothing you type is recorded, nor anything of a password box or the Vault." Classes="secondary" Margin="4,8,0,0" />
+
+            <TextBlock Text="{Binding Error}" Foreground="{DynamicResource HelmDanger}" TextWrapping="Wrap" Margin="4,12,0,0"
+                       IsVisible="{Binding Error, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+            <Grid ColumnDefinitions="*,8,*" Margin="0,16,0,0">
+                <Button Classes="wide" Content="Cancel" Click="Cancel_Click" />
+                <Button Grid.Column="2" Classes="wide accent" Command="{Binding SendCommand}" AutomationProperties.Name="Send">
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                        <ic:SymbolIcon Symbol="Send" FontSize="18" />
+                        <TextBlock Text="Send" VerticalAlignment="Center" />
+                    </StackPanel>
+                </Button>
+            </Grid>
+        </StackPanel>
+
+        <!-- Sent -->
+        <Border Classes="card" IsVisible="{Binding IsDone}" VerticalAlignment="Top">
+            <StackPanel Spacing="12">
+                <StackPanel Orientation="Horizontal" Spacing="10">
+                    <ic:SymbolIcon Symbol="CheckmarkCircle" IconVariant="Filled" FontSize="26" Foreground="{DynamicResource HelmSuccess}" />
+                    <TextBlock Text="{Binding SentCode, StringFormat='Bug #{0} saved'}" Classes="title" FontSize="17" VerticalAlignment="Center" />
+                </StackPanel>
+                <TextBlock Text="It syncs to your other devices with its black box and pictures. Claude Code reads it through Helm's tools." TextWrapping="Wrap" />
+                <Grid ColumnDefinitions="*,8,*">
+                    <Button Classes="wide" Content="Close" Click="Cancel_Click" />
+                    <Button Grid.Column="2" Classes="wide accent" Content="Open the bug" Click="Open_Click" />
+                </Grid>
+            </StackPanel>
+        </Border>
+    </Panel>
+</UserControl>

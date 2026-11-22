@@ -34,7 +34,15 @@ public partial class App : Avalonia.Application
         if (!s_started)
         {
             s_started = true;
-            AppDomain.CurrentDomain.UnhandledException += (_, e) => Log.Fatal(e.ExceptionObject as Exception, "Unhandled exception");
+            var crashFile = Services.GetRequiredService<Helm.Core.Settings.HelmPaths>().CrashBlackBoxFile;
+            AppDomain.CurrentDomain.UnhandledException += (_, e) =>
+            {
+                Log.Fatal(e.ExceptionObject as Exception, "Unhandled exception");
+                // The black box goes to disk: the next start offers to report the crash with it.
+                if (e.IsTerminating) Helm.Core.Diagnostics.BlackBox.Shared.WriteCrash(crashFile, e.ExceptionObject as Exception);
+            };
+            global::Android.Runtime.AndroidEnvironment.UnhandledExceptionRaiser += (_, e) =>
+                Helm.Core.Diagnostics.BlackBox.Shared.WriteCrash(crashFile, e.Exception);
             TaskScheduler.UnobservedTaskException += (_, e) =>
             {
                 Log.Error(e.Exception, "Unobserved task exception");
@@ -54,7 +62,13 @@ public partial class App : Avalonia.Application
         base.OnFrameworkInitializationCompleted();
     }
 
-    private static MainView CreateMainView() => new() { DataContext = Services.GetRequiredService<MainViewModel>() };
+    private static MainView CreateMainView()
+    {
+        var view = new MainView { DataContext = Services.GetRequiredService<MainViewModel>() };
+        // Bug reports' black box hooks, shake and notifications, once the shell exists (once per process).
+        Services.GetRequiredService<BugReports.AndroidBugReporter>().Start();
+        return view;
+    }
 
     /// <summary>The periodic pull waits while Helm is in the background and the phone is in Battery Saver.</summary>
     private static bool MayPoll()

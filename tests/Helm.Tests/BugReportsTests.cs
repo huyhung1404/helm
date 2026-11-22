@@ -113,6 +113,22 @@ public sealed class BugReportsTests
     }
 
     [Fact]
+    public void Helms_log_goes_into_the_black_box_as_the_log_file_writes_it()
+    {
+        var box = new BlackBox(new ManualTime(Start));
+        using var log = new Serilog.LoggerConfiguration().MinimumLevel.Debug().WriteTo.Sink(new BlackBoxSink(box)).CreateLogger();
+        log.ForContext("SourceContext", "Helm.Modules.Tracker.TrackerStore").Information("Module {Id} enabled", "habits");
+        log.Debug("not kept");
+        log.Error(new InvalidOperationException("same key"), "Saving failed");
+        var events = box.Snapshot().Events;
+        Assert.Equal(2, events.Count);
+        Assert.Equal("[INF] Module habits enabled", events[0].Text);
+        Assert.Equal("TrackerStore", events[0].Source);
+        Assert.Equal(BlackBoxKind.Error, events[1].Kind);
+        Assert.Contains("same key", events[1].Detail);
+    }
+
+    [Fact]
     public void A_crash_leaves_its_black_box_for_the_next_start_once()
     {
         var file = Path.Combine(Path.GetTempPath(), $"helm-crash-{Guid.NewGuid():N}.gz");

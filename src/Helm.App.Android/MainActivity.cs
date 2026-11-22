@@ -210,6 +210,12 @@ public sealed class MainActivity : AvaloniaMainActivity
     /// </summary>
     private void TakeRequestedModule()
     {
+        // Bug reports: the Quick Settings tile ("report"), a crash notification ("crash") or a bug's notification (its id).
+        if (Intent?.GetStringExtra(BugReports.AndroidBugReporter.ExtraBug) is { Length: > 0 } bug)
+        {
+            Intent.RemoveExtra(BugReports.AndroidBugReporter.ExtraBug);
+            BugReports.AndroidBugReporter.Request(bug);
+        }
         if (Intent?.GetStringExtra(ShellIntents.ExtraModule) is not { Length: > 0 } id) return;
         Intent.RemoveExtra(ShellIntents.ExtraModule);
         if (Intent.GetStringExtra(ShellIntents.ExtraItem) is { Length: > 0 } item)
@@ -223,6 +229,14 @@ public sealed class MainActivity : AvaloniaMainActivity
     /// <summary>Shows the page asked for, when the shell has not opened it already (it does on start).</summary>
     private static void OpenRequestedModule()
     {
+        try
+        {
+            App.Services.GetService<BugReports.AndroidBugReporter>()?.OpenRequested();
+        }
+        catch (Exception ex)
+        {
+            Serilog.Log.Warning(ex, "Could not open the bug report asked for");
+        }
         if (ShellIntents.TakeModule() is not { } id) return;
         try
         {

@@ -1,6 +1,7 @@
 using Helm.Core.Diagnostics;
 using Serilog.Core;
 using Serilog.Events;
+using Serilog.Formatting.Display;
 
 namespace Helm.Shell.BugReports;
 
@@ -11,6 +12,9 @@ namespace Helm.Shell.BugReports;
 public sealed class BlackBoxSink(BlackBox? box = null) : ILogEventSink
 {
     private readonly BlackBox _box = box ?? BlackBox.Shared;
+
+    // As the log file writes it: strings without quotes ({Message:lj}).
+    private static readonly MessageTemplateTextFormatter Message = new("{Message:lj}");
 
     public void Emit(LogEvent logEvent)
     {
@@ -26,7 +30,9 @@ public sealed class BlackBoxSink(BlackBox? box = null) : ILogEventSink
                 LogEventLevel.Error => "ERR",
                 _ => "FTL",
             };
-            var text = $"[{level}] {logEvent.RenderMessage()}";
+            using var rendered = new StringWriter();
+            Message.Format(logEvent, rendered);
+            var text = $"[{level}] {rendered}";
             if (logEvent.Exception is { } ex) text += $": {ex.GetType().Name}: {ex.Message}";
             var kind = logEvent.Level >= LogEventLevel.Warning ? BlackBoxKind.Error : BlackBoxKind.Log;
             _box.Record(kind, text, source, logEvent.Exception?.ToString());
