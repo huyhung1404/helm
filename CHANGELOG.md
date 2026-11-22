@@ -3,7 +3,7 @@
 All notable changes to Helm. The top section is used as the GitHub release body and as the Velopack release notes.
 Format: [Keep a Changelog](https://keepachangelog.com), versions follow [SemVer](https://semver.org).
 
-## [Unreleased]
+## [0.86.0] - 2026-11-22
 
 ### Added
 - **Bug reports** (the menu's footer next to What's new on PC, above General in the phone's drawer): report a bug
