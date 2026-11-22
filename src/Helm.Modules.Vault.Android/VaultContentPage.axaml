@@ -7,35 +7,6 @@
              xmlns:items="using:Helm.Modules.Vault.Items"
              x:Class="Helm.Modules.Vault.VaultContentPage"
              x:DataType="local:VaultPageViewModel">
-    <UserControl.Styles>
-        <!-- A section as a chip: a pill, outlined in the accent when chosen -->
-        <Style Selector="Button.chip">
-            <Setter Property="MinHeight" Value="38" />
-            <Setter Property="Padding" Value="14,0" />
-            <Setter Property="CornerRadius" Value="19" />
-            <Setter Property="BorderThickness" Value="1" />
-            <Setter Property="Background" Value="{DynamicResource HelmCardBackground}" />
-            <Setter Property="BorderBrush" Value="{DynamicResource HelmCardStroke}" />
-            <Setter Property="VerticalContentAlignment" Value="Center" />
-        </Style>
-        <Style Selector="Button.chip.on">
-            <Setter Property="BorderBrush" Value="{DynamicResource SystemAccentColor}" />
-            <Setter Property="FontWeight" Value="SemiBold" />
-        </Style>
-        <Style Selector="Button.chip.on:pointerover /template/ ContentPresenter#PART_ContentPresenter">
-            <Setter Property="BorderBrush" Value="{DynamicResource SystemAccentColor}" />
-        </Style>
-        <!-- A row of the list: the whole row opens the item -->
-        <Style Selector="Button.itemrow">
-            <Setter Property="HorizontalAlignment" Value="Stretch" />
-            <Setter Property="HorizontalContentAlignment" Value="Stretch" />
-            <Setter Property="Padding" Value="10,8" />
-            <Setter Property="MinHeight" Value="60" />
-            <Setter Property="CornerRadius" Value="10" />
-            <Setter Property="Background" Value="Transparent" />
-            <Setter Property="BorderThickness" Value="0" />
-        </Style>
-    </UserControl.Styles>
 
     <StackPanel Spacing="4">
         <!-- Title row: the icon, whether it is open and when it locks, Lock and the way to the settings -->
@@ -98,7 +69,7 @@
                     </Border>
                     <TextBlock Text="Vault is locked" Classes="title" FontSize="22" Margin="0,8,0,0" />
                     <TextBlock Classes="secondary" FontSize="13" Margin="0,0,0,8" Text="Your passwords and documents are encrypted on this device." />
-                    <Button Classes="accent" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" MinHeight="48" IsVisible="{Binding App.CanUseDeviceUnlock}"
+                    <Button Classes="accent" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" VerticalContentAlignment="Center" MinHeight="48" IsVisible="{Binding App.CanUseDeviceUnlock}"
                             Command="{Binding App.QuickUnlockCommand}">
                         <StackPanel Orientation="Horizontal" Spacing="8">
                             <ic:SymbolIcon Symbol="Fingerprint" FontSize="18" />
@@ -119,7 +90,7 @@
                         <ic:SymbolIcon Symbol="ErrorCircle" FontSize="16" Foreground="{DynamicResource HelmDanger}" VerticalAlignment="Top" />
                         <TextBlock TextWrapping="Wrap" Foreground="{DynamicResource HelmDanger}" Text="{Binding App.Error}" />
                     </StackPanel>
-                    <Button HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" MinHeight="44" Content="Unlock" Command="{Binding App.UnlockCommand}"
+                    <Button HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" VerticalContentAlignment="Center" MinHeight="44" Content="Unlock" Command="{Binding App.UnlockCommand}"
                             Classes.accent="{Binding !App.CanUseDeviceUnlock}" />
                     <!-- The recovery key instead of the password (and back) -->
                     <Button Classes="flat" Margin="0,6,0,0" Padding="0,8" MinHeight="44" Command="{Binding App.ToggleRecoveryKeyCommand}"
@@ -196,138 +167,14 @@
                 </Border>
 
                 <!-- The list: the sections as chips (swipe sideways), search and +, the rows. A tap opens an item in its place. -->
-                <StackPanel Spacing="8">
-                    <StackPanel.IsVisible>
+                <local:VaultListView>
+                    <local:VaultListView.IsVisible>
                         <MultiBinding Converter="{x:Static BoolConverters.And}">
                             <Binding Path="App.Items.Detail" Converter="{x:Static ObjectConverters.IsNull}" />
                             <Binding Path="App.Items.Editor" Converter="{x:Static ObjectConverters.IsNull}" />
                         </MultiBinding>
-                    </StackPanel.IsVisible>
-                    <Panel Margin="-16,0">
-                        <ScrollViewer HorizontalScrollBarVisibility="Hidden" VerticalScrollBarVisibility="Disabled">
-                            <!-- A soft right edge: more chips to swipe to (the last chip ends before it) -->
-                            <ScrollViewer.OpacityMask>
-                                <LinearGradientBrush StartPoint="0%,0%" EndPoint="100%,0%">
-                                    <GradientStop Offset="0" Color="Black" />
-                                    <GradientStop Offset="0.9" Color="Black" />
-                                    <GradientStop Offset="1" Color="Transparent" />
-                                </LinearGradientBrush>
-                            </ScrollViewer.OpacityMask>
-                            <StackPanel Orientation="Horizontal" Spacing="6" Margin="16,2,40,2">
-                                <ItemsControl ItemsSource="{Binding App.Items.Sections}">
-                                    <ItemsControl.ItemsPanel>
-                                        <ItemsPanelTemplate><StackPanel Orientation="Horizontal" Spacing="6" /></ItemsPanelTemplate>
-                                    </ItemsControl.ItemsPanel>
-                                    <ItemsControl.ItemTemplate>
-                                        <DataTemplate x:DataType="vm:VaultSection">
-                                            <Button Classes="chip" Classes.on="{Binding IsSelected}" AutomationProperties.Name="{Binding Label}"
-                                                    Command="{Binding $parent[UserControl].((local:VaultPageViewModel)DataContext).App.Items.ShowSectionCommand}" CommandParameter="{Binding}">
-                                                <StackPanel Orientation="Horizontal" Spacing="6">
-                                                    <ic:SymbolIcon Symbol="{Binding Kind, Converter={x:Static local:SectionIcon.Converter}}" FontSize="16" />
-                                                    <TextBlock Text="{Binding Label}" VerticalAlignment="Center" />
-                                                </StackPanel>
-                                            </Button>
-                                        </DataTemplate>
-                                    </ItemsControl.ItemTemplate>
-                                </ItemsControl>
-                                <ItemsControl ItemsSource="{Binding App.Items.TagSections}">
-                                    <ItemsControl.ItemsPanel>
-                                        <ItemsPanelTemplate><StackPanel Orientation="Horizontal" Spacing="6" /></ItemsPanelTemplate>
-                                    </ItemsControl.ItemsPanel>
-                                    <ItemsControl.ItemTemplate>
-                                        <DataTemplate x:DataType="vm:VaultSection">
-                                            <Button Classes="chip" Classes.on="{Binding IsSelected}" AutomationProperties.Name="{Binding Label}"
-                                                    Command="{Binding $parent[UserControl].((local:VaultPageViewModel)DataContext).App.Items.ShowSectionCommand}" CommandParameter="{Binding}">
-                                                <StackPanel Orientation="Horizontal" Spacing="6">
-                                                    <ic:SymbolIcon Symbol="Tag" FontSize="16" />
-                                                    <TextBlock Text="{Binding Label}" VerticalAlignment="Center" />
-                                                </StackPanel>
-                                            </Button>
-                                        </DataTemplate>
-                                    </ItemsControl.ItemTemplate>
-                                </ItemsControl>
-                                <Button Classes="chip" Classes.on="{Binding App.Items.TrashSection.IsSelected}" AutomationProperties.Name="Trash"
-                                        Command="{Binding App.Items.ShowSectionCommand}" CommandParameter="{Binding App.Items.TrashSection}">
-                                    <StackPanel Orientation="Horizontal" Spacing="6">
-                                        <ic:SymbolIcon Symbol="Delete" FontSize="16" />
-                                        <TextBlock Text="Trash" VerticalAlignment="Center" />
-                                    </StackPanel>
-                                </Button>
-                            </StackPanel>
-                        </ScrollViewer>
-                    </Panel>
-
-                    <DockPanel>
-                        <Button DockPanel.Dock="Right" Classes="accent" Margin="8,0,0,0" Width="48" MinHeight="44" Padding="0" HorizontalContentAlignment="Center"
-                                AutomationProperties.Name="New item" Command="{Binding App.Items.NewCommand}" CommandParameter="{x:Static items:VaultItemKind.Login}">
-                            <ic:SymbolIcon Symbol="Add" FontSize="18" />
-                        </Button>
-                        <TextBox PlaceholderText="Search" Text="{Binding App.Items.Search}" AutomationProperties.Name="Search" VerticalContentAlignment="Center" MinHeight="44" />
-                    </DockPanel>
-
-                    <StackPanel Spacing="8" Margin="4,12" IsVisible="{Binding App.Items.IsEmpty}">
-                        <TextBlock Classes="secondary" HorizontalAlignment="Center" TextAlignment="Center" TextWrapping="Wrap" Text="{Binding App.Items.EmptyText}" />
-                        <Button HorizontalAlignment="Center" Content="Search all items" Command="{Binding App.Items.SearchEverywhereCommand}" IsVisible="{Binding App.Items.CanSearchEverywhere}" />
-                    </StackPanel>
-
-                    <Border Classes="card" Padding="4" IsVisible="{Binding !App.Items.IsEmpty}">
-                        <ItemsControl ItemsSource="{Binding App.Items.Cards}" AutomationProperties.Name="Items">
-                            <ItemsControl.ItemTemplate>
-                                <DataTemplate x:DataType="vm:VaultCardViewModel">
-                                    <Button Classes="flat itemrow" AutomationProperties.Name="{Binding Title}"
-                                            Command="{Binding $parent[UserControl].((local:VaultPageViewModel)DataContext).App.Items.OpenCommand}" CommandParameter="{Binding}">
-                                        <Grid ColumnDefinitions="Auto,*,Auto">
-                                            <!-- The icon: its picture; else a login's initial, or the kind's symbol -->
-                                            <Panel Width="40" Height="40" Margin="0,0,12,0" VerticalAlignment="Center">
-                                                <Border CornerRadius="10" Background="{Binding AvatarColor, Converter={x:Static local:HexBrush.Converter}}">
-                                                    <Border.IsVisible>
-                                                        <MultiBinding Converter="{x:Static BoolConverters.And}">
-                                                            <Binding Path="!HasIcon" />
-                                                            <Binding Path="IsLogin" />
-                                                        </MultiBinding>
-                                                    </Border.IsVisible>
-                                                    <TextBlock Text="{Binding Initial}" Foreground="White" FontSize="17" FontWeight="SemiBold" HorizontalAlignment="Center" VerticalAlignment="Center" />
-                                                </Border>
-                                                <Border CornerRadius="10" Background="{DynamicResource HelmSubtleFill}">
-                                                    <Border.IsVisible>
-                                                        <MultiBinding Converter="{x:Static BoolConverters.And}">
-                                                            <Binding Path="!HasIcon" />
-                                                            <Binding Path="!IsLogin" />
-                                                        </MultiBinding>
-                                                    </Border.IsVisible>
-                                                    <ic:SymbolIcon Symbol="{Binding Kind, Converter={x:Static local:KindIcon.Converter}}" FontSize="20"
-                                                                   Foreground="{DynamicResource SystemAccentColor}" HorizontalAlignment="Center" VerticalAlignment="Center" />
-                                                </Border>
-                                                <Border CornerRadius="10" ClipToBounds="True" IsVisible="{Binding HasIcon}">
-                                                    <Image Source="{Binding Icon, Converter={x:Static local:IconBitmap.Converter}}" Stretch="UniformToFill" />
-                                                </Border>
-                                            </Panel>
-                                            <StackPanel Grid.Column="1" VerticalAlignment="Center" Spacing="1">
-                                                <StackPanel Orientation="Horizontal" Spacing="6">
-                                                    <TextBlock Text="{Binding Title}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
-                                                    <ic:SymbolIcon Symbol="Warning" FontSize="14" IsVisible="{Binding HasConflict}" />
-                                                </StackPanel>
-                                                <TextBlock Classes="secondary" FontSize="13" Text="{Binding Subtitle}" TextTrimming="CharacterEllipsis" TextWrapping="NoWrap" />
-                                            </StackPanel>
-                                            <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center" Margin="8,0,0,0">
-                                                <!-- The current two-factor code and how long it lasts -->
-                                                <StackPanel Orientation="Horizontal" Spacing="6" IsVisible="{Binding HasTotp}">
-                                                    <TextBlock Text="{Binding TotpCode}" FontFamily="monospace" FontSize="13" FontWeight="SemiBold" VerticalAlignment="Center"
-                                                               Foreground="{DynamicResource HelmSecondaryText}" />
-                                                    <local:TotpRing Width="16" Height="16" Percent="{Binding TotpProgress}" VerticalAlignment="Center"
-                                                                    Stroke="{DynamicResource SystemAccentColor}" Track="{DynamicResource HelmCardStroke}" />
-                                                </StackPanel>
-                                                <ic:SymbolIcon Symbol="Star" IconVariant="Filled" FontSize="15" Foreground="{DynamicResource SystemAccentColor}" IsVisible="{Binding Favorite}" />
-                                            </StackPanel>
-                                        </Grid>
-                                    </Button>
-                                </DataTemplate>
-                            </ItemsControl.ItemTemplate>
-                        </ItemsControl>
-                    </Border>
-                    <TextBlock Classes="secondary" Margin="4,4" TextWrapping="Wrap" IsVisible="{Binding App.Items.HasUnreadable}"
-                               Text="{Binding App.Items.UnreadableCount, StringFormat='{}{0} records cannot be opened with this vault key; they are kept, not deleted.'}" />
-                </StackPanel>
+                    </local:VaultListView.IsVisible>
+                </local:VaultListView>
 
                 <!-- An item, in place of the list (Back, or the arrow, returns) -->
                 <StackPanel Spacing="4">

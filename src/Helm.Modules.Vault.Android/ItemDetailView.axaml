@@ -299,16 +299,23 @@
             </StackPanel>
         </Border>
 
-        <!-- Notes and tags -->
-        <TextBlock Classes="section" Text="{Binding NotesLabel}" />
-        <Border Classes="card">
-            <StackPanel Spacing="6">
-                <TextBlock TextWrapping="Wrap" Text="{Binding Notes}" IsVisible="{Binding !IsEditing}" />
-                <TextBox AcceptsReturn="True" TextWrapping="Wrap" MinHeight="80" Text="{Binding Notes}" IsVisible="{Binding IsEditing}" AutomationProperties.Name="Notes" />
-                <TextBox PlaceholderText="Tags, separated by commas" Text="{Binding Tags}" IsVisible="{Binding IsEditing}" />
-                <TextBlock Classes="secondary" Text="{Binding Tags}" IsVisible="{Binding !IsEditing}" />
-            </StackPanel>
-        </Border>
+        <!-- Notes (or the description), and the tags while editing; shown when there is something to show -->
+        <StackPanel Spacing="4">
+            <StackPanel.IsVisible>
+                <MultiBinding Converter="{x:Static BoolConverters.Or}">
+                    <Binding Path="IsEditing" />
+                    <Binding Path="Notes" Converter="{x:Static StringConverters.IsNotNullOrEmpty}" />
+                </MultiBinding>
+            </StackPanel.IsVisible>
+            <TextBlock Classes="section" Text="{Binding NotesLabel}" />
+            <Border Classes="card">
+                <StackPanel Spacing="6">
+                    <TextBlock TextWrapping="Wrap" Text="{Binding Notes}" IsVisible="{Binding !IsEditing}" />
+                    <TextBox AcceptsReturn="True" TextWrapping="Wrap" MinHeight="80" Text="{Binding Notes}" IsVisible="{Binding IsEditing}" AutomationProperties.Name="Notes" />
+                    <TextBox PlaceholderText="Tags, separated by commas" Text="{Binding Tags}" IsVisible="{Binding IsEditing}" />
+                </StackPanel>
+            </Border>
+        </StackPanel>
 
         <!-- Files are fields now (Image, Document, Text file, Keystore): opening one shows progress here -->
         <ProgressBar Minimum="0" Maximum="1" Value="{Binding Progress}" IsVisible="{Binding IsBusy}" Margin="0,4,0,0" />
