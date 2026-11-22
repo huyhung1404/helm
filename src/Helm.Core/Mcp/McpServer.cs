@@ -183,7 +183,11 @@ public sealed class McpToolException(string message) : Exception(message);
 /// the text the model reads, as any result; <see cref="Meta"/> goes in the result's <c>_meta</c>, which hosts keep from
 /// the model.
 /// </summary>
-public sealed record McpToolResult(object? Content, JsonObject? Meta = null);
+/// <remarks><see cref="Images"/> go after the text as MCP image content (e.g. the pictures attached to a bug report).</remarks>
+public sealed record McpToolResult(object? Content, JsonObject? Meta = null, IReadOnlyList<McpImage>? Images = null);
+
+/// <summary>A picture in a tool result: its bytes and media type (image/png, image/jpeg…).</summary>
+public sealed record McpImage(string MimeType, byte[] Data);
 
 /// <summary>Tools a Helm module offers over MCP (registered as <c>IMcpToolProvider</c> singletons).</summary>
 public interface IMcpToolProvider
@@ -235,6 +239,11 @@ public sealed class McpServer
 
     /// <summary>A tool's <c>_meta</c> key in <c>tools/list</c>: true when a call of it can be taken back.</summary>
     public const string UndoableMeta = "helm/undoable";
+
+    private static readonly AsyncLocal<string?> CallingClientName = new();
+
+    /// <summary>During a tool call: the name its client gave in <c>initialize</c> ("claude-code"), for tools that record who did something.</summary>
+    public static string? CallingClient => CallingClientName.Value;
 
     /// <summary>This connection, with the name the client gave in <c>initialize</c>.</summary>
     public McpClientInfo Client { get; private set; }
@@ -387,6 +396,7 @@ public sealed class McpServer
                 return ToolResult(refused, isError: true);
             }
             allowed = asked;
+            CallingClientName.Value = Client.Name;
             var (reply, succeeded) = await RunToolAsync(tool, arguments.RootElement, _logger, ct).ConfigureAwait(false);
             ok = succeeded;
             return reply;
@@ -467,6 +477,12 @@ public sealed class McpServer
             {
                 var reply = ToolResult(withMeta.Content as string ?? JsonSerializer.Serialize(withMeta.Content, Output), isError: false);
                 if (withMeta.Meta is { } meta) reply["_meta"] = meta.DeepClone();
+                if (withMeta.Images is { Count: > 0 } images)
+                {
+                    var content = (JsonArray)reply["content"]!;
+                    foreach (var image in images)
+                        content.Add(new JsonObject { ["type"] = "image", ["data"] = Convert.ToBase64String(image.Data), ["mimeType"] = image.MimeType });
+                }
                 return (reply, true);
             }
             return (ToolResult(result as string ?? JsonSerializer.Serialize(result, Output), isError: false), true);
