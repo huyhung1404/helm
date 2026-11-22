@@ -30,6 +30,8 @@ internal static class AndroidHost
                 rollingInterval: RollingInterval.Day,
                 retainedFileCountLimit: 14,
                 outputTemplate: "{Timestamp:yyyy-MM-dd HH:mm:ss.fff} [{Level:u3}] {SourceContext}: {Message:lj}{NewLine}{Exception}")
+            // Information and up also go into the black box (Bug reports), in memory only.
+            .WriteTo.Sink(new Helm.Shell.BugReports.BlackBoxSink())
             .CreateLogger();
 
         var services = new ServiceCollection();
@@ -72,6 +74,10 @@ internal static class AndroidHost
         services.AddSingleton<HomeViewModel>();
         services.AddSingleton<GeneralViewModel>();
         services.AddSingleton<MainViewModel>();
+
+        // Bug reports: the black box, the synced bugs, their page and the report page (the app bar, a shake, the tile).
+        Helm.Shell.BugReports.BugReportsServices.AddBugReports(services, Helm.Shell.BugReports.BugDeviceKind.Phone);
+        services.AddSingleton<BugReports.AndroidBugReporter>();
 
         return services.BuildServiceProvider(new ServiceProviderOptions { ValidateOnBuild = true });
     }

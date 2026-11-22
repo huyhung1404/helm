@@ -188,6 +188,8 @@ public sealed partial class ShellNavigator(IServiceProvider services, ISettingsS
         if (key == "home") return new ShellTab(key, services.GetRequiredService<HomeViewModel>(), "Home", Symbol.Home, null, null);
         if (key == "general") return new ShellTab(key, services.GetRequiredService<GeneralViewModel>(), "General", Symbol.Settings, null, null);
         if (key == AiFeaturesKey) return new ShellTab(key, services.GetRequiredService<Helm.Ai.AiFeaturesViewModel>(), "AI features", Symbol.Sparkle, null, null);
+        if (key == BugReports.AndroidBugReporter.PageKey)
+            return new ShellTab(key, services.GetRequiredService<Helm.Shell.BugReports.BugReportsViewModel>(), Helm.Shell.BugReports.BugReportsServices.PageTitle, Symbol.Bug, null, null);
         var colon = key.IndexOf(':');
         if (colon < 0) return null;
         var id = key[(colon + 1)..];

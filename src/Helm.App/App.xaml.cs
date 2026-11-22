@@ -47,10 +47,17 @@ public partial class App : Application
                 rollingInterval: RollingInterval.Day,
                 retainedFileCountLimit: 14,
                 outputTemplate: "{Timestamp:yyyy-MM-dd HH:mm:ss.fff} [{Level:u3}] {SourceContext}: {Message:lj}{NewLine}{Exception}")
+            // Information and up also go into the black box (Bug reports), in memory only.
+            .WriteTo.Sink(new Shell.BugReports.BlackBoxSink())
             .CreateLogger();
 
         DispatcherUnhandledException += OnDispatcherUnhandledException;
-        AppDomain.CurrentDomain.UnhandledException += (_, args) => Log.Fatal(args.ExceptionObject as Exception, "Unhandled exception");
+        AppDomain.CurrentDomain.UnhandledException += (_, args) =>
+        {
+            Log.Fatal(args.ExceptionObject as Exception, "Unhandled exception");
+            // The black box goes to disk: the next start offers to report the crash with it.
+            if (args.IsTerminating) Core.Diagnostics.BlackBox.Shared.WriteCrash(paths.CrashBlackBoxFile, args.ExceptionObject as Exception);
+        };
         TaskScheduler.UnobservedTaskException += (_, args) =>
         {
             Log.Error(args.Exception, "Unobserved task exception");
@@ -70,6 +77,8 @@ public partial class App : Application
             var startHidden = !_args.Contains("--page", StringComparer.OrdinalIgnoreCase) && (_args.Contains("--startup", StringComparer.OrdinalIgnoreCase)
                 || Services.GetRequiredService<ISettingsStoreFactory>().Get<GeneralSettings>(GeneralSettings.StoreId).Current.StartMinimized);
             shell.Initialize(showWindow: !startHidden);
+            // Bug reports from anywhere (Ctrl+Alt+F12, the title bar, the tray) and the black box's hooks, before the tools start.
+            await Services.GetRequiredService<BugReports.PcBugReporter>().StartAsync().ConfigureAwait(true);
 
             _instance.ListenForActivation(() => Dispatcher.BeginInvoke(shell.ShowMainWindow));
 

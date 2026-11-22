@@ -94,6 +94,10 @@
                         </ui:SymbolIcon.Style>
                     </ui:SymbolIcon>
                 </Button>
+                <!-- Report a bug (also Ctrl+Alt+F12 anywhere, and the tray menu): the black box freezes as it opens. -->
+                <ui:Button x:Name="ReportBugButton" Appearance="Transparent" Margin="2,6,2,6" Padding="6" MinWidth="0" VerticalAlignment="Center"
+                           Icon="{ui:SymbolIcon Bug24}" ToolTip="Report a bug (Ctrl+Alt+F12)" AutomationProperties.Name="Report a bug"
+                           WindowChrome.IsHitTestVisibleInChrome="True" Click="ReportBug_Click" />
                 </StackPanel>
             </ui:TitleBar.CenterContent>
         </ui:TitleBar>

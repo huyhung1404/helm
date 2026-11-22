@@ -67,6 +67,13 @@ asks for one after two or more days in a row). `habit_check` ticks a day (today 
 started or in the future). Nothing is unticked or deleted through them. Try "why do I keep skipping my reading
 habit?".
 
+Bug reports' tools (always offered: bug reports are part of Helm, not a tool) let an agent fix the bugs the user
+reported: `bugs_list`, `bug_get` (the conversation and the black box summed up: the steps of the last 60 s, the
+errors with their stacks, UI freezes), `bug_blackbox` (every event) and `bug_images` (the pictures the user attached,
+as MCP images and as files) read them; `bug_claim`, `bug_comment`, `bug_ask` (the user's phone tells them),
+`bug_resolve` and `bug_release` work on one. An agent never closes a bug: `bug_resolve` leaves it waiting for the user
+to check. See [bug-fixing.md](bug-fixing.md) for the steps an agent follows.
+
 Slack Bot's tools (PC) let an agent report work to the team: `slack_conversations` lists the channels and DMs the user
 turned on in Slack Bot and whether the agent may post there (only those where **Write** is on); `slack_messages`
 reads a conversation or one thread; `slack_post` posts a message as the user, behind the AI signature, with @here,

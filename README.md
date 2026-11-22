@@ -26,6 +26,7 @@ Notes, tasks, a password vault, a shortcut guide and tools for Claude Code in on
 - **Updates itself.** New versions download in the background from GitHub Releases and install when you choose.
 - **Keyboard-first.** Hold Ctrl, Alt or Win to see the shortcuts of the app in front, Win+Alt+N to capture a note or task from any app.
 - **Helm tools for AI agents (MCP).** Claude Code, VS Code, Claude Desktop, Cursor or any MCP client can read and write your notes, Tracker and Missions through Helm's MCP server (`Helm.exe --mcp`); turn it on in **AI → Agents & MCP**.
+- **Report a bug from anywhere, with a black box.** Ctrl+Alt+F12 on PC, a shake or a Quick Settings tile on the phone: the report carries the last 60 seconds of what you did and how Helm answered (errors, freezes, never what you typed) and your own pictures; AI agents read, fix and hand bugs back through Helm's MCP tools, and only you close them ([docs/bug-fixing.md](docs/bug-fixing.md)).
 - **Your AI keys in one place.** Claude and Grok API keys in **AI → Models & keys**: Helm tests each one, shows what it can reach (and Grok's prepaid balance), and syncs them end-to-end encrypted to your phone, so Helm's tools can call AI models on every device ([docs/ai-keys.md](docs/ai-keys.md)).
 
 ## Tools

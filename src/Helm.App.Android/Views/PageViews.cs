@@ -19,6 +19,8 @@ internal static class PageViews
             HomeViewModel => new HomeView(),
             GeneralViewModel => new GeneralView(),
             Helm.Ai.AiFeaturesViewModel => new AiFeaturesView(),
+            Helm.Shell.BugReports.BugReportsViewModel => new BugReports.BugReportsView(),
+            Helm.Shell.BugReports.BugReportFormViewModel => new BugReports.BugReportView(),
             ModulePage module => new ModulePageTemplate().Build(module)!,
             _ => new TextBlock { Text = tab.Title },
         };

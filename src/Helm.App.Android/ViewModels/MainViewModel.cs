@@ -54,8 +54,10 @@ public sealed partial class MainViewModel : ObservableObject
     /// <summary>The sync button in the app bar.</summary>
     public Helm.Shell.ViewModels.SyncIndicatorViewModel Sync { get; }
 
-    public MainViewModel(ShellNavigator navigator, DialogService dialogs, IModuleHost<IAndroidModule> modules, Helm.Shell.ViewModels.SyncIndicatorViewModel sync)
+    public MainViewModel(ShellNavigator navigator, DialogService dialogs, IModuleHost<IAndroidModule> modules, Helm.Shell.ViewModels.SyncIndicatorViewModel sync,
+        BugReports.AndroidBugReporter bugs)
     {
+        _bugs = bugs;
         Navigator = navigator;
         Dialogs = dialogs;
         Sync = sync;
@@ -69,6 +71,7 @@ public sealed partial class MainViewModel : ObservableObject
                 Entries.Add(new NavEntry(module.DisplayName, module.Icon, false, () => navigator.GoModuleContent(module), module.IconImage, module: module));
         }
         GeneralEntry = new NavEntry("General", Symbol.Settings, false, navigator.GoGeneral, pageKey: "general");
+        BugReportsEntry = new NavEntry(Helm.Shell.BugReports.BugReportsServices.PageTitle, Symbol.Bug, false, () => bugs.ShowPage(), pageKey: BugReports.AndroidBugReporter.PageKey);
 
         navigator.PropertyChanged += (_, e) =>
         {
@@ -87,9 +90,18 @@ public sealed partial class MainViewModel : ObservableObject
     /// <summary>Pinned to the bottom of the drawer, like the Windows navigation pane.</summary>
     public NavEntry GeneralEntry { get; }
 
+    /// <summary>Above General: the bugs reported on every device.</summary>
+    public NavEntry BugReportsEntry { get; }
+
+    private readonly BugReports.AndroidBugReporter _bugs;
+
+    /// <summary>The app bar's bug button: freezes the black box and opens the report page.</summary>
+    [RelayCommand]
+    private void ReportBug() => _bugs.Report();
+
     private void MarkActive()
     {
-        foreach (var entry in Entries.Append(GeneralEntry)) entry.IsActive = entry.IsPage && entry.Shows(Navigator.ActiveTab);
+        foreach (var entry in Entries.Append(BugReportsEntry).Append(GeneralEntry)) entry.IsActive = entry.IsPage && entry.Shows(Navigator.ActiveTab);
     }
 
     [RelayCommand]
@@ -154,6 +166,17 @@ public sealed partial class MainViewModel : ObservableObject
             }
             // A tool with its own back stack (an open item) goes back first; only on the page that shows that stack.
             if (page.Module is Helm.Core.Platform.IBackHandler handler && handler.HandleBack()) return true;
+        }
+        // Bug reports: an open bug goes back to the list; the report page closes (the black box records again).
+        if (Navigator.CurrentPage is Helm.Shell.BugReports.BugReportsViewModel bugs && bugs.Selected is not null)
+        {
+            bugs.CloseDetailCommand.Execute(null);
+            return true;
+        }
+        if (Navigator.CurrentPage is Helm.Shell.BugReports.BugReportFormViewModel)
+        {
+            _bugs.CloseReport();
+            return true;
         }
         // General › AI features: a feature's detail goes back to the list, the list to General.
         if (Navigator.CurrentPage is Helm.Ai.AiFeaturesViewModel features && Navigator.ActiveTab is { } featuresTab)

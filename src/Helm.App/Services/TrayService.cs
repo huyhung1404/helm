@@ -53,6 +53,9 @@ internal sealed class TrayService(IModuleHost modules, ILogger<TrayService> logg
 
     private (string Version, Action Apply)? _updateReady;
 
+    /// <summary>The menu's "Report a bug…" (set once bug reports start; the menu is rebuilt with the modules).</summary>
+    public Action? ReportBug { get; set; }
+
     /// <summary>Adds (or removes, with null) a "Restart to update" item to the tray menu.</summary>
     public void SetUpdateReady(string? version, Action? apply)
     {
@@ -103,6 +106,12 @@ internal sealed class TrayService(IModuleHost modules, ILogger<TrayService> logg
         }
 
         menu.Items.Add(new Separator());
+        if (ReportBug is { } report)
+        {
+            var bug = new MenuItem { Header = "Report a bug…", InputGestureText = "Ctrl+Alt+F12" };
+            bug.Click += (_, _) => report();
+            menu.Items.Add(bug);
+        }
         if (_updateReady is { } ready)
         {
             var update = new MenuItem { Header = $"Restart to update (v{ready.Version})" };

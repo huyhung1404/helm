@@ -51,6 +51,9 @@ internal sealed class TabManager(IServiceProvider services, MainWindowViewModel 
     /// <summary>The main window's tab host.</summary>
     public TabHost Main => _main ?? throw new InvalidOperationException("The main window has not attached its tabs yet");
 
+    /// <summary>The title of the page shown in the window used last (the black box's "Page", the report's tool).</summary>
+    public string? ActivePageTitle => (_lastActive ?? _main)?.ActiveTab?.Look.Title;
+
     /// <summary>False until the main window exists (it attaches its tabs when it is created).</summary>
     public bool IsAttached => _main is not null;
 
@@ -270,6 +273,7 @@ internal sealed class TabManager(IServiceProvider services, MainWindowViewModel 
         if (pageType == typeof(WhatsNewPage)) return new("What's new", () => new SymbolIcon(SymbolRegular.Megaphone24));
         if (pageType == typeof(WelcomePage)) return new("Welcome", () => new SymbolIcon(SymbolRegular.HandWave24));
         if (pageType == typeof(DiagnosticsPage)) return new("Diagnostics", () => new SymbolIcon(SymbolRegular.Bug24));
+        if (pageType == typeof(BugReports.BugReportsPage)) return new(Shell.BugReports.BugReportsServices.PageTitle, () => new SymbolIcon(SymbolRegular.Bug24));
         foreach (var module in catalog.Groups.SelectMany(g => g.Modules))
         {
             var content = (module as IModuleContent)?.ContentPageType;
@@ -298,7 +302,7 @@ internal sealed class TabManager(IServiceProvider services, MainWindowViewModel 
         if (name == LegacyMcpPage) return typeof(AiPage);
         return Launchable().Select(l => l.PageType)
             .Concat(catalog.Groups.SelectMany(g => g.Modules).Select(m => m.SettingsPageType))
-            .Concat([typeof(WhatsNewPage)])
+            .Concat([typeof(WhatsNewPage), typeof(BugReports.BugReportsPage)])
             .FirstOrDefault(t => t.FullName == name);
     }
 }

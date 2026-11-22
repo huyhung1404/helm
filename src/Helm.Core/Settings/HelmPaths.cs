@@ -22,6 +22,9 @@ public sealed class HelmPaths
     public string SettingsDirectory => Path.Combine(Root, "settings");
     public string LogsDirectory => Path.Combine(Root, "logs");
 
+    /// <summary>The black box a crash left, offered as a bug report at the next start (see <see cref="Diagnostics.BlackBox.WriteCrash"/>).</summary>
+    public string CrashBlackBoxFile => Path.Combine(LogsDirectory, "crash-blackbox.gz");
+
     public string SettingsFile(string id) => Path.Combine(SettingsDirectory, $"{id}.json");
 
     public string ModuleDataDirectory(string moduleId) => Path.Combine(SettingsDirectory, moduleId);

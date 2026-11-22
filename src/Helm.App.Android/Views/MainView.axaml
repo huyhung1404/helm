@@ -60,7 +60,12 @@
     <Grid>
         <DockPanel>
             <!-- App bar: drawer button + page title (the Windows title bar + nav pane toggle) -->
-            <Grid x:Name="AppBar" DockPanel.Dock="Top" ColumnDefinitions="Auto,*,Auto" Height="56" Background="{DynamicResource HelmBarBackground}">
+            <Grid x:Name="AppBar" DockPanel.Dock="Top" ColumnDefinitions="Auto,*,Auto,Auto" Height="56" Background="{DynamicResource HelmBarBackground}">
+                <!-- Report a bug (also by shaking the phone, or from the Quick Settings tile): the black box freezes as it opens. -->
+                <Button Grid.Column="2" Classes="flat" Width="48" Height="48" Padding="0" HorizontalContentAlignment="Center"
+                        Command="{Binding ReportBugCommand}" ToolTip.Tip="Report a bug" AutomationProperties.Name="Report a bug">
+                    <ic:SymbolIcon Symbol="Bug" FontSize="22" />
+                </Button>
                 <Button Classes="flat" Width="48" Height="48" Margin="4,0,0,0" Padding="0" HorizontalContentAlignment="Center"
                         Command="{Binding TogglePaneCommand}" ToolTip.Tip="Navigation" AutomationProperties.Name="Open navigation">
                     <ic:SymbolIcon Symbol="Navigation" FontSize="22" />
@@ -69,7 +74,7 @@
                            TextTrimming="CharacterEllipsis" />
                 <!-- Sync: its state on every page; tap to sync now (or to set it up). Just the icon, without a button look (no
                      press fill), over a 48 dp touch target. -->
-                <Button Grid.Column="2" Width="48" Height="48" Margin="0,0,4,0" Padding="0" Background="Transparent"
+                <Button Grid.Column="3" Width="48" Height="48" Margin="0,0,4,0" Padding="0" Background="Transparent"
                         DataContext="{Binding Sync}" Command="{Binding SyncNowCommand}" ToolTip.Tip="{Binding ToolTip}" AutomationProperties.Name="Sync now">
                     <Button.Template>
                         <ControlTemplate>
@@ -107,6 +112,16 @@
                     <DockPanel Margin="8">
                         <StackPanel DockPanel.Dock="Bottom">
                             <Border Height="1" Margin="4,4,4,4" Background="{DynamicResource HelmSecondaryText}" Opacity="0.2" />
+                            <Panel>
+                                <Button Classes="navrow" Classes.active="{Binding BugReportsEntry.IsActive}" Command="{Binding OpenCommand}"
+                                        CommandParameter="{Binding BugReportsEntry}" AutomationProperties.Name="Bug reports">
+                                    <Grid ColumnDefinitions="40,*">
+                                        <ic:SymbolIcon Symbol="Bug" FontSize="20" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                        <TextBlock Grid.Column="1" Text="Bug reports" VerticalAlignment="Center" />
+                                    </Grid>
+                                </Button>
+                                <Border Classes="navmark" IsVisible="{Binding BugReportsEntry.IsActive}" />
+                            </Panel>
                             <Panel>
                                 <Button Classes="navrow" Classes.active="{Binding GeneralEntry.IsActive}" Command="{Binding OpenCommand}"
                                         CommandParameter="{Binding GeneralEntry}" AutomationProperties.Name="General">

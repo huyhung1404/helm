@@ -5,6 +5,22 @@ Format: [Keep a Changelog](https://keepachangelog.com), versions follow [SemVer]
 
 ## [Unreleased]
 
+### Added
+- **Bug reports** (the menu's footer next to What's new on PC, above General in the phone's drawer): report a bug
+  from anywhere — Ctrl+Alt+F12, the title bar's bug button or the tray menu on PC; the app bar's bug, a shake or the
+  "Report a Helm bug" Quick Settings tile on the phone. Write what happened, say how bad it is and add your own
+  pictures (button, Ctrl+V or drop on PC; gallery, camera or a copied picture on the phone). Each report carries
+  Helm's **black box**: the 60 seconds before you reported — what you clicked or tapped (also disabled buttons),
+  shortcuts, pages, how much you typed (never what), Helm's log with every error's stack, UI freezes and sync —
+  frozen as the report opens. A crash keeps its black box, and the next start offers to report it. Bugs sync end to
+  end encrypted; close them (fixed, not a bug, duplicate), reopen them with why, add details, answer an agent's
+  question, or copy one as Markdown.
+- **AI agents fix your bugs** (Helm's MCP): `bugs_list`, `bug_get`, `bug_blackbox`, `bug_images` read a bug with its
+  black box and pictures; `bug_claim`, `bug_comment`, `bug_ask`, `bug_resolve`, `bug_release` work on it. An agent
+  never closes a bug: it waits for you to check, and Helm asks you once your device runs the version with the fix.
+  **Hand to Claude Code** on a bug types the request into a new Claude Code session on your PC through Workspace
+  Controller ([docs/bug-fixing.md](docs/bug-fixing.md)).
+
 ### Changed
 - **Vault, redesigned** (PC and Android):
   - **Sections instead of two tabs:** All items, Favorites, Logins, 2FA & tokens, Cards, Identities, Notes,
