@@ -19,6 +19,25 @@ public static class KindIcon
     });
 }
 
+/// <summary>The icon of a section of the vault (the chip row; the same symbols as on Windows).</summary>
+public static class SectionIcon
+{
+    public static IValueConverter Converter { get; } = new FuncValueConverter<ViewModels.VaultSectionKind, Symbol>(kind => kind switch
+    {
+        ViewModels.VaultSectionKind.All => Symbol.Grid,
+        ViewModels.VaultSectionKind.Favorites => Symbol.Star,
+        ViewModels.VaultSectionKind.Logins => Symbol.Key,
+        ViewModels.VaultSectionKind.Tokens => Symbol.ShieldKeyhole,
+        ViewModels.VaultSectionKind.Cards => Symbol.Payment,
+        ViewModels.VaultSectionKind.Identities => Symbol.PersonKey,
+        ViewModels.VaultSectionKind.Notes => Symbol.Note,
+        ViewModels.VaultSectionKind.Documents => Symbol.Attach,
+        ViewModels.VaultSectionKind.Tag => Symbol.Tag,
+        ViewModels.VaultSectionKind.Trash => Symbol.Delete,
+        _ => Symbol.Grid,
+    });
+}
+
 /// <summary>Hides a secret field's value behind dots while editing (until revealed).</summary>
 public static class SecretChar
 {

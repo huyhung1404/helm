@@ -16,10 +16,61 @@
         </Style>
     </UserControl.Styles>
     <StackPanel Spacing="4">
+        <!-- The editor (New or Edit, full screen): what it is about, and the kinds of a new item -->
+        <TextBlock Classes="title" FontSize="20" Margin="2,4,0,4" Text="{Binding EditorTitle}" IsVisible="{Binding IsEditing}" />
+        <ListBox ItemsSource="{Binding KindOptions}" SelectedItem="{Binding KindOption}" Background="Transparent" Margin="0,0,0,4"
+                 ScrollViewer.HorizontalScrollBarVisibility="Disabled" AutomationProperties.Name="Kind of item">
+            <ListBox.IsVisible>
+                <MultiBinding Converter="{x:Static BoolConverters.And}">
+                    <Binding Path="IsEditing" />
+                    <Binding Path="IsNew" />
+                </MultiBinding>
+            </ListBox.IsVisible>
+            <ListBox.ItemsPanel>
+                <ItemsPanelTemplate><WrapPanel /></ItemsPanelTemplate>
+            </ListBox.ItemsPanel>
+            <ListBox.ItemTemplate>
+                <DataTemplate x:DataType="vm:VaultKindOption">
+                    <StackPanel Orientation="Horizontal" Spacing="6" AutomationProperties.Name="{Binding Label}">
+                        <ic:SymbolIcon Symbol="{Binding Kind, Converter={x:Static local:KindIcon.Converter}}" FontSize="16" />
+                        <TextBlock Text="{Binding Label}" VerticalAlignment="Center" />
+                    </StackPanel>
+                </DataTemplate>
+            </ListBox.ItemTemplate>
+            <ListBox.Styles>
+                <Style Selector="ListBoxItem">
+                    <Setter Property="Padding" Value="12,8" />
+                    <Setter Property="Margin" Value="0,0,6,6" />
+                    <Setter Property="CornerRadius" Value="18" />
+                    <Setter Property="BorderThickness" Value="1" />
+                    <Setter Property="BorderBrush" Value="{DynamicResource HelmCardStroke}" />
+                    <Setter Property="Background" Value="{DynamicResource HelmCardBackground}" />
+                </Style>
+                <Style Selector="ListBoxItem:selected">
+                    <Setter Property="BorderBrush" Value="{DynamicResource SystemAccentColor}" />
+                    <Setter Property="FontWeight" Value="SemiBold" />
+                </Style>
+            </ListBox.Styles>
+        </ListBox>
+
         <!-- Header -->
         <Border Classes="card">
             <StackPanel Spacing="8">
                 <DockPanel>
+                    <!-- The star (view only) -->
+                    <Button DockPanel.Dock="Right" Classes="flat" Width="44" Height="44" Padding="0" HorizontalContentAlignment="Center" VerticalAlignment="Top"
+                            Command="{Binding ToggleFavoriteCommand}" AutomationProperties.Name="Favorite">
+                        <Button.IsVisible>
+                            <MultiBinding Converter="{x:Static BoolConverters.And}">
+                                <Binding Path="!IsEditing" />
+                                <Binding Path="!Trashed" />
+                            </MultiBinding>
+                        </Button.IsVisible>
+                        <Panel>
+                            <ic:SymbolIcon Symbol="Star" IconVariant="Filled" FontSize="18" Foreground="{DynamicResource SystemAccentColor}" IsVisible="{Binding Favorite}" />
+                            <ic:SymbolIcon Symbol="Star" FontSize="18" IsVisible="{Binding !Favorite}" />
+                        </Panel>
+                    </Button>
                     <!-- Avatar: the item's own picture, else its first letter on a color from its title -->
                     <Panel DockPanel.Dock="Left" Width="48" Height="48" Margin="0,0,12,0" VerticalAlignment="Center">
                         <Border CornerRadius="12" Background="{Binding AvatarColor, Converter={x:Static local:HexBrush.Converter}}" IsVisible="{Binding !HasIcon}">
@@ -29,7 +80,27 @@
                             <Image Source="{Binding Icon, Converter={x:Static local:IconBitmap.Converter}}" Stretch="UniformToFill" />
                         </Border>
                     </Panel>
-                    <TextBlock Classes="title" FontSize="18" VerticalAlignment="Center" Text="{Binding Title}" IsVisible="{Binding !IsEditing}" TextWrapping="Wrap" />
+                    <StackPanel VerticalAlignment="Center" IsVisible="{Binding !IsEditing}" Spacing="2">
+                        <TextBlock Classes="title" FontSize="18" Text="{Binding Title}" TextWrapping="Wrap" />
+                        <WrapPanel>
+                            <ic:SymbolIcon Symbol="{Binding Kind, Converter={x:Static local:KindIcon.Converter}}" FontSize="14" Margin="0,0,5,0" VerticalAlignment="Center"
+                                           Foreground="{DynamicResource HelmSecondaryText}" />
+                            <TextBlock Classes="secondary" Text="{Binding KindLabel}" Margin="0,0,8,0" VerticalAlignment="Center" />
+                            <ItemsControl ItemsSource="{Binding TagList}">
+                                <ItemsControl.ItemsPanel>
+                                    <ItemsPanelTemplate><WrapPanel /></ItemsPanelTemplate>
+                                </ItemsControl.ItemsPanel>
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate x:DataType="x:String">
+                                        <Border CornerRadius="6" Padding="7,1" Margin="0,2,6,2" BorderThickness="1"
+                                                Background="{DynamicResource HelmSubtleFill}" BorderBrush="{DynamicResource HelmCardStroke}">
+                                            <TextBlock Text="{Binding}" FontSize="12" Foreground="{DynamicResource HelmSecondaryText}" />
+                                        </Border>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </WrapPanel>
+                    </StackPanel>
                     <TextBox PlaceholderText="Title" Text="{Binding Title}" IsVisible="{Binding IsEditing}" AutomationProperties.Name="Title" VerticalAlignment="Center" />
                 </DockPanel>
                 <WrapPanel IsVisible="{Binding IsEditing}">
@@ -41,9 +112,21 @@
                     </Button>
                     <Button Margin="0,0,8,4" Content="Remove icon" Command="{Binding RemoveIconCommand}" IsVisible="{Binding HasIcon}" />
                 </WrapPanel>
-                <DockPanel IsVisible="{Binding IsEditing}">
-                    <TextBlock DockPanel.Dock="Left" Text="Type" VerticalAlignment="Center" Margin="0,0,12,0" />
-                    <ComboBox ItemsSource="{Binding Types}" SelectedItem="{Binding Type}" HorizontalAlignment="Stretch" AutomationProperties.Name="Type" />
+                <DockPanel>
+                    <DockPanel.IsVisible>
+                        <MultiBinding Converter="{x:Static BoolConverters.And}">
+                            <Binding Path="IsEditing" />
+                            <Binding Path="!IsNew" />
+                        </MultiBinding>
+                    </DockPanel.IsVisible>
+                    <TextBlock DockPanel.Dock="Left" Text="Kind" VerticalAlignment="Center" Margin="0,0,12,0" />
+                    <ComboBox ItemsSource="{Binding KindOptions}" SelectedItem="{Binding KindOption}" HorizontalAlignment="Stretch" AutomationProperties.Name="Kind">
+                        <ComboBox.ItemTemplate>
+                            <DataTemplate x:DataType="vm:VaultKindOption">
+                                <TextBlock Text="{Binding Label}" />
+                            </DataTemplate>
+                        </ComboBox.ItemTemplate>
+                    </ComboBox>
                 </DockPanel>
                 <CheckBox Content="Favorite" IsChecked="{Binding Favorite}" IsVisible="{Binding IsEditing}" />
                 <WrapPanel>

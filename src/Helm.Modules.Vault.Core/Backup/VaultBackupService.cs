@@ -74,6 +74,23 @@ public sealed class VaultBackupService
 
     public string? LastError => _device.Current.LastBackupError;
 
+    /// <summary>This device's backup folder (PC) or Storage Access Framework tree (Android); null: this device does not back up.</summary>
+    public string? Location => _settings.Current.BackupLocation;
+
+    /// <summary>
+    /// A short name for where the backups go: "OneDrive", "Google Drive", "Dropbox", or the folder's own name ("USB",
+    /// "Backup"). Null without a location.
+    /// </summary>
+    public static string? PlaceName(string? location)
+    {
+        if (string.IsNullOrWhiteSpace(location)) return null;
+        var text = Uri.UnescapeDataString(location);
+        foreach (var (needle, name) in new[] { ("OneDrive", "OneDrive"), ("Google Drive", "Google Drive"), ("My Drive", "Google Drive"), ("Dropbox", "Dropbox"), ("iCloud", "iCloud Drive") })
+            if (text.Contains(needle, StringComparison.OrdinalIgnoreCase)) return name;
+        var last = text.TrimEnd('/', '\\', ':').Split('/', '\\', ':').LastOrDefault(s => s.Length > 0);
+        return last ?? text;
+    }
+
     /// <summary>A day passed since the last good backup (or there never was one) and a location is set.</summary>
     public bool IsDue => _settings.Current.BackupLocation is not null
         && (LastGoodBackup is not { } last || _time.GetUtcNow() - last > TimeSpan.FromHours(20));

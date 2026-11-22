@@ -76,7 +76,9 @@ public sealed partial class VaultAppViewModel : ObservableObject
         // sleeps, instead of waking the phone every second for as long as Helm runs.
         _totpTimer = new Timer(_ => _ui.Post(() =>
         {
-            if (IsItems) Items.TickTotp(DateTimeOffset.UtcNow);
+            if (!IsItems) return;
+            Items.TickTotp(DateTimeOffset.UtcNow);
+            OnPropertyChanged(nameof(LockCountdown));
         }), null, Timeout.Infinite, Timeout.Infinite);
         PropertyChanged += (_, e) =>
         {
@@ -147,6 +149,51 @@ public sealed partial class VaultAppViewModel : ObservableObject
     public string? BackupWarning => !_backup.IsOverdue ? null
         : _backup.LastGoodBackupAnywhere is not { } last ? "This vault has never been backed up. Choose a backup folder in the Vault settings (on one of your devices)."
         : $"No device has backed up this vault for {(DateTimeOffset.UtcNow - last).Days} days." + (_backup.LastError is { } e ? " " + e : "");
+
+    /// <summary>"locks in 4:52" while the vault is open and locks when idle; null otherwise.</summary>
+    public string? LockCountdown
+    {
+        get
+        {
+            if (!IsItems || _session.AutoLockAt is not { } at) return null;
+            var left = at - _session.UtcNow;
+            if (left < TimeSpan.Zero) left = TimeSpan.Zero;
+            return $"locks in {(int)left.TotalMinutes}:{left.Seconds:00}";
+        }
+    }
+
+    /// <summary>The backup line under the sections: "Backed up", "Backup failed" or "Not backed up".</summary>
+    public string BackupTitle => _backup.LastError is not null && _backup.Location is not null ? "Backup failed"
+        : _backup.LastGoodBackupAnywhere is null ? "Not backed up" : "Backed up";
+
+    /// <summary>"3 days ago · OneDrive · verified", or what to do about it.</summary>
+    public string BackupDetail
+    {
+        get
+        {
+            if (_backup.LastError is { } error && _backup.Location is not null) return error;
+            if (_backup.LastGoodBackupAnywhere is not { } last)
+                return "Choose a backup folder in the Vault settings (on one of your devices).";
+            var place = Backup.VaultBackupService.PlaceName(_backup.Location) ?? "on another device";
+            return $"{Ago(last)} · {place} · verified";
+        }
+    }
+
+    /// <summary>The latest backup is recent and this device's last attempt did not fail.</summary>
+    public bool BackupOk => BackupTitle == "Backed up" && !_backup.IsOverdue;
+
+    /// <summary>"just now", "5 minutes ago", "yesterday", "3 days ago".</summary>
+    internal string Ago(DateTimeOffset when)
+    {
+        var span = _session.UtcNow - when;
+        if (span < TimeSpan.FromMinutes(1)) return "just now";
+        if (span < TimeSpan.FromHours(1)) return Plural((int)span.TotalMinutes, "minute") + " ago";
+        if (span < TimeSpan.FromDays(1)) return Plural((int)span.TotalHours, "hour") + " ago";
+        if (span < TimeSpan.FromDays(2)) return "yesterday";
+        return Plural((int)span.TotalDays, "day") + " ago";
+
+        static string Plural(int n, string unit) => n == 1 ? $"1 {unit}" : $"{n} {unit}s";
+    }
 
     partial void OnNewPasswordChanged(string value) => OnPropertyChanged(nameof(PasswordStrength));
 
@@ -228,6 +275,15 @@ public sealed partial class VaultAppViewModel : ObservableObject
 
     [RelayCommand]
     private void Lock() => _session.Lock("user");
+
+    /// <summary>"Forgot it? Use the recovery key" (and back): what was typed in the other box is dropped.</summary>
+    [RelayCommand]
+    private void ToggleRecoveryKey()
+    {
+        UseRecoveryKey = !UseRecoveryKey;
+        Password = RecoveryKey = "";
+        Error = null;
+    }
 
     [RelayCommand]
     private void ShowGuide() => IsGuideOpen = true;
@@ -316,6 +372,10 @@ public sealed partial class VaultAppViewModel : ObservableObject
         OnPropertyChanged(nameof(HeldWarning));
         OnPropertyChanged(nameof(BackupWarning));
         OnPropertyChanged(nameof(WeakPasswordWarning));
+        OnPropertyChanged(nameof(BackupTitle));
+        OnPropertyChanged(nameof(BackupDetail));
+        OnPropertyChanged(nameof(BackupOk));
+        OnPropertyChanged(nameof(LockCountdown));
     }
 
     private async Task RunAsync(Func<Task> work)

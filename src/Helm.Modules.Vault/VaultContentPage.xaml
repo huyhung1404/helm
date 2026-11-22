@@ -26,6 +26,18 @@
             <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
                 <Image Source="{x:Static local:VaultIcon.Image}" Width="32" Height="32" Margin="0,0,12,0" xmlns:local="clr-namespace:Helm.Modules.Vault" />
                 <TextBlock Text="Vault" FontSize="28" FontWeight="SemiBold" VerticalAlignment="Center" />
+                <!-- Open, and when it locks for being idle -->
+                <Border Margin="14,0,0,0" Padding="10,3" CornerRadius="12" VerticalAlignment="Center" BorderThickness="1"
+                        Background="{DynamicResource CardBackgroundFillColorDefaultBrush}" BorderBrush="{DynamicResource CardStrokeColorDefaultBrush}"
+                        ToolTip="Vault locks after a while without use (Settings → Locking)"
+                        Visibility="{Binding App.IsItems, Converter={StaticResource BoolToVisibility}}">
+                    <StackPanel Orientation="Horizontal">
+                        <Ellipse Width="8" Height="8" Fill="{DynamicResource SystemFillColorSuccessBrush}" VerticalAlignment="Center" Margin="0,0,7,0" />
+                        <TextBlock Text="Unlocked" FontSize="12.5" Foreground="{DynamicResource TextFillColorSecondaryBrush}" VerticalAlignment="Center" />
+                        <TextBlock Text="{Binding App.LockCountdown, StringFormat=' · {0}'}" FontSize="12.5" Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                                   VerticalAlignment="Center" Visibility="{Binding App.LockCountdown, Converter={StaticResource NotEmptyToVisibility}}" />
+                    </StackPanel>
+                </Border>
             </StackPanel>
         </DockPanel>
 

@@ -14,6 +14,28 @@ public enum VaultItemType
     Info,
 }
 
+/// <summary>A kind of item with the name people see.</summary>
+public sealed record VaultKindOption(VaultItemKind Kind, string Label)
+{
+    public override string ToString() => Label;
+}
+
+/// <summary>The names of the kinds of items, in the order the editor offers them.</summary>
+public static class VaultKinds
+{
+    public static IReadOnlyList<VaultKindOption> Options { get; } =
+    [
+        new(VaultItemKind.Login, "Login"),
+        new(VaultItemKind.Token, "Token"),
+        new(VaultItemKind.Note, "Note"),
+        new(VaultItemKind.Card, "Card"),
+        new(VaultItemKind.Identity, "Identity"),
+        new(VaultItemKind.Document, "Document"),
+    ];
+
+    public static string Label(VaultItemKind kind) => Options.FirstOrDefault(o => o.Kind == kind)?.Label ?? kind.ToString();
+}
+
 /// <summary>
 /// One card of the list, closed: a login shows its icon, title, username and password (each with Copy); a token its
 /// title and token (Copy); an Info item its title and description. Secrets stay hidden until revealed and are copied
@@ -26,7 +48,6 @@ public sealed partial class VaultCardViewModel(VaultEntry entry, IVaultPlatform 
     [ObservableProperty] private bool _isRevealed;
     [ObservableProperty] private bool _isCopied;
     [ObservableProperty] private bool _isUsernameCopied;
-    [ObservableProperty] private bool _isExpanded;
     [ObservableProperty] private string _totpCode = "";
     [ObservableProperty] private int _totpSecondsLeft;
     [ObservableProperty] private bool _isTotpCopied;
@@ -80,6 +101,26 @@ public sealed partial class VaultCardViewModel(VaultEntry entry, IVaultPlatform 
 
     public bool HasDescription => IsInfo && Description.Length > 0;
 
+    public string KindLabel => VaultKinds.Label(_item.Kind);
+
+    /// <summary>
+    /// The line under the title in the list: the username, else the first plain field (a cardholder, a name), else the
+    /// start of an Info item's description, else the kind. Never a secret.
+    /// </summary>
+    public string Subtitle =>
+        Username
+        ?? _item.Fields.FirstOrDefault(f => !f.IsSecret && !f.IsFile && f.Kind is not (VaultFieldKind.Url or VaultFieldKind.Multiline) && f.Value.Trim().Length > 0)?.Value.Trim()
+        ?? (IsInfo && Description.Length > 0 ? Description.Split('\n')[0].Trim() : null)
+        ?? KindLabel;
+
+    /// <summary>How much of the current code's time is left, 0 to 100 (the ring next to it, like the detail's fields).</summary>
+    [ObservableProperty] private double _totpProgress;
+
+    /// <summary>The last seconds of a code: wait for the next one before typing it.</summary>
+    public bool TotpEndingSoon => HasTotp && TotpSecondsLeft <= 5;
+
+    partial void OnTotpSecondsLeftChanged(int value) => OnPropertyChanged(nameof(TotpEndingSoon));
+
     public byte[]? Icon => _item.Icon;
 
     public bool HasIcon => _item.Icon is { Length: > 0 };
@@ -100,6 +141,7 @@ public sealed partial class VaultCardViewModel(VaultEntry entry, IVaultPlatform 
         if (_totp is null) return;
         TotpCode = Totp.Group(_totp.Code(now));
         TotpSecondsLeft = _totp.SecondsLeft(now);
+        TotpProgress = 100.0 * TotpSecondsLeft / _totp.Period;
     }
 
     private int _totpCopies;

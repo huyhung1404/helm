@@ -67,13 +67,16 @@ public sealed class VaultModule(
         return Task.CompletedTask;
     }
 
-    /// <summary>Android back: close an open item before leaving the vault page.</summary>
+    /// <summary>Android back: close the editor (asking first if something was typed), then an open item, before leaving the vault page.</summary>
     public bool HandleBack()
     {
-        if (app.Items.Detail is not { } detail) return false;
-        // Editing: back cancels the edit (a new item closes); viewing: back closes the item.
-        if (detail.IsEditing) detail.CancelCommand.Execute(null);
-        else app.Items.CloseDetailCommand.Execute(null);
+        if (app.Items.Editor is { } editor)
+        {
+            editor.CancelCommand.Execute(null);
+            return true;
+        }
+        if (app.Items.Detail is null) return false;
+        app.Items.CloseDetailCommand.Execute(null);
         return true;
     }
 

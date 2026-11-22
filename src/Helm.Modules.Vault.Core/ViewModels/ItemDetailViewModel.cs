@@ -197,9 +197,12 @@ public sealed partial class ItemDetailViewModel : ObservableObject
     private readonly VaultSession _session;
     private readonly IVaultPlatform _platform;
     private readonly Action<string?> _saved;
+    private readonly Action<string>? _edit;
+    private readonly Action<string>? _toggleFavorite;
     private readonly Dictionary<string, VaultAttachment> _pending = new(StringComparer.Ordinal);
     private VaultItem _item;
     private string? _recordId;
+    private bool _loading;
 
     [ObservableProperty] private string _title = "";
     [ObservableProperty] private string _notes = "";
@@ -212,19 +215,24 @@ public sealed partial class ItemDetailViewModel : ObservableObject
     [ObservableProperty] private byte[]? _icon;
 
     /// <summary>
-    /// Login, Token or Info, changeable while editing (e.g. a token that was saved as a login). The fields stay as they
-    /// are; only the tab and the card's look depend on it.
+    /// What the item is (login, token, note, card, identity, document), changeable while editing. A new item that has
+    /// nothing typed yet takes the new kind's usual fields; otherwise the fields stay as they are.
     /// </summary>
-    [ObservableProperty] private VaultItemType _type;
+    [ObservableProperty] private VaultItemKind _kind;
 
+    /// <param name="saved">Called after save, trash, restore, delete or a settled conflict (the item's uid; null: it is gone or the new item was cancelled).</param>
+    /// <param name="edit">Edit opens this item in the editor pop-up (the detail stays as it is); null: Edit edits in place.</param>
+    /// <param name="toggleFavorite">The detail's star.</param>
     internal ItemDetailViewModel(VaultStore store, VaultFiles files, VaultSession session, IVaultPlatform platform,
-        VaultEntry? entry, VaultItemKind kind, Action<string?> saved)
+        VaultEntry? entry, VaultItemKind kind, Action<string?> saved, Action<string>? edit = null, Action<string>? toggleFavorite = null)
     {
         _store = store;
         _files = files;
         _session = session;
         _platform = platform;
         _saved = saved;
+        _edit = edit;
+        _toggleFavorite = toggleFavorite;
         Uid = entry?.Uid;
         _recordId = entry?.RecordId;
         Trashed = entry?.Trashed ?? false;
@@ -238,29 +246,50 @@ public sealed partial class ItemDetailViewModel : ObservableObject
     /// <summary>Null for an item that is not saved yet.</summary>
     public string? Uid { get; private set; }
 
-    public IReadOnlyList<VaultItemType> Types { get; } = Enum.GetValues<VaultItemType>();
+    /// <summary>Every kind, for the editor's kind picker.</summary>
+    public IReadOnlyList<VaultKindOption> KindOptions => VaultKinds.Options;
 
-    public bool IsInfo => Type == VaultItemType.Info;
-
-    /// <summary>"Description" for Info items (the card shows it), "Notes" otherwise.</summary>
-    public string NotesLabel => IsInfo ? "Description" : "Notes";
-
-    partial void OnTypeChanged(VaultItemType value)
+    /// <summary>The picked kind as an option (what the pickers bind to).</summary>
+    public VaultKindOption KindOption
     {
-        OnPropertyChanged(nameof(IsInfo));
-        OnPropertyChanged(nameof(NotesLabel));
+        get => VaultKinds.Options.First(o => o.Kind == Kind);
+        set { if (value is not null) Kind = value.Kind; }
     }
 
-    /// <summary>
-    /// The stored kind for a type. Info keeps an older item's own kind (card, identity, document), so nothing is
-    /// rewritten needlessly and older Helm versions still read it; a new Info item is stored as a note.
-    /// </summary>
-    private static VaultItemKind KindFor(VaultItemType type, VaultItemKind current) => type switch
+    public string KindLabel => VaultKinds.Label(Kind);
+
+    public bool IsInfo => VaultCardViewModel.TypeOf(Kind) == VaultItemType.Info;
+
+    /// <summary>"Description" for Info items (the list shows it), "Notes" otherwise.</summary>
+    public string NotesLabel => IsInfo ? "Description" : "Notes";
+
+    /// <summary>The item's tags, for the chips under its title.</summary>
+    public IReadOnlyList<string> TagList => Tags.Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries);
+
+    public bool HasTags => TagList.Count > 0;
+
+    /// <summary>"New item" or "Edit GitHub".</summary>
+    public string EditorTitle => IsNew ? "New item" : "Edit " + (_item.Title.Length > 0 ? _item.Title : "the item");
+
+    partial void OnKindChanged(VaultItemKind value)
     {
-        VaultItemType.Login => VaultItemKind.Login,
-        VaultItemType.Token => VaultItemKind.Token,
-        _ => VaultCardViewModel.TypeOf(current) == VaultItemType.Info ? current : VaultItemKind.Note,
-    };
+        OnPropertyChanged(nameof(KindOption));
+        OnPropertyChanged(nameof(KindLabel));
+        OnPropertyChanged(nameof(IsInfo));
+        OnPropertyChanged(nameof(NotesLabel));
+        // A new item with nothing typed in its fields takes the usual fields of its new kind.
+        if (!_loading && IsEditing && IsNew && Fields.All(f => f.Value.Length == 0))
+        {
+            Fields.Clear();
+            foreach (var field in VaultItem.New(value).Fields) Fields.Add(new FieldViewModel(this, field));
+        }
+    }
+
+    partial void OnTagsChanged(string value)
+    {
+        OnPropertyChanged(nameof(TagList));
+        OnPropertyChanged(nameof(HasTags));
+    }
 
     public bool Trashed { get; }
 
@@ -364,13 +393,31 @@ public sealed partial class ItemDetailViewModel : ObservableObject
     private void Edit()
     {
         if (Trashed) return;
-        IsEditing = true;
+        if (_edit is not null && Uid is not null) _edit(Uid);
+        else IsEditing = true;
         Touch();
     }
 
+    /// <summary>The star in the detail: favorite or not.</summary>
     [RelayCommand]
-    private void Cancel()
+    private void ToggleFavorite()
     {
+        if (Trashed || Uid is null) return;
+        if (_toggleFavorite is not null) _toggleFavorite(Uid);
+        Touch();
+    }
+
+    /// <summary>Something was typed that Save would keep (asked before it is thrown away).</summary>
+    public bool HasChanges => IsEditing && (IsNew
+        ? Title.Trim().Length > 0 || Notes.Trim().Length > 0 || Tags.Trim().Length > 0 || Icon is not null || Fields.Any(f => f.Value.Length > 0)
+        : !Build().SameContentAs(_item));
+
+    /// <summary>Closes the editor; what was typed is lost, so it asks first when there is any.</summary>
+    [RelayCommand]
+    private async Task CancelAsync()
+    {
+        if (HasChanges && !await _platform.ConfirmAsync("Discard the changes", "Close without saving what you typed?", "Discard").ConfigureAwait(true))
+            return;
         if (IsNew)
         {
             _saved(null);
@@ -380,6 +427,24 @@ public sealed partial class ItemDetailViewModel : ObservableObject
         IsEditing = false;
         Error = null;
     }
+
+    /// <summary>The item as the editor holds it now.</summary>
+    private VaultItem Build() => _item with
+    {
+        Kind = Kind,
+        Title = Title.Trim(),
+        Notes = Notes,
+        Favorite = Favorite,
+        Icon = Icon,
+        Tags = Tags.Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries).Distinct().ToList(),
+        Fields = Fields.Select(f => f.ToField())
+            .Where(f => f.IsFile ? f.AttachmentId is not null && FindAttachment(f.AttachmentId) is not null : f.Name.Length > 0 || f.Value.Length > 0)
+            .ToList(),
+        // Exactly the files the fields hold: new ones join, removed ones leave (they stay in the history).
+        Attachments = Fields.Where(f => f.IsFile && f.AttachmentId is not null)
+            .Select(f => FindAttachment(f.AttachmentId!)).OfType<VaultAttachment>()
+            .DistinctBy(a => a.Id).ToList(),
+    };
 
     [RelayCommand]
     private void Save()
@@ -397,22 +462,7 @@ public sealed partial class ItemDetailViewModel : ObservableObject
         }
         try
         {
-            var edited = _item with
-            {
-                Kind = KindFor(Type, _item.Kind),
-                Title = Title.Trim(),
-                Notes = Notes,
-                Favorite = Favorite,
-                Icon = Icon,
-                Tags = Tags.Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries).Distinct().ToList(),
-                Fields = Fields.Select(f => f.ToField())
-                    .Where(f => f.IsFile ? f.AttachmentId is not null && FindAttachment(f.AttachmentId) is not null : f.Name.Length > 0 || f.Value.Length > 0)
-                    .ToList(),
-                // Exactly the files the fields hold: new ones join, removed ones leave (they stay in the history).
-                Attachments = Fields.Where(f => f.IsFile && f.AttachmentId is not null)
-                    .Select(f => FindAttachment(f.AttachmentId!)).OfType<VaultAttachment>()
-                    .DistinctBy(a => a.Id).ToList(),
-            };
+            var edited = Build();
             if (Uid is null) Uid = _store.Add(edited);
             else _store.Save(Uid, edited);
             _item = _store.Get(Uid)?.Item ?? edited;
@@ -628,7 +678,16 @@ public sealed partial class ItemDetailViewModel : ObservableObject
 
     private void Load(VaultItem item)
     {
-        Type = VaultCardViewModel.TypeOf(item.Kind);
+        _loading = true; // loading is not choosing a kind: the fields below are the item's own
+        try
+        {
+            Kind = item.Kind;
+        }
+        finally
+        {
+            _loading = false;
+        }
+        OnPropertyChanged(nameof(EditorTitle));
         Title = item.Title;
         Notes = item.Notes;
         Tags = string.Join(", ", item.Tags);

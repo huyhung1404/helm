@@ -76,6 +76,22 @@ each document: FileKey (32 random bytes) stored inside its item, so only the Vau
   (S14).
 - Limits (documented, not solved): malware while the vault is unlocked; .NET strings cannot be wiped.
 
+## Screens
+
+Shared view models (`src/Helm.Modules.Vault.Core/ViewModels`), one layout per platform:
+
+| Part | View model | PC (`VaultView`) | Android (`VaultContentPage`) |
+|---|---|---|---|
+| Sections: All, Favorites, Logins, 2FA & tokens, Cards, Identities, Notes, Documents, one per tag, Trash | `ItemsViewModel.Sections` / `TagSections` / `TrashSection` | Left column; icons only from 720 to 1000 px; chips above the list below 720 px | A row of chips to swipe |
+| The list of the section, with search | `Cards`, `Search` (within the section; `SearchEverywhere` when nothing matches) | Middle column; the first item is selected (`AutoSelectFirst`) | Rows; a tap opens the item in their place |
+| The selected item, read only | `SelectedCard` → `Detail` | Right column (Back below 720 px) | In place of the list, Back returns |
+| New / Edit | `Editor` (a separate `ItemDetailViewModel`, so the detail does not change while editing) | Pop-up over the vault, inside the window (screen-capture exclusion covers it) | Full screen; Back = Cancel |
+| Status | `VaultAppViewModel.LockCountdown`, `BackupTitle` / `BackupDetail` / `BackupOk` | Next to the title; bottom of the left column | Next to the icon |
+
+"2FA & tokens" lists tokens and every item with a two-factor code; "Documents" lists documents and every item with
+a file. Closing the editor with changes asks first (`ItemDetailViewModel.HasChanges`). Locking closes the editor and
+drops the detail and the list (`ItemsViewModel.Clear`).
+
 ## Phases
 
 P0 Android module infrastructure (`Helm.Core.Android`), P1 Vault core, P2 blobs (client + Worker), P3 backup

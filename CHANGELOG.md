@@ -5,6 +5,23 @@ Format: [Keep a Changelog](https://keepachangelog.com), versions follow [SemVer]
 
 ## [Unreleased]
 
+### Changed
+- **Vault, redesigned** (PC and Android):
+  - **Sections instead of two tabs:** All items, Favorites, Logins, 2FA & tokens, Cards, Identities, Notes,
+    Documents, one per tag, and the Trash, each with its count. On the PC they are a column on the left (icons only
+    when the window is narrower, chips above the list when it is narrow); on a phone, a row of chips to swipe.
+  - **Three columns on the PC:** sections, the list, and the item you picked (shown, not edited). The list is
+    compact: picture or initial, title, username (or what the item is), the current two-factor code with a ring
+    counting down, and a star for favorites. The first item is shown as soon as the vault opens.
+  - **New and Edit open a pop-up** over the vault (full screen on a phone). New starts with a choice of kind (Login,
+    Token, Note, Card, Identity, Document) whose usual fields follow it until you type; Edit can change the kind.
+    Closing with something typed asks first.
+  - **Lock screen:** Windows Hello (or the fingerprint) is the main button, the error shows under the password, and
+    "Forgot it? Use the recovery key" replaces the checkbox.
+  - **At a glance:** "Unlocked · locks in 4:52" next to the title, and how the backup is doing ("Backed up 3 days ago
+    · OneDrive · verified") under the sections.
+  - Search looks in the section shown; when nothing matches there, one tap searches every item.
+
 ### Security
 - **Vault**: a vault password typed with "show password" on the lock screen stayed in the box, readable, after
   unlocking: the next time the vault locked, the lock screen showed it again. The box now empties (and hides) as soon

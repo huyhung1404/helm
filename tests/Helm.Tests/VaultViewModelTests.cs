@@ -119,6 +119,16 @@ public sealed class VaultViewModelTests : IDisposable
         Assert.Equal("", app.RecoveryKey);
         Assert.False(app.UseRecoveryKey);
 
+        // "Forgot it? Use the recovery key" and back: what was typed in the other box goes.
+        app.Password = "half of my pass";
+        app.ToggleRecoveryKeyCommand.Execute(null);
+        Assert.True(app.UseRecoveryKey);
+        Assert.Equal("", app.Password);
+        app.RecoveryKey = "HELMV-1234";
+        app.ToggleRecoveryKeyCommand.Execute(null);
+        Assert.False(app.UseRecoveryKey);
+        Assert.Equal("", app.RecoveryKey);
+
         // Typed, then the vault locks (and unlocks with something else): nothing waits in the box.
         app.Password = Password;
         await app.UnlockCommand.ExecuteAsync(null);
@@ -138,12 +148,11 @@ public sealed class VaultViewModelTests : IDisposable
         await session.CreateAsync(Password);
         var items = app.Items;
         items.NewCommand.Execute(VaultItemKind.Login);
-        var detail = items.Detail!;
-        detail.Title = "Bank";
-        detail.Fields.Single(f => f.IsPassword).GenerateCommand.Execute(null);
-        detail.SaveCommand.Execute(null);
+        var editor = items.Editor!;
+        editor.Title = "Bank";
+        editor.Fields.Single(f => f.IsPassword).GenerateCommand.Execute(null);
+        editor.SaveCommand.Execute(null);
         var card = Assert.Single(items.Cards);
-        items.ToggleCardCommand.Execute(card);
         card.ToggleRevealCommand.Execute(null);
         var field = items.Detail!.Fields.Single(f => f.IsPassword);
         field.ToggleRevealCommand.Execute(null);
@@ -187,38 +196,38 @@ public sealed class VaultViewModelTests : IDisposable
     }
 
     [Fact]
-    public async Task Items_are_created_in_the_editor_opened_on_their_card_searched_and_trashed()
+    public async Task Items_are_created_in_the_editor_shown_once_saved_searched_and_trashed()
     {
         var (app, session, _) = NewApp();
         await session.CreateAsync(Password);
         var items = app.Items;
 
         items.NewCommand.Execute(VaultItemKind.Login);
-        Assert.True(items.IsEditorOpen); // adding happens in the editor above the list
-        var detail = items.Detail!;
-        detail.Title = "Bank";
-        detail.Fields.Single(f => f.Kind == VaultFieldKind.Username).Value = "anh@example.com";
-        var password = detail.Fields.Single(f => f.IsPassword);
+        Assert.True(items.IsEditorOpen); // adding happens in the editor pop-up
+        Assert.Null(items.Detail);
+        var editor = items.Editor!;
+        Assert.Equal("New item", editor.EditorTitle);
+        editor.Title = "Bank";
+        editor.Fields.Single(f => f.Kind == VaultFieldKind.Username).Value = "anh@example.com";
+        var password = editor.Fields.Single(f => f.IsPassword);
         password.GenerateCommand.Execute(null);
         var generated = password.Value;
-        detail.SaveCommand.Execute(null);
+        editor.SaveCommand.Execute(null);
 
         Assert.False(items.IsEditorOpen);
         var card = Assert.Single(items.Cards);
         Assert.Equal("Bank", card.Title);
-        Assert.Equal("anh@example.com", card.Username);
-        Assert.False(card.IsExpanded); // a new item's card is closed once saved
-        Assert.Null(items.Detail);
-        items.ToggleCardCommand.Execute(card);
-        Assert.Equal("••••••••••", items.Detail!.Fields.Single(f => f.IsPassword).Display);
+        Assert.Equal("anh@example.com", card.Subtitle);
+        Assert.Same(card, items.SelectedCard); // the new item is shown
+        Assert.Equal("Bank", items.Detail!.Title);
+        Assert.Equal("••••••••••", items.Detail.Fields.Single(f => f.IsPassword).Display);
         var secret = items.Detail.Fields.Single(f => f.IsPassword);
         secret.ToggleRevealCommand.Execute(null); // the eye next to Copy
         Assert.Equal(generated, secret.Display);
-        items.ToggleCardCommand.Execute(card);
 
         card.CopyUsernameCommand.Execute(null);
         Assert.Equal("anh@example.com", _platform.CopiedText);
-        card.CopyCommand.Execute(null);
+        secret.CopyCommand.Execute(null);
         Assert.Equal(generated, _platform.CopiedSecret);
 
         // Search finds titles and usernames, never secret values.
@@ -226,12 +235,15 @@ public sealed class VaultViewModelTests : IDisposable
         Assert.Single(items.Cards);
         items.Search = generated[..6];
         Assert.Empty(items.Cards);
+        Assert.Contains("Nothing matches", items.EmptyText);
         items.Search = "";
 
-        items.ToggleCardCommand.Execute(items.Cards[0]);
+        items.OpenCommand.Execute(items.Cards[0]);
         await items.Detail!.MoveToTrashCommand.ExecuteAsync(null);
         Assert.Empty(items.Cards);
-        items.ShowFilterCommand.Execute(VaultFilter.Trash);
+        Assert.Null(items.Detail);
+        Assert.Equal(1, items.TrashSection.Count);
+        items.ShowSectionCommand.Execute(items.TrashSection);
         var trashed = Assert.Single(items.Cards);
         Assert.False(trashed.CanCopySecret); // the trash is for restoring, not copying
         Assert.False(trashed.HasUsername);
@@ -245,10 +257,10 @@ public sealed class VaultViewModelTests : IDisposable
         var items = app.Items;
 
         items.NewCommand.Execute(VaultItemKind.Note);
-        var detail = items.Detail!;
-        detail.Title = "Release keys";
-        detail.AddFieldCommand.Execute(VaultFieldKind.Keystore);
-        var field = detail.Fields.Last();
+        var editor = items.Editor!;
+        editor.Title = "Release keys";
+        editor.AddFieldCommand.Execute(VaultFieldKind.Keystore);
+        var field = editor.Fields.Last();
         Assert.Equal("Keystore", field.Name);
         Assert.True(field.IsFile);
         Assert.False(field.HasFile);
@@ -259,7 +271,7 @@ public sealed class VaultViewModelTests : IDisposable
         await field.ChooseFileCommand.ExecuteAsync(null);
         Assert.True(field.HasFile);
         Assert.StartsWith("helm-release.keystore", field.FileText);
-        detail.SaveCommand.Execute(null);
+        editor.SaveCommand.Execute(null);
 
         var saved = Assert.Single(store.Items()).Item;
         var attachment = Assert.Single(saved.Attachments);
@@ -267,23 +279,23 @@ public sealed class VaultViewModelTests : IDisposable
         Assert.Equal(attachment.Id, savedField.AttachmentId);
 
         // Open hands the decrypted file to the platform.
-        items.ToggleCardCommand.Execute(items.Cards.Single());
         var shown = items.Detail!.Fields.Single(f => f.IsFile);
         await shown.OpenFileCommand.ExecuteAsync(null);
         Assert.Equal(bytes, _platform.Opened);
 
         // A file picked and then cancelled never joins the item.
         items.Detail.EditCommand.Execute(null);
-        items.Detail.AddFieldCommand.Execute(VaultFieldKind.Document);
+        items.Editor!.AddFieldCommand.Execute(VaultFieldKind.Document);
         _platform.NextPick = ("passport.pdf", "application/pdf", [1, 2, 3]);
-        await items.Detail.Fields.Last().ChooseFileCommand.ExecuteAsync(null);
-        items.Detail.CancelCommand.Execute(null);
+        await items.Editor.Fields.Last().ChooseFileCommand.ExecuteAsync(null);
+        await items.Editor.CancelCommand.ExecuteAsync(null);
+        Assert.Null(items.Editor);
         Assert.Single(store.Items().Single().Item.Attachments);
 
         // Removing the field removes the file from the item (the history still has it).
-        items.Detail.EditCommand.Execute(null);
-        items.Detail.Fields.Single(f => f.IsFile).RemoveCommand.Execute(null);
-        items.Detail.SaveCommand.Execute(null);
+        items.Detail!.EditCommand.Execute(null);
+        items.Editor!.Fields.Single(f => f.IsFile).RemoveCommand.Execute(null);
+        items.Editor.SaveCommand.Execute(null);
         Assert.Empty(store.Items().Single().Item.Attachments);
     }
 
@@ -293,14 +305,14 @@ public sealed class VaultViewModelTests : IDisposable
         var (app, session, _) = NewApp();
         await session.CreateAsync(Password);
         app.Items.NewCommand.Execute(VaultItemKind.Note);
-        var detail = app.Items.Detail!;
-        detail.AddFieldCommand.Execute(VaultFieldKind.Image);
-        var field = detail.Fields.Last();
+        var editor = app.Items.Editor!;
+        editor.AddFieldCommand.Execute(VaultFieldKind.Image);
+        var field = editor.Fields.Last();
 
         _platform.NextPick = ("notes.txt", "text/plain", [65]);
         await field.ChooseFileCommand.ExecuteAsync(null);
         Assert.False(field.HasFile);
-        Assert.Contains("not a picture", detail.Error);
+        Assert.Contains("not a picture", editor.Error);
 
         _platform.NextPick = ("card.png", "image/png", [0x89, 0x50, 0x4E, 0x47]);
         await field.ChooseFileCommand.ExecuteAsync(null);
@@ -317,75 +329,70 @@ public sealed class VaultViewModelTests : IDisposable
         await _files!.AttachAsync(uid, "scan.jpg", "image/jpeg", new MemoryStream([1, 2, 3]));
 
         app.Items.Refresh();
-        app.Items.ToggleCardCommand.Execute(app.Items.Cards.Single());
+        app.Items.OpenCommand.Execute(app.Items.Cards.Single());
         var field = Assert.Single(app.Items.Detail!.Fields, f => f.IsFile);
         Assert.Equal(VaultFieldKind.Image, field.Kind);
         Assert.True(field.HasFile);
     }
 
     [Fact]
-    public async Task A_token_card_shows_its_title_and_the_hidden_token_with_copy()
+    public async Task A_token_shows_its_title_and_the_hidden_token_with_copy()
     {
         var (app, session, _) = NewApp();
         await session.CreateAsync(Password);
         var items = app.Items;
 
         items.NewCommand.Execute(VaultItemKind.Token);
-        var detail = items.Detail!;
-        var field = Assert.Single(detail.Fields);
+        var editor = items.Editor!;
+        var field = Assert.Single(editor.Fields);
         Assert.Equal("Token", field.Name);
         Assert.True(field.IsSecret);
-        Assert.Equal(VaultItemType.Token, detail.Type);
-        detail.Title = "OpenAI API";
+        Assert.Equal(VaultItemKind.Token, editor.Kind);
+        editor.Title = "OpenAI API";
         field.Value = "sk-live-abc";
-        detail.SaveCommand.Execute(null);
+        editor.SaveCommand.Execute(null);
 
-        Assert.Equal(VaultTab.Credentials, items.Tab);
         var card = Assert.Single(items.Cards);
         Assert.True(card.IsToken);
-        Assert.False(card.IsLogin); // no avatar, no username line
+        Assert.False(card.IsLogin); // no letter avatar
+        Assert.Equal("Token", card.Subtitle); // never the token itself
         Assert.True(card.HasSecret);
-        Assert.Equal("Copy the token", card.CopyLabel);
         Assert.DoesNotContain("sk-live", card.SecretDisplay);
-        card.ToggleRevealCommand.Execute(null);
-        Assert.Equal("sk-live-abc", card.SecretDisplay);
         card.CopyCommand.Execute(null);
         Assert.Equal("sk-live-abc", _platform.CopiedSecret);
         Assert.Null(_platform.CopiedText);
     }
 
     [Fact]
-    public async Task An_info_card_shows_its_title_and_description_and_new_info_starts_empty()
+    public async Task An_info_item_shows_its_description_and_a_new_note_starts_empty()
     {
         var (app, session, store) = NewApp();
         await session.CreateAsync(Password);
-        store.Add(VaultItem.New(VaultItemKind.Card, "Visa") with { Fields = [new VaultField("PIN", "1", VaultFieldKind.Secret)] });
+        store.Add(VaultItem.New(VaultItemKind.Card, "Visa") with { Fields = [new VaultField("Cardholder", "NGUYEN"), new VaultField("PIN", "1", VaultFieldKind.Secret)] });
         var items = app.Items;
 
         items.NewCommand.Execute(VaultItemKind.Note);
-        Assert.True(items.IsOtherTab);
-        var detail = items.Detail!;
-        Assert.Equal(VaultItemType.Info, detail.Type);
-        Assert.Empty(detail.Fields); // Info has the fields you add
-        Assert.Equal("Description", detail.NotesLabel);
-        detail.Title = "Wi-Fi";
-        detail.Notes = "Router in the hall";
-        detail.SaveCommand.Execute(null);
+        var editor = items.Editor!;
+        Assert.Equal(VaultItemKind.Note, editor.Kind);
+        Assert.Empty(editor.Fields); // a note has the fields you add
+        Assert.Equal("Description", editor.NotesLabel);
+        editor.Title = "Wi-Fi";
+        editor.Notes = "Router in the hall\nAdmin page 192.168.1.1";
+        editor.SaveCommand.Execute(null);
 
         var wifi = items.Cards.Single(c => c.Title == "Wi-Fi");
         Assert.True(wifi.IsInfo);
-        Assert.True(wifi.HasDescription);
-        Assert.Equal("Router in the hall", wifi.Description);
-        var visa = items.Cards.Single(c => c.Title == "Visa"); // an older card item is Info too
+        Assert.Equal("Router in the hall", wifi.Subtitle);
+        var visa = items.Cards.Single(c => c.Title == "Visa");
         Assert.True(visa.IsInfo);
-        Assert.False(visa.HasDescription);
-        Assert.False(visa.HasSecret); // a card's PIN is not shown on the closed card
+        Assert.Equal("NGUYEN", visa.Subtitle); // the first plain field, never the PIN
+        Assert.False(visa.HasSecret);
 
-        // Editing an older card as Info keeps its own kind (older Helm versions still read it).
-        items.ToggleCardCommand.Execute(visa);
+        // Editing an older card keeps its own kind (older Helm versions still read it).
+        items.OpenCommand.Execute(visa);
         items.Detail!.EditCommand.Execute(null);
-        items.Detail.Notes = "Main card";
-        items.Detail.SaveCommand.Execute(null);
+        items.Editor!.Notes = "Main card";
+        items.Editor.SaveCommand.Execute(null);
         Assert.Equal(VaultItemKind.Card, store.Get(visa.Uid)!.Item.Kind);
     }
 
@@ -405,42 +412,61 @@ public sealed class VaultViewModelTests : IDisposable
     }
 
     [Fact]
-    public async Task Credentials_and_Other_have_their_own_sub_tabs_and_search_counts_both()
+    public async Task Sections_list_kinds_two_factor_codes_documents_and_tags_and_search_stays_in_the_section()
     {
         var (app, session, store) = NewApp();
         await session.CreateAsync(Password);
-        store.Add(VaultItem.New(VaultItemKind.Login, "Bank") with { Fields = [new VaultField("Password", "p", VaultFieldKind.Password)] });
+        store.Add(VaultItem.New(VaultItemKind.Login, "Bank") with { Fields = [new VaultField("Password", "p", VaultFieldKind.Password)], Tags = ["Money"] });
+        store.Add(VaultItem.New(VaultItemKind.Login, "Mail") with { Fields = [new VaultField("Code", "JBSWY3DPEHPK3PXP", VaultFieldKind.Totp)] });
         store.Add(VaultItem.New(VaultItemKind.Token, "GitHub token") with { Fields = [new VaultField("Token", "ghp_x", VaultFieldKind.Secret)] });
         store.Add(VaultItem.New(VaultItemKind.Note, "Wi-Fi") with { Notes = "the bank's guest network" });
-        store.Add(VaultItem.New(VaultItemKind.Card, "Visa") with { Fields = [new VaultField("PIN", "1", VaultFieldKind.Password)] });
+        store.Add(VaultItem.New(VaultItemKind.Card, "Visa") with { Fields = [new VaultField("PIN", "1", VaultFieldKind.Password)], Tags = ["money "] });
+        store.Add(VaultItem.New(VaultItemKind.Document, "Passport scan"));
         var items = app.Items;
         items.Refresh();
 
-        Assert.Equal(VaultTab.Credentials, items.Tab);
-        Assert.Equal(["Bank", "GitHub token"], items.Cards.Select(c => c.Title).Order());
-        Assert.Equal([VaultFilter.Favorites, VaultFilter.All, VaultFilter.Logins, VaultFilter.Tokens, VaultFilter.Trash], items.Filters); // star first, bin last
-        items.ShowFilterCommand.Execute(VaultFilter.Tokens);
-        Assert.Equal("GitHub token", Assert.Single(items.Cards).Title);
+        Assert.Equal(["All items", "Favorites", "Logins", "2FA & tokens", "Cards", "Identities", "Notes", "Documents"], items.Sections.Select(s => s.Label));
+        int Count(VaultSectionKind kind) => items.Sections.Single(s => s.Kind == kind).Count;
+        Assert.Equal(6, Count(VaultSectionKind.All));
+        Assert.Equal(2, Count(VaultSectionKind.Logins));
+        Assert.Equal(2, Count(VaultSectionKind.Tokens)); // the token and the login with a two-factor code
+        Assert.Equal(1, Count(VaultSectionKind.Cards));
+        Assert.Equal(0, Count(VaultSectionKind.Identities));
+        Assert.Equal(1, Count(VaultSectionKind.Notes));
+        Assert.Equal(1, Count(VaultSectionKind.Documents));
+        var money = Assert.Single(items.TagSections); // "Money" and "money " are one tag
+        Assert.Equal("Money", money.Label);
+        Assert.Equal(2, money.Count);
+        Assert.True(items.Sections[0].IsSelected);
 
-        items.ShowTabCommand.Execute(VaultTab.Other);
-        Assert.True(items.IsOtherTab);
-        Assert.False(items.IsCredentialsTab);
-        Assert.Equal(VaultFilter.All, items.Filter); // a tab starts on All
-        Assert.Equal([VaultFilter.Favorites, VaultFilter.All, VaultFilter.Trash], items.Filters);
-        Assert.Equal(["Visa", "Wi-Fi"], items.Cards.Select(c => c.Title).Order());
+        items.ShowSectionCommand.Execute(items.Sections.Single(s => s.Kind == VaultSectionKind.Tokens));
+        Assert.Equal(["GitHub token", "Mail"], items.Cards.Select(c => c.Title));
+        Assert.True(items.Cards.Single(c => c.Title == "Mail").HasTotp);
+        Assert.False(items.Sections[0].IsSelected);
 
-        // One search for every tab: the headers count the matches of both.
-        Assert.Equal("Credentials", items.CredentialsHeader);
+        // Search looks in the section; when nothing is there, it offers every item.
         items.Search = "bank";
-        Assert.Equal("Credentials (1)", items.CredentialsHeader);
-        Assert.Equal("Other (1)", items.OtherHeader); // an Info item's description is searched
-        Assert.Equal("Wi-Fi", Assert.Single(items.Cards).Title);
-        items.ShowTabCommand.Execute(VaultTab.Credentials);
-        Assert.Equal("Bank", Assert.Single(items.Cards).Title);
+        Assert.Empty(items.Cards);
+        Assert.True(items.CanSearchEverywhere);
+        items.SearchEverywhereCommand.Execute(null);
+        Assert.Equal(VaultSectionKind.All, items.Section.Kind);
+        Assert.Equal(["Bank", "Wi-Fi"], items.Cards.Select(c => c.Title)); // a note's description is searched
+        items.Search = "";
+
+        items.ShowSectionCommand.Execute(money);
+        Assert.Equal(["Bank", "Visa"], items.Cards.Select(c => c.Title));
+
+        // The tag goes away with its last item: back to every item.
+        foreach (var entry in store.Items().Where(e => e.Item.Tags.Count > 0).ToList())
+            store.Save(entry.Uid, entry.Item with { Tags = [] });
+        items.Refresh();
+        Assert.Empty(items.TagSections);
+        Assert.False(items.HasTags);
+        Assert.Equal(VaultSectionKind.All, items.Section.Kind);
     }
 
     [Fact]
-    public async Task Each_tab_has_its_own_trash()
+    public async Task One_trash_holds_every_kind()
     {
         var (app, session, store) = NewApp();
         await session.CreateAsync(Password);
@@ -449,50 +475,65 @@ public sealed class VaultViewModelTests : IDisposable
         store.MoveToTrash(login);
         store.MoveToTrash(note);
         var items = app.Items;
+        items.Refresh();
 
-        items.ShowFilterCommand.Execute(VaultFilter.Trash);
-        Assert.Equal("Old bank", Assert.Single(items.Cards).Title);
-        items.Tab = VaultTab.Other;
-        items.ShowFilterCommand.Execute(VaultFilter.Trash);
-        Assert.Equal("Old note", Assert.Single(items.Cards).Title);
+        Assert.Equal(2, items.TrashSection.Count);
+        Assert.Equal(0, items.Sections[0].Count);
+        items.ShowSectionCommand.Execute(items.TrashSection);
+        Assert.True(items.IsTrash);
+        Assert.Equal(["Old bank", "Old note"], items.Cards.Select(c => c.Title));
+
+        // Restored: shown where it now lives.
+        items.OpenCommand.Execute(items.Cards[0]);
+        await items.Detail!.RestoreFromTrashCommand.ExecuteAsync(null);
+        Assert.Equal(VaultSectionKind.All, items.Section.Kind);
+        Assert.Equal("Old bank", items.SelectedCard!.Title);
     }
 
     [Fact]
-    public async Task Changing_the_type_moves_a_token_saved_as_a_login_to_tokens_and_keeps_the_old_version()
+    public async Task Changing_the_kind_moves_an_item_and_keeps_its_fields_and_the_old_version()
     {
         var (app, session, store) = NewApp();
         await session.CreateAsync(Password);
         var uid = store.Add(VaultItem.New(VaultItemKind.Login, "Stripe key") with { Fields = [new VaultField("Password", "sk_live_1", VaultFieldKind.Password)] });
         var items = app.Items;
         items.Refresh();
-        items.ToggleCardCommand.Execute(items.Cards.Single());
+        items.OpenCommand.Execute(items.Cards.Single());
         items.Detail!.EditCommand.Execute(null);
-        Assert.Equal([VaultItemType.Login, VaultItemType.Token, VaultItemType.Info], items.Detail.Types);
-        items.Detail.Type = VaultItemType.Token;
-        items.Detail.SaveCommand.Execute(null);
+        var editor = items.Editor!;
+        Assert.Equal("Edit Stripe key", editor.EditorTitle);
+        Assert.Equal(["Login", "Token", "Note", "Card", "Identity", "Document"], editor.KindOptions.Select(o => o.Label));
+        editor.KindOption = editor.KindOptions.Single(o => o.Kind == VaultItemKind.Token);
+        Assert.Single(editor.Fields); // an existing item keeps its fields
+        editor.SaveCommand.Execute(null);
 
         var saved = store.Get(uid)!.Item;
         Assert.Equal(VaultItemKind.Token, saved.Kind);
-        Assert.Equal("sk_live_1", saved.PrimarySecret); // the fields are kept as they were
+        Assert.Equal("sk_live_1", saved.PrimarySecret);
         Assert.Equal(VaultItemKind.Login, Assert.Single(saved.History).Item.Kind);
-        items.ShowFilterCommand.Execute(VaultFilter.Tokens);
-        var card = Assert.Single(items.Cards);
-        Assert.True(card.IsToken);
-        card.CopyCommand.Execute(null);
-        Assert.Equal("sk_live_1", _platform.CopiedSecret);
+        items.ShowSectionCommand.Execute(items.Sections.Single(s => s.Kind == VaultSectionKind.Tokens));
+        Assert.True(Assert.Single(items.Cards).IsToken);
 
-        // To Info: the item moves to Other and opens there.
-        if (!items.Cards.Single().IsExpanded) items.ToggleCardCommand.Execute(items.Cards.Single());
+        // To a note while Tokens is shown: it is no longer there, so it is shown in every item.
+        items.OpenCommand.Execute(items.Cards.Single());
         items.Detail!.EditCommand.Execute(null);
-        items.Detail.Type = VaultItemType.Info;
-        items.Detail.SaveCommand.Execute(null);
+        items.Editor!.Kind = VaultItemKind.Note;
+        items.Editor.SaveCommand.Execute(null);
         Assert.Equal(VaultItemKind.Note, store.Get(uid)!.Item.Kind);
-        Assert.True(items.IsOtherTab);
-        Assert.True(Assert.Single(items.Cards).IsExpanded);
+        Assert.Equal(VaultSectionKind.All, items.Section.Kind);
+        Assert.Equal(uid, items.SelectedCard!.Uid);
+
+        // A new item takes the usual fields of the kind picked, until something is typed.
+        items.NewCommand.Execute(VaultItemKind.Login);
+        items.Editor!.Kind = VaultItemKind.Card;
+        Assert.Equal(["Cardholder", "Number", "Expiry", "CVV", "PIN"], items.Editor.Fields.Select(f => f.Name));
+        items.Editor.Fields[0].Value = "NGUYEN";
+        items.Editor.Kind = VaultItemKind.Identity;
+        Assert.Equal("Cardholder", items.Editor.Fields[0].Name); // what was typed stays
     }
 
     [Fact]
-    public async Task Clicking_a_card_opens_it_and_again_closes_it_but_never_an_edit()
+    public async Task An_item_opens_in_the_detail_and_edits_happen_in_the_editor_while_the_detail_stays()
     {
         var (app, session, store) = NewApp();
         await session.CreateAsync(Password);
@@ -500,32 +541,46 @@ public sealed class VaultViewModelTests : IDisposable
         store.Add(VaultItem.New(VaultItemKind.Login, "Mail"));
         var items = app.Items;
         items.Refresh();
+        Assert.Null(items.SelectedCard); // a phone waits for a tap
         var bank = items.Cards.Single(c => c.Title == "Bank");
         var mail = items.Cards.Single(c => c.Title == "Mail");
 
-        items.ToggleCardCommand.Execute(bank);
-        Assert.True(bank.IsExpanded);
+        items.OpenCommand.Execute(bank);
+        Assert.Same(bank, items.SelectedCard);
         Assert.Equal("Bank", items.Detail!.Title);
-        items.ToggleCardCommand.Execute(mail); // one open card at a time
-        Assert.False(bank.IsExpanded);
-        Assert.True(mail.IsExpanded);
-        items.ToggleCardCommand.Execute(mail);
-        Assert.False(mail.IsExpanded);
+        items.SelectedCard = mail; // the PC's list selection
+        Assert.Equal("Mail", items.Detail!.Title);
+        items.CloseDetailCommand.Execute(null); // Back on a phone
         Assert.Null(items.Detail);
+        Assert.Null(items.SelectedCard);
 
-        items.ToggleCardCommand.Execute(bank);
+        items.OpenCommand.Execute(bank);
         items.Detail!.EditCommand.Execute(null);
         Assert.True(items.IsEditorOpen);
-        items.Detail.Title = "Bank (typing)";
-        items.ToggleCardCommand.Execute(bank);
+        Assert.False(items.Detail.IsEditing); // the detail keeps showing the item as it is
+        items.Editor!.Title = "Bank (typing)";
+        Assert.Equal("Bank", items.Detail.Title);
+        Assert.True(items.Editor.HasChanges);
+
+        var asked = _platform.Confirms;
+        await items.Editor.CancelCommand.ExecuteAsync(null); // something typed: asks first
+        Assert.Equal(asked + 1, _platform.Confirms);
+        Assert.Null(items.Editor);
+        Assert.Equal("Bank", store.Items().Single(e => e.Uid == bank.Uid).Item.Title);
+
+        items.Detail.EditCommand.Execute(null);
+        await items.Editor!.CancelCommand.ExecuteAsync(null); // nothing typed: closes at once
+        Assert.Equal(asked + 1, _platform.Confirms);
+
+        // The PC selects the first item by itself.
         items.CloseDetailCommand.Execute(null);
-        Assert.Equal("Bank (typing)", items.Detail!.Title); // an edit stays open
-        items.Detail.CancelCommand.Execute(null);
-        Assert.False(items.IsEditorOpen);
+        items.AutoSelectFirst = true;
+        items.Refresh();
+        Assert.Equal("Bank", items.SelectedCard!.Title);
     }
 
     [Fact]
-    public async Task The_star_on_a_card_toggles_favorite_without_a_new_version()
+    public async Task The_star_toggles_favorite_without_a_new_version()
     {
         var (app, session, store) = NewApp();
         await session.CreateAsync(Password);
@@ -536,9 +591,14 @@ public sealed class VaultViewModelTests : IDisposable
         items.ToggleFavoriteCommand.Execute(items.Cards.Single());
         Assert.True(store.Get(uid)!.Item.Favorite);
         Assert.True(items.Cards.Single().Favorite);
-        items.ShowFilterCommand.Execute(VaultFilter.Favorites);
+        var favorites = items.Sections.Single(s => s.Kind == VaultSectionKind.Favorites);
+        Assert.Equal(1, favorites.Count);
+        items.ShowSectionCommand.Execute(favorites);
         Assert.Single(items.Cards);
-        items.ToggleFavoriteCommand.Execute(items.Cards.Single());
+
+        // The detail's own star.
+        items.OpenCommand.Execute(items.Cards.Single());
+        items.Detail!.ToggleFavoriteCommand.Execute(null);
         Assert.False(store.Get(uid)!.Item.Favorite);
         Assert.Empty(items.Cards);
         Assert.Empty(store.Get(uid)!.Item.History); // star clicks do not push real edits out of the history
@@ -562,18 +622,43 @@ public sealed class VaultViewModelTests : IDisposable
         var (app, session, store) = NewApp();
         await session.CreateAsync(Password);
         var uid = store.Add(VaultItem.New(VaultItemKind.Note, "Wifi") with { Notes = "old" });
-        app.Items.Tab = VaultTab.Other;
-        app.Items.ToggleCardCommand.Execute(app.Items.Cards.Single());
+        app.Items.Refresh();
+        app.Items.OpenCommand.Execute(app.Items.Cards.Single());
         app.Items.Detail!.EditCommand.Execute(null);
-        app.Items.Detail.Notes = "new";
-        app.Items.Detail.SaveCommand.Execute(null);
+        app.Items.Editor!.Notes = "new";
+        app.Items.Editor.SaveCommand.Execute(null);
         Assert.Equal("new", store.Get(uid)!.Item.Notes);
         Assert.Single(app.Items.Detail!.History);
 
+        app.Items.Detail.EditCommand.Execute(null);
+        app.Items.Editor!.Notes = "typed, then the vault locked";
         session.Lock("test");
         Assert.Empty(app.Items.Cards);
         Assert.Null(app.Items.Detail);
+        Assert.Null(app.Items.Editor);
+        Assert.Empty(app.Items.TagSections);
         Assert.Equal(VaultScreen.Unlock, app.Screen);
+    }
+
+    [Fact]
+    public async Task The_vault_says_when_it_locks_and_how_the_backup_is_doing()
+    {
+        var (app, session, _) = NewApp();
+        Assert.Null(app.LockCountdown);
+        await session.CreateAsync(Password);
+        Assert.Matches(@"^locks in (4:5\d|5:00)$", app.LockCountdown); // 5 minutes by default
+        Assert.Equal("Not backed up", app.BackupTitle);
+        Assert.False(app.BackupOk);
+        Assert.Contains("backup folder", app.BackupDetail);
+
+        session.Lock("test");
+        Assert.Null(app.LockCountdown);
+
+        Assert.Equal("OneDrive", VaultBackupService.PlaceName(@"C:\Users\anh\OneDrive\Backup"));
+        Assert.Equal("Google Drive", VaultBackupService.PlaceName(@"G:\My Drive\Helm"));
+        Assert.Equal("Backup", VaultBackupService.PlaceName("content://com.android.externalstorage.documents/tree/primary%3ABackup"));
+        Assert.Equal("Vault", VaultBackupService.PlaceName(@"E:\Vault\"));
+        Assert.Null(VaultBackupService.PlaceName(null));
     }
 
     [Fact]
@@ -661,7 +746,13 @@ public sealed class VaultViewModelTests : IDisposable
         }
         public void CopySecret(string text) => CopiedSecret = text;
         public void CopyText(string text) => CopiedText = text;
-        public Task<bool> ConfirmAsync(string title, string message, string confirmText) => Task.FromResult(true);
+        public int Confirms { get; private set; }
+
+        public Task<bool> ConfirmAsync(string title, string message, string confirmText)
+        {
+            Confirms++;
+            return Task.FromResult(true);
+        }
         public Task<string?> PickBackupLocationAsync(CancellationToken ct) => Task.FromResult<string?>(null);
 
         public Task SaveEmergencyKitAsync(EmergencyKit kit, CancellationToken ct)

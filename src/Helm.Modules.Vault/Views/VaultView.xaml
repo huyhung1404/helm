@@ -50,22 +50,37 @@
             </DataTemplate.Triggers>
         </DataTemplate>
 
-        <!-- A whole card as one flat button (hover and press shading, keyboard focus) -->
-        <Style x:Key="CardButton" TargetType="Button">
-            <Setter Property="Background" Value="Transparent" />
+        <local:SectionIconConverter x:Key="SectionIcon" />
+        <local:NullToVisibilityConverter x:Key="NullToVisible" />
+        <local:NullToVisibilityConverter x:Key="NotNullToVisible" Invert="True" />
+
+        <!-- A section in the left column: icon, name, count; the chosen one is filled and marked with the accent -->
+        <Style x:Key="NavButton" TargetType="Button">
             <Setter Property="Cursor" Value="Hand" />
             <Setter Property="FocusVisualStyle" Value="{x:Null}" />
+            <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+            <Setter Property="Foreground" Value="{DynamicResource TextFillColorSecondaryBrush}" />
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="Button">
-                        <Border x:Name="Bd" Background="{TemplateBinding Background}" CornerRadius="8" BorderThickness="1" BorderBrush="Transparent" />
+                        <Grid Margin="0,1">
+                            <Border x:Name="Bd" CornerRadius="6" Padding="10,0" MinHeight="36" Background="Transparent" BorderThickness="1" BorderBrush="Transparent">
+                                <ContentPresenter VerticalAlignment="Center" />
+                            </Border>
+                            <Border x:Name="Mark" Width="3" Height="16" CornerRadius="1.5" HorizontalAlignment="Left" Visibility="Collapsed"
+                                    Background="{DynamicResource AccentFillColorDefaultBrush}" />
+                        </Grid>
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsMouseOver" Value="True">
                                 <Setter TargetName="Bd" Property="Background" Value="{DynamicResource SubtleFillColorSecondaryBrush}" />
+                                <Setter Property="Foreground" Value="{DynamicResource TextFillColorPrimaryBrush}" />
                             </Trigger>
-                            <Trigger Property="IsPressed" Value="True">
-                                <Setter TargetName="Bd" Property="Background" Value="{DynamicResource SubtleFillColorTertiaryBrush}" />
-                            </Trigger>
+                            <DataTrigger Binding="{Binding IsSelected}" Value="True">
+                                <Setter TargetName="Bd" Property="Background" Value="{DynamicResource SubtleFillColorSecondaryBrush}" />
+                                <Setter TargetName="Mark" Property="Visibility" Value="Visible" />
+                                <Setter Property="Foreground" Value="{DynamicResource TextFillColorPrimaryBrush}" />
+                                <Setter Property="FontWeight" Value="SemiBold" />
+                            </DataTrigger>
                             <Trigger Property="IsKeyboardFocused" Value="True">
                                 <Setter TargetName="Bd" Property="BorderBrush" Value="{DynamicResource AccentTextFillColorPrimaryBrush}" />
                             </Trigger>
@@ -75,26 +90,94 @@
             </Setter>
         </Style>
 
-        <!-- A sub-tab: a pill, filled with the accent when chosen -->
-        <Style x:Key="SubTab" TargetType="ListBoxItem">
-            <Setter Property="Margin" Value="0,0,6,4" />
+        <DataTemplate x:Key="NavItem" DataType="{x:Type vm:VaultSection}">
+            <Button Style="{StaticResource NavButton}" ToolTip="{Binding Label}" AutomationProperties.Name="{Binding Label}"
+                    Command="{Binding DataContext.Items.ShowSectionCommand, RelativeSource={RelativeSource AncestorType=local:VaultView}}" CommandParameter="{Binding}">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <ui:SymbolIcon Symbol="{Binding Kind, Converter={StaticResource SectionIcon}}" FontSize="17" VerticalAlignment="Center" />
+                    <TextBlock Grid.Column="1" Text="{Binding Label}" Margin="10,0,8,0" VerticalAlignment="Center" TextTrimming="CharacterEllipsis"
+                               Visibility="{Binding IsCompactNav, RelativeSource={RelativeSource AncestorType=local:VaultView}, Converter={StaticResource InverseBoolToVisibility}}" />
+                    <TextBlock Grid.Column="2" Text="{Binding Count}" FontSize="12" FontWeight="Normal" VerticalAlignment="Center"
+                               Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                               Visibility="{Binding IsCompactNav, RelativeSource={RelativeSource AncestorType=local:VaultView}, Converter={StaticResource InverseBoolToVisibility}}" />
+                </Grid>
+            </Button>
+        </DataTemplate>
+
+        <!-- A section as a chip (narrow window): a pill, outlined in the accent when chosen -->
+        <Style x:Key="ChipButton" TargetType="Button">
             <Setter Property="Cursor" Value="Hand" />
-            <Setter Property="Foreground" Value="{DynamicResource TextFillColorPrimaryBrush}" />
+            <Setter Property="FocusVisualStyle" Value="{x:Null}" />
+            <Setter Property="Margin" Value="0,0,6,0" />
+            <Setter Property="Foreground" Value="{DynamicResource TextFillColorSecondaryBrush}" />
             <Setter Property="Template">
                 <Setter.Value>
-                    <ControlTemplate TargetType="ListBoxItem">
-                        <Border x:Name="Bd" CornerRadius="14" Padding="14,5" Background="{DynamicResource ControlFillColorDefaultBrush}"
-                                BorderBrush="{DynamicResource CardStrokeColorDefaultBrush}" BorderThickness="1">
-                            <ContentPresenter />
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="Bd" CornerRadius="16" Padding="12,0" Height="32" BorderThickness="1"
+                                Background="{DynamicResource ControlFillColorDefaultBrush}" BorderBrush="{DynamicResource CardStrokeColorDefaultBrush}">
+                            <ContentPresenter VerticalAlignment="Center" />
                         </Border>
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsMouseOver" Value="True">
                                 <Setter TargetName="Bd" Property="Background" Value="{DynamicResource ControlFillColorSecondaryBrush}" />
+                                <Setter Property="Foreground" Value="{DynamicResource TextFillColorPrimaryBrush}" />
+                            </Trigger>
+                            <DataTrigger Binding="{Binding IsSelected}" Value="True">
+                                <Setter TargetName="Bd" Property="BorderBrush" Value="{DynamicResource AccentFillColorDefaultBrush}" />
+                                <Setter TargetName="Bd" Property="Background" Value="{DynamicResource SubtleFillColorSecondaryBrush}" />
+                                <Setter Property="Foreground" Value="{DynamicResource TextFillColorPrimaryBrush}" />
+                                <Setter Property="FontWeight" Value="SemiBold" />
+                            </DataTrigger>
+                            <Trigger Property="IsKeyboardFocused" Value="True">
+                                <Setter TargetName="Bd" Property="BorderBrush" Value="{DynamicResource AccentTextFillColorPrimaryBrush}" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <DataTemplate x:Key="ChipItem" DataType="{x:Type vm:VaultSection}">
+            <Button Style="{StaticResource ChipButton}" AutomationProperties.Name="{Binding Label}"
+                    Command="{Binding DataContext.Items.ShowSectionCommand, RelativeSource={RelativeSource AncestorType=local:VaultView}}" CommandParameter="{Binding}">
+                <StackPanel Orientation="Horizontal">
+                    <ui:SymbolIcon Symbol="{Binding Kind, Converter={StaticResource SectionIcon}}" FontSize="15" Margin="0,0,6,0" VerticalAlignment="Center" />
+                    <TextBlock Text="{Binding Label}" VerticalAlignment="Center" />
+                </StackPanel>
+            </Button>
+        </DataTemplate>
+
+        <!-- A row of the list: hover and selection fill, the accent mark on the chosen one -->
+        <Style x:Key="RowItem" TargetType="ListBoxItem">
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="FocusVisualStyle" Value="{x:Null}" />
+            <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+            <Setter Property="AutomationProperties.Name" Value="{Binding Title}" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ListBoxItem">
+                        <Grid Margin="0,1">
+                            <Border x:Name="Bd" CornerRadius="8" Padding="10,8" MinHeight="56" Background="Transparent" BorderThickness="1" BorderBrush="Transparent">
+                                <ContentPresenter />
+                            </Border>
+                            <Border x:Name="Mark" Width="3" Height="18" CornerRadius="1.5" HorizontalAlignment="Left" Visibility="Collapsed"
+                                    Background="{DynamicResource AccentFillColorDefaultBrush}" />
+                        </Grid>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Bd" Property="Background" Value="{DynamicResource SubtleFillColorSecondaryBrush}" />
                             </Trigger>
                             <Trigger Property="IsSelected" Value="True">
-                                <Setter TargetName="Bd" Property="Background" Value="{DynamicResource AccentFillColorDefaultBrush}" />
-                                <Setter TargetName="Bd" Property="BorderBrush" Value="{DynamicResource AccentFillColorDefaultBrush}" />
-                                <Setter Property="Foreground" Value="{DynamicResource TextOnAccentFillColorPrimaryBrush}" />
+                                <Setter TargetName="Bd" Property="Background" Value="{DynamicResource SubtleFillColorSecondaryBrush}" />
+                                <Setter TargetName="Mark" Property="Visibility" Value="Visible" />
+                            </Trigger>
+                            <Trigger Property="IsKeyboardFocused" Value="True">
+                                <Setter TargetName="Bd" Property="BorderBrush" Value="{DynamicResource AccentTextFillColorPrimaryBrush}" />
                             </Trigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>
@@ -155,22 +238,80 @@
             </Border>
         </ScrollViewer>
 
-        <!-- ============ Unlock ============ -->
-        <Border Grid.Row="1" Style="{StaticResource CenteredCard}" Width="420" Visibility="{Binding IsUnlock, Converter={StaticResource BoolToVisibility}}">
+        <!-- ============ Unlock: Windows Hello first, else the password (or the recovery key) ============ -->
+        <Border Grid.Row="1" Style="{StaticResource CenteredCard}" Width="400" Padding="28,28,28,20" Visibility="{Binding IsUnlock, Converter={StaticResource BoolToVisibility}}">
             <StackPanel>
-                <ui:SymbolIcon Symbol="LockClosed24" FontSize="40" HorizontalAlignment="Left" Foreground="{DynamicResource AccentTextFillColorPrimaryBrush}" />
-                <TextBlock Text="Vault is locked" FontSize="22" FontWeight="SemiBold" Margin="0,12,0,16" />
-                <ui:Button Content="{Binding DeviceUnlockName}" Icon="{ui:SymbolIcon Fingerprint24}" Appearance="Primary" HorizontalAlignment="Stretch" Margin="0,0,0,12"
+                <Border Width="52" Height="52" CornerRadius="14" HorizontalAlignment="Left" Background="{DynamicResource SubtleFillColorSecondaryBrush}">
+                    <ui:SymbolIcon Symbol="LockClosed24" FontSize="26" Foreground="{DynamicResource AccentTextFillColorPrimaryBrush}" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                </Border>
+                <TextBlock Text="Vault is locked" FontSize="22" FontWeight="SemiBold" Margin="0,16,0,2" Foreground="{DynamicResource TextFillColorPrimaryBrush}" />
+                <TextBlock Style="{DynamicResource HelmSecondaryText}" TextWrapping="Wrap" Margin="0,0,0,20"
+                           Text="Your passwords and documents are encrypted on this device." />
+                <ui:Button Content="{Binding DeviceUnlockName}" Icon="{ui:SymbolIcon Fingerprint24}" Appearance="Primary" HorizontalAlignment="Stretch" Height="42"
                            Command="{Binding QuickUnlockCommand}" Visibility="{Binding CanUseDeviceUnlock, Converter={StaticResource BoolToVisibility}}" />
-                <ui:PasswordBox x:Name="UnlockPasswordBox" AutomationProperties.Name="Vault password" PlaceholderText="Vault password" Password="{Binding Password, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                <Grid Margin="0,16" Visibility="{Binding CanUseDeviceUnlock, Converter={StaticResource BoolToVisibility}}">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+                    <Separator VerticalAlignment="Center" />
+                    <TextBlock Grid.Column="1" Margin="10,0" FontSize="12" Foreground="{DynamicResource TextFillColorTertiaryBrush}" Text="or type the vault password" />
+                    <Separator Grid.Column="2" VerticalAlignment="Center" />
+                </Grid>
+                <TextBlock FontSize="12" FontWeight="SemiBold" Foreground="{DynamicResource TextFillColorSecondaryBrush}" Margin="0,0,0,6">
+                    <TextBlock.Style>
+                        <Style TargetType="TextBlock">
+                            <Setter Property="Text" Value="Vault password" />
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding UseRecoveryKey}" Value="True"><Setter Property="Text" Value="Recovery key" /></DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </TextBlock.Style>
+                </TextBlock>
+                <ui:PasswordBox x:Name="UnlockPasswordBox" AutomationProperties.Name="Vault password" Password="{Binding Password, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
                                 Visibility="{Binding UseRecoveryKey, Converter={StaticResource InverseBoolToVisibility}}" />
-                <ui:TextBox AutomationProperties.Name="Recovery key" PlaceholderText="HELMV-XXXX-XXXX-…" FontFamily="Consolas" Text="{Binding RecoveryKey, UpdateSourceTrigger=PropertyChanged}"
+                <ui:TextBox AutomationProperties.Name="Recovery key" PlaceholderText="HELMV-XXXX-XXXX-…" FontFamily="Cascadia Mono, Consolas" Text="{Binding RecoveryKey, UpdateSourceTrigger=PropertyChanged}"
                             Visibility="{Binding UseRecoveryKey, Converter={StaticResource BoolToVisibility}}" />
-                <ui:InfoBar Margin="0,12,0,0" IsOpen="{Binding Error, Converter={StaticResource NotEmptyToBool}}" Message="{Binding Error}" Severity="Error" IsClosable="False" />
-                <ui:Button Content="Unlock" Appearance="Primary" Margin="0,12,0,0" HorizontalAlignment="Stretch" Command="{Binding UnlockCommand}" IsDefault="True"
-                           IsEnabled="{Binding IsBusy, Converter={StaticResource InverseBool}}" />
-                <ui:ProgressRing IsIndeterminate="True" Height="24" Width="24" Margin="0,12,0,0" Visibility="{Binding IsBusy, Converter={StaticResource BoolToVisibility}}" />
-                <CheckBox Margin="0,16,0,0" Content="I forgot the password: use the recovery key" IsChecked="{Binding UseRecoveryKey}" />
+                <!-- What went wrong, right under the box -->
+                <DockPanel Margin="0,8,0,0" Visibility="{Binding Error, Converter={StaticResource NotEmptyToVisibility}}">
+                    <ui:SymbolIcon Symbol="ErrorCircle24" FontSize="16" Foreground="{DynamicResource SystemFillColorCriticalBrush}" VerticalAlignment="Top" Margin="0,1,6,0" />
+                    <TextBlock Text="{Binding Error}" TextWrapping="Wrap" Foreground="{DynamicResource SystemFillColorCriticalBrush}" AutomationProperties.LiveSetting="Assertive" />
+                </DockPanel>
+                <ui:Button Content="Unlock" Margin="0,12,0,0" HorizontalAlignment="Stretch" Height="38" Command="{Binding UnlockCommand}" IsDefault="True"
+                           IsEnabled="{Binding IsBusy, Converter={StaticResource InverseBool}}">
+                    <ui:Button.Style>
+                        <Style TargetType="ui:Button" BasedOn="{StaticResource {x:Type ui:Button}}">
+                            <Setter Property="Appearance" Value="Secondary" />
+                            <Style.Triggers>
+                                <!-- Without Windows Hello, Unlock is the main button -->
+                                <DataTrigger Binding="{Binding CanUseDeviceUnlock}" Value="False"><Setter Property="Appearance" Value="Primary" /></DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </ui:Button.Style>
+                </ui:Button>
+                <ui:ProgressRing IsIndeterminate="True" Height="22" Width="22" Margin="0,12,0,0" Visibility="{Binding IsBusy, Converter={StaticResource BoolToVisibility}}" />
+                <!-- The recovery key instead of the password (and back) -->
+                <Button Margin="0,18,0,0" HorizontalAlignment="Left" Command="{Binding ToggleRecoveryKeyCommand}" Cursor="Hand" AutomationProperties.Name="Use the recovery key instead of the password">
+                    <Button.Template>
+                        <ControlTemplate TargetType="Button">
+                            <TextBlock x:Name="Text" FontWeight="SemiBold" Foreground="{DynamicResource AccentTextFillColorPrimaryBrush}">
+                                <TextBlock.Style>
+                                    <Style TargetType="TextBlock">
+                                        <Setter Property="Text" Value="Forgot it? Use the recovery key" />
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding UseRecoveryKey}" Value="True"><Setter Property="Text" Value="Use the password" /></DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </TextBlock.Style>
+                            </TextBlock>
+                            <ControlTemplate.Triggers>
+                                <Trigger Property="IsMouseOver" Value="True"><Setter TargetName="Text" Property="TextDecorations" Value="Underline" /></Trigger>
+                                <Trigger Property="IsKeyboardFocused" Value="True"><Setter TargetName="Text" Property="TextDecorations" Value="Underline" /></Trigger>
+                            </ControlTemplate.Triggers>
+                        </ControlTemplate>
+                    </Button.Template>
+                </Button>
             </StackPanel>
         </Border>
 
@@ -188,15 +329,15 @@
             </StackPanel>
         </Border>
 
-        <!-- ============ The vault ============ -->
-        <Grid Grid.Row="1" Margin="8,0,8,8" Visibility="{Binding IsItems, Converter={StaticResource BoolToVisibility}}">
+        <!-- ============ The vault: sections | items | the selected item ============ -->
+        <Grid Grid.Row="1" Visibility="{Binding IsItems, Converter={StaticResource BoolToVisibility}}">
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto" />
                 <RowDefinition Height="*" />
             </Grid.RowDefinitions>
 
             <!-- Warnings that must not be missed -->
-            <StackPanel>
+            <StackPanel Margin="0,0,0,4">
                 <ui:InfoBar Title="Sync is holding back deletions" Message="{Binding HeldWarning}" Severity="Warning" IsClosable="False" Margin="0,0,0,6"
                             IsOpen="{Binding HeldWarning, Converter={StaticResource NotEmptyToBool}}">
                     <ui:InfoBar.Content>
@@ -218,254 +359,189 @@
                 <ui:InfoBar Message="{Binding Error}" Severity="Error" IsClosable="False" Margin="0,0,0,6" IsOpen="{Binding Error, Converter={StaticResource NotEmptyToBool}}" />
             </StackPanel>
 
-            <!-- The list: search over every tab, the two tabs with their own Create, sub-tabs, then the cards -->
-            <DockPanel Grid.Row="1" DataContext="{Binding Items}">
-                <ui:TextBox x:Name="SearchBox" DockPanel.Dock="Top" AutomationProperties.Name="Search" PlaceholderText="Search every tab" Icon="{ui:SymbolIcon Search24}"
-                            Text="{Binding Search, UpdateSourceTrigger=PropertyChanged, Delay=150}" />
-
-                <Grid DockPanel.Dock="Top" Margin="0,10,0,0">
+            <Border Grid.Row="1" CornerRadius="8" BorderThickness="1" BorderBrush="{DynamicResource CardStrokeColorDefaultBrush}" ClipToBounds="True"
+                    Background="{DynamicResource LayerFillColorDefaultBrush}">
+                <Grid x:Name="Panes">
                     <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="Auto" />
-                        <ColumnDefinition Width="*" />
-                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition x:Name="NavColumn" Width="216" />
+                        <ColumnDefinition x:Name="ListColumn" Width="340" />
+                        <ColumnDefinition x:Name="DetailColumn" Width="*" />
                     </Grid.ColumnDefinitions>
-                    <StackPanel Orientation="Horizontal">
-                        <RadioButton Style="{StaticResource {x:Type ToggleButton}}" GroupName="VaultTabs" MinWidth="150" Margin="0,0,6,0"
-                                     Content="{Binding CredentialsHeader}" IsChecked="{Binding IsCredentialsTab}" AutomationProperties.Name="Credentials"
-                                     ToolTip="Logins and tokens" />
-                        <RadioButton Style="{StaticResource {x:Type ToggleButton}}" GroupName="VaultTabs" MinWidth="150"
-                                     Content="{Binding OtherHeader}" IsChecked="{Binding IsOtherTab}" AutomationProperties.Name="Other"
-                                     ToolTip="Info items: notes, cards, documents, pictures, with the fields you choose" />
-                    </StackPanel>
-                    <!-- Create: each tab makes its own kinds -->
-                    <ui:DropDownButton Grid.Column="2" Content="New" Icon="{ui:SymbolIcon Add24}" AutomationProperties.Name="New credential"
-                                       Visibility="{Binding IsCredentialsTab, Converter={StaticResource BoolToVisibility}}">
-                        <ui:DropDownButton.Flyout>
-                            <ContextMenu>
-                                <MenuItem Header="Login" Command="{Binding NewCommand}" CommandParameter="{x:Static items:VaultItemKind.Login}" />
-                                <MenuItem Header="Token (API key)" Command="{Binding NewCommand}" CommandParameter="{x:Static items:VaultItemKind.Token}" />
-                            </ContextMenu>
-                        </ui:DropDownButton.Flyout>
-                    </ui:DropDownButton>
-                    <ui:Button Grid.Column="2" Content="New info" Icon="{ui:SymbolIcon Add24}" AutomationProperties.Name="New info"
-                               Command="{Binding NewCommand}" CommandParameter="{x:Static items:VaultItemKind.Note}"
-                               Visibility="{Binding IsOtherTab, Converter={StaticResource BoolToVisibility}}" />
-                </Grid>
 
-                <!-- Sub-tabs -->
-                <ListBox DockPanel.Dock="Top" Margin="0,8,0,4" ItemsSource="{Binding Filters}" SelectedItem="{Binding Filter}" BorderThickness="0" Background="Transparent"
-                         AutomationProperties.Name="Show" ItemContainerStyle="{StaticResource SubTab}" ScrollViewer.HorizontalScrollBarVisibility="Disabled">
-                    <ListBox.ItemTemplate>
-                        <!-- Favorites is a star, the trash a bin; the others their name -->
-                        <DataTemplate DataType="{x:Type vm:VaultFilter}">
-                            <Grid AutomationProperties.Name="{Binding}" ToolTip="{Binding}">
-                                <TextBlock x:Name="Label" Text="{Binding}" />
-                                <ui:SymbolIcon x:Name="Glyph" Visibility="Collapsed" FontSize="16" Margin="-2,1" />
+                    <!-- Sections: kinds, tags, the trash, and how the backup is doing -->
+                    <Border x:Name="NavPane" BorderThickness="0,0,1,0" BorderBrush="{DynamicResource CardStrokeColorDefaultBrush}"
+                            Background="{DynamicResource LayerOnMicaBaseAltFillColorDefaultBrush}">
+                        <DockPanel>
+                            <StackPanel DockPanel.Dock="Bottom" Margin="8,4,8,10">
+                                <ContentControl Content="{Binding Items.TrashSection}" ContentTemplate="{StaticResource NavItem}" Focusable="False" />
+                                <Border x:Name="BackupCard" Margin="0,8,0,0" Padding="10,8" CornerRadius="8" BorderThickness="1"
+                                        Background="{DynamicResource CardBackgroundFillColorDefaultBrush}" BorderBrush="{DynamicResource CardStrokeColorDefaultBrush}"
+                                        ToolTip="{Binding BackupDetail}">
+                                    <StackPanel>
+                                        <StackPanel Orientation="Horizontal">
+                                            <ui:SymbolIcon FontSize="16" Margin="0,0,6,0">
+                                                <ui:SymbolIcon.Style>
+                                                    <Style TargetType="ui:SymbolIcon">
+                                                        <Setter Property="Symbol" Value="CloudCheckmark24" />
+                                                        <Setter Property="Foreground" Value="{DynamicResource SystemFillColorSuccessBrush}" />
+                                                        <Style.Triggers>
+                                                            <DataTrigger Binding="{Binding BackupOk}" Value="False">
+                                                                <Setter Property="Symbol" Value="CloudError24" />
+                                                                <Setter Property="Foreground" Value="{DynamicResource SystemFillColorCautionBrush}" />
+                                                            </DataTrigger>
+                                                        </Style.Triggers>
+                                                    </Style>
+                                                </ui:SymbolIcon.Style>
+                                            </ui:SymbolIcon>
+                                            <TextBlock x:Name="BackupTitleText" Text="{Binding BackupTitle}" FontWeight="SemiBold" FontSize="12.5" />
+                                        </StackPanel>
+                                        <TextBlock x:Name="BackupDetailText" Text="{Binding BackupDetail}" FontSize="12" TextWrapping="Wrap" Margin="0,2,0,0"
+                                                   Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+                                    </StackPanel>
+                                </Border>
+                            </StackPanel>
+                            <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                                <StackPanel Margin="8,10,8,4">
+                                    <ItemsControl ItemsSource="{Binding Items.Sections}" ItemTemplate="{StaticResource NavItem}" Focusable="False" />
+                                    <TextBlock x:Name="TagsHeader" Text="TAGS" FontSize="11" FontWeight="SemiBold" Margin="10,14,0,4"
+                                               Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                               Visibility="{Binding Items.HasTags, Converter={StaticResource BoolToVisibility}}" />
+                                    <ItemsControl ItemsSource="{Binding Items.TagSections}" ItemTemplate="{StaticResource NavItem}" Focusable="False" />
+                                </StackPanel>
+                            </ScrollViewer>
+                        </DockPanel>
+                    </Border>
+
+                    <!-- Items of the section: search, New, the list -->
+                    <Border x:Name="ListPane" Grid.Column="1" BorderThickness="0,0,1,0" BorderBrush="{DynamicResource CardStrokeColorDefaultBrush}">
+                        <DockPanel DataContext="{Binding Items}">
+                            <!-- On a narrow window the sections are a row of chips here instead of a column -->
+                            <Grid x:Name="ChipRow" DockPanel.Dock="Top" Visibility="Collapsed" Margin="0,8,0,0">
+                                <ScrollViewer x:Name="ChipScroller" HorizontalScrollBarVisibility="Hidden" VerticalScrollBarVisibility="Disabled" PanningMode="HorizontalOnly">
+                                    <StackPanel Orientation="Horizontal" Margin="10,0">
+                                        <ItemsControl ItemsSource="{Binding Sections}" ItemTemplate="{StaticResource ChipItem}" Focusable="False">
+                                            <ItemsControl.ItemsPanel>
+                                                <ItemsPanelTemplate><StackPanel Orientation="Horizontal" /></ItemsPanelTemplate>
+                                            </ItemsControl.ItemsPanel>
+                                        </ItemsControl>
+                                        <ItemsControl ItemsSource="{Binding TagSections}" ItemTemplate="{StaticResource ChipItem}" Focusable="False">
+                                            <ItemsControl.ItemsPanel>
+                                                <ItemsPanelTemplate><StackPanel Orientation="Horizontal" /></ItemsPanelTemplate>
+                                            </ItemsControl.ItemsPanel>
+                                        </ItemsControl>
+                                        <ContentControl Content="{Binding TrashSection}" ContentTemplate="{StaticResource ChipItem}" Focusable="False" />
+                                    </StackPanel>
+                                </ScrollViewer>
+                                <ui:Button x:Name="ChipLeft" Background="{DynamicResource SolidBackgroundFillColorBaseBrush}" HorizontalAlignment="Left" Margin="4,0,0,0" Padding="6" Icon="{ui:SymbolIcon ChevronLeft24}" Visibility="Collapsed"
+                                           AutomationProperties.Name="Scroll the sections left" Focusable="False" />
+                                <ui:Button x:Name="ChipRight" Background="{DynamicResource SolidBackgroundFillColorBaseBrush}" HorizontalAlignment="Right" Margin="0,0,4,0" Padding="6" Icon="{ui:SymbolIcon ChevronRight24}" Visibility="Collapsed"
+                                           AutomationProperties.Name="Scroll the sections right" Focusable="False" />
                             </Grid>
-                            <DataTemplate.Triggers>
-                                <DataTrigger Binding="{Binding}" Value="{x:Static vm:VaultFilter.Favorites}">
-                                    <Setter TargetName="Label" Property="Visibility" Value="Collapsed" />
-                                    <Setter TargetName="Glyph" Property="Visibility" Value="Visible" />
-                                    <Setter TargetName="Glyph" Property="Symbol" Value="Star24" />
-                                    <Setter TargetName="Glyph" Property="Filled" Value="True" />
-                                </DataTrigger>
-                                <DataTrigger Binding="{Binding}" Value="{x:Static vm:VaultFilter.Trash}">
-                                    <Setter TargetName="Label" Property="Visibility" Value="Collapsed" />
-                                    <Setter TargetName="Glyph" Property="Visibility" Value="Visible" />
-                                    <Setter TargetName="Glyph" Property="Symbol" Value="Delete24" />
-                                </DataTrigger>
-                            </DataTemplate.Triggers>
-                        </DataTemplate>
-                    </ListBox.ItemTemplate>
-                    <ListBox.ItemsPanel>
-                        <ItemsPanelTemplate>
-                            <WrapPanel />
-                        </ItemsPanelTemplate>
-                    </ListBox.ItemsPanel>
-                </ListBox>
 
-                <TextBlock DockPanel.Dock="Bottom" Margin="4,6,4,0" Style="{DynamicResource HelmSecondaryText}" Foreground="{DynamicResource SystemFillColorCautionBrush}"
-                           Visibility="{Binding UnreadableCount, Converter={StaticResource NotZeroToVisibility}}">
-                    <Run Text="{Binding UnreadableCount, Mode=OneWay}" /><Run Text=" records cannot be opened with this vault's key; they are kept, not deleted." />
-                </TextBlock>
+                            <DockPanel DockPanel.Dock="Top" Margin="12,12,12,8">
+                                <ui:Button DockPanel.Dock="Right" Margin="8,0,0,0" Appearance="Primary" Icon="{ui:SymbolIcon Add24}" Content="New"
+                                           AutomationProperties.Name="New item" ToolTip="Add a login, token, note, card, identity or document"
+                                           Command="{Binding NewCommand}" CommandParameter="{x:Static items:VaultItemKind.Login}" />
+                                <ui:TextBox x:Name="SearchBox" AutomationProperties.Name="Search" PlaceholderText="Search (Ctrl+F)" Icon="{ui:SymbolIcon Search24}"
+                                            ClearButtonEnabled="True" Text="{Binding Search, UpdateSourceTrigger=PropertyChanged, Delay=150}" />
+                            </DockPanel>
 
-                <Grid>
-                    <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
-                        <ItemsControl x:Name="CardList" ItemsSource="{Binding Cards}" Margin="0,4,0,0" AutomationProperties.Name="Items">
-                            <ItemsControl.ItemTemplate>
-                                <DataTemplate DataType="{x:Type vm:VaultCardViewModel}">
-                                    <Border Style="{DynamicResource HelmSurface}" Padding="0" Margin="0,0,0,8">
-                                        <StackPanel>
+                            <TextBlock DockPanel.Dock="Bottom" Margin="14,4,14,10" Style="{DynamicResource HelmSecondaryText}" TextWrapping="Wrap"
+                                       Visibility="{Binding HasUnreadable, Converter={StaticResource BoolToVisibility}}">
+                                <Run Text="{Binding UnreadableCount, Mode=OneWay}" /><Run Text=" item(s) were made by a newer Helm or could not be opened. They are kept untouched." />
+                            </TextBlock>
+
+                            <Grid>
+                                <ListBox x:Name="ItemList" ItemsSource="{Binding Cards}" SelectedItem="{Binding SelectedCard, Mode=TwoWay}"
+                                         ItemContainerStyle="{StaticResource RowItem}" Background="Transparent" BorderThickness="0" Padding="6,0,6,6"
+                                         AutomationProperties.Name="Items" ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                                         VirtualizingPanel.IsVirtualizing="True" VirtualizingPanel.ScrollUnit="Pixel">
+                                    <ListBox.ItemTemplate>
+                                        <DataTemplate DataType="{x:Type vm:VaultCardViewModel}">
                                             <Grid>
-                                                <!-- The whole card is one button: click to open, click again to close. -->
-                                                <Button Style="{StaticResource CardButton}" AutomationProperties.Name="{Binding Title}"
-                                                        Command="{Binding DataContext.ToggleCardCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}" CommandParameter="{Binding}" />
-                                                <Grid Margin="14,10,10,10">
-                                                    <Grid.Resources>
-                                                        <!-- Text lets clicks through to the card button; only the copy/show buttons take them -->
-                                                        <Style TargetType="TextBlock">
-                                                            <Setter Property="IsHitTestVisible" Value="False" />
-                                                        </Style>
-                                                    </Grid.Resources>
-                                                    <Grid.ColumnDefinitions>
-                                                        <ColumnDefinition Width="Auto" />
-                                                        <ColumnDefinition Width="*" />
-                                                        <ColumnDefinition Width="Auto" />
-                                                    </Grid.ColumnDefinitions>
-                                                    <Grid.RowDefinitions>
-                                                        <RowDefinition Height="Auto" />
-                                                        <RowDefinition Height="Auto" />
-                                                        <RowDefinition Height="Auto" />
-                                                        <RowDefinition Height="Auto" />
-                                                    </Grid.RowDefinitions>
-
-                                                    <!-- The icon: picture, initial or type -->
-                                                    <ContentPresenter Grid.RowSpan="4" Content="{Binding}" ContentTemplate="{StaticResource CardAvatar}" Margin="0,0,14,0" VerticalAlignment="Center"
-                                                                      IsHitTestVisible="False" />
-
-                                                    <DockPanel Grid.Column="1" Grid.ColumnSpan="2">
-                                                        <ui:SymbolIcon DockPanel.Dock="Right" Symbol="Warning24" Foreground="{DynamicResource SystemFillColorCautionBrush}" IsHitTestVisible="False"
-                                                                       ToolTip="Edited on two devices: choose a version" Visibility="{Binding HasConflict, Converter={StaticResource BoolToVisibility}}" />
-                                                        <!-- Star: favorite or not, one click -->
-                                                        <ui:Button DockPanel.Dock="Right" Appearance="Transparent" Padding="4" Margin="4,-4,0,-4"
-                                                                   Command="{Binding DataContext.ToggleFavoriteCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}" CommandParameter="{Binding}"
-                                                                   ToolTip="Favorite" AutomationProperties.Name="Favorite"
-                                                                   Visibility="{Binding Trashed, Converter={StaticResource InverseBoolToVisibility}}">
-                                                            <ui:SymbolIcon Symbol="Star24" FontSize="16">
-                                                                <ui:SymbolIcon.Style>
-                                                                    <Style TargetType="ui:SymbolIcon">
-                                                                        <Setter Property="Foreground" Value="{DynamicResource TextFillColorSecondaryBrush}" />
-                                                                        <Style.Triggers>
-                                                                            <DataTrigger Binding="{Binding Favorite}" Value="True">
-                                                                                <Setter Property="Filled" Value="True" />
-                                                                                <Setter Property="Foreground" Value="{DynamicResource AccentTextFillColorPrimaryBrush}" />
-                                                                            </DataTrigger>
-                                                                        </Style.Triggers>
-                                                                    </Style>
-                                                                </ui:SymbolIcon.Style>
-                                                            </ui:SymbolIcon>
-                                                        </ui:Button>
-                                                        <TextBlock Text="{Binding Title}" FontSize="15" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
-                                                    </DockPanel>
-
-                                                    <!-- Login: username (copy) and password (show, copy) -->
-                                                    <TextBlock Grid.Row="1" Grid.Column="1" Text="{Binding Username}" Style="{DynamicResource HelmSecondaryText}" TextTrimming="CharacterEllipsis"
-                                                               VerticalAlignment="Center" Visibility="{Binding HasUsername, Converter={StaticResource BoolToVisibility}}" />
-                                                    <ui:Button Grid.Row="1" Grid.Column="2" Padding="6" Appearance="Transparent" Command="{Binding CopyUsernameCommand}"
-                                                               ToolTip="Copy the username" AutomationProperties.Name="Copy the username" Visibility="{Binding HasUsername, Converter={StaticResource BoolToVisibility}}">
-                                                        <ui:SymbolIcon>
-                                                            <ui:SymbolIcon.Style>
-                                                                <Style TargetType="ui:SymbolIcon">
-                                                                    <Setter Property="Symbol" Value="Copy24" />
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="Auto" />
+                                                    <ColumnDefinition Width="*" />
+                                                    <ColumnDefinition Width="Auto" />
+                                                </Grid.ColumnDefinitions>
+                                                <ContentPresenter Content="{Binding}" ContentTemplate="{StaticResource CardAvatar}" VerticalAlignment="Center" Margin="0,0,12,0" />
+                                                <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                                    <StackPanel Orientation="Horizontal">
+                                                        <TextBlock Text="{Binding Title}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+                                                        <ui:SymbolIcon Symbol="Warning24" FontSize="14" Margin="6,0,0,0" Foreground="{DynamicResource SystemFillColorCautionBrush}"
+                                                                       ToolTip="Edited on two devices: open it to choose a version"
+                                                                       Visibility="{Binding HasConflict, Converter={StaticResource BoolToVisibility}}" />
+                                                    </StackPanel>
+                                                    <TextBlock Text="{Binding Subtitle}" FontSize="12.5" TextTrimming="CharacterEllipsis" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+                                                </StackPanel>
+                                                <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center" Margin="8,0,0,0">
+                                                    <StackPanel Orientation="Horizontal" Visibility="{Binding HasTotp, Converter={StaticResource BoolToVisibility}}"
+                                                                ToolTip="{Binding TotpSecondsLeft, StringFormat='Two-factor code · {0} s left'}">
+                                                        <TextBlock Text="{Binding TotpCode}" FontFamily="Cascadia Mono, Consolas" FontSize="12.5" FontWeight="SemiBold" VerticalAlignment="Center">
+                                                            <TextBlock.Style>
+                                                                <Style TargetType="TextBlock">
+                                                                    <Setter Property="Foreground" Value="{DynamicResource TextFillColorSecondaryBrush}" />
                                                                     <Style.Triggers>
-                                                                        <DataTrigger Binding="{Binding IsUsernameCopied}" Value="True"><Setter Property="Symbol" Value="Checkmark24" /></DataTrigger>
-                                                                    </Style.Triggers>
-                                                                </Style>
-                                                            </ui:SymbolIcon.Style>
-                                                        </ui:SymbolIcon>
-                                                    </ui:Button>
-
-                                                    <!-- Login password or token: hidden until shown, copy with feedback -->
-                                                    <TextBlock Grid.Row="2" Grid.Column="1" Text="{Binding SecretDisplay}" FontFamily="Consolas" FontSize="13" VerticalAlignment="Center"
-                                                               Foreground="{DynamicResource TextFillColorSecondaryBrush}" TextTrimming="CharacterEllipsis"
-                                                               Visibility="{Binding HasSecret, Converter={StaticResource BoolToVisibility}}" />
-                                                    <StackPanel Grid.Row="2" Grid.Column="2" Orientation="Horizontal" Visibility="{Binding CanCopySecret, Converter={StaticResource BoolToVisibility}}">
-                                                        <ui:Button Appearance="Transparent" Padding="6" Command="{Binding ToggleRevealCommand}" ToolTip="Show or hide" AutomationProperties.Name="Show or hide">
-                                                            <ui:SymbolIcon>
-                                                                <ui:SymbolIcon.Style>
-                                                                    <Style TargetType="ui:SymbolIcon">
-                                                                        <Setter Property="Symbol" Value="Eye24" />
-                                                                        <Style.Triggers>
-                                                                            <DataTrigger Binding="{Binding IsRevealed}" Value="True"><Setter Property="Symbol" Value="EyeOff24" /></DataTrigger>
-                                                                        </Style.Triggers>
-                                                                    </Style>
-                                                                </ui:SymbolIcon.Style>
-                                                            </ui:SymbolIcon>
-                                                        </ui:Button>
-                                                        <ui:Button Margin="4,0,0,0" Padding="10,5" Command="{Binding CopyCommand}" ToolTip="{Binding CopyLabel}" AutomationProperties.Name="{Binding CopyLabel}">
-                                                            <ui:Button.Style>
-                                                                <Style TargetType="ui:Button" BasedOn="{StaticResource {x:Type ui:Button}}">
-                                                                    <Setter Property="Appearance" Value="Secondary" />
-                                                                    <Setter Property="Icon" Value="{ui:SymbolIcon Copy24}" />
-                                                                    <Setter Property="Content" Value="Copy" />
-                                                                    <Style.Triggers>
-                                                                        <DataTrigger Binding="{Binding IsCopied}" Value="True">
-                                                                            <Setter Property="Appearance" Value="Success" />
-                                                                            <Setter Property="Icon" Value="{ui:SymbolIcon Checkmark24}" />
-                                                                            <Setter Property="Content" Value="Copied" />
+                                                                        <DataTrigger Binding="{Binding TotpEndingSoon}" Value="True">
+                                                                            <Setter Property="Foreground" Value="{DynamicResource SystemFillColorCautionBrush}" />
                                                                         </DataTrigger>
                                                                     </Style.Triggers>
                                                                 </Style>
-                                                            </ui:Button.Style>
-                                                        </ui:Button>
+                                                            </TextBlock.Style>
+                                                        </TextBlock>
+                                                        <ui:ProgressRing Width="14" Height="14" Margin="6,0,0,0" IsIndeterminate="False" Progress="{Binding TotpProgress, Mode=OneWay}" />
                                                     </StackPanel>
-
-                                                    <!-- Two-factor code: the current one, how long it lasts, copy with feedback -->
-                                                    <StackPanel Grid.Row="3" Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center" Margin="0,2,0,0"
-                                                                Visibility="{Binding HasTotp, Converter={StaticResource BoolToVisibility}}">
-                                                        <TextBlock Text="{Binding TotpCode}" FontFamily="Consolas" FontSize="15" FontWeight="SemiBold" Foreground="{DynamicResource AccentTextFillColorPrimaryBrush}"
-                                                                   AutomationProperties.Name="One-time code" VerticalAlignment="Center" />
-                                                        <TextBlock Text="{Binding TotpSecondsLeft, StringFormat='{} · {0} s'}" Style="{DynamicResource HelmSecondaryText}" VerticalAlignment="Center" />
-                                                    </StackPanel>
-                                                    <ui:Button Grid.Row="3" Grid.Column="2" Margin="0,2,0,0" Padding="10,5" Command="{Binding CopyTotpCommand}" HorizontalAlignment="Right"
-                                                               ToolTip="Copy the one-time code" AutomationProperties.Name="Copy the one-time code"
-                                                               Visibility="{Binding HasTotp, Converter={StaticResource BoolToVisibility}}">
-                                                        <ui:Button.Style>
-                                                            <Style TargetType="ui:Button" BasedOn="{StaticResource {x:Type ui:Button}}">
-                                                                <Setter Property="Appearance" Value="Secondary" />
-                                                                <Setter Property="Icon" Value="{ui:SymbolIcon Copy24}" />
-                                                                <Setter Property="Content" Value="Code" />
-                                                                <Style.Triggers>
-                                                                    <DataTrigger Binding="{Binding IsTotpCopied}" Value="True">
-                                                                        <Setter Property="Appearance" Value="Success" />
-                                                                        <Setter Property="Icon" Value="{ui:SymbolIcon Checkmark24}" />
-                                                                        <Setter Property="Content" Value="Copied" />
-                                                                    </DataTrigger>
-                                                                </Style.Triggers>
-                                                            </Style>
-                                                        </ui:Button.Style>
-                                                    </ui:Button>
-
-                                                    <!-- Info: its description, two lines at most -->
-                                                    <TextBlock Grid.Row="1" Grid.Column="1" Grid.ColumnSpan="2" Text="{Binding Description}" Style="{DynamicResource HelmSecondaryText}"
-                                                               TextWrapping="Wrap" TextTrimming="CharacterEllipsis" MaxHeight="40" Margin="0,2,0,0"
-                                                               Visibility="{Binding HasDescription, Converter={StaticResource BoolToVisibility}}" />
-                                                </Grid>
+                                                    <ui:SymbolIcon Symbol="Star24" Filled="True" FontSize="15" Margin="8,0,0,0" Foreground="{DynamicResource AccentTextFillColorPrimaryBrush}"
+                                                                   AutomationProperties.Name="Favorite" Visibility="{Binding Favorite, Converter={StaticResource BoolToVisibility}}" />
+                                                </StackPanel>
                                             </Grid>
+                                        </DataTemplate>
+                                    </ListBox.ItemTemplate>
+                                </ListBox>
+                                <StackPanel VerticalAlignment="Top" Margin="20,24" Visibility="{Binding IsEmpty, Converter={StaticResource BoolToVisibility}}">
+                                    <TextBlock Text="{Binding EmptyText}" TextWrapping="Wrap" HorizontalAlignment="Center" TextAlignment="Center"
+                                               Foreground="{DynamicResource TextFillColorTertiaryBrush}" />
+                                    <ui:Button Content="Search all items" Margin="0,10,0,0" HorizontalAlignment="Center" Command="{Binding SearchEverywhereCommand}"
+                                               Visibility="{Binding CanSearchEverywhere, Converter={StaticResource BoolToVisibility}}" />
+                                </StackPanel>
+                            </Grid>
+                        </DockPanel>
+                    </Border>
 
-                                            <!-- The open card: its detail right below it -->
-                                            <Border BorderThickness="0,1,0,0" BorderBrush="{DynamicResource CardStrokeColorDefaultBrush}" Padding="14,10,14,14"
-                                                    Visibility="{Binding IsExpanded, Converter={StaticResource BoolToVisibility}}">
-                                                <ContentControl Content="{Binding DataContext.Detail, RelativeSource={RelativeSource AncestorType=ItemsControl}}">
-                                                    <ContentControl.ContentTemplate>
-                                                        <DataTemplate DataType="{x:Type vm:ItemDetailViewModel}">
-                                                            <local:ItemDetailView />
-                                                        </DataTemplate>
-                                                    </ContentControl.ContentTemplate>
-                                                </ContentControl>
-                                            </Border>
-                                        </StackPanel>
-                                    </Border>
-                                </DataTemplate>
-                            </ItemsControl.ItemTemplate>
-                        </ItemsControl>
-                    </ScrollViewer>
-                    <TextBlock Text="Nothing here yet. Use New to add one." Style="{DynamicResource HelmSecondaryText}" TextWrapping="Wrap"
-                               Margin="8,24" TextAlignment="Center" Visibility="{Binding IsEmpty, Converter={StaticResource BoolToVisibility}}" />
+                    <!-- The selected item -->
+                    <Grid x:Name="DetailPane" Grid.Column="2">
+                        <TextBlock Text="Choose an item, or press New." HorizontalAlignment="Center" VerticalAlignment="Center"
+                                   Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                   Visibility="{Binding Items.Detail, Converter={StaticResource NullToVisible}}" />
+                        <DockPanel Visibility="{Binding Items.Detail, Converter={StaticResource NotNullToVisible}}">
+                            <ui:Button x:Name="BackButton" DockPanel.Dock="Top" HorizontalAlignment="Left" Margin="12,10,0,0" Appearance="Transparent"
+                                       Icon="{ui:SymbolIcon ArrowLeft24}" Content="Back" AutomationProperties.Name="Back to the list" Visibility="Collapsed"
+                                       Command="{Binding Items.CloseDetailCommand}" />
+                            <ScrollViewer x:Name="DetailScroller" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                                <ContentControl Content="{Binding Items.Detail}" Focusable="False" HorizontalAlignment="Stretch">
+                                    <ContentControl.ContentTemplate>
+                                        <DataTemplate DataType="{x:Type vm:ItemDetailViewModel}">
+                                            <local:ItemDetailView />
+                                        </DataTemplate>
+                                    </ContentControl.ContentTemplate>
+                                </ContentControl>
+                            </ScrollViewer>
+                        </DockPanel>
+                    </Grid>
                 </Grid>
-            </DockPanel>
+            </Border>
 
-            <!-- The editor, above the list (in this window, so it is hidden from screen capture like the rest of the vault) -->
+            <!-- The editor pop-up, over the vault (in this window, so it is hidden from screen capture like the rest of the vault) -->
             <Grid Grid.RowSpan="2" Visibility="{Binding Items.IsEditorOpen, Converter={StaticResource BoolToVisibility}}" Background="#99000000">
                 <Grid.InputBindings>
-                    <KeyBinding Key="Escape" Command="{Binding Items.Detail.CancelCommand}" />
+                    <KeyBinding Key="Escape" Command="{Binding Items.Editor.CancelCommand}" />
                 </Grid.InputBindings>
-                <Border Background="{DynamicResource ApplicationBackgroundBrush}" BorderBrush="{DynamicResource CardStrokeColorDefaultBrush}" BorderThickness="1" CornerRadius="10"
-                        MaxWidth="860" Margin="24" VerticalAlignment="Center">
+                <Border Background="{DynamicResource ApplicationBackgroundBrush}" BorderBrush="{DynamicResource CardStrokeColorDefaultBrush}" BorderThickness="1" CornerRadius="12"
+                        MaxWidth="760" Margin="24" VerticalAlignment="Center" ClipToBounds="True">
                     <Border.Effect>
-                        <DropShadowEffect BlurRadius="24" ShadowDepth="4" Opacity="0.35" />
+                        <DropShadowEffect BlurRadius="28" ShadowDepth="6" Opacity="0.35" />
                     </Border.Effect>
-                    <ContentControl Content="{Binding Items.Detail}" MaxHeight="{Binding ActualHeight, RelativeSource={RelativeSource AncestorType=Grid}, Converter={StaticResource EditorHeight}}">
+                    <ContentControl Content="{Binding Items.Editor}" MaxHeight="{Binding ActualHeight, RelativeSource={RelativeSource AncestorType=Grid}, Converter={StaticResource EditorHeight}}">
                         <ContentControl.ContentTemplate>
                             <DataTemplate DataType="{x:Type vm:ItemDetailViewModel}">
                                 <local:ItemEditorView />

@@ -53,7 +53,7 @@ Items are stored in collection `vault.items`, one record per version stream. The
 - A second record with the same `uid` is a conflict copy of that item.
 
 The item JSON has these fields:
-- `kind`: one of `login`, `note`, `card`, `identity`, `document`.
+- `kind`: one of `login`, `note`, `card`, `identity`, `document`, `token` (an API key or access token; Helm 0.9.3 and older cannot read it and keep it untouched).
 - `title`.
 - `fields`: a list of `{ name, value, kind }`. A `totp` field holds a two-factor secret: a base32 key or an
   `otpauth://totp/…` link (RFC 6238; SHA1, SHA256 or SHA512, 6–8 digits, 1–300 s). A `url` field

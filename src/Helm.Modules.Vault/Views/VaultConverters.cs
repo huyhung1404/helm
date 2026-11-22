@@ -68,6 +68,38 @@ public sealed class KindIconConverter : IValueConverter
     public object ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture) => Binding.DoNothing;
 }
 
+/// <summary>Visible when the value is null (<see cref="Invert"/>: when it is not).</summary>
+public sealed class NullToVisibilityConverter : IValueConverter
+{
+    public bool Invert { get; set; }
+
+    public object Convert(object? value, Type targetType, object? parameter, CultureInfo culture) =>
+        (value is null) != Invert ? Visibility.Visible : Visibility.Collapsed;
+
+    public object ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture) => Binding.DoNothing;
+}
+
+/// <summary>The icon of a section of the vault (left column, chip row).</summary>
+public sealed class SectionIconConverter : IValueConverter
+{
+    public object Convert(object? value, Type targetType, object? parameter, CultureInfo culture) => value switch
+    {
+        Helm.Modules.Vault.ViewModels.VaultSectionKind.All => SymbolRegular.Grid24,
+        Helm.Modules.Vault.ViewModels.VaultSectionKind.Favorites => SymbolRegular.Star24,
+        Helm.Modules.Vault.ViewModels.VaultSectionKind.Logins => SymbolRegular.Key24,
+        Helm.Modules.Vault.ViewModels.VaultSectionKind.Tokens => SymbolRegular.ShieldKeyhole24,
+        Helm.Modules.Vault.ViewModels.VaultSectionKind.Cards => SymbolRegular.Payment24,
+        Helm.Modules.Vault.ViewModels.VaultSectionKind.Identities => SymbolRegular.ContactCard24,
+        Helm.Modules.Vault.ViewModels.VaultSectionKind.Notes => SymbolRegular.Note24,
+        Helm.Modules.Vault.ViewModels.VaultSectionKind.Documents => SymbolRegular.Attach24,
+        Helm.Modules.Vault.ViewModels.VaultSectionKind.Tag => SymbolRegular.Tag24,
+        Helm.Modules.Vault.ViewModels.VaultSectionKind.Trash => SymbolRegular.Delete24,
+        _ => SymbolRegular.Grid24,
+    };
+
+    public object ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture) => Binding.DoNothing;
+}
+
 /// <summary>The editor's height limit: the room above the list minus its margins, so Save stays on screen.</summary>
 public sealed class EditorHeightConverter : IValueConverter
 {

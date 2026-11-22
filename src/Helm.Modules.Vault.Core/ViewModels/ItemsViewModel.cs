@@ -7,30 +7,69 @@ using Helm.Modules.Vault.Session;
 
 namespace Helm.Modules.Vault.ViewModels;
 
-/// <summary>The two tabs of the list: what you sign in with, and everything else. Each has its own Create.</summary>
-public enum VaultTab
-{
-    /// <summary>Logins and tokens.</summary>
-    Credentials,
-    /// <summary>Info items: notes, cards, identities, documents and pictures, with fields you add yourself.</summary>
-    Other,
-}
-
-/// <summary>A sub-tab inside a tab. <see cref="ItemsViewModel.Filters"/> lists the ones of the current tab.</summary>
-public enum VaultFilter
+/// <summary>What a section of the vault lists.</summary>
+public enum VaultSectionKind
 {
     All,
-    Logins,
-    Tokens,
     Favorites,
-    /// <summary>The tab's deleted items (kept 30 days).</summary>
+    Logins,
+    /// <summary>Tokens, and every item with a two-factor code.</summary>
+    Tokens,
+    Cards,
+    Identities,
+    Notes,
+    /// <summary>Documents, and every item with a file.</summary>
+    Documents,
+    /// <summary>The items with one tag (<see cref="VaultSection.Tag"/>).</summary>
+    Tag,
+    /// <summary>Deleted items, kept 30 days.</summary>
     Trash,
 }
 
+/// <summary>One entry of the vault's navigation (left column on the PC, the chip row on a phone), with its count.</summary>
+public sealed partial class VaultSection : ObservableObject
+{
+    [ObservableProperty] private int _count;
+    [ObservableProperty] private bool _isSelected;
+
+    public VaultSection(VaultSectionKind kind, string label, string? tag = null)
+    {
+        Kind = kind;
+        Label = label;
+        Tag = tag;
+    }
+
+    public VaultSectionKind Kind { get; }
+
+    public string Label { get; }
+
+    /// <summary>The tag of a <see cref="VaultSectionKind.Tag"/> section.</summary>
+    public string? Tag { get; }
+
+    public bool IsTag => Kind == VaultSectionKind.Tag;
+
+    /// <summary>A live (not trashed) item belongs here.</summary>
+    internal bool Contains(VaultItem item) => Kind switch
+    {
+        VaultSectionKind.All => true,
+        VaultSectionKind.Favorites => item.Favorite,
+        VaultSectionKind.Logins => item.Kind == VaultItemKind.Login,
+        VaultSectionKind.Tokens => item.Kind == VaultItemKind.Token || item.Fields.Any(f => f.Kind == VaultFieldKind.Totp && f.Value.Length > 0),
+        VaultSectionKind.Cards => item.Kind == VaultItemKind.Card,
+        VaultSectionKind.Identities => item.Kind == VaultItemKind.Identity,
+        VaultSectionKind.Notes => item.Kind == VaultItemKind.Note,
+        VaultSectionKind.Documents => item.Kind == VaultItemKind.Document || item.Attachments.Count > 0,
+        VaultSectionKind.Tag => item.Tags.Any(t => string.Equals(t.Trim(), Tag, StringComparison.CurrentCultureIgnoreCase)),
+        _ => false,
+    };
+
+    public override string ToString() => Label;
+}
+
 /// <summary>
-/// The unlocked vault: cards for the items of a tab, with search over every tab and sub-tabs. Clicking a card opens its
-/// detail below it (clicking again closes it); adding and editing happen in an editor shown above the list
-/// (<see cref="IsEditorOpen"/>).
+/// The unlocked vault: sections (kinds, favorites, tags, trash), the items of the chosen section with search, the
+/// selected item's detail (read only), and the editor where items are added and changed (<see cref="Editor"/>, shown as
+/// a pop-up over the vault).
 /// </summary>
 public sealed partial class ItemsViewModel : ObservableObject
 {
@@ -38,15 +77,15 @@ public sealed partial class ItemsViewModel : ObservableObject
     private readonly VaultFiles _files;
     private readonly VaultSession _session;
     private readonly IVaultPlatform _platform;
-    private bool _adding;
+    private bool _refreshing;
+    private bool _quietSection;
 
     [ObservableProperty] private string _search = "";
-    [ObservableProperty] private VaultTab _tab = VaultTab.Credentials;
-    [ObservableProperty] private VaultFilter _filter = VaultFilter.All;
+    [ObservableProperty] private VaultSection _section;
+    [ObservableProperty] private VaultCardViewModel? _selectedCard;
     [ObservableProperty] private ItemDetailViewModel? _detail;
+    [ObservableProperty] private ItemDetailViewModel? _editor;
     [ObservableProperty] private int _unreadableCount;
-    [ObservableProperty] private int _credentialsCount;
-    [ObservableProperty] private int _otherCount;
 
     internal ItemsViewModel(VaultStore store, VaultFiles files, VaultSession session, IVaultPlatform platform)
     {
@@ -54,75 +93,115 @@ public sealed partial class ItemsViewModel : ObservableObject
         _files = files;
         _session = session;
         _platform = platform;
+        Sections =
+        [
+            new(VaultSectionKind.All, "All items"),
+            new(VaultSectionKind.Favorites, "Favorites"),
+            new(VaultSectionKind.Logins, "Logins"),
+            new(VaultSectionKind.Tokens, "2FA & tokens"),
+            new(VaultSectionKind.Cards, "Cards"),
+            new(VaultSectionKind.Identities, "Identities"),
+            new(VaultSectionKind.Notes, "Notes"),
+            new(VaultSectionKind.Documents, "Documents"),
+        ];
+        TrashSection = new VaultSection(VaultSectionKind.Trash, "Trash");
+        _section = Sections[0];
+        _section.IsSelected = true;
     }
 
-    /// <summary>The cards of the current tab and sub-tab.</summary>
+    /// <summary>The fixed sections, in the order they are shown.</summary>
+    public IReadOnlyList<VaultSection> Sections { get; }
+
+    /// <summary>One section per tag used by a live item, by name.</summary>
+    public ObservableCollection<VaultSection> TagSections { get; } = [];
+
+    public VaultSection TrashSection { get; }
+
+    public bool HasTags => TagSections.Count > 0;
+
+    /// <summary>
+    /// The PC selects the first item when nothing is selected, so the detail column is never empty; a phone shows the
+    /// detail in place of the list, so it waits for a tap.
+    /// </summary>
+    public bool AutoSelectFirst { get; set; }
+
+    /// <summary>The items of the current section that match the search.</summary>
     public ObservableCollection<VaultCardViewModel> Cards { get; } = [];
 
-    /// <summary>Moves every shown one-time code on; the app calls it every second while the list is on screen.</summary>
+    public bool IsEmpty => Cards.Count == 0;
+
+    public bool IsTrash => Section.Kind == VaultSectionKind.Trash;
+
+    public bool HasUnreadable => UnreadableCount > 0;
+
+    /// <summary>Nothing matches in this section, but there may be matches elsewhere: offer to search every item.</summary>
+    public bool CanSearchEverywhere => IsEmpty && Search.Trim().Length > 0 && Section.Kind is not (VaultSectionKind.All or VaultSectionKind.Trash);
+
+    /// <summary>"Nothing here yet." or "Nothing matches “x” in Cards."</summary>
+    public string EmptyText => Search.Trim() is { Length: > 0 } q
+        ? $"Nothing matches “{q}”{(Section.Kind == VaultSectionKind.All ? "" : " in " + Section.Label)}."
+        : IsTrash ? "The trash is empty." : "Nothing here yet.";
+
+    /// <summary>A new item or a change is being made: the editor pop-up is open over the vault.</summary>
+    public bool IsEditorOpen => Editor is not null;
+
+    /// <summary>Moves every shown one-time code on; the app calls it every second while the vault is on screen.</summary>
     public void TickTotp(DateTimeOffset now)
     {
         foreach (var card in Cards)
             if (card.HasTotp) card.Tick(now);
         Detail?.Tick(now);
+        Editor?.Tick(now);
     }
-
-    public bool IsCredentialsTab
-    {
-        get => Tab == VaultTab.Credentials;
-        set { if (value) Tab = VaultTab.Credentials; }
-    }
-
-    public bool IsOtherTab
-    {
-        get => Tab == VaultTab.Other;
-        set { if (value) Tab = VaultTab.Other; }
-    }
-
-    // Favorites first (a star), the trash last (a bin).
-    private static readonly IReadOnlyList<VaultFilter> CredentialFilters = [VaultFilter.Favorites, VaultFilter.All, VaultFilter.Logins, VaultFilter.Tokens, VaultFilter.Trash];
-
-    private static readonly IReadOnlyList<VaultFilter> OtherFilters = [VaultFilter.Favorites, VaultFilter.All, VaultFilter.Trash];
-
-    /// <summary>The sub-tabs of the current tab.</summary>
-    public IReadOnlyList<VaultFilter> Filters => Tab == VaultTab.Credentials ? CredentialFilters : OtherFilters;
-
-    /// <summary>"Credentials" or "Credentials (3)" while searching, so matches in the other tab are not missed.</summary>
-    public string CredentialsHeader => Search.Trim().Length == 0 ? "Credentials" : $"Credentials ({CredentialsCount})";
-
-    public string OtherHeader => Search.Trim().Length == 0 ? "Other" : $"Other ({OtherCount})";
-
-    public bool IsEmpty => Cards.Count == 0;
-
-    public bool IsTrash => Filter == VaultFilter.Trash;
-
-    public bool HasUnreadable => UnreadableCount > 0;
-
-    /// <summary>A new item, or an item being edited: the editor is shown above the list.</summary>
-    public bool IsEditorOpen => Detail is { IsEditing: true };
-
-    /// <summary>The card whose detail is open (null: none).</summary>
-    public string? ExpandedUid { get; private set; }
 
     partial void OnUnreadableCountChanged(int value) => OnPropertyChanged(nameof(HasUnreadable));
 
-    partial void OnCredentialsCountChanged(int value) => OnPropertyChanged(nameof(CredentialsHeader));
-
-    partial void OnOtherCountChanged(int value) => OnPropertyChanged(nameof(OtherHeader));
-
-    partial void OnDetailChanged(ItemDetailViewModel? oldValue, ItemDetailViewModel? newValue)
+    partial void OnSectionChanged(VaultSection? oldValue, VaultSection newValue)
     {
-        if (oldValue is not null) oldValue.PropertyChanged -= OnDetailPropertyChanged;
-        if (newValue is not null) newValue.PropertyChanged += OnDetailPropertyChanged;
+        if (oldValue is not null) oldValue.IsSelected = false;
+        newValue.IsSelected = true;
+        OnPropertyChanged(nameof(IsTrash));
+        if (!_quietSection) Refresh();
+    }
+
+    /// <summary>Changes the section from inside <see cref="Refresh"/> (no second refresh).</summary>
+    private void SetSectionQuietly(VaultSection section)
+    {
+        _quietSection = true;
+        try
+        {
+            Section = section;
+        }
+        finally
+        {
+            _quietSection = false;
+        }
+    }
+
+    partial void OnSearchChanged(string value) => Refresh();
+
+    partial void OnSelectedCardChanged(VaultCardViewModel? value)
+    {
+        if (_refreshing) return;
+        Detail = value is null ? null : DetailFor(value.Uid);
+        _session.Touch();
+    }
+
+    partial void OnEditorChanged(ItemDetailViewModel? oldValue, ItemDetailViewModel? newValue)
+    {
+        if (oldValue is not null) oldValue.PropertyChanged -= OnEditorPropertyChanged;
+        if (newValue is not null) newValue.PropertyChanged += OnEditorPropertyChanged;
         OnPropertyChanged(nameof(IsEditorOpen));
     }
 
-    private void OnDetailPropertyChanged(object? sender, PropertyChangedEventArgs e)
+    private void OnEditorPropertyChanged(object? sender, PropertyChangedEventArgs e)
     {
-        if (e.PropertyName == nameof(ItemDetailViewModel.IsEditing)) OnPropertyChanged(nameof(IsEditorOpen));
+        // Cancel on an existing item ends editing: the pop-up closes.
+        if (e.PropertyName == nameof(ItemDetailViewModel.IsEditing) && sender is ItemDetailViewModel { IsEditing: false } editor && ReferenceEquals(editor, Editor))
+            Editor = null;
     }
 
-    /// <summary>Rebuilds the cards from the store (after a local save or a sync), keeping the open card.</summary>
+    /// <summary>Rebuilds the list and the counts from the store (after a save here or a sync), keeping the selection.</summary>
     public void Refresh()
     {
         if (_session.State != VaultState.Unlocked)
@@ -130,81 +209,141 @@ public sealed partial class ItemsViewModel : ObservableObject
             Clear();
             return;
         }
-        var query = Search.Trim();
         var items = _store.Items();
-        var entries = Filter == VaultFilter.Trash ? _store.Trash() : items;
-        Cards.Clear();
-        foreach (var entry in entries.Where(e => Matches(e, Tab, Filter, query)))
-            Cards.Add(new VaultCardViewModel(entry, _platform, _session) { IsExpanded = entry.Uid == ExpandedUid });
-        TickTotp(DateTimeOffset.UtcNow);
-        CredentialsCount = items.Count(e => Matches(e, VaultTab.Credentials, VaultFilter.All, query));
-        OtherCount = items.Count(e => Matches(e, VaultTab.Other, VaultFilter.All, query));
+        var trash = _store.Trash();
+        RefreshSections(items, trash);
+
+        var query = Search.Trim();
+        var selected = SelectedCard?.Uid;
+        _refreshing = true;
+        try
+        {
+            Cards.Clear();
+            var entries = IsTrash ? trash : items.Where(e => Section.Contains(e.Item));
+            foreach (var entry in entries.Where(e => Matches(e, query)).OrderBy(e => Title(e), StringComparer.CurrentCultureIgnoreCase))
+                Cards.Add(new VaultCardViewModel(entry, _platform, _session));
+            SelectedCard = selected is null ? null : Cards.FirstOrDefault(c => c.Uid == selected);
+        }
+        finally
+        {
+            _refreshing = false;
+        }
         UnreadableCount = _store.Unreadable().Count;
 
-        // An item being edited stays in the editor even if the list no longer shows it (e.g. a search that stops matching).
-        if (Detail is { IsEditing: true }) { }
-        else if (ExpandedUid is { } open && Cards.Any(c => c.Uid == open)) Detail = DetailFor(open);
-        else Collapse();
+        if (SelectedCard is null && AutoSelectFirst) SelectedCard = Cards.FirstOrDefault(); // its detail opens
+        else if (SelectedCard is { } card) Detail = DetailFor(card.Uid); // what changed shows (e.g. a sync)
+        else Detail = null;
+        TickTotp(DateTimeOffset.UtcNow);
         OnPropertyChanged(nameof(IsEmpty));
+        OnPropertyChanged(nameof(EmptyText));
+        OnPropertyChanged(nameof(CanSearchEverywhere));
     }
 
-    /// <summary>Drops everything decrypted (the vault locked).</summary>
+    private void RefreshSections(IReadOnlyList<VaultEntry> items, IReadOnlyList<VaultEntry> trash)
+    {
+        foreach (var section in Sections) section.Count = items.Count(e => section.Contains(e.Item));
+        TrashSection.Count = trash.Count;
+
+        // Tags as people typed them; "Work" and "work" are one tag.
+        var tags = items.SelectMany(e => e.Item.Tags).Where(t => t.Trim().Length > 0)
+            .GroupBy(t => t.Trim(), StringComparer.CurrentCultureIgnoreCase).Select(g => g.First().Trim())
+            .OrderBy(t => t, StringComparer.CurrentCultureIgnoreCase).ToList();
+        if (!tags.SequenceEqual(TagSections.Select(s => s.Tag!), StringComparer.CurrentCultureIgnoreCase))
+        {
+            TagSections.Clear();
+            foreach (var tag in tags) TagSections.Add(new VaultSection(VaultSectionKind.Tag, tag, tag) { IsSelected = Section.IsTag && string.Equals(Section.Tag, tag, StringComparison.CurrentCultureIgnoreCase) });
+            OnPropertyChanged(nameof(HasTags));
+        }
+        foreach (var section in TagSections) section.Count = items.Count(e => section.Contains(e.Item));
+
+        // The tag shown was removed from its last item: back to everything.
+        if (Section.IsTag && !TagSections.Any(s => string.Equals(s.Tag, Section.Tag, StringComparison.CurrentCultureIgnoreCase)))
+            SetSectionQuietly(Sections[0]);
+        else if (Section.IsTag)
+        {
+            // The rebuilt tag list has a new object for the shown tag.
+            var current = TagSections.First(s => string.Equals(s.Tag, Section.Tag, StringComparison.CurrentCultureIgnoreCase));
+            if (!ReferenceEquals(current, Section)) SetSectionQuietly(current);
+        }
+    }
+
+    /// <summary>Drops everything decrypted (the vault locked), the editor too.</summary>
     public void Clear()
     {
-        Cards.Clear();
-        ExpandedUid = null;
+        _refreshing = true;
+        try
+        {
+            Cards.Clear();
+            SelectedCard = null;
+        }
+        finally
+        {
+            _refreshing = false;
+        }
         Detail = null;
+        Editor = null;
+        TagSections.Clear();
+        OnPropertyChanged(nameof(HasTags));
         OnPropertyChanged(nameof(IsEmpty));
     }
 
-    /// <summary>Hides every secret shown with "Show" (cards and the open item): the page was left or hidden.</summary>
+    /// <summary>Hides every secret shown with "Show" (the open item and the editor): the page was left or hidden.</summary>
     public void HideRevealed()
     {
         foreach (var card in Cards) card.IsRevealed = false;
-        if (Detail is { } detail)
-            foreach (var field in detail.Fields) field.IsRevealed = false;
+        foreach (var detail in new[] { Detail, Editor })
+            if (detail is not null)
+                foreach (var field in detail.Fields) field.IsRevealed = false;
     }
 
-    /// <summary>Creates an item of the kind (Login or Token in Credentials, Info in Other) in the editor.</summary>
+    [RelayCommand]
+    private void ShowSection(VaultSection? section)
+    {
+        if (section is null) return;
+        if (ReferenceEquals(section, Section)) Refresh();
+        else Section = section;
+        _session.Touch();
+    }
+
+    /// <summary>The search found nothing in this section: look in every item.</summary>
+    [RelayCommand]
+    private void SearchEverywhere() => Section = Sections[0];
+
+    /// <summary>Opens the editor for a new item of the kind.</summary>
     [RelayCommand]
     private void New(VaultItemKind kind)
     {
-        var tab = TabOf(kind);
-        if (Tab != tab) Tab = tab;
-        if (Filter == VaultFilter.Trash) Filter = VaultFilter.All;
-        _adding = true;
-        Detail = new ItemDetailViewModel(_store, _files, _session, _platform, null, kind, OnDetailSaved);
+        Editor = new ItemDetailViewModel(_store, _files, _session, _platform, null, kind, OnEditorSaved);
         _session.Touch();
     }
 
-    /// <summary>A click on a card opens its detail below it; a click on the open card closes it.</summary>
-    [RelayCommand]
-    private void ToggleCard(VaultCardViewModel? card)
+    /// <summary>Opens the editor on an item (its Edit button). The detail keeps showing the item as it is meanwhile.</summary>
+    internal void EditItem(string uid)
     {
+        if (_store.Get(uid) is not { Trashed: false } entry) return;
+        Editor = new ItemDetailViewModel(_store, _files, _session, _platform, entry, entry.Item.Kind, OnEditorSaved, EditItem) { IsEditing = true };
         _session.Touch();
-        if (card is null) return;
-        if (Detail is { IsEditing: true }) return; // the editor is open above the list
-        if (card.Uid == ExpandedUid)
-        {
-            Collapse();
-            return;
-        }
-        Expand(card.Uid);
     }
 
-    /// <summary>Closes the open card (Back on Android).</summary>
+    /// <summary>Shows an item (a tap on its row; on the PC the list selection does the same).</summary>
+    [RelayCommand]
+    private void Open(VaultCardViewModel? card)
+    {
+        if (card is null) return;
+        if (ReferenceEquals(card, SelectedCard)) Detail ??= DetailFor(card.Uid);
+        else SelectedCard = card;
+    }
+
+    /// <summary>Back on a phone: from the item to the list.</summary>
     [RelayCommand]
     private void CloseDetail()
     {
-        if (Detail is { IsEditing: true }) return; // nothing typed is lost
-        Collapse();
+        SelectedCard = null;
+        Detail = null;
         _session.Touch();
     }
 
-    [RelayCommand]
-    private void ShowTab(VaultTab tab) => Tab = tab;
-
-    /// <summary>The star on a card: favorite or not (not a new version of the item).</summary>
+    /// <summary>The star: favorite or not (not a new version of the item).</summary>
     [RelayCommand]
     private void ToggleFavorite(VaultCardViewModel? card)
     {
@@ -220,91 +359,76 @@ public sealed partial class ItemsViewModel : ObservableObject
         Refresh();
     }
 
-    [RelayCommand]
-    private void ShowFilter(VaultFilter filter) => Filter = filter;
-
-    public static VaultTab TabOf(VaultItemKind kind) => kind is VaultItemKind.Login or VaultItemKind.Token ? VaultTab.Credentials : VaultTab.Other;
-
-    partial void OnSearchChanged(string value)
+    /// <summary>The detail's own star.</summary>
+    internal void ToggleFavorite(string uid)
     {
-        Refresh();
-        OnPropertyChanged(nameof(CredentialsHeader));
-        OnPropertyChanged(nameof(OtherHeader));
-    }
-
-    partial void OnTabChanged(VaultTab value)
-    {
-        OnPropertyChanged(nameof(IsCredentialsTab));
-        OnPropertyChanged(nameof(IsOtherTab));
-        OnPropertyChanged(nameof(Filters));
-        if (Detail is not { IsEditing: true }) ExpandedUid = null;
-        if (Filter == VaultFilter.All) Refresh();
-        else Filter = VaultFilter.All; // refreshes
-    }
-
-    partial void OnFilterChanged(VaultFilter value)
-    {
-        OnPropertyChanged(nameof(IsTrash));
-        Refresh();
-    }
-
-    private void Expand(string uid)
-    {
-        ExpandedUid = uid;
-        foreach (var c in Cards) c.IsExpanded = c.Uid == uid;
-        Detail = DetailFor(uid);
-    }
-
-    private void Collapse()
-    {
-        ExpandedUid = null;
-        foreach (var c in Cards) c.IsExpanded = false;
-        if (Detail is not { IsEditing: true }) Detail = null;
+        if (Cards.FirstOrDefault(c => c.Uid == uid) is { } card) ToggleFavorite(card);
+        else if (_store.Get(uid) is { Trashed: false } entry)
+        {
+            _store.SetFavorite(uid, !entry.Item.Favorite);
+            Refresh();
+        }
     }
 
     /// <summary>The detail of an existing item; null when it is gone (e.g. deleted on another device).</summary>
     private ItemDetailViewModel? DetailFor(string uid) =>
-        _store.Get(uid) is { } entry ? new ItemDetailViewModel(_store, _files, _session, _platform, entry, entry.Item.Kind, OnDetailSaved) : null;
+        _store.Get(uid) is { } entry ? new ItemDetailViewModel(_store, _files, _session, _platform, entry, entry.Item.Kind, OnDetailChanged, EditItem, ToggleFavorite) : null;
 
-    /// <summary>After save, trash, restore or delete: the list is rebuilt and the item's card is open (null: none).</summary>
-    private void OnDetailSaved(string? uid)
+    /// <summary>The editor saved (uid) or was cancelled (null): it closes, and a saved item is selected where it now is.</summary>
+    private void OnEditorSaved(string? uid)
     {
-        // A new item appears closed in the list; an item that was edited stays open where it was.
-        var added = _adding;
-        _adding = false;
-        Detail = null;
-        ExpandedUid = null;
-        if (uid is not null && _store.Get(uid) is { } entry)
-        {
-            // Show the saved item where it now is (its type may have moved it to the other tab).
-            var tab = TabOf(entry.Item.Kind);
-            if (Tab != tab) Tab = tab;
-            if (entry.Trashed != (Filter == VaultFilter.Trash)) Filter = entry.Trashed ? VaultFilter.Trash : VaultFilter.All;
-            if (!added) ExpandedUid = uid;
-        }
-        Refresh();
-        if (ExpandedUid is { } open && Detail is null) Detail = DetailFor(open);
+        Editor = null;
+        if (uid is not null) ShowItem(uid);
+        else Refresh();
     }
 
-    private static bool Matches(VaultEntry entry, VaultTab tab, VaultFilter filter, string query)
+    /// <summary>The detail trashed, restored, deleted or settled a conflict: the list follows.</summary>
+    private void OnDetailChanged(string? uid)
     {
-        var item = entry.Item;
-        if (TabOf(item.Kind) != tab) return false;
-        var kindOk = filter switch
+        if (uid is null)
         {
-            VaultFilter.Favorites => item.Favorite,
-            VaultFilter.Logins => item.Kind == VaultItemKind.Login,
-            VaultFilter.Tokens => item.Kind == VaultItemKind.Token,
-            _ => true,
-        };
-        if (!kindOk) return false;
+            CloseDetail();
+            Refresh();
+        }
+        else ShowItem(uid);
+    }
+
+    /// <summary>Selects an item, moving to a section that shows it when the current one does not.</summary>
+    private void ShowItem(string uid)
+    {
+        if (_store.Get(uid) is not { } entry)
+        {
+            Refresh();
+            return;
+        }
+        var wanted = entry.Trashed ? TrashSection : Section.Kind != VaultSectionKind.Trash && Section.Contains(entry.Item) ? Section : Sections[0];
+        if (!Matches(entry, Search.Trim())) Search = "";
+        _refreshing = true;
+        try
+        {
+            SelectedCard = null;
+        }
+        finally
+        {
+            _refreshing = false;
+        }
+        if (!ReferenceEquals(wanted, Section)) Section = wanted; // refreshes
+        else Refresh();
+        SelectedCard = Cards.FirstOrDefault(c => c.Uid == uid);
+    }
+
+    private static string Title(VaultEntry entry) => entry.Item.Title.Length > 0 ? entry.Item.Title : "Untitled";
+
+    private static bool Matches(VaultEntry entry, string query)
+    {
         if (query.Length == 0) return true;
-        // Search what the cards show anyway (an Info card shows its description): never secret values.
+        var item = entry.Item;
+        // Search what the list shows anyway (an Info item shows its description): never secret values.
         return item.Title.Contains(query, StringComparison.CurrentCultureIgnoreCase)
             || item.Tags.Any(t => t.Contains(query, StringComparison.CurrentCultureIgnoreCase))
             || item.Attachments.Any(a => a.Name.Contains(query, StringComparison.CurrentCultureIgnoreCase))
-            || (tab == VaultTab.Other && item.Notes.Contains(query, StringComparison.CurrentCultureIgnoreCase))
-            || item.Fields.Any(f => !f.IsSecret && f.Kind is VaultFieldKind.Username or VaultFieldKind.Url or VaultFieldKind.Email
+            || (!item.IsLoginOrToken && item.Notes.Contains(query, StringComparison.CurrentCultureIgnoreCase))
+            || item.Fields.Any(f => !f.IsSecret && !f.IsFile && f.Kind is not VaultFieldKind.Multiline
                 && f.Value.Contains(query, StringComparison.CurrentCultureIgnoreCase));
     }
 }

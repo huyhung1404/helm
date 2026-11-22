@@ -84,63 +84,85 @@ public sealed class VaultViewsTests : IDisposable
             Attachments = [scan.Result, keystore.Result],
         });
         Pump(Task.CompletedTask);
-        app.Items.Tab = VaultTab.Other;
-        app.Items.ToggleCardCommand.Execute(app.Items.Cards.Single(c => c.Uid == uid));
-        Layout(window);
+        // The PC shows an item at once (the first one), and the list selection opens the one clicked.
+        Assert.True(app.Items.AutoSelectFirst);
+        Assert.NotNull(app.Items.SelectedCard);
+        var list = (System.Windows.Controls.ListBox)window.FindName("ItemList");
+        list.SelectedItem = app.Items.Cards.Single(c => c.Uid == uid);
+        Assert.Equal("Visa", app.Items.Detail!.Title);
+        Layout(window, 1280);
         app.Items.Detail!.EditCommand.Execute(null);
         Assert.True(app.Items.IsEditorOpen);
-        Layout(window);
+        Layout(window, 1280);
 
         Pump(Task.Delay(300)); // the picture's preview is decrypted in the background
-        Assert.True(app.Items.Detail!.Fields.Single(f => f.IsImage).HasPreview);
-        var editor = new ItemEditorView { DataContext = app.Items.Detail };
+        Assert.True(app.Items.Editor!.Fields.Single(f => f.IsImage).HasPreview);
+        var editor = new ItemEditorView { DataContext = app.Items.Editor };
         Layout(editor);
-        app.Items.Detail!.CancelCommand.Execute(null);
+        Pump(app.Items.Editor!.CancelCommand.ExecuteAsync(null)); // nothing typed: closes without asking
+        Assert.False(app.Items.IsEditorOpen);
         var detail = new ItemDetailView { DataContext = app.Items.Detail };
         Layout(detail);
 
-        // Credentials: a login with a picture, letter avatars and a token.
+        // A login with a picture and a two-factor code, a letter avatar, and a token.
         store.Add(VaultItem.New(VaultItemKind.Login, "GitHub") with
         {
             Fields = [new VaultField("Username", "huyhung1404", VaultFieldKind.Username), new VaultField("Password", "gh-secret", VaultFieldKind.Password),
                 new VaultField("2FA", "JBSWY3DPEHPK3PXP", VaultFieldKind.Totp)],
             Icon = PngOf(Helm.Modules.Vault.VaultIcon.Image),
+            Tags = ["work"],
         });
         store.Add(VaultItem.New(VaultItemKind.Login, "Zalo") with { Fields = [new VaultField("Phone", "0901 234 567", VaultFieldKind.Username), new VaultField("Password", "z", VaultFieldKind.Password)] });
-        store.Add(VaultItem.New(VaultItemKind.Token, "OpenAI API") with { Fields = [new VaultField("Token", "sk-test-123", VaultFieldKind.Secret)] });
-        app.Items.Tab = VaultTab.Credentials;
-        Assert.Equal(4, app.Items.Cards.Count);
+        store.Add(VaultItem.New(VaultItemKind.Token, "OpenAI API") with { Fields = [new VaultField("Token", "sk-test-123", VaultFieldKind.Secret)], Tags = ["work"] });
+        Pump(Task.CompletedTask);
+        Assert.Equal(6, app.Items.Cards.Count);
         Assert.True(app.Items.Cards.Single(c => c.Title == "OpenAI API").IsToken);
-        app.Items.Cards.Single(c => c.Title == "Bank").ToggleRevealCommand.Execute(null);
-        Layout(window);
+        Assert.Equal(["bank", "travel", "work"], app.Items.TagSections.Select(s => s.Label));
+        Layout(window, 1280);
 
-        // The card button opens the card; the copy button on it takes its own clicks (text lets clicks through).
+        // A section in the left column: 2FA & tokens lists the token and the login with a code.
+        var tokens = Descendants<System.Windows.Controls.Button>(window)
+            .Single(b => b.CommandParameter is VaultSection { Kind: VaultSectionKind.Tokens } && b.Style == window.TryFindResource("NavButton"));
+        tokens.Command.Execute(tokens.CommandParameter);
+        Assert.Equal(["GitHub", "OpenAI API"], app.Items.Cards.Select(c => c.Title));
         var gitHub = app.Items.Cards.Single(c => c.Title == "GitHub");
-        var cardButton = Descendants<System.Windows.Controls.Button>(window)
-            .Single(b => b.DataContext == gitHub && b.CommandParameter == gitHub && System.Windows.Automation.AutomationProperties.GetName(b) == "GitHub");
-        var cardBorder = Ancestor<System.Windows.Controls.Border>(cardButton, b => b.Style == window.TryFindResource("HelmSurface"));
-        var title = Descendants<System.Windows.Controls.TextBlock>(cardBorder).First(t => t.Text == "GitHub");
-        Assert.Same(cardButton, ButtonAt(title));
-        var copy = Descendants<Wpf.Ui.Controls.Button>(cardBorder).Single(b => b.Command == gitHub.CopyCommand);
-        Assert.Same(copy, ButtonAt(copy));
-        cardButton.Command.Execute(cardButton.CommandParameter);
-        Assert.True(gitHub.IsExpanded);
+        list.SelectedItem = gitHub;
         Assert.Equal("GitHub", app.Items.Detail!.Title);
-        // Two-factor: the card and the item show the current code, never the key.
+        // Two-factor: the row and the item show the current code, never the key.
         Assert.True(gitHub.HasTotp);
         Assert.Matches(@"^\d{3} \d{3}$", gitHub.TotpCode);
+        Assert.InRange(gitHub.TotpProgress, 1, 100);
         var code = app.Items.Detail!.Fields.Single(f => f.IsTotp);
         Assert.Equal(code.TotpCode, code.Display);
         Assert.DoesNotContain("JBSW", code.Display);
-        Layout(window);
+        Layout(window, 1280);
         Layout(new ItemDetailView { DataContext = app.Items.Detail });
+
+        // The sections shrink to icons, then become chips above the list, as the window narrows.
+        Layout(window, 900);
+        Assert.Equal(VaultLayout.Compact, window.Layout);
+        Assert.True(window.IsCompactNav);
+        Layout(window, 600);
+        Assert.Equal(VaultLayout.Narrow, window.Layout);
+        Assert.Equal(Visibility.Visible, ((FrameworkElement)window.FindName("ChipRow")).Visibility);
+        Assert.Equal(Visibility.Visible, ((FrameworkElement)window.FindName("DetailPane")).Visibility); // the open item takes the width
+        app.Items.CloseDetailCommand.Execute(null); // Back
+        Layout(window, 600);
+        Assert.Equal(Visibility.Visible, ((FrameworkElement)window.FindName("ListPane")).Visibility);
+        Assert.Equal(Visibility.Collapsed, ((FrameworkElement)window.FindName("DetailPane")).Visibility);
+        Layout(window, 1280);
+        Assert.Equal(VaultLayout.Wide, window.Layout);
+        Assert.NotNull(app.Items.SelectedCard); // side by side again: an item is shown
+
+        // Edit and New open the editor pop-up; New offers every kind.
         app.Items.Detail!.EditCommand.Execute(null);
-        Layout(new ItemEditorView { DataContext = app.Items.Detail });
-        app.Items.Detail!.CancelCommand.Execute(null);
-        cardButton.Command.Execute(cardButton.CommandParameter);
-        Assert.Null(app.Items.Detail);
-        cardButton.Command.Execute(cardButton.CommandParameter);
-        Layout(window);
+        Layout(new ItemEditorView { DataContext = app.Items.Editor });
+        Pump(app.Items.Editor!.CancelCommand.ExecuteAsync(null));
+        app.Items.NewCommand.Execute(VaultItemKind.Login);
+        Assert.Equal(6, app.Items.Editor!.KindOptions.Count);
+        Layout(window, 1280);
+        Pump(app.Items.Editor!.CancelCommand.ExecuteAsync(null));
+        Layout(window, 1280);
 
         // The icon, large and at list size.
         foreach (var size in new[] { 256.0, 32.0 })
@@ -255,25 +277,25 @@ public sealed class VaultViewsTests : IDisposable
 
     private static int s_shot;
 
-    private static void Layout(FrameworkElement element)
+    private static void Layout(FrameworkElement element, double width = 1040, double height = 700)
     {
         // A window that is never shown does not lay out; its content does.
         var target = element is Window { Content: FrameworkElement content } ? content : element;
-        target.Measure(new Size(1040, 700));
-        target.Arrange(new Rect(0, 0, 1040, 700));
+        target.Measure(new Size(width, height));
+        target.Arrange(new Rect(0, 0, width, height));
         target.UpdateLayout();
-        Snapshot(element);
+        target.UpdateLayout(); // a layout that changes with the width (VaultView) settles in a second pass
+        Snapshot(element, new Size(width, height));
     }
 
     /// <summary>
     /// With HELM_VAULT_SNAPSHOTS set to a folder, every screen is rendered to a PNG there (in-process, off-screen: no
     /// window is shown and nothing on the desktop is captured), for checking the layout by eye.
     /// </summary>
-    private static void Snapshot(FrameworkElement element)
+    private static void Snapshot(FrameworkElement element, Size size)
     {
         if (Environment.GetEnvironmentVariable("HELM_VAULT_SNAPSHOTS") is not { Length: > 0 } folder) return;
         var visual = element is Window { Content: FrameworkElement content } ? content : element;
-        var size = new Size(1040, 700);
         var host = new System.Windows.Controls.Border
         {
             Background = (System.Windows.Media.Brush)Application.Current.FindResource("ApplicationBackgroundBrush"),

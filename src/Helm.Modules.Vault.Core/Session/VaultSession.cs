@@ -396,6 +396,7 @@ public sealed partial class VaultSession : ObservableObject, IDisposable
         }
         if (key is null) return;
         _autoLock.Change(Timeout.InfiniteTimeSpan, Timeout.InfiniteTimeSpan);
+        AutoLockAt = null;
         try { Locking?.Invoke(this, EventArgs.Empty); }
         catch (Exception ex) { _logger.LogError(ex, "A vault lock handler failed"); }
         key.Dispose();
@@ -411,7 +412,14 @@ public sealed partial class VaultSession : ObservableObject, IDisposable
         if (State != VaultState.Unlocked) return;
         var minutes = _settings.Current.AutoLockMinutes;
         _autoLock.Change(minutes > 0 ? TimeSpan.FromMinutes(minutes) : Timeout.InfiniteTimeSpan, Timeout.InfiniteTimeSpan);
+        AutoLockAt = minutes > 0 ? _time.GetUtcNow().AddMinutes(minutes) : null;
     }
+
+    /// <summary>When the vault locks for being idle, unless it is used before (null: locked, or no idle lock).</summary>
+    public DateTimeOffset? AutoLockAt { get; private set; }
+
+    /// <summary>Now, by the session's clock (tests move it).</summary>
+    public DateTimeOffset UtcNow => _time.GetUtcNow();
 
     public void Dispose()
     {
