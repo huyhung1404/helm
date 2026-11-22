@@ -211,8 +211,10 @@ public sealed partial class BugReportFormViewModel : ObservableObject
 
     public string FrozenAt => Snapshot.FrozenAt.ToLocalTime().ToString("HH:mm:ss", CultureInfo.InvariantCulture);
 
-    /// <summary>"The last 60 s, frozen at 14:31:52 · 214 events · 1 error".</summary>
-    public string BlackBoxText => $"The last {(int)BlackBox.Window.TotalSeconds} s, frozen at {FrozenAt} · {BugText.Summary(Snapshot)}";
+    /// <summary>"The last 60 s, frozen at 14:31:52 · 214 events" (errors and freezes are tags beside it).</summary>
+    public string BlackBoxText => $"The last {(int)BlackBox.Window.TotalSeconds} s, frozen at {FrozenAt} · {Snapshot.Events.Count} events";
+
+    public string ErrorText => ErrorCount == 1 ? "1 error" : $"{ErrorCount} errors";
 
     public int ErrorCount => Snapshot.ErrorCount;
 
@@ -328,6 +330,8 @@ public sealed class BugRowViewModel(string id, BugReport bug, int replies, DateT
 
     public bool HasReplies => Replies > 0;
 
+    public string RepliesText => Replies == 1 ? "1 reply" : $"{Replies} replies";
+
     public bool IsAsking => Bug.PendingQuestion is not null;
 
     /// <summary>"Tracker · Home PC · 3 min".</summary>
@@ -348,6 +352,9 @@ public sealed class BugEntryViewModel(string id, BugEntry entry, BugStore store,
     public bool ByAgent => Entry.ByAgent;
 
     public bool IsQuestion => Entry.Kind == BugEntryKind.Question;
+
+    /// <summary>"question" or "answer" beside the author, else null.</summary>
+    public string? Badge => Entry.Kind switch { BugEntryKind.Question => "question", BugEntryKind.Answer => "answer", _ => null };
 
     public string Author => Entry.Author;
 
@@ -763,7 +770,7 @@ public sealed partial class BugReportsViewModel : ObservableObject
         Bugs.Clear();
         foreach (var b in shown)
             Bugs.Add(new BugRowViewModel(b.Id, b.Value, _store.Entries(b.Id).Count(e => e.Value.Kind != BugEntryKind.Report && e.Value.Kind != BugEntryKind.Status), now));
-        FilterCounts = [.. Filters.Select(f => new FilterCount(f, all.Count(b => BugText.Matches(f, b.Value.Status))))];
+        FilterCounts = [.. Filters.Select(f => new FilterCount(f, all.Count(b => BugText.Matches(f, b.Value.Status)), f == Filter))];
         OpenCount = all.Count(b => b.Value.Status != BugStatus.Closed);
         IsEmpty = Bugs.Count == 0;
         if (selectedId is not null)
@@ -787,7 +794,7 @@ public sealed partial class BugReportsViewModel : ObservableObject
 }
 
 /// <summary>A filter and how many bugs it holds: "Fixing (2)".</summary>
-public sealed record FilterCount(BugFilter Filter, int Count)
+public sealed record FilterCount(BugFilter Filter, int Count, bool IsSelected = false)
 {
     public string Text => $"{BugText.Filter(Filter)} ({Count})";
 }
