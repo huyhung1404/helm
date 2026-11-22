@@ -81,6 +81,13 @@ public sealed partial class VaultSession : ObservableObject, IDisposable
     [ObservableProperty]
     private bool _mustChangePassword;
 
+    /// <summary>
+    /// The password typed at the last password unlock would not be accepted as a new one today
+    /// (<see cref="VaultKeyring.IsWeak"/>): the user is asked to change it. Kept in memory only, until the password changes.
+    /// </summary>
+    [ObservableProperty]
+    private bool _passwordIsWeak;
+
     public VaultSession(
         ISyncedCollection<VaultKeyringData> keyrings,
         ISettingsStoreFactory settings,
@@ -179,6 +186,7 @@ public sealed partial class VaultSession : ObservableObject, IDisposable
     public async Task UnlockAsync(string password, CancellationToken ct = default)
     {
         var keyring = RequireKeyring();
+        VaultKeyring.RequirePassword(password);
         ThrowIfThrottled();
         VaultKey key;
         try
@@ -191,6 +199,7 @@ public sealed partial class VaultSession : ObservableObject, IDisposable
             throw;
         }
         OnPasswordUnlocked();
+        PasswordIsWeak = VaultKeyring.IsWeak(password);
         SetUnlocked(key, mustChangePassword: false);
     }
 
@@ -292,6 +301,7 @@ public sealed partial class VaultSession : ObservableObject, IDisposable
         if (!MustChangePassword)
         {
             ArgumentNullException.ThrowIfNull(currentPassword);
+            VaultKeyring.RequirePassword(currentPassword);
             ThrowIfThrottled();
             try
             {
@@ -307,6 +317,7 @@ public sealed partial class VaultSession : ObservableObject, IDisposable
         _keyrings.Upsert(VaultKeyringData.RecordId(changed.VaultId), changed);
         _logger.LogInformation("Vault password changed");
         MustChangePassword = false;
+        PasswordIsWeak = false;
         OnPasswordUnlocked();
         RefreshKeyring();
     }
@@ -316,6 +327,7 @@ public sealed partial class VaultSession : ObservableObject, IDisposable
     {
         var keyring = RequireKeyring();
         var key = Key;
+        VaultKeyring.RequirePassword(password);
         ThrowIfThrottled();
         using (await Task.Run(() => VaultKeyring.UnlockWithPassword(keyring, password), ct).ConfigureAwait(true)) { }
         var (changed, text) = await Task.Run(() => VaultKeyring.NewRecoveryKey(keyring, key, Now()), ct).ConfigureAwait(true);

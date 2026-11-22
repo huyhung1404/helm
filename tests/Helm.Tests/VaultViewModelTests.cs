@@ -18,6 +18,7 @@ public sealed class VaultViewModelTests : IDisposable
     private readonly List<IDisposable> _owned = [];
     private readonly FakePlatform _platform = new();
     private VaultFiles? _files;
+    private SyncedCollection<VaultKeyringData>? _keyrings;
 
     public void Dispose()
     {
@@ -72,6 +73,117 @@ public sealed class VaultViewModelTests : IDisposable
         await app.UnlockCommand.ExecuteAsync(null);
         Assert.Equal(VaultScreen.Items, app.Screen);
         Assert.Equal("", app.Password);
+    }
+
+    [Fact]
+    public async Task Unlocking_with_nothing_typed_says_so_and_is_not_a_wrong_password()
+    {
+        var (app, session, _) = NewApp();
+        await session.CreateAsync(Password);
+        session.Lock("test");
+
+        for (var i = 0; i < 3; i++)
+        {
+            app.Password = "";
+            await app.UnlockCommand.ExecuteAsync(null);
+            Assert.Equal("Type the vault password.", app.Error); // not "Something went wrong: Argon2 needs a password set"
+        }
+
+        // None of them counted: the right password opens at once, with no wait for wrong ones.
+        app.Password = Password;
+        await app.UnlockCommand.ExecuteAsync(null);
+        Assert.Null(app.Error);
+        Assert.Equal(VaultScreen.Items, app.Screen);
+
+        // Same in the settings: an empty current password is not checked (nor counted).
+        var empty = await Assert.ThrowsAsync<VaultKeyException>(() => session.ChangePasswordAsync("", "another good vault password"));
+        Assert.Equal("Type the vault password.", empty.Message);
+        session.Lock("test");
+        app.Password = Password;
+        await app.UnlockCommand.ExecuteAsync(null);
+        Assert.Null(app.Error);
+    }
+
+    [Fact]
+    public async Task A_password_typed_and_left_on_the_lock_screen_is_forgotten_when_the_page_is_left_or_the_vault_locks()
+    {
+        var (app, session, _) = NewApp(out var settings);
+        await session.CreateAsync(Password);
+        session.Lock("test");
+
+        app.Password = "half of my pass";
+        app.UseRecoveryKey = true;
+        app.RecoveryKey = "HELMV-1234";
+        app.ForgetTypedSecrets(); // the page was left or hidden
+        Assert.Equal("", app.Password);
+        Assert.Equal("", app.RecoveryKey);
+        Assert.False(app.UseRecoveryKey);
+
+        // Typed, then the vault locks (and unlocks with something else): nothing waits in the box.
+        app.Password = Password;
+        await app.UnlockCommand.ExecuteAsync(null);
+        app.Password = "typed while unlocked";
+        session.Lock("inactivity");
+        Assert.Equal("", app.Password);
+
+        settings.CurrentPassword = settings.NewPassword = settings.ConfirmPassword = settings.ExportPassword = settings.ExportConfirm = "x";
+        settings.ForgetTypedSecrets();
+        Assert.All(new[] { settings.CurrentPassword, settings.NewPassword, settings.ConfirmPassword, settings.ExportPassword, settings.ExportConfirm }, v => Assert.Equal("", v));
+    }
+
+    [Fact]
+    public async Task Secrets_shown_with_the_eye_are_hidden_again_when_the_page_is_left()
+    {
+        var (app, session, _) = NewApp();
+        await session.CreateAsync(Password);
+        var items = app.Items;
+        items.NewCommand.Execute(VaultItemKind.Login);
+        var detail = items.Detail!;
+        detail.Title = "Bank";
+        detail.Fields.Single(f => f.IsPassword).GenerateCommand.Execute(null);
+        detail.SaveCommand.Execute(null);
+        var card = Assert.Single(items.Cards);
+        items.ToggleCardCommand.Execute(card);
+        card.ToggleRevealCommand.Execute(null);
+        var field = items.Detail!.Fields.Single(f => f.IsPassword);
+        field.ToggleRevealCommand.Execute(null);
+        Assert.True(card.IsRevealed);
+        Assert.True(field.IsRevealed);
+
+        items.HideRevealed();
+        Assert.False(card.IsRevealed);
+        Assert.False(field.IsRevealed);
+    }
+
+    [Fact]
+    public async Task A_vault_password_too_weak_by_todays_rules_is_flagged_at_unlock_until_it_is_changed()
+    {
+        var (app, session, _) = NewApp();
+        // A vault made before the strength check, with a password it would refuse today.
+        const string weak = "Password@2026!!";
+        Assert.True(VaultKeyring.IsWeak(weak));
+        Assert.False(VaultKeyring.IsWeak(Password));
+        var made = VaultKeyring.Create(weak, 0, VaultCryptoTests.CheapKdf(), checkStrength: false);
+        made.Key.Dispose();
+        _keyrings!.Upsert(VaultKeyringData.RecordId(made.Keyring.VaultId), made.Keyring);
+        Assert.Equal(VaultScreen.Unlock, app.Screen);
+
+        app.Password = weak;
+        await app.UnlockCommand.ExecuteAsync(null);
+        Assert.Equal(VaultScreen.Items, app.Screen);
+        Assert.NotNull(app.WeakPasswordWarning);
+
+        session.Lock("test");
+        app.Password = weak;
+        await app.UnlockCommand.ExecuteAsync(null);
+        Assert.NotNull(app.WeakPasswordWarning); // still weak: asked again
+
+        await session.ChangePasswordAsync(weak, Password);
+        Assert.Null(app.WeakPasswordWarning);
+        session.Lock("test");
+        app.Password = Password;
+        await app.UnlockCommand.ExecuteAsync(null);
+        Assert.Null(app.WeakPasswordWarning);
     }
 
     [Fact]
@@ -497,7 +609,7 @@ public sealed class VaultViewModelTests : IDisposable
         var blobs = new BlobStore(db, new NullBlobTransport(), paths.SyncBlobsDirectory);
         var engine = Own(new SyncEngine(db, new NullSyncTransport(), new InMemoryMasterKeyStore(), [], debounce: TimeSpan.FromHours(1), blobs: blobs));
         var records = Own(new SyncedCollection<VaultItemRecord>(engine, VaultStore.Options));
-        var keyrings = Own(new SyncedCollection<VaultKeyringData>(engine, new SyncedCollectionOptions<VaultKeyringData> { Name = VaultSession.KeyringCollection }));
+        var keyrings = _keyrings = Own(new SyncedCollection<VaultKeyringData>(engine, new SyncedCollectionOptions<VaultKeyringData> { Name = VaultSession.KeyringCollection }));
         var settings = Own(new SettingsStoreFactory(paths));
         var session = Own(new VaultSession(keyrings, settings, new NoDeviceUnlock(), engine) { NewKdf = VaultCryptoTests.CheapKdf });
         var store = Own(new VaultStore(records, session));

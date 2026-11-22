@@ -157,6 +157,14 @@ public sealed partial class ItemsViewModel : ObservableObject
         OnPropertyChanged(nameof(IsEmpty));
     }
 
+    /// <summary>Hides every secret shown with "Show" (cards and the open item): the page was left or hidden.</summary>
+    public void HideRevealed()
+    {
+        foreach (var card in Cards) card.IsRevealed = false;
+        if (Detail is { } detail)
+            foreach (var field in detail.Fields) field.IsRevealed = false;
+    }
+
     /// <summary>Creates an item of the kind (Login or Token in Credentials, Info in Other) in the editor.</summary>
     [RelayCommand]
     private void New(VaultItemKind kind)

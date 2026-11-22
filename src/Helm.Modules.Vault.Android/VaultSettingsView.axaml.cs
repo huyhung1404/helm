@@ -13,6 +13,8 @@ public partial class VaultSettingsView : UserControl
     {
         AvaloniaXamlLoader.Load(this);
         AttachedToVisualTree += (_, _) => UpdateAutofill();
+        // Leaving the page forgets the passwords typed there (not on pause: the export's file picker pauses Helm).
+        DetachedFromVisualTree += (_, _) => (DataContext as ViewModels.VaultSettingsViewModel)?.ForgetTypedSecrets();
         Helm.Core.Platform.ActivityHost.Resumed += (_, _) => Avalonia.Threading.Dispatcher.UIThread.Post(UpdateAutofill);
     }
 

@@ -121,6 +121,12 @@
                 <Border Classes="infobar warning" IsVisible="{Binding App.BackupWarning, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
                     <TextBlock TextWrapping="Wrap" Text="{Binding App.BackupWarning}" />
                 </Border>
+                <Border Classes="infobar warning" IsVisible="{Binding App.WeakPasswordWarning, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
+                    <StackPanel Spacing="8">
+                        <TextBlock TextWrapping="Wrap" Text="{Binding App.WeakPasswordWarning}" />
+                        <Button Classes="accent" Content="Change the password…" Command="{Binding OpenSettingsCommand}" />
+                    </StackPanel>
+                </Border>
 
                 <!-- List: search over every tab, the two tabs with their own Create, sub-tabs, then the cards.
                      Tapping a card opens it (the detail takes the page); Back closes it. -->

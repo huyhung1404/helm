@@ -71,6 +71,9 @@ each document: FileKey (32 random bytes) stored inside its item, so only the Vau
   clipboard exclusion formats. Android 13+: `ClipDescription.EXTRA_IS_SENSITIVE`.
 - Screen capture: `SetWindowDisplayAffinity(WDA_EXCLUDEFROMCAPTURE)` on Windows; `FLAG_SECURE` on Android.
 - Secret types print `***`; tests make sure logs never contain item content.
+- Typed passwords: the boxes of the lock, setup and settings screens empty (and stop showing) when the password is
+  used, when the vault locks, and when the page is left, hidden or minimized; secrets shown on items are hidden again
+  (S14).
 - Limits (documented, not solved): malware while the vault is unlocked; .NET strings cannot be wiped.
 
 ## Phases
@@ -131,3 +134,19 @@ Residual risks (documented, not fixed):
   to sign for "Helm Vault", which still needs the user to approve the prompt.
 - Documents opened in another app may be cached by that app; printing the Emergency Kit passes through the spooler.
 - The sync server learns how many vault records exist and their approximate sizes (chunks are padded to 64 KiB).
+
+## Security review (2026-11-22)
+
+A third pass, after SSH started signing in with passwords kept in Vault (`IVaultSecrets`), from someone at the
+user's PC and from a copy of the backup folder (tests in tests/Helm.Tests/VaultViewsTests.cs and VaultViewModelTests.cs).
+
+| # | Attack | Before | Fix |
+|---|---|---|---|
+| S14 | Sit at the PC after the user typed the vault password with "show password" on, and open Vault | A WPF-UI password box that shows its text ignores changes from outside, so clearing the password after an unlock left it in the box: the next lock screen showed it, readable. A password typed but not used also stayed when the page was left | `PageLeaveGuard`: a shown box is hidden before the view model's value is put into it; the lock, setup and settings pages forget typed passwords and hide shown secrets when left, hidden (tray) or minimized, and on lock. Android: forgotten when the page is left |
+| S15 | Copy the backup folder (OneDrive) and guess a vault password chosen before the strength check (S1) | Nothing told the user their password was below today's rule | After a password unlock, a password the check would refuse today shows a warning with "Change the password…"; in memory only, until it is changed |
+| S16 | (Usability with a security edge) Press Unlock with nothing typed | Argon2 threw a technical error ("Something went wrong") | "Type the vault password.", before the backoff and without counting as a wrong password |
+
+Checked and holding: AI agents never reach Vault secrets through SSH (`ssh_exec` and the menu tools only use a
+connection the user opened in Helm; Helm never connects for an agent, and a Vault password is only sent to a server
+whose host key is trusted); MCP, the connector and automatic AI jobs still never see Vault; pairing a device by code
+moves the sync key only, not the vault key.

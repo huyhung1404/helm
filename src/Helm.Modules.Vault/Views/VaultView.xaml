@@ -208,6 +208,13 @@
                 </ui:InfoBar>
                 <ui:InfoBar Title="Backup" Message="{Binding BackupWarning}" Severity="Warning" IsClosable="False" Margin="0,0,0,6"
                             IsOpen="{Binding BackupWarning, Converter={StaticResource NotEmptyToBool}}" />
+                <ui:InfoBar Title="Weak vault password" Message="{Binding WeakPasswordWarning}" Severity="Warning" IsClosable="False" Margin="0,0,0,6"
+                            IsOpen="{Binding WeakPasswordWarning, Converter={StaticResource NotEmptyToBool}}">
+                    <ui:InfoBar.Content>
+                        <ui:Button Content="Change the password…" Appearance="Primary" Margin="0,4,0,0"
+                                   Command="{Binding DataContext.OpenSettingsCommand, RelativeSource={RelativeSource AncestorType=Page}}" />
+                    </ui:InfoBar.Content>
+                </ui:InfoBar>
                 <ui:InfoBar Message="{Binding Error}" Severity="Error" IsClosable="False" Margin="0,0,0,6" IsOpen="{Binding Error, Converter={StaticResource NotEmptyToBool}}" />
             </StackPanel>
 

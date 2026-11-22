@@ -3,6 +3,22 @@
 All notable changes to Helm. The top section is used as the GitHub release body and as the Velopack release notes.
 Format: [Keep a Changelog](https://keepachangelog.com), versions follow [SemVer](https://semver.org).
 
+## [Unreleased]
+
+### Security
+- **Vault**: a vault password typed with "show password" on the lock screen stayed in the box, readable, after
+  unlocking: the next time the vault locked, the lock screen showed it again. The box now empties (and hides) as soon
+  as the password is used, when the vault locks, and whenever the Vault page or its settings page is left, Helm goes
+  to the tray or its window is minimized. Passwords typed but not used are forgotten the same way, and secrets shown
+  with the eye on items are hidden again.
+- **Vault**: a vault password that today's strength check would refuse (vaults made before it existed) is pointed out
+  after unlocking with it, with a way to change it: whoever copies a backup folder or the device's data can guess it
+  offline, with no limit, so it is the only lock there.
+
+### Fixed
+- **Vault**: Unlock with nothing typed says "Type the vault password." instead of a technical error, and does not
+  count as a wrong password.
+
 ## [0.85.2] - 2026-11-20
 
 ### Added

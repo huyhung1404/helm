@@ -87,6 +87,9 @@ public sealed partial class VaultSettingsViewModel : ObservableObject
 
     public IReadOnlyList<Choice> KeepMonthlyChoices { get; } = [new(0, "None"), new(12, "12 months"), new(36, "3 years"), new(120, "10 years")];
 
+    /// <summary>Forgets the passwords typed on the settings page but not used yet; the view calls it when the page is left or hidden.</summary>
+    public void ForgetTypedSecrets() => CurrentPassword = NewPassword = ConfirmPassword = ExportPassword = ExportConfirm = "";
+
     public bool VaultExists => _session.State != VaultState.NotSetUp;
 
     public bool IsUnlocked => _session.State == VaultState.Unlocked;

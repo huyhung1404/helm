@@ -75,6 +75,11 @@ public partial class VaultContentPage : Page
         PreviewMouseDown += (_, _) => viewModel.App.Session.Touch();
         Loaded += OnLoaded;
         Unloaded += (_, _) => Unprotect();
+        Views.PageLeaveGuard.Attach(this, viewModel.App, () =>
+        {
+            viewModel.App.ForgetTypedSecrets();
+            viewModel.App.Items.HideRevealed();
+        });
         viewModel.App.PropertyChanged += OnAppChanged;
         _settings.Changed += (_, _) => Dispatcher.BeginInvoke(Protect);
     }

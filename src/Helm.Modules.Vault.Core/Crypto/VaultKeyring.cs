@@ -56,9 +56,10 @@ public static class VaultKeyring
     /// <exception cref="VaultKeyException">The password is too weak (same rule as the sync passphrase).</exception>
     public static NewVault Create(string password, long nowMs) => Create(password, nowMs, VaultKdf.Default());
 
-    internal static NewVault Create(string password, long nowMs, VaultKdf kdf)
+    /// <param name="checkStrength">False only in tests, to build a vault like one made before the strength check.</param>
+    internal static NewVault Create(string password, long nowMs, VaultKdf kdf, bool checkStrength = true)
     {
-        ValidateNewPassword(password);
+        if (checkStrength) ValidateNewPassword(password);
         var vaultId = SyncIds.NewId();
         var key = VaultKey.Create();
         var (secret, text) = VaultRecoveryKey.Create();
@@ -89,9 +90,10 @@ public static class VaultKeyring
         }
     }
 
-    /// <exception cref="VaultKeyException">Wrong password, or a keyring from a newer Helm.</exception>
+    /// <exception cref="VaultKeyException">No password, a wrong one, or a keyring from a newer Helm.</exception>
     public static VaultKey UnlockWithPassword(VaultKeyringData keyring, string password)
     {
+        RequirePassword(password);
         EnsureSupported(keyring);
         var kek = VaultCrypto.PasswordKey(password, keyring.Kdf);
         return Unwrap(kek, keyring.Pass, Aad("pass", keyring), "The vault password is not correct.");
@@ -164,6 +166,20 @@ public static class VaultKeyring
             CryptographicOperations.ZeroMemory(secret);
         }
     }
+
+    /// <summary>Nothing typed: said plainly, before Argon2 (which refuses an empty input) and before it counts as a wrong password.</summary>
+    /// <exception cref="VaultKeyException">The password is empty.</exception>
+    public static void RequirePassword(string? password)
+    {
+        if (string.IsNullOrEmpty(password)) throw new VaultKeyException("Type the vault password.");
+    }
+
+    /// <summary>
+    /// The password would not be accepted as a new one today (too short or too easy to guess): it was chosen before
+    /// the strength check, so whoever copies a backup or the replica could guess it offline.
+    /// </summary>
+    public static bool IsWeak(string password) =>
+        SyncKeyVault.EstimateStrength(password) is PassphraseStrength.TooShort or PassphraseStrength.Weak;
 
     public static void ValidateNewPassword(string password)
     {

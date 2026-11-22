@@ -113,6 +113,23 @@ public sealed partial class VaultAppViewModel : ObservableObject
 
     public bool MustChangePassword => _session.MustChangePassword;
 
+    /// <summary>The vault password would not be accepted as a new one today: whoever copies a backup could guess it offline.</summary>
+    public string? WeakPasswordWarning => _session.PasswordIsWeak && !MustChangePassword
+        ? "Your vault password is too easy to guess by today's rules. Anyone who copies your backup folder or this device's data can try passwords offline, with no limit, so the password is the only lock there. Change it in the Vault settings."
+        : null;
+
+    /// <summary>
+    /// Forgets every password and recovery key typed into the vault screens but not used yet, so nothing typed is still
+    /// there (or shown, if it was revealed) when someone comes back to the page. The view calls it when the page is left
+    /// or hidden; locking does it too.
+    /// </summary>
+    public void ForgetTypedSecrets()
+    {
+        Password = RecoveryKey = NewPassword = ConfirmPassword = KitConfirmation = "";
+        UseRecoveryKey = false;
+        Error = null;
+    }
+
     public string PasswordStrength => SyncKeyVault.EstimateStrength(NewPassword) switch
     {
         PassphraseStrength.TooShort => $"At least {VaultKeyring.MinPasswordLength} characters",
@@ -258,6 +275,8 @@ public sealed partial class VaultAppViewModel : ObservableObject
     {
         if (e.PropertyName is nameof(VaultSession.State) or nameof(VaultSession.Keyring) or nameof(VaultSession.MustChangePassword) or nameof(VaultSession.CanUseDeviceUnlock))
             _ui.Post(UpdateScreen);
+        else if (e.PropertyName == nameof(VaultSession.PasswordIsWeak))
+            _ui.Post(RaiseWarnings);
     }
 
     private void UpdateScreen()
@@ -279,7 +298,12 @@ public sealed partial class VaultAppViewModel : ObservableObject
         if (screen != VaultScreen.Items)
         {
             Items.Clear();
-            if (changed) Kit = null;
+            if (changed)
+            {
+                Kit = null;
+                // Locked again (or the vault went away): nothing typed earlier waits in the boxes.
+                ForgetTypedSecrets();
+            }
         }
         OnPropertyChanged(nameof(CanUseDeviceUnlock));
         OnPropertyChanged(nameof(MustChangePassword));
@@ -291,6 +315,7 @@ public sealed partial class VaultAppViewModel : ObservableObject
     {
         OnPropertyChanged(nameof(HeldWarning));
         OnPropertyChanged(nameof(BackupWarning));
+        OnPropertyChanged(nameof(WeakPasswordWarning));
     }
 
     private async Task RunAsync(Func<Task> work)

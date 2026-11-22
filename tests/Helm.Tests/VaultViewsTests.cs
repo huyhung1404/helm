@@ -155,6 +155,78 @@ public sealed class VaultViewsTests : IDisposable
         Layout(window);
     });
 
+    [Fact]
+    public void A_password_revealed_on_the_lock_screen_is_gone_and_hidden_when_the_page_is_left() => RunSta(() =>
+    {
+        EnsureApplication();
+        System.Threading.SynchronizationContext.SetSynchronizationContext(new System.Windows.Threading.DispatcherSynchronizationContext());
+        var paths = new HelmPaths(_dir);
+        using var db = new SyncDatabase(paths.SyncDatabaseFile, TestKeys.Local);
+        var blobs = new BlobStore(db, new NullBlobTransport(), paths.SyncBlobsDirectory);
+        using var engine = new SyncEngine(db, new NullSyncTransport(), new InMemoryMasterKeyStore(), [], debounce: TimeSpan.FromHours(1), blobs: blobs);
+        using var records = new SyncedCollection<VaultItemRecord>(engine, VaultStore.Options);
+        using var keyrings = new SyncedCollection<VaultKeyringData>(engine, new SyncedCollectionOptions<VaultKeyringData> { Name = VaultSession.KeyringCollection });
+        using var settings = new SettingsStoreFactory(paths);
+        using var session = new VaultSession(keyrings, settings, new NoDeviceUnlock(), engine) { NewKdf = VaultCryptoTests.CheapKdf };
+        using var store = new VaultStore(records, session);
+        var files = new VaultFiles(store, blobs, session);
+        var backup = new VaultBackupService(session, store, blobs, new FolderBackupLocation(), settings);
+        var app = new VaultAppViewModel(session, store, files, backup, engine, new NullPlatform(), new Dispatcher());
+        Pump(session.CreateAsync("correct horse battery staple"));
+        session.Lock("test");
+        Pump(Task.CompletedTask);
+
+        var view = new VaultView { DataContext = app };
+        PageLeaveGuard.FollowViewModel(view, app); // as VaultContentPage does
+        Layout(view);
+        Assert.True(app.IsUnlock);
+        var box = (Wpf.Ui.Controls.PasswordBox)view.FindName("UnlockPasswordBox");
+
+        void TypeAndReveal(string text)
+        {
+            box.Password = text;
+            Assert.Equal(text, app.Password);
+            box.SetCurrentValue(Wpf.Ui.Controls.PasswordBox.IsPasswordRevealedProperty, true); // the eye button
+            Pump(Task.CompletedTask);
+            Assert.Equal(text, box.Text); // readable on screen
+        }
+
+        void AssertEmptyAndHidden()
+        {
+            Assert.Equal("", app.Password);
+            Assert.Equal("", box.Password);
+            Assert.Equal("", box.Text);
+            Assert.False(box.IsPasswordRevealed);
+        }
+
+        // 1. Typed, shown, and the page is left (another page, the tray, minimized).
+        TypeAndReveal("half of my vault pass");
+        PageLeaveGuard.Leave(view, app.ForgetTypedSecrets);
+        Pump(Task.CompletedTask);
+        AssertEmptyAndHidden();
+        box.Password = "typed again"; // after coming back: dots, not the password
+        Pump(Task.CompletedTask);
+        Assert.DoesNotContain("typed", box.Text, StringComparison.Ordinal);
+        box.Password = "";
+
+        // 2. Typed, shown, and unlocked with it: the password must not wait in the box for the next lock screen.
+        // (A shown WPF-UI box ignored the view model clearing it, so the password reappeared, readable, on the next lock.)
+        TypeAndReveal("correct horse battery staple");
+        Pump(app.UnlockCommand.ExecuteAsync(null));
+        Assert.True(app.IsItems);
+        AssertEmptyAndHidden();
+        session.Lock("test");
+        Pump(Task.CompletedTask);
+        Assert.True(app.IsUnlock);
+        AssertEmptyAndHidden();
+
+        // 3. Typed, shown, and the vault locked meanwhile (or anything else that clears it): same.
+        TypeAndReveal("something");
+        app.ForgetTypedSecrets();
+        Pump(Task.CompletedTask);
+        AssertEmptyAndHidden();
+    });
+
     private static byte[] PngOf(System.Windows.Media.ImageSource image)
     {
         var visual = new System.Windows.Media.DrawingVisual();

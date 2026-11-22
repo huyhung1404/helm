@@ -8,5 +8,6 @@ public partial class VaultPage : ModulePageBase
     {
         DataContext = viewModel;
         InitializeComponent();
+        Views.PageLeaveGuard.Attach(this, viewModel.Settings, viewModel.Settings.ForgetTypedSecrets);
     }
 }
