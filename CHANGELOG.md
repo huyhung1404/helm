@@ -3,7 +3,7 @@
 All notable changes to Helm. The top section is used as the GitHub release body and as the Velopack release notes.
 Format: [Keep a Changelog](https://keepachangelog.com), versions follow [SemVer](https://semver.org).
 
-## [Unreleased]
+## [0.86.1] - 2026-11-23
 
 ### Fixed
 - **Keyboard no longer jumps to Chinese on its own** (bug B1): Windows' own Alt+Shift (next input language) stayed on
