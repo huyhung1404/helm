@@ -70,8 +70,8 @@ public sealed class KeyboardInstaller(IInputMethods inputMethods, ILogger<Keyboa
         if (!inputMethods.AddInputMethod(KeyboardIds.InputMethod, makeDefault: true))
             throw new InvalidOperationException("Windows did not add Helm Keyboard to the keyboard list.");
         inputMethods.RemoveInputMethod(UsKeyboard);
-        // Windows' own Ctrl+Shift (switch keyboards within a language) takes the Shift before the shortcut sees it.
-        inputMethods.SetLayoutSwitchShortcut(false);
+        // Helm switches keyboards from now on: Windows' own Ctrl+Shift and Alt+Shift would fight it (see the method).
+        inputMethods.SetWindowsSwitchShortcuts(false);
         logger.LogInformation("Helm Keyboard installed from {Directory}", target);
         DeleteOldVersions(keep: target);
     }
@@ -81,7 +81,7 @@ public sealed class KeyboardInstaller(IInputMethods inputMethods, ILogger<Keyboa
     {
         inputMethods.AddInputMethod(UsKeyboard, makeDefault: true);
         inputMethods.RemoveInputMethod(KeyboardIds.InputMethod);
-        inputMethods.SetLayoutSwitchShortcut(true);
+        inputMethods.SetWindowsSwitchShortcuts(true);
         if (RegisteredDll(RegistryView.Registry64) is { } x64) RunRegsvr32(x64, unregister: true, wow64: false);
         if (RegisteredDll(RegistryView.Registry32) is { } x86) RunRegsvr32(x86, unregister: true, wow64: true);
         logger.LogInformation("Helm Keyboard removed");
@@ -100,7 +100,7 @@ public sealed class KeyboardInstaller(IInputMethods inputMethods, ILogger<Keyboa
         var inputMethods = new InputMethods();
         inputMethods.AddInputMethod(UsKeyboard, makeDefault: true);
         inputMethods.RemoveInputMethod(KeyboardIds.InputMethod);
-        inputMethods.SetLayoutSwitchShortcut(true);
+        inputMethods.SetWindowsSwitchShortcuts(true);
         log("Helm Keyboard taken off the keyboard list.");
         var commands = new List<string>();
         if (x64 is not null) commands.Add($"\"{Regsvr32(wow64: false)}\" /s /u \"{x64}\"");

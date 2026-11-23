@@ -172,7 +172,7 @@ public sealed partial class KeyboardViewModel : ObservableObject
         InstallDescription = status.State switch
         {
             KeyboardInstallState.NotBundled => "Not included in this build of Helm, so it cannot be installed from here.",
-            KeyboardInstallState.NotInstalled => "Not installed. Installing makes Helm Keyboard the English keyboard (in place of US) and turns off Windows' own Ctrl+Shift.",
+            KeyboardInstallState.NotInstalled => "Not installed. Installing makes Helm Keyboard the English keyboard (in place of US) and turns off Windows' own Ctrl+Shift and Alt+Shift.",
             KeyboardInstallState.Outdated => "Installed. A newer version came with this Helm.",
             _ => status.OldVersionsInUse > 0
                 ? "Installed. Apps that were open before the last update type with the old version until you close them."

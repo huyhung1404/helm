@@ -3,6 +3,15 @@
 All notable changes to Helm. The top section is used as the GitHub release body and as the Velopack release notes.
 Format: [Keep a Changelog](https://keepachangelog.com), versions follow [SemVer](https://semver.org).
 
+## [Unreleased]
+
+### Fixed
+- **Keyboard no longer jumps to Chinese on its own** (bug B1): Windows' own Alt+Shift (next input language) stayed on
+  next to Helm's shortcut, so an Alt+Shift slipped in VS Code's, Unity's or Slack's Alt+Shift+… shortcuts switched
+  to the Chinese keyboard behind Helm's back — and Helm then remembered Chinese for that app or site. Installing or
+  updating Helm Keyboard now turns Alt+Shift off together with Ctrl+Shift (Win+Space still works); removing it gives
+  both back. An app or site already remembered as 中 by mistake is fixed by switching it once with Helm's shortcut.
+
 ## [0.86.0] - 2026-11-22
 
 ### Added

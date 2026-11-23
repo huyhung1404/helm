@@ -32,10 +32,11 @@ public interface IInputMethods
     bool RemoveInputMethod(string inputMethod);
 
     /// <summary>
-    /// Windows' Ctrl+Shift, which switches keyboards within a language: on, Windows takes the Shift of a Ctrl+Shift
-    /// before input methods see it.
+    /// Windows' own switch shortcuts: Left Alt+Shift (next input language) and Ctrl+Shift (next keyboard within a
+    /// language). Off while Helm switches keyboards: Ctrl+Shift takes the Shift before the shortcut sees it, and an
+    /// Alt+Shift slipped in an Alt+Shift+… shortcut (VS Code, Unity) jumps to another language behind Helm's back.
     /// </summary>
-    void SetLayoutSwitchShortcut(bool on);
+    void SetWindowsSwitchShortcuts(bool on);
 
     /// <summary>A TSF global compartment (a value every app's input method sees). Use it on one STA thread only.</summary>
     IGlobalCompartment OpenGlobalCompartment(Guid id);
@@ -92,14 +93,15 @@ public sealed class InputMethods : IInputMethods
 
     public bool RemoveInputMethod(string inputMethod) => InstallLayoutOrTip(inputMethod, ILOT_UNINSTALL);
 
-    public void SetLayoutSwitchShortcut(bool on)
+    public void SetWindowsSwitchShortcuts(bool on)
     {
-        // "Layout Hotkey": 2 = Ctrl+Shift (Windows' default), 3 = none. "Hotkey" mirrors the language one (1 = Alt+Shift).
+        // "Layout Hotkey": 2 = Ctrl+Shift (Windows' default), 3 = none. "Language Hotkey": 1 = Left Alt+Shift (Windows'
+        // default), 3 = none; "Hotkey" is its older copy, kept equal. Win+Space stays: it is never pressed by accident.
         using (var key = Registry.CurrentUser.CreateSubKey(@"Keyboard Layout\Toggle"))
         {
             key.SetValue("Layout Hotkey", on ? "2" : "3");
-            if (key.GetValue("Hotkey") is null) key.SetValue("Hotkey", "1");
-            if (key.GetValue("Language Hotkey") is null) key.SetValue("Language Hotkey", "1");
+            key.SetValue("Language Hotkey", on ? "1" : "3");
+            key.SetValue("Hotkey", on ? "1" : "3");
         }
         unsafe
         {
