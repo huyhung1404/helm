@@ -16,6 +16,13 @@
         <Style Selector="Border.glass.danger">
             <Setter Property="BorderBrush" Value="{DynamicResource HelmDanger}" />
         </Style>
+        <!-- A card of Today is the way into its tool: the whole card is the button -->
+        <Style Selector="Button.card">
+            <Setter Property="HorizontalAlignment" Value="Stretch" />
+            <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+            <Setter Property="VerticalContentAlignment" Value="Top" />
+            <Setter Property="Padding" Value="16,14" />
+        </Style>
         <Style Selector="Button.link">
             <Setter Property="Background" Value="Transparent" />
             <Setter Property="BorderThickness" Value="0" />
@@ -45,7 +52,7 @@
                 <!-- 1. Capture: whatever comes to mind, sent to the right tool -->
                 <Border Classes="glass" Padding="16,6,6,6" Margin="0,22,0,0">
                     <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="10">
-                        <ic:SymbolIcon Symbol="Flash" FontSize="18" Foreground="{DynamicResource HelmEyebrow}" VerticalAlignment="Center" />
+                        <core:ModuleIcon Symbol="Flash" Image="{Binding CaptureIcon}" Size="22" Foreground="{DynamicResource HelmEyebrow}" VerticalAlignment="Center" />
                         <TextBox x:Name="CaptureBox" Grid.Column="1" Classes="bare" FontSize="15" Text="{Binding CaptureText}" VerticalAlignment="Center"
                                  PlaceholderText="Capture anything — /t task, /n note, /v word · Enter" AutomationProperties.Name="Capture">
                             <TextBox.KeyBindings>
@@ -72,9 +79,10 @@
                             <DataTemplate x:DataType="vm:HomeAlert">
                                 <Border Classes="glass fade" Classes.danger="{Binding IsDanger}" Padding="16,12,10,12" Margin="0,0,0,8">
                                     <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="12">
-                                        <Panel VerticalAlignment="Top" Margin="0,2,0,0">
-                                            <ic:SymbolIcon Symbol="ErrorCircle" FontSize="20" Foreground="{DynamicResource HelmDanger}" IsVisible="{Binding IsDanger}" />
-                                            <ic:SymbolIcon Symbol="Info" FontSize="20" Foreground="{DynamicResource HelmEyebrow}" IsVisible="{Binding !IsDanger}" />
+                                        <Panel VerticalAlignment="Center">
+                                            <ic:SymbolIcon Symbol="ErrorCircle" IconVariant="Filled" FontSize="22" Foreground="{DynamicResource HelmDanger}" IsVisible="{Binding IsDanger}" />
+                                            <ic:SymbolIcon Symbol="Warning" IconVariant="Filled" FontSize="22" Foreground="{DynamicResource HelmWarning}" IsVisible="{Binding IsWarning}" />
+                                            <ic:SymbolIcon Symbol="Info" IconVariant="Filled" FontSize="22" Foreground="{DynamicResource TextControlForeground}" IsVisible="{Binding IsInfo}" />
                                         </Panel>
                                         <StackPanel Grid.Column="1" VerticalAlignment="Center">
                                             <TextBlock Text="{Binding Title}" FontWeight="SemiBold" TextWrapping="Wrap" />
@@ -97,21 +105,14 @@
                         </ItemsControl.ItemsPanel>
                         <ItemsControl.ItemTemplate>
                             <DataTemplate x:DataType="vm:TodayCard">
-                                <Border Classes="glass lift fade" Padding="16,14">
+                                <Button Classes="glass card fade" Command="{Binding ActCommand}" AutomationProperties.Name="{Binding Tool.Name}">
                                     <StackPanel Spacing="10">
-                                        <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="10">
+                                        <Grid ColumnDefinitions="Auto,*" ColumnSpacing="10">
                                             <core:ModuleIcon Symbol="{Binding Tool.Icon}" Image="{Binding Tool.Image}" Size="24" Foreground="{DynamicResource HelmEyebrow}" VerticalAlignment="Center" />
                                             <StackPanel Grid.Column="1" VerticalAlignment="Center">
                                                 <TextBlock Classes="head" Text="{Binding Tool.Name}" />
                                                 <TextBlock Classes="muted" Text="{Binding Headline}" />
                                             </StackPanel>
-                                            <Button Grid.Column="2" Classes="chip" VerticalAlignment="Center" IsVisible="{Binding HasAction}" Command="{Binding ActCommand}"
-                                                    AutomationProperties.Name="{Binding ActionText}">
-                                                <StackPanel Orientation="Horizontal" Spacing="4">
-                                                    <TextBlock Text="{Binding ActionText}" FontSize="13" VerticalAlignment="Center" />
-                                                    <ic:SymbolIcon Symbol="ChevronRight" FontSize="12" VerticalAlignment="Center" />
-                                                </StackPanel>
-                                            </Button>
                                         </Grid>
                                         <ItemsControl ItemsSource="{Binding Items}" IsVisible="{Binding HasItems}">
                                             <ItemsControl.ItemTemplate>
@@ -138,7 +139,7 @@
                                             </ItemsControl.ItemTemplate>
                                         </ItemsControl>
                                     </StackPanel>
-                                </Border>
+                                </Button>
                             </DataTemplate>
                         </ItemsControl.ItemTemplate>
                     </ItemsControl>

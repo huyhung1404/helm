@@ -30,8 +30,12 @@ public sealed partial class HomeTool(string id, string name, string group, Symbo
 /// <summary>How bad a problem is: something broke, or something wants a decision.</summary>
 public enum AlertLevel
 {
+    /// <summary>Something broke: red.</summary>
     Danger,
-    Attention,
+    /// <summary>Something will break or wants a decision soon: yellow.</summary>
+    Warning,
+    /// <summary>Good to know (an update is ready): white.</summary>
+    Info,
 }
 
 /// <summary>Something about Helm itself that needs the user: an update, a shortcut taken, a vault never backed up, sync stuck.</summary>
@@ -44,6 +48,10 @@ public sealed partial class HomeAlert(string title, string detail, AlertLevel le
     public AlertLevel Level { get; } = level;
 
     public bool IsDanger => Level == AlertLevel.Danger;
+
+    public bool IsWarning => Level == AlertLevel.Warning;
+
+    public bool IsInfo => Level == AlertLevel.Info;
 
     public string ActionText { get; } = actionText;
 
@@ -128,6 +136,9 @@ public sealed partial class HomeViewModel(IHomeHost host, string version, TimePr
     [ObservableProperty] private string _syncLine = "";
 
     public string Version { get; } = version;
+
+    /// <summary>Quick Capture's own icon, at the start of the capture box.</summary>
+    public IImage? CaptureIcon { get; set; }
 
     public ObservableCollection<HomeAlert> Alerts { get; } = [];
 

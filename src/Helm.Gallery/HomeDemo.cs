@@ -43,7 +43,7 @@ internal static class HomeDemo
 
     public static Control Home(HomeStage stage)
     {
-        var vm = new HomeViewModel(new Host(), "v0.88.0") { SyncLine = "synced 2 minutes ago" };
+        var vm = new HomeViewModel(new Host(), "v0.88.0") { SyncLine = "synced 2 minutes ago", CaptureIcon = ToolIcons.For("quick-capture") };
         if (stage == HomeStage.AllClear) return new HomeView(vm);
 
         var tools = AllTools().ToDictionary(t => t.Id);
@@ -52,8 +52,8 @@ internal static class HomeDemo
         vm.SetAlerts(
         [
             new HomeAlert("Ctrl+Alt+N is taken by another app", "Window Zones cannot use it. Pick another shortcut.", AlertLevel.Danger, "Change", Done),
-            new HomeAlert("Helm 0.88.1 is ready", "Restart Helm to install it (about 10 seconds).", AlertLevel.Attention, "Restart", Done),
-            new HomeAlert("The vault has not been backed up for 9 days", "Your backup folder could not be reached.", AlertLevel.Attention, "Back up", Done),
+            new HomeAlert("Helm 0.88.1 is ready", "Restart Helm to install it (about 10 seconds).", AlertLevel.Info, "Restart", Done),
+            new HomeAlert("The vault has not been backed up for 9 days", "Your backup folder could not be reached.", AlertLevel.Warning, "Back up", Done),
         ]);
         vm.SetToday(
         [

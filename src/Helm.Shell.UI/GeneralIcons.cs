@@ -61,13 +61,12 @@ public static class GeneralIcons
         g.Add(pen, Geometry.Parse("M5 55H25L37 20L55 82L67 44L75 55H95"));
     }));
 
-    /// <summary>A lifebuoy: help when something goes wrong.</summary>
-    private static readonly Lazy<IImage> Help = new(() => Draw(0xFF06AEFF, 0xFF6366F1, (pen, _, g) =>
+    /// <summary>A question mark, filling the box: help.</summary>
+    private static readonly Lazy<IImage> Help = new(() => Draw(0xFF06AEFF, 0xFF6366F1, (pen, fill, g) =>
     {
-        g.Add(pen, new EllipseGeometry(new Rect(6, 6, 88, 88)));
-        g.Add(pen, new EllipseGeometry(new Rect(31, 31, 38, 38)));
-        // Four bands between the rings, on the diagonals.
-        g.Add(pen, Geometry.Parse("M36.6 36.6L19.6 19.6M63.4 36.6L80.4 19.6M36.6 63.4L19.6 80.4M63.4 63.4L80.4 80.4"));
+        var thick = new Pen(pen.Brush, 14, lineCap: PenLineCap.Round, lineJoin: PenLineJoin.Round);
+        g.Add(thick, Geometry.Parse("M24 31A26 25 0 1 1 61 53C54 58 50 63 50 72"));
+        g.Fill(fill, new EllipseGeometry(new Rect(41, 83, 17, 17)));
     }));
 
     private sealed class Drawing(DrawingGroup group)
