@@ -1,0 +1,21 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- Every tool's own icon as an Avalonia image, for the pages that list tools (Home, General) on PC and in the Gallery.
+       The phone app has its own copies of the same builders in its tool projects, so it does not reference this. -->
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <SupportedOSPlatformVersion></SupportedOSPlatformVersion>
+    <PlatformTarget>AnyCPU</PlatformTarget>
+    <RootNamespace>Helm.ToolIcons</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Helm.Shell.UI\Helm.Shell.UI.csproj" />
+    <ProjectReference Include="..\Helm.Modules.Tracker.UI\Helm.Modules.Tracker.UI.csproj" />
+    <ProjectReference Include="..\Helm.Modules.Wallet.Core\Helm.Modules.Wallet.Core.csproj" />
+    <ProjectReference Include="..\Helm.Modules.Vault.UI\Helm.Modules.Vault.UI.csproj" />
+  </ItemGroup>
+
+  <Import Project="ToolIcons.props" />
+
+</Project>

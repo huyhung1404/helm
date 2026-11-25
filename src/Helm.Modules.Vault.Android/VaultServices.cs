@@ -20,6 +20,9 @@ public static class VaultServices
         services.AddSingleton<Helm.Core.Secrets.IVaultSecrets>(sp => new Helm.Modules.Vault.Items.VaultSecrets(
             sp.GetRequiredService<VaultSession>(), sp.GetRequiredService<Helm.Modules.Vault.Items.VaultStore>(),
             () => sp.GetRequiredService<IShellNavigation>().ShowPage(typeof(VaultContentPage))));
+        // Home lists a vault that has not been backed up.
+        services.AddSingleton<Helm.Core.Today.IHomeAlertSource>(sp => new VaultBackupAlertSource(
+            sp.GetRequiredService<VaultBackupService>(), () => sp.GetRequiredService<IShellNavigation>().ShowPage(typeof(VaultContentPage))));
         services.AddVaultCore();
         return services.AddAndroidModule<VaultModule, VaultContentPage>();
     }

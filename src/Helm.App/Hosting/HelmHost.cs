@@ -1,3 +1,4 @@
+using Helm.Shell.Windows;
 using Helm.Ai.Agents;
 using Helm.App.Services;
 using Helm.App.ViewModels;
@@ -115,14 +116,12 @@ internal static class HelmHost
         builder.Services.AddSingleton<MainWindowViewModel>();
         builder.Services.AddSingleton<MainWindow>();
         builder.Services.AddSingleton<TabsPage>();
-        builder.Services.AddSingleton<HomeViewModel>();
-        builder.Services.AddSingleton<HomePage>();
         builder.Services.AddSingleton<UpdatesViewModel>();
         builder.Services.AddSingleton<SyncViewModel>();
         builder.Services.AddSingleton<BackgroundActivitiesViewModel>();
         builder.Services.AddSingleton<SyncIndicatorViewModel>();
-        builder.Services.AddSingleton<GeneralViewModel>();
-        builder.Services.AddSingleton<GeneralPage>();
+        builder.Services.AddSingleton<Helm.Shell.Windows.IShellWindowsHost, ShellWindowsHost>();
+        builder.Services.AddShellWindows();
         builder.Services.AddSingleton<McpPermissionsViewModel>();
         builder.Services.AddSingleton<McpViewModel>();
         builder.Services.AddSingleton<Helm.Ai.AiKeysViewModel>();

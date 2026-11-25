@@ -41,6 +41,9 @@ public sealed record HomeAlertData(string Id, string Title, string Detail, strin
 /// <summary>One kind of alert on Home. Registered in DI; Home lists what every source has.</summary>
 public interface IHomeAlertSource
 {
+    /// <summary>The tool this alert is about; Home lists it only while that tool is on. Null: about Helm itself.</summary>
+    string? ModuleId => null;
+
     event EventHandler? Changed;
 
     IReadOnlyList<HomeAlertData> Current();

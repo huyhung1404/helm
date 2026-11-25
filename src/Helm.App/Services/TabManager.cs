@@ -1,3 +1,4 @@
+using Helm.Shell.Windows;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
@@ -301,6 +302,9 @@ internal sealed class TabManager(IServiceProvider services, MainWindowViewModel 
     {
         if (string.IsNullOrEmpty(name)) return null;
         if (name == LegacyMcpPage) return typeof(AiPage);
+        // Home and General moved to Helm.Shell.Windows: tabs saved before open the same pages.
+        if (name == "Helm.App.Views.Pages.HomePage") return typeof(HomePage);
+        if (name == "Helm.App.Views.Pages.GeneralPage") return typeof(GeneralPage);
         return Launchable().Select(l => l.PageType)
             .Concat(catalog.Groups.SelectMany(g => g.Modules).Select(m => m.SettingsPageType))
             .Concat([typeof(WhatsNewPage), typeof(BugReports.BugReportsPage)])

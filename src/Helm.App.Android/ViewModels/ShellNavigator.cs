@@ -27,7 +27,7 @@ public sealed partial class ShellTab(string key, object page, string title, Symb
 {
     public string Key { get; } = key;
 
-    /// <summary>The page's view model (<see cref="HomeViewModel"/>, <see cref="GeneralViewModel"/>, <see cref="Helm.Ai.AiFeaturesViewModel"/>, <see cref="ModulePage"/>).</summary>
+    /// <summary>The page's view model (<see cref="Helm.Home.HomeViewModel"/>, <see cref="Helm.General.GeneralViewModel"/>, <see cref="Helm.Ai.AiFeaturesViewModel"/>, <see cref="ModulePage"/>).</summary>
     public object Page { get; } = page;
 
     public string Title { get; } = title;
@@ -76,7 +76,7 @@ public sealed partial class ShellNavigator(IServiceProvider services, ISettingsS
 
     public string Title => ActiveTab?.Title ?? "Helm";
 
-    public bool IsHome => CurrentPage is HomeViewModel;
+    public bool IsHome => CurrentPage is Helm.Home.HomeViewModel;
 
     public void GoHome() => Open(Describe("home")!);
 
@@ -185,8 +185,8 @@ public sealed partial class ShellNavigator(IServiceProvider services, ISettingsS
     /// <summary>The tab of a page by its key, as <see cref="ShellTab.Key"/> names it; null for an unknown or removed tool.</summary>
     public ShellTab? Describe(string key)
     {
-        if (key == "home") return new ShellTab(key, services.GetRequiredService<HomeViewModel>(), "Home", Symbol.Home, null, null);
-        if (key == "general") return new ShellTab(key, services.GetRequiredService<GeneralViewModel>(), "General", Symbol.Settings, null, null);
+        if (key == "home") return new ShellTab(key, services.GetRequiredService<Helm.Home.HomeScreen>().Model, "Home", Symbol.Home, null, null);
+        if (key == "general") return new ShellTab(key, services.GetRequiredService<Helm.General.GeneralComposer>().Model, "General", Symbol.Settings, null, null);
         if (key == AiFeaturesKey) return new ShellTab(key, services.GetRequiredService<Helm.Ai.AiFeaturesViewModel>(), "AI features", Symbol.Sparkle, null, null);
         if (key == BugReports.AndroidBugReporter.PageKey)
             return new ShellTab(key, services.GetRequiredService<Helm.Shell.BugReports.BugReportsViewModel>(), Helm.Shell.BugReports.BugReportsServices.PageTitle, Symbol.Bug, null, null);

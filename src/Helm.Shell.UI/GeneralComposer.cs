@@ -1,18 +1,9 @@
 using Helm.Core.Settings;
 using Helm.Core.Sync;
+using Helm.Shell.Home;
 using Helm.Shell.ViewModels;
 
 namespace Helm.General;
-
-/// <summary>What only the platform can do in General: open folders, reset, and the rows that are its own (theme, startup, administrator mode).</summary>
-public interface IGeneralPlatform
-{
-    void OpenSettingsFolder();
-
-    void OpenLogs();
-
-    Task ResetAllAsync();
-}
 
 /// <summary>
 /// General, filled from Helm's real view models: <see cref="SyncViewModel"/>, <see cref="UpdatesViewModel"/> and
@@ -43,13 +34,16 @@ public sealed class GeneralComposer : IGeneralHost
         updates.PropertyChanged += (_, _) => MirrorUpdates();
         background.Items.CollectionChanged += (_, _) => MirrorJobs();
         Model.PropertyChanged += (_, e) => PushSettings(e.PropertyName);
+        platform.PropertyChanged += (_, _) => MirrorPlatform();
 
         MirrorSync();
         MirrorDevices();
         MirrorTargets();
         MirrorUpdates();
         MirrorJobs();
-        Model.SettingsFolder = "";
+        MirrorPlatform();
+        Model.SettingsFolder = platform.SettingsFolder;
+        Model.HasAiFeatures = platform.HasAiFeatures;
     }
 
     public GeneralViewModel Model { get; }
@@ -118,6 +112,17 @@ public sealed class GeneralComposer : IGeneralHost
         Model.Section("updates").NeedsAttention = _updates.HasError;
     }
 
+    private void MirrorPlatform()
+    {
+        Mirroring(() =>
+        {
+            Model.ThemeIndex = _platform.ThemeIndex;
+            Model.RunAtStartup = _platform.RunAtStartup;
+            Model.StartMinimized = _platform.StartMinimized;
+            Model.RunAsAdministrator = _platform.RunAsAdministrator;
+        });
+    }
+
     private void MirrorJobs()
     {
         Model.Jobs.Clear();
@@ -155,6 +160,15 @@ public sealed class GeneralComposer : IGeneralHost
                 break;
             case nameof(GeneralViewModel.InstallOnRestart):
                 _updates.AutoInstallOnRestart = Model.InstallOnRestart;
+                break;
+            case nameof(GeneralViewModel.ThemeIndex):
+                _platform.ThemeIndex = Model.ThemeIndex;
+                break;
+            case nameof(GeneralViewModel.RunAtStartup):
+                _platform.RunAtStartup = Model.RunAtStartup;
+                break;
+            case nameof(GeneralViewModel.StartMinimized):
+                _platform.StartMinimized = Model.StartMinimized;
                 break;
             case nameof(GeneralViewModel.DeleteSettingsOnUninstall):
                 _updates.PurgeDataOnUninstall = Model.DeleteSettingsOnUninstall;
@@ -194,6 +208,8 @@ public sealed class GeneralComposer : IGeneralHost
         else _updates.CheckCommand.Execute(null);
         return Task.CompletedTask;
     }
+
+    public void OpenAiFeatures() => _platform.OpenAiFeatures();
 
     public void OpenSettingsFolder() => _platform.OpenSettingsFolder();
 

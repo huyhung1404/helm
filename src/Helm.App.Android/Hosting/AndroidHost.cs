@@ -71,8 +71,25 @@ internal static class AndroidHost
         services.AddSingleton<SyncViewModel>();
         services.AddSingleton<BackgroundActivitiesViewModel>();
         services.AddSingleton<SyncIndicatorViewModel>();
-        services.AddSingleton<HomeViewModel>();
-        services.AddSingleton<GeneralViewModel>();
+        // Home and General are the shared pages (Helm.Shell.UI), filled from the tools and from the view models above.
+        services.AddSingleton<Helm.Home.IToolIcons, AndroidToolIcons>();
+        services.AddSingleton(sp => new Helm.Home.ShellTools(sp.GetRequiredService<IModuleHost<IAndroidModule>>().Modules, sp.GetRequiredService<Helm.Home.IToolIcons>()));
+        services.AddSingleton<Helm.Shell.Home.IHomeLinks, AndroidHomeLinks>();
+        services.AddSingleton<Helm.Shell.Home.IGeneralPlatform, AndroidGeneralPlatform>();
+        services.AddSingleton<Helm.Core.Today.IHomeAlertSource>(sp => new Helm.Shell.Home.UpdateAlertSource(sp.GetRequiredService<IUpdateService>(), sp.GetRequiredService<Helm.Shell.Home.IHomeLinks>()));
+        services.AddSingleton<Helm.Core.Today.IHomeAlertSource>(sp => new Helm.Shell.Home.SyncAlertSource(sp.GetRequiredService<Helm.Core.Sync.SyncEngine>(), sp.GetRequiredService<Helm.Shell.Home.IHomeLinks>()));
+        services.AddSingleton(sp => new Helm.Home.HomeScreen(
+            sp.GetRequiredService<Helm.Home.ShellTools>(), sp.GetRequiredService<Helm.Home.IToolIcons>(), sp.GetServices<Helm.Core.Today.ITodaySource>(),
+            sp.GetServices<Helm.Core.Today.IHomeAlertSource>(), sp.GetServices<Helm.Core.Capture.ICaptureTarget>(), sp.GetRequiredService<Helm.Shell.Home.IHomeLinks>(),
+            sp.GetRequiredService<IUiDispatcher>(), sp.GetService<Helm.Core.Sync.SyncEngine>()));
+        services.AddSingleton(sp =>
+        {
+            var composer = new Helm.General.GeneralComposer(
+                sp.GetRequiredService<SyncViewModel>(), sp.GetRequiredService<UpdatesViewModel>(), sp.GetRequiredService<BackgroundActivitiesViewModel>(),
+                sp.GetRequiredService<Helm.Shell.Home.IGeneralPlatform>(), $"v{AppInfo.Version}", isDesktop: false);
+            composer.Model.SetTools(sp.GetRequiredService<Helm.Home.ShellTools>().All);
+            return composer;
+        });
         services.AddSingleton<MainViewModel>();
 
         // Bug reports: the black box, the synced bugs, their page and the report page (the app bar, a shake, the tile).

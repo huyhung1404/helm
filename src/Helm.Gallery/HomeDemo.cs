@@ -24,8 +24,8 @@ internal static class HomeDemo
         Tool("notes", "Notes", "Planning"),
         Tool("quick-capture", "Quick Capture", "Planning"),
         Tool("tracker", "Tracker", "Planning"),
-        Tool("slack", "Slack Bot", "Planning", on: false),
-        Tool("weekly", "Weekly Report", "Planning", on: false),
+        Tool("slackbot", "Slack Bot", "Planning", on: false),
+        Tool("weekly-report", "Weekly Report", "Planning", on: false),
         Tool("novel-reader", "Novel Reader", "Money & Media"),
         Tool("scratch", "Scratch", "Money & Media"),
         Tool("vocab", "Vocabulary", "Money & Media"),
@@ -39,11 +39,11 @@ internal static class HomeDemo
     ];
 
     private static HomeTool Tool(string id, string name, string group, bool on = true) =>
-        new(id, name, group, Symbol.Apps, ToolIcons.For(id), on);
+        new(id, name, group, Symbol.Apps, Helm.ToolIcons.ToolIcons.Of(id), on);
 
     public static Control Home(HomeStage stage)
     {
-        var vm = new HomeViewModel(new Host(), "v0.88.0") { SyncLine = "synced 2 minutes ago", CaptureIcon = ToolIcons.For("quick-capture") };
+        var vm = new HomeViewModel(new Host(), "v0.88.0") { SyncLine = "synced 2 minutes ago", CaptureIcon = Helm.ToolIcons.ToolIcons.Of("quick-capture") };
         if (stage == HomeStage.AllClear) return new HomeView(vm);
 
         var tools = AllTools().ToDictionary(t => t.Id);
@@ -130,6 +130,8 @@ internal static class HomeDemo
         public Task TurnOffSyncAsync() => Task.CompletedTask;
 
         public Task UpdateAsync() => Task.CompletedTask;
+
+        public void OpenAiFeatures() { }
 
         public void OpenSettingsFolder() { }
 

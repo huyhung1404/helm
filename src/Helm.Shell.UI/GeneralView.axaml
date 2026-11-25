@@ -261,7 +261,7 @@
                                 <StackPanel Spacing="12">
                                     <TextBlock Classes="head" Text="On this PC" />
                                     <DockPanel>
-                                        <ToggleSwitch DockPanel.Dock="Right" IsChecked="{Binding RunAsAdministrator}" OnContent="" OffContent="" AutomationProperties.Name="Administrator mode" />
+                                        <ToggleSwitch DockPanel.Dock="Right" IsChecked="{Binding RunAsAdministrator, Mode=OneWay}" IsEnabled="False" OnContent="" OffContent="" AutomationProperties.Name="Administrator mode" />
                                         <StackPanel VerticalAlignment="Center">
                                             <TextBlock Text="Administrator mode" />
                                             <TextBlock Classes="secondary" TextWrapping="Wrap" Text="Lets shortcuts and window tools work over apps that run as administrator." />
@@ -343,16 +343,29 @@
 
                         <!-- HELP & TROUBLESHOOTING -->
                         <StackPanel Spacing="14" IsVisible="{Binding IsHelp}" core:Motion.EnterOnShow="True">
+                            <Border Classes="glass" IsVisible="{Binding HasAiFeatures}">
+                                <StackPanel Spacing="10">
+                                    <StackPanel Spacing="2">
+                                        <TextBlock Classes="head" Text="AI features" />
+                                        <TextBlock Classes="secondary" TextWrapping="Wrap" Text="On or off, where each one runs, its model and daily cap. The same settings as on the PC." />
+                                    </StackPanel>
+                                    <Button Classes="ghost" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Content="Open AI features" Command="{Binding OpenAiFeaturesCommand}" />
+                                </StackPanel>
+                            </Border>
                             <Border Classes="glass">
                                 <StackPanel Spacing="12">
-                                    <StackPanel Spacing="2">
+                                    <StackPanel Spacing="2" IsVisible="{Binding HasSettingsFolder}">
                                         <TextBlock Classes="head" Text="Settings folder" />
                                         <TextBlock Classes="secondary" Text="{Binding SettingsFolder}" TextTrimming="CharacterEllipsis" />
                                     </StackPanel>
-                                    <Grid ColumnDefinitions="*,*" ColumnSpacing="8">
-                                        <Button Classes="ghost" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Content="Open the folder" Command="{Binding OpenSettingsFolderCommand}" />
-                                        <Button Grid.Column="1" Classes="ghost" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Content="Open the logs" Command="{Binding OpenLogsCommand}" />
-                                    </Grid>
+                                    <StackPanel Spacing="2" IsVisible="{Binding !HasSettingsFolder}">
+                                        <TextBlock Classes="head" Text="Logs" />
+                                        <TextBlock Classes="secondary" TextWrapping="Wrap" Text="Daily log files, kept for 14 days. Share the latest one to send it to yourself." />
+                                    </StackPanel>
+                                    <StackPanel Spacing="8">
+                                        <Button Classes="ghost" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Content="Open the folder" Command="{Binding OpenSettingsFolderCommand}" IsVisible="{Binding HasSettingsFolder}" />
+                                        <Button Classes="ghost" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Content="{Binding LogsText}" Command="{Binding OpenLogsCommand}" />
+                                    </StackPanel>
                                 </StackPanel>
                             </Border>
                             <Border Classes="glass">

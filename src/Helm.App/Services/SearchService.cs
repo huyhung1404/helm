@@ -1,3 +1,4 @@
+using Helm.Shell.Windows;
 using System.Windows;
 using System.Windows.Controls;
 using Helm.App.Views.Pages;
@@ -67,7 +68,6 @@ internal sealed class SearchService(IServiceProvider services, IModuleHost modul
             new("Home", "Helm", typeof(HomePage), null, 0),
             new("General", "Helm", typeof(GeneralPage), null, 1),
         };
-        AddCards(results, typeof(GeneralPage), "General");
 
         foreach (var module in modules.Modules)
         {

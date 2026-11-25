@@ -186,6 +186,8 @@ public sealed partial class MainViewModel : ObservableObject
             Navigator.Close(featuresTab);
             return true;
         }
+        // General on a phone: a part goes back to the list of parts.
+        if (Navigator.ActiveTab is { View: Helm.General.GeneralView general } && general.HandleBack()) return true;
         if (!Navigator.IsHome)
         {
             Navigator.GoHome();

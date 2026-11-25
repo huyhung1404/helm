@@ -31,6 +31,7 @@
     <ProjectReference Include="..\..\src\Helm.Modules.Tracker.UI\Helm.Modules.Tracker.UI.csproj" />
     <ProjectReference Include="..\..\src\Helm.Modules.Vault.UI\Helm.Modules.Vault.UI.csproj" />
     <ProjectReference Include="..\..\src\Helm.Shell.UI\Helm.Shell.UI.csproj" />
+    <ProjectReference Include="..\..\src\Helm.ToolIcons\Helm.ToolIcons.csproj" />
   </ItemGroup>
 
   <!-- The Gallery's in-memory stand-ins, so a page runs with its real view model here too. -->
@@ -39,7 +40,5 @@
     <Compile Include="..\..\src\Helm.Gallery\VaultDemo.cs" Link="VaultDemo.cs" />
     <Compile Include="..\..\src\Helm.Gallery\HomeDemo.cs" Link="HomeDemo.cs" />
   </ItemGroup>
-
-  <Import Project="..\..\src\Helm.Gallery\ToolIcons.props" />
 
 </Project>

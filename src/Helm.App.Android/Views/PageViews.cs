@@ -16,8 +16,8 @@ internal static class PageViews
     {
         Control page = tab.Page switch
         {
-            HomeViewModel => new HomeView(),
-            GeneralViewModel => new GeneralView(),
+            Helm.Home.HomeViewModel home => new Helm.Home.HomeView(home),
+            Helm.General.GeneralViewModel general => new Helm.General.GeneralView(general),
             Helm.Ai.AiFeaturesViewModel => new AiFeaturesView(),
             Helm.Shell.BugReports.BugReportsViewModel => new BugReports.BugReportsView(),
             Helm.Shell.BugReports.BugReportFormViewModel => new BugReports.BugReportView(),
@@ -26,7 +26,8 @@ internal static class PageViews
         };
         // As the shell's content control did: a page that does not set its own data context gets its view model.
         if (page.DataContext is null) page.DataContext = tab.Page;
-        if (IsFull(tab)) return page;
+        // Home and General lay themselves out (their own scrolling and margins), under the app bar.
+        if (IsFull(tab) || tab.Page is Helm.Home.HomeViewModel or Helm.General.GeneralViewModel) return page;
         return new ScrollViewer
         {
             HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled,

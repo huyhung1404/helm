@@ -40,6 +40,7 @@ public sealed class HomeComposer : IDisposable
     {
         if (_disposed) return;
         _home.SetAlerts(_alerts
+            .Where(source => source.ModuleId is not { } id || !_tools.TryGetValue(id, out var tool) || tool.IsEnabled)
             .SelectMany(source => source.Current().Select(a => (Alert: a, Source: source)))
             .OrderBy(x => x.Alert.Order)
             .Select(x => new HomeAlert(x.Alert.Title, x.Alert.Detail, x.Alert.ActionText, () => x.Source.Act(x.Alert.Id))));

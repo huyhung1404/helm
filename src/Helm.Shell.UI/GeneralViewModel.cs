@@ -79,6 +79,8 @@ public interface IGeneralHost
 
     Task UpdateAsync();
 
+    void OpenAiFeatures();
+
     void OpenSettingsFolder();
 
     void OpenLogs();
@@ -183,6 +185,12 @@ public sealed partial class GeneralViewModel : ObservableObject
     public IReadOnlyList<string> Themes { get; } = ["Same as the system", "Light", "Dark"];
 
     public string SettingsFolder { get; set; } = "";
+
+    /// <summary>A desktop has a folder to open; a phone shares its latest log instead.</summary>
+    public bool HasSettingsFolder => SettingsFolder.Length > 0;
+
+    public string LogsText => HasSettingsFolder ? "Open the logs" : "Share the latest log";
+
 
     public bool IsTools => Selected.Id == "tools";
 
@@ -296,6 +304,12 @@ public sealed partial class GeneralViewModel : ObservableObject
 
     [RelayCommand]
     private Task UpdateAsync() => _host.UpdateAsync();
+
+    /// <summary>The phone's page of AI feature settings is offered in Help.</summary>
+    public bool HasAiFeatures { get; set; }
+
+    [RelayCommand]
+    private void OpenAiFeatures() => _host.OpenAiFeatures();
 
     [RelayCommand]
     private void OpenSettingsFolder() => _host.OpenSettingsFolder();

@@ -28,7 +28,6 @@
     <Compile Include="$(MSBuildThisFileDirectory)..\Helm.Modules.Vocab.Android\VocabIcon.cs" Link="ToolIcons\VocabIcon.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)..\Helm.Modules.Wallet.Android\WalletIcon.cs" Link="ToolIcons\WalletIcon.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)..\Helm.Modules.Workspace.Android\WorkspaceIcon.cs" Link="ToolIcons\WorkspaceIcon.cs" />
-    <Compile Include="$(MSBuildThisFileDirectory)ToolIcons.cs" Link="ToolIcons\ToolIcons.cs" Condition="'$(MSBuildProjectName)' != 'Helm.Gallery'" />
   </ItemGroup>
 
 </Project>

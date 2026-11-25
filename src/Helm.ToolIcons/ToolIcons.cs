@@ -6,15 +6,15 @@ using Helm.Modules.SlackBot;
 using Helm.Modules.WeeklyReport;
 using Helm.Modules.WindowZones;
 
-namespace Helm.Gallery;
+namespace Helm.ToolIcons;
 
 /// <summary>
 /// Each tool's own icon, as Helm draws it. The phone app's Avalonia builders are linked in (see the .csproj); the
 /// Windows-only tools have WPF builders only, so their same shapes are drawn here the same way.
 /// </summary>
-internal static class ToolIcons
+public sealed class ToolIcons : Helm.Home.IToolIcons
 {
-    public static IImage? For(string id) => id switch
+    public static IImage? Of(string id) => id switch
     {
         "habits" => Helm.Modules.Habits.HabitsIcon.Image,
         "missions" => Helm.Modules.Missions.MissionsIcon.Image,
@@ -31,10 +31,12 @@ internal static class ToolIcons
         "keyboard" => Keyboard.Value,
         "window-zones" => WindowZones.Value,
         "shortcut-guide" => ShortcutGuide.Value,
-        "slack" => SlackBot.Value,
-        "weekly" => WeeklyReport.Value,
+        "slackbot" => SlackBot.Value,
+        "weekly-report" => WeeklyReport.Value,
         _ => null,
     };
+
+    public IImage? For(string moduleId) => Of(moduleId);
 
     private static readonly Lazy<IImage> Keyboard = new(() =>
     {

@@ -1,3 +1,4 @@
+using Helm.Shell.Windows;
 using System.ComponentModel;
 using System.Windows;
 using Helm.App.Services;
@@ -42,7 +43,7 @@ internal partial class MainWindow : FluentWindow
 
         // The sync button, and quicker pulls while the window is shown so other devices' changes show up within seconds.
         var sync = services.GetRequiredService<Helm.Shell.ViewModels.SyncIndicatorViewModel>();
-        sync.OpenSettings = () => navigator.NavigateToCard(typeof(Pages.GeneralPage), "Sync");
+        sync.OpenSettings = () => services.GetRequiredService<Helm.Shell.Home.IHomeLinks>().OpenGeneral("sync");
         SyncButton.DataContext = sync;
         var engine = services.GetRequiredService<Core.Sync.SyncEngine>();
         IsVisibleChanged += (_, e) => engine.SetPollInterval(e.NewValue is true ? Core.Sync.SyncEngine.ForegroundPollInterval : Core.Sync.SyncEngine.BackgroundPollInterval);
