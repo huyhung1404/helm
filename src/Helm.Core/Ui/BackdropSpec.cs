@@ -12,11 +12,13 @@ public static class BackdropSpec
 
     public readonly record struct Look(uint Top, uint Bottom, Glow Blue, Glow Teal);
 
-    public static Look Dark { get; } = new(0xFF222734, 0xFF13151B,
-        new Glow(0x590A7CF2, 0.15, 0.0, 0.75), new Glow(0x4000CFC0, 0.88, 1.0, 0.7));
+    // The Helm icon is mostly its dark graphite tile, colour only in the two bars: the same here. Graphite, with the
+    // blue and teal as faint glows (about a third as strong as a first try that tinted the whole window blue).
+    public static Look Dark { get; } = new(0xFF1D2027, 0xFF121419,
+        new Glow(0x1F0A7CF2, 0.15, 0.0, 0.75), new Glow(0x2600CFC0, 0.88, 1.0, 0.7));
 
-    public static Look Light { get; } = new(0xFFF5F8FC, 0xFFE4EBF4,
-        new Glow(0x5C06AEFF, 0.15, 0.0, 0.75), new Glow(0x4A00CFC0, 0.88, 1.0, 0.7));
+    public static Look Light { get; } = new(0xFFF7F8FA, 0xFFECEFF3,
+        new Glow(0x2606AEFF, 0.15, 0.0, 0.75), new Glow(0x2E00CFC0, 0.88, 1.0, 0.7));
 
     /// <summary>How far the glows are from where they rest at <paramref name="milliseconds"/> (any shared clock), in px.</summary>
     public static (double BlueX, double BlueY, double TealX, double TealY) Drift(long milliseconds)

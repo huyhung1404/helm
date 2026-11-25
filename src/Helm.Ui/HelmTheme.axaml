@@ -25,8 +25,8 @@
                     <SolidColorBrush x:Key="HelmGlass" Color="#B8FFFFFF" />
                     <SolidColorBrush x:Key="HelmGlassHover" Color="#EBFFFFFF" />
                     <SolidColorBrush x:Key="HelmGlassStroke" Color="#1F1C2A40" />
-                    <SolidColorBrush x:Key="HelmGlassStrokeStrong" Color="#CC0A84D8" />
-                    <SolidColorBrush x:Key="HelmEyebrow" Color="#0A6FC2" />
+                    <SolidColorBrush x:Key="HelmGlassStrokeStrong" Color="#B30E9688" />
+                    <SolidColorBrush x:Key="HelmEyebrow" Color="#0B7F74" />
                     <SolidColorBrush x:Key="HelmPillBackground" Color="#1C1F28" />
                     <SolidColorBrush x:Key="HelmPillForeground" Color="#FFFFFF" />
                     <BoxShadows x:Key="HelmGlassShadow">0 6 18 0 #141C2A40</BoxShadows>
@@ -47,8 +47,8 @@
                     <SolidColorBrush x:Key="HelmGlass" Color="#0FFFFFFF" />
                     <SolidColorBrush x:Key="HelmGlassHover" Color="#1AFFFFFF" />
                     <SolidColorBrush x:Key="HelmGlassStroke" Color="#1CFFFFFF" />
-                    <SolidColorBrush x:Key="HelmGlassStrokeStrong" Color="#B300C2D4" />
-                    <SolidColorBrush x:Key="HelmEyebrow" Color="#3FCBE4" />
+                    <SolidColorBrush x:Key="HelmGlassStrokeStrong" Color="#9900C9B5" />
+                    <SolidColorBrush x:Key="HelmEyebrow" Color="#2FD3C1" />
                     <SolidColorBrush x:Key="HelmPillBackground" Color="#F5F8FC" />
                     <SolidColorBrush x:Key="HelmPillForeground" Color="#161A22" />
                     <BoxShadows x:Key="HelmGlassShadow">0 8 24 0 #4D000000</BoxShadows>
