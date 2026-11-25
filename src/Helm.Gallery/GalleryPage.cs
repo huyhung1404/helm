@@ -21,6 +21,11 @@ internal sealed record GalleryPage(string Group, string Name, string Title, Func
     [
         new("Tracker", "With tasks", "Tracker", m => Tracker(m, seed: true), Framed: false),
         new("Tracker", "First run", "Tracker", m => Tracker(m, seed: false), Framed: false),
+        new("Vault", "Unlocked", "Vault", m => VaultDemo.Create(m, VaultStage.Items), Framed: false),
+        new("Vault", "Locked", "Vault", m => VaultDemo.Create(m, VaultStage.Locked), Framed: false),
+        new("Vault", "First run", "Vault", m => VaultDemo.Create(m, VaultStage.Setup), Framed: false),
+        new("Vault", "Emergency Kit", "Vault", m => VaultDemo.Create(m, VaultStage.Kit), Framed: false),
+        new("Vault", "Empty", "Vault", m => VaultDemo.Create(m, VaultStage.Empty), Framed: false),
         new("Base", "Controls", "Controls", _ => new ControlsPage()),
     ];
 

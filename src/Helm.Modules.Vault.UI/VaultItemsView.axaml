@@ -1,0 +1,213 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:ic="using:FluentIcons.Avalonia"
+             xmlns:vm="using:Helm.Modules.Vault.ViewModels"
+             xmlns:items="using:Helm.Modules.Vault.Items"
+             xmlns:core="using:Helm.Core.Ui"
+             xmlns:local="using:Helm.Modules.Vault.Ui"
+             x:Class="Helm.Modules.Vault.Ui.VaultItemsView"
+             x:DataType="vm:ItemsViewModel">
+
+    <!-- The unlocked vault, top to bottom: which part (sections) → find or add → the items. Wide: the items on the left
+         and the open item beside them. Phone: the open item takes the list's place (Back returns). -->
+    <UserControl.Styles>
+        <Style Selector="Border.tile">
+            <Setter Property="CornerRadius" Value="10" />
+            <Setter Property="Background" Value="{DynamicResource HelmGlassHover}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource HelmGlassStroke}" />
+            <Setter Property="BorderThickness" Value="1" />
+        </Style>
+        <Style Selector="Button.section">
+            <Setter Property="MinHeight" Value="40" />
+            <Setter Property="Padding" Value="14,0" />
+            <Setter Property="VerticalContentAlignment" Value="Center" />
+        </Style>
+        <Style Selector="Button.section TextBlock.count">
+            <Setter Property="Foreground" Value="{DynamicResource HelmSecondaryText}" />
+            <Setter Property="FontSize" Value="12" />
+        </Style>
+        <Style Selector="Border.glass.selected">
+            <Setter Property="BorderBrush" Value="{DynamicResource HelmGlassStrokeStrong}" />
+        </Style>
+    </UserControl.Styles>
+
+    <Grid RowDefinitions="Auto,*">
+        <!-- 1. Which part: sections, then tags, then the trash; swipe sideways -->
+        <ScrollViewer Grid.Row="0" HorizontalScrollBarVisibility="Hidden" VerticalScrollBarVisibility="Disabled" Margin="0,0,0,12">
+            <StackPanel Orientation="Horizontal" Spacing="8" Margin="0,0,0,2">
+                <ItemsControl ItemsSource="{Binding Sections}">
+                    <ItemsControl.ItemsPanel>
+                        <ItemsPanelTemplate><StackPanel Orientation="Horizontal" Spacing="8" /></ItemsPanelTemplate>
+                    </ItemsControl.ItemsPanel>
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate x:DataType="vm:VaultSection">
+                            <Button Classes="chip section" Classes.selected="{Binding IsSelected}" AutomationProperties.Name="{Binding Label}"
+                                    Command="{Binding $parent[UserControl].((vm:ItemsViewModel)DataContext).ShowSectionCommand}" CommandParameter="{Binding}">
+                                <StackPanel Orientation="Horizontal" Spacing="7">
+                                    <ic:SymbolIcon Symbol="{Binding Kind, Converter={x:Static local:SectionIcon.Converter}}" FontSize="16" />
+                                    <TextBlock Text="{Binding Label}" VerticalAlignment="Center" />
+                                    <TextBlock Classes="count" Text="{Binding Count}" VerticalAlignment="Center" />
+                                </StackPanel>
+                            </Button>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+                <ItemsControl ItemsSource="{Binding TagSections}">
+                    <ItemsControl.ItemsPanel>
+                        <ItemsPanelTemplate><StackPanel Orientation="Horizontal" Spacing="8" /></ItemsPanelTemplate>
+                    </ItemsControl.ItemsPanel>
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate x:DataType="vm:VaultSection">
+                            <Button Classes="chip section" Classes.selected="{Binding IsSelected}" AutomationProperties.Name="{Binding Label}"
+                                    Command="{Binding $parent[UserControl].((vm:ItemsViewModel)DataContext).ShowSectionCommand}" CommandParameter="{Binding}">
+                                <StackPanel Orientation="Horizontal" Spacing="7">
+                                    <ic:SymbolIcon Symbol="Tag" FontSize="16" />
+                                    <TextBlock Text="{Binding Label}" VerticalAlignment="Center" />
+                                    <TextBlock Classes="count" Text="{Binding Count}" VerticalAlignment="Center" />
+                                </StackPanel>
+                            </Button>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+                <Button Classes="chip section" Classes.selected="{Binding TrashSection.IsSelected}" AutomationProperties.Name="Trash"
+                        Command="{Binding ShowSectionCommand}" CommandParameter="{Binding TrashSection}">
+                    <StackPanel Orientation="Horizontal" Spacing="7">
+                        <ic:SymbolIcon Symbol="Delete" FontSize="16" />
+                        <TextBlock Text="Trash" VerticalAlignment="Center" />
+                        <TextBlock Classes="count" Text="{Binding TrashSection.Count}" VerticalAlignment="Center" />
+                    </StackPanel>
+                </Button>
+            </StackPanel>
+        </ScrollViewer>
+
+        <Grid Grid.Row="1" x:Name="Panes" ColumnDefinitions="380,*" ColumnSpacing="20">
+            <!-- 2. Find or add, 3. the items -->
+            <!-- The search bar stays on top (solid, so the items slide under it, not into a gap) -->
+            <Panel x:Name="ListPane">
+                <ScrollViewer HorizontalScrollBarVisibility="Disabled" Padding="0,64,14,14" core:ScrollFade.Enabled="True">
+                    <StackPanel>
+                        <!-- Nothing here: say what to do, and point at it -->
+                        <Border Classes="glass" Padding="24,22" IsVisible="{Binding IsEmpty}" core:Motion.EnterOnShow="True">
+                            <StackPanel Spacing="10" HorizontalAlignment="Center">
+                                <ic:SymbolIcon Symbol="ArrowUp" FontSize="18" Foreground="{DynamicResource HelmEyebrow}" HorizontalAlignment="Center" />
+                                <TextBlock Classes="muted" FontSize="14" HorizontalAlignment="Center" TextAlignment="Center" Text="{Binding EmptyText}" />
+                                <Button Classes="ghost" HorizontalAlignment="Center" Content="Search all items"
+                                        Command="{Binding SearchEverywhereCommand}" IsVisible="{Binding CanSearchEverywhere}" />
+                            </StackPanel>
+                        </Border>
+                        <ItemsControl ItemsSource="{Binding Cards}" AutomationProperties.Name="Items">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate x:DataType="vm:VaultCardViewModel">
+                                    <Border Classes="glass lift fade" Classes.selected="{Binding IsSelected}" Padding="12,8,8,8" Margin="0,0,0,8">
+                                        <Grid ColumnDefinitions="*,Auto">
+                                            <Button Classes="rowhit" Padding="0" Margin="0" HorizontalContentAlignment="Stretch"
+                                                    Command="{Binding $parent[UserControl].((vm:ItemsViewModel)DataContext).OpenCommand}" CommandParameter="{Binding}"
+                                                    AutomationProperties.Name="{Binding Title}">
+                                                <Grid ColumnDefinitions="Auto,*,Auto">
+                                                    <!-- Its picture; else a login's first letter on a colour, or the kind's symbol -->
+                                                    <Panel Width="42" Height="42" Margin="0,0,12,0" VerticalAlignment="Center">
+                                                        <Border CornerRadius="10" Background="{Binding AvatarColor, Converter={x:Static local:HexBrush.Converter}}">
+                                                            <Border.IsVisible>
+                                                                <MultiBinding Converter="{x:Static BoolConverters.And}">
+                                                                    <Binding Path="!HasIcon" />
+                                                                    <Binding Path="IsLogin" />
+                                                                </MultiBinding>
+                                                            </Border.IsVisible>
+                                                            <TextBlock Text="{Binding Initial}" Foreground="White" FontSize="17" FontWeight="SemiBold"
+                                                                       HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                                        </Border>
+                                                        <Border Classes="tile">
+                                                            <Border.IsVisible>
+                                                                <MultiBinding Converter="{x:Static BoolConverters.And}">
+                                                                    <Binding Path="!HasIcon" />
+                                                                    <Binding Path="!IsLogin" />
+                                                                </MultiBinding>
+                                                            </Border.IsVisible>
+                                                            <ic:SymbolIcon Symbol="{Binding Kind, Converter={x:Static local:KindIcon.Converter}}" FontSize="20"
+                                                                           Foreground="{DynamicResource HelmEyebrow}" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                                        </Border>
+                                                        <Border CornerRadius="10" ClipToBounds="True" IsVisible="{Binding HasIcon}">
+                                                            <Image Source="{Binding Icon, Converter={x:Static local:IconBitmap.Converter}}" Stretch="UniformToFill" />
+                                                        </Border>
+                                                    </Panel>
+                                                    <StackPanel Grid.Column="1" VerticalAlignment="Center" Spacing="1">
+                                                        <StackPanel Orientation="Horizontal" Spacing="6">
+                                                            <TextBlock Text="{Binding Title}" FontSize="15" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+                                                            <ic:SymbolIcon Symbol="Warning" FontSize="14" Foreground="{DynamicResource HelmDanger}" IsVisible="{Binding HasConflict}" />
+                                                        </StackPanel>
+                                                        <TextBlock Classes="muted" Text="{Binding Subtitle}" TextWrapping="NoWrap" TextTrimming="CharacterEllipsis" />
+                                                    </StackPanel>
+                                                    <!-- The one-time code now, and how long it lasts -->
+                                                    <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="6" VerticalAlignment="Center" Margin="8,0,4,0" IsVisible="{Binding HasTotp}">
+                                                        <TextBlock Text="{Binding TotpCode}" FontFamily="monospace" FontSize="13" FontWeight="SemiBold" VerticalAlignment="Center"
+                                                                   Foreground="{DynamicResource HelmSecondaryText}" />
+                                                        <local:TotpRing Width="16" Height="16" Percent="{Binding TotpProgress}" VerticalAlignment="Center"
+                                                                        Stroke="{DynamicResource HelmEyebrow}" Track="{DynamicResource HelmGlassStroke}" />
+                                                    </StackPanel>
+                                                </Grid>
+                                            </Button>
+                                            <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="6" VerticalAlignment="Center" Margin="6,0,0,0">
+                                                <ic:SymbolIcon Symbol="Star" IconVariant="Filled" FontSize="15" Foreground="{DynamicResource HelmEyebrow}"
+                                                               IsVisible="{Binding Favorite}" VerticalAlignment="Center" />
+                                                <!-- Do: copy the password (or token) without opening the item -->
+                                                <Button Classes="chip" Classes.selected="{Binding IsCopied}" Width="40" Padding="0" IsVisible="{Binding CanCopySecret}"
+                                                        Command="{Binding CopyCommand}" ToolTip.Tip="{Binding CopyLabel}" AutomationProperties.Name="{Binding CopyLabel}">
+                                                    <Panel>
+                                                        <ic:SymbolIcon Symbol="Copy" FontSize="16" IsVisible="{Binding !IsCopied}" />
+                                                        <ic:SymbolIcon Symbol="Checkmark" FontSize="16" Foreground="{DynamicResource HelmSuccess}" IsVisible="{Binding IsCopied}" />
+                                                    </Panel>
+                                                </Button>
+                                            </StackPanel>
+                                        </Grid>
+                                    </Border>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                        <TextBlock Classes="muted" Margin="4,4,4,8" IsVisible="{Binding HasUnreadable}"
+                                   Text="{Binding UnreadableCount, StringFormat='{}{0} records cannot be opened with this vault key; they are kept, not deleted.'}" />
+                    </StackPanel>
+                </ScrollViewer>
+                <Border x:Name="SearchBar" Classes="glass" Padding="14,6,6,6" VerticalAlignment="Top" Background="{DynamicResource HelmSheetBackground}">
+                    <Grid ColumnDefinitions="Auto,*,Auto">
+                        <ic:SymbolIcon Symbol="Search" FontSize="16" Foreground="{DynamicResource HelmSecondaryText}" VerticalAlignment="Center" Margin="0,0,8,0" />
+                        <TextBox x:Name="SearchBox" Grid.Column="1" Classes="bare" PlaceholderText="Search the vault" Text="{Binding Search}"
+                                 VerticalAlignment="Center" AutomationProperties.Name="Search" />
+                        <Button Grid.Column="2" Classes="pill" Width="40" Height="40" MinHeight="40" Padding="0" VerticalAlignment="Center"
+                                Command="{Binding NewCommand}" CommandParameter="{x:Static items:VaultItemKind.Login}"
+                                ToolTip.Tip="New item" AutomationProperties.Name="New item">
+                            <ic:SymbolIcon Symbol="Add" FontSize="18" Foreground="{DynamicResource HelmPillForeground}" />
+                        </Button>
+                    </Grid>
+                </Border>
+            </Panel>
+
+            <!-- The open item (a phone: in place of the list, with Back) -->
+            <Grid x:Name="DetailPane" Grid.Column="1" RowDefinitions="Auto,*">
+                <Button x:Name="BackButton" Classes="ghost" HorizontalAlignment="Left" Margin="0,0,0,10" IsVisible="False"
+                        Command="{Binding CloseDetailCommand}" AutomationProperties.Name="Back to the list">
+                    <StackPanel Orientation="Horizontal" Spacing="6">
+                        <ic:SymbolIcon Symbol="ArrowLeft" FontSize="16" />
+                        <TextBlock Text="Back" VerticalAlignment="Center" />
+                    </StackPanel>
+                </Button>
+                <ScrollViewer Grid.Row="1" HorizontalScrollBarVisibility="Disabled" Padding="0,0,14,14" core:ScrollFade.Enabled="True">
+                    <Panel>
+                        <ContentControl Content="{Binding Detail}" IsVisible="{Binding Detail, Converter={x:Static ObjectConverters.IsNotNull}}" core:Motion.EnterOnShow="True">
+                            <ContentControl.ContentTemplate>
+                                <DataTemplate x:DataType="vm:ItemDetailViewModel">
+                                    <local:VaultItemView />
+                                </DataTemplate>
+                            </ContentControl.ContentTemplate>
+                        </ContentControl>
+                        <Border x:Name="NoDetail" Classes="glass" Padding="24,28" IsVisible="{Binding Detail, Converter={x:Static ObjectConverters.IsNull}}">
+                            <StackPanel Spacing="8" HorizontalAlignment="Center">
+                                <ic:SymbolIcon Symbol="LockClosed" FontSize="22" Foreground="{DynamicResource HelmEyebrow}" HorizontalAlignment="Center" />
+                                <TextBlock Classes="muted" FontSize="14" TextAlignment="Center" Text="Pick an item to see it here." />
+                            </StackPanel>
+                        </Border>
+                    </Panel>
+                </ScrollViewer>
+            </Grid>
+        </Grid>
+    </Grid>
+</UserControl>

@@ -30,7 +30,10 @@
                     <SolidColorBrush x:Key="HelmEyebrow" Color="#0B7F74" />
                     <SolidColorBrush x:Key="HelmPillBackground" Color="#1C1F28" />
                     <SolidColorBrush x:Key="HelmPillForeground" Color="#FFFFFF" />
-                    <BoxShadows x:Key="HelmGlassShadow">0 6 18 0 #141C2A40</BoxShadows>
+                    <!-- Stacked cards: a tight contact shadow, a short soft one under the bottom edge (negative spread keeps it out of the gap
+                         between cards) and a thin light edge on top: they sit on the page like cards, no dark band between them. -->
+                    <BoxShadows x:Key="HelmGlassShadow">0 1 1 0 #141C2A40, 0 6 14 -6 #2E1C2A40, inset 0 1 0 0 #CCFFFFFF</BoxShadows>
+                    <BoxShadows x:Key="HelmLiftShadow">0 1 1 0 #1A1C2A40, 0 12 22 -6 #401C2A40, inset 0 1 0 0 #FFFFFFFF</BoxShadows>
                     <BoxShadows x:Key="HelmHeroShadow">0 16 40 0 #241C2A40</BoxShadows>
                 </ResourceDictionary>
                 <ResourceDictionary x:Key="Dark">
@@ -53,7 +56,8 @@
                     <SolidColorBrush x:Key="HelmEyebrow" Color="#2FD3C1" />
                     <SolidColorBrush x:Key="HelmPillBackground" Color="#F5F8FC" />
                     <SolidColorBrush x:Key="HelmPillForeground" Color="#161A22" />
-                    <BoxShadows x:Key="HelmGlassShadow">0 8 24 0 #4D000000</BoxShadows>
+                    <BoxShadows x:Key="HelmGlassShadow">0 1 1 0 #40000000, 0 6 14 -6 #66000000, inset 0 1 0 0 #1AFFFFFF</BoxShadows>
+                    <BoxShadows x:Key="HelmLiftShadow">0 1 1 0 #4D000000, 0 12 22 -6 #80000000, inset 0 1 0 0 #29FFFFFF</BoxShadows>
                     <BoxShadows x:Key="HelmHeroShadow">0 20 48 0 #73000000</BoxShadows>
                 </ResourceDictionary>
             </ResourceDictionary.ThemeDictionaries>
@@ -253,7 +257,7 @@
         </Setter>
     </Style>
     <Style Selector="Button.glass:pointerover /template/ ContentPresenter#PART_ContentPresenter">
-        <Setter Property="BoxShadow" Value="{DynamicResource HelmHeroShadow}" />
+        <Setter Property="BoxShadow" Value="{DynamicResource HelmLiftShadow}" />
         <Setter Property="Background" Value="{DynamicResource HelmGlassHover}" />
         <Setter Property="BorderBrush" Value="{DynamicResource HelmGlassStroke}" />
     </Style>
@@ -521,7 +525,7 @@
     </Style>
     <Style Selector="Border.glass.lift:pointerover">
         <Setter Property="Background" Value="{DynamicResource HelmGlassHover}" />
-        <Setter Property="BoxShadow" Value="{DynamicResource HelmHeroShadow}" />
+        <Setter Property="BoxShadow" Value="{DynamicResource HelmLiftShadow}" />
     </Style>
 
     <Style Selector="Border.shimmer">
@@ -538,4 +542,124 @@
             </Animation>
         </Style.Animations>
     </Style>
+
+    <!-- ===== Shared by every tool page (moved from TrackerView): text kinds, tags, row hit area, disclosure arrow, small actions, segmented tabs ===== -->
+        <Style Selector="TextBlock.muted">
+            <Setter Property="Foreground" Value="{DynamicResource HelmSecondaryText}" />
+            <Setter Property="FontSize" Value="12.5" />
+            <Setter Property="TextWrapping" Value="Wrap" />
+        </Style>
+        <Style Selector="TextBlock.late">
+            <Setter Property="Foreground" Value="{DynamicResource HelmDanger}" />
+        </Style>
+        <Style Selector="TextBlock.done">
+            <Setter Property="TextDecorations" Value="Strikethrough" />
+            <Setter Property="Foreground" Value="{DynamicResource HelmSecondaryText}" />
+        </Style>
+        <Style Selector="TextBlock.head">
+            <Setter Property="FontSize" Value="15" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+        </Style>
+        <Style Selector="TextBlock.stat">
+            <Setter Property="FontSize" Value="26" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+        </Style>
+        <Style Selector="Border.tag">
+            <Setter Property="Background" Value="{DynamicResource HelmGlassHover}" />
+            <Setter Property="CornerRadius" Value="6" />
+            <Setter Property="Padding" Value="7,1" />
+            <Setter Property="Margin" Value="0,0,6,0" />
+            <Setter Property="VerticalAlignment" Value="Center" />
+        </Style>
+        <Style Selector="Border.tag > TextBlock">
+            <Setter Property="FontSize" Value="11" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+        </Style>
+        <!-- The task's text: a tap target with no look of its own (the whole card lifts and lights up instead) -->
+        <Style Selector="Button.rowhit">
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="HorizontalAlignment" Value="Stretch" />
+            <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+        </Style>
+        <Style Selector="Button.rowhit:pointerover /template/ ContentPresenter#PART_ContentPresenter, Button.rowhit:pressed /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="Transparent" />
+        </Style>
+        <!-- A disclosure arrow: points right when closed, turns a quarter (down) when its section opens, and back.
+             core:Motion.Turn="{Binding IsExpanded}" on the Panel.turn around a ChevronRight sets .open / .closing. -->
+        <Style Selector="Panel.turn">
+            <Setter Property="RenderTransform"><RotateTransform /></Setter>
+        </Style>
+        <Style Selector="Panel.turn.open">
+            <Style.Animations>
+                <Animation Duration="0:0:0.2" Easing="CubicEaseOut" FillMode="Forward">
+                    <KeyFrame Cue="0%"><Setter Property="RotateTransform.Angle" Value="0" /></KeyFrame>
+                    <KeyFrame Cue="100%"><Setter Property="RotateTransform.Angle" Value="90" /></KeyFrame>
+                </Animation>
+            </Style.Animations>
+        </Style>
+        <Style Selector="Panel.turn.closing">
+            <Style.Animations>
+                <Animation Duration="0:0:0.2" Easing="CubicEaseOut" FillMode="Forward">
+                    <KeyFrame Cue="0%"><Setter Property="RotateTransform.Angle" Value="90" /></KeyFrame>
+                    <KeyFrame Cue="100%"><Setter Property="RotateTransform.Angle" Value="0" /></KeyFrame>
+                </Animation>
+            </Style.Animations>
+        </Style>        <!-- Small outlined action under an open task -->
+        <Style Selector=":is(Button).act">
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="BorderBrush" Value="{DynamicResource HelmGlassStroke}" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="CornerRadius" Value="10" />
+            <Setter Property="Padding" Value="10,7" />
+            <Setter Property="Margin" Value="0,0,6,6" />
+            <Setter Property="MinHeight" Value="36" />
+        </Style>
+        <Style Selector=":is(Button).act:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource HelmGlassHover}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource HelmGlassStroke}" />
+        </Style>
+        <Style Selector="ToggleButton.act:checked /template/ ContentPresenter#PART_ContentPresenter, Button.act.selected /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource HelmGlassHover}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource HelmGlassStrokeStrong}" />
+            <Setter Property="Foreground" Value="{DynamicResource TextControlForeground}" />
+        </Style>
+        <Style Selector="Button.act:disabled">
+            <Setter Property="Opacity" Value="0.35" />
+        </Style>
+        <Style Selector="Button.act:disabled /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="Transparent" />
+        </Style>
+        <!-- Tasks · Calendar · Insights -->
+        <Style Selector="RadioButton.seg">
+            <Setter Property="Template">
+                <ControlTemplate>
+                    <Border Name="Seg" Background="Transparent" CornerRadius="8" Padding="14,7">
+                        <ContentPresenter Content="{TemplateBinding Content}" />
+                    </Border>
+                </ControlTemplate>
+            </Setter>
+            <Setter Property="Foreground" Value="{DynamicResource HelmSecondaryText}" />
+            <Setter Property="FontSize" Value="13" />
+            <Setter Property="Cursor" Value="Hand" />
+        </Style>
+        <Style Selector="RadioButton.seg:checked">
+            <Setter Property="Foreground" Value="{DynamicResource TextControlForeground}" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+        </Style>
+        <Style Selector="RadioButton.seg:checked /template/ Border#Seg">
+            <Setter Property="Background" Value="{DynamicResource HelmGlassHover}" />
+        </Style>
+        <Style Selector=":is(UserControl).narrow TextBlock.display">
+            <Setter Property="FontSize" Value="28" />
+        </Style>
+        <!-- On a phone a task's actions are icons in one row (the words are their tooltips and names) -->
+        <Style Selector=":is(UserControl).narrow TextBlock.label">
+            <Setter Property="IsVisible" Value="False" />
+        </Style>
+        <Style Selector=":is(UserControl).narrow :is(Button).act">
+            <Setter Property="MinWidth" Value="36" />
+            <Setter Property="Padding" Value="9,7" />
+            <Setter Property="Margin" Value="0,0,4,4" />
+        </Style>
 </Styles>

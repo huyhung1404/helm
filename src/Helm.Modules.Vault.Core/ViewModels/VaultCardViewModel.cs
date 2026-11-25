@@ -45,6 +45,8 @@ public sealed partial class VaultCardViewModel(VaultEntry entry, IVaultPlatform 
 {
     private readonly VaultItem _item = entry.Item;
 
+    /// <summary>The row whose item is open (the list highlights it next to the detail on a wide screen).</summary>
+    [ObservableProperty] private bool _isSelected;
     [ObservableProperty] private bool _isRevealed;
     [ObservableProperty] private bool _isCopied;
     [ObservableProperty] private bool _isUsernameCopied;

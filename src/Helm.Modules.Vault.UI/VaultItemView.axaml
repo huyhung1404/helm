@@ -1,0 +1,402 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:ic="using:FluentIcons.Avalonia"
+             xmlns:vm="using:Helm.Modules.Vault.ViewModels"
+             xmlns:items="using:Helm.Modules.Vault.Items"
+             xmlns:core="using:Helm.Core.Ui"
+             xmlns:local="using:Helm.Modules.Vault.Ui"
+             x:Class="Helm.Modules.Vault.Ui.VaultItemView"
+             x:DataType="vm:ItemDetailViewModel">
+
+    <!-- One item: shown (a glass card for who it is, one for its fields, notes, history) or edited (the same cards turn
+         into fields; New and Edit open it as a sheet). -->
+    <UserControl.Styles>
+        <Style Selector="TextBlock.code">
+            <Setter Property="FontFamily" Value="monospace" />
+            <Setter Property="FontSize" Value="24" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="Foreground" Value="{DynamicResource HelmEyebrow}" />
+        </Style>
+        <!-- The kinds of a new item, as chips: the chosen one has the strong stroke and accent text -->
+        <Style Selector="ListBox.kinds">
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="Padding" Value="0" />
+        </Style>
+        <Style Selector="ListBox.kinds ListBoxItem">
+            <Setter Property="MinHeight" Value="40" />
+            <Setter Property="Padding" Value="12,0" />
+            <Setter Property="Margin" Value="0,0,6,6" />
+            <Setter Property="CornerRadius" Value="10" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="BorderBrush" Value="{DynamicResource HelmGlassStroke}" />
+            <Setter Property="Background" Value="Transparent" />
+        </Style>
+        <Style Selector="ListBox.kinds ListBoxItem:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource HelmGlassHover}" />
+        </Style>
+        <Style Selector="ListBox.kinds ListBoxItem:selected /template/ ContentPresenter#PART_ContentPresenter, ListBox.kinds ListBoxItem:selected:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource HelmGlassHover}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource HelmGlassStrokeStrong}" />
+            <Setter Property="Foreground" Value="{DynamicResource HelmEyebrow}" />
+        </Style>
+        <Style Selector="ToggleButton.fold">
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="Padding" Value="4,8" />
+        </Style>
+        <Style Selector="ToggleButton.fold:pointerover /template/ ContentPresenter#PART_ContentPresenter, ToggleButton.fold:checked /template/ ContentPresenter#PART_ContentPresenter, ToggleButton.fold:checked:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="Transparent" />
+        </Style>
+        <Style Selector="Button.ico">
+            <Setter Property="Width" Value="36" />
+            <Setter Property="Height" Value="36" />
+            <Setter Property="MinHeight" Value="36" />
+            <Setter Property="Padding" Value="0" />
+            <Setter Property="HorizontalContentAlignment" Value="Center" />
+            <Setter Property="VerticalContentAlignment" Value="Center" />
+        </Style>
+    </UserControl.Styles>
+
+    <StackPanel Spacing="12">
+        <!-- Editing: what it is about, and (a new item) the kind to start from -->
+        <StackPanel Spacing="2" IsVisible="{Binding IsEditing}">
+            <TextBlock Classes="eyebrow" Text="VAULT" />
+            <TextBlock Text="{Binding EditorTitle}" FontSize="22" FontWeight="SemiBold" TextWrapping="Wrap" />
+        </StackPanel>
+        <StackPanel Spacing="6" core:Motion.EnterOnShow="True">
+            <StackPanel.IsVisible>
+                <MultiBinding Converter="{x:Static BoolConverters.And}">
+                    <Binding Path="IsEditing" />
+                    <Binding Path="IsNew" />
+                </MultiBinding>
+            </StackPanel.IsVisible>
+            <TextBlock Classes="muted" Text="What are you saving?" />
+            <ListBox ItemsSource="{Binding KindOptions}" SelectedItem="{Binding KindOption}" Classes="kinds" AutomationProperties.Name="Kind of item"
+                     ScrollViewer.HorizontalScrollBarVisibility="Disabled">
+                <ListBox.ItemsPanel>
+                    <ItemsPanelTemplate><WrapPanel /></ItemsPanelTemplate>
+                </ListBox.ItemsPanel>
+                <ListBox.ItemTemplate>
+                    <DataTemplate x:DataType="vm:VaultKindOption">
+                        <StackPanel Orientation="Horizontal" Spacing="7" AutomationProperties.Name="{Binding Label}">
+                            <ic:SymbolIcon Symbol="{Binding Kind, Converter={x:Static local:KindIcon.Converter}}" FontSize="16" />
+                            <TextBlock Text="{Binding Label}" VerticalAlignment="Center" />
+                        </StackPanel>
+                    </DataTemplate>
+                </ListBox.ItemTemplate>
+            </ListBox>
+        </StackPanel>
+
+        <!-- Who it is -->
+        <Border Classes="glass" Padding="16">
+            <StackPanel Spacing="12">
+                <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="12">
+                    <!-- Avatar: its own picture, else its first letter on a colour from its title -->
+                    <Panel Width="52" Height="52" VerticalAlignment="Top">
+                        <Border CornerRadius="12" Background="{Binding AvatarColor, Converter={x:Static local:HexBrush.Converter}}" IsVisible="{Binding !HasIcon}">
+                            <TextBlock Text="{Binding Initial}" Foreground="White" FontSize="22" FontWeight="SemiBold" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        </Border>
+                        <Border CornerRadius="12" ClipToBounds="True" IsVisible="{Binding HasIcon}">
+                            <Image Source="{Binding Icon, Converter={x:Static local:IconBitmap.Converter}}" Stretch="UniformToFill" />
+                        </Border>
+                    </Panel>
+                    <StackPanel Grid.Column="1" VerticalAlignment="Center" Spacing="3" IsVisible="{Binding !IsEditing}">
+                        <TextBlock Text="{Binding Title}" FontSize="20" FontWeight="SemiBold" TextWrapping="Wrap" />
+                        <WrapPanel>
+                            <StackPanel Orientation="Horizontal" Spacing="6" Margin="0,0,10,0">
+                                <ic:SymbolIcon Symbol="{Binding Kind, Converter={x:Static local:KindIcon.Converter}}" FontSize="14" Foreground="{DynamicResource HelmSecondaryText}" VerticalAlignment="Center" />
+                                <TextBlock Classes="muted" Text="{Binding KindLabel}" VerticalAlignment="Center" />
+                            </StackPanel>
+                            <ItemsControl ItemsSource="{Binding TagList}">
+                                <ItemsControl.ItemsPanel>
+                                    <ItemsPanelTemplate><WrapPanel /></ItemsPanelTemplate>
+                                </ItemsControl.ItemsPanel>
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate x:DataType="x:String">
+                                        <Border Classes="tag" Margin="0,2,6,2"><TextBlock Text="{Binding}" /></Border>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </WrapPanel>
+                    </StackPanel>
+                    <TextBox Grid.Column="1" Classes="glass" PlaceholderText="Title" Text="{Binding Title}" IsVisible="{Binding IsEditing}"
+                             VerticalAlignment="Center" AutomationProperties.Name="Title" />
+                    <!-- The star: favourite or not -->
+                    <Button Grid.Column="2" Classes="chip ico" VerticalAlignment="Top" Command="{Binding ToggleFavoriteCommand}"
+                            ToolTip.Tip="Favourite" AutomationProperties.Name="Favourite">
+                        <Button.IsVisible>
+                            <MultiBinding Converter="{x:Static BoolConverters.And}">
+                                <Binding Path="!IsEditing" />
+                                <Binding Path="!Trashed" />
+                            </MultiBinding>
+                        </Button.IsVisible>
+                        <Panel>
+                            <ic:SymbolIcon Symbol="Star" IconVariant="Filled" FontSize="16" Foreground="{DynamicResource HelmEyebrow}" IsVisible="{Binding Favorite}" />
+                            <ic:SymbolIcon Symbol="Star" FontSize="16" IsVisible="{Binding !Favorite}" />
+                        </Panel>
+                    </Button>
+                </Grid>
+
+                <!-- Editing: icon, kind of an existing item, favourite -->
+                <Grid ColumnDefinitions="*,*" ColumnSpacing="8" IsVisible="{Binding IsEditing}">
+                    <Button Classes="ghost" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Command="{Binding ChooseIconCommand}">
+                        <StackPanel Orientation="Horizontal" Spacing="6">
+                            <ic:SymbolIcon Symbol="ImageAdd" FontSize="16" />
+                            <TextBlock Text="Choose icon…" VerticalAlignment="Center" />
+                        </StackPanel>
+                    </Button>
+                    <Button Grid.Column="1" Classes="ghost" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Content="Remove icon"
+                            Command="{Binding RemoveIconCommand}" IsEnabled="{Binding HasIcon}" />
+                </Grid>
+                <StackPanel Spacing="6">
+                    <StackPanel.IsVisible>
+                        <MultiBinding Converter="{x:Static BoolConverters.And}">
+                            <Binding Path="IsEditing" />
+                            <Binding Path="!IsNew" />
+                        </MultiBinding>
+                    </StackPanel.IsVisible>
+                    <TextBlock Classes="muted" Text="Kind" />
+                    <ComboBox Classes="glass" ItemsSource="{Binding KindOptions}" SelectedItem="{Binding KindOption}" HorizontalAlignment="Stretch" AutomationProperties.Name="Kind">
+                        <ComboBox.ItemTemplate>
+                            <DataTemplate x:DataType="vm:VaultKindOption">
+                                <TextBlock Text="{Binding Label}" />
+                            </DataTemplate>
+                        </ComboBox.ItemTemplate>
+                    </ComboBox>
+                </StackPanel>
+                <DockPanel IsVisible="{Binding IsEditing}">
+                    <ToggleSwitch DockPanel.Dock="Right" IsChecked="{Binding Favorite}" OnContent="" OffContent="" AutomationProperties.Name="Favourite" />
+                    <StackPanel VerticalAlignment="Center">
+                        <TextBlock Text="Favourite" />
+                        <TextBlock Classes="secondary" Text="Shows in the Favourites section." />
+                    </StackPanel>
+                </DockPanel>
+
+                <!-- Doing: edit or trash, or (in the trash) restore or delete for good -->
+                <Grid ColumnDefinitions="*,*" ColumnSpacing="8">
+                    <Grid.IsVisible>
+                        <MultiBinding Converter="{x:Static BoolConverters.And}">
+                            <Binding Path="!IsEditing" />
+                            <Binding Path="!Trashed" />
+                        </MultiBinding>
+                    </Grid.IsVisible>
+                    <Button Classes="ghost" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Command="{Binding EditCommand}"
+                            ToolTip.Tip="Edit" AutomationProperties.Name="Edit">
+                        <StackPanel Orientation="Horizontal" Spacing="6"><ic:SymbolIcon Symbol="Edit" FontSize="14" /><TextBlock Text="Edit" /></StackPanel>
+                    </Button>
+                    <Button Grid.Column="1" Classes="ghost" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Command="{Binding MoveToTrashCommand}"
+                            ToolTip.Tip="Move to trash" AutomationProperties.Name="Move to trash">
+                        <StackPanel Orientation="Horizontal" Spacing="6">
+                            <ic:SymbolIcon Symbol="Delete" FontSize="14" Foreground="{DynamicResource HelmDanger}" />
+                            <TextBlock Text="Move to trash" Foreground="{DynamicResource HelmDanger}" />
+                        </StackPanel>
+                    </Button>
+                </Grid>
+                <Grid ColumnDefinitions="*,*" ColumnSpacing="8" IsVisible="{Binding Trashed}">
+                    <Button Classes="pill" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Content="Restore" Command="{Binding RestoreFromTrashCommand}" />
+                    <Button Grid.Column="1" Classes="ghost" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Command="{Binding DeleteForeverCommand}">
+                        <TextBlock Text="Delete for good" Foreground="{DynamicResource HelmDanger}" />
+                    </Button>
+                </Grid>
+            </StackPanel>
+        </Border>
+
+        <Border Classes="glass" BorderBrush="{DynamicResource HelmDanger}" IsVisible="{Binding Error, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" core:Motion.EnterOnShow="True">
+            <TextBlock TextWrapping="Wrap" Text="{Binding Error}" />
+        </Border>
+
+        <!-- Edited on two devices -->
+        <Border Classes="glass" IsVisible="{Binding HasConflicts}">
+            <StackPanel Spacing="10">
+                <StackPanel Spacing="2">
+                    <TextBlock Classes="head" Text="Edited on two devices" />
+                    <TextBlock Classes="secondary" TextWrapping="Wrap" Text="Both versions are kept. Choose the one to keep; the other goes into the history." />
+                </StackPanel>
+                <Button Classes="ghost" HorizontalAlignment="Stretch" Content="Keep the version shown here" Command="{Binding KeepCurrentCommand}" />
+                <ItemsControl ItemsSource="{Binding Conflicts}">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate x:DataType="vm:ConflictViewModel">
+                            <Border Classes="glass" Margin="0,0,0,8" BoxShadow="">
+                                <StackPanel Spacing="6">
+                                    <TextBlock Text="{Binding When}" />
+                                    <TextBlock Classes="secondary" TextWrapping="Wrap" Text="{Binding Summary}" />
+                                    <Button Classes="ghost" HorizontalAlignment="Stretch" Content="Keep this one" Command="{Binding KeepThisCommand}" />
+                                </StackPanel>
+                            </Border>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+            </StackPanel>
+        </Border>
+
+        <!-- Fields -->
+        <Border Classes="glass" Padding="16,12">
+            <StackPanel Spacing="4">
+                <ItemsControl ItemsSource="{Binding Fields}">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate x:DataType="vm:FieldViewModel">
+                            <StackPanel Margin="0,4,0,8">
+                                <!-- Shown: name, value, and what can be done with it -->
+                                <Grid ColumnDefinitions="*,Auto" IsVisible="{Binding !Owner.IsEditing}">
+                                    <StackPanel>
+                                        <TextBlock Classes="eyebrow" Text="{Binding Name, Converter={x:Static core:UpperCase.Instance}}" />
+                                        <TextBlock TextWrapping="Wrap" FontSize="15" Margin="0,2,0,0" Text="{Binding Display}" IsVisible="{Binding IsValueField}"
+                                                   Classes.code="{Binding HasTotpCode}" />
+                                        <!-- A one-time code: how long it stays valid -->
+                                        <StackPanel Orientation="Horizontal" Spacing="8" Margin="0,4,0,0" IsVisible="{Binding HasTotpCode}">
+                                            <ProgressBar Width="90" MinWidth="0" Height="3" MinHeight="3" Minimum="0" Maximum="100" Value="{Binding TotpProgress}" VerticalAlignment="Center" />
+                                            <TextBlock Classes="secondary" Text="{Binding TotpSecondsLeft, StringFormat='{}{0} s left'}" />
+                                        </StackPanel>
+                                        <TextBlock TextWrapping="Wrap" FontSize="15" Margin="0,2,0,0" Text="{Binding FileText}" IsVisible="{Binding IsFile}" />
+                                        <Image Margin="0,8,0,0" MaxHeight="200" HorizontalAlignment="Left" Stretch="Uniform"
+                                               Source="{Binding Preview, Converter={x:Static local:PreviewBitmap.Converter}}" IsVisible="{Binding HasPreview}" />
+                                    </StackPanel>
+                                    <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="6" VerticalAlignment="Top">
+                                        <Button Classes="chip ico" Command="{Binding ToggleRevealCommand}" IsVisible="{Binding IsSecret}" ToolTip.Tip="Show or hide" AutomationProperties.Name="Show or hide">
+                                            <Panel>
+                                                <ic:SymbolIcon Symbol="Eye" FontSize="16" IsVisible="{Binding !IsRevealed}" />
+                                                <ic:SymbolIcon Symbol="EyeOff" FontSize="16" IsVisible="{Binding IsRevealed}" />
+                                            </Panel>
+                                        </Button>
+                                        <Button Classes="chip ico" Command="{Binding CopyCommand}" IsVisible="{Binding CanCopy}" ToolTip.Tip="Copy" AutomationProperties.Name="Copy">
+                                            <ic:SymbolIcon Symbol="Copy" FontSize="16" />
+                                        </Button>
+                                        <Button Classes="chip ico" Command="{Binding OpenFileCommand}" IsVisible="{Binding HasFile}" ToolTip.Tip="Open" AutomationProperties.Name="Open">
+                                            <ic:SymbolIcon Symbol="Open" FontSize="16" />
+                                        </Button>
+                                        <Button Classes="chip ico" Command="{Binding SaveFileCommand}" IsVisible="{Binding HasFile}" ToolTip.Tip="Save a copy" AutomationProperties.Name="Save a copy">
+                                            <ic:SymbolIcon Symbol="ArrowDownload" FontSize="16" />
+                                        </Button>
+                                    </StackPanel>
+                                </Grid>
+                                <!-- Edited: type, name and buttons on one line, then the value across the whole width -->
+                                <Grid ColumnDefinitions="110,*,Auto" RowDefinitions="Auto,Auto" RowSpacing="6" ColumnSpacing="6" IsVisible="{Binding Owner.IsEditing}">
+                                    <ComboBox Classes="glass" ItemsSource="{Binding Owner.FieldKinds}" SelectedItem="{Binding Kind}" HorizontalAlignment="Stretch" AutomationProperties.Name="Field type" />
+                                    <TextBox Grid.Column="1" Classes="glass" PlaceholderText="Name" Text="{Binding Name}" AutomationProperties.Name="Field name" />
+                                    <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="4">
+                                        <Button Classes="chip ico" Command="{Binding ToggleRevealCommand}" IsVisible="{Binding IsSecret}" ToolTip.Tip="Show or hide" AutomationProperties.Name="Show or hide">
+                                            <Panel>
+                                                <ic:SymbolIcon Symbol="Eye" FontSize="16" IsVisible="{Binding !IsRevealed}" />
+                                                <ic:SymbolIcon Symbol="EyeOff" FontSize="16" IsVisible="{Binding IsRevealed}" />
+                                            </Panel>
+                                        </Button>
+                                        <Button Classes="chip ico" Command="{Binding GenerateCommand}" IsVisible="{Binding IsPassword}" ToolTip.Tip="Make a strong password" AutomationProperties.Name="Make a strong password">
+                                            <ic:SymbolIcon Symbol="Wand" FontSize="16" />
+                                        </Button>
+                                        <Button Classes="chip ico" Command="{Binding RemoveCommand}" ToolTip.Tip="Remove this field" AutomationProperties.Name="Remove field">
+                                            <ic:SymbolIcon Symbol="Dismiss" FontSize="16" Foreground="{DynamicResource HelmDanger}" />
+                                        </Button>
+                                    </StackPanel>
+                                    <TextBox Grid.Row="1" Grid.ColumnSpan="3" Classes="glass" PlaceholderText="Value" Text="{Binding Value}" AcceptsReturn="{Binding IsMultiline}" TextWrapping="Wrap"
+                                             PasswordChar="{Binding IsSecret, Converter={x:Static local:SecretChar.Converter}}" RevealPassword="{Binding IsRevealed}"
+                                             AutomationProperties.Name="{Binding Name}" IsVisible="{Binding IsValueField}" />
+                                    <!-- A file: choose or replace, its name and a picture's preview -->
+                                    <StackPanel Grid.Row="1" Grid.ColumnSpan="3" Spacing="6" IsVisible="{Binding IsFile}">
+                                        <Button Classes="ghost" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Command="{Binding ChooseFileCommand}" AutomationProperties.Name="Choose file">
+                                            <Panel>
+                                                <TextBlock Text="Choose…" IsVisible="{Binding !HasFile}" />
+                                                <TextBlock Text="Replace…" IsVisible="{Binding HasFile}" />
+                                            </Panel>
+                                        </Button>
+                                        <TextBlock Classes="secondary" Text="{Binding FileText}" TextTrimming="CharacterEllipsis" />
+                                        <Image MaxHeight="96" HorizontalAlignment="Left" Stretch="Uniform"
+                                               Source="{Binding Preview, Converter={x:Static local:PreviewBitmap.Converter}}" IsVisible="{Binding HasPreview}" />
+                                    </StackPanel>
+                                </Grid>
+                                <!-- A two-factor key that gives no code, or its current code as a check -->
+                                <TextBlock Margin="2,4,0,0" TextWrapping="Wrap" Foreground="{DynamicResource HelmDanger}" Text="{Binding TotpError}">
+                                    <TextBlock.IsVisible>
+                                        <MultiBinding Converter="{x:Static BoolConverters.And}">
+                                            <Binding Path="Owner.IsEditing" />
+                                            <Binding Path="HasTotpError" />
+                                        </MultiBinding>
+                                    </TextBlock.IsVisible>
+                                </TextBlock>
+                                <TextBlock Margin="2,4,0,0" Classes="secondary" Text="{Binding TotpCode, StringFormat='Current code: {0}'}">
+                                    <TextBlock.IsVisible>
+                                        <MultiBinding Converter="{x:Static BoolConverters.And}">
+                                            <Binding Path="Owner.IsEditing" />
+                                            <Binding Path="HasTotpCode" />
+                                        </MultiBinding>
+                                    </TextBlock.IsVisible>
+                                </TextBlock>
+                            </StackPanel>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+                <Button Classes="ghost" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" IsVisible="{Binding IsEditing}" AutomationProperties.Name="Add a field">
+                    <StackPanel Orientation="Horizontal" Spacing="6"><ic:SymbolIcon Symbol="Add" FontSize="14" /><TextBlock Text="Add a field" /></StackPanel>
+                    <Button.Flyout>
+                        <MenuFlyout Placement="Bottom">
+                            <MenuItem Header="Text" Command="{Binding AddFieldCommand}" CommandParameter="{x:Static items:VaultFieldKind.Text}" />
+                            <MenuItem Header="Username" Command="{Binding AddFieldCommand}" CommandParameter="{x:Static items:VaultFieldKind.Username}" />
+                            <MenuItem Header="Password" Command="{Binding AddFieldCommand}" CommandParameter="{x:Static items:VaultFieldKind.Password}" />
+                            <MenuItem Header="Hidden (PIN, code…)" Command="{Binding AddFieldCommand}" CommandParameter="{x:Static items:VaultFieldKind.Secret}" />
+                            <MenuItem Header="One-time code (2FA)" Command="{Binding AddFieldCommand}" CommandParameter="{x:Static items:VaultFieldKind.Totp}" />
+                            <MenuItem Header="Website" Command="{Binding AddFieldCommand}" CommandParameter="{x:Static items:VaultFieldKind.Url}" />
+                            <MenuItem Header="Email" Command="{Binding AddFieldCommand}" CommandParameter="{x:Static items:VaultFieldKind.Email}" />
+                            <MenuItem Header="Phone" Command="{Binding AddFieldCommand}" CommandParameter="{x:Static items:VaultFieldKind.Phone}" />
+                            <MenuItem Header="Several lines" Command="{Binding AddFieldCommand}" CommandParameter="{x:Static items:VaultFieldKind.Multiline}" />
+                            <Separator />
+                            <MenuItem Header="Image" Command="{Binding AddFieldCommand}" CommandParameter="{x:Static items:VaultFieldKind.Image}" />
+                            <MenuItem Header="Document (any file)" Command="{Binding AddFieldCommand}" CommandParameter="{x:Static items:VaultFieldKind.Document}" />
+                            <MenuItem Header="Text file (.txt)" Command="{Binding AddFieldCommand}" CommandParameter="{x:Static items:VaultFieldKind.TextFile}" />
+                            <MenuItem Header="Keystore" Command="{Binding AddFieldCommand}" CommandParameter="{x:Static items:VaultFieldKind.Keystore}" />
+                        </MenuFlyout>
+                    </Button.Flyout>
+                </Button>
+            </StackPanel>
+        </Border>
+
+        <!-- Notes (or the description) and the tags: shown when there is something to show -->
+        <Border Classes="glass" Padding="16,12">
+            <Border.IsVisible>
+                <MultiBinding Converter="{x:Static BoolConverters.Or}">
+                    <Binding Path="IsEditing" />
+                    <Binding Path="Notes" Converter="{x:Static StringConverters.IsNotNullOrEmpty}" />
+                </MultiBinding>
+            </Border.IsVisible>
+            <StackPanel Spacing="8">
+                <TextBlock Classes="eyebrow" Text="{Binding NotesLabel, Converter={x:Static core:UpperCase.Instance}}" />
+                <TextBlock TextWrapping="Wrap" Text="{Binding Notes}" IsVisible="{Binding !IsEditing}" />
+                <TextBox Classes="glass" AcceptsReturn="True" TextWrapping="Wrap" MinHeight="90" Text="{Binding Notes}" IsVisible="{Binding IsEditing}" AutomationProperties.Name="Notes" />
+                <TextBox Classes="glass" PlaceholderText="Tags, separated by commas" Text="{Binding Tags}" IsVisible="{Binding IsEditing}" AutomationProperties.Name="Tags" />
+            </StackPanel>
+        </Border>
+
+        <!-- Opening a file shows its progress here -->
+        <ProgressBar Minimum="0" Maximum="1" Value="{Binding Progress}" IsVisible="{Binding IsBusy}" />
+
+        <!-- Editing: save or cancel -->
+        <Grid ColumnDefinitions="*,*" ColumnSpacing="8" IsVisible="{Binding IsEditing}">
+            <Button Classes="ghost" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Content="Cancel" Command="{Binding CancelCommand}" />
+            <Button Grid.Column="1" Classes="pill" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Content="Save" Command="{Binding SaveCommand}" />
+        </Grid>
+
+        <!-- History: folded away -->
+        <StackPanel IsVisible="{Binding !IsNew}">
+            <ToggleButton x:Name="HistoryToggle" Classes="fold" HorizontalAlignment="Left">
+                <StackPanel Orientation="Horizontal" Spacing="6">
+                    <Panel Width="12" Height="12" Classes="turn" core:Motion.Turn="{Binding #HistoryToggle.IsChecked}"><ic:SymbolIcon Symbol="ChevronRight" FontSize="12" Foreground="{DynamicResource HelmSecondaryText}" /></Panel>
+                    <TextBlock Text="History" Classes="muted" FontSize="13" />
+                </StackPanel>
+            </ToggleButton>
+            <ItemsControl ItemsSource="{Binding History}" IsVisible="{Binding #HistoryToggle.IsChecked}" core:Motion.EnterOnShow="True" core:Motion.FromTop="True">
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate x:DataType="vm:VersionViewModel">
+                        <Border Classes="glass" Margin="0,0,0,8" Padding="14,10" BoxShadow="">
+                            <Grid ColumnDefinitions="*,Auto">
+                                <StackPanel VerticalAlignment="Center">
+                                    <TextBlock Text="{Binding When}" />
+                                    <TextBlock Classes="secondary" TextWrapping="Wrap" Text="{Binding Summary}" />
+                                </StackPanel>
+                                <Button Grid.Column="1" Classes="ghost" Content="Restore" Command="{Binding RestoreCommand}" />
+                            </Grid>
+                        </Border>
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+        </StackPanel>
+        <TextBlock Classes="muted" Margin="4,0,0,0" Text="{Binding Modified}" />
+    </StackPanel>
+</UserControl>

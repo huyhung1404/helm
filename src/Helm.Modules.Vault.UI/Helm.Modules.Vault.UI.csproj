@@ -1,0 +1,19 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- The Vault page, ONE view for every platform (Windows through Helm.Ui.Windows, Android, later macOS/iOS). What
+       differs per platform (autofill, auto-type, extra settings) comes through IVaultPageHost; the vault logic and its
+       view models are Helm.Modules.Vault.Core. -->
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <SupportedOSPlatformVersion></SupportedOSPlatformVersion>
+    <PlatformTarget>AnyCPU</PlatformTarget>
+    <RootNamespace>Helm.Modules.Vault.Ui</RootNamespace>
+    <AvaloniaUseCompiledBindingsByDefault>true</AvaloniaUseCompiledBindingsByDefault>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Helm.Ui\Helm.Ui.csproj" />
+    <ProjectReference Include="..\Helm.Modules.Vault.Core\Helm.Modules.Vault.Core.csproj" />
+  </ItemGroup>
+
+</Project>

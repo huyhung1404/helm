@@ -1,0 +1,176 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:ic="using:FluentIcons.Avalonia"
+             xmlns:vm="using:Helm.Modules.Vault.ViewModels"
+             xmlns:core="using:Helm.Core.Ui"
+             x:Class="Helm.Modules.Vault.Ui.VaultSettingsView"
+             x:DataType="vm:VaultSettingsViewModel">
+
+    <!-- The vault's settings as a sheet over the vault (the gear): one card per subject, a switch or a field on the right. -->
+    <StackPanel Spacing="14">
+        <Grid ColumnDefinitions="*,Auto">
+            <StackPanel>
+                <TextBlock Classes="eyebrow" Text="VAULT" />
+                <TextBlock Text="Settings" FontSize="22" FontWeight="SemiBold" />
+            </StackPanel>
+            <Button x:Name="CloseButton" Grid.Column="1" Classes="chip" VerticalAlignment="Top" ToolTip.Tip="Close" AutomationProperties.Name="Close settings">
+                <ic:SymbolIcon Symbol="Dismiss" FontSize="14" />
+            </Button>
+        </Grid>
+
+        <Border Classes="glass" IsVisible="{Binding Message, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" BorderBrush="{DynamicResource HelmGlassStrokeStrong}" core:Motion.EnterOnShow="True">
+            <TextBlock TextWrapping="Wrap" Text="{Binding Message}" />
+        </Border>
+        <Border Classes="glass" IsVisible="{Binding Error, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" BorderBrush="{DynamicResource HelmDanger}" core:Motion.EnterOnShow="True">
+            <TextBlock TextWrapping="Wrap" Text="{Binding Error}" />
+        </Border>
+
+        <!-- The vault now -->
+        <Border Classes="glass">
+            <StackPanel Spacing="12">
+                <StackPanel Spacing="2">
+                    <TextBlock Text="Vault" Classes="head" />
+                    <TextBlock Text="{Binding StateText}" Classes="secondary" TextWrapping="Wrap" />
+                </StackPanel>
+                <Button Classes="ghost" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" IsVisible="{Binding IsUnlocked}" Command="{Binding LockNowCommand}">
+                    <StackPanel Orientation="Horizontal" Spacing="6"><ic:SymbolIcon Symbol="LockClosed" FontSize="14" /><TextBlock Text="Lock now" /></StackPanel>
+                </Button>
+            </StackPanel>
+        </Border>
+
+        <Border Classes="glass">
+            <StackPanel Spacing="12">
+                <TextBlock Text="Locking" Classes="head" />
+                <StackPanel Spacing="6">
+                    <TextBlock Text="Lock after inactivity" />
+                    <ComboBox Classes="glass" HorizontalAlignment="Stretch" ItemsSource="{Binding AutoLockChoices}" SelectedItem="{Binding AutoLock}" AutomationProperties.Name="Lock after inactivity" />
+                </StackPanel>
+                <DockPanel x:Name="SystemLockRow">
+                    <ToggleSwitch DockPanel.Dock="Right" IsChecked="{Binding LockOnSystemLock}" OnContent="" OffContent="" AutomationProperties.Name="Lock when the computer locks" />
+                    <StackPanel VerticalAlignment="Center">
+                        <TextBlock Text="Lock when the computer locks" />
+                        <TextBlock Text="Also when you sign out or it goes to sleep." Classes="secondary" TextWrapping="Wrap" />
+                    </StackPanel>
+                </DockPanel>
+                <StackPanel x:Name="BackgroundLockRow" Spacing="6">
+                    <TextBlock Text="Lock when Helm is in the background" />
+                    <ComboBox Classes="glass" HorizontalAlignment="Stretch" ItemsSource="{Binding BackgroundLockChoices}" SelectedItem="{Binding BackgroundLock}" AutomationProperties.Name="Lock when Helm is in the background" />
+                    <TextBlock Text="After switching apps or turning the screen off." Classes="secondary" />
+                </StackPanel>
+                <StackPanel Spacing="12" IsEnabled="{Binding DeviceUnlockAvailable}">
+                    <DockPanel>
+                        <ToggleSwitch DockPanel.Dock="Right" IsChecked="{Binding DeviceUnlockEnabled}" OnContent="" OffContent="" AutomationProperties.Name="Quick unlock" />
+                        <StackPanel VerticalAlignment="Center">
+                            <TextBlock Text="{Binding DeviceUnlockName, StringFormat='Unlock with {0}'}" />
+                            <TextBlock Text="Instead of the vault password, on this device." Classes="secondary" TextWrapping="Wrap" />
+                        </StackPanel>
+                    </DockPanel>
+                    <StackPanel Spacing="6">
+                        <TextBlock Text="Ask for the password again" />
+                        <ComboBox Classes="glass" HorizontalAlignment="Stretch" ItemsSource="{Binding RequirePasswordChoices}" SelectedItem="{Binding RequirePassword}" AutomationProperties.Name="Ask for the password again" />
+                    </StackPanel>
+                </StackPanel>
+            </StackPanel>
+        </Border>
+
+        <Border Classes="glass">
+            <StackPanel Spacing="12">
+                <TextBlock Text="Privacy" Classes="head" />
+                <StackPanel Spacing="6">
+                    <TextBlock Text="Clear copied secrets" />
+                    <ComboBox Classes="glass" HorizontalAlignment="Stretch" ItemsSource="{Binding ClipboardChoices}" SelectedItem="{Binding ClipboardClear}" AutomationProperties.Name="Clear copied secrets" />
+                    <TextBlock Text="Copied passwords are marked sensitive and cleared after this long." Classes="secondary" TextWrapping="Wrap" />
+                </StackPanel>
+                <DockPanel>
+                    <ToggleSwitch DockPanel.Dock="Right" IsChecked="{Binding ProtectFromScreenCapture}" OnContent="" OffContent="" AutomationProperties.Name="Hide from screenshots" />
+                    <StackPanel VerticalAlignment="Center">
+                        <TextBlock Text="Hide from screenshots" />
+                        <TextBlock Text="While the vault is open, screenshots, recordings and screen sharing stay blank." Classes="secondary" TextWrapping="Wrap" />
+                    </StackPanel>
+                </DockPanel>
+            </StackPanel>
+        </Border>
+
+        <!-- Settings only this platform has (Android: autofill; Windows: auto-type) -->
+        <ContentControl x:Name="PlatformCard" />
+
+        <Border Classes="glass">
+            <StackPanel Spacing="10">
+                <StackPanel Spacing="2">
+                    <TextBlock Text="Vault password" Classes="head" />
+                    <TextBlock Text="The recovery key stays the same. Other devices use the new password after they sync." Classes="secondary" TextWrapping="Wrap" />
+                </StackPanel>
+                <TextBox Classes="glass" PasswordChar="•" PlaceholderText="Current password" Text="{Binding CurrentPassword}" AutomationProperties.Name="Current password" />
+                <TextBox Classes="glass" PasswordChar="•" PlaceholderText="New password (at least 14 characters)" Text="{Binding NewPassword}" AutomationProperties.Name="New password" />
+                <TextBox Classes="glass" PasswordChar="•" PlaceholderText="New password again" Text="{Binding ConfirmPassword}" AutomationProperties.Name="New password again" />
+                <Button Classes="ghost" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Content="Change password" Command="{Binding ChangePasswordCommand}" />
+            </StackPanel>
+        </Border>
+
+        <Border Classes="glass">
+            <StackPanel Spacing="10">
+                <StackPanel Spacing="2">
+                    <TextBlock Text="Recovery key" Classes="head" />
+                    <TextBlock Text="{Binding RecoveryId, StringFormat='Your Emergency Kit must show the id {0}.'}" Classes="secondary" TextWrapping="Wrap" />
+                </StackPanel>
+                <TextBlock Text="Lost the kit? Type the current password above, then make a new key; the old one stops working." Classes="secondary" TextWrapping="Wrap" />
+                <Button Classes="ghost" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Command="{Binding NewRecoveryKeyCommand}">
+                    <StackPanel Orientation="Horizontal" Spacing="6">
+                        <ic:SymbolIcon Symbol="Key" FontSize="14" Foreground="{DynamicResource HelmDanger}" />
+                        <TextBlock Text="Make a new recovery key" Foreground="{DynamicResource HelmDanger}" />
+                    </StackPanel>
+                </Button>
+            </StackPanel>
+        </Border>
+
+        <Border Classes="glass">
+            <StackPanel Spacing="12">
+                <TextBlock Text="Backup" Classes="head" />
+                <StackPanel Spacing="6">
+                    <TextBlock Text="Backup folder" />
+                    <TextBlock Text="{Binding BackupLocation}" Classes="secondary" TextTrimming="CharacterEllipsis" TextWrapping="NoWrap" />
+                    <Button Classes="ghost" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Content="Choose a folder…" Command="{Binding ChooseBackupLocationCommand}" />
+                </StackPanel>
+                <StackPanel Spacing="6">
+                    <TextBlock Text="Daily encrypted backup" />
+                    <TextBlock Text="{Binding BackupStatus}" Classes="secondary" TextWrapping="Wrap" />
+                    <Grid ColumnDefinitions="*,*" ColumnSpacing="8">
+                        <Button Classes="ghost" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Content="Back up now" Command="{Binding BackUpNowCommand}" IsEnabled="{Binding HasBackupLocation}" />
+                        <Button Grid.Column="1" Classes="ghost" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Content="Restore deleted items" Command="{Binding RestoreMissingCommand}" IsEnabled="{Binding HasBackupLocation}" />
+                    </Grid>
+                </StackPanel>
+                <Grid ColumnDefinitions="*,*" ColumnSpacing="8">
+                    <StackPanel Spacing="6">
+                        <TextBlock Text="Keep daily snapshots for" />
+                        <ComboBox Classes="glass" HorizontalAlignment="Stretch" ItemsSource="{Binding KeepDailyChoices}" SelectedItem="{Binding KeepDaily}" AutomationProperties.Name="Keep daily snapshots for" />
+                    </StackPanel>
+                    <StackPanel Grid.Column="1" Spacing="6">
+                        <TextBlock Text="Keep monthly snapshots for" />
+                        <ComboBox Classes="glass" HorizontalAlignment="Stretch" ItemsSource="{Binding KeepMonthlyChoices}" SelectedItem="{Binding KeepMonthly}" AutomationProperties.Name="Keep monthly snapshots for" />
+                    </StackPanel>
+                </Grid>
+            </StackPanel>
+        </Border>
+
+        <Border Classes="glass">
+            <StackPanel Spacing="10">
+                <StackPanel Spacing="2">
+                    <TextBlock Text="Export to KeePass" Classes="head" />
+                    <TextBlock Text="A KDBX file that KeePassXC, KeePass and KeePassDX open: your way out if you ever leave Helm." Classes="secondary" TextWrapping="Wrap" />
+                </StackPanel>
+                <TextBox Classes="glass" PasswordChar="•" PlaceholderText="Password for the file (at least 14 characters)" Text="{Binding ExportPassword}" AutomationProperties.Name="Password for the file" />
+                <TextBox Classes="glass" PasswordChar="•" PlaceholderText="Password again" Text="{Binding ExportConfirm}" AutomationProperties.Name="Password again" />
+                <DockPanel>
+                    <ToggleSwitch DockPanel.Dock="Right" IsChecked="{Binding ExportDocuments}" OnContent="" OffContent="" AutomationProperties.Name="Include documents" />
+                    <StackPanel VerticalAlignment="Center">
+                        <TextBlock Text="Include documents" />
+                        <TextBlock Text="Makes the file as large as the documents." Classes="secondary" />
+                    </StackPanel>
+                </DockPanel>
+                <Button Classes="ghost" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Content="Export…" Command="{Binding ExportKdbxCommand}" />
+            </StackPanel>
+        </Border>
+
+        <Button x:Name="DoneButton" Classes="pill" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Content="Done" />
+    </StackPanel>
+</UserControl>

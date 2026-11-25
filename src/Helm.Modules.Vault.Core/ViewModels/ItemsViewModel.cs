@@ -180,10 +180,12 @@ public sealed partial class ItemsViewModel : ObservableObject
 
     partial void OnSearchChanged(string value) => Refresh();
 
-    partial void OnSelectedCardChanged(VaultCardViewModel? value)
+    partial void OnSelectedCardChanged(VaultCardViewModel? oldValue, VaultCardViewModel? newValue)
     {
+        if (oldValue is not null) oldValue.IsSelected = false;
+        if (newValue is not null) newValue.IsSelected = true;
         if (_refreshing) return;
-        Detail = value is null ? null : DetailFor(value.Uid);
+        Detail = newValue is null ? null : DetailFor(newValue.Uid);
         _session.Touch();
     }
 

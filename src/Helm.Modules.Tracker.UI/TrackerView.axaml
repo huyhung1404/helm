@@ -7,37 +7,6 @@
              x:DataType="vm:TrackerViewModel">
 
     <UserControl.Styles>
-        <Style Selector="TextBlock.muted">
-            <Setter Property="Foreground" Value="{DynamicResource HelmSecondaryText}" />
-            <Setter Property="FontSize" Value="12.5" />
-            <Setter Property="TextWrapping" Value="Wrap" />
-        </Style>
-        <Style Selector="TextBlock.late">
-            <Setter Property="Foreground" Value="{DynamicResource HelmDanger}" />
-        </Style>
-        <Style Selector="TextBlock.done">
-            <Setter Property="TextDecorations" Value="Strikethrough" />
-            <Setter Property="Foreground" Value="{DynamicResource HelmSecondaryText}" />
-        </Style>
-        <Style Selector="TextBlock.head">
-            <Setter Property="FontSize" Value="15" />
-            <Setter Property="FontWeight" Value="SemiBold" />
-        </Style>
-        <Style Selector="TextBlock.stat">
-            <Setter Property="FontSize" Value="26" />
-            <Setter Property="FontWeight" Value="SemiBold" />
-        </Style>
-        <Style Selector="Border.tag">
-            <Setter Property="Background" Value="{DynamicResource HelmGlassHover}" />
-            <Setter Property="CornerRadius" Value="6" />
-            <Setter Property="Padding" Value="7,1" />
-            <Setter Property="Margin" Value="0,0,6,0" />
-            <Setter Property="VerticalAlignment" Value="Center" />
-        </Style>
-        <Style Selector="Border.tag > TextBlock">
-            <Setter Property="FontSize" Value="11" />
-            <Setter Property="FontWeight" Value="SemiBold" />
-        </Style>
         <!-- The round tick at the start of a task -->
         <Style Selector="Button.tick">
             <Setter Property="Width" Value="44" />
@@ -83,81 +52,6 @@
                 </Animation>
             </Style.Animations>
         </Style>
-        <!-- The task's text: a tap target with no look of its own (the whole card lifts and lights up instead) -->
-        <Style Selector="Button.rowhit">
-            <Setter Property="Background" Value="Transparent" />
-            <Setter Property="BorderThickness" Value="0" />
-            <Setter Property="HorizontalAlignment" Value="Stretch" />
-            <Setter Property="HorizontalContentAlignment" Value="Stretch" />
-        </Style>
-        <Style Selector="Button.rowhit:pointerover /template/ ContentPresenter#PART_ContentPresenter, Button.rowhit:pressed /template/ ContentPresenter#PART_ContentPresenter">
-            <Setter Property="Background" Value="Transparent" />
-        </Style>
-        <!-- A disclosure arrow: points right when closed, turns a quarter (down) when its section opens, and back.
-             core:Motion.Turn="{Binding IsExpanded}" on the Panel.turn around a ChevronRight sets .open / .closing. -->
-        <Style Selector="Panel.turn">
-            <Setter Property="RenderTransform"><RotateTransform /></Setter>
-        </Style>
-        <Style Selector="Panel.turn.open">
-            <Style.Animations>
-                <Animation Duration="0:0:0.2" Easing="CubicEaseOut" FillMode="Forward">
-                    <KeyFrame Cue="0%"><Setter Property="RotateTransform.Angle" Value="0" /></KeyFrame>
-                    <KeyFrame Cue="100%"><Setter Property="RotateTransform.Angle" Value="90" /></KeyFrame>
-                </Animation>
-            </Style.Animations>
-        </Style>
-        <Style Selector="Panel.turn.closing">
-            <Style.Animations>
-                <Animation Duration="0:0:0.2" Easing="CubicEaseOut" FillMode="Forward">
-                    <KeyFrame Cue="0%"><Setter Property="RotateTransform.Angle" Value="90" /></KeyFrame>
-                    <KeyFrame Cue="100%"><Setter Property="RotateTransform.Angle" Value="0" /></KeyFrame>
-                </Animation>
-            </Style.Animations>
-        </Style>        <!-- Small outlined action under an open task -->
-        <Style Selector=":is(Button).act">
-            <Setter Property="Background" Value="Transparent" />
-            <Setter Property="BorderBrush" Value="{DynamicResource HelmGlassStroke}" />
-            <Setter Property="BorderThickness" Value="1" />
-            <Setter Property="CornerRadius" Value="10" />
-            <Setter Property="Padding" Value="10,7" />
-            <Setter Property="Margin" Value="0,0,6,6" />
-            <Setter Property="MinHeight" Value="36" />
-        </Style>
-        <Style Selector=":is(Button).act:pointerover /template/ ContentPresenter#PART_ContentPresenter">
-            <Setter Property="Background" Value="{DynamicResource HelmGlassHover}" />
-            <Setter Property="BorderBrush" Value="{DynamicResource HelmGlassStroke}" />
-        </Style>
-        <Style Selector="ToggleButton.act:checked /template/ ContentPresenter#PART_ContentPresenter, Button.act.selected /template/ ContentPresenter#PART_ContentPresenter">
-            <Setter Property="Background" Value="{DynamicResource HelmGlassHover}" />
-            <Setter Property="BorderBrush" Value="{DynamicResource HelmGlassStrokeStrong}" />
-            <Setter Property="Foreground" Value="{DynamicResource TextControlForeground}" />
-        </Style>
-        <Style Selector="Button.act:disabled">
-            <Setter Property="Opacity" Value="0.35" />
-        </Style>
-        <Style Selector="Button.act:disabled /template/ ContentPresenter#PART_ContentPresenter">
-            <Setter Property="Background" Value="Transparent" />
-        </Style>
-        <!-- Tasks · Calendar · Insights -->
-        <Style Selector="RadioButton.seg">
-            <Setter Property="Template">
-                <ControlTemplate>
-                    <Border Name="Seg" Background="Transparent" CornerRadius="8" Padding="14,7">
-                        <ContentPresenter Content="{TemplateBinding Content}" />
-                    </Border>
-                </ControlTemplate>
-            </Setter>
-            <Setter Property="Foreground" Value="{DynamicResource HelmSecondaryText}" />
-            <Setter Property="FontSize" Value="13" />
-            <Setter Property="Cursor" Value="Hand" />
-        </Style>
-        <Style Selector="RadioButton.seg:checked">
-            <Setter Property="Foreground" Value="{DynamicResource TextControlForeground}" />
-            <Setter Property="FontWeight" Value="SemiBold" />
-        </Style>
-        <Style Selector="RadioButton.seg:checked /template/ Border#Seg">
-            <Setter Property="Background" Value="{DynamicResource HelmGlassHover}" />
-        </Style>
         <!-- Calendar -->
         <Style Selector="Button.calday">
             <Setter Property="CornerRadius" Value="10" />
@@ -183,18 +77,6 @@
         </Style>
         <Style Selector="Ellipse.dot.done">
             <Setter Property="Opacity" Value="0.4" />
-        </Style>
-        <Style Selector=":is(UserControl).narrow TextBlock.display">
-            <Setter Property="FontSize" Value="28" />
-        </Style>
-        <!-- On a phone a task's actions are icons in one row (the words are their tooltips and names) -->
-        <Style Selector=":is(UserControl).narrow TextBlock.label">
-            <Setter Property="IsVisible" Value="False" />
-        </Style>
-        <Style Selector=":is(UserControl).narrow :is(Button).act">
-            <Setter Property="MinWidth" Value="36" />
-            <Setter Property="Padding" Value="9,7" />
-            <Setter Property="Margin" Value="0,0,4,4" />
         </Style>
     </UserControl.Styles>
 
@@ -226,18 +108,18 @@
                             </ItemsControl.ItemTemplate>
                         </ItemsControl>
                         <CheckBox Content="{Binding SpreadText}" IsChecked="{Binding SpreadDates}" IsVisible="{Binding CanSpread}" />
-                        <WrapPanel HorizontalAlignment="Right">
-                            <Button Classes="act" Content="Cancel" Command="{Binding CloseCommand}" />
-                            <Button Classes="act" Content="Try again" Command="{Binding RetryCommand}" />
-                            <Button Classes="pill" Content="{Binding AddText}" Command="{Binding AddCommand}" Margin="0,0,0,6" />
-                        </WrapPanel>
+                        <Grid ColumnDefinitions="*,*,2*" ColumnSpacing="8">
+                            <Button Classes="act" Margin="0" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Content="Cancel" Command="{Binding CloseCommand}" />
+                            <Button Grid.Column="1" Classes="act" Margin="0" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Content="Try again" Command="{Binding RetryCommand}" />
+                            <Button Grid.Column="2" Classes="pill" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Content="{Binding AddText}" Command="{Binding AddCommand}" />
+                        </Grid>
                     </StackPanel>
                     <StackPanel Spacing="6" IsVisible="{Binding IsStuck}">
                         <TextBlock Text="{Binding Status}" TextWrapping="Wrap" />
-                        <WrapPanel HorizontalAlignment="Right">
-                            <Button Classes="act" Content="Try again" Command="{Binding RetryCommand}" />
-                            <Button Classes="act" Content="Cancel" Command="{Binding CloseCommand}" />
-                        </WrapPanel>
+                        <Grid ColumnDefinitions="*,*" ColumnSpacing="8">
+                            <Button Classes="act" Margin="0" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Content="Try again" Command="{Binding RetryCommand}" />
+                            <Button Grid.Column="1" Classes="act" Margin="0" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Content="Cancel" Command="{Binding CloseCommand}" />
+                        </Grid>
                     </StackPanel>
                     <Grid ColumnDefinitions="*,Auto,Auto" IsVisible="{Binding CanUndo}">
                         <TextBlock Text="{Binding Status}" TextWrapping="Wrap" VerticalAlignment="Center" />
@@ -351,10 +233,10 @@
                                           ItemsSource="{Binding $parent[UserControl].((vm:TrackerViewModel)DataContext).RepeatNames}" />
                                 <TextBox Grid.Column="1" Classes="glass" Width="96" Margin="8,0,0,0" PlaceholderText="Days" Text="{Binding EditRepeatDays}" />
                             </Grid>
-                            <WrapPanel>
-                                <Button Classes="pill" Content="Save" Command="{Binding SaveEditCommand}" Margin="0,0,8,0" />
-                                <Button Classes="ghost" Content="Cancel" Command="{Binding CancelEditCommand}" />
-                            </WrapPanel>
+                            <Grid ColumnDefinitions="*,*" ColumnSpacing="8">
+                                <Button Classes="pill" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Content="Save" Command="{Binding SaveEditCommand}" />
+                                <Button Grid.Column="1" Classes="ghost" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Content="Cancel" Command="{Binding CancelEditCommand}" />
+                            </Grid>
                         </StackPanel>
                     </StackPanel>
                 </StackPanel>
@@ -424,9 +306,9 @@
                                     </StackPanel>
                                 </Border>
                             </UniformGrid>
-                            <Button x:Name="FirstRunButton" Classes="pill" HorizontalAlignment="Left" MinWidth="220" Command="{Binding CreateTasksWorkspaceCommand}"
+                            <Button x:Name="FirstRunButton" Classes="pill" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Command="{Binding CreateTasksWorkspaceCommand}"
                                     AutomationProperties.Name="Make my first list">
-                                <StackPanel Orientation="Horizontal" Spacing="8">
+                                <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Center">
                                     <TextBlock Text="Make my first list" Foreground="{DynamicResource HelmPillForeground}" />
                                     <ic:SymbolIcon Symbol="ArrowRight" FontSize="16" Foreground="{DynamicResource HelmPillForeground}" />
                                 </StackPanel>

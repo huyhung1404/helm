@@ -34,6 +34,21 @@ code goes). Tracker (`src/Helm.Modules.Tracker.UI/TrackerView.axaml`) is the ref
   the tab bar is one borderless pill (`SubtleFillColorTertiaryBrush`) with pill tabs.
 - Cards: `Border.glass` (radius 12, glass fill, thin stroke, soft shadow); `.glass.hero` (radius 16) for the one big
   card (first run). Sheets/dialogs: `Border.sheet` / `HelmSheetBackground` (solid, radius 26, 28 on top of a phone sheet, stroke): a floating card is more rounded than the cards under it, never sharper. Popup lists: radius 12.
+- **Stacked cards sit on the page, they are not smudged onto it.** The card shadow (`HelmGlassShadow`, `HelmLiftShadow` on
+  hover) is three layers: a tight contact shadow, a short soft one under the bottom edge with a **negative spread** (it
+  never reaches into the gap between cards) and a thin light edge on top (`inset 0 1 0 0`). Never a wide dark blur
+  (`0 8 24 0 black`): in a list it fills the gaps and shows as a black band under every card. Hover changes the
+  shadow layers one for one, so the transition is smooth. Hero and sheets keep the big shadow (`HelmHeroShadow`).
+- **A scrolling list keeps room for its scrollbar and shadows**: a `ScrollViewer` inside a column has `Padding="0,0,14,14"`,
+  so the bar never touches the cards and the last card's shadow is not cut off. (A page-wide scroller needs it only
+  when the page margin is under 16.)
+- **A scrolling list never ends in a hard cut through a card.** Where it meets something fixed (the search bar above it, a
+  sheet's edge) put `core:ScrollFade.Enabled="True"` on its `ScrollViewer`: the edge fades over ~22 px while there is
+  more to scroll to, and nothing fades at the very top or bottom, so the first and last card keep their edges. Sheets
+  do it already. A bar that stays above a list (Vault's search + add) is **sticky**: the `ScrollViewer` fills the whole
+  area with `Padding` top = the bar's height + 10, the bar sits over it (`VerticalAlignment="Top"`, solid
+  `HelmSheetBackground`), so the cards slide under the bar. Never put the bar in a row above the scroller: the cut then
+  floats in the empty gap under the bar.
 - Colours only from HelmTheme keys: `HelmGlass`, `HelmGlassHover`, `HelmGlassStroke`, `HelmGlassStrokeStrong` (the
   chosen thing), `HelmEyebrow` (teal accent text), `HelmPillBackground/Foreground`, `HelmSecondaryText`,
   `HelmDanger`, `HelmSuccess`. Never a raw hex in a page.
@@ -66,6 +81,9 @@ code goes). Tracker (`src/Helm.Modules.Tracker.UI/TrackerView.axaml`) is the ref
 - Phone: actions are icons in one row (labels `TextBlock.label` hidden), side-by-side things stack, lists of cards go
   two by two or scroll sideways with the scrollbar hidden. The tabs and the gear stay on the **right**, as on PC (on a
   phone on their own line under the date, right-aligned).
+- **Text never runs out of its card.** Text beside an icon or a button is in a `Grid` with an `Auto,*` column (the text in
+  the `*` column, `TextWrapping="Wrap"`), never in a horizontal `StackPanel` (a StackPanel gives its children
+  unlimited width, so a long sentence is cut at the card's edge). Check every message and warning at Phone 390.
 - Every floating card (date picker, settings, confirmation) is `Sheet.Show(anchor, body)`: a card in the middle on PC, a
   sheet from the bottom on a phone. It opens over the nearest ancestor with class `screen` (the Gallery's phone frame)
   or the window, keeps the page's light/dark, and grows into place.
@@ -123,7 +141,8 @@ code goes). Tracker (`src/Helm.Modules.Tracker.UI/TrackerView.axaml`) is the ref
   right.
 - **Confirmation** (`GlassDialogs`): title 18 semibold, a `secondary` sentence saying what will be removed and what stays,
   Cancel `ghost` + the action `pill` on the right; the action is named by its verb ("Delete"), never "OK".
-- **First run**: eyebrow "START HERE", a title, three step cards (the first outlined, the rest faded), one pill.
+- **First run**: eyebrow "START HERE", a title, three step cards (the first outlined, the rest faded), one pill that
+  fills the card's width with its label centred (the same on PC and phone).
 - **Calendar**: month grid of `glass` cells (round only inside the date picker), dots for what is due (red overdue,
   amber debts, faded done), week view as rows; the chosen day's tasks under it with a quick add.
 - **Insights**: numbers in `stat` (26 semibold) in glass cards, then bars in the accent colour.

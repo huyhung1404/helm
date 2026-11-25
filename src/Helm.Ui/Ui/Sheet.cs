@@ -47,6 +47,20 @@ public static class Sheet
     /// <summary>True when sheets over <paramref name="anchor"/>'s screen come from the bottom.</summary>
     public static bool IsPhone(Control anchor) => Find(anchor) is { } f && f.Screen.Bounds.Width < PhoneBelow;
 
+    private static ScrollViewer Scroller(Control body, double maxHeight)
+    {
+        var scroller = new ScrollViewer
+        {
+            Content = body,
+            Padding = new Thickness(0, 0, 12, 0),
+            MaxHeight = maxHeight,
+            HorizontalScrollBarVisibility = Avalonia.Controls.Primitives.ScrollBarVisibility.Disabled,
+        };
+        // A tall sheet scrolls: its edges fade instead of cutting a card in half.
+        ScrollFade.SetEnabled(scroller, true);
+        return scroller;
+    }
+
     /// <summary>Opens <paramref name="body"/> in a sheet; null when there is no screen to open over.</summary>
     public static SheetHandle? Show(Control anchor, Control body, double width = 400)
     {
@@ -70,7 +84,7 @@ public static class Sheet
                 Children =
                 {
                     phone ? new Border { Width = 36, Height = 4, CornerRadius = new CornerRadius(2), HorizontalAlignment = HorizontalAlignment.Center, Background = new SolidColorBrush(Colors.Gray, 0.5) } : new Panel { Height = 0 },
-                    new ScrollViewer { Content = body, Padding = new Thickness(0, 0, 12, 0), MaxHeight = size.Height - 96, HorizontalScrollBarVisibility = Avalonia.Controls.Primitives.ScrollBarVisibility.Disabled },
+                    Scroller(body, size.Height - 96),
                 },
             },
         };

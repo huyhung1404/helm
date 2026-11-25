@@ -77,7 +77,6 @@ public partial class TrackerView : UserControl
         if (!narrow) NewListBox.IsVisible = false;
         // First run: the three steps side by side on a wide page, one under the other on a phone.
         FirstRunSteps.Columns = narrow ? 1 : 3;
-        FirstRunButton.HorizontalAlignment = narrow ? Avalonia.Layout.HorizontalAlignment.Stretch : Avalonia.Layout.HorizontalAlignment.Left;
     }
 
     /// <summary>Each tab replaces the whole page under the tabs, from its title down.</summary>
