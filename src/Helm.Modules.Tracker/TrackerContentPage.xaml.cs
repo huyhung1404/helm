@@ -1,52 +1,36 @@
-using System.ComponentModel;
 using System.Text;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Threading;
-using Helm.Core.Modules;
+using Helm.Core.Ui;
+using Helm.Modules.Tracker.Ui;
 
 namespace Helm.Modules.Tracker;
 
 /// <summary>
-/// The Tracker itself, opened from the menu and the Quick access tile (see <see cref="IModuleContent"/>). While the
-/// tool is off the lists stay visible but read-only, with a note pointing to the settings (Home → Utilities).
+/// The Tracker itself, opened from the menu and the Quick access tile. SPIKE: a WPF shell around the shared Avalonia
+/// <see cref="TrackerView"/>; this class only does what Windows does its own way (the save dialog).
 /// </summary>
-public partial class TrackerContentPage : Page
+public partial class TrackerContentPage : Page, ITrackerPageHost
 {
-    private readonly TrackerModule _module;
+    private readonly TrackerViewModel _viewModel;
     private readonly DispatcherTimer _clock = new() { Interval = TimeSpan.FromSeconds(60) };
 
     public TrackerContentPage(TrackerModule module, TrackerViewModel viewModel)
     {
-        _module = module;
-        DataContext = viewModel;
+        _viewModel = viewModel;
         InitializeComponent();
-        // Module and page are both singletons, so the subscription lives as long as the page.
-        module.PropertyChanged += OnModuleChanged;
-        ApplyEnabled();
+        Host.Page = new PageFrame("Tracker", new TrackerView(module, viewModel, this));
         // "Added just now" goes stale after a minute; refresh the relative times while the page is on screen.
         _clock.Tick += (_, _) => viewModel.RefreshDetails();
         Loaded += (_, _) => _clock.Start();
         Unloaded += (_, _) => _clock.Stop();
     }
 
-    private void OnModuleChanged(object? sender, PropertyChangedEventArgs e)
-    {
-        if (e.PropertyName == nameof(IModule.IsEnabled)) Dispatcher.BeginInvoke(ApplyEnabled);
-    }
+    public void Opened() { }
 
-    private void ApplyEnabled()
+    public void ExportCalendar(string ics)
     {
-        var on = _module.IsEnabled;
-        Body.IsEnabled = on;
-        OffBar.IsOpen = !on;
-        OffBar.Visibility = on ? Visibility.Collapsed : Visibility.Visible;
-    }
-
-    /// <summary>View glue: the save dialog is Windows UI; the calendar file comes from the shared view model.</summary>
-    private void ExportIcs_Click(object sender, RoutedEventArgs e)
-    {
-        var viewModel = (TrackerViewModel)DataContext;
         var dialog = new Microsoft.Win32.SaveFileDialog
         {
             FileName = $"helm-tracker-{DateTime.Now:yyyyMMdd}.ics",
@@ -56,12 +40,12 @@ public partial class TrackerContentPage : Page
         if (dialog.ShowDialog(Window.GetWindow(this)) != true) return;
         try
         {
-            File.WriteAllText(dialog.FileName, viewModel.CalendarIcs(), new UTF8Encoding(encoderShouldEmitUTF8Identifier: false));
-            viewModel.ReportExport("The calendar", dialog.FileName);
+            File.WriteAllText(dialog.FileName, ics, new UTF8Encoding(encoderShouldEmitUTF8Identifier: false));
+            _viewModel.ReportExport("The calendar", dialog.FileName);
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or System.Security.SecurityException)
         {
-            viewModel.ReportExportFailure(ex);
+            _viewModel.ReportExportFailure(ex);
         }
     }
 }

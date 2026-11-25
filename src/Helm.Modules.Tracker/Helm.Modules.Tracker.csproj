@@ -8,6 +8,8 @@
   <ItemGroup>
     <ProjectReference Include="..\Helm.Core.Windows\Helm.Core.Windows.csproj" />
     <ProjectReference Include="..\Helm.Modules.Tracker.Core\Helm.Modules.Tracker.Core.csproj" />
+    <ProjectReference Include="..\Helm.Modules.Tracker.UI\Helm.Modules.Tracker.UI.csproj" />
+    <ProjectReference Include="..\Helm.Ui.Windows\Helm.Ui.Windows.csproj" />
   </ItemGroup>
 
   <ItemGroup>
