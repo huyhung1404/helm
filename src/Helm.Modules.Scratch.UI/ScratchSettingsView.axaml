@@ -1,0 +1,85 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:ic="using:FluentIcons.Avalonia"
+             xmlns:vm="using:Helm.Modules.Scratch"
+             xmlns:core="using:Helm.Core.Ui"
+             x:Class="Helm.Modules.Scratch.Ui.ScratchSettingsView"
+             x:DataType="vm:ScratchViewModel">
+
+    <!-- Scratch's settings as a sheet over Scratch (the gear): one card per subject. -->
+    <StackPanel Spacing="14">
+        <Grid ColumnDefinitions="*,Auto">
+            <StackPanel>
+                <TextBlock Classes="eyebrow" Text="SCRATCH" />
+                <TextBlock Text="Settings" FontSize="22" FontWeight="SemiBold" />
+            </StackPanel>
+            <Button x:Name="CloseButton" Grid.Column="1" Classes="chip" VerticalAlignment="Top" ToolTip.Tip="Close" AutomationProperties.Name="Close settings">
+                <ic:SymbolIcon Symbol="Dismiss" FontSize="14" />
+            </Button>
+        </Grid>
+
+        <!-- On or off: off keeps everything, read only -->
+        <Border Classes="glass">
+            <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
+                <StackPanel VerticalAlignment="Center">
+                    <TextBlock Text="Scratch is on" Classes="head" />
+                    <TextBlock Text="Off keeps everything in it but you cannot add or take things out, and this device stops receiving the clipboard." Classes="secondary" TextWrapping="Wrap" />
+                </StackPanel>
+                <ToggleSwitch x:Name="EnableSwitch" Grid.Column="1" VerticalAlignment="Center" OnContent="" OffContent="" AutomationProperties.Name="Scratch on or off" />
+            </Grid>
+        </Border>
+
+        <Border Classes="glass">
+            <StackPanel Spacing="12">
+                <TextBlock Text="Clipboard" Classes="head" />
+                <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
+                    <StackPanel VerticalAlignment="Center">
+                        <TextBlock Text="Receive “Send to clipboard”" />
+                        <TextBlock Text="When you use Send to clipboard on another device, copy that thing onto this device's clipboard too (while Helm is open)." Classes="secondary" TextWrapping="Wrap" />
+                    </StackPanel>
+                    <ToggleSwitch Grid.Column="1" VerticalAlignment="Center" IsChecked="{Binding ReceiveClipboard}" OnContent="" OffContent="" AutomationProperties.Name="Receive Send to clipboard" />
+                </Grid>
+            </StackPanel>
+        </Border>
+
+        <Border Classes="glass">
+            <StackPanel Spacing="12">
+                <TextBlock Text="Display" Classes="head" />
+                <StackPanel Spacing="6">
+                    <TextBlock Text="Cards shown at first" />
+                    <ComboBox Classes="glass" HorizontalAlignment="Stretch" ItemsSource="{x:Static core:ListPager.SizeNames}" SelectedIndex="{Binding ItemsShownIndex}"
+                              AutomationProperties.Name="Cards shown at first" />
+                    <TextBlock Text="Show more adds as many again. Fewer keeps Scratch smooth to scroll." Classes="secondary" TextWrapping="Wrap" />
+                </StackPanel>
+            </StackPanel>
+        </Border>
+
+        <Border Classes="glass">
+            <StackPanel Spacing="10">
+                <StackPanel Spacing="2">
+                    <TextBlock Text="Storage" Classes="head" />
+                    <TextBlock Text="{Binding StorageSummary}" Classes="secondary" TextWrapping="Wrap" />
+                </StackPanel>
+                <Button Classes="ghost" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Content="Free up space on this device" Command="{Binding FreeUpSpaceCommand}" />
+            </StackPanel>
+        </Border>
+
+        <Border Classes="glass">
+            <StackPanel Spacing="10">
+                <StackPanel Spacing="2">
+                    <TextBlock Text="Trash" Classes="head" />
+                    <TextBlock Text="{Binding TrashSummary}" Classes="secondary" TextWrapping="Wrap" />
+                </StackPanel>
+                <Button Classes="ghost" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Command="{Binding EmptyTrashCommand}" IsEnabled="{Binding HasTrash}"
+                        AutomationProperties.Name="Empty the trash">
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                        <ic:SymbolIcon Symbol="Delete" FontSize="14" Foreground="{DynamicResource HelmDanger}" />
+                        <TextBlock Text="Empty the trash" Foreground="{DynamicResource HelmDanger}" />
+                    </StackPanel>
+                </Button>
+            </StackPanel>
+        </Border>
+
+        <Button x:Name="DoneButton" Classes="pill" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Content="Done" />
+    </StackPanel>
+</UserControl>

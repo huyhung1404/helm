@@ -1,0 +1,452 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:ic="using:FluentIcons.Avalonia"
+             xmlns:vm="using:Helm.Modules.Scratch"
+             xmlns:local="using:Helm.Modules.Scratch.Ui"
+             xmlns:core="using:Helm.Core.Ui"
+             x:Class="Helm.Modules.Scratch.Ui.ScratchView"
+             x:DataType="vm:ScratchViewModel">
+
+    <!-- Scratch, the same view on every platform: a wall of cards showing what each holds, under a bar that stays on top
+         (search, add). Wide: click a card to select it (Shift/Ctrl for more), double-click opens it, the keyboard and the
+         right-click menu act on it, drag moves it. Phone: a tap shows the thing's details in place of the wall, the card has
+         Copy and Trash buttons, hold a card and drag it onto another to move it. -->
+    <UserControl.Styles>
+        <!-- One thing on the wall: a glass card as tall as what it shows -->
+        <Style Selector="Border.card">
+            <Setter Property="Padding" Value="12,12,8,8" />
+        </Style>
+        <Style Selector="Border.card.selected">
+            <Setter Property="BorderBrush" Value="{DynamicResource HelmGlassStrokeStrong}" />
+            <Setter Property="Background" Value="{DynamicResource HelmGlassHover}" />
+        </Style>
+        <!-- The card's content as a tap target, without button chrome -->
+        <Style Selector="Button.cardhit">
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="Padding" Value="0" />
+            <Setter Property="HorizontalAlignment" Value="Stretch" />
+            <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+        </Style>
+        <Style Selector="Button.cardhit:pointerover /template/ ContentPresenter#PART_ContentPresenter, Button.cardhit:pressed /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="Transparent" />
+        </Style>
+        <Style Selector="Border.thumb">
+            <Setter Property="Width" Value="52" />
+            <Setter Property="Height" Value="52" />
+            <Setter Property="CornerRadius" Value="10" />
+            <Setter Property="ClipToBounds" Value="True" />
+            <Setter Property="Background" Value="{DynamicResource HelmGlassHover}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource HelmGlassStroke}" />
+            <Setter Property="BorderThickness" Value="1" />
+        </Style>
+        <!-- Copy and Trash on the card: the phone has the buttons, the PC the keyboard and the right-click menu -->
+        <Style Selector="StackPanel.cardactions">
+            <Setter Property="IsVisible" Value="False" />
+        </Style>
+        <Style Selector=":is(UserControl).narrow StackPanel.cardactions">
+            <Setter Property="IsVisible" Value="True" />
+        </Style>
+        <!-- Phone: the actions keep their icons, the words go -->
+        <Style Selector=":is(UserControl).narrow TextBlock.label">
+            <Setter Property="IsVisible" Value="False" />
+        </Style>
+        <Style Selector="Button.action">
+            <Setter Property="HorizontalAlignment" Value="Stretch" />
+            <Setter Property="HorizontalContentAlignment" Value="Center" />
+        </Style>
+    </UserControl.Styles>
+
+    <Panel>
+        <core:Backdrop />
+
+        <!-- THE WALL -->
+        <Panel x:Name="WallLayer">
+            <ScrollViewer x:Name="Scroller" HorizontalScrollBarVisibility="Disabled" core:ScrollFade.Enabled="True">
+                <StackPanel x:Name="Page" Margin="40,12,40,96">
+                    <!-- Shown while the tool is turned off -->
+                    <Border x:Name="OffBar" Classes="glass" Margin="0,0,0,16" IsVisible="False">
+                        <StackPanel>
+                            <TextBlock Text="Scratch is turned off" Classes="head" />
+                            <TextBlock Text="Everything in it is kept. Turn Scratch on in its settings (the gear) to add and take things out." Classes="muted" TextWrapping="Wrap" />
+                        </StackPanel>
+                    </Border>
+
+                    <!-- Sync off, storage full: what you add does not reach the other devices -->
+                    <Border Classes="glass" Margin="0,0,0,16" IsVisible="{Binding HasSyncNote}" BorderBrush="{DynamicResource HelmDanger}">
+                        <Grid ColumnDefinitions="Auto,*" ColumnSpacing="12">
+                            <ic:SymbolIcon Symbol="Warning" FontSize="18" Foreground="{DynamicResource HelmDanger}" VerticalAlignment="Center" />
+                            <TextBlock Grid.Column="1" Text="{Binding SyncNote}" TextWrapping="Wrap" VerticalAlignment="Center" />
+                        </Grid>
+                    </Border>
+
+                    <!-- What happened -->
+                    <Border Classes="glass" Margin="0,0,0,16" IsVisible="{Binding HasMessage}" core:Motion.EnterOnShow="True">
+                        <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="12">
+                            <ic:SymbolIcon Symbol="Info" FontSize="18" Foreground="{DynamicResource HelmEyebrow}" VerticalAlignment="Center" />
+                            <TextBlock Grid.Column="1" Text="{Binding Message}" TextWrapping="Wrap" VerticalAlignment="Center" />
+                            <Button Grid.Column="2" Classes="chip" Command="{Binding DismissMessageCommand}" ToolTip.Tip="Dismiss" AutomationProperties.Name="Dismiss">
+                                <ic:SymbolIcon Symbol="Dismiss" FontSize="14" />
+                            </Button>
+                        </Grid>
+                    </Border>
+
+                    <!-- Adding, downloading -->
+                    <Border Classes="glass" Margin="0,0,0,16" IsVisible="{Binding IsBusy}" core:Motion.EnterOnShow="True">
+                        <StackPanel Spacing="10">
+                            <TextBlock Text="{Binding BusyText}" TextWrapping="Wrap" MaxLines="2" TextTrimming="CharacterEllipsis" />
+                            <ProgressBar Minimum="0" Maximum="100" Value="{Binding Progress}" IsIndeterminate="{Binding !IsProgressKnown}" />
+                        </StackPanel>
+                    </Border>
+
+                    <!-- Add a piece of text -->
+                    <Border Classes="glass" Margin="0,0,0,16" IsVisible="{Binding IsTextBoxOpen}" core:Motion.EnterOnShow="True" core:Motion.FromTop="True">
+                        <StackPanel Spacing="10">
+                            <TextBox x:Name="NewTextBox" Classes="glass" PlaceholderText="A link, an address, a code, a few lines for your other devices…" AcceptsReturn="True"
+                                     TextWrapping="Wrap" MinHeight="96" MaxHeight="240" VerticalContentAlignment="Top"
+                                     Text="{Binding NewText}" AutomationProperties.Name="Text to add" />
+                            <Grid ColumnDefinitions="*,2*" ColumnSpacing="8">
+                                <Button Classes="ghost" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Content="Cancel" Command="{Binding CancelTextCommand}" />
+                                <Button Grid.Column="1" Classes="pill" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Content="Add" Command="{Binding SaveTextCommand}" />
+                            </Grid>
+                        </StackPanel>
+                    </Border>
+
+                    <!-- The title, what is in it, and the filters -->
+                    <Grid x:Name="TitleRow" ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto" Margin="0,0,0,16">
+                        <StackPanel>
+                            <TextBlock Classes="display" Text="{Binding ListTitle}" />
+                            <TextBlock Classes="muted" FontSize="14" Margin="0,4,0,0" Text="{Binding ListSummary}" />
+                        </StackPanel>
+                        <Button x:Name="EmptyTrashButton" Grid.Column="1" Classes="ghost" VerticalAlignment="Bottom" Command="{Binding EmptyTrashCommand}"
+                                IsVisible="{Binding ShowingTrash}" IsEnabled="{Binding HasTrash}" ToolTip.Tip="Delete everything in the trash for good"
+                                AutomationProperties.Name="Empty the trash">
+                            <StackPanel Orientation="Horizontal" Spacing="6">
+                                <ic:SymbolIcon Symbol="Delete" FontSize="14" Foreground="{DynamicResource HelmDanger}" />
+                                <TextBlock Classes="label" Text="Empty trash" Foreground="{DynamicResource HelmDanger}" />
+                            </StackPanel>
+                        </Button>
+                        <ScrollViewer x:Name="FilterScroller" Grid.Column="1" HorizontalScrollBarVisibility="Hidden" VerticalScrollBarVisibility="Disabled"
+                                      VerticalAlignment="Bottom" HorizontalAlignment="Right" IsVisible="{Binding NotShowingTrash}">
+                            <Border Classes="glass" Padding="3" CornerRadius="10" BoxShadow="">
+                                <ItemsControl ItemsSource="{Binding FilterBar}">
+                                    <ItemsControl.ItemsPanel>
+                                        <ItemsPanelTemplate><StackPanel Orientation="Horizontal" Spacing="2" /></ItemsPanelTemplate>
+                                    </ItemsControl.ItemsPanel>
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate DataType="vm:ScratchFilterTab">
+                                            <RadioButton Classes="seg" GroupName="ScratchFilter" IsChecked="{Binding IsSelected, Mode=OneWay}" Content="{Binding Label}"
+                                                         Command="{Binding $parent[ItemsControl].((vm:ScratchViewModel)DataContext).ShowFilterCommand}" CommandParameter="{Binding}"
+                                                         AutomationProperties.Name="{Binding Name}" />
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                            </Border>
+                        </ScrollViewer>
+                    </Grid>
+
+                    <StackPanel x:Name="Body">
+                        <!-- The wall: each card shows what it holds and is as tall as that -->
+                        <ItemsControl x:Name="Wall" ItemsSource="{Binding Rows}" IsVisible="{Binding HasRows}" Classes="enter">
+                            <ItemsControl.ItemsPanel>
+                                <ItemsPanelTemplate>
+                                    <core:MasonryPanel MinColumnWidth="220" Spacing="12" />
+                                </ItemsPanelTemplate>
+                            </ItemsControl.ItemsPanel>
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate DataType="vm:ScratchRowViewModel">
+                                    <Border Classes="glass lift fade card" Classes.selected="{Binding IsSelected}">
+                                        <!-- Right-click: everything else that can be done with it (wide only) -->
+                                        <Border.ContextMenu>
+                                            <ContextMenu>
+                                                <MenuItem Header="Open" InputGesture="Enter" IsVisible="{Binding IsFile}" Command="{Binding $parent[ItemsControl].((vm:ScratchViewModel)DataContext).OpenCommand}" CommandParameter="{Binding}">
+                                                    <MenuItem.Icon><ic:SymbolIcon Symbol="Open" FontSize="16" /></MenuItem.Icon>
+                                                </MenuItem>
+                                                <MenuItem Header="Copy" InputGesture="Ctrl+C" Command="{Binding $parent[ItemsControl].((vm:ScratchViewModel)DataContext).CopyCommand}" CommandParameter="{Binding}">
+                                                    <MenuItem.Icon><ic:SymbolIcon Symbol="Copy" FontSize="16" /></MenuItem.Icon>
+                                                </MenuItem>
+                                                <MenuItem Header="Send to clipboard on all devices" InputGesture="Ctrl+Shift+C" IsVisible="{Binding IsLive}"
+                                                          Command="{Binding $parent[ItemsControl].((vm:ScratchViewModel)DataContext).SendToClipboardCommand}" CommandParameter="{Binding}">
+                                                    <MenuItem.Icon><ic:SymbolIcon Symbol="ClipboardArrowRight" FontSize="16" /></MenuItem.Icon>
+                                                </MenuItem>
+                                                <MenuItem Header="Save as…" IsVisible="{Binding IsFile}" Command="{Binding $parent[ItemsControl].((vm:ScratchViewModel)DataContext).SaveCommand}" CommandParameter="{Binding}">
+                                                    <MenuItem.Icon><ic:SymbolIcon Symbol="ArrowDownload" FontSize="16" /></MenuItem.Icon>
+                                                </MenuItem>
+                                                <MenuItem Header="Send to Notes" InputGesture="Ctrl+Shift+N" IsVisible="{Binding CanBecomeNote}"
+                                                          Command="{Binding $parent[ItemsControl].((vm:ScratchViewModel)DataContext).SendToNotesCommand}" CommandParameter="{Binding}">
+                                                    <MenuItem.Icon><ic:SymbolIcon Symbol="Notepad" FontSize="16" /></MenuItem.Icon>
+                                                </MenuItem>
+                                                <MenuItem Header="Move to the trash" InputGesture="Delete" IsVisible="{Binding IsLive}"
+                                                          Command="{Binding $parent[ItemsControl].((vm:ScratchViewModel)DataContext).TrashCommand}" CommandParameter="{Binding}">
+                                                    <MenuItem.Icon><ic:SymbolIcon Symbol="Delete" FontSize="16" /></MenuItem.Icon>
+                                                </MenuItem>
+                                                <MenuItem Header="Restore" IsVisible="{Binding Trashed}" Command="{Binding $parent[ItemsControl].((vm:ScratchViewModel)DataContext).RestoreCommand}" CommandParameter="{Binding}">
+                                                    <MenuItem.Icon><ic:SymbolIcon Symbol="ArrowUndo" FontSize="16" /></MenuItem.Icon>
+                                                </MenuItem>
+                                                <MenuItem Header="Delete for good" InputGesture="Delete" IsVisible="{Binding Trashed}"
+                                                          Command="{Binding $parent[ItemsControl].((vm:ScratchViewModel)DataContext).DeleteForeverCommand}" CommandParameter="{Binding}">
+                                                    <MenuItem.Icon><ic:SymbolIcon Symbol="Delete" FontSize="16" Foreground="{DynamicResource HelmDanger}" /></MenuItem.Icon>
+                                                </MenuItem>
+                                            </ContextMenu>
+                                        </Border.ContextMenu>
+                                        <StackPanel Spacing="8">
+                                            <Button Classes="cardhit" AutomationProperties.Name="{Binding Name}">
+                                                <Panel>
+                                                    <!-- A photo or a video: the picture at its own shape -->
+                                                    <Panel IsVisible="{Binding HasThumbnail}">
+                                                        <Border CornerRadius="8" ClipToBounds="True">
+                                                            <Image Source="{Binding Thumbnail, Converter={x:Static local:ScratchThumbnailConverter.Instance}}" Stretch="Uniform" />
+                                                        </Border>
+                                                        <Border Width="36" Height="36" CornerRadius="18" HorizontalAlignment="Center" VerticalAlignment="Center" Opacity="0.9"
+                                                                Background="{DynamicResource HelmSheetBackground}" IsVisible="{Binding IsVideo}">
+                                                            <ic:SymbolIcon Symbol="Play" IconVariant="Filled" FontSize="16" />
+                                                        </Border>
+                                                    </Panel>
+                                                    <!-- A text: all of it -->
+                                                    <TextBlock Text="{Binding FullText}" TextWrapping="Wrap" FontSize="14" LineHeight="20" IsVisible="{Binding IsText}" />
+                                                    <!-- Any other file: its icon and name -->
+                                                    <Grid ColumnDefinitions="Auto,*" ColumnSpacing="12">
+                                                        <Grid.IsVisible>
+                                                            <MultiBinding Converter="{x:Static BoolConverters.And}">
+                                                                <Binding Path="IsFile" />
+                                                                <Binding Path="HasNoThumbnail" />
+                                                            </MultiBinding>
+                                                        </Grid.IsVisible>
+                                                        <Border Classes="thumb" VerticalAlignment="Top">
+                                                            <Panel>
+                                                                <ic:SymbolIcon Symbol="Image" FontSize="22" Foreground="{DynamicResource HelmSecondaryText}" IsVisible="{Binding IsImage}" />
+                                                                <ic:SymbolIcon Symbol="Video" FontSize="22" Foreground="{DynamicResource HelmSecondaryText}" IsVisible="{Binding IsVideo}" />
+                                                                <ic:SymbolIcon Symbol="Document" FontSize="22" Foreground="{DynamicResource HelmSecondaryText}" IsVisible="{Binding IsDocument}" />
+                                                            </Panel>
+                                                        </Border>
+                                                        <TextBlock Grid.Column="1" Text="{Binding Name}" FontWeight="SemiBold" TextWrapping="Wrap" MaxLines="3"
+                                                                   TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
+                                                    </Grid>
+                                                </Panel>
+                                            </Button>
+
+                                            <!-- Footer: when, the upload state, and (phone) Copy and Trash -->
+                                            <Grid ColumnDefinitions="*,Auto">
+                                                <StackPanel VerticalAlignment="Center">
+                                                    <TextBlock Text="{Binding Footer}" FontSize="11" Classes="muted" TextTrimming="CharacterEllipsis" />
+                                                    <TextBlock Text="{Binding Status}" FontSize="11" Foreground="{DynamicResource HelmEyebrow}" TextTrimming="CharacterEllipsis"
+                                                               IsVisible="{Binding HasStatus}" />
+                                                </StackPanel>
+                                                <StackPanel Grid.Column="1" Classes="cardactions" Orientation="Horizontal">
+                                                    <Button Classes="flat small" Width="40" Height="40" Padding="0" HorizontalContentAlignment="Center" ToolTip.Tip="Copy" AutomationProperties.Name="Copy"
+                                                            Command="{Binding $parent[ItemsControl].((vm:ScratchViewModel)DataContext).CopyCommand}" CommandParameter="{Binding}">
+                                                        <ic:SymbolIcon Symbol="Copy" FontSize="16" />
+                                                    </Button>
+                                                    <Button Classes="flat small" Width="40" Height="40" Padding="0" HorizontalContentAlignment="Center" ToolTip.Tip="Move to the trash"
+                                                            AutomationProperties.Name="Move to the trash" IsVisible="{Binding IsLive}"
+                                                            Command="{Binding $parent[ItemsControl].((vm:ScratchViewModel)DataContext).TrashCommand}" CommandParameter="{Binding}">
+                                                        <ic:SymbolIcon Symbol="Delete" FontSize="16" />
+                                                    </Button>
+                                                    <Button Classes="flat small" Width="40" Height="40" Padding="0" HorizontalContentAlignment="Center" ToolTip.Tip="Restore"
+                                                            AutomationProperties.Name="Restore" IsVisible="{Binding Trashed}"
+                                                            Command="{Binding $parent[ItemsControl].((vm:ScratchViewModel)DataContext).RestoreCommand}" CommandParameter="{Binding}">
+                                                        <ic:SymbolIcon Symbol="ArrowUndo" FontSize="16" />
+                                                    </Button>
+                                                </StackPanel>
+                                            </Grid>
+                                        </StackPanel>
+                                    </Border>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+
+                        <!-- A page at a time -->
+                        <Button Classes="ghost" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Margin="0,16,0,0"
+                                Content="{Binding Pager.MoreText}" Command="{Binding Pager.ShowMoreCommand}" IsVisible="{Binding Pager.HasMore}"
+                                AutomationProperties.Name="Show more cards" />
+
+                        <!-- Empty: what is here, and how to put something in -->
+                        <Border Classes="glass enter" IsVisible="{Binding IsListEmpty}" Padding="22,20">
+                            <Grid ColumnDefinitions="Auto,*" ColumnSpacing="14">
+                                <ic:SymbolIcon Symbol="ClipboardPaste" FontSize="28" Foreground="{DynamicResource HelmEyebrow}" VerticalAlignment="Top" />
+                                <StackPanel Grid.Column="1" Spacing="10">
+                                    <TextBlock Text="{Binding EmptyListText}" TextWrapping="Wrap" FontSize="15" />
+                                    <TextBlock x:Name="AddHint" Classes="muted" TextWrapping="Wrap" IsVisible="{Binding NotShowingTrash}" />
+                                </StackPanel>
+                            </Grid>
+                        </Border>
+                    </StackPanel>
+                </StackPanel>
+            </ScrollViewer>
+
+            <!-- The bar stays on top over the page's own background; the cards fade out under it -->
+            <Grid x:Name="TopBar" VerticalAlignment="Top" Margin="40,20,40,12" ColumnDefinitions="Auto,*,Auto,Auto,Auto,Auto" ColumnSpacing="10">
+                <!-- A phone's page has no app bar: the menu button opens the drawer -->
+                <Button x:Name="MenuButton" Classes="chip" Click="Menu_Click" IsVisible="False" VerticalAlignment="Center"
+                        ToolTip.Tip="Menu" AutomationProperties.Name="Open navigation">
+                    <ic:SymbolIcon Symbol="Navigation" FontSize="16" />
+                </Button>
+                <Border Grid.Column="1" Classes="glass" Padding="14,0,6,0" BoxShadow="">
+                    <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="10">
+                        <ic:SymbolIcon Symbol="Search" FontSize="16" Foreground="{DynamicResource HelmSecondaryText}" VerticalAlignment="Center" />
+                        <TextBox x:Name="SearchBox" Grid.Column="1" Classes="bare" PlaceholderText="Search (Ctrl+F)" Text="{Binding Search}"
+                                 VerticalContentAlignment="Center" MinHeight="40" AutomationProperties.Name="Search Scratch" />
+                        <Button Grid.Column="2" Classes="flat" Width="32" Height="32" Padding="0" HorizontalContentAlignment="Center"
+                                Command="{Binding ClearSearchCommand}" IsVisible="{Binding IsSearching}" ToolTip.Tip="Clear the search"
+                                AutomationProperties.Name="Clear the search">
+                            <ic:SymbolIcon Symbol="Dismiss" FontSize="12" />
+                        </Button>
+                    </Grid>
+                </Border>
+                <Button x:Name="FilesButton" Grid.Column="2" Classes="pill" Command="{Binding AddFilesCommand}" IsEnabled="{Binding IsNotBusy}"
+                        ToolTip.Tip="Add files, photos or videos" AutomationProperties.Name="Add files">
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                        <ic:SymbolIcon Symbol="Add" FontSize="14" Foreground="{DynamicResource HelmPillForeground}" />
+                        <TextBlock Classes="label" Text="Files" Foreground="{DynamicResource HelmPillForeground}" />
+                    </StackPanel>
+                </Button>
+                <Button x:Name="TextButton" Grid.Column="3" Classes="chip" Command="{Binding OpenTextBoxCommand}" IsEnabled="{Binding IsNotBusy}"
+                        ToolTip.Tip="Add a piece of text" AutomationProperties.Name="Add text">
+                    <StackPanel Orientation="Horizontal" Spacing="6">
+                        <ic:SymbolIcon Symbol="TextT" FontSize="16" />
+                        <TextBlock Classes="label" Text="Text" />
+                    </StackPanel>
+                </Button>
+                <Button x:Name="PasteButton" Grid.Column="4" Classes="chip" Click="Paste_Click" IsEnabled="{Binding IsNotBusy}"
+                        ToolTip.Tip="Paste what you copied (Ctrl+V)" AutomationProperties.Name="Paste">
+                    <StackPanel Orientation="Horizontal" Spacing="6">
+                        <ic:SymbolIcon Symbol="ClipboardPaste" FontSize="16" />
+                        <TextBlock Classes="label" Text="Paste" />
+                    </StackPanel>
+                </Button>
+                <Button Grid.Column="5" Classes="chip" Click="Settings_Click" ToolTip.Tip="Scratch settings" AutomationProperties.Name="Scratch settings">
+                    <ic:SymbolIcon Symbol="Settings" FontSize="16" />
+                </Button>
+            </Grid>
+
+            <!-- The trash: a rounded square in the bottom right corner, the number of things in it as a badge -->
+            <Panel x:Name="TrashFab" HorizontalAlignment="Right" VerticalAlignment="Bottom" Margin="0,0,40,28" Width="56" Height="56">
+                <Button Classes="glass" Classes.selected="{Binding ShowingTrash}" Width="56" Height="56" Padding="0" CornerRadius="14" Background="{DynamicResource HelmSheetBackground}"
+                        HorizontalContentAlignment="Center" VerticalContentAlignment="Center" Command="{Binding ToggleTrashCommand}"
+                        ToolTip.Tip="Things you deleted, and things nobody used for a week" AutomationProperties.Name="Trash">
+                    <ic:SymbolIcon Symbol="Delete" FontSize="22" />
+                </Button>
+                <Border Background="{DynamicResource HelmDanger}" CornerRadius="10" MinWidth="20" Height="20" Padding="5,0" HorizontalAlignment="Right"
+                        VerticalAlignment="Top" Margin="0,-4,-4,0" IsVisible="{Binding HasTrash}" IsHitTestVisible="False">
+                    <TextBlock Text="{Binding TrashCount}" FontSize="11" FontWeight="Bold" Foreground="White" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                </Border>
+            </Panel>
+        </Panel>
+
+        <!-- ONE THING'S DETAILS (phone): in the wall's place; Back returns -->
+        <ScrollViewer x:Name="DetailLayer" IsVisible="False" HorizontalScrollBarVisibility="Disabled" core:ScrollFade.Enabled="True">
+            <StackPanel Margin="16,14,16,28" Spacing="12" core:Motion.EnterOnShow="True">
+                <Button Classes="chip" HorizontalAlignment="Left" Command="{Binding CloseDetailCommand}" AutomationProperties.Name="Back to the wall">
+                    <StackPanel Orientation="Horizontal" Spacing="6">
+                        <ic:SymbolIcon Symbol="ArrowLeft" FontSize="16" />
+                        <TextBlock Text="Scratch" />
+                    </StackPanel>
+                </Button>
+
+                <!-- The picture: a tap opens the file itself -->
+                <Button Classes="cardhit" Command="{Binding OpenCommand}" CommandParameter="{Binding Selected}" AutomationProperties.Name="Open"
+                        IsVisible="{Binding Selected.HasThumbnail, FallbackValue=False}">
+                    <Border CornerRadius="12" ClipToBounds="True" Height="260" Background="{DynamicResource HelmGlass}" BorderBrush="{DynamicResource HelmGlassStroke}" BorderThickness="1">
+                        <Panel>
+                            <Image Source="{Binding Selected.Thumbnail, Converter={x:Static local:ScratchThumbnailConverter.Instance}}" Stretch="Uniform" />
+                            <Border Width="48" Height="48" CornerRadius="24" HorizontalAlignment="Center" VerticalAlignment="Center" Opacity="0.9"
+                                    Background="{DynamicResource HelmSheetBackground}" IsVisible="{Binding Selected.IsVideo, FallbackValue=False}">
+                                <ic:SymbolIcon Symbol="Play" IconVariant="Filled" FontSize="22" />
+                            </Border>
+                        </Panel>
+                    </Border>
+                </Button>
+
+                <Border Classes="glass">
+                    <StackPanel Spacing="4">
+                        <SelectableTextBlock Text="{Binding Selected.Name}" FontSize="18" FontWeight="SemiBold" TextWrapping="Wrap" />
+                        <TextBlock Text="{Binding Selected.Meta}" Classes="muted" TextWrapping="Wrap" />
+                        <TextBlock Text="{Binding Selected.Status}" FontSize="12" Foreground="{DynamicResource HelmEyebrow}"
+                                   IsVisible="{Binding Selected.HasStatus, FallbackValue=False}" />
+                        <!-- The whole text, to read and select -->
+                        <SelectableTextBlock Margin="0,8,0,0" Text="{Binding DetailText}" TextWrapping="Wrap" LineHeight="21"
+                                             IsVisible="{Binding Selected.IsText, FallbackValue=False}" />
+                    </StackPanel>
+                </Border>
+
+                <!-- A file -->
+                <StackPanel Spacing="8">
+                    <StackPanel.IsVisible>
+                        <MultiBinding Converter="{x:Static BoolConverters.And}">
+                            <Binding Path="Selected.IsFile" FallbackValue="False" />
+                            <Binding Path="Selected.IsLive" FallbackValue="False" />
+                        </MultiBinding>
+                    </StackPanel.IsVisible>
+                    <Grid ColumnDefinitions="*,*" ColumnSpacing="8">
+                        <Button Classes="pill" HorizontalAlignment="Stretch" Command="{Binding OpenCommand}" CommandParameter="{Binding Selected}" AutomationProperties.Name="Open">
+                            <StackPanel Orientation="Horizontal" Spacing="6" HorizontalAlignment="Center">
+                                <ic:SymbolIcon Symbol="Open" FontSize="16" Foreground="{DynamicResource HelmPillForeground}" />
+                                <TextBlock Text="Open" Foreground="{DynamicResource HelmPillForeground}" />
+                            </StackPanel>
+                        </Button>
+                        <Button Grid.Column="1" Classes="ghost action" Command="{Binding SendCommand}" CommandParameter="{Binding Selected}" AutomationProperties.Name="Share">
+                            <StackPanel Orientation="Horizontal" Spacing="6">
+                                <ic:SymbolIcon Symbol="Share" FontSize="16" />
+                                <TextBlock Text="{Binding SendLabel}" />
+                            </StackPanel>
+                        </Button>
+                    </Grid>
+                    <Button Classes="ghost action" Command="{Binding SaveCommand}" CommandParameter="{Binding Selected}" AutomationProperties.Name="Save to phone">
+                        <StackPanel Orientation="Horizontal" Spacing="6">
+                            <ic:SymbolIcon Symbol="ArrowDownload" FontSize="16" />
+                            <TextBlock Text="Save to phone" />
+                        </StackPanel>
+                    </Button>
+                </StackPanel>
+
+                <!-- A text -->
+                <Button Classes="pill" HorizontalAlignment="Stretch" Command="{Binding CopyTextCommand}" CommandParameter="{Binding Selected}" AutomationProperties.Name="Copy">
+                    <Button.IsVisible>
+                        <MultiBinding Converter="{x:Static BoolConverters.And}">
+                            <Binding Path="Selected.IsText" FallbackValue="False" />
+                            <Binding Path="Selected.IsLive" FallbackValue="False" />
+                        </MultiBinding>
+                    </Button.IsVisible>
+                    <StackPanel Orientation="Horizontal" Spacing="6" HorizontalAlignment="Center">
+                        <ic:SymbolIcon Symbol="Copy" FontSize="16" Foreground="{DynamicResource HelmPillForeground}" />
+                        <TextBlock Text="Copy" Foreground="{DynamicResource HelmPillForeground}" />
+                    </StackPanel>
+                </Button>
+
+                <!-- Here and on the other devices -->
+                <Button Classes="ghost action" Command="{Binding SendToClipboardCommand}" CommandParameter="{Binding Selected}" AutomationProperties.Name="Send to clipboard"
+                        IsVisible="{Binding Selected.IsLive, FallbackValue=False}">
+                    <StackPanel Orientation="Horizontal" Spacing="6">
+                        <ic:SymbolIcon Symbol="ClipboardArrowRight" FontSize="16" />
+                        <TextBlock Text="Send to clipboard (all devices)" />
+                    </StackPanel>
+                </Button>
+
+                <!-- Keep a text for good: it becomes a note, the card goes to the trash -->
+                <Button Classes="ghost action" Command="{Binding SendToNotesCommand}" CommandParameter="{Binding Selected}" AutomationProperties.Name="Send to Notes"
+                        IsVisible="{Binding Selected.CanBecomeNote, FallbackValue=False}">
+                    <StackPanel Orientation="Horizontal" Spacing="6">
+                        <ic:SymbolIcon Symbol="Notepad" FontSize="16" />
+                        <TextBlock Text="Send to Notes" />
+                    </StackPanel>
+                </Button>
+
+                <Button Classes="ghost action" Command="{Binding TrashCommand}" CommandParameter="{Binding Selected}" AutomationProperties.Name="Move to the trash"
+                        IsVisible="{Binding Selected.IsLive, FallbackValue=False}">
+                    <StackPanel Orientation="Horizontal" Spacing="6">
+                        <ic:SymbolIcon Symbol="Delete" FontSize="16" Foreground="{DynamicResource HelmDanger}" />
+                        <TextBlock Text="Move to the trash" Foreground="{DynamicResource HelmDanger}" />
+                    </StackPanel>
+                </Button>
+
+                <!-- In the trash: bring it back or delete it for good -->
+                <Grid ColumnDefinitions="*,*" ColumnSpacing="8" IsVisible="{Binding Selected.Trashed, FallbackValue=False}">
+                    <Button Classes="pill" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Content="Restore" Command="{Binding RestoreCommand}" CommandParameter="{Binding Selected}" />
+                    <Button Grid.Column="1" Classes="ghost action" Command="{Binding DeleteForeverCommand}" CommandParameter="{Binding Selected}" AutomationProperties.Name="Delete for good">
+                        <TextBlock Text="Delete for good" Foreground="{DynamicResource HelmDanger}" />
+                    </Button>
+                </Grid>
+            </StackPanel>
+        </ScrollViewer>
+    </Panel>
+</UserControl>

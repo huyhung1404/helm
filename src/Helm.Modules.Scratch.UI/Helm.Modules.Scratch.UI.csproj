@@ -1,0 +1,18 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- The Scratch page, ONE view for every platform (Windows through Helm.Ui.Windows, Android, later macOS/iOS). What differs
+       per platform (reading the clipboard, files dropped on the page, the hint text) comes through IScratchPageHost. -->
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <SupportedOSPlatformVersion></SupportedOSPlatformVersion>
+    <PlatformTarget>AnyCPU</PlatformTarget>
+    <RootNamespace>Helm.Modules.Scratch.Ui</RootNamespace>
+    <AvaloniaUseCompiledBindingsByDefault>true</AvaloniaUseCompiledBindingsByDefault>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Helm.Ui\Helm.Ui.csproj" />
+    <ProjectReference Include="..\Helm.Modules.Scratch.Core\Helm.Modules.Scratch.Core.csproj" />
+  </ItemGroup>
+
+</Project>

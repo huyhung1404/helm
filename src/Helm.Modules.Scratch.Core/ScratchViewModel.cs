@@ -140,7 +140,7 @@ public sealed partial class ScratchViewModel : ObservableObject
     private readonly ScratchClipboardRelay _relay;
     private readonly ISettingsStore<ScratchSettings> _settings;
     private readonly IUiDispatcher _ui;
-    private readonly IDialogService _dialogs;
+    private IDialogService _dialogs;
     private readonly IClipboardService _clipboard;
     private readonly ISyncService? _sync;
     private readonly INoteWriter? _notes;
@@ -228,6 +228,9 @@ public sealed partial class ScratchViewModel : ObservableObject
 
     public IReadOnlyList<ScratchFilterTab> FilterTabs { get; }
 
+    /// <summary>The filters under the title: all but the trash (it has its own button).</summary>
+    public IReadOnlyList<ScratchFilterTab> FilterBar => [.. FilterTabs.Where(t => !t.IsTrash)];
+
     /// <summary>"Copy" on Windows, "Share" on Android.</summary>
     public string SendLabel => _platform.SendLabel;
 
@@ -235,10 +238,46 @@ public sealed partial class ScratchViewModel : ObservableObject
     public bool HasSyncNote => !string.IsNullOrEmpty(SyncNote);
     public bool HasRows => Rows.Count > 0;
     public bool IsListEmpty => Rows.Count == 0;
+
+    /// <summary>The page's title: Scratch, or Trash while it is open.</summary>
+    public string ListTitle => ShowingTrash ? "Trash" : "Scratch";
     public bool IsNotBusy => !IsBusy;
     public bool ShowingTrash => Filter == ScratchFilter.Trash;
     public bool NotShowingTrash => !ShowingTrash;
     public bool HasTrash => _store.Counts()[ScratchFilter.Trash] > 0;
+
+    /// <summary>How many things are in the trash (the number on the trash button).</summary>
+    public int TrashCount => _store.Counts()[ScratchFilter.Trash];
+
+    /// <summary>Confirmations are the view's own (a glass sheet on every platform); the injected one is the fallback.</summary>
+    public void UseDialogs(IDialogService dialogs) => _dialogs = dialogs;
+
+    /// <summary>The trash button: into the trash, and back to the filter that was open before.</summary>
+    [RelayCommand]
+    private void ToggleTrash()
+    {
+        var back = _settings.Current.Filter;
+        Filter = ShowingTrash ? (Enum.IsDefined(back) && back != ScratchFilter.Trash ? back : ScratchFilter.All) : ScratchFilter.Trash;
+    }
+
+    /// <summary>Under the title: "12 things", "3 found for “xyz”", "2 in the trash".</summary>
+    public string ListSummary
+    {
+        get
+        {
+            var n = Rows.Count;
+            if (Search.Trim().Length > 0) return n == 0 ? "Nothing found" : $"{n} found for “{Search.Trim()}”";
+            if (n == 0) return "";
+            var things = n == 1 ? "1 thing" : $"{n} things";
+            return ShowingTrash ? $"{things} · deleted for good after you empty the trash" : things;
+        }
+    }
+
+    /// <summary>Something is typed in the search box (its clear button shows).</summary>
+    public bool IsSearching => Search.Length > 0;
+
+    [RelayCommand]
+    private void ClearSearch() => Search = "";
     public bool IsDetailOpen => Selected is not null;
     public bool IsDetailClosed => Selected is null;
 
@@ -280,11 +319,13 @@ public sealed partial class ScratchViewModel : ObservableObject
         OnPropertyChanged(nameof(ShowingTrash));
         OnPropertyChanged(nameof(NotShowingTrash));
         OnPropertyChanged(nameof(CanReorder));
+        OnPropertyChanged(nameof(ListTitle));
         RefreshList();
     }
 
     partial void OnSearchChanged(string value)
     {
+        OnPropertyChanged(nameof(IsSearching));
         OnPropertyChanged(nameof(CanReorder));
         RefreshList();
     }
@@ -970,6 +1011,8 @@ public sealed partial class ScratchViewModel : ObservableObject
         OnPropertyChanged(nameof(IsListEmpty));
         OnPropertyChanged(nameof(EmptyListText));
         OnPropertyChanged(nameof(HasTrash));
+        OnPropertyChanged(nameof(TrashCount));
+        OnPropertyChanged(nameof(ListSummary));
         OnPropertyChanged(nameof(TrashSummary));
     }
 
