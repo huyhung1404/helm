@@ -3,7 +3,7 @@
 All notable changes to Helm. The top section is used as the GitHub release body and as the Velopack release notes.
 Format: [Keep a Changelog](https://keepachangelog.com), versions follow [SemVer](https://semver.org).
 
-## [Unreleased]
+## [0.86.3] - 2026-11-25
 
 ### Fixed
 - **Keyboard: Vietnamese now types in apps built on the older Windows text input (IMM32)**, such as apps made with
