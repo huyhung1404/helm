@@ -1,0 +1,41 @@
+# SPIKE only (branch spike/*): builds Helm Keyboard with the transitory-context fix and the Avalonia Gallery, so the
+# fix can be tried on a PC without the C++ build tools. Not for main/develop.
+name: Spike keyboard
+
+on:
+  push:
+    branches: ['spike/**']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  keyboard:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: |
+            8.0.x
+            10.0.x
+
+      - name: Helm Keyboard (NativeAOT, x64 + x86)
+        shell: pwsh
+        run: ./scripts/build-keyboard.ps1 -Version 0.86.3
+
+      - name: Gallery
+        run: dotnet publish src/Helm.Gallery -c Release -o out/gallery --nologo
+
+      - name: Package
+        shell: pwsh
+        run: |
+          Copy-Item artifacts/keyboard out/keyboard -Recurse
+          Copy-Item scripts/spike-install-keyboard.ps1, scripts/spike-gallery-with-log.cmd out/
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: helm-keyboard-spike
+          path: out/
