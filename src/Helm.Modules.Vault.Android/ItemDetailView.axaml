@@ -221,15 +221,15 @@
                                                Source="{Binding Preview, Converter={x:Static local:PreviewBitmap.Converter}}" IsVisible="{Binding HasPreview}" />
                                     </StackPanel>
                                 </DockPanel>
-                                <!-- Edit: one row, [type] [name] [value] [x] -->
-                                <Grid ColumnDefinitions="96,*,1.4*,Auto,Auto" IsVisible="{Binding Owner.IsEditing}">
+                                <!-- Edit: two lines, [type] [name] [buttons] [x], then the value across the whole width: one cramped row overlapped on a phone held sideways -->
+                                <Grid ColumnDefinitions="96,*,Auto,Auto" RowDefinitions="Auto,Auto" RowSpacing="4" IsVisible="{Binding Owner.IsEditing}">
                                     <ComboBox ItemsSource="{Binding Owner.FieldKinds}" SelectedItem="{Binding Kind}" HorizontalAlignment="Stretch" VerticalAlignment="Top" AutomationProperties.Name="Field type" />
                                     <TextBox Grid.Column="1" Margin="4,0,0,0" VerticalAlignment="Top" PlaceholderText="Name" Text="{Binding Name}" AutomationProperties.Name="Field name" />
-                                    <TextBox Grid.Column="2" Margin="4,0,0,0" PlaceholderText="Value" Text="{Binding Value}" AcceptsReturn="{Binding IsMultiline}" TextWrapping="Wrap"
+                                    <TextBox Grid.Row="1" Grid.ColumnSpan="4" PlaceholderText="Value" Text="{Binding Value}" AcceptsReturn="{Binding IsMultiline}" TextWrapping="Wrap"
                                              PasswordChar="{Binding IsSecret, Converter={x:Static local:SecretChar.Converter}}" RevealPassword="{Binding IsRevealed}"
                                              AutomationProperties.Name="{Binding Name}" IsVisible="{Binding IsValueField}" />
                                     <!-- A file: Choose / Replace, its name and a picture's preview -->
-                                    <StackPanel Grid.Column="2" Margin="4,0,0,0" Spacing="4" IsVisible="{Binding IsFile}">
+                                    <StackPanel Grid.Row="1" Grid.ColumnSpan="4" Spacing="4" IsVisible="{Binding IsFile}">
                                         <Button HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Command="{Binding ChooseFileCommand}" AutomationProperties.Name="Choose file">
                                             <Panel>
                                                 <TextBlock Text="Choose…" IsVisible="{Binding !HasFile}" />
@@ -240,7 +240,7 @@
                                         <Image MaxHeight="96" HorizontalAlignment="Left" Stretch="Uniform"
                                                Source="{Binding Preview, Converter={x:Static local:PreviewBitmap.Converter}}" IsVisible="{Binding HasPreview}" />
                                     </StackPanel>
-                                    <StackPanel Grid.Column="3" Orientation="Horizontal" VerticalAlignment="Top">
+                                    <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Top">
                                         <Button Classes="flat" Width="40" Command="{Binding ToggleRevealCommand}" IsVisible="{Binding IsSecret}" AutomationProperties.Name="Show or hide">
                                             <Panel>
                                                 <ic:SymbolIcon Symbol="Eye" FontSize="18" IsVisible="{Binding !IsRevealed}" />
@@ -251,7 +251,7 @@
                                             <ic:SymbolIcon Symbol="Wand" FontSize="18" />
                                         </Button>
                                     </StackPanel>
-                                    <Button Grid.Column="4" Classes="flat" Width="40" VerticalAlignment="Top" Command="{Binding RemoveCommand}" AutomationProperties.Name="Remove field">
+                                    <Button Grid.Column="3" Classes="flat" Width="40" VerticalAlignment="Top" Command="{Binding RemoveCommand}" AutomationProperties.Name="Remove field">
                                         <ic:SymbolIcon Symbol="Dismiss" FontSize="18" />
                                     </Button>
                                 </Grid>

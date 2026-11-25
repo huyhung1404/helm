@@ -22,6 +22,9 @@ internal sealed class KeyboardEngine : IAsyncDisposable
     /// <summary>A switch Helm asks for shows in the window within this time, or is asked for once more.</summary>
     private static readonly TimeSpan Settling = TimeSpan.FromSeconds(0.6);
 
+    /// <summary>How often the keyboard showing is compared with the one Helm last set, to catch a jump nobody asked for.</summary>
+    private static readonly TimeSpan Watching = TimeSpan.FromMilliseconds(400);
+
     private static readonly TimeSpan IndicatorTime = TimeSpan.FromSeconds(0.9);
 
     /// <summary>While a browser is in front, how often its address is read again to notice a tab or site change.</summary>
@@ -49,6 +52,11 @@ internal sealed class KeyboardEngine : IAsyncDisposable
     /// <summary>The window in front controls another computer (<see cref="RemoteWindows"/>).</summary>
     private bool _remote;
     private IDisposable? _sitePollTimer;
+    private IDisposable? _watchdog;
+    // The last modifier key some program injected (hook thread writes, engine thread reads): evidence for a jump nobody asked for.
+    private long _injectedAt;
+    private int _injectedKey;
+    private bool _injectedByHelm;
     private nint _window;
     /// <summary>The keyboard the app in front should type with.</summary>
     private KeyboardMode _mode;
@@ -88,6 +96,7 @@ internal sealed class KeyboardEngine : IAsyncDisposable
             engine._foregroundHook = await WinEventHook.InstallAsync(engine._thread,
                 [(WinEvents.SystemForeground, WinEvents.SystemForeground)], engine.OnWinEvent, logger).ConfigureAwait(false);
             keyboard.Intercept += engine.OnKey;
+            engine._watchdog = engine._thread.StartTimer(Watching, engine.Watch);
             engine.WatchShortcut(options.Shortcut);
             engine._thread.Post(() => engine.OnForeground(windows.GetForegroundWindow()));
         }
@@ -152,6 +161,7 @@ internal sealed class KeyboardEngine : IAsyncDisposable
             {
                 _foregroundHook?.Dispose();
                 _sitePollTimer?.Dispose();
+                _watchdog?.Dispose();
                 _indicatorTimer?.Dispose();
                 _indicator?.Dispose();
                 // The input method takes its own shortcut back.
@@ -191,8 +201,31 @@ internal sealed class KeyboardEngine : IAsyncDisposable
     // On the hook thread: must return at once.
     private void OnKey(object? sender, KeyboardHookEventArgs e)
     {
+        if (e.IsInjected && e.VirtualKey is >= 0x10 and <= 0x12 or >= 0xA0 and <= 0xA5 or 0x5B or 0x5C or 0x20)
+        {
+            _injectedKey = e.VirtualKey;
+            _injectedByHelm = e.ExtraInfo == InputSimulator.HelmSignature;
+            _injectedAt = Environment.TickCount64;
+        }
         if (e.ExtraInfo == InputSimulator.HelmSignature) return;
         if (_tap?.OnKey(e.VirtualKey, e.IsKeyDown) == true) SwitchNext();
+    }
+
+
+    /// <summary>
+    /// On the engine thread, on a timer. Chinese appearing in the window in front while Helm set another keyboard is not
+    /// a choice (Helm's shortcut is the only way to Chinese it accepts): something else switched it — a program injecting
+    /// keys, Windows. It is logged with the last injected modifier key, and put back.
+    /// </summary>
+    private void Watch()
+    {
+        if (!_shows || _identity is null || _mode == KeyboardMode.Chinese || _options.Exclusions.IsExcluded(_app ?? "")) return;
+        var hwnd = _windows.GetForegroundWindow();
+        if (hwnd != _window || CurrentMode(hwnd) != KeyboardMode.Chinese) return;
+        var ago = _injectedAt == 0 ? -1 : Environment.TickCount64 - _injectedAt;
+        _logger.LogWarning("Keyboard jumped to Chinese in {Identity} without Helm's shortcut; last injected modifier key: {Key:X} by {By} {Ago} ms ago; putting back {Mode}",
+            _identity, _injectedKey, _injectedByHelm ? "Helm" : "another program", ago, _mode);
+        Apply(hwnd, _mode);
     }
 
     private void OnWinEvent(WinEventArgs e)
@@ -274,7 +307,9 @@ internal sealed class KeyboardEngine : IAsyncDisposable
             && _inputMethods.GetLanguage(_window) is var language and not 0)
         {
             var left = KeyboardModes.From(language, _vietnamese?.Read() == 1);
-            if (left != _mode) _apps.Remember(_identity, left);
+            // Chinese is only ever chosen with Helm's shortcut (SwitchNext remembers it). A window showing Chinese on its
+            // own — Windows gives new windows the first language of the list — is not a choice, so it is never learnt.
+            if (left != _mode && left != KeyboardMode.Chinese) _apps.Remember(_identity, left);
         }
 
         _app = app;
@@ -299,6 +334,15 @@ internal sealed class KeyboardEngine : IAsyncDisposable
         // page never seen before: leave the keyboard as it is and remember what it is for next time this identity leaves.
         if (identity is null || _options.Exclusions.IsExcluded(app) || (site is not null && !_apps.Knows(site)))
         {
+            // Chinese here was not chosen by the user (the shortcut would have made the site known): Windows opened the
+            // window in the first language of its list. Go back to English instead of typing Chinese by surprise.
+            if (current == KeyboardMode.Chinese && !_options.Exclusions.IsExcluded(app))
+            {
+                _mode = KeyboardMode.English;
+                _logger.LogDebug("{Identity} in front: Chinese not chosen, back to English", identity ?? app);
+                Apply(hwnd, _mode);
+                return;
+            }
             _mode = current;
             _shows = true;
             _logger.LogDebug("{Identity} in front: kept {Mode}", identity ?? app, current);

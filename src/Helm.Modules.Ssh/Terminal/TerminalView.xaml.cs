@@ -51,8 +51,17 @@ public partial class TerminalView
         InitializeComponent();
         // The terminal's own background (terminal.html), so nothing flashes white while it loads.
         Web.DefaultBackgroundColor = System.Drawing.Color.FromArgb(0x0C, 0x0C, 0x0C);
-        Loaded += (_, _) => _init ??= InitializeAsync();
+        Loaded += (_, _) =>
+        {
+            _init ??= InitializeAsync();
+            NavOverlay.Changed += OnNavOverlay;
+            OnNavOverlay(null, EventArgs.Empty);
+        };
+        Unloaded += (_, _) => NavOverlay.Changed -= OnNavOverlay;
     }
+
+    /// <summary>The auto-hiding menu opens over the page, and a WebView2 would cover it: the terminal steps aside.</summary>
+    private void OnNavOverlay(object? sender, EventArgs e) => Web.Margin = new Thickness(NavOverlay.Width, 0, 0, 0);
 
     internal void Attach(SshViewModel viewModel, IDialogService dialogs, IClipboardService clipboard, ILogger logger, string dataFolder)
     {

@@ -227,6 +227,9 @@ internal sealed class NavPaneController
             _paneGrid.Effect = null;
         }
 
+        // The part of the open menu lying over the page (past the strip that is always reserved).
+        Helm.Shell.Services.NavOverlay.Set(_expanded && !_pinned ? expandedWidth - reserved : 0);
+
         _resizer.Visibility = _expanded ? Visibility.Visible : Visibility.Collapsed;
         _resizer.Margin = new Thickness(expandedWidth - _resizer.Width / 2, 0, 0, 0);
 
