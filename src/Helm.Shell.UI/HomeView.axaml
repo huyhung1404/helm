@@ -96,18 +96,19 @@
                     <ItemsControl ItemsSource="{Binding Alerts}">
                         <ItemsControl.ItemTemplate>
                             <DataTemplate x:DataType="vm:HomeAlert">
-                                <Panel Margin="0,0,0,8">
-                                    <Border Classes="glass fade" CornerRadius="0,12,12,0" Padding="21,12,10,12">
-                                    <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
-                                        <StackPanel VerticalAlignment="Center">
-                                            <TextBlock Text="{Binding Title}" FontWeight="SemiBold" TextWrapping="Wrap" />
-                                            <TextBlock Classes="muted" Text="{Binding Detail}" />
-                                        </StackPanel>
-                                        <Button Grid.Column="1" Classes="ghost" VerticalAlignment="Center" Content="{Binding ActionText}" Command="{Binding ActCommand}" />
-                                    </Grid>
-                                    </Border>
-                                    <Border Classes="alertbar" Classes.danger="{Binding IsDanger}" Classes.warning="{Binding IsWarning}" Classes.info="{Binding IsInfo}" />
-                                </Panel>
+                                <Border Classes="glass fade" Padding="0" Margin="0,0,0,8" ClipToBounds="True">
+                                    <Panel>
+                                        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12" Margin="21,12,10,12">
+                                            <StackPanel VerticalAlignment="Center">
+                                                <TextBlock Text="{Binding Title}" FontWeight="SemiBold" TextWrapping="Wrap" />
+                                                <TextBlock Classes="muted" Text="{Binding Detail}" />
+                                            </StackPanel>
+                                            <Button Grid.Column="1" Classes="ghost" VerticalAlignment="Center" Content="{Binding ActionText}" Command="{Binding ActCommand}" />
+                                        </Grid>
+                                        <!-- The bar follows the card's rounded corners (the card clips it) -->
+                                        <Border Classes="alertbar" Classes.danger="{Binding IsDanger}" Classes.warning="{Binding IsWarning}" Classes.info="{Binding IsInfo}" />
+                                    </Panel>
+                                </Border>
                             </DataTemplate>
                         </ItemsControl.ItemTemplate>
                     </ItemsControl>
