@@ -1,90 +1,96 @@
 # HANDOFF Helm
 
-Updated 2026-11-25 18:30, packed on the work PC (cty), session "Avalonia UI: Tracker + Vault on PC and Android (v0.87.0, v0.88.0),
-then the Home ("today") and General redesign demo". Sessions still to pack: none.
+Updated 2026-11-25 20:45, packed on the home PC, session "Home ('today') and General wired into Helm on PC and Android
+(v0.89.0)". Sessions still to pack: none.
 For Claude (skill handoff; the user reads it with `compact-skill dịch`). New machine: read all of this, then CLAUDE.md and
-`.claude/skills/helm-ui-ux/SKILL.md`.
+`.claude/skills/helm-ui-ux/SKILL.md` (read it BEFORE any UI work: this session skipped it once and Anh noticed).
 
 ## 1. Last message (verbatim)
-> chốt, đóng gói toàn bộ lên ( đóng gói cả gallery lên để máy khác cũng biết để thực thi, anh sẽ chạy ở nhà cho phần này, đừng để thiếu data ở máy khác)
+> giờ sửa đến phần notes và phần scratch
 
-State: done (this file). Anh "chốt" the Home + General demo as it stands on `feat/home-ui` and will run the Gallery at home.
-Next step waits for Anh: wire Home + General into Helm (PC, then Android), see §3.
+State: waiting for Anh. Claude read Notes and Scratch and proposed moving both to the shared Avalonia UI (one tool per PR,
+`Helm.Modules.Notes.UI` then `Helm.Modules.Scratch.UI`, demo in Gallery first, delete the WPF and Android copies). Open
+questions to Anh (§3): new look or copy the current layout, order, and how to ship.
+Anh's two last messages after that: "skill helm-ui-ux đâu, handoff không đóng gói à" (asked why the skill was not used and
+why no handoff yet; this file is the answer to the second).
 
 ## 2. State
-- Released: **v0.88.0** = main = develop = tag `v0.88.0` = 2a32596 (Release run 45593034431 was waiting for Anh's approval
-  in Actions when packed; check it was approved). v0.87.0 = 9732b21 before it.
-- v0.88.0 contents: Vault in Avalonia (`src/Helm.Modules.Vault.UI`) on PC and Android; Tracker on Android uses the shared
-  `TrackerView`; old Tracker/Vault settings pages and the old WPF/Android vault views deleted (settings = gear sheet,
-  first card = the tool's on/off switch); card shadows (no dark band), `ScrollFade`, sticky search bar, full-width
-  buttons; `HotkeyBox` (Avalonia shortcut recorder, `src/Helm.Ui.Windows`); Android Back closes sheets first
-  (`Sheet.CloseTopmost`).
-- Not hand-tested by anyone yet (Anh said he tests himself): Android Tracker/Vault (menu button, Back, widget, autofill,
-  fingerprint, Vietnamese typing), PC Vault create/unlock/items flow, Windows Hello, auto-type shortcut recording.
-- Just done (branch **feat/home-ui**, pushed, 46ee7c4, from v0.88.0, NOT merged): demo of the new Home and General in
-  `src/Helm.Shell.UI` (namespaces `Helm.Home`, `Helm.General`), shown in Helm.Gallery only:
-  - Home = "today": greeting + "n things need you today", capture box (Quick Capture's own icon, /t /n /v), "Needs
-    attention" (plain cards, no colours/levels, in the order the platform gives, most important first), "Today" cards per
-    tool (whole card opens the tool, Tracker/Habits tick in place), "All clear", footer "Helm vX · synced …" pinned to the
-    bottom.
-  - General = parts list on the left (each with its state line, own picture icons in `GeneralIcons.cs`, version at the
-    foot), the chosen part on the right, all parts the same width, tops lined up; phone: the list is the page, a part
-    opens in its place with Back. Parts: Tools (only switches), Sync, Updates, Appearance & startup, Running in
-    background, Help & troubleshooting.
-  - Switches take the background's corner colour where they sit (`Helm.Ui/Ui/BackdropTint.cs`, teal fallback).
-  - Gallery shows real tool icons via `src/Helm.Gallery/ToolIcons.props` + `ToolIcons.cs`.
-  - Tests: `tests/Helm.Ui.Tests` 29 pass (HomeViewTests, SwitchColourTests, ScrollFadeTests, Vault/Tracker).
+- Released: **v0.89.0** = main = develop = tag `v0.89.0` = 19a0c5a (also branch `feat/home-wire`). Release run: asked Anh to
+  approve it in GitHub Actions (Review deployments → Approve); not confirmed. v0.88.0 = 2a32596.
+- v0.89.0 contents (commits b958001, 14b9efd, 6596759, 19a0c5a):
+  - Home ("today") and General (6 parts) are the shared Avalonia pages (`src/Helm.Shell.UI`) on PC and Android. The WPF
+    Home/General pages and their view models, and the Android Home/General views and view models, are deleted.
+  - Portable layer: `ITodaySource` / `IHomeAlertSource` (`src/Helm.Core/Today`). Today cards: Tracker (due today or overdue,
+    tick) and Habits (habits to build, tick). Alerts: update, sync (Shell), hotkey conflicts (PC), vault backup (Vault.Core,
+    both platforms). `HomeComposer` fills Home; `HomeScreen` builds it; `HomeCaptureHost` routes `/t /n /v`.
+  - `GeneralComposer` mirrors the real `SyncViewModel`, `UpdatesViewModel`, `BackgroundActivitiesViewModel` into
+    `GeneralViewModel` (two ways for switches). Sync's connect / unlock / recovery key / change passphrase / held deletions /
+    new device token are `SyncFlowsView` bound to the real `SyncViewModel`. Platform rows through `IGeneralPlatform`
+    (`Helm.Shell/Home`): `WindowsGeneralPlatform`, `AndroidGeneralPlatform` (`Services/ShellPlatform.cs`).
+  - New projects: `Helm.Shell.Windows` (two WPF pages hosting the views, links, hotkey alert; Helm.App holds no Avalonia types
+    because `Helm.Ui` is aliased there), `Helm.ToolIcons` (tool pictures for PC and Gallery; the phone uses
+    `IAndroidModule.IconImage`).
+- Checked on PC (screenshots of a real test instance): Home (greeting, capture, alerts) and General (Tools, Sync connect
+  screen) render; no errors in the log. NOT checked: Updates / Appearance / Background parts, ticking on Home, capture, the
+  vault-backup alert, anything on Android (this PC has no Android workload; CI builds it).
+- Tests: `tests/Helm.Ui.Tests` 35 pass; `tests/Helm.Tests` 3 fail, same 3 on `develop` before this work
+  (WalletFundsTests funds widget, WeeklyReportGitTests working time, WorkspacePhoneFixesTests timeline). Not covered by a
+  test: `GeneralComposer`, `HomeScreen`, the Windows/Android platform classes.
 
 ## 3. Open
 - Waiting for Anh:
-  1. Approve Release run 45593034431 (v0.88.0) in GitHub Actions if not done (Review deployments → Approve).
-  2. Hand-test v0.88.0 on PC and the phone (list in §2).
-  3. Look at the Home/General demo at home: `scripts\gallery.cmd` on branch `feat/home-ui` (see §6), then say go to wire it.
-- Unfinished / next (needs Anh's go):
-  - Wire Home + General into Helm: an interface for each tool's "today" part (none yet), alerts from updates/hotkey
-    conflicts/vault backup/sync in that order, General's sync first-run screens (invite code, create passphrase, unlock,
-    recovery key) which the demo does not have; the WPF Home/General pages go away after (PC hosts via `AvaloniaHost`),
-    Android after that. Old PC shell pieces still WPF.
-  - Proposals Anh has not answered yet (from the review): phone touch targets 44 px (chips/switches are 36), the tick
-    inside a Today card is a button in a button, muted text contrast in the light theme, focus in the capture box on PC,
-    reduced-motion, loading placeholders on Home.
-  - Flaky: the first headless UI test after a fresh build sometimes fails in 1 ms (TextBoxTests / TrackerViewTests);
-    passes on rerun. Not investigated.
-- Other branches pushed while packing (older sessions, untouched, not merged): `feat/proxy-stream` (AI proxy streaming,
-  2026-11-05), `feat/wallet-funds-redesign` (2026-11-02, may already be in main as Funds v0.72 — check before merging).
+  1. Approve the Release run of v0.89.0 in GitHub Actions; look at the Android job first (nothing built Android before the tag).
+  2. Hand-test v0.89.0: PC Home (tick a task / habit, capture `/t`, alerts' buttons), General parts (switches, theme, startup,
+     Updates, Sync connect/unlock), and on the phone Home, General, Back from a part, AI features under Help, share log, reset.
+  3. Answer for Notes and Scratch: (a) new Tracker-style look (cards, sheets) with a Gallery demo first, or copy the current
+     layout; (b) Notes first then Scratch, or both; (c) push the branch for CI to build Android before releasing (Claude
+     recommends) instead of releasing straight away.
+- Next: move **Notes**, then **Scratch**, to Avalonia per CLAUDE.md (start from their Android views in
+  `Helm.Modules.<X>.Android`, add the wide layout, port PC-only parts: Scratch = paste Ctrl+V, drop files, drag ghost,
+  thumbnails, open, copy files; delete WPF and Android copies; settings become a gear sheet with the tool's on/off switch
+  first, `SettingsPageType` = content page). Read `helm-ui-ux` first and demo in Gallery.
+- Not done from v0.89.0 (Anh knows): "today" cards for Vocab, Wallet, Missions; review proposals (44 px touch targets on
+  phone, tick-in-a-card is a button in a button, muted text contrast in light theme, focus in the capture box on PC,
+  reduced motion, loading placeholders); the top search box no longer finds cards inside General; `GeneralComposer` tests;
+  the new Help card and `SyncFlowsView` were written without re-checking against `helm-ui-ux` (e.g. `TextBlock title` with
+  FontSize 15 in an infobar, `Fields fill the row`).
+- Flaky: the first headless UI test after a fresh build sometimes fails in 1 ms; passes on rerun.
+- Other branches (older, untouched, not merged): `feat/proxy-stream`, `feat/wallet-funds-redesign` (may already be in main),
+  `feat/bug-reports` (see memory: worktree `F:\Helm\helm-bugs`, 3 commits, a Vault session merges it).
 
 ## 4. Stores
-- Repo `huyhung1404/helm`: work PC `C:\Project\Helm` (main) + `C:\Project\Helm-develop` (develop) + worktrees under
-  `C:\tmp\h*` (this session: `C:\tmp\hbase` = feat/home-ui, `C:\tmp\htrk` = fix/tracker-old-settings, merged).
-  All clean.
-- Skill used for every UI change: in the repo, `.claude/skills/helm-ui-ux/SKILL.md`.
-- Not pushed:
-  - `feat/screen-link`, `spike/mirror-m0`: features Anh removed on purpose (2026-10), kept local only.
-  - `C:\Project\Helm\VocabStyles.axaml`: empty stray file (0 bytes), not part of anything.
-  - Stash `stash@{0}` (habits streak reminder): already on develop as 0207be6; kept, not dropped.
-  - User-level skill `ui-ux-pro-max` lives in this PC's `%USERPROFILE%\.claude\skills`, not in the repo.
+- Repo `huyhung1404/helm`: home PC `F:\Helm\helm` (develop, at 2a32596, not yet pulled to v0.89.0), `F:\Helm\helm-home`
+  (worktree, `feat/home-wire` = main 19a0c5a + this file), `F:\Helm\helm-bugs` (feat/bug-reports), `F:\Helm\helm-keyboard`
+  (feat/helm-keyboard). Work PC: `C:\Project\Helm`, `C:\Project\Helm-develop`, `C:\tmp\h*`. All clean and pushed.
+- `feat/home-ui` (46ee7c4) is merged into v0.89.0 through `feat/home-wire`; both branches can go once Anh agrees.
+- Not pushed: `feat/screen-link`, `spike/mirror-m0` (work PC, removed on purpose), stray empty `C:\Project\Helm\VocabStyles.axaml`,
+  stash `stash@{0}` on the work PC (habits streak, already in develop), user-level skill `ui-ux-pro-max` (work PC only).
+  Scratch test data of this session lives under this PC's temp folder only.
 
 ## 5. Rules and lessons not in the repo
-- UI demo → the real Avalonia view in Helm.Gallery with fake data; never an HTML mock-up, never a demo-only copy of a view.
-- Tool icons: never replace a tool's own picture icon with a Fluent glyph; new icons are frameless vectors in a 100×100
-  box, strokes ~10, one gradient bottom-left → top-right, same size/weight as the tool icons.
-- Android: Anh tests on his own phone. Never launch LDPlayer/adb unasked. Local Android build works with the private SDK:
-  `%LOCALAPPDATA%\HelmDev\dotnet\dotnet.exe build src/Helm.App.Android -c Debug -p:EmbedAssembliesIntoApk=true
-  -p:AndroidSdkDirectory=%LOCALAPPDATA%\HelmDev\android-sdk -p:JavaSdkDirectory=%LOCALAPPDATA%\HelmDev\jdk` (~5 min).
-- Release flow: push the branch first so CI (incl. the Android job) checks it, then fast-forward main + develop, push main,
-  develop and the tag; the Release run waits for Anh's approval. Bump Directory.Build.props + CHANGELOG top section by
-  hand (bump-version.ps1 fails to parse on Windows PowerShell 5.1).
+- Read `.claude/skills/helm-ui-ux/SKILL.md` before any UI change. Plan in Vietnamese, wait for Anh's approval, then code; he
+  may say "build only when done" (then do not build in between; build once at the end).
+- UI demo → the real Avalonia view in Helm.Gallery with fake data; never an HTML mock-up.
+- Tool icons: never replace a tool's picture icon with a Fluent glyph; frameless vector, 100×100 box, strokes ~10, one gradient.
+- Android: Anh tests on his phone; never launch LDPlayer/adb unasked. Only the work PC has the private Android SDK
+  (`%LOCALAPPDATA%\HelmDev\...`, command in the old handoff: `dotnet build src/Helm.App.Android -c Debug
+  -p:EmbedAssembliesIntoApk=true -p:AndroidSdkDirectory=... -p:JavaSdkDirectory=...`); the home PC cannot build Android.
+- Helm.App aliases `Helm.Ui` as `avalonia`: put code that touches Avalonia types in a project like `Helm.Shell.Windows`, and
+  give Helm.App only plain interfaces (e.g. `IShellWindowsHost`).
+- Release flow: push the branch first so CI (incl. Android) checks it, then fast-forward main + develop, push both and the tag;
+  the Release run waits for Anh's approval. Bump `Directory.Build.props` + CHANGELOG top by hand. Merge main into the branch
+  first when main has a docs-only commit (HANDOFF). This session released straight away at Anh's order ("bỏ qua test").
 - Seeing a real Helm window without touching Anh's desktop: start a test instance `Helm.exe --no-elevate --allow-multiple
-  --data-dir <scratch>`, drive it with UI Automation, capture with PrintWindow. Vault hides the whole window from capture
-  (black image) unless `<data-dir>\settings\vault.json` has `{"version": 1, "protectFromScreenCapture": false}` —
-  settings JSON keys are camelCase.
-- Stop the running Gallery before building: it locks the DLLs of its worktree.
-- Python edits through bash heredocs lose backslashes (`\\H` → `\H`): write scripts to a file with the Write tool.
+  --data-dir <scratch> --page General`, drive it with UI Automation (`InvokePattern` on a named element), capture with
+  PrintWindow. Stop it by process id afterwards (check the command line: Anh's own Helm runs too). A second instance reports
+  every hotkey as taken by another app because Anh's Helm holds them: not a bug.
+- Bash heredocs with apostrophes inside this tool's shell sometimes fail to parse ("unexpected EOF"): write files with the
+  Write tool. Python in a heredoc: `\H` in a normal string is an invalid escape (warning, but the text survives).
 - Reply to Anh in Vietnamese (Anh/em); his name is Hùng.
 
 ## 6. Checks on a new machine
-- Any window: `git fetch && git switch feat/home-ui && git pull` → HEAD at 46ee7c4 or later.
-- `dotnet --list-sdks` → a .NET 8 SDK (the Gallery and Helm.Ui are net8.0; .NET 10 + the android workload only for Android).
-- `scripts\gallery.cmd` → the Helm Gallery window; left list has `Home · Busy day`, `Home · All clear`, `General · PC`,
-  `General · Phone`, Tracker and Vault entries. Tool icons show in General → Tools (not glyphs).
-- `dotnet test tests/Helm.Ui.Tests` → 29 passed (rerun once if the first test fails in 1 ms).
+- Any window: `git fetch && git switch main && git pull` → HEAD has `chore: release v0.89.0` (19a0c5a) or later.
+- `dotnet --list-sdks` → a .NET 8 SDK or 10 (the home PC has only 10.0.400 and still builds `Helm.App`, `Helm.Gallery`, tests).
+- `dotnet build src/Helm.App` → 0 errors; `dotnet test tests/Helm.Ui.Tests` → 35 passed (rerun once if the first fails in 1 ms).
+- `dotnet test tests/Helm.Tests` → 2485 passed, 3 failed (the three named in §2, failing on develop too).
+- `scripts\gallery.cmd` → the Helm Gallery; entries `Home · Busy day`, `Home · All clear`, `General · PC`, `General · Phone`.
