@@ -3,6 +3,19 @@
 All notable changes to Helm. The top section is used as the GitHub release body and as the Velopack release notes.
 Format: [Keep a Changelog](https://keepachangelog.com), versions follow [SemVer](https://semver.org).
 
+## [0.86.2] - 2026-11-25
+
+### Fixed
+- **Keyboard: Chinese no longer appears by itself** (bug B1, reopened). Windows opens new windows in the first language
+  of its list, so an app or site could start in Chinese with nobody touching a key, and Helm took that for your choice
+  and remembered it. Chinese is now remembered only when you pick it with Helm's shortcut; an app or site never seen
+  before goes back to English. If Chinese still shows up in the window in front, Helm puts the keyboard back and logs
+  "Keyboard jumped to Chinese" with the last injected modifier key, to find what sent it.
+- **SSH (PC): the terminal no longer covers the menu** (bug B2). The side menu opens over the page and the terminal
+  (a web view) was drawn on top of it; it now steps aside while the menu is open.
+- **Vault (phone): fields no longer overlap when editing sideways** (bug B3). A field's type, name and buttons are one
+  line and its value takes the full width below.
+
 ## [0.86.1] - 2026-11-23
 
 ### Fixed
