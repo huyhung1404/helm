@@ -136,7 +136,5 @@ internal static class HomeDemo
         public void OpenLogs() { }
 
         public Task ResetAllAsync() => Task.CompletedTask;
-
-        public Task OpenToolAsync(HomeTool tool) => Task.CompletedTask;
     }
 }

@@ -80,9 +80,6 @@ public interface IGeneralHost
     void OpenLogs();
 
     Task ResetAllAsync();
-
-    /// <summary>A tool's chevron in Tools: its page.</summary>
-    Task OpenToolAsync(HomeTool tool);
 }
 
 /// <summary>
@@ -251,9 +248,6 @@ public sealed partial class GeneralViewModel : ObservableObject
 
     [RelayCommand]
     private void ToggleSort() => GroupByCategory = !GroupByCategory;
-
-    [RelayCommand]
-    private Task OpenToolAsync(HomeTool? tool) => tool is null ? Task.CompletedTask : _host.OpenToolAsync(tool);
 
     [RelayCommand]
     private Task SyncNowAsync() => _host.SyncNowAsync();

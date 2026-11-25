@@ -104,18 +104,13 @@
                                 <ItemsControl.ItemTemplate>
                                     <DataTemplate x:DataType="home:HomeTool">
                                         <Border Classes="glass fade" Padding="14,8,8,8" Margin="0,0,0,8">
-                                            <Grid ColumnDefinitions="Auto,*,Auto,Auto" ColumnSpacing="12">
+                                            <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="12">
                                                 <core:ModuleIcon Symbol="{Binding Icon}" Image="{Binding Image}" Size="28" Foreground="{DynamicResource HelmEyebrow}" VerticalAlignment="Center" />
                                                 <StackPanel Grid.Column="1" VerticalAlignment="Center">
                                                     <TextBlock Text="{Binding Name}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
                                                     <TextBlock Classes="muted" FontSize="12" Text="{Binding Group}" />
                                                 </StackPanel>
                                                 <ToggleSwitch Grid.Column="2" IsChecked="{Binding IsEnabled}" OnContent="" OffContent="" VerticalAlignment="Center" AutomationProperties.Name="{Binding Name}" />
-                                                <Button Grid.Column="3" Classes="chip" Width="36" Height="36" MinHeight="36" Padding="0" IsEnabled="{Binding IsEnabled}"
-                                                        Command="{Binding $parent[UserControl].((vm:GeneralViewModel)DataContext).OpenToolCommand}" CommandParameter="{Binding}"
-                                                        ToolTip.Tip="Open" AutomationProperties.Name="{Binding Name, StringFormat='Open {0}'}">
-                                                    <ic:SymbolIcon Symbol="ChevronRight" FontSize="14" />
-                                                </Button>
                                             </Grid>
                                         </Border>
                                     </DataTemplate>
