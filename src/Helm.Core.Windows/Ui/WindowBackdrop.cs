@@ -14,18 +14,21 @@ namespace Helm.Core.Ui;
 public sealed class WindowBackdrop : Grid
 {
     private readonly Border _base = new();
-    private readonly Border _blue = new() { RenderTransform = new TranslateTransform(), CacheMode = new BitmapCache() };
-    private readonly Border _teal = new() { RenderTransform = new TranslateTransform(), CacheMode = new BitmapCache() };
+    private readonly List<Border> _glows = [];
     private readonly DispatcherTimer _timer = new(DispatcherPriority.Background) { Interval = BackdropSpec.Tick };
+    private BackdropSpec.Look _look = BackdropSpec.Dark;
 
     public WindowBackdrop()
     {
         IsHitTestVisible = false;
         ClipToBounds = true;
-        _blue.Margin = _teal.Margin = new Thickness(-BackdropSpec.Bleed);
         Children.Add(_base);
-        Children.Add(_blue);
-        Children.Add(_teal);
+        foreach (var _ in BackdropSpec.Dark.Glows)
+        {
+            var glow = new Border { RenderTransform = new TranslateTransform(), CacheMode = new BitmapCache(), Margin = new Thickness(-BackdropSpec.Bleed) };
+            _glows.Add(glow);
+            Children.Add(glow);
+        }
         _timer.Tick += (_, _) => Move();
         Loaded += (_, _) =>
         {
@@ -45,21 +48,21 @@ public sealed class WindowBackdrop : Grid
 
     private void Move()
     {
-        var (bx, by, tx, ty) = BackdropSpec.Drift(Environment.TickCount64);
-        var blue = (TranslateTransform)_blue.RenderTransform;
-        var teal = (TranslateTransform)_teal.RenderTransform;
-        blue.X = bx;
-        blue.Y = by;
-        teal.X = tx;
-        teal.Y = ty;
+        var now = Environment.TickCount64;
+        for (var i = 0; i < _glows.Count; i++)
+        {
+            var (x, y) = BackdropSpec.Drift(_look.Glows[i], now);
+            var shift = (TranslateTransform)_glows[i].RenderTransform;
+            shift.X = x;
+            shift.Y = y;
+        }
     }
 
     private void Paint()
     {
-        var look = ApplicationThemeManager.GetAppTheme() == ApplicationTheme.Light ? BackdropSpec.Light : BackdropSpec.Dark;
-        _base.Background = new LinearGradientBrush(ToColor(look.Top), ToColor(look.Bottom), new Point(0, 0), new Point(0.6, 1));
-        _blue.Background = Glow(look.Blue);
-        _teal.Background = Glow(look.Teal);
+        _look = ApplicationThemeManager.GetAppTheme() == ApplicationTheme.Light ? BackdropSpec.Light : BackdropSpec.Dark;
+        _base.Background = new LinearGradientBrush(ToColor(_look.Top), ToColor(_look.Bottom), new Point(0, 0), new Point(0.6, 1));
+        for (var i = 0; i < _glows.Count; i++) _glows[i].Background = Glow(_look.Glows[i]);
     }
 
     /// <summary>Same placement as the Avalonia side: on a layer the size of the window grown by the bleed.</summary>

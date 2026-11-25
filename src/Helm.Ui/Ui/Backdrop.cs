@@ -22,8 +22,8 @@ public sealed class Backdrop : Panel
     public static Rect? GetCanvas(Control control) => control.GetValue(CanvasProperty);
 
     private readonly Border _base = new();
-    private readonly Border _blue = new() { RenderTransform = new TranslateTransform() };
-    private readonly Border _teal = new() { RenderTransform = new TranslateTransform() };
+    private readonly List<Border> _glows = [];
+    private BackdropSpec.Look _look = BackdropSpec.Dark;
     private DispatcherTimer? _timer;
 
     static Backdrop() => AffectsArrange<Backdrop>(CanvasProperty);
@@ -33,8 +33,12 @@ public sealed class Backdrop : Panel
         IsHitTestVisible = false;
         ClipToBounds = true;
         Children.Add(_base);
-        Children.Add(_blue);
-        Children.Add(_teal);
+        foreach (var _ in BackdropSpec.Dark.Glows)
+        {
+            var glow = new Border { RenderTransform = new TranslateTransform() };
+            _glows.Add(glow);
+            Children.Add(glow);
+        }
         ActualThemeVariantChanged += (_, _) => Paint();
     }
 
@@ -59,34 +63,33 @@ public sealed class Backdrop : Panel
     {
         var canvas = GetCanvas(this) ?? new Rect(finalSize);
         _base.Arrange(canvas);
-        var glow = canvas.Inflate(BackdropSpec.Bleed);
-        _blue.Arrange(glow);
-        _teal.Arrange(glow);
+        var layer = canvas.Inflate(BackdropSpec.Bleed);
+        foreach (var glow in _glows) glow.Arrange(layer);
         return finalSize;
     }
 
     private void Move()
     {
-        var (bx, by, tx, ty) = BackdropSpec.Drift(Environment.TickCount64);
-        var blue = (TranslateTransform)_blue.RenderTransform!;
-        var teal = (TranslateTransform)_teal.RenderTransform!;
-        blue.X = bx;
-        blue.Y = by;
-        teal.X = tx;
-        teal.Y = ty;
+        var now = Environment.TickCount64;
+        for (var i = 0; i < _glows.Count; i++)
+        {
+            var (x, y) = BackdropSpec.Drift(_look.Glows[i], now);
+            var shift = (TranslateTransform)_glows[i].RenderTransform!;
+            shift.X = x;
+            shift.Y = y;
+        }
     }
 
     private void Paint()
     {
-        var look = ActualThemeVariant == ThemeVariant.Light ? BackdropSpec.Light : BackdropSpec.Dark;
+        _look = ActualThemeVariant == ThemeVariant.Light ? BackdropSpec.Light : BackdropSpec.Dark;
         _base.Background = new LinearGradientBrush
         {
             StartPoint = new RelativePoint(0, 0, RelativeUnit.Relative),
             EndPoint = new RelativePoint(0.6, 1, RelativeUnit.Relative),
-            GradientStops = { new GradientStop(Color.FromUInt32(look.Top), 0), new GradientStop(Color.FromUInt32(look.Bottom), 1) },
+            GradientStops = { new GradientStop(Color.FromUInt32(_look.Top), 0), new GradientStop(Color.FromUInt32(_look.Bottom), 1) },
         };
-        _blue.Background = Glow(look.Blue);
-        _teal.Background = Glow(look.Teal);
+        for (var i = 0; i < _glows.Count; i++) _glows[i].Background = Glow(_look.Glows[i]);
     }
 
     /// <summary>A glow placed on the glow layer, which is the canvas grown by <see cref="BackdropSpec.Bleed"/> each side.</summary>
