@@ -23,6 +23,9 @@ public sealed class AvaloniaHost : ContentControl
 {
     private Surface? _surface;
 
+    /// <summary>Starts Avalonia before the first page; a test swaps it so no real Avalonia starts in the test process.</summary>
+    internal static Action Starter { get; set; } = HelmAvalonia.EnsureStarted;
+
     public AvaloniaHost()
     {
         Focusable = false;
@@ -37,7 +40,7 @@ public sealed class AvaloniaHost : ContentControl
     {
         try
         {
-            HelmAvalonia.EnsureStarted();
+            Starter();
             var page = createPage();
             _surface ??= new Surface();
             _surface.Inner.Content = page;

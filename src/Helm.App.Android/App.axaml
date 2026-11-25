@@ -1,10 +1,11 @@
 <Application xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:ui="using:Helm.Core.Ui"
              x:Class="Helm.App.Android.App"
              RequestedThemeVariant="Default">
 
     <!-- Helm's look (surfaces, Fluent accent, card/row styles) is shared by every platform: src/Helm.Ui/HelmTheme.axaml. -->
     <Application.Styles>
-        <StyleInclude Source="avares://Helm.Ui/HelmTheme.axaml" />
+        <ui:HelmTheme />
     </Application.Styles>
 </Application>

@@ -9,13 +9,23 @@ public sealed class AvaloniaHostTests
     [Fact]
     public void A_page_that_throws_shows_a_message_instead_of_failing_the_window() => RunSta(() =>
     {
-        var host = new AvaloniaHost();
-        host.Show(() => throw new InvalidOperationException("broken page"));
+        // No real Avalonia in the test process (it changes the process's DPI handling for the WPF tests that follow).
+        var starter = AvaloniaHost.Starter;
+        AvaloniaHost.Starter = () => { };
+        try
+        {
+            var host = new AvaloniaHost();
+            host.Show(() => throw new InvalidOperationException("broken page"));
 
-        Assert.Null(host.Page);
-        Assert.IsNotType<WindowsFormsHost>(host.Content);
-        var texts = ((StackPanel)host.Content).Children.OfType<TextBlock>().Select(t => t.Text);
-        Assert.Contains(texts, t => t.Contains("broken page"));
+            Assert.Null(host.Page);
+            Assert.IsNotType<WindowsFormsHost>(host.Content);
+            var texts = ((StackPanel)host.Content).Children.OfType<TextBlock>().Select(t => t.Text);
+            Assert.Contains(texts, t => t.Contains("broken page"));
+        }
+        finally
+        {
+            AvaloniaHost.Starter = starter;
+        }
     });
 
     private static void RunSta(Action body)

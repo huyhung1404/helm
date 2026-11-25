@@ -3,6 +3,30 @@
 All notable changes to Helm. The top section is used as the GitHub release body and as the Velopack release notes.
 Format: [Keep a Changelog](https://keepachangelog.com), versions follow [SemVer](https://semver.org).
 
+## [0.87.0] - 2026-11-25
+
+### Changed
+- **Tracker has a new look and a new flow (PC).** One page, top to bottom: pick a list, add a task (type and press
+  Enter; due date, priority and repeat are one click away), do it, and the finished ones fold away under "Done".
+  Calendar and Insights are tabs that replace the whole page. A task opens to its steps and actions, with a turning
+  arrow, and the first run walks you through three steps.
+- **Helm's window has a new background across the whole window**: Helm's graphite with four faint corner glows in the
+  colours of the Helm icon, drifting slowly, instead of Windows' translucent Mica. The tab bar is now one soft pill
+  with pill tabs, without divider lines.
+- **A new date and time picker** (Tracker; the phone's picker too): quick picks (Today, Tomorrow, this weekend, next
+  week), a month to tap a day in, time chips and hour/minute fields. A card on PC, a sheet from the bottom on a phone.
+
+### Added
+- **Tracker settings open as a sheet over the page** (the gear next to the tabs), with a full list manager: add a list,
+  rename it in place, delete it (asked first), plus finished tasks, reminders and export.
+- **Confirmations look like the rest of Helm** (a rounded sheet with Cancel and the action) for the Tracker.
+- **Motion**: things grow into place when they appear, lists open and close with a turning arrow, task cards light up
+  under the pointer.
+
+### Under the hood
+- The Tracker page is now written once (Avalonia) and shown inside Helm on PC; the phone will use the same page when it
+  moves over. Shared controls (date picker, links, theme) moved to a new Helm.Ui project. Helm.Gallery shows any page
+  on its own with fake data and hot reload (scripts/gallery.cmd).
 ## [0.86.3] - 2026-11-25
 
 ### Fixed
