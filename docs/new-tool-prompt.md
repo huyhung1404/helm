@@ -22,7 +22,7 @@ Print a short plan before you start, then continue without waiting:
 - **Class prefix**: PascalCase, e.g. `ColorPicker`.
 - **Group**: what the tool is for — one of `Planning` (notes, to-dos, goals, capture: Notes, Tracker, Missions,
   Quick Capture), `MoneyAndMedia` (Wallet, Novel Reader), `SecurityAndServers` (secrets and remote machines: Vault,
-  SSH), `WindowsAndDesktop` (windows, input and the desktop itself: Always on Top, Shortcut Guide). Pick the closest;
+  SSH), `WindowsAndDesktop` (windows, input and the desktop itself: Always on Top, Window Zones). Pick the closest;
   the same group on both platforms. If none fits, add a group to `ModuleGroup` with a name that says what is inside
   (never a generic one like "Tools" or "Advanced") plus its `DisplayName` and PC `Icon`.
 - **Icon**: a `SymbolRegular` value that exists (see §6). On Android the same icon is `FluentIcons.Common.Symbol.<Name>` (no size suffix).
@@ -44,7 +44,7 @@ Print a short plan before you start, then continue without waiting:
   - A tool on both platforms without a `.Core` project can link the shape file into its Android project
     (`<Compile Include="..\Helm.Modules.<Prefix>\<Prefix>IconShape.cs" Link="…" />`), as Quick Capture does.
   See `ClaudeLogo`, `VaultIconShape` / `VaultIcon`, `TrackerIconShape` / `TrackerLogo` / `TrackerIcon`,
-  `QuickCaptureIconShape`, `ShortcutGuideIconShape`.
+  `QuickCaptureIconShape`.
 - **Default hotkey**: only if the tool needs one; choose one that is unlikely to clash.
 - **Content page**: yes if the tool is something you *work in* (lists, a chat, a vault, a viewer), no if it only
   runs in the background and is configured (a hotkey, a hook). See "Content page and settings page" in §4.

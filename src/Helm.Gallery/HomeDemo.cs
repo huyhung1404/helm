@@ -33,7 +33,6 @@ internal static class HomeDemo
         Tool("ssh", "SSH", "Security & Servers"),
         Tool("vault", "Vault", "Security & Servers"),
         Tool("keyboard", "Helm Keyboard", "Windows & Desktop", on: false),
-        Tool("shortcut-guide", "Shortcut Guide", "Windows & Desktop"),
         Tool("window-zones", "Window Zones", "Windows & Desktop"),
         Tool("workspace", "Workspace Controller", "Windows & Desktop"),
     ];

@@ -14,7 +14,6 @@
     <Compile Include="$(MSBuildThisFileDirectory)..\Helm.Modules.QuickCapture\QuickCaptureIconShape.cs" Link="ToolIcons\QuickCaptureIconShape.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)..\Helm.Modules.Keyboard\KeyboardIconShape.cs" Link="ToolIcons\KeyboardIconShape.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)..\Helm.Modules.WindowZones\WindowZonesIconShape.cs" Link="ToolIcons\WindowZonesIconShape.cs" />
-    <Compile Include="$(MSBuildThisFileDirectory)..\Helm.Modules.ShortcutGuide\ShortcutGuideIconShape.cs" Link="ToolIcons\ShortcutGuideIconShape.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)..\Helm.Modules.SlackBot\SlackBotIconShape.cs" Link="ToolIcons\SlackBotIconShape.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)..\Helm.Modules.WeeklyReport\WeeklyReportIconShape.cs" Link="ToolIcons\WeeklyReportIconShape.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)..\Helm.Modules.Habits.Android\HabitsIcon.cs" Link="ToolIcons\HabitsIcon.cs" />

@@ -1,7 +1,6 @@
 using Avalonia;
 using Avalonia.Media;
 using Helm.Modules.Keyboard;
-using Helm.Modules.ShortcutGuide;
 using Helm.Modules.SlackBot;
 using Helm.Modules.WeeklyReport;
 using Helm.Modules.WindowZones;
@@ -30,7 +29,6 @@ public sealed class ToolIcons : Helm.Home.IToolIcons
         "vault" => Helm.Modules.Vault.Ui.VaultIcon.Image,
         "keyboard" => Keyboard.Value,
         "window-zones" => WindowZones.Value,
-        "shortcut-guide" => ShortcutGuide.Value,
         "slackbot" => SlackBot.Value,
         "weekly-report" => WeeklyReport.Value,
         _ => null,
@@ -54,16 +52,6 @@ public sealed class ToolIcons : Helm.Home.IToolIcons
         var gradient = Gradient(size, WindowZonesIconShape.GradientStart, WindowZonesIconShape.GradientEnd);
         var group = Box(size);
         group.Children.Add(new GeometryDrawing { Pen = new Pen(gradient, WindowZonesIconShape.Stroke, lineJoin: PenLineJoin.Round), Geometry = Geometry.Parse(WindowZonesIconShape.Zones) });
-        return new DrawingImage(group);
-    });
-
-    private static readonly Lazy<IImage> ShortcutGuide = new(() =>
-    {
-        const double size = ShortcutGuideIconShape.Size;
-        var gradient = Gradient(size, ShortcutGuideIconShape.GradientStart, ShortcutGuideIconShape.GradientEnd);
-        var group = Box(size);
-        group.Children.Add(new GeometryDrawing { Pen = new Pen(gradient, ShortcutGuideIconShape.Stroke, lineJoin: PenLineJoin.Round), Geometry = Geometry.Parse(ShortcutGuideIconShape.Keycap) });
-        group.Children.Add(new GeometryDrawing { Brush = gradient, Geometry = Geometry.Parse(ShortcutGuideIconShape.Sparkle) });
         return new DrawingImage(group);
     });
 

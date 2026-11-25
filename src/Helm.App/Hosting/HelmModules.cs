@@ -4,7 +4,6 @@ using Helm.Modules.Missions;
 using Helm.Modules.Notes;
 using Helm.Modules.NovelReader;
 using Helm.Modules.QuickCapture;
-using Helm.Modules.ShortcutGuide;
 using Helm.Modules.Ssh;
 using Helm.Modules.Scratch;
 using Helm.Modules.SlackBot;
@@ -37,7 +36,6 @@ internal static class HelmModules
         services.AddScratchModule();
         services.AddSshModule();
         services.AddQuickCaptureModule();
-        services.AddShortcutGuideModule();
         services.AddWindowZonesModule();
         services.AddKeyboardModule();
         services.AddWorkspaceModule();
