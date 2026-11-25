@@ -31,6 +31,7 @@
 
     <Panel>
         <core:Backdrop />
+        <Grid RowDefinitions="*,Auto">
         <ScrollViewer x:Name="Scroller" HorizontalScrollBarVisibility="Disabled">
             <StackPanel x:Name="Page" Margin="40,28,40,40" MaxWidth="1100">
 
@@ -151,13 +152,13 @@
                         <TextBlock Classes="muted" FontSize="14" TextAlignment="Center" Text="Nothing is due and Helm is fine. Capture what comes up above." />
                     </StackPanel>
                 </Border>
-
-                <!-- Helm itself, quietly -->
-                <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Spacing="4" Margin="0,28,0,0">
-                    <TextBlock Classes="muted" Text="{Binding Footer}" VerticalAlignment="Center" />
-                    <Button Classes="link" Content="What's new" Command="{Binding OpenWhatsNewCommand}" />
-                </StackPanel>
             </StackPanel>
         </ScrollViewer>
+        <!-- Helm itself, quietly: pinned to the bottom of the page -->
+        <StackPanel Grid.Row="1" Orientation="Horizontal" HorizontalAlignment="Center" Spacing="4" Margin="0,6,0,14">
+            <TextBlock Classes="muted" Text="{Binding Footer}" VerticalAlignment="Center" />
+            <Button Classes="link" Content="What's new" Command="{Binding OpenWhatsNewCommand}" />
+        </StackPanel>
+        </Grid>
     </Panel>
 </UserControl>
