@@ -21,12 +21,18 @@
             <Setter Property="IsHitTestVisible" Value="False" />
         </Style>
         <Style Selector="Border.alertbar.danger">
+            <Setter Property="Width" Value="6" />
+            <Setter Property="BoxShadow" Value="{DynamicResource HelmAlertGlowDanger}" />
             <Setter Property="Background" Value="{DynamicResource HelmAlertDanger}" />
         </Style>
         <Style Selector="Border.alertbar.warning">
+            <Setter Property="Width" Value="5" />
+            <Setter Property="BoxShadow" Value="{DynamicResource HelmAlertGlowWarning}" />
             <Setter Property="Background" Value="{DynamicResource HelmAlertWarning}" />
         </Style>
         <Style Selector="Border.alertbar.info">
+            <Setter Property="Width" Value="4" />
+            <Setter Property="BoxShadow" Value="{DynamicResource HelmAlertGlowInfo}" />
             <Setter Property="Background" Value="{DynamicResource HelmAlertInfo}" />
         </Style>
         <!-- A card of Today is the way into its tool: the whole card is the button -->
