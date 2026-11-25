@@ -65,10 +65,10 @@ public sealed class HomeViewTests
         var (window, view) = Show<GeneralView>(HomeDemo.General(desktop: true));
         var vm = (GeneralViewModel)view.DataContext!;
 
-        Assert.Equal("14 of 17 on", vm.Section("tools").Summary);
+        Assert.Equal("13 of 16 on", vm.Section("tools").Summary);
         Assert.True(vm.IsTools);
         vm.Tools.Single(t => t.Name == "Helm Keyboard").IsEnabled = true;
-        Assert.Equal("15 of 17 on", vm.Section("tools").Summary);
+        Assert.Equal("14 of 16 on", vm.Section("tools").Summary);
 
         vm.Selected = vm.Section("sync");
         Dispatcher.UIThread.RunJobs();
