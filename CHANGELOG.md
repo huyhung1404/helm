@@ -3,6 +3,34 @@
 All notable changes to Helm. The top section is used as the GitHub release body and as the Velopack release notes.
 Format: [Keep a Changelog](https://keepachangelog.com), versions follow [SemVer](https://semver.org).
 
+## [0.88.0] - 2026-11-25
+
+### Changed
+- **Vault has the new look and flow, on PC and on the phone.** One page, top to bottom: pick a part (All items, Favorites,
+  Logins, 2FA & tokens, Cards, Identities, Notes, Documents, your tags, Trash), search or add, then your items. Each row
+  copies the password (or token) with one tap and shows the current two-factor code with its countdown. On a wide screen
+  the open item sits beside the list; on a phone it takes the list's place and Back returns. Adding or editing an item,
+  the settings and the guide open as sheets over the page.
+- **Tracker on the phone now uses the same page as Helm on PC** (lists, quick add, Calendar and Insights, the date picker,
+  the settings sheet): the old phone pages are gone, so a change to Tracker is made once.
+- **Tracker and Vault have no separate settings page any more.** The gear opens the settings as a sheet over the page;
+  Tracker's sheet starts with the switch that turns the tool on or off. Home → Utilities opens the tool itself.
+- **Cards in a list now look raised** (a tight shadow, a soft one under the bottom edge and a light top edge) instead of
+  leaving a dark band between them; buttons inside a card (first run, edit, proposed steps) fill its width.
+- **Scrolling lists fade at the edge** instead of cutting a card in half, and the search bar of the vault stays on top
+  while the items slide under it.
+
+### Added
+- **Windows Hello, the auto-type shortcut and the vault's other Windows options live in the new settings sheet.** The
+  auto-type shortcut is recorded in a new box (click, press the keys, Esc cancels).
+- **Android: the Back button closes an open sheet first** (settings, date picker, a question), then an open vault item,
+  before it leaves the page. Autofill, the home-screen widget and the notification warning are cards in the sheet.
+
+### Under the hood
+- `Helm.Modules.Vault.UI` is the Vault page, written once (Avalonia) and shown by Helm PC and Android; the WPF vault views
+  and both Android pages are deleted. Shared styles moved from the Tracker page into the theme. Helm.Gallery shows the
+  Vault with a real in-memory vault.
+
 ## [0.87.0] - 2026-11-25
 
 ### Changed
