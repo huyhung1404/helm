@@ -22,6 +22,7 @@
                     <SolidColorBrush x:Key="HelmDanger" Color="#C42B1C" />
                     <SolidColorBrush x:Key="HelmScrim" Color="#66000000" />
                     <!-- Glass pages (Backdrop + Border.glass; the backdrop itself is Helm.Core BackdropSpec), Helm icon colours -->
+                    <SolidColorBrush x:Key="HelmSheetBackground" Color="#FCFDFE" />
                     <SolidColorBrush x:Key="HelmGlass" Color="#B8FFFFFF" />
                     <SolidColorBrush x:Key="HelmGlassHover" Color="#EBFFFFFF" />
                     <SolidColorBrush x:Key="HelmGlassStroke" Color="#1F1C2A40" />
@@ -44,6 +45,7 @@
                     <SolidColorBrush x:Key="HelmInfoBackground" Color="#2E2E2E" />
                     <SolidColorBrush x:Key="HelmDanger" Color="#FF99A4" />
                     <SolidColorBrush x:Key="HelmScrim" Color="#99000000" />
+                    <SolidColorBrush x:Key="HelmSheetBackground" Color="#1B1E24" />
                     <SolidColorBrush x:Key="HelmGlass" Color="#14FFFFFF" />
                     <SolidColorBrush x:Key="HelmGlassHover" Color="#21FFFFFF" />
                     <SolidColorBrush x:Key="HelmGlassStroke" Color="#21FFFFFF" />
@@ -261,13 +263,17 @@
     <Style Selector="Button.glass.selected:pointerover /template/ ContentPresenter#PART_ContentPresenter">
         <Setter Property="BorderBrush" Value="{DynamicResource HelmGlassStrokeStrong}" />
     </Style>
+    <!-- BUTTONS AND INPUTS, one rule: radius 10, height 40 (36 for small actions in a card). Three kinds of button:
+         pill = the one main action of an area (bright, filled); ghost = a secondary action (thin stroke);
+         chip = an icon or option button (thin stroke; .selected / :checked marks it). Inputs use .glass.
+         Cards are radius 12, big cards and sheets 16-18; round only for a day in a calendar. -->
     <!-- The one main action on a glass page: a bright pill -->
     <Style Selector="Button.pill">
         <Setter Property="Background" Value="{DynamicResource HelmPillBackground}" />
         <Setter Property="Foreground" Value="{DynamicResource HelmPillForeground}" />
         <Setter Property="CornerRadius" Value="10" />
         <Setter Property="Padding" Value="18,10" />
-        <Setter Property="MinHeight" Value="44" />
+        <Setter Property="MinHeight" Value="40" />
         <Setter Property="FontWeight" Value="SemiBold" />
         <Setter Property="HorizontalContentAlignment" Value="Center" />
         <Setter Property="VerticalContentAlignment" Value="Center" />
@@ -289,7 +295,7 @@
         <Setter Property="BorderThickness" Value="1" />
         <Setter Property="CornerRadius" Value="10" />
         <Setter Property="Padding" Value="14,10" />
-        <Setter Property="MinHeight" Value="44" />
+        <Setter Property="MinHeight" Value="40" />
         <Setter Property="HorizontalContentAlignment" Value="Center" />
         <Setter Property="VerticalContentAlignment" Value="Center" />
     </Style>
@@ -354,6 +360,75 @@
         <Setter Property="Background" Value="{DynamicResource HelmGlassHover}" />
         <Setter Property="BorderBrush" Value="{DynamicResource HelmGlassStrokeStrong}" />
         <Setter Property="BorderThickness" Value="1" />
+    </Style>
+    <!-- A glass ComboBox's list: a rounded floating card; items are rounded rows, the chosen one marked with the
+         accent stroke instead of a solid blue fill -->
+    <Style Selector="ComboBox.glass /template/ Border#PopupBorder">
+        <Setter Property="Background" Value="{DynamicResource HelmSheetBackground}" />
+        <Setter Property="BorderBrush" Value="{DynamicResource HelmGlassStroke}" />
+        <Setter Property="BorderThickness" Value="1" />
+        <Setter Property="CornerRadius" Value="12" />
+        <Setter Property="Padding" Value="4" />
+        <Setter Property="BoxShadow" Value="{DynamicResource HelmGlassShadow}" />
+    </Style>
+    <Style Selector="ComboBox.glass ComboBoxItem">
+        <Setter Property="CornerRadius" Value="8" />
+        <Setter Property="Margin" Value="0,1" />
+        <Setter Property="Padding" Value="12,9" />
+    </Style>
+    <Style Selector="ComboBox.glass ComboBoxItem:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+        <Setter Property="Background" Value="{DynamicResource HelmGlassHover}" />
+    </Style>
+    <Style Selector="ComboBox.glass ComboBoxItem:selected /template/ ContentPresenter#PART_ContentPresenter, ComboBox.glass ComboBoxItem:selected:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+        <Setter Property="Background" Value="{DynamicResource HelmGlassHover}" />
+        <Setter Property="Foreground" Value="{DynamicResource HelmEyebrow}" />
+    </Style>
+    <!-- A sheet or dialog that floats over a page (the date picker): solid, rounded, a thin stroke -->
+    <Style Selector="Border.sheet">
+        <Setter Property="Background" Value="{DynamicResource HelmSheetBackground}" />
+        <Setter Property="BorderBrush" Value="{DynamicResource HelmGlassStroke}" />
+        <Setter Property="BorderThickness" Value="1" />
+        <Setter Property="CornerRadius" Value="18" />
+        <Setter Property="BoxShadow" Value="{DynamicResource HelmHeroShadow}" />
+    </Style>
+    <!-- A day in a month grid: round; today ringed in the accent; the chosen day filled like the pill -->
+    <Style Selector="Button.day">
+        <Setter Property="Width" Value="40" />
+        <Setter Property="Height" Value="40" />
+        <Setter Property="Padding" Value="0" />
+        <Setter Property="CornerRadius" Value="20" />
+        <Setter Property="Background" Value="Transparent" />
+        <Setter Property="BorderThickness" Value="1" />
+        <Setter Property="BorderBrush" Value="Transparent" />
+        <Setter Property="HorizontalAlignment" Value="Center" />
+        <Setter Property="HorizontalContentAlignment" Value="Center" />
+        <Setter Property="VerticalContentAlignment" Value="Center" />
+    </Style>
+    <Style Selector="Button.day:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+        <Setter Property="Background" Value="{DynamicResource HelmGlassHover}" />
+        <Setter Property="BorderBrush" Value="Transparent" />
+    </Style>
+    <Style Selector="Button.day.today">
+        <Setter Property="BorderBrush" Value="{DynamicResource HelmGlassStrokeStrong}" />
+        <Setter Property="Foreground" Value="{DynamicResource HelmEyebrow}" />
+    </Style>
+    <Style Selector="Button.day.out">
+        <Setter Property="Opacity" Value="0.35" />
+    </Style>
+    <Style Selector="Button.day.selected">
+        <Setter Property="Background" Value="{DynamicResource HelmPillBackground}" />
+        <Setter Property="Foreground" Value="{DynamicResource HelmPillForeground}" />
+        <Setter Property="FontWeight" Value="SemiBold" />
+    </Style>
+    <Style Selector="Button.day.selected:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+        <Setter Property="Background" Value="{DynamicResource HelmPillBackground}" />
+        <Setter Property="Foreground" Value="{DynamicResource HelmPillForeground}" />
+    </Style>
+    <!-- A chosen chip (a quick pick that matches the value) -->
+    <Style Selector="Button.chip.selected">
+        <Setter Property="BorderBrush" Value="{DynamicResource HelmGlassStrokeStrong}" />
+        <Setter Property="Foreground" Value="{DynamicResource HelmEyebrow}" />
+        <Setter Property="Background" Value="{DynamicResource HelmGlassHover}" />
     </Style>
     <!-- A small rounded icon or text button on a glass page (40 high, radius 10); a ToggleButton.chip shows on/off -->
     <Style Selector=":is(Button).chip">

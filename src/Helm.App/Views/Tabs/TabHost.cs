@@ -19,8 +19,11 @@ namespace Helm.App.Views.Tabs;
 internal sealed class TabHost : UserControl
 {
     /// <summary>Where the strip's tabs start inside the host (DIPs): a torn-off tab is placed under the cursor by it.</summary>
-    public const double StripLeft = 8;
-    public const double StripTop = 6;
+    /// <summary>The tab bar pill's border and padding: the tabs start this far inside it.</summary>
+    public const double PillInset = 5;
+
+    public const double StripLeft = 8 + PillInset;
+    public const double StripTop = 6 + PillInset;
 
     /// <summary>How far off the strip (DIPs) a dragged tab must go before it leaves for a window of its own.</summary>
     private const double TearDistance = 24;
@@ -80,7 +83,7 @@ internal sealed class TabHost : UserControl
             add.ContextMenu.IsOpen = true;
         };
 
-        _strip = new Grid { Margin = new Thickness(StripLeft, StripTop, 8, 4), Background = Brushes.Transparent };
+        _strip = new Grid { Background = Brushes.Transparent };
         _strip.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
         _strip.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
         _strip.Children.Add(_scroller);
@@ -90,8 +93,18 @@ internal sealed class TabHost : UserControl
         _strip.MouseLeftButtonUp += (_, _) => EndDrag();
         _strip.LostMouseCapture += (_, _) => EndDrag();
 
-        var divider = new Border { Height = 1 };
-        divider.SetResourceReference(Border.BackgroundProperty, "DividerStrokeColorDefaultBrush");
+        // The tabs sit in one pill, barely lighter than Helm's background, with pill tabs inside (no divider line).
+        var pill = new Border
+        {
+            Margin = new Thickness(StripLeft - PillInset, StripTop - PillInset, 8, 6),
+            Padding = new Thickness(4),
+            CornerRadius = new CornerRadius(20),
+            BorderThickness = new Thickness(1),
+            Child = _strip,
+        };
+        pill.SetResourceReference(Border.BackgroundProperty, "SubtleFillColorTertiaryBrush");
+        pill.SetResourceReference(Border.BorderBrushProperty, "CardStrokeColorDefaultBrush");
+        var divider = new Border { Height = 0 };
 
         _content = new Border { ClipToBounds = true };
 
@@ -101,7 +114,7 @@ internal sealed class TabHost : UserControl
         root.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
         Grid.SetRow(divider, 1);
         Grid.SetRow(_content, 2);
-        root.Children.Add(_strip);
+        root.Children.Add(pill);
         root.Children.Add(divider);
         root.Children.Add(_content);
         Content = root;

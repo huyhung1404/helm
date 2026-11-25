@@ -26,7 +26,8 @@ internal sealed class GalleryWindow : Window
     private readonly ToggleSwitch _dark = new() { OnContent = "Dark", OffContent = "Light", IsChecked = true };
     private readonly ToggleSwitch _on = new() { OnContent = "Tool on", OffContent = "Tool off", IsChecked = true };
     private readonly FakeModule _module = new("tool", "Tool");
-    private readonly Border _frame = new() { ClipToBounds = true, CornerRadius = new CornerRadius(8) };
+    // "screen": what a page's sheets and pickers open over, so the phone frame behaves like a phone.
+    private readonly Border _frame = new() { ClipToBounds = true, CornerRadius = new CornerRadius(8), Classes = { "screen" } };
     private readonly ThemeVariantScope _scope = new() { RequestedThemeVariant = ThemeVariant.Dark };
 
     public GalleryWindow()

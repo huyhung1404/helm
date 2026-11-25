@@ -6,18 +6,19 @@ using Avalonia.Data;
 using Avalonia.Input;
 using Avalonia.Layout;
 using Avalonia.Media;
+using Avalonia.VisualTree;
 using FluentIcons.Avalonia;
 using Helm.Core.Text;
-using Calendar = Avalonia.Controls.Calendar;
 using Symbol = FluentIcons.Common.Symbol;
 
 namespace Helm.Core.Ui;
 
 /// <summary>
-/// One field for a day and a time, the same everywhere in Helm on the phone. A tap opens one sheet from the bottom: a
-/// strip of days to swipe (with a calendar for a day further away), hour and minute columns, and Now / None / Done.
-/// Binds <see cref="Date"/> (the day; its time part is ignored) and <see cref="Time"/> separately, so view models keep
-/// their date and time properties. The Windows app has the same control (typed text, chips and a panel).
+/// One field for a day and a time, the same everywhere in Helm. A tap opens the picker: quick picks (Today, Tomorrow,
+/// the weekend, next week; or Yesterday for things that happened), a month to tap a day in, the time (common hours or
+/// any hour and minute), then Done. On a phone the picker is a sheet from the bottom; on a wider window a card in the
+/// middle. Binds <see cref="Date"/> (the day; its time part is ignored) and <see cref="Time"/> separately, so view
+/// models keep their date and time properties.
 /// </summary>
 public sealed class DateTimeBox : UserControl
 {
@@ -35,32 +36,38 @@ public sealed class DateTimeBox : UserControl
 
     public static readonly StyledProperty<string> PlaceholderTextProperty = AvaloniaProperty.Register<DateTimeBox, string>(nameof(PlaceholderText), "");
 
-    private const int PastDays = 60;
-    private const int FutureDays = 120;
+    /// <summary>Below this window width the picker is a bottom sheet (a phone); above it a card in the middle.</summary>
+    private const double SheetBelow = 720;
+
+    private static readonly TimeSpan[] CommonTimes = [new(9, 0, 0), new(12, 0, 0), new(17, 0, 0), new(20, 0, 0)];
 
     private readonly TextBlock _text = new() { VerticalAlignment = VerticalAlignment.Center, TextTrimming = TextTrimming.CharacterEllipsis };
     private readonly SymbolIcon _icon = new() { Symbol = Symbol.Calendar, FontSize = 18, Margin = new Thickness(0, 0, 10, 0) };
-    private Control? _sheet;
+    private readonly Button _field;
+    private Control? _overlay;
     private DateTime _draftDate;
     private TimeSpan? _draftTime;
-    private StackPanel? _strip;
-    private ScrollViewer? _stripScroll;
-    private Calendar? _calendar;
-    private ListBox? _hours;
-    private ListBox? _minutes;
+    private DateTime _month;
+    private TextBlock? _summary;
+    private TextBlock? _monthTitle;
+    private UniformGrid? _days;
+    private WrapPanel? _quick;
+    private WrapPanel? _times;
+    private ComboBox? _hour;
+    private ComboBox? _minute;
     private bool _syncing;
 
     public DateTimeBox()
     {
-        var field = new Button
+        var field = _field = new Button
         {
             HorizontalAlignment = HorizontalAlignment.Stretch,
             HorizontalContentAlignment = HorizontalAlignment.Left,
             VerticalContentAlignment = VerticalAlignment.Center,
-            MinHeight = 44,
+            MinHeight = 40,
             Content = new StackPanel { Orientation = Orientation.Horizontal, Children = { _icon, _text } },
         };
-        field.Click += (_, _) => OpenSheet();
+        field.Click += (_, _) => Open();
         Content = field;
         ShowValue();
     }
@@ -79,21 +86,21 @@ public sealed class DateTimeBox : UserControl
         set => SetValue(TimeProperty, value);
     }
 
-    /// <summary>False for a day only (a deadline): no time columns.</summary>
+    /// <summary>False for a day only (a deadline): no time.</summary>
     public bool ShowTime
     {
         get => GetValue(ShowTimeProperty);
         set => SetValue(ShowTimeProperty, value);
     }
 
-    /// <summary>Past for things that happened (a payment), Future for things due: the strip of days follows.</summary>
+    /// <summary>Past for things that happened (a payment), Future for things due: the quick picks follow.</summary>
     public DateLean Lean
     {
         get => GetValue(LeanProperty);
         set => SetValue(LeanProperty, value);
     }
 
-    /// <summary>Whether the value can be cleared (None, and No time for an optional time).</summary>
+    /// <summary>Whether the value can be cleared (Clear, and No time for an optional time).</summary>
     public bool AllowEmpty
     {
         get => GetValue(AllowEmptyProperty);
@@ -115,7 +122,7 @@ public sealed class DateTimeBox : UserControl
 
     protected override void OnDetachedFromVisualTree(VisualTreeAttachmentEventArgs e)
     {
-        CloseSheet();
+        Close();
         base.OnDetachedFromVisualTree(e);
     }
 
@@ -125,6 +132,8 @@ public sealed class DateTimeBox : UserControl
         _text.Text = text.Length > 0 ? text : PlaceholderText;
         _text.Opacity = text.Length > 0 ? 1 : 0.6;
         _icon.Symbol = ShowTime ? Symbol.CalendarClock : Symbol.Calendar;
+        // Screen readers hear what it is and what it says ("Due date: Tomorrow, 09:00").
+        Avalonia.Automation.AutomationProperties.SetName(_field, text.Length > 0 && PlaceholderText.Length > 0 ? $"{PlaceholderText}: {text}" : _text.Text);
     }
 
     private static TimeSpan NowTime()
@@ -133,211 +142,249 @@ public sealed class DateTimeBox : UserControl
         return new TimeSpan(now.Hour, now.Minute, 0);
     }
 
-    // ---- The sheet -----------------------------------------------------------------------------------------------
+    // ---- The picker ----------------------------------------------------------------------------------------------
 
-    private void OpenSheet()
+    private void Open()
     {
-        if (_sheet is not null || OverlayLayer.GetOverlayLayer(this) is not { } layer || TopLevel.GetTopLevel(this) is not { } top) return;
+        if (_overlay is not null || OverlayLayer.GetOverlayLayer(this) is not { } layer || TopLevel.GetTopLevel(this) is not { } top) return;
         _draftDate = (Date ?? DateTime.Today).Date;
         _draftTime = Time ?? (ShowTime && !AllowEmpty ? NowTime() : null);
+        _month = new DateTime(_draftDate.Year, _draftDate.Month, 1);
+        // The screen it opens over: the window, or a stand-in screen (the Gallery's phone frame, class "screen").
+        Control screen = this.GetVisualAncestors().OfType<Control>().FirstOrDefault(a => a.Classes.Contains("screen")) ?? top;
+        var at = screen.TranslatePoint(default, top) ?? default;
+        var size = screen.Bounds.Size;
+        var phone = size.Width < SheetBelow;
 
-        var body = new StackPanel { Spacing = 12 };
-        var grab = new Border { Width = 36, Height = 4, CornerRadius = new CornerRadius(2), HorizontalAlignment = HorizontalAlignment.Center };
-        grab.Bind(Border.BackgroundProperty, this.GetResourceObservable("HelmCardStroke"));
-        body.Children.Add(grab);
+        var body = new StackPanel { Spacing = 16 };
+        if (phone)
+            body.Children.Add(new Border
+            {
+                Width = 36, Height = 4, CornerRadius = new CornerRadius(2), HorizontalAlignment = HorizontalAlignment.Center,
+                Background = new SolidColorBrush(Colors.Gray, 0.5),
+            });
 
-        // Days: a strip to swipe, and a calendar for a day further away.
-        _strip = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 6 };
-        _stripScroll = new ScrollViewer { HorizontalScrollBarVisibility = ScrollBarVisibility.Auto, VerticalScrollBarVisibility = ScrollBarVisibility.Disabled, Content = _strip };
-        body.Children.Add(_stripScroll);
-        _calendar = new Calendar { IsVisible = false, HorizontalAlignment = HorizontalAlignment.Center, SelectionMode = CalendarSelectionMode.SingleDate };
-        _calendar.SelectedDatesChanged += (_, _) =>
-        {
-            if (_syncing || _calendar.SelectedDate is not { } d) return;
-            _draftDate = d.Date;
-            BuildStrip();
-        };
-        var other = new Button { Content = "Another day…", HorizontalAlignment = HorizontalAlignment.Left };
-        other.Click += (_, _) =>
-        {
-            _calendar.IsVisible = !_calendar.IsVisible;
-            _syncing = true;
-            _calendar.SelectedDate = _draftDate;
-            _calendar.DisplayDate = _draftDate;
-            _syncing = false;
-        };
-        body.Children.Add(other);
-        body.Children.Add(_calendar);
+        // What it says now, in words.
+        _summary = new TextBlock { FontSize = 20, FontWeight = FontWeight.SemiBold, TextWrapping = TextWrapping.Wrap };
+        var head = new StackPanel { Spacing = 2 };
+        if (PlaceholderText.Length > 0) head.Children.Add(new TextBlock { Text = PlaceholderText.ToUpper(CultureInfo.CurrentCulture), Classes = { "eyebrow" } });
+        head.Children.Add(_summary);
+        body.Children.Add(head);
 
-        // Time: hour and minute columns.
+        // Quick picks.
+        _quick = new WrapPanel { ItemSpacing = 8, LineSpacing = 8 };
+        body.Children.Add(_quick);
+
+        // The month.
+        _monthTitle = new TextBlock { FontSize = 15, FontWeight = FontWeight.SemiBold, VerticalAlignment = VerticalAlignment.Center };
+        var previous = IconChip(Symbol.ChevronLeft, "Previous month", () => ShowMonth(-1));
+        var next = IconChip(Symbol.ChevronRight, "Next month", () => ShowMonth(1));
+        var monthBar = new Grid { ColumnDefinitions = ColumnDefinitions.Parse("*,Auto,8,Auto") };
+        monthBar.Children.Add(_monthTitle);
+        Grid.SetColumn(previous, 1);
+        Grid.SetColumn(next, 3);
+        monthBar.Children.Add(previous);
+        monthBar.Children.Add(next);
+        var weekdays = new UniformGrid { Columns = 7, Margin = new Thickness(0, 4, 0, 0) };
+        var culture = CultureInfo.CurrentCulture;
+        var firstDay = (int)culture.DateTimeFormat.FirstDayOfWeek;
+        for (var i = 0; i < 7; i++)
+            weekdays.Children.Add(new TextBlock
+            {
+                Text = culture.DateTimeFormat.ShortestDayNames[(firstDay + i) % 7],
+                Classes = { "secondary" }, HorizontalAlignment = HorizontalAlignment.Center, TextWrapping = TextWrapping.NoWrap,
+            });
+        _days = new UniformGrid { Columns = 7, Rows = 6 };
+        body.Children.Add(new StackPanel { Spacing = 6, Children = { monthBar, weekdays, _days } });
+
+        // The time.
         if (ShowTime)
         {
-            _hours = Column(Enumerable.Range(0, 24));
-            _minutes = Column(Enumerable.Range(0, 60));
-            _hours.SelectionChanged += (_, _) => PickTime();
-            _minutes.SelectionChanged += (_, _) => PickTime();
-            var times = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8, HorizontalAlignment = HorizontalAlignment.Center };
-            times.Children.Add(_hours);
-            times.Children.Add(new TextBlock { Text = ":", FontSize = 22, FontWeight = FontWeight.SemiBold, VerticalAlignment = VerticalAlignment.Center });
-            times.Children.Add(_minutes);
-            body.Children.Add(times);
-            if (AllowEmpty)
+            _times = new WrapPanel { ItemSpacing = 8, LineSpacing = 8 };
+            _hour = new ComboBox { Classes = { "glass" }, ItemsSource = Enumerable.Range(0, 24).Select(h => h.ToString("00", CultureInfo.InvariantCulture)).ToList(), MinWidth = 84, PlaceholderText = "Hour" };
+            _minute = new ComboBox { Classes = { "glass" }, ItemsSource = Enumerable.Range(0, 12).Select(m => (m * 5).ToString("00", CultureInfo.InvariantCulture)).ToList(), MinWidth = 84, PlaceholderText = "Min" };
+            Avalonia.Automation.AutomationProperties.SetName(_hour, "Hour");
+            Avalonia.Automation.AutomationProperties.SetName(_minute, "Minute");
+            _hour.SelectionChanged += (_, _) => PickTime();
+            _minute.SelectionChanged += (_, _) => PickTime();
+            var exact = new StackPanel
             {
-                var noTime = new CheckBox { Content = "No time", IsChecked = _draftTime is null, HorizontalAlignment = HorizontalAlignment.Center };
-                noTime.IsCheckedChanged += (_, _) =>
-                {
-                    _draftTime = noTime.IsChecked == true ? null : _draftTime ?? new TimeSpan(9, 0, 0);
-                    SyncColumns();
-                };
-                body.Children.Add(noTime);
-            }
+                Orientation = Orientation.Horizontal, Spacing = 6,
+                Children = { _hour, new TextBlock { Text = ":", FontSize = 18, FontWeight = FontWeight.SemiBold, VerticalAlignment = VerticalAlignment.Center }, _minute },
+            };
+            body.Children.Add(new StackPanel { Spacing = 8, Children = { new TextBlock { Text = "Time", FontWeight = FontWeight.SemiBold }, _times, exact } });
         }
 
-        // Now / None / Done
-        var buttons = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8, HorizontalAlignment = HorizontalAlignment.Right };
-        var nowLabel = Lean == DateLean.Past && ShowTime ? "Now" : "Today";
-        buttons.Children.Add(SheetButton(nowLabel, false, () =>
-        {
-            _draftDate = DateTime.Today;
-            if (Lean == DateLean.Past && ShowTime) _draftTime = NowTime();
-            BuildStrip();
-            SyncColumns();
-        }));
+        // Clear · Cancel · Done
+        var footer = new Grid { ColumnDefinitions = ColumnDefinitions.Parse("Auto,*,Auto,8,Auto") };
         if (AllowEmpty)
-            buttons.Children.Add(SheetButton("None", false, () =>
+            footer.Children.Add(TextButton("Clear", "ghost", () =>
             {
                 Date = null;
                 Time = null;
-                CloseSheet();
+                Close();
             }));
-        buttons.Children.Add(SheetButton("Done", true, () =>
+        var cancel = TextButton("Cancel", "ghost", Close);
+        var done = TextButton("Done", "pill", () =>
         {
             Date = _draftDate;
             if (ShowTime) Time = _draftTime;
-            CloseSheet();
-        }));
-        body.Children.Add(buttons);
+            Close();
+        });
+        done.MinWidth = 96;
+        Grid.SetColumn(cancel, 2);
+        Grid.SetColumn(done, 4);
+        footer.Children.Add(cancel);
+        footer.Children.Add(done);
+        body.Children.Add(footer);
 
-        var sheet = new Border
+        var card = new Border
         {
-            VerticalAlignment = VerticalAlignment.Bottom,
-            CornerRadius = new CornerRadius(16, 16, 0, 0),
-            Padding = new Thickness(16, 10, 16, 28),
-            Child = body,
+            Classes = { "sheet" },
+            Padding = phone ? new Thickness(18, 10, 18, 24) : new Thickness(22),
+            Width = phone ? double.NaN : 400,
+            VerticalAlignment = phone ? VerticalAlignment.Bottom : VerticalAlignment.Center,
+            HorizontalAlignment = phone ? HorizontalAlignment.Stretch : HorizontalAlignment.Center,
+            Child = new ScrollViewer { Content = body, MaxHeight = size.Height - 48, HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled },
         };
-        sheet.Bind(Border.BackgroundProperty, this.GetResourceObservable("HelmCardBackground"));
-        // A tap on the sheet itself must not reach the scrim.
-        sheet.PointerPressed += (_, e) => e.Handled = true;
-        var scrim = new Grid
-        {
-            Width = top.ClientSize.Width,
-            Height = top.ClientSize.Height,
-            Children = { sheet },
-        };
+        if (phone) card.CornerRadius = new CornerRadius(20, 20, 0, 0);
+        // A tap on the card itself must not reach the scrim.
+        card.PointerPressed += (_, e) => e.Handled = true;
+        var scrim = new Grid { Width = size.Width, Height = size.Height, Children = { card } };
         scrim.Bind(Panel.BackgroundProperty, this.GetResourceObservable("HelmScrim"));
-        scrim.PointerPressed += (_, _) => CloseSheet();
-        _sheet = scrim;
-        layer.Children.Add(scrim);
-        BuildStrip();
-        SyncColumns();
+        scrim.PointerPressed += (_, _) => Close();
+        scrim.KeyDown += (_, e) =>
+        {
+            if (e.Key == Key.Escape) Close();
+        };
+        // The overlay layer is outside the page: keep the page's light/dark (it may differ from the window's, in the Gallery).
+        var overlay = new ThemeVariantScope { RequestedThemeVariant = ActualThemeVariant, Child = scrim };
+        Canvas.SetLeft(overlay, at.X);
+        Canvas.SetTop(overlay, at.Y);
+        _overlay = overlay;
+        layer.Children.Add(overlay);
+        Refresh();
+        // A sheet slides up from the bottom; the card rises a little.
+        Motion.Enter(card, phone ? 60 : 12);
     }
 
-    private void CloseSheet()
+    private void Close()
     {
-        if (_sheet is null) return;
-        if (_sheet.Parent is Panel panel) panel.Children.Remove(_sheet);
-        _sheet = null;
-        _strip = null;
-        _calendar = null;
-        _hours = _minutes = null;
+        if (_overlay is null) return;
+        if (_overlay.Parent is Panel panel) panel.Children.Remove(_overlay);
+        _overlay = null;
+        _summary = _monthTitle = null;
+        _days = null;
+        _quick = _times = null;
+        _hour = _minute = null;
     }
 
-    private static Button SheetButton(string text, bool primary, Action click)
+    private static Button TextButton(string text, string kind, Action click)
     {
-        var b = new Button { Content = text, MinWidth = 80, HorizontalContentAlignment = HorizontalAlignment.Center, VerticalContentAlignment = VerticalAlignment.Center };
-        if (primary) b.Classes.Add("accent");
+        var b = new Button { Content = text, Classes = { kind }, HorizontalContentAlignment = HorizontalAlignment.Center };
         b.Click += (_, _) => click();
         return b;
     }
 
-    /// <summary>The days around the chosen one, newest on the right for the past and oldest on the left for the future.</summary>
-    private void BuildStrip()
+    private static Button IconChip(Symbol symbol, string name, Action click)
     {
-        if (_strip is null) return;
-        _strip.Children.Clear();
-        var today = DateTime.Today;
-        var first = Lean == DateLean.Past ? today.AddDays(-PastDays) : today;
-        var last = Lean == DateLean.Past ? today : today.AddDays(FutureDays);
-        if (_draftDate < first) first = _draftDate;
-        if (_draftDate > last) last = _draftDate;
-        Button? selected = null;
-        for (var d = first; d <= last; d = d.AddDays(1))
-        {
-            var day = d;
-            var culture = CultureInfo.CurrentCulture;
-            var top = day == today ? "Today" : day == today.AddDays(-1) ? "Yest." : day == today.AddDays(1) ? "Tmrw" : day.ToString("ddd", culture);
-            var chip = new Button
-            {
-                Width = 58,
-                Padding = new Thickness(0, 6),
-                HorizontalContentAlignment = HorizontalAlignment.Center,
-                Content = new StackPanel
-                {
-                    HorizontalAlignment = HorizontalAlignment.Center,
-                    Children =
-                    {
-                        new TextBlock { Text = top, FontSize = 11, HorizontalAlignment = HorizontalAlignment.Center },
-                        new TextBlock { Text = day.Day.ToString(culture), FontSize = 18, FontWeight = FontWeight.SemiBold, HorizontalAlignment = HorizontalAlignment.Center },
-                        new TextBlock { Text = day.ToString("MMM", culture), FontSize = 11, HorizontalAlignment = HorizontalAlignment.Center },
-                    },
-                },
-            };
-            if (day == _draftDate)
-            {
-                chip.Classes.Add("accent");
-                selected = chip;
-            }
-            chip.Click += (_, _) =>
-            {
-                _draftDate = day;
-                BuildStrip();
-            };
-            _strip.Children.Add(chip);
-        }
-        if (selected is not null) Avalonia.Threading.Dispatcher.UIThread.Post(() => selected.BringIntoView(), Avalonia.Threading.DispatcherPriority.Loaded);
+        var b = new Button { Classes = { "chip" }, Content = new SymbolIcon { Symbol = symbol, FontSize = 14 } };
+        Avalonia.Automation.AutomationProperties.SetName(b, name);
+        b.Click += (_, _) => click();
+        return b;
     }
 
-    private static ListBox Column(IEnumerable<int> values) => new()
+    private Button Chip(string text, bool selected, Action click)
     {
-        Width = 76,
-        Height = 176,
-        ItemsSource = values.Select(v => v.ToString("00", CultureInfo.InvariantCulture)).ToList(),
-    };
+        var b = new Button { Classes = { "chip" }, Content = text };
+        if (selected) b.Classes.Add("selected");
+        b.Click += (_, _) =>
+        {
+            click();
+            Refresh();
+        };
+        return b;
+    }
+
+    private void ShowMonth(int step)
+    {
+        _month = _month.AddMonths(step);
+        Refresh();
+    }
+
+    /// <summary>Redraws everything that follows the draft: the summary, the chips, the month and the time.</summary>
+    private void Refresh()
+    {
+        if (_summary is null || _quick is null || _days is null || _monthTitle is null) return;
+        var culture = CultureInfo.CurrentCulture;
+        var today = DateTime.Today;
+        _summary.Text = DateTimeText.Format(DateOnly.FromDateTime(_draftDate), ShowTime ? _draftTime : null, DateOnly.FromDateTime(today));
+
+        _quick.Children.Clear();
+        foreach (var (label, day) in QuickDays(today))
+            _quick.Children.Add(Chip(label, day == _draftDate, () =>
+            {
+                _draftDate = day;
+                _month = new DateTime(day.Year, day.Month, 1);
+            }));
+
+        _monthTitle.Text = _month.ToString("MMMM yyyy", culture);
+        _days.Children.Clear();
+        var offset = ((int)_month.DayOfWeek - (int)culture.DateTimeFormat.FirstDayOfWeek + 7) % 7;
+        var first = _month.AddDays(-offset);
+        for (var i = 0; i < 42; i++)
+        {
+            var day = first.AddDays(i);
+            var cell = new Button { Classes = { "day" }, Content = day.Day.ToString(culture) };
+            if (day.Month != _month.Month) cell.Classes.Add("out");
+            if (day == today) cell.Classes.Add("today");
+            if (day == _draftDate) cell.Classes.Add("selected");
+            Avalonia.Automation.AutomationProperties.SetName(cell, day.ToString("D", culture));
+            cell.Click += (_, _) =>
+            {
+                _draftDate = day;
+                if (day.Month != _month.Month) _month = new DateTime(day.Year, day.Month, 1);
+                Refresh();
+            };
+            _days.Children.Add(cell);
+        }
+
+        if (_times is not null && _hour is not null && _minute is not null)
+        {
+            _times.Children.Clear();
+            if (AllowEmpty) _times.Children.Add(Chip("No time", _draftTime is null, () => _draftTime = null));
+            if (Lean == DateLean.Past) _times.Children.Add(Chip("Now", false, () => _draftTime = NowTime()));
+            foreach (var t in CommonTimes)
+                _times.Children.Add(Chip(DateTimeText.Clock(t), _draftTime == t, () => _draftTime = t));
+            _syncing = true;
+            _hour.SelectedIndex = _draftTime?.Hours ?? -1;
+            _minute.SelectedIndex = _draftTime is { } dt ? dt.Minutes / 5 : -1;
+            _syncing = false;
+        }
+    }
+
+    /// <summary>The quick picks: days ahead for things due, days back for things that happened.</summary>
+    private IEnumerable<(string Label, DateTime Day)> QuickDays(DateTime today)
+    {
+        if (Lean == DateLean.Past)
+        {
+            yield return ("Today", today);
+            yield return ("Yesterday", today.AddDays(-1));
+            yield return ("2 days ago", today.AddDays(-2));
+            yield break;
+        }
+        yield return ("Today", today);
+        yield return ("Tomorrow", today.AddDays(1));
+        var saturday = today.AddDays(((int)DayOfWeek.Saturday - (int)today.DayOfWeek + 7) % 7);
+        if (saturday > today.AddDays(1)) yield return ("This weekend", saturday);
+        var monday = today.AddDays(((int)DayOfWeek.Monday - (int)today.DayOfWeek + 7) % 7 is 0 ? 7 : ((int)DayOfWeek.Monday - (int)today.DayOfWeek + 7) % 7);
+        yield return ("Next week", monday);
+    }
 
     private void PickTime()
     {
-        if (_syncing || _hours is null || _minutes is null) return;
-        var h = Math.Max(0, _hours.SelectedIndex);
-        var m = Math.Max(0, _minutes.SelectedIndex);
-        if (_hours.SelectedIndex < 0 && _minutes.SelectedIndex < 0) return;
-        _draftTime = new TimeSpan(h, m, 0);
-        SyncColumns();
-    }
-
-    private void SyncColumns()
-    {
-        if (_hours is null || _minutes is null) return;
-        _syncing = true;
-        _hours.SelectedIndex = _draftTime?.Hours ?? -1;
-        _minutes.SelectedIndex = _draftTime?.Minutes ?? -1;
-        _hours.Opacity = _minutes.Opacity = _draftTime is null ? 0.5 : 1;
-        _syncing = false;
-        var hours = _hours;
-        var minutes = _minutes;
-        Avalonia.Threading.Dispatcher.UIThread.Post(() =>
-        {
-            if (hours.SelectedIndex >= 0) hours.ScrollIntoView(hours.SelectedIndex);
-            if (minutes.SelectedIndex >= 0) minutes.ScrollIntoView(minutes.SelectedIndex);
-        }, Avalonia.Threading.DispatcherPriority.Loaded);
+        if (_syncing || _hour is null || _minute is null || _hour.SelectedIndex < 0 && _minute.SelectedIndex < 0) return;
+        _draftTime = new TimeSpan(Math.Max(0, _hour.SelectedIndex), Math.Max(0, _minute.SelectedIndex) * 5, 0);
+        Refresh();
     }
 }

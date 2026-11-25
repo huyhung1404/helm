@@ -30,7 +30,7 @@ internal sealed class TabHeader : Border
         MaxWidth = 220;
         Margin = new Thickness(0, 0, 2, 0);
         Padding = new Thickness(10, 0, 2, 0);
-        CornerRadius = new CornerRadius(6);
+        CornerRadius = new CornerRadius(16); // a pill inside the tab bar's pill
         Background = Brushes.Transparent;
         Cursor = Cursors.Arrow;
         ToolTip = tab.Look.Title;
@@ -125,7 +125,8 @@ internal sealed class TabHeader : Border
 
     private void UpdateLook()
     {
-        _indicator.Visibility = _active ? Visibility.Visible : Visibility.Collapsed;
+        // The shown tab is the filled pill; no underline.
+        _indicator.Visibility = Visibility.Collapsed;
         _title.SetResourceReference(TextBlock.ForegroundProperty, _active ? "TextFillColorPrimaryBrush" : "TextFillColorSecondaryBrush");
         if (_active) SetResourceReference(BackgroundProperty, "SubtleFillColorSecondaryBrush");
         else if (IsMouseOver) SetResourceReference(BackgroundProperty, "SubtleFillColorTertiaryBrush");

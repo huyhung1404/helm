@@ -74,15 +74,10 @@ public partial class TrackerView : UserControl
         TasksPanel.IsVisible = !insights;
         InsightsPanel.IsVisible = insights;
         Scroller.Offset = default;
-        Replay(insights ? InsightsPanel : ReferenceEquals(sender, CalendarTab) ? CalendarPanel : TasksPanel);
     }
 
-    /// <summary>Plays a panel's way in again (HelmTheme's .enter), for a tab or a list just picked.</summary>
-    private static void Replay(Control panel)
-    {
-        panel.Classes.Remove("enter");
-        Dispatcher.UIThread.Post(() => panel.Classes.Add("enter"), DispatcherPriority.Render);
-    }
+    /// <summary>Plays the list's way in again for a list just picked (tabs play theirs as they are shown).</summary>
+    private static void Replay(Control panel) => Helm.Core.Ui.Motion.Enter(panel);
 
     private void Settings_Click(object? sender, RoutedEventArgs e) => _host?.OpenSettings();
 
