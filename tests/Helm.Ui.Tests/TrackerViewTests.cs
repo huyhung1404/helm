@@ -1,3 +1,4 @@
+using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Headless.XUnit;
 using Avalonia.Threading;
@@ -107,6 +108,24 @@ public sealed class TrackerViewTests : IDisposable
         gear.RaiseEvent(new Avalonia.Interactivity.RoutedEventArgs(Button.ClickEvent));
 
         Assert.Equal(1, host.SettingsOpened);
+        window.Close();
+    }
+
+    [AvaloniaFact]
+    public void An_opened_task_turns_its_chevron_and_on_a_phone_its_actions_are_icons()
+    {
+        _store.AddItem(_store.AddWorkspace("Hôm nay"), new TrackerItemDraft("Gọi điện cho mẹ"));
+        var (window, view, vm) = Show(width: 390);
+        vm.OpenItems[0].IsExpanded = true;
+        Dispatcher.UIThread.RunJobs();
+
+        var chevron = view.GetVisualDescendants().OfType<Panel>().First(i => i.Classes.Contains("turn"));
+        Assert.Contains("open", chevron.Classes);
+        // It turns by a rotation (Avalonia keeps it in its standard transform group once animated).
+        Assert.True(chevron.RenderTransform is Avalonia.Media.RotateTransform
+            || (chevron.RenderTransform as Avalonia.Media.TransformGroup)?.Children.OfType<Avalonia.Media.RotateTransform>().Any() == true);
+        var edit = view.GetVisualDescendants().OfType<Button>().Single(b => Avalonia.Automation.AutomationProperties.GetName(b) == "Edit");
+        Assert.All(edit.GetVisualDescendants().OfType<TextBlock>().Where(t => t.Classes.Contains("label")), t => Assert.False(t.IsVisible));
         window.Close();
     }
 

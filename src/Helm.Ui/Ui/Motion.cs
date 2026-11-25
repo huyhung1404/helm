@@ -8,20 +8,29 @@ using Avalonia.Styling;
 namespace Helm.Core.Ui;
 
 /// <summary>
-/// How things come on screen in Helm: they fade in and rise a few pixels, quickly and eased. <see cref="Enter"/> plays
-/// it once; <c>core:Motion.EnterOnShow="True"</c> plays it every time a control is shown again (a tab, a folded
-/// section, a task opened, a page shown in the WPF shell).
+/// How things come on screen in Helm: they grow into place (a popup scale, from a little smaller to full size) as
+/// they appear, quickly and eased. <see cref="Enter"/> plays it once; <c>core:Motion.EnterOnShow="True"</c> plays it
+/// every time a control is shown again (a tab, a folded section, a task opened, a page shown in the WPF shell). A
+/// section that opens downwards grows from its top edge (<see cref="FromTopProperty"/>); a dialog from its centre.
 /// </summary>
 public static class Motion
 {
     public static readonly AttachedProperty<bool> EnterOnShowProperty =
         AvaloniaProperty.RegisterAttached<Control, bool>("EnterOnShow", typeof(Motion));
 
+    /// <summary>Grow from the top edge (a section opening under its header) instead of the centre.</summary>
+    public static readonly AttachedProperty<bool> FromTopProperty =
+        AvaloniaProperty.RegisterAttached<Control, bool>("FromTop", typeof(Motion));
+
     public static void SetEnterOnShow(Control control, bool value) => control.SetValue(EnterOnShowProperty, value);
 
     public static bool GetEnterOnShow(Control control) => control.GetValue(EnterOnShowProperty);
 
-    public static readonly TimeSpan Duration = TimeSpan.FromMilliseconds(280);
+    public static void SetFromTop(Control control, bool value) => control.SetValue(FromTopProperty, value);
+
+    public static bool GetFromTop(Control control) => control.GetValue(FromTopProperty);
+
+    public static readonly TimeSpan Duration = TimeSpan.FromMilliseconds(260);
 
     static Motion() =>
         EnterOnShowProperty.Changed.AddClassHandler<Control>((control, e) =>
@@ -35,19 +44,25 @@ public static class Motion
         if (e.Property == Visual.IsVisibleProperty && e.NewValue is true && sender is Control control) Enter(control);
     }
 
-    /// <summary>Fades <paramref name="control"/> in, rising <paramref name="rise"/> px (only fades if it is transformed otherwise).</summary>
-    public static void Enter(Control control, double rise = 12)
+    /// <summary>Grows <paramref name="control"/> into place from <paramref name="from"/> of its size (only fades if it is transformed otherwise).</summary>
+    public static void Enter(Control control, double from = 0.94)
     {
-        if (control.RenderTransform is null) control.RenderTransform = new TranslateTransform();
-        var moves = control.RenderTransform is TranslateTransform;
-        var from = new KeyFrame { Cue = new Cue(0), Setters = { new Setter(Visual.OpacityProperty, 0d) } };
-        var to = new KeyFrame { Cue = new Cue(1), Setters = { new Setter(Visual.OpacityProperty, 1d) } };
-        if (moves)
+        if (control.RenderTransform is null) control.RenderTransform = new ScaleTransform();
+        // The centre unless told otherwise (FromTop, or an origin the caller set).
+        // Avalonia turns RenderTransform into its standard group (scale, skew, rotate, translate) the first time a
+        // transform is animated, so a group can be scaled too.
+        var scales = control.RenderTransform is ScaleTransform or TransformGroup;
+        if (scales && GetFromTop(control)) control.RenderTransformOrigin = new RelativePoint(0.5, 0, RelativeUnit.Relative);
+        var start = new KeyFrame { Cue = new Cue(0), Setters = { new Setter(Visual.OpacityProperty, 0d) } };
+        var end = new KeyFrame { Cue = new Cue(1), Setters = { new Setter(Visual.OpacityProperty, 1d) } };
+        if (scales)
         {
-            from.Setters.Add(new Setter(TranslateTransform.YProperty, rise));
-            to.Setters.Add(new Setter(TranslateTransform.YProperty, 0d));
+            start.Setters.Add(new Setter(ScaleTransform.ScaleXProperty, from));
+            start.Setters.Add(new Setter(ScaleTransform.ScaleYProperty, from));
+            end.Setters.Add(new Setter(ScaleTransform.ScaleXProperty, 1d));
+            end.Setters.Add(new Setter(ScaleTransform.ScaleYProperty, 1d));
         }
-        var animation = new Animation { Duration = Duration, Easing = new CubicEaseOut(), FillMode = FillMode.Backward, Children = { from, to } };
+        var animation = new Animation { Duration = Duration, Easing = new CubicEaseOut(), FillMode = FillMode.Backward, Children = { start, end } };
         _ = animation.RunAsync(control);
     }
 }

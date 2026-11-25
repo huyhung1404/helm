@@ -264,8 +264,10 @@ public sealed class DateTimeBox : UserControl
         _overlay = overlay;
         layer.Children.Add(overlay);
         Refresh();
-        // A sheet slides up from the bottom; the card rises a little.
-        Motion.Enter(card, phone ? 60 : 12);
+        // The card grows into place; a phone's sheet grows up from its bottom edge.
+        card.RenderTransform = new ScaleTransform();
+        if (phone) card.RenderTransformOrigin = new RelativePoint(0.5, 1, RelativeUnit.Relative);
+        Motion.Enter(card, phone ? 0.9 : 0.94);
     }
 
     private void Close()

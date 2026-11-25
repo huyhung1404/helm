@@ -20,7 +20,7 @@ internal sealed class TabHost : UserControl
 {
     /// <summary>Where the strip's tabs start inside the host (DIPs): a torn-off tab is placed under the cursor by it.</summary>
     /// <summary>The tab bar pill's border and padding: the tabs start this far inside it.</summary>
-    public const double PillInset = 5;
+    public const double PillInset = 4;
 
     public const double StripLeft = 8 + PillInset;
     public const double StripTop = 6 + PillInset;
@@ -93,17 +93,15 @@ internal sealed class TabHost : UserControl
         _strip.MouseLeftButtonUp += (_, _) => EndDrag();
         _strip.LostMouseCapture += (_, _) => EndDrag();
 
-        // The tabs sit in one pill, barely lighter than Helm's background, with pill tabs inside (no divider line).
+        // The tabs sit in one pill, barely lighter than Helm's background, with pill tabs inside: no border, no divider.
         var pill = new Border
         {
             Margin = new Thickness(StripLeft - PillInset, StripTop - PillInset, 8, 6),
             Padding = new Thickness(4),
             CornerRadius = new CornerRadius(20),
-            BorderThickness = new Thickness(1),
             Child = _strip,
         };
         pill.SetResourceReference(Border.BackgroundProperty, "SubtleFillColorTertiaryBrush");
-        pill.SetResourceReference(Border.BorderBrushProperty, "CardStrokeColorDefaultBrush");
         var divider = new Border { Height = 0 };
 
         _content = new Border { ClipToBounds = true };

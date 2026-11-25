@@ -16,6 +16,12 @@
     WindowCornerPreference="Round"
     WindowStartupLocation="CenterScreen">
 
+    <ui:FluentWindow.Resources>
+        <!-- One surface: the content area has no panel or border of its own over Helm's background (WindowBackdrop). -->
+        <SolidColorBrush x:Key="NavigationViewContentBackground" Color="Transparent" />
+        <SolidColorBrush x:Key="NavigationViewContentGridBorderBrush" Color="Transparent" />
+    </ui:FluentWindow.Resources>
+
     <Grid x:Name="RootGrid">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />

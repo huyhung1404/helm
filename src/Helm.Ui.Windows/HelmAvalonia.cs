@@ -27,7 +27,11 @@ public static class HelmAvalonia
         try
         {
             // Avalonia 12 started by hand needs a text shaper (HarfBuzz) as well as the platform and renderer.
-            AppBuilder.Configure<HostedApp>().UseWin32().UseSkia().UseHarfBuzz().SetupWithoutStarting();
+            // Popups (lists, menus, tooltips) are drawn inside the page, not as windows of their own: an embedded page
+            // does not learn that the WPF window moved, so a popup window opened where the window used to be.
+            AppBuilder.Configure<HostedApp>().UseWin32().UseSkia().UseHarfBuzz()
+                .With(new Win32PlatformOptions { OverlayPopups = true })
+                .SetupWithoutStarting();
             s_started = true;
         }
         catch (Exception ex)

@@ -94,19 +94,24 @@
             <Setter Property="Background" Value="Transparent" />
         </Style>
         <!-- A chevron that turns when its section opens (half a turn; .quarter: a quarter, for a right-pointing one) -->
-        <Style Selector="ic|SymbolIcon.turn">
-            <Setter Property="RenderTransform" Value="rotate(0deg)" />
-            <Setter Property="Transitions">
-                <Transitions>
-                    <TransformOperationsTransition Property="RenderTransform" Duration="0:0:0.2" Easing="CubicEaseOut" />
-                </Transitions>
-            </Setter>
+        <Style Selector="Panel.turn">
+            <Setter Property="RenderTransform"><RotateTransform /></Setter>
         </Style>
-        <Style Selector="ic|SymbolIcon.turn.open">
-            <Setter Property="RenderTransform" Value="rotate(180deg)" />
+        <Style Selector="Panel.turn.open">
+            <Style.Animations>
+                <Animation Duration="0:0:0.2" Easing="CubicEaseOut" FillMode="Forward">
+                    <KeyFrame Cue="0%"><Setter Property="RotateTransform.Angle" Value="0" /></KeyFrame>
+                    <KeyFrame Cue="100%"><Setter Property="RotateTransform.Angle" Value="180" /></KeyFrame>
+                </Animation>
+            </Style.Animations>
         </Style>
-        <Style Selector="ic|SymbolIcon.turn.quarter.open">
-            <Setter Property="RenderTransform" Value="rotate(90deg)" />
+        <Style Selector="Panel.turn.quarter.open">
+            <Style.Animations>
+                <Animation Duration="0:0:0.2" Easing="CubicEaseOut" FillMode="Forward">
+                    <KeyFrame Cue="0%"><Setter Property="RotateTransform.Angle" Value="0" /></KeyFrame>
+                    <KeyFrame Cue="100%"><Setter Property="RotateTransform.Angle" Value="90" /></KeyFrame>
+                </Animation>
+            </Style.Animations>
         </Style>
         <!-- Small outlined action under an open task -->
         <Style Selector=":is(Button).act">
@@ -158,7 +163,7 @@
             <Setter Property="CornerRadius" Value="10" />
             <Setter Property="MinHeight" Value="56" />
         </Style>
-        <Style Selector="UserControl.narrow Button.calday">
+        <Style Selector=":is(UserControl).narrow Button.calday">
             <Setter Property="MinHeight" Value="44" />
         </Style>
         <Style Selector="Button.calday.out">
@@ -179,8 +184,17 @@
         <Style Selector="Ellipse.dot.done">
             <Setter Property="Opacity" Value="0.4" />
         </Style>
-        <Style Selector="UserControl.narrow TextBlock.display">
+        <Style Selector=":is(UserControl).narrow TextBlock.display">
             <Setter Property="FontSize" Value="28" />
+        </Style>
+        <!-- On a phone a task's actions are icons in one row (the words are their tooltips and names) -->
+        <Style Selector=":is(UserControl).narrow TextBlock.label">
+            <Setter Property="IsVisible" Value="False" />
+        </Style>
+        <Style Selector=":is(UserControl).narrow :is(Button).act">
+            <Setter Property="MinWidth" Value="36" />
+            <Setter Property="Padding" Value="9,7" />
+            <Setter Property="Margin" Value="0,0,4,4" />
         </Style>
     </UserControl.Styles>
 
@@ -261,15 +275,14 @@
                                     </WrapPanel>
                                     <TextBlock Text="{Binding Item.Notes}" Classes="muted" IsVisible="{Binding HasNotes}" Margin="0,3,0,0" MaxLines="2" TextTrimming="CharacterEllipsis" />
                                 </StackPanel>
-                                <ic:SymbolIcon Grid.Column="1" Symbol="ChevronDown" FontSize="14" Margin="8,6,0,0" VerticalAlignment="Top" Classes="turn" Classes.open="{Binding IsExpanded}"
-                                               Foreground="{DynamicResource HelmSecondaryText}" />
+                                <Panel Grid.Column="1" Margin="8,6,0,0" VerticalAlignment="Top" Width="14" Height="14" Classes="turn" Classes.open="{Binding IsExpanded}"><ic:SymbolIcon Symbol="ChevronDown" FontSize="14" Foreground="{DynamicResource HelmSecondaryText}" /></Panel>
                             </Grid>
                         </Button>
                     </Grid>
 
                     <!-- AI's proposed steps show under their task whether the task is open or not -->
                     <ContentControl Content="{Binding Proposal}" Margin="34,0,0,0" />
-                    <StackPanel Margin="34,8,0,0" IsVisible="{Binding IsExpanded}" core:Motion.EnterOnShow="True">
+                    <StackPanel Margin="34,8,0,0" IsVisible="{Binding IsExpanded}" core:Motion.EnterOnShow="True" core:Motion.FromTop="True">
                         <core:LinksPanel DataContext="{Binding Links}" Margin="0,0,0,4" />
                         <ItemsControl ItemsSource="{Binding Subtasks}" IsVisible="{Binding HasSubtasks}">
                             <ItemsControl.ItemTemplate>
@@ -299,20 +312,20 @@
                             </TextBox.KeyBindings>
                         </TextBox>
                         <WrapPanel IsVisible="{Binding !IsEditing}">
-                            <Button Classes="act" Command="{Binding StartCommand}" IsVisible="{Binding CanStart}">
-                                <StackPanel Orientation="Horizontal" Spacing="6"><ic:SymbolIcon Symbol="Play" FontSize="14" /><TextBlock Text="Start" /></StackPanel>
+                            <Button Classes="act" Command="{Binding StartCommand}" IsVisible="{Binding CanStart}" ToolTip.Tip="Start" AutomationProperties.Name="Start">
+                                <StackPanel Orientation="Horizontal" Spacing="6"><ic:SymbolIcon Symbol="Play" FontSize="14" /><TextBlock Classes="label" Text="Start" /></StackPanel>
                             </Button>
-                            <Button Classes="act" Command="{Binding BreakDownCommand}" IsVisible="{Binding CanBreakDown}">
+                            <Button Classes="act" Command="{Binding BreakDownCommand}" IsVisible="{Binding CanBreakDown}" ToolTip.Tip="Split into steps" AutomationProperties.Name="Split into steps">
                                 <StackPanel Orientation="Horizontal" Spacing="6">
                                     <ic:SymbolIcon Symbol="Sparkle" FontSize="14" Foreground="{DynamicResource HelmEyebrow}" />
-                                    <TextBlock Text="Split into steps" Foreground="{DynamicResource HelmEyebrow}" />
+                                    <TextBlock Classes="label" Text="Split into steps" Foreground="{DynamicResource HelmEyebrow}" />
                                 </StackPanel>
                             </Button>
-                            <Button Classes="act" Command="{Binding BeginEditCommand}">
-                                <StackPanel Orientation="Horizontal" Spacing="6"><ic:SymbolIcon Symbol="Edit" FontSize="14" /><TextBlock Text="Edit" /></StackPanel>
+                            <Button Classes="act" Command="{Binding BeginEditCommand}" ToolTip.Tip="Edit" AutomationProperties.Name="Edit">
+                                <StackPanel Orientation="Horizontal" Spacing="6"><ic:SymbolIcon Symbol="Edit" FontSize="14" /><TextBlock Classes="label" Text="Edit" /></StackPanel>
                             </Button>
-                            <Button Classes="act" Command="{Binding Links.StartPickingCommand}" IsVisible="{Binding Links, Converter={x:Static ObjectConverters.IsNotNull}}">
-                                <StackPanel Orientation="Horizontal" Spacing="6"><ic:SymbolIcon Symbol="Link" FontSize="14" /><TextBlock Text="Link a note" /></StackPanel>
+                            <Button Classes="act" Command="{Binding Links.StartPickingCommand}" IsVisible="{Binding Links, Converter={x:Static ObjectConverters.IsNotNull}}" ToolTip.Tip="Link a note" AutomationProperties.Name="Link a note">
+                                <StackPanel Orientation="Horizontal" Spacing="6"><ic:SymbolIcon Symbol="Link" FontSize="14" /><TextBlock Classes="label" Text="Link a note" /></StackPanel>
                             </Button>
                             <Button Classes="act" Command="{Binding MoveUpCommand}" IsVisible="{Binding IsOpen}" IsEnabled="{Binding CanMoveUp}" AutomationProperties.Name="Move up">
                                 <ic:SymbolIcon Symbol="ArrowUp" FontSize="14" />
@@ -320,12 +333,12 @@
                             <Button Classes="act" Command="{Binding MoveDownCommand}" IsVisible="{Binding IsOpen}" IsEnabled="{Binding CanMoveDown}" AutomationProperties.Name="Move down">
                                 <ic:SymbolIcon Symbol="ArrowDown" FontSize="14" />
                             </Button>
-                            <Button Classes="act" Command="{Binding DeleteCommand}">
-                                <TextBlock Text="Delete" Foreground="{DynamicResource HelmDanger}" />
+                            <Button Classes="act" Command="{Binding DeleteCommand}" AutomationProperties.Name="Delete">
+                                <StackPanel Orientation="Horizontal" Spacing="6"><ic:SymbolIcon Symbol="Delete" FontSize="14" Foreground="{DynamicResource HelmDanger}" /><TextBlock Classes="label" Text="Delete" Foreground="{DynamicResource HelmDanger}" /></StackPanel>
                             </Button>
                         </WrapPanel>
 
-                        <StackPanel Spacing="8" IsVisible="{Binding IsEditing}" core:Motion.EnterOnShow="True">
+                        <StackPanel Spacing="8" IsVisible="{Binding IsEditing}" core:Motion.EnterOnShow="True" core:Motion.FromTop="True">
                             <TextBox Classes="glass" PlaceholderText="Title" Text="{Binding EditTitle}" AutomationProperties.Name="Title" />
                             <TextBox Classes="glass" PlaceholderText="Notes" Text="{Binding EditNotes}" AcceptsReturn="True" TextWrapping="Wrap" MinHeight="72"
                                      VerticalContentAlignment="Top" Padding="12,10" AutomationProperties.Name="Notes" />
@@ -425,7 +438,7 @@
                     <Panel IsVisible="{Binding ShowListsView}">
                     <StackPanel x:Name="TasksPanel" Classes="enter" core:Motion.EnterOnShow="True">
                         <!-- 1. Which list: all of them in one row, the open one highlighted -->
-                        <ScrollViewer HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Disabled" Margin="0,22,0,0">
+                        <ScrollViewer HorizontalScrollBarVisibility="Hidden" VerticalScrollBarVisibility="Disabled" Margin="0,22,0,0">
                             <StackPanel Orientation="Horizontal" Spacing="10" Margin="0,0,0,6">
                                 <ItemsControl ItemsSource="{Binding Workspaces}">
                                     <ItemsControl.ItemsPanel>
@@ -493,7 +506,7 @@
                                         <ic:SymbolIcon Symbol="Add" FontSize="18" Foreground="{DynamicResource HelmPillForeground}" />
                                     </Button>
                                 </Grid>
-                                <WrapPanel IsVisible="{Binding #MoreToggle.IsChecked}" Margin="0,10,0,0" LineSpacing="8" core:Motion.EnterOnShow="True">
+                                <WrapPanel IsVisible="{Binding #MoreToggle.IsChecked}" Margin="0,10,0,0" LineSpacing="8" core:Motion.EnterOnShow="True" core:Motion.FromTop="True">
                                     <core:DateTimeBox Classes="glass" Date="{Binding NewDueDate}" Time="{Binding NewDueTime}" Lean="Future" AllowEmpty="True"
                                                       PlaceholderText="Due date" MinWidth="220" Margin="0,0,8,0" />
                                     <ComboBox Classes="glass" ItemsSource="{Binding PriorityNames}" SelectedIndex="{Binding NewPriorityIndex}" MinWidth="130"
@@ -528,11 +541,11 @@
                         <!-- 4. Done, folded away -->
                         <Button Classes="flat" HorizontalAlignment="Left" Padding="4,8" Margin="0,8,0,4" Click="ToggleDone_Click" IsVisible="{Binding HasCompleted}">
                             <StackPanel Orientation="Horizontal" Spacing="6">
-                                <ic:SymbolIcon Symbol="ChevronRight" FontSize="12" Classes="turn quarter" Classes.open="{Binding ShowCompleted}" Foreground="{DynamicResource HelmSecondaryText}" />
+                                <Panel Width="12" Height="12" Classes="turn quarter" Classes.open="{Binding ShowCompleted}"><ic:SymbolIcon Symbol="ChevronRight" FontSize="12" Foreground="{DynamicResource HelmSecondaryText}" /></Panel>
                                 <TextBlock Text="Done" Classes="muted" FontSize="13" />
                             </StackPanel>
                         </Button>
-                        <ItemsControl ItemsSource="{Binding CompletedItems}" IsVisible="{Binding ShowCompleted}" core:Motion.EnterOnShow="True" />
+                        <ItemsControl ItemsSource="{Binding CompletedItems}" IsVisible="{Binding ShowCompleted}" core:Motion.EnterOnShow="True" core:Motion.FromTop="True" />
                         <Button Classes="ghost" HorizontalAlignment="Stretch" Content="{Binding CompletedPager.MoreText}" Command="{Binding CompletedPager.ShowMoreCommand}">
                             <Button.IsVisible>
                                 <MultiBinding Converter="{x:Static BoolConverters.And}">
