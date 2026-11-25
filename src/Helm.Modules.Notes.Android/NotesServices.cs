@@ -9,6 +9,6 @@ public static class NotesServices
         services
             .AddNotesCore()
             .AddNoteLinks(typeof(NotesContentPage))
-            .AddAndroidModule<NotesModule, NotesPage>()
+            .AddAndroidModule<NotesModule, NotesContentPage>()
             .AddTransient<NotesContentPage>();
 }

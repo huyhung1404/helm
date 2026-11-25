@@ -21,7 +21,12 @@ public partial class NoteEditorView : UserControl
         TasksPane.MaxHeight = narrow ? 420 : double.PositiveInfinity;
     }
 
-    public void FocusBody() => BodyBox.Focus();
+    /// <summary>The cursor goes into the text, at its end, so typing goes on where it stopped.</summary>
+    public void FocusBody()
+    {
+        BodyBox.Focus();
+        BodyBox.CaretIndex = BodyBox.Text?.Length ?? 0;
+    }
 
     public void FocusTitle() => TitleBox.Focus();
 }

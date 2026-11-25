@@ -21,7 +21,7 @@ public sealed class NotesModule(NotesViewModel viewModel, NoteIndexer indexer) :
     /// <summary>The same vector icon as on Windows (<see cref="NotesIconShape"/>).</summary>
     public override IImage? IconImage => NotesIcon.Image;
 
-    public override Type PageType => typeof(NotesPage);
+    public override Type PageType => typeof(NotesContentPage);
     public Type ContentPageType => typeof(NotesContentPage);
 
     public override Task EnableAsync(CancellationToken ct)

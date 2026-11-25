@@ -30,6 +30,7 @@
   <ItemGroup>
     <ProjectReference Include="..\Helm.Core.Android\Helm.Core.Android.csproj" />
     <ProjectReference Include="..\Helm.Modules.Notes.Core\Helm.Modules.Notes.Core.csproj" />
+    <ProjectReference Include="..\Helm.Modules.Notes.UI\Helm.Modules.Notes.UI.csproj" />
   </ItemGroup>
 
 </Project>

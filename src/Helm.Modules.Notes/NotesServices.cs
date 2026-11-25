@@ -9,6 +9,6 @@ public static class NotesServices
         services
             .AddNotesCore()
             .AddNoteLinks(typeof(NotesContentPage))
-            .AddHelmModule<NotesModule, NotesPage, NotesViewModel>()
+            .AddHelmModule<NotesModule, NotesContentPage, NotesViewModel>()
             .AddSingleton<NotesContentPage>();
 }

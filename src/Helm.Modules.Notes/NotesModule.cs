@@ -8,8 +8,7 @@ namespace Helm.Modules.Notes;
 /// <summary>
 /// Notes on Windows. The notes live in Helm Sync and the pages work directly on <see cref="NotesStore"/>; the only
 /// background work is indexing them for search by meaning, where the model was downloaded (<see cref="NoteIndexer"/>).
-/// The menu and Quick access open <see cref="NotesContentPage"/>; Home → Utilities opens the settings
-/// (<see cref="NotesPage"/>).
+/// The menu, Quick access and Home → Utilities open <see cref="NotesContentPage"/>; its settings are a sheet inside it.
 /// </summary>
 public sealed class NotesModule(NotesViewModel viewModel, NoteIndexer indexer) : HelmModuleBase, IModuleContent
 {
@@ -19,7 +18,7 @@ public sealed class NotesModule(NotesViewModel viewModel, NoteIndexer indexer) :
     public override ModuleGroup Group => ModuleGroup.Planning;
     public override SymbolRegular Icon => SymbolRegular.Notepad24;
     public override ImageSource IconImage => NotesLogo.Image;
-    public override Type SettingsPageType => typeof(NotesPage);
+    public override Type SettingsPageType => typeof(NotesContentPage);
     public Type ContentPageType => typeof(NotesContentPage);
     public override IReadOnlyList<HotkeyDefinition> Hotkeys => [];
 
