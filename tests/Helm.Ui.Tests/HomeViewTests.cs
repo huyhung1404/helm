@@ -1,76 +1,99 @@
 using Avalonia.Controls;
 using Avalonia.Headless.XUnit;
+using Avalonia.Interactivity;
 using Avalonia.Threading;
 using Avalonia.VisualTree;
 using Helm.Gallery;
+using Helm.General;
 using Helm.Home;
 
 namespace Helm.Ui.Tests;
 
-/// <summary>The shared Home page (Helm.Home.UI) with the Gallery's made-up Helm.</summary>
+/// <summary>The shared Home ("today") and General pages (Helm.Shell.UI) with the Gallery's made-up Helm.</summary>
 public sealed class HomeViewTests
 {
-    private static (Window Window, HomeView View, HomeViewModel Vm) Show(HomeStage stage, double width = 1200)
+    private static (Window Window, T View) Show<T>(Control view, double width = 1200) where T : Control
     {
-        var view = (HomeView)HomeDemo.Create(stage);
         var window = new Window { Content = view, Width = width, Height = 900 };
         window.Show();
         Dispatcher.UIThread.RunJobs();
-        return (window, view, (HomeViewModel)view.DataContext!);
+        return (window, (T)view);
     }
 
     private static List<TextBlock> Shown(Control root, string text) =>
         root.GetVisualDescendants().OfType<TextBlock>().Where(t => t.Text == text && t.IsEffectivelyVisible).ToList();
 
     [AvaloniaFact]
-    public void Tools_that_are_on_are_tiles_and_a_switch_adds_or_removes_one()
+    public void A_busy_day_puts_problems_first_then_each_tools_part_most_urgent_first()
     {
-        var (window, view, vm) = Show(HomeStage.Desktop);
+        var (window, view) = Show<HomeView>(HomeDemo.Home(HomeStage.Busy));
+        var vm = (HomeViewModel)view.DataContext!;
 
-        Assert.Equal(14, vm.QuickAccess.Count); // three of the seventeen are off
-        Assert.Single(Shown(view, "Tracker"));
-        Assert.Single(Shown(view, "3 open · 1 overdue"));
+        Assert.Equal(AlertLevel.Danger, vm.Alerts[0].Level);
+        Assert.Equal("Tracker", vm.Today[0].Tool.Name);
+        Assert.Single(Shown(view, "NEEDS ATTENTION"));
+        Assert.Single(Shown(view, "Trả tiền điện tháng 11"));
+        Assert.Empty(Shown(view, "All clear"));
+        window.Close();
+    }
 
-        var keyboard = vm.Tools.Single(t => t.Id == "keyboard");
-        keyboard.IsEnabled = true;
+    [AvaloniaFact]
+    public void Ticking_a_task_on_home_counts_it_done()
+    {
+        var (window, view) = Show<HomeView>(HomeDemo.Home(HomeStage.Busy));
+        var vm = (HomeViewModel)view.DataContext!;
+        var before = vm.Headline;
+
+        vm.Today[0].Items[0].TickCommand.Execute(null);
+        Assert.True(vm.Today[0].Items[0].IsDone);
+        Assert.NotEqual(before, vm.Headline);
+        window.Close();
+    }
+
+    [AvaloniaFact]
+    public void Nothing_due_and_nothing_wrong_is_all_clear()
+    {
+        var (window, view) = Show<HomeView>(HomeDemo.Home(HomeStage.AllClear));
+        Assert.Single(Shown(view, "All clear"));
+        Assert.Empty(Shown(view, "NEEDS ATTENTION"));
+        window.Close();
+    }
+
+    [AvaloniaFact]
+    public void General_lists_its_parts_with_their_state_and_a_switch_counts_in_tools()
+    {
+        var (window, view) = Show<GeneralView>(HomeDemo.General(desktop: true));
+        var vm = (GeneralViewModel)view.DataContext!;
+
+        Assert.Equal("14 of 17 on", vm.Section("tools").Summary);
+        Assert.True(vm.IsTools);
+        vm.Tools.Single(t => t.Name == "Helm Keyboard").IsEnabled = true;
+        Assert.Equal("15 of 17 on", vm.Section("tools").Summary);
+
+        vm.Selected = vm.Section("sync");
         Dispatcher.UIThread.RunJobs();
-        Assert.Contains(keyboard, vm.QuickAccess);
-        keyboard.IsEnabled = false;
-        Assert.DoesNotContain(keyboard, vm.QuickAccess);
+        Assert.Single(Shown(view, "Devices"));
+        Assert.Empty(Shown(view, "A tool that is off is hidden from the menu and Home, and does nothing in the background. Its data stays."));
         window.Close();
     }
 
     [AvaloniaFact]
-    public void A_desktop_shows_shortcuts_and_conflicts_a_phone_does_not()
+    public void On_a_phone_General_is_the_list_and_a_part_opens_in_its_place()
     {
-        var (desktop, desktopView, _) = Show(HomeStage.Desktop);
-        Assert.Single(Shown(desktopView, "Shortcut conflicts"));
-        Assert.Single(Shown(desktopView, "Snap the window to a zone"));
-        desktop.Close();
+        var (window, view) = Show<GeneralView>(HomeDemo.General(desktop: false), width: 390);
+        var row = view.GetVisualDescendants().OfType<Button>().First(b => Avalonia.Automation.AutomationProperties.GetName(b) == "Sync");
 
-        var (phone, phoneView, _) = Show(HomeStage.Phone, width: 390);
-        Assert.Contains("narrow", (IEnumerable<string>)phoneView.Classes);
-        Assert.Empty(Shown(phoneView, "Shortcut conflicts"));
-        Assert.Empty(Shown(phoneView, "Snap the window to a zone"));
-        phone.Close();
-    }
+        Assert.Empty(Shown(view, "Devices"));
+        row.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+        Dispatcher.UIThread.RunJobs();
+        Assert.Single(Shown(view, "Devices"));
+        var rail = view.FindControl<Control>("Rail")!;
+        Assert.False(rail.IsVisible); // the part took the list's place
 
-    [AvaloniaFact]
-    public void With_nothing_on_it_says_what_to_do()
-    {
-        var (window, view, vm) = Show(HomeStage.Empty);
-        Assert.False(vm.HasQuickAccess);
-        Assert.Single(Shown(view, "No tool is on yet. Turn one on below."));
-        window.Close();
-    }
-
-    [AvaloniaFact]
-    public void The_tools_list_orders_by_name_or_by_category()
-    {
-        var (window, _, vm) = Show(HomeStage.Desktop);
-        Assert.Equal(vm.Tools.OrderBy(t => t.Name, StringComparer.CurrentCultureIgnoreCase).Select(t => t.Id), vm.Tools.Select(t => t.Id));
-        vm.ToggleSortCommand.Execute(null);
-        Assert.Equal(vm.Tools.OrderBy(t => t.Group, StringComparer.CurrentCulture).ThenBy(t => t.Name, StringComparer.CurrentCultureIgnoreCase).Select(t => t.Id), vm.Tools.Select(t => t.Id));
+        Assert.True(view.HandleBack());
+        Dispatcher.UIThread.RunJobs();
+        Assert.True(rail.IsVisible);
+        Assert.Empty(Shown(view, "Devices"));
         window.Close();
     }
 }

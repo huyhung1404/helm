@@ -1,0 +1,380 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:ic="using:FluentIcons.Avalonia"
+             xmlns:core="using:Helm.Core.Ui"
+             xmlns:vm="using:Helm.General"
+             xmlns:home="using:Helm.Home"
+             x:Class="Helm.General.GeneralView"
+             x:DataType="vm:GeneralViewModel">
+
+    <!-- General in parts: the list on the left says how each part stands (a phone: the list is the page, a part opens in
+         its place with Back); the chosen part on the right. -->
+    <UserControl.Styles>
+        <Style Selector="Border.tile">
+            <Setter Property="Width" Value="38" />
+            <Setter Property="Height" Value="38" />
+            <Setter Property="CornerRadius" Value="10" />
+            <Setter Property="Background" Value="{DynamicResource HelmGlassHover}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource HelmGlassStroke}" />
+            <Setter Property="BorderThickness" Value="1" />
+        </Style>
+        <Style Selector="Button.part">
+            <Setter Property="HorizontalAlignment" Value="Stretch" />
+            <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+            <Setter Property="Padding" Value="12,10" />
+            <Setter Property="Margin" Value="0,0,0,8" />
+        </Style>
+        <Style Selector="TextBlock.title">
+            <Setter Property="FontSize" Value="22" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+        </Style>
+        <Style Selector="Border.tag">
+            <Setter Property="Background" Value="{DynamicResource HelmGlassHover}" />
+            <Setter Property="CornerRadius" Value="6" />
+            <Setter Property="Padding" Value="7,1" />
+            <Setter Property="VerticalAlignment" Value="Center" />
+        </Style>
+        <Style Selector="Border.tag > TextBlock">
+            <Setter Property="FontSize" Value="11" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="Foreground" Value="{DynamicResource HelmEyebrow}" />
+        </Style>
+        <Style Selector="ToggleButton.chip">
+            <Setter Property="Margin" Value="0,0,8,8" />
+        </Style>
+    </UserControl.Styles>
+
+    <Panel>
+        <core:Backdrop />
+        <Grid x:Name="Page" ColumnDefinitions="290,*" ColumnSpacing="28" Margin="40,28,40,0">
+
+            <!-- The parts, each with how it stands -->
+            <ScrollViewer x:Name="Rail" HorizontalScrollBarVisibility="Disabled" Padding="0,0,0,24">
+                <StackPanel>
+                    <TextBlock Classes="eyebrow" Text="HELM" />
+                    <TextBlock Classes="display" Text="General" Margin="0,8,0,4" />
+                    <TextBlock Classes="muted" FontSize="14" Text="{Binding Version, StringFormat='Helm {0}'}" Margin="0,0,0,20" />
+                    <ItemsControl ItemsSource="{Binding Sections}">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate x:DataType="vm:GeneralSection">
+                                <Button Classes="glass part" Classes.selected="{Binding IsSelected}" Click="Section_Click" AutomationProperties.Name="{Binding Title}">
+                                    <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="12">
+                                        <Border Classes="tile">
+                                            <ic:SymbolIcon Symbol="{Binding Icon}" FontSize="18" Foreground="{DynamicResource HelmEyebrow}" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                        </Border>
+                                        <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                            <TextBlock Text="{Binding Title}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+                                            <TextBlock Classes="muted" Classes.late="{Binding NeedsAttention}" FontSize="12" Text="{Binding Summary}" TextWrapping="NoWrap" TextTrimming="CharacterEllipsis" />
+                                        </StackPanel>
+                                        <ic:SymbolIcon x:Name="Chevron" Grid.Column="2" Symbol="ChevronRight" FontSize="12" Foreground="{DynamicResource HelmSecondaryText}" VerticalAlignment="Center" />
+                                    </Grid>
+                                </Button>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </StackPanel>
+            </ScrollViewer>
+
+            <!-- The chosen part -->
+            <Grid x:Name="Detail" Grid.Column="1" RowDefinitions="Auto,*">
+                <Button x:Name="BackButton" Classes="ghost" HorizontalAlignment="Left" Margin="0,0,0,12" IsVisible="False" Click="Back_Click" AutomationProperties.Name="Back to General">
+                    <StackPanel Orientation="Horizontal" Spacing="6">
+                        <ic:SymbolIcon Symbol="ArrowLeft" FontSize="16" />
+                        <TextBlock Text="General" VerticalAlignment="Center" />
+                    </StackPanel>
+                </Button>
+                <ScrollViewer x:Name="Scroller" Grid.Row="1" HorizontalScrollBarVisibility="Disabled" Padding="0,0,14,24" core:ScrollFade.Enabled="True">
+                    <Panel MaxWidth="760" HorizontalAlignment="Left">
+
+                        <!-- TOOLS -->
+                        <StackPanel Spacing="14" IsVisible="{Binding IsTools}" core:Motion.EnterOnShow="True">
+                            <Grid ColumnDefinitions="*,Auto">
+                                <StackPanel>
+                                    <TextBlock Classes="title" Text="Tools" />
+                                    <TextBlock Classes="muted" FontSize="14" Text="A tool that is off is hidden from the menu and Home, and does nothing in the background. Its data stays." />
+                                </StackPanel>
+                                <Button Grid.Column="1" Classes="chip" VerticalAlignment="Top" Command="{Binding ToggleSortCommand}" ToolTip.Tip="Change the order" AutomationProperties.Name="Sort tools">
+                                    <StackPanel Orientation="Horizontal" Spacing="6">
+                                        <ic:SymbolIcon Symbol="ArrowSort" FontSize="14" />
+                                        <TextBlock Text="{Binding SortLabel}" FontSize="13" />
+                                    </StackPanel>
+                                </Button>
+                            </Grid>
+                            <ItemsControl ItemsSource="{Binding Tools}" AutomationProperties.Name="Tools">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate x:DataType="home:HomeTool">
+                                        <Border Classes="glass fade" Padding="14,8,8,8" Margin="0,0,0,8">
+                                            <Grid ColumnDefinitions="Auto,*,Auto,Auto" ColumnSpacing="12">
+                                                <core:ModuleIcon Symbol="{Binding Icon}" Image="{Binding Image}" Size="28" Foreground="{DynamicResource HelmEyebrow}" VerticalAlignment="Center" />
+                                                <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                                    <TextBlock Text="{Binding Name}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+                                                    <TextBlock Classes="muted" FontSize="12" Text="{Binding Group}" />
+                                                </StackPanel>
+                                                <ToggleSwitch Grid.Column="2" IsChecked="{Binding IsEnabled}" OnContent="" OffContent="" VerticalAlignment="Center" AutomationProperties.Name="{Binding Name}" />
+                                                <Button Grid.Column="3" Classes="chip" Width="36" Height="36" MinHeight="36" Padding="0" IsEnabled="{Binding IsEnabled}"
+                                                        Command="{Binding $parent[UserControl].((vm:GeneralViewModel)DataContext).OpenToolCommand}" CommandParameter="{Binding}"
+                                                        ToolTip.Tip="Open" AutomationProperties.Name="{Binding Name, StringFormat='Open {0}'}">
+                                                    <ic:SymbolIcon Symbol="ChevronRight" FontSize="14" />
+                                                </Button>
+                                            </Grid>
+                                        </Border>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </StackPanel>
+
+                        <!-- SYNC -->
+                        <StackPanel Spacing="14" IsVisible="{Binding IsSync}" core:Motion.EnterOnShow="True">
+                            <StackPanel>
+                                <TextBlock Classes="title" Text="Sync" />
+                                <TextBlock Classes="muted" FontSize="14" Text="End-to-end encrypted: neither the server nor whoever invited you can read your data." TextWrapping="Wrap" />
+                            </StackPanel>
+                            <Border Classes="glass">
+                                <StackPanel Spacing="12">
+                                    <Grid ColumnDefinitions="Auto,*" ColumnSpacing="12">
+                                        <ic:SymbolIcon Symbol="CheckmarkCircle" IconVariant="Filled" FontSize="26" Foreground="{DynamicResource HelmSuccess}" VerticalAlignment="Center" />
+                                        <StackPanel Grid.Column="1">
+                                            <TextBlock Classes="head" Text="{Binding AccountName}" />
+                                            <TextBlock Classes="muted" Text="{Binding SyncStatus}" />
+                                            <TextBlock Classes="muted" Text="{Binding Usage}" />
+                                        </StackPanel>
+                                    </Grid>
+                                    <Button Classes="pill" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Command="{Binding SyncNowCommand}">
+                                        <StackPanel Orientation="Horizontal" Spacing="8">
+                                            <ic:SymbolIcon Symbol="ArrowSync" FontSize="16" Foreground="{DynamicResource HelmPillForeground}" />
+                                            <TextBlock Text="Sync now" Foreground="{DynamicResource HelmPillForeground}" />
+                                        </StackPanel>
+                                    </Button>
+                                </StackPanel>
+                            </Border>
+                            <Border Classes="glass">
+                                <StackPanel Spacing="10">
+                                    <StackPanel Spacing="2">
+                                        <TextBlock Classes="head" Text="What syncs on this device" />
+                                        <TextBlock Classes="secondary" TextWrapping="Wrap" Text="Untick a tool to keep it on this device only, e.g. the vault on a shared PC. What it has here stays." />
+                                    </StackPanel>
+                                    <ItemsControl ItemsSource="{Binding SyncTargets}">
+                                        <ItemsControl.ItemsPanel>
+                                            <ItemsPanelTemplate><WrapPanel /></ItemsPanelTemplate>
+                                        </ItemsControl.ItemsPanel>
+                                        <ItemsControl.ItemTemplate>
+                                            <DataTemplate x:DataType="vm:SyncTarget">
+                                                <ToggleButton Classes="chip" IsChecked="{Binding IsSynced}" AutomationProperties.Name="{Binding Name}">
+                                                    <StackPanel Orientation="Horizontal" Spacing="6">
+                                                        <ic:SymbolIcon Symbol="Checkmark" FontSize="13" IsVisible="{Binding IsSynced}" />
+                                                        <TextBlock Text="{Binding Name}" FontSize="13" />
+                                                    </StackPanel>
+                                                </ToggleButton>
+                                            </DataTemplate>
+                                        </ItemsControl.ItemTemplate>
+                                    </ItemsControl>
+                                </StackPanel>
+                            </Border>
+                            <Border Classes="glass">
+                                <StackPanel Spacing="10">
+                                    <TextBlock Classes="head" Text="Devices" />
+                                    <ItemsControl ItemsSource="{Binding Devices}">
+                                        <ItemsControl.ItemTemplate>
+                                            <DataTemplate x:DataType="vm:SyncDevice">
+                                                <Grid ColumnDefinitions="*,Auto" Margin="0,0,0,10">
+                                                    <StackPanel VerticalAlignment="Center">
+                                                        <StackPanel Orientation="Horizontal" Spacing="8">
+                                                            <TextBlock Text="{Binding Name}" FontWeight="SemiBold" VerticalAlignment="Center" />
+                                                            <Border Classes="tag" IsVisible="{Binding IsThis}"><TextBlock Text="This device" /></Border>
+                                                        </StackPanel>
+                                                        <TextBlock Classes="muted" Text="{Binding Details}" />
+                                                    </StackPanel>
+                                                    <Button Grid.Column="1" Classes="ghost" VerticalAlignment="Center" IsVisible="{Binding CanRemove}" Command="{Binding RemoveCommand}"
+                                                            AutomationProperties.Name="{Binding Name, StringFormat='Remove {0}'}">
+                                                        <TextBlock Text="Remove" Foreground="{DynamicResource HelmDanger}" />
+                                                    </Button>
+                                                </Grid>
+                                            </DataTemplate>
+                                        </ItemsControl.ItemTemplate>
+                                    </ItemsControl>
+                                    <TextBlock Classes="secondary" TextWrapping="Wrap" Text="Add a device that shows an 18-digit pairing code: it gets its own token and the key, nobody types the passphrase." />
+                                    <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
+                                        <TextBox Classes="glass mono" PlaceholderText="18-digit pairing code" Text="{Binding PairingCode}" AutomationProperties.Name="Pairing code" />
+                                        <Button Grid.Column="1" Classes="pill" Content="Add device" Command="{Binding PairCommand}" />
+                                    </Grid>
+                                </StackPanel>
+                            </Border>
+                            <Border Classes="glass">
+                                <StackPanel Spacing="10">
+                                    <StackPanel Spacing="2">
+                                        <TextBlock Classes="head" Text="Passphrase" />
+                                        <TextBlock Classes="secondary" TextWrapping="Wrap" Text="Unlocks sync on a new device. Changing it keeps your devices syncing and your recovery key." />
+                                    </StackPanel>
+                                    <Button Classes="ghost" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Content="Change passphrase…" Command="{Binding ChangePassphraseCommand}" />
+                                </StackPanel>
+                            </Border>
+                            <Border Classes="glass">
+                                <StackPanel Spacing="10">
+                                    <StackPanel Spacing="2">
+                                        <TextBlock Classes="head" Text="Turn off sync on this device" />
+                                        <TextBlock Classes="secondary" TextWrapping="Wrap" Text="Stops syncing and forgets this device's token and key. Your data stays here." />
+                                    </StackPanel>
+                                    <Button Classes="ghost" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Command="{Binding TurnOffSyncCommand}">
+                                        <TextBlock Text="Turn off sync…" Foreground="{DynamicResource HelmDanger}" />
+                                    </Button>
+                                </StackPanel>
+                            </Border>
+                        </StackPanel>
+
+                        <!-- UPDATES -->
+                        <StackPanel Spacing="14" IsVisible="{Binding IsUpdates}" core:Motion.EnterOnShow="True">
+                            <StackPanel>
+                                <TextBlock Classes="title" Text="Updates" />
+                                <TextBlock Classes="muted" FontSize="14" Text="{Binding Version, StringFormat='This is Helm {0}.'}" />
+                            </StackPanel>
+                            <Border Classes="glass">
+                                <StackPanel Spacing="12">
+                                    <Grid ColumnDefinitions="Auto,*" ColumnSpacing="12">
+                                        <ic:SymbolIcon Symbol="ArrowCircleDown" IconVariant="Filled" FontSize="26" Foreground="{DynamicResource HelmEyebrow}" VerticalAlignment="Center" />
+                                        <StackPanel Grid.Column="1">
+                                            <TextBlock Classes="head" Text="{Binding UpdateTitle}" />
+                                            <TextBlock Classes="muted" Text="{Binding UpdateSubtitle}" />
+                                        </StackPanel>
+                                    </Grid>
+                                    <Button Classes="pill" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Content="{Binding UpdateAction}" Command="{Binding UpdateCommand}" />
+                                </StackPanel>
+                            </Border>
+                            <Border Classes="glass">
+                                <StackPanel Spacing="12">
+                                    <StackPanel Spacing="6">
+                                        <TextBlock Text="Update channel" />
+                                        <ComboBox Classes="glass" HorizontalAlignment="Stretch" ItemsSource="{Binding Channels}" SelectedIndex="{Binding ChannelIndex}" AutomationProperties.Name="Update channel" />
+                                        <TextBlock Classes="secondary" TextWrapping="Wrap" Text="Preview gets new things a few days early, with a little more risk." />
+                                    </StackPanel>
+                                    <DockPanel>
+                                        <ToggleSwitch DockPanel.Dock="Right" IsChecked="{Binding AutoDownload}" OnContent="" OffContent="" AutomationProperties.Name="Download updates automatically" />
+                                        <StackPanel VerticalAlignment="Center">
+                                            <TextBlock Text="Download updates automatically" />
+                                            <TextBlock Classes="secondary" Text="In the background, when one is out." />
+                                        </StackPanel>
+                                    </DockPanel>
+                                    <DockPanel IsVisible="{Binding IsDesktop}" IsEnabled="{Binding AutoDownload}">
+                                        <ToggleSwitch DockPanel.Dock="Right" IsChecked="{Binding InstallOnRestart}" OnContent="" OffContent="" AutomationProperties.Name="Install when Helm restarts" />
+                                        <StackPanel VerticalAlignment="Center">
+                                            <TextBlock Text="Install when Helm restarts" />
+                                            <TextBlock Classes="secondary" Text="Off: you choose when, from Home." />
+                                        </StackPanel>
+                                    </DockPanel>
+                                </StackPanel>
+                            </Border>
+                            <Border Classes="glass" IsVisible="{Binding IsDesktop}">
+                                <StackPanel Spacing="12">
+                                    <TextBlock Classes="head" Text="On this PC" />
+                                    <DockPanel>
+                                        <ToggleSwitch DockPanel.Dock="Right" IsChecked="{Binding RunAsAdministrator}" OnContent="" OffContent="" AutomationProperties.Name="Administrator mode" />
+                                        <StackPanel VerticalAlignment="Center">
+                                            <TextBlock Text="Administrator mode" />
+                                            <TextBlock Classes="secondary" TextWrapping="Wrap" Text="Lets shortcuts and window tools work over apps that run as administrator." />
+                                        </StackPanel>
+                                    </DockPanel>
+                                    <DockPanel>
+                                        <ToggleSwitch DockPanel.Dock="Right" IsChecked="{Binding DeleteSettingsOnUninstall}" OnContent="" OffContent="" AutomationProperties.Name="Delete my settings when Helm is uninstalled" />
+                                        <StackPanel VerticalAlignment="Center">
+                                            <TextBlock Text="Delete my settings when Helm is uninstalled" />
+                                            <TextBlock Classes="secondary" Text="Synced data stays in your account either way." />
+                                        </StackPanel>
+                                    </DockPanel>
+                                </StackPanel>
+                            </Border>
+                        </StackPanel>
+
+                        <!-- APPEARANCE & STARTUP -->
+                        <StackPanel Spacing="14" IsVisible="{Binding IsAppearance}" core:Motion.EnterOnShow="True">
+                            <TextBlock Classes="title" Text="{Binding Selected.Title}" />
+                            <Border Classes="glass">
+                                <StackPanel Spacing="6">
+                                    <TextBlock Text="Theme" />
+                                    <ComboBox Classes="glass" HorizontalAlignment="Stretch" ItemsSource="{Binding Themes}" SelectedIndex="{Binding ThemeIndex}" AutomationProperties.Name="Theme" />
+                                </StackPanel>
+                            </Border>
+                            <Border Classes="glass" IsVisible="{Binding IsDesktop}">
+                                <StackPanel Spacing="12">
+                                    <TextBlock Classes="head" Text="Startup" />
+                                    <DockPanel>
+                                        <ToggleSwitch DockPanel.Dock="Right" IsChecked="{Binding RunAtStartup}" OnContent="" OffContent="" AutomationProperties.Name="Start with Windows" />
+                                        <StackPanel VerticalAlignment="Center">
+                                            <TextBlock Text="Start with Windows" />
+                                            <TextBlock Classes="secondary" Text="Your shortcuts and reminders work from the moment you sign in." />
+                                        </StackPanel>
+                                    </DockPanel>
+                                    <DockPanel IsEnabled="{Binding RunAtStartup}">
+                                        <ToggleSwitch DockPanel.Dock="Right" IsChecked="{Binding StartMinimized}" OnContent="" OffContent="" AutomationProperties.Name="Start in the tray" />
+                                        <StackPanel VerticalAlignment="Center">
+                                            <TextBlock Text="Start in the tray" />
+                                            <TextBlock Classes="secondary" Text="No window at sign-in; open Helm from its tray icon." />
+                                        </StackPanel>
+                                    </DockPanel>
+                                </StackPanel>
+                            </Border>
+                        </StackPanel>
+
+                        <!-- RUNNING IN BACKGROUND -->
+                        <StackPanel Spacing="14" IsVisible="{Binding IsBackground}" core:Motion.EnterOnShow="True">
+                            <StackPanel>
+                                <TextBlock Classes="title" Text="Running in background" />
+                                <TextBlock Classes="muted" FontSize="14" TextWrapping="Wrap" Text="Tools that keep working while their page is closed. Stop turns the tool off." />
+                            </StackPanel>
+                            <Border Classes="glass" Padding="24,22" IsVisible="{Binding !HasJobs}">
+                                <TextBlock Classes="muted" FontSize="14" HorizontalAlignment="Center" Text="Nothing is running in the background." />
+                            </Border>
+                            <ItemsControl ItemsSource="{Binding Jobs}">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate x:DataType="vm:BackgroundJob">
+                                        <Border Classes="glass fade" Padding="16,12,10,12" Margin="0,0,0,8">
+                                            <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
+                                                <StackPanel VerticalAlignment="Center">
+                                                    <TextBlock Text="{Binding Title}" FontWeight="SemiBold" />
+                                                    <TextBlock Classes="muted" Text="{Binding Detail}" />
+                                                    <TextBlock Classes="muted" FontSize="12" Text="{Binding Since}" />
+                                                </StackPanel>
+                                                <Button Grid.Column="1" Classes="ghost" VerticalAlignment="Center" Command="{Binding StopCommand}" AutomationProperties.Name="{Binding Title, StringFormat='Stop {0}'}">
+                                                    <StackPanel Orientation="Horizontal" Spacing="6">
+                                                        <ic:SymbolIcon Symbol="Stop" FontSize="14" />
+                                                        <TextBlock Text="Stop" />
+                                                    </StackPanel>
+                                                </Button>
+                                            </Grid>
+                                        </Border>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </StackPanel>
+
+                        <!-- HELP & TROUBLESHOOTING -->
+                        <StackPanel Spacing="14" IsVisible="{Binding IsHelp}" core:Motion.EnterOnShow="True">
+                            <TextBlock Classes="title" Text="Help &amp; troubleshooting" />
+                            <Border Classes="glass">
+                                <StackPanel Spacing="12">
+                                    <StackPanel Spacing="2">
+                                        <TextBlock Classes="head" Text="Settings folder" />
+                                        <TextBlock Classes="secondary" Text="{Binding SettingsFolder}" TextTrimming="CharacterEllipsis" />
+                                    </StackPanel>
+                                    <Grid ColumnDefinitions="*,*" ColumnSpacing="8">
+                                        <Button Classes="ghost" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Content="Open the folder" Command="{Binding OpenSettingsFolderCommand}" />
+                                        <Button Grid.Column="1" Classes="ghost" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Content="Open the logs" Command="{Binding OpenLogsCommand}" />
+                                    </Grid>
+                                </StackPanel>
+                            </Border>
+                            <Border Classes="glass">
+                                <StackPanel Spacing="10">
+                                    <StackPanel Spacing="2">
+                                        <TextBlock Classes="head" Text="Reset all settings" />
+                                        <TextBlock Classes="secondary" TextWrapping="Wrap" Text="Every tool goes back to how it was installed. Your synced data (lists, notes, the vault) stays." />
+                                    </StackPanel>
+                                    <Button Classes="ghost" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Command="{Binding ResetAllCommand}">
+                                        <TextBlock Text="Reset all settings…" Foreground="{DynamicResource HelmDanger}" />
+                                    </Button>
+                                </StackPanel>
+                            </Border>
+                        </StackPanel>
+                    </Panel>
+                </ScrollViewer>
+            </Grid>
+        </Grid>
+    </Panel>
+</UserControl>

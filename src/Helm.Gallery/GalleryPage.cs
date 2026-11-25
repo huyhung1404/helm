@@ -19,10 +19,10 @@ internal sealed record GalleryPage(string Group, string Name, string Title, Func
 
     public static IReadOnlyList<GalleryPage> All { get; } =
     [
-        new("Home", "Desktop", "Home", _ => HomeDemo.Create(HomeStage.Desktop), Framed: false),
-        new("Home", "Phone", "Home", _ => HomeDemo.Create(HomeStage.Phone), Framed: false),
-        new("Home", "Attention", "Home", _ => HomeDemo.Create(HomeStage.Attention), Framed: false),
-        new("Home", "Nothing on", "Home", _ => HomeDemo.Create(HomeStage.Empty), Framed: false),
+        new("Home", "Busy day", "Home", _ => HomeDemo.Home(HomeStage.Busy), Framed: false),
+        new("Home", "All clear", "Home", _ => HomeDemo.Home(HomeStage.AllClear), Framed: false),
+        new("General", "PC", "General", _ => HomeDemo.General(desktop: true), Framed: false),
+        new("General", "Phone", "General", _ => HomeDemo.General(desktop: false), Framed: false),
         new("Tracker", "With tasks", "Tracker", m => Tracker(m, seed: true), Framed: false),
         new("Tracker", "First run", "Tracker", m => Tracker(m, seed: false), Framed: false),
         new("Vault", "Unlocked", "Vault", m => VaultDemo.Create(m, VaultStage.Items), Framed: false),

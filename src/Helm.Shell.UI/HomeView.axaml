@@ -1,0 +1,163 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:ic="using:FluentIcons.Avalonia"
+             xmlns:core="using:Helm.Core.Ui"
+             xmlns:vm="using:Helm.Home"
+             x:Class="Helm.Home.HomeView"
+             x:DataType="vm:HomeViewModel">
+
+    <!-- Home is "today", top to bottom: capture what comes up → what is wrong with Helm (only when something is) → what
+         each tool has for today, most urgent first, the small things done right here → all clear. -->
+    <UserControl.Styles>
+        <Style Selector="TextBlock.done">
+            <Setter Property="TextDecorations" Value="Strikethrough" />
+            <Setter Property="Foreground" Value="{DynamicResource HelmSecondaryText}" />
+        </Style>
+        <Style Selector="Border.glass.danger">
+            <Setter Property="BorderBrush" Value="{DynamicResource HelmDanger}" />
+        </Style>
+        <Style Selector="Button.link">
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="Padding" Value="6,4" />
+            <Setter Property="Foreground" Value="{DynamicResource HelmSecondaryText}" />
+            <Setter Property="FontSize" Value="12.5" />
+        </Style>
+        <Style Selector="Button.link:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource HelmGlassHover}" />
+            <Setter Property="Foreground" Value="{DynamicResource HelmEyebrow}" />
+        </Style>
+    </UserControl.Styles>
+
+    <Panel>
+        <core:Backdrop />
+        <ScrollViewer x:Name="Scroller" HorizontalScrollBarVisibility="Disabled">
+            <StackPanel x:Name="Page" Margin="40,28,40,40" MaxWidth="1100">
+
+                <!-- Today, and how much is left -->
+                <TextBlock Classes="eyebrow" Text="{Binding DateLine, Converter={x:Static core:UpperCase.Instance}}" />
+                <StackPanel Margin="0,8,0,0">
+                    <TextBlock Classes="display" Text="{Binding Greeting}" />
+                    <TextBlock Classes="muted" FontSize="14" Margin="0,4,0,0" Text="{Binding Headline}" />
+                </StackPanel>
+
+                <!-- 1. Capture: whatever comes to mind, sent to the right tool -->
+                <Border Classes="glass" Padding="16,6,6,6" Margin="0,22,0,0">
+                    <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="10">
+                        <ic:SymbolIcon Symbol="Flash" FontSize="18" Foreground="{DynamicResource HelmEyebrow}" VerticalAlignment="Center" />
+                        <TextBox x:Name="CaptureBox" Grid.Column="1" Classes="bare" FontSize="15" Text="{Binding CaptureText}" VerticalAlignment="Center"
+                                 PlaceholderText="Capture anything — /t task, /n note, /v word · Enter" AutomationProperties.Name="Capture">
+                            <TextBox.KeyBindings>
+                                <KeyBinding Gesture="Enter" Command="{Binding CaptureCommand}" />
+                            </TextBox.KeyBindings>
+                        </TextBox>
+                        <Button Grid.Column="2" Classes="pill" Width="40" Height="40" MinHeight="40" Padding="0" VerticalAlignment="Center"
+                                Command="{Binding CaptureCommand}" ToolTip.Tip="Capture" AutomationProperties.Name="Capture">
+                            <ic:SymbolIcon Symbol="Add" FontSize="18" Foreground="{DynamicResource HelmPillForeground}" />
+                        </Button>
+                    </Grid>
+                </Border>
+                <StackPanel Orientation="Horizontal" Spacing="6" Margin="16,8,0,0" IsVisible="{Binding CaptureMessage, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"
+                            core:Motion.EnterOnShow="True">
+                    <ic:SymbolIcon Symbol="Checkmark" FontSize="14" Foreground="{DynamicResource HelmSuccess}" VerticalAlignment="Center" />
+                    <TextBlock Classes="muted" Text="{Binding CaptureMessage}" VerticalAlignment="Center" />
+                </StackPanel>
+
+                <!-- 2. Needs attention: about Helm itself, only when something is wrong -->
+                <StackPanel IsVisible="{Binding HasAlerts}" Margin="0,22,0,0">
+                    <TextBlock Classes="eyebrow" Text="NEEDS ATTENTION" Margin="0,0,0,10" />
+                    <ItemsControl ItemsSource="{Binding Alerts}">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate x:DataType="vm:HomeAlert">
+                                <Border Classes="glass fade" Classes.danger="{Binding IsDanger}" Padding="16,12,10,12" Margin="0,0,0,8">
+                                    <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="12">
+                                        <Panel VerticalAlignment="Top" Margin="0,2,0,0">
+                                            <ic:SymbolIcon Symbol="ErrorCircle" FontSize="20" Foreground="{DynamicResource HelmDanger}" IsVisible="{Binding IsDanger}" />
+                                            <ic:SymbolIcon Symbol="Info" FontSize="20" Foreground="{DynamicResource HelmEyebrow}" IsVisible="{Binding !IsDanger}" />
+                                        </Panel>
+                                        <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                            <TextBlock Text="{Binding Title}" FontWeight="SemiBold" TextWrapping="Wrap" />
+                                            <TextBlock Classes="muted" Text="{Binding Detail}" />
+                                        </StackPanel>
+                                        <Button Grid.Column="2" Classes="ghost" VerticalAlignment="Center" Content="{Binding ActionText}" Command="{Binding ActCommand}" />
+                                    </Grid>
+                                </Border>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </StackPanel>
+
+                <!-- 3. Today: each tool's part, most urgent first -->
+                <StackPanel IsVisible="{Binding HasToday}" Margin="0,22,0,0">
+                    <TextBlock Classes="eyebrow" Text="TODAY" Margin="0,0,0,10" />
+                    <ItemsControl ItemsSource="{Binding Today}">
+                        <ItemsControl.ItemsPanel>
+                            <ItemsPanelTemplate><core:MasonryPanel MinColumnWidth="340" Spacing="12" /></ItemsPanelTemplate>
+                        </ItemsControl.ItemsPanel>
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate x:DataType="vm:TodayCard">
+                                <Border Classes="glass lift fade" Padding="16,14">
+                                    <StackPanel Spacing="10">
+                                        <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="10">
+                                            <core:ModuleIcon Symbol="{Binding Tool.Icon}" Image="{Binding Tool.Image}" Size="24" Foreground="{DynamicResource HelmEyebrow}" VerticalAlignment="Center" />
+                                            <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                                <TextBlock Classes="head" Text="{Binding Tool.Name}" />
+                                                <TextBlock Classes="muted" Text="{Binding Headline}" />
+                                            </StackPanel>
+                                            <Button Grid.Column="2" Classes="chip" VerticalAlignment="Center" IsVisible="{Binding HasAction}" Command="{Binding ActCommand}"
+                                                    AutomationProperties.Name="{Binding ActionText}">
+                                                <StackPanel Orientation="Horizontal" Spacing="4">
+                                                    <TextBlock Text="{Binding ActionText}" FontSize="13" VerticalAlignment="Center" />
+                                                    <ic:SymbolIcon Symbol="ChevronRight" FontSize="12" VerticalAlignment="Center" />
+                                                </StackPanel>
+                                            </Button>
+                                        </Grid>
+                                        <ItemsControl ItemsSource="{Binding Items}" IsVisible="{Binding HasItems}">
+                                            <ItemsControl.ItemTemplate>
+                                                <DataTemplate x:DataType="vm:TodayItem">
+                                                    <Grid ColumnDefinitions="Auto,*" ColumnSpacing="10" Margin="0,4">
+                                                        <Panel Width="22" VerticalAlignment="Top" Margin="0,1,0,0">
+                                                            <Button Classes="tick" Classes.checked="{Binding IsDone}" IsVisible="{Binding CanTick}" Command="{Binding TickCommand}"
+                                                                    AutomationProperties.Name="{Binding Text}">
+                                                                <Panel>
+                                                                    <Border Classes="ring" />
+                                                                    <ic:SymbolIcon Symbol="Checkmark" FontSize="13" Foreground="#10170F" IsVisible="{Binding IsDone}"
+                                                                                   HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                                                </Panel>
+                                                            </Button>
+                                                            <Ellipse Width="6" Height="6" Fill="{DynamicResource HelmSecondaryText}" IsVisible="{Binding !CanTick}"
+                                                                     HorizontalAlignment="Center" VerticalAlignment="Center" Margin="0,7,0,0" />
+                                                        </Panel>
+                                                        <StackPanel Grid.Column="1">
+                                                            <TextBlock Text="{Binding Text}" TextWrapping="Wrap" Classes.done="{Binding IsDone}" />
+                                                            <TextBlock Classes="muted" Classes.late="{Binding IsLate}" Text="{Binding Detail}" IsVisible="{Binding HasDetail}" />
+                                                        </StackPanel>
+                                                    </Grid>
+                                                </DataTemplate>
+                                            </ItemsControl.ItemTemplate>
+                                        </ItemsControl>
+                                    </StackPanel>
+                                </Border>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </StackPanel>
+
+                <!-- 4. All clear -->
+                <Border Classes="glass hero" Padding="28,26" Margin="0,22,0,0" IsVisible="{Binding IsAllClear}">
+                    <StackPanel Spacing="8" HorizontalAlignment="Center">
+                        <ic:SymbolIcon Symbol="CheckmarkCircle" IconVariant="Filled" FontSize="34" Foreground="{DynamicResource HelmSuccess}" HorizontalAlignment="Center" />
+                        <TextBlock Text="All clear" FontSize="22" FontWeight="SemiBold" HorizontalAlignment="Center" />
+                        <TextBlock Classes="muted" FontSize="14" TextAlignment="Center" Text="Nothing is due and Helm is fine. Capture what comes up above." />
+                    </StackPanel>
+                </Border>
+
+                <!-- Helm itself, quietly -->
+                <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Spacing="4" Margin="0,28,0,0">
+                    <TextBlock Classes="muted" Text="{Binding Footer}" VerticalAlignment="Center" />
+                    <Button Classes="link" Content="What's new" Command="{Binding OpenWhatsNewCommand}" />
+                </StackPanel>
+            </StackPanel>
+        </ScrollViewer>
+    </Panel>
+</UserControl>

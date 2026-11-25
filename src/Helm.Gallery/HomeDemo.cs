@@ -1,6 +1,6 @@
 using Avalonia.Controls;
+using Helm.General;
 using Helm.Home;
-using Helm.Modules.Vault.Ui;
 using Symbol = FluentIcons.Common.Symbol;
 
 namespace Helm.Gallery;
@@ -8,97 +8,135 @@ namespace Helm.Gallery;
 /// <summary>Which Home a Gallery entry shows.</summary>
 internal enum HomeStage
 {
-    /// <summary>A desktop with tools on, shortcuts, an update waiting.</summary>
-    Desktop,
-    /// <summary>A phone: no shortcuts, no conflicts.</summary>
-    Phone,
-    /// <summary>Nothing turned on yet.</summary>
-    Empty,
-    /// <summary>A desktop with a shortcut conflict and an update check running.</summary>
-    Attention,
+    /// <summary>A busy day: something wrong with Helm, and things due in several tools.</summary>
+    Busy,
+    /// <summary>Nothing due, nothing wrong.</summary>
+    AllClear,
 }
 
-/// <summary>The real Home view with a made-up Helm: the tools of today's Helm, a few of them on.</summary>
+/// <summary>The real Home and General views with a made-up Helm: today's tools, each with its own icon.</summary>
 internal static class HomeDemo
 {
-    public static Control Create(HomeStage stage)
+    public static IReadOnlyList<HomeTool> AllTools() =>
+    [
+        Tool("habits", "Habits", "Planning"),
+        Tool("missions", "Missions", "Planning"),
+        Tool("notes", "Notes", "Planning"),
+        Tool("quick-capture", "Quick Capture", "Planning"),
+        Tool("tracker", "Tracker", "Planning"),
+        Tool("slack", "Slack Bot", "Planning", on: false),
+        Tool("weekly", "Weekly Report", "Planning", on: false),
+        Tool("novel-reader", "Novel Reader", "Money & Media"),
+        Tool("scratch", "Scratch", "Money & Media"),
+        Tool("vocab", "Vocabulary", "Money & Media"),
+        Tool("wallet", "Wallet", "Money & Media"),
+        Tool("ssh", "SSH", "Security & Servers"),
+        Tool("vault", "Vault", "Security & Servers"),
+        Tool("keyboard", "Helm Keyboard", "Windows & Desktop", on: false),
+        Tool("shortcut-guide", "Shortcut Guide", "Windows & Desktop"),
+        Tool("window-zones", "Window Zones", "Windows & Desktop"),
+        Tool("workspace", "Workspace Controller", "Windows & Desktop"),
+    ];
+
+    private static HomeTool Tool(string id, string name, string group, bool on = true) =>
+        new(id, name, group, Symbol.Apps, ToolIcons.For(id), on);
+
+    public static Control Home(HomeStage stage)
     {
-        var desktop = stage != HomeStage.Phone;
-        var viewModel = new HomeViewModel(new NoHost(), "v0.88.0", showsShortcuts: desktop);
-        var tools = Tools(stage);
-        viewModel.SetTools(tools);
-        if (desktop && stage != HomeStage.Empty)
-        {
-            HomeTool Tool(string id) => tools.Single(t => t.Id == id);
-            viewModel.SetShortcuts(
+        var vm = new HomeViewModel(new Host(), "v0.88.0") { SyncLine = "synced 2 minutes ago" };
+        if (stage == HomeStage.AllClear) return new HomeView(vm);
+
+        var tools = AllTools().ToDictionary(t => t.Id);
+        static Task Done() => Task.CompletedTask;
+        void Ticked(TodayItem item) { }
+        vm.SetAlerts(
+        [
+            new HomeAlert("Ctrl+Alt+N is taken by another app", "Window Zones cannot use it. Pick another shortcut.", AlertLevel.Danger, "Change", Done),
+            new HomeAlert("Helm 0.88.1 is ready", "Restart Helm to install it (about 10 seconds).", AlertLevel.Attention, "Restart", Done),
+            new HomeAlert("The vault has not been backed up for 9 days", "Your backup folder could not be reached.", AlertLevel.Attention, "Back up", Done),
+        ]);
+        vm.SetToday(
+        [
+            new TodayCard(tools["tracker"], "3 open today · 1 overdue",
             [
-                new HomeShortcut(Tool("quick-capture"), "Capture a thought, a task, a word", ["Win", "Ctrl", "Space"]),
-                new HomeShortcut(Tool("window-zones"), "Snap the window to a zone", ["Ctrl", "Alt", "N"]),
-                new HomeShortcut(Tool("vault"), "Auto-type a login into the window in front", ["Ctrl", "Alt", "A"]),
-                new HomeShortcut(Tool("shortcut-guide"), "Show the shortcuts of the app in front", ["Hold", "Win"]),
-            ]);
-        }
-        switch (stage)
-        {
-            case HomeStage.Desktop:
-            case HomeStage.Phone:
-                viewModel.UpdateTitle = "Update ready";
-                viewModel.UpdateSubtitle = "v0.88.0 is ready to install";
-                viewModel.UpdateTone = HomeTone.Attention;
-                break;
-            case HomeStage.Attention:
-                viewModel.UpdateTitle = "Checking for updates…";
-                viewModel.UpdateSubtitle = "Just a moment";
-                viewModel.IsCheckingForUpdates = true;
-                viewModel.HasConflicts = true;
-                viewModel.ConflictSummary = "1 conflict found";
-                break;
-            default:
-                viewModel.UpdateTitle = "You're up to date";
-                viewModel.UpdateSubtitle = "Checked 2 hours ago";
-                break;
-        }
-        return new HomeView(viewModel);
+                new TodayItem("Trả tiền điện tháng 11", "Overdue · was due yesterday", isLate: true, tick: Ticked),
+                new TodayItem("Gửi báo cáo tuần", "Today 17:00", tick: Ticked),
+                new TodayItem("Ôn Aptis phần Writing", "Today 20:00 · 2 of 3 steps", tick: Ticked),
+            ], "Open", Done, urgency: 90),
+            new TodayCard(tools["habits"], "2 of 4 done",
+            [
+                new TodayItem("Đọc sách 20 phút", "12-day streak", tick: Ticked),
+                new TodayItem("Tập thể dục", "3-day streak", tick: Ticked),
+            ], "Open", Done, urgency: 60),
+            new TodayCard(tools["wallet"], "Due soon",
+            [
+                new TodayItem("Internet FPT · 250.000 ₫", "Due tomorrow"),
+                new TodayItem("Anh Minh owes you 2.000.000 ₫", "Said he'd pay back today"),
+            ], "Open", Done, urgency: 70),
+            new TodayCard(tools["missions"], "Aptis B1 · step 3 of 8",
+            [
+                new TodayItem("Write 150 words about your hometown", "Next step"),
+            ], "Continue", Done, urgency: 40),
+            new TodayCard(tools["vocab"], "18 words to review", [], "Review", Done, urgency: 30),
+            new TodayCard(tools["workspace"], "Claude is waiting for you",
+            [
+                new TodayItem("helm · feat/home-ui", "Asked a question 4 minutes ago"),
+            ], "Answer", Done, urgency: 80),
+        ]);
+        return new HomeView(vm);
     }
 
-    private static List<HomeTool> Tools(HomeStage stage)
+    public static Control General(bool desktop)
     {
-        var tracker = new HomeTool("tracker", "Tracker", "Planning", Symbol.TaskListSquare, summary: "3 open · 1 overdue");
-        var vault = new HomeTool("vault", "Vault", "Security & Servers", Symbol.ShieldKeyhole, VaultIcon.Image, "Locked");
-        var tools = new List<HomeTool>
+        var vm = new GeneralViewModel(new Host(), "v0.88.0", desktop)
         {
-            new("habits", "Habits", "Planning", Symbol.Grid, summary: "2 of 4 done today"),
-            new("missions", "Missions", "Planning", Symbol.Flag, summary: "Aptis B1 · step 3"),
-            new("notes", "Notes", "Planning", Symbol.Note),
-            new("quick-capture", "Quick Capture", "Planning", Symbol.Flash),
-            tracker,
-            new("novel-reader", "Novel Reader", "Money & Media", Symbol.Book),
-            new("scratch", "Scratch", "Money & Media", Symbol.Edit),
-            new("wallet", "Wallet", "Money & Media", Symbol.Payment, summary: "12.4 triệu left this month"),
-            new("ssh", "SSH", "Security & Servers", Symbol.Code, summary: "2 servers"),
-            vault,
-            new("keyboard", "Helm Keyboard", "Windows & Desktop", Symbol.Keyboard, isEnabled: false),
-            new("shortcut-guide", "Shortcut Guide", "Windows & Desktop", Symbol.Key),
-            new("window-zones", "Window Zones", "Windows & Desktop", Symbol.Grid),
-            new("workspace", "Workspace Controller", "Windows & Desktop", Symbol.Link, summary: "1 session running"),
-            new("slack", "Slack Bot", "Planning", Symbol.Chat, isEnabled: false),
-            new("weekly", "Weekly Report", "Planning", Symbol.Document, isEnabled: false),
-            new("vocab", "Vocabulary", "Money & Media", Symbol.Search, summary: "18 to review"),
+            AccountName = "hung",
+            SyncStatus = "Synced 2 minutes ago",
+            SyncServer = "sync.huyhung1404.com",
+            Usage = "38 MB of 1 GB used",
+            UpdateTitle = "Update ready",
+            UpdateSubtitle = "0.88.1 downloaded · restart to install",
+            UpdateAction = "Restart to update",
+            SettingsFolder = @"C:\Users\you\AppData\Roaming\Helm",
         };
-        if (stage == HomeStage.Empty)
-            foreach (var tool in tools) tool.IsEnabled = false;
-        // A phone has no Windows tools.
-        return stage == HomeStage.Phone ? tools.Where(t => t.Group != "Windows & Desktop").ToList() : tools;
+        var tools = AllTools();
+        vm.SetTools(desktop ? tools : tools.Where(t => t.Group != "Windows & Desktop"));
+        foreach (var name in new[] { "Notes", "Tracker", "Habits", "Missions", "Wallet", "Vocabulary", "Novel Reader", "Scratch" })
+            vm.SyncTargets.Add(new SyncTarget(name, true));
+        vm.SyncTargets.Add(new SyncTarget("Vault", desktop));
+        static Task NoOp(object _) => Task.CompletedTask;
+        vm.Devices.Add(new SyncDevice("Work PC", "Seen just now · Windows 11", isThis: desktop, NoOp));
+        vm.Devices.Add(new SyncDevice("Home PC", "Seen 3 days ago · Windows 11", isThis: false, NoOp));
+        vm.Devices.Add(new SyncDevice("Pixel 8", "Seen 20 minutes ago · Android 15", isThis: !desktop, NoOp));
+        vm.Jobs.Add(new BackgroundJob("Tracker", "Due-date reminders, every 10 minutes", "Since 08:12", NoOp));
+        vm.Jobs.Add(new BackgroundJob("Workspace Controller", "Relays your VS Code sessions to the phone", "Since 08:12", NoOp));
+        if (desktop) vm.Jobs.Add(new BackgroundJob("Window Zones", "Listens for Ctrl+Alt+N", "Since 08:12", NoOp));
+        vm.Section("updates").NeedsAttention = true;
+        return new GeneralView(vm);
     }
 
-    private sealed class NoHost : IHomeHost
+    private sealed class Host : IHomeHost, IGeneralHost
     {
-        public Task LaunchAsync(HomeTool tool) => Task.CompletedTask;
+        public Task<string> CaptureAsync(string text) => Task.FromResult(text.StartsWith("/n", StringComparison.Ordinal) ? "Added to Notes" : "Added to Tracker · Hôm nay");
 
         public void OpenWhatsNew() { }
 
-        public void OpenConflicts() { }
+        public Task SyncNowAsync() => Task.CompletedTask;
+
+        public Task PairDeviceAsync(string code) => Task.CompletedTask;
+
+        public Task ChangePassphraseAsync() => Task.CompletedTask;
+
+        public Task TurnOffSyncAsync() => Task.CompletedTask;
 
         public Task UpdateAsync() => Task.CompletedTask;
+
+        public void OpenSettingsFolder() { }
+
+        public void OpenLogs() { }
+
+        public Task ResetAllAsync() => Task.CompletedTask;
+
+        public Task OpenToolAsync(HomeTool tool) => Task.CompletedTask;
     }
 }
