@@ -68,8 +68,5 @@ internal sealed record GalleryPage(string Group, string Name, string Title, Func
         public void ExportCalendar(string ics) { }
 
         public void Opened() { }
-
-        // The settings page is still WPF (Helm's TrackerPage); the Gallery has nothing to open yet.
-        public void OpenSettings() { }
     }
 }

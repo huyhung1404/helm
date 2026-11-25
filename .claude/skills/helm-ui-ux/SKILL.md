@@ -17,7 +17,12 @@ code goes). Tracker (`src/Helm.Modules.Tracker.UI/TrackerView.axaml`) is the ref
 - Empty states say what to do next and point at it ("Add the first task above" with an arrow).
 - No decorative "featured" cards when items are equal (no "Up next" hero for an unordered list).
 - Tabs replace everything under them, from the page title down, and scroll to the top.
-- Content page ↔ settings: a gear on the content page, "Open <tool>" first on the settings page.
+- Content page ↔ settings: a gear on the content page opens the tool's settings as a **sheet over the page** (no
+  navigating away; Done / X closes it). Tracker: `TrackerSettingsView`. A WPF settings page may stay for Home →
+  Utilities until it moves.
+- Confirmations (delete…) are `GlassDialogs` (a `Sheet`): the question, what happens, Cancel + the action as a pill. A
+  view model gets it through `IDialogService`; the view swaps it in (`viewModel.UseDialogs(new GlassDialogs(() => this))`).
+  Never the OS or WPF-UI dialog.
 
 ## 2. Surface
 - Background: `core:Backdrop` behind every glass page (spec: `Helm.Core/Ui/BackdropSpec.cs`, the only place for its
@@ -47,23 +52,34 @@ code goes). Tracker (`src/Helm.Modules.Tracker.UI/TrackerView.axaml`) is the ref
 - Inputs: `TextBox.glass`, `ComboBox.glass` (its list is a rounded floating card, chosen row in accent text, no blue
   fill), `core:DateTimeBox Classes="glass"`. A text box inside a glass card that is itself the field: `TextBox.bare`.
 - Every icon-only button has `AutomationProperties.Name` and a tooltip.
+- **Fields fill the row.** Inside a form or card a field is full width, or equal columns sharing the row; nothing sits
+  left-aligned with a gap beside it. A `WrapPanel` is only for chips and buttons, never for fields. On a phone the
+  usual arrangement is the longest field on its own line, then two equal columns (Grid positions set in code from
+  `OnSizeChanged`, as `OptionsGrid` in TrackerView).
+- Round things stay round: a button in a pill (the tab bar's +) has `CornerRadius` = half its height, so its hover never
+  squares off the pill.
 - A row's tap area (`Button.rowhit`) has no look of its own: the whole card lights up (`Border.glass.lift`).
 
 ## 5. Layout: one view, PC and phone
 - One adaptive view; below 720 px the view gets class `narrow` (set in code from `OnSizeChanged`). Select it with
   `:is(UserControl).narrow …` (a plain `UserControl.narrow` selector never matches the view's own type).
 - Phone: actions are icons in one row (labels `TextBlock.label` hidden), side-by-side things stack, lists of cards go
-  two by two or scroll sideways with the scrollbar hidden. Tabs go under the date line.
-- Pickers: `DateTimeBox` is a card in the middle on PC, a sheet from the bottom on a phone. It opens over the nearest
-  ancestor with class `screen` (the Gallery's phone frame) or the window.
+  two by two or scroll sideways with the scrollbar hidden. The tabs and the gear stay on the **right**, as on PC (on a
+  phone on their own line under the date, right-aligned).
+- Every floating card (date picker, settings, confirmation) is `Sheet.Show(anchor, body)`: a card in the middle on PC, a
+  sheet from the bottom on a phone. It opens over the nearest ancestor with class `screen` (the Gallery's phone frame)
+  or the window, keeps the page's light/dark, and grows into place.
 
 ## 6. Motion: never static, never in the way
 - Things grow into place (popup scale ~0.94 → 1 with opacity, 260 ms, cubic ease-out), not a plain fade:
   `core:Motion.EnterOnShow="True"` on anything shown again (tabs, folded sections, an opened task, edit forms, option
   rows, messages); add `core:Motion.FromTop="True"` for a section opening under its header. `Motion.Enter(control)`
   in code (a list just picked, a sheet: phone sheets grow from the bottom edge). `Classes="enter"` for first load.
-- ComboBox lists grow open from the top (`ComboBox.glass:dropdownopen` style). Chevrons turn (`Panel.turn` with
-  `.open`, `.quarter` for right-pointing); the tick ring pops when a task is done.
+- ComboBox lists grow open from the top (`ComboBox.glass:dropdownopen` style) and open under the field with the left
+  edges lined up (`Placement=BottomEdgeAlignedLeft` on its Popup; the default centres a list wider than the field).
+- Disclosure arrows point **right when closed, turn a quarter to point down when open, and turn back**: a
+  `ChevronRight` in a `Panel.turn` with `core:Motion.Turn="{Binding IsExpanded}"` (never an arrow that flips up). The
+  tick ring pops when a task is done.
 - Hover: cards light up and cast a deeper shadow (Background + BoxShadow transitions), no movement.
 - **Avalonia 12 pitfalls**: transform strings in a Setter (`"translateY(-2px)"`, `"rotate(180deg)"`) do nothing; use
   transform objects (`<ScaleTransform/>`, `<RotateTransform/>`) and animate their properties

@@ -71,6 +71,7 @@ internal sealed class TabHost : UserControl
             Padding = new Thickness(0),
             BorderThickness = new Thickness(0),
             Margin = new Thickness(2, 0, 0, 0),
+            CornerRadius = new CornerRadius(16), // round, like the tabs: a square hover would stick out of the pill
             ToolTip = "Open a tool in a new tab",
             ContextMenu = new ContextMenu(),
         };

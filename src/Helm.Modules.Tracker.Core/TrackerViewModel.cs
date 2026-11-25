@@ -35,7 +35,7 @@ public sealed partial class TrackerViewModel : ObservableObject
     private readonly TrackerStore _store;
     private readonly ISettingsStore<TrackerSettings> _settings;
     private readonly IUiDispatcher _ui;
-    private readonly IDialogService _dialogs;
+    private IDialogService _dialogs;
     private readonly IClipboardService _clipboard;
     private readonly TrackerReminderService _reminders;
     private readonly ILogger<TrackerViewModel> _logger;
@@ -140,6 +140,9 @@ public sealed partial class TrackerViewModel : ObservableObject
             };
         Refresh();
     }
+
+    /// <summary>The page that shows this view model asks its own confirmations (the shared view uses its glass sheet).</summary>
+    public void UseDialogs(IDialogService dialogs) => _dialogs = dialogs;
 
     // ---- Links to notes ------------------------------------------------------------------------------------------
 

@@ -2,26 +2,22 @@ using System.Text;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Threading;
-using Helm.Core.Services;
 using Helm.Modules.Tracker.Ui;
 
 namespace Helm.Modules.Tracker;
 
 /// <summary>
 /// The Tracker itself, opened from the menu and the Quick access tile (see <see cref="IModuleContent"/>): the shared
-/// Avalonia <see cref="TrackerView"/> inside this WPF page, plus what only Windows does (the save dialog, showing
-/// the settings page).
+/// Avalonia <see cref="TrackerView"/> inside this WPF page, plus what only Windows does (the save dialog).
 /// </summary>
 public partial class TrackerContentPage : Page, ITrackerPageHost
 {
     private readonly TrackerViewModel _viewModel;
-    private readonly IShellNavigation _navigation;
     private readonly DispatcherTimer _clock = new() { Interval = TimeSpan.FromSeconds(60) };
 
-    public TrackerContentPage(TrackerModule module, TrackerViewModel viewModel, IShellNavigation navigation)
+    public TrackerContentPage(TrackerModule module, TrackerViewModel viewModel)
     {
         _viewModel = viewModel;
-        _navigation = navigation;
         InitializeComponent();
         Host.Show(() => new TrackerView(module, viewModel, this));
         // "Added just now" goes stale after a minute; refresh the relative times while the page is on screen.
@@ -31,8 +27,6 @@ public partial class TrackerContentPage : Page, ITrackerPageHost
     }
 
     public void Opened() { }
-
-    public void OpenSettings() => _navigation.ShowPage(typeof(TrackerPage));
 
     /// <summary>The save dialog is Windows UI; the calendar file comes from the shared view model.</summary>
     public void ExportCalendar(string ics)

@@ -21,6 +21,8 @@
 
   <ItemGroup>
     <ProjectReference Include="..\Helm.Core\Helm.Core.csproj" />
+    <!-- IDialogService (GlassDialogs) -->
+    <ProjectReference Include="..\Helm.Shell\Helm.Shell.csproj" />
   </ItemGroup>
 
 </Project>

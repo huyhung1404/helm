@@ -5,6 +5,7 @@ using Avalonia.Controls.Primitives;
 using Avalonia.Interactivity;
 using Avalonia.Threading;
 using Helm.Core.Modules;
+using Helm.Core.Ui;
 
 namespace Helm.Modules.Tracker.Ui;
 
@@ -17,8 +18,6 @@ public interface ITrackerPageHost
     /// <summary>The page came on screen (Android asks for notifications here and checks today's reminder).</summary>
     void Opened();
 
-    /// <summary>Show Tracker's settings page (the gear at the top of the Tracker).</summary>
-    void OpenSettings();
 }
 
 /// <summary>
@@ -43,6 +42,8 @@ public partial class TrackerView : UserControl
         _viewModel = viewModel;
         _host = host;
         DataContext = viewModel;
+        // Confirmations (delete a task or a list) are the same glass sheet on every platform.
+        viewModel.UseDialogs(new GlassDialogs(() => this));
         InitializeComponent();
         AttachedToVisualTree += (_, _) => viewModel.Workspaces.CollectionChanged += OnListsChanged;
         DetachedFromVisualTree += (_, _) => viewModel.Workspaces.CollectionChanged -= OnListsChanged;
@@ -58,7 +59,19 @@ public partial class TrackerView : UserControl
         Grid.SetColumn(Tabs, narrow ? 0 : 1);
         Grid.SetRow(Tabs, narrow ? 1 : 0);
         Tabs.Margin = narrow ? new Thickness(0, 12, 0, 0) : default;
-        // First run: the three steps side by side on a wide page, one under the other on a phone.
+        // Options under the quick add fill the row: on a phone the date has its own line, priority and repeat share the next.
+        OptionsGrid.ColumnDefinitions = ColumnDefinitions.Parse(narrow ? "*,*" : "2*,*,*");
+        Grid.SetColumnSpan(DueBox, narrow ? 2 : 1);
+        Grid.SetColumn(PriorityBox, narrow ? 0 : 1);
+        Grid.SetRow(PriorityBox, narrow ? 1 : 0);
+        Grid.SetColumn(RepeatBox, narrow ? 1 : 2);
+        Grid.SetRow(RepeatBox, narrow ? 1 : 0);
+        Grid.SetColumn(DaysBox, narrow ? 0 : 2);
+        Grid.SetColumnSpan(DaysBox, narrow ? 2 : 1);
+        Grid.SetRow(DaysBox, narrow ? 2 : 1);
+        // Tabs on the right, like the other screens, on a phone too (own line under the date).
+        Grid.SetColumnSpan(Tabs, narrow ? 2 : 1);
+        Tabs.HorizontalAlignment = narrow ? Avalonia.Layout.HorizontalAlignment.Right : Avalonia.Layout.HorizontalAlignment.Left;        // First run: the three steps side by side on a wide page, one under the other on a phone.
         FirstRunSteps.Columns = narrow ? 1 : 3;
         FirstRunButton.HorizontalAlignment = narrow ? Avalonia.Layout.HorizontalAlignment.Stretch : Avalonia.Layout.HorizontalAlignment.Left;
     }
@@ -79,7 +92,13 @@ public partial class TrackerView : UserControl
     /// <summary>Plays the list's way in again for a list just picked (tabs play theirs as they are shown).</summary>
     private static void Replay(Control panel) => Helm.Core.Ui.Motion.Enter(panel);
 
-    private void Settings_Click(object? sender, RoutedEventArgs e) => _host?.OpenSettings();
+    /// <summary>The gear: Tracker's settings as a sheet over the page, not a page to navigate to.</summary>
+    private void Settings_Click(object? sender, RoutedEventArgs e)
+    {
+        if (_viewModel is null) return;
+        SheetHandle? sheet = null;
+        sheet = Sheet.Show(this, new TrackerSettingsView(_viewModel, () => sheet?.Close()), 480);
+    }
 
     private void List_Click(object? sender, RoutedEventArgs e)
     {

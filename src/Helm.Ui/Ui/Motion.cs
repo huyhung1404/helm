@@ -22,6 +22,14 @@ public static class Motion
     public static readonly AttachedProperty<bool> FromTopProperty =
         AvaloniaProperty.RegisterAttached<Control, bool>("FromTop", typeof(Motion));
 
+    /// <summary>For a disclosure arrow (Panel.turn): true while its section is open; sets the .open / .closing classes the turn styles play.</summary>
+    public static readonly AttachedProperty<bool> TurnProperty =
+        AvaloniaProperty.RegisterAttached<Control, bool>("Turn", typeof(Motion));
+
+    public static void SetTurn(Control control, bool value) => control.SetValue(TurnProperty, value);
+
+    public static bool GetTurn(Control control) => control.GetValue(TurnProperty);
+
     public static void SetEnterOnShow(Control control, bool value) => control.SetValue(EnterOnShowProperty, value);
 
     public static bool GetEnterOnShow(Control control) => control.GetValue(EnterOnShowProperty);
@@ -32,12 +40,20 @@ public static class Motion
 
     public static readonly TimeSpan Duration = TimeSpan.FromMilliseconds(260);
 
-    static Motion() =>
+    static Motion()
+    {
         EnterOnShowProperty.Changed.AddClassHandler<Control>((control, e) =>
         {
             control.PropertyChanged -= OnPropertyChanged;
             if (e.NewValue is true) control.PropertyChanged += OnPropertyChanged;
         });
+        TurnProperty.Changed.AddClassHandler<Control>((control, e) =>
+        {
+            var open = e.NewValue is true;
+            control.Classes.Set("open", open);
+            control.Classes.Set("closing", !open && e.OldValue is true);
+        });
+    }
 
     private static void OnPropertyChanged(object? sender, AvaloniaPropertyChangedEventArgs e)
     {

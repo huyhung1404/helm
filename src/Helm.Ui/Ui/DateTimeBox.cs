@@ -6,7 +6,6 @@ using Avalonia.Data;
 using Avalonia.Input;
 using Avalonia.Layout;
 using Avalonia.Media;
-using Avalonia.VisualTree;
 using FluentIcons.Avalonia;
 using Helm.Core.Text;
 using Symbol = FluentIcons.Common.Symbol;
@@ -36,15 +35,12 @@ public sealed class DateTimeBox : UserControl
 
     public static readonly StyledProperty<string> PlaceholderTextProperty = AvaloniaProperty.Register<DateTimeBox, string>(nameof(PlaceholderText), "");
 
-    /// <summary>Below this window width the picker is a bottom sheet (a phone); above it a card in the middle.</summary>
-    private const double SheetBelow = 720;
-
     private static readonly TimeSpan[] CommonTimes = [new(9, 0, 0), new(12, 0, 0), new(17, 0, 0), new(20, 0, 0)];
 
     private readonly TextBlock _text = new() { VerticalAlignment = VerticalAlignment.Center, TextTrimming = TextTrimming.CharacterEllipsis };
     private readonly SymbolIcon _icon = new() { Symbol = Symbol.Calendar, FontSize = 18, Margin = new Thickness(0, 0, 10, 0) };
     private readonly Button _field;
-    private Control? _overlay;
+    private SheetHandle? _sheet;
     private DateTime _draftDate;
     private TimeSpan? _draftTime;
     private DateTime _month;
@@ -146,24 +142,12 @@ public sealed class DateTimeBox : UserControl
 
     private void Open()
     {
-        if (_overlay is not null || OverlayLayer.GetOverlayLayer(this) is not { } layer || TopLevel.GetTopLevel(this) is not { } top) return;
+        if (_sheet is not null) return;
         _draftDate = (Date ?? DateTime.Today).Date;
         _draftTime = Time ?? (ShowTime && !AllowEmpty ? NowTime() : null);
         _month = new DateTime(_draftDate.Year, _draftDate.Month, 1);
-        // The screen it opens over: the window, or a stand-in screen (the Gallery's phone frame, class "screen").
-        Control screen = this.GetVisualAncestors().OfType<Control>().FirstOrDefault(a => a.Classes.Contains("screen")) ?? top;
-        var at = screen.TranslatePoint(default, top) ?? default;
-        var size = screen.Bounds.Size;
-        var phone = size.Width < SheetBelow;
 
         var body = new StackPanel { Spacing = 16 };
-        if (phone)
-            body.Children.Add(new Border
-            {
-                Width = 36, Height = 4, CornerRadius = new CornerRadius(2), HorizontalAlignment = HorizontalAlignment.Center,
-                Background = new SolidColorBrush(Colors.Gray, 0.5),
-            });
-
         // What it says now, in words.
         _summary = new TextBlock { FontSize = 20, FontWeight = FontWeight.SemiBold, TextWrapping = TextWrapping.Wrap };
         var head = new StackPanel { Spacing = 2 };
@@ -238,49 +222,20 @@ public sealed class DateTimeBox : UserControl
         footer.Children.Add(done);
         body.Children.Add(footer);
 
-        var card = new Border
-        {
-            Classes = { "sheet" },
-            Padding = phone ? new Thickness(18, 10, 18, 24) : new Thickness(22),
-            Width = phone ? double.NaN : 400,
-            VerticalAlignment = phone ? VerticalAlignment.Bottom : VerticalAlignment.Center,
-            HorizontalAlignment = phone ? HorizontalAlignment.Stretch : HorizontalAlignment.Center,
-            Child = new ScrollViewer { Content = body, MaxHeight = size.Height - 48, HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled },
-        };
-        if (phone) card.CornerRadius = new CornerRadius(20, 20, 0, 0);
-        // A tap on the card itself must not reach the scrim.
-        card.PointerPressed += (_, e) => e.Handled = true;
-        var scrim = new Grid { Width = size.Width, Height = size.Height, Children = { card } };
-        scrim.Bind(Panel.BackgroundProperty, this.GetResourceObservable("HelmScrim"));
-        scrim.PointerPressed += (_, _) => Close();
-        scrim.KeyDown += (_, e) =>
-        {
-            if (e.Key == Key.Escape) Close();
-        };
-        // The overlay layer is outside the page: keep the page's light/dark (it may differ from the window's, in the Gallery).
-        var overlay = new ThemeVariantScope { RequestedThemeVariant = ActualThemeVariant, Child = scrim };
-        Canvas.SetLeft(overlay, at.X);
-        Canvas.SetTop(overlay, at.Y);
-        _overlay = overlay;
-        layer.Children.Add(overlay);
-        Refresh();
-        // The card grows into place; a phone's sheet grows up from its bottom edge.
-        card.RenderTransform = new ScaleTransform();
-        if (phone) card.RenderTransformOrigin = new RelativePoint(0.5, 1, RelativeUnit.Relative);
-        Motion.Enter(card, phone ? 0.9 : 0.94);
-    }
+        _sheet = Sheet.Show(this, body);
+        if (_sheet is null) return;
+        _sheet.Closed += Forget;    }
 
-    private void Close()
+    private void Close() => _sheet?.Close();
+
+    private void Forget()
     {
-        if (_overlay is null) return;
-        if (_overlay.Parent is Panel panel) panel.Children.Remove(_overlay);
-        _overlay = null;
+        _sheet = null;
         _summary = _monthTitle = null;
         _days = null;
         _quick = _times = null;
         _hour = _minute = null;
     }
-
     private static Button TextButton(string text, string kind, Action click)
     {
         var b = new Button { Content = text, Classes = { kind }, HorizontalContentAlignment = HorizontalAlignment.Center };

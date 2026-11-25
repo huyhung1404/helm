@@ -1,0 +1,97 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:ic="using:FluentIcons.Avalonia"
+             xmlns:vm="using:Helm.Modules.Tracker"
+             xmlns:core="using:Helm.Core.Ui"
+             x:Class="Helm.Modules.Tracker.Ui.TrackerSettingsView"
+             x:DataType="vm:TrackerViewModel">
+
+    <!-- Tracker's settings as a sheet over the Tracker (the gear): one card per subject, a switch or a field on the right. -->
+    <StackPanel Spacing="14">
+        <Grid ColumnDefinitions="*,Auto">
+            <StackPanel>
+                <TextBlock Classes="eyebrow" Text="TRACKER" />
+                <TextBlock Text="Settings" FontSize="22" FontWeight="SemiBold" />
+            </StackPanel>
+            <Button x:Name="CloseButton" Grid.Column="1" Classes="chip" VerticalAlignment="Top" ToolTip.Tip="Close" AutomationProperties.Name="Close settings">
+                <ic:SymbolIcon Symbol="Dismiss" FontSize="14" />
+            </Button>
+        </Grid>
+
+        <Border Classes="glass" IsVisible="{Binding HasWorkspaces}">
+            <StackPanel Spacing="10">
+                <TextBlock Text="This list" Classes="head" />
+                <TextBox Classes="glass" Text="{Binding WorkspaceName, UpdateSourceTrigger=LostFocus}" PlaceholderText="List name" AutomationProperties.Name="List name" />
+                <Button Classes="ghost" HorizontalAlignment="Left" Command="{Binding DeleteWorkspaceCommand}" AutomationProperties.Name="Delete this list">
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                        <ic:SymbolIcon Symbol="Delete" FontSize="14" Foreground="{DynamicResource HelmDanger}" />
+                        <TextBlock Text="Delete this list" Foreground="{DynamicResource HelmDanger}" />
+                    </StackPanel>
+                </Button>
+                <TextBlock Text="Removes it and its tasks from all your devices. The history stays in the reports." Classes="secondary" />
+            </StackPanel>
+        </Border>
+
+        <Border Classes="glass">
+            <StackPanel Spacing="12">
+                <TextBlock Text="Display" Classes="head" />
+                <DockPanel>
+                    <ToggleSwitch DockPanel.Dock="Right" IsChecked="{Binding ShowCompleted}" OnContent="" OffContent="" AutomationProperties.Name="Show finished tasks" />
+                    <StackPanel VerticalAlignment="Center">
+                        <TextBlock Text="Show finished tasks" />
+                        <TextBlock Text="List them under the open ones." Classes="secondary" />
+                    </StackPanel>
+                </DockPanel>
+                <StackPanel Spacing="6">
+                    <TextBlock Text="Tasks shown at first" />
+                    <ComboBox Classes="glass" HorizontalAlignment="Stretch" ItemsSource="{x:Static core:ListPager.SizeNames}" SelectedIndex="{Binding ItemsShownIndex}"
+                              AutomationProperties.Name="Tasks shown at first" />
+                    <TextBlock Text="Show more adds as many again. Fewer keeps Tracker smooth to scroll." Classes="secondary" />
+                </StackPanel>
+            </StackPanel>
+        </Border>
+
+        <Border Classes="glass">
+            <StackPanel Spacing="12">
+                <TextBlock Text="Reminders" Classes="head" />
+                <DockPanel>
+                    <ToggleSwitch DockPanel.Dock="Right" IsChecked="{Binding RemindersEnabled}" OnContent="" OffContent="" AutomationProperties.Name="Due date reminders" />
+                    <StackPanel VerticalAlignment="Center">
+                        <TextBlock Text="Due date reminders" />
+                        <TextBlock Text="Once a day, a notification about tasks and debts due soon or overdue." Classes="secondary" />
+                    </StackPanel>
+                </DockPanel>
+                <StackPanel Spacing="12" IsEnabled="{Binding RemindersEnabled}">
+                    <StackPanel Spacing="6">
+                        <TextBlock Text="Reminder time" />
+                        <ComboBox Classes="glass" HorizontalAlignment="Stretch" ItemsSource="{Binding ReminderHourNames}" SelectedIndex="{Binding ReminderHourIndex}"
+                                  AutomationProperties.Name="Reminder time" />
+                    </StackPanel>
+                    <StackPanel Spacing="6">
+                        <TextBlock Text="Due soon means" />
+                        <ComboBox Classes="glass" HorizontalAlignment="Stretch" ItemsSource="{Binding RemindDaysNames}" SelectedIndex="{Binding RemindDaysIndex}"
+                                  AutomationProperties.Name="Due soon means" />
+                    </StackPanel>
+                </StackPanel>
+                <Button Classes="ghost" HorizontalAlignment="Left" Content="Remind me now" Command="{Binding RemindNowCommand}" />
+            </StackPanel>
+        </Border>
+
+        <Border Classes="glass">
+            <StackPanel Spacing="10">
+                <TextBlock Text="Export" Classes="head" />
+                <TextBlock Text="Copies every task, or every change in the history, to paste into a spreadsheet." Classes="secondary" />
+                <WrapPanel>
+                    <Button Classes="ghost" Content="Copy tasks" Command="{Binding CopyItemsCsvCommand}" Margin="0,0,8,8" />
+                    <Button Classes="ghost" Content="Copy history" Command="{Binding CopyHistoryCsvCommand}" Margin="0,0,8,8" />
+                </WrapPanel>
+            </StackPanel>
+        </Border>
+
+        <Border Classes="glass" IsVisible="{Binding HasMessage}" BorderBrush="{DynamicResource HelmDanger}">
+            <TextBlock Text="{Binding Message}" TextWrapping="Wrap" />
+        </Border>
+
+        <Button x:Name="DoneButton" Classes="pill" HorizontalAlignment="Stretch" Content="Done" />
+    </StackPanel>
+</UserControl>

@@ -94,23 +94,43 @@ public sealed class TrackerViewTests : IDisposable
     }
 
     [AvaloniaFact]
-    public void The_gear_opens_the_settings()
+    public void The_gear_opens_the_settings_as_a_sheet_over_the_page()
     {
         _store.AddWorkspace("Hôm nay");
-        var vm = new TrackerViewModel(_store, _settings, new AvaloniaUi(), new YesDialogs(), new NoClipboard(),
-            new TrackerReminderService(_store, _settings), NullLogger<TrackerViewModel>.Instance);
-        var host = new NoHost();
-        var view = new TrackerView(new FakeModule("tracker", "Tracker"), vm, host);
-        var window = new Window { Content = view, Width = 1200, Height = 900 };
-        window.Show();
+        var (window, view, _) = Show();
+        var layer = Avalonia.Controls.Primitives.OverlayLayer.GetOverlayLayer(view)!;
 
         var gear = view.GetVisualDescendants().OfType<Button>().Single(b => Avalonia.Automation.AutomationProperties.GetName(b) == "Tracker settings");
         gear.RaiseEvent(new Avalonia.Interactivity.RoutedEventArgs(Button.ClickEvent));
+        Dispatcher.UIThread.RunJobs();
 
-        Assert.Equal(1, host.SettingsOpened);
+        var settings = layer.GetVisualDescendants().OfType<TrackerSettingsView>().Single();
+        Assert.Contains(settings.GetVisualDescendants().OfType<TextBlock>(), t => t.Text == "Settings");
+        // Done closes it.
+        settings.GetVisualDescendants().OfType<Button>().Single(b => b.Name == "DoneButton").RaiseEvent(new Avalonia.Interactivity.RoutedEventArgs(Button.ClickEvent));
+        Dispatcher.UIThread.RunJobs();
+        Assert.Empty(layer.GetVisualDescendants().OfType<TrackerSettingsView>());
         window.Close();
     }
 
+    [AvaloniaFact]
+    public async Task Deleting_a_task_asks_in_the_glass_sheet_and_Cancel_keeps_it()
+    {
+        _store.AddItem(_store.AddWorkspace("Hôm nay"), new TrackerItemDraft("Gọi điện cho mẹ"));
+        var (window, view, vm) = Show();
+        var layer = Avalonia.Controls.Primitives.OverlayLayer.GetOverlayLayer(view)!;
+
+        var asking = vm.OpenItems[0].DeleteCommand.ExecuteAsync(null);
+        Dispatcher.UIThread.RunJobs();
+        Assert.Contains(layer.GetVisualDescendants().OfType<TextBlock>(), t => t.Text == "Delete this task?");
+
+        layer.GetVisualDescendants().OfType<Button>().Single(b => b.Content as string == "Cancel").RaiseEvent(new Avalonia.Interactivity.RoutedEventArgs(Button.ClickEvent));
+        await asking;
+        Dispatcher.UIThread.RunJobs();
+        Assert.Single(vm.OpenItems);
+        Assert.DoesNotContain(layer.GetVisualDescendants().OfType<TextBlock>(), t => t.Text == "Delete this task?");
+        window.Close();
+    }
     [AvaloniaFact]
     public void An_opened_task_turns_its_chevron_and_on_a_phone_its_actions_are_icons()
     {
@@ -131,13 +151,10 @@ public sealed class TrackerViewTests : IDisposable
 
     private sealed class NoHost : ITrackerPageHost
     {
-        public int SettingsOpened { get; private set; }
-
         public void ExportCalendar(string ics) { }
 
         public void Opened() { }
 
-        public void OpenSettings() => SettingsOpened++;
     }
 
     private sealed class OneAnswer(string answer) : IAiText
