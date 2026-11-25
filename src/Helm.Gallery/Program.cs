@@ -60,6 +60,7 @@ internal sealed class GalleryWindow : Window
         _on.IsCheckedChanged += (_, _) => _module.IsEnabled = _on.IsChecked == true;
         _pages.SelectedIndex = 0;
         ApplySize();
+        Opened += (_, _) => Helm.Ui.Windows.InputLog.Attach(this, "gallery");
     }
 
     private void ShowPage()

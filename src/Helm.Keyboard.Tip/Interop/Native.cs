@@ -28,6 +28,17 @@ internal static partial class Native
     [LibraryImport("user32.dll")]
     public static partial short GetKeyState(int virtualKey);
 
+    [LibraryImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    public static unsafe partial bool GetKeyboardState(byte* state);
+
+    [LibraryImport("user32.dll")]
+    public static partial uint MapVirtualKeyW(uint code, uint mapType);
+
+    /// <summary>flags 0x4: do not change the keyboard state (dead keys stay as they are).</summary>
+    [LibraryImport("user32.dll")]
+    public static unsafe partial int ToUnicode(uint virtualKey, uint scanCode, byte* keyState, char* buffer, int bufferSize, uint flags);
+
     [LibraryImport("kernel32.dll", SetLastError = true)]
     public static partial nint OpenProcess(uint access, int inherit, uint processId);
 

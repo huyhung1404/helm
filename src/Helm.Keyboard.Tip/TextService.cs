@@ -56,6 +56,18 @@ internal sealed unsafe partial class TextService
     /// ("d" + "ich" → "dđh"); a composition replaces it right.
     /// </summary>
     private bool _composeOnly;
+    /// <summary>The focused text is an IMM32 control (transitory context); see <see cref="LearnKind"/>.</summary>
+    private bool _transitory;
+
+    /// <summary>The character a key types with the current Shift/Caps state; null for Enter, arrows, F-keys…</summary>
+    private static unsafe char? Printable(int virtualKey)
+    {
+        var state = stackalloc byte[256];
+        if (!Native.GetKeyboardState(state)) return null;
+        var buffer = stackalloc char[4];
+        var count = Native.ToUnicode((uint)virtualKey, Native.MapVirtualKeyW((uint)virtualKey, 0), state, buffer, 4, 0x4);
+        return count == 1 && buffer[0] >= ' ' ? buffer[0] : null;
+    }
     /// <summary>The focused text box's kind (an address bar or not) is known.</summary>
     private bool _kindKnown;
     private ITfComposition? _composition;
@@ -141,6 +153,10 @@ internal sealed unsafe partial class TextService
                 case KeyKind.Backspace:
                     eaten = _word.IsEmpty ? 0 : 1;
                     break;
+                case KeyKind.Other when _transitory && !_word.IsEmpty && Printable((int)wParam) is not null:
+                    // Committed in OnKeyDown together with the character (see there).
+                    eaten = 1;
+                    break;
                 case KeyKind.Other:
                     // Hand the word over now, so the app gets it before the key (a space, a comma, Enter, an arrow…).
                     Commit(context);
@@ -189,6 +205,15 @@ internal sealed unsafe partial class TextService
                     {
                         Edit(context, ec => BackspaceInto(context, ec));
                     }
+                    eaten = 1;
+                    break;
+                case KeyKind.Other when _transitory && !_word.IsEmpty && Printable(virtualKey) is { } character:
+                    // An IMM32 app drops the characters that follow a finished composition in the same keystroke
+                    // (Avalonia ignores WM_CHAR after it inserted the result), so the space or comma that ends the
+                    // word goes into the composition and both are handed over at once.
+                    var text = _word.Text + character;
+                    Forget();
+                    Edit(context, ec => SetText(context, ec, text, end: true));
                     eaten = 1;
                     break;
                 case KeyKind.Other:
@@ -256,6 +281,7 @@ internal sealed unsafe partial class TextService
         {
             CommitLater();
             _composeOnly = false;
+            _transitory = false;
             _kindKnown = false;
         }
         catch (Exception ex)
@@ -477,6 +503,7 @@ internal sealed unsafe partial class TextService
         {
             if (Log.IsVerbose) Log.Info("transitory context (IMM32 app): composing");
             _composeOnly = true;
+            _transitory = true;
             return;
         }
         if (RangeAtCaret(context, ec) is not { } range || context.GetAppProperty(TsfIds.PropInputScope, out var property) < 0

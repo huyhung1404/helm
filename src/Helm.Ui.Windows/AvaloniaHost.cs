@@ -19,6 +19,16 @@ public sealed class AvaloniaHost : WindowsFormsHost
     {
         HelmAvalonia.EnsureStarted();
         Child = _inner;
+        // While focus is in the page, WPF still matches keys against routed commands up the tree (the tab's Frame binds
+        // Backspace to "Back", others Ctrl+C, Delete…). A command that cannot run still marks the key handled, and WPF
+        // then never hands the message to the page: Backspace did nothing. Say "not here, keep routing" for every
+        // routed command aimed at the page, so the key stays unhandled and reaches Avalonia.
+        System.Windows.Input.CommandManager.AddPreviewCanExecuteHandler(this, (_, e) =>
+        {
+            e.CanExecute = false;
+            e.ContinueRouting = true;
+            e.Handled = true;
+        });
         // The hosted window is a real HWND: it does not follow WPF render transforms such as the tab's slide-in, and
         // stays where the animation started. Re-place it once the animation is over (a layout pass re-syncs it).
         Loaded += (_, _) =>
@@ -37,8 +47,23 @@ public sealed class AvaloniaHost : WindowsFormsHost
     public Avalonia.Controls.Control? Page
     {
         get => _inner.Content;
-        set => _inner.Content = value;
+        set
+        {
+            _inner.Content = value;
+            if (value is null || !InputLog.On) return;
+            value.AttachedToVisualTree += (_, _) =>
+            {
+                if (Avalonia.Controls.TopLevel.GetTopLevel(value) is { } top && _logged.Add(top)) InputLog.Attach(top, "avalonia");
+            };
+            // What WPF sees while focus is inside the hosted page, and whether something in WPF takes the key.
+            AddHandler(System.Windows.Input.Keyboard.PreviewKeyDownEvent, new System.Windows.Input.KeyEventHandler((_, e) =>
+                InputLog.Write($"wpf PreviewKeyDown {e.Key} handled={e.Handled}")), handledEventsToo: true);
+            AddHandler(System.Windows.Input.Keyboard.KeyDownEvent, new System.Windows.Input.KeyEventHandler((_, e) =>
+                InputLog.Write($"wpf KeyDown {e.Key} handled={e.Handled}")), handledEventsToo: true);
+        }
     }
+
+    private readonly HashSet<Avalonia.Controls.TopLevel> _logged = [];
 }
 
 /// <summary>The Avalonia side of the WPF app: one Application with Helm's shared theme.</summary>
