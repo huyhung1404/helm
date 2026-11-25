@@ -3,6 +3,18 @@
 All notable changes to Helm. The top section is used as the GitHub release body and as the Velopack release notes.
 Format: [Keep a Changelog](https://keepachangelog.com), versions follow [SemVer](https://semver.org).
 
+## [0.89.0] - 2026-11-25
+
+### Changed
+- **Home is now "today", on PC and on the phone.** A greeting, a box to capture a thought (`/t` task, `/n` note, `/v` word),
+  what needs you about Helm itself (an update ready, a shortcut taken by another app, sync stuck, a vault that was not
+  backed up) and a card for each tool that has something for today. Tracker's tasks due today or overdue and Habits can
+  be ticked right there. The lists of shortcuts and Quick access are gone from Home.
+- **General is in parts:** Tools (only the switches), Sync, Updates, Appearance & startup, Running in the background, and
+  Help & troubleshooting. Each part says how it stands in the list. Connecting sync, unlocking, the recovery key and
+  changing the passphrase are shown there too, the same on PC and phone. On the phone, AI features are under Help.
+- Adding a device in Sync makes a token for it (copy it once, enter it on the new device).
+
 ## [0.88.0] - 2026-11-25
 
 ### Changed
