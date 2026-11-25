@@ -103,8 +103,14 @@ code goes). Tracker (`src/Helm.Modules.Tracker.UI/TrackerView.axaml`) is the ref
   max 2 lines; a right-pointing chevron that turns down. Tapping the text opens it: "+ Add a step" (bare box), one row
   of `act` buttons (Start, Split into steps in accent, Edit, Link a note, ↑ ↓, Delete in HelmDanger), and the inline edit
   form (all fields `glass`, Save `pill`, Cancel `ghost`). Done tasks sit under a folded "Done" header.
+- **Managing things (lists, folders…) lives in the settings sheet, fully**: a "Lists" card with one row per list (tile
+  with its initial, the name as a `glass` field you edit in place and save on Enter or leaving it, a `secondary` line
+  "n open · showing now", a red trash `chip` that asks first), then a field + `pill` "Add list". Do not leave a lone
+  "delete this …" button for the current item. On a wide screen the page itself has no "New list" button (it is added
+  in the settings); a phone keeps a quick "New list" at the end of the list row.
 - **Settings sheet** (`TrackerSettingsView`): header = eyebrow (the tool's name) + "Settings" 22 semibold + a close
-  `chip`; then one `Border.glass` card per subject (this list, display, reminders, export), each with a `head` title;
+  `chip`; then one `Border.glass` card per subject (lists, display, reminders, export), each with a `head` title;
+  buttons inside a card fill its width (one button: full width; two: equal columns) and are never left-aligned with a gap;
   a setting is its name and a `secondary` explanation on the left and a switch on the right, or a label above a full-width
   `glass` field; a dependent setting is disabled while its switch is off; a destructive action is a `ghost` with a
   red icon and text and a `secondary` line saying what it removes; the bottom is one full-width `pill` "Done". Order:

@@ -333,9 +333,27 @@ public sealed partial class TrackerViewModel : ObservableObject
     private void CreateTasksWorkspace() => CreateAndSelect("To-do");
 
     [RelayCommand]
-    private async Task DeleteWorkspaceAsync()
+    private Task DeleteWorkspaceAsync() => SelectedWorkspace is { } ws ? ConfirmAndDeleteAsync(ws) : Task.CompletedTask;
+
+    /// <summary>Delete one list from the list manager (settings): asks first, says how many tasks go with it.</summary>
+    [RelayCommand]
+    private Task DeleteListAsync(WorkspaceOption? list) => list is null ? Task.CompletedTask : ConfirmAndDeleteAsync(list);
+
+    /// <summary>Renames a list from the list manager; an empty name puts the old one back.</summary>
+    public void RenameWorkspace(WorkspaceOption list, string name)
     {
-        if (SelectedWorkspace is not { } ws) return;
+        name = name.Trim();
+        if (name.Length == 0 || name == list.Name)
+        {
+            list.Name = _store.GetWorkspace(list.Id)?.Name ?? list.Name;
+            return;
+        }
+        Try(() => _store.UpdateWorkspace(list.Id, w => w with { Name = name }));
+        Refresh();
+    }
+
+    private async Task ConfirmAndDeleteAsync(WorkspaceOption ws)
+    {
         var count = _store.Items(ws.Id).Count;
         var ok = await _dialogs.ConfirmAsync(
             $"Delete “{ws.Name}”?",

@@ -463,7 +463,7 @@
                                         </DataTemplate>
                                     </ItemsControl.ItemTemplate>
                                 </ItemsControl>
-                                <Button Classes="ghost" MinHeight="56" Click="NewList_Click" AutomationProperties.Name="New list">
+                                <Button x:Name="NewListButton" Classes="ghost" MinHeight="56" Click="NewList_Click" IsVisible="False" AutomationProperties.Name="New list">
                                     <StackPanel Orientation="Horizontal" Spacing="6"><ic:SymbolIcon Symbol="Add" FontSize="14" /><TextBlock Text="New list" /></StackPanel>
                                 </Button>
                             </StackPanel>

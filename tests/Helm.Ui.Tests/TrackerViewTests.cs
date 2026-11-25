@@ -114,6 +114,55 @@ public sealed class TrackerViewTests : IDisposable
     }
 
     [AvaloniaFact]
+    public async Task Lists_are_managed_in_the_settings_renamed_in_place_and_removed_after_asking()
+    {
+        _store.AddWorkspace("Hôm nay");
+        _store.AddWorkspace("Helm");
+        var (window, view, vm) = Show();
+        var layer = Avalonia.Controls.Primitives.OverlayLayer.GetOverlayLayer(view)!;
+        view.GetVisualDescendants().OfType<Button>().Single(b => Avalonia.Automation.AutomationProperties.GetName(b) == "Tracker settings")
+            .RaiseEvent(new Avalonia.Interactivity.RoutedEventArgs(Button.ClickEvent));
+        Dispatcher.UIThread.RunJobs();
+
+        // Rename Helm in its row.
+        var box = layer.GetVisualDescendants().OfType<TextBox>().Single(t => t.Text == "Helm" && Avalonia.Automation.AutomationProperties.GetName(t) == "List name");
+        box.Text = "Công việc";
+        box.RaiseEvent(new Avalonia.Interactivity.RoutedEventArgs(Avalonia.Input.InputElement.LostFocusEvent));
+        Dispatcher.UIThread.RunJobs();
+        Assert.Contains(vm.Workspaces, w => w.Name == "Công việc");
+
+        // Remove it: asks first; Delete removes it, and its row goes.
+        var asking = layer.GetVisualDescendants().OfType<Button>().Single(b => Avalonia.Automation.AutomationProperties.GetName(b) == "Delete Công việc");
+        asking.Command!.Execute(asking.CommandParameter);
+        Dispatcher.UIThread.RunJobs();
+        Assert.Contains(layer.GetVisualDescendants().OfType<TextBlock>(), t => t.Text is { } s && s.StartsWith("Delete “Công việc”"));
+        layer.GetVisualDescendants().OfType<Button>().Last(b => b.Content as string == "Delete").RaiseEvent(new Avalonia.Interactivity.RoutedEventArgs(Button.ClickEvent));
+        await Task.Delay(50);
+        Dispatcher.UIThread.RunJobs();
+        Assert.DoesNotContain(vm.Workspaces, w => w.Name == "Công việc");
+        Assert.Single(vm.Workspaces);
+
+        // Add one.
+        vm.NewWorkspaceName = "Nhà";
+        vm.CreateWorkspaceCommand.Execute(null);
+        Dispatcher.UIThread.RunJobs();
+        Assert.Equal(["Hôm nay", "Nhà"], vm.Workspaces.Select(w => w.Name).Order(StringComparer.Ordinal));
+        window.Close();
+    }
+
+    [AvaloniaFact]
+    public void New_list_is_only_on_a_phone_lists_are_added_in_the_settings_on_a_wide_screen()
+    {
+        _store.AddWorkspace("Hôm nay");
+        var wide = Show(width: 1200);
+        Assert.DoesNotContain(wide.View.GetVisualDescendants().OfType<Button>(), b => b.Name == "NewListButton" && b.IsEffectivelyVisible);
+        wide.Window.Close();
+        var phone = Show(width: 390);
+        Assert.Contains(phone.View.GetVisualDescendants().OfType<Button>(), b => b.Name == "NewListButton" && b.IsEffectivelyVisible);
+        phone.Window.Close();
+    }
+
+    [AvaloniaFact]
     public async Task Deleting_a_task_asks_in_the_glass_sheet_and_Cancel_keeps_it()
     {
         _store.AddItem(_store.AddWorkspace("Hôm nay"), new TrackerItemDraft("Gọi điện cho mẹ"));

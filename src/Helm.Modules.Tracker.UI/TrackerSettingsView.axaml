@@ -7,6 +7,20 @@
              x:DataType="vm:TrackerViewModel">
 
     <!-- Tracker's settings as a sheet over the Tracker (the gear): one card per subject, a switch or a field on the right. -->
+    <UserControl.Styles>
+        <Style Selector="Border.tile">
+            <Setter Property="Width" Value="40" />
+            <Setter Property="Height" Value="40" />
+            <Setter Property="CornerRadius" Value="10" />
+            <Setter Property="Background" Value="{DynamicResource HelmGlassHover}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource HelmGlassStroke}" />
+            <Setter Property="BorderThickness" Value="1" />
+        </Style>
+        <Style Selector="Border.tile.selected">
+            <Setter Property="BorderBrush" Value="{DynamicResource HelmGlassStrokeStrong}" />
+        </Style>
+    </UserControl.Styles>
+
     <StackPanel Spacing="14">
         <Grid ColumnDefinitions="*,Auto">
             <StackPanel>
@@ -18,20 +32,48 @@
             </Button>
         </Grid>
 
-        <Border Classes="glass" IsVisible="{Binding HasWorkspaces}">
-            <StackPanel Spacing="10">
-                <TextBlock Text="This list" Classes="head" />
-                <TextBox Classes="glass" Text="{Binding WorkspaceName, UpdateSourceTrigger=LostFocus}" PlaceholderText="List name" AutomationProperties.Name="List name" />
-                <Button Classes="ghost" HorizontalAlignment="Left" Command="{Binding DeleteWorkspaceCommand}" AutomationProperties.Name="Delete this list">
-                    <StackPanel Orientation="Horizontal" Spacing="8">
-                        <ic:SymbolIcon Symbol="Delete" FontSize="14" Foreground="{DynamicResource HelmDanger}" />
-                        <TextBlock Text="Delete this list" Foreground="{DynamicResource HelmDanger}" />
-                    </StackPanel>
-                </Button>
-                <TextBlock Text="Removes it and its tasks from all your devices. The history stays in the reports." Classes="secondary" />
+        <!-- Manage the lists: every list on its own row (rename in place, remove), then add one -->
+        <Border Classes="glass">
+            <StackPanel Spacing="12">
+                <StackPanel Spacing="2">
+                    <TextBlock Text="Lists" Classes="head" />
+                    <TextBlock Text="Add, rename or remove your to-do lists. Debts are kept in Wallet." Classes="secondary" />
+                </StackPanel>
+                <ItemsControl ItemsSource="{Binding Workspaces}">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate DataType="vm:WorkspaceOption">
+                            <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="10" Margin="0,0,0,10">
+                                <Border Classes="tile" Classes.selected="{Binding IsSelected}" VerticalAlignment="Top">
+                                    <TextBlock Text="{Binding Initial}" FontWeight="Bold" Foreground="{DynamicResource HelmEyebrow}"
+                                               HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                </Border>
+                                <StackPanel Grid.Column="1" Spacing="4">
+                                    <TextBox Classes="glass" Text="{Binding Name, Mode=OneWay}" LostFocus="Rename_LostFocus" KeyDown="Rename_KeyDown"
+                                             AutomationProperties.Name="List name" />
+                                    <StackPanel Orientation="Horizontal" Spacing="6" Margin="2,0,0,0">
+                                        <TextBlock Text="{Binding Summary}" Classes="secondary" />
+                                        <TextBlock Text="· showing now" Classes="secondary" Foreground="{DynamicResource HelmEyebrow}" IsVisible="{Binding IsSelected}" />
+                                    </StackPanel>
+                                </StackPanel>
+                                <Button Grid.Column="2" Classes="chip" VerticalAlignment="Top" ToolTip.Tip="Delete this list"
+                                        Command="{Binding $parent[UserControl].((vm:TrackerViewModel)DataContext).DeleteListCommand}" CommandParameter="{Binding}"
+                                        AutomationProperties.Name="{Binding Name, StringFormat='Delete {0}'}">
+                                    <ic:SymbolIcon Symbol="Delete" FontSize="16" Foreground="{DynamicResource HelmDanger}" />
+                                </Button>
+                            </Grid>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+                <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
+                    <TextBox Classes="glass" PlaceholderText="Name of a new list" Text="{Binding NewWorkspaceName}" AutomationProperties.Name="New list name">
+                        <TextBox.KeyBindings>
+                            <KeyBinding Gesture="Enter" Command="{Binding CreateWorkspaceCommand}" />
+                        </TextBox.KeyBindings>
+                    </TextBox>
+                    <Button Grid.Column="1" Classes="pill" Content="Add list" Command="{Binding CreateWorkspaceCommand}" />
+                </Grid>
             </StackPanel>
         </Border>
-
         <Border Classes="glass">
             <StackPanel Spacing="12">
                 <TextBlock Text="Display" Classes="head" />
@@ -73,7 +115,7 @@
                                   AutomationProperties.Name="Due soon means" />
                     </StackPanel>
                 </StackPanel>
-                <Button Classes="ghost" HorizontalAlignment="Left" Content="Remind me now" Command="{Binding RemindNowCommand}" />
+                <Button Classes="ghost" HorizontalAlignment="Stretch" Content="Remind me now" Command="{Binding RemindNowCommand}" />
             </StackPanel>
         </Border>
 
@@ -81,10 +123,10 @@
             <StackPanel Spacing="10">
                 <TextBlock Text="Export" Classes="head" />
                 <TextBlock Text="Copies every task, or every change in the history, to paste into a spreadsheet." Classes="secondary" />
-                <WrapPanel>
-                    <Button Classes="ghost" Content="Copy tasks" Command="{Binding CopyItemsCsvCommand}" Margin="0,0,8,8" />
-                    <Button Classes="ghost" Content="Copy history" Command="{Binding CopyHistoryCsvCommand}" Margin="0,0,8,8" />
-                </WrapPanel>
+                <Grid ColumnDefinitions="*,*" ColumnSpacing="8">
+                    <Button Classes="ghost" HorizontalAlignment="Stretch" Content="Copy tasks" Command="{Binding CopyItemsCsvCommand}" />
+                    <Button Grid.Column="1" Classes="ghost" HorizontalAlignment="Stretch" Content="Copy history" Command="{Binding CopyHistoryCsvCommand}" />
+                </Grid>
             </StackPanel>
         </Border>
 

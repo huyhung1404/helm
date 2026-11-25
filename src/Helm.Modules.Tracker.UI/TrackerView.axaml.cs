@@ -32,6 +32,7 @@ public partial class TrackerView : UserControl
     private readonly IModule? _module;
     private readonly TrackerViewModel? _viewModel;
     private readonly ITrackerPageHost? _host;
+    private bool _settingsOpen;
 
     /// <summary>For the XAML loader and the previewer only.</summary>
     public TrackerView() => InitializeComponent();
@@ -71,7 +72,10 @@ public partial class TrackerView : UserControl
         Grid.SetRow(DaysBox, narrow ? 2 : 1);
         // Tabs on the right, like the other screens, on a phone too (own line under the date).
         Grid.SetColumnSpan(Tabs, narrow ? 2 : 1);
-        Tabs.HorizontalAlignment = narrow ? Avalonia.Layout.HorizontalAlignment.Right : Avalonia.Layout.HorizontalAlignment.Left;        // First run: the three steps side by side on a wide page, one under the other on a phone.
+        Tabs.HorizontalAlignment = narrow ? Avalonia.Layout.HorizontalAlignment.Right : Avalonia.Layout.HorizontalAlignment.Left;        // Lists are added in the settings (the gear); only a phone keeps a quick "New list" at the end of the row.
+        NewListButton.IsVisible = narrow;
+        if (!narrow) NewListBox.IsVisible = false;
+        // First run: the three steps side by side on a wide page, one under the other on a phone.
         FirstRunSteps.Columns = narrow ? 1 : 3;
         FirstRunButton.HorizontalAlignment = narrow ? Avalonia.Layout.HorizontalAlignment.Stretch : Avalonia.Layout.HorizontalAlignment.Left;
     }
@@ -98,6 +102,9 @@ public partial class TrackerView : UserControl
         if (_viewModel is null) return;
         SheetHandle? sheet = null;
         sheet = Sheet.Show(this, new TrackerSettingsView(_viewModel, () => sheet?.Close()), 480);
+        if (sheet is null) return;
+        _settingsOpen = true;
+        sheet.Closed += () => _settingsOpen = false;
     }
 
     private void List_Click(object? sender, RoutedEventArgs e)
@@ -123,7 +130,8 @@ public partial class TrackerView : UserControl
         if (e.Action != System.Collections.Specialized.NotifyCollectionChangedAction.Add) return;
         NewListBox.IsVisible = false;
         Replay(TasksPanel);
-        Dispatcher.UIThread.Post(() => NewTaskBox.Focus(), DispatcherPriority.Input);
+        // A list made in the settings sheet keeps the cursor there.
+        if (!_settingsOpen) Dispatcher.UIThread.Post(() => NewTaskBox.Focus(), DispatcherPriority.Input);
     }
 
     private void ToggleDone_Click(object? sender, RoutedEventArgs e)

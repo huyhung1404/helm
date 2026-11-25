@@ -1,4 +1,6 @@
 using Avalonia.Controls;
+using Avalonia.Input;
+using Avalonia.Interactivity;
 
 namespace Helm.Modules.Tracker.Ui;
 
@@ -8,11 +10,29 @@ public partial class TrackerSettingsView : UserControl
     /// <summary>For the XAML loader and the previewer only.</summary>
     public TrackerSettingsView() => InitializeComponent();
 
+    private readonly TrackerViewModel? _viewModel;
+
     public TrackerSettingsView(TrackerViewModel viewModel, Action close)
     {
+        _viewModel = viewModel;
         DataContext = viewModel;
         InitializeComponent();
         CloseButton.Click += (_, _) => close();
         DoneButton.Click += (_, _) => close();
+    }
+
+    // A list's name is edited in its row and saved when the field loses focus or on Enter.
+    private void Rename_LostFocus(object? sender, RoutedEventArgs e) => Rename(sender as TextBox);
+
+    private void Rename_KeyDown(object? sender, KeyEventArgs e)
+    {
+        if (e.Key != Key.Enter) return;
+        Rename(sender as TextBox);
+        e.Handled = true;
+    }
+
+    private void Rename(TextBox? box)
+    {
+        if (box?.DataContext is WorkspaceOption list) _viewModel?.RenameWorkspace(list, box.Text ?? "");
     }
 }
