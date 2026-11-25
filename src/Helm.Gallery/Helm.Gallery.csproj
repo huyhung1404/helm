@@ -1,0 +1,29 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- See one shared page at a time without building Helm: the real view over fake data, at phone / tablet / PC width,
+       light or dark, with hot reload (save an .axaml and the open page updates). Run: scripts/gallery.cmd.
+       Built by CI with the solution; never shipped. -->
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <SupportedOSPlatformVersion></SupportedOSPlatformVersion>
+    <PlatformTarget>AnyCPU</PlatformTarget>
+    <RootNamespace>Helm.Gallery</RootNamespace>
+    <AvaloniaUseCompiledBindingsByDefault>true</AvaloniaUseCompiledBindingsByDefault>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Avalonia.Desktop" Version="12.1.3" />
+  </ItemGroup>
+
+  <!-- Hot reload, Debug only. -->
+  <ItemGroup Condition="'$(Configuration)' == 'Debug'">
+    <PackageReference Include="HotAvalonia" Version="3.1.5" PrivateAssets="All" Publish="True" />
+    <PackageReference Include="Avalonia.Markup.Xaml.Loader" Version="12.1.3" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Helm.Ui\Helm.Ui.csproj" />
+  </ItemGroup>
+
+</Project>

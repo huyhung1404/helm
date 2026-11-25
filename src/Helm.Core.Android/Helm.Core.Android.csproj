@@ -30,6 +30,8 @@
   <ItemGroup>
     <ProjectReference Include="..\Helm.Core\Helm.Core.csproj" />
     <ProjectReference Include="..\Helm.Shell\Helm.Shell.csproj" />
+    <!-- The Avalonia base shared with every platform (theme, DateTimeBox, LinksPanel...). -->
+    <ProjectReference Include="..\Helm.Ui\Helm.Ui.csproj" />
   </ItemGroup>
 
 </Project>

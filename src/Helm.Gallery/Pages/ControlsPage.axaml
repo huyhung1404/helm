@@ -1,0 +1,63 @@
+﻿<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:ui="using:Helm.Core.Ui"
+             xmlns:icons="using:FluentIcons.Avalonia"
+             x:Class="Helm.Gallery.Pages.ControlsPage">
+    <!-- Helm.Ui's styles and shared controls in one place: check a style change here before it reaches every tool. -->
+    <StackPanel>
+        <TextBlock Classes="section" Text="Typing" />
+        <Border Classes="card">
+            <StackPanel Spacing="8">
+                <TextBlock Classes="secondary"
+                           Text="Vietnamese with Helm Keyboard: the word being composed shows without an underline." />
+                <TextBox PlaceholderText="Gõ tiếng Việt ở đây" />
+                <TextBox PlaceholderText="Several lines" AcceptsReturn="True" TextWrapping="Wrap" MinHeight="80" />
+                <TextBox PlaceholderText="Password" PasswordChar="•" Classes="revealPasswordButton" />
+                <TextBox Classes="mono" Text="mono: ssh root@example 22" />
+            </StackPanel>
+        </Border>
+
+        <TextBlock Classes="section" Text="Date and time" />
+        <Border Classes="card">
+            <StackPanel Spacing="8">
+                <ui:DateTimeBox AllowEmpty="True" PlaceholderText="Due date" />
+                <ui:DateTimeBox ShowTime="False" AllowEmpty="True" PlaceholderText="Date only" />
+            </StackPanel>
+        </Border>
+
+        <TextBlock Classes="section" Text="Cards and rows" />
+        <Border Classes="card">
+            <StackPanel>
+                <TextBlock Classes="title" Text="A card title" />
+                <TextBlock Classes="secondary" Text="Secondary text under it wraps when the frame is narrow, like on a phone." />
+                <Border Classes="row">
+                    <DockPanel>
+                        <ToggleSwitch DockPanel.Dock="Right" IsChecked="True" OnContent="" OffContent="" />
+                        <TextBlock VerticalAlignment="Center" Text="A row with a switch" />
+                    </DockPanel>
+                </Border>
+                <Border Classes="row">
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                        <Button Classes="accent" Content="Save" />
+                        <Button Content="Cancel" />
+                        <Button Classes="danger" Content="Delete" />
+                    </StackPanel>
+                </Border>
+            </StackPanel>
+        </Border>
+        <Border Classes="infobar"><TextBlock Text="An info bar." TextWrapping="Wrap" /></Border>
+        <Border Classes="infobar warning"><TextBlock Text="A warning bar." TextWrapping="Wrap" /></Border>
+        <Border Classes="shimmer" Width="220" />
+        <Border Classes="shimmer" Width="160" />
+
+        <TextBlock Classes="section" Text="Icons" />
+        <Border Classes="card">
+            <StackPanel Orientation="Horizontal" Spacing="12">
+                <ui:ModuleIcon Symbol="TaskListSquare" Size="32" />
+                <ui:ModuleIcon Symbol="Wallet" Size="32" />
+                <ui:ModuleIcon Symbol="Notepad" Size="32" />
+                <icons:SymbolIcon Symbol="Settings" />
+            </StackPanel>
+        </Border>
+    </StackPanel>
+</UserControl>

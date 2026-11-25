@@ -1,0 +1,26 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- The Avalonia base every platform shares: Helm's theme (HelmTheme.axaml), card/row styles and the shared controls.
+       The Windows app (through Helm.Ui.Windows), Android, and later macOS/iOS reference it; it knows no platform.
+       Namespaces stay Helm.Core.Ui so a page reads the same everywhere. Helm.Core.Windows still has WPF controls with
+       the same names (DateTimeBox, LinksPanel...) for the WPF pages: a project referencing both must not use them
+       unqualified. Those WPF copies go away as tools move to Avalonia. -->
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <SupportedOSPlatformVersion></SupportedOSPlatformVersion>
+    <PlatformTarget>AnyCPU</PlatformTarget>
+    <RootNamespace>Helm.Core</RootNamespace>
+    <AvaloniaUseCompiledBindingsByDefault>true</AvaloniaUseCompiledBindingsByDefault>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Avalonia" Version="12.1.3" />
+    <PackageReference Include="Avalonia.Themes.Fluent" Version="12.1.3" />
+    <PackageReference Include="FluentIcons.Avalonia" Version="2.1.343" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Helm.Core\Helm.Core.csproj" />
+  </ItemGroup>
+
+</Project>
