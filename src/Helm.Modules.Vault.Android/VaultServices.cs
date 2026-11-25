@@ -1,4 +1,3 @@
-using CommunityToolkit.Mvvm.Input;
 using Helm.Core.Modules;
 using Helm.Core.Services;
 using Helm.Modules.Vault.Backup;
@@ -8,27 +7,6 @@ using Helm.Modules.Vault.ViewModels;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Helm.Modules.Vault;
-
-/// <summary>
-/// Both vault pages: the module (the Enable card, is it on), the vault screens and the settings (shared view models),
-/// and the way between the content page and the settings page.
-/// </summary>
-public sealed partial class VaultPageViewModel(VaultModule module, VaultAppViewModel app, VaultSettingsViewModel settings, IShellNavigation navigation)
-{
-    public VaultModule Module { get; } = module;
-
-    public VaultAppViewModel App { get; } = app;
-
-    public VaultSettingsViewModel Settings { get; } = settings;
-
-    public Avalonia.Media.IImage VaultIcon => Vault.VaultIcon.Image;
-
-    [RelayCommand]
-    private void OpenSettings() => navigation.ShowPage(typeof(VaultPage));
-
-    [RelayCommand]
-    private void OpenVault() => navigation.ShowPage(typeof(VaultContentPage));
-}
 
 public static class VaultServices
 {
@@ -43,8 +21,6 @@ public static class VaultServices
             sp.GetRequiredService<VaultSession>(), sp.GetRequiredService<Helm.Modules.Vault.Items.VaultStore>(),
             () => sp.GetRequiredService<IShellNavigation>().ShowPage(typeof(VaultContentPage))));
         services.AddVaultCore();
-        services.AddSingleton<VaultPageViewModel>();
-        services.AddTransient<VaultContentPage>();
-        return services.AddAndroidModule<VaultModule, VaultPage>();
+        return services.AddAndroidModule<VaultModule, VaultContentPage>();
     }
 }

@@ -249,6 +249,13 @@
         <ScrollViewer x:Name="Scroller" HorizontalScrollBarVisibility="Disabled">
             <StackPanel x:Name="Page" Margin="40,28,40,40">
 
+                <!-- A phone's page has no app bar: the menu button opens the drawer -->
+                <StackPanel x:Name="MenuRow" IsVisible="False" Margin="0,0,0,12">
+                    <Button Classes="chip" HorizontalAlignment="Left" Click="Menu_Click" ToolTip.Tip="Menu" AutomationProperties.Name="Open navigation">
+                        <ic:SymbolIcon Symbol="Navigation" FontSize="16" />
+                    </Button>
+                </StackPanel>
+
                 <!-- Today, and which view -->
                 <Grid x:Name="TopBar" ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto">
                     <TextBlock Classes="eyebrow" Text="{Binding TodayLine, Converter={x:Static core:UpperCase.Instance}}" VerticalAlignment="Center"

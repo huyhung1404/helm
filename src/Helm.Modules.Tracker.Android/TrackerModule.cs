@@ -10,7 +10,7 @@ namespace Helm.Modules.Tracker;
 /// Tracker on Android. The module keeps the home-screen widgets in step with the data (local edits and synced
 /// changes) and with the on/off state, and sets the hourly alarm behind the due-date reminders.
 /// </summary>
-public sealed class TrackerModule : AndroidModuleBase, IModuleContent, IDisposable
+public sealed class TrackerModule : AndroidModuleBase, IModuleContent, Helm.Core.Platform.IBackHandler, IDisposable
 {
     private readonly ILogger<TrackerModule> _logger;
     private readonly Timer _widgetTimer;
@@ -34,8 +34,12 @@ public sealed class TrackerModule : AndroidModuleBase, IModuleContent, IDisposab
     /// <summary>The same vector icon as on Windows (<see cref="TrackerIconShape"/>).</summary>
     public override IImage? IconImage => TrackerIcon.Image;
 
-    public override Type PageType => typeof(TrackerPage);
+    // Its settings are a sheet inside the Tracker page (the gear): one page.
+    public override Type PageType => typeof(TrackerContentPage);
     public Type ContentPageType => typeof(TrackerContentPage);
+
+    /// <summary>Android back closes a sheet (settings, the date picker, a question) before it leaves the page.</summary>
+    public bool HandleBack() => Helm.Core.Ui.Sheet.CloseTopmost();
 
     public override Task EnableAsync(CancellationToken ct)
     {

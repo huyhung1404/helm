@@ -1,0 +1,40 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:Helm.Modules.Tracker"
+             x:Class="Helm.Modules.Tracker.TrackerAndroidSettings"
+             x:DataType="vm:TrackerViewModel">
+
+    <!-- What only Android has, as more cards in the shared settings sheet: the notification warning and the home-screen widget. -->
+    <StackPanel Spacing="14">
+        <Border x:Name="NotificationsBlocked" Classes="glass" BorderBrush="{DynamicResource HelmDanger}" IsVisible="False">
+            <TextBlock Text="Notifications are off for Helm in Android settings, so reminders cannot be shown." TextWrapping="Wrap" />
+        </Border>
+
+        <Border Classes="glass">
+            <StackPanel Spacing="12">
+                <StackPanel Spacing="2">
+                    <TextBlock Text="Home-screen widget" Classes="head" />
+                    <TextBlock TextWrapping="Wrap" Classes="secondary"
+                               Text="Your open tasks or debts on the home screen: tap a circle to finish a task, the title to switch list. With nothing open, or after the shrink button, it becomes a small button showing how many are open; tap it for sync and +." />
+                </StackPanel>
+                <!-- Only when the launcher can place a widget on request -->
+                <Button x:Name="AddWidgetButton" Classes="ghost" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Content="Add to home screen"
+                        Click="AddWidget_Click" IsVisible="False" />
+                <StackPanel Spacing="6">
+                    <TextBlock Text="Background" />
+                    <ComboBox Classes="glass" HorizontalAlignment="Stretch" ItemsSource="{Binding WidgetBackgroundNames}" SelectedIndex="{Binding WidgetBackgroundIndex}"
+                              AutomationProperties.Name="Widget background" />
+                </StackPanel>
+                <StackPanel Spacing="4">
+                    <TextBlock Text="{Binding WidgetOpacity, StringFormat='Opacity {0}%'}" />
+                    <Slider Minimum="0" Maximum="100" TickFrequency="10" IsSnapToTickEnabled="True" Value="{Binding WidgetOpacity}" AutomationProperties.Name="Widget opacity" />
+                </StackPanel>
+                <StackPanel Spacing="6">
+                    <TextBlock Text="Text" />
+                    <ComboBox Classes="glass" HorizontalAlignment="Stretch" ItemsSource="{Binding WidgetTextNames}" SelectedIndex="{Binding WidgetTextIndex}"
+                              AutomationProperties.Name="Widget text colour" />
+                </StackPanel>
+            </StackPanel>
+        </Border>
+    </StackPanel>
+</UserControl>

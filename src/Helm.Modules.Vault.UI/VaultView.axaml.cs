@@ -52,6 +52,7 @@ public partial class VaultView : UserControl
         _narrow = e.NewSize.Width < Narrow;
         Classes.Set("narrow", _narrow);
         Page.Margin = _narrow ? new Thickness(16, 18, 16, 16) : new Thickness(40, 28, 40, 24);
+        MenuRow.IsVisible = _host?.OpenMenu is not null;
         // The actions beside the title on a wide page, on their own line (right-aligned) on a phone.
         var actions = Actions;
         Grid.SetColumn(actions, _narrow ? 0 : 1);
@@ -175,6 +176,21 @@ public partial class VaultView : UserControl
             await editor.CancelCommand.ExecuteAsync(null);
             if (ReferenceEquals(_app.Items.Editor, editor) && editor.IsEditing) ShowEditor(editor);
         };
+    }
+
+    private void Menu_Click(object? sender, RoutedEventArgs e) => _host?.OpenMenu?.Invoke(this);
+
+    /// <summary>
+    /// Android Back: a sheet over the page closes first (the editor asks before discarding what was typed); then an open
+    /// item goes back to the list. False lets the shell leave the page.
+    /// </summary>
+    public bool HandleBack()
+    {
+        if (_app is null) return false;
+        if (Sheet.CloseTopmost()) return true;
+        if (_app.Items.Detail is null || !_narrow) return false;
+        _app.Items.CloseDetailCommand.Execute(null);
+        return true;
     }
 
     /// <summary>The gear: the vault's settings as a sheet over the page, not a page to navigate to.</summary>

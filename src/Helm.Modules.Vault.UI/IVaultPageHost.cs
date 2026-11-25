@@ -14,6 +14,9 @@ public interface IVaultPageHost
 
     /// <summary>The platform can lock the vault when the computer locks (Windows): shows that switch.</summary>
     bool CanLockWithSystem { get; }
+
+    /// <summary>A phone's page fills the screen and has no app bar: this opens its menu (the drawer). Null: no menu button.</summary>
+    Action<Control>? OpenMenu => null;
 }
 
 /// <summary>

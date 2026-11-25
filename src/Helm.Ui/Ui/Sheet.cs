@@ -23,6 +23,7 @@ public sealed class SheetHandle
         if (Overlay is null) return;
         if (Overlay.Parent is Panel panel) panel.Children.Remove(Overlay);
         Overlay = null;
+        Sheet.Forget(this);
         Closed?.Invoke();
     }
 }
@@ -42,6 +43,30 @@ public static class Sheet
         if (TopLevel.GetTopLevel(anchor) is not { } top) return null;
         Control screen = anchor.GetVisualAncestors().OfType<Control>().FirstOrDefault(a => a.Classes.Contains("screen")) ?? top;
         return (screen, top);
+    }
+
+    private static readonly List<SheetHandle> Opened = [];
+
+    internal static void Forget(SheetHandle handle) => Opened.Remove(handle);
+
+    /// <summary>
+    /// Closes the sheet opened last, as the phone's Back button does (a sheet is on top of the page, so Back goes to it
+    /// first). False when no sheet is open.
+    /// </summary>
+    public static bool CloseTopmost()
+    {
+        for (var i = Opened.Count - 1; i >= 0; i--)
+        {
+            var handle = Opened[i];
+            if (!handle.IsOpen)
+            {
+                Opened.RemoveAt(i);
+                continue;
+            }
+            handle.Close();
+            return true;
+        }
+        return false;
     }
 
     /// <summary>True when sheets over <paramref name="anchor"/>'s screen come from the bottom.</summary>
@@ -105,6 +130,7 @@ public static class Sheet
         Canvas.SetTop(overlay, at.Y);
         handle.Overlay = overlay;
         layer.Children.Add(overlay);
+        Opened.Add(handle);
 
         // The card grows into place; a phone's sheet grows up from its bottom edge.
         card.RenderTransform = new ScaleTransform();

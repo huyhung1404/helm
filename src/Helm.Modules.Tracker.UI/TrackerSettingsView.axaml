@@ -130,6 +130,9 @@
             </StackPanel>
         </Border>
 
+        <!-- What only this platform has (Android: the widget, the notification warning) -->
+        <ContentControl x:Name="PlatformCards" />
+
         <Border Classes="glass">
             <StackPanel Spacing="10">
                 <TextBlock Text="Export" Classes="head" />

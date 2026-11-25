@@ -13,11 +13,12 @@ public partial class TrackerSettingsView : UserControl
 
     private readonly TrackerViewModel? _viewModel;
 
-    public TrackerSettingsView(TrackerViewModel viewModel, IModule module, Action close)
+    public TrackerSettingsView(TrackerViewModel viewModel, IModule module, Control? platformCards, Action close)
     {
         _viewModel = viewModel;
         DataContext = viewModel;
         InitializeComponent();
+        PlatformCards.Content = platformCards;
         CloseButton.Click += (_, _) => close();
         DoneButton.Click += (_, _) => close();
         // The tool's on/off switch (it used to be on a settings page of its own).

@@ -18,6 +18,14 @@ public interface ITrackerPageHost
     /// <summary>The page came on screen (Android asks for notifications here and checks today's reminder).</summary>
     void Opened();
 
+    /// <summary>
+    /// Settings only this platform has (Android: the home-screen widget, the notification warning), as cards in the
+    /// settings sheet. Null: none.
+    /// </summary>
+    Control? CreatePlatformSettings() => null;
+
+    /// <summary>A phone's page fills the screen and has no app bar: this opens its menu (the drawer). Null: no menu button.</summary>
+    Action<Control>? OpenMenu => null;
 }
 
 /// <summary>
@@ -56,6 +64,7 @@ public partial class TrackerView : UserControl
         var narrow = e.NewSize.Width < Narrow;
         Classes.Set("narrow", narrow);
         Page.Margin = narrow ? new Thickness(16, 18, 16, 28) : new Thickness(40, 28, 40, 40);
+        MenuRow.IsVisible = _host?.OpenMenu is not null;
         // Tabs beside today's line on a wide page, under it on a phone.
         Grid.SetColumn(Tabs, narrow ? 0 : 1);
         Grid.SetRow(Tabs, narrow ? 1 : 0);
@@ -92,6 +101,8 @@ public partial class TrackerView : UserControl
         Scroller.Offset = default;
     }
 
+    private void Menu_Click(object? sender, RoutedEventArgs e) => _host?.OpenMenu?.Invoke(this);
+
     /// <summary>Plays the list's way in again for a list just picked (tabs play theirs as they are shown).</summary>
     private static void Replay(Control panel) => Helm.Core.Ui.Motion.Enter(panel);
 
@@ -100,7 +111,7 @@ public partial class TrackerView : UserControl
     {
         if (_viewModel is null || _module is null) return;
         SheetHandle? sheet = null;
-        sheet = Sheet.Show(this, new TrackerSettingsView(_viewModel, _module, () => sheet?.Close()), 480);
+        sheet = Sheet.Show(this, new TrackerSettingsView(_viewModel, _module, _host?.CreatePlatformSettings(), () => sheet?.Close()), 480);
         if (sheet is null) return;
         _settingsOpen = true;
         sheet.Closed += () => _settingsOpen = false;

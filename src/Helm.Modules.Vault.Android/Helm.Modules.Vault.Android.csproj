@@ -1,6 +1,6 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
-  <!-- Vault on Android: the Avalonia page over the shared Helm.Modules.Vault.Core, plus fingerprint/face unlock
+  <!-- Vault on Android: hosts the shared Vault page (Helm.Modules.Vault.UI) over Helm.Modules.Vault.Core, plus fingerprint/face unlock
        (Android Keystore + BiometricPrompt), FLAG_SECURE, Storage Access Framework backups and the protected clipboard. -->
   <PropertyGroup>
     <TargetFramework>net10.0-android</TargetFramework>
@@ -29,6 +29,8 @@
   <ItemGroup>
     <ProjectReference Include="..\Helm.Core.Android\Helm.Core.Android.csproj" />
     <ProjectReference Include="..\Helm.Modules.Vault.Core\Helm.Modules.Vault.Core.csproj" />
+    <!-- The vault page itself is the shared view, the same as on Windows. -->
+    <ProjectReference Include="..\Helm.Modules.Vault.UI\Helm.Modules.Vault.UI.csproj" />
   </ItemGroup>
 
 </Project>

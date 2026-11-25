@@ -197,6 +197,8 @@ public sealed partial class ShellNavigator(IServiceProvider services, ISettingsS
         return key[..colon] switch
         {
             "content" when module is IModuleContent content => new ShellTab(key, new ModulePage(module, content.ContentPageType), module.DisplayName, module.Icon, module.IconImage, module),
+            // A tool whose settings are a sheet inside its content page has one page: settings open that.
+            "settings" when module is IModuleContent same && same.ContentPageType == module.PageType => Describe(ContentKey(module)),
             // A tool with content has its options on a second page: its tab says so.
             "settings" => new ShellTab(key, new ModulePage(module, module.PageType),
                 module is IModuleContent ? $"{module.DisplayName} settings" : module.DisplayName, module.Icon, module.IconImage, module),
@@ -215,7 +217,7 @@ public sealed partial class ShellNavigator(IServiceProvider services, ISettingsS
         _restored = true;
         var windows = services.GetRequiredService<ToolWindows>();
         foreach (var key in _general.Current.Window.Tabs ?? [])
-            if (!windows.IsOpen(key) && Tabs.All(t => t.Key != key) && Describe(key) is { } tab) Tabs.Add(tab);
+            if (!windows.IsOpen(key) && Describe(key) is { } tab && Tabs.All(t => t.Key != tab.Key)) Tabs.Add(tab);
         if (ShellIntents.TakeModule() is { } requested && services.GetRequiredService<IModuleHost<IAndroidModule>>().Find(requested) is { } module)
         {
             GoModuleContent(module);

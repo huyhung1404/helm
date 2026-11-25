@@ -9,6 +9,5 @@ public static class TrackerServices
         services
             .AddTrackerCore()
             .AddTrackerLinks(typeof(TrackerContentPage))
-            .AddAndroidModule<TrackerModule, TrackerPage>()
-            .AddTransient<TrackerContentPage>();
+            .AddAndroidModule<TrackerModule, TrackerContentPage>();
 }

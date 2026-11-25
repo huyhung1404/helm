@@ -1,39 +1,49 @@
 using Android.Content;
 using Android.Views.Autofill;
+using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Interactivity;
-using Avalonia.Markup.Xaml;
 using AndroidApp = Android.App.Application;
 
 namespace Helm.Modules.Vault;
 
-public partial class VaultSettingsView : UserControl
+/// <summary>Whether Helm is Android's autofill service, and the way to Android's screen that changes it.</summary>
+public partial class VaultAutofillCard : UserControl
 {
-    public VaultSettingsView()
+    public VaultAutofillCard()
     {
-        AvaloniaXamlLoader.Load(this);
-        AttachedToVisualTree += (_, _) => UpdateAutofill();
-        // Leaving the page forgets the passwords typed there (not on pause: the export's file picker pauses Helm).
-        DetachedFromVisualTree += (_, _) => (DataContext as ViewModels.VaultSettingsViewModel)?.ForgetTypedSecrets();
-        Helm.Core.Platform.ActivityHost.Resumed += (_, _) => Avalonia.Threading.Dispatcher.UIThread.Post(UpdateAutofill);
+        InitializeComponent();
+    }
+
+    private void OnResumed(object? sender, EventArgs e) => Avalonia.Threading.Dispatcher.UIThread.Post(UpdateAutofill);
+
+    protected override void OnAttachedToVisualTree(VisualTreeAttachmentEventArgs e)
+    {
+        base.OnAttachedToVisualTree(e);
+        Helm.Core.Platform.ActivityHost.Resumed += OnResumed;
+        UpdateAutofill();
+    }
+
+    protected override void OnDetachedFromVisualTree(VisualTreeAttachmentEventArgs e)
+    {
+        // The activity outlives the sheet: do not stay subscribed.
+        Helm.Core.Platform.ActivityHost.Resumed -= OnResumed;
+        base.OnDetachedFromVisualTree(e);
     }
 
     /// <summary>Whether Helm is Android's autofill service now (it changes in Android's settings, not here).</summary>
     private void UpdateAutofill()
     {
         var manager = AndroidApp.Context.GetSystemService(Java.Lang.Class.FromType(typeof(AutofillManager))) as AutofillManager;
-        var state = this.FindControl<TextBlock>("AutofillState");
-        var button = this.FindControl<Button>("AutofillButton");
-        if (state is null || button is null) return;
         if (manager is null || !manager.IsAutofillSupported)
         {
-            state.Text = "This phone does not support autofill.";
-            button.IsVisible = false;
+            AutofillState.Text = "This phone does not support autofill.";
+            AutofillButton.IsVisible = false;
             return;
         }
         var on = manager.HasEnabledAutofillServices;
-        state.Text = on ? "Helm fills passwords on this phone." : "Another app (or none) fills passwords now.";
-        button.Content = on ? "Autofill settings…" : "Use Helm for autofill…";
+        AutofillState.Text = on ? "Helm fills passwords on this phone." : "Another app (or none) fills passwords now.";
+        AutofillButton.Content = on ? "Autofill settings…" : "Use Helm for autofill…";
     }
 
     /// <summary>Android's own screen for choosing the autofill service, with Helm proposed.</summary>

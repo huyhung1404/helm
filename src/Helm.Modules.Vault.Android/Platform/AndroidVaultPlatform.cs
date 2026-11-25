@@ -103,7 +103,8 @@ internal sealed class AndroidVaultPlatform : IVaultPlatform
 
     public void CopyText(string text) => Copy(text, sensitive: false);
 
-    public Task<bool> ConfirmAsync(string title, string message, string confirmText) => _dialogs.ConfirmAsync(title, message, confirmText);
+    /// <summary>Helm's own confirmation sheet, drawn by the vault page that is on screen.</summary>
+    public Task<bool> ConfirmAsync(string title, string message, string confirmText) => Ui.VaultDialogs.ConfirmAsync(title, message, confirmText);
 
     /// <summary>A folder (for example in Google Drive) chosen with the system picker; Helm keeps access to it.</summary>
     public async Task<string?> PickBackupLocationAsync(CancellationToken ct)
@@ -120,7 +121,7 @@ internal sealed class AndroidVaultPlatform : IVaultPlatform
     public async Task SaveEmergencyKitAsync(EmergencyKit kit, CancellationToken ct)
     {
         // The recovery key opens the whole vault without the password: say so before it lands in Drive or Downloads.
-        if (!await _dialogs.ConfirmAsync("Save the Emergency Kit",
+        if (!await ConfirmAsync("Save the Emergency Kit",
                 "This file holds the recovery key, which opens your whole vault without the password. Save it where you can print it or move it to a USB stick, then delete the file. Do not keep it in Google Drive, email or chat.",
                 "Save").ConfigureAwait(true))
             return;

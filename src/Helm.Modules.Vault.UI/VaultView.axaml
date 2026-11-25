@@ -34,6 +34,12 @@
 
             <!-- Where we are, and what can be done: the guide, lock, the settings (the gear) -->
             <StackPanel Grid.Row="0" Margin="0,0,0,18">
+                <!-- A phone's page has no app bar: the menu button opens the drawer -->
+                <StackPanel x:Name="MenuRow" IsVisible="False" Margin="0,0,0,12">
+                    <Button Classes="chip" HorizontalAlignment="Left" Click="Menu_Click" ToolTip.Tip="Menu" AutomationProperties.Name="Open navigation">
+                        <ic:SymbolIcon Symbol="Navigation" FontSize="16" />
+                    </Button>
+                </StackPanel>
                 <Grid x:Name="TopBar" ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto">
                     <StackPanel>
                         <TextBlock x:Name="Eyebrow" Classes="eyebrow" TextWrapping="Wrap" Margin="0,0,12,0" />

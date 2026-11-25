@@ -35,8 +35,9 @@ public sealed class VaultModule(
     public override string Description => "Keeps passwords, secure notes, cards and documents encrypted, synced and backed up.";
     public override ModuleGroup Group => ModuleGroup.SecurityAndServers;
     public override Symbol Icon => Symbol.ShieldKeyhole;
-    public override Avalonia.Media.IImage IconImage => VaultIcon.Image;
-    public override Type PageType => typeof(VaultPage);
+    public override Avalonia.Media.IImage IconImage => Ui.VaultIcon.Image;
+    // Its settings are a sheet inside the vault page (the gear): one page.
+    public override Type PageType => typeof(VaultContentPage);
 
     public Type ContentPageType => typeof(VaultContentPage);
 
@@ -67,15 +68,15 @@ public sealed class VaultModule(
         return Task.CompletedTask;
     }
 
-    /// <summary>Android back: close the editor (asking first if something was typed), then an open item, before leaving the vault page.</summary>
+    /// <summary>
+    /// Android back: a sheet over the page closes first (the editor asks before discarding what was typed), then an open
+    /// item goes back to the list (on a phone, where the item takes the list's place), before leaving the vault page.
+    /// </summary>
     public bool HandleBack()
     {
-        if (app.Items.Editor is { } editor)
-        {
-            editor.CancelCommand.Execute(null);
-            return true;
-        }
-        if (app.Items.Detail is null) return false;
+        if (Helm.Core.Ui.Sheet.CloseTopmost()) return true;
+        // On a phone nothing is picked for you: an open item is the screen to go back from.
+        if (app.Items.AutoSelectFirst || app.Items.Detail is null) return false;
         app.Items.CloseDetailCommand.Execute(null);
         return true;
     }

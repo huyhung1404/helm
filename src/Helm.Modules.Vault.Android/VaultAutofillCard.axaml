@@ -1,0 +1,17 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             x:Class="Helm.Modules.Vault.VaultAutofillCard">
+
+    <!-- Android only, a card in the shared settings sheet: whether Helm fills passwords in other apps. -->
+    <Border Classes="glass">
+        <StackPanel Spacing="12">
+            <StackPanel Spacing="2">
+                <TextBlock Classes="head" Text="Fill passwords in other apps" />
+                <TextBlock Classes="secondary" TextWrapping="Wrap"
+                           Text="Sign-in forms in apps and browsers offer your vault's logins. When the vault is locked, a fingerprint or the password opens it first. A login you pick for an app is offered there again next time." />
+            </StackPanel>
+            <TextBlock x:Name="AutofillState" Classes="secondary" TextWrapping="Wrap" />
+            <Button x:Name="AutofillButton" Classes="ghost" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Content="Use Helm for autofill…" Click="Autofill_Click" />
+        </StackPanel>
+    </Border>
+</UserControl>
