@@ -28,6 +28,7 @@
   <ItemGroup>
     <ProjectReference Include="..\Helm.Core.Android\Helm.Core.Android.csproj" />
     <ProjectReference Include="..\Helm.Modules.Scratch.Core\Helm.Modules.Scratch.Core.csproj" />
+    <ProjectReference Include="..\Helm.Modules.Scratch.UI\Helm.Modules.Scratch.UI.csproj" />
   </ItemGroup>
 
 </Project>

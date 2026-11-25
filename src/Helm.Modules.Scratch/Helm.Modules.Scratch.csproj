@@ -8,6 +8,9 @@
   <ItemGroup>
     <ProjectReference Include="..\Helm.Core.Windows\Helm.Core.Windows.csproj" />
     <ProjectReference Include="..\Helm.Modules.Scratch.Core\Helm.Modules.Scratch.Core.csproj" />
+    <!-- The page is the shared Avalonia view, shown through Helm.Ui.Windows. -->
+    <ProjectReference Include="..\Helm.Modules.Scratch.UI\Helm.Modules.Scratch.UI.csproj" />
+    <ProjectReference Include="..\Helm.Ui.Windows\Helm.Ui.Windows.csproj" />
   </ItemGroup>
 
   <ItemGroup>

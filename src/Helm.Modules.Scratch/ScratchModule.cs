@@ -7,8 +7,8 @@ namespace Helm.Modules.Scratch;
 
 /// <summary>
 /// Scratch on Windows. The things live in Helm Sync (files as encrypted blobs) and the pages work directly on
-/// <see cref="ScratchStore"/>; the only background work is following Send to clipboard from the other devices. The menu and Quick access open <see cref="ScratchContentPage"/>;
-/// Home → Utilities opens the settings (<see cref="ScratchPage"/>).
+/// <see cref="ScratchStore"/>; the only background work is following Send to clipboard from the other devices. The menu, Quick access and Home → Utilities open <see cref="ScratchContentPage"/>;
+/// its settings are a sheet inside it.
 /// </summary>
 public sealed class ScratchModule(ScratchViewModel viewModel, ScratchClipboardRelay relay) : HelmModuleBase, IModuleContent
 {
@@ -18,7 +18,7 @@ public sealed class ScratchModule(ScratchViewModel viewModel, ScratchClipboardRe
     public override ModuleGroup Group => ModuleGroup.MoneyAndMedia;
     public override SymbolRegular Icon => SymbolRegular.Note24;
     public override ImageSource IconImage => ScratchLogo.Image;
-    public override Type SettingsPageType => typeof(ScratchPage);
+    public override Type SettingsPageType => typeof(ScratchContentPage);
     public Type ContentPageType => typeof(ScratchContentPage);
     public override IReadOnlyList<HotkeyDefinition> Hotkeys => [];
 

@@ -1,218 +1,34 @@
-using System.ComponentModel;
-using System.Globalization;
 using System.IO;
 using System.Windows;
 using System.Windows.Controls;
-using System.Windows.Data;
-using System.Windows.Documents;
-using System.Windows.Input;
-using System.Windows.Threading;
-using Helm.Core.Modules;
+using Helm.Modules.Scratch.Ui;
 using Microsoft.Extensions.Logging;
 
 namespace Helm.Modules.Scratch;
 
 /// <summary>
-/// Scratch itself, opened from the menu and the Quick access tile (see <see cref="IModuleContent"/>). Files and text
-/// dropped on the page or pasted with Ctrl+V go into Scratch. While the tool is off the list stays visible but
-/// read-only, with a note pointing to the settings (Home → Utilities).
+/// Scratch itself, opened from the menu, Quick access and Home → Utilities (see <see cref="IModuleContent"/>): the shared
+/// Avalonia <see cref="ScratchView"/> inside this WPF page, plus what only Windows does: the clipboard (files copied in
+/// Explorer, a screenshot, text) and the files dropped on the page.
 /// </summary>
-public partial class ScratchContentPage : Page
+public partial class ScratchContentPage : Page, IScratchPageHost
 {
-    private readonly ScratchModule _module;
     private readonly ScratchViewModel _viewModel;
     private readonly ILogger<ScratchContentPage> _logger;
 
     public ScratchContentPage(ScratchModule module, ScratchViewModel viewModel, ILogger<ScratchContentPage> logger)
     {
-        _module = module;
         _viewModel = viewModel;
         _logger = logger;
-        DataContext = viewModel;
         InitializeComponent();
-        // Module, view model and page are singletons, so the subscriptions live as long as the page.
-        module.PropertyChanged += OnModuleChanged;
-        CommandBindings.Add(new CommandBinding(ApplicationCommands.Find, (_, _) => { SearchBox.Focus(); SearchBox.SelectAll(); }));
-        InputBindings.Add(new KeyBinding(ApplicationCommands.Find, Key.F, ModifierKeys.Control));
-        DragOver += OnDragOver;
-        Drop += OnDrop;
-        Wall.PreviewMouseLeftButtonDown += OnCardPressed;
-        Wall.PreviewMouseMove += OnCardMoved;
-        Wall.PreviewMouseLeftButtonUp += (_, _) => _pressed = null;
-        Wall.DragOver += OnCardDragOver;
-        // The ghost follows the cursor over the whole page, also where nothing can be dropped.
-        PreviewDragOver += (_, e) => _ghost?.MoveTo(e.GetPosition(Root));
-        Wall.Drop += OnCardDrop;
-        // The keys work on the whole window while this page shows, wherever the focus is (the menu after opening the
-        // page, for one): Ctrl+V adds; Ctrl+C, Ctrl+Shift+C, Delete, Enter, Esc act on the selected card.
-        Loaded += (_, _) =>
-        {
-            _window = Window.GetWindow(this);
-            if (_window is not null) _window.PreviewKeyDown += OnKeyDown;
-        };
-        Unloaded += (_, _) =>
-        {
-            if (_window is not null) _window.PreviewKeyDown -= OnKeyDown;
-            _window = null;
-        };
-        ApplyEnabled();
+        Host.Show(() => new ScratchView(module, viewModel, this));
     }
 
-    private bool CanAdd => _module.IsEnabled && _viewModel.IsNotBusy;
-
-    private Window? _window;
-
-    // ---- Reordering: drag a card onto another one ----------------------------------------------------------------
-
-    private const string CardFormat = "Helm.Scratch.Card";
-    private ScratchRowViewModel? _pressed;
-    private Point _pressedAt;
-    private DragGhost? _ghost;
-
-    /// <summary>
-    /// A click selects the card (the keyboard then acts on it); Shift or Ctrl + click adds it to the selection or takes
-    /// it out; a double click opens it; a drag moves it.
-    /// </summary>
-    private void OnCardPressed(object sender, MouseButtonEventArgs e)
-    {
-        var row = InsideActionButton(e.OriginalSource as DependencyObject) ? null : RowAt(e.OriginalSource as DependencyObject);
-        _pressed = row;
-        _pressedAt = e.GetPosition(Wall);
-        Wall.Focus();
-        if (row is not null && (Keyboard.Modifiers & (ModifierKeys.Shift | ModifierKeys.Control)) != 0)
-        {
-            _viewModel.ToggleSelect(row);
-            return;
-        }
-        _viewModel.SelectCommand.Execute(row);
-        if (row is not null && e.ClickCount == 2) _viewModel.OpenCommand.Execute(row);
-    }
-
-    // ---- Keyboard ------------------------------------------------------------------------------------------------
-
-    private void OnKeyDown(object sender, KeyEventArgs e)
-    {
-        // A text box (search) keeps its own keys.
-        if (Keyboard.FocusedElement is System.Windows.Controls.Primitives.TextBoxBase || !_module.IsEnabled) return;
-        var ctrl = Keyboard.Modifiers.HasFlag(ModifierKeys.Control);
-        var shift = Keyboard.Modifiers.HasFlag(ModifierKeys.Shift);
-        if (e.Key == Key.V && ctrl && !shift)
-        {
-            if (CanAdd) PasteFromClipboard();
-            e.Handled = true;
-            return;
-        }
-        if (e.Key == Key.Escape && _viewModel.Selected is not null)
-        {
-            _viewModel.CloseDetail();
-            e.Handled = true;
-            return;
-        }
-        if (e.Key == Key.A && ctrl && !shift)
-        {
-            _viewModel.SelectAll();
-            e.Handled = true;
-            return;
-        }
-        if (_viewModel.SelectionCount == 0) return;
-        var single = _viewModel.SelectionCount == 1 ? _viewModel.Selected : null;
-        switch (e.Key)
-        {
-            case Key.C when ctrl && shift:
-                if (single is { IsLive: true }) _viewModel.SendToClipboardCommand.Execute(single);
-                break;
-            case Key.C when ctrl:
-                _ = _viewModel.CopySelectedAsync();
-                break;
-            case Key.N when ctrl && shift:
-                _ = _viewModel.SendSelectedToNotesAsync();
-                break;
-            case Key.Delete when shift:
-                // Like Shift+Delete in Explorer: for good, without the trash (it asks first).
-                _ = _viewModel.DeleteSelectedForeverAsync();
-                break;
-            case Key.Delete:
-                // In the trash, deleting is for good (it asks first).
-                _ = _viewModel.DeleteSelectedAsync();
-                break;
-            case Key.Enter:
-                if (single is not null) _viewModel.OpenCommand.Execute(single);
-                break;
-            default:
-                return;
-        }
-        e.Handled = true;
-    }
-
-    private void OnCardMoved(object sender, MouseEventArgs e)
-    {
-        if (_pressed is not { } row || e.LeftButton != MouseButtonState.Pressed || !_viewModel.CanReorder || !_module.IsEnabled) return;
-        var moved = e.GetPosition(Wall) - _pressedAt;
-        if (Math.Abs(moved.X) < SystemParameters.MinimumHorizontalDragDistance && Math.Abs(moved.Y) < SystemParameters.MinimumVerticalDragDistance) return;
-        _pressed = null;
-        var card = Wall.ItemContainerGenerator.ContainerFromItem(row) as FrameworkElement;
-        var layer = AdornerLayer.GetAdornerLayer(Root);
-        if (card is not null && layer is not null)
-        {
-            // The picture of the card follows the cursor; its place stays, faded, until it is dropped.
-            _ghost = new DragGhost(Root, card, Wall.TranslatePoint(_pressedAt, card));
-            _ghost.MoveTo(e.GetPosition(Root));
-            layer.Add(_ghost);
-        }
-        if (card is not null) card.Opacity = 0.3;
-        try
-        {
-            DragDrop.DoDragDrop(Wall, new DataObject(CardFormat, row.Id), DragDropEffects.Move);
-        }
-        finally
-        {
-            if (card is not null) card.Opacity = 1;
-            if (_ghost is not null) layer?.Remove(_ghost);
-            _ghost = null;
-        }
-    }
-
-    private void OnCardDragOver(object sender, DragEventArgs e)
-    {
-        if (!e.Data.GetDataPresent(CardFormat)) return;
-        e.Effects = _viewModel.CanReorder && RowAt(e.OriginalSource as DependencyObject) is not null ? DragDropEffects.Move : DragDropEffects.None;
-        e.Handled = true;
-    }
-
-    private void OnCardDrop(object sender, DragEventArgs e)
-    {
-        if (e.Data.GetData(CardFormat) is not string id) return;
-        e.Handled = true;
-        if (RowAt(e.OriginalSource as DependencyObject) is { } target) _viewModel.Move(id, target.Id);
-    }
-
-    /// <summary>The card under an element of the wall.</summary>
-    private static ScratchRowViewModel? RowAt(DependencyObject? element)
-    {
-        for (var current = element; current is not null; current = ParentOf(current))
-            if (current is FrameworkElement { DataContext: ScratchRowViewModel row }) return row;
-        return null;
-    }
-
-    private static bool InsideActionButton(DependencyObject? element)
-    {
-        for (var current = element; current is not null; current = ParentOf(current))
-        {
-            if (current is Wpf.Ui.Controls.Button) return true;
-            if (current is ItemsControl) return false;
-        }
-        return false;
-    }
-
-    private static DependencyObject? ParentOf(DependencyObject element) =>
-        element is System.Windows.Media.Visual or System.Windows.Media.Media3D.Visual3D
-            ? System.Windows.Media.VisualTreeHelper.GetParent(element)
-            : LogicalTreeHelper.GetParent(element);
+    public string AddHint => "Press Ctrl+V to add the files, picture or text you copied, or drop files on this page. On your phone, share photos to “Helm Scratch”.";
 
     /// <summary>Files copied in Explorer, then a picture (a screenshot), then text.</summary>
-    private async void PasteFromClipboard()
+    public async Task PasteAsync()
     {
-        if (!CanAdd) return;
         try
         {
             if (Clipboard.ContainsFileDropList())
@@ -240,33 +56,8 @@ public partial class ScratchContentPage : Page
         }
     }
 
-    private void OnDragOver(object sender, DragEventArgs e)
-    {
-        var accepted = CanAdd && (e.Data.GetDataPresent(DataFormats.FileDrop) || e.Data.GetDataPresent(DataFormats.UnicodeText));
-        e.Effects = accepted ? DragDropEffects.Copy : DragDropEffects.None;
-        e.Handled = true;
-    }
-
-    private async void OnDrop(object sender, DragEventArgs e)
-    {
-        if (!CanAdd) return;
-        e.Handled = true;
-        try
-        {
-            if (e.Data.GetData(DataFormats.FileDrop) is string[] paths)
-                await AddPathsAsync(paths);
-            else if (e.Data.GetData(DataFormats.UnicodeText) is string text)
-                await _viewModel.AddTextAsync(text);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogWarning(ex, "Dropping into Scratch failed");
-            _viewModel.Message = $"Could not add what was dropped: {ex.Message}";
-        }
-    }
-
     /// <summary>Files go in; folders are named in a message (their files can be added themselves).</summary>
-    private async Task AddPathsAsync(IReadOnlyList<string> paths)
+    public async Task<bool> AddPathsAsync(IReadOnlyList<string> paths)
     {
         var files = paths.Where(File.Exists).ToList();
         var folders = paths.Where(Directory.Exists).ToList();
@@ -276,30 +67,6 @@ public partial class ScratchContentPage : Page
             var note = folders.Count == 1 ? $"“{Path.GetFileName(folders[0])}” is a folder" : $"{folders.Count} folders were skipped";
             _viewModel.Message = $"{(files.Count > 0 ? _viewModel.Message + " " : "")}{note}: add the files inside it, or a .zip of it.".Trim();
         }
+        return files.Count > 0 || folders.Count > 0;
     }
-
-    private void OnModuleChanged(object? sender, PropertyChangedEventArgs e)
-    {
-        if (e.PropertyName == nameof(IModule.IsEnabled)) Dispatcher.BeginInvoke(ApplyEnabled);
-    }
-
-    private void ApplyEnabled()
-    {
-        var on = _module.IsEnabled;
-        Body.IsEnabled = on;
-        Actions.IsEnabled = on;
-        OffBar.IsOpen = !on;
-        OffBar.Visibility = on ? Visibility.Collapsed : Visibility.Visible;
-    }
-}
-
-/// <summary>Visible only when every bound value is true (e.g. a file that is not in the trash).</summary>
-public sealed class AllTrueToVisibility : IMultiValueConverter
-{
-    public static AllTrueToVisibility Instance { get; } = new();
-
-    public object Convert(object[] values, Type targetType, object? parameter, CultureInfo culture) =>
-        values.All(v => v is true) ? Visibility.Visible : Visibility.Collapsed;
-
-    public object[] ConvertBack(object value, Type[] targetTypes, object? parameter, CultureInfo culture) => [];
 }

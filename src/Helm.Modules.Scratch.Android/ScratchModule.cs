@@ -27,7 +27,7 @@ public sealed class ScratchModule(ScratchViewModel viewModel, ScratchClipboardRe
     /// <summary>The same vector icon as on Windows (<see cref="ScratchIconShape"/>).</summary>
     public override IImage? IconImage => ScratchIcon.Image;
 
-    public override Type PageType => typeof(ScratchPage);
+    public override Type PageType => typeof(ScratchContentPage);
     public Type ContentPageType => typeof(ScratchContentPage);
 
     public override Task EnableAsync(CancellationToken ct)

@@ -9,6 +9,6 @@ public static class ScratchServices
         services
             .AddSingleton<IScratchPlatform, AndroidScratchPlatform>()
             .AddScratchCore()
-            .AddAndroidModule<ScratchModule, ScratchPage>()
+            .AddAndroidModule<ScratchModule, ScratchContentPage>()
             .AddTransient<ScratchContentPage>();
 }
