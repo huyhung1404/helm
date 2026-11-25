@@ -136,7 +136,8 @@ code goes). Tracker (`src/Helm.Modules.Tracker.UI/TrackerView.axaml`) is the ref
   right.
 - **Confirmation** (`GlassDialogs`): title 18 semibold, a `secondary` sentence saying what will be removed and what stays,
   Cancel `ghost` + the action `pill` on the right; the action is named by its verb ("Delete"), never "OK".
-- **First run**: eyebrow "START HERE", a title, three step cards (the first outlined, the rest faded), one pill.
+- **First run**: eyebrow "START HERE", a title, three step cards (the first outlined, the rest faded), one pill that
+  fills the card's width with its label centred (the same on PC and phone).
 - **Calendar**: month grid of `glass` cells (round only inside the date picker), dots for what is due (red overdue,
   amber debts, faded done), week view as rows; the chosen day's tasks under it with a quick add.
 - **Insights**: numbers in `stat` (26 semibold) in glass cards, then bars in the accent colour.

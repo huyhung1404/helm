@@ -226,18 +226,18 @@
                             </ItemsControl.ItemTemplate>
                         </ItemsControl>
                         <CheckBox Content="{Binding SpreadText}" IsChecked="{Binding SpreadDates}" IsVisible="{Binding CanSpread}" />
-                        <WrapPanel HorizontalAlignment="Right">
-                            <Button Classes="act" Content="Cancel" Command="{Binding CloseCommand}" />
-                            <Button Classes="act" Content="Try again" Command="{Binding RetryCommand}" />
-                            <Button Classes="pill" Content="{Binding AddText}" Command="{Binding AddCommand}" Margin="0,0,0,6" />
-                        </WrapPanel>
+                        <Grid ColumnDefinitions="*,*,2*" ColumnSpacing="8">
+                            <Button Classes="act" Margin="0" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Content="Cancel" Command="{Binding CloseCommand}" />
+                            <Button Grid.Column="1" Classes="act" Margin="0" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Content="Try again" Command="{Binding RetryCommand}" />
+                            <Button Grid.Column="2" Classes="pill" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Content="{Binding AddText}" Command="{Binding AddCommand}" />
+                        </Grid>
                     </StackPanel>
                     <StackPanel Spacing="6" IsVisible="{Binding IsStuck}">
                         <TextBlock Text="{Binding Status}" TextWrapping="Wrap" />
-                        <WrapPanel HorizontalAlignment="Right">
-                            <Button Classes="act" Content="Try again" Command="{Binding RetryCommand}" />
-                            <Button Classes="act" Content="Cancel" Command="{Binding CloseCommand}" />
-                        </WrapPanel>
+                        <Grid ColumnDefinitions="*,*" ColumnSpacing="8">
+                            <Button Classes="act" Margin="0" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Content="Try again" Command="{Binding RetryCommand}" />
+                            <Button Grid.Column="1" Classes="act" Margin="0" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Content="Cancel" Command="{Binding CloseCommand}" />
+                        </Grid>
                     </StackPanel>
                     <Grid ColumnDefinitions="*,Auto,Auto" IsVisible="{Binding CanUndo}">
                         <TextBlock Text="{Binding Status}" TextWrapping="Wrap" VerticalAlignment="Center" />
@@ -351,10 +351,10 @@
                                           ItemsSource="{Binding $parent[UserControl].((vm:TrackerViewModel)DataContext).RepeatNames}" />
                                 <TextBox Grid.Column="1" Classes="glass" Width="96" Margin="8,0,0,0" PlaceholderText="Days" Text="{Binding EditRepeatDays}" />
                             </Grid>
-                            <WrapPanel>
-                                <Button Classes="pill" Content="Save" Command="{Binding SaveEditCommand}" Margin="0,0,8,0" />
-                                <Button Classes="ghost" Content="Cancel" Command="{Binding CancelEditCommand}" />
-                            </WrapPanel>
+                            <Grid ColumnDefinitions="*,*" ColumnSpacing="8">
+                                <Button Classes="pill" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Content="Save" Command="{Binding SaveEditCommand}" />
+                                <Button Grid.Column="1" Classes="ghost" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Content="Cancel" Command="{Binding CancelEditCommand}" />
+                            </Grid>
                         </StackPanel>
                     </StackPanel>
                 </StackPanel>
@@ -424,9 +424,9 @@
                                     </StackPanel>
                                 </Border>
                             </UniformGrid>
-                            <Button x:Name="FirstRunButton" Classes="pill" HorizontalAlignment="Left" MinWidth="220" Command="{Binding CreateTasksWorkspaceCommand}"
+                            <Button x:Name="FirstRunButton" Classes="pill" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Command="{Binding CreateTasksWorkspaceCommand}"
                                     AutomationProperties.Name="Make my first list">
-                                <StackPanel Orientation="Horizontal" Spacing="8">
+                                <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Center">
                                     <TextBlock Text="Make my first list" Foreground="{DynamicResource HelmPillForeground}" />
                                     <ic:SymbolIcon Symbol="ArrowRight" FontSize="16" Foreground="{DynamicResource HelmPillForeground}" />
                                 </StackPanel>
