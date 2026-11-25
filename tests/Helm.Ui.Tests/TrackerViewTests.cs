@@ -114,6 +114,35 @@ public sealed class TrackerViewTests : IDisposable
     }
 
     [AvaloniaFact]
+    public void The_settings_sheet_turns_the_tool_on_and_off()
+    {
+        // The on/off switch used to be on a WPF settings page; with that gone it lives in the sheet.
+        _store.AddWorkspace("Hôm nay");
+        var module = new FakeModule("tracker", "Tracker");
+        var vm = new TrackerViewModel(_store, _settings, new AvaloniaUi(), new YesDialogs(), new NoClipboard(),
+            new TrackerReminderService(_store, _settings), NullLogger<TrackerViewModel>.Instance);
+        var view = new TrackerView(module, vm, new NoHost());
+        var window = new Window { Content = view, Width = 1200, Height = 900 };
+        window.Show();
+        Dispatcher.UIThread.RunJobs();
+        var layer = Avalonia.Controls.Primitives.OverlayLayer.GetOverlayLayer(view)!;
+        view.GetVisualDescendants().OfType<Button>().Single(b => Avalonia.Automation.AutomationProperties.GetName(b) == "Tracker settings")
+            .RaiseEvent(new Avalonia.Interactivity.RoutedEventArgs(Button.ClickEvent));
+        Dispatcher.UIThread.RunJobs();
+
+        var toggle = layer.GetVisualDescendants().OfType<ToggleSwitch>().Single(t => t.Name == "EnableSwitch");
+        Assert.True(toggle.IsChecked);
+        toggle.IsChecked = false;
+        Dispatcher.UIThread.RunJobs();
+        Assert.False(module.IsEnabled);
+        // Turned off elsewhere, the switch follows.
+        module.IsEnabled = true;
+        Dispatcher.UIThread.RunJobs();
+        Assert.True(toggle.IsChecked);
+        window.Close();
+    }
+
+    [AvaloniaFact]
     public async Task Lists_are_managed_in_the_settings_renamed_in_place_and_removed_after_asking()
     {
         _store.AddWorkspace("Hôm nay");

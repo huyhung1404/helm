@@ -11,7 +11,8 @@ namespace Helm.Modules.Tracker;
 /// <summary>
 /// Tracker on Windows. The data lives in Helm Sync and the pages work directly on <see cref="TrackerStore"/>; the only
 /// background work is the daily due-date reminder (a tray notification) while the tool is on. The menu and Quick
-/// access open <see cref="TrackerContentPage"/>; Home → Utilities opens the settings (<see cref="TrackerPage"/>).
+/// access open <see cref="TrackerContentPage"/>, and so does Home → Utilities: its settings are a sheet inside that page
+/// (the gear), so there is no separate settings page.
 /// </summary>
 public sealed class TrackerModule : HelmModuleBase, IModuleContent, IDisposable
 {
@@ -41,7 +42,7 @@ public sealed class TrackerModule : HelmModuleBase, IModuleContent, IDisposable
     public override ModuleGroup Group => ModuleGroup.Planning;
     public override SymbolRegular Icon => SymbolRegular.TaskListSquareLtr24;
     public override ImageSource IconImage => TrackerLogo.Image;
-    public override Type SettingsPageType => typeof(TrackerPage);
+    public override Type SettingsPageType => typeof(TrackerContentPage);
     public Type ContentPageType => typeof(TrackerContentPage);
     public override IReadOnlyList<HotkeyDefinition> Hotkeys => [];
 

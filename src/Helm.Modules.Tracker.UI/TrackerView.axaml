@@ -389,7 +389,7 @@
                 <Border x:Name="OffBar" Classes="glass" Margin="0,16,0,0" IsVisible="False">
                     <StackPanel>
                         <TextBlock Text="Tracker is turned off" Classes="head" />
-                        <TextBlock Text="Your lists are kept. Turn Tracker on in its settings to use them." Classes="muted" />
+                        <TextBlock Text="Your lists are kept. Turn Tracker on in its settings (the gear) to use them." Classes="muted" />
                     </StackPanel>
                 </Border>
 

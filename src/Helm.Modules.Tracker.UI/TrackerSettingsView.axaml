@@ -32,6 +32,17 @@
             </Button>
         </Grid>
 
+        <!-- On or off: off keeps the lists (read only) and stops the daily reminder -->
+        <Border Classes="glass">
+            <DockPanel>
+                <ToggleSwitch x:Name="EnableSwitch" DockPanel.Dock="Right" OnContent="" OffContent="" AutomationProperties.Name="Tracker on or off" />
+                <StackPanel VerticalAlignment="Center">
+                    <TextBlock Text="Tracker is on" Classes="head" />
+                    <TextBlock Text="Off keeps your lists but makes them read only, and stops the daily reminder." Classes="secondary" TextWrapping="Wrap" />
+                </StackPanel>
+            </DockPanel>
+        </Border>
+
         <!-- Manage the lists: every list on its own row (rename in place, remove), then add one -->
         <Border Classes="glass">
             <StackPanel Spacing="12">

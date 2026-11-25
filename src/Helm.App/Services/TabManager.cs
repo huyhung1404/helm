@@ -278,8 +278,9 @@ internal sealed class TabManager(IServiceProvider services, MainWindowViewModel 
         {
             var content = (module as IModuleContent)?.ContentPageType;
             if (pageType != content && pageType != module.SettingsPageType) continue;
-            // A tool with content has its options on a second page: its tab says so.
-            var title = content is not null && pageType == module.SettingsPageType ? $"{module.DisplayName} settings" : module.DisplayName;
+            // A tool with content and a separate settings page has its options there: that tab says so. (A tool whose
+            // settings are a sheet inside its content page has one page.)
+            var title = content is not null && content != module.SettingsPageType && pageType == module.SettingsPageType ? $"{module.DisplayName} settings" : module.DisplayName;
             return new(title, () => ModuleIcon.Create(module, imageSize: 16));
         }
         var page = services.GetService(pageType) as Page;

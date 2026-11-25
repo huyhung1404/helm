@@ -8,6 +8,8 @@ namespace Helm.Core.Modules;
 /// <item>the <b>settings</b> page (<c>IHelmModule.SettingsPageType</c> / <c>IAndroidModule.PageType</c>): the Enable
 /// card and the options. The Utilities list on Home (its chevron) and search open it.</item>
 /// </list>
+/// A tool may have no separate settings page: when its settings are a sheet inside its content page (Tracker), its
+/// settings page type is the content page type and every entry point opens that page.
 /// Tools without content (e.g. a hotkey that pins windows) do not implement this; every entry point opens their
 /// settings page. Platform-neutral, so the Windows and Android modules implement the same interface.
 /// </summary>

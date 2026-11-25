@@ -9,6 +9,5 @@ public static class TrackerServices
         services
             .AddTrackerCore()
             .AddTrackerLinks(typeof(TrackerContentPage))
-            .AddHelmModule<TrackerModule, TrackerPage, TrackerViewModel>()
-            .AddSingleton<TrackerContentPage>();
+            .AddHelmModule<TrackerModule, TrackerContentPage, TrackerViewModel>();
 }
